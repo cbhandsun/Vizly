@@ -1,0 +1,253 @@
+// packages/core/src/components/custom-edges/renderers/AdvancedSmartEdgeGraphics.tsx
+import React, { memo, useMemo } from 'react';
+import { BaseEdge, EdgeLabelRenderer, EdgeProps } from '@xyflow/react';
+import { Dropdown } from 'antd';
+import { getEdgeLabelStyleMenuItems } from '../../diagrams/EdgeLabelStyleMenu';
+import { useEdgeTheme } from '../../diagrams/EdgeUpdateContext';
+import { UseSmartEdgeRoutingReturn } from '../hooks/useSmartEdgeRouting';
+import { UseEdgeLabelInteractionsReturn } from '../hooks/useEdgeLabelInteractions';
+import { useSmartEdgeContext } from '../useSmartEdgeContext';
+
+export interface AdvancedSmartEdgeGraphicsProps {
+    props: EdgeProps;
+    router: UseSmartEdgeRoutingReturn;
+    labelManager: UseEdgeLabelInteractionsReturn;
+}
+
+const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: AdvancedSmartEdgeGraphicsProps) => {
+    const { 
+        id, label, style, markerStart, markerEnd, 
+        labelStyle, labelShowBg, labelBgStyle, labelBgPadding, labelBgBorderRadius,
+        source, target, sourceX, sourceY, targetX, targetY 
+    } = props;
+    
+    const { 
+        safeFinalPath, opacity, crossfadeOpacity, finalLabelX, finalLabelY, 
+        nodesDragging, isStale, isBusEdge, isLoading,
+        shouldRenderDebugVisuals, shouldRenderPortHeatmap, obstacles, centeredCoords, workerSmartLabelPos
+    } = router;
+
+    const {
+        isEditing, editText, isDraggingLabel,
+        setEditText, handleLabelDoubleClick, handleLabelBlur,
+        handleLabelMouseDown, handleLabelContextMenu, handleStyleChange, handleResetPosition
+    } = labelManager;
+
+    const edgeData = props.data as Record<string, any> | undefined;
+    const currentTheme = useEdgeTheme();
+    const context = useSmartEdgeContext(props);
+    const { simpleNodeMap, multiEdgeInfo } = context;
+
+    // ---------- Bus styling ----------
+    const bundleInfo = edgeData?.bundleInfo;
+    const busStyle = useMemo(() => {
+        if (!bundleInfo || bundleInfo.bundleSize < 2) {
+            if (style && typeof style.strokeWidth === 'number') {
+                return { ...style, strokeWidth: String(style.strokeWidth) };
+            }
+            return style;
+        }
+        const bw = Math.min(6, Number(style?.strokeWidth || 1) + (bundleInfo.bundleSize - 1) * 0.8);
+        return { ...style, strokeWidth: String(bw) };
+    }, [style, bundleInfo]);
+
+    // ---------- Theme-aware label styling ----------
+    const resolvedLabel = (label ?? edgeData?.label);
+    const resolvedLabelText = (resolvedLabel === null || typeof resolvedLabel === 'undefined') ? '' : String(resolvedLabel);
+    const labelColor = (labelStyle as any)?.fill ?? (labelStyle as any)?.color ?? (busStyle as any)?.stroke ?? '#374151';
+    const themeFontSize = currentTheme?.typography?.fontSize?.sm;
+    const themeFontFamily = currentTheme?.typography?.fontFamily;
+    const labelFontSize = (labelStyle as any)?.fontSize ?? themeFontSize ?? 12;
+    const labelFontFamily = (labelStyle as any)?.fontFamily ?? themeFontFamily;
+    const labelFontWeight = (labelStyle as any)?.fontWeight;
+    
+    const labelPadding = (() => {
+        if (!labelShowBg) return undefined;
+        const p = labelBgPadding as any;
+        if (typeof p === 'number' && isFinite(p)) return `${p}px`;
+        if (Array.isArray(p) && p.length >= 2) {
+            const x = Number(p[0]);
+            const y = Number(p[1]);
+            if (isFinite(x) && isFinite(y)) return `${y}px ${x}px`;
+        }
+        return '2px 4px';
+    })();
+
+    const currentLabelStyle = (labelStyle || {}) as any;
+
+    return (
+        <g 
+            className="edge-cyber-flow"
+            style={{ cursor: 'pointer', opacity: opacity * crossfadeOpacity, transition: nodesDragging ? 'none' : 'opacity 0.25s ease-in-out' }}
+        >
+            <BaseEdge {...({
+                id,
+                path: safeFinalPath,
+                markerStart: markerStart as any,
+                markerEnd: markerEnd as any,
+                style: busStyle,
+                interactionWidth: 40
+            } as any)} />
+            
+            <g className="custom-edge-updater-group">
+                <circle className="custom-edge-updater custom-edge-updater-source" cx={sourceX} cy={sourceY} />
+                <circle className="custom-edge-updater custom-edge-updater-target" cx={targetX} cy={targetY} />
+            </g>
+
+            {resolvedLabelText && (
+                <EdgeLabelRenderer>
+                    <div
+                        style={{
+                            position: 'absolute',
+                            transform: `translate(-50%, -50%) translate(${finalLabelX}px, ${finalLabelY}px)`,
+                            pointerEvents: 'none',
+                            whiteSpace: 'nowrap',
+                            color: String(labelColor),
+                            fontSize: labelFontSize,
+                            fontFamily: labelFontFamily,
+                            fontWeight: labelFontWeight,
+                            background: labelShowBg ? ((labelBgStyle as any)?.fill ?? (labelBgStyle as any)?.background ?? (currentTheme?.diagram?.canvas?.background ? String(currentTheme.diagram.canvas.background) : 'rgba(255,255,255,0.85)')) : 'transparent',
+                            padding: labelPadding,
+                            borderRadius: labelShowBg ? (labelBgBorderRadius ?? 2) : 0,
+                            opacity: opacity * crossfadeOpacity,
+                            transition: nodesDragging ? 'none' : 'opacity 0.25s ease-in-out',
+                            ...(labelStyle as any),
+                        }}
+                        className="nodrag nopan"
+                    >
+                        {isEditing ? (
+                            <textarea
+                                value={editText}
+                                onChange={(e) => setEditText(e.target.value)}
+                                onBlur={handleLabelBlur}
+                                autoFocus
+                                aria-label="Edit Edge Label"
+                                title="Edit Edge Label"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleLabelBlur();
+                                    }
+                                }}
+                                style={{
+                                    width: 'auto',
+                                    minWidth: '60px',
+                                    height: 'auto',
+                                    resize: 'none',
+                                    border: 'none',
+                                    background: 'rgba(255,255,255,0.8)',
+                                    outline: '2px solid #1677ff',
+                                    borderRadius: 2,
+                                    padding: 2,
+                                    fontFamily: 'inherit',
+                                    fontSize: 'inherit',
+                                    color: 'inherit',
+                                    textAlign: 'center',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        ) : (
+                            <Dropdown
+                                menu={{
+                                    items: getEdgeLabelStyleMenuItems({
+                                        edgeId: id,
+                                        currentStyle: currentLabelStyle,
+                                        onStyleChange: handleStyleChange,
+                                        onResetPosition: handleResetPosition
+                                    })
+                                }}
+                                trigger={['contextMenu']}
+                            >
+                                <div
+                                    onDoubleClick={handleLabelDoubleClick}
+                                    onMouseDown={handleLabelMouseDown}
+                                    onContextMenu={handleLabelContextMenu}
+                                    style={{
+                                        cursor: isDraggingLabel ? 'grabbing' : 'grab',
+                                        pointerEvents: 'auto',
+                                        userSelect: 'none',
+                                        fontWeight: currentLabelStyle.fontWeight || 'normal',
+                                        color: currentLabelStyle.color || 'inherit',
+                                        fontSize: currentLabelStyle.fontSize ? `${currentLabelStyle.fontSize}px` : 'inherit'
+                                    }}
+                                >
+                                    {resolvedLabelText}
+                                </div>
+                            </Dropdown>
+                        )}
+                    </div>
+                </EdgeLabelRenderer>
+            )}
+
+            {shouldRenderDebugVisuals && (
+                <g className="react-flow__edge-debug">
+                    {obstacles?.map((o: any, i: number) => (
+                        <rect key={`o-${i}`} x={o.x} y={o.y} width={o.width} height={o.height} fill="rgba(255,0,0,0.2)" stroke="red" strokeWidth={1} />
+                    ))}
+                    {centeredCoords?.busTrunkSource && <circle cx={centeredCoords.busTrunkSource.x} cy={centeredCoords.busTrunkSource.y} r={4} fill="blue" />}
+                    {centeredCoords?.busTrunkTarget && <circle cx={centeredCoords.busTrunkTarget.x} cy={centeredCoords.busTrunkTarget.y} r={4} fill="green" />}
+                    {workerSmartLabelPos && <circle cx={workerSmartLabelPos.x} cy={workerSmartLabelPos.y} r={2} fill="orange" />}
+                </g>
+            )}
+
+            {shouldRenderPortHeatmap && (() => {
+                const heatmapElements: React.ReactNode[] = [];
+                const srcNode = simpleNodeMap?.get(source);
+                const tgtNode = simpleNodeMap?.get(target);
+                const getHeatColor = (usage: number) => {
+                    if (usage <= 0) return 'rgba(0,255,0,0.5)';
+                    if (usage <= 2) return 'rgba(255,255,0,0.6)';
+                    if (usage <= 4) return 'rgba(255,165,0,0.7)';
+                    return 'rgba(255,0,0,0.8)';
+                };
+                const portOffset = { l: [-8, 0], r: [8, 0], t: [0, -8], b: [0, 8] } as const;
+                const ports = ['l', 'r', 't', 'b'] as const;
+
+                if (srcNode) {
+                    const sn = srcNode as any;
+                    const sx = sn.positionAbsolute?.x ?? sn.position?.x ?? 0;
+                    const sy = sn.positionAbsolute?.y ?? sn.position?.y ?? 0;
+                    const sw = sn.measured?.width ?? sn.width ?? 100;
+                    const sh = sn.measured?.height ?? sn.height ?? 40;
+                    const srcCenter = { x: sx + sw / 2, y: sy + sh / 2 };
+                    ports.forEach(p => {
+                        const usage = (props.data as any)?.sourceUsage?.[p] ?? 0;
+                        const off = portOffset[p];
+                        const px = p === 'l' ? sx : p === 'r' ? sx + sw : srcCenter.x;
+                        const py = p === 't' ? sy : p === 'b' ? sy + sh : srcCenter.y;
+                        heatmapElements.push(
+                            <circle key={`src-${p}`} cx={px + off[0]} cy={py + off[1]} r={6 + usage} fill={getHeatColor(usage)} stroke="#333" strokeWidth={0.5}>
+                                <title>Source {p.toUpperCase()}: {usage}</title>
+                            </circle>
+                        );
+                    });
+                }
+                if (tgtNode) {
+                    const tn = tgtNode as any;
+                    const tx = tn.positionAbsolute?.x ?? tn.position?.x ?? 0;
+                    const ty = tn.positionAbsolute?.y ?? tn.position?.y ?? 0;
+                    const tw = tn.measured?.width ?? tn.width ?? 100;
+                    const th = tn.measured?.height ?? tn.height ?? 40;
+                    const tgtCenter = { x: tx + tw / 2, y: ty + th / 2 };
+                    ports.forEach(p => {
+                        const usage = (props.data as any)?.targetUsage?.[p] ?? 0;
+                        const off = portOffset[p];
+                        const px = p === 'l' ? tx : p === 'r' ? tx + tw : tgtCenter.x;
+                        const py = p === 't' ? ty : p === 'b' ? ty + th : tgtCenter.y;
+                        heatmapElements.push(
+                            <circle key={`tgt-${p}`} cx={px + off[0]} cy={py + off[1]} r={6 + usage} fill={getHeatColor(usage)} stroke="#333" strokeWidth={0.5}>
+                                <title>Target {p.toUpperCase()}: {usage}</title>
+                            </circle>
+                        );
+                    });
+                }
+                return <g className="react-flow__edge-heatmap">{heatmapElements}</g>;
+            })()}
+
+        </g>
+    );
+};
+
+export const AdvancedSmartEdgeGraphics = memo(InnerAdvancedSmartEdgeGraphics);

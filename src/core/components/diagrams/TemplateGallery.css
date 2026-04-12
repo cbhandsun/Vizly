@@ -1,0 +1,51 @@
+/* 模板库样式 */
+
+.template-gallery {
+    padding: 24px;
+    background: #fff;
+    min-height: 600px;
+}
+
+.template-gallery-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.template-gallery-header h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.template-gallery-content {
+    margin-top: 16px;
+}
+
+/* 模板卡片样式 */
+.template-card {
+    height: 100%;
+    transition: all 0.3s ease;
+}
+
+.template-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.template-card-icon {
+    transition: transform 0.3s ease;
+}
+
+.template-card:hover .template-card-icon {
+    transform: scale(1.1);
+}
+
+/* 暗黑模式支持 */
+@media (prefers-color-scheme: dark) {
+    .template-gallery {
+        background: #1f1f1f;
+        color: #e0e0e0;
+    }
+}

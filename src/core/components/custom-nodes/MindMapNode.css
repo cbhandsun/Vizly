@@ -1,0 +1,447 @@
+/* ========================================
+   Mind Map Node Styles
+   发散脑图节点，带有胶囊风格和嵌入式加号按钮
+   ======================================== */
+
+.mindmap-node {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 24px;
+    border-radius: 8px;
+    background: transparent;
+    color: #334155;
+    font-size: 14px;
+    font-weight: 500;
+    position: relative;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: default;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: -0.01em;
+}
+
+.mindmap-node.selected {
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4);
+    background: #fff;
+    border-radius: 8px;
+}
+
+/* 根节点特殊样式 (Root) - Premium Modern Pill */
+.mindmap-node.depth-0 {
+    font-weight: 700;
+    font-size: 18px;
+    background: #ffffff;
+    color: #0f172a;
+    border: 3px solid #6366f1;
+    border-radius: 14px;
+    padding: 14px 32px;
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15), 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.mindmap-node.depth-0:hover {
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.25), 0 2px 6px rgba(0, 0, 0, 0.05);
+    transform: translateY(-1px);
+}
+
+.mindmap-node.depth-0.selected {
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2), 0 8px 24px rgba(99, 102, 241, 0.3);
+    border-color: #4f46e5;
+}
+
+/* 一级分支样式 (Main Topics) - Emphasized Underline */
+.mindmap-node.depth-1.shape-underline {
+    font-size: 16px;
+    font-weight: 600;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid var(--branch-color, #cbd5e1);
+    border-radius: 0;
+    padding: 6px 12px;
+    min-width: 100px;
+    box-shadow: none;
+    color: #1e293b;
+    position: relative;
+    /* Adding subtle gradient highlight on hover */
+    background-image: linear-gradient(to top, rgba(248, 250, 252, 0.0) 0%, transparent 100%);
+}
+
+.mindmap-node.depth-1.shape-underline:hover { 
+    background: rgba(248, 250, 252, 0.8); 
+    border-bottom-color: var(--branch-color, #818cf8);
+}
+.mindmap-node.depth-1.shape-underline.selected { 
+    background: rgba(241, 245, 249, 0.9); 
+}
+
+/* 叶子节点样式 (Subtopics) - Delicate Underline */
+.mindmap-node.shape-underline[class*="depth-"]:not(.depth-0):not(.depth-1) {
+    font-size: 14px;
+    font-weight: 400;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid var(--branch-color, #cbd5e1);
+    border-radius: 0;
+    padding: 4px 10px;
+    min-width: 80px;
+    box-shadow: none;
+    color: #475569;
+    transition: all 0.2s ease;
+}
+
+.mindmap-node.shape-underline[class*="depth-"]:not(.depth-0):not(.depth-1):hover {
+    background: rgba(248, 250, 252, 0.6);
+    color: #1e293b;
+}
+
+.mindmap-node.shape-underline[class*="depth-"]:not(.depth-0):not(.depth-1).selected {
+    background: rgba(241, 245, 249, 0.8);
+    color: #0f172a;
+    box-shadow: none;
+}
+
+/* Custom Shapes */
+.mindmap-node.shape-pill[class*="depth-"]:not(.depth-0) {
+    font-size: 14px;
+    font-weight: 500;
+    background: #ffffff;
+    border: 2px solid var(--branch-color, #cbd5e1);
+    border-radius: 20px;
+    padding: 6px 16px;
+    min-width: 80px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+}
+.mindmap-node.shape-pill[class*="depth-"]:not(.depth-0):hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); transform: translateY(-1px); }
+.mindmap-node.shape-pill[class*="depth-"]:not(.depth-0).selected { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(0,0,0,0.05); }
+
+.mindmap-node.shape-box[class*="depth-"]:not(.depth-0) {
+    font-size: 14px;
+    font-weight: 500;
+    background: #ffffff;
+    border: 2px solid var(--branch-color, #cbd5e1);
+    border-radius: 6px;
+    padding: 8px 16px;
+    min-width: 80px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+}
+.mindmap-node.shape-box[class*="depth-"]:not(.depth-0):hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); transform: translateY(-1px); }
+.mindmap-node.shape-box[class*="depth-"]:not(.depth-0).selected { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(0,0,0,0.05); }
+
+/* Toolbar styles */
+.mindmap-toolbar {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.mindmap-toolbar-btn {
+    background: transparent;
+    border: none;
+    padding: 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #475569;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mindmap-toolbar-btn:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+.mindmap-toolbar-btn.active {
+    background: #eef2ff;
+    color: #4f46e5;
+}
+
+/* ---- Handles ---- */
+.mindmap-handle {
+    width: 6px !important;
+    height: 6px !important;
+    background: #cbd5e1 !important;
+    border: none !important;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.mindmap-node:hover .mindmap-handle {
+    opacity: 1;
+}
+
+/* ---- Unified Tool Island ---- */
+.mindmap-tool-island {
+    position: absolute;
+    top: -48px;
+    left: 50%;
+    transform: translateX(-50%) translateY(8px) scale(0.95);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(226, 232, 240, 0.6);
+    border-radius: 9999px; /* Pill shape */
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0,0,0,0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 50;
+    pointer-events: none;
+    backdrop-filter: blur(16px) saturate(1.5);
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+}
+
+.mindmap-node:hover .mindmap-tool-island,
+.mindmap-node.selected .mindmap-tool-island {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0) scale(1);
+    pointer-events: all;
+}
+
+/* Tool Island internal divider */
+.mindmap-tool-island .divider {
+    width: 1px;
+    height: 14px;
+    background: #cbd5e1;
+    margin: 0 4px;
+    border-radius: 1px;
+}
+
+/* Base button for tool island */
+.mindmap-island-btn {
+    background: transparent;
+    border: none;
+    padding: 6px;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.mindmap-island-btn:hover {
+    background: rgba(241, 245, 249, 0.8);
+    color: #0f172a;
+    transform: scale(1.05);
+}
+
+.mindmap-island-btn.active {
+    background: #eef2ff;
+    color: #4f46e5;
+    box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.2);
+}
+
+.mindmap-island-btn.primary {
+    color: var(--branch-color, #6366f1);
+    background: rgba(99, 102, 241, 0.05);
+}
+.mindmap-island-btn.primary:hover {
+    background: var(--branch-color, #6366f1);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.mindmap-island-btn .collapse-count {
+    font-size: 11px;
+    font-weight: 700;
+}
+/* ---- Inline Editing ---- */
+.mindmap-inline-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
+    text-align: center;
+    width: 100%;
+    min-width: 60px;
+    padding: 0;
+    margin: 0;
+}
+
+.mindmap-inline-input::selection {
+    background: rgba(99, 102, 241, 0.3);
+}
+
+/* ---- Magnetic Drop Indicators ---- */
+.drop-target-highlight {
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4);
+}
+
+.drop-above::before, .drop-below::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: #3b82f6;
+    border-radius: 2px;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+    animation: pulse-drop 1.5s infinite;
+}
+
+.drop-above::before {
+    top: -6px;
+}
+
+.drop-below::after {
+    bottom: -6px;
+}
+
+.drop-inside::after {
+    content: "";
+    position: absolute;
+    right: -14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #3b82f6;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.8);
+    animation: pulse-drop 1.5s infinite;
+}
+
+@keyframes pulse-drop {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* ====================================================================
+   3. Rich Content (Phase 3)
+   ==================================================================== */
+
+.mindmap-image-wrapper {
+    width: 100%;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+}
+
+.mindmap-image {
+    max-width: 100%;
+    max-height: 120px;
+    object-fit: cover;
+    display: block;
+}
+
+.mindmap-label-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mindmap-icon {
+    font-size: 1.1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mindmap-rich-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 6px;
+    width: 100%;
+}
+
+.mindmap-note {
+    font-size: 11px;
+    color: #8c8c8c;
+    line-height: 1.4;
+    max-width: 180px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: rgba(0, 0, 0, 0.02);
+    padding: 4px 6px;
+    border-radius: 4px;
+    border-left: 2px solid var(--branch-color, #d9d9d9);
+}
+
+.mindmap-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.mindmap-tag {
+    font-size: 10px;
+    color: #595959;
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 10px;
+    border: 1px solid #d9d9d9;
+    white-space: nowrap;
+}
+
+/* Hover effects for tags */
+.mindmap-node:hover .mindmap-tag {
+    background: #e6f7ff;
+    border-color: #91d5ff;
+    color: #1890ff;
+}
+
+/* ---- Layout Transition ---- */
+/* Apply smooth transitions to React Flow's wrapper div. Ignore when user is actively dragging. */
+.react-flow__node-mindmap:not(.dragging) {
+    transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease;
+}
+
+/* ---- Drag & Drop Indicators (Phase 4) ---- */
+.react-flow__node-mindmap.drop-target-highlight .mindmap-node {
+    /* Base highlight for 'inside' (reparenting as child) */
+    outline: 2px solid #52c41a;
+    outline-offset: 2px;
+    background: #f6ffed;
+}
+
+.react-flow__node-mindmap.drop-above .mindmap-node {
+    outline: none;
+    box-shadow: 0 -4px 0 0 #52c41a;
+    background: #ffffff;
+}
+
+.react-flow__node-mindmap.drop-below .mindmap-node {
+    outline: none;
+    box-shadow: 0 4px 0 0 #52c41a;
+    background: #ffffff;
+}
+
+/* ---- Relationship Handles ---- */
+.mindmap-node .mindmap-relationship-handle {
+    width: 14px;
+    height: 14px;
+    background: #f43f5e;
+    border: 3px solid #fff;
+    opacity: 0;
+    transition: all 0.2s;
+    border-radius: 50%;
+    z-index: 20;
+}
+
+.mindmap-node:hover .mindmap-relationship-handle {
+    opacity: 0.8;
+}
+
+.mindmap-node .mindmap-relationship-handle:hover {
+    opacity: 1;
+    transform: scale(1.2);
+}

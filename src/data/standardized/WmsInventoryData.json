@@ -1,0 +1,318 @@
+{
+  "metadata": {
+    "title": "高级WMS库存管理流程图 (参考EWM)",
+    "description": "一份参考SAP EWM设计的精细化WMS流程，涵盖从ERP集成、收货、上架、内部作业、波次拣选到发货的全链路。",
+    "author": "SystemAI with EWM Practice",
+    "tags": [
+      "仓储"
+    ],
+    "createdAt": "2025-04-05T16:00:00Z",
+    "updatedAt": "2025-04-06T11:30:00Z"
+  },
+  "nodes": [
+    {
+      "id": "erp-inbound-delivery",
+      "domain": "erp",
+      "domainClass": "be-scm",
+      "subDomain": "ERP集成",
+      "type": "system",
+      "role": "entry_point",
+      "description": "<b>ERP 创建内向交货单</b><br />基于采购订单，ERP下发预期到货通知 (ASN)"
+    },
+    {
+      "id": "goods-receipt-posting",
+      "domain": "inbound",
+      "domainClass": "be-logistics",
+      "subDomain": "收货处理",
+      "type": "process",
+      "role": "task",
+      "description": "<b>收货与过账 (Goods Receipt)</b><br />扫描ASN进行收货，系统记录初步库存"
+    },
+    {
+      "id": "quality-inspection-process",
+      "domain": "internal-ops",
+      "domainClass": "ch",
+      "subDomain": "质量管理",
+      "type": "process",
+      "role": "task",
+      "description": "<b>质量检验 (QI)</b><br />对到港货物进行抽检或全检，生成质检报告"
+    },
+    {
+      "id": "quality-inspection-decision",
+      "domain": "internal-ops",
+      "domainClass": "ch",
+      "subDomain": "质量管理",
+      "type": "process",
+      "role": "decision",
+      "description": "<b>质检决策点</b><br />在质检工作中心判定通过或失败"
+    },
+    {
+      "id": "deconsolidation-vas",
+      "domain": "inbound",
+      "domainClass": "be-logistics",
+      "subDomain": "入库执行",
+      "type": "process",
+      "role": "physical_task",
+      "description": "<b>拆包与增值服务 (VAS)</b><br />拆解托盘、贴标、重新包装等增值作业"
+    },
+    {
+      "id": "putaway-execution",
+      "domain": "inbound",
+      "domainClass": "be-logistics",
+      "subDomain": "入库执行",
+      "type": "process",
+      "role": "physical_movement",
+      "description": "<b>上架执行 (Putaway)</b><br />系统推荐库位，叉车/AGV执行上架"
+    },
+    {
+      "id": "storage-bin",
+      "domain": "storage",
+      "domainClass": "store",
+      "subDomain": "存储单元",
+      "type": "database",
+      "role": "final_state",
+      "description": "<b>仓储货位 (Storage Bin)</b><br />货物在库存中的最终位置，状态为“可用”"
+    },
+    {
+      "id": "rejected-stock-zone",
+      "domain": "storage",
+      "domainClass": "store",
+      "subDomain": "存储单元",
+      "type": "database",
+      "role": "final_state",
+      "description": "<b>不合格品区</b><br />存放质检失败的货物，等待后续处理"
+    },
+    {
+      "id": "erp-outbound-delivery-order",
+      "domain": "erp",
+      "domainClass": "be-scm",
+      "subDomain": "ERP集成",
+      "type": "system",
+      "role": "entry_point",
+      "description": "<b>ERP 创建外向交货单</b><br />基于销售订单，ERP向WMS下发提货请求"
+    },
+    {
+      "id": "wave-management",
+      "domain": "outbound",
+      "domainClass": "ch",
+      "subDomain": "任务编排",
+      "type": "process",
+      "role": "scheduling",
+      "description": "<b>波次管理 (Wave)</b><br />将多张订单按规则合并为波次，集中处理"
+    },
+    {
+      "id": "picking-execution",
+      "domain": "outbound",
+      "domainClass": "be-logistics",
+      "subDomain": "出库执行",
+      "type": "process",
+      "role": "physical_task",
+      "description": "<b>拣货执行 (Picking)</b><br />WMS生成拣货任务(TO)，员工/机器人按路径拣选"
+    },
+    {
+      "id": "packing-station",
+      "domain": "outbound",
+      "domainClass": "be-logistics",
+      "subDomain": "出库执行",
+      "type": "process",
+      "role": "physical_task",
+      "description": "<b>打包站 (Packing)</b><br />合箱、称重、填充与贴运单"
+    },
+    {
+      "id": "goods-issue-posting",
+      "domain": "outbound",
+      "domainClass": "be-logistics",
+      "subDomain": "发货处理",
+      "type": "process",
+      "role": "exit_point",
+      "description": "<b>发货过账 (Goods Issue)</b><br />货物装车离港，系统扣减库存并通知ERP"
+    },
+    {
+      "id": "cycle-counting",
+      "domain": "internal-ops",
+      "domainClass": "ch",
+      "subDomain": "库存管理",
+      "type": "process",
+      "role": "task",
+      "description": "<b>周期性盘点 (Cycle Count)</b><br />按计划对部分库存进行盘点，确保账实相符"
+    },
+    {
+      "id": "stock-adjustment",
+      "domain": "internal-ops",
+      "domainClass": "ch",
+      "subDomain": "库存管理",
+      "type": "process",
+      "role": "data_update",
+      "description": "<b>库存调整</b><br />处理盘点差异、报损、状态变更"
+    },
+    {
+      "id": "wms-monitor",
+      "domain": "analytics",
+      "domainClass": "ch",
+      "subDomain": "实时监控",
+      "type": "system",
+      "role": "guidance",
+      "description": "<b>仓储监控器 (Monitor)</b><br />监控库存、任务、资源和异常的仪表盘"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "erp-inbound-delivery",
+      "target": "goods-receipt-posting",
+      "type": "data",
+      "label": "ASN下发"
+    },
+    {
+      "id": "e2",
+      "source": "goods-receipt-posting",
+      "target": "quality-inspection-process",
+      "type": "main",
+      "label": "移至质检区"
+    },
+    {
+      "id": "e3",
+      "source": "quality-inspection-process",
+      "target": "quality-inspection-decision",
+      "type": "main"
+    },
+    {
+      "id": "e4-pass",
+      "source": "quality-inspection-decision",
+      "target": "deconsolidation-vas",
+      "type": "main",
+      "label": "质检通过"
+    },
+    {
+      "id": "e4-fail",
+      "source": "quality-inspection-decision",
+      "target": "rejected-stock-zone",
+      "type": "main",
+      "label": "质检失败"
+    },
+    {
+      "id": "e5",
+      "source": "deconsolidation-vas",
+      "target": "putaway-execution",
+      "type": "main",
+      "label": "待上架"
+    },
+    {
+      "id": "e6",
+      "source": "putaway-execution",
+      "target": "storage-bin",
+      "type": "main",
+      "label": "库存入位"
+    },
+    {
+      "id": "e7",
+      "source": "erp-outbound-delivery-order",
+      "target": "wave-management",
+      "type": "data",
+      "label": "订单下发"
+    },
+    {
+      "id": "e8",
+      "source": "wave-management",
+      "target": "picking-execution",
+      "type": "main",
+      "label": "释放拣货任务"
+    },
+    {
+      "id": "e9",
+      "source": "storage-bin",
+      "target": "picking-execution",
+      "type": "dependency",
+      "label": "从货位拣选"
+    },
+    {
+      "id": "e10",
+      "source": "picking-execution",
+      "target": "packing-station",
+      "type": "main",
+      "label": "送至打包站"
+    },
+    {
+      "id": "e11",
+      "source": "packing-station",
+      "target": "goods-issue-posting",
+      "type": "main",
+      "label": "待发货"
+    },
+    {
+      "id": "e12",
+      "source": "goods-issue-posting",
+      "target": "erp-outbound-delivery-order",
+      "type": "data",
+      "label": "更新发货状态"
+    },
+    {
+      "id": "e13",
+      "source": "storage-bin",
+      "target": "cycle-counting",
+      "type": "dependency",
+      "label": "盘点任务"
+    },
+    {
+      "id": "e14",
+      "source": "cycle-counting",
+      "target": "stock-adjustment",
+      "type": "dependency",
+      "label": "报告盘点差异"
+    },
+    {
+      "id": "e15",
+      "source": "stock-adjustment",
+      "target": "storage-bin",
+      "type": "data",
+      "label": "调整库存数量"
+    },
+    {
+      "id": "e16",
+      "source": "rejected-stock-zone",
+      "target": "erp-inbound-delivery",
+      "type": "dependency",
+      "label": "触发退货流程"
+    },
+    {
+      "id": "e17",
+      "source": "storage-bin",
+      "target": "wms-monitor",
+      "type": "data",
+      "label": "实时库存数据"
+    },
+    {
+      "id": "e18",
+      "source": "wave-management",
+      "target": "wms-monitor",
+      "type": "data",
+      "label": "任务进度"
+    }
+  ],
+  "layout": {
+    "spacing": {
+      "horizontal": 180,
+      "vertical": 120
+    },
+    "padding": {
+      "horizontal": 24,
+      "vertical": 24
+    },
+    "groupPadding": 40,
+    "generateDomainGroups": true,
+    "fitDomainContent": true,
+    "generateSubDomainGroups": true,
+    "subDomainWhitelist": [
+      "ERP集成",
+      "收货处理",
+      "质量管理",
+      "入库执行",
+      "存储单元",
+      "任务编排",
+      "出库执行",
+      "发货处理",
+      "库存管理",
+      "实时监控"
+    ]
+  }
+}

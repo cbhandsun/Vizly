@@ -1,0 +1,91 @@
+/* Canvas Ruler Styles */
+
+/* 标尺背景 */
+.ruler-background {
+    fill: rgba(255, 255, 255, 0.95);
+}
+
+.ruler-background.dark {
+    fill: rgba(30, 30, 30, 0.95);
+}
+
+/* 水平标尺 */
+.canvas-ruler-horizontal {
+    border-bottom: 1px solid #e0e0e0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.canvas-ruler-horizontal.dark {
+    border-bottom: 1px solid #444;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* 垂直标尺 */
+.canvas-ruler-vertical {
+    border-right: 1px solid #e0e0e0;
+    box-shadow: 1px 0 3px rgba(0, 0, 0, 0.05);
+}
+
+.canvas-ruler-vertical.dark {
+    border-right: 1px solid #444;
+    box-shadow: 1px 0 3px rgba(0, 0, 0, 0.3);
+}
+
+/* 主刻度线 */
+.ruler-tick-major {
+    stroke: #333;
+    stroke-width: 1.5;
+}
+
+.dark .ruler-tick-major {
+    stroke: #ddd;
+}
+
+/* 次刻度线 */
+.ruler-tick-minor {
+    stroke: #999;
+    stroke-width: 1;
+}
+
+.dark .ruler-tick-minor {
+    stroke: #666;
+}
+
+/* 刻度标签 */
+.ruler-label {
+    fill: #333;
+    font-size: 10px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-weight: 500;
+    -webkit-user-select: none;
+    user-select: none;
+    pointer-events: none;
+}
+
+.dark .ruler-label {
+    fill: #ddd;
+}
+
+/* 角落填充块 */
+.ruler-corner {
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom: 1px solid #e0e0e0;
+    border-right: 1px solid #e0e0e0;
+    box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.ruler-corner.dark {
+    background: rgba(30, 30, 30, 0.95);
+    border-bottom: 1px solid #444;
+    border-right: 1px solid #444;
+    box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* 可选：角落Logo/图标 */
+.ruler-corner::after {
+    content: '';
+    display: block;
+    width: 100%;
+    height: 100%;
+    /* 可以在这里添加背景图或SVG图标 */
+}

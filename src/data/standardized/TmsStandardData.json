@@ -1,0 +1,361 @@
+{
+  "id": "tms-architecture-v1",
+  "name": "TMS运输管理系统架构图",
+  "type": "tms",
+  "version": "1.0.0",
+  "nodes": [
+    {
+      "id": "upstream-systems",
+      "description": "<b>上游系统</b><br/>• 客户 OMS/ERP/SCM",
+      "domain": "external",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "logistics-oms",
+      "description": "<b>物流订单中心 (Orchestrator)</b><br/>• 订单聚合与分发<br/>• 履约网络编排 (寻源/拆合单)<br/>• 全程状态监控",
+      "domain": "logistics",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "wms-inbound",
+      "description": "<b>WMS-收货与存储</b><br/>• ASN 预约/收货上架<br/>• 库内补货/存储",
+      "domain": "wms",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "wms-outbound",
+      "description": "<b>WMS-履行与出库</b><br/>• 接收出库指令/波次计划<br/>• 包装/集货/月台集货",
+      "domain": "wms",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "wms-integration",
+      "description": "<b>WMS集成</b><br/>• 统一主数据<br/>• 库存状态同步",
+      "domain": "wms",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "tms-planning",
+      "description": "<b>TMS-计划与调度</b><br/>• 线路/车辆/在途实时规划<br/>• 运力匹配/成本预估<br/>• 禁运规则审核",
+      "domain": "tms",
+      "subDomain": "核心规划与执行",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "tms-execution",
+      "description": "<b>TMS-在途执行</b><br/>• 运单跟踪/异常管理<br/>• 车辆调度与指派",
+      "domain": "tms",
+      "subDomain": "核心规划与执行",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "tms-delivery",
+      "description": "<b>TMS-交付与签收</b><br/>• POD签收/电子回单<br/>• 异常上报与处理",
+      "domain": "tms",
+      "subDomain": "交付与签收",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "fleet-management",
+      "description": "<b>车队管理</b><br/>• 车辆档案/维保管理<br/>• 油耗/路桥/保险管理",
+      "domain": "fleet",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "driver-management",
+      "description": "<b>司机管理</b><br/>• 司机档案/证件管理<br/>• 排班/考核/培训记录",
+      "domain": "fleet",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "gps",
+      "description": "<b>GPS系统</b><br/>• 实时位置追踪<br/>• 轨迹回放分析",
+      "domain": "tech",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "frp",
+      "description": "<b>FRP系统</b><br/>• 统一主数据<br/>• 在途库存同步",
+      "domain": "tech",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "carrier-portal",
+      "description": "<b>承运商门户</b><br/>• 运单接收/状态反馈<br/>• 账单/对账",
+      "domain": "external",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "mobile-app",
+      "description": "<b>移动应用</b><br/>• 司机APP<br/>• 客户小程序",
+      "domain": "external",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "performance-analysis",
+      "description": "<b>绩效分析</b><br/>• 时效/成本/服务质量<br/>• 运营效率分析",
+      "domain": "analytics",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "cost-analysis",
+      "description": "<b>成本分析</b><br/>• 运费模型<br/>• 风险评估",
+      "domain": "analytics",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "bi-report",
+      "description": "<b>BI报表</b><br/>• 自定义报表<br/>• 数据可视化大屏",
+      "domain": "analytics",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-upstream-oms",
+      "source": "upstream-systems",
+      "target": "logistics-oms",
+      "type": "main",
+      "label": "订单下发"
+    },
+    {
+      "id": "edge-oms-wms-inbound",
+      "source": "logistics-oms",
+      "target": "wms-inbound",
+      "type": "main",
+      "label": "入库指令"
+    },
+    {
+      "id": "edge-oms-wms-outbound",
+      "source": "logistics-oms",
+      "target": "wms-outbound",
+      "type": "main",
+      "label": "出库指令"
+    },
+    {
+      "id": "edge-wms-inbound-outbound",
+      "source": "wms-inbound",
+      "target": "wms-outbound",
+      "type": "dependency",
+      "label": "库存流转"
+    },
+    {
+      "id": "edge-wms-tms-planning",
+      "source": "wms-outbound",
+      "target": "tms-planning",
+      "type": "main",
+      "label": "运输需求"
+    },
+    {
+      "id": "edge-tms-planning-execution",
+      "source": "tms-planning",
+      "target": "tms-execution",
+      "type": "main",
+      "label": "执行计划"
+    },
+    {
+      "id": "edge-tms-execution-delivery",
+      "source": "tms-execution",
+      "target": "tms-delivery",
+      "type": "main",
+      "label": "配送执行"
+    },
+    {
+      "id": "edge-fleet-tms-planning",
+      "source": "fleet-management",
+      "target": "tms-planning",
+      "type": "support",
+      "label": "车辆资源"
+    },
+    {
+      "id": "edge-driver-tms-execution",
+      "source": "driver-management",
+      "target": "tms-execution",
+      "type": "support",
+      "label": "司机资源"
+    },
+    {
+      "id": "edge-gps-tms-execution",
+      "source": "gps",
+      "target": "tms-execution",
+      "type": "data",
+      "label": "位置数据"
+    },
+    {
+      "id": "edge-frp-wms-integration",
+      "source": "frp",
+      "target": "wms-integration",
+      "type": "data",
+      "label": "主数据同步"
+    },
+    {
+      "id": "edge-tms-carrier",
+      "source": "tms-execution",
+      "target": "carrier-portal",
+      "type": "dependency",
+      "label": "承运商协同"
+    },
+    {
+      "id": "edge-tms-mobile",
+      "source": "tms-delivery",
+      "target": "mobile-app",
+      "type": "dependency",
+      "label": "移动端交互"
+    },
+    {
+      "id": "edge-tms-performance",
+      "source": "tms-delivery",
+      "target": "performance-analysis",
+      "type": "data",
+      "label": "绩效数据"
+    },
+    {
+      "id": "edge-tms-cost",
+      "source": "tms-planning",
+      "target": "cost-analysis",
+      "type": "data",
+      "label": "成本数据"
+    },
+    {
+      "id": "edge-analysis-bi",
+      "source": "performance-analysis",
+      "target": "bi-report",
+      "type": "data",
+      "label": "报表数据"
+    },
+    {
+      "id": "edge-cost-bi",
+      "source": "cost-analysis",
+      "target": "bi-report",
+      "type": "data",
+      "label": "成本报表"
+    }
+  ],
+  "layout": {
+    "direction": "TB",
+    "spacing": {
+      "horizontal": 40,
+      "vertical": 60
+    },
+    "padding": {
+      "horizontal": 20,
+      "vertical": 14
+    },
+    "constraints": {
+      "minWidth": 120,
+      "minHeight": 60
+    },
+    "generateSubDomainGroups": true
+  },
+  "theme": {
+    "name": "tms",
+    "displayName": "TMS主题",
+    "domains": {
+      "external": {
+        "border": "#607D8B",
+        "main": "#607D8B",
+        "light": "#ECEFF1",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "logistics": {
+        "border": "#795548",
+        "main": "#795548",
+        "light": "#F3E5AB",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "wms": {
+        "border": "#4CAF50",
+        "main": "#4CAF50",
+        "light": "#E8F5E8",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "tms": {
+        "border": "#FF9800",
+        "main": "#FF9800",
+        "light": "#FFF3E0",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "fleet": {
+        "border": "#2196F3",
+        "main": "#2196F3",
+        "light": "#E3F2FD",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "tech": {
+        "border": "#9C27B0",
+        "main": "#9C27B0",
+        "light": "#F3E5F5",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "analytics": {
+        "border": "#47CACC",
+        "main": "#47CACC",
+        "light": "#E0F2F1",
+        "text": "#333333",
+        "background": "#ffffff"
+      }
+    },
+    "isCustom": false
+  },
+  "config": {
+    "NODE_WIDTH": 120,
+    "NODE_HEIGHT": 60,
+    "NODE_PADDING": {
+      "horizontal": 20,
+      "vertical": 14
+    },
+    "SPACING": {
+      "H": 40,
+      "V": 60
+    }
+  },
+  "metadata": {
+    "description": "TMS运输管理系统架构图，展示了从订单接收到最终交付的完整运输管理流程",
+    "author": "TMS Team",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z",
+    "tags": [
+      "运输"
+    ]
+  }
+}

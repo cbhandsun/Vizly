@@ -1,0 +1,396 @@
+{
+  "id": "logistics-architecture-v1",
+  "name": "物流架构图",
+  "type": "logistics",
+  "version": "1.0.0",
+  "nodes": [
+    {
+      "id": "upstream",
+      "description": "<b>上游系统</b><br/>(ERP / OMS / SCM)",
+      "domain": "external",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 1,
+      "position": {
+        "x": 550,
+        "y": 100
+      }
+    },
+    {
+      "id": "l-oms",
+      "description": "<b>物流订单中心 (L-OMS)</b><br/>• 接收上游订单/拆分物流单<br/>• 仓/运/关/配协同与编排<br/>• 全链路状态追踪与预警",
+      "domain": "logistics",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1,
+      "position": {
+        "x": 550,
+        "y": 320
+      }
+    },
+    {
+      "id": "wms",
+      "description": "<b>仓储管理 (WMS)</b><br/>• 入库/上架/拣选/波次/盘点<br/>• 库内移动/路径优化/库存管理<br/>• RF/PDA/电子标签支持",
+      "domain": "logistics",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1,
+      "position": {
+        "x": 100,
+        "y": 620
+      }
+    },
+    {
+      "id": "wcs",
+      "description": "<b>仓储控制 (WCS)</b><br/>• AGV/ASRS/输送线/分拣机调度<br/>• 自动化设备状态监控<br/>• 与WMS接口/执行具体任务",
+      "domain": "logistics",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1,
+      "position": {
+        "x": 100,
+        "y": 710
+      }
+    },
+    {
+      "id": "tms",
+      "description": "<b>运输管理 (TMS)</b><br/>• 运力资源/线路规划/智能配载<br/>• 承运商协同/在途跟踪<br/>• 回单管理/异常处理",
+      "domain": "logistics",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1,
+      "position": {
+        "x": 550,
+        "y": 620
+      }
+    },
+    {
+      "id": "customs",
+      "description": "<b>关务管理 (GTS)</b><br/>• 进出口报关/单一窗口对接<br/>• 贸易合规/关务文件/税费计算",
+      "domain": "logistics",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1,
+      "position": {
+        "x": 1000,
+        "y": 620
+      }
+    },
+    {
+      "id": "bms",
+      "description": "<b>计费结算 (BMS)</b><br/>• 物流费用模型/合同管理<br/>• 自动计费/账单生成<br/>• 应收应付/对账与结算",
+      "domain": "logistics",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1,
+      "position": {
+        "x": 100,
+        "y": 1300
+      }
+    },
+    {
+      "id": "yms",
+      "description": "<b>堆场管理 (YMS)</b><br/>• 预约/排队/月台调度<br/>• 车辆入场/停泊/离场管理<br/>• 封条/铅封管理",
+      "domain": "logistics",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "zIndex": 1,
+      "position": {
+        "x": 550,
+        "y": 1300
+      }
+    },
+    {
+      "id": "carrier-portal",
+      "description": "<b>承运商门户/EDI</b><br/>• 招投标/运力发布<br/>• 订单接收/状态反馈<br/>• 账单确认/KPI考核",
+      "domain": "external",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 1,
+      "position": {
+        "x": 1000,
+        "y": 1300
+      }
+    },
+    {
+      "id": "visibility",
+      "description": "<b>物流追踪平台</b><br/>• 聚合多源(WMS/TMS/IoT)数据<br/>• 端到端可视化(ETD/ETA)<br/>• AI异常预警/智能客服",
+      "domain": "data",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1,
+      "position": {
+        "x": 1150,
+        "y": 320
+      }
+    },
+    {
+      "id": "downstream",
+      "description": "<b>下游系统</b><br/>(客户端 / 第三方平台)",
+      "domain": "external",
+      "domainClass": "ch",
+      "type": "custom",
+      "zIndex": 1,
+      "position": {
+        "x": 550,
+        "y": 1500
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-upstream-loms",
+      "source": "upstream",
+      "target": "l-oms",
+      "type": "main",
+      "label": "订单下发",
+      "style": {
+        "stroke": "#FF5722",
+        "strokeWidth": 3
+      }
+    },
+    {
+      "id": "edge-loms-wms",
+      "source": "l-oms",
+      "target": "wms",
+      "type": "main",
+      "label": "仓储指令",
+      "style": {
+        "stroke": "#FF5722",
+        "strokeWidth": 3
+      }
+    },
+    {
+      "id": "edge-loms-tms",
+      "source": "l-oms",
+      "target": "tms",
+      "type": "main",
+      "label": "运输指令",
+      "style": {
+        "stroke": "#FF5722",
+        "strokeWidth": 3
+      }
+    },
+    {
+      "id": "edge-loms-customs",
+      "source": "l-oms",
+      "target": "customs",
+      "type": "main",
+      "label": "关务指令",
+      "style": {
+        "stroke": "#FF5722",
+        "strokeWidth": 3
+      }
+    },
+    {
+      "id": "edge-wms-wcs",
+      "source": "wms",
+      "target": "wcs",
+      "type": "dependency",
+      "label": "设备控制",
+      "style": {
+        "stroke": "#78909C",
+        "strokeWidth": 2,
+        "strokeDasharray": "5 5"
+      }
+    },
+    {
+      "id": "edge-wms-bms",
+      "source": "wms",
+      "target": "bms",
+      "type": "support",
+      "label": "仓储费用",
+      "style": {
+        "stroke": "#78909C",
+        "strokeWidth": 2,
+        "strokeDasharray": "5 5"
+      }
+    },
+    {
+      "id": "edge-tms-bms",
+      "source": "tms",
+      "target": "bms",
+      "type": "support",
+      "label": "运输费用",
+      "style": {
+        "stroke": "#78909C",
+        "strokeWidth": 2,
+        "strokeDasharray": "5 5"
+      }
+    },
+    {
+      "id": "edge-tms-yms",
+      "source": "tms",
+      "target": "yms",
+      "type": "dependency",
+      "label": "堆场协调",
+      "style": {
+        "stroke": "#78909C",
+        "strokeWidth": 2,
+        "strokeDasharray": "5 5"
+      }
+    },
+    {
+      "id": "edge-tms-carrier",
+      "source": "tms",
+      "target": "carrier-portal",
+      "type": "dependency",
+      "label": "承运商协同",
+      "style": {
+        "stroke": "#78909C",
+        "strokeWidth": 2,
+        "strokeDasharray": "5 5"
+      }
+    },
+    {
+      "id": "edge-loms-visibility",
+      "source": "l-oms",
+      "target": "visibility",
+      "type": "data",
+      "label": "状态数据",
+      "style": {
+        "stroke": "#47CACC",
+        "strokeWidth": 2,
+        "strokeDasharray": "6 4"
+      }
+    },
+    {
+      "id": "edge-wms-visibility",
+      "source": "wms",
+      "target": "visibility",
+      "type": "data",
+      "label": "仓储数据",
+      "style": {
+        "stroke": "#47CACC",
+        "strokeWidth": 2,
+        "strokeDasharray": "6 4"
+      }
+    },
+    {
+      "id": "edge-tms-visibility",
+      "source": "tms",
+      "target": "visibility",
+      "type": "data",
+      "label": "运输数据",
+      "style": {
+        "stroke": "#47CACC",
+        "strokeWidth": 2,
+        "strokeDasharray": "6 4"
+      }
+    },
+    {
+      "id": "edge-visibility-downstream",
+      "source": "visibility",
+      "target": "downstream",
+      "type": "main",
+      "label": "状态推送",
+      "style": {
+        "stroke": "#FF5722",
+        "strokeWidth": 3
+      }
+    },
+    {
+      "id": "edge-tms-downstream",
+      "source": "tms",
+      "target": "downstream",
+      "type": "main",
+      "label": "配送完成",
+      "style": {
+        "stroke": "#FF5722",
+        "strokeWidth": 3
+      }
+    }
+  ],
+  "layout": {
+    "direction": "TB",
+    "spacing": {
+      "horizontal": 140,
+      "vertical": 100
+    },
+    "padding": {
+      "horizontal": 20,
+      "vertical": 70,
+      "top": 70,
+      "bottom": 20
+    },
+    "constraints": {
+      "minWidth": 300,
+      "maxWidth": 300,
+      "minHeight": 140,
+      "maxHeight": 140
+    }
+  },
+  "theme": {
+    "name": "logistics",
+    "displayName": "物流主题",
+    "domains": {
+      "logistics": {
+        "border": "#795548",
+        "main": "#795548",
+        "light": "#F3E5AB",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "external": {
+        "border": "#607D8B",
+        "main": "#607D8B",
+        "light": "#ECEFF1",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "data": {
+        "border": "#47CACC",
+        "main": "#47CACC",
+        "light": "#E0F2F1",
+        "text": "#333333",
+        "background": "#ffffff"
+      }
+    },
+    "isCustom": false
+  },
+  "config": {
+    "NODE_WIDTH": 300,
+    "NODE_HEIGHT": 140,
+    "NODE_PADDING": {
+      "horizontal": 20,
+      "vertical": 70,
+      "top": 70,
+      "bottom": 20
+    },
+    "SPACING": {
+      "H": 140,
+      "V": 100
+    },
+    "SUB_GROUP_PADDING": {
+      "H": 20,
+      "V_TOP": 70,
+      "V_BOTTOM": 20
+    },
+    "COLS": {
+      "WAREHOUSE": 100,
+      "MAIN_SPINE": 550,
+      "DATA_PILLAR": 1150
+    },
+    "ROWS": {
+      "UPSTREAM": 100,
+      "ORCHESTRATION": 320,
+      "MAIN_FLOW_BUS": 530,
+      "EXECUTION": 620,
+      "DEPENDENCY_BUS": 1120,
+      "SUPPORT": 1300,
+      "DOWNSTREAM": 1500
+    },
+    "V_GAP_SUB_NODE": 90,
+    "H_GAP_SUPPORT": 50,
+    "V_GAP_MAIN": 120
+  },
+  "metadata": {
+    "title": "物流架构图",
+    "description": "物流系统架构图，展示了从上游订单到下游交付的完整物流链路",
+    "author": "Logistics Team",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "tags": [
+      "架构"
+    ]
+  }
+}

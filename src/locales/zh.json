@@ -1,0 +1,1250 @@
+{
+    "common": {
+        "language": "语言",
+        "search": "搜索",
+        "save": "保存",
+        "cancel": "取消",
+        "ok": "好的",
+        "remoteDataInvalid": "远程图表数据格式不完整：{{reason}}",
+        "remoteDataRepaired": "远程图表数据格式不完整，已自动修复：{{reason}}",
+        "loading": "加载中...",
+        "on": "开启",
+        "off": "关闭",
+        "error": "错误",
+        "success": "成功",
+        "confirm": "确定",
+        "delete": "删除"
+    },
+    "templates": {
+        "title": "模板库",
+        "use": "使用",
+        "useTemplate": "使用模板",
+        "builtin": "内置",
+        "usageCount": "使用次数",
+        "confirmDelete": "确定删除此模板？",
+        "searchPlaceholder": "搜索模板...",
+        "noResults": "未找到匹配的模板",
+        "empty": "暂无模板",
+        "category": {
+            "all": "全部"
+        }
+    },
+    "auth": {
+        "login": "登录",
+        "menu": {
+            "myDiagrams": "我的图表",
+            "logout": "退出登录"
+        },
+        "modal": {
+            "title": "登录 / 注册",
+            "description": "输入邮箱获取 Magic Link，无需密码；若账号不存在将自动创建。",
+            "emailPlaceholder": "邮箱地址",
+            "emailRequired": "请输入邮箱",
+            "emailInvalid": "请输入有效的邮箱地址",
+            "sendMagicLink": "发送 Magic Link",
+            "magicLinkSent": "登录链接已发送，请检查邮箱",
+            "checkEmailTitle": "请查收邮箱",
+            "checkEmailDesc": "我们已发送一封包含登录链接的邮件，请点击链接完成登录。",
+            "tabs": {
+                "password": "密码登录",
+                "magiclink": "Magic Link",
+                "register": "注册账号"
+            },
+            "password": {
+                "placeholder": "密码",
+                "required": "请输入密码"
+            },
+            "register": {
+                "passwordPlaceholder": "密码（至少6位）",
+                "passwordMin": "密码至少 6 位",
+                "confirmPlaceholder": "确认密码",
+                "confirmRequired": "请确认密码",
+                "passwordMismatch": "两次输入的密码不一致",
+                "button": "注册",
+                "success": "注册成功"
+            },
+            "loginButton": "登录",
+            "loginSuccess": "登录成功",
+            "invalidCredentials": "邮箱或密码错误。如果您之前用 Magic Link 登录，请先切换到「Magic Link」标签页登录后设置密码。",
+            "noAccount": "没有账号？",
+            "registerNow": "立即注册",
+            "hasAccount": "已有账号？",
+            "backToLogin": "返回登录",
+            "magicLinkHint": "💡 如果您之前通过 Magic Link 登录过，可以继续使用此方式。登录后可在个人菜单中设置密码。"
+        }
+    },
+    "storage": {
+        "manager": {
+            "title": "云端图表管理",
+            "refresh": "刷新",
+            "searchPlaceholder": "搜索云端图表...",
+            "providerSwitched": "已切换存储源：{{provider}}",
+            "loadFailed": "无法获取云端列表，请检查配置或登录状态",
+            "downloading": "正在加载云端图表...",
+            "downloadedAndOpened": "已下载并打开",
+            "noContent": "图表无内容",
+            "deleted": "删除成功",
+            "deleteFailed": "删除失败",
+            "open": "打开",
+            "delete": "删除",
+            "confirmDeleteTitle": "确认删除？",
+            "confirmDeleteDesc": "删除后将无法恢复。",
+            "unknownTime": "未知时间",
+            "sizeKb": "{{kb}} KB",
+            "noCloudDiagrams": "暂无云端图表",
+            "providerNotConfigured": "{{provider}} 未配置",
+            "goConfig": "去配置",
+            "needLoginForSupabase": "使用 Supabase 需要先登录"
+        }
+    },
+    "designer": {
+        "title": "图表视图",
+        "debug": {
+            "panel": {
+                "title": "路由调试器",
+                "close": "关闭",
+                "toggleHint": "使用 {{shortcut}} 开关调试面板",
+                "tab": {
+                    "perf": "性能",
+                    "cache": "缓存",
+                    "visual": "可视化"
+                }
+            },
+            "visualizer": {
+                "title": "寻路可视化",
+                "close": "关闭",
+                "debug": "调试",
+                "maximize": "最大化",
+                "restore": "还原",
+                "edgeIdPlaceholder": "边 ID（例如 edge-1）",
+                "selectEdgeHint": "选择一条连线以进行调试。",
+                "noDebugData": "暂无调试数据",
+                "grid": "网格",
+                "obstacles": "障碍",
+                "vg": "可视图",
+                "quadTree": "四叉树",
+                "legend": {
+                    "obstacle": "障碍",
+                    "source": "起点",
+                    "target": "终点",
+                    "lineCross": "穿越线",
+                    "turn": "拐点",
+                    "buffer": "缓冲",
+                    "visited": "访问过",
+                    "rawPath": "原始路径"
+                },
+                "stats": {
+                    "strategy": "策略：{{value}}",
+                    "grid": "网格：{{value}}",
+                    "vg": "可视图：{{value}}",
+                    "qt": "四叉树：{{value}}",
+                    "visited": "访问：{{count}} 个节点",
+                    "ports": "端口：{{source}} → {{target}}｜方向：{{dir}}｜几何：{{geo}}｜d=({{dx}},{{dy}})",
+                    "time": "耗时：{{ms}}ms",
+                    "steps": "步数：{{count}}",
+                    "length": "长度：{{value}}"
+                }
+            }
+        },
+        "menu": {
+            "title": "图表选择",
+            "more": "更多",
+            "expandMenu": "展开菜单",
+            "collapseMenu": "收起菜单",
+            "docsPreview": "文档预览",
+            "searchPlaceholder": "搜索图表（{{shortcut}}）",
+            "favorites": "收藏",
+            "clear": "清空",
+            "favorite": "收藏",
+            "unfavorite": "取消收藏",
+            "expandAll": "全部展开",
+            "collapseAll": "全部收起",
+            "tagFilter": "标签筛选",
+            "matchAny": "任意匹配",
+            "matchAll": "全部匹配",
+            "switchTheme": "切换主题",
+            "category": {
+                "other": "常用",
+                "architecture": "核心架构图",
+                "debug": "调试与实验视图",
+                "business": "业务流程",
+                "logistics": "物流场景",
+                "subSystem": "子系统架构",
+                "tool": "工具箱"
+            },
+            "theme": {
+                "light": "浅色主题",
+                "dark": "深色主题",
+                "ocean": "海洋主题",
+                "forest": "森林主题",
+                "highContrast": "高对比主题",
+                "sunset": "日落主题",
+                "mono": "单色主题",
+                "original": "原始主题"
+            }
+        },
+        "commandPalette": {
+            "group": {
+                "favorites": "收藏",
+                "recent": "最近",
+                "actions": "操作",
+                "diagrams": "图表"
+            },
+            "searchAria": "搜索命令或图表",
+            "placeholder": "输入关键词：图表名 / 标签 / 操作（Enter 执行，Esc 关闭）",
+            "noResults": "没有匹配的命令或图表",
+            "groupHeader": "{{group}}（{{count}}）",
+            "openInNewTabHint": "{{mod}}+Enter 新标签",
+            "footerHint": "Enter 执行 · {{mod}}+Enter 次级动作 · Esc 关闭 · ↑↓ 选择",
+            "toggleHint": "{{mod}}+K 打开",
+            "shortcutsHelp": "快捷键帮助"
+        },
+        "manage": {
+            "title": "图表管理",
+            "tabs": {
+                "my": "我的图表",
+                "shared": "与我共享"
+            },
+            "back": "返回工作台",
+            "storageConfig": "存储配置",
+            "searchPlaceholder": "搜索图表...",
+            "refresh": "刷新",
+            "providerSwitched": "已切换存储源：{{provider}}",
+            "cloudListFailed": "无法获取云端列表，请检查配置或登录状态",
+            "loadingCloud": "正在加载云端图表...",
+            "downloading": "正在下载...",
+            "uploading": "正在上传...",
+            "downloadedAndOpened": "已下载并打开",
+            "noContent": "图表无内容",
+            "uploaded": "上传成功",
+            "uploadFailed": "上传失败",
+            "open": "打开",
+            "upload": "上传",
+            "idLabel": "ID：{{id}}",
+            "openAndDownload": "打开（下载）",
+            "confirmDeleteTitle": "确认删除？",
+            "confirmDeleteDesc": "删除后将无法恢复。",
+            "delete": "删除",
+            "deleted": "删除成功",
+            "deleteFailed": "删除失败",
+            "unknownTime": "未知时间",
+            "sizeKb": "{{kb}} KB",
+            "noLocalResults": "没有匹配的本地图表",
+            "noCloudResults": "没有匹配的云端图表",
+            "needLoginForSupabase": "使用 Supabase 需要先登录",
+            "login": "登录",
+            "providerNotConfigured": "{{provider}} 未配置",
+            "goConfigS3": "去配置 S3",
+            "localTemplates": "本地模板",
+            "cloudStorage": "云端存储（{{provider}}）"
+        },
+        "shortcuts": {
+            "title": "快捷键",
+            "subtitle": "这些快捷键在图表工作台中可用；不同系统会自动使用 Cmd 或 Ctrl。",
+            "action": {
+                "palette": "打开命令面板",
+                "menuSearch": "聚焦左侧菜单搜索",
+                "menuToggle": "展开/收起左侧菜单",
+                "debugToggle": "显示/隐藏调试面板",
+                "settings": "打开更多设置",
+                "exitFullscreen": "退出全屏"
+            },
+            "note": {
+                "devOnly": "仅开发/调试使用"
+            },
+            "table": {
+                "action": "动作",
+                "shortcut": "快捷键",
+                "note": "备注"
+            }
+        },
+        "commandItems": {
+            "shortcuts": "快捷键帮助",
+            "settings": "打开更多设置",
+            "enterFullscreen": "进入全屏",
+            "exitFullscreen": "退出全屏",
+            "expandMenu": "展开左侧菜单",
+            "collapseMenu": "收起左侧菜单",
+            "docs": "打开文档预览",
+            "manage": "打开图表管理",
+            "clearFavorites": "清空收藏图表"
+        },
+        "settings": {
+            "edgeMode": "连线模式",
+            "smart": "智能连线",
+            "native": "原生连线",
+            "layoutStrategy": "布局策略",
+            "nodeLayout": "节点布局",
+            "elkAlgorithm": "ELK算法",
+            "showMainFlow": "仅显示主流程（动线）",
+            "advancedConfig": "高级配置",
+            "autoDisabled": "自动（已禁用）",
+            "autoDisabledDesc": "域整体布局下节点布局不再单独生效",
+            "elk": {
+                "layered": {
+                    "title": "ELK Layered",
+                    "desc": "分层布局，主次分明"
+                },
+                "mrtree": {
+                    "title": "ELK Mr. Tree",
+                    "desc": "树布局，父子层次"
+                },
+                "force": {
+                    "title": "ELK Force",
+                    "desc": "力导布局，关系分布"
+                }
+            },
+            "preset": {
+                "elastic": {
+                    "label": "Elastic + ELK",
+                    "desc": "标准风格：均衡布局"
+                },
+                "soft": {
+                    "label": "Soft + ELK",
+                    "desc": "有机风格：疏松聚类"
+                },
+                "strict": {
+                    "label": "Strict + ELK",
+                    "desc": "工程风格：严格对齐"
+                }
+            }
+        },
+        "viewer": {
+            "toggleFlowDirection": "切换流程方向",
+            "more": "更多",
+            "moreSettings": "更多设置",
+            "renderFailed": "渲染失败",
+            "renderFailedSubtitle": "图表渲染出现异常，请刷新页面或切换到其他图表。"
+        },
+        "toolbar": {
+            "undo": "撤销 (Ctrl+Z)",
+            "redo": "重做 (Ctrl+Y)",
+            "zoomIn": "放大",
+            "zoomOut": "缩小",
+            "fitView": "适应",
+            "layout": "布局",
+            "save": "保存",
+            "style": "图表风格",
+            "import": "导入数据 (JSON)",
+            "export": "导出标准数据 (JSON)",
+            "edit": "编辑源数据 (JSON)",
+            "autoRouting": "自动布线",
+            "showGrid": "显示网格",
+            "gridOff": "网格：关闭",
+            "gridDots": "网格：点状",
+            "gridLines": "网格：线状",
+            "gridCross": "网格：交叉",
+            "shortcuts": "快捷键",
+            "smartRouting": "智能自动布线",
+            "containers": "容器与分组",
+            "domain": "域 (Domain)",
+            "subdomain": "子域 (Sub-domain)",
+            "wrap": "包含选中 (Wrap)",
+            "basic": "基础组件",
+            "start": "开始",
+            "process": "流程",
+            "decision": "判断",
+            "data": "数据",
+            "system": "系统",
+            "database": "数据库",
+            "input": "输入",
+            "module": "模块",
+            "image": "图片",
+            "end": "结束",
+            "selectionMode": {
+                "label": "框选模式",
+                "partial": "相交选中",
+                "full": "全包选中"
+            },
+            "showRuler": "显示标尺",
+            "hideRuler": "隐藏标尺",
+            "dragToMove": "拖动移动工具栏（双击重置位置）"
+        },
+        "jsonEditor": {
+            "title": "编辑图表数据 (JSON)",
+            "formatStandard": "标准数据 (可双向编辑)",
+            "formatPure": "标准数据 (纯净智能版)",
+            "formatReactFlow": "React Flow (只读 Debug)",
+            "format": "格式化 JSON",
+            "download": "下载文件",
+            "applyOnly": "仅预览并应用",
+            "saveAndClose": "应用修改并关闭",
+            "reactFlowWarning": "当前处于 React Flow 内部渲染节点/边结构大纲预览（只读）。该模式仅供 Debug，不支持反向应用。如需修改架构，请切换到标准数据模式。"
+        },
+        "statusBar": {
+            "nodes": "节点",
+            "edges": "连线",
+            "smartMesh": "智能网格",
+            "directLink": "直接连接",
+            "selectedSummary": "已选：{{nodes}} 节点，{{edges}} 连线",
+            "smartRoutingEnabled": "智能布线已启用",
+            "directRoutingEnabled": "直接连线模式"
+        },
+        "flowchart": {
+            "importFailed": "导入失败：JSON 无效或数据格式不支持",
+            "invalidJson": "JSON 无效：{{reason}}",
+            "commandPaletteHint": "按下 {{mod}}+K 或 / 打开命令面板",
+            "commandDisabled": "当前不可用",
+            "undo": {
+                "title": "支持撤销",
+                "action": "撤销",
+                "done": "已撤销",
+                "desc": {
+                    "paste": "粘贴：{{nodes}} 节点，{{edges}} 连线",
+                    "cut": "剪切：{{nodes}} 节点，{{edges}} 连线",
+                    "delete": "删除：{{nodes}} 节点，{{edges}} 连线",
+                    "duplicate": "复制副本：{{nodes}} 节点",
+                    "group": "成组：{{nodes}} 节点",
+                    "ungroup": "解组：{{groups}} 分组",
+                    "layout": "自动布局：{{direction}} / {{algorithm}}"
+                }
+            },
+            "commandCategory": {
+                "general": "通用",
+                "view": "视图",
+                "file": "文件",
+                "action": "动作",
+                "nodes": "节点",
+                "edges": "连线"
+            },
+            "commands": {
+                "toggleGrid": "切换网格",
+                "toggleSmartRouting": "切换智能布线",
+                "undo": "撤销",
+                "redo": "重做",
+                "copy": "复制",
+                "paste": "粘贴",
+                "cut": "剪切",
+                "deleteSelected": "删除选中",
+                "deleteShortcut": "Del / Backspace",
+                "duplicate": "复制副本",
+                "selectAll": "全选",
+                "group": "成组",
+                "ungroup": "解组",
+                "autoLayoutTB": "自动布局（上下）",
+                "autoLayoutLR": "自动布局（左右）"
+            },
+            "group": {
+                "defaultLabel": "新分组",
+                "defaultDescription": "分组选中项"
+            },
+            "toast": {
+                "nothingToCopy": "没有可复制的内容",
+                "nothingToPaste": "没有可粘贴的内容",
+                "nothingToCut": "没有可剪切的内容",
+                "nothingToDuplicate": "没有可复制的节点",
+                "needTwoNodesToGroup": "至少选择两个节点才能成组",
+                "groupSameLevel": "请在同一层级内选择节点进行成组",
+                "nothingToUngroup": "没有可解组的分组",
+                "copied": "已复制：{{nodes}} 节点，{{edges}} 连线",
+                "pasted": "已粘贴：{{nodes}} 节点，{{edges}} 连线",
+                "cut": "已剪切：{{nodes}} 节点，{{edges}} 连线",
+                "deleted": "已删除：{{nodes}} 节点，{{edges}} 连线",
+                "duplicated": "已复制副本：{{nodes}} 节点",
+                "grouped": "已成组：{{nodes}} 节点",
+                "ungrouped": "已解组：{{groups}} 分组",
+                "edgeReversed": "已反转连线方向",
+                "waypointsReset": "已重置连线路径",
+                "convertedToEditable": "已转为可编辑连线"
+            },
+            "onboarding": {
+                "title": "快速上手",
+                "openPalette": "打开命令面板（{{mod}}+K）",
+                "dismiss": "不再提示",
+                "step": {
+                    "drag": "从左侧拖拽组件到画布",
+                    "connect": "从节点把手拖拽连线；落到空白处可快速新增节点",
+                    "palette": "用 {{mod}}+K 或 / 搜索并执行命令",
+                    "pan": "按住 Space 并拖拽可平移画布"
+                }
+            },
+            "layout": {
+                "tooltip": "自动布局",
+                "dagreTB": "Dagre 垂直布局（TB）",
+                "dagreLR": "Dagre 水平布局（LR）",
+                "elkTB": "ELK 垂直布局（Layered）",
+                "elkLR": "ELK 水平布局（Layered）",
+                "treeGroup": "树形布局",
+                "treeTB": "↕ 树形 (上→下)",
+                "treeLR": "↔ 树形 (左→右)",
+                "forceGroup": "力导向",
+                "force": "⊙ 力导向",
+                "domainGroup": "域感知布局",
+                "domainDagreLR": "◈ DomainDagre (左→右)",
+                "domainDagreTB": "◈ DomainDagre (上→下) (默认)",
+                "domainVertical": "▥ DomainVertical (上→下)",
+                "domainHorizontal": "▦ DomainHorizontal (左→右)",
+                "nodeLayoutGroup": "域内节点排布",
+                "nodeFlow": "▷ 流式",
+                "nodeGrid": "⊞ 网格",
+                "nodeHorizontal": "⊟ 水平",
+                "nodeVertical": "⊞ 垂直",
+                "nodeDagre": "◈ Dagre分层 (默认)"
+            }
+        },
+        "flowchartShortcuts": {
+            "title": "流程图快捷键",
+            "subtitle": "这些快捷键在流程图画布中可用；系统会自动使用 {{mod}}。",
+            "paletteDescription": "查看流程图快捷键清单",
+            "table": {
+                "action": "动作",
+                "shortcut": "快捷键",
+                "note": "备注"
+            },
+            "action": {
+                "palette": "打开命令面板",
+                "undo": "撤销",
+                "redo": "重做",
+                "copy": "复制选中",
+                "paste": "粘贴",
+                "cut": "剪切选中",
+                "duplicate": "复制副本",
+                "selectAll": "全选",
+                "group": "成组",
+                "ungroup": "解组",
+                "delete": "删除选中",
+                "nudge": "微移选中",
+                "nudgeFast": "快速微移选中",
+                "duplicateDrag": "拖拽复制节点",
+                "pan": "平移画布"
+            },
+            "shortcut": {
+                "delete": "Del / Backspace",
+                "nudge": "方向键（1px）",
+                "nudgeFast": "Shift + 方向键（10px）",
+                "duplicateDrag": "Alt + 拖拽",
+                "pan": "Space + 拖拽"
+            }
+        },
+        "sidebar": {
+            "basic": "基础形状",
+            "components": "组件",
+            "search": "搜索...",
+            "flowControl": "流程控制",
+            "dataIO": "数据与 I/O",
+            "containers": "容器",
+            "special": "特殊",
+            "shapes": "形状",
+            "navigator": "导航",
+            "noNodesFound": "未找到匹配节点",
+            "zoomToNode": "聚焦到节点",
+            "expandSidebar": "展开侧边栏",
+            "collapseSidebar": "收起侧边栏",
+            "clickOrDragToExpand": "点击或拖拽展开",
+            "expandAll": "全部展开",
+            "collapseAll": "全部收起",
+            "domainGroup": "域分组",
+            "subGroup": "子分组",
+            "customNode": "自定义节点",
+            "note": "备注",
+            "zoom": "缩放",
+            "reset": "重置",
+            "zoomInHint": "放大（Ctrl+滚轮也可）",
+            "zoomOutHint": "缩小（Ctrl+滚轮也可）",
+            "layers": "图层",
+            "techIcons": "技术图标",
+            "server": "服务器",
+            "network": "网络",
+            "security": "安全",
+            "user": "用户",
+            "email": "邮件",
+            "notification": "通知",
+            "settings": "设置",
+            "code": "代码",
+            "terminal": "终端",
+            "preparation": "准备",
+            "delay": "延迟",
+            "manualInput": "手动输入",
+            "display": "显示",
+            "document": "文档",
+            "cloud": "云朵",
+            "connector": "连接器",
+            "parallelogram": "平行四边形",
+            "trapezoid": "手工操作",
+            "predefinedProcess": "预定义流程",
+            "multiDocument": "多文档",
+            "offPageConnector": "页外连接器",
+            "internalStorage": "内部存储"
+        }
+    },
+    "header": {
+        "edgeMode": "连线模式",
+        "smart": "智能连线",
+        "native": "原生连线"
+    },
+    "aiChat": {
+        "title": "AI 架构助手",
+        "history": "历史对话",
+        "historyTitle": "历史对话",
+        "deleteConversation": "删除对话？",
+        "viewHistory": "查看历史话题",
+        "settings": "设置",
+        "close": "关闭",
+        "loggedIn": "已登录云同步: {{email}}",
+        "notLoggedIn": "未登录，数据仅保存在本地",
+        "previewCode": "预览代码",
+        "saveLocal": "保存到本地",
+        "saveS3": "保存到 S3",
+        "saveCloud": "保存到云端",
+        "saveDiagram": "保存图表",
+        "apply": "应用",
+        "inputHint": "⌨️ Enter 发送 | Shift+Enter 换行 | Esc 关闭",
+        "inputPlaceholder": "描述你想生成的架构图... 输入 / 查看命令",
+        "saveDialogTitle": "保存图表",
+        "confirmSave": "确认保存",
+        "cancel": "取消",
+        "nameLabel": "名称：",
+        "namePlaceholder": "请输入图表名称",
+        "saveTarget": "将保存到:",
+        "cmdAddDesc": "添加新节点",
+        "cmdConnectDesc": "连接两个节点",
+        "cmdLayoutDesc": "切换布局 (tree, grid, flow)",
+        "cmdClearDesc": "清空对话",
+        "cmdHelpDesc": "显示帮助",
+        "welcomeMsg": "你好！我是架构图 AI 助手。您可以直接告诉我架构需求，或者选择下方的示例开始：\n\n- \"画一个典型的电商微服务架构\"\n- \"生成一个带有 S3 和 Lambda 的 AWS 云架构\"\n- \"创建一个简单的 React 组件关系图\"",
+        "clearedMsg": "对话已清空。有什么可以帮助您的？",
+        "noModel": "没有找到可用的模型，请先在设置中配置 API Key 并启用模型",
+        "invalidDiagram": "无效的图表数据",
+        "requestFailed": "请求失败: {{error}}",
+        "requestError": "❌ 请求出错: {{error}}",
+        "autoSwitched": "已自动切换到: {{name}}"
+    },
+    "export": {
+        "backToTop": "回到顶部",
+        "fitScreen": "适应屏幕",
+        "fullScreen": "全屏",
+        "exitFullScreen": "退出全屏",
+        "options": "导出选项",
+        "export": "导出",
+        "png": "PNG 格式",
+        "pdf": "PDF 格式",
+        "svg": "SVG 格式",
+        "gif": "GIF 动图",
+        "saveToCloud": "保存到云端",
+        "savingToCloud": "正在保存到云端...",
+        "cloudSaveSuccess": "云端保存成功",
+        "cloudSaveFailed": "云端保存失败",
+        "snapshotFailed": "快照生成失败（将仅保存数据）：{{reason}}",
+        "exporting": "正在导出",
+        "wait": "请稍候，导出完成后将自动下载文件"
+    },
+    "share": {
+        "title": "分享图表",
+        "generateLink": "生成分享链接",
+        "copyLink": "复制链接",
+        "copied": "链接已复制到剪贴板",
+        "expiration": "有效期",
+        "never": "永不过期",
+        "1day": "1天",
+        "7days": "7天",
+        "30days": "30天",
+        "revokeShare": "撤销分享",
+        "revokeConfirm": "确定要撤销此分享链接吗？撤销后链接将失效。",
+        "revoked": "分享已撤销",
+        "noShares": "暂无分享链接",
+        "createdAt": "创建于",
+        "expiresAt": "过期于",
+        "shareButton": "分享",
+        "loginRequired": "请先登录后才能使用分享功能",
+        "savingFirst": "正在保存图表到云端...",
+        "loadingShared": "正在加载分享的图表...",
+        "notFound": "分享链接无效或已过期",
+        "poweredBy": "由 DiagramView 创建",
+        "tabs": {
+            "link": "公开链接",
+            "invite": "定向邀请"
+        },
+        "inviteInput": "输入用户的注册邮箱...",
+        "inviteBtn": "邀请",
+        "roleViewer": "只读 (Viewer)",
+        "roleEditor": "编辑 (Editor)",
+        "collaborators": "协作者",
+        "remove": "移除",
+        "owner": "所有者",
+        "you": "你",
+        "inviteSuccess": "邀请成功",
+        "inviteFailed": "邀请失败：{{error}}",
+        "removeSuccess": "已移除协作者",
+        "loadFailed": "加载失败：{{error}}"
+    },
+    "theme": {
+        "selector": {
+            "title": "主题设置",
+            "choose": "选择主题",
+            "themes": "主题列表",
+            "presets": "预设主题",
+            "custom": "自定义",
+            "settings": "设置",
+            "loading": "加载主题中...",
+            "name": "主题名称",
+            "desc": "描述",
+            "mode": "模式",
+            "baseTheme": "基础主题",
+            "light": "亮色",
+            "dark": "暗色",
+            "import": "导入",
+            "export": "导出",
+            "performance": "性能指标",
+            "actions": {
+                "create": "创建",
+                "apply": "应用",
+                "delete": "删除",
+                "cancel": "取消",
+                "save": "保存"
+            }
+        }
+    },
+    "propertyPanel": {
+        "mixedSelection": "混合选择 ({{count}})",
+        "title": "属性设置",
+        "multipleNodes": "多个节点 ({{count}})",
+        "multipleEdges": "多个连线 ({{count}})",
+        "groupProperties": "分组属性",
+        "nodeProperties": "节点属性",
+        "connectorProperties": "连线属性",
+        "properties": "属性",
+        "settings": "设置",
+        "noSelection": "请选择元素以编辑属性",
+        "selectItemToEdit": "请选择一个元素进行编辑",
+        "expand": "展开面板",
+        "collapse": "收起面板",
+        "id": "ID",
+        "information": "基本信息",
+        "layout": "布局",
+        "semantics": "语义设定",
+        "appearance": "外观样式",
+        "colors": "色彩设定",
+        "mainColor": "主色调",
+        "backgroundColor": "背景色",
+        "textColor": "文本色",
+        "styling": "风格设置",
+        "connection": "连接设置",
+        "lineStyle": "线条风格",
+        "label": "标签",
+        "description": "描述",
+        "width": "宽度",
+        "height": "高度",
+        "domainName": "域名称",
+        "domainClass": "域类型",
+        "sequence": "顺位 / 排序",
+        "themeColor": "主题色 (Hex)",
+        "shape": "形状",
+        "icon": "图标",
+        "lineType": "线条类型",
+        "arrowHead": "箭头样式",
+        "style": "样式",
+        "borderStyle": "边框样式",
+        "solid": "实线",
+        "dashed": "虚线",
+        "none": "无",
+        "arrow": "箭头",
+        "color": "颜色",
+        "strokeColor": "线条颜色",
+        "lineWidth": "线条粗细",
+        "borderRadius": "圆角",
+        "textAlign": "文本对齐",
+        "borderWidth": "边框宽度",
+        "selectOption": "请选择...",
+        "select": "请选择...",
+        "mixed": "(混合)",
+        "options": {
+            "domainClass": {
+                "core": "核心（业务）",
+                "system": "系统（基础设施）",
+                "external": "外部（第三方）",
+                "decision": "决策（逻辑）",
+                "support": "支撑（辅助）"
+            },
+            "shape": {
+                "rectangle": "矩形",
+                "pill": "胶囊（圆角）",
+                "diamond": "菱形",
+                "database": "数据库",
+                "parallelogram": "平行四边形",
+                "circle": "圆形",
+                "ellipse": "椭圆",
+                "triangle": "三角形",
+                "hexagon": "六边形",
+                "star": "星形",
+                "document": "文档",
+                "cloud": "云朵",
+                "manualInput": "手动输入",
+                "preparation": "准备",
+                "delay": "延迟",
+                "display": "显示",
+                "note": "备注",
+                "trapezoid": "梯形（手工操作）",
+                "predefinedProcess": "预定义流程",
+                "multiDocument": "多文档",
+                "offPage": "页外连接器",
+                "internalStorage": "内部存储"
+            },
+            "icon": {
+                "play": "开始 / 播放",
+                "square": "步骤 / 方块",
+                "cog": "设置",
+                "stop": "结束 / 停止",
+                "database": "数据库",
+                "question": "判断 / 决策",
+                "arrow": "下一步 / 箭头",
+                "group": "分组",
+                "box": "容器",
+                "thLarge": "模块",
+                "image": "图片",
+                "eye": "查看",
+                "keyboard": "输入",
+                "circle": "圆形",
+                "star": "星形",
+                "file": "文件",
+                "cloud": "云朵",
+                "clock": "时钟",
+                "desktop": "显示器",
+                "note": "备注",
+                "hexagon": "六边形"
+            },
+            "edgeType": {
+                "smartStep": "智能折线",
+                "smartBezier": "智能曲线",
+                "smartStraight": "智能直线",
+                "step": "折线（基础）",
+                "bezier": "曲线（基础）",
+                "straight": "直线",
+                "editable": "可编辑（调整路径）"
+            },
+            "arrowStyle": {
+                "none": "无箭头",
+                "arrow": "实心箭头",
+                "openArrow": "空心箭头",
+                "bidirectional": "双向箭头"
+            }
+        }
+    },
+    "config": {
+        "title": "配置面板",
+        "loading": "正在加载配置系统...",
+        "error": "错误: {{message}}",
+        "unsavedChanges": "有未保存的更改",
+        "actions": {
+            "save": "保存更改",
+            "reset": "重置",
+            "close": "关闭",
+            "applyCompact": "应用ELK紧凑预设",
+            "applyConsistent": "应用ELK一致性预设"
+        },
+        "tabs": {
+            "nodes": "节点设置",
+            "containers": "容器设置",
+            "spacing": "间距设置",
+            "edges": "连线设置",
+            "layout": "布局设置",
+            "performance": "性能设置"
+        },
+        "boolean": {
+            "enable": "启用",
+            "disable": "禁用"
+        },
+        "options": {
+            "smart": "智能连线",
+            "advanced-smart": "高级智能连线",
+            "native": "原生连线",
+            "bezier": "贝塞尔曲线",
+            "straight": "直线",
+            "step": "阶梯线",
+            "LR": "水平：左→右",
+            "RL": "水平：右→左",
+            "TB": "垂直：上→下",
+            "BT": "垂直：下→上",
+            "DomainVerticalLayout": "整体：域垂直",
+            "DomainHorizontalLayout": "整体：域水平",
+            "DomainElkLayout": "整体：域ELK",
+            "DomainElkCompoundLayout": "整体：ELK复合",
+            "DomainElkRadialLayout": "整体：ELK径向(手动)",
+            "DomainElkForceLayout": "整体：ELK力导向",
+            "DomainElkTrueRadialLayout": "整体：ELK真径向",
+            "HorizontalLayout": "节点：水平",
+            "VerticalLayout": "节点：垂直",
+            "GridLayout": "节点：网格",
+            "CenteredLayout": "节点：居中",
+            "ElkNodeLayout": "节点：ELK-first",
+            "DagreLayout": "节点：Dagre分层",
+            "auto": "行业预设：自动",
+            "strict_industry": "行业预设：严格",
+            "balanced_industry": "行业预设：均衡",
+            "relaxed_industry": "行业预设：放松",
+            "NETWORK_SIMPLEX": "ELK：网络单纯形",
+            "LINEAR_SEGMENTS": "ELK：线段",
+            "BRANDES_KOEPF": "ELK：Brandes-Koepf"
+        },
+        "groups": {
+            "basic": "基础设置",
+            "obstacle": "避障与容器",
+            "geometry": "几何微调",
+            "preference": "偏好权重",
+            "sampling": "高级采样",
+            "bezier": "贝塞尔微调",
+            "core": "核心策略",
+            "elkBasic": "ELK 基础",
+            "elkSpacing": "ELK 间距",
+            "elkAdvanced": "ELK 高级微调"
+        },
+        "diagram": {
+            "node": {
+                "minWidth": {
+                    "label": "节点最小宽度",
+                    "desc": "控制节点在文本较短时的最小展示宽度（px）。\n- 作用：防止过窄导致图面抖动与换行异常\n- 建议：120–180；与“水平内边距/字体大小”共同影响可读性\n- 注意：过小可能压缩端口间距并增加边路径拐点"
+                },
+                "maxWidth": {
+                    "label": "节点最大宽度",
+                    "desc": "限制节点在内容过长时的最大宽度（px）。\n- 作用：避免过宽影响统一域宽与整体布局密度\n- 建议：260–360；超过域统一宽后会触发域扩容\n- 提示：内容超出会换行，高度随之增长"
+                },
+                "height": {
+                    "label": "节点高度",
+                    "desc": "节点的基准高度（px），在多行文本时会按需增高。\n- 作用：影响端口位置与同层对齐\n- 建议：56–96；过高会降低层密度、增加路径长度\n- 关联：受字体大小与垂直内边距共同影响"
+                },
+                "padding": {
+                    "horizontal": {
+                        "label": "节点水平内边距",
+                        "desc": "节点左右的内容留白（px）。\n- 作用：提高文本可读性并为端口留出安全区\n- 建议：16–28；过大将推高统一域宽\n- 提示：与最小/最大宽度协同设置以获得稳定布局"
+                    },
+                    "vertical": {
+                        "label": "节点垂直内边距",
+                        "desc": "节点上下的内容留白（px）。\n- 作用：影响文本呼吸感与端口纵向位置\n- 建议：12–24；过大将增加层间空间需求\n- 注意：与“节点高度/字体大小”共同决定最终高度"
+                    }
+                },
+                "boxShadow": {
+                    "label": "节点阴影",
+                    "desc": "节点阴影的 CSS 表达式。\n- 示例：0 2px 4px rgba(0,0,0,0.1)\n- 作用：提升分层与可点击感；在导出时也会呈现\n- 提示：轻阴影适合密集布局，重阴影适合强调重要节点"
+                }
+            },
+            "font": {
+                "size": {
+                    "label": "字体大小",
+                    "desc": "节点正文文字的字号（px）。\n- 建议：14–18；过小影响可读性，过大导致节点增高\n- 关联：同时影响节点宽/高与连线端口分布\n- 提示：如标题需更大，请在主题或节点样式中分别设置"
+                }
+            },
+            "domain": {
+                "padding": {
+                    "horizontal": {
+                        "label": "域水平内边距",
+                        "desc": "域（业务分区）左右的内部留白（px）。\n- 作用：保证域内节点不贴边，提升可读性\n- 建议：24–40；过大将放宽统一域宽并增加整体宽度\n- 关联：与子域、节点的左右留白叠加"
+                    },
+                    "vertical": {
+                        "label": "域垂直内边距",
+                        "desc": "域上下的内部留白（px）。\n- 作用：避免节点靠近域边界与标题条\n- 建议：24–40；与“域标题安全间距”协同保证不遮挡\n- 提示：过小可能造成标题与首行节点重叠风险"
+                    }
+                },
+                "gap": {
+                    "label": "域间距",
+                    "desc": "不同业务域之间的水平或垂直间距（px）。\n- 作用：区分业务边界，避免跨域连线过于拥挤\n- 建议：48–96；主流程拥挤时适当增大\n- 影响：过小增加边交叉概率，过大拉长路径"
+                },
+                "sideSafeGap": {
+                    "label": "域侧边安全间距",
+                    "desc": "域左右额外留白（px），用于保护标题和边进出区域。\n- 建议：6–12；过大会浪费画布空间\n- 提示：与“域水平内边距”叠加后形成最终侧边距离"
+                },
+                "bottomSafeGap": {
+                    "label": "域底部安全间距",
+                    "desc": "域底部额外留白（px），防止尾部节点或注释贴边。\n- 建议：8–16；与垂直内边距共同生效\n- 导出提示：适当留白可避免裁剪边界"
+                },
+                "title": {
+                    "height": {
+                        "label": "域标题高度",
+                        "desc": "域标题条的预留高度（px）。\n- 建议：40–56；与主题的标题字号/行高匹配\n- 注意：配合“标题安全间距”可避免内容覆盖标题"
+                    },
+                    "safeGap": {
+                        "label": "域标题安全间距",
+                        "desc": "标题条与内容之间的安全留白（px）。\n- 建议：6–12；过小可能导致首行节点遮挡标题\n- 关联：子域也有对应的标题避让配置"
+                    }
+                }
+            },
+            "subDomain": {
+                "padding": {
+                    "horizontal": {
+                        "label": "子域水平内边距",
+                        "desc": "子域左右内部留白（px）。\n- 建议：20–32；用于保证内部节点与边在子域边界不拥挤\n- 注意：子域必须严格包含其内容，留白不足会触发扩容"
+                    },
+                    "vertical": {
+                        "label": "子域垂直内边距",
+                        "desc": "子域上下内部留白（px）。\n- 建议：20–32；与“子域标题高度/避让”协同\n- 提示：过小可能导致首行节点贴近标题"
+                    }
+                },
+                "title": {
+                    "height": {
+                        "label": "子域标题高度",
+                        "desc": "子域标题条的预留高度（px）。\n- 建议：36–48；与子域标题字号匹配\n- 注意：若启用“确保标题避让”，内容会自动下移"
+                    }
+                },
+                "ensureTitleClearance": {
+                    "label": "确保标题避让",
+                    "desc": "启用后子域内容会自动避开标题条区域。\n- 作用：避免标题被内部节点遮挡\n- 场景：标题较高或内容密集时建议开启"
+                }
+            },
+            "spacing": {
+                "horizontal": {
+                    "label": "水平节点间距",
+                    "desc": "同层节点之间的水平距离（px）。\n- 建议：120–180；主流程场景可适当加大以减少交叉\n- 影响：越大越不拥挤，但路径可能更长"
+                },
+                "vertical": {
+                    "label": "垂直节点间距",
+                    "desc": "相邻层之间的垂直距离（px）。\n- 建议：80–140；过大将降低信息密度并加长连线\n- 关联：与“ELK 层间距”共同影响层次结构"
+                }
+            },
+            "edge": {
+                "mode": {
+                    "label": "连线模式",
+                    "desc": "选择连线的渲染模式"
+                },
+                "pathType": {
+                    "label": "连线类型",
+                    "desc": "选择连线的路径类型"
+                },
+                "directionalHandlePolicy": {
+                    "label": "把手方向策略",
+                    "desc": "prefer=偏好特定方向; force=强制方向; off=关闭限制"
+                },
+                "forceDirect": {
+                    "label": "强制直连",
+                    "desc": "忽略避障和墙体，强制使用最直接路径（用于强调主流程）"
+                },
+                "intraContainerNoObstacle": {
+                    "label": "容器内不避障",
+                    "desc": "同容器内的节点连线忽略内部障碍，路径更直"
+                },
+                "pureObstacleMode": {
+                    "label": "纯避障模式",
+                    "desc": "忽略容器墙体影响，仅考虑节点障碍"
+                },
+                "ignoreContainers": {
+                    "label": "忽略容器影响",
+                    "desc": "不考虑容器越界惩罚与容器归属，仅按业务节点与几何评估"
+                },
+                "laneClamp": {
+                    "label": "启用车道钳制",
+                    "desc": "源/目标同容器时限制路径留在容器内（避免外沿绕行）"
+                },
+                "obstaclePadding": {
+                    "label": "障碍内边距",
+                    "desc": "智能避障时的节点安全边距，越大越不贴边但路径可能更绕"
+                },
+                "minArrowOffset": {
+                    "label": "箭头最小偏移",
+                    "desc": "避免箭头贴近拐点或节点边界的最小像素偏移"
+                },
+                "stepLastSegmentMin": {
+                    "label": "阶梯末段最小长度",
+                    "desc": "确保阶梯型连线末段与箭头之间至少保留该长度的直线段"
+                },
+                "disableDomainInfluence": {
+                    "label": "关闭域/子域偏好影响",
+                    "desc": "移除跨域垂直偏好、同域正交偏好与容器惩罚，仅按几何与障碍选择"
+                },
+                "crossDomainVerticalPrefer": {
+                    "label": "跨域垂直偏好",
+                    "desc": "跨域关系更偏向上下端口（下出上入/上出下入）"
+                },
+                "crossDomainBias": {
+                    "label": "跨域偏好权重",
+                    "desc": "跨域垂直偏好的权重系数（0–1，越大越偏向上下）"
+                },
+                "preferOrthogonalInDomain": {
+                    "label": "同域正交偏好",
+                    "desc": "同域的非近轴向关系倾向使用阶梯端口组合"
+                },
+                "domainOrthogonalBias": {
+                    "label": "同域正交偏好权重",
+                    "desc": "同域正交偏好权重系数（0–1，越大越偏向正交）"
+                },
+                "preferLROnHorizontal": {
+                    "label": "水平主轴优先左右端口",
+                    "desc": "明显左右结构时优先右出左入/左出右入"
+                },
+                "horizontalBiasThreshold": {
+                    "label": "水平主轴判定阈值",
+                    "desc": "判定水平主轴的阈值H（|dx| ≥ |dy| · H），越小越容易判定为水平"
+                },
+                "typePreferenceProfile": {
+                    "label": "类型偏好档位",
+                    "desc": "正交优先/平衡/允许更多曲线，影响直线/阶梯/贝塞尔的选择倾向"
+                },
+                "orthogonalSamplingEnabled": {
+                    "label": "启用正交采样",
+                    "desc": "在阶梯路径下进行多通道采样以避开密集障碍（性能友好）"
+                },
+                "orthogonalGridSize": {
+                    "label": "正交采样网格步长",
+                    "desc": "候选通道间的横向网格步长（像素），越大越稀疏"
+                },
+                "orthogonalSampleBudget": {
+                    "label": "正交采样候选数量",
+                    "desc": "候选通道数量上限（含中点与两侧），建议 3–11"
+                },
+                "gridAStarEnabled": {
+                    "label": "启用网格A*候选",
+                    "desc": "为阶梯路径采样少量正交候选，提升避障质量（性能友好）"
+                },
+                "gridAStarGridSize": {
+                    "label": "网格A*步长",
+                    "desc": "网格A*的正交步长（像素），越大候选越稀疏"
+                },
+                "gridAStarMaxExpansions": {
+                    "label": "网格A*扩展预算",
+                    "desc": "搜索扩展步数上限，建议 200–600，保护性能"
+                },
+                "beziersAllowedMinAngleDeg": {
+                    "label": "贝塞尔最小偏角(°)",
+                    "desc": "小于该角度更偏向直线/阶梯，角度越大越容易选贝塞尔"
+                },
+                "beziersAllowedMinDetourRatio": {
+                    "label": "贝塞尔最小绕行比例",
+                    "desc": "路径长度/直线距离达到该比例后才允许贝塞尔"
+                },
+                "corridorObstacleHardThreshold": {
+                    "label": "走廊拥挤硬阈值",
+                    "desc": "障碍计数达到该阈值后才考虑贝塞尔（更严格）"
+                }
+            },
+            "layout": {
+                "INDUSTRY_PROFILE": {
+                    "label": "行业预设",
+                    "desc": "一键应用行业对标参数：严格/均衡/放松/自动（密度感知）"
+                },
+                "strategy": {
+                    "label": "整体布局策略",
+                    "desc": "选择整体编排策略（域垂直/域水平/域ELK复合/ELK径向/ELK力导向）"
+                },
+                "direction": {
+                    "label": "域布局方向",
+                    "desc": "控制整体层次布局方向（LR=水平左→右，RL=水平右→左，TB=垂直上→下，BT=垂直下→上）"
+                },
+                "nodeStrategy": {
+                    "label": "节点布局策略",
+                    "desc": "域/子域内部的节点排列策略（水平/垂直/网格/居中/ELK-first）。当整体策略为域ELK时此设置不生效"
+                },
+                "linkOrientation": {
+                    "label": "联动域/节点方向",
+                    "desc": "启用后选择域水平则默认节点垂直；选择域垂直则默认节点水平。"
+                },
+                "CONTAINMENT_POLICY": {
+                    "label": "容器包含策略",
+                    "desc": "strict=严格包含(钳制+扩容); soft=仅扩容(mermaid风格); elastic=软包含+局部钳制"
+                },
+                "ELK_ALGORITHM": {
+                    "label": "ELK布局算法",
+                    "desc": "映射到 elk.algorithm（layered/force/stress/radial/mrtree/disco），默认 layered。注意：不同算法支持的参数不同。"
+                },
+                "RANK_MODE": {
+                    "label": "分层微调模式",
+                    "desc": "elk=原始ELK层; dagre_like=ELK后进行rank吸附与同层微调(更接近mermaid)"
+                },
+                "ELK_STRICT_MODE": {
+                    "label": "ELK严格模式",
+                    "desc": "仅保留 ELK 排布与尺寸投影，禁用二次推开/重排行与子域dx/dy同步。"
+                },
+                "ELK_DIRECTION": {
+                    "label": "ELK布局方向",
+                    "desc": "覆盖 elk.direction（RIGHT/DOWN/LEFT/UP），优先于“域布局方向”"
+                },
+                "ELK_NODE_SPACING": {
+                    "label": "ELK节点间距",
+                    "desc": "映射到 elk.spacing.nodeNode，用于控制同层内节点最小间距（px）。"
+                },
+                "ELK_LAYER_SPACING": {
+                    "label": "ELK层间距",
+                    "desc": "映射到 elk.layered.spacing.nodeNodeBetweenLayers，用于控制层与层之间最小间距（px）。"
+                },
+                "ELK_LABEL_SPACING": {
+                    "label": "ELK标签间距",
+                    "desc": "映射到 elk.spacing.labelLabel；控制标签间最小间距（px）"
+                },
+                "ELK_EDGE_NODE_SPACING": {
+                    "label": "ELK边-点间距",
+                    "desc": "映射到 elk.spacing.edgeNode；控制边与节点的最小距离（px）"
+                },
+                "ELK_EDGE_EDGE_SPACING": {
+                    "label": "ELK边-边间距",
+                    "desc": "映射到 elk.spacing.edgeEdge；控制边与边之间的最小距离（px）"
+                },
+                "ELK_PORT_PORT_SPACING": {
+                    "label": "ELK端口间距",
+                    "desc": "映射到 elk.spacing.portPort；控制端口与端口之间的最小距离（px）"
+                },
+                "ELK_PORT_BORDER_OFFSET": {
+                    "label": "ELK端口边距",
+                    "desc": "映射到 elk.port.borderOffset；节点端口距离边框的最小像素偏移"
+                },
+                "ELK_NODE_PLACEMENT": {
+                    "label": "ELK节点放置策略",
+                    "desc": "映射到 elk.layered.nodePlacement.strategy（NETWORK_SIMPLEX/LINEAR_SEGMENTS/BRANDES_KOEPF）"
+                },
+                "ELK_LAYERING": {
+                    "label": "ELK层级策略",
+                    "desc": "映射到 elk.layered.layering.strategy（NETWORK_SIMPLEX/LONGEST_PATH/COFFMAN_GRAHAM）"
+                },
+                "ELK_EDGE_ROUTING": {
+                    "label": "ELK边路由",
+                    "desc": "映射到 elk.layered.edgeRouting（POLYLINE/ORTHOGONAL/SPLINES），影响边的走线形态"
+                },
+                "ELK_MERGE_EDGES": {
+                    "label": "ELK合并边",
+                    "desc": "映射到 elk.layered.mergeEdges，启用后同源同目标的多条边可能被合并显示"
+                },
+                "ELK_FIXED_ALIGNMENT": {
+                    "label": "ELK对齐偏好",
+                    "desc": "映射到 elk.layered.nodePlacement.bk.fixedAlignment（NONE/BALANCED/LEFTDOWN/RIGHTUP/LEFTUP/RIGHTDOWN）"
+                },
+                "ELK_CONSIDER_MODEL_ORDER": {
+                    "label": "ELK考虑模型顺序",
+                    "desc": "映射到 elk.layered.considerModelOrder；启用后尽量保留输入顺序对层内节点的影响"
+                },
+                "ELK_CYCLE_BREAKING": {
+                    "label": "ELK断环策略",
+                    "desc": "映射到 elk.layered.cycleBreaking.strategy（GREEDY/DEPTH_FIRST/INTERACTIVE）"
+                }
+            }
+        },
+        "performance": {
+            "enableVirtualization": {
+                "label": "启用虚拟化",
+                "desc": "在大量节点时启用虚拟化渲染以提升性能"
+            },
+            "enableAnimations": {
+                "label": "启用动画",
+                "desc": "启用节点和连线的过渡动画"
+            }
+        }
+    },
+    "diagram": {
+        "title": {
+            "genericStandard": "通用标准架构图",
+            "warehouse3d": "3D 智能仓库展示",
+            "flowchartDesigner": "流程图设计器"
+        }
+    },
+    "style": {
+        "category": {
+            "design-system": "设计系统风格",
+            "professional": "专业报表风格",
+            "minimal": "极简风格",
+            "specialty": "特色风格"
+        },
+        "preset": {
+            "standard": "标准",
+            "bold": "厚重",
+            "compact": "紧凑",
+            "material": "质感",
+            "minimal": "极简",
+            "neumorphic": "拟物柔光",
+            "glass": "半透明玻璃",
+            "outline": "描边",
+            "fluent": "Fluent（微软）",
+            "ant": "Ant Design",
+            "carbon": "IBM Carbon",
+            "atlassian": "Atlassian",
+            "dashboard": "数据看板",
+            "blueprint": "工程蓝图",
+            "mono": "黑白高对比"
+        },
+        "switcher": {
+            "title": "风格方案"
+        }
+    }
+}

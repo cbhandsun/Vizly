@@ -1,0 +1,157 @@
+/* ========================================
+   SwimLane Container Node Styles
+   泳道容器 - 仅提供外壳和标题栏
+   内部 Lane 由 titleGroup 子节点组成
+   ======================================== */
+
+.swimlane-node {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    min-width: 400px;
+    min-height: 250px;
+    position: relative;
+    border-radius: 10px;
+    border: 2px solid var(--swimlane-border, #94a3b8);
+    background: var(--swimlane-bg, rgba(248, 250, 252, 0.6));
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.swimlane-node:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.swimlane-node.selected {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+}
+
+/* ---- Header ---- */
+.swimlane-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    min-height: 36px;
+    flex-shrink: 0;
+    -webkit-user-select: none;
+    user-select: none;
+    border-radius: 8px 8px 0 0;
+}
+
+.swimlane-header-icon {
+    font-size: 16px;
+    opacity: 0.9;
+}
+
+.swimlane-header-label {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.swimlane-header-badge {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+/* ---- Content area (children rendered by React Flow) ---- */
+.swimlane-content {
+    flex: 1;
+    position: relative;
+    min-height: 200px;
+}
+
+/* ---- Handles ---- */
+.swimlane-handle {
+    width: 8px !important;
+    height: 8px !important;
+    background: var(--swimlane-border, #94a3b8) !important;
+    border: 2px solid #fff !important;
+    border-radius: 50% !important;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.swimlane-node:hover .swimlane-handle {
+    opacity: 1;
+}
+
+/* ---- Resize Handle ---- */
+.swimlane-resize-handle {
+    width: 8px !important;
+    height: 8px !important;
+    border-radius: 2px !important;
+}
+
+/* ========================================
+   Drop Target Highlight (Global for Containers)
+   ======================================== */
+.react-flow__node.drop-target-highlight .swimlane-node,
+.react-flow__node.drop-target-highlight .title-group-node {
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.6) inset !important;
+    background-color: rgba(99, 102, 241, 0.08) !important;
+    border-color: #6366f1 !important;
+    transition: all 0.2s ease;
+}
+
+/* ========================================
+   Add Lane Button
+   ======================================== */
+.swimlane-add-lane-btn {
+    position: absolute;
+    bottom: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32px;
+    height: 32px;
+    background: #fff;
+    border: 2px solid #6366f1;
+    color: #6366f1;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s ease;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.swimlane-node:hover .swimlane-add-lane-btn,
+.swimlane-node.selected .swimlane-add-lane-btn {
+    opacity: 1;
+}
+
+.swimlane-add-lane-btn:hover {
+    background: #6366f1;
+    color: #fff;
+    transform: translateX(-50%) scale(1.1);
+}
+
+.swimlane-add-lane-btn.vertical {
+    bottom: auto;
+    left: auto;
+    right: -16px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.swimlane-add-lane-btn.vertical:hover {
+    transform: translateY(-50%) scale(1.1);
+}

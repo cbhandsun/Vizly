@@ -1,0 +1,1199 @@
+@import '@xyflow/react/dist/style.css';
+/* ReactFlow 样式 */
+
+
+/* React Flow Controls Override */
+.react-flow__controls {
+  box-shadow: var(--shadow-glass) !important;
+  background: var(--glass-bg, rgba(255, 255, 255, 0.7)) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2)) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 4px !important;
+  overflow: hidden !important;
+}
+
+.react-flow__controls-button {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+  background: transparent !important;
+  transition: background-color 0.2s, color 0.2s !important;
+  border-radius: 4px !important;
+  margin: 1px !important;
+}
+
+.react-flow__controls-button:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: var(--color-primary-600) !important;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__controls-button svg {
+  fill: var(--color-slate-600) !important;
+}
+
+.react-flow__controls-button:hover svg {
+  fill: var(--color-primary-600) !important;
+}
+
+
+
+html,
+body,
+#root,
+.app-layout {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Premium Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 4px;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.5);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* Firefox support (partial) */
+@supports (scrollbar-width: thin) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+  }
+}
+
+
+
+
+
+/* 现代化设计系统 */
+:root {
+  /* ==========================================================================
+     Design System: Core Tokens
+     ========================================================================== */
+
+  /* --- Color Palette: Primary (Indigo/Blue) --- */
+  --color-primary-50: #eef2ff;
+  --color-primary-100: #e0e7ff;
+  --color-primary-200: #c7d2fe;
+  --color-primary-300: #a5b4fc;
+  --color-primary-400: #818cf8;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5;
+  --color-primary-700: #4338ca;
+  --color-primary-800: #3730a3;
+  --color-primary-900: #312e81;
+
+  /* --- Color Palette: Secondary (Slate/Cool Gray) --- */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+
+  /* --- Color Palette: Semantic --- */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+
+  /* --- Gradients --- */
+  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --gradient-accent: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --gradient-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.5) 100%);
+  --gradient-glass: linear-gradient(145deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.1) 100%);
+
+  /* --- Backgrounds --- */
+  --bg-app: #f8fafc;
+  --bg-pattern: radial-gradient(#e2e8f0 1px, transparent 1px);
+  /* Global app background */
+  --bg-surface: #ffffff;
+  --bg-surface-translucent: rgba(255, 255, 255, 0.6);
+  --bg-sidebar: rgba(255, 255, 255, 0.65);
+  --bg-panel: rgba(255, 255, 255, 0.75);
+
+  /* --- Premium Enhancements --- */
+  --glass-border: 1px solid rgba(255, 255, 255, 0.5);
+  --glass-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+
+  /* --- Typography --- */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* --- Spacing --- */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* --- Radius --- */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* --- Shadows (Elevation) --- */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+
+  /* --- Borders --- */
+  --border-light: rgba(255, 255, 255, 0.2);
+  --border-subtle: rgba(148, 163, 184, 0.2);
+  --border-focus: var(--color-primary-500);
+
+  /* --- Transitions --- */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* --- Menu & Sidebar Specifics --- */
+  --menu-bg-light: rgba(255, 255, 255, 0.65);
+  --menu-bg-dark: rgba(15, 23, 42, 0.65);
+  --menu-border-light: rgba(255, 255, 255, 0.4);
+  --menu-border-dark: rgba(255, 255, 255, 0.05);
+  --menu-accent-blue: #3b82f6;
+  --menu-glass-bg: rgba(255, 255, 255, 0.6);
+  --menu-glass-bg-dark: rgba(15, 23, 42, 0.6);
+  --menu-item-radius: var(--radius-lg);
+  --menu-item-active-border: var(--color-primary-500);
+  --menu-item-active-bg: linear-gradient(90deg, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0.02) 100%);
+  --menu-item-active-shadow: var(--shadow-sm);
+}
+
+/* ========================================================================== */
+/* Performance Mode: CSS Optimization (Auto-triggered @ 300+ nodes)         */
+/* ========================================================================== */
+
+/**
+ * 性能降级策略
+ * - 自动触发：当节点数超过300或正在拖拽时
+ * - 目标：减少重绘开销,保持60FPS流畅度
+ * - 方法：关闭动画、降低模糊强度、移除阴影
+ */
+
+[data-performance="high"] .react-flow__node {
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  transition: none !important;
+  will-change: transform;
+}
+
+[data-performance="high"] .react-flow__edge {
+  transition: none !important;
+}
+
+[data-performance="high"] .glass,
+[data-performance="high"] .glass-strong,
+[data-performance="high"] .glass-effect {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: var(--shadow-sm) !important;
+  /* 保留最小阴影 */
+}
+
+/* 降低模糊强度而非完全移除 */
+[data-performance="normal"] .glass-strong {
+  -webkit-backdrop-filter: blur(12px) !important;
+  /* 从20px降至12px */
+  backdrop-filter: blur(12px) !important;
+}
+
+/* 禁用无限动画循环和重滤镜渲染 */
+[data-performance="high"] .premium-node::before,
+[data-performance="high"] [class*="pulse"],
+[data-performance="high"] [class*="glow"],
+[data-performance="high"] .edge-cyber-flow path.react-flow__edge-path,
+[data-performance="high"] .cyber-minimap,
+[data-performance="high"] .react-flow__handle {
+  animation: none !important;
+  filter: none !important;
+}
+
+/* 全局样式重置 */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* 移除app-main的padding，让蓝色背景铺满 */
+.app-main {
+  padding: 0 !important;
+}
+
+html,
+body {
+  height: 100vh;
+  /* 严格的100vh约束 */
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  /* 防止页面滚动 */
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  background-color: var(--bg-app);
+  background-image: var(--bg-pattern);
+  background-size: 20px 20px;
+  color: var(--color-slate-800);
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 根元素严格100vh约束 */
+#root {
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+  background-clip: padding-box;
+}
+
+/* 现代化按钮样式 */
+.btn-modern {
+  background: var(--primary-gradient);
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 12px 24px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-modern:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-modern:active {
+  transform: translateY(0);
+}
+
+.btn-modern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.btn-modern:hover::before {
+  left: 100%;
+}
+
+/* 玻璃态效果 */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-xl);
+}
+
+.glass-strong {
+  background: rgba(255, 255, 255, 0.2);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-xl);
+}
+
+/* 现代磨砂玻璃效果类 */
+.glass-effect {
+  background: var(--menu-bg-light) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  border: 1px solid var(--menu-border-light) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+}
+
+[data-theme='dark'] .glass-effect {
+  background: var(--menu-bg-dark) !important;
+  border: 1px solid var(--menu-border-dark) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+.diagram-folder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  margin: 14px 0 6px 0;
+  border-radius: var(--menu-item-radius);
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  background: var(--menu-glass-bg);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  transition: all var(--transition-normal);
+  position: relative;
+}
+
+.diagram-folder-header:hover {
+  background: white;
+  border-color: var(--menu-accent-blue);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
+}
+
+.diagram-folder-header.expanded {
+  background: white;
+  border-color: rgba(59, 130, 246, 0.15);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.03);
+}
+
+[data-theme='dark'] .diagram-folder-header {
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0.10), rgba(148, 163, 184, 0.06));
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+[data-theme='dark'] .diagram-folder-header:hover {
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0.13), rgba(148, 163, 184, 0.08));
+  border-color: rgba(148, 163, 184, 0.30);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+.diagram-folder-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+[data-theme='dark'] .diagram-folder-pill {
+  color: #94a3b8;
+}
+
+.diagram-folder-title {
+  font-size: 0.675rem;
+  font-weight: 800;
+  color: #334155;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+[data-theme='dark'] .diagram-folder-title {
+  color: rgba(226, 232, 240, 0.92);
+}
+
+.diagram-folder-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft 0.6s ease-out;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.4s ease-out;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  body {
+    font-size: 0.9rem;
+  }
+
+  .btn-modern {
+    padding: 10px 20px;
+    font-size: 0.7875rem;
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  body {
+    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+    color: #e2e8f0;
+  }
+
+  .glass {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .glass-strong {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+}
+
+
+
+
+
+.panel-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.menu-toggle-floating {
+  position: fixed;
+  top: 120px;
+  left: 24px;
+  z-index: 1001;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.125rem;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.menu-toggle-floating:hover {
+  transform: scale(1.1) translateY(-2px);
+  box-shadow: 0 12px 32px rgba(102, 126, 234, 0.4);
+}
+
+.menu-toggle-floating.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-60px);
+}
+
+.menu-toggle-floating.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+
+
+@media (max-width: 768px) {
+  .menu-toggle-floating {
+    top: 100px;
+    left: 16px;
+    width: 48px;
+    height: 48px;
+  }
+}
+
+
+
+
+
+
+/* ===== Edge Animation for Main Flow ===== */
+@keyframes edgeDash {
+  0% {
+    stroke-dashoffset: 0;
+  }
+
+  100% {
+    stroke-dashoffset: -200;
+  }
+}
+
+/* 主流程动线动画样式 - 使用更具体的选择器确保覆盖 React Flow 默认样式 */
+.react-flow__edge-path.edge-animated,
+.react-flow__edge.edge-animated path {
+  stroke-dasharray: 6 3 !important;
+  animation: edgeDash 10s linear infinite !important;
+}
+
+/* 确保动画在深色主题下也可见 */
+[data-theme='dark'] .react-flow__edge-path.edge-animated,
+[data-theme='dark'] .react-flow__edge.edge-animated path {
+  stroke: #FF5722 !important;
+  filter: drop-shadow(0 0 2px rgba(255, 87, 34, 0.8)) !important;
+}
+
+/* ===== React Flow Node Overflow Handling ===== */
+/* 确保自定义节点内容不会超出其计算的边界 */
+/* 这是解决左右内边距不对称问题的关键 CSS */
+.react-flow__node-custom {
+  overflow: hidden !important;
+}
+
+/* 注意：.react-flow__node 保持默认的 overflow: visible 以允许阴影和选中效果显示 */
+
+/* 确保 SubGroup 和 TitleGroup 节点也裁剪溢出内容 */
+.react-flow__node-subGroup,
+.react-flow__node-titleGroup {
+  overflow: hidden !important;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* 统一按钮样式（小图标按钮） */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #1f2937;
+  font-size: 0.73125rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-icon:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.btn-icon:active {
+  transform: translateY(1px);
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+/* 菜单顶部折叠切换按钮（避免与移动端浮动按钮冲突） */
+.menu-toggle-header {
+  min-width: 32px;
+  height: 32px;
+  border: none;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
+}
+
+.menu-toggle-header:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.35);
+}
+
+/* 现代菜单卡片与缩略图 */
+.diagram-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  transition: all 0.2s ease;
+}
+
+.diagram-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.diagram-card.selected {
+  border-color: #28a745;
+  box-shadow: 0 2px 10px rgba(40, 167, 69, 0.15);
+}
+
+.diagram-card .diagram-card-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.diagram-card.collapsed .diagram-card-content {
+  justify-content: center;
+  padding: 6px 8px;
+}
+
+.diagram-thumb {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #374151;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.diagram-thumb-sm {
+  width: 20px;
+  height: 20px;
+  color: #1f2937;
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+
+.diagram-card.selected .diagram-thumb,
+.diagram-card.selected .diagram-thumb-sm {
+  color: #28a745;
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 1rem;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .app-nav {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+/* 动画效果 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft 0.6s ease-out;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.4s ease-out;
+}
+
+/* Type Scale & Responsiveness */
+html {
+  font-size: 16px;
+  /* Default base */
+}
+
+/* Mobile Devices */
+@media (max-width: 639px) {
+  html {
+    font-size: 14px;
+    /* More compact on phones */
+  }
+}
+
+/* Tablets */
+@media (min-width: 640px) and (max-width: 1023px) {
+  html {
+    font-size: 15px;
+    /* Slightly reduced */
+  }
+}
+
+/* Large Screens (Full HD+) */
+@media (min-width: 1536px) {
+  html {
+    font-size: 18px;
+    /* Improved readability on 27" monitors */
+  }
+}
+
+/* 4K Screens */
+@media (min-width: 2560px) {
+  html {
+    font-size: 24px;
+    /* Prevents UI from being tiny on 4K */
+  }
+}
+
+/* Legacy Mobile Override for Buttons */
+@media (max-width: 768px) {
+  .btn-modern {
+    padding: 10px 20px;
+    font-size: 0.7875rem;
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  body {
+    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+    color: #e2e8f0;
+  }
+
+  .glass {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .glass-strong {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+}
+
+
+
+
+
+.panel-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.menu-toggle-floating {
+  position: fixed;
+  top: 120px;
+  left: 24px;
+  z-index: 1001;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.125rem;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.menu-toggle-floating:hover {
+  transform: scale(1.1) translateY(-2px);
+  box-shadow: 0 12px 32px rgba(102, 126, 234, 0.4);
+}
+
+.menu-toggle-floating.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-60px);
+}
+
+.menu-toggle-floating.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.diagram-container {
+  flex: 1;
+  position: relative;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  /* 确保宽度不超过容器 */
+  box-sizing: border-box;
+  /* 包含边框和内边距在宽度计算内 */
+  overflow: visible;
+  /* 允许下拉菜单显示 */
+}
+
+.diagram-header {
+  background: rgba(255, 255, 255, 0.95);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  /* 提高z-index确保下拉菜单在最上层 */
+  flex-shrink: 0;
+  width: 100%;
+  /* 确保宽度不超过容器 */
+  box-sizing: border-box;
+  /* 包含padding在宽度计算内 */
+  overflow: visible;
+  /* 允许下拉菜单显示 */
+}
+
+.diagram-container.fullscreen .diagram-header {
+  background: #ffffff;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.diagram-container.fullscreen .diagram-content {
+  background: #ffffff;
+}
+
+.diagram-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0;
+}
+
+.diagram-content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  /* 让 ReactFlow 自行管理滚动/平移，避免外层滚动影响容器高度 */
+  padding: 0;
+  /* 移除内边距，让图表完全填充容器 */
+  width: 100%;
+  /* 确保宽度不超过容器 */
+  height: 100%;
+  box-sizing: border-box;
+  /* 包含边框和内边距在宽度计算内 */
+  margin: 0;
+  /* 确保没有外边距影响 */
+}
+
+@media (max-width: 768px) {
+  .menu-toggle-floating {
+    top: 100px;
+    left: 16px;
+    width: 48px;
+    height: 48px;
+  }
+}
+
+
+
+
+
+
+/* ===== Edge Animation for Main Flow ===== */
+@keyframes edgeDash {
+  0% {
+    stroke-dashoffset: 0;
+  }
+
+  100% {
+    stroke-dashoffset: -200;
+  }
+}
+
+/* Optional helper class if needed in future */
+.edge-animated {
+  stroke-dasharray: 6 3;
+  animation: edgeDash 10s linear infinite;
+}
+
+
+
+
+
+
+
+
+/* ==========================================================================
+   Micro-interactions & Animations
+   ========================================================================== */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Utility Animations */
+.animate-fade-in {
+  animation: fadeIn var(--transition-normal) forwards;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp var(--transition-normal) forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn var(--transition-fast) forwards;
+}
+
+/* Stagger delays (generate up to 10) */
+.delay-1 {
+  animation-delay: 50ms;
+}
+
+.delay-2 {
+  animation-delay: 100ms;
+}
+
+.delay-3 {
+  animation-delay: 150ms;
+}
+
+.delay-4 {
+  animation-delay: 200ms;
+}
+
+.delay-5 {
+  animation-delay: 250ms;
+}
+
+/* Interactive Elements */
+.clickable-scale {
+  transition: transform var(--transition-fast);
+}
+
+.clickable-scale:active {
+  transform: scale(0.96);
+}
+
+.hover-lift {
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Focus Ring Utility */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-primary-100), 0 0 0 4px var(--color-primary-500);
+}
+
+/* ==========================================================================
+   Tactile Emotional Design (Drop-Bounce & Magnet-Snap)
+   ========================================================================== */
+
+@keyframes dropBounce {
+  0% { scale: 0.85; opacity: 0; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); }
+  60% { scale: 1.02; opacity: 1; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+  100% { scale: 1; opacity: 1; box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1); }
+}
+
+.node-drop-bounce {
+  animation: dropBounce 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* 连线靠近时的手柄磁吸放大效果 */
+.react-flow__handle-connecting {
+  transform: scale(2.5) !important;
+  box-shadow: 0 0 12px var(--color-primary-500) !important;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+/* 连接成功时的水波纹效果 */
+@keyframes snapRipples {
+  0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.6); }
+  100% { box-shadow: 0 0 0 16px rgba(79, 70, 229, 0); }
+}
+
+.react-flow__handle-valid {
+  animation: snapRipples 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  transform: scale(3) !important;
+  background-color: var(--color-success) !important;
+}
+
+/* ========================================================================== */
+/* Phase 2: Flowchart Visual Aesthetics Overhaul Variables & Animations       */
+/* ========================================================================== */
+
+/* 1. Data Flow Edge Animations */
+@keyframes cyber-flow-pulse {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.edge-cyber-flow path.react-flow__edge-path {
+  stroke-dasharray: 6 6 !important;
+  animation: cyber-flow-pulse 1.2s linear infinite !important;
+  /* Glowing line effect */
+  filter: drop-shadow(0 0 3px rgba(99, 102, 241, 0.4));
+}
+
+[data-theme='dark'] .edge-cyber-flow path.react-flow__edge-path {
+  filter: drop-shadow(0 0 5px rgba(129, 140, 248, 0.7));
+}
+
+/* 2. Magnetic Tactile Ports (Handle Breathing) */
+.react-flow__handle {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease !important;
+}
+
+/* Make handles larger on hover to induce that tactile snapping sensation */
+.react-flow__handle:hover {
+  transform: scale(1.6) !important;
+  box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.25) !important;
+  z-index: 1000 !important;
+}
+
+[data-theme='dark'] .react-flow__handle:hover {
+  box-shadow: 0 0 0 6px rgba(147, 197, 253, 0.15) !important;
+}
+
+/* 3. Cyber Minimap Radar Overrides */
+.cyber-minimap {
+  background: var(--menu-bg-light) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  border-radius: var(--radius-xl) !important;
+  border: 1px solid var(--menu-border-light) !important;
+  box-shadow: var(--shadow-glass) !important;
+  overflow: hidden;
+  margin: 12px !important;
+}
+
+[data-theme='dark'] .cyber-minimap {
+  background: var(--menu-bg-dark) !important;
+  border: 1px solid var(--menu-border-dark) !important;
+}
+
+.cyber-minimap-mask {
+  fill: rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme='dark'] .cyber-minimap-mask {
+  fill: rgba(15, 23, 42, 0.5) !important; /* Authentic radar darkness */
+}
+
+/* Add an active ring when dragged */
+.cyber-minimap-mask:active {
+  stroke: var(--color-primary-500) !important;
+  stroke-width: 1px !important;
+}

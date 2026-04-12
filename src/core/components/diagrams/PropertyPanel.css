@@ -1,0 +1,165 @@
+/* src/components/diagrams/PropertyPanel.css */
+
+.property-panel-container {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    background-color: var(--glass-bg, rgba(255, 255, 255, 0.7));
+    border-left: 1px solid var(--glass-border, rgba(255, 255, 255, 0.3));
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    backdrop-filter: blur(12px) saturate(180%);
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-glass);
+    z-index: 1005;
+    flex-shrink: 0;
+    width: 0;
+    opacity: 0;
+    overflow: hidden;
+}
+
+.property-panel-container.visible {
+    width: 320px;
+    opacity: 1;
+}
+
+/* 停靠模式（集成在选项卡内） */
+.property-panel-container.docked {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background-color: transparent;
+    border-left: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+}
+
+/* 收起状态 */
+.property-panel-container.visible.collapsed {
+    width: 0;
+    opacity: 0;
+}
+
+/* 展开/收起按钮 */
+.property-panel-toggle {
+    position: absolute;
+    left: -32px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.08);
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.property-panel-toggle:hover {
+    background: rgba(255, 255, 255, 1);
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.12);
+}
+
+.property-panel-toggle svg {
+    transition: transform 0.3s ease;
+}
+
+.property-panel-toggle.collapsed svg {
+    transform: rotate(180deg);
+}
+
+.property-panel-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.property-panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    /* font-weight: 600; handled by Typography */
+    /* font-size: 0.9rem; handled by Typography */
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.2));
+}
+
+.property-panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+    background-color: transparent;
+}
+
+.property-panel-empty {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px;
+}
+
+.color-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+.color-row:last-child {
+    border-bottom: none;
+}
+
+/* Customizing Ant Design Collapse to look transparent/minimal */
+.property-collapse .ant-collapse-header {
+    padding: 12px 16px !important;
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.65) !important;
+    font-size: 13px !important;
+    background: transparent !important;
+}
+
+.property-collapse .ant-collapse-content-box {
+    padding: 0 16px 16px !important;
+}
+
+.property-collapse .ant-form-item {
+    margin-bottom: 12px;
+}
+
+.property-collapse .ant-form-item-label {
+    padding-bottom: 2px !important;
+}
+
+.property-collapse .ant-form-item-label label {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+}
+
+/* Scrollbar styling for webkit */
+.property-panel-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.property-panel-content::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+
+.property-panel-content::-webkit-scrollbar-track {
+    background-color: transparent;
+}

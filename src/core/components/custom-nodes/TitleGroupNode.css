@@ -1,0 +1,252 @@
+/* src/components/custom-nodes/TitleGroupNode.css */
+
+/* Premium enhancements */
+.title-group-node {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    transition: all var(--transition-normal), height 0.3s ease, width 0.3s ease, box-shadow 0.25s ease;
+    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+    border-radius: var(--group-radius);
+    border: 1.5px solid var(--group-border-color);
+    background: transparent;
+}
+
+/* 🔑 阻止 React Flow 提升大组 z-index，强制沉入底层（-1）防止背景遮挡前方的子节点 */
+.react-flow__node-titleGroup {
+    z-index: -1 !important;
+}
+
+.title-group-node.glass {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.title-group-node.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+/* Drop Target Highlight */
+.title-group-node.drop-target {
+    border-color: var(--color-primary-500) !important;
+    border-width: 3px !important;
+    box-shadow: 0 0 0 4px rgba(var(--color-primary-rgb), 0.2) !important;
+    background-color: rgba(var(--color-primary-rgb), 0.05) !important;
+    transform: scale(1.01);
+    animation: drop-target-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes drop-target-pulse {
+    0%, 100% { box-shadow: 0 0 0 4px rgba(var(--color-primary-rgb), 0.15); }
+    50% { box-shadow: 0 0 0 8px rgba(var(--color-primary-rgb), 0.08); }
+}
+
+.title-group-node:hover {
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1), 0 4px 8px -2px rgba(0, 0, 0, 0.06), 0 0 0 1px var(--group-border-color);
+}
+
+/* Debug Overlay */
+.title-group-debug {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 11px;
+    line-height: 14px;
+    color: #111;
+    background: rgba(255, 255, 255, 0.75);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    pointer-events: none;
+    z-index: 999;
+}
+
+.debug-color-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    border-width: 1px;
+    border-style: solid;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+    display: inline-block;
+}
+
+/* Title Bar */
+.title-group-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    position: relative;
+    transition: background-color var(--transition-fast);
+
+    /* Variable Usage */
+    height: var(--group-title-height);
+    /* 微渐变：从主色到略深色，增强立体感 */
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--group-theme-color) 100%, white 8%) 0%,
+        var(--group-theme-color) 50%,
+        color-mix(in srgb, var(--group-theme-color) 100%, black 10%) 100%
+    );
+    background-color: var(--group-theme-color);
+    /* Fallback */
+    color: var(--group-text-color);
+    font-size: var(--group-title-size);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    z-index: 2;
+}
+
+/* 高光线：模拟玻璃高光 */
+.title-group-bar::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.25) 20%,
+        rgba(255, 255, 255, 0.35) 50%,
+        rgba(255, 255, 255, 0.25) 80%,
+        transparent 100%
+    );
+    pointer-events: none;
+}
+
+.title-group-icon {
+    margin-right: 8px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.title-group-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.title-group-subtitle {
+    font-size: 12px;
+    opacity: 0.9;
+    font-weight: 400;
+    margin-top: 2px;
+}
+
+/* 🆕 双击编辑标题 */
+.title-text {
+    cursor: default;
+}
+
+.title-text span {
+    cursor: text;
+}
+
+.title-group-inline-input {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 4px;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    padding: 2px 6px;
+    outline: none;
+    width: 100%;
+    min-width: 80px;
+    max-width: 300px;
+    text-align: center;
+}
+
+.title-group-inline-input:focus {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
+}
+
+/* Content Area */
+.title-group-content {
+    position: relative;
+    height: calc(100% - var(--group-title-height));
+    padding: var(--group-padding);
+    color: var(--group-content-text);
+    background-color: var(--group-bg-color);
+    transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
+    /* 顶部内阴影：增强标题栏与内容区的层次分离 */
+    box-shadow: inset 0 2px 6px -2px rgba(0, 0, 0, 0.08);
+}
+
+.title-group-content.glass {
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    backdrop-filter: blur(12px) saturate(160%);
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.2));
+}
+
+.title-group-content.blueprint {
+    background-image: repeating-linear-gradient(0deg, rgba(74, 144, 226, 0.1) 0px, rgba(74, 144, 226, 0.1) 1px, transparent 1px, transparent 12px), repeating-linear-gradient(90deg, rgba(74, 144, 226, 0.1) 0px, rgba(74, 144, 226, 0.1) 1px, transparent 1px, transparent 12px);
+    background-color: #f8fbff;
+}
+
+/* Handles */
+.title-group-handle {
+    border: 2px solid white;
+    background-color: var(--group-border-color);
+    width: 12px;
+    height: 12px;
+    transition: background-color var(--transition-fast);
+    z-index: 10;
+}
+
+/* 🆕 折叠控件 */
+.title-group-collapse-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    padding-right: 12px;
+}
+
+.title-group-child-count {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.2);
+    color: var(--group-text-color);
+    opacity: 0.9;
+}
+
+.title-group-collapse-btn {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: var(--group-text-color);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.title-group-collapse-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.title-group-collapse-btn:active {
+    transform: scale(0.95);
+}

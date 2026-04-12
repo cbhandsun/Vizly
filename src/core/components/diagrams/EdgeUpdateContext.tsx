@@ -1,0 +1,101 @@
+import React, { createContext, useContext, useMemo, useState, useEffect } from 'react';
+import type { Theme } from '../../themes/types/ThemeTypes';
+
+export interface Waypoint {
+    x: number;
+    y: number;
+}
+
+export interface EdgeUpdateCallbacks {
+    onLabelOffsetChange: (edgeId: string, offset: { x: number; y: number }) => void;
+    onLabelStyleChange: (edgeId: string, style: Record<string, any>) => void;
+    onWaypointsChange: (edgeId: string, waypoints: Waypoint[]) => void;
+    onLabelChange: (edgeId: string, label: string) => void;
+}
+
+const EdgeUpdateContext = createContext<EdgeUpdateCallbacks | null>(null);
+
+/**
+ * P3: 主题 Context — 统一订阅一次，所有边组件共享
+ * 消除 N 条边 × N 个 ThemeChangeListener 的问题
+ */
+const EdgeThemeContext = createContext<Theme | null>(null);
+
+/**
+ * 🚀 P3 性能优化：通过 Context 传递边回调，替代 .map() 逐个注入
+ *
+ * 原来 enhancedEdges 在每次边变化时通过 .map() 创建 N 个新对象，
+ * 导致所有边组件的 props 浅比较失败。
+ * 现在回调通过 Context 获取，边数组引用保持稳定。
+ */
+export const EdgeUpdateProvider: React.FC<{
+    callbacks: EdgeUpdateCallbacks;
+    children: React.ReactNode;
+}> = ({ callbacks, children }) => {
+    // ⭐ 只在回调引用真正变化时重建 value
+    const value = useMemo(() => callbacks, [
+        callbacks.onLabelOffsetChange,
+        callbacks.onLabelStyleChange,
+        callbacks.onWaypointsChange,
+        callbacks.onLabelChange,
+    ]);
+
+    // P3: 统一主题订阅 — 一个 Provider 一个 listener
+    const [currentTheme, setCurrentTheme] = useState<Theme | null>(() => {
+        try {
+            const { getThemeManager } = require('../../themes');
+            const tm = getThemeManager();
+            return tm.getCurrentTheme?.() || null;
+        } catch {
+            return null;
+        }
+    });
+
+    useEffect(() => {
+        let unsubscribe: (() => void) | undefined;
+        try {
+            const { getThemeManager } = require('../../themes');
+            const tm = getThemeManager();
+            unsubscribe = tm.addThemeChangeListener((theme: Theme | null) => {
+                setCurrentTheme(theme || null);
+            });
+        } catch {
+            unsubscribe = undefined;
+        }
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, []);
+
+    return (
+        <EdgeUpdateContext.Provider value={value}>
+            <EdgeThemeContext.Provider value={currentTheme}>
+                {children}
+            </EdgeThemeContext.Provider>
+        </EdgeUpdateContext.Provider>
+    );
+};
+
+/**
+ * 边组件内部使用此 hook 获取回调
+ */
+export function useEdgeUpdate(): EdgeUpdateCallbacks {
+    const ctx = useContext(EdgeUpdateContext);
+    if (!ctx) {
+        // 兼容：如果未被 Provider 包裹，返回 no-op 回调
+        return {
+            onLabelOffsetChange: () => { },
+            onLabelStyleChange: () => { },
+            onWaypointsChange: () => { },
+            onLabelChange: () => { },
+        };
+    }
+    return ctx;
+}
+
+/**
+ * P3: 边组件使用此 hook 获取当前主题（从 Provider 统一订阅）
+ */
+export function useEdgeTheme(): Theme | null {
+    return useContext(EdgeThemeContext);
+}

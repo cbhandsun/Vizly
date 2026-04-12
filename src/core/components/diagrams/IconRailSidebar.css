@@ -1,0 +1,241 @@
+/* Icon Rail + Floating Drawer Sidebar */
+
+/* ============================================
+   Icon Rail — 固定 48px 垂直图标栏
+   (参考 Miro 侧边栏设计)
+   ============================================ */
+.icon-rail {
+    position: absolute;
+    top: 80px;
+    left: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 44px;
+    height: max-content;
+    padding: 8px 0;
+    gap: 4px;
+    background: var(--designer-panel-bg, rgba(255, 255, 255, 0.85));
+    backdrop-filter: var(--designer-blur, blur(20px) saturate(150%));
+    -webkit-backdrop-filter: var(--designer-blur, blur(20px) saturate(150%));
+    box-shadow: var(--designer-shadow, 0 8px 32px rgba(0, 0, 0, 0.08));
+    border: 1px solid var(--designer-border, rgba(0, 0, 0, 0.06));
+    border-radius: 22px;
+    z-index: 110;
+}
+
+.icon-rail-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+.icon-rail-btn:hover {
+    background: rgba(0, 0, 0, 0.04);
+    color: rgba(0, 0, 0, 0.85);
+    transform: scale(1.03);
+}
+
+.icon-rail-btn.active {
+    background: rgba(0, 0, 0, 0.08); /* hyper minimalist, no loud blue */
+    color: #111;
+    box-shadow: none;
+}
+
+/* Active indicator dot */
+.icon-rail-btn.active::after {
+    content: '';
+    position: absolute;
+    left: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 12px;
+    border-radius: 3px;
+    background: #000;
+}
+
+.icon-rail-divider {
+    width: 24px;
+    height: 1px;
+    background: rgba(0, 0, 0, 0.06);
+    margin: 4px 0;
+}
+
+.icon-rail-spacer {
+    height: 4px; /* No longer taking flex:1, just a rigid space because rail is max-content */
+}
+
+/* ============================================
+   Floating Drawer — 悬浮面板
+   绝对定位，不占据 Flex 空间
+   ============================================ */
+.side-drawer-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 105;
+    /* 透明背景，仅用于点击关闭 */
+}
+
+.side-drawer {
+    position: absolute;
+    top: 80px;
+    left: 68px; /* offset from the icon rail (16 + 44 + 8) */
+    max-height: calc(100% - 96px); /* padding from bottom */
+    /* width is set dynamically via inline style (240-400px) */
+    min-width: 240px;
+    max-width: 400px;
+    background: var(--designer-panel-bg, rgba(255, 255, 255, 0.88));
+    backdrop-filter: var(--designer-blur, blur(20px) saturate(180%));
+    -webkit-backdrop-filter: var(--designer-blur, blur(20px) saturate(180%));
+    box-shadow: var(--designer-shadow, 0 8px 32px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.04));
+    border: 1px solid var(--designer-border, rgba(0, 0, 0, 0.06));
+    border-radius: var(--designer-radius, 20px);
+    z-index: 108;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: drawerSlideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+}
+
+@keyframes drawerSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.side-drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    flex-shrink: 0;
+}
+
+.side-drawer-header-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.side-drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 12px;
+}
+
+.side-drawer-body::-webkit-scrollbar {
+    width: 4px;
+}
+
+.side-drawer-body::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.08);
+    border-radius: 4px;
+}
+
+.side-drawer-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* Search bar inside drawer */
+.side-drawer .side-drawer-search {
+    padding: 0 0 10px 0;
+}
+
+/* ============================================
+   深色模式
+   ============================================ */
+[data-theme='dark'] .icon-rail {
+    background: rgba(30, 30, 46, 0.75);
+    border-right-color: rgba(255, 255, 255, 0.04);
+}
+
+[data-theme='dark'] .icon-rail-btn {
+    color: rgba(205, 214, 244, 0.55);
+}
+
+[data-theme='dark'] .icon-rail-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(205, 214, 244, 0.85);
+}
+
+[data-theme='dark'] .icon-rail-btn.active {
+    background: rgba(137, 180, 250, 0.15);
+    color: #89b4fa;
+    box-shadow: inset 0 0 0 1.5px rgba(137, 180, 250, 0.2);
+}
+
+[data-theme='dark'] .icon-rail-btn.active::after {
+    background: #89b4fa;
+}
+
+[data-theme='dark'] .icon-rail-divider {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme='dark'] .side-drawer {
+    background: rgba(30, 30, 46, 0.92);
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.25), 1px 0 0 rgba(255, 255, 255, 0.04);
+}
+
+[data-theme='dark'] .side-drawer-header {
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme='dark'] .side-drawer-header-title {
+    color: rgba(205, 214, 244, 0.85);
+}
+
+[data-theme='dark'] .side-drawer-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* 系统跟随暗色模式 */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .icon-rail {
+        background: rgba(30, 30, 46, 0.75);
+        border-right-color: rgba(255, 255, 255, 0.04);
+    }
+
+    :root:not([data-theme='light']) .icon-rail-btn {
+        color: rgba(205, 214, 244, 0.55);
+    }
+
+    :root:not([data-theme='light']) .icon-rail-btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(205, 214, 244, 0.85);
+    }
+
+    :root:not([data-theme='light']) .icon-rail-btn.active {
+        background: rgba(137, 180, 250, 0.15);
+        color: #89b4fa;
+    }
+
+    :root:not([data-theme='light']) .side-drawer {
+        background: rgba(30, 30, 46, 0.92);
+        box-shadow: 8px 0 32px rgba(0, 0, 0, 0.25), 1px 0 0 rgba(255, 255, 255, 0.04);
+    }
+}

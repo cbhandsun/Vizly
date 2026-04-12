@@ -1,0 +1,460 @@
+{
+  "id": "wms-demand-allocation-strategy-v2",
+  "name": "仓储需求分流与库存分配策略 (含缺货逻辑)",
+  "version": "1.0.0",
+  "type": "architecture",
+  "metadata": {
+    "title": "基于水位与满足率的智能分流策略",
+    "description": "展示从库存检查、满足率截断到直拣/补货双池分配的全链路逻辑",
+    "author": "Algorithm Team",
+    "tags": [
+      "计划",
+      "算法"
+    ],
+    "updatedAt": "2023-10-28"
+  },
+  "layout": {
+    "autoDirection": true,
+    "fitDomainContent": true,
+    "spacing": {
+      "horizontal": 40,
+      "vertical": 50
+    },
+    "padding": {
+      "horizontal": 20,
+      "vertical": 20
+    },
+    "domainOrder": [
+      "策略计算",
+      "资源分配",
+      "作业执行"
+    ],
+    "subDomainOrder": {
+      "策略计算": [
+        "数据准备",
+        "初分逻辑",
+        "库存修正"
+      ],
+      "资源分配": [
+        "直拣池分配",
+        "补货池分配"
+      ]
+    }
+  },
+  "theme": {
+    "name": "light",
+    "domains": {}
+  },
+  "nodes": [
+    {
+      "id": "start-calc",
+      "description": "<b>策略启动</b><br>• 开始分流计算<br>• 加载当前快照",
+      "domain": "策略计算",
+      "subDomain": "数据准备",
+      "domainClass": "mid",
+      "type": "custom",
+      "metadata": {
+        "sequence": "1"
+      }
+    },
+    {
+      "id": "init-data",
+      "description": "<b>数据初始化</b><br>• 汇总拣选/存储库存<br>• 汇总所有订单需求",
+      "domain": "策略计算",
+      "subDomain": "数据准备",
+      "domainClass": "data",
+      "type": "custom",
+      "metadata": {
+        "sequence": "2"
+      }
+    },
+    {
+      "id": "check-inv-sufficiency",
+      "description": "<b>库存充足性校验</b><br>• 总库存 < 总需求?<br>• 判断是否需要降级",
+      "domain": "策略计算",
+      "subDomain": "数据准备",
+      "domainClass": "mid",
+      "type": "custom",
+      "metadata": {
+        "sequence": "2.1"
+      }
+    },
+    {
+      "id": "apply-satisfaction-rate",
+      "description": "<b>削减需求 (满足率)</b><br>• 计算 Rate = Inv / Demand<br>• 订单量 = 原需求 × Rate",
+      "domain": "策略计算",
+      "subDomain": "数据准备",
+      "domainClass": "data",
+      "type": "custom",
+      "metadata": {
+        "sequence": "2.2"
+      }
+    },
+    {
+      "id": "calc-theory-ratio",
+      "description": "<b>理论水位计算</b><br>• 计算拣选位占比<br>• 设定 Max_Ratio (如0.7)",
+      "domain": "策略计算",
+      "subDomain": "数据准备",
+      "domainClass": "data",
+      "type": "custom",
+      "metadata": {
+        "sequence": "3"
+      }
+    },
+    {
+      "id": "sort-demand",
+      "description": "<b>需求排序</b><br>• 门店需求从小到大<br>• 准备贪婪切分",
+      "domain": "策略计算",
+      "subDomain": "初分逻辑",
+      "domainClass": "mid",
+      "type": "custom",
+      "metadata": {
+        "sequence": "4"
+      }
+    },
+    {
+      "id": "check-limit",
+      "description": "<b>水位阈值判定</b><br>• 累计需求 ≤ Max_Ratio?<br>• 决定入池方向",
+      "domain": "策略计算",
+      "subDomain": "初分逻辑",
+      "domainClass": "mid",
+      "type": "custom",
+      "metadata": {
+        "sequence": "5"
+      }
+    },
+    {
+      "id": "pool-a-entry",
+      "description": "<b>归入直拣池 (Pool A)</b><br>• 累加直拣需求量<br>• 标记为直拣订单",
+      "domain": "策略计算",
+      "subDomain": "初分逻辑",
+      "domainClass": "fe",
+      "type": "custom",
+      "metadata": {
+        "sequence": "5.1"
+      }
+    },
+    {
+      "id": "pool-b-entry",
+      "description": "<b>归入补货池 (Pool B)</b><br>• 剩余需求触顶溢出<br>• 标记为补货订单",
+      "domain": "策略计算",
+      "subDomain": "初分逻辑",
+      "domainClass": "be-corp",
+      "type": "custom",
+      "metadata": {
+        "sequence": "5.2"
+      }
+    },
+    {
+      "id": "calc-real-ratio",
+      "description": "<b>实际占比修正</b><br>• 计算 Real_Ratio<br>• 修正理论偏差",
+      "domain": "策略计算",
+      "subDomain": "库存修正",
+      "domainClass": "data",
+      "type": "custom",
+      "metadata": {
+        "sequence": "6"
+      }
+    },
+    {
+      "id": "fix-quota",
+      "description": "<b>库存配额锁定</b><br>• 锁定直拣配额 (Quota A)<br>• 释放余量给补货池",
+      "domain": "策略计算",
+      "subDomain": "库存修正",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "metadata": {
+        "sequence": "7"
+      }
+    },
+    {
+      "id": "greedy-spec",
+      "description": "<b>规格贪婪分配</b><br>• 消耗 Quota A<br>• 优先满足大规格整箱",
+      "domain": "资源分配",
+      "subDomain": "直拣池分配",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "metadata": {
+        "sequence": "8"
+      }
+    },
+    {
+      "id": "check-rem",
+      "description": "<b>配额检查</b><br>• Quota A 是否耗尽?",
+      "domain": "资源分配",
+      "subDomain": "直拣池分配",
+      "domainClass": "mid",
+      "type": "custom",
+      "metadata": {
+        "sequence": "9"
+      }
+    },
+    {
+      "id": "sort-rem-round",
+      "description": "<b>零头轮询</b><br>• 剩余配额逐个分配<br>• 满足门店零头需求",
+      "domain": "资源分配",
+      "subDomain": "直拣池分配",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "metadata": {
+        "sequence": "10"
+      }
+    },
+    {
+      "id": "merge-res",
+      "description": "<b>全量资源合并</b><br>• 拣选余量 (Res) +<br>• 存储位库存 (Store)",
+      "domain": "资源分配",
+      "subDomain": "补货池分配",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "metadata": {
+        "sequence": "11"
+      }
+    },
+    {
+      "id": "alloc-mixed",
+      "description": "<b>混合贪婪分配</b><br>• 优先切分拣选余量<br>• 不足则切分存储位",
+      "domain": "资源分配",
+      "subDomain": "补货池分配",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "metadata": {
+        "sequence": "12"
+      }
+    },
+    {
+      "id": "check-source",
+      "description": "<b>库位来源判断</b><br>• 是否动用了存储位?",
+      "domain": "资源分配",
+      "subDomain": "补货池分配",
+      "domainClass": "mid",
+      "type": "custom",
+      "metadata": {
+        "sequence": "13"
+      }
+    },
+    {
+      "id": "task-direct-a",
+      "description": "<b>直拣任务生成</b><br>• 仅拣选作业<br>• 直接发货出库",
+      "domain": "作业执行",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "metadata": {
+        "sequence": "14"
+      }
+    },
+    {
+      "id": "task-rep-b",
+      "description": "<b>补货任务生成</b><br>• 存储->拣选移库<br>• 单据挂起等待",
+      "domain": "作业执行",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "metadata": {
+        "sequence": "15"
+      }
+    },
+    {
+      "id": "task-direct-b",
+      "description": "<b>拣漏直拣任务</b><br>• 这里无需补货<br>• 转为纯拣选单",
+      "domain": "作业执行",
+      "domainClass": "be-logistics",
+      "type": "custom",
+      "metadata": {
+        "sequence": "16"
+      }
+    },
+    {
+      "id": "end-wms",
+      "description": "<b>WMS作业释放</b><br>• 完成策略计算<br>• 作业下发",
+      "domain": "作业执行",
+      "domainClass": "external",
+      "type": "custom",
+      "metadata": {
+        "sequence": "17"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "start-calc",
+      "target": "init-data",
+      "type": "main"
+    },
+    {
+      "id": "e-check-inv",
+      "source": "init-data",
+      "target": "check-inv-sufficiency",
+      "type": "main",
+      "label": "基础数据"
+    },
+    {
+      "id": "e-shortage-yes",
+      "source": "check-inv-sufficiency",
+      "target": "apply-satisfaction-rate",
+      "type": "main",
+      "label": "缺货 (Inv < Demand)"
+    },
+    {
+      "id": "e-shortage-no",
+      "source": "check-inv-sufficiency",
+      "target": "calc-theory-ratio",
+      "type": "main",
+      "label": "充足"
+    },
+    {
+      "id": "e-rate-applied",
+      "source": "apply-satisfaction-rate",
+      "target": "calc-theory-ratio",
+      "type": "data",
+      "label": "修正需求 (Q*Rate)"
+    },
+    {
+      "id": "e3",
+      "source": "calc-theory-ratio",
+      "target": "sort-demand",
+      "type": "main",
+      "label": "Max_Ratio"
+    },
+    {
+      "id": "e4",
+      "source": "sort-demand",
+      "target": "check-limit",
+      "type": "main",
+      "label": "循环处理"
+    },
+    {
+      "id": "e5",
+      "source": "check-limit",
+      "target": "pool-a-entry",
+      "type": "main",
+      "label": "Yes (未满)"
+    },
+    {
+      "id": "e6",
+      "source": "check-limit",
+      "target": "pool-b-entry",
+      "type": "main",
+      "label": "No (溢出)"
+    },
+    {
+      "id": "e7",
+      "source": "pool-a-entry",
+      "target": "calc-real-ratio",
+      "type": "main",
+      "label": "汇聚"
+    },
+    {
+      "id": "e8",
+      "source": "pool-b-entry",
+      "target": "calc-real-ratio",
+      "type": "main",
+      "label": "汇聚"
+    },
+    {
+      "id": "e9",
+      "source": "calc-real-ratio",
+      "target": "fix-quota",
+      "type": "data",
+      "label": "Real_Ratio"
+    },
+    {
+      "id": "e10",
+      "source": "fix-quota",
+      "target": "greedy-spec",
+      "type": "dependency",
+      "label": "Quota A",
+      "data": {
+        "constraints": {
+          "obstacleBehavior": "strict",
+          "priority": -1
+        }
+      }
+    },
+    {
+      "id": "e11",
+      "source": "greedy-spec",
+      "target": "check-rem",
+      "type": "main"
+    },
+    {
+      "id": "e12",
+      "source": "check-rem",
+      "target": "sort-rem-round",
+      "type": "main",
+      "label": "有剩余"
+    },
+    {
+      "id": "e13",
+      "source": "check-rem",
+      "target": "task-direct-a",
+      "type": "main",
+      "label": "耗尽"
+    },
+    {
+      "id": "e14",
+      "source": "sort-rem-round",
+      "target": "task-direct-a",
+      "type": "main",
+      "label": "分配完"
+    },
+    {
+      "id": "e15",
+      "source": "pool-b-entry",
+      "target": "merge-res",
+      "type": "data",
+      "label": "Pool B Demand"
+    },
+    {
+      "id": "e16",
+      "source": "fix-quota",
+      "target": "merge-res",
+      "type": "data",
+      "label": "余量传递"
+    },
+    {
+      "id": "e17",
+      "source": "merge-res",
+      "target": "alloc-mixed",
+      "type": "main"
+    },
+    {
+      "id": "e18",
+      "source": "alloc-mixed",
+      "target": "check-source",
+      "type": "main"
+    },
+    {
+      "id": "e19",
+      "source": "check-source",
+      "target": "task-rep-b",
+      "type": "main",
+      "label": "用到存储"
+    },
+    {
+      "id": "e20",
+      "source": "check-source",
+      "target": "task-direct-b",
+      "type": "main",
+      "label": "拣选捡漏"
+    },
+    {
+      "id": "e21",
+      "source": "task-direct-a",
+      "target": "end-wms",
+      "type": "main"
+    },
+    {
+      "id": "e22",
+      "source": "task-rep-b",
+      "target": "end-wms",
+      "type": "dependency"
+    },
+    {
+      "id": "e23",
+      "source": "task-direct-b",
+      "target": "end-wms",
+      "type": "main"
+    }
+  ]
+}

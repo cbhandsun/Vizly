@@ -1,0 +1,1550 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { TrunkCalculator } from '../workers/core/TrunkCalculator';
+
+import { createDefaultRoutingConfig } from '../types/routing';
+import {
+    PathFindingJob,
+    PathFindingResult,
+
+    Point,
+    SharedGraphContext,
+} from '../types/routing';
+import { Edge, Position } from '@xyflow/react';
+import WorkerPool from '../workers/WorkerPool';
+import { EdgeRoutingCache } from './EdgeRoutingCache';
+import { RoutingPerformanceMonitor } from '../monitoring/RoutingPerformanceMonitor';
+import { IncrementalRoutingManager } from './IncrementalRoutingManager';
+import { PathfindingWorkerPool } from '../workers/PathfindingWorkerPool'; // [FIX] Partial lowercase filename
+import { RoutingStrategySelector } from '../algorithms/RoutingStrategySelector';
+import { VisibilityGraphCache } from '../algorithms/VisibilityGraphCache';
+import { setPathfindingConfig } from '../algorithms/pathfinding';
+import { LineObstacle, Rectangle } from '../algorithms/pathfinding';
+import { optimizePaths } from '../algorithms/LPNudge';
+
+/**
+ * [P0-2] Main coordination service for edge routing.
+ * Manages caching, worker delegation, and incremental updates.
+ */
+
+export interface RoutingRequest {
+    edgeId: string;
+    job: Partial<PathFindingJob> & {
+        source: string;
+        target: string;
+        sourceRect?: Rectangle;
+        targetRect?: Rectangle;
+    };
+    graph: SharedGraphContext;
+    priority?: number; // 0=High (Interactive), 1=Normal, 2=Low (Background)
+}
+
+export interface PortUsageStats {
+    top: number;
+    bottom: number;
+    left: number;
+    right: number;
+}
+
+// [Phase 1] Trunk Routing Configuration Constants
+const TRUNK_CONFIG = {
+    /** Unified deadzone threshold for side classification (±30px) */
+    DEADZONE_THRESHOLD: 30,
+    /** Minimum edges to form a bus trunk */
+    MIN_BUS_SIZE: 2,
+    /** Bias multiplier for feedback edges (Phase 2) */
+    FEEDBACK_BIAS: 1.5,
+} as const;
+
+/** [Phase 2] Debug data structure for trunk visualization */
+interface TrunkDebugData {
+    /** Edge ID */
+    edgeId: string;
+    /** Edge type (main, feedback, data, etc.) */
+    edgeType?: string;
+    /** Geometric delta */
+    delta: number;
+    /** Direction sign */
+    dirSign: number;
+    /** Classified side (1 = forward, -1 = backward) */
+    side: number;
+    /** Whether edge type influenced classification */
+    typeInfluenced: boolean;
+    /** Trunk geometry if assigned */
+    trunk?: {
+        direction: 'horizontal' | 'vertical';
+        axis: number;
+        range: { min: number; max: number };
+        port?: string;
+    };
+}
+
+/**
+ * [Phase 2] Classify edge side with Edge Type semantic support
+ * 
+ * @param delta - Geometric delta (peer position - hub position)
+ * @param dirSign - Direction sign based on layout (+1 for LR/TB, -1 for RL/BT)
+ * @param edgeType - Edge type ('feedback', 'main', etc.) for semantic classification
+ * @returns 1 for forward/positive side, -1 for backward/negative side
+ */
+function classifyEdgeSide(delta: number, dirSign: number, edgeType?: string): number {
+    // Semantic Rule: feedback edges are ALWAYS backward
+    if (edgeType === 'feedback') {
+        return -1;
+    }
+
+    // Apply unified deadzone threshold
+    const isForward = (delta * dirSign) > -TRUNK_CONFIG.DEADZONE_THRESHOLD;
+    return isForward ? 1 : -1;
+}
+
+export class EdgeRoutingCoordinator {
+    private static instance: EdgeRoutingCoordinator | null = null;
+    private workerPool: WorkerPool;
+    private cache: EdgeRoutingCache;
+    private monitor: RoutingPerformanceMonitor;
+    private incrementalManager: IncrementalRoutingManager;
+
+    // [P0] Parallel worker pool
+    private parallelPool: PathfindingWorkerPool | null = null;
+    private useParallelRouting: boolean = false;
+
+    // [P1.2] VG and Strategy optimizations
+    private vgCacheManager: VisibilityGraphCache;
+    private strategySelector: RoutingStrategySelector;
+
+    // [P0-2] State for incremental updates
+    private dirtyEdges: Set<string> = new Set();
+    private edgeDependencies: Map<string, Set<string>> = new Map(); // edgeId -> Set<nodeId>
+    private allEdges: Edge[] = [];
+    private graphVersion: number = 0;
+
+    // [P2-3] Port Usage for Congestion Awareness
+    // private portUsageStats: Record<string, PortUsageStats> = {};
+
+    // [P2-3] Pending Requests for Batching
+    // Track latest request per edge to avoid duplicate work in same tick
+    private latestRequests: Map<string, { request: RoutingRequest; graphKey: string; seq: number; updatedAt: number }> = new Map();
+    private requestSeq: number = 0;
+
+    // [NEW] Debug State
+    private debugEdgeId: string | null = null;
+    private onDebugData: ((data: unknown) => void) | null = null;
+
+    // [Phase 2] Trunk Debug Data Collection
+    private trunkDebugData: Map<string, TrunkDebugData> = new Map();
+
+    public clearDebugEdge(): void {
+        this.setDebugEdge(null);
+        console.log(`[EdgeRoutingCoordinator] Debug edge cleared.`);
+    }
+
+    // [FIX] Debounce Timer
+    private pendingTimeout: any = null;
+    // Map to store resolvers for pending edge requests
+    private pendingResolvers: Map<
+        string,
+        { resolve: (value: PathFindingResult | PromiseLike<PathFindingResult>) => void; seq: number }
+    > = new Map();
+
+    private readonly MAX_PENDING_SEGMENTS = 50;
+
+    /**
+     * [P0] Schedule a batch routing run (debounced).
+     * Call this after manually marking edges as dirty.
+     */
+    public scheduleBatchRouting(): void {
+        if (this.pendingTimeout) return;
+        console.log(`[DEBUG-WORKER-COORD] scheduleBatchRouting called with ${this.dirtyEdges.size} dirty edges`);
+        this.pendingTimeout = setTimeout(() => {
+            this.pendingTimeout = null;
+            console.log(`[DEBUG-WORKER-COORD] Timeout fired, calling triggerBatchRouting...`);
+            this.triggerBatchRouting();
+        }, 16);
+    }
+
+    private constructor() {
+        this.workerPool = WorkerPool.getInstance();
+        this.cache = EdgeRoutingCache.getInstance();
+        this.monitor = RoutingPerformanceMonitor.getInstance();
+        this.incrementalManager = new IncrementalRoutingManager();
+
+        // [P1.2] Initialize VG optimization modules
+        this.vgCacheManager = new VisibilityGraphCache({ maxSize: 10 });
+        this.strategySelector = new RoutingStrategySelector();
+
+        // Configure pathfinding to use P1.2 optimizations
+        setPathfindingConfig({
+            enableSmartStrategy: true,
+            strategySelector: this.strategySelector,
+            vgCacheManager: this.vgCacheManager
+        });
+
+        // Initialize parallel pool if enabled
+        this.initializeParallelPool();
+    }
+
+    /**
+     * [P0 OPTIMIZATION] Initialize parallel worker pool
+     */
+    private initializeParallelPool(): void {
+        try {
+            this.parallelPool = new PathfindingWorkerPool();
+            this.useParallelRouting = true;
+            console.log('[EdgeRoutingCoordinator] Parallel routing enabled');
+        } catch (error) {
+            console.warn('[EdgeRoutingCoordinator] Failed to initialize parallel pool:', error);
+            this.useParallelRouting = false;
+        }
+    }
+
+    public static getInstance(): EdgeRoutingCoordinator {
+        if (!EdgeRoutingCoordinator.instance) {
+            EdgeRoutingCoordinator.instance = new EdgeRoutingCoordinator();
+        }
+        return EdgeRoutingCoordinator.instance;
+    }
+
+    /**
+     * [P0] Get current graph version
+     */
+    public getGraphVersion(): number {
+        return this.graphVersion;
+    }
+
+    /**
+     * Mark the graph as dirty (topology changed).
+     * This invalidates the cache because routing depends on obstacles/other edges.
+     */
+    public notifyGraphChange(changedNodeIds?: string[]): void {
+        // [P2.1] Incremental cache invalidation
+        if (changedNodeIds && changedNodeIds.length > 0 && this.edgeDependencies.size > 0) {
+            // [FIX] DO NOT increment graphVersion in incremental mode!
+            // graphVersion is part of every cache key (getCachedResult uses it).
+            // Incrementing it invalidates ALL cached results, even for edges whose
+            // source/target didn't move. Only delete specific edge caches.
+            const affectedEdges = new Set<string>();
+            for (const nodeId of changedNodeIds) {
+                const deps = this.edgeDependencies.get(nodeId);
+                if (deps) {
+                    for (const edgeId of deps) {
+                        affectedEdges.add(edgeId);
+                        this.cache.deleteByEdgeId(edgeId);
+                    }
+                }
+            }
+            // Mark only affected edges as dirty
+            for (const edgeId of affectedEdges) {
+                this.dirtyEdges.add(edgeId);
+            }
+        } else {
+            // Fallback: full invalidation when no specific nodes provided
+            this.graphVersion++;
+            this.cache.clear();
+            this.dirtyEdges.clear();
+            this.allEdges.forEach(edge => this.dirtyEdges.add(edge.id));
+        }
+
+        this.workerPool.markDirty();
+
+        for (const [edgeId, pending] of this.pendingResolvers.entries()) {
+            const entry = this.latestRequests.get(edgeId);
+            const sx = entry?.request.job.sourceX ?? 0;
+            const sy = entry?.request.job.sourceY ?? 0;
+            const tx = entry?.request.job.targetX ?? 0;
+            const ty = entry?.request.job.targetY ?? 0;
+            pending.resolve({
+                jobId: entry?.request.job.jobId || edgeId,
+                edgeId,
+                path: `M ${sx} ${sy} L ${tx} ${ty}`,
+                points: [{ x: sx, y: sy }, { x: tx, y: ty }],
+                labelX: (sx + tx) / 2,
+                labelY: (sy + ty) / 2,
+                error: 'Graph changed'
+            });
+        }
+        this.pendingResolvers.clear();
+    }
+
+    /**
+     * [FIX] Force clear ALL caches and reset routing state
+     * More thorough than notifyGraphChange - clears port usage, dependencies, etc.
+     */
+    public forceClearAllCaches(): void {
+        this.cache.clear();
+        this.workerPool.markDirty();
+        // this.portUsageStats = {};
+        this.dirtyEdges.clear();
+        this.edgeDependencies.clear();
+        this.latestRequests.clear(); // [NEW] Prevent batchRouteDirtyEdges from using old coords
+        this.graphVersion++;
+        
+        // [NEW] Clear global SVG path cache to prevent "flying lines" UI fallback
+        try {
+            const cache = (window as any).__dv_rendered_path_cache__;
+            if (cache instanceof Map) {
+                cache.clear();
+            }
+        } catch (e) {}
+
+        console.log('[EdgeRoutingCoordinator] All caches forcefully cleared');
+    }
+
+    private onSelectionChange: ((edgeId: string | null) => void) | null = null;
+
+    public setDebugEdge(edgeId: string | null) {
+        this.debugEdgeId = edgeId;
+        if (this.onSelectionChange) {
+            this.onSelectionChange(edgeId);
+        }
+    }
+
+    public forceDebugReRoute(edgeId?: string | null): void {
+        const targetId = edgeId ?? this.debugEdgeId;
+        if (!targetId) {
+            return;
+        }
+        this.setDebugEdge(targetId);
+
+        const entry = this.latestRequests.get(targetId);
+        if (!entry) {
+            console.warn('[EdgeRoutingCoordinator] forceDebugReRoute: no latest request for edge', targetId);
+            return;
+        }
+
+        this.dirtyEdges.add(targetId);
+
+        if (this.pendingTimeout) {
+            clearTimeout(this.pendingTimeout);
+        }
+        this.pendingTimeout = setTimeout(() => {
+            this.pendingTimeout = null;
+            this.triggerBatchRouting();
+        }, 0);
+    }
+
+    public registerDebugListener(callback: (data: unknown) => void) {
+        this.onDebugData = callback;
+    }
+
+    public registerSelectionListener(callback: (edgeId: string | null) => void) {
+        this.onSelectionChange = callback;
+    }
+
+    /**
+     * Route an edge using Cache -> Worker fallback.
+     * [P2-3] Refactored for separate Job and Graph Context
+     */
+    public async route(request: RoutingRequest): Promise<PathFindingResult> {
+        const startTime = performance.now();
+        const { edgeId, job, graph } = request;
+        const isBus = !!job.isOneToMany || !!job.isManyToOne;
+
+        // 1. Generate Cache Key
+        const cacheParams = {
+            ...this.extractCacheableParams(job, graph),
+            version: this.graphVersion
+        };
+        const key = this.cache.generateKey(edgeId, cacheParams);
+
+        // 2. Check Cache
+        const cached = isBus ? null : this.cache.get(key);
+        if (cached) {
+            this.monitor.track({
+                edgeId: edgeId,
+                routingTime: performance.now() - startTime,
+                cacheHit: true
+            });
+            return cached;
+        }
+
+        // 3. Register for Batch Processing and Wait
+        return new Promise<PathFindingResult>((resolve) => {
+            const existing = this.pendingResolvers.get(edgeId);
+            if (existing) {
+                // [FIX] Chain resolvers instead of overwriting.
+                // When React StrictMode or component remount causes route() to be
+                // called multiple times for the same edge, the old resolver would be
+                // overwritten, orphaning the old Promise (it would never resolve).
+                // By chaining, ALL Promises for this edge resolve together.
+                const previousResolve = existing.resolve;
+                existing.resolve = (result: PathFindingResult | PromiseLike<PathFindingResult>) => {
+                    previousResolve(result);
+                    resolve(result);
+                };
+                // Update the request data with latest coordinates
+                this.registerRoutingRequest(request, existing.seq);
+            } else {
+                const seq = ++this.requestSeq;
+                this.pendingResolvers.set(edgeId, { resolve, seq });
+                this.registerRoutingRequest(request, seq);
+            }
+        });
+    }
+
+    /**
+     * [P0] Fallback to serial routing if parallel fails
+     */
+    private async routeSerialFallback(
+        jobs: PathFindingJob[],
+        graph: SharedGraphContext
+    ): Promise<PathFindingResult[]> {
+        // [FIX] Ensure Bus Indices are assigned even in serial fallback
+        // This is critical because if parallel routing fails or is disabled,
+        // we still need the trunk geometry for proper bus routing.
+        this.assignBusIndices(jobs, graph);
+        this.assignGlobalChannels(jobs);
+
+        const results: PathFindingResult[] = [];
+
+        for (const job of jobs) {
+            try {
+                const result = await this.workerPool.calculatePath(job, graph as any);
+                results.push(result);
+            } catch (err) {
+                console.error(`[Coordinator] Serial routing failed for ${job.edgeId}:`, err);
+                // [FIX] Return fallback path instead of empty string to ensure visibility
+                const fallbackPath = `M ${job.sourceX} ${job.sourceY} L ${job.targetX} ${job.targetY}`;
+                results.push({
+                    jobId: job.jobId,
+                    edgeId: job.edgeId,
+                    path: fallbackPath,
+                    points: [{ x: job.sourceX, y: job.sourceY }, { x: job.targetX, y: job.targetY }],
+                    labelX: (job.sourceX + job.targetX) / 2,
+                    labelY: (job.sourceY + job.targetY) / 2,
+                    error: String(err)
+                });
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * [P2-3] Extract parameters relevant for caching key
+     */
+    private extractCacheableParams(job: Partial<PathFindingJob> & { sourceRect?: Rectangle; targetRect?: Rectangle }, _graph: SharedGraphContext): Record<string, unknown> {
+        // We only care about things that affect pathfinding geometry
+        return {
+            s: job.source,
+            t: job.target,
+            sx: Math.round(job.sourceX ?? 0),
+            sy: Math.round(job.sourceY ?? 0),
+            tx: Math.round(job.targetX ?? 0),
+            ty: Math.round(job.targetY ?? 0),
+            sr: job.sourceRect ? `${job.sourceRect.x},${job.sourceRect.y},${job.sourceRect.width},${job.sourceRect.height}` : '0',
+            tr: job.targetRect ? `${job.targetRect.x},${job.targetRect.y},${job.targetRect.width},${job.targetRect.height}` : '0',
+            // Include obstacles signature? Ideally yes, but maybe graph version handles it.
+            // For now rely on graphVersion for global obstacle changes.
+            // But if we want local caching, we might need a spatial hash of relevant obstacles.
+            // @ts-expect-error - Job type is loose string in legacy code
+            type: job.type || 's', // Smart
+            // [FIX] Include Bus Routing params in cache key
+            bus: `${!!(job as any).isOneToMany}|${!!(job as any).isManyToOne}|${(job as any).busTrunkSource?.x ?? 0},${(job as any).busTrunkSource?.y ?? 0}|${(job as any).busTrunkTarget?.x ?? 0},${(job as any).busTrunkTarget?.y ?? 0}`,
+            // Include port preferences/constraints if any
+        };
+    }
+
+    /**
+     * [P0-2] Initialize edge dependencies for incremental routing.
+     * Call this once with all edges to build the dependency graph.
+     */
+    public initializeEdges(edges: Edge[]): void {
+        const oldEdgeIds = new Set(this.allEdges.map(e => e.id));
+        const newEdgeIds = new Set(edges.map(e => e.id));
+        const affectedNodes = new Set<string>();
+
+        // Detect removed edges
+        this.allEdges.forEach(e => {
+            if (!newEdgeIds.has(e.id)) {
+                affectedNodes.add(e.source);
+                affectedNodes.add(e.target);
+            }
+        });
+
+        // Detect added or changed edges
+        edges.forEach(e => {
+            if (!oldEdgeIds.has(e.id)) {
+                affectedNodes.add(e.source);
+                affectedNodes.add(e.target);
+            } else {
+                const old = this.allEdges.find(o => o.id === e.id);
+                if (old && (old.source !== e.source || old.target !== e.target)) {
+                    affectedNodes.add(old.source);
+                    affectedNodes.add(old.target);
+                    affectedNodes.add(e.source);
+                    affectedNodes.add(e.target);
+                }
+            }
+        });
+
+        this.allEdges = edges;
+        this.edgeDependencies.clear();
+
+        // Build dependency map: edge → nodes it depends on
+        edges.forEach(edge => {
+            const deps = new Set<string>();
+            deps.add(edge.source);
+            deps.add(edge.target);
+            this.edgeDependencies.set(edge.id, deps);
+        });
+
+        // [FIX] Invalidate affected nodes to trigger peer re-routing when topology changes
+        if (affectedNodes.size > 0 && oldEdgeIds.size > 0) {
+            this.notifyGraphChange(Array.from(affectedNodes));
+        }
+
+        console.log(`[EdgeRoutingCoordinator] Initialized ${edges.length} edges for incremental routing`);
+    }
+
+    /**
+     * [P0-2] Mark nodes as changed (e.g., during drag).
+     * This marks all edges connected to these nodes as dirty.
+     */
+    public markNodesChanged(nodeIds: string[] | string): void {
+        const ids = Array.isArray(nodeIds) ? nodeIds : [nodeIds];
+        const initialDirty = new Set<string>();
+
+        ids.forEach(nodeId => {
+            // Find all edges that depend on this node
+            this.edgeDependencies.forEach((deps, edgeId) => {
+                if (deps.has(nodeId)) {
+                    initialDirty.add(edgeId);
+                }
+            });
+        });
+
+        // [FIX] Expand dirty set to include siblings (edges sharing source or target).
+        // Since bus trunk centroids depend on ALL peers, moving one peer must invalidate and re-route ALL peers.
+        initialDirty.forEach(edgeId => {
+            this.dirtyEdges.add(edgeId);
+            const edge = this.allEdges.find(e => e.id === edgeId);
+            if (edge) {
+                this.allEdges.forEach(sibling => {
+                    if (sibling.source === edge.source || sibling.target === edge.target) {
+                        this.dirtyEdges.add(sibling.id);
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * [P0-2] Get list of dirty edges that need rerouting.
+     */
+    public getDirtyEdges(): string[] {
+        return Array.from(this.dirtyEdges);
+    }
+
+    /**
+     * [P0-2] Clear dirty flags after rerouting.
+     */
+    public clearDirtyEdges(): void {
+        this.dirtyEdges.clear();
+    }
+
+    /**
+     * [P0-2] Check if incremental routing is needed.
+     */
+    public hasDirtyEdges(): boolean {
+        return this.dirtyEdges.size > 0;
+    }
+
+    /**
+     * [P0-2] Get incremental routing statistics.
+     */
+    public getIncrementalStats(): { total: number; dirty: number; ratio: number } {
+        const total = this.allEdges.length;
+        const dirty = this.dirtyEdges.size;
+        return {
+            total,
+            dirty,
+            ratio: total > 0 ? dirty / total : 0
+        };
+    }
+
+    private buildJob(request: RoutingRequest): PathFindingJob {
+        const baseJob = request.job as Partial<PathFindingJob>;
+        return {
+            ...baseJob,
+            edgeId: request.edgeId,
+            jobId: baseJob.jobId || request.edgeId
+        } as PathFindingJob;
+    }
+
+    public registerRoutingRequest(request: RoutingRequest, seq?: number): void {
+        const graphKey = this.buildGraphKey(request.graph);
+        const s = typeof seq === 'number' ? seq : ++this.requestSeq;
+        const _isFirstRequest = !this.latestRequests.has(request.edgeId);
+        this.latestRequests.set(request.edgeId, { request, graphKey, seq: s, updatedAt: performance.now() });
+        
+        // [FIX] Any requested edge MUST be added to dirty batch.
+        // If the smart edge hook dispatched a route() request, its fingerprint changed 
+        // (e.g. user toggled edge type). Without this, the Promise never resolves and the edge 
+        // enters a permanent fallback 'Straight Line' mode.
+        this.dirtyEdges.add(request.edgeId);
+
+        // Debounce trigger
+        this.scheduleBatchRouting();
+    }
+
+    private async triggerBatchRouting() {
+        console.log(`[DEBUG-WORKER-COORD] triggerBatchRouting: dirtyEdges=${this.dirtyEdges.size}, pendingResolvers=${this.pendingResolvers.size}`);
+        if (!this.hasDirtyEdges()) return;
+
+        try {
+            console.log(`[DEBUG-WORKER-COORD] calling batchRouteDirtyEdges...`);
+            const results = await this.batchRouteDirtyEdges();
+            console.log(`[DEBUG-WORKER-COORD] batchRouteDirtyEdges returned: ${results.size} results, remaining pendingResolvers=${this.pendingResolvers.size}`);
+        } catch (err: any) {
+            console.error(`[DEBUG-WORKER-COORD] batchRouteDirtyEdges failed:`, err);
+            // [FIX] Ensure pending resolvers are cleared to avoid deadlocks
+            for (const [edgeId, pending] of this.pendingResolvers.entries()) {
+                const entry = this.latestRequests.get(edgeId);
+                const sx = entry?.request.job.sourceX ?? 0;
+                const sy = entry?.request.job.sourceY ?? 0;
+                const tx = entry?.request.job.targetX ?? 0;
+                const ty = entry?.request.job.targetY ?? 0;
+                pending.resolve({
+                    jobId: entry?.request.job.jobId || edgeId,
+                    edgeId,
+                    path: `M ${sx} ${sy} L ${tx} ${ty}`,
+                    points: [{ x: sx, y: sy }, { x: tx, y: ty }],
+                    labelX: (sx + tx) / 2,
+                    labelY: (sy + ty) / 2,
+                    error: 'Batch routing failed: ' + err.message
+                });
+            }
+            this.pendingResolvers.clear();
+        }
+    }
+
+    public getCachedResult(request: RoutingRequest): PathFindingResult | null {
+        const cacheParams = {
+            ...this.extractCacheableParams(request.job, request.graph),
+            version: this.graphVersion
+        };
+        const key = this.cache.generateKey(request.edgeId, cacheParams);
+        return this.cache.get(key) ?? null;
+    }
+
+    /**
+     * [P1.2] Simplified graph key using version number.
+     * Since graphVersion increments on every topology change,
+     * this is sufficient for grouping purposes.
+     */
+    private buildGraphKey(_graph: SharedGraphContext): string {
+        return `v${this.graphVersion}`;
+    }
+
+    /**
+     * [P0-2] Batch route all dirty edges.
+     * Uses parallel worker pool if available.
+     */
+    public async batchRouteDirtyEdges(): Promise<Map<string, PathFindingResult>> {
+        const resultsMap = new Map<string, PathFindingResult>();
+        const dirtyIds = this.getDirtyEdges();
+        if (dirtyIds.length === 0) return resultsMap;
+
+        const entries = dirtyIds
+            .map(id => this.latestRequests.get(id))
+            .filter((entry): entry is { request: RoutingRequest; graphKey: string; seq: number; updatedAt: number } => Boolean(entry));
+
+        if (entries.length === 0) {
+            // [FIX] Prevent infinite loop where dirty edges exist but have no pending requests
+            this.dirtyEdges.clear();
+            return resultsMap;
+        }
+
+        const groups = new Map<string, { graph: SharedGraphContext; requests: RoutingRequest[]; graphKey: string; seqByEdge: Map<string, number> }>();
+
+        const freshest = entries.reduce((a, b) => (a.updatedAt >= b.updatedAt ? a : b));
+        const unifiedKey = freshest.graphKey;
+        const seqByEdge = new Map<string, number>();
+        const requests = entries.map(e => {
+            seqByEdge.set(e.request.edgeId, e.seq);
+            return e.request;
+        });
+        groups.set(unifiedKey, { graph: freshest.request.graph, requests, graphKey: freshest.graphKey, seqByEdge });
+
+        // [DEBUG] Check Grouping
+        // console.log(`[Coordinator] Batch Routing: ${dirtyIds.length} dirty edges grouped into ${groups.size} batches.`);
+        // groups.forEach((g, k) => console.log(`  Batch Key (short): ${k.substring(0, 20)}... Size: ${g.requests.length}`));
+
+        for (const group of groups.values()) {
+            const startTime = performance.now();
+            const jobs = group.requests.map(req => {
+                const job = this.buildJob(req);
+                if (this.debugEdgeId && req.edgeId === this.debugEdgeId) {
+                    job.debug = true;
+                }
+                return job;
+            });
+
+            // [FIX] Assign Bus Indices for Nudge
+            this.assignBusIndices(jobs, group.graph);
+
+            // [FIX] Assign Global Channels for Crossing Reduction
+            this.assignGlobalChannels(jobs);
+
+            // [FIX] Inject neighbor context for congestion
+            this.injectCongestionContext(jobs, group.graph);
+
+            const relatedNodeIds = new Set<string>();
+            group.requests.forEach(req => {
+                if (req.job?.source) relatedNodeIds.add(req.job.source);
+                if (req.job?.target) relatedNodeIds.add(req.job.target);
+            });
+            const pendingEdges = this.collectPendingEdges(group.graphKey, relatedNodeIds, this.MAX_PENDING_SEGMENTS);
+            const graphContext = pendingEdges.length > 0
+                ? { ...group.graph, pendingEdges: [...(group.graph.pendingEdges ?? []), ...pendingEdges] }
+                : group.graph;
+
+            const results = await this.routeParallel(jobs, graphContext);
+
+            // [NEW] Global Nudging: separate parallel line segments (LPNudge)
+            const config = group.graph.config;
+            const isNudgeEnabled = config?.postProcessing?.enableNudge !== false;
+            
+            if (isNudgeEnabled && results.length > 1) {
+                this.applyGlobalNudge(results, group.requests, group.graph);
+            }
+
+            // [FIX] Iterate over REQUESTS to ensure every request gets a response (Prevent Hanging Promises)
+            group.requests.forEach((req, index) => {
+                const expectedSeq = group.seqByEdge.get(req.edgeId);
+                const latestSeq = this.latestRequests.get(req.edgeId)?.seq;
+                // [FIX] Do NOT skip processing when seq mismatches.
+                // The old code returned early here, but this left the pendingResolver
+                // permanently unresolved — the component's Promise.then() never fires.
+                // The result is still fresh (just computed by the Worker), so use it.
+                const isSuperseded = typeof expectedSeq === 'number' && typeof latestSeq === 'number' && expectedSeq !== latestSeq;
+
+                const result = results[index];
+
+                if (!result) {
+                    console.error(`[Coordinator] Missing result for edge ${req.edgeId} at index ${index}`);
+                    const pending = this.pendingResolvers.get(req.edgeId);
+                    if (pending) {
+                        const sx = req.job.sourceX ?? 0;
+                        const sy = req.job.sourceY ?? 0;
+                        const tx = req.job.targetX ?? 0;
+                        const ty = req.job.targetY ?? 0;
+                        pending.resolve({
+                            jobId: req.job.jobId || req.edgeId,
+                            edgeId: req.edgeId,
+                            path: `M ${sx} ${sy} L ${tx} ${ty}`,
+                            points: [{ x: sx, y: sy }, { x: tx, y: ty }],
+                            labelX: (sx + tx) / 2,
+                            labelY: (sy + ty) / 2,
+                            error: 'Missing result from parallel routing'
+                        });
+                        this.pendingResolvers.delete(req.edgeId);
+                    }
+                    return;
+                }
+
+                const isBus = !!(req.job as any).isOneToMany || !!(req.job as any).isManyToOne;
+                if (!isBus) {
+                    const cacheParams = {
+                        ...this.extractCacheableParams(req.job, group.graph),
+                        version: this.graphVersion
+                    };
+                    const key = this.cache.generateKey(req.edgeId, cacheParams);
+                    this.cache.set(key, result);
+                }
+
+                // [FIX] Track Performance
+                this.monitor.track({
+                    edgeId: req.edgeId,
+                    routingTime: performance.now() - startTime,
+                    cacheHit: false,
+                    workerTime: result.metadata?.executionTime
+                });
+
+                const shouldEmitDebug =
+                    (this.debugEdgeId && req.edgeId === this.debugEdgeId) ||
+                    jobs[index]?.debug ||
+                    group.graph.config?.debug;
+                if (shouldEmitDebug) {
+                    // [FIX] Explicitly log to console to ensure Alt+Click works even if UI callback is detached
+                    console.log(`\n======================================================`);
+                    console.log(`[EdgeRoutingCoordinator] 🐞 DEBUG DATA FOR EDGE: ${req.edgeId}`);
+                    console.log(`======================================================`);
+                    console.dir(result, { depth: null });
+                    const trunkData = this.trunkDebugData.get(req.edgeId);
+                    if (trunkData) console.log(`[EdgeRoutingCoordinator] Trunk classification:`, trunkData);
+                    console.log(`======================================================\n`);
+
+                    if (this.onDebugData) {
+                        this.onDebugData({
+                            edgeId: req.edgeId,
+                            pathPoints: result.points,
+                            metadata: result.metadata,
+                            ...(result.debugInfo || {}),
+                            // [Phase 2] Trunk classification info
+                            trunkClassification: trunkData ? {
+                                side: trunkData.side > 0 ? 'FORWARD' : 'BACKWARD',
+                                edgeType: trunkData.edgeType,
+                                delta: trunkData.delta,
+                                typeInfluenced: trunkData.typeInfluenced,
+                                trunk: trunkData.trunk
+                            } : null
+                        });
+                    }
+                }
+                resultsMap.set(req.edgeId, result);
+                // Only clear dirty flag if this is the latest request
+                if (!isSuperseded) {
+                    this.dirtyEdges.delete(req.edgeId);
+                }
+
+                // [FIX] Always resolve the pending resolver, regardless of seq.
+                // The result is fresh from the Worker. Even if a newer request was
+                // registered during async computation, the geometric result is still
+                // valid (coordinates haven't changed, only the seq counter advanced
+                // due to React re-renders).
+                const pending = this.pendingResolvers.get(req.edgeId);
+                if (pending) {
+                    pending.resolve(result);
+                    this.pendingResolvers.delete(req.edgeId);
+                }
+            });
+        }
+
+        return resultsMap;
+    }
+
+    private collectPendingEdges(graphKey: string, relatedNodeIds: Set<string>, maxSegments: number): LineObstacle[] {
+        const pendingEdges: LineObstacle[] = [];
+        for (const [edgeId, entry] of this.latestRequests.entries()) {
+            if (this.dirtyEdges.has(edgeId)) continue;
+            if (entry.graphKey !== graphKey) continue;
+            if (relatedNodeIds.size > 0) {
+                const sourceId = entry.request.job?.source;
+                const targetId = entry.request.job?.target;
+                if (sourceId && relatedNodeIds.has(sourceId) === false && targetId && relatedNodeIds.has(targetId) === false) {
+                    continue;
+                }
+            }
+            const cached = this.getCachedResult(entry.request);
+            if (!cached?.points || cached.points.length < 2) continue;
+            for (let i = 0; i < cached.points.length - 1; i++) {
+                pendingEdges.push({
+                    start: cached.points[i],
+                    end: cached.points[i + 1]
+                });
+                if (pendingEdges.length >= maxSegments) {
+                    return pendingEdges;
+                }
+            }
+        }
+        return pendingEdges;
+    }
+
+    /**
+     * [P0] Perform incremental routing for dirty edges.
+     * Called by UI loop or scheduler.
+     */
+    public async routeIncremental(context: SharedGraphContext): Promise<Map<string, PathFindingResult>> {
+        const _changedNodes = this.identifyChangedNodes(context.nodes as any[], this.allEdges); // Need previous state?
+        // Actually, dirtyEdges should be maintained by markNodesChanged calls from UI.
+        // If not, we can diff here. For now assume external marking.
+
+        return this.batchRouteDirtyEdges();
+    }
+
+    // Identifies nodes that moved significantly - Placeholder
+    private identifyChangedNodes(_allNodes: any[], _allEdges: Edge[]): string[] {
+        return [];
+    }
+
+    /**
+     * [P0] Route all edges using parallel worker pool
+     * Target: 60-75% performance improvement for initial render
+     */
+    public async routeParallel(
+        jobs: PathFindingJob[],
+        graph: SharedGraphContext,
+        _onProgress?: (completed: number, total: number) => void
+    ): Promise<PathFindingResult[]> {
+        // [SYNC] Populate allEdges to enable Nudge context for this batch
+        if (this.allEdges.length === 0 && jobs.length > 0) {
+            // Map PathFindingJob to Edge-like structure to avoid @ts-ignore
+            this.allEdges = jobs.map(job => ({
+                id: job.edgeId,
+                source: job.source,
+                target: job.target,
+                data: {}
+            })) as any[];
+        }
+        if (!this.useParallelRouting || !this.parallelPool) {
+            // console.warn('[P0 Parallel] Pool not available, falling back to serial routing');
+            return this.routeSerialFallback(jobs, graph);
+        }
+
+        // console.log(`[P0 Parallel] Routing ${jobs.length} edges with worker pool`);
+
+        try {
+            // [FIX] Assign Bus Indices for Nudge
+            this.assignBusIndices(jobs, graph);
+
+            // Use calculatePaths (alias for routeBatch) compatibility
+            console.log(`[DEBUG-WORKER-COORD] calling parallelPool.calculatePaths for ${jobs.length} jobs...`);
+            const results = await this.parallelPool.calculatePaths(jobs, graph);
+            console.log(`[DEBUG-WORKER-COORD] parallelPool.calculatePaths returned ${results?.length} results`);
+
+            if (!results || results.length !== jobs.length) {
+                console.error(`[DEBUG-WORKER-COORD] Parallel routing returned incomplete results. Expected ${jobs.length}, got ${results?.length}`);
+                // Fallback to serial? Or fill with errors?
+                // For now, let it crash to fallback in catch block if it throws, otherwise we might have partial results.
+            }
+
+
+            return results;
+        } catch (error) {
+            console.error('[P0 Parallel] Failed, falling back to serial:', error);
+            return this.routeSerialFallback(jobs, graph);
+        }
+    }
+
+    /**
+     * [P0] Get incremental routing statistics
+     */
+    public getOptimizationStats() {
+        return {
+            incremental: this.incrementalManager.getStats(),
+            parallel: this.parallelPool?.getStats() || null,
+            cache: this.cache.getStats(),
+            // [P1.2] VG optimization stats
+            vgCache: this.vgCacheManager.getStats(),
+            strategy: this.strategySelector.getStats()
+        };
+    }
+
+    /**
+     * [P0] Enable/disable parallel routing
+     */
+    public setParallelRoutingEnabled(enabled: boolean): void {
+        this.useParallelRouting = enabled && !!this.parallelPool;
+        console.log(`[P0] Parallel routing ${this.useParallelRouting ? 'enabled' : 'disabled'}`);
+    }
+
+    /**
+     * [P1.2] Clear VG cache
+     */
+    public clearVisibilityGraphCache(): void {
+        this.vgCacheManager.clear();
+        console.log('[P1.2] VG cache cleared');
+    }
+
+    /**
+     * [P1.2] Get VG cache statistics
+     */
+    public getVGCacheStats() {
+        return this.vgCacheManager.getStats();
+    }
+
+    /**
+     * [P1.2] Set VG cache max size
+     */
+    public setVGCacheSize(maxSize: number): void {
+        this.vgCacheManager.setMaxSize(maxSize);
+        console.log(`[P1.2] VG cache size set to ${maxSize}`);
+    }
+
+    // [P0] Assign Bus Indices (outgoingIndex, outgoingCount, etc.)
+    // Groups edges by (source, target) AND sorts them to ensure deterministic parallel routing.
+    // [FIX] Now uses graph.edges to detect bus membership globally, ensuring isolated updates respect the bus.
+    // [NEW] Calculates Trunk Geometry centrally to avoid fragmentation in batched workers.
+    // [P0] Assign Bus Indices (outgoingIndex, outgoingCount, etc.)
+    // Groups edges by (source, target) AND sorts them to ensure deterministic parallel routing.
+    // [FIX] Now uses graph.edges to detect bus membership globally, ensuring isolated updates respect the bus.
+    // [NEW] Uses centralized processBusGroups for consistent Trunk Geometry.
+    private assignBusIndices(jobs: PathFindingJob[], graph: SharedGraphContext): void {
+        // [FIX] Consolidate Ground Truth Topology to prevent State Tearing anomaly.
+        // During rapid fast-mounting in React (like changing layout/mode), individual 
+        // coordinate requests may arrive carrying temporally staggered snapshot graph instances. 
+        // We MUST manually ensure that every single job designated for processing in this exact 
+        // batch is physically represented within the relational matrix, otherwise siblings will be splintered.
+        const rawGraphEdges = (graph.edges || []) as Array<{ id: string; source: string; target: string; sourceHandle?: string; targetHandle?: string }>;
+        const consolidatedEdgesMap = new Map<string, typeof rawGraphEdges[number]>();
+        
+        rawGraphEdges.forEach(e => consolidatedEdgesMap.set(e.id, e));
+        jobs.forEach(j => {
+            if (!consolidatedEdgesMap.has(j.edgeId)) {
+                consolidatedEdgesMap.set(j.edgeId, { 
+                    id: j.edgeId, 
+                    source: j.source, 
+                    target: j.target, 
+                    sourceHandle: j.sourceHandle || undefined, 
+                    targetHandle: j.targetHandle || undefined 
+                });
+            }
+        });
+        const allEdges = Array.from(consolidatedEdgesMap.values());
+        const allNodes = graph.nodes as Array<{ id: string; position?: { x: number; y: number }; measured?: { width?: number; height?: number }; width?: number; height?: number; parentId?: string; positionAbsolute?: { x: number; y: number }; computed?: { positionAbsolute?: { x: number; y: number } } }>;
+        const defaultConfig = createDefaultRoutingConfig();
+
+        // [FIX] Create Node Map for O(1) lookup and Parent Traversal
+        const nodeMap = new Map<string, typeof allNodes[number]>();
+        allNodes.forEach(n => nodeMap.set(n.id, n));
+
+        // [FIX] Helper to get Absolute Position with Parent Traversal
+        const getAbsolutePosition = (node: any): { x: number, y: number } => {
+            // Priority 1: RF Computed Absolute (Fastest)
+            if (node.computed?.positionAbsolute) return node.computed.positionAbsolute;
+            if (node.positionAbsolute) return node.positionAbsolute;
+
+            // Priority 2: Manual Parent Traversal
+            const pId = node.parentId || node.parentNode;
+            if (pId && nodeMap.has(pId)) {
+                const parent = nodeMap.get(pId);
+                const parentAbs = getAbsolutePosition(parent);
+                return {
+                    x: parentAbs.x + (node.position?.x ?? 0),
+                    y: parentAbs.y + (node.position?.y ?? 0)
+                };
+            }
+
+            // Priority 3: Base Case (No parent, return relative)
+            return node.position || { x: node.x ?? 0, y: node.y ?? 0 };
+        };
+
+        // Helper: Get Node Rect
+        const getNodeRect = (id: string): Rectangle | undefined => {
+            const n = nodeMap.get(id);
+            if (!n) return undefined;
+            const w = n.width || n.measured?.width || 150;
+            const h = n.height || n.measured?.height || 80;
+
+            // [FIX] Use robust absolute position
+            const absPos = getAbsolutePosition(n);
+            return { x: absPos.x, y: absPos.y, width: w, height: h };
+        };
+
+        // [FIX] Pre-populate Absolute Geometry for Worker
+        jobs.forEach(job => {
+            job.sourceRect = getNodeRect(job.source);
+            job.targetRect = getNodeRect(job.target);
+        });
+
+        const trunkCalculator = new TrunkCalculator();
+        const layoutDir = (graph as any).layoutDirection || 'LR';
+
+        // 1. One-to-Many Processing (Source Groups)
+        const sourceGroups = new Map<string, PathFindingJob[]>();
+        jobs.forEach(job => {
+            // [FIX] Context flag `job.isOneToMany` might be stale due to React cache optimizations.
+            // We use global `allEdges` to establish the Ground Truth.
+            const globalOutgoing = allEdges.filter(e => e.source === job.source);
+            job.isOneToMany = globalOutgoing.length > 1;
+            
+            if (!sourceGroups.has(job.source)) sourceGroups.set(job.source, []);
+            sourceGroups.get(job.source)?.push(job);
+        });
+
+        sourceGroups.forEach((groupJobs, sourceId) => {
+            const busJobs = groupJobs.filter(j => j.isOneToMany);
+            if (busJobs.length > 0) {
+                const globalOutgoing = allEdges.filter(e => e.source === sourceId);
+                this.processBusGroups(
+                    sourceId,
+                    busJobs,
+                    globalOutgoing,
+                    getNodeRect,
+                    trunkCalculator,
+                    defaultConfig,
+                    layoutDir,
+                    false // isManyToOne = false
+                );
+            }
+        });
+
+        // 2. Many-to-One Processing (Target Groups)
+        const targetGroups = new Map<string, PathFindingJob[]>();
+        jobs.forEach(job => {
+            // [FIX] Establish Ground Truth for N:1 relationships
+            const globalIncoming = allEdges.filter(e => e.target === job.target);
+            job.isManyToOne = globalIncoming.length > 1;
+            
+            if (!targetGroups.has(job.target)) targetGroups.set(job.target, []);
+            targetGroups.get(job.target)?.push(job);
+        });
+
+        targetGroups.forEach((groupJobs, targetId) => {
+            const busJobs = groupJobs.filter(j => j.isManyToOne);
+            if (busJobs.length > 0) {
+                const globalIncoming = allEdges.filter(e => e.target === targetId);
+                this.processBusGroups(
+                    targetId,
+                    busJobs,
+                    globalIncoming,
+                    getNodeRect,
+                    trunkCalculator,
+                    defaultConfig,
+                    layoutDir,
+                    true // isManyToOne = true
+                );
+            } else {
+                // Fallback for non-bus incoming groups
+                groupJobs.sort((a, b) => (a.sourceY || 0) - (b.sourceY || 0));
+                groupJobs.forEach((job, index) => {
+                    job.incomingIndex = index;
+                    job.incomingCount = groupJobs.length;
+                });
+            }
+        });
+
+        // 3. Parallel Groups (Non-Bus)
+        // Ensure basic indexing for parallel edges not handled by bus logic
+        const parallelGroups = new Map<string, PathFindingJob[]>();
+        jobs.forEach(job => {
+            if (job.isOneToMany || job.isManyToOne) return; // Already handled
+            const key = `${job.source}->${job.target}`;
+            if (!parallelGroups.has(key)) parallelGroups.set(key, []);
+            parallelGroups.get(key)?.push(job);
+        });
+
+        parallelGroups.forEach(group => {
+            if (group.length <= 1) return;
+            group.sort((a, b) => {
+                // @ts-expect-error
+                const diff = (a.targetPos?.y || a.targetY || 0) - (b.targetPos?.y || b.targetY || 0);
+                return diff;
+            });
+            // We don't explicitly assign indices here as PortSelector handles it, but good to sort.
+        });
+    }
+
+    /**
+     * [P0] Assign Global Channels
+     * Sorts edges globally within spatial bands to minimize crossings for parallel routes.
+     */
+    private assignGlobalChannels(jobs: PathFindingJob[]): void {
+        // [FIX Phase 2] First detect and separate bidirectional edge pairs
+        this.assignBidirectionalChannels(jobs);
+
+        const horizontalGroups = new Map<number, PathFindingJob[]>();
+        const verticalGroups = new Map<number, PathFindingJob[]>();
+        const GROUP_SIZE = 150; // Band height/width (increased to capture more parallel edges)
+
+        jobs.forEach(job => {
+            const dx = Math.abs(job.targetX - job.sourceX);
+            const dy = Math.abs(job.targetY - job.sourceY);
+            // Determine dominant direction
+            if (dx > dy) {
+                // Horizontal: Group by Y band
+                const midY = (job.sourceY + job.targetY) / 2;
+                const key = Math.floor(midY / GROUP_SIZE);
+                if (!horizontalGroups.has(key)) horizontalGroups.set(key, []);
+                horizontalGroups.get(key)?.push(job);
+            } else {
+                // Vertical: Group by X band
+                const midX = (job.sourceX + job.targetX) / 2;
+                const key = Math.floor(midX / GROUP_SIZE);
+                if (!verticalGroups.has(key)) verticalGroups.set(key, []);
+                verticalGroups.get(key)?.push(job);
+            }
+        });
+
+        // Process Horizontal Groups
+        horizontalGroups.forEach(group => {
+            // Sort by specific Y geometry (Source Y + Target Y)
+            group.sort((a, b) => {
+                const valA = a.sourceY + a.targetY;
+                const valB = b.sourceY + b.targetY;
+                if (Math.abs(valA - valB) > 1) return valA - valB;
+                // Tie-breaker for stable bus ordering
+                return (a.outgoingIndex || 0) - (b.outgoingIndex || 0) || (a.incomingIndex || 0) - (b.incomingIndex || 0) || a.edgeId.localeCompare(b.edgeId);
+            });
+            group.forEach((job, index) => {
+                job.globalChannelIndex = index;
+                job.globalChannelCount = group.length;
+                job.globalChannelType = 'horizontal';
+            });
+        });
+
+        // Process Vertical Groups
+        verticalGroups.forEach(group => {
+            // Sort by specific X geometry
+            group.sort((a, b) => {
+                const valA = a.sourceX + a.targetX;
+                const valB = b.sourceX + b.targetX;
+                if (Math.abs(valA - valB) > 1) return valA - valB;
+                // Tie-breaker
+                return (a.outgoingIndex || 0) - (b.outgoingIndex || 0) || (a.incomingIndex || 0) - (b.incomingIndex || 0) || a.edgeId.localeCompare(b.edgeId);
+            });
+            group.forEach((job, index) => {
+                job.globalChannelIndex = index;
+                job.globalChannelCount = group.length;
+                job.globalChannelType = 'vertical';
+            });
+        });
+    }
+
+    /**
+     * [FIX Phase 2] Assign Bidirectional Channels
+     * Detects A↔B bidirectional edge pairs and assigns separation channels.
+     */
+    private assignBidirectionalChannels(jobs: PathFindingJob[]): void {
+        const pairMap = new Map<string, PathFindingJob[]>();
+        const defaultConfig = createDefaultRoutingConfig();
+        const spacing = defaultConfig.bus.bidirectionalSpacing || 25;
+
+        // Group jobs by node pair (A-B is same as B-A)
+        jobs.forEach(job => {
+            const key1 = `${job.source}-${job.target}`;
+            const key2 = `${job.target}-${job.source}`;
+            const key = key1 < key2 ? key1 : key2;
+            if (!pairMap.has(key)) pairMap.set(key, []);
+            pairMap.get(key)?.push(job);
+        });
+
+        // Process each pair
+        pairMap.forEach((pair, _pairKey) => {
+            if (pair.length === 2) {
+                // Bidirectional pair detected (A→B and B→A)
+                // Sort to ensure deterministic channel assignment
+                pair.sort((a, b) => {
+                    const keyA = `${a.source}-${a.target}`;
+                    const keyB = `${b.source}-${b.target}`;
+                    return keyA.localeCompare(keyB);
+                });
+
+                // Assign channels: 0 for "forward", 1 for "backward"
+                pair[0].bidirectionalChannel = 0;
+                pair[1].bidirectionalChannel = 1;
+                pair[0].bidirectionalSpacing = spacing;
+                pair[1].bidirectionalSpacing = spacing;
+
+                // Debug log
+                if (this.debugEdgeId) {
+                    console.log(`[Bidirectional] Pair detected: ${pair[0].edgeId} ↔ ${pair[1].edgeId}, spacing=${spacing}`);
+                }
+            }
+            // For single-direction or >2 edges (rare), no special handling
+        });
+    }
+
+    /**
+     * [P2-3] Inject Congestion Context
+     * Pass information about OTHER edges in the batch to the worker
+     * so it can build a local congestion map.
+     */
+    private injectCongestionContext(jobs: PathFindingJob[], graph: SharedGraphContext): void {
+        const portUsage: Record<string, number> = {};
+
+        // Simple usage count
+        jobs.forEach(job => {
+            portUsage[job.source] = (portUsage[job.source] || 0) + 1;
+            portUsage[job.target] = (portUsage[job.target] || 0) + 1;
+        });
+
+        // Attach to graph config? Or job?
+        // Since graphConfig is shared, let's put it there.
+        if (!graph.config) graph.config = {};
+        // @ts-expect-error - dynamic property
+        graph.config.portCongestion = portUsage; // Workers can read this
+    }
+
+    /**
+     * [Phase 3] Unified processing for Bus Groups (1-to-N and N-to-1)
+     */
+    private processBusGroups(
+        hubId: string,
+        busGroupJobs: PathFindingJob[],
+        globalPeers: any[], // Edges from SharedGraphContext
+        getNodeRect: (id: string) => Rectangle | undefined,
+        trunkCalculator: TrunkCalculator,
+        defaultConfig: any,
+        layoutDir: string,
+        isManyToOne: boolean
+    ): void {
+        const hubRect = getNodeRect(hubId);
+        if (!hubRect) return;
+
+        const hubCenter = { x: hubRect.x + hubRect.width / 2, y: hubRect.y + hubRect.height / 2 };
+
+        // [CRITICAL FIX] Directional Homogeneity Projection (Geometric Predominance Override v2)
+        // Replaces simple distance sum which fails on highly spread-out tree layouts.
+        // We tally the polarity of offsets. If all nodes are strictly "above" or "below", 
+        // it's an undeniable vertical flow. If they are spread left/right simultaneously, 
+        // horizontal flow is chaotic.
+        let isHorz = layoutDir === 'LR' || layoutDir === 'RL';
+
+        let aboveCount = 0, belowCount = 0;
+        let leftCount = 0, rightCount = 0;
+        let validPeers = 0;
+
+        globalPeers.forEach(peerEdge => {
+            const peerId = isManyToOne ? peerEdge.source : peerEdge.target;
+            const peerRect = getNodeRect(peerId);
+            if (peerRect) {
+                const pc = { x: peerRect.x + peerRect.width / 2, y: peerRect.y + peerRect.height / 2 };
+                // Use a deadzone of 10px to ignore slight misalignments
+                if (pc.y < hubCenter.y - 10) aboveCount++;
+                else if (pc.y > hubCenter.y + 10) belowCount++;
+
+                if (pc.x < hubCenter.x - 10) leftCount++;
+                else if (pc.x > hubCenter.x + 10) rightCount++;
+
+                validPeers++;
+            }
+        });
+
+        if (validPeers > 1) {
+            const yPurity = Math.max(aboveCount, belowCount) / validPeers;
+            const xPurity = Math.max(leftCount, rightCount) / validPeers;
+
+            // If layout is overwhelmingly uniform in Y (e.g. all above) but scattered in X
+            if (yPurity >= 0.8 && xPurity < 0.8) {
+                isHorz = false; // Strictly Vertical Flow (TB / BT)
+            }
+            // If layout is overwhelmingly uniform in X (e.g. all left) but scattered in Y
+            else if (xPurity >= 0.8 && yPurity < 0.8) {
+                isHorz = true; // Strictly Horizontal Flow (LR / RL)
+            }
+            // If both are pure (e.g. diagonal clump), fallback to the stronger purity or layoutDir
+            else if (yPurity >= 0.8 && xPurity >= 0.8) {
+                if (yPurity > xPurity) isHorz = false;
+                else if (xPurity > yPurity) isHorz = true;
+            }
+            // If both are chaotic, rely on user layoutDir string
+        }
+
+        const dirSign = (layoutDir === 'RL' || layoutDir === 'BT') ? -1 : 1;
+        // Group peers by geometric side
+        const sideGroups = new Map<string, any[]>(); // 'forward' | 'backward'
+
+        globalPeers.forEach(peerEdge => {
+            const peerId = isManyToOne ? peerEdge.source : peerEdge.target;
+            const peerRect = getNodeRect(peerId);
+            if (!peerRect) return;
+
+            const peerCenter = { x: peerRect.x + peerRect.width / 2, y: peerRect.y + peerRect.height / 2 };
+            // Correctly evaluate delta with Geometric Predominance
+            const delta = isHorz ? (peerCenter.x - hubCenter.x) : (peerCenter.y - hubCenter.y);
+
+            const edgeType = peerEdge.type as string | undefined;
+            // Use unified classification
+            const sideVal = classifyEdgeSide(delta, dirSign, edgeType);
+            const key = sideVal > 0 ? 'forward' : 'backward';
+
+            // [Debug] Classification
+            this.trunkDebugData.set(peerEdge.id, {
+                edgeId: peerEdge.id,
+                edgeType,
+                delta,
+                dirSign,
+                side: sideVal,
+                typeInfluenced: classifyEdgeSide(delta, dirSign, undefined) !== sideVal
+            });
+
+            if (!sideGroups.has(key)) sideGroups.set(key, []);
+            sideGroups.get(key)?.push(peerEdge);
+        });
+
+        // Calculate Trunks (Dual-Trunk Architecture)
+        const forwardEdges = sideGroups.get('forward') || [];
+        const backwardEdges = sideGroups.get('backward') || [];
+
+        if (forwardEdges.length > 0 || backwardEdges.length > 0) {
+            const forwardPeers = forwardEdges.map(e => getNodeRect(isManyToOne ? e.source : e.target)).filter((r): r is Rectangle => !!r);
+            const backwardPeers = backwardEdges.map(e => getNodeRect(isManyToOne ? e.source : e.target)).filter((r): r is Rectangle => !!r);
+
+            const trunks = trunkCalculator.calculateParallelTrunks(
+                hubRect,
+                forwardPeers,
+                backwardPeers,
+                isManyToOne,
+                defaultConfig,
+                layoutDir
+            );
+
+            // Assign Forward Trunk
+            if (trunks.forward && forwardEdges.length > 0) {
+                this.assignTrunkGeometry(forwardEdges, busGroupJobs, trunks.forward, layoutDir, getNodeRect, isManyToOne);
+            }
+
+            // Assign Backward Trunk
+            if (trunks.backward && backwardEdges.length > 0) {
+                this.assignTrunkGeometry(backwardEdges, busGroupJobs, trunks.backward, layoutDir, getNodeRect, isManyToOne);
+            }
+        }
+    }
+
+    private assignTrunkGeometry(
+        edges: any[],
+        busGroupJobs: PathFindingJob[],
+        trunk: { axis: number; direction: 'horizontal' | 'vertical'; range: { min: number; max: number }; suggestedPort: 'top' | 'bottom' | 'left' | 'right' },
+        layoutDir: string,
+        getNodeRect: (id: string) => Rectangle | undefined,
+        isManyToOne: boolean
+    ): void {
+        // [FIX] Removed dirtyEdges.add + scheduleBatchRouting that caused infinite recursion:
+        // assignTrunkGeometry is called FROM batchRouteDirtyEdges, so marking edges dirty here
+        // triggers another batchRouteDirtyEdges → infinite cascade.
+
+        // Debug attachment
+        edges.forEach((edge: any) => {
+            const debugEntry = this.trunkDebugData.get(edge.id);
+            if (debugEntry) {
+                debugEntry.trunk = {
+                    direction: trunk.direction,
+                    axis: trunk.axis,
+                    range: trunk.range,
+                    port: trunk.suggestedPort
+                };
+            }
+        });
+
+        // Pre-sort peers ONCE outside the loop (O(NlogN) instead of O(N²logN))
+        const sortedGlobal = [...edges].sort((a: any, b: any) => {
+            const rectA = getNodeRect(isManyToOne ? a.source : a.target);
+            const rectB = getNodeRect(isManyToOne ? b.source : b.target);
+
+            const valA = trunk.direction === 'horizontal' ? (rectA?.x || 0) : (rectA?.y || 0);
+            const valB = trunk.direction === 'horizontal' ? (rectB?.x || 0) : (rectB?.y || 0);
+            const diff = valA - valB;
+            if (Math.abs(diff) > 1.0) return diff;
+
+            const secA = trunk.direction === 'horizontal' ? (rectA?.y || 0) : (rectA?.x || 0);
+            const secB = trunk.direction === 'horizontal' ? (rectB?.y || 0) : (rectB?.x || 0);
+            const diffSec = secA - secB;
+            if (Math.abs(diffSec) > 1.0) return diffSec;
+
+            return (a.id || '').localeCompare(b.id || '');
+        });
+
+        edges.forEach((edge: any) => {
+            const job = busGroupJobs.find(j => j.edgeId === edge.id);
+            if (!job) return;
+
+            if (isManyToOne) {
+                job.isManyToOne = true;
+                job.incomingCount = edges.length;
+            } else {
+                job.isOneToMany = true;
+                job.outgoingCount = edges.length;
+            }
+
+            const index = sortedGlobal.findIndex((e: any) => e.id === job.edgeId);
+
+            if (isManyToOne) {
+                job.incomingIndex = index;
+            } else {
+                job.outgoingIndex = index;
+            }
+
+            // Assign Trunk Coordinates
+            if (trunk.direction === 'vertical') {
+                job.busTrunkSource = { x: trunk.axis, y: trunk.range.min };
+                job.busTrunkTarget = { x: trunk.axis, y: trunk.range.max };
+            } else {
+                job.busTrunkSource = { x: trunk.range.min, y: trunk.axis };
+                job.busTrunkTarget = { x: trunk.range.max, y: trunk.axis };
+            }
+
+            // Assign Port
+            if (trunk.suggestedPort) {
+                const port = trunk.suggestedPort === 'top' ? Position.Top :
+                    trunk.suggestedPort === 'bottom' ? Position.Bottom :
+                        trunk.suggestedPort === 'left' ? Position.Left : Position.Right;
+
+                if (isManyToOne) {
+                    job.busTargetPort = port;
+                } else {
+                    job.busSourcePort = port;
+                }
+            }
+
+            job.layoutDirection = layoutDir;
+        });
+    }
+
+    /**
+     * [NEW] Helper to apply LPNudge separately for overlapping paths
+     */
+    private applyGlobalNudge(results: (PathFindingResult | null)[], requests: RoutingRequest[], graph: SharedGraphContext): void {
+        const config = graph.config;
+        const validResults = results.filter((r): r is PathFindingResult => r !== null && !r.error && !!r.points && r.points.length > 0);
+        if (validResults.length <= 1) return;
+
+        // We only nudge standard paths (non-bus) to avoid breaking trunk logic which has its own spacing
+        const nudgeableResults = validResults.filter((r) => {
+            const req = requests.find(rq => rq.edgeId === r.edgeId);
+            const isBus = req && (!!(req.job as any).isOneToMany || !!(req.job as any).isManyToOne);
+            return !isBus;
+        });
+
+        if (nudgeableResults.length <= 1) return;
+
+        const paths = nudgeableResults.map(r => {
+            const raw = r.points;
+            if (raw.length < 3) return raw;
+            
+            // [FIX] Strictly remove ALL collinear points (both forward and backward).
+            // LPNudge treats each segment between points as a separate entity. 
+            // If a single straight line has intermediate points, it will be broken into 
+            // multiple segments that might be nudged differently, causing slanted jogs.
+            const cleaned: Point[] = [{ x: raw[0].x, y: raw[0].y }];
+            for (let i = 1; i < raw.length - 1; i++) {
+                const prev = cleaned[cleaned.length - 1];
+                const curr = raw[i];
+                const next = raw[i + 1];
+
+                const isHorizontal = Math.abs(prev.y - curr.y) < 1 && Math.abs(curr.y - next.y) < 1;
+                const isVertical = Math.abs(prev.x - curr.x) < 1 && Math.abs(curr.x - next.x) < 1;
+
+                if (isHorizontal || isVertical) {
+                    continue; // Skip this redundant intermediate point
+                }
+                cleaned.push({ x: curr.x, y: curr.y });
+            }
+            cleaned.push({ x: raw[raw.length - 1].x, y: raw[raw.length - 1].y });
+            return cleaned;
+        });
+
+        try {
+            const nudgedPaths = optimizePaths(paths, {
+                minSpacing: config?.postProcessing?.nudgeSpacing ?? 12,
+                maxOffset: 50,
+                debug: config?.debug
+            });
+
+            // Apply back
+            nudgedPaths.forEach((newPoints, i) => {
+                const res = nudgeableResults[i];
+                res.points = newPoints;
+                // Rebuild SVG path based on updated points
+                if (newPoints.length > 0) {
+                    res.path = `M ${newPoints[0].x} ${newPoints[0].y} ` + newPoints.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
+                    // Also update label pos if it's the middle segment
+                    if (newPoints.length >= 2) {
+                        const midIndex = Math.floor(newPoints.length / 2);
+                        const p1 = newPoints[midIndex - 1];
+                        const p2 = newPoints[midIndex];
+                        res.labelX = (p1.x + p2.x) / 2;
+                        res.labelY = (p1.y + p2.y) / 2;
+                    }
+                }
+            });
+            if (config?.debug) {
+                console.log(`[LPNudge] Successfully nudged ${nudgedPaths.length} parallel paths.`);
+            }
+        } catch (err) {
+            console.error('[LPNudge] Global Nudging failed, falling back to original paths:', err);
+        }
+    }
+
+    /**
+     * Cleanup resources
+     */
+    public cleanup(): void {
+        this.workerPool.terminate();
+        this.parallelPool?.terminate();
+        this.cache.clear();
+        EdgeRoutingCoordinator.instance = null;
+    }
+}

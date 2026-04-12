@@ -1,0 +1,746 @@
+{
+  "id": "wms-process-flow-v1",
+  "name": "WMS订单-分配-任务-任务分组-作业-人效流程",
+  "type": "wms-process",
+  "version": "1.1.0",
+  "nodes": [
+    {
+      "id": "order-input",
+      "description": "<b>订单</b><br/>来自 OMS/ERP 的销售订单<br/>渠道/客户/优先级/时效",
+      "domain": "order",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1,
+      "metadata": {
+        "layer": "CORE_CENTER"
+      }
+    },
+    {
+      "id": "allocation",
+      "description": "<b>分配</b><br/>库存预留与校验<br/>批次/库位/波次策略",
+      "domain": "allocation",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1,
+      "metadata": {
+        "layer": "CORE_CENTER"
+      }
+    },
+    {
+      "id": "task-generate",
+      "description": "<b>任务</b><br/>按策略生成作业任务<br/>拣选/补货/移库等",
+      "domain": "task",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1,
+      "metadata": {
+        "layer": "CORE_CENTER"
+      }
+    },
+    {
+      "id": "task-group",
+      "description": "<b>任务分组</b><br/>波次/区域/容器分组<br/>容量与并发约束",
+      "domain": "task-group",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1,
+      "metadata": {
+        "layer": "CORE_CENTER"
+      }
+    },
+    {
+      "id": "operation",
+      "description": "<b>作业</b><br/>RF/自动化执行拣选/复核/打包/交接",
+      "domain": "operation",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1,
+      "metadata": {
+        "layer": "CORE_CENTER"
+      }
+    },
+    {
+      "id": "labor-kpi",
+      "description": "<b>人效统计</b><br/>UPH/时长/路径/异常<br/>岗位/班组/人员维度",
+      "domain": "analytics",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1,
+      "metadata": {
+        "layer": "CORE_CENTER"
+      }
+    },
+    {
+      "id": "order-import",
+      "description": "<b>订单导入/创建</b><br/>OMS/ERP/API/手工",
+      "domain": "order",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "order-validate",
+      "description": "<b>订单校验</b><br/>SKU/数量/地址/信用",
+      "domain": "order",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "order-sla-classify",
+      "description": "<b>优先级/SLA 分类</b><br/>客户等级/时效",
+      "domain": "order",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "order-split-merge",
+      "description": "<b>拆分/合并</b><br/>多仓/多波次",
+      "domain": "order",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "order-exception",
+      "description": "<b>异常处理</b><br/>缺货/黑名单/冻结",
+      "domain": "order",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "atp-check",
+      "description": "<b>ATP 可承诺量</b><br/>实时可用库存",
+      "domain": "allocation",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "reservation",
+      "description": "<b>库存预留/锁定</b><br/>锁定粒度与时效",
+      "domain": "allocation",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "slotting",
+      "description": "<b>库位选择</b><br/>ABC/温控/危险品",
+      "domain": "allocation",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "batch-lot",
+      "description": "<b>批次/效期/序列号</b><br/>合规与兼容",
+      "domain": "allocation",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "wave-planning",
+      "description": "<b>波次规划</b><br/>按截止/承运商/区域",
+      "domain": "allocation",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "allocation-rollback",
+      "description": "<b>分配回滚/重算</b><br/>异常重试",
+      "domain": "allocation",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "pick-task-gen",
+      "description": "<b>拣选任务</b><br/>单品/整箱/整托",
+      "domain": "task",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "replenish-task-gen",
+      "description": "<b>补货任务</b><br/>触发/预估补",
+      "domain": "task",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "sort-task-gen",
+      "description": "<b>分拣/集货任务</b>",
+      "domain": "task",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "qc-task-gen",
+      "description": "<b>质检任务</b><br/>抽检/全检",
+      "domain": "task",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "pack-task-gen",
+      "description": "<b>打包任务</b><br/>包装材/体积重量",
+      "domain": "task",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "wave-build",
+      "description": "<b>波次组建</b><br/>时间/批量/承运商",
+      "domain": "task-group",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "zone-group",
+      "description": "<b>区域/分区编组</b><br/>分区策略",
+      "domain": "task-group",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "container-assign",
+      "description": "<b>容器/载具分配</b><br/>料箱/笼车/托盘",
+      "domain": "task-group",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "priority-sequence",
+      "description": "<b>优先级/节拍排序</b>",
+      "domain": "task-group",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "cutoff-grouping",
+      "description": "<b>截单处理</b><br/>出库时点",
+      "domain": "task-group",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "picking-exec",
+      "description": "<b>拣选执行</b><br/>RF/Voice/亮灯",
+      "domain": "operation",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "replenish-exec",
+      "description": "<b>补货执行</b><br/>补到位/二次补",
+      "domain": "operation",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "sorting-exec",
+      "description": "<b>分拣/集货</b><br/>按波次/按订单",
+      "domain": "operation",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "packing-exec",
+      "description": "<b>打包/称重/贴单</b>",
+      "domain": "operation",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "qc-exec",
+      "description": "<b>质检/复核</b>",
+      "domain": "operation",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "loading-handover",
+      "description": "<b>装车/交接/出门</b>",
+      "domain": "operation",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "wcs-integration",
+      "description": "<b>WCS/自动化接口</b><br/>分拣机/AGV/密集库",
+      "domain": "operation",
+      "domainClass": "be-scm",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "real-time-board",
+      "description": "<b>实时看板</b><br/>WIP/瓶颈",
+      "domain": "analytics",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "uph-calc",
+      "description": "<b>UPH/效率计算</b><br/>工序/人员",
+      "domain": "analytics",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "path-heatmap",
+      "description": "<b>路径/动线热力图</b>",
+      "domain": "analytics",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "exception-alert",
+      "description": "<b>异常告警</b><br/>缺货/堵塞/长等待",
+      "domain": "analytics",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    },
+    {
+      "id": "labor-schedule-feedback",
+      "description": "<b>人力排班/策略反馈</b>",
+      "domain": "analytics",
+      "domainClass": "data",
+      "type": "custom",
+      "zIndex": 1
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-order-allocation",
+      "source": "order-input",
+      "target": "allocation",
+      "type": "main",
+      "label": "订单进入分配",
+      "zIndex": 20
+    },
+    {
+      "id": "e-allocation-task",
+      "source": "allocation",
+      "target": "task-generate",
+      "type": "main",
+      "label": "库存锁定→任务生成",
+      "zIndex": 20
+    },
+    {
+      "id": "e-task-taskgroup",
+      "source": "task-generate",
+      "target": "task-group",
+      "type": "main",
+      "label": "任务整理分组",
+      "zIndex": 20
+    },
+    {
+      "id": "e-taskgroup-operation",
+      "source": "task-group",
+      "target": "operation",
+      "type": "main",
+      "label": "下发到作业",
+      "zIndex": 20
+    },
+    {
+      "id": "e-operation-labor",
+      "source": "operation",
+      "target": "labor-kpi",
+      "type": "data",
+      "label": "作业数据回传",
+      "zIndex": 10
+    },
+    {
+      "id": "e-order-import",
+      "source": "order-input",
+      "target": "order-import",
+      "type": "support",
+      "label": "订单来源"
+    },
+    {
+      "id": "e-order-validate",
+      "source": "order-input",
+      "target": "order-validate",
+      "type": "dependency",
+      "label": "业务校验"
+    },
+    {
+      "id": "e-order-sla",
+      "source": "order-input",
+      "target": "order-sla-classify",
+      "type": "support",
+      "label": "优先级策略"
+    },
+    {
+      "id": "e-order-split",
+      "source": "order-input",
+      "target": "order-split-merge",
+      "type": "support",
+      "label": "拆并策略"
+    },
+    {
+      "id": "e-order-exception",
+      "source": "order-input",
+      "target": "order-exception",
+      "type": "dependency",
+      "label": "异常处理"
+    },
+    {
+      "id": "e-atp",
+      "source": "allocation",
+      "target": "atp-check",
+      "type": "support",
+      "label": "ATP校验"
+    },
+    {
+      "id": "e-reservation",
+      "source": "allocation",
+      "target": "reservation",
+      "type": "support",
+      "label": "库存预留"
+    },
+    {
+      "id": "e-slotting",
+      "source": "allocation",
+      "target": "slotting",
+      "type": "support",
+      "label": "库位选择"
+    },
+    {
+      "id": "e-batch",
+      "source": "allocation",
+      "target": "batch-lot",
+      "type": "support",
+      "label": "批次/效期"
+    },
+    {
+      "id": "e-wave-plan",
+      "source": "allocation",
+      "target": "wave-planning",
+      "type": "support",
+      "label": "波次规划"
+    },
+    {
+      "id": "e-alloc-rollback",
+      "source": "allocation",
+      "target": "allocation-rollback",
+      "type": "dependency",
+      "label": "回滚/重算"
+    },
+    {
+      "id": "e-pick-task",
+      "source": "task-generate",
+      "target": "pick-task-gen",
+      "type": "support",
+      "label": "拣选任务"
+    },
+    {
+      "id": "e-replenish-task",
+      "source": "task-generate",
+      "target": "replenish-task-gen",
+      "type": "support",
+      "label": "补货任务"
+    },
+    {
+      "id": "e-sort-task",
+      "source": "task-generate",
+      "target": "sort-task-gen",
+      "type": "support",
+      "label": "分拣/集货"
+    },
+    {
+      "id": "e-qc-task",
+      "source": "task-generate",
+      "target": "qc-task-gen",
+      "type": "support",
+      "label": "质检任务"
+    },
+    {
+      "id": "e-pack-task",
+      "source": "task-generate",
+      "target": "pack-task-gen",
+      "type": "support",
+      "label": "打包任务"
+    },
+    {
+      "id": "e-wave-build",
+      "source": "task-group",
+      "target": "wave-build",
+      "type": "support",
+      "label": "组建波次"
+    },
+    {
+      "id": "e-zone-group",
+      "source": "task-group",
+      "target": "zone-group",
+      "type": "support",
+      "label": "分区编组"
+    },
+    {
+      "id": "e-container-assign",
+      "source": "task-group",
+      "target": "container-assign",
+      "type": "support",
+      "label": "容器分配"
+    },
+    {
+      "id": "e-priority-seq",
+      "source": "task-group",
+      "target": "priority-sequence",
+      "type": "support",
+      "label": "优先级/节拍"
+    },
+    {
+      "id": "e-cutoff",
+      "source": "task-group",
+      "target": "cutoff-grouping",
+      "type": "dependency",
+      "label": "截单"
+    },
+    {
+      "id": "e-picking-exec",
+      "source": "operation",
+      "target": "picking-exec",
+      "type": "support",
+      "label": "拣选"
+    },
+    {
+      "id": "e-replenish-exec",
+      "source": "operation",
+      "target": "replenish-exec",
+      "type": "support",
+      "label": "补货"
+    },
+    {
+      "id": "e-sorting-exec",
+      "source": "operation",
+      "target": "sorting-exec",
+      "type": "support",
+      "label": "分拣/集货"
+    },
+    {
+      "id": "e-packing-exec",
+      "source": "operation",
+      "target": "packing-exec",
+      "type": "support",
+      "label": "打包"
+    },
+    {
+      "id": "e-qc-exec",
+      "source": "operation",
+      "target": "qc-exec",
+      "type": "support",
+      "label": "质检/复核"
+    },
+    {
+      "id": "e-loading",
+      "source": "operation",
+      "target": "loading-handover",
+      "type": "support",
+      "label": "装车/交接"
+    },
+    {
+      "id": "e-wcs",
+      "source": "operation",
+      "target": "wcs-integration",
+      "type": "dependency",
+      "label": "自动化接口"
+    },
+    {
+      "id": "e-op-rt",
+      "source": "operation",
+      "target": "real-time-board",
+      "type": "data",
+      "label": "实时数据"
+    },
+    {
+      "id": "e-op-uph",
+      "source": "operation",
+      "target": "uph-calc",
+      "type": "data",
+      "label": "计时/产出"
+    },
+    {
+      "id": "e-op-heat",
+      "source": "operation",
+      "target": "path-heatmap",
+      "type": "data",
+      "label": "路径"
+    },
+    {
+      "id": "e-op-alert",
+      "source": "operation",
+      "target": "exception-alert",
+      "type": "data",
+      "label": "异常事件"
+    },
+    {
+      "id": "e-rt-labor",
+      "source": "real-time-board",
+      "target": "labor-kpi",
+      "type": "data",
+      "label": "看板汇总"
+    },
+    {
+      "id": "e-uph-labor",
+      "source": "uph-calc",
+      "target": "labor-kpi",
+      "type": "data",
+      "label": "效率计算"
+    },
+    {
+      "id": "e-heat-labor",
+      "source": "path-heatmap",
+      "target": "labor-kpi",
+      "type": "data",
+      "label": "路径分析"
+    },
+    {
+      "id": "e-alert-labor",
+      "source": "exception-alert",
+      "target": "labor-kpi",
+      "type": "data",
+      "label": "异常统计"
+    },
+    {
+      "id": "e-labor-alloc-fb",
+      "source": "labor-schedule-feedback",
+      "target": "allocation",
+      "type": "feedback",
+      "label": "产能/人力→分配策略"
+    },
+    {
+      "id": "e-labor-group-fb",
+      "source": "labor-schedule-feedback",
+      "target": "task-group",
+      "type": "feedback",
+      "label": "人力→编组/并发"
+    },
+    {
+      "id": "e-labor-input",
+      "source": "labor-kpi",
+      "target": "labor-schedule-feedback",
+      "type": "support",
+      "label": "统计→排班"
+    }
+  ],
+  "layout": {
+    "direction": "LR",
+    "spacing": {
+      "horizontal": 72,
+      "vertical": 48
+    },
+    "padding": {
+      "horizontal": 24,
+      "vertical": 16
+    },
+    "constraints": {
+      "minWidth": 160,
+      "minHeight": 72
+    },
+    "generateDomainGroups": true,
+    "generateSubDomainGroups": true,
+    "groupPadding": 36
+  },
+  "theme": {
+    "name": "wms-process",
+    "displayName": "WMS流程主题",
+    "domains": {
+      "order": {
+        "border": "#64748B",
+        "main": "#64748B",
+        "light": "#ECEFF1",
+        "text": "#1F2937",
+        "background": "#ffffff"
+      },
+      "allocation": {
+        "border": "#F59E0B",
+        "main": "#F59E0B",
+        "light": "#FEF3C7",
+        "text": "#1F2937",
+        "background": "#ffffff"
+      },
+      "task": {
+        "border": "#10B981",
+        "main": "#10B981",
+        "light": "#D1FAE5",
+        "text": "#1F2937",
+        "background": "#ffffff"
+      },
+      "task-group": {
+        "border": "#34D399",
+        "main": "#34D399",
+        "light": "#ECFDF5",
+        "text": "#1F2937",
+        "background": "#ffffff"
+      },
+      "operation": {
+        "border": "#3B82F6",
+        "main": "#3B82F6",
+        "light": "#DBEAFE",
+        "text": "#1F2937",
+        "background": "#ffffff"
+      },
+      "analytics": {
+        "border": "#8B5CF6",
+        "main": "#8B5CF6",
+        "light": "#EDE9FE",
+        "text": "#1F2937",
+        "background": "#ffffff"
+      }
+    },
+    "isCustom": true
+  },
+  "config": {
+    "NODE_WIDTH": 200,
+    "NODE_HEIGHT": 72,
+    "NODE_PADDING": {
+      "horizontal": 20,
+      "vertical": 14
+    },
+    "SPACING": {
+      "H": 72,
+      "V": 48
+    },
+    "Z_EDGE": {
+      "MAIN": 20,
+      "STRATEGY": 10,
+      "SUPPORT": 5
+    }
+  },
+  "metadata": {
+    "description": "面向WMS的订单到人效的主干流程示意",
+    "author": "WMS Team",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z",
+    "tags": [
+      "仓储"
+    ]
+  }
+}

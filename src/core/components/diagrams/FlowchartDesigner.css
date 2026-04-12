@@ -1,0 +1,1332 @@
+/* src/components/diagrams/FlowchartDesigner.css */
+
+/* ============================================
+   统一设计器 UI / Glassmorphism Design Tokens (Hyper-Glass)
+   ============================================ */
+:root {
+    --designer-panel-bg: rgba(255, 255, 255, 0.65);
+    --designer-blur: blur(32px) saturate(200%);
+    --designer-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4), 0 24px 48px -12px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    --designer-border: transparent;
+    --designer-radius: 20px;
+}
+
+[data-theme='dark'] {
+    --designer-panel-bg: rgba(30, 30, 46, 0.55);
+    --designer-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 24px 48px -12px rgba(0, 0, 0, 0.4), 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    --designer-border: transparent;
+}
+
+/* ============================================
+   Viewport Transition Override
+   Prevents entire canvas from animating during panel layout resizes causing the "jump"
+   ============================================ */
+.react-flow__viewport {
+    transition: none !important;
+}
+
+/* ============================================
+   设计器根容器 — 扁平化 Flexbox 布局
+   替代 antd Layout 的隐式 flex 样式
+   ============================================ */
+.diagram-root {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+/* 画布主区域 — 占满剩余空间 */
+.diagram-canvas-area {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    /* Flexbox 溢出防护 (W3C 标准) */
+    height: 100%;
+    overflow: hidden;
+    background-color: transparent;
+}
+
+/* 🎨 P1-4: 浮动工具栏入场动画 */
+@keyframes toolbarFadeIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -100%) scale(0.92) translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, -100%) scale(1) translateY(0);
+    }
+}
+
+/* Modern Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.diagram-status-bar {
+    position: absolute;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    left: 16px;
+    transform: none;
+    background: var(--glass-bg, rgba(255, 255, 255, 0.7));
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    backdrop-filter: blur(12px) saturate(180%);
+    padding: 6px 16px;
+    border-radius: 99px;
+    /* Pill shape */
+    box-shadow: var(--glass-shadow, 0 8px 32px rgba(31, 38, 135, 0.15));
+    border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
+    font-size: 0.73125rem;
+    color: var(--color-slate-600);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    pointer-events: none;
+    z-index: 200;
+    font-weight: 500;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.diagram-status-bar:hover {
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: var(--shadow-lg);
+    transform: none;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    position: relative;
+}
+
+.status-dot::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border-radius: 50%;
+    opacity: 0.4;
+    box-shadow: inherit;
+}
+
+.status-separator {
+    width: 1px;
+    height: 16px;
+    background-color: var(--border-subtle);
+}
+
+.status-mode {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.2s;
+}
+
+.status-mode svg {
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.context-menu-item {
+    padding: 8px 16px;
+    font-size: 13px;
+    color: #333;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.context-menu-item:hover {
+    background-color: #f5f5f5;
+    color: #2196F3;
+}
+
+/* ============================================
+   节点性能优化
+   ============================================ */
+
+/* 限制每个节点的重排范围 — 子节点变化不影响其他节点 */
+.react-flow__node {
+    contain: layout style;
+}
+
+/* 拖拽中的节点 — GPU 层提升 + 最高 z-index */
+.react-flow__node.dragging {
+    will-change: transform;
+    z-index: 1000 !important;
+}
+
+/* ============================================
+   微交互动画
+   ============================================ */
+
+/* 1. 全局动画定义 */
+
+/* 对齐线闪现动画 */
+@keyframes flash-guide {
+
+    0%,
+    100% {
+        opacity: 0.8;
+        stroke-width: 1;
+    }
+
+    50% {
+        opacity: 1;
+        stroke-width: 2;
+    }
+}
+
+/* 连接成功脉冲动画 */
+@keyframes connect-success-pulse {
+    0% {
+        stroke-width: 2;
+        opacity: 1;
+    }
+
+    50% {
+        stroke-width: 4;
+        opacity: 0.8;
+    }
+
+    100% {
+        stroke-width: 2;
+        opacity: 1;
+    }
+}
+
+/* 2. 节点交互效果 */
+
+/* 节点悬停效果 — 由 FlowchartNode.css 处理，此处仅补充 z-index */
+.react-flow__node:hover {
+    z-index: 100;
+}
+
+/* 选中节点 - 统一 outline 方案 (不与内联 boxShadow 冲突) */
+.react-flow__node.selected {
+    outline: 2px solid var(--theme-primary-main, #3b82f6);
+    outline-offset: 1px;
+    z-index: 10;
+    border-radius: var(--node-radius, 10px);
+}
+
+/* 非矩形形状节点：移除矩形效果 */
+.react-flow__node:has(.shape-non-rect) {
+    box-shadow: none !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+.react-flow__node:has(.shape-non-rect):hover {
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
+}
+
+.react-flow__node:has(.shape-non-rect).selected {
+    animation: none;
+}
+
+.react-flow__node:has(.shape-non-rect).rf-connecting {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.react-flow__node:has(.shape-non-rect).rf-connectable {
+    border: none !important;
+    background: transparent !important;
+}
+
+.react-flow__node:has(.shape-non-rect).rf-connectable.rf-connect-preview {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+}
+
+/* 正在拖拽的节点 — 悬浮阴影 + 半透明 */
+.react-flow__node.dragging {
+    opacity: 0.85;
+    cursor: grabbing !important;
+    transition: opacity 0.1s;
+    filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.15));
+    z-index: 1000 !important;
+}
+
+/* Drop 反馈（移除导致跳动的缩放动画，保留内发光反馈） */
+.react-flow__node.just-dropped {
+    box-shadow: 0 0 0 3px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.25));
+    transition: box-shadow 0.2s ease-out;
+}
+
+/* 3. 连接点（Handle）交互效果 */
+
+/* 连接点基础样式 */
+.react-flow__handle {
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-width 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 连接点悬停效果 */
+.react-flow__handle:hover {
+    transform: scale(1.3);
+    border-width: 3px !important;
+    z-index: 1000;
+}
+
+/* 可连接状态的连接点 */
+.react-flow__handle.connectable {
+    background: var(--theme-success-main, #10b981) !important;
+    border-color: var(--theme-success-dark, #059669) !important;
+    box-shadow: 0 0 0 2px var(--theme-success-main-alpha, rgba(16, 185, 129, 0.2));
+}
+
+/* 4. 连接创建微交互 */
+
+/* 正在连接的源节点 */
+.react-flow__node.rf-connecting {
+    border: 2px solid var(--theme-primary-main, #3b82f6) !important;
+    box-shadow: 0 0 0 4px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.2));
+    transition: border 0.2s, box-shadow 0.2s;
+}
+
+/* 可连接的目标节点 — 虚线提示 */
+.react-flow__node.rf-connectable {
+    border: 2px dashed var(--theme-success-main, #10b981) !important;
+    background: var(--theme-success-main-alpha-light, rgba(16, 185, 129, 0.05));
+    transition: border 0.2s, background 0.2s;
+}
+
+/* 可连接的目标节点 — 所有 Handle 显示并高亮 */
+.react-flow__node.rf-connectable .flowchart-handle {
+    opacity: 1 !important;
+    background: var(--theme-success-main, #10b981) !important;
+    border-color: var(--theme-success-dark, #059669) !important;
+    width: 8px !important;
+    height: 8px !important;
+    transform: scale(1.2);
+    box-shadow: 0 0 0 3px var(--theme-success-main-alpha, rgba(16, 185, 129, 0.25));
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* 连线预览态 — 节点级：实线边框 + 绿色光晕 + 微放大 */
+.react-flow__node.rf-connectable.rf-connect-preview {
+    border-style: solid !important;
+    border-color: var(--theme-success-main, rgba(16, 185, 129, 1)) !important;
+    box-shadow: 0 0 0 8px var(--theme-success-main-alpha, rgba(16, 185, 129, 0.15));
+    background: var(--theme-success-main-alpha-light, rgba(16, 185, 129, 0.08));
+    transform: scale(1.02);
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* 连线预览态 — 非吸附方向的 Handle 淡化 */
+.react-flow__node.rf-connectable.rf-connect-preview .flowchart-handle {
+    opacity: 0.3 !important;
+    transform: scale(1);
+    box-shadow: none;
+}
+
+/* 🎯 磁吸反馈脉动动画 — 吸附方向 Handle 高亮 + 脉冲 */
+@keyframes magnetic-pulse {
+    0%, 100% {
+        transform: scale(2.0);
+        box-shadow: 0 0 0 4px var(--theme-success-main-alpha, rgba(16, 185, 129, 0.4)), 0 0 12px var(--theme-success-main-alpha-light, rgba(16, 185, 129, 0.2));
+    }
+    50% {
+        transform: scale(2.5);
+        box-shadow: 0 0 0 8px var(--theme-success-main-alpha, rgba(16, 185, 129, 0.5)), 0 0 20px var(--theme-success-main-alpha, rgba(16, 185, 129, 0.3));
+        background: var(--theme-success-dark, #059669) !important;
+    }
+}
+
+/* 🔑 吸附方向 Handle — 脉冲动画 (修复: .flowchart-handle 替代原来匹配不到的 .flowchart-handle-target) */
+.react-flow__node.rf-connectable.rf-connect-preview.rf-connect-side-top .react-flow__handle-top.flowchart-handle,
+.react-flow__node.rf-connectable.rf-connect-preview.rf-connect-side-right .react-flow__handle-right.flowchart-handle,
+.react-flow__node.rf-connectable.rf-connect-preview.rf-connect-side-bottom .react-flow__handle-bottom.flowchart-handle,
+.react-flow__node.rf-connectable.rf-connect-preview.rf-connect-side-left .react-flow__handle-left.flowchart-handle {
+    opacity: 1 !important;
+    animation: magnetic-pulse 0.6s ease-in-out infinite;
+    z-index: 1000;
+    background: var(--theme-success-main, #10b981) !important;
+    border-color: var(--theme-success-dark, #059669) !important;
+    width: 10px !important;
+    height: 10px !important;
+}
+
+/* 🎯 连接成功弹跳动画 */
+@keyframes connection-snap {
+    0%   { transform: scale(2.5); box-shadow: 0 0 0 10px var(--theme-success-main-alpha, rgba(16, 185, 129, 0.5)); }
+    40%  { transform: scale(1.0); box-shadow: 0 0 0 0px rgba(16, 185, 129, 0); }
+    60%  { transform: scale(1.4); }
+    100% { transform: scale(1.0); }
+}
+
+/* 5. 边（Edge）交互效果 */
+
+/* 边路径样式过渡（不过渡 d 属性 — 拖拽时太重） */
+.react-flow__edge-path {
+    transition: stroke-width 0.2s ease, stroke 0.2s ease, filter 0.2s ease;
+}
+
+.performance-mode .react-flow__edge-path {
+    transition: none !important;
+}
+
+/* 边悬停效果 — 蓝色高亮光晕 (对标 Figma/Lucidchart 顶级体验) */
+.react-flow__edge:hover .react-flow__edge-path {
+    stroke: var(--theme-primary-main, #3b82f6);
+    stroke-width: 3;
+    filter: drop-shadow(0 0 6px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.5)));
+}
+
+/* 选中的边 — 蓝色描边更明显 */
+.react-flow__edge.selected .react-flow__edge-path {
+    stroke: var(--theme-primary-main, #3b82f6) !important;
+    stroke-width: 3;
+    filter: drop-shadow(0 0 4px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.4)));
+}
+
+/* ⭐ 边端点重连手柄 — 悬停/选中时显示可拖拽圆形 */
+/* 连接成功动画 */
+.react-flow__edge.just-connected .react-flow__edge-path {
+    stroke: var(--theme-success-main, #10b981) !important;
+    animation: connect-success-pulse 1s ease-in-out;
+}
+
+/* 原生边缘更新器：完全透明，但放大半径（r=12或更多）作为广阔的拖拽交互热区 */
+circle.react-flow__edgeupdater {
+    cursor: grab;
+    fill: transparent !important;
+    stroke: transparent !important;
+    r: 14 !important;
+    opacity: 0 !important;
+    pointer-events: all;
+}
+
+circle.react-flow__edgeupdater:active {
+    cursor: grabbing;
+}
+
+/* ⭐ 自绘高精度锚点 (Custom Visual Updater) — 悬停/选中时显示 */
+circle.custom-edge-updater {
+    fill: var(--theme-background-main, #ffffff);
+    stroke: var(--theme-primary-dark, #2563eb);
+    stroke-width: 2.5;
+    r: 4.5;
+    opacity: 0;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none; /* 让事件穿透到下方的巨大原生热区 */
+}
+
+/* 覆盖/悬停/选中均显示句柄 */
+.react-flow__edge:hover circle.custom-edge-updater,
+.react-flow__edge.selected circle.custom-edge-updater {
+    opacity: 1;
+    filter: drop-shadow(0 2px 4px rgba(37, 99, 235, 0.2));
+}
+
+/* 由于 native updater 渲染在组件树后方，使用 :has() 逆向查找到 parent 并影响 custom updater */
+.react-flow__edge:has(.react-flow__edgeupdater:hover) .custom-edge-updater {
+    fill: var(--theme-primary-light, #f8fafc);
+    stroke: var(--theme-primary-dark, #1d4ed8);
+    r: 6;
+    stroke-width: 3;
+    filter: drop-shadow(0 0 6px var(--theme-primary-main-alpha, rgba(37, 99, 235, 0.5))) drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+}
+
+/* 核心杀手锏：利用 :has() 伪类，当存在被选中、或悬挂被悬停的边时，直接将带有 SVG 的 Edges 容器层级凌驾于 Nodes 之上。
+   这就防止了下面原本层级绝缘的 HTML Handle 元素“吃掉”原本想点在圈圈上的鼠标事件（例如用户抱怨的：“移动连线还是会生崽”）。
+   [FIX] Node hover 本身带 z-index: 100/1000，必须加满到 2000 以彻底压制！ */
+.react-flow:has(.react-flow__edge.selected, .react-flow__edge:hover) .react-flow__edges {
+    z-index: 2000 !important;
+}
+
+/* 6. 对齐线效果 */
+
+.smart-guide-line {
+    animation: flash-guide 0.3s ease-in-out;
+}
+
+/* 7. 响应式和无障碍 */
+
+/* 禁用动画（用户偏好） */
+@media (prefers-reduced-motion: reduce) {
+
+    .react-flow__node,
+    .react-flow__handle,
+    .react-flow__edge-path,
+    .smart-guide-line {
+        animation: none !important;
+        transition: none !important;
+    }
+
+    .react-flow__node:hover {
+        transform: none;
+    }
+
+    .react-flow__handle:hover {
+        transform: none;
+    }
+}
+
+/* 7b. 键盘焦点指示器 (focus-visible) */
+/* 键盘 Tab 导航时显示清晰的蓝色 outline，鼠标点击不影响 */
+.modern-toolbar .ant-btn:focus-visible,
+.floating-toolbar .ant-btn:focus-visible,
+.diagram-status-bar .ant-btn:focus-visible {
+    outline: 2px solid var(--theme-primary-main, #3b82f6);
+    outline-offset: 2px;
+    border-radius: 4px;
+    box-shadow: 0 0 0 3px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.2));
+}
+
+[data-theme='dark'] .modern-toolbar .ant-btn:focus-visible,
+[data-theme='dark'] .floating-toolbar .ant-btn:focus-visible,
+[data-theme='dark'] .diagram-status-bar .ant-btn:focus-visible {
+    outline-color: #89b4fa;
+    box-shadow: 0 0 0 3px rgba(137, 180, 250, 0.25);
+}
+
+/* 低性能设备优化 - 拖动时启用高性能模式 */
+/* ===== 高性能拖动模式（核心优化） ===== */
+.react-flow.performance-mode .react-flow__node,
+.react-flow.performance-mode .react-flow__edge-path,
+.react-flow.performance-mode .react-flow__handle {
+    transition: none !important;
+    /* animation: none !important; [FIX] 禁用：会导致节点松开时入场动画(fadeIn)被重置并重播，引发全屏狂闪 */
+}
+
+/* 拖动中的节点提升到GPU层 */
+.react-flow.performance-mode .react-flow__node.dragging {
+    will-change: transform;
+    contain: strict;
+}
+
+/* 禁用悬停效果减少重排 */
+.react-flow.performance-mode .react-flow__node:hover {
+    transform: none;
+    /* filter: none; */
+}
+
+.react-flow.performance-mode .react-flow__node.selected {
+    animation: none;
+}
+
+/* 拖动时隐藏 MiniMap 减少实时渲染开销 */
+.react-flow.performance-mode .react-flow__minimap {
+    opacity: 0.3;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+/* 拖动时简化节点样式（移除 box-shadow）- Disabled to prevent full canvas repaint flash
+.react-flow.performance-mode .react-flow__node:not(.dragging) {
+    box-shadow: none !important;
+    filter: none !important;
+} */
+
+/* 8. 自定义节点类型特殊效果 */
+
+/* 分组节点悬停效果（较弱） */
+.react-flow__node[data-type="titleGroup"]:hover,
+.react-flow__node[data-type="subGroup"]:hover {
+    transform: scale(1.005);
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
+}
+
+/* 9. 性能优化 */
+
+/* GPU 加速 - 仅对拖动中的节点启用 */
+/* 移除了全局 translateZ(0)：100个节点 = 100个合成层 = 内存压力 */
+.react-flow__node.dragging {
+    will-change: transform;
+}
+
+.diagram-dragging .react-flow__node:hover {
+    transform: none;
+    filter: none;
+}
+
+.diagram-dragging .react-flow__node.selected {
+    animation: none;
+}
+
+/* 🚀 性能优化：拖动时禁用 flowchart-node 内部所有 transition */
+.diagram-dragging .flowchart-node,
+.diagram-dragging .flowchart-node *,
+.diagram-dragging .flowchart-shape,
+.diagram-dragging .flowchart-shape-stroke,
+.diagram-dragging .smart-edge {
+    transition: none !important;
+    /* animation: none !important; [FIX] 禁用：防止动画重播闪屏 */
+}
+
+/* 🚀 performance-mode 补充覆盖：smart-edge 和 SVG shapes */
+.react-flow.performance-mode .smart-edge,
+.react-flow.performance-mode .flowchart-shape,
+.react-flow.performance-mode .flowchart-shape-stroke {
+    transition: none !important;
+    /* filter: none !important; */
+}
+
+/* 🚀 P5: 连线期间禁用 handle 和连接预览元素的 transition/animation */
+.react-flow.performance-mode .react-flow__node.rf-connecting,
+.react-flow.performance-mode .react-flow__node.rf-connectable,
+.react-flow.performance-mode .react-flow__node.rf-connectable.rf-connect-preview,
+.react-flow.performance-mode .react-flow__connection-path {
+    transition: none !important;
+}
+
+/* 导航条目悬停效果 */
+.navigator-item {
+    transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.navigator-item:hover {
+    background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+.navigator-item:active {
+    background-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Sidebar Trigger Button */
+.sidebar-trigger-btn {
+    transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-trigger-btn:hover {
+    color: #fff !important;
+    background-color: var(--theme-primary-main, #2196F3) !important;
+    box-shadow: 0 4px 12px var(--theme-primary-main-alpha, rgba(33, 150, 243, 0.3));
+    transform: scale(1.05);
+}
+
+/* Floating Toolbars Hover */
+.modern-toolbar:hover {
+    background: rgba(255, 255, 255, 0.9) !important;
+    box-shadow: 0 12px 48px rgba(31, 38, 135, 0.2) !important;
+}
+
+.floating-toolbar {
+    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background-color: rgba(255, 255, 255, 0.85);
+}
+
+.floating-toolbar:hover {
+    background: rgba(255, 255, 255, 0.95) !important;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.18) !important;
+}
+
+
+
+/* 10. 拖拽父节点高亮效果 */
+
+/* 节点拖动到父容器（titleGroup/subGroup）时的高亮效果 */
+.react-flow__node.drop-target-highlight {
+    box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.5) !important;
+    background-color: rgba(24, 144, 255, 0.05) !important;
+    border-color: rgba(24, 144, 255, 0.8) !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 11. QuickConnect 菜单入场动画 */
+@keyframes quickMenuFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.92) translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* ============================================
+   12. 深色模式自适应
+   支持两种触发方式：
+   - [data-theme='dark'] — 手动切换
+   - @media (prefers-color-scheme: dark) — 系统跟随
+   ============================================ */
+
+/* --- 共用暗色变量 --- */
+:root {
+    --diagram-dark-bg: #1e1e2e;
+    --diagram-dark-surface: rgba(30, 30, 46, 0.85);
+    --diagram-dark-border: rgba(255, 255, 255, 0.08);
+    --diagram-dark-text: #cdd6f4;
+    --diagram-dark-text-secondary: #a6adc8;
+    --diagram-dark-hover: rgba(255, 255, 255, 0.06);
+    --diagram-dark-accent: #89b4fa;
+    --diagram-dark-success: #a6e3a1;
+}
+
+/* --- data-theme 方式 --- */
+[data-theme='dark'] .diagram-status-bar {
+    background: var(--diagram-dark-surface);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+    border-color: var(--diagram-dark-border);
+    color: var(--diagram-dark-text-secondary);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .diagram-status-bar:hover {
+    background: rgba(30, 30, 46, 0.95);
+}
+
+[data-theme='dark'] .context-menu-item {
+    color: var(--diagram-dark-text);
+}
+
+[data-theme='dark'] .context-menu-item:hover {
+    background-color: var(--diagram-dark-hover);
+    color: var(--diagram-dark-accent);
+}
+
+[data-theme='dark'] .react-flow__node.selected {
+    outline-color: var(--diagram-dark-accent);
+}
+
+[data-theme='dark'] .react-flow__edge:hover .react-flow__edge-path {
+    stroke: var(--diagram-dark-accent);
+}
+
+[data-theme='dark'] .react-flow__edge.selected .react-flow__edge-path {
+    stroke: var(--diagram-dark-accent) !important;
+    filter: drop-shadow(0 0 3px rgba(137, 180, 250, 0.3));
+}
+
+[data-theme='dark'] .react-flow__node.rf-connecting {
+    border-color: var(--diagram-dark-accent) !important;
+    box-shadow: 0 0 0 4px rgba(137, 180, 250, 0.2);
+}
+
+[data-theme='dark'] .react-flow__node.rf-connectable {
+    border-color: var(--diagram-dark-success) !important;
+    background: rgba(166, 227, 161, 0.05);
+}
+
+[data-theme='dark'] .react-flow__node.drop-target-highlight {
+    box-shadow: 0 0 0 3px rgba(137, 180, 250, 0.4) !important;
+    background-color: rgba(137, 180, 250, 0.05) !important;
+    border-color: rgba(137, 180, 250, 0.6) !important;
+}
+
+[data-theme='dark'] .modern-toolbar:hover {
+    background: rgba(30, 30, 46, 0.92) !important;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35) !important;
+}
+
+[data-theme='dark'] .floating-toolbar {
+    background-color: rgba(30, 30, 46, 0.88) !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(205, 214, 244, 0.06) !important;
+}
+
+[data-theme='dark'] .floating-toolbar:hover {
+    background: rgba(30, 30, 46, 0.95) !important;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* 🆕 深色模式：工具栏按钮统一 hover / active 样式 */
+[data-theme='dark'] .modern-toolbar .ant-btn-text,
+[data-theme='dark'] .floating-toolbar .ant-btn-text {
+    color: rgba(205, 214, 244, 0.85) !important;
+}
+
+[data-theme='dark'] .modern-toolbar .ant-btn-text:hover,
+[data-theme='dark'] .floating-toolbar .ant-btn-text:hover {
+    background: rgba(137, 180, 250, 0.15) !important;
+    color: #89b4fa !important;
+}
+
+[data-theme='dark'] .modern-toolbar .ant-btn-text:active,
+[data-theme='dark'] .floating-toolbar .ant-btn-text:active {
+    background: rgba(137, 180, 250, 0.25) !important;
+}
+
+[data-theme='dark'] .modern-toolbar .ant-btn-text[disabled],
+[data-theme='dark'] .floating-toolbar .ant-btn-text[disabled] {
+    color: rgba(205, 214, 244, 0.25) !important;
+}
+
+/* 🆕 深色模式：primary ghost 按钮（网格/路由/标尺等激活态） */
+[data-theme='dark'] .modern-toolbar .ant-btn-primary.ant-btn-background-ghost {
+    color: #89b4fa !important;
+    border-color: rgba(137, 180, 250, 0.5) !important;
+    background: rgba(137, 180, 250, 0.12) !important;
+}
+
+[data-theme='dark'] .modern-toolbar .ant-btn-primary.ant-btn-background-ghost:hover {
+    background: rgba(137, 180, 250, 0.22) !important;
+    border-color: rgba(137, 180, 250, 0.7) !important;
+}
+
+/* 🆕 深色模式：拖拽手柄 */
+[data-theme='dark'] .modern-toolbar .ant-card-body>div:first-child {
+    color: rgba(205, 214, 244, 0.35) !important;
+}
+
+[data-theme='dark'] .modern-toolbar .ant-card-body>div:first-child:hover {
+    color: rgba(205, 214, 244, 0.75) !important;
+}
+
+/* 🆕 深色模式：分隔线 */
+[data-theme='dark'] .modern-toolbar .ant-divider,
+[data-theme='dark'] .floating-toolbar .ant-divider {
+    border-color: rgba(205, 214, 244, 0.12) !important;
+}
+
+[data-theme='dark'] .sidebar-trigger-btn:hover {
+    background-color: var(--diagram-dark-accent) !important;
+    color: #1e1e2e !important;
+}
+
+[data-theme='dark'] .navigator-item:hover {
+    background-color: var(--diagram-dark-hover) !important;
+}
+
+
+
+
+/* --- 系统跟随方式（无 data-theme 标记时生效） --- */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .diagram-status-bar {
+        background: var(--diagram-dark-surface);
+        -webkit-backdrop-filter: blur(16px) saturate(160%);
+        backdrop-filter: blur(16px) saturate(160%);
+        border-color: var(--diagram-dark-border);
+        color: var(--diagram-dark-text-secondary);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    :root:not([data-theme='light']) .diagram-status-bar:hover {
+        background: rgba(30, 30, 46, 0.95);
+    }
+
+    :root:not([data-theme='light']) .context-menu-item {
+        color: var(--diagram-dark-text);
+    }
+
+    :root:not([data-theme='light']) .context-menu-item:hover {
+        background-color: var(--diagram-dark-hover);
+        color: var(--diagram-dark-accent);
+    }
+
+    :root:not([data-theme='light']) .react-flow__node.selected {
+        outline-color: var(--diagram-dark-accent);
+    }
+
+    :root:not([data-theme='light']) .react-flow__edge:hover .react-flow__edge-path {
+        stroke: var(--diagram-dark-accent);
+    }
+
+    :root:not([data-theme='light']) .react-flow__edge.selected .react-flow__edge-path {
+        stroke: var(--diagram-dark-accent) !important;
+        filter: drop-shadow(0 0 3px rgba(137, 180, 250, 0.3));
+    }
+
+    :root:not([data-theme='light']) .react-flow__node.drop-target-highlight {
+        box-shadow: 0 0 0 3px rgba(137, 180, 250, 0.4) !important;
+        background-color: rgba(137, 180, 250, 0.05) !important;
+        border-color: rgba(137, 180, 250, 0.6) !important;
+    }
+
+    :root:not([data-theme='light']) .floating-toolbar {
+        background-color: rgba(30, 30, 46, 0.88) !important;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(205, 214, 244, 0.06) !important;
+    }
+
+    :root:not([data-theme='light']) .modern-toolbar:hover,
+    :root:not([data-theme='light']) .floating-toolbar:hover {
+        background: rgba(30, 30, 46, 0.95) !important;
+        box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35) !important;
+    }
+
+    :root:not([data-theme='light']) .modern-toolbar .ant-btn-text,
+    :root:not([data-theme='light']) .floating-toolbar .ant-btn-text {
+        color: rgba(205, 214, 244, 0.85) !important;
+    }
+
+    :root:not([data-theme='light']) .modern-toolbar .ant-btn-text:hover,
+    :root:not([data-theme='light']) .floating-toolbar .ant-btn-text:hover {
+        background: rgba(137, 180, 250, 0.15) !important;
+        color: #89b4fa !important;
+    }
+
+    :root:not([data-theme='light']) .modern-toolbar .ant-btn-text[disabled],
+    :root:not([data-theme='light']) .floating-toolbar .ant-btn-text[disabled] {
+        color: rgba(205, 214, 244, 0.25) !important;
+    }
+
+    :root:not([data-theme='light']) .modern-toolbar .ant-btn-primary.ant-btn-background-ghost {
+        color: #89b4fa !important;
+        border-color: rgba(137, 180, 250, 0.5) !important;
+        background: rgba(137, 180, 250, 0.12) !important;
+    }
+
+    :root:not([data-theme='light']) .modern-toolbar .ant-divider,
+    :root:not([data-theme='light']) .floating-toolbar .ant-divider {
+        border-color: rgba(205, 214, 244, 0.12) !important;
+    }
+}
+
+/* ============================================
+   13. 右侧边栏 Tabs 高度链修复
+   Ant Design Tabs 内部容器默认无 height，
+   导致 AI 面板 flex 布局无法撑满，输入框悬空。
+   ============================================ */
+.designer-right-sidebar .ant-tabs {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.designer-right-sidebar .ant-tabs-content-holder {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.designer-right-sidebar .ant-tabs-content {
+    height: 100%;
+}
+
+.designer-right-sidebar .ant-tabs-tabpane {
+    height: 100%;
+}
+
+/* Tabs 内直接子 div（容器 wrapper）也要撑满 */
+.designer-right-sidebar .ant-tabs-tabpane>div {
+    height: 100%;
+}
+
+/* ============================================
+   🌙 暗色模式（Dark Mode）
+   由 useThemeMode Hook 在 <html> 上设置 data-theme="dark"
+   ============================================ */
+
+[data-theme="dark"] .diagram-root {
+    background-color: #1a1a2e;
+}
+
+/* 画布背景 */
+[data-theme="dark"] .react-flow {
+    background-color: #16213e !important;
+}
+
+/* React Flow 网格 */
+[data-theme="dark"] .react-flow__background pattern circle {
+    fill: rgba(255, 255, 255, 0.06) !important;
+}
+[data-theme="dark"] .react-flow__background pattern line {
+    stroke: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* 节点卡片 */
+[data-theme="dark"] .react-flow__node {
+    background: #1e293b;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+[data-theme="dark"] .react-flow__node.selected {
+    outline-color: #60a5fa !important;
+}
+
+/* 自定义节点 */
+[data-theme="dark"] .flowchart-node,
+[data-theme="dark"] .custom-node-wrapper {
+    background: #1e293b !important;
+    border-color: #475569 !important;
+    color: #e2e8f0 !important;
+}
+[data-theme="dark"] .flowchart-node .node-label,
+[data-theme="dark"] .custom-node-wrapper .node-label {
+    color: #f1f5f9 !important;
+}
+[data-theme="dark"] .flowchart-node .node-description {
+    color: #94a3b8 !important;
+}
+
+/* 分组节点 */
+[data-theme="dark"] .title-group-node {
+    background: rgba(30, 41, 59, 0.85) !important;
+    border-color: #475569 !important;
+}
+[data-theme="dark"] .title-group-node .group-title {
+    color: #e2e8f0 !important;
+}
+
+/* 连线与边 */
+[data-theme="dark"] .react-flow__edge path {
+    stroke: #64748b;
+}
+[data-theme="dark"] .react-flow__edge.selected path {
+    stroke: #60a5fa !important;
+}
+[data-theme="dark"] .react-flow__edge:hover path {
+    stroke: #818cf8 !important;
+}
+
+/* 连接点 (Handles) */
+[data-theme="dark"] .react-flow__handle {
+    background: #475569;
+    border-color: #60a5fa;
+}
+
+/* 浮动工具栏 — glassmorphism 暗色 */
+[data-theme="dark"] .modern-toolbar {
+    background: rgba(30, 41, 59, 0.85) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+}
+[data-theme="dark"] .modern-toolbar .ant-btn-text {
+    color: #cbd5e1 !important;
+}
+[data-theme="dark"] .modern-toolbar .ant-btn-text:hover {
+    color: #f1f5f9 !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+[data-theme="dark"] .modern-toolbar .ant-divider {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* 状态栏 */
+[data-theme="dark"] .diagram-status-bar {
+    background: rgba(30, 41, 59, 0.9) !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+    color: #94a3b8 !important;
+}
+
+/* 右侧面板 */
+[data-theme="dark"] .designer-right-sidebar {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+}
+[data-theme="dark"] .designer-right-sidebar .ant-tabs-tab {
+    color: #94a3b8 !important;
+}
+[data-theme="dark"] .designer-right-sidebar .ant-tabs-tab-active {
+    color: #60a5fa !important;
+}
+
+/* 属性面板 */
+[data-theme="dark"] .property-panel {
+    background: #1e293b !important;
+    color: #e2e8f0 !important;
+}
+
+/* 左侧边栏 */
+[data-theme="dark"] .icon-rail-sidebar {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+}
+
+/* 搜索栏 */
+[data-theme="dark"] .canvas-search-bar,
+[data-theme="dark"] div[style*="backdrop-filter"] {
+    background: rgba(30, 41, 59, 0.95) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 浮动上下文工具栏 */
+[data-theme="dark"] .floating-context-toolbar,
+[data-theme="dark"] .contextual-edge-toolbar {
+    background: rgba(30, 41, 59, 0.95) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+}
+
+/* 小地图 */
+[data-theme="dark"] .react-flow__minimap {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+}
+
+/* 标尺 */
+[data-theme="dark"] .canvas-ruler {
+    background: #1e293b !important;
+    color: #64748b !important;
+}
+
+/* 滚动条暗色 */
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* Ant Design 下拉菜单暗色适配 */
+[data-theme="dark"] .ant-dropdown {
+    --antd-wave-shadow-color: #60a5fa;
+}
+[data-theme="dark"] .ant-dropdown .ant-dropdown-menu {
+    background: #1e293b !important;
+    border: 1px solid #334155 !important;
+}
+[data-theme="dark"] .ant-dropdown .ant-dropdown-menu-item {
+    color: #e2e8f0 !important;
+}
+[data-theme="dark"] .ant-dropdown .ant-dropdown-menu-item:hover {
+    background: rgba(96, 165, 250, 0.08) !important;
+}
+
+/* DesignerRightSidebar — glassmorphism 暗色 */
+[data-theme="dark"] .designer-right-sidebar {
+    background-color: rgba(30, 41, 59, 0.95) !important;
+    backdrop-filter: blur(20px) saturate(180%);
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* GenericStandardDiagram — AI 侧栏暗色 */
+[data-theme="dark"] .gsd-ai-sidebar {
+    background-color: #1e293b !important;
+    border-left-color: #334155 !important;
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* PropertyPanel 暗色 */
+[data-theme="dark"] .ant-collapse {
+    background: transparent;
+    border-color: #334155;
+}
+[data-theme="dark"] .ant-collapse > .ant-collapse-item {
+    border-bottom-color: #334155;
+}
+[data-theme="dark"] .ant-collapse > .ant-collapse-item > .ant-collapse-header {
+    color: #e2e8f0;
+}
+[data-theme="dark"] .ant-collapse-content {
+    background: transparent;
+    border-top-color: #334155;
+    color: #cbd5e1;
+}
+[data-theme="dark"] .ant-input,
+[data-theme="dark"] .ant-input-number,
+[data-theme="dark"] .ant-select-selector {
+    background: #0f172a !important;
+    border-color: #475569 !important;
+    color: #e2e8f0 !important;
+}
+[data-theme="dark"] .ant-input:focus,
+[data-theme="dark"] .ant-input-number:focus,
+[data-theme="dark"] .ant-input-number-focused {
+    border-color: #60a5fa !important;
+}
+[data-theme="dark"] .ant-select-dropdown {
+    background: #1e293b !important;
+    border: 1px solid #334155;
+}
+[data-theme="dark"] .ant-select-item {
+    color: #e2e8f0 !important;
+}
+[data-theme="dark"] .ant-select-item-option-active {
+    background: rgba(96, 165, 250, 0.08) !important;
+}
+[data-theme="dark"] .ant-select-item-option-selected {
+    background: rgba(96, 165, 250, 0.15) !important;
+}
+
+/* Tabs 暗色 */
+[data-theme="dark"] .ant-tabs-nav {
+    border-bottom-color: #334155 !important;
+}
+[data-theme="dark"] .ant-tabs-tab {
+    color: #94a3b8 !important;
+}
+[data-theme="dark"] .ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: #60a5fa !important;
+}
+[data-theme="dark"] .ant-tabs-ink-bar {
+    background: #60a5fa !important;
+}
+
+/* Modal 暗色 */
+[data-theme="dark"] .ant-modal-content {
+    background: #1e293b !important;
+    border: 1px solid #334155;
+}
+[data-theme="dark"] .ant-modal-header {
+    background: transparent !important;
+    border-bottom-color: #334155 !important;
+}
+[data-theme="dark"] .ant-modal-title {
+    color: #e2e8f0 !important;
+}
+[data-theme="dark"] .ant-modal-body {
+    color: #cbd5e1;
+}
+[data-theme="dark"] .ant-modal-footer {
+    border-top-color: #334155 !important;
+}
+
+/* Tooltip 暗色 */
+[data-theme="dark"] .ant-tooltip-inner {
+    background: #0f172a !important;
+    color: #e2e8f0 !important;
+}
+
+/* IconRailSidebar — 浮动抽屉暗色 */
+[data-theme="dark"] .side-drawer {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+}
+[data-theme="dark"] .side-drawer-header {
+    border-bottom-color: #334155 !important;
+    color: #e2e8f0 !important;
+}
+
+/* ============================================
+   Selection Marquee — Figma-style
+   ============================================ */
+.react-flow__selection {
+    background: rgba(59, 130, 246, 0.08) !important;
+    border: 1.5px solid rgba(59, 130, 246, 0.5) !important;
+    border-radius: 4px !important;
+}
+
+.react-flow__nodesselection-rect {
+    background: rgba(59, 130, 246, 0.04) !important;
+    border: 1.5px dashed rgba(59, 130, 246, 0.4) !important;
+    border-radius: 6px !important;
+}
+
+/* ============================================
+   Connection Handles — 精致悬浮效果
+   ============================================ */
+.react-flow__handle {
+    width: 7px !important;
+    height: 7px !important;
+    background: #94a3b8 !important;
+    border: 1.5px solid #fff !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 0 0 0 transparent;
+}
+
+.react-flow__handle:hover {
+    width: 11px !important;
+    height: 11px !important;
+    background: var(--theme-primary-main, #3b82f6) !important;
+    border-color: var(--theme-background-main, #fff) !important;
+    box-shadow: 0 0 0 3px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.25)), 0 0 8px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.3)) !important;
+    z-index: 10;
+}
+
+/* 连线拖拽中：候选 handle 呼吸脉冲 */
+.react-flow.connecting .react-flow__handle:not(.connectingto):not(.connectingfrom) {
+    animation: handlePulse 1.2s ease-in-out infinite !important;
+}
+
+.react-flow.connecting .react-flow__handle.connectionindicator {
+    width: 11px !important;
+    height: 11px !important;
+    background: var(--theme-success-main, #10b981) !important;
+    animation: handlePulse 0.8s ease-in-out infinite !important;
+}
+
+@keyframes handlePulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.4));
+    }
+    50% {
+        box-shadow: 0 0 0 4px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.1)), 0 0 10px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.2));
+    }
+}
+
+/* 暗色模式 handle */
+[data-theme="dark"] .react-flow__handle {
+    background: var(--theme-text-muted, #64748b) !important;
+    border-color: var(--theme-background-main, #1e293b) !important;
+}
+
+[data-theme="dark"] .react-flow__handle:hover {
+    background: var(--theme-primary-main, #60a5fa) !important;
+    border-color: var(--theme-background-main, #1e293b) !important;
+    box-shadow: 0 0 0 3px var(--theme-primary-main-alpha, rgba(96, 165, 250, 0.25)), 0 0 8px var(--theme-primary-main-alpha, rgba(96, 165, 250, 0.3)) !important;
+}
+
+/* 选框 */
+.react-flow__selection {
+    background: var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.08)) !important;
+    border-color: var(--theme-primary-main, rgba(59, 130, 246, 0.5)) !important;
+}
+
+.react-flow__nodesselection-rect {
+    background: var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.04)) !important;
+    border-color: var(--theme-primary-main, rgba(59, 130, 246, 0.4)) !important;
+}
+
+/* ============================================
+   Semantic Zoom & Canvas Virtualization
+   当 zoom < 0.4 时，触发容器级降级渲染
+   ============================================ */
+.diagram-zoomed-out .react-flow__node {
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+    transition: none !important;
+}
+
+/* 隐藏无关交互组件 */
+.diagram-zoomed-out .react-flow__handle,
+.diagram-zoomed-out .react-flow__resize-control,
+.diagram-zoomed-out .react-flow__connection-indicator,
+.diagram-zoomed-out .node-toolbar-wrapper,
+.diagram-zoomed-out .diagram-context-menu {
+    display: none !important;
+}
+
+/* 隐藏节点内的复杂表单组件 */
+.diagram-zoomed-out .react-flow__node input,
+.diagram-zoomed-out .react-flow__node textarea,
+.diagram-zoomed-out .react-flow__node select,
+.diagram-zoomed-out .react-flow__node button,
+.diagram-zoomed-out .react-flow__node .ant-select,
+.diagram-zoomed-out .react-flow__node .ant-btn,
+.diagram-zoomed-out .react-flow__node .domain-tag,
+.diagram-zoomed-out .react-flow__node .node-icon-container {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* 富文本与编辑框降级 */
+.diagram-zoomed-out .react-flow__node [contenteditable="true"] {
+    pointer-events: none !important;
+    caret-color: transparent !important;
+    background: transparent !important;
+    overflow: hidden !important;
+}
+
+/* 边线降级：取消所有复杂虚线与动画连线 */
+.diagram-zoomed-out .react-flow__edge-path {
+    stroke-dasharray: none !important;
+    animation: none !important;
+}
+
+/* 连线文字降级 */
+.diagram-zoomed-out .react-flow__edge-textbg,
+.diagram-zoomed-out .react-flow__edge-text,
+.diagram-zoomed-out .edge-label-container {
+    display: none !important;
+}
+

@@ -1,0 +1,264 @@
+/**
+ * 错误边界组件样式
+ * 提供优雅的错误显示界面
+ */
+
+.error-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 20px;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  margin: 16px;
+}
+
+.error-boundary--page {
+  min-height: 100vh;
+  margin: 0;
+  border-radius: 0;
+  background: linear-gradient(135deg, #fef2f2 0%, #fef7f7 100%);
+}
+
+.error-boundary--component {
+  min-height: 200px;
+  background-color: #fffbeb;
+  border-color: #fed7aa;
+}
+
+.error-boundary__container {
+  text-align: center;
+  max-width: 600px;
+  width: 100%;
+}
+
+.error-boundary__icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.8;
+}
+
+.error-boundary__title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #dc2626;
+  margin: 0 0 12px 0;
+}
+
+.error-boundary--component .error-boundary__title {
+  font-size: 18px;
+  color: #d97706;
+}
+
+.error-boundary__message {
+  font-size: 16px;
+  color: #6b7280;
+  line-height: 1.6;
+  margin: 0 0 24px 0;
+}
+
+.error-boundary__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.error-boundary__button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.error-boundary__button--primary {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.error-boundary__button--primary:hover {
+  background-color: #2563eb;
+  transform: translateY(-1px);
+}
+
+.error-boundary__button--secondary {
+  background-color: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.error-boundary__button--secondary:hover {
+  background-color: #e5e7eb;
+  transform: translateY(-1px);
+}
+
+.error-boundary__details {
+  margin-top: 24px;
+  text-align: left;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.error-boundary__details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 12px;
+}
+
+.error-boundary__details summary:hover {
+  color: #111827;
+}
+
+.error-boundary__stack {
+  background-color: #1f2937;
+  color: #f9fafb;
+  padding: 12px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 8px 0;
+}
+
+.error-boundary__retry-info {
+  font-size: 14px;
+  color: #6b7280;
+  margin-top: 16px;
+  padding: 12px;
+  background-color: #f3f4f6;
+  border-radius: 6px;
+  border-left: 4px solid #fbbf24;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .error-boundary {
+    padding: 16px;
+    margin: 8px;
+  }
+  
+  .error-boundary--page {
+    padding: 20px 16px;
+  }
+  
+  .error-boundary__icon {
+    font-size: 36px;
+  }
+  
+  .error-boundary__title {
+    font-size: 20px;
+  }
+  
+  .error-boundary--component .error-boundary__title {
+    font-size: 16px;
+  }
+  
+  .error-boundary__message {
+    font-size: 14px;
+  }
+  
+  .error-boundary__actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .error-boundary__button {
+    width: 100%;
+    max-width: 200px;
+    justify-content: center;
+  }
+}
+
+/* 暗色主题支持 */
+@media (prefers-color-scheme: dark) {
+  .error-boundary {
+    background-color: #1f2937;
+    border-color: #374151;
+  }
+  
+  .error-boundary--page {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+  }
+  
+  .error-boundary--component {
+    background-color: #374151;
+    border-color: #4b5563;
+  }
+  
+  .error-boundary__title {
+    color: #f87171;
+  }
+  
+  .error-boundary--component .error-boundary__title {
+    color: #fbbf24;
+  }
+  
+  .error-boundary__message {
+    color: #d1d5db;
+  }
+  
+  .error-boundary__details {
+    background-color: #374151;
+    border-color: #4b5563;
+  }
+  
+  .error-boundary__details summary {
+    color: #d1d5db;
+  }
+  
+  .error-boundary__details summary:hover {
+    color: #f9fafb;
+  }
+  
+  .error-boundary__retry-info {
+    background-color: #374151;
+    border-left-color: #fbbf24;
+    color: #d1d5db;
+  }
+}
+
+/* 动画效果 */
+.error-boundary {
+  animation: errorBoundaryFadeIn 0.3s ease-out;
+}
+
+@keyframes errorBoundaryFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.error-boundary__button {
+  animation: buttonSlideIn 0.4s ease-out;
+}
+
+@keyframes buttonSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

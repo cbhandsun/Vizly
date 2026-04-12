@@ -1,0 +1,201 @@
+/* src/components/custom-nodes/SubGroupNode.css */
+
+.sub-group-node {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transition: all var(--transition-normal), height 0.3s ease, width 0.3s ease, box-shadow 0.25s ease;
+    border-radius: 12px;
+    /* 极微弱内阴影：增加容器凹陷感 */
+    box-shadow: inset 0 1px 4px -1px rgba(0, 0, 0, 0.06);
+    /* 🔑 让点击穿透到子节点，标题/按钮通过 pointer-events: auto 保留交互 */
+    pointer-events: none;
+}
+
+/* 🔑 React Flow 外层 wrapper 也需要穿透，并且强制放入底层（-1）防止背景遮挡普通节点 */
+.react-flow__node-subGroup {
+    pointer-events: none !important;
+    z-index: -1 !important;
+}
+
+/* 使 subGroup 内的交互区域恢复事件 */
+.react-flow__node-subGroup .sub-group-title,
+.react-flow__node-subGroup .sub-group-collapse-controls,
+.react-flow__node-subGroup .sub-group-handle,
+.react-flow__node-subGroup .flowchart-resize-handle,
+.react-flow__node-subGroup .flowchart-resize-line {
+    pointer-events: auto;
+}
+
+/* Drop Target Highlight */
+.sub-group-node.drop-target {
+    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.3) !important;
+    border-color: var(--color-primary-500) !important;
+    transform: scale(1.01);
+    animation: sub-drop-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes sub-drop-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.2); }
+    50% { box-shadow: 0 0 0 6px rgba(var(--color-primary-rgb), 0.1); }
+}
+
+.sub-group-node:hover {
+    box-shadow: inset 0 1px 4px -1px rgba(0, 0, 0, 0.06), 0 4px 16px -4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Glass Effect */
+.sub-group-node.glass {
+    -webkit-backdrop-filter: saturate(1.8) blur(10px);
+    backdrop-filter: saturate(1.8) blur(10px);
+    background: rgba(255, 255, 255, 0.5);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+
+/* Debug Overlay */
+.sub-group-debug {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 11px;
+    line-height: 14px;
+    color: #111;
+    background: rgba(255, 255, 255, 0.75);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    pointer-events: none;
+    z-index: 200;
+}
+
+.sub-group-title {
+    padding: 10px 14px;
+    border-top-left-radius: 10px;
+    /* Default, overridden by style logic */
+    border-top-right-radius: 10px;
+    background-color: transparent;
+    padding-left: 14px;
+    pointer-events: auto;
+    position: relative;
+}
+
+/* 标题区底部渐变分割线 */
+.sub-group-title::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 14px;
+    right: 14px;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        currentColor 50%,
+        transparent 100%
+    );
+    opacity: 0.12;
+    pointer-events: none;
+}
+
+.sub-group-handle {
+    width: 8px;
+    /* React Flow defaults, can be overridden */
+    height: 8px;
+    background: #555;
+    border-radius: 50%;
+}
+
+/* Blueprint Pattern */
+.sub-group-node.blueprint {
+    background-image: repeating-linear-gradient(0deg, rgba(25, 118, 210, 0.12) 0px, rgba(25, 118, 210, 0.12) 1px, transparent 1px, transparent 12px),
+        repeating-linear-gradient(90deg, rgba(25, 118, 210, 0.12) 0px, rgba(25, 118, 210, 0.12) 1px, transparent 1px, transparent 12px);
+}
+
+/* Glass Effect */
+.sub-group-node.glass {
+    -webkit-backdrop-filter: saturate(1.2) blur(6px);
+    backdrop-filter: saturate(1.2) blur(6px);
+}
+
+/* Hidden State */
+.sub-group-node.hidden {
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+}
+
+/* Selected State */
+.sub-group-node.selected {
+    box-shadow: 0 0 0 2px rgba(0, 120, 255, 0.5);
+}
+
+/* 🆕 折叠控件样式 */
+.sub-group-collapse-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    pointer-events: auto;
+}
+
+.sub-group-child-count {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 10px;
+    background: rgba(74, 144, 226, 0.1);
+    color: currentColor;
+    opacity: 0.8;
+    border: 1px solid rgba(74, 144, 226, 0.3);
+}
+
+.sub-group-collapse-btn {
+    background: rgba(74, 144, 226, 0.1);
+    border: 1px solid rgba(74, 144, 226, 0.3);
+    color: currentColor;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sub-group-collapse-btn:hover {
+    background: rgba(74, 144, 226, 0.2);
+    transform: scale(1.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sub-group-collapse-btn:active {
+    transform: scale(0.95);
+}
+
+/* 🆕 双击编辑标题 */
+.sub-group-inline-input {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(74, 144, 226, 0.4);
+    border-radius: 4px;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    padding: 2px 6px;
+    outline: none;
+    width: 100%;
+    min-width: 80px;
+    max-width: 300px;
+    text-align: center;
+    pointer-events: auto;
+}
+
+.sub-group-inline-input:focus {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(74, 144, 226, 0.7);
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.15);
+}

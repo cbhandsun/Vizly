@@ -1,0 +1,155 @@
+/**
+ * Port Selector
+ * 
+ * Handles smart port selection, dynamic port sliding, and fan-out distribution.
+ */
+
+import { Point, Rectangle } from '../../algorithms/geometryUtils';
+import { Position, UnifiedRoutingConfig } from '../../types/routing';
+import { selectOptimalPorts } from '../../algorithms/costAwarePorts';
+
+
+export class PortSelector {
+    private config: UnifiedRoutingConfig;
+
+    constructor(config: UnifiedRoutingConfig) {
+        this.config = config;
+    }
+
+    /**
+     * Get optimal ports for a connection
+     */
+    selectPorts(
+        sourceRect: Rectangle,
+        targetRect: Rectangle,
+        obstacles: Rectangle[],
+        options: {
+            effectiveDir: string;
+            portUsage?: Record<string, number>;
+            sourceId: string;
+            targetId: string;
+        }
+    ) {
+        return selectOptimalPorts(
+            sourceRect,
+            targetRect,
+            obstacles,
+            [], // Sanitized obstacles if any
+            {
+                ...this.config.portSelection,
+                layoutDirection: options.effectiveDir as 'TB' | 'LR' | 'BT' | 'RL',
+                portUsage: options.portUsage,
+                sourceId: options.sourceId,
+                targetId: options.targetId,
+                enableDynamicPorts: this.config.portSelection.enableDynamicPorts,
+                portSlidePadding: this.config.portSelection.portSlidePadding
+            }
+        );
+    }
+
+    /**
+     * Map Position enum to string direction (t, b, l, r)
+     */
+    mapPosToDir(p: Position): string {
+        if (p === Position.Top) return 't';
+        if (p === Position.Bottom) return 'b';
+        if (p === Position.Left) return 'l';
+        return 'r';
+    }
+
+    /**
+     * Get slide bounds for a rectangle with padding
+     */
+    getSlideBounds(r: Rectangle) {
+        const padding = Math.max(0, this.config.portSelection.portSlidePadding ?? 0);
+        const minX = r.x + padding;
+        const maxX = r.x + r.width - padding;
+        const minY = r.y + padding;
+        const maxY = r.y + r.height - padding;
+
+        return {
+            minX: Math.min(minX, maxX),
+            maxX: Math.max(minX, maxX),
+            minY: Math.min(minY, maxY),
+            maxY: Math.max(minY, maxY)
+        };
+    }
+
+    /**
+     * Calculate port coordinate with dynamic sliding towards target center
+     */
+    getPortPointWithSlide(
+        rect: Rectangle,
+        pos: Position,
+        targetCenter?: Point
+    ): Point {
+        const cx = rect.x + rect.width / 2;
+        const cy = rect.y + rect.height / 2;
+        const enableSlide = Boolean(this.config.portSelection.enableDynamicPorts && targetCenter);
+
+        if (!enableSlide || !targetCenter) {
+            if (pos === Position.Top) return { x: cx, y: rect.y };
+            if (pos === Position.Bottom) return { x: cx, y: rect.y + rect.height };
+            if (pos === Position.Left) return { x: rect.x, y: cy };
+            return { x: rect.x + rect.width, y: cy };
+        }
+
+        const bounds = this.getSlideBounds(rect);
+        // [FIX] Strict Centering: Constrain the dynamic sliding to the central 50% of the node.
+        // This ensures that single ports are not pushed to the far corners ("sides"),
+        // satisfying the requirement: "Ports distributed close to center, not on sides".
+        const strictMinX = Math.max(bounds.minX, rect.x + rect.width * 0.25);
+        const strictMaxX = Math.min(bounds.maxX, rect.x + rect.width * 0.75);
+        const strictMinY = Math.max(bounds.minY, rect.y + rect.height * 0.25);
+        const strictMaxY = Math.min(bounds.maxY, rect.y + rect.height * 0.75);
+
+        // Safety check for small nodes
+        const safeMinX = Math.min(strictMinX, strictMaxX);
+        const safeMaxX = Math.max(strictMinX, strictMaxX);
+        const safeMinY = Math.min(strictMinY, strictMaxY);
+        const safeMaxY = Math.max(strictMinY, strictMaxY);
+
+        const clampX = (val: number) => Math.max(safeMinX, Math.min(safeMaxX, val));
+        const clampY = (val: number) => Math.max(safeMinY, Math.min(safeMaxY, val));
+
+        if (pos === Position.Top) return { x: clampX(targetCenter.x), y: rect.y };
+        if (pos === Position.Bottom) return { x: clampX(targetCenter.x), y: rect.y + rect.height };
+        if (pos === Position.Left) return { x: rect.x, y: clampY(targetCenter.y) };
+        return { x: rect.x + rect.width, y: clampY(targetCenter.y) };
+    }
+
+    /**
+     * Calculate position with fan-out/slotting distribution
+     */
+    getDistributedPortPoint(
+        rect: Rectangle,
+        pos: Position,
+        index: number,
+        count: number,
+        targetCenter?: Point
+    ): Point {
+        if (count <= 1) {
+            return this.getPortPointWithSlide(rect, pos, targetCenter);
+        }
+
+        const isVerticalPort = pos === Position.Top || pos === Position.Bottom;
+        const PORT_SPREAD = isVerticalPort ? 20 : 20;
+
+        const sideOffset = (index - (count - 1) / 2) * PORT_SPREAD;
+        const basePt = this.getPortPointWithSlide(rect, pos, targetCenter);
+        const bounds = this.getSlideBounds(rect);
+        const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
+
+        if (pos === Position.Left || pos === Position.Right) {
+            return {
+                x: basePt.x,
+                y: clamp(basePt.y + sideOffset, bounds.minY, bounds.maxY)
+            };
+        } else {
+            return {
+                x: clamp(basePt.x + sideOffset, bounds.minX, bounds.maxX),
+                y: basePt.y
+            };
+        }
+    }
+}

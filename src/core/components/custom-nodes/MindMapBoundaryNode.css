@@ -1,0 +1,24 @@
+.mindmap-boundary-node {
+    position: relative;
+    border-radius: 12px;
+    pointer-events: none; /* Let clicks pass through to nodes behind it */
+    z-index: -1; /* Always behind regular nodes */
+    transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.mindmap-boundary-node.selected {
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.5);
+}
+
+.mindmap-boundary-title {
+    position: absolute;
+    top: -24px;
+    left: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    pointer-events: auto; /* Title can be clicked */
+    background: rgba(255, 255, 255, 0.8);
+    padding: 2px 8px;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}

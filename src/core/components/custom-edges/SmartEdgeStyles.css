@@ -1,0 +1,72 @@
+/* 智能连线的专用样式 */
+.smart-edge {
+  transition: filter 0.2s ease-in-out, opacity 0.2s ease-in-out;
+}
+
+/* 🚀 性能模式：拖动时禁用 smart-edge 过渡 */
+.performance-mode .smart-edge {
+  transition: none !important;
+  filter: none !important;
+}
+
+/* SVG path 样式过渡（不过渡 d 属性 — 拖拽性能） */
+.react-flow__edge-path {
+  transition: stroke-width 0.15s ease, stroke 0.15s ease;
+}
+
+/* P-perf: 移除 filter: brightness，避免100+边 hover 时合成层重绘 */
+/* hover 高亮已由 FlowchartDesigner.css 的 edge:hover stroke 规则覆盖 */
+/* .smart-edge:hover { filter: ... } — 已移除 */
+
+/* 智能连线的动画效果 */
+@keyframes smart-pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.smart-edge.animated {
+  animation: smart-pulse 2s ease-in-out infinite;
+}
+
+/* 智能连线的高光效果 */
+.react-flow__edge-path-highlight {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* 智能连线的阴影效果 */
+.react-flow__edge-path-shadow {
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+/* 智能连线在选中状态下的样式 */
+.react-flow__edge.selected .smart-edge {
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.2)) brightness(1.2);
+  stroke-width: calc(var(--stroke-width, 2px) + 1px);
+}
+
+/* 智能连线的标签样式增强 */
+.react-flow__edge-text {
+  font-size: 12px;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+/* 为智能连线添加微妙的渐变效果 */
+.smart-edge-gradient {
+  background: linear-gradient(45deg, currentColor 0%, currentColor 100%);
+  opacity: 0.1;
+}
+
+/* Draw.io 风格：hover 拐点时显示 ✕ 删除按钮 */
+.nodrag.nopan:hover .bend-delete-btn {
+  opacity: 1 !important;
+}

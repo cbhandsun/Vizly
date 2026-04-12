@@ -1,0 +1,150 @@
+/* =============================================
+   DiffOverlay — Diff 标注层样式 + 画布高亮
+   ============================================= */
+
+/* --- 顶部信息栏 --- */
+.diff-overlay-bar {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  color: white;
+  font-size: 13px;
+  max-width: 90%;
+  flex-wrap: wrap;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.diff-no-changes {
+  color: #52c41a;
+}
+
+.diff-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.diff-version-label {
+  font-weight: 600;
+  color: #4fc3f7;
+}
+
+.diff-summary {
+  color: rgba(255, 255, 255, 0.8);
+  font-variant-numeric: tabular-nums;
+}
+
+.diff-legend-items {
+  display: flex;
+  gap: 8px;
+}
+
+.diff-legend-item {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.diff-legend-item.added { background: rgba(76, 175, 80, 0.2); color: #81c784; }
+.diff-legend-item.removed { background: rgba(244, 67, 54, 0.2); color: #e57373; }
+.diff-legend-item.modified { background: rgba(255, 193, 7, 0.2); color: #ffd54f; }
+
+/* --- 详细变更列表 --- */
+.diff-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.diff-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.diff-section-title {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.diff-section-title.added { color: #81c784; }
+.diff-section-title.removed { color: #e57373; }
+.diff-section-title.modified { color: #ffd54f; }
+
+.diff-item-tag {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: 'Menlo', 'Monaco', monospace;
+}
+
+.diff-item-tag.added { background: rgba(76, 175, 80, 0.15); color: #a5d6a7; }
+.diff-item-tag.removed { background: rgba(244, 67, 54, 0.15); color: #ef9a9a; text-decoration: line-through; }
+.diff-item-tag.modified { background: rgba(255, 193, 7, 0.15); color: #ffe082; }
+
+.diff-close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.diff-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* =============================================
+   画布节点/边高亮 — 配合 getDiffClassName() 使用
+   ============================================= */
+
+/* 新增节点 — 绿色脉冲描边 */
+.react-flow__node.diff-added {
+  outline: 3px solid #4CAF50 !important;
+  outline-offset: 2px;
+  animation: diffPulseGreen 1.5s infinite;
+}
+
+/* 修改节点 — 黄色脉冲描边 */
+.react-flow__node.diff-modified {
+  outline: 3px solid #FFC107 !important;
+  outline-offset: 2px;
+  animation: diffPulseYellow 1.5s infinite;
+}
+
+/* 新增边 — 绿色 */
+.react-flow__edge.diff-added .react-flow__edge-path {
+  stroke: #4CAF50 !important;
+  stroke-width: 3 !important;
+}
+
+/* 修改边 — 黄色 */
+.react-flow__edge.diff-modified .react-flow__edge-path {
+  stroke: #FFC107 !important;
+  stroke-width: 3 !important;
+}
+
+@keyframes diffPulseGreen {
+  0%, 100% { outline-color: #4CAF50; }
+  50% { outline-color: rgba(76, 175, 80, 0.3); }
+}
+
+@keyframes diffPulseYellow {
+  0%, 100% { outline-color: #FFC107; }
+  50% { outline-color: rgba(255, 193, 7, 0.3); }
+}

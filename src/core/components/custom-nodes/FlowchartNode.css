@@ -1,0 +1,595 @@
+/* src/components/custom-nodes/FlowchartNode.css */
+
+.flowchart-node {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    min-width: 80px;
+    min-height: 40px;
+    position: relative;
+    transition: opacity var(--transition-normal), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0;
+    animation: fadeInScale var(--transition-normal) forwards;
+    /* 🎨 增强阴影：3层阴影营造真实悬浮感 */
+    box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.08),
+        0 4px 12px rgba(0, 0, 0, 0.06),
+        0 8px 24px rgba(0, 0, 0, 0.04);
+    border-radius: var(--node-radius, 12px);
+    /* 🎨 主题色微底色 + 顶部高光 */
+    background-image:
+        linear-gradient(180deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.1) 100%),
+        linear-gradient(180deg, var(--node-main, transparent) 0%, var(--node-main, transparent) 100%);
+    background-blend-mode: normal;
+    background-size: 100% 100%, 100% 100%;
+    background-color: color-mix(in srgb, var(--node-main, #3b82f6) 4%, white 96%);
+}
+
+/* 非矩形形状：移除矩形 box-shadow，改用 filter: drop-shadow 跟随 SVG 轮廓 */
+.flowchart-node.shape-non-rect {
+    box-shadow: none !important;
+    background: transparent !important;
+}
+
+/* 🔒 Locked node visual indicator */
+.flowchart-node.locked {
+    cursor: not-allowed;
+    outline: 2px dashed rgba(0, 0, 0, 0.2);
+    outline-offset: 2px;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: translateY(2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.flowchart-node:hover {
+    z-index: 10;
+    transform: translateY(-1px);
+    box-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.10),
+        0 8px 28px rgba(0, 0, 0, 0.08),
+        0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+/* 选中态：无 bounce，使用 outline 过渡 */
+
+
+.diagram-dragging .flowchart-node {
+    transition: none !important;
+    /* filter: none !important; [FIX] 禁用，防止全局重绘 */
+    /* box-shadow: none !important; [FIX] 禁用，防止全局重绘 */
+    will-change: transform;
+}
+
+/* .diagram-dragging .flowchart-node:hover { filter: none !important; } disabled */
+
+.diagram-dragging .flowchart-node:hover:not(.selected) {
+    transform: none;
+}
+
+.diagram-dragging .react-flow__node:not(.dragging) .flowchart-node {
+    pointer-events: none;
+}
+
+
+
+/* 🆕 节点内容区域布局 */
+.flowchart-node-content {
+    color: var(--node-text);
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    z-index: 1;
+    padding: 12px 18px; /* 稍微紧凑的上下边距 */
+    overflow: visible; /* 行业准则：内容为王，宁可溢出也绝不隐藏截断导致用户丢失关键信息 */
+}
+
+/* 🆕 标题行：粗体 + 主题色 */
+.flowchart-node-title {
+    color: var(--node-text);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+    letter-spacing: 0.01em;
+    display: flex;
+    align-items: center;
+    justify-content: center; /* 确保标题本身居中 */
+    gap: 6px;
+    padding-bottom: 5px; /* 减小标题占据的空间 */
+    margin-bottom: 5px; /* 减小标题占据的空间 */
+    border-bottom: 1px solid color-mix(in srgb, var(--node-text) 8%, transparent); /* 更优雅的分割线 */
+    flex-shrink: 0; /* 禁止因容器过小而挤压标题高度 */
+    white-space: pre-wrap; /* 允许标题在框较窄时自然换行 */
+    word-break: break-word;
+    text-align: center;
+}
+
+/* 仅标题无描述时，移除底部分隔 */
+.flowchart-node-title:last-child {
+    padding-bottom: 0;
+    margin-bottom: 0;
+    border-bottom: none;
+    border-image: none;
+}
+
+.flowchart-node-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    color: var(--node-main, var(--node-border));
+    opacity: 0.8;
+}
+
+/* 🆕 描述体：辅助文字样式 */
+.flowchart-node-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    overflow: visible;
+    /* 默认尽量左对齐，增强多行子弹列表的阅读性 */
+    align-items: flex-start;
+    flex-shrink: 0; 
+}
+
+.flowchart-node-body-line {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--node-text);
+    opacity: 0.80; /* 稍微提升对比度 */
+    width: 100%;
+    text-align: left; /* 强制左对齐，如果父容器居中，行依旧向左看齐更美观 */
+    padding-left: 2px;
+    flex-shrink: 0; /* 禁止行文字高度被挤压截断 */
+    white-space: pre-wrap; /* 允许文字自然换行而不是单行截断，这是美观的重要部分 */
+    word-break: break-word;
+}
+
+/* accentBar 由风格预设驱动，通过 JSX renderAccentBar() 动态渲染 */
+
+.flowchart-node-label {
+    color: var(--node-text);
+    font-size: 13px;
+    text-align: center;
+    font-weight: 600;
+    pointer-events: none;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    position: relative;
+    z-index: 1;
+    letter-spacing: 0.02em;
+    line-height: 1.4;
+}
+
+.glass .flowchart-node-label {
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.4);
+}
+
+/* 🆕 折叠按钮样式 */
+.flowchart-collapse-btn {
+    pointer-events: auto;
+    background: transparent;
+    border: none;
+    color: var(--node-text);
+    opacity: 0.5;
+    cursor: pointer;
+    font-size: 10px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: opacity 0.2s, background-color 0.2s;
+    margin-left: 4px;
+    flex-shrink: 0;
+}
+
+.flowchart-collapse-btn:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.05);
+    transform: scale(1.1);
+}
+
+/* 🆕 描述内容样式（保留兼容） */
+.flowchart-node-description {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--node-text);
+    opacity: 0.75;
+    text-align: left;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    max-width: 100%;
+}
+
+.flowchart-node-description.collapsed {
+    max-height: 20px;
+}
+
+.flowchart-node-description.expanded {
+    max-height: 200px;
+}
+
+.flowchart-description-summary {
+    font-style: italic;
+    opacity: 0.7;
+}
+
+.flowchart-description-full {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* SVG Rendering */
+.flowchart-svg-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    z-index: 0;
+    /* SVG 容器本身不拦截，但内部填充形状需要接收事件用于选中 */
+    pointer-events: none;
+}
+
+/* 🔑 SVG 形状必须接收事件，否则节点无法点击选中 */
+.flowchart-svg-layer .flowchart-shape,
+.flowchart-svg-layer .flowchart-shape-bg {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.flowchart-shape {
+    fill: var(--node-bg);
+    stroke: var(--node-border);
+    stroke-width: var(--node-stroke-width, 2px);
+    stroke-dasharray: var(--node-stroke-dash);
+    transition: fill 0.2s ease, stroke 0.2s ease, stroke-width 0.2s ease;
+    /* 🎨 SVG 滤镜：内发光效果提升填充层次感 */
+    filter: brightness(1.02);
+}
+
+.flowchart-shape-group .flowchart-shape-bg {
+    fill: var(--node-bg);
+    stroke: none;
+}
+
+.flowchart-shape-group .flowchart-shape-stroke {
+    fill: none;
+    stroke: var(--node-border);
+    stroke-width: var(--node-stroke-width);
+    stroke-dasharray: var(--node-stroke-dash);
+    transition: stroke 0.2s ease, stroke-width 0.2s ease;
+}
+
+/* 🎨 P1: Handle 动画系统 — 默认小巧，hover 放大 + 蓝色光环 */
+.flowchart-handle {
+    background: #ffffff !important;
+    width: 6px !important;
+    height: 6px !important;
+    z-index: 30;
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s, box-shadow 0.25s ease;
+    border: 1.5px solid var(--node-border, #94a3b8) !important;
+    border-radius: 50%;
+    box-shadow: none;
+}
+
+.flowchart-node:hover .flowchart-handle,
+.flowchart-node.selected .flowchart-handle {
+    opacity: 1;
+    width: 8px !important;
+    height: 8px !important;
+    border: 2px solid var(--node-border, #94a3b8) !important;
+}
+
+.diagram-dragging .flowchart-node:hover .flowchart-handle,
+.diagram-dragging .flowchart-node.selected .flowchart-handle,
+.diagram-dragging .flowchart-handle {
+    opacity: 0 !important;
+    transform: none !important;
+    transition: none !important;
+    box-shadow: none !important;
+    pointer-events: none !important;
+}
+
+.diagram-dragging .flowchart-handle:hover {
+    opacity: 0 !important;
+    transform: none !important;
+}
+
+/* 🎨 P1: Handle hover — 放大 + 蓝色品牌光环 */
+.flowchart-handle:hover {
+    opacity: 1 !important;
+    transform: scale(1.6);
+    border-color: #3b82f6 !important;
+    background: #ffffff !important;
+    width: 8px !important;
+    height: 8px !important;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18), 0 0 8px rgba(59, 130, 246, 0.12);
+    cursor: pointer;
+}
+
+/* Handle 隐形热区扩展（缩小以避免与 ⊕ 按钮的光标冲突） */
+.flowchart-handle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    transform: translate(-50%, -50%);
+    background: transparent;
+    z-index: -1;
+    border-radius: 50%;
+}
+
+/* 重复的 handle hover 规则已合并到上方 */
+.flowchart-node.selected .flowchart-handle,
+.flowchart-node:hover .flowchart-handle {
+    opacity: 1;
+}
+
+.flowchart-handle.react-flow__handle-top {
+    top: 0px !important;
+}
+
+.flowchart-handle.react-flow__handle-bottom {
+    bottom: 0px !important;
+}
+
+.flowchart-handle.react-flow__handle-left {
+    left: 0px !important;
+}
+
+.flowchart-handle.react-flow__handle-right {
+    right: 0px !important;
+}
+
+/* 拖拽连线进行时，让目标 Handle 可点击 */
+.react-flow__node.rf-connectable .flowchart-handle {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.flowchart-handle-legacy {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Toolbar */
+.flowchart-node-toolbar {
+    display: flex;
+    gap: 6px;
+    padding: 6px;
+    background-color: rgba(255, 255, 255, 0.85);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    backdrop-filter: blur(12px) saturate(180%);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transform-origin: bottom center;
+    animation: scaleIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transform: translateY(-34px);
+}
+
+.diagram-dragging .flowchart-node-toolbar {
+    display: none !important;
+}
+
+.flowchart-domain-btn {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: #fff;
+    font-weight: bold;
+    padding: 0;
+    border: 1.5px solid transparent;
+    transition: transform var(--transition-fast);
+}
+
+.flowchart-domain-btn:hover {
+    transform: scale(1.1);
+}
+
+.flowchart-domain-btn.active {
+    border-color: #000;
+    box-shadow: 0 0 0 1px #fff;
+}
+
+.flowchart-toolbar-divider {
+    width: 1px;
+    height: 16px;
+    background-color: var(--border-subtle);
+    margin: 0 4px;
+}
+
+.flowchart-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: none;
+    background-color: transparent;
+    cursor: pointer;
+    color: var(--color-slate-600);
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.flowchart-action-btn:hover {
+    background-color: var(--bg-surface);
+    color: var(--color-primary-600);
+}
+
+.flowchart-action-btn.delete:hover {
+    color: var(--color-danger);
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* Glass preset helper */
+.flowchart-glass-bg {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--node-radius);
+    -webkit-backdrop-filter: var(--node-backdrop);
+    backdrop-filter: var(--node-backdrop);
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* ── 深色模式：节点视觉增强 ── */
+[data-theme='dark'] .flowchart-node {
+    background-color: color-mix(in srgb, var(--node-main, #60a5fa) 6%, #1e293b 94%);
+    box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.2),
+        0 4px 12px rgba(0, 0, 0, 0.16),
+        0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme='dark'] .flowchart-node:hover {
+    box-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.28),
+        0 8px 28px rgba(0, 0, 0, 0.22),
+        0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+[data-theme='dark'] .flowchart-node-title {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ── 深色模式：节点工具栏 ── */
+[data-theme='dark'] .flowchart-node-toolbar {
+    background-color: rgba(30, 30, 46, 0.92);
+    border-color: rgba(205, 214, 244, 0.08);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(205, 214, 244, 0.06);
+}
+
+[data-theme='dark'] .flowchart-action-btn {
+    color: rgba(205, 214, 244, 0.75);
+}
+
+[data-theme='dark'] .flowchart-action-btn:hover {
+    background-color: rgba(137, 180, 250, 0.15);
+    color: #89b4fa;
+}
+
+[data-theme='dark'] .flowchart-action-btn.delete:hover {
+    color: #f38ba8;
+    background-color: rgba(243, 139, 168, 0.12);
+}
+
+[data-theme='dark'] .flowchart-toolbar-divider {
+    background-color: rgba(205, 214, 244, 0.12);
+}
+
+[data-theme='dark'] .flowchart-domain-btn.active {
+    border-color: #cdd6f4;
+    box-shadow: 0 0 0 1px rgba(30, 30, 46, 0.8);
+}
+
+/* 系统跟随深色 */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .flowchart-node-toolbar {
+        background-color: rgba(30, 30, 46, 0.92);
+        border-color: rgba(205, 214, 244, 0.08);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(205, 214, 244, 0.06);
+    }
+
+    :root:not([data-theme='light']) .flowchart-action-btn {
+        color: rgba(205, 214, 244, 0.75);
+    }
+
+    :root:not([data-theme='light']) .flowchart-action-btn:hover {
+        background-color: rgba(137, 180, 250, 0.15);
+        color: #89b4fa;
+    }
+
+    :root:not([data-theme='light']) .flowchart-action-btn.delete:hover {
+        color: #f38ba8;
+        background-color: rgba(243, 139, 168, 0.12);
+    }
+
+    :root:not([data-theme='light']) .flowchart-toolbar-divider {
+        background-color: rgba(205, 214, 244, 0.12);
+    }
+}
+
+/* 🆕 Quick Clone & Connect Buttons（⊕ 作为 Handle 子元素） */
+.flowchart-quick-clone-btn {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border: 1.5px solid var(--node-border, #3b82f6);
+    color: var(--node-border, #3b82f6);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 50;
+    isolation: isolate;
+    opacity: 0;
+    pointer-events: none;
+    /* P4: 缩短初始延迟 0.2s→0.08s，防止快速移到按钮时按钮消失 */
+    transition: opacity 0.15s 0.08s, transform 0.15s ease, background-color 0.15s, color 0.15s;
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.2);
+}
+
+/* Handle 始终允许子元素溢出 */
+.flowchart-handle { overflow: visible !important; }
+
+/* 显示 ⊕ */
+.flowchart-node:hover .flowchart-quick-clone-btn,
+.flowchart-node.selected .flowchart-quick-clone-btn {
+    opacity: 1;
+    pointer-events: auto;
+    transition-delay: 0.1s, 0s, 0s, 0s;
+}
+
+/* hover 高亮 */
+.flowchart-quick-clone-btn:hover {
+    background: var(--node-border, #3b82f6);
+    color: #fff;
+}
+
+/* 拖拽/连线进行中隐藏 ⊕ */
+.diagram-dragging .flowchart-quick-clone-btn,
+.react-flow__node.connecting .flowchart-quick-clone-btn,
+.react-flow.connecting .flowchart-quick-clone-btn {
+    display: none !important;
+}
+
+/* ⊕ 方向定位（相对 Handle 父元素）+ hover 放大 */
+.flowchart-quick-clone-btn[data-dir="top"]    { top: auto; bottom: 100%; left: 50%; transform: translate(-50%, -4px); }
+.flowchart-quick-clone-btn[data-dir="bottom"] { bottom: auto; top: 100%; left: 50%; transform: translate(-50%, 4px); }
+.flowchart-quick-clone-btn[data-dir="left"]   { left: auto; right: 100%; top: 50%; transform: translate(-4px, -50%); }
+.flowchart-quick-clone-btn[data-dir="right"]  { right: auto; left: 100%; top: 50%; transform: translate(4px, -50%); }
+
+.flowchart-quick-clone-btn[data-dir="top"]:hover    { transform: translate(-50%, -4px) scale(1.15); }
+.flowchart-quick-clone-btn[data-dir="bottom"]:hover { transform: translate(-50%, 4px) scale(1.15); }
+.flowchart-quick-clone-btn[data-dir="left"]:hover   { transform: translate(-4px, -50%) scale(1.15); }
+.flowchart-quick-clone-btn[data-dir="right"]:hover  { transform: translate(4px, -50%) scale(1.15); }

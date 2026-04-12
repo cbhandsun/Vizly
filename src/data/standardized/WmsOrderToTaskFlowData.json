@@ -1,0 +1,417 @@
+{
+  "id": "wms-order-to-task-flow",
+  "name": "WMS从订单到任务流程",
+  "type": "wms-process",
+  "version": "1.0.0",
+  "metadata": {
+    "title": "WMS从订单到任务流程",
+    "description": "展示WMS系统从接收订单到生成执行任务的完整业务流与数据流。"
+  },
+  "nodes": [
+    {
+      "id": "erp",
+      "type": "custom",
+      "domain": "order_source",
+      "domainClass": "ch",
+      "role": "system",
+      "subDomain": "订单来源",
+      "description": "企业资源计划系统，下发销售订单或调拨单。"
+    },
+    {
+      "id": "oms",
+      "type": "custom",
+      "domain": "order_source",
+      "domainClass": "ch",
+      "role": "system",
+      "subDomain": "订单来源",
+      "description": "订单管理系统，下发电商订单。"
+    },
+    {
+      "id": "manual_order",
+      "type": "custom",
+      "domain": "order_source",
+      "domainClass": "ch",
+      "role": "manual",
+      "subDomain": "订单来源",
+      "description": "手工创建的仓库订单。"
+    },
+    {
+      "id": "order_validation",
+      "type": "custom",
+      "domain": "order_ingestion",
+      "domainClass": "be-scm",
+      "role": "process",
+      "subDomain": "订单接入",
+      "description": "WMS接收订单，进行数据格式、库存等基础校验。"
+    },
+    {
+      "id": "wh_request",
+      "type": "custom",
+      "domain": "order_ingestion",
+      "domainClass": "be-scm",
+      "role": "data",
+      "subDomain": "订单接入",
+      "description": "在WMS内部创建统一的“仓库请求”数据结构。"
+    },
+    {
+      "id": "wave_processing",
+      "type": "custom",
+      "domain": "task_orchestration",
+      "domainClass": "be-scm",
+      "role": "process",
+      "subDomain": "任务编排",
+      "description": "将多个仓库请求按规则合并为波次。"
+    },
+    {
+      "id": "task_creation",
+      "type": "custom",
+      "domain": "task_orchestration",
+      "domainClass": "be-scm",
+      "role": "process",
+      "subDomain": "任务编排",
+      "description": "将请求分解为具体的物理移动任务（WT）。"
+    },
+    {
+      "id": "wocr",
+      "type": "custom",
+      "domain": "task_orchestration",
+      "domainClass": "be-scm",
+      "role": "rules",
+      "subDomain": "任务编排",
+      "description": "定义任务如何分组、排序、过滤的规则引擎。"
+    },
+    {
+      "id": "task_filtering",
+      "type": "custom",
+      "domain": "task_orchestration",
+      "domainClass": "be-scm",
+      "role": "sub-process",
+      "subDomain": "任务编排",
+      "description": "根据重量、体积、区域等条件过滤任务。"
+    },
+    {
+      "id": "task_sorting",
+      "type": "custom",
+      "domain": "task_orchestration",
+      "domainClass": "be-scm",
+      "role": "sub-process",
+      "subDomain": "任务编排",
+      "description": "根据路径优化算法对任务进行排序。"
+    },
+    {
+      "id": "task_grouping",
+      "type": "custom",
+      "domain": "task_orchestration",
+      "domainClass": "be-scm",
+      "role": "sub-process",
+      "subDomain": "任务编排",
+      "description": "将任务按活动区域（如拣货区）分组。"
+    },
+    {
+      "id": "wh_order",
+      "type": "custom",
+      "domain": "task_orchestration",
+      "domainClass": "be-scm",
+      "role": "data",
+      "subDomain": "任务编排",
+      "description": "将优化后的任务组合成可执行的“仓库订单”。"
+    },
+    {
+      "id": "rf_device",
+      "type": "custom",
+      "domain": "task_execution",
+      "domainClass": "be-logistics",
+      "role": "device",
+      "subDomain": "任务执行",
+      "description": "操作员使用的手持设备，接收指令，反馈结果。"
+    },
+    {
+      "id": "picking",
+      "type": "custom",
+      "domain": "task_execution",
+      "domainClass": "be-logistics",
+      "role": "action",
+      "subDomain": "任务执行",
+      "description": "从货位上拿取商品。"
+    },
+    {
+      "id": "packing",
+      "type": "custom",
+      "domain": "task_execution",
+      "domainClass": "be-logistics",
+      "role": "action",
+      "subDomain": "任务执行",
+      "description": "对商品进行包装、贴标。"
+    },
+    {
+      "id": "shipping",
+      "type": "custom",
+      "domain": "task_execution",
+      "domainClass": "be-logistics",
+      "role": "action",
+      "subDomain": "任务执行",
+      "description": "将包裹装车并发运。"
+    },
+    {
+      "id": "execution_confirm",
+      "type": "custom",
+      "domain": "task_execution",
+      "domainClass": "data",
+      "role": "process",
+      "subDomain": "系统反馈",
+      "description": "操作员通过RF确认任务完成。"
+    },
+    {
+      "id": "inventory_update",
+      "type": "custom",
+      "domain": "task_execution",
+      "domainClass": "data",
+      "role": "system",
+      "subDomain": "系统反馈",
+      "description": "WMS实时更新库存信息。"
+    },
+    {
+      "id": "erp_feedback",
+      "type": "custom",
+      "domain": "task_execution",
+      "domainClass": "data",
+      "role": "system",
+      "subDomain": "系统反馈",
+      "description": "将订单完成状态反馈给ERP。"
+    },
+    {
+      "id": "oms_feedback",
+      "type": "custom",
+      "domain": "task_execution",
+      "domainClass": "data",
+      "role": "system",
+      "subDomain": "系统反馈",
+      "description": "将订单完成状态反馈给OMS。"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-erp-ov",
+      "source": "erp",
+      "target": "order_validation",
+      "type": "main",
+      "label": "ERP订单导入"
+    },
+    {
+      "id": "e-oms-ov",
+      "source": "oms",
+      "target": "order_validation",
+      "type": "main",
+      "label": "OMS订单导入"
+    },
+    {
+      "id": "e-man-ov",
+      "source": "manual_order",
+      "target": "order_validation",
+      "type": "main",
+      "label": "手工订单导入"
+    },
+    {
+      "id": "e-ov-wr",
+      "source": "order_validation",
+      "target": "wh_request",
+      "type": "main",
+      "label": "校验通过→仓库请求"
+    },
+    {
+      "id": "e-wr-wp",
+      "source": "wh_request",
+      "target": "wave_processing",
+      "type": "main",
+      "label": "进入波次处理"
+    },
+    {
+      "id": "e-wp-tc",
+      "source": "wave_processing",
+      "target": "task_creation",
+      "type": "main",
+      "label": "生成执行任务"
+    },
+    {
+      "id": "e-tc-wocr",
+      "source": "task_creation",
+      "target": "wocr",
+      "type": "main",
+      "label": "生成规则上下文"
+    },
+    {
+      "id": "e-wocr-tf",
+      "source": "wocr",
+      "target": "task_filtering",
+      "type": "main",
+      "label": "筛选规则"
+    },
+    {
+      "id": "e-wocr-ts",
+      "source": "wocr",
+      "target": "task_sorting",
+      "type": "main",
+      "label": "排序规则"
+    },
+    {
+      "id": "e-wocr-tg",
+      "source": "wocr",
+      "target": "task_grouping",
+      "type": "main",
+      "label": "分组规则"
+    },
+    {
+      "id": "e-tf-wo",
+      "source": "task_filtering",
+      "target": "wh_order",
+      "type": "main",
+      "label": "汇入作业单"
+    },
+    {
+      "id": "e-ts-wo",
+      "source": "task_sorting",
+      "target": "wh_order",
+      "type": "main",
+      "label": "汇入作业单"
+    },
+    {
+      "id": "e-tg-wo",
+      "source": "task_grouping",
+      "target": "wh_order",
+      "type": "main",
+      "label": "汇入作业单"
+    },
+    {
+      "id": "e-wo-rfd",
+      "source": "wh_order",
+      "target": "rf_device",
+      "type": "main",
+      "label": "下发到终端"
+    },
+    {
+      "id": "e-rfd-pick",
+      "source": "rf_device",
+      "target": "picking",
+      "type": "main",
+      "label": "拣选作业"
+    },
+    {
+      "id": "e-rfd-pack",
+      "source": "rf_device",
+      "target": "packing",
+      "type": "main",
+      "label": "打包作业"
+    },
+    {
+      "id": "e-rfd-ship",
+      "source": "rf_device",
+      "target": "shipping",
+      "type": "main",
+      "label": "发运作业"
+    },
+    {
+      "id": "e-pick-ec",
+      "source": "picking",
+      "target": "execution_confirm",
+      "type": "main",
+      "label": "拣选完成→确认"
+    },
+    {
+      "id": "e-pack-ec",
+      "source": "packing",
+      "target": "execution_confirm",
+      "type": "main",
+      "label": "打包完成→确认"
+    },
+    {
+      "id": "e-ship-ec",
+      "source": "shipping",
+      "target": "execution_confirm",
+      "type": "main",
+      "label": "发运完成→确认"
+    },
+    {
+      "id": "e-ec-iu",
+      "source": "execution_confirm",
+      "target": "inventory_update",
+      "type": "main",
+      "label": "库存更新"
+    },
+    {
+      "id": "e-ec-ef",
+      "source": "execution_confirm",
+      "target": "erp_feedback",
+      "type": "main",
+      "label": "反馈ERP"
+    },
+    {
+      "id": "e-ec-of",
+      "source": "execution_confirm",
+      "target": "oms_feedback",
+      "type": "main",
+      "label": "反馈OMS"
+    },
+    {
+      "id": "e-wocr-tc-feedback",
+      "source": "wocr",
+      "target": "task_creation",
+      "type": "feedback",
+      "label": "规则应用"
+    }
+  ],
+  "layout": {
+    "direction": "LR",
+    "autoDirection": true,
+    "spacing": {
+      "horizontal": 150,
+      "vertical": 260
+    },
+    "padding": {
+      "horizontal": 20,
+      "vertical": 20
+    },
+    "groupPadding": 36,
+    "generateDomainGroups": false,
+    "generateSubDomainGroups": true,
+    "subDomainWhitelist": [
+      "任务编排",
+      "任务执行"
+    ],
+    "tags": [
+      "仓储"
+    ],
+    "laneOrder": [
+      "offline",
+      "order_source",
+      "order_ingestion",
+      "task_orchestration",
+      "task_execution",
+      "system_feedback"
+    ],
+    "busAlign": "baseline"
+  },
+  "theme": {
+    "name": "wms-flow-theme",
+    "displayName": "WMS流程主题",
+    "domains": {
+      "order_source": {
+        "border": "#2196F3"
+      },
+      "order_ingestion": {
+        "border": "#00BCD4"
+      },
+      "task_orchestration": {
+        "border": "#9C27B0"
+      },
+      "task_execution": {
+        "border": "#FF9800"
+      },
+      "system_feedback": {
+        "border": "#4CAF50"
+      },
+      "offline": {
+        "border": "#795548"
+      }
+    }
+  }
+}

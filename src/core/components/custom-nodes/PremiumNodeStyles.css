@@ -1,0 +1,219 @@
+/**
+ * Premium Node Styles - 现代化视觉效果
+ */
+
+/* ========================================
+   1. 节点玻璃效果 (轻量化)
+   ======================================== */
+
+.diagram-node-glass {
+  /* 轻度半透明 */
+  -webkit-backdrop-filter: blur(8px) saturate(150%);
+  backdrop-filter: blur(8px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Dark Mode 适配 */
+.diagram-node-glass.dark {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ========================================
+   2. 悬停效果 - 顶部高光线扫过
+   ======================================== */
+
+.diagram-node-hover-glow {
+  position: relative;
+  transition: box-shadow 0.15s ease;
+  overflow: hidden;
+}
+
+/* hover 时顶部高光线从左到右扫过 */
+.diagram-node-hover-glow::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.6) 40%,
+    rgba(255, 255, 255, 0.8) 50%,
+    rgba(255, 255, 255, 0.6) 60%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 10;
+  transition: left 0s;
+}
+
+.diagram-node-hover-glow:hover::before {
+  left: 100%;
+  transition: left 0.6s ease;
+}
+
+/* 选中状态：呼吸光圈动画 */
+.diagram-node-selected {
+  animation: node-breathe-glow 2.5s ease-in-out infinite;
+}
+
+@keyframes node-breathe-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1), 0 4px 12px -2px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.18), 0 4px 16px -2px rgba(0, 0, 0, 0.12);
+  }
+}
+
+/* ========================================
+   3. 边缘流动光效
+   ======================================== */
+
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: 20;
+  }
+}
+
+.diagram-edge-flow {
+  stroke-dasharray: 10;
+  animation: dash-flow 1s linear infinite;
+}
+
+.diagram-edge-bus-flow {
+  stroke-width: 3;
+  stroke: url(#bus-flow-gradient);
+  stroke-dasharray: 10 5;
+  animation: dash-flow 1.5s linear infinite;
+}
+
+/* ========================================
+   4. 连线发光投影路径
+   ======================================== */
+
+.edge-glow-path {
+  filter: blur(3px);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* ========================================
+   5. 连线高级标签
+   ======================================== */
+
+.edge-label-premium {
+  background: rgba(255, 255, 255, 0.92);
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: auto;
+  cursor: text;
+  user-select: none;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.edge-label-premium:hover {
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  transform: scale(1.03);
+}
+
+/* ========================================
+   6. 连线选中态流动动画 (蚂蚁线)
+   ======================================== */
+
+@keyframes edge-ant-march {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.edge-selected-flow {
+  stroke-dasharray: 6 4;
+  animation: edge-ant-march 0.8s linear infinite;
+}
+
+/* ========================================
+   7. React Flow 节点基础样式
+   ======================================== */
+
+.react-flow__node {
+  transition: opacity 0.3s ease;
+}
+
+/* 非矩形形状节点 */
+.react-flow__node:has(.shape-non-rect) {
+  box-shadow: none;
+  background: transparent;
+}
+
+/* 新增节点淡入效果 */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.diagram-node-new {
+  animation: fade-in-up 0.35s ease-out;
+}
+
+/* ========================================
+   8. 拖拽反馈
+   ======================================== */
+
+.diagram-node-dragging {
+  cursor: grabbing !important;
+  opacity: 0.85;
+  z-index: 9999;
+}
+
+/* ========================================
+   9. 响应式与无障碍
+   ======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+
+  .diagram-node-hover-glow,
+  .diagram-node-selected,
+  .diagram-edge-flow,
+  .diagram-edge-bus-flow,
+  .edge-selected-flow,
+  .react-flow__node {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .diagram-node-glass {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .diagram-node-hover-glow::before {
+    display: none;
+  }
+}
+
+@media (prefers-contrast: high) {
+  .diagram-node-glass {
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid currentColor;
+  }
+
+  .diagram-node-glass.dark {
+    background: rgba(0, 0, 0, 0.95);
+  }
+}

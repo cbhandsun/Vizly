@@ -1,0 +1,80 @@
+/* ============================================
+   React Flow Native Controls Glassmorphism Override (Modern Phase 2)
+   ============================================ */
+
+.react-flow__controls {
+    /* Glassmorphism token matching FixedMiniMap and ContextMenu */
+    background: rgba(255, 255, 255, 0.7) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.5) !important;
+    
+    border-radius: 12px !important; /* Pill-like inner */
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    padding: 4px !important;
+    
+    /* Position them gracefully to avoid DiagramStatusBar overlapping */
+    bottom: 56px !important; /* Move above status bar */
+    left: 20px !important;
+    z-index: 1000 !important;
+    box-sizing: border-box !important;
+}
+
+/* Dark mode handling */
+html[data-theme='dark'] .react-flow__controls {
+    background: rgba(30, 30, 46, 0.55) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+}
+
+/* The buttons inside ReactFlow Controls */
+.react-flow__controls-button {
+    background: transparent !important;
+    border: none !important;
+    border-bottom: none !important;
+    color: var(--color-slate-600, #475569) !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    border-radius: 8px !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 28px !important;
+    height: 28px !important;
+}
+
+/* Fix SVG sizing and alignment inside native controls */
+.react-flow__controls-button svg {
+    max-width: 14px !important;
+    max-height: 14px !important;
+    fill: currentColor !important;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.react-flow__controls-button:hover {
+    background: rgba(0, 0, 0, 0.05) !important;
+    color: #2563eb !important;
+}
+
+.react-flow__controls-button:hover svg {
+    transform: scale(1.1) !important;
+}
+
+/* Dark mode handling for buttons */
+html[data-theme='dark'] .react-flow__controls-button {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+html[data-theme='dark'] .react-flow__controls-button:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: #fff !important;
+}
+
+/* Active states for locking native zoom */
+.react-flow__controls-button.react-flow__controls-interactive[data-interactive="true"] {
+    color: #2563eb !important;
+}

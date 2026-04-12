@@ -1,0 +1,674 @@
+.docs-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  background: linear-gradient(180deg, #f7f8fb 0%, #f3f4f6 100%);
+  overflow: hidden;
+}
+
+.docs-header {
+  flex-shrink: 0;
+  padding: 12px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffffcc;
+  -webkit-backdrop-filter: saturate(180%) blur(6px);
+  backdrop-filter: saturate(180%) blur(6px);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.docs-header h2 {
+  margin: 0;
+  font-size: 1.0125rem;
+  font-weight: 640;
+  color: #111827;
+}
+
+.docs-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.docs-breadcrumb {
+  color: #6b7280;
+  font-size: 0.675rem;
+  margin-left: 8px;
+}
+
+.docs-breadcrumb .sep {
+  margin: 0 6px;
+  color: #9ca3af;
+}
+
+.docs-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-btn {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.675rem;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.header-btn:hover {
+  border-color: #c7d2fe;
+}
+
+.docs-sidebar {
+  width: 300px;
+  border-right: 1px solid rgba(55, 53, 47, 0.09);
+  background: #f7f7f5;
+  overflow: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.docs-sidebar.floating {
+  position: fixed;
+  z-index: 50;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+}
+
+.docs-sidebar.collapsed {
+  width: 0 !important;
+  min-width: 0;
+  overflow: visible;
+}
+
+.docs-sidebar.collapsed {
+  border-right: 0;
+}
+
+.docs-sidebar.collapsed .docs-sidebar-inner {
+  display: none;
+}
+
+.sidebar-collapsed-tab {
+  top: 96px;
+  background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+  border: 1px solid #d7e6ff;
+  border-radius: 9999px;
+  padding: 4px 10px;
+  color: #1f3fd6;
+  font-size: 0.675rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  width: 64px;
+  height: 26px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(17, 24, 39, 0.08);
+  z-index: 60;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-collapsed-tab:hover {
+  border-color: #93c5fd;
+  background: #f5f8ff;
+  box-shadow: 0 8px 20px rgba(17, 24, 39, 0.12);
+  transform: translateY(-1px);
+}
+
+.sidebar-collapsed-tab:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 10px rgba(17, 24, 39, 0.08);
+}
+
+.sidebar-collapsed-tab::after {
+  content: '›';
+  font-size: 0.7875rem;
+  font-weight: 700;
+  color: #5b7cf8;
+  margin-left: 4px;
+}
+
+/* 全局挂件（固定模式通过 Portal 挂到 body），彻底避免父级遮挡 */
+.sidebar-collapsed-tab.global {
+  position: fixed;
+  left: 12px;
+  top: 120px;
+  z-index: 5000;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sidebar-collapsed-tab.global:hover {
+  border-color: #93c5fd;
+  background: #f5f8ff;
+  box-shadow: 0 10px 24px rgba(17, 24, 39, 0.12);
+  transform: translateY(-1px);
+}
+
+.sidebar-collapsed-tab.global:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(17, 24, 39, 0.10);
+}
+
+/* 浮动模式：挂签依附在浮动侧栏盒子上 */
+.docs-sidebar.floating .sidebar-collapsed-tab {
+  position: absolute;
+  left: 8px;
+}
+
+/* 固定模式：挂签固定在视口左侧，确保总是可见 */
+
+.sidebar-resizer {
+  position: absolute;
+  right: -3px;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.sidebar-drag-handle {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f7f7f5;
+  /* Match sidebar */
+  color: #37352f;
+  font-size: 0.7875rem;
+  font-weight: 500;
+  padding: 12px 14px 6px;
+  /* Notion-like top spacing */
+  margin-bottom: 4px;
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.2s;
+}
+
+.sidebar-drag-handle:hover {
+  background: #efefef;
+}
+
+.title-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.title-icon-btn {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.7875rem;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.title-icon-btn:hover {
+  border-color: #c7d2fe;
+}
+
+.sidebar-title {
+  font-weight: 600;
+}
+
+.menu-btn {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.7875rem;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.menu-btn:hover {
+  border-color: #c7d2fe;
+}
+
+.sidebar-menu {
+  position: fixed;
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: saturate(180%) blur(6px);
+  backdrop-filter: saturate(180%) blur(6px);
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(17, 24, 39, 0.08);
+  padding: 10px 12px;
+  z-index: 4000;
+  min-width: 240px;
+  max-width: 360px;
+}
+
+.sidebar-menu::after {
+  content: '';
+  position: absolute;
+  border: 8px solid transparent;
+  z-index: 4001;
+}
+
+.sidebar-menu.placement-bottom::after {
+  top: -16px;
+  right: 24px;
+  border-bottom-color: rgba(255, 255, 255, 0.92);
+  filter: drop-shadow(0 2px 2px rgba(17, 24, 39, 0.06));
+}
+
+.sidebar-menu.placement-top::after {
+  bottom: -16px;
+  right: 24px;
+  border-top-color: rgba(255, 255, 255, 0.92);
+  filter: drop-shadow(0 -2px 2px rgba(17, 24, 39, 0.06));
+}
+
+.sidebar-menu .menu-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.sidebar-menu .tool-label {
+  font-size: 0.675rem;
+  color: #6b7280;
+}
+
+/* 菜单内控件风格（不影响侧栏其他区域） */
+.sidebar-menu .tool-btn {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #374151;
+  font-size: 0.675rem;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.sidebar-menu .tool-btn:hover {
+  border-color: #c7d2fe;
+  background: #f9fafb;
+}
+
+.sidebar-menu .tool-select {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #374151;
+  font-size: 0.675rem;
+  padding: 4px 8px;
+}
+
+.sidebar-menu .tool-toggle {
+  font-size: 0.675rem;
+  color: #374151;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sidebar-menu .menu-divider {
+  height: 1px;
+  background: #eef2ff;
+  margin: 8px 0;
+  border: 0;
+}
+
+.sidebar-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.sidebar-tools.compact {
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.sidebar-tools .tool-btn {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.675rem;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.sidebar-tools .tool-btn:hover {
+  border-color: #c7d2fe;
+}
+
+.sidebar-tools .tool-select {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.675rem;
+  padding: 4px 8px;
+}
+
+.sidebar-tools .tool-toggle {
+  font-size: 0.675rem;
+  color: #374151;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tool-icon-btn {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.7875rem;
+  padding: 4px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.tool-icon-btn:hover {
+  border-color: #c7d2fe;
+}
+
+.docs-sidebar-inner {
+  padding: 0 4px 20px;
+}
+
+.steps {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  padding: 8px 8px 12px;
+  border-bottom: 1px dashed #e5e7eb;
+  z-index: 1;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.step-item:hover {
+  background: #f3f4f6;
+}
+
+.step-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #9ca3af;
+}
+
+.step-item.active .step-dot {
+  background: #4f46e5;
+}
+
+.step-label {
+  font-size: 0.675rem;
+  color: #374151;
+}
+
+/* Notion-like Tree View Styles */
+.tree-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+  margin: 1px 0;
+  padding-right: 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  color: #5f5e5b;
+  /* Notion default text color */
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background 0.05s ease;
+}
+
+.tree-row:hover {
+  background: rgba(55, 53, 47, 0.08);
+}
+
+.tree-row.active {
+  background: rgba(55, 53, 47, 0.08);
+  /* Selection state */
+  color: #37352f;
+  font-weight: 500;
+}
+
+.tree-content {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  overflow: hidden;
+  gap: 6px;
+}
+
+.tree-text {
+  font-size: 0.7875rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 20px;
+}
+
+.tree-text.font-medium {
+  font-weight: 500;
+  color: #37352f;
+  /* Darker for folders/groups */
+}
+
+/* Icons */
+.tree-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: #9b9a97;
+  /* Muted icon color */
+  border-radius: 4px;
+}
+
+.tree-toggle-icon :global(svg) {
+  width: 12px;
+  height: 12px;
+}
+
+.tree-toggle-icon.open :global(svg) {
+  transform: rotate(90deg);
+}
+
+.tree-row:hover .tree-toggle-icon:hover {
+  background: rgba(55, 53, 47, 0.08);
+}
+
+.tree-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #91918e;
+  font-size: 0.9rem;
+}
+
+.file-icon {
+  font-size: 0.84375rem;
+  color: #91918e;
+}
+
+/* Row Actions (Fav star etc) */
+.row-action {
+  opacity: 0;
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 4px;
+  color: #9b9a97;
+  transition: opacity 0.15s ease;
+}
+
+.tree-row:hover .row-action,
+.row-action.active {
+  opacity: 1;
+}
+
+.row-action:hover {
+  background: rgba(55, 53, 47, 0.16);
+  color: #37352f;
+}
+
+.row-action.fav.active {
+  color: #d9730d;
+  /* Brand orange or yellow for favorites */
+}
+
+.mark {
+  background: rgba(245, 158, 11, 0.2);
+  color: #d9730d;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.docs-main {
+  flex: 1;
+  overflow: auto;
+  background: #fff;
+}
+
+.doc-section {
+  border-bottom: 1px solid #f3f4f6;
+  position: relative;
+}
+
+.doc-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  padding: 16px 24px;
+}
+
+/* 内容宽度快捷切换工具条 */
+.content-width-toolbar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  gap: 6px;
+  padding: 0;
+  z-index: 20;
+}
+
+.width-btn {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.85);
+  -webkit-backdrop-filter: saturate(180%) blur(6px);
+  backdrop-filter: saturate(180%) blur(6px);
+  color: #374151;
+  font-size: 0.675rem;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.width-btn:hover {
+  border-color: #c7d2fe;
+}
+
+.width-menu {
+  position: fixed;
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: saturate(180%) blur(6px);
+  backdrop-filter: saturate(180%) blur(6px);
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(17, 24, 39, 0.08);
+  padding: 8px 10px;
+  z-index: 4000;
+}
+
+.width-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.width-menu::after {
+  content: '';
+  position: absolute;
+  border: 8px solid transparent;
+}
+
+.width-menu.placement-bottom::after {
+  top: -16px;
+  right: 16px;
+  border-bottom-color: rgba(255, 255, 255, 0.92);
+}
+
+.width-menu.placement-top::after {
+  bottom: -16px;
+  right: 16px;
+  border-top-color: rgba(255, 255, 255, 0.92);
+}
+
+.width-chip {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #374151;
+  font-size: 0.675rem;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.width-chip:hover {
+  border-color: #c7d2fe;
+}
+
+.width-chip.active {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #1f3fd6;
+}
+
+.sidebar-tools.overlay {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: #ffffffee;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.docs-sidebar:hover .sidebar-tools.overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Search input refactoring */
+.search-input {
+  padding: 6px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}

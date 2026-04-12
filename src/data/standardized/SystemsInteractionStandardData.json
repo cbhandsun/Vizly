@@ -1,0 +1,314 @@
+{
+  "id": "systems-interaction-v1",
+  "name": "系统交互架构图",
+  "type": "systems-interaction",
+  "version": "1.0.0",
+  "nodes": [
+    {
+      "id": "sales-channels",
+      "description": "<b>销售渠道</b><br/>电商平台 / 门店 / B2B",
+      "domain": "数据输入",
+      "domainClass": "ch",
+      "type": "custom"
+    },
+    {
+      "id": "master-data",
+      "description": "<b>主数据 (MDM)</b><br/>商品 / 客户 / 供应商 / 地理位置",
+      "domain": "决策与协同",
+      "domainClass": "data",
+      "subDomain": "数据管理",
+      "type": "custom"
+    },
+    {
+      "id": "oms-order",
+      "description": "<b>订单中心</b><br/>• 订单接入 / 审核 / 拆合<br/>• 价格 / 促销 / 库存预占",
+      "domain": "决策与协同",
+      "subDomain": "决策与协同",
+      "domainClass": "be-logistics",
+      "type": "custom"
+    },
+    {
+      "id": "oms-atc",
+      "description": "<b>全渠道库存中心 (ATC)</b><br/>• 汇集多仓物理库存<br/>• 计算渠道可售量",
+      "domain": "决策与协同",
+      "subDomain": "决策与协同",
+      "domainClass": "be-logistics",
+      "type": "custom"
+    },
+    {
+      "id": "oms-fulfill",
+      "description": "<b>订单履约中心</b><br/>• 寻源/智能分仓<br/>• 生成发货指令 (SOP)",
+      "domain": "决策与协同",
+      "subDomain": "决策与协同",
+      "domainClass": "be-logistics",
+      "type": "custom"
+    },
+    {
+      "id": "wms-inventory",
+      "description": "<b>WMS - 库存管理</b><br/>• 库位 / 批次 / 序列号<br/>• 物理库存同步",
+      "domain": "wms-tms",
+      "subDomain": "物流执行层",
+      "domainClass": "be-scm",
+      "type": "custom"
+    },
+    {
+      "id": "wms-outbound",
+      "description": "<b>WMS - 出库执行</b><br/>• 波次 / 拣货 / 打包 / 复核<br/>• 生成包裹 & 打印面单",
+      "domain": "wms-tms",
+      "subDomain": "物流执行层",
+      "domainClass": "be-scm",
+      "type": "custom"
+    },
+    {
+      "id": "tms-planning",
+      "description": "<b>TMS - 计划调度</b><br/>• 运力匹配 / 路径规划<br/>• 成本预估 / 任务派发",
+      "domain": "wms-tms",
+      "subDomain": "物流执行层",
+      "domainClass": "be-logistics",
+      "type": "custom"
+    },
+    {
+      "id": "tms-execution",
+      "description": "<b>TMS - 在途执行</b><br/>• 可视化追踪 / 异常预警<br/>• 状态上报 / 电子回单 (POD)",
+      "domain": "wms-tms",
+      "subDomain": "物流执行层",
+      "domainClass": "be-logistics",
+      "type": "custom"
+    },
+    {
+      "id": "customer",
+      "description": "<b>终端客户</b>",
+      "domain": "external",
+      "subDomain": "客户管理",
+      "domainClass": "ch",
+      "type": "custom"
+    },
+    {
+      "id": "carrier-partner",
+      "description": "<b>承运商/司机</b>",
+      "domain": "external",
+      "subDomain": "客户管理",
+      "domainClass": "ch",
+      "type": "custom"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-sales-oms-order",
+      "source": "sales-channels",
+      "target": "oms-order",
+      "type": "main",
+      "label": "订单下发",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-oms-order-atc",
+      "source": "oms-order",
+      "target": "oms-atc",
+      "type": "main",
+      "label": "库存查询",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-oms-atc-fulfill",
+      "source": "oms-atc",
+      "target": "oms-fulfill",
+      "type": "main",
+      "label": "库存确认",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-oms-fulfill-wms-outbound",
+      "source": "oms-fulfill",
+      "target": "wms-outbound",
+      "type": "main",
+      "label": "发货指令(SOP)",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-wms-inventory-outbound",
+      "source": "wms-inventory",
+      "target": "wms-outbound",
+      "type": "main",
+      "label": "库存分配",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-wms-outbound-tms-planning",
+      "source": "wms-outbound",
+      "target": "tms-planning",
+      "type": "main",
+      "label": "运输需求",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-tms-planning-execution",
+      "source": "tms-planning",
+      "target": "tms-execution",
+      "type": "main",
+      "label": "运输计划",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-tms-execution-carrier",
+      "source": "tms-execution",
+      "target": "carrier-partner",
+      "type": "main",
+      "label": "任务派发",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-carrier-customer",
+      "source": "carrier-partner",
+      "target": "customer",
+      "type": "main",
+      "label": "配送服务",
+      "zIndex": 20
+    },
+    {
+      "id": "edge-master-data-oms-order",
+      "source": "master-data",
+      "target": "oms-order",
+      "type": "data",
+      "label": "商品/客户信息",
+      "zIndex": 10
+    },
+    {
+      "id": "edge-master-data-wms-inventory",
+      "source": "master-data",
+      "target": "wms-inventory",
+      "type": "data",
+      "label": "商品主数据",
+      "zIndex": 10
+    },
+    {
+      "id": "edge-master-data-tms-planning",
+      "source": "master-data",
+      "target": "tms-planning",
+      "type": "data",
+      "label": "地理位置信息",
+      "zIndex": 10
+    },
+    {
+      "id": "edge-wms-inventory-oms-atc",
+      "source": "wms-inventory",
+      "target": "oms-atc",
+      "type": "data",
+      "label": "库存同步",
+      "zIndex": 10
+    },
+    {
+      "id": "edge-wms-outbound-oms-fulfill",
+      "source": "wms-outbound",
+      "target": "oms-fulfill",
+      "type": "feedback",
+      "label": "出库状态",
+      "zIndex": 5
+    },
+    {
+      "id": "edge-tms-execution-wms-outbound",
+      "source": "tms-execution",
+      "target": "wms-outbound",
+      "type": "feedback",
+      "label": "运输状态",
+      "zIndex": 5
+    },
+    {
+      "id": "edge-tms-execution-oms-order",
+      "source": "tms-execution",
+      "target": "oms-order",
+      "type": "feedback",
+      "label": "配送状态",
+      "zIndex": 5
+    }
+  ],
+  "layout": {
+    "subDomainWhitelist": [
+      "物流执行层",
+      "决策与协同"
+    ],
+    "generateDomainGroups": false,
+    "generateSubDomainGroups": true,
+    "spacing": {
+      "horizontal": 140,
+      "vertical": 100
+    },
+    "padding": {
+      "horizontal": 60,
+      "vertical": 80
+    },
+    "constraints": {
+      "minWidth": 280,
+      "minHeight": 120
+    }
+  },
+  "theme": {
+    "name": "systems-interaction",
+    "displayName": "系统交互主题",
+    "domains": {
+      "external": {
+        "border": "#546E7A",
+        "main": "#546E7A",
+        "light": "#ECEFF1",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "oms": {
+        "border": "#7E57C2",
+        "main": "#7E57C2",
+        "light": "#F3E5F5",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "wms": {
+        "border": "#039BE5",
+        "main": "#039BE5",
+        "light": "#E1F5FE",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "tms": {
+        "border": "#43A047",
+        "main": "#43A047",
+        "light": "#E8F5E8",
+        "text": "#333333",
+        "background": "#ffffff"
+      },
+      "data": {
+        "border": "#F57C00",
+        "main": "#F57C00",
+        "light": "#FFF3E0",
+        "text": "#333333",
+        "background": "#ffffff"
+      }
+    },
+    "isCustom": false
+  },
+  "config": {
+    "NODE_WIDTH": 280,
+    "NODE_HEIGHT": 120,
+    "NODE_PADDING": {
+      "horizontal": 60,
+      "vertical": 80
+    },
+    "SPACING": {
+      "H": 140,
+      "V": 100
+    },
+    "Z_EDGE": {
+      "MAIN": 20,
+      "DATA": 10,
+      "FEEDBACK": 5
+    }
+  },
+  "metadata": {
+    "title": "系统交互架构图",
+    "description": "系统交互架构图，展示了OMS、WMS、TMS等核心系统之间的数据流和业务交互",
+    "author": "Systems Architecture Team",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z",
+    "tags": [
+      "系统"
+    ]
+  }
+}

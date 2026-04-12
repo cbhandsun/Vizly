@@ -1,0 +1,1252 @@
+{
+    "common": {
+        "language": "Language",
+        "search": "Search",
+        "save": "Save",
+        "cancel": "Cancel",
+        "ok": "OK",
+        "remoteDataInvalid": "Remote diagram data is invalid: {{reason}}",
+        "remoteDataRepaired": "Remote diagram data is incomplete; auto-repaired: {{reason}}",
+        "loading": "Loading...",
+        "on": "On",
+        "off": "Off",
+        "error": "Error",
+        "success": "Success",
+        "confirm": "Confirm",
+        "delete": "Delete"
+    },
+    "templates": {
+        "title": "Template Library",
+        "use": "Use",
+        "useTemplate": "Use Template",
+        "builtin": "Built-in",
+        "usageCount": "Usage Count",
+        "confirmDelete": "Are you sure to delete this template?",
+        "searchPlaceholder": "Search templates...",
+        "noResults": "No matching templates found",
+        "empty": "No templates available",
+        "category": {
+            "all": "All"
+        }
+    },
+    "auth": {
+        "login": "Sign in",
+        "menu": {
+            "myDiagrams": "My diagrams",
+            "logout": "Sign out"
+        },
+        "modal": {
+            "title": "Sign in / Sign up",
+            "description": "Enter your email to receive a magic link. No passwords required. If you don't have an account, one will be created automatically.",
+            "emailPlaceholder": "Email Address",
+            "emailRequired": "Please enter your email",
+            "emailInvalid": "Please enter a valid email",
+            "sendMagicLink": "Send Magic Link",
+            "magicLinkSent": "Magic link sent to your email",
+            "checkEmailTitle": "Check your email",
+            "checkEmailDesc": "We've sent a magic link to sign you in.",
+            "tabs": {
+                "password": "Password",
+                "magiclink": "Magic Link",
+                "register": "Register"
+            },
+            "password": {
+                "placeholder": "Password",
+                "required": "Please enter a password"
+            },
+            "register": {
+                "passwordPlaceholder": "Password (min 6 characters)",
+                "passwordMin": "Password must be at least 6 characters",
+                "confirmPlaceholder": "Confirm password",
+                "confirmRequired": "Please confirm password",
+                "passwordMismatch": "Passwords do not match",
+                "button": "Sign Up",
+                "success": "Registration successful"
+            },
+            "loginButton": "Sign In",
+            "loginSuccess": "Login successful",
+            "invalidCredentials": "Incorrect email or password. If you previously signed in with a Magic Link, please use the Magic Link tab first to set a password.",
+            "noAccount": "Don't have an account?",
+            "registerNow": "Register now",
+            "hasAccount": "Already have an account?",
+            "backToLogin": "Back to login",
+            "magicLinkHint": "💡 If you previously used Magic Link, you can continue using it. You can set a password later in your profile."
+        }
+    },
+    "storage": {
+        "manager": {
+            "title": "Cloud diagrams",
+            "refresh": "Refresh",
+            "searchPlaceholder": "Search cloud diagrams...",
+            "providerSwitched": "Switched provider: {{provider}}",
+            "loadFailed": "Failed to load cloud list. Check config or login.",
+            "downloading": "Loading cloud diagram...",
+            "downloadedAndOpened": "Downloaded and opened",
+            "noContent": "No content",
+            "deleted": "Deleted",
+            "deleteFailed": "Delete failed",
+            "open": "Open",
+            "delete": "Delete",
+            "confirmDeleteTitle": "Delete?",
+            "confirmDeleteDesc": "This action cannot be undone.",
+            "unknownTime": "Unknown time",
+            "sizeKb": "{{kb}} KB",
+            "noCloudDiagrams": "No cloud diagrams",
+            "providerNotConfigured": "{{provider}} not configured",
+            "goConfig": "Configure",
+            "needLoginForSupabase": "Sign in to use Supabase"
+        }
+    },
+    "designer": {
+        "title": "Diagram View",
+        "debug": {
+            "panel": {
+                "title": "Routing Debugger",
+                "close": "Close",
+                "toggleHint": "Toggle with {{shortcut}}",
+                "tab": {
+                    "perf": "Perf",
+                    "cache": "Cache",
+                    "visual": "Visual"
+                }
+            },
+            "visualizer": {
+                "title": "Pathfinding Visualizer",
+                "close": "Close",
+                "debug": "Debug",
+                "maximize": "Maximize",
+                "restore": "Restore",
+                "edgeIdPlaceholder": "Edge ID (e.g. edge-1)",
+                "selectEdgeHint": "Select an edge to debug it.",
+                "noDebugData": "No debug data",
+                "grid": "Grid",
+                "obstacles": "Obstacles",
+                "vg": "VG",
+                "quadTree": "QuadTree",
+                "legend": {
+                    "obstacle": "Obstacle",
+                    "source": "Source",
+                    "target": "Target",
+                    "lineCross": "Line Cross",
+                    "turn": "Turn",
+                    "buffer": "Buffer",
+                    "visited": "Visited",
+                    "rawPath": "Raw Path"
+                },
+                "stats": {
+                    "strategy": "Strategy: {{value}}",
+                    "grid": "Grid: {{value}}",
+                    "vg": "VG: {{value}}",
+                    "qt": "QT: {{value}}",
+                    "visited": "Visited: {{count}} nodes",
+                    "ports": "Ports: {{source}} → {{target}} | Dir: {{dir}} | Geo: {{geo}} | d=({{dx}},{{dy}})",
+                    "time": "Time: {{ms}}ms",
+                    "steps": "Steps: {{count}}",
+                    "length": "Length: {{value}}"
+                }
+            }
+        },
+        "menu": {
+            "title": "Diagrams",
+            "more": "More",
+            "expandMenu": "Expand Menu",
+            "collapseMenu": "Collapse Menu",
+            "docsPreview": "Docs Preview",
+            "searchPlaceholder": "Search diagrams ({{shortcut}})",
+            "favorites": "Favorites",
+            "clear": "Clear",
+            "favorite": "Favorite",
+            "unfavorite": "Unfavorite",
+            "expandAll": "Expand All",
+            "collapseAll": "Collapse All",
+            "tagFilter": "Tag Filter",
+            "matchAny": "Match Any",
+            "matchAll": "Match All",
+            "switchTheme": "Switch Theme",
+            "category": {
+                "other": "Common",
+                "architecture": "Architecture",
+                "debug": "Debug & Experiments",
+                "business": "Business Flow",
+                "logistics": "Logistics",
+                "subSystem": "Subsystem Architecture",
+                "tool": "Toolbox"
+            },
+            "theme": {
+                "light": "Light",
+                "dark": "Dark",
+                "ocean": "Ocean",
+                "forest": "Forest",
+                "highContrast": "High Contrast",
+                "sunset": "Sunset",
+                "mono": "Mono",
+                "original": "Original"
+            }
+        },
+        "commandPalette": {
+            "group": {
+                "favorites": "Favorites",
+                "recent": "Recent",
+                "actions": "Actions",
+                "diagrams": "Diagrams"
+            },
+            "searchAria": "Search commands or diagrams",
+            "placeholder": "Type to search (Enter to run, Esc to close)",
+            "noResults": "No matching commands or diagrams",
+            "groupHeader": "{{group}} ({{count}})",
+            "openInNewTabHint": "{{mod}}+Enter new tab",
+            "footerHint": "Enter run · {{mod}}+Enter secondary · Esc close · ↑↓ select",
+            "toggleHint": "{{mod}}+K to open",
+            "shortcutsHelp": "Keyboard shortcuts"
+        },
+        "manage": {
+            "title": "Diagram Manager",
+            "tabs": {
+                "my": "My Diagrams",
+                "shared": "Shared with me"
+            },
+            "back": "Back to workspace",
+            "storageConfig": "Storage config",
+            "searchPlaceholder": "Search diagrams...",
+            "refresh": "Refresh",
+            "providerSwitched": "Switched provider: {{provider}}",
+            "cloudListFailed": "Failed to load cloud list. Check config or login.",
+            "loadingCloud": "Loading cloud diagram...",
+            "downloading": "Downloading...",
+            "uploading": "Uploading...",
+            "downloadedAndOpened": "Downloaded and opened",
+            "noContent": "No content",
+            "uploaded": "Uploaded",
+            "uploadFailed": "Upload failed",
+            "open": "Open",
+            "upload": "Upload",
+            "idLabel": "ID: {{id}}",
+            "openAndDownload": "Open (download)",
+            "confirmDeleteTitle": "Delete?",
+            "confirmDeleteDesc": "This action cannot be undone.",
+            "delete": "Delete",
+            "deleted": "Deleted",
+            "deleteFailed": "Delete failed",
+            "unknownTime": "Unknown time",
+            "sizeKb": "{{kb}} KB",
+            "noLocalResults": "No matching local diagrams",
+            "noCloudResults": "No matching cloud diagrams",
+            "needLoginForSupabase": "Sign in to use Supabase",
+            "login": "Sign in",
+            "providerNotConfigured": "{{provider}} not configured",
+            "goConfigS3": "Configure S3",
+            "localTemplates": "Local templates",
+            "cloudStorage": "Cloud storage ({{provider}})"
+        },
+        "shortcuts": {
+            "title": "Keyboard Shortcuts",
+            "subtitle": "These shortcuts work in the diagram workspace; it automatically uses Cmd on macOS and Ctrl on Windows.",
+            "action": {
+                "palette": "Open command palette",
+                "menuSearch": "Focus menu search",
+                "menuToggle": "Toggle left menu",
+                "debugToggle": "Toggle debug panel",
+                "settings": "Open settings",
+                "exitFullscreen": "Exit fullscreen"
+            },
+            "note": {
+                "devOnly": "Dev/debug only"
+            },
+            "table": {
+                "action": "Action",
+                "shortcut": "Shortcut",
+                "note": "Note"
+            }
+        },
+        "commandItems": {
+            "shortcuts": "Keyboard shortcuts",
+            "settings": "Open settings",
+            "enterFullscreen": "Enter fullscreen",
+            "exitFullscreen": "Exit fullscreen",
+            "expandMenu": "Expand left menu",
+            "collapseMenu": "Collapse left menu",
+            "docs": "Open docs preview",
+            "manage": "Open diagram manager",
+            "clearFavorites": "Clear favorites"
+        },
+        "settings": {
+            "edgeMode": "Edge Mode",
+            "smart": "Smart Routing",
+            "native": "Native Routing",
+            "layoutStrategy": "Layout Strategy",
+            "nodeLayout": "Node Layout",
+            "elkAlgorithm": "ELK Algorithm",
+            "showMainFlow": "Show Main Flow Only",
+            "advancedConfig": "Advanced Config",
+            "autoDisabled": "Auto (Disabled)",
+            "autoDisabledDesc": "Node layout is handled by domain layout",
+            "elk": {
+                "layered": {
+                    "title": "ELK Layered",
+                    "desc": "Layered layout with clear hierarchy"
+                },
+                "mrtree": {
+                    "title": "ELK Mr. Tree",
+                    "desc": "Tree layout with parent-child hierarchy"
+                },
+                "force": {
+                    "title": "ELK Force",
+                    "desc": "Force-directed layout for relationships"
+                }
+            },
+            "preset": {
+                "elastic": {
+                    "label": "Elastic + ELK",
+                    "desc": "Standard style: Balanced layout"
+                },
+                "soft": {
+                    "label": "Soft + ELK",
+                    "desc": "Organic style: Loose clustering"
+                },
+                "strict": {
+                    "label": "Strict + ELK",
+                    "desc": "Engineering style: Strict alignment"
+                }
+            }
+        },
+        "viewer": {
+            "toggleFlowDirection": "Toggle flow direction",
+            "more": "More",
+            "moreSettings": "More settings",
+            "renderFailed": "Render failed",
+            "renderFailedSubtitle": "An error occurred while rendering the diagram. Refresh or switch to another diagram."
+        },
+        "toolbar": {
+            "undo": "Undo (Ctrl+Z)",
+            "redo": "Redo (Ctrl+Y)",
+            "zoomIn": "Zoom In",
+            "zoomOut": "Zoom Out",
+            "fitView": "Fit View",
+            "layout": "Layout",
+            "save": "Save",
+            "style": "Chart Style",
+            "import": "Import JSON",
+            "export": "Export JSON",
+            "edit": "Edit JSON",
+            "autoRouting": "Auto Routing",
+            "showGrid": "Show Grid",
+            "gridOff": "Grid: Off",
+            "gridDots": "Grid: Dots",
+            "gridLines": "Grid: Lines",
+            "gridCross": "Grid: Cross",
+            "shortcuts": "Keyboard Shortcuts",
+            "smartRouting": "Smart Routing",
+            "containers": "Containers",
+            "domain": "Domain",
+            "subdomain": "Sub-domain",
+            "wrap": "Wrap Selection",
+            "basic": "Basic Components",
+            "start": "Start",
+            "process": "Process",
+            "decision": "Decision",
+            "data": "Data",
+            "system": "System",
+            "database": "Database",
+            "input": "Input",
+            "module": "Module",
+            "image": "Image",
+            "end": "End",
+            "selectionMode": {
+                "label": "Selection Mode",
+                "partial": "Intersecting (Partial)",
+                "full": "Contained (Full)"
+            },
+            "showRuler": "Show Ruler",
+            "hideRuler": "Hide Ruler",
+            "dragToMove": "Drag to move toolbar (double-click to reset)"
+        },
+        "jsonEditor": {
+            "title": "Edit Diagram Data (JSON)",
+            "formatStandard": "Standard Data (Editable)",
+            "formatPure": "Pure Data (Smart Layout)",
+            "formatReactFlow": "React Flow (Read-Only)",
+            "format": "Format JSON",
+            "download": "Download File",
+            "applyOnly": "Preview and Apply",
+            "saveAndClose": "Apply and Close",
+            "reactFlowWarning": "You are currently viewing internal React Flow graph models (Read-Only mode). This is for debugging purposes only. To edit diagram structure, please switch to Standard Data mode."
+        },
+        "statusBar": {
+            "nodes": "Nodes",
+            "edges": "Edges",
+            "smartMesh": "Smart Mesh",
+            "directLink": "Direct Link",
+            "selectedSummary": "Selected: {{nodes}} nodes, {{edges}} edges",
+            "smartRoutingEnabled": "Smart routing enabled",
+            "directRoutingEnabled": "Direct routing enabled"
+        },
+        "flowchart": {
+            "importFailed": "Import failed: invalid JSON or unsupported data format",
+            "invalidJson": "Invalid JSON: {{reason}}",
+            "commandPaletteHint": "Press {{mod}}+K or / to open Command Palette",
+            "commandDisabled": "Currently unavailable",
+            "undo": {
+                "title": "Undo available",
+                "action": "Undo",
+                "done": "Undone",
+                "desc": {
+                    "paste": "Paste: {{nodes}} nodes, {{edges}} edges",
+                    "cut": "Cut: {{nodes}} nodes, {{edges}} edges",
+                    "delete": "Delete: {{nodes}} nodes, {{edges}} edges",
+                    "duplicate": "Duplicate: {{nodes}} nodes",
+                    "group": "Group: {{nodes}} nodes",
+                    "ungroup": "Ungroup: {{groups}} groups",
+                    "layout": "Auto layout: {{direction}} / {{algorithm}}"
+                }
+            },
+            "commandCategory": {
+                "general": "General",
+                "view": "View",
+                "file": "File",
+                "action": "Action",
+                "nodes": "Nodes",
+                "edges": "Edges"
+            },
+            "commands": {
+                "toggleGrid": "Toggle Grid",
+                "toggleSmartRouting": "Toggle Smart Routing",
+                "undo": "Undo",
+                "redo": "Redo",
+                "copy": "Copy",
+                "paste": "Paste",
+                "cut": "Cut",
+                "deleteSelected": "Delete Selected",
+                "deleteShortcut": "Del / Backspace",
+                "duplicate": "Duplicate",
+                "selectAll": "Select All",
+                "group": "Group",
+                "ungroup": "Ungroup",
+                "autoLayoutTB": "Auto Layout (Top-Bottom)",
+                "autoLayoutLR": "Auto Layout (Left-Right)"
+            },
+            "group": {
+                "defaultLabel": "New Group",
+                "defaultDescription": "Grouped Selection"
+            },
+            "toast": {
+                "nothingToCopy": "Nothing to copy",
+                "nothingToPaste": "Nothing to paste",
+                "nothingToCut": "Nothing to cut",
+                "nothingToDuplicate": "Nothing to duplicate",
+                "needTwoNodesToGroup": "Select at least two nodes to group",
+                "groupSameLevel": "Please select nodes within the same level to group them",
+                "nothingToUngroup": "Nothing to ungroup",
+                "copied": "Copied: {{nodes}} nodes, {{edges}} edges",
+                "pasted": "Pasted: {{nodes}} nodes, {{edges}} edges",
+                "cut": "Cut: {{nodes}} nodes, {{edges}} edges",
+                "deleted": "Deleted: {{nodes}} nodes, {{edges}} edges",
+                "duplicated": "Duplicated: {{nodes}} nodes",
+                "grouped": "Grouped: {{nodes}} nodes",
+                "ungrouped": "Ungrouped: {{groups}} groups",
+                "edgeReversed": "Edge direction reversed",
+                "waypointsReset": "Edge path reset",
+                "convertedToEditable": "Converted to editable edge"
+            },
+            "onboarding": {
+                "title": "Quick Start",
+                "openPalette": "Open palette ({{mod}}+K)",
+                "dismiss": "Dismiss",
+                "step": {
+                    "drag": "Drag a component from the left sidebar onto the canvas",
+                    "connect": "Drag a handle to connect; drop on blank space to Quick Add",
+                    "palette": "Use {{mod}}+K or / to search and run commands",
+                    "pan": "Hold Space and drag to pan the canvas"
+                }
+            },
+            "layout": {
+                "tooltip": "Auto Layout",
+                "dagreTB": "Dagre Vertical (TB)",
+                "dagreLR": "Dagre Horizontal (LR)",
+                "elkTB": "ELK Vertical (Layered)",
+                "elkLR": "ELK Horizontal (Layered)",
+                "treeGroup": "Tree Layout",
+                "treeTB": "↕ Tree (Top→Bottom)",
+                "treeLR": "↔ Tree (Left→Right)",
+                "forceGroup": "Force-Directed",
+                "force": "⊙ Force-Directed",
+                "domainGroup": "Domain-Aware Layout",
+                "domainDagreLR": "◈ DomainDagre (Left→Right)",
+                "domainDagreTB": "◈ DomainDagre (Top→Bottom) (Default)",
+                "domainVertical": "▥ DomainVertical (Top→Bottom)",
+                "domainHorizontal": "▦ DomainHorizontal (Left→Right)",
+                "nodeLayoutGroup": "Node Layout Within Domain",
+                "nodeFlow": "▷ Flow",
+                "nodeGrid": "⊞ Grid",
+                "nodeHorizontal": "⊟ Horizontal",
+                "nodeVertical": "⊞ Vertical",
+                "nodeDagre": "◈ Dagre Layered (Default)"
+            }
+        },
+        "flowchartShortcuts": {
+            "title": "Flowchart Shortcuts",
+            "subtitle": "These shortcuts work in the flowchart canvas; it uses {{mod}} automatically on your system.",
+            "paletteDescription": "Show flowchart shortcut list",
+            "table": {
+                "action": "Action",
+                "shortcut": "Shortcut",
+                "note": "Note"
+            },
+            "action": {
+                "palette": "Open command palette",
+                "undo": "Undo",
+                "redo": "Redo",
+                "copy": "Copy selection",
+                "paste": "Paste",
+                "cut": "Cut selection",
+                "duplicate": "Duplicate selection",
+                "selectAll": "Select all",
+                "group": "Group selection",
+                "ungroup": "Ungroup selection",
+                "delete": "Delete selection",
+                "nudge": "Nudge selection",
+                "nudgeFast": "Nudge selection (fast)",
+                "duplicateDrag": "Duplicate node (drag)",
+                "pan": "Pan canvas"
+            },
+            "shortcut": {
+                "delete": "Del / Backspace",
+                "nudge": "Arrow keys (1px)",
+                "nudgeFast": "Shift + Arrow keys (10px)",
+                "duplicateDrag": "Alt + Drag",
+                "pan": "Space + Drag"
+            }
+        },
+        "sidebar": {
+            "basic": "Basic Shapes",
+            "components": "Components",
+            "search": "Search...",
+            "flowControl": "Flow Control",
+            "dataIO": "Data & I/O",
+            "containers": "Containers",
+            "special": "Special",
+            "shapes": "Shapes",
+            "navigator": "Navigator",
+            "noNodesFound": "No nodes found",
+            "zoomToNode": "Zoom to Node",
+            "expandSidebar": "Expand Sidebar",
+            "collapseSidebar": "Collapse Sidebar",
+            "clickOrDragToExpand": "Click or Drag to Expand",
+            "expandAll": "Expand All",
+            "collapseAll": "Collapse All",
+            "domainGroup": "Domain Group",
+            "subGroup": "Sub Group",
+            "customNode": "Custom Node",
+            "note": "Note",
+            "zoom": "Zoom",
+            "reset": "Reset",
+            "zoomInHint": "Zoom In (Ctrl+Wheel)",
+            "zoomOutHint": "Zoom Out (Ctrl+Wheel)",
+            "layers": "Layers",
+            "techIcons": "Tech Icons",
+            "server": "Server",
+            "network": "Network",
+            "security": "Security",
+            "user": "User",
+            "email": "Email",
+            "notification": "Notification",
+            "settings": "Settings",
+            "code": "Code",
+            "terminal": "Terminal",
+            "preparation": "Preparation",
+            "delay": "Delay",
+            "manualInput": "Manual Input",
+            "display": "Display",
+            "document": "Document",
+            "cloud": "Cloud",
+            "connector": "Connector",
+            "parallelogram": "Parallelogram",
+            "trapezoid": "Manual Operation",
+            "predefinedProcess": "Predefined Process",
+            "multiDocument": "Multi-Document",
+            "offPageConnector": "Off-page Connector",
+            "internalStorage": "Internal Storage"
+        }
+    },
+    "header": {
+        "edgeMode": "Edge Mode",
+        "smart": "Smart",
+        "native": "Native"
+    },
+    "aiChat": {
+        "title": "AI Architect",
+        "history": "History",
+        "historyTitle": "Chat History",
+        "deleteConversation": "Delete conversation?",
+        "viewHistory": "View history",
+        "settings": "Settings",
+        "close": "Close",
+        "loggedIn": "Logged in, synced: {{email}}",
+        "notLoggedIn": "Not logged in, data saved locally",
+        "previewCode": "Preview Code",
+        "saveLocal": "Save Local",
+        "saveS3": "Save to S3",
+        "saveCloud": "Save to Cloud",
+        "saveDiagram": "Save Diagram",
+        "apply": "Apply",
+        "inputHint": "⌨️ Enter to send | Shift+Enter new line | Esc close",
+        "inputPlaceholder": "Describe the architecture diagram... Type / for commands",
+        "saveDialogTitle": "Save Diagram",
+        "confirmSave": "Confirm Save",
+        "cancel": "Cancel",
+        "nameLabel": "Name:",
+        "namePlaceholder": "Enter diagram name",
+        "saveTarget": "Save to:",
+        "cmdAddDesc": "Add new node",
+        "cmdConnectDesc": "Connect two nodes",
+        "cmdLayoutDesc": "Switch layout (tree, grid, flow)",
+        "cmdClearDesc": "Clear conversation",
+        "cmdHelpDesc": "Show help",
+        "welcomeMsg": "Hello! I'm the Architecture AI Assistant. You can tell me your architecture needs, or try one of these examples:\n\n- \"Draw a typical e-commerce microservice architecture\"\n- \"Generate an AWS cloud architecture with S3 and Lambda\"\n- \"Create a simple React component relationship diagram\"",
+        "clearedMsg": "Conversation cleared. How can I help?",
+        "noModel": "No models available. Please configure an API Key and enable a model in settings.",
+        "invalidDiagram": "Invalid diagram data",
+        "requestFailed": "Request failed: {{error}}",
+        "requestError": "❌ Request error: {{error}}",
+        "autoSwitched": "Auto-switched to: {{name}}"
+    },
+    "export": {
+        "backToTop": "Back to Top",
+        "fitScreen": "Fit Screen",
+        "fullScreen": "Fullscreen",
+        "exitFullScreen": "Exit Fullscreen",
+        "options": "Export Options",
+        "export": "Export",
+        "png": "PNG Format",
+        "pdf": "PDF Format",
+        "svg": "SVG Format",
+        "gif": "GIF Animation",
+        "saveToCloud": "Save to Cloud",
+        "savingToCloud": "Saving to cloud...",
+        "cloudSaveSuccess": "Saved to cloud",
+        "cloudSaveFailed": "Cloud save failed",
+        "snapshotFailed": "Snapshot generation failed (saving data only): {{reason}}",
+        "exporting": "Exporting",
+        "wait": "Please wait, file will download automatically."
+    },
+    "share": {
+        "title": "Share Diagram",
+        "generateLink": "Generate Share Link",
+        "copyLink": "Copy Link",
+        "copied": "Link copied to clipboard",
+        "expiration": "Expiration",
+        "never": "Never expires",
+        "1day": "1 day",
+        "7days": "7 days",
+        "30days": "30 days",
+        "revokeShare": "Revoke Share",
+        "revokeConfirm": "Are you sure you want to revoke this share link? The link will become invalid.",
+        "revoked": "Share revoked",
+        "noShares": "No share links yet",
+        "createdAt": "Created",
+        "expiresAt": "Expires",
+        "shareButton": "Share",
+        "loginRequired": "Please sign in to use sharing",
+        "savingFirst": "Saving diagram to cloud...",
+        "loadingShared": "Loading shared diagram...",
+        "notFound": "Share link is invalid or has expired",
+        "poweredBy": "Created with DiagramView",
+        "tabs": {
+            "link": "Public Link",
+            "invite": "Invite People"
+        },
+        "inviteInput": "Add registered email...",
+        "inviteBtn": "Invite",
+        "roleViewer": "Viewer",
+        "roleEditor": "Editor",
+        "collaborators": "Collaborators",
+        "remove": "Remove",
+        "owner": "Owner",
+        "you": "You",
+        "inviteSuccess": "Invited successfully",
+        "inviteFailed": "Failed to invite: {{error}}",
+        "removeSuccess": "Collaborator removed",
+        "loadFailed": "Failed to load: {{error}}"
+    },
+    "theme": {
+        "selector": {
+            "title": "Theme Settings",
+            "choose": "Choose Theme",
+            "themes": "Themes",
+            "presets": "Presets",
+            "custom": "Custom",
+            "settings": "Settings",
+            "loading": "Loading themes...",
+            "name": "Theme Name",
+            "desc": "Description",
+            "mode": "Mode",
+            "light": "Light",
+            "dark": "Dark",
+            "baseTheme": "Base Theme",
+            "performance": "Performance Metrics",
+            "import": "Import",
+            "export": "Export",
+            "actions": {
+                "create": "Create",
+                "apply": "Apply",
+                "delete": "Delete",
+                "cancel": "Cancel",
+                "save": "Save"
+            }
+        }
+    },
+    "propertyPanel": {
+        "mixedSelection": "Mixed Selection ({{count}})",
+        "title": "Property Settings",
+        "multipleNodes": "Multiple Nodes ({{count}})",
+        "multipleEdges": "Multiple Edges ({{count}})",
+        "groupProperties": "Group Properties",
+        "nodeProperties": "Node Properties",
+        "connectorProperties": "Connector Properties",
+        "properties": "Properties",
+        "settings": "Settings",
+        "noSelection": "Select items to edit properties",
+        "selectItemToEdit": "Select an item to edit",
+        "expand": "Expand Panel",
+        "collapse": "Collapse Panel",
+        "id": "ID",
+        "information": "Information",
+        "layout": "Layout",
+        "semantics": "Semantics",
+        "appearance": "Appearance",
+        "styling": "Styling",
+        "connection": "Connection",
+        "lineStyle": "Line Style",
+        "label": "Label",
+        "description": "Description",
+        "width": "Width",
+        "height": "Height",
+        "domainName": "Domain Name",
+        "domainClass": "Domain Class",
+        "sequence": "Sequence / Order",
+        "themeColor": "Theme Color (Hex)",
+        "shape": "Shape",
+        "lineType": "Line Type",
+        "arrowHead": "Arrow Head",
+        "style": "Style",
+        "borderStyle": "Border Style",
+        "solid": "Solid",
+        "dashed": "Dashed",
+        "none": "None",
+        "arrow": "Arrow",
+        "color": "Color",
+        "strokeColor": "Stroke",
+        "lineWidth": "Line Width",
+        "borderRadius": "Border Radius",
+        "textAlign": "Text Align",
+        "borderWidth": "Border Width",
+        "select": "Select...",
+        "mixed": "(Mixed)",
+        "icon": "Icon",
+        "colors": "Colors",
+        "mainColor": "Main Color",
+        "backgroundColor": "Background Color",
+        "textColor": "Text Color",
+        "selectOption": "Select...",
+        "options": {
+            "domainClass": {
+                "core": "Core (Business)",
+                "system": "System (Infrastructure)",
+                "external": "External (3rd Party)",
+                "decision": "Decision (Logic)",
+                "support": "Support (Auxiliary)"
+            },
+            "shape": {
+                "rectangle": "Rectangle",
+                "pill": "Rounded Pill",
+                "diamond": "Diamond",
+                "database": "Database",
+                "parallelogram": "Parallelogram",
+                "circle": "Circle",
+                "ellipse": "Ellipse",
+                "triangle": "Triangle",
+                "hexagon": "Hexagon",
+                "star": "Star",
+                "document": "Document",
+                "cloud": "Cloud",
+                "manualInput": "Manual Input",
+                "preparation": "Preparation",
+                "delay": "Delay",
+                "display": "Display",
+                "note": "Note",
+                "trapezoid": "Trapezoid (Manual Op)",
+                "predefinedProcess": "Predefined Process",
+                "multiDocument": "Multi-Document",
+                "offPage": "Off-page Connector",
+                "internalStorage": "Internal Storage"
+            },
+            "icon": {
+                "play": "Start / Play",
+                "square": "Step / Square",
+                "cog": "Settings",
+                "stop": "Stop",
+                "database": "Database",
+                "question": "Decision",
+                "arrow": "Next / Arrow",
+                "group": "Group",
+                "box": "Container",
+                "thLarge": "Modules",
+                "image": "Image",
+                "eye": "Inspect",
+                "keyboard": "Input",
+                "circle": "Circle",
+                "star": "Star",
+                "file": "File",
+                "cloud": "Cloud",
+                "clock": "Clock",
+                "desktop": "Desktop",
+                "note": "Note",
+                "hexagon": "Hexagon"
+            },
+            "edgeType": {
+                "smartStep": "Smart Step",
+                "smartBezier": "Smart Bezier",
+                "smartStraight": "Smart Straight",
+                "step": "Step (Base)",
+                "bezier": "Bezier (Base)",
+                "straight": "Straight",
+                "editable": "Editable (Waypoints)"
+            },
+            "arrowStyle": {
+                "none": "None",
+                "arrow": "Filled Arrow",
+                "openArrow": "Open Arrow",
+                "bidirectional": "Bidirectional"
+            }
+        }
+    },
+    "config": {
+        "title": "Configuration Panel",
+        "loading": "Loading configuration system...",
+        "error": "Error: {{message}}",
+        "unsavedChanges": "Unsaved changes",
+        "actions": {
+            "save": "Save Changes",
+            "reset": "Reset",
+            "close": "Close",
+            "applyCompact": "Apply ELK Compact Preset",
+            "applyConsistent": "Apply ELK Consistent Preset"
+        },
+        "tabs": {
+            "nodes": "Node Settings",
+            "containers": "Container Settings",
+            "spacing": "Spacing Settings",
+            "edges": "Edge Settings",
+            "layout": "Layout Settings",
+            "performance": "Performance Settings"
+        },
+        "boolean": {
+            "enable": "Enable",
+            "disable": "Disable"
+        },
+        "options": {
+            "smart": "Smart Routing",
+            "advanced-smart": "Advanced Smart Routing",
+            "native": "Native Routing",
+            "bezier": "Bezier Curve",
+            "straight": "Straight Line",
+            "step": "Step Line",
+            "LR": "Horizontal: Left -> Right",
+            "RL": "Horizontal: Right -> Left",
+            "TB": "Vertical: Top -> Bottom",
+            "BT": "Vertical: Bottom -> Top",
+            "DomainVerticalLayout": "Global: Domain Vertical",
+            "DomainHorizontalLayout": "Global: Domain Horizontal",
+            "DomainElkLayout": "Global: Domain ELK",
+            "DomainElkCompoundLayout": "Global: ELK Compound",
+            "DomainElkRadialLayout": "Global: ELK Radial (Manual)",
+            "DomainElkForceLayout": "Global: ELK Force",
+            "DomainElkTrueRadialLayout": "Global: ELK True Radial",
+            "HorizontalLayout": "Node: Horizontal",
+            "VerticalLayout": "Node: Vertical",
+            "GridLayout": "Node: Grid",
+            "CenteredLayout": "Node: Centered",
+            "ElkNodeLayout": "Node: ELK-first",
+            "DagreLayout": "Node: Dagre Layered",
+            "auth": {
+                "auto": "Industry Preset: Auto",
+                "strict_industry": "Industry Preset: Strict",
+                "balanced_industry": "Industry Preset: Balanced",
+                "relaxed_industry": "Industry Preset: Relaxed",
+                "NETWORK_SIMPLEX": "ELK: Network Simplex",
+                "LINEAR_SEGMENTS": "ELK: Linear Segments",
+                "BRANDES_KOEPF": "ELK: Brandes-Koepf"
+            },
+            "groups": {
+                "basic": "Basic Settings",
+                "obstacle": "Obstacles & Containers",
+                "geometry": "Geometry Tuning",
+                "preference": "Preference Weights",
+                "sampling": "Advanced Sampling",
+                "bezier": "Bezier Tuning",
+                "core": "Core Strategy",
+                "elkBasic": "ELK Basic",
+                "elkSpacing": "ELK Spacing",
+                "elkAdvanced": "ELK Advanced Tuning"
+            },
+            "diagram": {
+                "node": {
+                    "minWidth": {
+                        "label": "Node Min Width",
+                        "desc": "Minimum display width of the node when text is short. Prevents layout jitter."
+                    },
+                    "maxWidth": {
+                        "label": "Node Max Width",
+                        "desc": "Maximum width of the node. Content will wrap if exceeded."
+                    },
+                    "height": {
+                        "label": "Node Height",
+                        "desc": "Base height of the node. Will expand for multi-line text."
+                    },
+                    "padding": {
+                        "horizontal": {
+                            "label": "Node Horizontal Padding",
+                            "desc": "Left and right padding for node content."
+                        },
+                        "vertical": {
+                            "label": "Node Vertical Padding",
+                            "desc": "Top and bottom padding for node content."
+                        }
+                    },
+                    "boxShadow": {
+                        "label": "Node Shadow",
+                        "desc": "CSS box-shadow expression for nodes."
+                    }
+                },
+                "font": {
+                    "size": {
+                        "label": "Font Size",
+                        "desc": "Font size for node text (px)."
+                    }
+                },
+                "domain": {
+                    "padding": {
+                        "horizontal": {
+                            "label": "Domain Horizontal Padding",
+                            "desc": "Internal padding for domains (left/right)."
+                        },
+                        "vertical": {
+                            "label": "Domain Vertical Padding",
+                            "desc": "Internal padding for domains (top/bottom)."
+                        }
+                    },
+                    "gap": {
+                        "label": "Domain Gap",
+                        "desc": "Spacing between different domains."
+                    },
+                    "sideSafeGap": {
+                        "label": "Domain Side Safe Gap",
+                        "desc": "Extra margin on domain sides for safety."
+                    },
+                    "bottomSafeGap": {
+                        "label": "Domain Bottom Safe Gap",
+                        "desc": "Extra margin at the bottom of the domain."
+                    },
+                    "title": {
+                        "height": {
+                            "label": "Domain Title Height",
+                            "desc": "Reserved height for domain title bar."
+                        },
+                        "safeGap": {
+                            "label": "Domain Title Safe Gap",
+                            "desc": "Safe gap between title and content."
+                        }
+                    }
+                },
+                "subDomain": {
+                    "padding": {
+                        "horizontal": {
+                            "label": "SubDomain Horizontal Padding",
+                            "desc": "Internal padding for sub-domains."
+                        },
+                        "vertical": {
+                            "label": "SubDomain Vertical Padding",
+                            "desc": "Internal padding for sub-domains."
+                        }
+                    },
+                    "title": {
+                        "height": {
+                            "label": "SubDomain Title Height",
+                            "desc": "Reserved height for sub-domain title bar."
+                        }
+                    },
+                    "ensureTitleClearance": {
+                        "label": "Ensure Title Clearance",
+                        "desc": "Automatically shift content to avoid title overlap."
+                    }
+                },
+                "spacing": {
+                    "horizontal": {
+                        "label": "Horizontal Node Spacing",
+                        "desc": "Horizontal distance between nodes in the same layer."
+                    },
+                    "vertical": {
+                        "label": "Vertical Node Spacing",
+                        "desc": "Vertical distance between layers."
+                    }
+                },
+                "edge": {
+                    "mode": {
+                        "label": "Edge Mode",
+                        "desc": "Select rendering mode for edges."
+                    },
+                    "pathType": {
+                        "label": "Path Type",
+                        "desc": "Select path style (Step, Bezier, etc.)."
+                    },
+                    "directionalHandlePolicy": {
+                        "label": "Handle Direction Policy",
+                        "desc": "Strategy for handle placement (prefer, force, off)."
+                    },
+                    "forceDirect": {
+                        "label": "Force Direct",
+                        "desc": "Ignore obstacles and force direct path."
+                    },
+                    "intraContainerNoObstacle": {
+                        "label": "No Obstacles in Container",
+                        "desc": "Ignore internal obstacles for intra-container edges."
+                    },
+                    "pureObstacleMode": {
+                        "label": "Pure Obstacle Mode",
+                        "desc": "Ignore container walls, consider only node obstacles."
+                    },
+                    "ignoreContainers": {
+                        "label": "Ignore Containers",
+                        "desc": "Ignore container penalties and ownership."
+                    },
+                    "laneClamp": {
+                        "label": "Enable Lane Clamp",
+                        "desc": "Restrict path to container lane when within same container."
+                    },
+                    "obstaclePadding": {
+                        "label": "Obstacle Padding",
+                        "desc": "Safety margin around obstacles."
+                    },
+                    "minArrowOffset": {
+                        "label": "Min Arrow Offset",
+                        "desc": "Minimum offset for arrow from node boundary."
+                    },
+                    "stepLastSegmentMin": {
+                        "label": "Step Last Segment Min",
+                        "desc": "Minimum length for the final segment of a step line."
+                    },
+                    "disableDomainInfluence": {
+                        "label": "Disable Domain Influence",
+                        "desc": "Remove domain preferences, use geometry/obstacles only."
+                    },
+                    "crossDomainVerticalPrefer": {
+                        "label": "Cross-Domain Vertical Prefer",
+                        "desc": "Prefer vertical ports for cross-domain edges."
+                    },
+                    "crossDomainBias": {
+                        "label": "Cross-Domain Bias",
+                        "desc": "Weight for cross-domain vertical preference."
+                    },
+                    "preferOrthogonalInDomain": {
+                        "label": "Prefer Orthogonal in Domain",
+                        "desc": "Prefer orthogonal paths within domain."
+                    },
+                    "domainOrthogonalBias": {
+                        "label": "Domain Orthogonal Bias",
+                        "desc": "Weight for domain orthogonal preference."
+                    },
+                    "preferLROnHorizontal": {
+                        "label": "Prefer LR on Horizontal",
+                        "desc": "Prefer Left-Right ports for horizontal flow."
+                    },
+                    "horizontalBiasThreshold": {
+                        "label": "Horizontal Bias Threshold",
+                        "desc": "Threshold for determining horizontal flow."
+                    },
+                    "typePreferenceProfile": {
+                        "label": "Type Preference Profile",
+                        "desc": "Profile for edge type selection (Orthogonal/Balanced/Curved)."
+                    },
+                    "orthogonalSamplingEnabled": {
+                        "label": "Enable Orthogonal Sampling",
+                        "desc": "Use multi-channel sampling for step paths."
+                    },
+                    "orthogonalGridSize": {
+                        "label": "Orthogonal Grid Size",
+                        "desc": "Grid size for orthogonal sampling."
+                    },
+                    "orthogonalSampleBudget": {
+                        "label": "Orthogonal Sample Budget",
+                        "desc": "Max number of candidates for sampling."
+                    },
+                    "gridAStarEnabled": {
+                        "label": "Enable Grid A*",
+                        "desc": "Use Grid A* for pathfinding candidates."
+                    },
+                    "gridAStarGridSize": {
+                        "label": "Grid A* Step Size",
+                        "desc": "Grid size for A*."
+                    },
+                    "gridAStarMaxExpansions": {
+                        "label": "Grid A* Max Expansions",
+                        "desc": "Max expansions for A* search."
+                    },
+                    "beziersAllowedMinAngleDeg": {
+                        "label": "Bezier Min Angle",
+                        "desc": "Min angle to allow bezier curves."
+                    },
+                    "beziersAllowedMinDetourRatio": {
+                        "label": "Bezier Min Detour Ratio",
+                        "desc": "Min detour ratio to allow bezier curves."
+                    },
+                    "corridorObstacleHardThreshold": {
+                        "label": "Corridor Obstacle Threshold",
+                        "desc": "Obstacle count threshold to fallback to bezier."
+                    }
+                },
+                "layout": {
+                    "INDUSTRY_PROFILE": {
+                        "label": "Industry Preset",
+                        "desc": "Apply industry standard presets."
+                    },
+                    "strategy": {
+                        "label": "Global Layout Strategy",
+                        "desc": "Choose the overall layout strategy."
+                    },
+                    "direction": {
+                        "label": "Domain Layout Direction",
+                        "desc": "Direction of the global layout (LR, TB, etc.)."
+                    },
+                    "nodeStrategy": {
+                        "label": "Node Layout Strategy",
+                        "desc": "Strategy for laying out nodes within domains."
+                    },
+                    "linkOrientation": {
+                        "label": "Link Orientation",
+                        "desc": "Link domain and node orientation."
+                    },
+                    "CONTAINMENT_POLICY": {
+                        "label": "Containment Policy",
+                        "desc": "Strict, Soft, or Elastic containment."
+                    },
+                    "ELK_ALGORITHM": {
+                        "label": "ELK Algorithm",
+                        "desc": "Underlying ELK algorithm (layered, force, etc.)."
+                    },
+                    "RANK_MODE": {
+                        "label": "Rank Mode",
+                        "desc": "Fine-tuning for ranking (ELK vs Dagre-like)."
+                    },
+                    "ELK_STRICT_MODE": {
+                        "label": "ELK Strict Mode",
+                        "desc": "Strictly follow ELK output, disable post-processing."
+                    },
+                    "ELK_DIRECTION": {
+                        "label": "ELK Direction",
+                        "desc": "Override ELK direction."
+                    },
+                    "ELK_NODE_SPACING": {
+                        "label": "ELK Node Spacing",
+                        "desc": "Spacing between nodes in ELK."
+                    },
+                    "ELK_LAYER_SPACING": {
+                        "label": "ELK Layer Spacing",
+                        "desc": "Spacing between layers in ELK."
+                    },
+                    "ELK_LABEL_SPACING": {
+                        "label": "ELK Label Spacing",
+                        "desc": "Spacing between labels."
+                    },
+                    "ELK_EDGE_NODE_SPACING": {
+                        "label": "ELK Edge-Node Spacing",
+                        "desc": "Spacing between edges and nodes."
+                    },
+                    "ELK_EDGE_EDGE_SPACING": {
+                        "label": "ELK Edge-Edge Spacing",
+                        "desc": "Spacing between edges."
+                    },
+                    "ELK_PORT_PORT_SPACING": {
+                        "label": "ELK Port Spacing",
+                        "desc": "Spacing between ports."
+                    },
+                    "ELK_PORT_BORDER_OFFSET": {
+                        "label": "ELK Port Border Offset",
+                        "desc": "Offset of ports from node border."
+                    },
+                    "ELK_NODE_PLACEMENT": {
+                        "label": "ELK Node Placement",
+                        "desc": "Strategy for node placement."
+                    },
+                    "ELK_LAYERING": {
+                        "label": "ELK Layering",
+                        "desc": "Strategy for layering."
+                    },
+                    "ELK_EDGE_ROUTING": {
+                        "label": "ELK Edge Routing",
+                        "desc": "Routing style for ELK edges."
+                    },
+                    "ELK_MERGE_EDGES": {
+                        "label": "ELK Merge Edges",
+                        "desc": "Merge multiple edges between same nodes."
+                    },
+                    "ELK_FIXED_ALIGNMENT": {
+                        "label": "ELK Fixed Alignment",
+                        "desc": "Alignment preference for nodes."
+                    },
+                    "ELK_CONSIDER_MODEL_ORDER": {
+                        "label": "ELK Consider Model Order",
+                        "desc": "Respect original order of nodes."
+                    },
+                    "ELK_CYCLE_BREAKING": {
+                        "label": "ELK Cycle Breaking",
+                        "desc": "Strategy for breaking cycles."
+                    }
+                }
+            },
+            "performance": {
+                "enableVirtualization": {
+                    "label": "Enable Virtualization",
+                    "desc": "Use virtualization for large diagrams."
+                },
+                "enableAnimations": {
+                    "label": "Enable Animations",
+                    "desc": "Enable transitions and animations."
+                }
+            }
+        }
+    },
+    "diagram": {
+        "title": {
+            "genericStandard": "Generic Standard Architecture",
+            "warehouse3d": "3D Smart Warehouse Display",
+            "flowchartDesigner": "Flowchart Designer"
+        }
+    },
+    "style": {
+        "category": {
+            "design-system": "Design System",
+            "professional": "Professional",
+            "minimal": "Minimalist",
+            "specialty": "Specialty"
+        },
+        "preset": {
+            "standard": "Standard",
+            "bold": "Bold",
+            "compact": "Compact",
+            "material": "Material",
+            "minimal": "Minimal",
+            "neumorphic": "Neumorphic",
+            "glass": "Glass",
+            "outline": "Outline",
+            "fluent": "Fluent",
+            "ant": "Ant Design",
+            "carbon": "IBM Carbon",
+            "atlassian": "Atlassian",
+            "dashboard": "Dashboard",
+            "blueprint": "Blueprint",
+            "mono": "Monochrome"
+        },
+        "switcher": {
+            "title": "Style Schemes"
+        }
+    }
+}

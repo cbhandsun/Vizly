@@ -1,0 +1,311 @@
+import { geometryAnalyzer } from './core/GeometryAnalyzer';
+import { portSelector } from './core/PortSelector';
+import { costEvaluator } from './core/CostEvaluator';
+import * as pathFinder from '../algorithms/pathfinding';
+
+import type {
+    NodeGeometry,
+    RoutingConfig,
+    RoutingDecision,
+    EdgeRoutingWeights,
+    PortUsage,
+    EdgeType,
+    RoutingPlugin,
+    Point
+} from './types/routing';
+
+/**
+ * 权重预设
+ */
+export const EDGE_ROUTING_PRESETS: Record<string, EdgeRoutingWeights> = {
+    default: {
+        length: 1.0,
+        turn: 50,
+        crossing: 160,
+        lrBias: 120,
+        tbBias: 120,
+        wrongSign: 2000,
+        usagePenalty: 40,
+        overlapPenalty: 220,
+        exitContainerPenalty: 1600,
+        crossDomainPenalty: 0,
+        detourPenalty: 300,
+        lastSegShort: 22,
+        alignmentBonus: 120,
+        flowBonus: 500,
+        edgeCrossing: 80
+    },
+    compact: {
+        length: 2.0,
+        turn: 30,
+        crossing: 100,
+        lrBias: 80,
+        tbBias: 80,
+        wrongSign: 2000,
+        usagePenalty: 20,
+        overlapPenalty: 150,
+        exitContainerPenalty: 800,
+        crossDomainPenalty: 0,
+        detourPenalty: 400,
+        lastSegShort: 10,
+        alignmentBonus: 60,
+        flowBonus: 40,
+        edgeCrossing: 50
+    },
+    clear: {
+        length: 0.5,
+        turn: 60,
+        crossing: 300,
+        lrBias: 150,
+        tbBias: 150,
+        wrongSign: 2000,
+        usagePenalty: 80,
+        overlapPenalty: 400,
+        exitContainerPenalty: 2000,
+        crossDomainPenalty: 100,
+        detourPenalty: 1200,
+        lastSegShort: 30,
+        alignmentBonus: 180,
+        flowBonus: 120,
+        edgeCrossing: 150
+    }
+};
+
+export class EdgeRouter {
+    private plugins: Map<string, RoutingPlugin> = new Map();
+
+    /**
+     * 主要路由方法
+     */
+    route(
+        sourceNode: NodeGeometry,
+        targetNode: NodeGeometry,
+        config: RoutingConfig,
+        usage?: PortUsage,
+        customWeights?: Partial<EdgeRoutingWeights>
+    ): RoutingDecision {
+
+        // 将路由系统内部简写 (r/l/t/b) 映射为 FlowchartNode Handle 全称 (right/left/top/bottom)
+        const expandHandle = (h: string): string => {
+            const s = String(h).toLowerCase();
+            if (s === 'r') return 'right';
+            if (s === 'l') return 'left';
+            if (s === 't') return 'top';
+            if (s === 'b') return 'bottom';
+            // 已经是全称或其他自定义 ID，原样返回
+            return h;
+        };
+
+        try {
+            const normalizeHandle = (h?: string): 'l' | 'r' | 't' | 'b' | undefined => {
+                if (!h) return undefined;
+                const s = String(h).toLowerCase();
+                if (s === 'l' || s.startsWith('l') || s.includes('left')) return 'l';
+                if (s === 'r' || s.startsWith('r') || s.includes('right')) return 'r';
+                if (s === 't' || s.startsWith('t') || s.includes('top')) return 't';
+                if (s === 'b' || s.startsWith('b') || s.includes('bottom')) return 'b';
+                return undefined;
+            };
+
+            // 1. 获取权重配置
+            const weights = this.getWeights(config, customWeights);
+
+            // 2. 几何分析
+            const geometry = geometryAnalyzer.analyze(
+                sourceNode,
+                targetNode,
+                config.layoutDirection || 'LR'
+            );
+
+            // 3. 端口选择
+            const portResult = portSelector.selectOptimalPorts(
+                sourceNode,
+                targetNode,
+                config,
+                weights,
+                usage,
+                geometry
+            );
+
+            // 4. 确定路由类型
+            const type = this.resolveEdgeType(config, geometry);
+
+            // 5. 计算路径
+            let computedPath: Point[] = [];
+
+            // 如果是Step相关类型，启用高级寻路
+            // 确保有 obstacles 数据（由HandlePicker注入）
+            if ((type === 'advanced-smart-step' || type === 'step' || type === 'advanced-smart-straight' || type === 'advanced-smart-bezier') && (config as any).obstacles) {
+
+                // 计算边界盒 (包含 Source, Target 和所有 Obstacles)
+                let minX = Math.min(sourceNode.position.x, targetNode.position.x);
+                let minY = Math.min(sourceNode.position.y, targetNode.position.y);
+                let maxX = Math.max(sourceNode.position.x + sourceNode.dimensions.width, targetNode.position.x + targetNode.dimensions.width);
+                let maxY = Math.max(sourceNode.position.y + sourceNode.dimensions.height, targetNode.position.y + targetNode.dimensions.height);
+
+                // 扩展边界以容纳绕路
+                const padding = 600;
+                minX -= padding;
+                minY -= padding;
+                maxX += padding;
+                maxY += padding;
+
+                const sh = normalizeHandle(portResult.sourceHandle);
+                const th = normalizeHandle(portResult.targetHandle);
+
+                const startPoint = {
+                    x: sourceNode.position.x + (sh === 'r' ? sourceNode.dimensions.width : sh === 'l' ? 0 : sourceNode.dimensions.width / 2),
+                    y: sourceNode.position.y + (sh === 'b' ? sourceNode.dimensions.height : sh === 't' ? 0 : sourceNode.dimensions.height / 2)
+                };
+
+                const endPoint = {
+                    x: targetNode.position.x + (th === 'r' ? targetNode.dimensions.width : th === 'l' ? 0 : targetNode.dimensions.width / 2),
+                    y: targetNode.position.y + (th === 'b' ? targetNode.dimensions.height : th === 't' ? 0 : targetNode.dimensions.height / 2)
+                };
+
+                // 端口微调：将起始点移出节点一点点，防止直接碰撞
+                const offset = 1;
+                if (sh === 'r') startPoint.x += offset;
+                else if (sh === 'l') startPoint.x -= offset;
+                else if (sh === 'b') startPoint.y += offset;
+                else if (sh === 't') startPoint.y -= offset;
+
+                if (th === 'r') endPoint.x += offset;
+                else if (th === 'l') endPoint.x -= offset;
+                else if (th === 'b') endPoint.y += offset;
+                else if (th === 't') endPoint.y -= offset;
+
+
+                // [FIX] Correct Argument Order for findPath
+                // Signature: findPath(start, end, obstacles, gridSize, lineObstacles, debugOut)
+                // Note: 'bbox' and 'maxExpansions' are not used in current pathfinding.ts implementation or handled internally.
+                // Note: 'lineObstacles' acts as 'routedPaths' here.
+
+                // Transform routedPaths (Point[][]) to LineObstacle[]
+                const lineObstacles: { start: { x: number; y: number }; end: { x: number; y: number } }[] = [];
+                if (config.routedPaths) {
+                    for (const rp of config.routedPaths) {
+                        if (rp.points && rp.points.length > 1) {
+                            for (let i = 0; i < rp.points.length - 1; i++) {
+                                lineObstacles.push({ start: rp.points[i], end: rp.points[i + 1] });
+                            }
+                        }
+                    }
+                }
+
+                const path = pathFinder.findPath(
+                    startPoint,
+                    endPoint,
+                    (config as any).obstacles || [],
+                    config.orthogonalGridSize || 20,
+                    lineObstacles
+                );
+
+                if (path && path.length > 0) {
+                    computedPath = path;
+                } else {
+                    // [FIX] Fallback for Main Thread "Fast Pass" Failure
+                    // If A* fails (e.g. exceeds 1500 limit), return a simple straight line
+                    // so the edge is VISIBLE immediately. The Worker will refine it later.
+                    computedPath = [startPoint, endPoint];
+                }
+            }
+
+            return {
+                type,
+                sourceHandle: expandHandle(portResult.sourceHandle),
+                targetHandle: expandHandle(portResult.targetHandle),
+                autoSource: portResult.autoSource,
+                autoTarget: portResult.autoTarget,
+                computedPath,
+                cost: portResult.cost,
+                algorithm: 'modular'
+            };
+        } catch (error) {
+            console.error('[EdgeRouter] Fatal Error:', error);
+            // Fallback to straight line to prevent missing lines
+            return {
+                type: 'advanced-smart-straight' as any,
+                sourceHandle: 'bottom',
+                targetHandle: 'top',
+                autoSource: true,
+                autoTarget: true,
+                computedPath: [],
+                cost: 0,
+                algorithm: 'fallback'
+            };
+        }
+    }
+
+    /**
+     * 注册插件
+     */
+    use(plugin: RoutingPlugin): void {
+        this.plugins.set(plugin.name, plugin);
+        costEvaluator.registerPlugin(plugin);
+    }
+
+    /**
+     * 卸载插件
+     */
+    unuse(pluginName: string): void {
+        this.plugins.delete(pluginName);
+    }
+
+    /**
+     * 获取权重配置
+     */
+    private getWeights(
+        config: RoutingConfig,
+        customWeights?: Partial<EdgeRoutingWeights>
+    ): EdgeRoutingWeights {
+        const preset = config.globalPath || 'default';
+        const base = EDGE_ROUTING_PRESETS[preset] || EDGE_ROUTING_PRESETS.default;
+
+        if (customWeights) {
+            return { ...base, ...customWeights };
+        }
+
+        return base;
+    }
+
+    /**
+     * 解析边类型
+     */
+    private resolveEdgeType(config: RoutingConfig, geometry: any): EdgeType {
+        if (config.mode === 'native') {
+            const globalPath = config.globalPath || 'bezier';
+            if (globalPath.includes('smooth')) return 'smoothstep' as unknown as EdgeType;
+            if (globalPath.includes('straight')) return 'straight' as unknown as EdgeType;
+            if (globalPath.includes('bezier')) return 'bezier' as unknown as EdgeType;
+            return 'step' as unknown as EdgeType;
+        }
+
+        const globalPath = config.globalPath || 'step';
+
+        if (globalPath.includes('straight')) return 'advanced-smart-straight' as unknown as EdgeType;
+        if (globalPath.includes('step')) return 'advanced-smart-step' as unknown as EdgeType;
+        if (globalPath.includes('bezier')) return 'advanced-smart-bezier' as unknown as EdgeType;
+
+        return 'advanced-smart-bezier' as unknown as EdgeType;
+    }
+}
+
+// 导出单例
+export const edgeRouter = new EdgeRouter();
+
+// 导出类型和工具
+export {
+    geometryAnalyzer,
+    portSelector,
+    costEvaluator,
+    pathFinder
+};
+
+export type {
+    NodeGeometry,
+    RoutingConfig,
+    RoutingDecision,
+    EdgeRoutingWeights,
+    PortUsage
+};

@@ -1,0 +1,115 @@
+@keyframes contextMenuPopIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.diagram-context-menu {
+    animation: contextMenuPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transform-origin: top left;
+    
+    background-color: rgba(255, 255, 255, 0.8) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    
+    border: 1px solid rgba(255, 255, 255, 0.6) !important;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.08), 
+        0 2px 8px rgba(0, 0, 0, 0.04),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.5) !important;
+    
+    border-radius: 12px !important;
+    overflow: hidden;
+    min-width: 180px;
+    padding: 6px 0 !important;
+}
+
+/* Dark mode overrides if dark mode is active on html */
+html[data-theme='dark'] .diagram-context-menu {
+    background-color: rgba(30, 30, 30, 0.75) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.4), 
+        0 2px 8px rgba(0, 0, 0, 0.2),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Make Antd Menu transparent inside our custom container */
+.diagram-context-menu .ant-menu {
+    background: transparent !important;
+    border-right: none !important;
+}
+
+.diagram-context-menu .ant-menu-item {
+    border-radius: 6px !important;
+    margin: 2px 8px !important;
+    width: calc(100% - 16px) !important;
+    transition: all 0.2s ease !important;
+    height: 32px !important;
+    line-height: 32px !important;
+}
+
+/* Align icon in menu items */
+.diagram-context-menu .ant-menu-item .anticon {
+    font-size: 14px;
+    margin-right: 8px !important;
+    vertical-align: -0.125em;
+}
+
+.diagram-context-menu .ant-menu-item-group-title {
+    padding: 4px 16px !important;
+    font-size: 12px !important;
+}
+
+.diagram-context-menu .ant-menu-item:hover,
+.diagram-context-menu .ant-menu-item-active {
+    background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+html[data-theme='dark'] .diagram-context-menu .ant-menu-item:hover,
+html[data-theme='dark'] .diagram-context-menu .ant-menu-item-active {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.diagram-context-menu .ant-menu-item-danger:hover {
+    background-color: rgba(255, 77, 79, 0.1) !important;
+}
+
+html[data-theme='dark'] .diagram-context-menu .ant-menu-item-danger:hover {
+    background-color: rgba(255, 77, 79, 0.2) !important;
+}
+
+/* Adjust submenu popups */
+.ant-menu-submenu-popup.diagram-context-menu-popup {
+    animation: contextMenuPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.ant-menu-submenu-popup.diagram-context-menu-popup .ant-menu {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.6) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08) !important;
+    border-radius: 12px !important;
+    padding: 6px 0 !important;
+}
+
+html[data-theme='dark'] .ant-menu-submenu-popup.diagram-context-menu-popup .ant-menu {
+    background-color: rgba(30, 30, 30, 0.75) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+}
+
+.ant-menu-item-divider {
+    border-color: rgba(0, 0, 0, 0.06) !important;
+    margin: 4px 0 !important;
+}
+
+html[data-theme='dark'] .ant-menu-item-divider {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}

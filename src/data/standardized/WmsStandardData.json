@@ -1,0 +1,389 @@
+{
+  "id": "wms-e2e-solution",
+  "name": "WMS 全流程解决方案",
+  "type": "wms",
+  "version": "1.0.0",
+  "nodes": [
+    {
+      "id": "erp",
+      "type": "custom",
+      "domain": "access",
+      "domainClass": "ch",
+      "role": "system",
+      "subDomain": "接入管理",
+      "description": "<b>ERP 系统</b><br/>• 主数据维护（物料/供应商/客户）<br/>• 订单与库存同步接口<br/>• 财务对账与结算"
+    },
+    {
+      "id": "oms",
+      "type": "custom",
+      "domain": "access",
+      "domainClass": "ch",
+      "role": "system",
+      "subDomain": "接入管理",
+      "description": "<b>OMS 订单管理</b><br/>• 订单创建/审核<br/>• 库存锁定与分配<br/>• 履约网络编排"
+    },
+    {
+      "id": "asn",
+      "type": "custom",
+      "domain": "wms-inbound",
+      "domainClass": "be-scm",
+      "role": "process",
+      "subDomain": "预约管理",
+      "description": "<b>ASN / 预约管理</b><br/>• 到货预约/月台排班<br/>• 预约校验与更新<br/>• ASN创建与预检"
+    },
+    {
+      "id": "receipt",
+      "type": "custom",
+      "domain": "wms-inbound",
+      "domainClass": "be-scm",
+      "role": "process",
+      "subDomain": "收货与质检",
+      "description": "<b>收货与质检</b><br/>• 条码扫描/差异校验<br/>• 质检判定与异常处理<br/>• 收货上架任务生成"
+    },
+    {
+      "id": "putaway",
+      "type": "custom",
+      "domain": "wms-inbound",
+      "domainClass": "be-scm",
+      "role": "process",
+      "subDomain": "库存上架",
+      "description": "<b>上架与入库</b><br/>• 库位推荐与策略<br/>• 上架确认与占用<br/>• 库存状态变更"
+    },
+    {
+      "id": "inventory-view",
+      "type": "custom",
+      "domain": "wms-inventory",
+      "domainClass": "be-scm",
+      "role": "process",
+      "subDomain": "库存视图",
+      "description": "<b>库存视图与查询</b><br/>• 批次/序列/状态维度<br/>• 先进先出(FIFO)/保质期<br/>• 多维查询与报表"
+    },
+    {
+      "id": "cycle-count",
+      "type": "custom",
+      "domain": "wms-inventory",
+      "domainClass": "be-scm",
+      "role": "process",
+      "subDomain": "库存盘点",
+      "description": "<b>周期盘点</b><br/>• ABC分类盘点<br/>• 盘盈/盘亏处理<br/>• 差异复核与回滚"
+    },
+    {
+      "id": "replenishment",
+      "type": "custom",
+      "domain": "wms-inventory",
+      "domainClass": "be-scm",
+      "subDomain": "库存补货",
+      "description": "<b>补货策略</b><br/>• 最小/安全库存阈值<br/>• 波次前补货预警<br/>• 库位平衡与跨区补货"
+    },
+    {
+      "id": "movement",
+      "type": "custom",
+      "domain": "wms-inventory",
+      "domainClass": "be-scm",
+      "role": "process",
+      "subDomain": "库内移动",
+      "description": "<b>库内移动与调整</b><br/>• 移库/换托/拆托<br/>• 状态调整与冻结<br/>• 任务编排与约束"
+    },
+    {
+      "id": "so",
+      "type": "custom",
+      "domain": "wms-outbound",
+      "domainClass": "be-scm",
+      "role": "process",
+      "subDomain": "订单处理",
+      "description": "<b>波次 / 订单处理</b><br/>• 波次策略（库区/时效）<br/>• 订单释放与锁定<br/>• 任务拆分与合并"
+    },
+    {
+      "id": "picking",
+      "type": "custom",
+      "domain": "wms-outbound",
+      "domainClass": "be-scm",
+      "role": "process",
+      "subDomain": "拣货作业",
+      "description": "<b>拣货与集货</b><br/>• 路径优化/多单拣选<br/>• 集货墙与容器管理<br/>• 异常拣选处理"
+    },
+    {
+      "id": "packing",
+      "type": "custom",
+      "domain": "wms-outbound",
+      "domainClass": "be-scm",
+      "role": "process",
+      "subDomain": "打包作业",
+      "description": "<b>复核与打包</b><br/>• 条码复核/缺件校验<br/>• 包装材料与称重<br/>• 单据打印与贴标"
+    },
+    {
+      "id": "shipping",
+      "type": "custom",
+      "domain": "wms-outbound",
+      "domainClass": "be-scm",
+      "role": "process",
+      "subDomain": "发运作业",
+      "description": "<b>发货与交接</b><br/>• 发运与月台分配<br/>• 车次装载与封签<br/>• POD回传与对账"
+    },
+    {
+      "id": "tms",
+      "type": "custom",
+      "domain": "tms",
+      "domainClass": "be-logistics",
+      "role": "system",
+      "subDomain": "运输协同",
+      "description": "<b>TMS 运输管理</b><br/>• 运力匹配与调度计划<br/>• 在途跟踪/POD回传<br/>• 结算与对账"
+    },
+    {
+      "id": "carrier-portal",
+      "type": "custom",
+      "domain": "external",
+      "domainClass": "ch",
+      "role": "system",
+      "subDomain": "承运商门户",
+      "description": "<b>承运商门户</b><br/>• 任务接收与回传<br/>• 路线与预约管理<br/>• 费用与账单"
+    },
+    {
+      "id": "master-data",
+      "type": "custom",
+      "domain": "data",
+      "domainClass": "data",
+      "role": "data",
+      "subDomain": "主数据管理",
+      "description": "<b>主数据管理</b><br/>• 商品/库位/承运商<br/>• 编码/血缘/质量管控<br/>• 变更审计与发布"
+    },
+    {
+      "id": "bi-reporting",
+      "type": "custom",
+      "domain": "data",
+      "domainClass": "data",
+      "role": "data",
+      "subDomain": "报表分析",
+      "description": "<b>BI 与报表分析</b><br/>• 库存与作业效率报表<br/>• 异常与时效分析<br/>• 可视化数据大屏"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_erp_asn",
+      "type": "main",
+      "source": "erp",
+      "target": "asn",
+      "label": "采购/调拨指令"
+    },
+    {
+      "id": "e_oms_asn",
+      "type": "main",
+      "source": "oms",
+      "target": "asn",
+      "label": "预期到货通知"
+    },
+    {
+      "id": "e_asn_receipt",
+      "type": "main",
+      "source": "asn",
+      "target": "receipt",
+      "label": "指导收货"
+    },
+    {
+      "id": "e_receipt_putaway",
+      "type": "main",
+      "source": "receipt",
+      "target": "putaway",
+      "label": "上架任务"
+    },
+    {
+      "id": "e_putaway_inventory",
+      "type": "main",
+      "source": "putaway",
+      "target": "inventory-view",
+      "label": "更新库存"
+    },
+    {
+      "id": "e_oms_so",
+      "type": "main",
+      "source": "oms",
+      "target": "so",
+      "label": "销售/出库订单"
+    },
+    {
+      "id": "e_so_picking",
+      "type": "main",
+      "source": "so",
+      "target": "picking",
+      "label": "生成拣货任务"
+    },
+    {
+      "id": "e_picking_packing",
+      "type": "main",
+      "source": "picking",
+      "target": "packing",
+      "label": "完成拣货"
+    },
+    {
+      "id": "e_packing_shipping",
+      "type": "main",
+      "source": "packing",
+      "target": "shipping",
+      "label": "包裹/箱唛信息"
+    },
+    {
+      "id": "e_shipping_tms",
+      "type": "main",
+      "source": "shipping",
+      "target": "tms",
+      "label": "发运请求"
+    },
+    {
+      "id": "e_shipping_oms",
+      "type": "data",
+      "source": "shipping",
+      "target": "oms",
+      "label": "发货状态回传"
+    },
+    {
+      "id": "e_inv_cycle",
+      "type": "dependency",
+      "source": "inventory-view",
+      "target": "cycle-count",
+      "label": "盘点范围"
+    },
+    {
+      "id": "e_cycle_inv",
+      "type": "data",
+      "source": "cycle-count",
+      "target": "inventory-view",
+      "label": "盘点结果更新"
+    },
+    {
+      "id": "e_inv_replen",
+      "type": "dependency",
+      "source": "inventory-view",
+      "target": "replenishment",
+      "label": "触发补货"
+    },
+    {
+      "id": "e_replen_move",
+      "type": "main",
+      "source": "replenishment",
+      "target": "movement",
+      "label": "生成移库任务"
+    },
+    {
+      "id": "e_move_inv",
+      "type": "data",
+      "source": "movement",
+      "target": "inventory-view",
+      "label": "更新库存位置"
+    },
+    {
+      "id": "e_so_inv",
+      "type": "dependency",
+      "source": "so",
+      "target": "inventory-view",
+      "label": "预占/分配库存"
+    },
+    {
+      "id": "e_tms_carrier",
+      "type": "main",
+      "source": "tms",
+      "target": "carrier-portal",
+      "label": "运输任务"
+    },
+    {
+      "id": "e_carrier_tms",
+      "type": "data",
+      "source": "carrier-portal",
+      "target": "tms",
+      "label": "运输状态更新"
+    },
+    {
+      "id": "e_md_erp",
+      "type": "dependency",
+      "source": "master-data",
+      "target": "erp",
+      "label": "物料/供应商"
+    },
+    {
+      "id": "e_md_oms",
+      "type": "dependency",
+      "source": "master-data",
+      "target": "oms",
+      "label": "商品/客户"
+    },
+    {
+      "id": "e_md_asn",
+      "type": "dependency",
+      "source": "master-data",
+      "target": "asn",
+      "label": "基础数据"
+    },
+    {
+      "id": "e_md_so",
+      "type": "dependency",
+      "source": "master-data",
+      "target": "so",
+      "label": "基础数据"
+    },
+    {
+      "id": "e_inv_bi",
+      "type": "data",
+      "source": "inventory-view",
+      "target": "bi-reporting",
+      "label": "库存数据"
+    },
+    {
+      "id": "e_receipt_bi",
+      "type": "data",
+      "source": "receipt",
+      "target": "bi-reporting",
+      "label": "入库数据"
+    },
+    {
+      "id": "e_shipping_bi",
+      "type": "data",
+      "source": "shipping",
+      "target": "bi-reporting",
+      "label": "出库数据"
+    }
+  ],
+  "metadata": {
+    "title": "WMS 全流程解决方案",
+    "description": "展示从订单到交付的WMS核心业务流程，涵盖入库、库存、出库三大环节及与外部系统的协同。",
+    "tags": [
+      "仓储"
+    ]
+  },
+  "layout": {
+    "direction": "LR",
+    "spacing": {
+      "horizontal": 120,
+      "vertical": 80
+    },
+    "padding": {
+      "horizontal": 20,
+      "vertical": 20
+    }
+  },
+  "theme": {
+    "name": "wms-e2e-theme",
+    "displayName": "WMS端到端主题",
+    "domains": {
+      "access": {
+        "border": "#78909C"
+      },
+      "external": {
+        "border": "#78909C"
+      },
+      "wms-inbound": {
+        "border": "#42A5F5"
+      },
+      "wms-inventory": {
+        "border": "#66BB6A"
+      },
+      "wms-outbound": {
+        "border": "#FFA726"
+      },
+      "tms": {
+        "border": "#AB47BC"
+      },
+      "data": {
+        "border": "#26A69A"
+      }
+    }
+  }
+}
