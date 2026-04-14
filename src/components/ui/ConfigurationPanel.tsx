@@ -776,7 +776,9 @@ const renderConfigEditor = (item: ConfigItem) => {
             })}
           </select>
           {nodeLayoutDisabled && (
-            <div className="text-[10px] text-amber-500 font-medium">Domain ELK active</div>
+            <div className="text-[10px] text-amber-500 font-medium">
+              {t('config.layout.domainElkActive', '域ELK生效中')}
+            </div>
           )}
         </div>
       );

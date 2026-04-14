@@ -89,7 +89,14 @@ const MindMapNode = ({ id, data, isConnectable, selected }: MindMapNodeProps) =>
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
             e.stopPropagation();
+            e.preventDefault();
             handleSave();
+            setTimeout(() => window.dispatchEvent(new CustomEvent('mindmap:shortcut-trigger', { detail: { key: 'Enter', nodeId: id } })), 10);
+        } else if (e.key === 'Tab') {
+            e.stopPropagation();
+            e.preventDefault();
+            handleSave();
+            setTimeout(() => window.dispatchEvent(new CustomEvent('mindmap:shortcut-trigger', { detail: { key: 'Tab', nodeId: id } })), 10);
         } else if (e.key === 'Escape') {
             e.stopPropagation();
             setIsEditing(false);

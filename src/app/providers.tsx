@@ -4,6 +4,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { HashRouter } from 'react-router-dom';
 import { useConfigIntegration } from '@/core';
 import { AuthProvider } from '@/context/AuthContext';
+import { SubscriptionProvider } from '@/context/SubscriptionContext';
 import AntdThemeBridge from './AntdThemeBridge';
 
 interface AppProvidersProps {
@@ -19,11 +20,13 @@ export const AppProviders: React.FC<AppProvidersProps> = ({ children }) => {
     <ReactFlowProvider>
       <HashRouter>
         <AuthProvider>
-          <ConfigIntegrationBootstrap>
-            <AntdThemeBridge>
-              {children}
-            </AntdThemeBridge>
-          </ConfigIntegrationBootstrap>
+          <SubscriptionProvider>
+            <ConfigIntegrationBootstrap>
+              <AntdThemeBridge>
+                {children}
+              </AntdThemeBridge>
+            </ConfigIntegrationBootstrap>
+          </SubscriptionProvider>
         </AuthProvider>
       </HashRouter>
     </ReactFlowProvider>

@@ -72,6 +72,10 @@ export interface DiagramComponentProps {
   isYjsSynced?: boolean;
   /** (IoC) 本地状态改变时推送给云协作端 */
   onSyncPush?: (nodes: any[], edges: any[]) => void;
+  /** (IoC) Active remote users for cursors */
+  activeUsers?: any[];
+  /** (IoC) Yjs Awareness for local cursor tracking */
+  yAwareness?: any;
   /** (IoC) 触发云端保存 (Legacy) */
   onCloudSave?: () => Promise<void>;
   /** (IoC) 触发直接覆盖保存 */

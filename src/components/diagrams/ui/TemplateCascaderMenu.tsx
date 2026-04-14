@@ -140,8 +140,15 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       placeholder={placeholder}
       allowClear={allowClear}
       showSearch={{
-        filter: (inputValue, path) =>
-          path.some(option => (option.label as string).toLowerCase().indexOf(inputValue.toLowerCase()) > -1),
+      filter: (inputValue, path) => {
+          const input = inputValue.toLowerCase();
+          return path.some(option => {
+            const lbl = option.label;
+            const text = typeof lbl === 'string' ? lbl : (option.value as string) ?? '';
+            return text.toLowerCase().indexOf(input) > -1;
+          });
+        },
+
       }}
       expandTrigger="hover"
       style={{ width: 320, ...style }}

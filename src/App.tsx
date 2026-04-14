@@ -2,7 +2,6 @@
 import React from 'react';
 import { ErrorBoundary } from '@/core/components/shared/ErrorBoundary';
 import { AppProviders, AppRoutes } from '@/app/index';
-import { SubscriptionProvider } from '@/context/SubscriptionContext';
 import { UpgradeModal } from '@/components/ui/UpgradeModal';
 
 console.log('📦 [@diagramview/core] loaded v1.0.0 (lazy initialized)');
@@ -29,11 +28,9 @@ const App: React.FC = () => {
     >
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-900 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] transition-colors duration-300">
         <AppProviders>
-          <SubscriptionProvider>
             <AppRoutes />
             <UpgradeModal />
-          </SubscriptionProvider>
-        </AppProviders>
+          </AppProviders>
       </div>
     </ErrorBoundary>
   );

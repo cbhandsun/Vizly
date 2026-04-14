@@ -401,6 +401,60 @@ export function useMindMapOrchestrator(
     }, [handleQuickAdd]);
 
     useEffect(() => {
+        const handleShortcutTrigger = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            if (!detail || !detail.nodeId || !detail.key) return;
+            
+            const selected = nodes.find(n => n.id === detail.nodeId);
+            if (!selected) return;
+
+            if (detail.key === 'Tab') {
+                // Add Child
+                const event = new CustomEvent('mindmap:quickadd', {
+                    detail: {
+                        parentId: selected.id,
+                        direction: selected.data?.direction ?? 'LR',
+                        depth: selected.data?.depth ?? 0
+                    }
+                });
+                window.dispatchEvent(event);
+            } else if (detail.key === 'Enter') {
+                // Add Sibling
+                const depth = (selected.data?.depth as number) ?? 0;
+                if (depth === 0) {
+                    const event = new CustomEvent('mindmap:quickadd', {
+                        detail: {
+                            parentId: selected.id,
+                            direction: selected.data?.direction ?? 'LR',
+                            depth: 0
+                        }
+                    });
+                    window.dispatchEvent(event);
+                    return;
+                }
+
+                const parentEdge = edges.find(edge => edge.target === selected.id && edge.type !== 'relationshipEdge');
+                if (parentEdge) {
+                     const parentNode = nodes.find(n => n.id === parentEdge.source);
+                     if (parentNode) {
+                          const event = new CustomEvent('mindmap:quickadd', {
+                              detail: {
+                                  parentId: parentNode.id,
+                                  direction: parentNode.data?.direction ?? 'LR',
+                                  depth: parentNode.data?.depth ?? 0
+                              }
+                          });
+                          window.dispatchEvent(event);
+                      }
+                 }
+            }
+        };
+
+        window.addEventListener('mindmap:shortcut-trigger', handleShortcutTrigger);
+        return () => window.removeEventListener('mindmap:shortcut-trigger', handleShortcutTrigger);
+    }, [nodes, edges]);
+
+    useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             // Ignore if user is typing in an input or textarea
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {

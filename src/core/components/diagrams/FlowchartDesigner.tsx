@@ -107,6 +107,7 @@ import { DesignerHeaderLayer } from './ui/DesignerHeaderLayer';
 import { DesignerOverlaysLayer } from './ui/DesignerOverlaysLayer';
 import { DesignerCanvasFeaturesLayer } from './ui/DesignerCanvasFeaturesLayer';
 import ArrowTimelineNode from './nodes/ArrowTimelineNode';
+import { LiveCursors } from '../../../components/diagrams/collaboration/LiveCursors';
 // useMindMapOrchestrator decoupled
 
 const FallbackNode = ({ type, data }: any) => (
@@ -115,9 +116,7 @@ const FallbackNode = ({ type, data }: any) => (
     </div>
 );
 
-// ⭐ P1 性能优化：模块级常量 nodeTypes，永远不会变化
-// onUpdateNodeData 通过 React Context (NodeUpdateProvider) 传递，不再通过 props
-const NODE_TYPES: NodeTypes = {
+const DEFAULT_NODE_TYPES: NodeTypes = {
     custom: CustomNode,
     titleGroup: TitleGroupNode,
     subGroup: SubGroupNode,
@@ -131,7 +130,7 @@ const NODE_TYPES: NodeTypes = {
 };
 
 // [NEW] Declare static edge types to inject specialized rendering
-const EDGE_TYPES = {
+const DEFAULT_EDGE_TYPES = {
     mindmapEdge: MindMapEdge,
     relationshipEdge: RelationshipEdge
 };
@@ -142,6 +141,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     extraExportItems,
     isYjsSynced,
     onSyncPush,
+    activeUsers = [],
+    yAwareness,
     onCloudSave,
     onDirectSave,
     isDirectSaveDisabled,
@@ -338,6 +339,20 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         }
     }, [pluginId, id, setNodes, setEdges, reactFlowInstance, updateNodesBatch, updateEdgesBatch, takeSnapshot]);
 
+    const dynamicNodeTypes = useMemo(() => {
+        if (activePlugin?.getNodeTypes) {
+            return { ...DEFAULT_NODE_TYPES, ...activePlugin.getNodeTypes() };
+        }
+        return DEFAULT_NODE_TYPES;
+    }, [activePlugin]);
+
+    const dynamicEdgeTypes = useMemo(() => {
+        if (activePlugin?.getEdgeTypes) {
+            return { ...DEFAULT_EDGE_TYPES, ...activePlugin.getEdgeTypes() };
+        }
+        return DEFAULT_EDGE_TYPES;
+    }, [activePlugin]);
+
     // 2. Interactions Domain Controller
     const interactionsParams = useDesignerInteractions({
         nodes, edges, setNodes, setEdges,
@@ -479,6 +494,56 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         return () => window.removeEventListener('editor:focus-entity', handleFocusEntity as EventListener);
     }, [reactFlowInstance, setSelectedNodes, setSelectedEdges]);
 
+    const handleExport = useCallback(() => setJsonEditorVisible(true), []);
+
+    useEffect(() => {
+        const handleCommand = (e: CustomEvent) => {
+            const { action } = e.detail;
+            if (action === 'smart-layout') {
+                handleSmartLayout();
+            } else if (action === 'export-png') {
+                const downloadBtn = document.querySelector('[data-id="toolbar-export-btn"]') as HTMLButtonElement;
+                if(downloadBtn) downloadBtn.click();
+                else handleExport();
+            } else if (action === 'add-node') {
+                // Determine center of current viewport to place the node
+                if (!reactFlowInstance) return;
+                const { x, y, zoom } = reactFlowInstance.getViewport();
+                // We fake a generic position if possible, or use standard top-left
+                const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
+                const windowHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+                const rx = (windowWidth / 2 - x) / zoom;
+                const ry = (windowHeight / 2 - y) / zoom;
+                
+                // Let's use the first available node type in the active plugin, or fallback to 'custom'
+                const nodeType = activePlugin?.getNodeTypes ? Object.keys(activePlugin.getNodeTypes())[0] : 'custom';
+                
+                const newId = `node_${Date.now()}`;
+                setNodes(nds => [...nds, {
+                    id: newId,
+                    type: nodeType || 'custom',
+                    position: { x: rx, y: ry },
+                    data: { label: 'New Node' },
+                    selected: true
+                } as Node]);
+            } else if (action === 'clear-canvas') {
+                Modal.confirm({
+                    title: '清空画布 (Clear Canvas)',
+                    content: '确定要清空画布吗？此操作不可撤销。(Are you sure you want to clear the canvas?)',
+                    okText: '确定 (OK)',
+                    cancelText: '取消 (Cancel)',
+                    onOk: () => {
+                        setNodes([]);
+                        setEdges([]);
+                        takeSnapshot([], []);
+                    }
+                });
+            }
+        };
+        window.addEventListener('editor:command', handleCommand as EventListener);
+        return () => window.removeEventListener('editor:command', handleCommand as EventListener);
+    }, [handleSmartLayout, handleExport, setNodes, setEdges, takeSnapshot, reactFlowInstance, activePlugin]);
+
     useEffect(() => {
         const handleAddSummary = (e: CustomEvent) => {
             const { sourceIds } = e.detail;
@@ -525,7 +590,6 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         return () => window.removeEventListener('editor:add-summary-node', handleAddSummary as EventListener);
     }, [setNodes, setEdges, takeSnapshot]);
 
-    const handleExport = useCallback(() => setJsonEditorVisible(true), []);
     const handleImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -1013,8 +1077,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                 <FlowchartCanvasShell
                                     nodes={nodesWithGhost.map(n => n.position ? n : { ...n, position: { x: 0, y: 0 } })} // ⭐ 防御性：确保所有节点都有 position
                                     displayEdges={finalEdgesWithGhost} // ⭐ 使用经过主线高亮/过滤和幽灵边处理的最终边缘组
-                                    nodeTypes={NODE_TYPES}
-                                    edgeTypes={EDGE_TYPES}
+                                    nodeTypes={dynamicNodeTypes}
+                                    edgeTypes={dynamicEdgeTypes}
                                     onInit={handleReactFlowInit}
                                     onNodesChange={onNodesChangeWithLock}
                                     onEdgesChange={onEdgesChangeWithLock}
@@ -1067,7 +1131,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                             onPreview: setQuickConnectPreview
                                         }}
                                         hoverToolbar={{
-                                            nodeTypes: NODE_TYPES,
+                                            nodeTypes: dynamicNodeTypes,
                                             pluginCtx,
                                             activePlugin,
                                             quickAddMenuVisible: !!quickAddMenu?.visible,
@@ -1139,6 +1203,9 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                         const plugin = PluginRegistry.getInstance().getPlugin(pluginId) || PluginRegistry.getInstance().getPlugin('flowchart');
                                         return plugin?.contributeCanvasComponents ? plugin.contributeCanvasComponents(pluginCtx) : null;
                                     })()}
+                                    {activeUsers.length > 0 && yAwareness && (
+                                        <LiveCursors activeUsers={activeUsers} yAwareness={yAwareness} />
+                                    )}
                                 </FlowchartCanvasShell>
                             </LayoutStabilityContext.Provider>
                         </div>

@@ -27,7 +27,9 @@ import { createPortal } from 'react-dom';
 import { useDraggablePanel } from '../hooks/useDraggablePanel';
 import { MdDragIndicator } from 'react-icons/md';
 import { ShortcutsHelpModal } from '@/core/components/ui/ShortcutsHelpModal';
+import { CollaborationModal } from './ui/CollaborationModal';
 import { useYjsCollaboration } from './diagrams/collaboration/YjsProviderHooks';
+import { TeamOutlined } from '@ant-design/icons';
 import { useCloudSave } from './diagrams/hooks/useCloudSave';
 const AIConfigModal = React.lazy(() => import('./ai/AIConfigModal'));
 const AIChatView = React.lazy(() => import('./ai/AIChatPanel').then(m => ({ default: m.AIChatView })));
@@ -74,13 +76,27 @@ const DiagramViewer: React.FC = () => {
     const [refreshNonce, setRefreshNonce] = useState(0);
 
     // =============== Phase 5: IoC 依赖注入层 =================
-    const YJS_WS_URL = import.meta.env.VITE_YJS_WEBSOCKET_URL || 'ws://localhost:1234';
-    const { isSynced: isYjsSynced, pushLocalChangesToYjs } = useYjsCollaboration({
-        roomName: `room-${selectedDiagramId}`,
+    const YJS_WS_URL = import.meta.env.VITE_YJS_WEBSOCKET_URL || 'wss://demos.yjs.dev/ws';
+    const roomFromUrl = searchParams.get('room');
+    const [collabModalVisible, setCollabModalVisible] = useState(false);
+    const roomName = roomFromUrl || `vizly-room-${selectedDiagramId}`;
+    
+    // Enable if user specifically clicks Share, OR if the url has ?room=, OR cloud-sync is active
+    const isCollabEnabled = !!roomFromUrl || collabModalVisible || hasFeature('cloud-sync');
+
+    const { isSynced: isYjsSynced, pushLocalChangesToYjs, activeUsers, provider } = useYjsCollaboration({
+        roomName,
         serverUrl: YJS_WS_URL,
         token: jwtToken || 'guest',
-        enabled: hasFeature('cloud-sync')
+        enabled: isCollabEnabled
     });
+
+    // Provide client ID to window for UI badge tracking
+    useEffect(() => {
+        if (provider?.awareness?.clientID) {
+            (window as any)._yjsClientId = provider.awareness.clientID;
+        }
+    }, [provider?.awareness?.clientID]);
 
     const { saveToCloud, shareDialogOpen, openShareDialog, closeShareDialog, ensureSaved } = useCloudSave(selectedDiagramId);
     const [aiConfigVisible, setAiConfigVisible] = useState(false);
@@ -475,6 +491,30 @@ const DiagramViewer: React.FC = () => {
                 e.preventDefault();
                 setIsSettingsOpen(true);
             }
+
+            // Global Actions (Command Palette matches)
+            if (e.altKey && (e.key === 'n' || e.key === 'N')) {
+                e.preventDefault();
+                window.dispatchEvent(new CustomEvent('editor:command', { detail: { action: 'add-node' }}));
+            }
+            if (mod && (e.key === 'j' || e.key === 'J')) {
+                e.preventDefault();
+                const aiBtn = document.querySelector('[data-id="toolbar-ai-btn"]') || document.querySelector('.toolbar-button-ai');
+                if (aiBtn) (aiBtn as HTMLButtonElement).click();
+            }
+            if (mod && e.shiftKey && (e.key === 'l' || e.key === 'L')) {
+                e.preventDefault();
+                window.dispatchEvent(new CustomEvent('editor:command', { detail: { action: 'smart-layout' }}));
+            }
+            if (mod && e.shiftKey && (e.key === 'e' || e.key === 'E')) {
+                e.preventDefault();
+                window.dispatchEvent(new CustomEvent('editor:command', { detail: { action: 'export-png' }}));
+            }
+            if (mod && e.shiftKey && (e.key === 't' || e.key === 'T')) {
+                e.preventDefault();
+                const themeBtn = document.querySelector('[data-id="toolbar-theme-btn"]');
+                if (themeBtn) (themeBtn as HTMLButtonElement).click();
+            }
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
@@ -557,7 +597,7 @@ const DiagramViewer: React.FC = () => {
             {
                 id: 'op:shortcuts',
                 group: 'actions',
-                title: t('designer.commandItems.shortcuts'),
+                title: t('designer.commandItems.shortcuts', '快捷键 / Shortcuts'),
                 keywords: ['快捷键', 'shortcuts', '帮助', 'help'],
                 shortcut: '?',
                 onSelect: () => setIsShortcutsOpen(true)
@@ -565,40 +605,92 @@ const DiagramViewer: React.FC = () => {
             {
                 id: 'op:settings',
                 group: 'actions',
-                title: t('designer.commandItems.settings'),
-                keywords: ['设置', '配置', 'drawer'],
+                title: t('designer.commandItems.settings', '配置面板 / Settings'),
+                keywords: ['设置', '配置', 'drawer', 'settings'],
                 shortcut: `${mod}+,`,
                 onSelect: () => setIsSettingsOpen(true)
             },
             {
                 id: 'op:toggleFullscreen',
                 group: 'actions',
-                title: isFullscreen ? t('designer.commandItems.exitFullscreen') : t('designer.commandItems.enterFullscreen'),
+                title: isFullscreen ? t('designer.commandItems.exitFullscreen', '退出全屏 / Exit Fullscreen') : t('designer.commandItems.enterFullscreen', '进入全屏 / Fullscreen'),
                 keywords: ['全屏', 'fullscreen'],
                 shortcut: 'Esc',
                 onSelect: () => handleToggleFullscreen()
             },
-
+            {
+                id: 'op:smartLayout',
+                group: 'actions',
+                title: t('designer.commandItems.smartLayout', '智能布局 / Smart Layout'),
+                keywords: ['布局', '整理', 'layout', 'smart'],
+                shortcut: `${mod}+Shift+L`,
+                onSelect: () => window.dispatchEvent(new CustomEvent('editor:command', { detail: { action: 'smart-layout' }}))
+            },
+            {
+                id: 'op:addNode',
+                group: 'actions',
+                title: t('designer.commandItems.addNode', '添加节点 / Add Node'),
+                keywords: ['创建', '节点', 'add', 'node', 'create'],
+                shortcut: `Alt+N`,
+                onSelect: () => window.dispatchEvent(new CustomEvent('editor:command', { detail: { action: 'add-node' }}))
+            },
+            {
+                id: 'op:triggerAi',
+                group: 'actions',
+                title: t('designer.commandItems.triggerAi', '唤出 AI 助手 / AI Copilot'),
+                keywords: ['ai', 'copilot', 'generate', '生成', '助手'],
+                shortcut: `${mod}+J`,
+                onSelect: () => {
+                    const aiBtn = document.querySelector('[data-id="toolbar-ai-btn"]') || document.querySelector('.toolbar-button-ai');
+                    if (aiBtn) (aiBtn as HTMLButtonElement).click();
+                }
+            },
+            {
+                id: 'op:themeNext',
+                group: 'actions',
+                title: t('designer.commandItems.themeNext', '切换下一个主题 / Next Theme'),
+                keywords: ['主题', 'theme', 'color', 'style'],
+                shortcut: `${mod}+Shift+T`,
+                onSelect: () => {
+                    const themeBtn = document.querySelector('[data-id="toolbar-theme-btn"]');
+                    if (themeBtn) (themeBtn as HTMLButtonElement).click();
+                }
+            },
+            {
+                id: 'op:exportPng',
+                group: 'actions',
+                title: t('designer.commandItems.exportPng', '导出 PNG / Export PNG'),
+                keywords: ['导出', '图片', 'export', 'png', 'image'],
+                shortcut: `${mod}+Shift+E`,
+                onSelect: () => window.dispatchEvent(new CustomEvent('editor:command', { detail: { action: 'export-png' }}))
+            },
+            {
+                id: 'op:clearCanvas',
+                group: 'actions',
+                title: t('designer.commandItems.clearCanvas', '清空画布 / Clear Canvas'),
+                keywords: ['清空', '重置', 'clear', 'reset'],
+                onSelect: () => window.dispatchEvent(new CustomEvent('editor:command', { detail: { action: 'clear-canvas' }}))
+            },
             {
                 id: 'op:docs',
                 group: 'actions',
-                title: t('designer.commandItems.docs'),
-                keywords: ['docs', '文档'],
+                title: t('designer.commandItems.docs', '文档 / Documentation'),
+                keywords: ['docs', '文档', 'help'],
                 onSelect: () => navigate('/docs'),
                 onAltSelect: () => window.open('/docs', '_blank')
             },
             {
                 id: 'op:manage',
                 group: 'actions',
-                title: t('designer.commandItems.manage'),
-                keywords: ['manage', '管理'],
+                title: t('designer.commandItems.manage', '管理 / Management'),
+                keywords: ['manage', '管理', 'admin'],
                 onSelect: () => navigate('/manage'),
                 onAltSelect: () => window.open('/manage', '_blank')
             },
             {
                 id: 'op:clearFavorites',
                 group: 'actions',
-                title: t('designer.commandItems.clearFavorites'),
+                title: t('designer.commandItems.clearFavorites', '清空收藏 / Clear Favorites'),
                 keywords: ['收藏', 'favorites', '清空'],
                 onSelect: () => {
                     try { localStorage.setItem('diagramMenu.favorites', JSON.stringify([])); } catch { void 0; }
@@ -764,6 +856,17 @@ const DiagramViewer: React.FC = () => {
                             >
                                 <CloudOutlined /> 网盘 <span style={{ fontSize: '11px', opacity: 0.5 }}>👑</span>
                             </button>
+                            <button
+                                className="flex items-center justify-center gap-1 px-2 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-xs font-medium text-blue-600 dark:text-blue-400 rounded-md transition-colors border-none outline-none cursor-pointer"
+                                onClick={() => setCollabModalVisible(true)}
+                            >
+                                <TeamOutlined /> 协作沟通
+                                {activeUsers && activeUsers.length > 1 && (
+                                    <span className="ml-1 bg-blue-500 text-white px-1.5 rounded-full text-[10px]">
+                                        {activeUsers.length}
+                                    </span>
+                                )}
+                            </button>
                             <Tooltip title="防误触保护只读锁 (阅览展示推荐)">
                                 <Switch
                                     size="small"
@@ -811,6 +914,12 @@ const DiagramViewer: React.FC = () => {
                     onClose={() => setIsShortcutsOpen(false)}
                     getContainer={() => document.getElementById('app-root-layout') || document.body}
                 />
+                <CollaborationModal
+                    open={collabModalVisible}
+                    onClose={() => setCollabModalVisible(false)}
+                    activeUsers={activeUsers || []}
+                    roomName={roomName}
+                />
                 <DiagramControlBridge />
 
                 {/* Main Content Area */}
@@ -853,6 +962,8 @@ const DiagramViewer: React.FC = () => {
                                                 extraExportItems={extraExportItems}
                                                 isYjsSynced={isYjsSynced}
                                                 onSyncPush={pushLocalChangesToYjs}
+                                                activeUsers={activeUsers || []}
+                                                yAwareness={provider?.awareness}
                                                 onCloudSave={saveToCloud}
                                                 onDirectSave={handleDirectSave}
                                                 isDirectSaveDisabled={false}
