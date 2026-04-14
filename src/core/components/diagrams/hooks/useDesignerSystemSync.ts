@@ -59,7 +59,7 @@ export function useDesignerSystemSync({
                         try {
                             const { dataRegistry } = await import('@/data/DataRegistry');
                             const localSvc = dataRegistry.getDataService();
-                            localSvc.registerDiagram(newData, { noAutoSave: !options?.keepHistory });
+                            localSvc.registerDiagram(newData);
                         } catch(e) { }
 
                         setNodes(newNodes);

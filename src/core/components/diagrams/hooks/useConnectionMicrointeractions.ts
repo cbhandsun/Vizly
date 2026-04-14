@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
-import { Node, Connection, OnConnectStart, OnConnectEnd } from '@xyflow/react';
+import { Node, Connection, OnConnectStart, OnConnectEnd, ReactFlowInstance } from '@xyflow/react';
 import { readDomViewport } from '../../../utils/domViewport';
 
 /**
@@ -122,8 +122,8 @@ export const useConnectionMicrointeractions = ({
                 else if (angle >= -135 && angle < -45) bestSide = 'top';
                 else bestSide = 'left';
                 bestHandleId = `t-${bestSide}`;
-                bestX = ptr.clientX - bcr.left;
-                bestY = ptr.clientY - bcr.top;
+                bestX = ptr.clientX;
+                bestY = ptr.clientY;
             }
         }
 

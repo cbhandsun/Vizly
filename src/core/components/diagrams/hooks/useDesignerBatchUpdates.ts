@@ -55,7 +55,7 @@ export function useDesignerBatchUpdates({
 
                     // 3. Handle Theme (explicit nested)
                     if ('theme' in partialData && partialData.theme) {
-                        updated.data = { ...updated.data, theme: { ...(updated.data.theme || {}), ...partialData.theme } };
+                        updated.data = { ...(updated.data as Record<string, unknown>), theme: { ...((updated.data as any)?.theme || {}), ...partialData.theme } };
                     }
 
                     // 4. Handle Legacy/Implicit Data properties
