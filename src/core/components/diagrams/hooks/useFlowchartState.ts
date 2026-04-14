@@ -60,8 +60,38 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
             let shouldSnapshot = false;
 
             // Check for deletions
-            if (changes.some(change => change.type === 'remove')) {
+            const deletedNodeIds = changes.filter(change => change.type === 'remove').map((change: any) => change.id);
+            if (deletedNodeIds.length > 0) {
                 shouldSnapshot = true;
+                
+                // Smart Deletion for Mind Maps (Delete & Heal)
+                const newEdgesToAdd: Edge[] = [];
+                deletedNodeIds.forEach(id => {
+                    const node = nodesRef.current.find(n => n.id === id);
+                    if (node?.type === 'mindmap' && !node.data.isMindMapRoot) {
+                        const parentEdge = edgesRef.current.find(e => e.target === id);
+                        if (parentEdge) {
+                            const parentId = parentEdge.source;
+                            const childEdges = edgesRef.current.filter(e => e.source === id);
+                            childEdges.forEach(ce => {
+                                if (!deletedNodeIds.includes(ce.target)) {
+                                    newEdgesToAdd.push({
+                                        id: `edge_${parentId}_${ce.target}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+                                        source: parentId,
+                                        target: ce.target,
+                                        type: ce.type || 'advanced-smart-step',
+                                        style: ce.style,
+                                        data: ce.data,
+                                        markerEnd: ce.markerEnd
+                                    });
+                                }
+                            });
+                        }
+                    }
+                });
+                if (newEdgesToAdd.length > 0) {
+                    setEdges(eds => [...eds, ...newEdgesToAdd]);
+                }
             }
 
             // Check for dimension changes (resizing)

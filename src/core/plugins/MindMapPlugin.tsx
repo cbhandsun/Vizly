@@ -141,6 +141,7 @@ const MindMapToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
                     { label: '↔ 双向展开', value: 'LR' },
                     { label: '→ 向右展开', value: 'R' },
                     { label: '← 向左展开', value: 'L' },
+                    { label: '↓ 向下展开', value: 'TB' }
                 ]}
             />
 

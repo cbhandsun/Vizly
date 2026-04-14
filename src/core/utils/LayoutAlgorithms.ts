@@ -419,8 +419,11 @@ export function autoMindMapLayout(
     direction: string = 'LR',
     options: LayoutOptions = {}
 ): Map<string, Point> {
+    if (direction === 'TB') {
+        return treeLayout(nodes, edges, { direction: 'TB', ...options });
+    }
     if (direction === 'R' || direction === 'L') {
-        return directionalMindMapLayout(nodes, edges, direction, options);
+        return directionalMindMapLayout(nodes, edges, direction as 'L' | 'R', options);
     }
     return symmetricMindMapLayout(nodes, edges, options);
 }

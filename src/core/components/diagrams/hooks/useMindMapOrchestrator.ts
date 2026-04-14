@@ -23,11 +23,16 @@ export function useMindMapOrchestrator(
         let needsSync = false;
         const currentRootData: Record<string, string> = {};
 
+        // Compute a structural signature to detect node additions, removals, or collapse state changes
+        const structSignature = nodes.filter(n => n.type === 'mindmap').map(n => `${n.id}:${n.data?.collapsed ? '1' : '0'}`).join('|');
+        const edgeSignature = edges.filter(e => e.type !== 'relationshipEdge').map(e => `${e.source}->${e.target}`).join('|');
+        const currentSignature = `${structSignature}||${edgeSignature}`;
+
         for (const root of rootNodes) {
             const dir = (root.data?.direction as string) || 'LR';
             const shape = (root.data?.shape as string) || 'pill';
             const pathStyle = (root.data?.pathStyle as string) || 'bezier';
-            const key = `${dir}|${shape}|${pathStyle}`;
+            const key = `${dir}|${shape}|${pathStyle}||${currentSignature}`;
             currentRootData[root.id] = key;
             if (prevRootDataRef.current[root.id] !== key) {
                 needsSync = true;
@@ -36,6 +41,7 @@ export function useMindMapOrchestrator(
 
         if (!needsSync) return;
         prevRootDataRef.current = currentRootData;
+        
         
         // Build adjacency map (ignoring relationships)
         const childrenMap = new Map<string, string[]>();
@@ -48,6 +54,8 @@ export function useMindMapOrchestrator(
 
         const nodeUpdates = new Map<string, any>();
         const newPositions = new Map<string, XYPosition>();
+        const nodesToHide = new Set<string>();
+        const edgesToHide = new Set<string>();
 
         for (const root of rootNodes) {
             const direction = (root.data?.direction as string) || 'LR';
@@ -57,28 +65,59 @@ export function useMindMapOrchestrator(
             const subtreeNodes: Node[] = [];
             const subtreeEdges: Edge[] = [];
 
-            const queue = [root.id];
+            const queue = [{ id: root.id, hideKids: false, inheritedColor: undefined as string | undefined }];
             while (queue.length > 0) {
-                const currId = queue.shift()!;
+                const { id: currId, hideKids, inheritedColor } = queue.shift()!;
                 const currNode = nodes.find(n => n.id === currId);
+                const kids = childrenMap.get(currId) || [];
                 
+                // Determine the effective color for this node and its descendants
+                let effectiveColor = inheritedColor;
+                if (currId === root.id) {
+                    effectiveColor = undefined; // root has no branch color
+                } else if (!effectiveColor) {
+                    if (currNode?.data?.branchColor) {
+                        // First-level branch defining its own color
+                        effectiveColor = currNode.data.branchColor as string;
+                    } else {
+                        // Auto-assign color if missing
+                        const rootKids = childrenMap.get(root.id) || [];
+                        const branchIndex = Math.max(0, rootKids.indexOf(currId));
+                        effectiveColor = PALETTE[branchIndex % PALETTE.length];
+                    }
+                }
+
                 if (currNode) {
-                    subtreeNodes.push(currNode);
+                    if (hideKids) {
+                        nodesToHide.add(currId);
+                    } else {
+                        subtreeNodes.push(currNode);
+                    }
                     if (currId !== root.id) {
-                        nodeUpdates.set(currId, { direction, pathStyle, shape });
+                        nodeUpdates.set(currId, { direction, pathStyle, shape, childrenCount: kids.length, branchColor: effectiveColor });
+                    } else {
+                        nodeUpdates.set(currId, { childrenCount: kids.length });
                     }
                 }
                 
-                const kids = childrenMap.get(currId) || [];
+                const isCollapsed = currNode?.data?.collapsed === true;
+                const nextHideKids = hideKids || isCollapsed;
+                
                 for (const k of kids) {
-                    queue.push(k);
+                    queue.push({ id: k, hideKids: nextHideKids, inheritedColor: effectiveColor });
                     const e = edges.find(edge => edge.source === currId && edge.target === k);
-                    if (e) subtreeEdges.push(e);
+                    if (e) {
+                        if (nextHideKids) {
+                            edgesToHide.add(e.id);
+                        } else {
+                            subtreeEdges.push(e);
+                        }
+                    }
                 }
             }
 
-            const visibleNodes = subtreeNodes.filter(n => !n.hidden);
-            const visibleEdges = subtreeEdges.filter(e => !e.hidden);
+            const visibleNodes = subtreeNodes;
+            const visibleEdges = subtreeEdges;
             
             if (visibleNodes.length > 0) {
                 const pos = autoMindMapLayout(visibleNodes, visibleEdges, direction, {
@@ -152,6 +191,8 @@ export function useMindMapOrchestrator(
                     if (newData.pathStyle !== update.pathStyle) { newData.pathStyle = update.pathStyle; nChanged = true; }
                     if (newData.shape !== update.shape) { newData.shape = update.shape; nChanged = true; }
                     if (newData.direction !== update.direction) { newData.direction = update.direction; nChanged = true; }
+                    if (newData.childrenCount !== update.childrenCount) { newData.childrenCount = update.childrenCount; nChanged = true; }
+                    if (newData.branchColor !== update.branchColor && update.branchColor !== undefined) { newData.branchColor = update.branchColor; nChanged = true; }
                 }
                 
                 let newPos = n.position;
@@ -161,9 +202,14 @@ export function useMindMapOrchestrator(
                     nChanged = true;
                 }
                 
+                const shouldBeHidden = nodesToHide.has(n.id);
+                if (n.hidden !== shouldBeHidden) {
+                    nChanged = true;
+                }
+                
                 if (nChanged) {
                     changed = true;
-                    return { ...n, position: newPos, data: newData };
+                    return { ...n, position: newPos, data: newData, hidden: shouldBeHidden };
                 }
                 return n;
             });

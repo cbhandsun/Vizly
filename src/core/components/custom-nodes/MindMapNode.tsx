@@ -78,6 +78,11 @@ const MindMapNode = ({ id, data, isConnectable, selected }: MindMapNodeProps) =>
         return () => window.removeEventListener('mindmap:edit', handleRemoteEdit);
     }, [id]);
 
+    const handleToggleCollapse = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        updateNodeData(id, { collapsed: !collapsed });
+    }, [id, collapsed, updateNodeData]);
+
     // Save logic
     const handleSave = () => {
         if (isEditing) {
@@ -133,7 +138,7 @@ const MindMapNode = ({ id, data, isConnectable, selected }: MindMapNodeProps) =>
                     }
                     isConnectable={isConnectable}
                     className="mindmap-handle"
-                    style={depth > 0 ? { top: 'auto', bottom: '1px', transform: (direction === 'L' || (direction === 'LR' && isLeft)) ? 'translate(50%, 50%)' : 'translate(-50%, 50%)' } : undefined}
+                    style={depth > 0 && direction !== 'TB' ? { top: 'auto', bottom: '1px', transform: (direction === 'L' || (direction === 'LR' && isLeft)) ? 'translate(50%, 50%)' : 'translate(-50%, 50%)' } : undefined}
                 />
             )}
 
@@ -216,22 +221,54 @@ const MindMapNode = ({ id, data, isConnectable, selected }: MindMapNodeProps) =>
 
             {/* Source Handle (出口) */}
             {depth > 0 ? (
-                <Handle
-                    type="source"
-                    position={
-                        direction === 'L' ? Position.Left :
-                        direction === 'R' ? Position.Right :
-                        direction === 'LR' ? (isLeft ? Position.Left : Position.Right) : Position.Bottom
-                    }
-                    isConnectable={isConnectable}
-                    className="mindmap-handle"
-                    style={depth > 0 ? { top: 'auto', bottom: '1px', transform: (direction === 'L' || (direction === 'LR' && isLeft)) ? 'translate(-50%, 50%)' : 'translate(50%, 50%)' } : undefined}
-                />
+                <>
+                    <Handle
+                        type="source"
+                        position={
+                            direction === 'L' ? Position.Left :
+                            direction === 'R' ? Position.Right :
+                            direction === 'LR' ? (isLeft ? Position.Left : Position.Right) : Position.Bottom
+                        }
+                        isConnectable={isConnectable}
+                        className="mindmap-handle"
+                        style={depth > 0 && direction !== 'TB' ? { top: 'auto', bottom: '1px', transform: (direction === 'L' || (direction === 'LR' && isLeft)) ? 'translate(-50%, 50%)' : 'translate(50%, 50%)' } : undefined}
+                    />
+                    {childrenCount > 0 && (
+                        <div 
+                            className="mindmap-collapse-toggle" 
+                            style={direction === 'TB' 
+                                ? { left: '50%', position: 'absolute', bottom: '-15px', transform: 'translateX(-50%)', zIndex: 10 }
+                                : { [direction === 'L' || (direction === 'LR' && isLeft) ? 'left' : 'right']: '-22px', position: 'absolute', top: '50%', transform: 'translateY(-50%)', zIndex: 10 }
+                            }
+                            onClick={handleToggleCollapse}
+                        >
+                            {collapsed ? <span className="mindmap-collapse-count">{childrenCount}</span> : <FaMinus size={10} />}
+                        </div>
+                    )}
+                </>
             ) : (
                 <>
-                    {/* Root node needs two source handles to support connections to both sides */}
-                    <Handle type="source" id="source-right" position={Position.Right} isConnectable={isConnectable} className="mindmap-handle" />
-                    <Handle type="source" id="source-left" position={Position.Left} isConnectable={isConnectable} className="mindmap-handle" />
+                    {/* Root node needs source handles based on direction */}
+                    {direction !== 'TB' ? (
+                        <>
+                            <Handle type="source" id="source-right" position={Position.Right} isConnectable={isConnectable} className="mindmap-handle" />
+                            <Handle type="source" id="source-left" position={Position.Left} isConnectable={isConnectable} className="mindmap-handle" />
+                        </>
+                    ) : (
+                         <Handle type="source" id="source-bottom" position={Position.Bottom} isConnectable={isConnectable} className="mindmap-handle" />
+                    )}
+                    {childrenCount > 0 && (
+                        <div 
+                            className="mindmap-collapse-toggle" 
+                            style={direction === 'TB' 
+                                ? { left: '50%', position: 'absolute', bottom: '-15px', transform: 'translateX(-50%)', zIndex: 10 }
+                                : { right: '-22px', position: 'absolute', top: '50%', transform: 'translateY(-50%)', zIndex: 10 }
+                            }
+                            onClick={handleToggleCollapse}
+                        >
+                            {collapsed ? <span className="mindmap-collapse-count">{childrenCount}</span> : <FaMinus size={10} />}
+                        </div>
+                    )}
                 </>
             )}
 
