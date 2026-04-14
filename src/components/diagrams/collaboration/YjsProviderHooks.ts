@@ -4,6 +4,48 @@ import { WebsocketProvider } from 'y-websocket';
 import { Node, Edge, useReactFlow } from '@xyflow/react';
 import { Awareness } from 'y-protocols/awareness';
 
+// Lightweight, performant strict equality check designed specifically for React Flow elements
+const isElementEqual = (a: any, b: any): boolean => {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    if (a.id !== b.id || a.type !== b.type || a.selected !== b.selected || a.hidden !== b.hidden) return false;
+    
+    // Compare positions if they exist (Nodes)
+    if (a.position && b.position) {
+        if (a.position.x !== b.position.x || a.position.y !== b.position.y) return false;
+    }
+
+    // Compare measured dimensions if they exist
+    if (a.measured && b.measured) {
+         if (a.measured.width !== b.measured.width || a.measured.height !== b.measured.height) return false;
+    }
+    
+    // Compare source/target properties if they exist (Edges)
+    if (a.source !== b.source || a.target !== b.target) return false;
+    if (a.sourceHandle !== b.sourceHandle || a.targetHandle !== b.targetHandle) return false;
+
+    // Fast check for data payload changes
+    // Using simple reference check first, then shallow/key-level comparison for top level
+    if (a.data !== b.data) {
+        if (!a.data || !b.data) return false;
+        const keysA = Object.keys(a.data);
+        const keysB = Object.keys(b.data);
+        if (keysA.length !== keysB.length) return false;
+        for (let i = 0; i < keysA.length; i++) {
+            const key = keysA[i];
+            // Since data objects can be deep, we do a basic identity check or stringify just the sub-value if it's an object,
+            // but typical payload props are primitives. For perfect safety, stringify strictly the data payload if mismatched.
+            if (typeof a.data[key] === 'object' && a.data[key] !== null) {
+                if (JSON.stringify(a.data[key]) !== JSON.stringify(b.data[key])) return false;
+            } else if (a.data[key] !== b.data[key]) {
+                return false;
+            }
+        }
+    }
+    
+    return true;
+};
+
 export interface YjsCollaborationOptions {
     roomName: string;
     serverUrl: string;
@@ -37,12 +79,23 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         const nodesMap = ydoc.getMap<Node>('flowchart-nodes');
         const edgesMap = ydoc.getMap<Edge>('flowchart-edges');
 
-        // Setup random user color and initial state for cursor
-        const colors = ['#f43f5e', '#f97316', '#eab308', '#10b981', '#0ea5e9', '#6366f1', '#d946ef'];
-        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        // Setup persistent user identity across reloads
+        const STORAGE_KEY_NAME = 'vizly_collaborator_name';
+        const STORAGE_KEY_COLOR = 'vizly_collaborator_color';
+        let userName = sessionStorage.getItem(STORAGE_KEY_NAME);
+        let userColor = sessionStorage.getItem(STORAGE_KEY_COLOR);
+
+        if (!userName || !userColor) {
+            const colors = ['#f43f5e', '#f97316', '#eab308', '#10b981', '#0ea5e9', '#6366f1', '#d946ef'];
+            userName = 'Guest ' + Math.floor(Math.random() * 1000);
+            userColor = colors[Math.floor(Math.random() * colors.length)];
+            sessionStorage.setItem(STORAGE_KEY_NAME, userName);
+            sessionStorage.setItem(STORAGE_KEY_COLOR, userColor);
+        }
+
         yProvider.awareness.setLocalStateField('user', {
-            name: 'Guest ' + Math.floor(Math.random() * 1000),
-            color: randomColor
+            name: userName,
+            color: userColor
         });
 
         return { doc: ydoc, provider: yProvider, yNodes: nodesMap, yEdges: edgesMap };
@@ -135,7 +188,8 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
                 const lastSynced = lastSyncedNodesRef.current.get(n.id);
                 if (lastSynced !== n) {
                     const existing = yNodes.get(n.id);
-                    if (!existing || JSON.stringify(existing) !== JSON.stringify(n)) {
+                    // Use fast performant diff instead of JSON.stringify which hangs UI during dense drags
+                    if (!existing || !isElementEqual(existing, n)) {
                         yNodes.set(n.id, n);
                     }
                 }
@@ -156,7 +210,8 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
                 const lastSynced = lastSyncedEdgesRef.current.get(e.id);
                 if (lastSynced !== e) {
                     const existing = yEdges.get(e.id);
-                    if (!existing || JSON.stringify(existing) !== JSON.stringify(e)) {
+                    // Fast performant edge diff
+                    if (!existing || !isElementEqual(existing, e)) {
                         yEdges.set(e.id, e);
                     }
                 }

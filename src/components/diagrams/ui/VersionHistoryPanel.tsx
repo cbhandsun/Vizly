@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Drawer, Button, Input, List, Typography, Space, Tooltip, Badge, Popconfirm } from 'antd';
 import { ClockCircleOutlined, PlusOutlined, UndoOutlined, EyeOutlined } from '@ant-design/icons';
-import { useVersionHistory } from './hooks/useVersionHistory';
+import { useVersionHistory } from '../hooks/useVersionHistory';
 import { useReactFlow } from '@xyflow/react';
 
 const { Text, Title } = Typography;
