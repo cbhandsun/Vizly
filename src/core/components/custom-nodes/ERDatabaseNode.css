@@ -1,0 +1,87 @@
+.er-database-node {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    display: flex;
+    flex-direction: column;
+    min-width: 240px;
+    overflow: hidden;
+    transition: all 0.2s ease-in-out;
+}
+
+.er-database-node.selected {
+    box-shadow: 0 0 0 2px #3b82f6, 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.er-header {
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.er-header-icon {
+    font-size: 14px;
+}
+
+.er-header-title {
+    font-size: 14px;
+    font-weight: 600;
+    font-family: monospace;
+    flex: 1;
+}
+
+.er-column-list {
+    display: flex;
+    flex-direction: column;
+    background-color: #f8fafc;
+}
+
+.er-column-row {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-bottom: 1px dashed #e2e8f0;
+    font-size: 12px;
+    font-family: monospace;
+    position: relative;
+}
+
+.er-column-row:last-child {
+    border-bottom: none;
+}
+
+.er-column-key {
+    width: 24px;
+    font-weight: bold;
+    color: #f59e0b; /* Orange for PK */
+}
+
+.er-column-key.fk {
+    color: #64748b; /* Gray for FK */
+    font-weight: normal;
+}
+
+.er-column-name {
+    flex: 1;
+    color: #0f172a;
+    font-weight: 500;
+}
+
+.er-column-type {
+    color: #64748b;
+    margin-left: 12px;
+}
+
+.er-handle {
+    width: 8px !important;
+    height: 8px !important;
+    background: #ffffff !important;
+    border: 2px solid #3b82f6 !important;
+}
+
+.er-handle:hover {
+    background: #3b82f6 !important;
+}

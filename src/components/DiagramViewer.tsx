@@ -84,7 +84,7 @@ const DiagramViewer: React.FC = () => {
     // Enable if user specifically clicks Share, OR if the url has ?room=, OR cloud-sync is active
     const isCollabEnabled = !!roomFromUrl || collabModalVisible || hasFeature('cloud-sync');
 
-    const { isSynced: isYjsSynced, pushLocalChangesToYjs, activeUsers, provider } = useYjsCollaboration({
+    const { isSynced: isYjsSynced, pushLocalChangesToYjs, activeUsers, provider, wsStatus } = useYjsCollaboration({
         roomName,
         serverUrl: YJS_WS_URL,
         token: jwtToken || 'guest',
@@ -101,6 +101,7 @@ const DiagramViewer: React.FC = () => {
     const { saveToCloud, shareDialogOpen, openShareDialog, closeShareDialog, ensureSaved } = useCloudSave(selectedDiagramId);
     const [aiConfigVisible, setAiConfigVisible] = useState(false);
     const [cloudManagerVisible, setCloudManagerVisible] = useState(false);
+    const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
 
     const aiNodesRef = useMemo(() => ({
         get current() {
@@ -852,21 +853,55 @@ const DiagramViewer: React.FC = () => {
                             )}
                             <button
                                 className="flex items-center justify-center gap-1 px-2 py-1.5 bg-white/50 hover:bg-black/5 dark:bg-[#1e293b]/50 dark:hover:bg-white/10 text-xs font-medium text-gray-700 dark:text-gray-300 rounded-md transition-colors border-none outline-none cursor-pointer"
+                                onClick={() => setVersionHistoryOpen(true)}
+                            >
+                                <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 512 512" height="12px" width="12px" xmlns="http://www.w3.org/2000/svg"><path d="M256 8C119 8 8 119 8 256s111 248 248 248 248-111 248-248S393 8 256 8zm0 448c-110.5 0-200-89.5-200-200S145.5 56 256 56s200 89.5 200 200-89.5 200-200 200zm61.8-104.4l-84.9-61.7c-3.1-2.3-4.9-5.9-4.9-9.7V116c0-6.6 5.4-12 12-12h32c6.6 0 12 5.4 12 12v141.7l66.8 48.6c5.4 3.9 6.5 11.4 2.6 16.8L334.6 349c-3.9 5.3-11.4 6.5-16.8 2.6z"></path></svg> 
+                                版本历史
+                            </button>
+                            <button
+                                className="flex items-center justify-center gap-1 px-2 py-1.5 bg-white/50 hover:bg-black/5 dark:bg-[#1e293b]/50 dark:hover:bg-white/10 text-xs font-medium text-gray-700 dark:text-gray-300 rounded-md transition-colors border-none outline-none cursor-pointer"
                                 onClick={() => setCloudManagerVisible(true)}
                             >
                                 <CloudOutlined /> 网盘 <span style={{ fontSize: '11px', opacity: 0.5 }}>👑</span>
                             </button>
-                            <button
-                                className="flex items-center justify-center gap-1 px-2 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-xs font-medium text-blue-600 dark:text-blue-400 rounded-md transition-colors border-none outline-none cursor-pointer"
-                                onClick={() => setCollabModalVisible(true)}
-                            >
-                                <TeamOutlined /> 协作沟通
-                                {activeUsers && activeUsers.length > 1 && (
-                                    <span className="ml-1 bg-blue-500 text-white px-1.5 rounded-full text-[10px]">
-                                        {activeUsers.length}
-                                    </span>
+                            <div className="flex items-center gap-2">
+                                {activeUsers && activeUsers.length > 0 && (
+                                    <div className="flex -space-x-2 mr-1">
+                                        {activeUsers.slice(0, 3).map(u => (
+                                            <div 
+                                                key={u.clientId} 
+                                                className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-white dark:border-[#0f172a]"
+                                                style={{ backgroundColor: u.user?.color || '#ccc' }}
+                                                title={u.user?.name || 'User'}
+                                            >
+                                                {u.user?.name ? u.user.name.charAt(0).toUpperCase() : '?'}
+                                            </div>
+                                        ))}
+                                        {activeUsers.length > 3 && (
+                                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-600 bg-gray-200 border-2 border-white dark:border-[#0f172a]">
+                                                +{activeUsers.length - 3}
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
-                            </button>
+                                <button
+                                    className="flex items-center justify-center gap-1 px-2 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-xs font-medium text-blue-600 dark:text-blue-400 rounded-md transition-colors border-none outline-none cursor-pointer"
+                                    onClick={() => setCollabModalVisible(true)}
+                                >
+                                    <TeamOutlined /> 分享与协作
+                                    {isCollabEnabled && (
+                                        <span 
+                                            className="w-1.5 h-1.5 rounded-full ml-1" 
+                                            style={{ 
+                                                backgroundColor: wsStatus === 'connected' ? '#10b981' : 
+                                                               wsStatus === 'connecting' ? '#f59e0b' : '#ef4444',
+                                                boxShadow: wsStatus === 'connected' ? '0 0 6px rgba(16, 185, 129, 0.4)' : 'none'
+                                            }}
+                                            title={`WebSocket: ${wsStatus}`}
+                                        />
+                                    )}
+                                </button>
+                            </div>
                             <Tooltip title="防误触保护只读锁 (阅览展示推荐)">
                                 <Switch
                                     size="small"
@@ -973,6 +1008,8 @@ const DiagramViewer: React.FC = () => {
                                                 onCloseShareDialog={closeShareDialog}
                                                 onEnsureSaved={ensureSaved}
                                                 showAiCrown={true}
+                                                isVersionHistoryOpen={versionHistoryOpen}
+                                                onVersionHistoryClose={() => setVersionHistoryOpen(false)}
                                                 renderAIChatPanel={
                                                     <Suspense fallback={<div className="p-4 text-center text-gray-500">Loading AI...</div>}>
                                                         <AIChatView

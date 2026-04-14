@@ -12,6 +12,7 @@ import CustomNode from '../custom-nodes/CustomNode';
 import TitleGroupNode from '../custom-nodes/TitleGroupNode';
 import SubGroupNode from '../custom-nodes/SubGroupNode';
 import FlowchartNode from '../custom-nodes/FlowchartNode';
+import IconNode from '../custom-nodes/IconNode';
 import SwimLaneNode from '../custom-nodes/SwimLaneNode';
 import StickyNoteNode from '../custom-nodes/StickyNoteNode';
 import MindMapNode from '../custom-nodes/MindMapNode';
@@ -108,6 +109,8 @@ import { DesignerOverlaysLayer } from './ui/DesignerOverlaysLayer';
 import { DesignerCanvasFeaturesLayer } from './ui/DesignerCanvasFeaturesLayer';
 import ArrowTimelineNode from './nodes/ArrowTimelineNode';
 import { LiveCursors } from '../../../components/diagrams/collaboration/LiveCursors';
+import ERDatabaseNode from '../custom-nodes/ERDatabaseNode';
+import { VersionHistoryPanel } from '../../../components/diagrams/ui/VersionHistoryPanel';
 // useMindMapOrchestrator decoupled
 
 const FallbackNode = ({ type, data }: any) => (
@@ -127,6 +130,8 @@ const DEFAULT_NODE_TYPES: NodeTypes = {
     'sticky-note': StickyNoteNode,
     arrowTimeline: ArrowTimelineNode as any,
     timelineNode: FallbackNode as any, 
+    iconNode: IconNode as any,
+    erNode: ERDatabaseNode as any,
 };
 
 // [NEW] Declare static edge types to inject specialized rendering
@@ -154,6 +159,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     showAiCrown,
     onAiTabIntercept,
     topActionArea,
+    isVersionHistoryOpen = false,
+    onVersionHistoryClose,
     showOnlyMainFlow: externalShowOnlyMainFlow = false,
     highlightMainFlow: externalHighlightMainFlow = false,
     onMainFlowAnimationChange,
@@ -1279,6 +1286,14 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                             }}
                             renderAIConfigModal={renderAIConfigModal}
                             renderShareDialog={renderShareDialog}
+                        />
+                        {/* GAP-05: Version History Panel Wrapper */}
+                        <VersionHistoryPanel
+                            diagramId={id || 'default-diagram'}
+                            isOpen={isVersionHistoryOpen}
+                            onClose={() => {
+                                if (onVersionHistoryClose) onVersionHistoryClose();
+                            }}
                         />
                         </>
                     }

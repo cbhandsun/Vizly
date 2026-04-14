@@ -46,10 +46,12 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
   const [state, actions] = useConfigIntegration();
   const [editingValues, setEditingValues] = useState<Record<string, any>>({});
   const [hasChanges, setHasChanges] = useState(false);
-  const [activeTab, setActiveTab] = useState<'nodes' | 'containers' | 'spacing' | 'edges' | 'layout' | 'performance'>('nodes');
+  const [isAdvancedMode, setIsAdvancedMode] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'basic' | 'nodes' | 'containers' | 'spacing' | 'edges' | 'layout' | 'performance'>('basic');
 
   // 定义可编辑的配置项，按类别分组
-  const configItemsByCategory: Record<string, ConfigItem[]> = useMemo(() => ({
+  const configItemsByCategory: Record<string, ConfigItem[]> = useMemo(() => {
+    const raw = {
     nodes: [
       {
         key: 'diagram.node.minWidth',
@@ -621,7 +623,18 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
         value: true
       }
     ]
-  }), []);
+    };
+
+    const basic = [
+      ...raw.nodes.filter(i => i.key === 'diagram.node.minWidth' || i.key === 'diagram.node.height'),
+      ...raw.spacing.filter(i => i.key === 'diagram.spacing.horizontal' || i.key === 'diagram.spacing.vertical'),
+      ...raw.edges.filter(i => i.key === 'diagram.edge.mode' || i.key === 'diagram.edge.pathType'),
+      ...raw.layout.filter(i => i.key === 'diagram.layout.strategy' || i.key === 'diagram.layout.direction'),
+      ...raw.performance.filter(i => i.key === 'performance.enableAnimations')
+    ].map(i => ({...i, group: undefined})); // 基础设置不分组，平铺展现
+
+    return { basic, ...raw };
+  }, []);
 
 // 获取所有配置项的扁平列表
 const configItems: ConfigItem[] = useMemo(() => [
@@ -944,14 +957,16 @@ return createPortal(
         </div>
         
         <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1">
-          {[
+          {(isAdvancedMode ? [
             { id: 'nodes', label: t('config.tabs.nodes') },
             { id: 'containers', label: t('config.tabs.containers') },
             { id: 'spacing', label: t('config.tabs.spacing') },
             { id: 'edges', label: t('config.tabs.edges') },
             { id: 'layout', label: t('config.tabs.layout') },
             { id: 'performance', label: t('config.tabs.performance') }
-          ].map(tab => (
+          ] : [
+            { id: 'basic', label: t('config.tabs.basic', '基础设置') }
+          ]).map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
@@ -961,6 +976,29 @@ return createPortal(
             </button>
           ))}
         </div>
+
+        {/* 高级模式切换 */}
+        <div className="px-5 py-4 border-t border-black/5 dark:border-white/5 bg-gray-50/50 dark:bg-black/20">
+          <label className="flex items-center justify-between cursor-pointer group">
+            <span className="text-[13px] font-medium text-gray-700 dark:text-gray-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+              {t('config.advancedMode', '专家模式')}
+            </span>
+            <div className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${isAdvancedMode ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-white/10'}`}>
+              <span className="sr-only">Use advanced mode</span>
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={isAdvancedMode}
+                onChange={(e) => {
+                  const advanced = e.target.checked;
+                  setIsAdvancedMode(advanced);
+                  setActiveTab(advanced ? 'nodes' : 'basic');
+                }}
+              />
+              <span className={`pointer-events-none absolute left-[2px] top-[2px] inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isAdvancedMode ? 'translate-x-4' : 'translate-x-0'}`} />
+            </div>
+          </label>
+        </div>
       </div>
 
       {/* 右侧主区域 Main Content */}
@@ -968,7 +1006,7 @@ return createPortal(
         {/* 顶部标题栏 & 关闭按钮 */}
         <div className="flex-none flex items-center justify-between px-8 md:px-12 pt-7 pb-5">
           <h1 className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight leading-none">
-            {t(`config.tabs.${activeTab}`)}
+            {activeTab === 'basic' ? t('config.tabs.basic', '基础设置') : t(`config.tabs.${activeTab}`)}
           </h1>
           <button onClick={onClose} className="-mr-2 p-1.5 rounded-md text-gray-400 hover:text-gray-800 hover:bg-black/5 dark:hover:text-gray-100 dark:hover:bg-white/10 transition-colors" title={t('config.actions.close')}>
             <FaTimes className="w-4 h-4" />

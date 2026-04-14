@@ -66,6 +66,70 @@ export class SupabaseStorageProvider implements IStorageProvider {
         if (error) throw error;
     }
 
+    // === Version History (GAP-05) ===
+    async saveVersion(diagramId: string, data: any, message?: string) {
+        const { data: dbData, error } = await supabase!
+            .from('diagram_versions')
+            .insert({
+                diagram_id: diagramId,
+                snapshot_data: data,
+                message: message || '版本快照',
+                author_id: 'anonymous' // Can be replaced with actual user later
+            })
+            .select()
+            .single();
+        if (error) throw error;
+        return {
+            id: dbData.id,
+            diagramId: dbData.diagram_id,
+            snapshotData: dbData.snapshot_data,
+            authorId: dbData.author_id,
+            createdAt: new Date(dbData.created_at).getTime(),
+            message: dbData.message
+        };
+    }
+
+    async listVersions(diagramId: string) {
+        const { data, error } = await supabase!
+            .from('diagram_versions')
+            .select('id, diagram_id, author_id, created_at, message') // Omit heavy snapshotData for list
+            .eq('diagram_id', diagramId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return (data || []).map(item => ({
+            id: item.id,
+            diagramId: item.diagram_id,
+            snapshotData: null, // Don't load snapshot data in list for performance
+            authorId: item.author_id,
+            createdAt: new Date(item.created_at).getTime(),
+            message: item.message
+        }));
+    }
+
+    async loadVersion(diagramId: string, versionId: string) {
+        const { data, error } = await supabase!
+            .from('diagram_versions')
+            .select('*')
+            .eq('id', versionId)
+            .eq('diagram_id', diagramId)
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') return null; // Not found
+            throw error;
+        }
+
+        return {
+            id: data.id,
+            diagramId: data.diagram_id,
+            snapshotData: data.snapshot_data,
+            authorId: data.author_id,
+            createdAt: new Date(data.created_at).getTime(),
+            message: data.message
+        };
+    }
+
     // === Config specific to Supabase user configs ===
     async saveConfig(key: string, value: any, user_id: string) {
         const { data, error } = await supabase!

@@ -203,10 +203,19 @@ const getMetricColor = (status: MetricBadge['status']) => {
 
 // ====== 主组件 ======
 const ArchitectureNode: React.FC<NodeProps<Node<ArchitectureNodeData>>> = ({ data, selected }) => {
-    const { label, type, description, status = 'normal', themeColor, metrics = [], linterErrors = [] } = data;
-    const color = themeColor || DEFAULT_COLORS[type] || '#1890ff';
+    // 🛡️ 防御性编程：防止外部传入无效数据导致白屏 (GAP-01)
+    if (!data) {
+        console.warn('ArchitectureNode rendered without data');
+        return <div style={{width: 130, height: 80, background: '#fafafa', border: '1px solid #d9d9d9', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>Invalid Node</div>;
+    }
 
-    const isError = status === 'error' || linterErrors.length > 0;
+    const { label, type, description, status = 'normal', themeColor, metrics = [], linterErrors = [] } = data;
+    const color = themeColor || (type ? DEFAULT_COLORS[type] : null) || '#1890ff';
+
+    const safeMetrics = Array.isArray(metrics) ? metrics : [];
+    const safeLinterErrors = Array.isArray(linterErrors) ? linterErrors : [];
+
+    const isError = status === 'error' || safeLinterErrors.length > 0;
 
     // 选中态外框样式
     const outerStyle: React.CSSProperties = useMemo(() => ({
@@ -226,7 +235,7 @@ const ArchitectureNode: React.FC<NodeProps<Node<ArchitectureNodeData>>> = ({ dat
 
     // 根据类型选择形状
     const shapeEl = useMemo(() => {
-        const l = (label as string) || '未命名';
+        const l = typeof label === 'string' ? label : (label ? String(label) : '未命名');
         switch (type) {
             case 'database': return <CylinderShape color={color} label={l} />;
             case 'cache': return <CylinderShape color={color} dashed label={l} />;
@@ -244,12 +253,12 @@ const ArchitectureNode: React.FC<NodeProps<Node<ArchitectureNodeData>>> = ({ dat
     return (
         <div style={outerStyle}>
             {/* Linter 警示徽标 */}
-            {linterErrors.length > 0 && (
+            {safeLinterErrors.length > 0 && (
                 <div style={{
                     position: 'absolute', top: -12, right: -12, zIndex: 10,
                     background: '#fff', borderRadius: '50%',
                     boxShadow: '0 2px 6px rgba(245,34,45,0.4)',
-                }} title={linterErrors.join('\n')}>
+                }} title={safeLinterErrors.join('\n')}>
                     <ExclamationCircleOutlined style={{ color: '#f5222d', fontSize: 20 }} />
                 </div>
             )}
@@ -274,12 +283,12 @@ const ArchitectureNode: React.FC<NodeProps<Node<ArchitectureNodeData>>> = ({ dat
             )}
 
             {/* 实况数据探针区 */}
-            {metrics && metrics.length > 0 && (
+            {safeMetrics.length > 0 && (
                 <div style={{
                     display: 'flex', flexWrap: 'wrap', gap: 4,
                     justifyContent: 'center', marginTop: 4,
                 }}>
-                    {metrics.map((m, idx) => (
+                    {safeMetrics.map((m, idx) => (
                         <div key={idx} style={{
                             display: 'flex', alignItems: 'center', gap: 3,
                             background: '#fff', border: `1px solid ${getMetricColor(m.status)}50`,

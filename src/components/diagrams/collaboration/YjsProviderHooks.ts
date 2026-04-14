@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { Node, Edge, useReactFlow } from '@xyflow/react';
@@ -17,6 +17,11 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
     
     const [synced, setSynced] = useState(false);
     const [activeUsers, setActiveUsers] = useState<any[]>([]);
+    const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
+
+    // GAP-02: Collaboration Optimization. Track references instead of stringifying everything
+    const lastSyncedNodesRef = useRef<Map<string, Node>>(new Map());
+    const lastSyncedEdgesRef = useRef<Map<string, Edge>>(new Map());
     
     const { doc, provider, yNodes, yEdges } = useMemo(() => {
         if (!enabled || !serverUrl) return { doc: null, provider: null, yNodes: null, yEdges: null };
@@ -47,7 +52,12 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         if (!provider || !yNodes || !yEdges) return;
 
         const handleSync = (isSynced: boolean) => setSynced(isSynced);
-        provider.on('synced', handleSync);
+        provider.on('sync', handleSync);
+
+        const handleStatus = (event: { status: 'connecting' | 'connected' | 'disconnected' }) => {
+            setWsStatus(event.status);
+        };
+        provider.on('status', handleStatus);
 
         const handleAwarenessChange = () => {
             const states = Array.from(provider.awareness.getStates().entries());
@@ -99,7 +109,8 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         yEdges.observe(handleRemoteEdgeChange);
 
         return () => {
-            provider.off('synced', handleSync);
+            provider.off('sync', handleSync);
+            provider.off('status', handleStatus);
             provider.awareness.off('change', handleAwarenessChange);
             yNodes.unobserve(handleRemoteNodeChange);
             yEdges.unobserve(handleRemoteEdgeChange);
@@ -112,25 +123,46 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         if (!doc || !yNodes || !yEdges || !enabled) return;
         
         doc.transact(() => {
-            const currentKeys = new Set(yNodes.keys());
+            // 1. Process Nodes
+            const currentYNodeKeys = new Set(yNodes.keys());
+            const newNodesCache = new Map<string, Node>();
+            
             nodes.forEach(n => {
-                const existing = yNodes.get(n.id);
-                if (!existing || JSON.stringify(existing) !== JSON.stringify(n)) {
-                    yNodes.set(n.id, n);
+                newNodesCache.set(n.id, n);
+                currentYNodeKeys.delete(n.id); // Mark as kept
+                
+                // O(1) reference check. Only deep dive if reference changed
+                const lastSynced = lastSyncedNodesRef.current.get(n.id);
+                if (lastSynced !== n) {
+                    const existing = yNodes.get(n.id);
+                    if (!existing || JSON.stringify(existing) !== JSON.stringify(n)) {
+                        yNodes.set(n.id, n);
+                    }
                 }
-                currentKeys.delete(n.id);
             });
-            currentKeys.forEach(k => yNodes.delete(k));
+            // Delete removed nodes
+            currentYNodeKeys.forEach(k => yNodes.delete(k));
+            lastSyncedNodesRef.current = newNodesCache; // Update cache
 
-            const edgeKeys = new Set(yEdges.keys());
+            // 2. Process Edges
+            const currentYEdgeKeys = new Set(yEdges.keys());
+            const newEdgesCache = new Map<string, Edge>();
+            
             edges.forEach(e => {
-                const existing = yEdges.get(e.id);
-                if (!existing || JSON.stringify(existing) !== JSON.stringify(e)) {
-                    yEdges.set(e.id, e);
+                newEdgesCache.set(e.id, e);
+                currentYEdgeKeys.delete(e.id);
+                
+                // O(1) reference check.
+                const lastSynced = lastSyncedEdgesRef.current.get(e.id);
+                if (lastSynced !== e) {
+                    const existing = yEdges.get(e.id);
+                    if (!existing || JSON.stringify(existing) !== JSON.stringify(e)) {
+                        yEdges.set(e.id, e);
+                    }
                 }
-                edgeKeys.delete(e.id);
             });
-            edgeKeys.forEach(k => yEdges.delete(k));
+            currentYEdgeKeys.forEach(k => yEdges.delete(k));
+            lastSyncedEdgesRef.current = newEdgesCache; // Update cache
         });
     };
 
@@ -138,6 +170,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         isSynced: synced,
         provider,
         activeUsers,
+        wsStatus,
         pushLocalChangesToYjs,
     };
 }

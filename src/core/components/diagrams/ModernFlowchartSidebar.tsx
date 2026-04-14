@@ -15,6 +15,7 @@ import { getUiScale } from '../shared/viewportStore';
 import { PanelZoomApi, usePanelZoom } from '../../hooks/usePanelZoom';
 import { LayerManagementPanel } from './LayerManagementPanel';
 import { NodeTemplatePanel } from './NodeTemplatePanel';
+import { IconLibraryPanel } from './IconLibraryPanel';
 import type { NodeTemplate } from './hooks/useNodeTemplates';
 import type { LayerConfig } from './hooks/useLayerManagement';
 import { useSidebarNavigatorTree } from './hooks/useSidebarNavigatorTree';
@@ -457,6 +458,21 @@ export const ModernFlowchartSidebar: React.FC<FlowchartSidebarProps> = ({
                                         </div>
                                     )
                                 }] : []),
+                                // Iconify Tab
+                                {
+                                    key: 'icons',
+                                    label: (
+                                        <span>
+                                            <FaSearch style={{ marginRight: 4 }} />
+                                            {t('designer.sidebar.icons', '云端图标')}
+                                        </span>
+                                    ),
+                                    children: (
+                                        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                            <IconLibraryPanel />
+                                        </div>
+                                    )
+                                },
                                 // Templates Tab (always visible for discoverability)
                                 {
                                     key: 'templates',

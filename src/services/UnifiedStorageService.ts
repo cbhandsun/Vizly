@@ -1,6 +1,7 @@
-import { IStorageProvider, DiagramMetadata, SavedDiagram } from './storage/types';
+import { IStorageProvider, DiagramMetadata, SavedDiagram, DiagramVersion } from './storage/types';
 import { supabaseStorage } from './SupabaseStorage';
 import { s3Storage } from './StorageService';
+import { localVersionDB } from './IndexedDBStorage';
 
 export type StorageProviderType = 'supabase' | 's3';
 
@@ -72,6 +73,45 @@ export class UnifiedStorageService implements IStorageProvider {
 
     async deleteDiagram(id: string): Promise<void> {
         return this.activeProvider.deleteDiagram(id);
+    }
+
+    // === Versioning Methods with Local Fallback ===
+    async saveVersion(diagramId: string, data: any, message?: string): Promise<DiagramVersion> {
+        try {
+            if (this.activeProvider.saveVersion) {
+                return await this.activeProvider.saveVersion(diagramId, data, message);
+            }
+        } catch (e) {
+            console.warn("Active provider saveVersion failed, falling back to local db", e);
+        }
+        // Fallback or missing provider support
+        return localVersionDB.saveVersion(diagramId, data, message);
+    }
+
+    async listVersions(diagramId: string): Promise<DiagramVersion[]> {
+        try {
+            if (this.activeProvider.listVersions) {
+                return await this.activeProvider.listVersions(diagramId);
+            }
+        } catch (e) {
+            console.warn("Active provider listVersions failed, falling back to local db", e);
+        }
+        return localVersionDB.listVersions(diagramId);
+    }
+
+    async loadVersion(diagramId: string, versionId: string): Promise<DiagramVersion | null> {
+        try {
+            // Priority try local since we might have cached it, but actually cloud is source of truth if we use cloud.
+            // Wait, if it failed previously it might only be in local. Let's try active provider first.
+            if (this.activeProvider.loadVersion) {
+                const ver = await this.activeProvider.loadVersion(diagramId, versionId);
+                if (ver) return ver;
+            }
+        } catch (e) {
+            console.warn("Active provider loadVersion failed, falling back to local db", e);
+        }
+        // Fallback to local
+        return localVersionDB.loadVersion(diagramId, versionId);
     }
 }
 

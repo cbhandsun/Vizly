@@ -117,6 +117,10 @@ export interface DiagramComponentProps {
   onReadonlyChange?: (isReadonly: boolean) => void;
   /** 触发打开高级偏好设置回调 */
   onOpenSettings?: () => void;
+  /** (IoC) 是否打开版本历史面板 */
+  isVersionHistoryOpen?: boolean;
+  /** (IoC) 关闭版本历史面板回调 */
+  onVersionHistoryClose?: () => void;
 }
 
 // 图表数据接口

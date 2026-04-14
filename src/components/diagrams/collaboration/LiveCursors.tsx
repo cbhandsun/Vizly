@@ -33,21 +33,29 @@ export const LiveCursors: React.FC<LiveCursorsProps> = ({ activeUsers, yAwarenes
   useEffect(() => {
     if (!yAwareness || !reactFlow) return;
 
-    // Throttle cursor updates slightly to save bandwidth
-    let lastUpdate = 0;
-    const handlePointerMove = (e: PointerEvent) => {
-      const now = performance.now();
-      if (now - lastUpdate < 30) return; // ~30fps
-      lastUpdate = now;
+    let localRafId: number;
+    let targetPos = { x: 0, y: 0 };
+    let hasPendingUpdate = false;
 
-      // Ensure we only track if the pointer is roughly inside the app area
+    const syncCursor = () => {
+      if (hasPendingUpdate) {
+        yAwareness.setLocalStateField('cursor', targetPos);
+        hasPendingUpdate = false;
+      }
+      localRafId = requestAnimationFrame(syncCursor);
+    };
+    localRafId = requestAnimationFrame(syncCursor);
+
+    const handlePointerMove = (e: PointerEvent) => {
       const flowPos = reactFlow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-      yAwareness.setLocalStateField('cursor', flowPos);
+      targetPos = flowPos;
+      hasPendingUpdate = true;
     };
 
     window.addEventListener('pointermove', handlePointerMove);
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
+      cancelAnimationFrame(localRafId);
     };
   }, [reactFlow, yAwareness]);
 

@@ -11,6 +11,8 @@ export const TYPE_TO_PLUGIN_ID: Record<string, string> = {
     'mindmap':      'mindmap',
     'timeline':     'timeline-diagram',
     'architecture': 'architecture-diagram',
+    'swimlane':     'swimlane-diagram',
+    'er-diagram':   'er-diagram',
 };
 
 /**

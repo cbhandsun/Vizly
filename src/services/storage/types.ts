@@ -15,6 +15,15 @@ export interface SavedDiagram {
     user_id: string;
 }
 
+export interface DiagramVersion {
+    id: string;
+    diagramId: string;
+    snapshotData: any;
+    authorId?: string;
+    createdAt: number;
+    message?: string;
+}
+
 export interface IStorageProvider {
     name: string;
     id: 's3' | 'supabase';
@@ -24,6 +33,11 @@ export interface IStorageProvider {
     loadDiagram(id: string): Promise<SavedDiagram>;
     saveDiagram(diagram: SavedDiagram): Promise<SavedDiagram>;
     deleteDiagram(id: string): Promise<void>;
+
+    // Versioning Operations
+    listVersions?(diagramId: string): Promise<DiagramVersion[]>;
+    loadVersion?(diagramId: string, versionId: string): Promise<DiagramVersion | null>;
+    saveVersion?(diagramId: string, data: any, message?: string): Promise<DiagramVersion>;
 
     // Config / Auth
     isConfigured(): boolean;

@@ -290,6 +290,8 @@ export type DiagramType =
   | 'mindmap'
   | 'timeline'
   | 'flowchart'
+  | 'swimlane'
+  | 'er-diagram'
   | 'custom';
 
 // === 数据转换接口 ===
