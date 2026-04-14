@@ -4,7 +4,6 @@
  */
 
 import { useCallback, useRef, useMemo } from 'react';
-import { jsPDF } from 'jspdf';
 import { dispatchDiagramControl } from '../components/shared/diagramControl';
 import {
   getTargetDiagramElement,
@@ -354,6 +353,9 @@ export const useOptimizedDiagramControls = (
           3
         );
       });
+
+      // 动态引入jsPDF
+      const { jsPDF } = await import('jspdf');
 
       // 创建PDF
       const pdf = new jsPDF({

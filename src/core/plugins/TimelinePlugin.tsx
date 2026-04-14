@@ -313,7 +313,7 @@ const TimelineSmartActionBar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
                 <Button size="small" type="text" icon={<FlagOutlined style={{ color: '#cf1322' }} />} onClick={() => handleAppendNode('milestone')} />
             </Tooltip>
 
-            <Divider type="vertical" style={{ height: 16, margin: '0 2px' }} />
+            <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
 
             {/* 视图操作 */}
             <Tooltip title="今天居中">

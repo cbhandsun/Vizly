@@ -1,12 +1,11 @@
 // @ts-nocheck
 import React from 'react';
-import { ErrorBoundary } from '@/core';
+import { ErrorBoundary } from '@/core/components/shared/ErrorBoundary';
 import { AppProviders, AppRoutes } from '@/app/index';
-import { DiagramCoreInfo } from '@/core';
 import { SubscriptionProvider } from '@/context/SubscriptionContext';
 import { UpgradeModal } from '@/components/ui/UpgradeModal';
 
-console.log('📦 [@diagramview/core] loaded:', DiagramCoreInfo);
+console.log('📦 [@diagramview/core] loaded v1.0.0 (lazy initialized)');
 
 /**
  * 主应用组件

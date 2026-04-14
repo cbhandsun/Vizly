@@ -93,6 +93,11 @@ const TitleGroupNode = React.memo(({ id, data, width = 200, height = 120, select
   const titleBarHeight = data.titleBarHeight || (preset?.domain?.titleBarHeight ?? 40);
   const baseZIndex = data.baseZIndex || 1;
 
+  const isDark = theme?.name === 'dark' || theme?.mode === 'dark';
+  const glassBg = isDark
+    ? 'linear-gradient(to bottom, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.2))'
+    : 'linear-gradient(to bottom, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.25))';
+
   // CSS Variables
   const nodeStyle = {
     '--group-theme-color': themeColor,
@@ -100,6 +105,7 @@ const TitleGroupNode = React.memo(({ id, data, width = 200, height = 120, select
     '--group-text-color': textColor,
     '--group-content-text': contentTextColor,
     '--group-bg-color': backgroundColor,
+    '--group-glass-bg': glassBg,
     '--group-title-height': `${titleBarHeight}px`,
     // ⭐ isLane: 移除圆角和阴影，实现紧凑布局
     '--group-radius': data.isLane ? '0px' : (`${Math.min(preset?.domain?.radius ?? 12, 6)}px`),

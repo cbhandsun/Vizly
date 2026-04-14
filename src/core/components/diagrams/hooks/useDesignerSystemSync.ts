@@ -68,7 +68,7 @@ export function useDesignerSystemSync({
                         // 强制延迟执行一次路由与 Layout
                         if (reactFlowInstance) {
                             setTimeout(() => {
-                                reactFlowInstance.fitView({ padding: 0.2, duration: 400 });
+                                reactFlowInstance.fitView({ padding: 0.2, duration: 400, minZoom: 0.55 });
                             }, 50);
                         }
                     } catch(err) {
@@ -91,7 +91,7 @@ export function useDesignerSystemSync({
             if (newNodes.length > 0) {
                 setNodes(newNodes);
                 setEdges(newEdges);
-                setTimeout(() => reactFlowInstance?.fitView({ duration: 800, padding: 0.35, maxZoom: 1.15 }), 50);
+                setTimeout(() => reactFlowInstance?.fitView({ duration: 800, padding: 0.35, minZoom: 0.55, maxZoom: 1.15 }), 50);
             }
         };
         return () => {
@@ -134,7 +134,12 @@ export function useDesignerSystemSync({
         if (hasRestoredAutoSave.current) return;
 
         const saved = loadSaved();
-        if (saved && saved.nodes.length > 0) {
+        
+        // Guard against corrupted autosave that contains RAW Standard Nodes instead of Canvas Nodes
+        const isCanvasData = saved && saved.nodes && saved.nodes.length > 0 && 
+            saved.nodes.some((n: any) => n.data !== undefined && (n.type === 'flowchart' || n.type === 'titleGroup' || n.type === 'subGroup' || n.type === 'group' || n.type === 'swimlane'));
+
+        if (isCanvasData) {
             hasRestoredAutoSave.current = true;
             const layoutOptimizer = LayoutOptimizer.getInstance();
             const containerTypes = new Set(['titleGroup', 'subGroup', 'swimlane', 'group']);

@@ -134,7 +134,7 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
         }
 
         window.requestAnimationFrame(() => {
-            fitView({ duration: 800, padding: 0.2, maxZoom: 1.15 });
+            fitView({ duration: 800, padding: 0.2, minZoom: 0.55, maxZoom: 1.15 });
         });
 
     }, [instance]);
@@ -282,7 +282,7 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
 
             // 布局后适配视口
             window.requestAnimationFrame(() => {
-                fitView({ duration: 800, padding: 0.2, maxZoom: 1.15 });
+                fitView({ duration: 800, padding: 0.2, minZoom: 0.55, maxZoom: 1.15 });
             });
 
         } catch (err) {

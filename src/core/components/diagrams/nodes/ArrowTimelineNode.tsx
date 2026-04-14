@@ -486,7 +486,7 @@ const ArrowTimelineToolbarExtension = ({ node, updateNodesBatch }: any) => {
                 </Tooltip>
             </Popover>
 
-            <Divider type="vertical" style={{ margin: '0 2px' }} />
+            <Divider orientation="vertical" style={{ margin: '0 2px' }} />
 
             <Popover content={DataEditorContent} trigger="click" placement="bottom">
                 <Tooltip title="编辑明细数据">

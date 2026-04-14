@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Button, Typography, Space, Divider, message } from 'antd';
+import { Modal, Button, Typography, Space, Divider, App } from 'antd';
 import { CrownOutlined, CheckCircleFilled } from '@ant-design/icons';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { AuthModal } from '@/components/auth/AuthModal';
@@ -8,6 +8,7 @@ const { Title, Text, Paragraph } = Typography;
 
 export const UpgradeModal: React.FC = () => {
   const { isUpgradeModalVisible, hideUpgradeModal, upgradeFeatureContext, jwtToken } = useSubscription();
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [isAuthModalVisible, setIsAuthModalVisible] = useState(false);
 
@@ -36,12 +37,17 @@ export const UpgradeModal: React.FC = () => {
       if (!response.ok) {
          let errorText = '';
          try {
-             const errJson = await response.json();
-             errorText = errJson.error || response.statusText;
+             const rawText = await response.text();
+             try {
+                 const errJson = JSON.parse(rawText);
+                 errorText = errJson.error || errJson.message || rawText;
+             } catch {
+                 errorText = rawText;
+             }
          } catch {
-             errorText = response.statusText;
+             errorText = response.statusText || '未知服务器响应';
          }
-         throw new Error(`请求失败: ${errorText}`);
+         throw new Error(`状态码 ${response.status}: ${errorText}`);
       }
 
       const data = await response.json();

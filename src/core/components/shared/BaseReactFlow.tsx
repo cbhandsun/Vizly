@@ -473,9 +473,12 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         } catch { return 1.15; }
       })();
 
+      // 保证可读性的自适应最小缩放防线（解决长/宽图自适应后太小看不清的问题）
+      const MIN_FIT_ZOOM = 0.55;
+
       // 计算按宽度适配的缩放比，并顶端对齐
       // 应用 fitRatio 调整目标宽度，实现"留白"效果（解决 100% 撑满过于拥挤的问题）
-      let zoom = Math.max(0.05, Math.min(maxFitZoom, (containerWidth * fitRatio) / bboxWidth));
+      let zoom = Math.max(MIN_FIT_ZOOM, Math.min(maxFitZoom, (containerWidth * fitRatio) / bboxWidth));
       // 双次保障最终的安全边界
       zoom = Math.min(zoom, maxZoom);
       zoom = Math.max(zoom, minZoom);

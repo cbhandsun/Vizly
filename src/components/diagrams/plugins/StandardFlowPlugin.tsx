@@ -97,7 +97,7 @@ const StandardTemplateToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
            ctx.setNodes(nodes);
            ctx.setEdges(edges);
            setTimeout(() => {
-             ctx.reactFlowInstance?.fitView({ duration: 800, padding: 0.35 });
+             ctx.reactFlowInstance?.fitView({ duration: 800, padding: 0.35, minZoom: 0.55 });
            }, 50);
         });
       });

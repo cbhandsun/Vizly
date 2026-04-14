@@ -1,8 +1,5 @@
-import { toPng, toSvg } from 'html-to-image';
-import { jsPDF } from 'jspdf';
 import { getNodesBounds, Node } from '@xyflow/react';
-
-export const downloadImage = (
+export const downloadImage = async (
     nodes: Node[],
     format: 'png' | 'svg' | 'pdf' = 'png'
 ) => {
@@ -43,17 +40,23 @@ export const downloadImage = (
     };
 
     switch (format) {
-        case 'png':
+        case 'png': {
+            const { toPng } = await import('html-to-image');
             toPng(viewportElem, exportOptions).then((dataUrl: string) => {
                 download(dataUrl, 'diagram.png');
             });
             break;
-        case 'svg':
+        }
+        case 'svg': {
+            const { toSvg } = await import('html-to-image');
             toSvg(viewportElem, exportOptions).then((dataUrl: string) => {
                 download(dataUrl, 'diagram.svg');
             });
             break;
-        case 'pdf':
+        }
+        case 'pdf': {
+            const { toPng } = await import('html-to-image');
+            const { jsPDF } = await import('jspdf');
             toPng(viewportElem, exportOptions).then((dataUrl: string) => {
                 const pdf = new jsPDF({
                     orientation: bounds.width > bounds.height ? 'l' : 'p',
@@ -64,5 +67,6 @@ export const downloadImage = (
                 pdf.save('diagram.pdf');
             });
             break;
+        }
     }
 };

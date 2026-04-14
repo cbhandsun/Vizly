@@ -153,7 +153,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                 />
             </Tooltip>
 
-            <Divider type="vertical" style={{ margin: '0 2px' }} />
+            <Divider orientation="vertical" style={{ margin: '0 2px' }} />
 
             {/* 线型 */}
             <Tooltip title={isDashed ? "实线" : "虚线"}>
@@ -194,7 +194,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                 />
             </Tooltip>
 
-            <Divider type="vertical" style={{ margin: '0 2px' }} />
+            <Divider orientation="vertical" style={{ margin: '0 2px' }} />
 
             {/* 箭头样式 */}
             <Tooltip title="切换箭头样式">
@@ -218,7 +218,7 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                 />
             </Tooltip>
 
-            <Divider type="vertical" style={{ margin: '0 2px' }} />
+            <Divider orientation="vertical" style={{ margin: '0 2px' }} />
 
             {/* 标签编辑 */}
             {isEditingLabel ? (

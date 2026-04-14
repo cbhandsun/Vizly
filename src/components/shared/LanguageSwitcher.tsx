@@ -31,7 +31,7 @@ export const LanguageSwitcher: React.FC = () => {
             onChange={handleChange}
             style={{ width: '100%', fontSize: '13px' }}
             popupMatchSelectWidth={false}
-            dropdownStyle={{ borderRadius: '8px', padding: '4px' }}
+            styles={{ popup: { root: { borderRadius: '8px', padding: '4px' } } }}
             options={[
                 { value: 'en', label: <div className="flex items-center gap-2"><span>🇬🇧</span> English</div> },
                 { value: 'zh', label: <div className="flex items-center gap-2"><span>🇨🇳</span> 中文</div> }

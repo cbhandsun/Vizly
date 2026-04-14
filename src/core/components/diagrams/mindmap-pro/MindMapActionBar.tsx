@@ -147,14 +147,14 @@ export const MindMapActionBar: React.FC = () => {
       <ActionBtn icon={<LinkOutlined />} label="联系线" onClick={handleAddRelationship} />
       <ActionBtn icon={<BlockOutlined />} label="概括总结" disabled={selectedNodes.length === 0} onClick={handleAddSummary} />
 
-      <Divider type="vertical" style={{ height: 32 }} />
+      <Divider orientation="vertical" style={{ height: 32 }} />
 
       {/* 美化 */}
       <Popover 
           content={<MindMapBeautifyPanel ctx={mockCtx} selectedNodes={selectedNodes} selectedEdges={selectedEdges} />} 
           trigger="click" 
           placement="bottom"
-          overlayInnerStyle={{ padding: 0 }}
+          styles={{ root: {}, container: { padding: 0 } }}
       >
           <div>
             <ActionBtn icon={<FormatPainterOutlined />} label="美化" />

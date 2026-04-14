@@ -121,7 +121,7 @@ const MindMapToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
     };
 
     const handleFitView = () => {
-        ctx.reactFlowInstance?.fitView({ duration: 600, padding: 0.2 });
+        ctx.reactFlowInstance?.fitView({ duration: 600, padding: 0.2, minZoom: 0.55 });
     };
 
     // Read current direction from root
@@ -144,7 +144,7 @@ const MindMapToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
                 ]}
             />
 
-            <Divider type="vertical" style={{ height: 16, margin: '0 2px' }} />
+            <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
 
             <Tooltip title="折叠所有分支">
                 <Button size="small" type="text" icon={<MenuFoldOutlined />} onClick={handleCollapseAll} />
@@ -153,7 +153,7 @@ const MindMapToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
                 <Button size="small" type="text" icon={<MenuUnfoldOutlined />} onClick={handleExpandAll} />
             </Tooltip>
 
-            <Divider type="vertical" style={{ height: 16, margin: '0 2px' }} />
+            <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
 
             <Tooltip title="适应视口">
                 <Button size="small" type="text" icon={<FullscreenOutlined />} onClick={handleFitView} />

@@ -4,7 +4,7 @@ import { Button, Avatar, Dropdown, MenuProps, Tooltip } from 'antd';
 import { UserOutlined, LoginOutlined, LogoutOutlined, CloudOutlined } from '@ant-design/icons';
 import { useAuth } from '@/context/AuthContext';
 import { AuthModal } from './AuthModal';
-import { CloudStorageManagerModal } from '../storage/CloudStorageManagerModal';
+const CloudStorageManagerModal = React.lazy(() => import('../storage/CloudStorageManagerModal').then(m => ({ default: m.CloudStorageManagerModal })));
 import { useTranslation } from 'react-i18next';
 
 export const AuthStatus: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
@@ -86,10 +86,12 @@ export const AuthStatus: React.FC<{ compact?: boolean }> = ({ compact = false })
                 open={isModalOpen}
                 onCancel={() => setIsModalOpen(false)}
             />
-            <CloudStorageManagerModal
-                open={isCloudModalOpen}
-                onCancel={() => setIsCloudModalOpen(false)}
-            />
+            <React.Suspense fallback={null}>
+                <CloudStorageManagerModal
+                    open={isCloudModalOpen}
+                    onCancel={() => setIsCloudModalOpen(false)}
+                />
+            </React.Suspense>
         </>
     );
 };

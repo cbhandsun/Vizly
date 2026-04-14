@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { useCallback } from 'react';
-import { jsPDF } from 'jspdf';
 import { dispatchDiagramControl } from '../components/shared/diagramControl';
 import { getTargetDiagramElement, temporarilyHideElements, exportElementToPngDataUrl, exportElementToSvgDataUrl, buildExportFileName, exportFullDiagramToPngDataUrl, exportFullDiagramToSvgDataUrl, exportFullDiagramByAdjustingViewportToPngDataUrl, exportFullDiagramByAdjustingViewportToSvgDataUrl, exportGifFrameWithAnimationClone, exportGifFramesWithAnimationCloneBatch } from '../components/shared/exportUtils';
 import { createGIF, type CreateOptions } from 'gifshot';
@@ -124,6 +123,7 @@ export const useDiagramControls = (diagramId: string, enableMainFlowAnimation: b
       const paddedWidth = img.naturalWidth;
       const paddedHeight = img.naturalHeight;
       const isPortrait = paddedHeight > paddedWidth;
+      const { jsPDF } = await import('jspdf');
       const pdf = new jsPDF({
         orientation: isPortrait ? 'portrait' : 'landscape',
         unit: 'px',

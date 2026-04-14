@@ -7,45 +7,46 @@ import Spin from 'antd/es/spin';
 import Result from 'antd/es/result';
 import { ConfigProvider } from 'antd';
 import { useTranslation } from 'react-i18next';
-import { useDiagramControls } from '@/core';
-import { useUIState } from '@/core';
+import { useDiagramControls } from '@/core/hooks/useDiagramControls';
+import { useUIState } from '@/core/hooks/useUIState';
 import { diagramDefinitions } from '../data/diagram-definitions';
 import { DiagramSettingsPanel } from './ui/DiagramSettingsPanel';
 import { EnhancedThemeSelector } from './ui/EnhancedThemeSelector';
 import { DiagramThemeProvider } from '@/core/themes/DiagramThemeProvider';
-import { useConfigIntegration, useConfigValue } from '@/core';
-import { useDiagramHostStorage } from '@/core';
+import { useConfigIntegration, useConfigValue } from '@/core/hooks/useConfigIntegration';
+import { useDiagramHostStorage } from '@/core/hooks/useDiagramHostStorage';
 import { useSubscription } from '../context/SubscriptionContext';
 
-import { DiagramControlBridge } from '@/core';
-import { dispatchDiagramControl } from '@/core';
-import { RoutingDebugPanel } from './debug/RoutingDebugPanel';
-import { LayeredConfigManager, ConfigLayer } from '@/core';
+import { type DiagramControlAction } from '@/core/components/shared/diagramControl';
+import { dispatchDiagramControl } from '@/core/components/shared/diagramControl';
+const RoutingDebugPanel = React.lazy(() => import('./debug/RoutingDebugPanel').then(m => ({ default: m.RoutingDebugPanel })));
+import { LayeredConfigManager, ConfigLayer } from '@/core/config/LayeredConfigManager';
 import { DiagramLayout } from './layout/DiagramLayout';
-import { CommandPalette, CommandItem } from '@/core';
+import { CommandPalette, type CommandItem } from '@/core/components/ui/CommandPalette';
 import { createPortal } from 'react-dom';
 import { useDraggablePanel } from '../hooks/useDraggablePanel';
 import { MdDragIndicator } from 'react-icons/md';
-import { ShortcutsHelpModal } from '@/core';
+import { ShortcutsHelpModal } from '@/core/components/ui/ShortcutsHelpModal';
 import { useYjsCollaboration } from './diagrams/collaboration/YjsProviderHooks';
 import { useCloudSave } from './diagrams/hooks/useCloudSave';
-import AIConfigModal from './ai/AIConfigModal';
-import { AIChatView } from './ai/AIChatPanel';
-import ShareDialog from './diagrams/ShareDialog';
+const AIConfigModal = React.lazy(() => import('./ai/AIConfigModal'));
+const AIChatView = React.lazy(() => import('./ai/AIChatPanel').then(m => ({ default: m.AIChatView })));
+const ShareDialog = React.lazy(() => import('./diagrams/ShareDialog'));
 import { CloudOutlined, AppstoreOutlined, FolderOpenOutlined, LockOutlined, UnlockOutlined, HomeOutlined } from '@ant-design/icons';
 import { Dropdown, Tooltip, Switch, message, Modal, Input } from 'antd';
-import { CloudStorageManagerModal } from './storage/CloudStorageManagerModal';
+const CloudStorageManagerModal = React.lazy(() => import('./storage/CloudStorageManagerModal').then(m => ({ default: m.CloudStorageManagerModal })));
 import { dataService } from '@/services/DataService';
 import { PRESET_MAP } from '@/data/standardized';
 import { CUSTOM_PRESETS_STORAGE_KEY } from './diagrams/ui/TemplateCascaderMenu';
 import { unifiedStorage } from '@/services/UnifiedStorageService';
-import { tryAttachDiagramSnapshot } from '@/core';
-import { invalidateRemoteDiagramPreview } from '@/core';
+import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
+import { invalidateRemoteDiagramPreview } from '@/core/utils/remoteDiagramPreview';
 import { TemplateCascaderMenu } from './diagrams/ui/TemplateCascaderMenu';
+import DiagramControlBridge from '@/core/components/shared/DiagramControlBridge';
 
 
 
-import { DraggableSettingsPanel } from './ui/DraggableSettingsPanel';
+const DraggableSettingsPanel = React.lazy(() => import('./ui/DraggableSettingsPanel').then(m => ({ default: m.DraggableSettingsPanel })));
 import { resolvePluginId } from '@/core/plugins/registry';
 
 import { ErrorBoundary } from './ui/ErrorBoundary';
@@ -154,6 +155,7 @@ const DiagramViewer: React.FC = () => {
         if (resolvedPluginId) {
             // Dynamically load UnifiedDesigner for recognized plugin types
             return lazy(() => import('@/core').then(m => {
+                if (m.initializePlugins) m.initializePlugins();
                 return {
                     default: (props: any) => React.createElement(m.UnifiedDesigner, { ...props, pluginId: resolvedPluginId })
                 };
@@ -161,7 +163,10 @@ const DiagramViewer: React.FC = () => {
         }
 
         // Fallback to FlowchartDesigner if not found
-        return lazy(() => import('@/core').then(m => ({ default: m.FlowchartDesigner })));
+        return lazy(() => import('@/core').then(m => {
+            if (m.initializePlugins) m.initializePlugins();
+            return { default: m.FlowchartDesigner };
+        }));
     }, [selectedDiagram?.component, docType, resolvedPluginId]);
 
     // 仅显示主流程（动线）开关状态（函数级注释）
@@ -302,6 +307,45 @@ const DiagramViewer: React.FC = () => {
         });
         addRecentDiagram(id);
     }, [setSearchParams, addRecentDiagram]);
+
+    const seedAutoSaveAndNavigate = useCallback(async (data: any, id: string) => {
+        let processedData = data;
+        
+        // Check if it's a standardized data payload that requires conversion to canvas format
+        // Standard Node Data usually has 'domain' at root and no 'data' object wrapper
+        const needsConversion = data && data.nodes && data.nodes.length > 0 && 
+            (!('data' in data.nodes[0]) || ('domain' in data.nodes[0]));
+        
+        if (needsConversion) {
+            try {
+                const { standardDataToCanvas } = await import('@/core/components/diagrams/designerUtils');
+                const layoutResult = await standardDataToCanvas(data);
+                
+                processedData = {
+                    ...data,
+                    nodes: layoutResult.nodes,
+                    edges: layoutResult.edges || data.edges || [],
+                    // Ensure a layout config exists
+                    layout: data.layout || { type: 'DomainDagreLayout', direction: 'TB' }
+                };
+            } catch (err) {
+                console.warn('[DiagramViewer] Standard data layout fallback execution failed:', err);
+            }
+        }
+
+        if (processedData && processedData.nodes) {
+            const storageKey = `flowchart-autosave-v2-${id}`;
+            localStorage.setItem(storageKey, JSON.stringify({
+                nodes: processedData.nodes,
+                edges: processedData.edges || [],
+                layout: processedData.layout,
+                metadata: processedData.metadata,
+                timestamp: Date.now(),
+                version: '1.0'
+            }));
+        }
+        handleSelectDiagram(id);
+    }, [handleSelectDiagram]);
 
 
 
@@ -652,45 +696,7 @@ const DiagramViewer: React.FC = () => {
                                     onChange={async (val, leafKey, rootGroup) => {
                                         if (!leafKey) return;
 
-                                        const seedAutoSaveAndNavigate = async (data: any, id: string) => {
-                                            let processedData = data;
-                                            
-                                            // Check if it's a standardized data payload that requires auto-layout (no positional info)
-                                            // Provide safe fallback checks if the node's position doesn't exist
-                                            const needsAutoLayout = data && data.nodes && data.nodes.length > 0 && (!data.nodes[0].position || data.nodes[0].position.x === undefined);
-                                            
-                                            if (needsAutoLayout) {
-                                                try {
-                                                    const { standardDataToCanvas } = await import('@/core/components/diagrams/designerUtils');
-                                                    const layoutResult = await standardDataToCanvas(data);
-                                                    
-                                                    processedData = {
-                                                        ...data,
-                                                        nodes: layoutResult.nodes,
-                                                        edges: layoutResult.edges || data.edges || [],
-                                                        // Ensure a layout config exists
-                                                        layout: data.layout || { type: 'DomainDagreLayout', direction: 'TB' }
-                                                    };
-                                                } catch (err) {
-                                                    console.warn('[DiagramViewer] Standard data layout fallback execution failed:', err);
-                                                }
-                                            }
-
-                                            if (processedData && processedData.nodes) {
-                                                const storageKey = `flowchart-autosave-v2-${id}`;
-                                                localStorage.setItem(storageKey, JSON.stringify({
-                                                    nodes: processedData.nodes,
-                                                    edges: processedData.edges || [],
-                                                    layout: processedData.layout,
-                                                    metadata: processedData.metadata,
-                                                    timestamp: Date.now(),
-                                                    version: '1.0'
-                                                }));
-                                            }
-                                            handleSelectDiagram(id);
-                                        };
-
-                                        if (rootGroup === 's3' || rootGroup === 'cloud') {
+                                        if (rootGroup === 's3' || rootGroup === 'cloud' || rootGroup === 'supabase') {
                                             const providerName = rootGroup === 's3' ? 's3' : 'supabase';
                                             const messageKey = message.loading(t('storage.manager.downloading'), 0);
                                             try {
@@ -779,13 +785,16 @@ const DiagramViewer: React.FC = () => {
                             >
                                 <FaCog />
                             </button>
-                            {/* 悬浮拖拽设置面板 Portal */}
-                            {isSettingsOpen && <DraggableSettingsPanel
-                                onClose={() => setIsSettingsOpen(false)}
-                                title={t('designer.viewer.moreSettings')}
-                            >
-                                {settingsPanel}
-                            </DraggableSettingsPanel>}
+                            {isSettingsOpen && (
+                                <Suspense fallback={<div />}>
+                                    <DraggableSettingsPanel
+                                        onClose={() => setIsSettingsOpen(false)}
+                                        title={t('designer.viewer.moreSettings')}
+                                    >
+                                        {settingsPanel}
+                                    </DraggableSettingsPanel>
+                                </Suspense>
+                            )}
                         </>
                     )
                 }}
@@ -854,37 +863,39 @@ const DiagramViewer: React.FC = () => {
                                                 onEnsureSaved={ensureSaved}
                                                 showAiCrown={true}
                                                 renderAIChatPanel={
-                                                    <AIChatView
-                                                        onOpenConfig={() => setAiConfigVisible(true)}
-                                                        onPreviewJson={(json: string) => {
-                                                            const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
-                                                            if (bridge && bridge.importData) {
-                                                                try {
-                                                                    const obj = JSON.parse(json);
-                                                                    bridge.importData(obj, { keepHistory: true });
-                                                                } catch (e) {
-                                                                    // ignore
+                                                    <Suspense fallback={<div className="p-4 text-center text-gray-500">Loading AI...</div>}>
+                                                        <AIChatView
+                                                            onOpenConfig={() => setAiConfigVisible(true)}
+                                                            onPreviewJson={(json: string) => {
+                                                                const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
+                                                                if (bridge && bridge.importData) {
+                                                                    try {
+                                                                        const obj = JSON.parse(json);
+                                                                        bridge.importData(obj, { keepHistory: true });
+                                                                    } catch (e) {
+                                                                        // ignore
+                                                                    }
                                                                 }
-                                                            }
-                                                        }}
-                                                        onApplyJson={(json: string) => {
-                                                            const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
-                                                            if (bridge && bridge.importData) {
-                                                                try {
-                                                                    const obj = JSON.parse(json);
-                                                                    bridge.importData(obj, { keepHistory: true });
-                                                                } catch (e) {
-                                                                    // ignore
+                                                            }}
+                                                            onApplyJson={(json: string) => {
+                                                                const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
+                                                                if (bridge && bridge.importData) {
+                                                                    try {
+                                                                        const obj = JSON.parse(json);
+                                                                        bridge.importData(obj, { keepHistory: true });
+                                                                    } catch (e) {
+                                                                        // ignore
+                                                                    }
                                                                 }
-                                                            }
-                                                        }}
-                                                        diagramNodesRef={aiNodesRef as any}
-                                                        diagramEdgesRef={aiEdgesRef as any}
-                                                        onClose={() => {
-                                                            const aiBtn = document.querySelector('.toolbar-button-ai');
-                                                            if (aiBtn) aiBtn.click();
-                                                        }}
-                                                    />
+                                                            }}
+                                                            diagramNodesRef={aiNodesRef as any}
+                                                            diagramEdgesRef={aiEdgesRef as any}
+                                                            onClose={() => {
+                                                                const aiBtn = document.querySelector('.toolbar-button-ai');
+                                                                if (aiBtn) aiBtn.click();
+                                                            }}
+                                                        />
+                                                    </Suspense>
                                                 }
                                                 onAiTabIntercept={useCallback(() => {
                                                     if (!hasFeature('ai-assistant')) {
@@ -897,11 +908,13 @@ const DiagramViewer: React.FC = () => {
                                                     <EnhancedThemeSelector />
                                                 }
                                                 renderAIConfigModal={
-                                                    <AIConfigModal
-                                                        open={aiConfigVisible}
-                                                        onCancel={() => setAiConfigVisible(false)}
-                                                        onSave={() => setAiConfigVisible(false)}
-                                                    />
+                                                    <Suspense fallback={<div />}>
+                                                        <AIConfigModal
+                                                            open={aiConfigVisible}
+                                                            onCancel={() => setAiConfigVisible(false)}
+                                                            onSave={() => setAiConfigVisible(false)}
+                                                        />
+                                                    </Suspense>
                                                 }
                                                 renderShareDialog={
                                                     <ShareDialog
@@ -920,7 +933,7 @@ const DiagramViewer: React.FC = () => {
                                     open={cloudManagerVisible}
                                     onCancel={() => setCloudManagerVisible(false)}
                                     onSelect={(data) => {
-                                        handleSelectDiagram(data.id);
+                                        seedAutoSaveAndNavigate(data, data.id);
                                     }}
                                 />
                             </ErrorBoundary>

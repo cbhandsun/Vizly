@@ -153,9 +153,14 @@ import { ArchitecturePlugin as InternalArchitecturePlugin } from './plugins/Arch
 import { TimelinePlugin as InternalTimelinePlugin } from './plugins/TimelinePlugin';
 import { MindMapPlugin as InternalMindMapPlugin } from './plugins/MindMapPlugin';
 
-const __registry = InternalPluginRegistry.getInstance();
-__registry.register(new InternalFlowchartPlugin(), true);
-__registry.register(new InternalArchitecturePlugin());
-__registry.register(new InternalTimelinePlugin());
-__registry.register(new InternalMindMapPlugin());
+export function initializePlugins() {
+  const __registry = InternalPluginRegistry.getInstance();
+  if (!__registry.getPlugin('flowchart')) {
+    __registry.register(new InternalFlowchartPlugin(), true);
+    __registry.register(new InternalArchitecturePlugin());
+    __registry.register(new InternalTimelinePlugin());
+    __registry.register(new InternalMindMapPlugin());
+  }
+}
+
 export * from './hooks/useTopologyLinter';

@@ -1,4 +1,4 @@
-import * as htmlToImage from 'html-to-image';
+
 
 /**
  * 计算当前 React Flow 图的内容包围盒（基于节点位置与尺寸）。
@@ -213,7 +213,7 @@ export const temporarilyHideElements = async <T>(selectors: string[], fn: () => 
  * @param pixelRatio - 像素比（默认 2，建议 3 用于高清）
  */
 export const exportElementToPngDataUrl = async (element: HTMLElement, paddingPx = 40, pixelRatio: number = 2) => {
-  return htmlToImage.toPng(element, {
+  return (await import('html-to-image')).toPng(element, {
     backgroundColor: '#ffffff',
     quality: 1.0,
     pixelRatio,
@@ -229,7 +229,7 @@ export const exportElementToPngDataUrl = async (element: HTMLElement, paddingPx 
  * @returns SVG数据URL
  */
 export const exportElementToSvgDataUrl = async (element: HTMLElement, paddingPx = 40) => {
-  return htmlToImage.toSvg(element, {
+  return (await import('html-to-image')).toSvg(element, {
     backgroundColor: '#ffffff',
     quality: 1.0,
     pixelRatio: 2,
@@ -348,7 +348,7 @@ export async function exportFullDiagramToPngDataUrl(diagramId: string, paddingPx
   // 渲染为 PNG
   try {
     const target = clone;
-    const dataUrl = await htmlToImage.toPng(target, {
+    const dataUrl = await (await import('html-to-image')).toPng(target, {
       backgroundColor: '#ffffff',
       quality: 1.0,
       pixelRatio,
@@ -517,7 +517,7 @@ export async function exportGifFrameWithAnimationClone(
 
   try {
     const target = clone;
-    return await htmlToImage.toPng(target, {
+    return await (await import('html-to-image')).toPng(target, {
       backgroundColor: '#ffffff',
       quality: 1.0,
       pixelRatio,
@@ -672,7 +672,7 @@ export async function exportGifFramesWithAnimationCloneBatch(
       });
 
       const target = clone;
-      const dataUrl = await htmlToImage.toPng(target, {
+      const dataUrl = await (await import('html-to-image')).toPng(target, {
         backgroundColor: '#ffffff',
         quality: 1.0,
         pixelRatio,
@@ -775,7 +775,7 @@ export async function exportFullDiagramToSvgDataUrl(diagramId: string, paddingPx
 
   try {
     const target = clone;
-    const dataUrl = await htmlToImage.toSvg(target, {
+    const dataUrl = await (await import('html-to-image')).toSvg(target, {
       backgroundColor: '#ffffff',
       quality: 1.0,
       cacheBust: true,
@@ -868,7 +868,7 @@ export async function exportFullDiagramByAdjustingViewportToPngDataUrl(
     // [FIX] 等待浏览器重排 Reflow/Repaint，防止截断或空白及文字错位
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    return await htmlToImage.toPng(root, {
+    return await (await import('html-to-image')).toPng(root, {
       backgroundColor: '#ffffff',
       quality: 1.0,
       pixelRatio,
@@ -966,7 +966,7 @@ export async function exportFullDiagramByAdjustingViewportToSvgDataUrl(
       // [FIX] 等待浏览器重排 Reflow/Repaint
       await new Promise(resolve => setTimeout(resolve, 300));
 
-      return htmlToImage.toSvg(root, {
+      return (await import('html-to-image')).toSvg(root, {
         backgroundColor: '#ffffff',
         quality: 1.0,
         cacheBust: true,

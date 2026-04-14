@@ -121,7 +121,7 @@ const FlowchartToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
     };
 
     const handleFitView = () => {
-        ctx.reactFlowInstance?.fitView({ duration: 600, padding: 0.25 });
+        ctx.reactFlowInstance?.fitView({ duration: 600, padding: 0.25, minZoom: 0.55 });
     };
 
     const handleAutoLayout = () => {
@@ -142,13 +142,13 @@ const FlowchartToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
             <AntTooltip title="垂直居中"><Button size="small" type="text" icon={<VerticalAlignMiddleOutlined style={iconBtnStyle} />} onClick={() => handleAlign('center-v')} /></AntTooltip>
             <AntTooltip title="底对齐"><Button size="small" type="text" icon={<VerticalAlignBottomOutlined style={iconBtnStyle} />} onClick={() => handleAlign('bottom')} /></AntTooltip>
 
-            <Divider type="vertical" style={{ height: 16, margin: '0 4px' }} />
+            <Divider orientation="vertical" style={{ height: 16, margin: '0 4px' }} />
 
             {/* 分布操作组 */}
             <AntTooltip title="水平等距"><Button size="small" type="text" icon={<ColumnWidthOutlined style={iconBtnStyle} />} onClick={() => handleDistribute('horizontal')} /></AntTooltip>
             <AntTooltip title="垂直等距"><Button size="small" type="text" icon={<ColumnHeightOutlined style={iconBtnStyle} />} onClick={() => handleDistribute('vertical')} /></AntTooltip>
 
-            <Divider type="vertical" style={{ height: 16, margin: '0 4px' }} />
+            <Divider orientation="vertical" style={{ height: 16, margin: '0 4px' }} />
 
             {/* 视图操作 */}
             <AntTooltip title="自动布局"><Button size="small" type="text" icon={<ApartmentOutlined style={iconBtnStyle} />} onClick={handleAutoLayout} /></AntTooltip>

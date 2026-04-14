@@ -13,8 +13,10 @@ import { useAuth } from '@/context/AuthContext';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { tryAttachDiagramSnapshot } from '@/core';
 import { invalidateRemoteDiagramPreview } from '@/core';
-import ShareDialog from '@/components/diagrams/ShareDialog';
-import { CloudStorageManagerModal } from '@/components/storage/CloudStorageManagerModal';
+const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
+const CloudStorageManagerModal = React.lazy(() => import('@/components/storage/CloudStorageManagerModal').then(async (m) => {
+  return { default: m.CloudStorageManagerModal };
+}));
 
 interface ExportToolsProps {
   diagramId: string;
@@ -404,17 +406,19 @@ const ExportTools: React.FC<ExportToolsProps> = ({
         </Dropdown>
       </Space>
 
-      <ShareDialog
-        open={shareDialogOpen}
-        onClose={() => setShareDialogOpen(false)}
-        diagramId={diagramId}
-        onEnsureSaved={handleEnsureSaved}
-      />
-      <CloudStorageManagerModal
-        open={cloudManagerOpen}
-        onCancel={() => setCloudManagerOpen(false)}
-        onOpenInDesigner={onOpenInDesigner}
-      />
+      <React.Suspense fallback={null}>
+        <ShareDialog
+          open={shareDialogOpen}
+          onClose={() => setShareDialogOpen(false)}
+          diagramId={diagramId}
+          onEnsureSaved={handleEnsureSaved}
+        />
+        <CloudStorageManagerModal
+          open={cloudManagerOpen}
+          onCancel={() => setCloudManagerOpen(false)}
+          onOpenInDesigner={onOpenInDesigner}
+        />
+      </React.Suspense>
     </>
   );
 };

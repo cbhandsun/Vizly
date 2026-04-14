@@ -322,7 +322,7 @@ const ArchitectureToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
                 <Button size="small" type="text" icon={<PartitionOutlined />} onClick={handleToggleDirection} />
             </Tooltip>
 
-            <Divider type="vertical" style={{ height: 16, margin: '0 2px' }} />
+            <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
 
             <Tooltip title={selectedCount === 2 ? '建立依赖关系' : '请选中两个节点'}>
                 <Button size="small" type="text" icon={<NodeIndexOutlined />} onClick={handleAddRelationship} disabled={selectedCount !== 2} />

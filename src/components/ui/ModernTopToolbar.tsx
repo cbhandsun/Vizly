@@ -60,7 +60,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
             { value: 'advanced-smart', label: t('header.smart') },
             { value: 'native', label: t('header.native') },
           ]}
-          dropdownStyle={{ borderRadius: '8px', padding: '4px' }}
+          styles={{ popup: { root: { borderRadius: '8px', padding: '4px' } } }}
         />
       </div>
       
@@ -81,13 +81,14 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       <div className="flex items-center gap-2 flex-shrink-0 h-[48px] px-3 bg-white/90 dark:bg-[#0f172a]/95 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/80 rounded-[14px] shadow-[0_4px_24px_rgba(0,0,0,0.06)] pointer-events-auto">
         {/* Vizly Brand → Home */}
         <a
-          className="flex items-center gap-2 px-1.5 py-1 rounded-md no-underline cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+          className="flex items-center justify-center px-2 py-1 rounded-md no-underline cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5"
           onClick={(e) => { e.preventDefault(); window.location.href = '#/manage'; }}
           href="#/manage"
           title="Back to Home"
         >
-          <div className="w-6 h-6 rounded bg-gradient-to-br from-[#6366f1] to-[#a855f7] flex items-center justify-center text-white font-bold text-[13px] flex-shrink-0 shadow-[0_1px_2px_rgba(99,102,241,0.2)]">V</div>
-          {!compact && <span className="font-bold text-[14px] text-slate-800 dark:text-slate-200 tracking-tight whitespace-nowrap">Vizly</span>}
+          <span className="font-extrabold text-[16px] tracking-tight whitespace-nowrap bg-clip-text text-transparent bg-gradient-to-r from-[#6366f1] to-[#a855f7]">
+            {compact ? 'V' : 'Vizly'}
+          </span>
         </a>
 
         {/* Breadcrumb chevron */}
@@ -161,7 +162,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
             placement="bottomRight"
             open={moreOpen}
             onOpenChange={setMoreOpen}
-            overlayInnerStyle={{ padding: 0, borderRadius: '12px' }}
+            styles={{ root: {}, container: { padding: 0, borderRadius: '12px' } }}
           >
             <button className="inline-flex items-center justify-center w-[30px] h-[30px] border-none rounded-md bg-transparent text-slate-600 dark:text-slate-400 hover:bg-indigo-500/10 hover:text-indigo-500 active:bg-indigo-500/20 active:scale-95 transition-all outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 cursor-pointer" title="More options">
               <MoreOutlined />

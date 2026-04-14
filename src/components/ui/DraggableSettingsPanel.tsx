@@ -24,12 +24,12 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
     return createPortal(
         <div
             ref={panelRef}
-            className="bg-white/70 dark:bg-[#1C1C1E]/80 backdrop-blur-xl backdrop-saturate-150 border border-white/20 dark:border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.12)] rounded-xl"
+            className="bg-white/80 dark:bg-[#111113]/85 backdrop-blur-2xl backdrop-saturate-[180%] border border-white/40 dark:border-white/10 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.15)] rounded-xl overflow-hidden"
             style={{
                 position: 'fixed',
                 top: 0,
                 left: 0,
-                width: '440px',
+                width: '460px',
                 maxHeight: 'calc(100vh - 80px)',
                 display: 'flex',
                 flexDirection: 'column',
@@ -39,30 +39,21 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
         >
             <div
                 onPointerDown={handlePointerDown}
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 16px',
-                    borderBottom: '1px solid rgba(128,128,128,0.1)',
-                    cursor: 'move',
-                    userSelect: 'none',
-                    flexShrink: 0
-                }}
+                className="flex items-center justify-between px-5 py-3.5 bg-white/40 dark:bg-black/20 hover:bg-white/50 dark:hover:bg-black/30 backdrop-blur-md border-b border-black/5 dark:border-white/5 cursor-move select-none shrink-0 transition-colors"
             >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <MdDragIndicator style={{ color: 'var(--color-text-tertiary, #999)' }} />
-                    <span style={{ fontWeight: 600, fontSize: '15px' }}>{title}</span>
+                <div className="flex items-center gap-2">
+                    <MdDragIndicator className="text-gray-400 dark:text-gray-500 text-lg" />
+                    <span className="font-semibold text-[14px] text-gray-800 dark:text-gray-200">{title}</span>
                 </div>
-                <Button
-                    type="text"
-                    size="small"
+                <button
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); onClose(); }}
-                    style={{ fontSize: '18px', lineHeight: 1 }}
+                    className="flex items-center justify-center w-7 h-7 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border-none outline-none cursor-pointer"
                 >
-                    ×
-                </Button>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                </button>
             </div>
 
             {/* 内容区域：ConfigProvider 让下拉框弹出到 body，避免被 overflow 裁剪 */}
@@ -77,8 +68,7 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
                 <div style={{
                     flex: 1,
                     overflowY: 'auto',
-                    overflowX: 'hidden',
-                    padding: '16px'
+                    overflowX: 'hidden'
                 }}>
                     {children}
                 </div>

@@ -160,7 +160,7 @@ export class EnhancedThemeManager {
       await this.applyTheme(theme, themeId);
       return theme;
     } catch (error) {
-      console.error(`🎨 EnhancedThemeManager - 主题加载失败: ${themeId}`, error);
+      console.warn(`🎨 EnhancedThemeManager - 主题加载失败: ${themeId}`, error);
       throw error;
     } finally {
       this.isLoading = false;
@@ -209,6 +209,45 @@ export class EnhancedThemeManager {
         });
 
         return theme;
+      }
+
+      // 如果预设不存在，尝试从数据中心(DataRegistry)提取内嵌的主题属性
+      try {
+        const { DataRegistry } = await import('../../data/DataRegistry');
+        const dataService = DataRegistry.getInstance().getDataService();
+        const result = await dataService.queryDiagrams({});
+        const diagramWithTheme = result.data.find((d: any) => d.theme?.name === themeId);
+        
+        if (diagramWithTheme && diagramWithTheme.theme) {
+          // 借用 light 预设作为基础主题拼装出一个完整的 Theme 对象
+          const basePreset = await loadThemePreset('light');
+          if (basePreset) {
+            const customTheme = {
+               ...basePreset.theme,
+               id: themeId,
+               name: diagramWithTheme.theme.displayName || themeId,
+               diagram: {
+                 ...basePreset.theme.diagram,
+                 domains: {
+                   ...basePreset.theme.diagram.domains,
+                   ...diagramWithTheme.theme.domains
+                 }
+               }
+            };
+            this.addCustomTheme(customTheme as any);
+            
+            this.emitEvent({
+              type: 'theme-loaded',
+              themeId,
+              newTheme: customTheme as any,
+              timestamp: Date.now()
+            });
+
+            return customTheme as any;
+          }
+        }
+      } catch (embErr) {
+        console.warn(`[EnhancedThemeManager] 尝试从数据中心加载内嵌主题失败:`, embErr);
       }
 
       throw new Error(`主题 "${themeId}" 不存在`);

@@ -267,7 +267,7 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
         group: '避障与容器'
       },
       {
-        key: 'edge.obstaclePadding',
+        key: 'diagram.edge.obstaclePadding',
         type: 'number' as const,
         value: 36,
         min: 0,
@@ -277,7 +277,7 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
       },
       // --- 几何微调 ---
       {
-        key: 'edge.minArrowOffset',
+        key: 'diagram.edge.minArrowOffset',
         type: 'number' as const,
         value: 18,
         min: 0,
@@ -286,7 +286,7 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
         group: '几何微调'
       },
       {
-        key: 'edge.stepLastSegmentMin',
+        key: 'diagram.edge.stepLastSegmentMin',
         type: 'number' as const,
         value: 24,
         min: 0,
@@ -738,42 +738,45 @@ const renderConfigEditor = (item: ConfigItem) => {
           max={item.max}
           step={item.step}
           onChange={(e) => handleValueChange(item.key, Number(e.target.value))}
-          className="w-full px-3 py-2 text-sm transition-colors border rounded-md border-gray-300/50 dark:border-gray-600/50 bg-white/50 dark:bg-black/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+          className="w-24 px-3 py-1.5 text-[13px] font-medium text-center transition-all bg-black/5 dark:bg-white/10 border border-transparent rounded-[8px] text-gray-800 dark:text-gray-100 hover:bg-black/10 dark:hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-black"
           title={t(`config.${item.key}.label`)}
         />
       );
 
     case 'boolean':
       return (
-        <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-200">
+        <label className="relative inline-flex items-center cursor-pointer">
           <input
             type="checkbox"
             checked={Boolean(currentValue)}
             onChange={(e) => handleValueChange(item.key, e.target.checked)}
-            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300/50 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:bg-black/40 dark:border-gray-600/50"
+            className="sr-only peer"
           />
-          <span>{currentValue ? t('config.boolean.enable') : t('config.boolean.disable')}</span>
+          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
         </label>
       );
 
     case 'select':
       return (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col items-end gap-1">
           <select
             value={currentValue}
             onChange={(e) => handleValueChange(item.key, e.target.value)}
-            className="w-full px-3 py-2 text-sm transition-colors border rounded-md border-gray-300/50 dark:border-gray-600/50 bg-white/50 dark:bg-black/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 disabled:opacity-50"
+            className="w-48 px-3 py-1.5 text-[13px] font-medium transition-all bg-black/5 dark:bg-white/10 border border-transparent rounded-[8px] text-gray-800 dark:text-gray-100 hover:bg-black/10 dark:hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-black cursor-pointer disabled:opacity-50"
             disabled={nodeLayoutDisabled}
             title={t(`config.${item.key}.label`)}
           >
-            {item.options?.map(option => (
-              <option key={option} value={option}>
-                {t(`config.options.${option}`)}
-              </option>
-            ))}
+            {item.options?.map(option => {
+              const trOpt = t(`config.options.${option}`);
+              return (
+                <option key={option} value={option}>
+                  {trOpt.startsWith('config.') ? option : trOpt}
+                </option>
+              );
+            })}
           </select>
           {nodeLayoutDisabled && (
-            <div className="text-xs text-orange-500/80 dark:text-orange-400/80 mt-1">Domain ELK overrides Node Strategy</div>
+            <div className="text-[10px] text-amber-500 font-medium">Domain ELK active</div>
           )}
         </div>
       );
@@ -785,40 +788,52 @@ const renderConfigEditor = (item: ConfigItem) => {
           type="text"
           value={currentValue}
           onChange={(e) => handleValueChange(item.key, e.target.value)}
-          className="w-full px-3 py-2 text-sm transition-colors border rounded-md border-gray-300/50 dark:border-gray-600/50 bg-white/50 dark:bg-black/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+          className="w-64 px-3 py-1.5 text-[13px] font-medium transition-all bg-black/5 dark:bg-white/10 border border-transparent rounded-[8px] text-gray-800 dark:text-gray-100 hover:bg-black/10 dark:hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-black"
           title={t(`config.${item.key}.label`)}
         />
       );
   }
 };
 
-// 渲染单个配置项
-const renderConfigItem = (item: ConfigItem) => (
-  <div key={item.key} className="flex flex-col justify-between p-4 transition-colors rounded-xl bg-white/40 dark:bg-black/20 border border-black/5 dark:border-white/5 hover:bg-white/60 dark:hover:bg-black/30">
-    <div className="flex items-center justify-between mb-3">
-      <div className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
-        {t(`config.${item.key}.label`)}
-        {t(`config.${item.key}.desc`) && (
-          <Tooltip content={t(`config.${item.key}.desc`)} delay={0}>
-            <FaQuestionCircle
-              className="ml-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 cursor-help transition-colors"
-            />
-          </Tooltip>
-        )}
+// 渲染单个配置项 (macOS System Settings Style Row)
+const renderConfigItem = (item: ConfigItem) => {
+  const rawLabel = t(`config.${item.key}.label`);
+  const name = item.key.split('.').pop() || '';
+  const fallbackLabel = /^[A-Z_]+$/.test(name) 
+    ? name.split('_').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ')
+    : name.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+    
+  const displayLabel = rawLabel.startsWith('config.') 
+    ? (item.label || fallbackLabel)
+    : rawLabel;
+
+  const rawDesc = t(`config.${item.key}.desc`);
+  const displayDesc = rawDesc.startsWith('config.') ? item.description : rawDesc;
+  // Extract primary sentence to avoid wall of text, keep rest in tooltip
+  const primaryDesc = displayDesc ? displayDesc.split(' - ')[0] : '';
+
+  return (
+  <div key={item.key} className="flex items-center justify-between px-5 py-3 transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
+    <div className="flex flex-col pr-4 flex-1 min-w-0">
+      <div className="text-[13px] font-medium text-gray-800 dark:text-gray-200 leading-tight">
+        {displayLabel}
       </div>
-      <div className="text-xs font-mono text-gray-500 dark:text-gray-400 bg-black/5 dark:bg-white/10 px-2 py-1 rounded max-w-[120px] truncate">
-        {typeof editingValues[item.key] === 'boolean'
-          ? (editingValues[item.key] ? '✓' : '✗')
-          : String(editingValues[item.key] || '')
-        }
-      </div>
+      {primaryDesc && (
+        <div
+          className="mt-0.5 text-[11.5px] text-gray-400 dark:text-gray-500 truncate max-w-[280px] cursor-help"
+          title={displayDesc}
+        >
+          {primaryDesc}
+        </div>
+      )}
     </div>
 
-    <div className="w-full">
+    <div className="flex items-center flex-none">
       {renderConfigEditor(item)}
     </div>
   </div>
-);
+  );
+};
 
 // 渲染当前标签页的内容（支持分组）
 const renderTabContent = () => {
@@ -827,8 +842,10 @@ const renderTabContent = () => {
 
   if (!hasGroups) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {items.map(renderConfigItem)}
+      <div className="flex flex-col gap-4 pb-4">
+        <div className="flex flex-col bg-white dark:bg-[#1A1A1C] shadow-sm border border-gray-200/60 dark:border-white/10 rounded-[12px] overflow-hidden divide-y divide-gray-100 dark:divide-white/5">
+          {items.map(renderConfigItem)}
+        </div>
       </div>
     );
   }
@@ -847,26 +864,26 @@ const renderTabContent = () => {
   });
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 pb-4">
       {groups.map((group, index) => (
         <div key={index} className="flex flex-col">
-          <div className="mb-4">
-            <h3 className="text-sm font-bold tracking-wider text-gray-500 uppercase dark:text-gray-400">
-              {['基础设置', '避障与容器', '几何微调', '偏好权重', '高级采样', '贝塞尔微调', '核心策略', 'ELK 基础', 'ELK 间距', 'ELK 高级微调'].includes(group.name)
-                ? t(`config.groups.${group.name === '基础设置' ? 'basic' :
-                  group.name === '避障与容器' ? 'obstacle' :
-                    group.name === '几何微调' ? 'geometry' :
-                      group.name === '偏好权重' ? 'preference' :
-                        group.name === '高级采样' ? 'sampling' :
-                          group.name === '贝塞尔微调' ? 'bezier' :
-                            group.name === '核心策略' ? 'core' :
-                              group.name === 'ELK 基础' ? 'elkBasic' :
-                                group.name === 'ELK 间距' ? 'elkSpacing' : 'elkAdvanced'
-                  }`)
-                : group.name}
+          <div className="mb-2 px-2">
+            <h3 className="text-[11px] font-semibold tracking-wider text-gray-500 dark:text-gray-400 uppercase">
+              {(() => {
+                const map: Record<string, string> = {
+                  '基础设置': 'basic', '避障与容器': 'obstacle', '几何微调': 'geometry', '偏好权重': 'preference',
+                  '高级采样': 'sampling', '贝塞尔微调': 'bezier', '核心策略': 'core', 'ELK 基础': 'elkBasic',
+                  'ELK 间距': 'elkSpacing', 'ELK 高级微调': 'elkAdvanced'
+                };
+                if (map[group.name]) {
+                  const tGroup = t(`config.groups.${map[group.name]}`);
+                  return tGroup.startsWith('config.') ? group.name : tGroup;
+                }
+                return group.name;
+              })()}
             </h3>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex flex-col bg-white dark:bg-[#1A1A1C] shadow-sm border border-gray-200/60 dark:border-white/10 rounded-[12px] overflow-hidden divide-y divide-gray-100 dark:divide-white/5">
             {group.items.map(renderConfigItem)}
           </div>
         </div>
@@ -901,75 +918,69 @@ if (!state.isReady) {
   );
 }
 
-// 通用的按钮类模板
-const activeTabClass = "bg-white/50 dark:bg-black/30 text-blue-600 dark:text-blue-400 shadow-sm border border-black/5 dark:border-white/5";
-const inactiveTabClass = "text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 border border-transparent";
-const actionBtnPrimary = "text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20 shadow-sm";
-const actionBtnSecondary = "text-gray-700 dark:text-gray-200 bg-white/50 dark:bg-black/40 hover:bg-white/80 dark:hover:bg-black/60 border border-black/5 dark:border-white/10 shadow-sm";
+// 等效于 iOS/macOS 风格的激活态与默认态
+const activeTabClass = "bg-black/5 dark:bg-white/10 text-gray-900 dark:text-gray-100 font-semibold";
+const inactiveTabClass = "text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 font-medium";
+const actionBtnPrimary = "text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm border-transparent rounded-[8px]";
+const actionBtnSecondary = "text-gray-700 dark:text-gray-200 bg-white dark:bg-black hover:bg-gray-50 dark:hover:bg-white/5 border border-black/10 dark:border-white/10 shadow-sm rounded-[8px]";
 
 // 修复（函数级注释）：确保配置面板在全屏下可见，portal 挂载到全屏元素
 return createPortal(
-  <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={onClose}>
-    <div className={`relative flex flex-col w-full max-w-4xl max-h-[90vh] rounded-2xl bg-white/70 dark:bg-[#1C1C1E]/80 backdrop-blur-xl backdrop-saturate-150 border border-white/20 dark:border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.12)] transition-all duration-300 transform ${isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`} onClick={(e) => e.stopPropagation()}>
-      {/* 头部 */}
-      <div className="flex-none px-6 py-4 border-b border-gray-200/50 dark:border-gray-700/50 flex items-center justify-between">
-        <div className="flex items-center gap-3 text-lg font-semibold text-gray-800 dark:text-gray-100">
-          <FaCog className="text-blue-500" />
-          <h2>{t('config.title')}</h2>
+  <div className={`fixed inset-0 z-[5000] flex items-center justify-center p-4 sm:p-6 bg-black/30 dark:bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={onClose}>
+    {/* Vercel/Linear 风格设置面板 (Sidebar Master-Detail) */}
+    <div className={`relative flex w-full max-w-[900px] h-full max-h-[640px] rounded-[16px] bg-white dark:bg-[#111113] border border-black/10 dark:border-white/10 shadow-2xl transition-all duration-300 transform ${isOpen ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'} overflow-hidden`} onClick={(e) => e.stopPropagation()}>
+      
+      {/* 左侧导航栏 Sidebar */}
+      <div className="w-[240px] flex-none flex flex-col border-r border-black/10 dark:border-white/10 bg-gray-50/60 dark:bg-black/30">
+        <div className="px-5 py-5 border-b border-transparent">
+          <h2 className="text-[15px] font-semibold tracking-tight text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <div className="p-1.5 bg-indigo-500/10 rounded-md">
+              <FaCog className="text-indigo-600 dark:text-indigo-400 w-3.5 h-3.5" />
+            </div>
+            {t('config.title')}
+          </h2>
         </div>
-        <button onClick={onClose} className="p-2 text-gray-500 transition-colors rounded-full hover:bg-black/5 dark:hover:bg-white/10 hover:text-gray-800 dark:hover:text-gray-100" title={t('config.actions.close')}>
-          <FaTimes />
-        </button>
+        
+        <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1">
+          {[
+            { id: 'nodes', label: t('config.tabs.nodes') },
+            { id: 'containers', label: t('config.tabs.containers') },
+            { id: 'spacing', label: t('config.tabs.spacing') },
+            { id: 'edges', label: t('config.tabs.edges') },
+            { id: 'layout', label: t('config.tabs.layout') },
+            { id: 'performance', label: t('config.tabs.performance') }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`w-full flex items-center px-3 py-2 text-[13px] rounded-lg transition-colors ${activeTab === tab.id ? activeTabClass : inactiveTabClass}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Tab标签页 */}
-      <div className="flex-none flex px-6 py-2 gap-2 overflow-x-auto border-b border-gray-200/50 dark:border-gray-700/50 scrollbar-hide">
-        <button
-          className={`flex-none px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${activeTab === 'nodes' ? activeTabClass : inactiveTabClass}`}
-          onClick={() => setActiveTab('nodes')}
-        >
-          {t('config.tabs.nodes')}
-        </button>
-        <button
-          className={`flex-none px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${activeTab === 'containers' ? activeTabClass : inactiveTabClass}`}
-          onClick={() => setActiveTab('containers')}
-        >
-          {t('config.tabs.containers')}
-        </button>
-        <button
-          className={`flex-none px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${activeTab === 'spacing' ? activeTabClass : inactiveTabClass}`}
-          onClick={() => setActiveTab('spacing')}
-        >
-          {t('config.tabs.spacing')}
-        </button>
-        <button
-          className={`flex-none px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${activeTab === 'edges' ? activeTabClass : inactiveTabClass}`}
-          onClick={() => setActiveTab('edges')}
-        >
-          {t('config.tabs.edges')}
-        </button>
-        <button
-          className={`flex-none px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${activeTab === 'layout' ? activeTabClass : inactiveTabClass}`}
-          onClick={() => setActiveTab('layout')}
-        >
-          {t('config.tabs.layout')}
-        </button>
-        <button
-          className={`flex-none px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${activeTab === 'performance' ? activeTabClass : inactiveTabClass}`}
-          onClick={() => setActiveTab('performance')}
-        >
-          {t('config.tabs.performance')}
-        </button>
-      </div>
+      {/* 右侧主区域 Main Content */}
+      <div className="flex-1 flex flex-col relative bg-transparent overflow-hidden">
+        {/* 顶部标题栏 & 关闭按钮 */}
+        <div className="flex-none flex items-center justify-between px-8 md:px-12 pt-7 pb-5">
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight leading-none">
+            {t(`config.tabs.${activeTab}`)}
+          </h1>
+          <button onClick={onClose} className="-mr-2 p-1.5 rounded-md text-gray-400 hover:text-gray-800 hover:bg-black/5 dark:hover:text-gray-100 dark:hover:bg-white/10 transition-colors" title={t('config.actions.close')}>
+            <FaTimes className="w-4 h-4" />
+          </button>
+        </div>
 
-      {/* 内容区域 */}
-      <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
-        <div className="w-full">
-          {renderTabContent()}
-          {activeTab === 'layout' && (
-            <div className="mt-6 flex gap-3">
-              <button
-                className={`flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-colors rounded-lg flex-1 sm:flex-none ${actionBtnSecondary}`}
+        {/* 滚动内容区 */}
+        <div className="flex-1 overflow-y-auto px-8 md:px-12 pb-8 pt-1 scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10">
+          <div className="w-full max-w-2xl mx-auto pb-12">
+            {renderTabContent()}
+            {activeTab === 'layout' && (
+              <div className="mt-8 flex flex-col sm:flex-row gap-3">
+                <button
+                className={`flex items-center justify-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors rounded-lg flex-1 sm:flex-none ${actionBtnSecondary}`}
                 onClick={async () => {
                   const preset: Record<string, any> = {
                     'diagram.layout.ELK_NODE_SPACING': 36,
@@ -991,12 +1002,12 @@ return createPortal(
                   setEditingValues(next);
                   setHasChanges(false);
                 }}
-                title={t('config.actions.applyCompact')}
+                title={t('config.actions.applyCompact') === 'config.actions.applyCompact' ? '应用紧凑排版预设' : t('config.actions.applyCompact')}
               >
-                {t('config.actions.applyCompact')}
+                {t('config.actions.applyCompact') === 'config.actions.applyCompact' ? '应用紧凑排版预设' : t('config.actions.applyCompact')}
               </button>
               <button
-                className={`flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-colors rounded-lg flex-1 sm:flex-none ${actionBtnSecondary}`}
+                className={`flex items-center justify-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors rounded-lg flex-1 sm:flex-none ${actionBtnSecondary}`}
                 onClick={async () => {
                   const preset: Record<string, any> = {
                     'diagram.layout.ELK_NODE_SPACING': 56,
@@ -1018,9 +1029,9 @@ return createPortal(
                   setEditingValues(next);
                   setHasChanges(false);
                 }}
-                title={t('config.actions.applyConsistent')}
+                title={t('config.actions.applyConsistent') === 'config.actions.applyConsistent' ? '应用标准排版预设' : t('config.actions.applyConsistent')}
               >
-                {t('config.actions.applyConsistent')}
+                {t('config.actions.applyConsistent') === 'config.actions.applyConsistent' ? '应用标准排版预设' : t('config.actions.applyConsistent')}
               </button>
             </div>
           )}
@@ -1028,31 +1039,40 @@ return createPortal(
       </div>
 
       {/* 底部操作栏 */}
-      <div className="flex-none px-6 py-4 border-t border-gray-200/50 dark:border-gray-700/50 flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50/30 dark:bg-black/20">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+      <div className="flex-none px-10 py-5 border-t border-black/5 dark:border-white/5 flex items-center justify-between bg-gray-50/30 dark:bg-[#161618]">
+        <div className="flex items-center gap-3">
           <button
             onClick={handleResetChanges}
-            className={`flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-colors rounded-lg flex-1 sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnSecondary}`}
+            className={`flex items-center justify-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnSecondary}`}
             disabled={!hasChanges}
           >
             <FaUndo />
-            {t('config.actions.reset')}
+            {t('config.actions.reset') === 'config.actions.reset' ? '重置' : t('config.actions.reset')}
+          </button>
+          {hasChanges && (
+            <div className="flex items-center gap-2 text-[13px] font-medium text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-md border border-amber-200 dark:border-amber-800/30">
+              <FaExclamationTriangle className="w-3.5 h-3.5" />
+              {t('config.unsavedChanges') === 'config.unsavedChanges' ? '有未保存的更改' : t('config.unsavedChanges')}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onClose}
+            className={`px-6 py-2 text-[13px] font-medium transition-colors ${actionBtnSecondary}`}
+          >
+            {t('config.actions.cancel') === 'config.actions.cancel' ? '取消' : t('config.actions.cancel')}
           </button>
           <button
             onClick={handleSaveChanges}
-            className={`flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-colors rounded-lg flex-1 sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnPrimary}`}
             disabled={!hasChanges || !state.isReady || !state.integration}
+            className={`flex items-center justify-center gap-2 px-6 py-2 text-[13px] font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnPrimary}`}
           >
             <FaCheck />
-            {t('config.actions.save')}
+            {t('config.actions.save') === 'config.actions.save' ? '保存更改' : t('config.actions.save')}
           </button>
         </div>
-        {hasChanges && (
-          <div className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full border border-amber-200 dark:border-amber-800/30">
-            <FaExclamationTriangle />
-            {t('config.unsavedChanges')}
-          </div>
-        )}
+      </div>
       </div>
     </div>
   </div>,

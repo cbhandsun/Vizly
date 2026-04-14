@@ -117,7 +117,12 @@ export const useCustomNodeStyleResolution = ({
     const safeCustomStyle = { ...(d.customStyle || {}) } as React.CSSProperties;
     if ('backgroundColor' in safeCustomStyle) delete (safeCustomStyle as any).backgroundColor;
     if ('border' in safeCustomStyle) delete (safeCustomStyle as any).border;
-    if ('borderColor' in safeCustomStyle) delete (safeCustomStyle as any).borderColor;
+    const getVisualBackgroundColor = () => {
+        if (selected) return hexToRgba(themeMain, 0.06);
+        if (bgPolicy === 'white' && !hasExplicitDomainColor) return '#FFFFFF';
+        if (bgPolicy === 'tint') return '#FFFFFF'; // Treat tint as white for contrast purposes since it sits on a mostly light canvas
+        return themeBackground || 'transparent'; // This is a simplification; transparent should probably assume the canvas color
+    };
 
     // Text Contrast Resolution
     const resolveContentTextColor = (customColor?: string, bgColor?: string) => {
@@ -131,11 +136,20 @@ export const useCustomNodeStyleResolution = ({
         const neutralText = theme?.palette?.neutral?.text;
         if (neutralText) return ensureReadableText(neutralText, String(bgColor || '#FFFFFF'));
         
-        if (bgColor) return pickReadableTextColor(bgColor, '#FFFFFF', '#111111');
-        return '#111111';
+        if (bgColor) return resolveContrast(bgColor);
+        return isDarkTheme ? '#FFFFFF' : '#1F2937';
     };
 
-    const textColor = resolveContentTextColor(d?.customStyle?.color, themeBackground);
+    // Helper for contrast when color is not provided
+    const resolveContrast = (bg: string) => {
+      return ensureReadableText('#1F2937', bg, 4.5, '#FFFFFF', '#1F2937');
+    }
+
+    // Determine the baseline color to test contrast against
+    const contrastBaseBg = getVisualBackgroundColor();
+    const effectiveContrastBg = contrastBaseBg === 'transparent' ? (isDarkTheme ? '#1e1e1e' : '#ffffff') : contrastBaseBg;
+
+    const textColor = resolveContentTextColor(d?.customStyle?.color, effectiveContrastBg);
 
     // --- Computed Styles Objects ---
     const containerStyle: React.CSSProperties = {

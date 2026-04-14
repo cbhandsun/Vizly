@@ -189,7 +189,7 @@
 .title-group-content.glass {
     -webkit-backdrop-filter: blur(12px) saturate(160%);
     backdrop-filter: blur(12px) saturate(160%);
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.2));
+    background: var(--group-glass-bg);
 }
 
 .title-group-content.blueprint {

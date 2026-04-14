@@ -81,8 +81,8 @@ export function useLayoutStrategy({
     // [FIX] 两步 fitView：先无动画（解决虚拟化 onlyRenderVisibleElements），再平滑动画
     const twoStepFitView = useCallback(() => {
         requestAnimationFrame(() => {
-            reactFlowInstance.fitView({ duration: 0, padding: 0.2 });
-            setTimeout(() => reactFlowInstance.fitView({ duration: 600, padding: 0.2 }), 100);
+            reactFlowInstance.fitView({ duration: 0, padding: 0.2, minZoom: 0.55 });
+            setTimeout(() => reactFlowInstance.fitView({ duration: 600, padding: 0.2, minZoom: 0.55 }), 100);
         });
     }, [reactFlowInstance]);
 

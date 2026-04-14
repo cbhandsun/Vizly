@@ -304,24 +304,26 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         return (
           <div
             key={themeId}
-            className={`relative flex flex-col gap-3 p-4 transition-all duration-200 rounded-xl cursor-pointer border ${isActive ? 'bg-white/60 dark:bg-black/40 border-blue-500/50 shadow-md shadow-blue-500/10' : 'bg-white/30 dark:bg-black/20 border-black/5 dark:border-white/5 hover:bg-white/50 dark:hover:bg-black/30'}`}
+            className={`group relative flex flex-col gap-3 p-4 transition-all duration-300 rounded-2xl cursor-pointer hover:-translate-y-1 ${isActive ? 'bg-white/90 dark:bg-black/60 border border-blue-500/50 shadow-[0_8px_24px_-8px_rgba(59,130,246,0.4)] ring-1 ring-blue-500/20' : 'bg-white/40 dark:bg-black/20 border border-black/[0.03] dark:border-white/[0.03] hover:border-black/[0.08] dark:hover:border-white/[0.1] hover:shadow-[0_8px_20px_-8px_rgba(0,0,0,0.1)] hover:bg-white/80 dark:hover:bg-black/40'}`}
             onClick={() => handleThemeChange(themeId)}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleThemeChange(themeId); } }}
           >
-            <div className="w-full h-16 rounded-lg opacity-90 shadow-inner" style={{
+            <div className="w-full h-20 rounded-xl shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),0_4px_12px_rgba(0,0,0,0.08)] relative overflow-hidden transform transition-transform group-hover:scale-[1.02]" style={{
               background: getGradientBackground(preset || themeData || { id: themeId }),
-            }} />
-            <div className="flex flex-col pt-2 pointer-events-none">
-              <div className="text-sm font-semibold text-gray-800 dark:text-gray-100 capitalize">
+            }}>
+               <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/30 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 transform -translate-x-[150%] group-hover:translate-x-[150%]" style={{ transitionProperty: 'opacity, transform' }} />
+            </div>
+            <div className="flex flex-col pt-1 pointer-events-none">
+              <div className="text-[15px] font-semibold text-gray-800 dark:text-gray-100 capitalize tracking-tight">
                 {preset?.name || t(`theme.selector.${themeId}`, { defaultValue: themeId })}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
+              <div className="text-xs text-gray-500/80 dark:text-gray-400 font-medium">
                 {preset?.category === 'built-in' ? '基础主题' : preset?.category === 'preset' ? '系统预设' : t('theme.selector.themes')}
               </div>
             </div>
-            {isActive && <FaCheck className="absolute top-3 right-3 text-blue-500 p-1 bg-white/80 dark:bg-black/50 rounded-full shadow-sm" />}
+            {isActive && <FaCheck className="absolute top-2 right-2 text-blue-500 p-1.5 w-6 h-6 bg-white/90 dark:bg-black/70 rounded-full shadow-sm backdrop-blur-md" />}
           </div>
         );
       })}
@@ -348,20 +350,22 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
                 {categoryPresets.map(preset => (
                   <div
                     key={preset.id}
-                    className="flex flex-col gap-3 p-4 transition-all duration-200 rounded-xl cursor-pointer border bg-white/30 dark:bg-black/20 border-black/5 dark:border-white/5 hover:bg-white/50 dark:hover:bg-black/30"
+                    className="group relative flex flex-col gap-3 p-4 transition-all duration-300 rounded-2xl cursor-pointer bg-white/40 dark:bg-black/20 border border-black/[0.03] dark:border-white/[0.03] hover:-translate-y-1 hover:shadow-[0_8px_20px_-8px_rgba(0,0,0,0.1)] hover:bg-white/80 dark:hover:bg-black/40"
                     onClick={() => handleApplyPreset(preset)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleApplyPreset(preset); } }}
                   >
-                    <div className="w-full h-16 rounded-lg opacity-90 shadow-inner" style={{
+                    <div className="w-full h-20 rounded-xl shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),0_4px_12px_rgba(0,0,0,0.08)] relative overflow-hidden transform transition-transform group-hover:scale-[1.02]" style={{
                       background: getGradientBackground(preset),
-                    }} />
-                    <div className="relative pt-16 flex-1 text-left z-10 flex flex-col pointer-events-none">
-                      <span className="font-medium text-gray-800 dark:text-gray-100 capitalize">
+                    }}>
+                       <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/30 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 transform -translate-x-[150%] group-hover:translate-x-[150%]" style={{ transitionProperty: 'opacity, transform' }} />
+                    </div>
+                    <div className="relative pt-2 flex-1 text-left z-10 flex flex-col pointer-events-none">
+                      <span className="font-semibold text-[15px] text-gray-800 dark:text-gray-100 capitalize tracking-tight">
                         {preset?.name || preset.id}
                       </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                      <span className="text-xs font-medium text-gray-500/80 dark:text-gray-400">
                         {preset?.category === 'built-in' ? '基础主题' : preset?.category === 'preset' ? '系统预设' : '自定义'}
                       </span>
                     </div>
@@ -540,45 +544,48 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
     );
   }
 
-  const activeTabClass = "bg-white/50 dark:bg-black/30 text-blue-600 dark:text-blue-400 shadow-sm border border-black/5 dark:border-white/5";
-  const inactiveTabClass = "text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 border border-transparent";
+  const activeTabClass = "bg-white dark:bg-[#3A3A3C] text-gray-900 dark:text-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)] rounded-[10px] font-semibold transform transition-all duration-300 scale-100 ring-1 ring-black/5 dark:ring-white/10";
+  const inactiveTabClass = "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/5 rounded-[10px] font-medium transition-all duration-300 scale-[0.98] opacity-80 hover:opacity-100 hover:scale-100";
 
   return (
     <>
       <button
-        className={`flex items-center gap-2 h-8 px-3 text-sm transition-colors rounded-[8px] bg-white/70 dark:bg-[#1C1C1E]/80 backdrop-blur-xl border border-black/5 dark:border-white/10 hover:bg-white flex items-center justify-center dark:hover:bg-[#2C2C2E]/90 text-gray-700 dark:text-gray-200 shadow-sm shadow-black/5 pointer-events-auto ${className}`}
+        className={`flex items-center justify-between gap-1.5 h-8 px-2.5 text-[13px] transition-colors rounded-[6px] bg-white dark:bg-[#1C1C1E] border border-[#d9d9d9] dark:border-white/15 hover:border-blue-400 dark:hover:border-blue-500 text-gray-700 dark:text-gray-200 shadow-none pointer-events-auto overflow-hidden w-full ${className}`}
         onClick={() => setIsOpen(!isOpen)}
         style={style}
       >
-        <div
-          className="w-[14px] h-[14px] rounded-full border border-black/10 dark:border-white/20 shadow-sm"
-          style={{
-            background: currentTheme?.palette?.primary?.main || token.colorPrimary,
-          }}
-        />
-        <span>
-          {currentTheme
-            ? t(`theme.selector.${currentTheme.id}`, { defaultValue: currentTheme.name })
-            : t('theme.selector.choose')}
+        <span className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+          <span
+            className="flex-shrink-0 w-2.5 h-2.5 rounded-full border border-black/10 dark:border-white/20"
+            style={{ background: currentTheme?.palette?.primary?.main || token.colorPrimary }}
+          />
+          <span className="truncate text-gray-700 dark:text-gray-200">
+            {currentTheme
+              ? t(`theme.selector.${currentTheme.id}`, { defaultValue: currentTheme.name })
+              : t('theme.selector.choose')}
+          </span>
         </span>
+        <svg className="flex-shrink-0 text-gray-400 w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
       </button>
 
       {isOpen && createPortal(
-        <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsOpen(false)}>
+        <div className={`fixed inset-0 z-[3000] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsOpen(false)}>
           <div
-            className="relative flex flex-col w-full max-w-2xl max-h-[85vh] rounded-2xl bg-white/70 dark:bg-[#1C1C1E]/80 backdrop-blur-xl backdrop-saturate-150 border border-white/20 dark:border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.12)] overflow-hidden transition-all duration-300 pointer-events-auto"
+            className="relative flex flex-col w-full max-w-2xl max-h-[85vh] rounded-2xl bg-white/70 dark:bg-[#1C1C1E]/80 backdrop-blur-3xl backdrop-saturate-200 border border-white/40 dark:border-white/10 shadow-[0_16px_40px_0_rgba(0,0,0,0.16),inset_0_1px_1px_rgba(255,255,255,0.4)] overflow-hidden transition-all duration-300 pointer-events-auto"
             onClick={(e) => e.stopPropagation()}
             style={{
               cursor: isDragging ? 'grabbing' : 'default',
+              transform: isOpen ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(20px)',
+              opacity: isOpen ? 1 : 0
             }}
             ref={panelRef}
           >
             {/* Header */}
-            <div className="flex-none px-6 py-4 border-b border-gray-200/50 dark:border-gray-700/50 flex items-center justify-between"
+            <div className="flex-none px-6 py-5 border-b border-gray-200/50 dark:border-gray-700/50 flex items-center justify-between"
               onPointerDown={handlePointerDown}
               style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
             >
-              <div className="flex items-center gap-3 text-lg font-semibold text-gray-800 dark:text-gray-100">
+              <div className="flex items-center gap-3 text-lg font-bold text-gray-800 dark:text-gray-100 tracking-tight">
                 <FaPalette className="text-purple-500" />
                 <h2>{t('theme.selector.title')}</h2>
               </div>
@@ -593,37 +600,39 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
             </div>
 
             {/* Tabs */}
-            <div className="flex-none flex px-6 py-2 gap-2 overflow-x-auto border-b border-gray-200/50 dark:border-gray-700/50 scrollbar-hide">
-              <button
-                className={`flex-none px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap cursor-pointer ${activeTab === 'themes' ? activeTabClass : inactiveTabClass}`}
-                onClick={() => setActiveTab('themes')}
-              >
-                {t('theme.selector.themes')}
-              </button>
-              {showPresets && (
+            <div className="flex-none px-6 pt-4 pb-2 border-b border-gray-200/50 dark:border-gray-700/50">
+              <div className="flex items-center gap-1 p-1 bg-black/[0.04] dark:bg-white/[0.06] rounded-[12px] w-fit shadow-[inset_0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.2)]">
                 <button
-                  className={`flex-none px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap cursor-pointer ${activeTab === 'presets' ? activeTabClass : inactiveTabClass}`}
-                  onClick={() => setActiveTab('presets')}
+                  className={`flex-none px-4 py-2 text-[14px] rounded-[10px] whitespace-nowrap cursor-pointer ${activeTab === 'themes' ? activeTabClass : inactiveTabClass}`}
+                  onClick={() => setActiveTab('themes')}
                 >
-                  {t('theme.selector.presets')}
+                  {t('theme.selector.themes')}
                 </button>
-              )}
-              {showCustomThemes && (
+                {showPresets && (
+                  <button
+                    className={`flex-none px-4 py-2 text-[14px] rounded-[10px] whitespace-nowrap cursor-pointer ${activeTab === 'presets' ? activeTabClass : inactiveTabClass}`}
+                    onClick={() => setActiveTab('presets')}
+                  >
+                    {t('theme.selector.presets')}
+                  </button>
+                )}
+                {showCustomThemes && (
+                  <button
+                    className={`flex-none px-4 py-2 text-[14px] rounded-[10px] whitespace-nowrap cursor-pointer ${activeTab === 'custom' ? activeTabClass : inactiveTabClass}`}
+                    onClick={() => setActiveTab('custom')}
+                  >
+                    {t('theme.selector.custom')}
+                  </button>
+                )}
+                <div className="w-2" />
                 <button
-                  className={`flex-none px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap cursor-pointer ${activeTab === 'custom' ? activeTabClass : inactiveTabClass}`}
-                  onClick={() => setActiveTab('custom')}
+                  className={`flex-none px-3 py-2 rounded-[10px] cursor-pointer flex items-center justify-center ${activeTab === 'settings' ? activeTabClass : inactiveTabClass}`}
+                  onClick={() => setActiveTab('settings')}
+                  title={t('theme.selector.settings') || 'Settings'}
                 >
-                  {t('theme.selector.custom')}
+                  <FaCog />
                 </button>
-              )}
-              <div className="flex-1" />
-              <button
-                className={`flex-none p-2 rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center ${activeTab === 'settings' ? activeTabClass : inactiveTabClass}`}
-                onClick={() => setActiveTab('settings')}
-                title={t('theme.selector.settings') || 'Settings'}
-              >
-                <FaCog />
-              </button>
+              </div>
             </div>
 
             {/* Content */}

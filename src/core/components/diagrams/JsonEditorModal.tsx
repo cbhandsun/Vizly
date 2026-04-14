@@ -101,7 +101,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
             if (newNodes.length > 0) {
                 setNodes(newNodes);
                 setEdges(newEdges);
-                setTimeout(() => reactFlowInstance.fitView({ duration: 800, padding: 0.35 }), 50);
+                setTimeout(() => reactFlowInstance.fitView({ duration: 800, padding: 0.35, minZoom: 0.55 }), 50);
                 message.success(t('designer.flowchart.jsonApplied') || '应用成功');
                 return true;
             }

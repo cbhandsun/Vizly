@@ -139,24 +139,21 @@ const PresetCard: React.FC<{
     const { t } = useTranslation();
     return (
         <div
-            className={`relative flex flex-col gap-3 p-4 transition-all duration-200 rounded-xl cursor-pointer border ${isActive ? 'bg-white/60 dark:bg-black/40 border-blue-500/50 shadow-md shadow-blue-500/10' : 'bg-white/30 dark:bg-black/20 border-black/5 dark:border-white/5 hover:bg-white/50 dark:hover:bg-black/30'} group`}
+            className={`group relative flex flex-col gap-3 p-4 transition-all duration-300 rounded-2xl cursor-pointer hover:-translate-y-1 ${isActive ? 'bg-white/90 dark:bg-black/60 border border-blue-500/50 shadow-[0_8px_24px_-8px_rgba(59,130,246,0.4)] ring-1 ring-blue-500/20' : 'bg-white/40 dark:bg-black/20 border border-black/[0.03] dark:border-white/[0.03] hover:border-black/[0.08] dark:hover:border-white/[0.1] hover:shadow-[0_8px_20px_-8px_rgba(0,0,0,0.1)] hover:bg-white/80 dark:hover:bg-black/40'}`}
             onClick={onClick}
             onMouseEnter={onHover}
             onMouseLeave={onLeave}
             title={preset.description}
         >
-            <div className="flex items-center justify-center p-2 rounded-lg bg-gray-50/50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700/50">
+            <div className="flex items-center justify-center p-3 rounded-xl bg-gray-50/50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700/50 overflow-hidden relative shadow-[inset_0_2px_4px_rgba(255,255,255,0.3)] dark:shadow-[inset_0_1px_2px_rgba(255,255,255,0.05)] transform transition-transform group-hover:scale-[1.02]">
                 <StylePreviewMini preset={preset} size="md" />
+                <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/30 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 transform -translate-x-[150%] group-hover:translate-x-[150%]" style={{ transitionProperty: 'opacity, transform' }} />
             </div>
-            <div className="flex flex-col">
-                <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">{t(`style.preset.${preset.name}`)}</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">{preset.description}</div>
+            <div className="flex flex-col pt-1">
+                <div className="text-[15px] font-semibold text-gray-800 dark:text-gray-100 tracking-tight">{t(`style.preset.${preset.name}`)}</div>
+                <div className="text-[13px] text-gray-500/80 dark:text-gray-400 truncate mt-1 font-medium">{preset.description}</div>
             </div>
-            {isActive && (
-                <div className="absolute top-2 right-2 text-blue-500 p-1 bg-white/80 dark:bg-black/50 rounded-full shadow-sm">
-                    <FaCheck size={12} />
-                </div>
-            )}
+            {isActive && <FaCheck className="absolute top-2 right-2 text-blue-500 p-1.5 w-6 h-6 bg-white/90 dark:bg-black/70 rounded-full shadow-sm backdrop-blur-md" />}
         </div>
     );
 };
@@ -219,26 +216,33 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
         <>
             {/* 触发按钮 */}
             <button
-                className={`flex items-center gap-2 h-8 px-3 text-sm transition-colors rounded-[8px] bg-white/70 dark:bg-[#1C1C1E]/80 backdrop-blur-xl border border-black/5 dark:border-white/10 hover:bg-white dark:hover:bg-[#2C2C2E]/90 text-gray-700 dark:text-gray-200 shadow-sm shadow-black/5 pointer-events-auto ${className}`}
+                className={`flex items-center justify-between gap-1.5 h-8 px-2.5 text-[13px] transition-colors rounded-[6px] bg-white dark:bg-[#1C1C1E] border border-[#d9d9d9] dark:border-white/15 hover:border-blue-400 dark:hover:border-blue-500 text-gray-700 dark:text-gray-200 pointer-events-auto overflow-hidden w-full ${className}`}
                 onClick={() => setIsOpen(!isOpen)}
                 style={style}
             >
-                <StylePreviewMini preset={currentPreset} size="sm" />
-                <span>{t(`style.preset.${currentPreset.name}`)}</span>
+                <span className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+                    <StylePreviewMini preset={currentPreset} size="sm" />
+                    <span className="truncate">{t(`style.preset.${currentPreset.name}`)}</span>
+                </span>
+                <svg className="flex-shrink-0 text-gray-400 w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </button>
 
             {/* 弹出面板 */}
             {isOpen &&
                 createPortal(
-                    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsOpen(false)}>
+                    <div className={`fixed inset-0 z-[3000] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsOpen(false)}>
                         <div
-                            className="relative flex flex-col w-full max-w-2xl max-h-[85vh] rounded-2xl bg-white/70 dark:bg-[#1C1C1E]/80 backdrop-blur-xl backdrop-saturate-150 border border-white/20 dark:border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.12)] overflow-hidden transition-all duration-300 pointer-events-auto"
+                            className="relative flex flex-col w-full max-w-2xl max-h-[85vh] rounded-2xl bg-white/70 dark:bg-[#1C1C1E]/80 backdrop-blur-3xl backdrop-saturate-200 border border-white/40 dark:border-white/10 shadow-[0_16px_40px_0_rgba(0,0,0,0.16),inset_0_1px_1px_rgba(255,255,255,0.4)] overflow-hidden transition-all duration-300 pointer-events-auto"
                             ref={panelRef}
                             onClick={(e) => e.stopPropagation()}
+                            style={{
+                                transform: isOpen ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(20px)',
+                                opacity: isOpen ? 1 : 0
+                            }}
                         >
                             {/* 面板头部 */}
-                            <div className="flex-none px-6 py-4 border-b border-gray-200/50 dark:border-gray-700/50 flex items-center justify-between">
-                                <div className="flex items-center gap-3 text-lg font-semibold text-gray-800 dark:text-gray-100">
+                            <div className="flex-none px-6 py-5 border-b border-gray-200/50 dark:border-gray-700/50 flex items-center justify-between">
+                                <div className="flex items-center gap-3 text-lg font-bold text-gray-800 dark:text-gray-100 tracking-tight">
                                     <FaPalette className="text-blue-500" />
                                     <h2>{t('style.switcher.title')}</h2>
                                 </div>

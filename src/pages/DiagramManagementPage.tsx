@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { Button, Modal, message, Dropdown, MenuProps, Avatar } from 'antd';
+import { Button, Modal, Dropdown, MenuProps, Avatar, App } from 'antd';
 import {
     CloudOutlined,
     LaptopOutlined,
@@ -102,6 +102,7 @@ const WorkspaceDashboardPage: React.FC = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const { t } = useTranslation();
     const { user } = useAuth();
+    const { message, modal } = App.useApp();
     
     // --- State ---
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -273,7 +274,7 @@ const WorkspaceDashboardPage: React.FC = () => {
 
     const handleDeleteDiagram = async (e: React.MouseEvent, item: UnifiedDiagramItem) => {
         e.stopPropagation();
-        Modal.confirm({
+        modal.confirm({
             title: 'Delete Document',
             content: 'Are you sure you want to completely erase this document? This cannot be undone.',
             okText: 'Delete',
@@ -514,8 +515,14 @@ const WorkspaceDashboardPage: React.FC = () => {
         <div className="workspace-dashboard">
             {/* Global Top Navigation */}
             <header className="workspace-global-header">
-                <div className="workspace-header-brand">
-                    <div className="workspace-header-logo">V</div>
+                <div className="workspace-header-brand" onClick={() => navigate('/manage')}>
+                    <div className="workspace-header-logo" style={{ transition: 'transform 0.2s ease' }}>
+                        <img 
+                            src="/favicon.svg" 
+                            alt="Vizly Logo" 
+                            style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 0 6px rgba(134,59,255,0.5))' }}
+                        />
+                    </div>
                     <div className="workspace-header-title">Vizly</div>
                 </div>
                 
