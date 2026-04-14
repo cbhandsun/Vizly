@@ -59,6 +59,18 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
 
     useEffect(() => {
         registerCommands([
+            // --- Diagram / Nodes ---
+            { id: 'node.add', label: '新建节点 (Add Node)', category: 'Nodes', keywords: ['add', 'new', 'create', '新建', '节点'], icon: <FaProjectDiagram />, action: () => window.dispatchEvent(new CustomEvent('editor:command', { detail: { action: 'add-node' } })) },
+            { id: 'node.clear', label: '清空画布 (Clear Canvas)', category: 'General', keywords: ['clear', 'empty', 'reset', '清空', '重置'], icon: <FaTrash />, action: () => window.dispatchEvent(new CustomEvent('editor:command', { detail: { action: 'clear-canvas' } })) },
+
+            // --- AI ---
+            { id: 'ai.generate', label: 'AI 顾问 (AI Assistant)', category: 'Action', keywords: ['ai', 'generate', 'assistant', 'chat', '顾问', '生成'], icon: <FaProjectDiagram />, action: () => window.dispatchEvent(new CustomEvent('editor:command', { detail: { action: 'toggle-ai-chat' } })) },
+            
+            // --- Diagram Types ---
+            { id: 'diagram.flowchart', label: '切换图表: 流程图 (Flowchart)', category: 'Diagram', keywords: ['switch', 'flowchart', '流程图'], icon: <FaProjectDiagram />, action: () => window.dispatchEvent(new CustomEvent('diagram-global-format-changed', { detail: 'flowchart' })) },
+            { id: 'diagram.architecture', label: '切换图表: 架构图 (Architecture)', category: 'Diagram', keywords: ['switch', 'architecture', '架构图'], icon: <FaProjectDiagram />, action: () => window.dispatchEvent(new CustomEvent('diagram-global-format-changed', { detail: 'architecture' })) },
+            { id: 'diagram.mindmap', label: '切换图表: 思维导图 (Mind Map)', category: 'Diagram', keywords: ['switch', 'mindmap', '思维导图'], icon: <FaProjectDiagram />, action: () => window.dispatchEvent(new CustomEvent('diagram-global-format-changed', { detail: 'mindmap' })) },
+
             // --- View ---
             { id: 'zoom.in', label: t('designer.toolbar.zoomIn'), category: 'View', shortcut: `${mod} + =`, icon: <FaSearchPlus />, action: () => props.reactFlowInstance?.zoomIn() },
             { id: 'zoom.out', label: t('designer.toolbar.zoomOut'), category: 'View', shortcut: `${mod} + -`, icon: <FaSearchMinus />, action: () => props.reactFlowInstance?.zoomOut() },

@@ -512,6 +512,9 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                 const downloadBtn = document.querySelector('[data-id="toolbar-export-btn"]') as HTMLButtonElement;
                 if(downloadBtn) downloadBtn.click();
                 else handleExport();
+            } else if (action === 'toggle-ai-chat') {
+                setAiChatVisible(true);
+                setActiveRightTab('ai');
             } else if (action === 'add-node') {
                 // Determine center of current viewport to place the node
                 if (!reactFlowInstance) return;
