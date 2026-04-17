@@ -9,19 +9,7 @@ import type { InputRef } from 'antd';
 import Button from 'antd/es/button';
 import { useTranslation } from 'react-i18next';
 
-type CommandGroup = 'favorites' | 'recent' | 'actions' | 'diagrams';
-
-export interface CommandItem {
-  id: string;
-  group: CommandGroup;
-  title: string;
-  description?: string;
-  keywords?: string[];
-  meta?: string[];
-  shortcut?: string;
-  onSelect: () => void;
-  onAltSelect?: () => void;
-}
+import { CommandItem } from '../../types/plugin';
 
 interface CommandPaletteProps {
   open: boolean;

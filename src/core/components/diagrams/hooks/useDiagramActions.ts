@@ -55,6 +55,25 @@ export const useDiagramActions = ({
         }
 
         if (nodeIdsToDelete.size > 0 || edgeIdsToDelete.size > 0) {
+            // [DDD] MindMap Cascading Deletion: if a mindmap node is deleted, delete its subtree
+            const mindMapNodes = nodes.filter(n => nodeIdsToDelete.has(n.id) && n.type === 'mindmap');
+            if (mindMapNodes.length > 0) {
+                const visited = new Set<string>(nodeIdsToDelete);
+                const getDescendants = (parentId: string) => {
+                    const childrenIds = edges
+                        .filter(e => e.source === parentId && e.type !== 'relationshipEdge')
+                        .map(e => e.target);
+                    for (const cid of childrenIds) {
+                        if (!visited.has(cid)) {
+                            visited.add(cid);
+                            nodeIdsToDelete.add(cid);
+                            getDescendants(cid);
+                        }
+                    }
+                };
+                mindMapNodes.forEach(rn => getDescendants(rn.id));
+            }
+
             // 拦截器：允许插件否决删除操作
             if (activePlugin && pluginCtx) {
                 if (nodeIdsToDelete.size > 0 && activePlugin.onBeforeNodesDelete) {

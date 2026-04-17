@@ -5,8 +5,13 @@ import { useTranslation } from 'react-i18next';
 import {
     FaFileExport, FaFolderOpen, FaShareAlt, FaCloudUploadAlt, FaSave,
     FaPlay, FaImage, FaFileCode, FaFilePdf, FaFilm, FaProjectDiagram,
-    FaCode, FaHistory, FaExchangeAlt, FaBars, FaCog, FaLock, FaUnlock
+    FaCode, FaHistory, FaExchangeAlt, FaBars, FaCog, FaLock, FaUnlock,
+    FaMagic, FaRegComment
 } from 'react-icons/fa';
+import { CollaborationAvatars } from './ui/CollaborationAvatars';
+import { AdvancedExportModal } from './ui/AdvancedExportModal';
+import { PluginManagerModal } from './ui/PluginManagerModal';
+import { ApiOutlined } from '@ant-design/icons';
 
 interface TopActionButtonsProps {
     onExportJSON: () => void;
@@ -34,6 +39,14 @@ interface TopActionButtonsProps {
     isReadonly?: boolean;
     onReadonlyChange?: (val: boolean) => void;
     onOpenSettings?: () => void;
+    onSmartOptimize?: () => void;
+    // ⭐ Phase 10: 提升的 Modal 控制状态
+    exportModalVisible?: boolean;
+    setExportModalVisible?: (val: boolean) => void;
+    pluginManagerVisible?: boolean;
+    setPluginManagerVisible?: (val: boolean) => void;
+    isCommentMode?: boolean; // ⭐ Phase 11
+    setIsCommentMode?: (val: boolean) => void;
 }
 
 export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
@@ -49,6 +62,14 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     isReadonly,
     onReadonlyChange,
     onOpenSettings,
+    onSmartOptimize,
+    // 解构新 Props
+    exportModalVisible = false,
+    setExportModalVisible = () => {},
+    pluginManagerVisible = false,
+    setPluginManagerVisible = () => {},
+    isCommentMode = false,
+    setIsCommentMode = () => {},
 }) => {
     const { t } = useTranslation();
 
@@ -132,6 +153,44 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                 </Tooltip>
             )}
 
+            {onSmartOptimize && (
+                <Tooltip title="智能全图优化 (解决重叠与对齐)">
+                    <Button 
+                        type="text" 
+                        icon={<FaMagic className="text-[12px] text-purple-500" />} 
+                        onClick={onSmartOptimize}
+                        style={{ width: 32, height: 32, borderRadius: '6px', border: 'none', background: 'transparent' }}
+                        className="flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                    />
+                </Tooltip>
+            )}
+
+            <Tooltip title="插件管理中心">
+                <Button 
+                    type="text" 
+                    icon={<ApiOutlined style={{ fontSize: 13 }} />} 
+                    onClick={() => setPluginManagerVisible(true)}
+                    style={{ width: 32, height: 32, borderRadius: '6px', border: 'none', background: 'transparent' }}
+                    className="flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-blue-500 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                />
+            </Tooltip>
+
+            {setIsCommentMode && (
+                <Tooltip title={isCommentMode ? "退出评论模式 (C)" : "评论模式 (C)"}>
+                    <Button 
+                        type="text" 
+                        icon={<FaRegComment className={`text-[12px] ${isCommentMode ? 'text-green-500' : ''}`} />} 
+                        onClick={() => setIsCommentMode(!isCommentMode)}
+                        style={{ width: 32, height: 32, borderRadius: '6px', border: 'none', background: isCommentMode ? 'rgba(16, 185, 129, 0.1)' : 'transparent' }}
+                        className={`flex items-center justify-center transition-colors ${isCommentMode ? 'text-green-600' : 'text-slate-600 dark:text-slate-300 hover:text-green-500 hover:bg-black/5 dark:hover:bg-white/10'}`}
+                    />
+                </Tooltip>
+            )}
+
+            <div style={{ marginLeft: 8, marginRight: 8, height: 20, width: 1, backgroundColor: '#f0f0f0' }} />
+            
+            <CollaborationAvatars />
+
             {onShare && (
                 <Button 
                     type="primary" 
@@ -192,7 +251,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             </Tooltip>
 
             <Dropdown menu={{ items: exportMenu }} placement="bottomRight">
-                <Button type="text" icon={<FaFileExport />}>导出</Button>
+                <Button type="text" icon={<FaFileExport />} onClick={() => setExportModalVisible(true)}>导出</Button>
             </Dropdown>
 
             {onDirectSave && (
@@ -258,6 +317,15 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             )}
 
             {children}
+
+            <AdvancedExportModal 
+                visible={exportModalVisible} 
+                onClose={() => setExportModalVisible(false)} 
+            />
+            <PluginManagerModal 
+                visible={pluginManagerVisible} 
+                onClose={() => setPluginManagerVisible(false)} 
+            />
         </div>
     );
 };

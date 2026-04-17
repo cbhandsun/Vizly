@@ -93,6 +93,8 @@ interface BaseReactFlowProps {
   onPaneContextMenu?: (event: React.MouseEvent | MouseEvent) => void;
   onPaneClick?: (event: React.MouseEvent | MouseEvent) => void;
   onPaneDoubleClick?: (event: React.MouseEvent | MouseEvent) => void;
+  onPaneMouseMove?: (event: React.MouseEvent) => void;
+  onPaneMouseLeave?: (event: React.MouseEvent) => void;
   onNodeClick?: (event: React.MouseEvent, node: Node) => void;
   onEdgeClick?: (event: React.MouseEvent, edge: Edge) => void;
   connectionRadius?: number;
@@ -175,6 +177,8 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   onPaneContextMenu,
   onPaneClick,
   onPaneDoubleClick,
+  onPaneMouseMove,
+  onPaneMouseLeave,
   onNodeClick,
   onEdgeClick,
   connectionRadius = 20,
@@ -843,6 +847,8 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           onEdgeContextMenu={onEdgeContextMenu}
           onPaneContextMenu={onPaneContextMenu}
           onPaneClick={onPaneClick}
+          onPaneMouseMove={onPaneMouseMove}
+          onPaneMouseLeave={onPaneMouseLeave}
           onNodeClick={onNodeClick}
           onEdgeClick={onEdgeClick}
           onDoubleClick={(e) => {

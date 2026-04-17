@@ -5,6 +5,7 @@ import { FaCog } from 'react-icons/fa';
 import Button from 'antd/es/button';
 import Spin from 'antd/es/spin';
 import Result from 'antd/es/result';
+import Avatar from 'antd/es/avatar';
 import { ConfigProvider } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useDiagramControls } from '@/core/hooks/useDiagramControls';
@@ -34,9 +35,10 @@ import { useCloudSave } from './diagrams/hooks/useCloudSave';
 const AIConfigModal = React.lazy(() => import('./ai/AIConfigModal'));
 const AIChatView = React.lazy(() => import('./ai/AIChatPanel').then(m => ({ default: m.AIChatView })));
 const ShareDialog = React.lazy(() => import('./diagrams/ShareDialog'));
-import { CloudOutlined, AppstoreOutlined, FolderOpenOutlined, LockOutlined, UnlockOutlined, HomeOutlined } from '@ant-design/icons';
+import { CloudOutlined, AppstoreOutlined, FolderOpenOutlined, LockOutlined, UnlockOutlined, HomeOutlined, CodeOutlined } from '@ant-design/icons';
 import { Dropdown, Tooltip, Switch, message, Modal, Input } from 'antd';
 const CloudStorageManagerModal = React.lazy(() => import('./storage/CloudStorageManagerModal').then(m => ({ default: m.CloudStorageManagerModal })));
+import { MermaidImportModal } from './ui/MermaidImportModal';
 import { dataService } from '@/services/DataService';
 import { PRESET_MAP } from '@/data/standardized';
 import { CUSTOM_PRESETS_STORAGE_KEY } from './diagrams/ui/TemplateCascaderMenu';
@@ -99,9 +101,48 @@ const DiagramViewer: React.FC = () => {
     }, [provider?.awareness?.clientID]);
 
     const { saveToCloud, shareDialogOpen, openShareDialog, closeShareDialog, ensureSaved } = useCloudSave(selectedDiagramId);
+    
+    // --- Phase 6: Mermaid Import Logic ---
+    const handleImportMermaidNodes = useCallback(async (nodes: any[], edges: any[]) => {
+        const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
+        if (!bridge) {
+            message.error('无法连接到画布，请重试');
+            return;
+        }
+
+        try {
+            // 1. 批量创建节点 (利用更新后的 addNode 支持自定义 ID)
+            for (const n of nodes) {
+                await bridge.addNode({
+                    id: n.id,
+                    label: n.data.label,
+                    type: n.data.type,
+                    shape: n.data.shape,
+                    parentId: n.parentId,
+                    position: n.position
+                });
+            }
+
+            // 2. 批量连接
+            for (const e of edges) {
+                if (bridge.connectNodes) {
+                    bridge.connectNodes({ source: e.source, target: e.target, label: e.label });
+                }
+            }
+
+            // 3. 自动触发智能布局
+            setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('editor:command', { detail: { action: 'smart-layout' } }));
+            }, 500);
+        } catch (err) {
+            console.error('[Mermaid Import] Error:', err);
+            message.error('导入过程中发生错误');
+        }
+    }, [selectedDiagramId]);
     const [aiConfigVisible, setAiConfigVisible] = useState(false);
     const [cloudManagerVisible, setCloudManagerVisible] = useState(false);
     const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+    const [mermaidModalVisible, setMermaidModalVisible] = useState(false);
 
     const aiNodesRef = useMemo(() => ({
         get current() {
@@ -199,6 +240,21 @@ const DiagramViewer: React.FC = () => {
     // ==========================================
     /** 图表锁定防误触：禁止所有拖拽连线编排 */
     const [isReadonly, setIsReadonly] = useState<boolean>(false);
+
+    /** 沉浸式演示模式：隐藏 UI 侧边栏与工具栏 */
+    const [isPresentationMode, setIsPresentationMode] = useState<boolean>(false);
+
+    // ESC 退出演示模式监听
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isPresentationMode) {
+                setIsPresentationMode(false);
+                message.info('演示模式已退出');
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isPresentationMode]);
 
     /** 更强大的多端另存为统筹逻辑 */
     const handleSaveTo = useCallback(async (target: 's3' | 'supabase' | 'local') => {
@@ -516,10 +572,13 @@ const DiagramViewer: React.FC = () => {
                 const themeBtn = document.querySelector('[data-id="toolbar-theme-btn"]');
                 if (themeBtn) (themeBtn as HTMLButtonElement).click();
             }
+            if (e.key === 'Escape' && isPresentationMode) {
+                setIsPresentationMode(false);
+            }
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [handleFsControl]);
+    }, [handleFsControl, isPresentationMode]);
 
     /**
      * 函数级注释：初始化连线模式的默认值
@@ -638,13 +697,18 @@ const DiagramViewer: React.FC = () => {
             {
                 id: 'op:triggerAi',
                 group: 'actions',
-                title: t('designer.commandItems.triggerAi', '唤出 AI 助手 / AI Copilot'),
-                keywords: ['ai', 'copilot', 'generate', '生成', '助手'],
-                shortcut: `${mod}+J`,
                 onSelect: () => {
                     const aiBtn = document.querySelector('[data-id="toolbar-ai-btn"]') || document.querySelector('.toolbar-button-ai');
                     if (aiBtn) (aiBtn as HTMLButtonElement).click();
                 }
+            },
+            {
+                id: 'op:importMermaid',
+                group: 'actions',
+                title: t('designer.commandItems.importMermaid', '从 Mermaid 导入 / Import Mermaid'),
+                keywords: ['mermaid', 'import', 'code', 'markdown', '导入', '代码'],
+                shortcut: `${mod}+Shift+M`,
+                onSelect: () => setMermaidModalVisible(true)
             },
             {
                 id: 'op:themeNext',
@@ -769,6 +833,7 @@ const DiagramViewer: React.FC = () => {
     return (
         <DiagramThemeProvider>
             <DiagramLayout
+                isPresentationMode={isPresentationMode}
                 toolbarProps={{
                     diagramId: selectedDiagramId,
                     diagramName: selectedDiagram?.titleKey ? t(selectedDiagram.titleKey) : (selectedDiagram?.name || 'Diagram'),
@@ -866,41 +931,37 @@ const DiagramViewer: React.FC = () => {
                             </button>
                             <div className="flex items-center gap-2">
                                 {activeUsers && activeUsers.length > 0 && (
-                                    <div className="flex -space-x-2 mr-1">
-                                        {activeUsers.slice(0, 3).map(u => (
-                                            <div 
-                                                key={u.clientId} 
-                                                className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-white dark:border-[#0f172a]"
-                                                style={{ backgroundColor: u.user?.color || '#ccc' }}
-                                                title={u.user?.name || 'User'}
-                                            >
-                                                {u.user?.name ? u.user.name.charAt(0).toUpperCase() : '?'}
-                                            </div>
+                                    <Avatar.Group
+                                        maxCount={3}
+                                        size="small"
+                                        maxStyle={{ color: '#f56a00', backgroundColor: '#fde3cf', fontSize: '10px' }}
+                                    >
+                                        {activeUsers.map(u => (
+                                            <Tooltip key={u.clientId} title={u.user?.name || 'Anonymous'}>
+                                                <Avatar 
+                                                    style={{ backgroundColor: u.user?.color || '#1677ff', border: '2px solid #fff' }}
+                                                >
+                                                    {u.user?.name ? u.user.name.charAt(0).toUpperCase() : '?'}
+                                                </Avatar>
+                                            </Tooltip>
                                         ))}
-                                        {activeUsers.length > 3 && (
-                                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-600 bg-gray-200 border-2 border-white dark:border-[#0f172a]">
-                                                +{activeUsers.length - 3}
+                                    </Avatar.Group>
+                                )}
+                                <Tooltip title={isCollabEnabled ? "协同会话进行中" : "开启实时协作分享"}>
+                                    <button
+                                        className="flex items-center justify-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-xs font-semibold text-blue-600 dark:text-blue-400 rounded-lg transition-all border-none outline-none cursor-pointer shadow-sm"
+                                        onClick={() => setCollabModalVisible(true)}
+                                    >
+                                        <TeamOutlined style={{ fontSize: '14px' }} />
+                                        协作分享
+                                        {isCollabEnabled && (
+                                            <div className="relative flex h-2 w-2 ml-0.5">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                                             </div>
                                         )}
-                                    </div>
-                                )}
-                                <button
-                                    className="flex items-center justify-center gap-1 px-2 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-xs font-medium text-blue-600 dark:text-blue-400 rounded-md transition-colors border-none outline-none cursor-pointer"
-                                    onClick={() => setCollabModalVisible(true)}
-                                >
-                                    <TeamOutlined /> 分享与协作
-                                    {isCollabEnabled && (
-                                        <span 
-                                            className="w-1.5 h-1.5 rounded-full ml-1" 
-                                            style={{ 
-                                                backgroundColor: wsStatus === 'connected' ? '#10b981' : 
-                                                               wsStatus === 'connecting' ? '#f59e0b' : '#ef4444',
-                                                boxShadow: wsStatus === 'connected' ? '0 0 6px rgba(16, 185, 129, 0.4)' : 'none'
-                                            }}
-                                            title={`WebSocket: ${wsStatus}`}
-                                        />
-                                    )}
-                                </button>
+                                    </button>
+                                </Tooltip>
                             </div>
                             <Tooltip title="防误触保护只读锁 (阅览展示推荐)">
                                 <Switch
@@ -1003,17 +1064,11 @@ const DiagramViewer: React.FC = () => {
                                                 onDirectSave={handleDirectSave}
                                                 isDirectSaveDisabled={false}
                                                 onSaveAsTo={handleSaveTo}
-                                                shareDialogOpen={shareDialogOpen}
-                                                onOpenShareDialog={openShareDialog}
-                                                onCloseShareDialog={closeShareDialog}
-                                                onEnsureSaved={ensureSaved}
-                                                showAiCrown={true}
-                                                isVersionHistoryOpen={versionHistoryOpen}
-                                                onVersionHistoryClose={() => setVersionHistoryOpen(false)}
                                                 renderAIChatPanel={
                                                     <Suspense fallback={<div className="p-4 text-center text-gray-500">Loading AI...</div>}>
                                                         <AIChatView
                                                             onOpenConfig={() => setAiConfigVisible(true)}
+                                                            pluginId={resolvedPluginId || 'flowchart-diagram'}
                                                             onPreviewJson={(json: string) => {
                                                                 const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
                                                                 if (bridge && bridge.importData) {
@@ -1038,6 +1093,82 @@ const DiagramViewer: React.FC = () => {
                                                             }}
                                                             diagramNodesRef={aiNodesRef as any}
                                                             diagramEdgesRef={aiEdgesRef as any}
+                                                            canvasOps={{
+                                                                onAddNode: (label, shape) => {
+                                                                    const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
+                                                                    if (bridge?.addNode) {
+                                                                        return bridge.addNode({ label, shape });
+                                                                    }
+                                                                },
+                                                                onDeleteNodes: (ids) => {
+                                                                    const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
+                                                                    if (bridge?.deleteNodes) {
+                                                                        bridge.deleteNodes(ids);
+                                                                    }
+                                                                },
+                                                                onConnectNodes: (source, target, label) => {
+                                                                    const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
+                                                                    if (bridge?.connectNodes) {
+                                                                        bridge.connectNodes({ source, target, label });
+                                                                    }
+                                                                },
+                                                                onAutoLayout: (strategy) => {
+                                                                    const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
+                                                                    if (bridge?.triggerLayout) {
+                                                                        bridge.triggerLayout(strategy);
+                                                                    }
+                                                                },
+                                                                onGroupNodes: (ids, name) => {
+                                                                    const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
+                                                                    if (bridge?.onGroupNodes) {
+                                                                        bridge.onGroupNodes(ids, name);
+                                                                    }
+                                                                },
+                                                                onAnalyze: () => {
+                                                                    const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
+                                                                    if (bridge?.onAnalyze) {
+                                                                        return bridge.onAnalyze();
+                                                                    }
+                                                                    return { summary: '无法执行分析: Bridge 未就绪', nodes: [], issues: [] };
+                                                                },
+                                                                onExport: (type) => {
+                                                                    if (type === 'png') exportToPNG();
+                                                                    else if (type === 'pdf') exportToPDF();
+                                                                    else if (type === 'svg') exportToSVG();
+                                                                    else if (type === 'gif') exportToGIF();
+                                                                },
+                                                                onSave: () => {
+                                                                    handleDirectSave();
+                                                                },
+                                                                onShare: () => {
+                                                                    setCollabModalVisible(true);
+                                                                },
+                                                                onUpdateTheme: (styles) => {
+                                                                    let styleTag = document.getElementById('ai-dynamic-theme');
+                                                                    if (!styleTag) {
+                                                                        styleTag = document.createElement('style');
+                                                                        styleTag.id = 'ai-dynamic-theme';
+                                                                        document.head.appendChild(styleTag);
+                                                                    }
+                                                                    const cssVars = Object.entries(styles)
+                                                                        .map(([key, value]) => `  --${key}: ${value} !important;`)
+                                                                        .join('\n');
+                                                                    styleTag.innerHTML = `:root {\n${cssVars}\n}`;
+                                                                    message.success('🎨 AI 审美方案已应用');
+                                                                },
+                                                                onTogglePresentation: (active) => {
+                                                                    setIsPresentationMode(active);
+                                                                    if (active && !isFullscreen) {
+                                                                        handleToggleFullscreen();
+                                                                    }
+                                                                },
+                                                                onAnimatePath: (ids, options) => {
+                                                                    const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
+                                                                    if (bridge?.animatePath) {
+                                                                        bridge.animatePath(ids, options);
+                                                                    }
+                                                                }
+                                                            }}
                                                             onClose={() => {
                                                                 const aiBtn = document.querySelector('.toolbar-button-ai');
                                                                 if (aiBtn) aiBtn.click();
@@ -1077,14 +1208,33 @@ const DiagramViewer: React.FC = () => {
                                     })()}
                                 </Suspense>
 
-                                <CloudStorageManagerModal
-                                    open={cloudManagerVisible}
-                                    onCancel={() => setCloudManagerVisible(false)}
-                                    onSelect={(data) => {
-                                        seedAutoSaveAndNavigate(data, data.id);
-                                    }}
-                                />
+                                {/* 演示模式退出提示层 */}
+                                {isPresentationMode && (
+                                    <div 
+                                        className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[3000] px-6 py-2.5 bg-black/70 hover:bg-black/90 backdrop-blur-md text-white text-xs font-semibold rounded-full cursor-pointer transition-all border border-white/20 shadow-2xl animate-bounce-subtle"
+                                        onClick={() => {
+                                            setIsPresentationMode(false);
+                                            message.info('演示模式已退出');
+                                        }}
+                                    >
+                                        🎬 点击或按 ESC 退出演示模式
+                                    </div>
+                                )}
                             </ErrorBoundary>
+
+                            <CloudStorageManagerModal
+                                open={cloudManagerVisible}
+                                onCancel={() => setCloudManagerVisible(false)}
+                                onSelect={(data) => {
+                                    seedAutoSaveAndNavigate(data, data.id);
+                                }}
+                            />
+
+                            <MermaidImportModal 
+                                visible={mermaidModalVisible}
+                                onClose={() => setMermaidModalVisible(false)}
+                                onImport={handleImportMermaidNodes}
+                            />
                         </div>
                     </ConfigProvider>
                 </div>

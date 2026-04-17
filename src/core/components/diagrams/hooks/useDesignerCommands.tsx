@@ -37,6 +37,11 @@ interface UseDesignerCommandsProps {
     // UI
     setShowShortcuts: React.Dispatch<React.SetStateAction<boolean>>;
     // Plugins
+    onOpenPlugins?: () => void;
+    // ⭐ Phase 11: Comments
+    isCommentMode: boolean;
+    setIsCommentMode: (enabled: boolean) => void;
+
     pluginCtx?: PluginContext;
     activePlugin?: DiagramTypePlugin | null;
 }
@@ -91,18 +96,22 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
             { id: 'edit.ungroup', label: t('designer.flowchart.commands.ungroup'), category: 'Nodes', shortcut: `${mod} + Shift + G`, action: props.handleUngroupWithToast },
 
             // --- File ---
-            { id: 'file.export', label: t('designer.toolbar.export'), category: 'File', icon: <FaSave />, action: props.handleExport },
+            { id: 'file.export', label: '高级导出 (High-DPI Export)...', category: 'File', keywords: ['export', 'png', 'svg', 'pdf', 'high-dpi', '导出', '打印'], icon: <FaSave />, action: props.handleExport },
             { id: 'file.exportMermaid', label: '导出为 Mermaid 文件', category: 'File', icon: <FaProjectDiagram />, action: props.handleExportMermaid },
             { id: 'file.copyMermaid', label: '复制为 Mermaid (剪贴板)', category: 'File', icon: <FaCopy />, action: props.handleCopyAsMermaid },
             { id: 'file.import', label: t('designer.toolbar.import'), category: 'File', icon: <FaFolderOpen />, action: () => props.fileInputRef.current?.click() },
             { id: 'file.editJson', label: t('designer.toolbar.edit'), category: 'File', icon: <FaEdit />, action: props.handleOpenJsonEditor },
+            { id: 'file.plugins', label: '插件管理 (Plugin Manager)...', category: 'General', keywords: ['plugins', 'management', 'extensions', '插件', '管理'], icon: <FaProjectDiagram />, action: () => props.onOpenPlugins?.() },
 
             // --- Layout ---
             { id: 'layout.tb', label: t('designer.flowchart.commands.autoLayoutTB'), category: 'Action', icon: <FaProjectDiagram />, action: () => props.handleStrategyLayout('tree', undefined, 'TB') },
             { id: 'layout.lr', label: t('designer.flowchart.commands.autoLayoutLR'), category: 'Action', icon: <FaProjectDiagram />, action: () => props.handleStrategyLayout('tree', undefined, 'LR') },
             { id: 'layout.smart', label: '智能布局推荐 (Smart Layout)', category: 'Action', icon: <FaProjectDiagram />, action: props.handleSmartLayout },
+
+            // --- Phase 11: 评论系统 ---
+            { id: 'comment.toggle', label: '切换评论模式 (Toggle Comment Mode)', category: 'General', shortcut: 'C', icon: <FaEdit />, action: () => props.setIsCommentMode(!props.isCommentMode) },
         ]);
-    }, [props.canUndo, props.canRedo, isMac, mod, registerCommands, t]);
+    }, [props.canUndo, props.canRedo, props.isCommentMode, props.setIsCommentMode, isMac, mod, registerCommands, t]);
 
     const categoryMeta = useCallback((category: string) => {
         if (category === 'View') return t('designer.flowchart.commandCategory.view');

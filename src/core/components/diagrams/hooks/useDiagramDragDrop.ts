@@ -7,14 +7,15 @@ interface UseDiagramDragDropProps {
     nodes: Node[];
     edges: Edge[];
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
+    setEdges: React.Dispatch<React.SetStateAction<Edge[]>>; // ⭐ Phase 10: 恢复连线
     takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
     reactFlowInstance: ReactFlowInstance | null;
     setIsDragging: (dragging: boolean) => void;
     onSmartNodeDrag?: (e: React.MouseEvent, node: Node, nodes: Node[]) => SnapDelta | null;
     clearGuides: () => void;
     enableAltDuplicate?: boolean;
-    isConnecting?: boolean; // 新增：用于禁用连线时的 Alt 复制
-    activeLayerId?: string; // ⭐ 新增：当前活动图层ID
+    isConnecting?: boolean; 
+    activeLayerId?: string;
 }
 
 export const useDiagramDragDrop = ({
@@ -47,12 +48,68 @@ export const useDiagramDragDrop = ({
     }, []);
 
     const onDrop = useCallback(
-        (event: React.DragEvent) => {
+        async (event: React.DragEvent) => {
             event.preventDefault();
 
             if (!reactFlowInstance) return;
 
+            // ─── Phase 10: Reverse Import (Image-as-Source) ───
+            const files = Array.from(event.dataTransfer.files);
+            if (files.length > 0) {
+                const file = files[0];
+                const isImage = file.type.startsWith('image/') || file.name.endsWith('.svg');
+                
+                if (isImage) {
+                    try {
+                        let diagramState: any = null;
+
+                        if (file.type === 'image/svg+xml' || file.name.endsWith('.svg')) {
+                            // 1. 从 SVG 解析 metadata
+                            const text = await file.text();
+                            const matches = text.match(/<metadata id="vizly-state">([\s\S]*?)<\/metadata>/);
+                            if (matches && matches[1]) {
+                                diagramState = JSON.parse(decodeURIComponent(matches[1]));
+                            }
+                        } else {
+                            // 2. 从 PNG/JPG 解析尾部二进制数据
+                            const buffer = await file.arrayBuffer();
+                            const uint8 = new Uint8Array(buffer);
+                            const textDecoder = new TextDecoder();
+                            const fullContent = textDecoder.decode(uint8);
+                            
+                            const startMarker = 'VIZLY_META_START';
+                            const endMarker = 'VIZLY_META_END';
+                            
+                            const startIndex = fullContent.lastIndexOf(startMarker);
+                            const endIndex = fullContent.lastIndexOf(endMarker);
+                            
+                            if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+                                const rawJson = fullContent.substring(startIndex + startMarker.length, endIndex);
+                                diagramState = JSON.parse(rawJson);
+                            }
+                        }
+
+                        if (diagramState && diagramState.nodes && diagramState.edges) {
+                            takeSnapshot(nodes, edges);
+                            // 优雅地合并或替换
+                            // 这里采用“智能提示/直接恢复”策略，Phase 10 默认为直接恢复
+                            setNodes(diagramState.nodes);
+                            setEdges(diagramState.edges);
+                            
+                            // 自定义事件通知 UI 恢复成功
+                            window.dispatchEvent(new CustomEvent('vizly:reverse-import-success', { 
+                                detail: { filename: file.name } 
+                            }));
+                            return;
+                        }
+                    } catch (err) {
+                        console.error('Reverse Import failed:', err);
+                    }
+                }
+            }
+
             const typeData = event.dataTransfer.getData('application/reactflow');
+            // ... (Rest of existing drop logic)
 
             // Check if the dropped data is valid
             if (!typeData) return;
@@ -85,6 +142,7 @@ export const useDiagramDragDrop = ({
                 else if (typeName === 'subGroup') { finalOffsetX = 125; finalOffsetY = 75; }
                 else if (typeName === 'arrowTimeline') { finalOffsetX = 275; finalOffsetY = 35; }
                 else if (typeName === 'swimlane') { finalOffsetX = 400; finalOffsetY = 250; }
+                else if (typeName === 'iconNode') { finalOffsetX = 32; finalOffsetY = 32; } // 64x64 center
                 else { finalOffsetX = 70; finalOffsetY = 35; } // 默认基础尺寸中心(140x70)
 
                 const ghostLeftScreenX = event.clientX - finalOffsetX;
@@ -217,7 +275,9 @@ export const useDiagramDragDrop = ({
                             ? { width: 250, height: 150 }
                             : typeName === 'arrowTimeline'
                                 ? undefined // 允许内部基于 SVG_WIDTH 自动撑开外部 ReactFlow 容器
-                                : { width: 140, height: 70 },
+                                : typeName === 'iconNode'
+                                    ? { width: 64, height: 64 }
+                                    : { width: 140, height: 70 },
                     zIndex: typeName === 'titleGroup' ? -1 : typeName === 'subGroup' ? 0 : 2,
                 };
 

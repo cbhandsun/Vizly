@@ -31,12 +31,21 @@ export interface DesignerHeaderLayerProps {
         isReadonly: boolean;
         onReadonlyChange: (v: boolean) => void;
         onOpenSettings: () => void;
+        onSmartOptimize?: () => void;
         highlightMainFlow: boolean;
         handleToggleHighlightMainFlow: () => void;
         showOnlyMainFlow: boolean;
         handleToggleShowOnlyMainFlow: () => void;
         topActionArea?: React.ReactNode;
         pluginToolbar?: React.ReactNode;
+
+        // ⭐ Phase 10: 状态提升
+        exportModalVisible: boolean;
+        setExportModalVisible: (v: boolean) => void;
+        pluginManagerVisible: boolean;
+        setPluginManagerVisible: (v: boolean) => void;
+        isCommentMode: boolean; // ⭐ Phase 11
+        setIsCommentMode: (v: boolean) => void;
     };
 
     toolbar: {
@@ -121,6 +130,14 @@ export const DesignerHeaderLayer = React.memo(
                     isReadonly={topActions.isReadonly}
                     onReadonlyChange={topActions.onReadonlyChange}
                     onOpenSettings={topActions.onOpenSettings}
+                    onSmartOptimize={topActions.onSmartOptimize}
+                    // ⭐ Phase 10
+                    exportModalVisible={topActions.exportModalVisible}
+                    setExportModalVisible={topActions.setExportModalVisible}
+                    pluginManagerVisible={topActions.pluginManagerVisible}
+                    setPluginManagerVisible={topActions.setPluginManagerVisible}
+                    isCommentMode={topActions.isCommentMode}
+                    setIsCommentMode={topActions.setIsCommentMode}
                     extraMoreItems={[
                         {
                             key: 'toggle-highlight-main',
@@ -199,6 +216,8 @@ export const DesignerHeaderLayer = React.memo(
                     onAddMindMap={toolbar.onAddMindMap}
                     onExport={toolbar.onExport}
                     onImportClick={toolbar.onImportClick}
+                    isCommentMode={topActions.isCommentMode}
+                    setIsCommentMode={topActions.setIsCommentMode}
                 >
                     {toolbar.renderThemeSelector && (
                         <>
@@ -231,7 +250,8 @@ export const DesignerHeaderLayer = React.memo(
             prevProps.topActions.isReadonly === nextProps.topActions.isReadonly &&
             prevProps.topActions.highlightMainFlow === nextProps.topActions.highlightMainFlow &&
             prevProps.topActions.showOnlyMainFlow === nextProps.topActions.showOnlyMainFlow &&
-            prevProps.topActions.isDirectSaveDisabled === nextProps.topActions.isDirectSaveDisabled
+            prevProps.topActions.isDirectSaveDisabled === nextProps.topActions.isDirectSaveDisabled &&
+            prevProps.topActions.isCommentMode === nextProps.topActions.isCommentMode
         );
     }
 );

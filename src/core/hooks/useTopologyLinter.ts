@@ -48,11 +48,16 @@ const DEFAULT_RULES: LintRule[] = [
     { id: 'FLOW-004', severity: 'warning',message: '建议: 缓存层通常不主动向网关推送数据',
       sourceTypes: ['cache'], targetTypes: ['gateway'] },
 
-    // 可靠性
-    { id: 'REL-001', severity: 'info',    message: '提示: 网关直连数据库会导致耦合，建议经过服务层',
-      sourceTypes: ['gateway'], targetTypes: ['database'] },
     { id: 'REL-002', severity: 'info',    message: '提示: 网关直连缓存会导致耦合，建议经过服务层',
       sourceTypes: ['gateway'], targetTypes: ['cache'] },
+
+    // ====== 网络拓扑规则 (NEW in 2.0) ======
+    { id: 'NET-001', severity: 'warning', message: '建议: 云资源节点应放置在容器（如 VPC/子网）内',
+      sourceTypes: ['networkNode'], targetTypes: [] }, // 特殊处理：检查父容器
+    { id: 'NET-002', severity: 'error',   message: '安全违规: 内部资源不应绕过子网限制直连外部公网',
+      sourceTypes: ['networkNode'], targetTypes: ['public'] },
+    { id: 'ISO-001', severity: 'info',    message: '提示: 该节点目前为孤立状态，未连接到任何组件',
+      sourceTypes: ['architectureNode', 'networkNode'], targetTypes: [] },
 ];
 
 const SEVERITY_EDGE_STYLE: Record<string, { stroke: string; strokeWidth: number; strokeDasharray: string }> = {
@@ -98,19 +103,70 @@ export function useTopologyLinter(nodes: Node[], edges: Edge[], options: Topolog
         const nextEdges = debouncedEdges.map(e => ({ ...e }));
         const nodeMap = new Map(nextNodes.map(n => [n.id, n]));
 
+        // 1. 节点级校验 (孤立节点、容器合规)
+        nextNodes.forEach(node => {
+            const isArch = node.type === 'architectureNode';
+            const isNet = node.type === 'networkNode';
+            if (!isArch && !isNet) return;
+
+            const errs = node.data.linterErrors as string[];
+            
+            // NET-001: 检查网络节点是否在容器内
+            if (isNet && !node.parentId) {
+                const rule = allRules.find(r => r.id === 'NET-001');
+                if (rule) {
+                    const msg = `[${rule.id}] ${rule.message}`;
+                    if (!errs.includes(msg)) errs.push(msg);
+                    violations.push({
+                        ruleId: rule.id,
+                        severity: rule.severity,
+                        message: rule.message,
+                        edgeId: '',
+                        sourceId: node.id,
+                        targetId: '',
+                    });
+                }
+            }
+
+            // ISO-001: 检查孤立节点
+            const isConnected = debouncedEdges.some(e => e.source === node.id || e.target === node.id);
+            if (!isConnected) {
+                const rule = allRules.find(r => r.id === 'ISO-001');
+                if (rule) {
+                    const msg = `[${rule.id}] ${rule.message}`;
+                    if (!errs.includes(msg)) errs.push(msg);
+                    violations.push({
+                        ruleId: rule.id,
+                        severity: rule.severity,
+                        message: rule.message,
+                        edgeId: '',
+                        sourceId: node.id,
+                        targetId: '',
+                    });
+                }
+            }
+        });
+
+        // 2. 边级校验 (拓扑流向)
         nextEdges.forEach(edge => {
             const sourceNode = nodeMap.get(edge.source);
             const targetNode = nodeMap.get(edge.target);
             if (!sourceNode || !targetNode) return;
 
-            // 仅对 architectureNode 生效
-            if (sourceNode.type !== 'architectureNode' || targetNode.type !== 'architectureNode') return;
+            // 检查 architectureNode 或 networkNode
+            const sType = sourceNode.type;
+            const tType = targetNode.type;
+            const isValidType = (t: string | undefined) => t === 'architectureNode' || t === 'networkNode';
+            if (!isValidType(sType) || !isValidType(tType)) return;
 
-            const stype = (sourceNode.data as Record<string, unknown>).type as string;
-            const ttype = (targetNode.data as Record<string, unknown>).type as string;
+            const stypeAttr = (sourceNode.data as any).type as string;
+            const ttypeAttr = (targetNode.data as any).type as string;
 
             for (const rule of allRules) {
-                if (rule.sourceTypes.includes(stype) && rule.targetTypes.includes(ttype)) {
+                // 如果 rule.targetTypes 为空，说明是节点级规则，跳过
+                if (rule.targetTypes.length === 0) continue;
+
+                if (rule.sourceTypes.includes(stypeAttr || sType) && rule.targetTypes.includes(ttypeAttr || tType)) {
                     violations.push({
                         ruleId: rule.id,
                         severity: rule.severity,
@@ -129,11 +185,11 @@ export function useTopologyLinter(nodes: Node[], edges: Edge[], options: Topolog
                     }
 
                     // 视觉标记：节点
-                    const errs = targetNode.data.linterErrors as string[];
+                    const targetErrs = targetNode.data.linterErrors as string[];
                     const msg = `[${rule.id}] ${rule.message}`;
-                    if (!errs.includes(msg)) errs.push(msg);
+                    if (!targetErrs.includes(msg)) targetErrs.push(msg);
 
-                    break; // 每条边只报最高优先级的第一条
+                    break; 
                 }
             }
         });

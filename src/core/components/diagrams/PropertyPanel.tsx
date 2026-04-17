@@ -16,6 +16,7 @@ import type { Color } from 'antd/es/color-picker';
 import { useNodePropertyItems } from './NodePropertyEditor';
 import { useEdgePropertyItems } from './EdgePropertyEditor';
 import { ThemeSwitcherPanel } from '../ui/ThemeSwitcherPanel';
+import { IconExplorer } from '../shared/IconExplorer';
 import './PropertyPanel.css';
 
 const { Text } = Typography;
@@ -83,6 +84,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
     const [localDesc, setLocalDesc] = useState('');
     const [localDomain, setLocalDomain] = useState('');
     const [localEdgeLabel, setLocalEdgeLabel] = useState('');
+    const [iconExplorerVisible, setIconExplorerVisible] = useState(false);
 
     const getNodeData = (node: Node) => node.data as FlowchartNodeData;
     const getCommonValue = <T, V>(items: T[], getter: (item: T) => V): V | undefined => {
@@ -147,6 +149,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
         onColorChange: handleNodeColorChange,
         localLabel, setLocalLabel, localDesc, setLocalDesc, localDomain, setLocalDomain,
         debouncedUpdateLabel, debouncedUpdateDesc, debouncedUpdateDomain,
+        onShowIconExplorer: () => setIconExplorerVisible(true),
     });
 
     const edgeItems = useEdgePropertyItems({
@@ -250,6 +253,16 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                     />
                 </div>
             </div>
+
+            <IconExplorer
+                visible={iconExplorerVisible}
+                onClose={() => setIconExplorerVisible(false)}
+                onSelect={(iconName) => {
+                    armSnapshot();
+                    updateNodes({ icon: iconName });
+                }}
+                initialValue={getCommonValue(selectedNodes, (n) => getNodeData(n)?.icon)}
+            />
         </aside>
     );
 };

@@ -2,35 +2,32 @@ import React, { memo, useCallback, useState, useRef, useEffect } from 'react';
 import { Handle, Position, NodeProps, Node, useReactFlow } from '@xyflow/react';
 import { NodeToolbar } from '@xyflow/react';
 import { MindMapActionBar } from '../diagrams/mindmap-pro/MindMapActionBar';
-import { FaGripLines, FaRegSquare, FaCircle, FaPlus, FaMinus } from 'react-icons/fa';
+import { FaMinus } from 'react-icons/fa';
 import './MindMapNode.css';
 
 export interface MindMapNodeData extends Record<string, unknown> {
     label?: string;
     depth?: number;
     color?: string;
-    direction?: 'LR' | 'TB' | 'R' | 'L';
+    direction?: 'LR' | 'TB' | 'BT' | 'R' | 'L' | 'FISHBONE';
     branchColor?: string;
     isNew?: boolean;
     shape?: 'underline' | 'pill' | 'box';
     pathStyle?: 'bezier' | 'straight' | 'step';
     collapsed?: boolean;
     childrenCount?: number;
-    // Phase 3: Rich Content
     icon?: string;
     image?: string;
     note?: string;
     tags?: string[];
+    summaryBracket?: {
+        minY: number;
+        maxY: number;
+        dir: 'L' | 'R';
+    };
 }
 
-interface MindMapNodeProps extends Partial<NodeProps<Node<MindMapNodeData, 'mindmap'>>> {
-    id: string;
-    data: MindMapNodeData;
-    isConnectable?: boolean;
-    selected?: boolean;
-}
-
-const MindMapNode = ({ id, data, isConnectable, selected }: MindMapNodeProps) => {
+const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindMapNodeData, 'mindmap'>>) => {
     const depth = data?.depth ?? 1; 
     const direction = data?.direction ?? 'LR';
     const branchColor = data?.branchColor;
@@ -50,7 +47,6 @@ const MindMapNode = ({ id, data, isConnectable, selected }: MindMapNodeProps) =>
     const inputRef = useRef<HTMLInputElement>(null);
     const { updateNodeData } = useReactFlow();
 
-    // Auto-focus when entering edit mode
     useEffect(() => {
         if (isEditing && inputRef.current) {
             inputRef.current.focus();
@@ -58,16 +54,13 @@ const MindMapNode = ({ id, data, isConnectable, selected }: MindMapNodeProps) =>
         }
     }, [isEditing]);
 
-    // Zero-Click Editing Trigger
     useEffect(() => {
         if (data?.isNew) {
             setIsEditing(true);
-            // Remove the flag so it only triggers once upon creation
             updateNodeData(id, { isNew: undefined });
         }
     }, [data?.isNew, id, updateNodeData]);
 
-    // Remote Edit Trigger (F2 / Space)
     useEffect(() => {
         const handleRemoteEdit = (e: Event) => {
             if ((e as CustomEvent).detail.nodeId === id) {
@@ -83,7 +76,6 @@ const MindMapNode = ({ id, data, isConnectable, selected }: MindMapNodeProps) =>
         updateNodeData(id, { collapsed: !collapsed });
     }, [id, collapsed, updateNodeData]);
 
-    // Save logic
     const handleSave = () => {
         if (isEditing) {
             setIsEditing(false);
@@ -105,11 +97,10 @@ const MindMapNode = ({ id, data, isConnectable, selected }: MindMapNodeProps) =>
         } else if (e.key === 'Escape') {
             e.stopPropagation();
             setIsEditing(false);
-            setEditValue(data?.label || ''); // Revert
+            setEditValue(data?.label || '');
         }
     };
 
-    // Apply color logic
     const themeStyle = branchColor && depth > 0 ? {
         '--branch-color': branchColor,
     } as React.CSSProperties : {};
@@ -127,29 +118,29 @@ const MindMapNode = ({ id, data, isConnectable, selected }: MindMapNodeProps) =>
                 <MindMapActionBar />
             </NodeToolbar>
 
-            {/* Target Handle (入口) -> Only for non-root */}
             {depth > 0 && (
                 <Handle
                     type="target"
                     position={
                         direction === 'L' ? Position.Right :
                         direction === 'R' ? Position.Left :
+                        direction === 'FISHBONE' ? Position.Right :
+                        direction === 'TB' ? Position.Top :
+                        direction === 'BT' ? Position.Bottom :
                         direction === 'LR' ? (isLeft ? Position.Right : Position.Left) : Position.Top
                     }
                     isConnectable={isConnectable}
                     className="mindmap-handle"
-                    style={depth > 0 && direction !== 'TB' ? { top: 'auto', bottom: '1px', transform: (direction === 'L' || (direction === 'LR' && isLeft)) ? 'translate(50%, 50%)' : 'translate(-50%, 50%)' } : undefined}
+                    style={depth > 0 && !['TB', 'BT'].includes(direction) ? { top: 'auto', bottom: '1px', transform: (direction === 'L' || direction === 'FISHBONE' || (direction === 'LR' && isLeft)) ? 'translate(50%, 50%)' : 'translate(-50%, 50%)' } : { borderRadius: '50%' }}
                 />
             )}
 
-            {/* Rich Image (Rendered above content) */}
             {image && (
                 <div className="mindmap-image-wrapper">
                     <img src={image} alt="Node Graphic" className="mindmap-image" />
                 </div>
             )}
 
-            {/* Label Content */}
             <div className="mindmap-label-wrapper">
                 {icon && <span className="mindmap-icon">{icon}</span>}
                 <div className="mindmap-label">
@@ -161,7 +152,6 @@ const MindMapNode = ({ id, data, isConnectable, selected }: MindMapNodeProps) =>
                             onChange={(e) => setEditValue(e.target.value)}
                             onBlur={handleSave}
                             onKeyDown={handleKeyDown}
-                            // Allow typing
                             onClick={(e) => e.stopPropagation()}
                             onPointerDown={(e) => e.stopPropagation()}
                         />
@@ -171,7 +161,6 @@ const MindMapNode = ({ id, data, isConnectable, selected }: MindMapNodeProps) =>
                 </div>
             </div>
 
-            {/* Rich Note and Tags (Rendered below content) */}
             {(note || tags.length > 0) && !isEditing && (
                 <div className="mindmap-rich-footer">
                     {note && <div className="mindmap-note">{note}</div>}
@@ -183,86 +172,86 @@ const MindMapNode = ({ id, data, isConnectable, selected }: MindMapNodeProps) =>
                 </div>
             )}
 
-            {/* Logic Summary Bracket Rendering */}
+            {/* Professional Summary Bracket */}
             {(() => {
-                if (!data.isSummary) return null;
-                const bracket = data.summaryBracket as { minY: number, maxY: number, dir: string } | undefined;
-                if (!bracket) return null;
+                const summaryBracket = data.summaryBracket;
+                if (!summaryBracket) return null;
 
-                const h = Math.max(bracket.maxY - bracket.minY, 20);
-                const cY = h / 2;
-                const isLeft = bracket.dir === 'L';
+                const { minY, maxY, dir } = summaryBracket;
+                const hHeight = Math.abs(maxY - minY);
+                const cY = hHeight / 2;
+                const isSummaryLeft = dir === 'L';
                 
-                // dir === 'R': Summary is on Right, bracket points Right "}" (targets <- summary)
-                // dir === 'L': Summary is on Left, bracket points Left "{" (summary -> targets)
-                
-                const d = isLeft
-                    // Left pointing bracket "{"
-                    ? `M 20,0 Q 10,0 10,10 L 10,${cY - 10} Q 10,${cY} 0,${cY} Q 10,${cY} 10,${cY + 10} L 10,${h - 10} Q 10,${h} 20,${h}`
-                    // Right pointing bracket "}"
-                    : `M 0,0 Q 10,0 10,10 L 10,${cY - 10} Q 10,${cY} 20,${cY} Q 10,${cY} 10,${cY + 10} L 10,${h - 10} Q 10,${h} 0,${h}`;
+                const r = 8;
+                const d = isSummaryLeft
+                    ? `M 15 0 C 8 0 8 ${r} 8 ${r} L 8 ${cY-r} C 8 ${cY} 0 ${cY} 0 ${cY} C 8 ${cY} 8 ${cY} 8 ${cY+r} L 8 ${hHeight-r} C 8 ${hHeight-r} 8 ${hHeight} 15 ${hHeight}`
+                    : `M 0 0 C 7 0 7 ${r} 7 ${r} L 7 ${cY-r} C 7 ${cY} 15 ${cY} 15 ${cY} C 7 ${cY} 7 ${cY} 7 ${cY+r} L 7 ${hHeight-r} C 7 ${hHeight-r} 7 ${hHeight} 0 ${hHeight}`;
 
                 return (
                     <svg
                         style={{
                             position: 'absolute',
-                            top: bracket.minY,
-                            height: h,
-                            width: 20,
-                            [isLeft ? 'left' : 'right']: 'calc(100% + 5px)',
+                            top: minY,
+                            left: isSummaryLeft ? 'auto' : 'calc(100% + 8px)',
+                            right: isSummaryLeft ? 'calc(100% + 8px)' : 'auto',
+                            height: hHeight,
+                            width: 15,
                             pointerEvents: 'none',
-                            overflow: 'visible'
+                            overflow: 'visible',
+                            zIndex: 10
                         }}
                     >
-                        <path d={d} stroke="#a0aab5" fill="none" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                        <path 
+                            d={d} 
+                            stroke="#8e9aaf" 
+                            fill="none" 
+                            strokeWidth={1.8} 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                        />
                     </svg>
                 );
             })()}
 
-            {/* Source Handle (出口) */}
-            {depth > 0 ? (
+            {depth === 0 ? (
+                <>
+                    {direction === 'TB' ? (
+                        <Handle type="source" id="source-bottom" position={Position.Bottom} isConnectable={isConnectable} className="mindmap-handle" />
+                    ) : direction === 'BT' ? (
+                        <Handle type="source" id="source-top" position={Position.Top} isConnectable={isConnectable} className="mindmap-handle" />
+                    ) : direction === 'R' ? (
+                        <Handle type="source" id="source-right" position={Position.Right} isConnectable={isConnectable} className="mindmap-handle" />
+                    ) : direction === 'L' || direction === 'FISHBONE' ? (
+                        <Handle type="source" id="source-left" position={Position.Left} isConnectable={isConnectable} className="mindmap-handle" />
+                    ) : (
+                        <>
+                            <Handle type="source" id="source-right" position={Position.Right} isConnectable={isConnectable} className="mindmap-handle" />
+                            <Handle type="source" id="source-left" position={Position.Left} isConnectable={isConnectable} className="mindmap-handle" />
+                        </>
+                    )}
+                </>
+            ) : (
                 <>
                     <Handle
                         type="source"
                         position={
                             direction === 'L' ? Position.Left :
                             direction === 'R' ? Position.Right :
+                            direction === 'FISHBONE' ? Position.Left :
+                            direction === 'TB' ? Position.Bottom :
+                            direction === 'BT' ? Position.Top :
                             direction === 'LR' ? (isLeft ? Position.Left : Position.Right) : Position.Bottom
                         }
                         isConnectable={isConnectable}
                         className="mindmap-handle"
-                        style={depth > 0 && direction !== 'TB' ? { top: 'auto', bottom: '1px', transform: (direction === 'L' || (direction === 'LR' && isLeft)) ? 'translate(-50%, 50%)' : 'translate(50%, 50%)' } : undefined}
+                        style={!['TB', 'BT'].includes(direction) ? { top: 'auto', bottom: '1px', transform: (direction === 'L' || direction === 'FISHBONE' || (direction === 'LR' && isLeft)) ? 'translate(-50%, 50%)' : 'translate(50%, 50%)' } : { borderRadius: '50%' }}
                     />
                     {childrenCount > 0 && (
                         <div 
                             className="mindmap-collapse-toggle" 
-                            style={direction === 'TB' 
-                                ? { left: '50%', position: 'absolute', bottom: '-15px', transform: 'translateX(-50%)', zIndex: 10 }
+                            style={['TB', 'BT'].includes(direction)
+                                ? { left: '50%', position: 'absolute', [direction === 'TB' ? 'bottom' : 'top']: '-15px', transform: 'translateX(-50%)', zIndex: 10 }
                                 : { [direction === 'L' || (direction === 'LR' && isLeft) ? 'left' : 'right']: '-22px', position: 'absolute', top: '50%', transform: 'translateY(-50%)', zIndex: 10 }
-                            }
-                            onClick={handleToggleCollapse}
-                        >
-                            {collapsed ? <span className="mindmap-collapse-count">{childrenCount}</span> : <FaMinus size={10} />}
-                        </div>
-                    )}
-                </>
-            ) : (
-                <>
-                    {/* Root node needs source handles based on direction */}
-                    {direction !== 'TB' ? (
-                        <>
-                            <Handle type="source" id="source-right" position={Position.Right} isConnectable={isConnectable} className="mindmap-handle" />
-                            <Handle type="source" id="source-left" position={Position.Left} isConnectable={isConnectable} className="mindmap-handle" />
-                        </>
-                    ) : (
-                         <Handle type="source" id="source-bottom" position={Position.Bottom} isConnectable={isConnectable} className="mindmap-handle" />
-                    )}
-                    {childrenCount > 0 && (
-                        <div 
-                            className="mindmap-collapse-toggle" 
-                            style={direction === 'TB' 
-                                ? { left: '50%', position: 'absolute', bottom: '-15px', transform: 'translateX(-50%)', zIndex: 10 }
-                                : { right: '-22px', position: 'absolute', top: '50%', transform: 'translateY(-50%)', zIndex: 10 }
                             }
                             onClick={handleToggleCollapse}
                         >
@@ -272,7 +261,6 @@ const MindMapNode = ({ id, data, isConnectable, selected }: MindMapNodeProps) =>
                 </>
             )}
 
-            {/* Relationship Handles (visible on hover) */}
             <Handle
                 type="source"
                 id="relationship-source"

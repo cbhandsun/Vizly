@@ -144,6 +144,7 @@ export * from './plugins/ArchitecturePlugin';
 export * from './plugins/MindMapPlugin';
 export * from './plugins/SwimlanePlugin';
 export * from './plugins/ERDiagramPlugin';
+export * from './plugins/NetworkTopologyPlugin';
 export { default as UnifiedDesigner } from './components/diagrams/FlowchartDesigner';
 export type { DiagramComponentProps as UnifiedDesignerProps } from './types/diagram-components';
 export { default as ArchitectureNode } from './components/custom-nodes/ArchitectureNode';
@@ -156,6 +157,7 @@ import { TimelinePlugin as InternalTimelinePlugin } from './plugins/TimelinePlug
 import { MindMapPlugin as InternalMindMapPlugin } from './plugins/MindMapPlugin';
 import { SwimlanePlugin as InternalSwimlanePlugin } from './plugins/SwimlanePlugin';
 import { ERDiagramPlugin as InternalERDiagramPlugin } from './plugins/ERDiagramPlugin';
+import { NetworkTopologyPlugin as InternalNetworkTopologyPlugin } from './plugins/NetworkTopologyPlugin';
 
 export function initializePlugins() {
   const __registry = InternalPluginRegistry.getInstance();
@@ -166,6 +168,7 @@ export function initializePlugins() {
     __registry.register(new InternalMindMapPlugin());
     __registry.register(new InternalSwimlanePlugin());
     __registry.register(new InternalERDiagramPlugin());
+    __registry.register(new InternalNetworkTopologyPlugin());
   }
 }
 

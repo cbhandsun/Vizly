@@ -109,7 +109,10 @@ export const MindMapEdge = ({
 
     // We strictly DO NOT pass markerEnd to BaseEdge to ensure NO arrowheads.
     const pathStyle = (sourceNode?.data?.pathStyle as string) || 'bezier';
-    
+    const branchColor = (sourceNode?.data?.branchColor as string) || '#ccc';
+    const depth = (sourceNode?.data?.depth as number) || 0;
+    const isMainBranch = depth === 0;
+
     let edgePath = '';
     
     const pathParams = {
@@ -126,15 +129,25 @@ export const MindMapEdge = ({
     } else if (pathStyle === 'step') {
         [edgePath] = getSmoothStepPath({
             ...pathParams,
-            borderRadius: 16
+            borderRadius: 20
         });
+    } else if (pathStyle === 'rounded' || pathStyle === 'organic') {
+        // High-Fidelity Noodle Style: custom bezier with horizontal priority
+        const dx = Math.abs(dTX - dSX);
+        const controlOffset = Math.min(dx * 0.5, 180);
+        const sourceControlX = dSX + (dTX > dSX ? controlOffset : -controlOffset);
+        const targetControlX = dTX - (dTX > dSX ? controlOffset : -controlOffset);
+        edgePath = `M${dSX},${dSY} C${sourceControlX},${dSY} ${targetControlX},${dTY} ${dTX},${dTY}`;
     } else {
         // Default: Bezier for a nice smooth organic feel
         [edgePath] = getBezierPath({
             ...pathParams,
-            curvature: 0.7,
+            curvature: 0.8,
         });
     }
+
+    // Weighted Strokes for hierarchy awareness
+    const strokeWidth = isMainBranch ? 3.5 : 2;
 
     return (
         <BaseEdge 
@@ -142,9 +155,14 @@ export const MindMapEdge = ({
             path={edgePath} 
             style={{
                  ...style,
+                 stroke: branchColor,
+                 strokeWidth: strokeWidth,
                  strokeLinecap: 'round',
                  strokeLinejoin: 'round',
-                 strokeDasharray: 'none'
+                 strokeDasharray: 'none',
+                 transition: 'stroke 0.3s ease, stroke-width 0.3s ease',
+                 filter: isMainBranch ? 'drop-shadow(0px 1px 2px rgba(0,0,0,0.1))' : 'none',
+                 opacity: 0.9,
             }} 
         />
     );

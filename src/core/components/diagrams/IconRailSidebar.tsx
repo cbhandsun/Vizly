@@ -3,7 +3,7 @@ import { Input, Collapse, Typography, theme, Tooltip, Flex, Popover, Slider, But
 import {
     FaShapes, FaCompass, FaStream, FaStar, FaSearch,
     FaPlay, FaBox, FaTimes,
-    FaSearchPlus, FaSearchMinus
+    FaSearchPlus, FaSearchMinus, FaRegComment
 } from 'react-icons/fa';
 import { Node } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +20,7 @@ import {
     FaKeyboard,
     FaServer, FaNetworkWired, FaLock, FaPlug, FaUser, FaEnvelope, FaBell, FaCog, FaCode, FaTerminal
 } from 'react-icons/fa';
+import { CommentPanel } from './CommentPanel';
 import './IconRailSidebar.css';
 
 const { Text } = Typography;
@@ -209,6 +210,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
     // ---- Rail 按钮定义 ----
     const builtInButtons = [
         { key: 'navigator', icon: <FaCompass />, label: t('designer.sidebar.navigator') },
+        { key: 'comments', icon: <FaRegComment />, label: '评论反馈' },
         ...(onCreateLayer ? [{ key: 'layers', icon: <FaStream />, label: t('designer.sidebar.layers') }] : []),
         ...(templates && templates.length > 0 ? [{ key: 'templates', icon: <FaStar />, label: `模板 (${templates.length})` }] : []),
     ];
@@ -316,6 +318,8 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                         onRenameTemplate={onRenameTemplate || (() => { })}
                     />
                 );
+            case 'comments':
+                return <CommentPanel />;
             default:
                 return null;
         }
@@ -329,6 +333,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
             case 'navigator': return t('designer.sidebar.navigator');
             case 'layers': return t('designer.sidebar.layers');
             case 'templates': return `模板 (${templates?.length || 0})`;
+            case 'comments': return '评论反馈';
             default: return '';
         }
     };

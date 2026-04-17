@@ -118,6 +118,8 @@ export class NodeFactory {
         const s = raw.trim().toLowerCase();
         if (s === 'titlegroup') return 'titleGroup';
         if (s === 'subgroup') return 'subGroup';
+        if (s === 'networknode') return 'networkNode';
+        if (s === 'networkcontainer') return 'networkContainer';
         if (s === 'domain' || s === 'input' || s === 'output' || s === 'default' || s === 'custom') {
           return s;
         }
@@ -132,7 +134,7 @@ export class NodeFactory {
      * 函数级注释：域类校验（按类型）
      * 目标：在业务节点类型上强制要求 `domainClass` 存在；容器类节点跳过校验。
      */
-    const mustHaveDomainClass = !new Set(['subGroup', 'titleGroup', 'domain']).has(String(normalizedType));
+    const mustHaveDomainClass = !new Set(['subGroup', 'titleGroup', 'domain', 'networkContainer']).has(String(normalizedType));
     const dcPresent = String((config.domainClass ?? (config.data as any)?.domainClass ?? '')).trim().length > 0;
     if (mustHaveDomainClass && !dcPresent) {
       throw new Error(`节点缺少 domainClass: ${config.id}`);

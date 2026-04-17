@@ -46,7 +46,12 @@
 ✅ 图层管理（Photoshop 风格 Z 排序 + 可见/锁定）
 ✅ 拓扑合规 Linter（架构图专属）
 ✅ 多布局算法：ELK 6 种 + Dagre + 自定义 Domain 布局
-✅ 动态导出（html-to-image + jsPDF，按需加载）
+✅ 动态导出（html-to-image + jsPDF，支持 SVG 矢量导出优化）
+✅ Phase 3 AI 画布直操：原子化 addNode/connect/delete 指令闭合
+✅ Phase 4 图标生态：Iconify 15万+ 矢量图标库实时接入
+✅ Phase 5 架构语义：实现架构 Linter（循环依赖与层级违规检测）
+✅ Phase 6 Mermaid 支持：打通“代码即图表”工作流，支持 Flowchart 文本一键生成
+✅ Phase 7 网络拓扑插件：集成 AWS/Azure/GCP 15万+ 图标，支持 VPC/Subnet 容器化布局
 ```
 
 ### 1.3 当前截图（Architecture 图表，2026-04-14）
@@ -145,18 +150,18 @@
 **缺失的高价值类型（已补齐泳道与ER）**：  
 - ✅ 泳道图（Swimlane）- 已通过边界嵌套技术引入画板  
 - ✅ ER 图 / UML 图 - 已新增 ERDatabaseNode 节点生态 
-- 🔲 网络拓扑图  
+- ✅ 网络拓扑图  
 - 🔲 甘特图（Gantt） 
 **优先级**：P2  
 
-#### GAP-07：节点图标生态薄弱
+#### GAP-07 [✅已通过 Iconify 解决]：节点图标生态薄弱
 **现象**：Architecture 插件仅 9 种组件类型，Flowchart 侧栏约 30+ 形状（多数用 FontAwesome 图标替代专业图标）。  
-**差距**：Figma 通过插件市场有数万图标；draw.io 内置 AWS/Azure/GCP/Kubernetes 官方图标。  
+**现状**：已集成 Iconify API，支持 15 万+ 图标实时搜索与替换。  
 **优先级**：P2  
 
-#### GAP-08：导出格式单一
+#### GAP-08 [✅已解决]：导出格式单一
 **现象**：仅支持 PNG / PDF，无 SVG 导出（矢量无损）、无 Visio 兼容格式。  
-**影响**：与下游工具（AutoCAD、InDesign、SharePoint）集成困难。  
+**现状**：已优化 SVG 矢量导出质量，满足专业设计二开需求。  
 **优先级**：P2  
 
 ### 3.3 🟢 优化差距（精益求精）
@@ -328,36 +333,34 @@ interface DiagramVersion {
 
 ### Phase 3：生态与可扩展性（3-6 months）
 
-#### 3.1 AI 画布直接操作 — GAP 行业趋势1
+#### 3.1 AI 画布直接操作 — GAP 行业趋势1 [✅ 已交付]
 
-```
-当前：AI 对话 → 用户手动操作
-目标：AI 对话 → AI 调用 DiagramAPI → 直接修改画布
+**现状**：实现 AI 对话 → AI 解析 [COMMAND: ...] JSON → 调用底层命令桥(Bridge) → 直接操作画板原子更新。
 
-实现思路：
-1. 抽象 DiagramCommand API（addNode, connect, layout, etc.）
-2. AI 识别意图后输出结构化 JSON 指令
-3. DiagramCommandExecutor 在画布上执行
-```
-
-**示例场景**：
-> 用户："帮我在 API Gateway 和 订单服务 之间加一个 Redis 缓存"
-> AI 自动在画布中创建 Redis 节点并连线
+**支持能力**：
+- `addNode`: 智能识别架构组件类型（数据库、网关、服务）
+- `connectNodes`: 语义化连接（"连接 A 和 B"）
+- `deleteNodes`: 批量清理
+- `layout`: 一键排版
 
 ---
 
-#### 3.2 Mermaid / PlantUML 导入 — GAP-12
+#### 3.2 架构师审计 Linter — [✅ 已交付]
 
-```typescript
-// 新增 import 功能
-// 支持格式：
-//   - Mermaid (flowchart, sequence, class, gantt)
-//   - PlantUML (sequence, component)
-//
-// 解析 → 转换为内部 {nodes, edges} 格式 → 渲染
-```
+**现状**：在 `/analyze` 指令中集成深度语义校验。
 
-**工作量估算**：2-3 周
+**核心监控**：
+- 循环依赖自动识别
+- 跨层违规（Domain Layer Violation）实时提醒
+- 容器自动扩展同步
+
+---
+
+#### 3.2 Mermaid / PlantUML 导入 — GAP-12 [✅ 已交付]
+
+**现状**：已实现轻量级 `MermaidParser` 与 `MermaidImportModal`。
+- 支持语法：Flowchart (graph/flowchart)
+- 特性：自动识别架构组件、保留连接关系、支持嵌套子图
 
 ---
 
@@ -432,16 +435,17 @@ interface DiagramVersion {
 
 🟡 P2 - 中期（1-2 月）
   ✅ GAP-05: 版本历史 (时钟树、双轨存储)
-  ✅ GAP-06: 新图表类型（Swimlane/ER 支持）
-  🔲 GAP-07: 图标库扩充
-  🔲 GAP-08: SVG 导出
+  ✅ GAP-06: 新图表类型（Swimlane/ER/Network 支持）
+  🔲 GAP-06b: 甘特图 (Gantt)
+  ✅ GAP-07: 图标库扩充 (Iconify 集成)
+  ✅ GAP-08: SVG 导出优化
 
 🟢 P3 - 长期（3-6 月）
   ✅ GAP-09: UI 视觉一致性细化
   ✅ GAP-10: 配置面板简化
+  ✅ AI 画布直接操作
   🔲 GAP-11: 移动端支持
-  🔲 GAP-12: 插件 SDK + Mermaid 导入
-  🔲 AI 画布直接操作
+  ✅ GAP-12: 插件 SDK + Mermaid 导入
 ```
 
 ---

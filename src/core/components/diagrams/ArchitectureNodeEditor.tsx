@@ -3,7 +3,8 @@ import { Node } from '@xyflow/react';
 import { ArchitectureNodeData } from '../custom-nodes/ArchitectureNode';
 import { NodeDataUpdate } from '../../types/diagram-updates';
 import { Form, Select, Typography, Input, Card, Tag, Badge, Space } from 'antd';
-import { CloudServerOutlined, DashboardOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { CloudServerOutlined, DashboardOutlined, SafetyCertificateOutlined, SearchOutlined } from '@ant-design/icons';
+import { Icon } from '@iconify/react';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -12,11 +13,12 @@ interface ArchitectureNodeEditorProps {
     selectedNodes: Node[];
     updateNodes: (partialData: NodeDataUpdate) => void;
     armSnapshot: () => void;
+    onShowIconExplorer?: (onSelect: (icon: string) => void) => void;
     disabled: boolean;
 }
 
 export const ArchitectureNodeEditor: React.FC<ArchitectureNodeEditorProps> = ({
-    selectedNodes, updateNodes, armSnapshot, disabled
+    selectedNodes, updateNodes, armSnapshot, onShowIconExplorer, disabled
 }) => {
     if (selectedNodes.length !== 1) {
         return <Text type="secondary">请选择单个架构节点进行编辑</Text>;
@@ -45,6 +47,43 @@ export const ArchitectureNodeEditor: React.FC<ArchitectureNodeEditorProps> = ({
                             { label: 'System / Group', value: 'system' },
                         ]}
                     />
+                </Form.Item>
+                <Form.Item label="图标 (Icon)">
+                    <Space.Compact style={{ width: '100%' }}>
+                        <Input
+                            prefix={data.icon ? <Icon icon={data.icon} /> : <SearchOutlined />}
+                            placeholder="选择图标..."
+                            value={data.icon || ''}
+                            readOnly
+                            onClick={() => onShowIconExplorer?.((icon) => {
+                                armSnapshot();
+                                updateNodes({ data: { icon } });
+                            })}
+                            disabled={disabled}
+                            style={{ cursor: 'pointer' }}
+                        />
+                        <Button
+                            icon={<SearchOutlined />}
+                            onClick={() => onShowIconExplorer?.((icon) => {
+                                armSnapshot();
+                                updateNodes({ data: { icon } });
+                            })}
+                            disabled={disabled}
+                        >
+                            搜索
+                        </Button>
+                        {data.icon && (
+                            <Button
+                                onClick={() => {
+                                    armSnapshot();
+                                    updateNodes({ data: { icon: undefined } });
+                                }}
+                                disabled={disabled}
+                            >
+                                清除
+                            </Button>
+                        )}
+                    </Space.Compact>
                 </Form.Item>
                 <Form.Item label="健康状态 (Status)">
                     <Select

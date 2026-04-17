@@ -32,8 +32,10 @@ import {
     PlusOutlined,
     DeleteOutlined,
     ArrowUpOutlined,
-    ArrowDownOutlined
+    ArrowDownOutlined,
+    SearchOutlined
 } from '@ant-design/icons';
+import { FaSearch } from 'react-icons/fa';
 import type { Color } from 'antd/es/color-picker';
 import type { CollapseProps } from 'antd';
 
@@ -61,6 +63,7 @@ export interface UseNodePropertyItemsParams {
     debouncedUpdateLabel: (value: string) => void;
     debouncedUpdateDesc: (value: string) => void;
     debouncedUpdateDomain: (value: string) => void;
+    onShowIconExplorer?: () => void;
 }
 
 const getNodeData = (node: Node) => node.data as FlowchartNodeData;
@@ -76,6 +79,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
         localLabel, setLocalLabel, localDesc, setLocalDesc,
         localDomain, setLocalDomain,
         debouncedUpdateLabel, debouncedUpdateDesc, debouncedUpdateDomain,
+        onShowIconExplorer,
     } = params;
 
     const nodeCount = selectedNodes.length;
@@ -248,34 +252,46 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                             ]} />
                     </Form.Item>
                     <Form.Item label={t('propertyPanel.icon')}>
-                        <Select value={commonNodeIcon}
-                            onChange={val => updateNodes({ icon: typeof val === 'string' ? val : undefined })}
-                            onDropdownVisibleChange={(open) => { if (open) armSnapshot(); }}
-                            placeholder={commonNodeIcon === undefined ? mixedLabel : selectLabel}
-                            allowClear disabled={disabled}
-                            options={[
-                                { label: t('propertyPanel.options.icon.play'), value: 'play' },
-                                { label: t('propertyPanel.options.icon.square'), value: 'square' },
-                                { label: t('propertyPanel.options.icon.cog'), value: 'cog' },
-                                { label: t('propertyPanel.options.icon.stop'), value: 'stop' },
-                                { label: t('propertyPanel.options.icon.database'), value: 'database' },
-                                { label: t('propertyPanel.options.icon.question'), value: 'question' },
-                                { label: t('propertyPanel.options.icon.arrow'), value: 'arrow' },
-                                { label: t('propertyPanel.options.icon.group'), value: 'group' },
-                                { label: t('propertyPanel.options.icon.box'), value: 'box' },
-                                { label: t('propertyPanel.options.icon.thLarge'), value: 'th-large' },
-                                { label: t('propertyPanel.options.icon.image'), value: 'image' },
-                                { label: t('propertyPanel.options.icon.eye'), value: 'eye' },
-                                { label: t('propertyPanel.options.icon.keyboard'), value: 'keyboard' },
-                                { label: t('propertyPanel.options.icon.circle'), value: 'circle' },
-                                { label: t('propertyPanel.options.icon.star'), value: 'star' },
-                                { label: t('propertyPanel.options.icon.file'), value: 'file' },
-                                { label: t('propertyPanel.options.icon.cloud'), value: 'cloud' },
-                                { label: t('propertyPanel.options.icon.clock'), value: 'clock' },
-                                { label: t('propertyPanel.options.icon.desktop'), value: 'desktop' },
-                                { label: t('propertyPanel.options.icon.note'), value: 'note' },
-                                { label: t('propertyPanel.options.icon.hexagon'), value: 'hexagon' },
-                            ]} />
+                        <Space.Compact style={{ width: '100%' }}>
+                            <Select 
+                                value={commonNodeIcon}
+                                onChange={val => updateNodes({ icon: typeof val === 'string' ? val : undefined })}
+                                onDropdownVisibleChange={(open) => { if (open) armSnapshot(); }}
+                                placeholder={commonNodeIcon === undefined ? mixedLabel : selectLabel}
+                                allowClear 
+                                disabled={disabled}
+                                style={{ flex: 1 }}
+                                options={[
+                                    { label: t('propertyPanel.options.icon.play'), value: 'play' },
+                                    { label: t('propertyPanel.options.icon.square'), value: 'square' },
+                                    { label: t('propertyPanel.options.icon.cog'), value: 'cog' },
+                                    { label: t('propertyPanel.options.icon.stop'), value: 'stop' },
+                                    { label: t('propertyPanel.options.icon.database'), value: 'database' },
+                                    { label: t('propertyPanel.options.icon.question'), value: 'question' },
+                                    { label: t('propertyPanel.options.icon.arrow'), value: 'arrow' },
+                                    { label: t('propertyPanel.options.icon.group'), value: 'group' },
+                                    { label: t('propertyPanel.options.icon.box'), value: 'box' },
+                                    { label: t('propertyPanel.options.icon.thLarge'), value: 'th-large' },
+                                    { label: t('propertyPanel.options.icon.image'), value: 'image' },
+                                    { label: t('propertyPanel.options.icon.eye'), value: 'eye' },
+                                    { label: t('propertyPanel.options.icon.keyboard'), value: 'keyboard' },
+                                    { label: t('propertyPanel.options.icon.circle'), value: 'circle' },
+                                    { label: t('propertyPanel.options.icon.star'), value: 'star' },
+                                    { label: t('propertyPanel.options.icon.file'), value: 'file' },
+                                    { label: t('propertyPanel.options.icon.cloud'), value: 'cloud' },
+                                    { label: t('propertyPanel.options.icon.clock'), value: 'clock' },
+                                    { label: t('propertyPanel.options.icon.desktop'), value: 'desktop' },
+                                    { label: t('propertyPanel.options.icon.note'), value: 'note' },
+                                    { label: t('propertyPanel.options.icon.hexagon'), value: 'hexagon' },
+                                ]} 
+                            />
+                            <Button 
+                                icon={<FaSearch />} 
+                                onClick={onShowIconExplorer}
+                                title={t('iconExplorer.open', '浏览更多图标')}
+                                disabled={disabled}
+                            />
+                        </Space.Compact>
                     </Form.Item>
                     <Form.Item label={t('propertyPanel.borderStyle')}>
                         <Radio.Group value={commonNodeBorderStyle}
@@ -497,6 +513,13 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                     selectedNodes={selectedNodes}
                     updateNodes={updateNodes}
                     armSnapshot={armSnapshot}
+                    onShowIconExplorer={(onSelect) => {
+                        // For simplicity, we trigger the shared explorer.
+                        // If we needed specific logic, we'd pass it through.
+                        // But since onShowIconExplorer in params takes no args,
+                        // we just call it.
+                        onShowIconExplorer?.();
+                    }}
                     disabled={disabled}
                 />
             )

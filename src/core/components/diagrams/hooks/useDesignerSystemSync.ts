@@ -4,6 +4,7 @@ import type { MessageInstance } from 'antd/es/message/interface';
 import { useAutoSave } from './useAutoSave';
 import { PluginRegistry } from '../../../services/PluginRegistry';
 import { LayoutOptimizer } from '../../layout/LayoutOptimizer';
+import { analyzeDiagram } from '@/utils/diagramAnalyzer';
 
 export interface UseDesignerSystemSyncProps {
     id?: string;
@@ -73,6 +74,246 @@ export function useDesignerSystemSync({
                         }
                     } catch(err) {
                         console.error('importData 失败', err);
+                    }
+                }
+            });
+
+            // --- 扩展原子化操作 API (Phase 3: AI Design Pilot) ---
+            Object.defineProperty(standardData, 'addNode', {
+                enumerable: false,
+                value: async (args: { id?: string; label: string; type?: string; shape?: string; parentId?: string; position?: {x: number, y: number} }) => {
+                    const { id: incomingId, label, type: incomingType, shape = 'rectangle', parentId, position } = args;
+                    const id = incomingId || `node_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+                    
+                    const layoutOptimizer = (await import('../../layout/LayoutOptimizer')).LayoutOptimizer.getInstance();
+                    const width = layoutOptimizer.calculateNodeWidth(label);
+
+                    // 默认类型映射逻辑
+                    let nodeType = incomingType || (pluginId === 'architecture-diagram' ? 'architectureNode' : 'flowchart');
+                    let architectureType: any = undefined;
+
+                    // 如果是在架构图模式下，或者指令明确要求 architecture 类型
+                    if (nodeType === 'architectureNode' || pluginId === 'architecture-diagram') {
+                        nodeType = 'architectureNode';
+                        const lowerLabel = label.toLowerCase();
+                        if (lowerLabel.includes('db') || lowerLabel.includes('数据库') || lowerLabel.includes('mysql') || lowerLabel.includes('redis') || lowerLabel.includes('mongo')) {
+                            architectureType = lowerLabel.includes('redis') ? 'cache' : 'database';
+                        } else if (lowerLabel.includes('网关') || lowerLabel.includes('gateway') || lowerLabel.includes('nginx')) {
+                            architectureType = 'gateway';
+                        } else if (lowerLabel.includes('服务') || lowerLabel.includes('service') || lowerLabel.includes('api')) {
+                            architectureType = 'microservice';
+                        } else if (lowerLabel.includes('前端') || lowerLabel.includes('web') || lowerLabel.includes('app') || lowerLabel.includes('ui')) {
+                            architectureType = 'frontend';
+                        } else if (lowerLabel.includes('队列') || lowerLabel.includes('mq') || lowerLabel.includes('kafka')) {
+                            architectureType = 'messageQueue';
+                        } else {
+                            architectureType = 'component';
+                        }
+                    }
+                    
+                    const newNode: Node = {
+                        id,
+                        type: nodeType,
+                        position: position || (parentId ? { x: 20, y: 60 } : { x: 100, y: 100 }), // 子节点默认相对坐标
+                        parentId,
+                        data: {
+                            label,
+                            description: `<b>${label}</b>`,
+                            shape,
+                            type: architectureType,
+                            domain: '业务域',
+                            domainClass: 'core'
+                        },
+                        width,
+                        height: 50,
+                        style: { width }
+                    };
+
+                    setNodes((nds: any) => {
+                        let nextNodes = [...nds, newNode];
+                        
+                        // Phase 5: 自动调整父容器尺寸
+                        if (parentId) {
+                            const parentIdx = nextNodes.findIndex(n => n.id === parentId);
+                            if (parentIdx !== -1) {
+                                const parent = nextNodes[parentIdx];
+                                // 如果是容器类型 (group/subGroup等)
+                                const isContainer = ['group', 'subGroup', 'titleGroup', 'titleGroupNode'].includes(parent.type || '');
+                                if (isContainer) {
+                                    const minWidth = (newNode.position.x || 0) + (newNode.width || 120) + 40;
+                                    const minHeight = (newNode.position.y || 0) + (newNode.height || 50) + 40;
+                                    
+                                    const newParentWidth = Math.max(parent.width || 0, minWidth);
+                                    const newParentHeight = Math.max(parent.height || 0, minHeight);
+                                    
+                                    nextNodes[parentIdx] = {
+                                        ...parent,
+                                        width: newParentWidth,
+                                        height: newParentHeight,
+                                        style: { ...parent.style, width: newParentWidth, height: newParentHeight }
+                                    };
+                                }
+                            }
+                        }
+                        return nextNodes;
+                    });
+                    return id;
+                }
+            });
+
+            Object.defineProperty(standardData, 'deleteNodes', {
+                enumerable: false,
+                value: async (ids: string[]) => {
+                    setNodes((nds: any) => nds.filter((n: any) => !ids.includes(n.id)));
+                    setEdges((eds: any) => eds.filter((e: any) => !ids.includes(e.source) && !ids.includes(e.target)));
+                }
+            });
+
+            Object.defineProperty(standardData, 'connectNodes', {
+                enumerable: false,
+                value: async (args: { source: string; target: string; label?: string; type?: string }) => {
+                    const { source, target, label, type = 'advanced-smart-step' } = args;
+                    const id = `edge_${source}_${target}_${Date.now().toString().substring(7)}`;
+                    
+                    const newEdge: Edge = {
+                        id,
+                        source,
+                        target,
+                        type,
+                        label,
+                        markerEnd: { type: 'arrowclosed' as any }
+                    };
+
+                    setEdges((eds: any) => [...eds, newEdge]);
+                    return id;
+                }
+            });
+
+            Object.defineProperty(standardData, 'updateNode', {
+                enumerable: false,
+                value: async (id: string, data: any) => {
+                    setNodes((nds: any) => nds.map((n: any) => {
+                        if (n.id === id) {
+                            const newData = { ...n.data, ...data };
+                            if (data.label && !data.description) {
+                                newData.description = `<b>${data.label}</b>`;
+                            }
+                            
+                            // Re-calculate width if label changed
+                            let width = n.width;
+                            let style = n.style;
+                            if (data.label) {
+                                const width_val = LayoutOptimizer.getInstance().calculateNodeWidth(data.label);
+                                width = width_val;
+                                style = { ...style, width: width_val };
+                            }
+
+                            return { ...n, data: newData, width, style };
+                        }
+                        return n;
+                    }));
+                }
+            });
+
+            Object.defineProperty(standardData, 'triggerLayout', {
+                enumerable: false,
+                value: async (strategy?: string) => {
+                    window.dispatchEvent(new CustomEvent('diagramControl', { detail: { action: 'layout', strategy } }));
+                }
+            });
+
+            Object.defineProperty(standardData, 'groupNodes', {
+                enumerable: false,
+                value: async (nodeIds: string[], groupName?: string) => {
+                    if (nodeIds.length === 0) return;
+                    
+                    setNodes((nds: any) => {
+                        const targetNodes = nds.filter((n: any) => nodeIds.includes(n.id));
+                        if (targetNodes.length === 0) return nds;
+
+                        // Calculate BBox
+                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                        targetNodes.forEach((n: any) => {
+                            const x = n.position.x;
+                            const y = n.position.y;
+                            const w = n.measured?.width || n.width || 120;
+                            const h = n.measured?.height || n.height || 60;
+                            minX = Math.min(minX, x);
+                            minY = Math.min(minY, y);
+                            maxX = Math.max(maxX, x + w);
+                            maxY = Math.max(maxY, y + h);
+                        });
+
+                        const padding = 40;
+                        const groupId = `group_${Date.now()}`;
+                        const groupNode: Node = {
+                            id: groupId,
+                            type: 'titleGroup',
+                            position: { x: minX - padding, y: minY - padding },
+                            data: {
+                                label: groupName || '智能分组',
+                                description: 'AI 自动创建的分组',
+                                domainClass: 'core'
+                            },
+                            style: {
+                                width: maxX - minX + padding * 2,
+                                height: maxY - minY + padding * 2,
+                            },
+                            zIndex: -1
+                        };
+
+                        const nodeIdSet = new Set(nodeIds);
+                        const nextNodes = nds.map((n: any) => {
+                            if (nodeIdSet.has(n.id)) {
+                                return {
+                                    ...n,
+                                    parentId: groupId,
+                                    extent: 'parent',
+                                    position: {
+                                        x: n.position.x - (minX - padding),
+                                        y: n.position.y - (minY - padding)
+                                    }
+                                };
+                            }
+                            return n;
+                        });
+
+                        return [...nextNodes, groupNode];
+                    });
+                }
+            });
+
+            Object.defineProperty(standardData, 'analyze', {
+                enumerable: false,
+                value: () => {
+                    return analyzeDiagram(nodes as any, edges as any);
+                }
+            });
+
+            Object.defineProperty(standardData, 'animatePath', {
+                enumerable: false,
+                value: async (edgeIds: string[], options?: { duration?: number; loop?: boolean }) => {
+                    if (!edgeIds || edgeIds.length === 0) return;
+                    const duration = options?.duration || 2000;
+                    
+                    // 1. 开始动画
+                    setEdges((eds: any) => eds.map((e: any) => {
+                        if (edgeIds.includes(e.id)) {
+                            return { ...e, animated: true };
+                        }
+                        return e;
+                    }));
+
+                    // 2. 如果不是循环模式，则在 duration 后关闭
+                    if (!options?.loop) {
+                        setTimeout(() => {
+                            setEdges((eds: any) => eds.map((e: any) => {
+                                if (edgeIds.includes(e.id)) {
+                                    return { ...e, animated: false };
+                                }
+                                return e;
+                            }));
+                        }, duration);
                     }
                 }
             });

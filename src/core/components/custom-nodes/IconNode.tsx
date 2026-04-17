@@ -71,21 +71,29 @@ const IconNode = ({ data, selected, id }: IconNodeProps) => {
                     style={{
                         width: '100%',
                         height: '100%',
-                        color: data.color || 'inherit'
+                        color: data.color || 'inherit',
+                        filter: isHovered ? 'drop-shadow(0 0 4px rgba(59, 130, 246, 0.3))' : 'none',
+                        transition: 'filter 0.3s ease, transform 0.3s ease',
+                        transform: isHovered ? 'scale(1.05)' : 'scale(1)'
                     }}
                 />
             </div>
 
-            {data.label && (
+            {(data.label || data.description) && (
                 <div style={{
-                    marginTop: 4,
-                    fontSize: 12,
+                    marginTop: 6,
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: '#4b5563',
                     textAlign: 'center',
                     pointerEvents: 'none',
                     userSelect: 'none',
-                    fontFamily: 'Inter, sans-serif'
+                    lineHeight: 1.2,
+                    maxWidth: '120%',
+                    wordBreak: 'break-word',
+                    fontFamily: 'Inter, -apple-system, sans-serif'
                 }}>
-                    {data.label}
+                    {data.label || data.description}
                 </div>
             )}
 

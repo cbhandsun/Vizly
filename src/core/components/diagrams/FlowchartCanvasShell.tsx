@@ -26,6 +26,8 @@ export interface FlowchartCanvasShellProps {
     onViewportChange?: (viewport: { x: number; y: number; zoom: number }) => void;
     onPaneClick: () => void;
     onPaneDoubleClick: (event: React.MouseEvent | MouseEvent) => void;
+    onPaneMouseMove?: (event: React.MouseEvent) => void;
+    onPaneMouseLeave?: (event: React.MouseEvent) => void;
     onNodeClick?: (event: React.MouseEvent, node: Node) => void;
     onEdgeClick?: (event: React.MouseEvent, edge: Edge) => void;
     selectionMode: SelectionMode;
@@ -75,6 +77,8 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
     onViewportChange,
     onPaneClick,
     onPaneDoubleClick,
+    onPaneMouseMove,
+    onPaneMouseLeave,
     onNodeClick,
     onEdgeClick,
     selectionMode,
@@ -137,6 +141,8 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             onEdgeClick={onEdgeClick}
             onPaneClick={onPaneClick}
             onPaneDoubleClick={onPaneDoubleClick}
+            onPaneMouseMove={onPaneMouseMove}
+            onPaneMouseLeave={onPaneMouseLeave}
             selectionMode={selectionMode}
             connectionRadius={44}
             onNodeContextMenu={onNodeContextMenu}

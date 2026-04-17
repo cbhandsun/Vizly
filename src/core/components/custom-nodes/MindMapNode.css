@@ -279,47 +279,60 @@
 }
 
 /* ---- Magnetic Drop Indicators ---- */
-.drop-target-highlight {
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4);
+.drop-target-highlight .mindmap-node {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5), 0 8px 16px rgba(0, 0, 0, 0.1);
+    background: #eff6ff !important;
 }
 
 .drop-above::before, .drop-below::after {
     content: "";
     position: absolute;
-    left: 0;
-    width: 100%;
+    left: -10px;
+    right: -10px;
     height: 3px;
     background: #3b82f6;
-    border-radius: 2px;
+    border-radius: 4px;
     box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
-    animation: pulse-drop 1.5s infinite;
+    z-index: 100;
+    pointer-events: none;
 }
 
 .drop-above::before {
-    top: -6px;
+    top: -8px;
 }
 
 .drop-below::after {
-    bottom: -6px;
+    bottom: -8px;
 }
 
-.drop-inside::after {
-    content: "";
-    position: absolute;
-    right: -14px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #3b82f6;
-    box-shadow: 0 0 8px rgba(59, 130, 246, 0.8);
-    animation: pulse-drop 1.5s infinite;
+/* Insertion Line Caps */
+.drop-above::after, .drop-below::before {
+    display: none; /* Hide conflicting defaults if any */
+}
+
+/* Add dots at the end of the insertion line for a premium look */
+.drop-above::before, .drop-below::after {
+    background-image: radial-gradient(circle at 2px center, #3b82f6 2px, transparent 2px),
+                      radial-gradient(circle at calc(100% - 2px) center, #3b82f6 2px, transparent 2px);
+}
+
+.drop-inside .mindmap-node {
+    border: 2px solid #3b82f6 !important;
+    background: #f0f9ff !important;
+}
+
+.relationship-hint {
+    animation: pulse-relationship 1s infinite alternate;
+}
+
+@keyframes pulse-relationship {
+    0% { box-shadow: 0 0 0 0px rgba(244, 63, 94, 0.4); }
+    100% { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); }
 }
 
 @keyframes pulse-drop {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+    50% { opacity: 0.6; }
 }
 
 /* ====================================================================

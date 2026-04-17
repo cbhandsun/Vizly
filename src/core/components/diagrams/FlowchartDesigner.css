@@ -414,6 +414,18 @@
     animation: connect-success-pulse 1s ease-in-out;
 }
 
+/* AI 驱动的动态路径增强 — 呼吸发光效果 */
+@keyframes edge-glow-pulse {
+    0% { filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.4)); stroke-width: 2; }
+    50% { filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.8)); stroke-width: 3; }
+    100% { filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.4)); stroke-width: 2; }
+}
+
+.react-flow__edge-path.animated {
+    stroke-dasharray: 8;
+    animation: react-flow__dash-animation 0.6s linear infinite, edge-glow-pulse 2s ease-in-out infinite !important;
+}
+
 /* 原生边缘更新器：完全透明，但放大半径（r=12或更多）作为广阔的拖拽交互热区 */
 circle.react-flow__edgeupdater {
     cursor: grab;

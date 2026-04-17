@@ -10,6 +10,32 @@ export interface ContextMenuState {
     targetId?: string;
 }
 
+export interface CommentReply {
+    id: string;
+    authorId: string;
+    authorName: string;
+    authorColor: string;
+    avatar?: string;
+    content: string;
+    createdAt: number;
+}
+
+export interface CommentThread {
+    id: string;
+    x: number;
+    y: number;
+    authorId: string;
+    authorName: string;
+    authorColor: string;
+    content: string;
+    createdAt: number;
+    isResolved: boolean;
+    replies: CommentReply[];
+    nodeId?: string;
+}
+
+export type Comment = CommentThread;
+
 interface DiagramState {
   nodes: Node[];
   edges: Edge[];
@@ -17,6 +43,16 @@ interface DiagramState {
   selectedEdges: Edge[];
   isDragging: boolean;
   contextMenu: ContextMenuState | null;
+
+  // ⭐ Phase 11: 评论系统
+  comments: CommentThread[];
+  isCommentMode: boolean;
+  user: {
+      id: string;
+      name: string;
+      color: string;
+      avatar?: string;
+  };
   
   // Actions
   setNodes: (nodes: Node[] | ((nds: Node[]) => Node[])) => void;
@@ -25,6 +61,13 @@ interface DiagramState {
   setSelectedEdges: (edges: Edge[] | ((eds: Edge[]) => Edge[])) => void;
   setIsDragging: (isDragging: boolean) => void;
   setContextMenu: (menu: ContextMenuState | null) => void;
+  
+  // ⭐ Phase 11 Actions
+  setComments: (comments: CommentThread[] | ((prev: CommentThread[]) => CommentThread[])) => void;
+  setIsCommentMode: (enabled: boolean) => void;
+  addComment: (comment: CommentThread) => void;
+  updateComment: (id: string, updates: Partial<CommentThread>) => void;
+  removeComment: (id: string) => void;
   
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -37,6 +80,13 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   selectedEdges: [],
   isDragging: false,
   contextMenu: null,
+  comments: [],
+  isCommentMode: false,
+  user: {
+      id: 'current-user',
+      name: 'Admin User',
+      color: '#1890ff'
+  },
 
   setNodes: (nodesOrUpdater) => {
     set((state) => ({
@@ -64,6 +114,22 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   setIsDragging: (isDragging) => set({ isDragging }),
   setContextMenu: (contextMenu) => set({ contextMenu }),
+
+  setComments: (commentsOrUpdater) => {
+    set((state) => ({
+      comments: typeof commentsOrUpdater === 'function' ? commentsOrUpdater(state.comments) : commentsOrUpdater
+    }));
+  },
+  setIsCommentMode: (enabled) => set({ isCommentMode: enabled }),
+  addComment: (comment) => set((state) => ({ comments: [...state.comments, comment] })),
+  
+  updateComment: (id, updates) => set((state) => ({
+      comments: state.comments.map(c => c.id === id ? { ...c, ...updates } : c)
+  })),
+
+  removeComment: (id) => set((state) => ({
+      comments: state.comments.filter(c => c.id !== id)
+  })),
 
   onNodesChange: (changes: NodeChange[]) => {
     set((state) => ({

@@ -1,6 +1,6 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useLayoutEffect } from 'react';
 import { Node, Edge, XYPosition } from '@xyflow/react';
-import { autoMindMapLayout } from '../../../utils/LayoutAlgorithms';
+import { autoMindMapLayout, calculateSummaryGeometry, calculateSubtreeBounds } from '../../../utils/LayoutAlgorithms';
 import { useRef } from 'react';
 import { parseIndentedText } from '../../../utils/textTreeParser';
 
@@ -15,48 +15,59 @@ export function useMindMapOrchestrator(
 ) {
     const prevRootDataRef = useRef<Record<string, string>>({});
 
-    // Watch for root direction & style changes to sync them down and trigger relayout
-    useEffect(() => {
-        const rootNodes = nodes.filter(n => n.type === 'mindmap' && n.data?.depth === 0);
-        if (rootNodes.length === 0) return;
-
-        let needsSync = false;
-        const currentRootData: Record<string, string> = {};
-
-        // Compute a structural signature to detect node additions, removals, or collapse state changes
-        const structSignature = nodes.filter(n => n.type === 'mindmap').map(n => `${n.id}:${n.data?.collapsed ? '1' : '0'}`).join('|');
-        const edgeSignature = edges.filter(e => e.type !== 'relationshipEdge').map(e => `${e.source}->${e.target}`).join('|');
-        const currentSignature = `${structSignature}||${edgeSignature}`;
-
-        for (const root of rootNodes) {
-            const dir = (root.data?.direction as string) || 'LR';
-            const shape = (root.data?.shape as string) || 'pill';
-            const pathStyle = (root.data?.pathStyle as string) || 'bezier';
-            const key = `${dir}|${shape}|${pathStyle}||${currentSignature}`;
-            currentRootData[root.id] = key;
-            if (prevRootDataRef.current[root.id] !== key) {
-                needsSync = true;
+    useLayoutEffect(() => {
+        // --- STEP 1: Lightweight Structural Signature ---
+        // We calculate a cheap hash first to see if we can skip map building.
+        // HASH includes: set of IDs, collapsed state, measured dimensions (if available)
+        const structHashParts: string[] = [];
+        for (const n of nodes) {
+            if (n.type === 'mindmap') {
+                structHashParts.push(`${n.id}:${n.data?.collapsed ? 'C' : 'O'}`);
             }
         }
+        const edgeHashParts: string[] = [];
+        for (const e of edges) {
+            if (e.type !== 'relationshipEdge') {
+                edgeHashParts.push(`${e.source}->${e.target}`);
+            }
+        }
+        const currentSignature = `${structHashParts.join('|')}#${edgeHashParts.join('|')}`;
 
-        if (!needsSync) return;
-        prevRootDataRef.current = currentRootData;
+        // Check if any root properties changed
+        const rootNodes = nodes.filter(n => n.type === 'mindmap' && n.data?.depth === 0);
+        const rootDataParts: string[] = [];
+        for (const root of rootNodes) {
+             rootDataParts.push(`${root.id}:${root.data?.direction || 'LR'}:${root.data?.pathStyle || 'bezier'}:${root.data?.shape || 'pill'}`);
+        }
+        const rootSignature = rootDataParts.join('|');
+        const finalSignature = `${currentSignature}##${rootSignature}`;
+
+        if (prevRootDataRef.current['__global_sig__'] === finalSignature) {
+            return;
+        }
+        prevRootDataRef.current['__global_sig__'] = finalSignature;
+
+        // --- STEP 2: Lookup Acceleration (Map Building) ---
+        // Only run when something meaningful changed.
+        const nodeMap = new Map<string, Node>();
+        nodes.forEach(n => nodeMap.set(n.id, n));
         
-        
-        // Build adjacency map (ignoring relationships)
         const childrenMap = new Map<string, string[]>();
+        const edgeMap = new Map<string, Edge>();
         const structureEdges = edges.filter(e => e.type !== 'relationshipEdge');
 
         for (const e of structureEdges) {
             if (!childrenMap.has(e.source)) childrenMap.set(e.source, []);
             childrenMap.get(e.source)!.push(e.target);
+            edgeMap.set(`${e.source}->${e.target}`, e);
         }
 
         const nodeUpdates = new Map<string, any>();
-        const newPositions = new Map<string, XYPosition>();
+        const newPositions = new Map<string, { x: number, y: number }>();
         const nodesToHide = new Set<string>();
         const edgesToHide = new Set<string>();
 
+        // --- Pass 1: Tree Layout ---
         for (const root of rootNodes) {
             const direction = (root.data?.direction as string) || 'LR';
             const pathStyle = (root.data?.pathStyle as string) || 'bezier';
@@ -68,19 +79,16 @@ export function useMindMapOrchestrator(
             const queue = [{ id: root.id, hideKids: false, inheritedColor: undefined as string | undefined }];
             while (queue.length > 0) {
                 const { id: currId, hideKids, inheritedColor } = queue.shift()!;
-                const currNode = nodes.find(n => n.id === currId);
+                const currNode = nodeMap.get(currId);
                 const kids = childrenMap.get(currId) || [];
                 
-                // Determine the effective color for this node and its descendants
                 let effectiveColor = inheritedColor;
                 if (currId === root.id) {
-                    effectiveColor = undefined; // root has no branch color
+                    effectiveColor = undefined;
                 } else if (!effectiveColor) {
                     if (currNode?.data?.branchColor) {
-                        // First-level branch defining its own color
                         effectiveColor = currNode.data.branchColor as string;
                     } else {
-                        // Auto-assign color if missing
                         const rootKids = childrenMap.get(root.id) || [];
                         const branchIndex = Math.max(0, rootKids.indexOf(currId));
                         effectiveColor = PALETTE[branchIndex % PALETTE.length];
@@ -93,11 +101,13 @@ export function useMindMapOrchestrator(
                     } else {
                         subtreeNodes.push(currNode);
                     }
-                    if (currId !== root.id) {
-                        nodeUpdates.set(currId, { direction, pathStyle, shape, childrenCount: kids.length, branchColor: effectiveColor });
-                    } else {
-                        nodeUpdates.set(currId, { childrenCount: kids.length });
-                    }
+                    nodeUpdates.set(currId, { 
+                        direction, 
+                        pathStyle, 
+                        shape, 
+                        childrenCount: kids.length, 
+                        branchColor: currId !== root.id ? effectiveColor : undefined 
+                    });
                 }
                 
                 const isCollapsed = currNode?.data?.collapsed === true;
@@ -105,255 +115,201 @@ export function useMindMapOrchestrator(
                 
                 for (const k of kids) {
                     queue.push({ id: k, hideKids: nextHideKids, inheritedColor: effectiveColor });
-                    const e = edges.find(edge => edge.source === currId && edge.target === k);
+                    const e = edgeMap.get(`${currId}->${k}`);
                     if (e) {
-                        if (nextHideKids) {
-                            edgesToHide.add(e.id);
-                        } else {
-                            subtreeEdges.push(e);
-                        }
+                         if (nextHideKids) edgesToHide.add(e.id);
+                         else subtreeEdges.push(e);
                     }
                 }
             }
 
-            const visibleNodes = subtreeNodes;
-            const visibleEdges = subtreeEdges;
-            
-            if (visibleNodes.length > 0) {
-                const pos = autoMindMapLayout(visibleNodes, visibleEdges, direction, {
+            if (subtreeNodes.length > 0) {
+                const pos = autoMindMapLayout(subtreeNodes, subtreeEdges, direction, {
                     nodeSpacing: 48,
                     levelSpacing: 140
-                });
+                }, { nodeMap, childrenMap });
                 for (const [nid, p] of pos.entries()) {
                     newPositions.set(nid, p);
                 }
             }
         }
 
-        // --- Pass 2: Boundary Node Calculation ---
+        // --- Pass 2: Boundary Calculation ---
         const boundaryNodes = nodes.filter(n => n.type === 'mindmap-boundary');
         const boundaryUpdates = new Map<string, { x: number, y: number, width: number, height: number }>();
-        const boundaryPadding = 30;
+
+        // Combined position map for child-relative calculations
+        const combinedPosMap = new Map<string, { x: number, y: number }>();
+        for (const n of nodes) combinedPosMap.set(n.id, n.position);
+        for (const [nid, p] of newPositions.entries()) combinedPosMap.set(nid, p);
 
         for (const bNode of boundaryNodes) {
             const targetId = bNode.data?.targetSubtreeId as string;
             if (!targetId) continue;
 
-            const getSubNodes = (currentId: string, acc: Set<string>) => {
-                acc.add(currentId);
-                const kids = childrenMap.get(currentId) || [];
-                for (const k of kids) {
-                    getSubNodes(k, acc);
-                }
-            };
-            const targetSet = new Set<string>();
-            getSubNodes(targetId, targetSet);
-
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            let hasValidNodes = false;
-
-            for (const nid of targetSet) {
-                const n = nodes.find(x => x.id === nid);
-                if (!n || n.hidden) continue;
-
-                const posX = newPositions.get(nid)?.x ?? n.position.x;
-                const posY = newPositions.get(nid)?.y ?? n.position.y;
-                const width = n.measured?.width || (n.data?.width as number) || 150;
-                const height = n.measured?.height || (n.data?.height as number) || 50;
-
-                if (posX < minX) minX = posX;
-                if (posY < minY) minY = posY;
-                if (posX + width > maxX) maxX = posX + width;
-                if (posY + height > maxY) maxY = posY + height;
-                hasValidNodes = true;
-            }
-
-            if (hasValidNodes) {
+            const bounds = calculateSubtreeBounds(targetId, combinedPosMap, nodeMap, childrenMap);
+            if (bounds) {
+                const padding = 30;
                 boundaryUpdates.set(bNode.id, {
-                    x: minX - boundaryPadding,
-                    y: minY - boundaryPadding,
-                    width: (maxX - minX) + boundaryPadding * 2,
-                    height: (maxY - minY) + boundaryPadding * 2
+                    x: bounds.x - padding,
+                    y: bounds.y - padding,
+                    width: bounds.width + padding * 2,
+                    height: bounds.height + padding * 2
                 });
             }
         }
+
+        // --- Pass 3: Summary Node Calculation ---
+        const summaryNodes = nodes.filter(n => n.data?.isSummary);
+        const summaryUpdates = new Map<string, { x: number, y: number, bracket?: any }>();
+        const firstRoot = rootNodes[0];
+        const globalDir = firstRoot?.data?.direction as string || 'LR';
+
+        for (const sNode of summaryNodes) {
+            const targets = (sNode.data?.summaryTargetIds || sNode.data?.summaryTargets) as string[];
+            if (!targets || targets.length === 0) continue;
+
+            const bounds = calculateSummaryGeometry(targets, combinedPosMap, nodeMap, globalDir);
+            if (bounds) {
+                const summaryW = sNode.measured?.width || 100;
+                const summaryH = sNode.measured?.height || 40;
+                const margin = 50; 
+                
+                const newX = bounds.dir === 'L' ? bounds.x - margin - summaryW : bounds.x + margin;
+                const newY = (bounds.minY + bounds.maxY) / 2 - summaryH / 2;
+                
+                const centerY = newY + summaryH / 2;
+                const bracket = { 
+                    minY: bounds.minY - centerY, 
+                    maxY: bounds.maxY - centerY, 
+                    dir: bounds.dir 
+                };
+                
+                summaryUpdates.set(sNode.id, { x: newX, y: newY, bracket });
+            }
+        }
         
+        // --- Pass 2.5: Boundary Reconciliation (Self-Healing) ---
+        // Ensure that nodes with data.hasBoundary=true actually HAVE a boundary node,
+        // and remove boundaries for nodes that turned it off.
+        const nodesThatShouldHaveBoundary = new Set(nodes.filter(n => n.type === 'mindmap' && n.data?.hasBoundary).map(n => n.id));
+        const existingBoundaryTargets = new Set(boundaryNodes.map(n => n.data?.targetSubtreeId as string).filter(Boolean));
+        
+        const boundariesToAdd: Node[] = [];
+        const boundariesToRemove = new Set<string>();
+
+        // Find missing boundaries
+        for (const targetId of nodesThatShouldHaveBoundary) {
+            if (!existingBoundaryTargets.has(targetId)) {
+                const targetNode = nodeMap.get(targetId);
+                if (targetNode) {
+                    boundariesToAdd.push({
+                        id: `boundary-${targetId}-${Date.now()}`,
+                        type: 'mindmap-boundary',
+                        position: { x: targetNode.position.x, y: targetNode.position.y },
+                        data: { targetSubtreeId: targetId, label: 'Boundary' },
+                        selectable: false,
+                        zIndex: -1
+                    });
+                }
+            }
+        }
+
+        // Find stale boundaries
+        for (const bNode of boundaryNodes) {
+            const tId = bNode.data?.targetSubtreeId as string;
+            if (!nodesThatShouldHaveBoundary.has(tId)) {
+                boundariesToRemove.add(bNode.id);
+            }
+        }
+
+        // --- Final State Update ---
         setNodes(nds => {
             let changed = false;
-            const nextNodes = nds.map(n => {
-                if (n.type !== 'mindmap') return n;
-                
-                let nChanged = false;
-                const newData = { ...n.data };
-                
-                const update = nodeUpdates.get(n.id);
-                if (update) {
-                    if (newData.pathStyle !== update.pathStyle) { newData.pathStyle = update.pathStyle; nChanged = true; }
-                    if (newData.shape !== update.shape) { newData.shape = update.shape; nChanged = true; }
-                    if (newData.direction !== update.direction) { newData.direction = update.direction; nChanged = true; }
-                    if (newData.childrenCount !== update.childrenCount) { newData.childrenCount = update.childrenCount; nChanged = true; }
-                    if (newData.branchColor !== update.branchColor && update.branchColor !== undefined) { newData.branchColor = update.branchColor; nChanged = true; }
-                }
-                
-                let newPos = n.position;
-                const targetPos = newPositions.get(n.id);
-                if (targetPos && (targetPos.x !== n.position.x || targetPos.y !== n.position.y)) {
-                    newPos = targetPos;
-                    nChanged = true;
-                }
-                
-                const shouldBeHidden = nodesToHide.has(n.id);
-                if (n.hidden !== shouldBeHidden) {
-                    nChanged = true;
-                }
-                
-                if (nChanged) {
-                    changed = true;
-                    return { ...n, position: newPos, data: newData, hidden: shouldBeHidden };
-                }
-                return n;
-            });
+            // 1. Remove stale boundaries
+            let nextNodes = nds;
+            if (boundariesToRemove.size > 0) {
+                nextNodes = nextNodes.filter(n => !boundariesToRemove.has(n.id));
+                changed = true;
+            }
 
-            // Second pass for non-mindmap node updates that orchestrated nodes
-            const finalNodes = nextNodes.map(n => {
+            // 2. Update existing nodes
+            const updatedNodes = nextNodes.map(n => {
+                let nChanged = false;
+                let nextPos = { ...n.position };
+                let nextData = { ...n.data };
+                let nextHidden = n.hidden;
+
+                // Position & Layout
+                if (n.type === 'mindmap') {
+                    const targetPos = newPositions.get(n.id);
+                    if (targetPos && (Math.abs(targetPos.x - n.position.x) > 0.5 || Math.abs(targetPos.y - n.position.y) > 0.5)) {
+                        nextPos = targetPos;
+                        nChanged = true;
+                    }
+
+                    const update = nodeUpdates.get(n.id);
+                    if (update) {
+                        for (const key in update) {
+                            if (nextData[key] !== update[key]) {
+                                nextData[key] = update[key];
+                                nChanged = true;
+                            }
+                        }
+                    }
+
+                    const shouldBeHidden = nodesToHide.has(n.id);
+                    if (n.hidden !== shouldBeHidden) {
+                        nextHidden = shouldBeHidden;
+                        nChanged = true;
+                    }
+                }
+
+                // Boundary Geometry
                 if (n.type === 'mindmap-boundary') {
                     const bUpdate = boundaryUpdates.get(n.id);
                     if (bUpdate) {
-                        let bChanged = false;
-                        const newData = { ...n.data };
-                        
-                        if (newData.width !== bUpdate.width) { newData.width = bUpdate.width; bChanged = true; }
-                        if (newData.height !== bUpdate.height) { newData.height = bUpdate.height; bChanged = true; }
-                        
-                        if (n.position.x !== bUpdate.x || n.position.y !== bUpdate.y) {
-                            bChanged = true;
+                        if (Math.abs(n.position.x - bUpdate.x) > 0.5 || Math.abs(n.position.y - bUpdate.y) > 0.5) {
+                            nextPos = { x: bUpdate.x, y: bUpdate.y };
+                            nChanged = true;
                         }
-                        
-                        if (bChanged) {
-                            changed = true;
-                            return { ...n, position: { x: bUpdate.x, y: bUpdate.y }, data: newData };
+                        if (n.data?.width !== bUpdate.width || n.data?.height !== bUpdate.height) {
+                            nextData.width = bUpdate.width;
+                            nextData.height = bUpdate.height;
+                            nChanged = true;
                         }
                     }
+                }
+
+                // Summary Geometry
+                if (n.data?.isSummary) {
+                    const sUpdate = summaryUpdates.get(n.id);
+                    if (sUpdate) {
+                        if (Math.abs(n.position.x - sUpdate.x) > 0.5 || Math.abs(n.position.y - sUpdate.y) > 0.5) {
+                            nextPos = { x: sUpdate.x, y: sUpdate.y };
+                            nChanged = true;
+                        }
+                        if (JSON.stringify(n.data?.summaryBracket) !== JSON.stringify(sUpdate.bracket)) {
+                            nextData.summaryBracket = sUpdate.bracket;
+                            nChanged = true;
+                        }
+                    }
+                }
+
+                if (nChanged) {
+                    changed = true;
+                    return { ...n, position: nextPos, data: nextData, hidden: nextHidden };
                 }
                 return n;
             });
 
-            // Pass 2.5: Boundary Nodes Reconciliation
-            // If any mindmap node has `data.hasBoundary`, ensure a boundary node exists for it.
-            // If it doesn't have it, ensure it's removed.
-            const requiredBoundaries = new Set<string>();
-            let nextFinalNodes = [...finalNodes];
-            let nodesAddedOrRemoved = false;
-
-            nds.forEach(n => {
-                if (n.type === 'mindmap' && n.data?.hasBoundary) {
-                    requiredBoundaries.add(n.id);
-                    const bId = `boundary-for-${n.id}`;
-                    if (!nextFinalNodes.find(x => x.id === bId)) {
-                        nextFinalNodes.push({
-                            id: bId,
-                            type: 'mindmap-boundary',
-                            position: { x: n.position.x, y: n.position.y },
-                            data: { targetSubtreeId: n.id, width: 100, height: 100 }
-                        });
-                        nodesAddedOrRemoved = true;
-                    }
-                }
-            });
-
-            const toRemove = nextFinalNodes.filter(n => {
-                if (n.type === 'mindmap-boundary') {
-                    const tid = n.data?.targetSubtreeId as string;
-                    if (!tid || !requiredBoundaries.has(tid)) return true;
-                }
-                return false;
-            });
-
-            if (toRemove.length > 0) {
-                nextFinalNodes = nextFinalNodes.filter(n => !toRemove.includes(n));
-                nodesAddedOrRemoved = true;
+            // 3. Add new boundaries
+            if (boundariesToAdd.length > 0) {
+                changed = true;
+                return [...updatedNodes, ...boundariesToAdd];
             }
 
-            // Pass 2.6: Summary Nodes Coordinate Sync
-            const summaryUpdates = new Map<string, { x: number, y: number, bracket?: { minY: number, maxY: number, dir: string } }>();
-            nextFinalNodes.forEach(sNode => {
-                if (sNode.data?.isSummary) {
-                    const targets = sNode.data?.summaryTargets as string[];
-                    if (targets && targets.length > 0) {
-                        let totalY = 0;
-                        let maxRightX = -Infinity;
-                        let minLeftX = Infinity;
-                        let count = 0;
-                        
-                        // Infer global direction from target nodes to decide if we put summary on right or left
-                        let inferredDir = 'R'; 
-                        
-                        let minTargetY = Infinity;
-                        let maxTargetY = -Infinity;
-
-                        targets.forEach(tid => {
-                            const tNode = nextFinalNodes.find(x => x.id === tid);
-                            if (tNode) {
-                                const px = tNode.position.x;
-                                const py = tNode.position.y;
-                                const w = tNode.measured?.width || 120;
-                                const h = tNode.measured?.height || 50;
-                                const cy = py + h/2;
-                                totalY += cy; // Use center Y
-                                if (cy < minTargetY) minTargetY = cy;
-                                if (cy > maxTargetY) maxTargetY = cy;
-                                if (px + w > maxRightX) maxRightX = px + w;
-                                if (px < minLeftX) minLeftX = px;
-                                count++;
-                                
-                                // Determine direction by checking parent relation:
-                                // If node is explicitly LR bounded, check where it is relative to root. 
-                                // But simple heuristic: if it's L direction, its data.direction is 'L', else 'R'/'TB'
-                                if (tNode.data?.direction === 'L') inferredDir = 'L';
-                            }
-                        });
-                        
-                        if (count > 0) {
-                            const avgY = totalY / count;
-                            // Summary node dimensions approx 100x40
-                            const summaryW = sNode.measured?.width || 100;
-                            const summaryH = sNode.measured?.height || 40;
-                            
-                            const margin = 60; // Distance from targets to summary
-                            const newX = inferredDir === 'L' ? minLeftX - margin - summaryW : maxRightX + margin;
-                            const newY = avgY - summaryH / 2;
-                            
-                            // Calculate local relative coordinates for bracket
-                            // Target center Y's relative to summary node's center Y
-                            const localMinY = minTargetY - avgY;
-                            const localMaxY = maxTargetY - avgY;
-                            
-                            const bracket = { minY: localMinY, maxY: localMaxY, dir: inferredDir };
-                            
-                            if (Math.abs(sNode.position.x - newX) > 1 || Math.abs(sNode.position.y - newY) > 1 || JSON.stringify(sNode.data?.summaryBracket) !== JSON.stringify(bracket)) {
-                                summaryUpdates.set(sNode.id, { x: newX, y: newY, bracket });
-                            }
-                        }
-                    }
-                }
-            });
-
-            if (summaryUpdates.size > 0) {
-                nextFinalNodes = nextFinalNodes.map(n => {
-                    const update = summaryUpdates.get(n.id);
-                    if (update) {
-                        return { 
-                            ...n, 
-                            position: { x: update.x, y: update.y },
-                            data: { ...n.data, summaryBracket: update.bracket }
-                        };
-                    }
-                    return n;
-                });
-                nodesAddedOrRemoved = true;
-            }
-
-            return (changed || nodesAddedOrRemoved) ? nextFinalNodes : nds;
+            return changed ? updatedNodes : nds;
         });
 
     }, [nodes, edges, setNodes]);
@@ -1050,4 +1006,78 @@ export function useMindMapOrchestrator(
         return () => window.removeEventListener('mindmap:reparent', handleReparent);
     }, [handleReparent]);
 
+    const handleAddSummary = useCallback((e: Event) => {
+        const detail = (e as CustomEvent).detail;
+        if (!detail || !detail.sourceIds) return;
+
+        takeSnapshot();
+        const newId = `summary-${Date.now()}`;
+        const newNode: Node = {
+            id: newId,
+            type: 'mindmap',
+            position: { x: 0, y: 0 },
+            data: {
+                label: '概要总结',
+                isSummary: true,
+                summaryTargetIds: detail.sourceIds,
+                depth: 10,
+            }
+        };
+
+        setNodes(nds => [...nds, newNode]);
+    }, [setNodes, takeSnapshot]);
+
+    const handleAddBoundary = useCallback((e: Event) => {
+        const detail = (e as CustomEvent).detail;
+        const nodeId = detail?.sourceId || detail?.nodeId;
+        const nodeIds = detail?.nodeIds || (nodeId ? [nodeId] : []);
+        
+        if (nodeIds.length === 0) return;
+
+        takeSnapshot();
+        const newId = `boundary-${Date.now()}`;
+        const newNode: Node = {
+            id: newId,
+            type: 'mindmap-boundary',
+            position: { x: 0, y: 0 }, // Will be calculated by orchestrator
+            data: {
+                targetSubtreeIds: nodeIds,
+                label: '逻辑外框',
+                width: 100,
+                height: 100,
+            }
+        };
+
+        setNodes(nds => [...nds, newNode]);
+    }, [setNodes, takeSnapshot]);
+
+    const handleCreateRelationship = useCallback((e: Event) => {
+        // Since we can't easily trigger connection programmatically across hooks without exposing internal RF state,
+        // we use a message to guide the user. Professional tools often use this "mode" state.
+        const detail = (e as CustomEvent).detail;
+        if (detail?.sourceId) {
+            // Highlighting the source node to guide the user
+            setNodes(nds => nds.map(n => n.id === detail.sourceId ? { ...n, className: 'relationship-hint' } : n));
+            setTimeout(() => {
+                setNodes(nds => nds.map(n => n.id === detail.sourceId ? { ...n, className: '' } : n));
+            }, 2000);
+            
+            // @ts-ignore
+            if (window.antdMessage) {
+                // @ts-ignore
+                window.antdMessage.info('请拖动节点右侧红色手柄到目标节点');
+            }
+        }
+    }, [setNodes]);
+
+    useEffect(() => {
+        window.addEventListener('editor:add-summary-node', handleAddSummary);
+        window.addEventListener('editor:add-boundary-node', handleAddBoundary);
+        window.addEventListener('editor:create-relationship-edge', handleCreateRelationship);
+        return () => {
+            window.removeEventListener('editor:add-summary-node', handleAddSummary);
+            window.removeEventListener('editor:add-boundary-node', handleAddBoundary);
+            window.removeEventListener('editor:create-relationship-edge', handleCreateRelationship);
+        };
+    }, [handleAddSummary, handleAddBoundary, handleCreateRelationship]);
 }

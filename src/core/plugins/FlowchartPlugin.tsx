@@ -1,114 +1,91 @@
 import React from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { theme, Tooltip, Typography, Collapse, Input } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
+import { theme, Tooltip, Typography, Input, Button, Divider } from 'antd';
+import { 
+    SearchOutlined, AlignLeftOutlined, AlignCenterOutlined, AlignRightOutlined, 
+    VerticalAlignTopOutlined, VerticalAlignMiddleOutlined, VerticalAlignBottomOutlined, 
+    ColumnWidthOutlined, ColumnHeightOutlined, FullscreenOutlined, ApartmentOutlined 
+} from '@ant-design/icons';
 import { useState } from 'react';
-import { FaShapes, FaPen, FaObjectGroup, FaPlay, FaBox, FaLayerGroup, FaThLarge, FaImage, FaServer, FaNetworkWired, FaLock, FaPlug, FaUser, FaEnvelope, FaBell, FaCog, FaCode, FaTerminal, FaStream, FaChevronRight } from 'react-icons/fa';
+import { 
+    FaShapes, FaBox, FaLayerGroup, FaThLarge, FaImage, FaServer, 
+    FaNetworkWired, FaLock, FaPlug, FaUser, FaEnvelope, FaBell, FaCog, 
+    FaCode, FaTerminal, FaStream, FaChevronRight, FaCloud
+} from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { DiagramTypePlugin, PluginContext, SidebarPanel } from '../types/plugin';
 import { ShapePreview } from '../components/diagrams/ShapePreview';
+import { IconExplorer } from '../components/diagrams/IconExplorer';
+import { BaseDiagramPlugin } from '../sdk/BasePlugin';
 
 const { Text } = Typography;
 type NodeConfig = Record<string, unknown>;
 
-export class FlowchartPlugin implements DiagramTypePlugin {
-  id = 'flowchart';
-  name = '通用画布';
+export class FlowchartPlugin extends BaseDiagramPlugin implements DiagramTypePlugin {
+    id = 'flowchart';
+    name = '通用画布';
+    version = '1.1';
 
-  // Plugin Versioning & Migration
-  version = '1.1';
-  
-  async migrate(data: any, fromVersion: string | undefined): Promise<any> {
-      console.log(`[FlowchartPlugin] Migrating data from version ${fromVersion || '1.0'} to ${this.version}`);
-      let migratedData = { ...data };
-      
-      // Example Migration Strategy (Version 1.0 -> 1.1)
-      if (!fromVersion || fromVersion === '1.0') {
-          if (Array.isArray(migratedData.nodes)) {
-              migratedData.nodes = migratedData.nodes.map((n: any) => {
-                  // Ensure specific fields exist, or normalize themes
-                  const metadata = n.metadata || {};
-                  return {
-                      ...n,
-                      metadata: {
-                          ...metadata,
-                          // Optional: Normalize missing shapes to rectangle
-                          shape: metadata.shape || 'rectangle'
-                      }
-                  };
-              });
-          }
-      }
+    async migrate(data: any, fromVersion: string | undefined): Promise<any> {
+        const migratedData = await super.migrate(data, fromVersion);
+        console.log(`[FlowchartPlugin] Migrating data from version ${fromVersion || '1.0'} to ${this.version}`);
+        
+        if (!fromVersion || fromVersion === '1.0') {
+            if (Array.isArray(migratedData.nodes)) {
+                migratedData.nodes = migratedData.nodes.map((n: any) => {
+                    const metadata = n.metadata || {};
+                    return {
+                        ...n,
+                        metadata: {
+                            ...metadata,
+                            shape: metadata.shape || 'rectangle'
+                        }
+                    };
+                });
+            }
+        }
+        return migratedData;
+    }
 
-      return migratedData;
-  }
+    contributeToolbar(ctx: PluginContext) {
+        return <FlowchartToolbar ctx={ctx} />;
+    }
 
-  parseData(_source: unknown) {
-    // 通用设计器使用原生的 parse 机制
-    return { nodes: [], edges: [] };
-  }
+    contributeSidebarPanels(ctx: PluginContext): SidebarPanel[] {
+        return [
+            {
+                id: 'shapes',
+                title: '基础形状',
+                icon: <FaShapes />,
+                content: <FlowchartShapesPanel ctx={ctx} />,
+            },
+            {
+                id: 'icons',
+                title: '云端图标库',
+                icon: <FaCloud />,
+                content: <IconExplorer ctx={ctx} />,
+            }
+        ];
+    }
 
-  serializeData(nodes: Node[], edges: Edge[]) {
-    return { nodes, edges };
-  }
-
-  getEmptyState() {
-    return { nodes: [], edges: [] };
-  }
-
-  getSupportedLayouts() {
-    return [];
-  }
-
-  getDefaultLayout() {
-    return '';
-  }
-
-  getNodeTypes() { return {}; }
-  getEdgeTypes() { return {}; }
-
-  contributeToolbar(ctx: PluginContext) {
-    return <FlowchartToolbar ctx={ctx} />;
-  }
-
-  contributeSidebarPanels(ctx: PluginContext): SidebarPanel[] {
-    return [
-      {
-        id: 'shapes',
-        title: '基础形状',
-        icon: <FaShapes />,
-        content: <FlowchartShapesPanel ctx={ctx} />,
-      }
-    ];
-  }
-
-  // 节点拖入画布时的默认数据工厂
-  createNodeData(type: string): Record<string, any> {
-      const CATEGORY_COLORS: Record<string, { main: string; border: string; text: string }> = {
-          default:    { main: '#4A90D9', border: '#3A78C2', text: '#fff' },
-          decision:   { main: '#F0B429', border: '#D9A21E', text: '#333' },
-          process:    { main: '#47B881', border: '#3AA06F', text: '#fff' },
-          data:       { main: '#7B61FF', border: '#6A4FE0', text: '#fff' },
-          terminal:   { main: '#E85D75', border: '#D14D65', text: '#fff' },
-          group:      { main: '#8492A6', border: '#707F94', text: '#fff' },
-      };
-      const palette = CATEGORY_COLORS[type] || CATEGORY_COLORS['default'];
-      return {
-          label: '新建节点',
-          theme: palette
-      };
-  }
+    createNodeData(type: string): Record<string, any> {
+        const CATEGORY_COLORS: Record<string, { main: string; border: string; text: string }> = {
+            default:    { main: '#4A90D9', border: '#3A78C2', text: '#fff' },
+            decision:   { main: '#F0B429', border: '#D9A21E', text: '#333' },
+            process:    { main: '#47B881', border: '#3AA06F', text: '#fff' },
+            data:       { main: '#7B61FF', border: '#6A4FE0', text: '#fff' },
+            terminal:   { main: '#E85D75', border: '#D14D65', text: '#fff' },
+            group:      { main: '#8492A6', border: '#707F94', text: '#fff' },
+        };
+        const palette = CATEGORY_COLORS[type] || CATEGORY_COLORS['default'];
+        return {
+            label: '新建节点',
+            theme: palette
+        };
+    }
 }
 
 // ====== 流程图专属工具栏 ======
-import { Button, Tooltip as AntTooltip, Divider } from 'antd';
-import {
-    AlignLeftOutlined, AlignCenterOutlined, AlignRightOutlined,
-    VerticalAlignTopOutlined, VerticalAlignMiddleOutlined, VerticalAlignBottomOutlined,
-    ColumnWidthOutlined, ColumnHeightOutlined,
-    FullscreenOutlined, ApartmentOutlined,
-} from '@ant-design/icons';
-
 const FlowchartToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
     if (!ctx) return null;
 
@@ -134,25 +111,22 @@ const FlowchartToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
 
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '0 8px', borderLeft: '1px solid #e8e8e8', marginLeft: 8 }}>
-            {/* 对齐操作组 */}
-            <AntTooltip title="左对齐"><Button size="small" type="text" icon={<AlignLeftOutlined style={iconBtnStyle} />} onClick={() => handleAlign('left')} /></AntTooltip>
-            <AntTooltip title="水平居中"><Button size="small" type="text" icon={<AlignCenterOutlined style={iconBtnStyle} />} onClick={() => handleAlign('center-h')} /></AntTooltip>
-            <AntTooltip title="右对齐"><Button size="small" type="text" icon={<AlignRightOutlined style={iconBtnStyle} />} onClick={() => handleAlign('right')} /></AntTooltip>
-            <AntTooltip title="顶对齐"><Button size="small" type="text" icon={<VerticalAlignTopOutlined style={iconBtnStyle} />} onClick={() => handleAlign('top')} /></AntTooltip>
-            <AntTooltip title="垂直居中"><Button size="small" type="text" icon={<VerticalAlignMiddleOutlined style={iconBtnStyle} />} onClick={() => handleAlign('center-v')} /></AntTooltip>
-            <AntTooltip title="底对齐"><Button size="small" type="text" icon={<VerticalAlignBottomOutlined style={iconBtnStyle} />} onClick={() => handleAlign('bottom')} /></AntTooltip>
+            <Tooltip title="左对齐"><Button size="small" type="text" icon={<AlignLeftOutlined style={iconBtnStyle} />} onClick={() => handleAlign('left')} /></Tooltip>
+            <Tooltip title="水平居中"><Button size="small" type="text" icon={<AlignCenterOutlined style={iconBtnStyle} />} onClick={() => handleAlign('center-h')} /></Tooltip>
+            <Tooltip title="右对齐"><Button size="small" type="text" icon={<AlignRightOutlined style={iconBtnStyle} />} onClick={() => handleAlign('right')} /></Tooltip>
+            <Tooltip title="顶对齐"><Button size="small" type="text" icon={<VerticalAlignTopOutlined style={iconBtnStyle} />} onClick={() => handleAlign('top')} /></Tooltip>
+            <Tooltip title="垂直居中"><Button size="small" type="text" icon={<VerticalAlignMiddleOutlined style={iconBtnStyle} />} onClick={() => handleAlign('center-v')} /></Tooltip>
+            <Tooltip title="底对齐"><Button size="small" type="text" icon={<VerticalAlignBottomOutlined style={iconBtnStyle} />} onClick={() => handleAlign('bottom')} /></Tooltip>
 
             <Divider orientation="vertical" style={{ height: 16, margin: '0 4px' }} />
 
-            {/* 分布操作组 */}
-            <AntTooltip title="水平等距"><Button size="small" type="text" icon={<ColumnWidthOutlined style={iconBtnStyle} />} onClick={() => handleDistribute('horizontal')} /></AntTooltip>
-            <AntTooltip title="垂直等距"><Button size="small" type="text" icon={<ColumnHeightOutlined style={iconBtnStyle} />} onClick={() => handleDistribute('vertical')} /></AntTooltip>
+            <Tooltip title="水平等距"><Button size="small" type="text" icon={<ColumnWidthOutlined style={iconBtnStyle} />} onClick={() => handleDistribute('horizontal')} /></Tooltip>
+            <Tooltip title="垂直等距"><Button size="small" type="text" icon={<ColumnHeightOutlined style={iconBtnStyle} />} onClick={() => handleDistribute('vertical')} /></Tooltip>
 
             <Divider orientation="vertical" style={{ height: 16, margin: '0 4px' }} />
 
-            {/* 视图操作 */}
-            <AntTooltip title="自动布局"><Button size="small" type="text" icon={<ApartmentOutlined style={iconBtnStyle} />} onClick={handleAutoLayout} /></AntTooltip>
-            <AntTooltip title="适应视口"><Button size="small" type="text" icon={<FullscreenOutlined style={iconBtnStyle} />} onClick={handleFitView} /></AntTooltip>
+            <Tooltip title="自动布局"><Button size="small" type="text" icon={<ApartmentOutlined style={iconBtnStyle} />} onClick={handleAutoLayout} /></Tooltip>
+            <Tooltip title="适应视口"><Button size="small" type="text" icon={<FullscreenOutlined style={iconBtnStyle} />} onClick={handleFitView} /></Tooltip>
         </div>
     );
 };
@@ -181,7 +155,6 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
         }));
         event.dataTransfer.effectAllowed = 'move';
 
-        // 🎨 自定义拖拽预览：绘制与最终节点相似的形状
         try {
             const W = 140, H = 70;
             const dpr = window.devicePixelRatio || 2;
@@ -196,7 +169,6 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                 const themeColor = (config as any)?.theme?.main || '#3b82f6';
                 const shape = (config as any)?.shape || 'rectangle';
 
-                // 低透明度填充 + 主题色描边
                 const hexToRgba = (hex: string, alpha: number) => {
                     const c = hex.replace('#', '');
                     const r = parseInt(c.substring(0, 2), 16);
@@ -214,7 +186,6 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                     const cx = w / 2, cy = h / 2;
                     ctxCanvas.beginPath();
                     if (nodeType === 'arrowTimeline') {
-                        // 自定义时间线专门的拖拽预览绘制
                         const drawSegment = (x: number, y: number, sw: number, sh: number, isLast: boolean) => {
                             ctxCanvas.moveTo(x, y);
                             ctxCanvas.lineTo(x + sw - (isLast ? 0 : 8), y);
@@ -240,7 +211,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                         ctxCanvas.strokeStyle = '#52c41a';
                         drawSegment(10 + w * 0.45, cy - 10, w * 0.45, 20, true);
                         ctxCanvas.fill(); ctxCanvas.stroke();
-                        return; // 提前结束，不执行通用的文字绘制
+                        return;
                     }
                     switch (shape) {
                         case 'pill': ctxCanvas.roundRect(4, 4, w - 8, h - 8, (h - 8) / 2); break;
@@ -308,7 +279,6 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
             requestAnimationFrame(() => canvas.remove());
         } catch {}
     };
-
     
     const renderDraggableItem = (label: string, icon: React.ReactNode, type: string, typeName: string, config: NodeConfig) => {
         return (
@@ -353,7 +323,6 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
     };
 
     const ALL_ITEMS = [
-        // Basic
         { category: 'basic', label: 'Circle', icon: <ShapePreview shape="circle" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'ellipse', icon: 'circle', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
         { category: 'basic', label: 'Rect', icon: <ShapePreview shape="rectangle" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'square', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
         { category: 'basic', label: 'Diamond', icon: <ShapePreview shape="diamond" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'diamond', icon: 'question', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
@@ -362,14 +331,10 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
         { category: 'basic', label: 'Star', icon: <ShapePreview shape="star" color="#F59E0B" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'star', icon: 'star', theme: { main: '#FFC107', border: '#FFB300', text: '#fff' } } },
         { category: 'basic', label: 'Pill', icon: <ShapePreview shape="pill" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'pill', icon: 'play', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
         { category: 'basic', label: 'Note', icon: <ShapePreview shape="note" color="#F59E0B" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'note', icon: 'note', theme: { main: '#FFEB3B', border: '#FDD835', text: '#000' } } },
-        
-        // Flow Control
         { category: 'flow-control', label: t('designer.toolbar.start'), icon: <ShapePreview shape="pill" color="#4CAF50" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'pill', icon: 'play', theme: { main: '#4CAF50', border: '#43a047', text: '#fff' } } },
         { category: 'flow-control', label: t('designer.toolbar.process'), icon: <ShapePreview shape="rectangle" color="#2196F3" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'square', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
         { category: 'flow-control', label: t('designer.toolbar.decision'), icon: <ShapePreview shape="diamond" color="#ff9800" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'diamond', icon: 'question', theme: { main: '#ff9800', border: '#fb8c00', text: '#fff' } } },
         { category: 'flow-control', label: t('designer.toolbar.end'), icon: <ShapePreview shape="pill" color="#f44336" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'pill', icon: 'stop', theme: { main: '#f44336', border: '#e53935', text: '#fff' } } },
-
-        // Data IO
         { category: 'data-io', label: t('designer.toolbar.database'), icon: <ShapePreview shape="database" color="#9C27B0" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'database', icon: 'database', theme: { main: '#9C27B0', border: '#8e24aa', text: '#fff' } } },
         { category: 'data-io', label: t('designer.sidebar.parallelogram'), icon: <ShapePreview shape="parallelogram" color="#00BCD4" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'parallelogram', icon: 'arrow', theme: { main: '#00BCD4', border: '#00ACC1', text: '#fff' } } },
         { category: 'data-io', label: t('designer.sidebar.document'), icon: <ShapePreview shape="document" color="#2196F3" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'document', icon: 'file', theme: { main: '#2196F3', border: '#1e88e5', text: '#fff' } } },
@@ -377,13 +342,9 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
         { category: 'data-io', label: t('designer.sidebar.cloud'), icon: <ShapePreview shape="cloud" color="#03A9F4" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'cloud', icon: 'cloud', theme: { main: '#03A9F4', border: '#039BE5', text: '#fff' } } },
         { category: 'data-io', label: t('designer.toolbar.module'), icon: <FaThLarge style={{ color: '#607d8b' }} />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'th-large', theme: { main: '#607d8b', border: '#546e7a', text: '#fff' } } },
         { category: 'data-io', label: t('designer.toolbar.image'), icon: <FaImage style={{ color: '#795548' }} />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'image', theme: { main: '#795548', border: '#6d4c41', text: '#fff' } } },
-
-        // Containers
         { category: 'containers', label: t('designer.sidebar.domainGroup'), icon: <FaLayerGroup style={{ color: '#3F51B5' }} />, type: 'titleGroup', typeName: 'titleGroup', config: { themeColor: '#3F51B5', domainClass: 'core' } },
         { category: 'containers', label: t('designer.sidebar.subGroup'), icon: <FaBox style={{ color: '#673AB7' }} />, type: 'subGroup', typeName: 'subGroup', config: { themeColor: '#673AB7' } },
         { category: 'containers', label: 'Swimlane', icon: <FaStream style={{ color: '#6366f1' }} />, type: 'swimlane', typeName: 'swimlane', config: { label: 'Swimlane', direction: 'horizontal', lanes: [{ id: 'lane-1', label: '用户', color: '#3b82f6' }] } },
-
-        // Tech Icons
         { category: 'tech-icons', label: t('designer.sidebar.server'), icon: <FaServer style={{ color: '#455A64' }} />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'server', theme: { main: '#455A64', border: '#37474F', text: '#fff' } } },
         { category: 'tech-icons', label: t('designer.sidebar.network'), icon: <FaNetworkWired style={{ color: '#0288D1' }} />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'network', theme: { main: '#0288D1', border: '#0277BD', text: '#fff' } } },
         { category: 'tech-icons', label: t('designer.sidebar.security'), icon: <FaLock style={{ color: '#E65100' }} />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'lock', theme: { main: '#E65100', border: '#BF360C', text: '#fff' } } },
@@ -394,8 +355,6 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
         { category: 'tech-icons', label: t('designer.sidebar.settings'), icon: <FaCog style={{ color: '#78909C' }} />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'cog', theme: { main: '#78909C', border: '#607D8B', text: '#fff' } } },
         { category: 'tech-icons', label: t('designer.sidebar.code'), icon: <FaCode style={{ color: '#7B1FA2' }} />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'code', theme: { main: '#7B1FA2', border: '#6A1B9A', text: '#fff' } } },
         { category: 'tech-icons', label: t('designer.sidebar.terminal'), icon: <FaTerminal style={{ color: '#212121' }} />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'rectangle', icon: 'terminal', theme: { main: '#212121', border: '#000', text: '#0f0' } } },
-
-        // Special
         { category: 'special', label: t('designer.sidebar.connector'), icon: <ShapePreview shape="circle" color="#E91E63" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'circle', icon: 'circle', theme: { main: '#E91E63', border: '#C2185B', text: '#fff' } } },
         { category: 'special', label: t('designer.sidebar.offPageConnector'), icon: <ShapePreview shape="off-page" color="#673AB7" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'off-page', icon: 'arrow', theme: { main: '#673AB7', border: '#512DA8', text: '#fff' } } },
         { category: 'special', label: t('designer.sidebar.internalStorage'), icon: <ShapePreview shape="internal-storage" color="#455A64" />, type: 'flowchart', typeName: 'flowchart', config: { shape: 'internal-storage', icon: 'database', theme: { main: '#455A64', border: '#37474F', text: '#fff' } } },

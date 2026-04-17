@@ -74,14 +74,17 @@ export const MindMapBeautifyPanel: React.FC<{ ctx: PluginContext, selectedNodes:
              </div>
 
              <Form layout="vertical" size="small">
-                 <Form.Item label="结构方向" tooltip="默认由中心节点决定，修改将影响其子分支">
+                 <Form.Item label="结构布局" tooltip="默认由中心节点决定，修改将影响其子分支">
                      <Select 
                          value={direction} 
                          onChange={v => handleBatchUpdate('direction', v)}
                          options={[
-                             { label: '双向展开 (逻辑图)', value: 'LR' },
-                             { label: '向右展开 (向右逻辑图)', value: 'R' },
-                             { label: '向左展开 (向左逻辑图)', value: 'L' }
+                             { label: '思维导图 (Balanced)', value: 'LR' },
+                             { label: '逻辑图 - 向右', value: 'R' },
+                             { label: '逻辑图 - 向左', value: 'L' },
+                             { label: '鱼骨图 (Fishbone)', value: 'FISHBONE' },
+                             { label: '树形图 (Top-Down)', value: 'TB' },
+                             { label: '树形图 (Bottom-Up)', value: 'BT' }
                          ]}
                      />
                  </Form.Item>
@@ -106,11 +109,13 @@ export const MindMapBeautifyPanel: React.FC<{ ctx: PluginContext, selectedNodes:
                          onChange={v => handleBatchUpdate('pathStyle', v)}
                          options={[
                              { label: '贝塞尔曲线 (Bezier)', value: 'bezier' },
+                             { label: '有机曲线 (Rounded)', value: 'rounded' },
                              { label: '折线/直角 (Step)', value: 'step' },
                              { label: '直线 (Straight)', value: 'straight' }
                          ]}
                      />
                  </Form.Item>
+
 
                  <Form.Item label="分支颜色" tooltip="改变当前分支的主题色">
                      <Popover content={ColorPickerContent} trigger="click" placement="bottomLeft">

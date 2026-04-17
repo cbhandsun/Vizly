@@ -251,6 +251,36 @@ export const buildExportFileName = (diagramId: string | undefined, ext: 'png' | 
 };
 
 /**
+ * 触发基于 Data URL 的浏览器下载
+ */
+export const triggerDownload = (dataUrl: string, fileName: string) => {
+  const link = document.createElement('a');
+  link.href = dataUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+/**
+ * 导出全图为 PNG 并触发下载
+ */
+export async function downloadPngDiagram(diagramId: string, paddingPx = 40, pixelRatio: number = 3) {
+  const dataUrl = await exportFullDiagramToPngDataUrl(diagramId, paddingPx, pixelRatio);
+  const fileName = buildExportFileName(diagramId, 'png');
+  triggerDownload(dataUrl, fileName);
+}
+
+/**
+ * 导出全图为 SVG 并触发下载
+ */
+export async function downloadSvgDiagram(diagramId: string, paddingPx = 40) {
+  const dataUrl = await exportFullDiagramToSvgDataUrl(diagramId, paddingPx);
+  const fileName = buildExportFileName(diagramId, 'svg');
+  triggerDownload(dataUrl, fileName);
+}
+
+/**
  * 导出“完整架构图”为 PNG 数据URL。
  * 核心思路：离屏克隆 React Flow 容器，依据节点包围盒重设 viewport 的 transform，
  * 令整张图内容在克隆容器内完整可见，再用 html-to-image 渲染。
@@ -972,7 +1002,9 @@ export async function exportFullDiagramByAdjustingViewportToSvgDataUrl(
         cacheBust: true,
         width: exportWidth,
         height: exportHeight,
-        style: { backgroundColor: '#ffffff', overflow: 'visible', padding: `${paddingPx}px` }
+        // [FIX] 移除 style 中的 padding，因为 viewport 变换已经包含了 padding。
+        // 保持 backgroundColor 确保背景不透明。
+        style: { backgroundColor: '#ffffff', overflow: 'visible', padding: '0' }
       });
     });
     return dataUrl;

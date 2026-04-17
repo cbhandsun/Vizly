@@ -13,6 +13,7 @@ export const TYPE_TO_PLUGIN_ID: Record<string, string> = {
     'architecture': 'architecture-diagram',
     'swimlane':     'swimlane-diagram',
     'er-diagram':   'er-diagram',
+    'network':      'network',
 };
 
 /**

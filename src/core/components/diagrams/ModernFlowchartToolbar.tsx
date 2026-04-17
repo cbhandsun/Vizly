@@ -5,7 +5,7 @@ import {
     FaSitemap, FaObjectGroup, FaRegObjectGroup, FaRuler, FaGripVertical,
     FaEllipsisH, FaTrashAlt, FaProjectDiagram,
     FaMagnet, FaPen, FaStickyNote, FaMousePointer,
-    FaFolderOpen, FaFileExport, FaMap
+    FaFolderOpen, FaFileExport, FaMap, FaRegComment
 } from 'react-icons/fa';
 import { BackgroundVariant } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
@@ -74,6 +74,10 @@ interface FlowchartToolbarProps {
     onActivatePointer?: () => void;
     onAddStickyNote?: () => void;
     onAddMindMap?: () => void;
+
+    // --- Phase 11: Comments ---
+    isCommentMode?: boolean;
+    setIsCommentMode?: (v: boolean) => void;
 }
 
 export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
@@ -118,6 +122,8 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
     onAddMindMap,
     onImportClick,
     onExport,
+    isCommentMode,
+    setIsCommentMode,
 }) => {
     const { t } = useTranslation();
     const onLabel = t('common.on');
@@ -495,6 +501,17 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
                                         icon={<FaProjectDiagram />} 
                                         onClick={onAddMindMap}
                                         style={{ color: '#8B5CF6' }}
+                                    />
+                                </Tooltip>
+                            )}
+
+                            {setIsCommentMode && (
+                                <Tooltip title={isCommentMode ? "退出评论模式 (C)" : "评论模式 (C)"}>
+                                    <Button 
+                                        type={isCommentMode ? 'primary' : 'text'} 
+                                        icon={<FaRegComment />} 
+                                        onClick={() => setIsCommentMode(!isCommentMode)}
+                                        style={{ color: isCommentMode ? undefined : '#10B981' }}
                                     />
                                 </Tooltip>
                             )}

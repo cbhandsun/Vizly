@@ -18,7 +18,7 @@ const SubscriptionContext = createContext<SubscriptionContextType | undefined>(u
 import { useAuth } from './AuthContext';
 
 const TIER_FEATURES: Record<UserTier, string[]> = {
-  free: [],
+  free: ['ai-assistant'],
   pro: ['export-hd-svg', 'export-pdf', 'cloud-sync', 'cloud-history', 'premium-templates'],
   enterprise: ['export-hd-svg', 'export-pdf', 'cloud-sync', 'cloud-history', 'premium-templates', 'sso', 'whitelabel', 'rbac']
 };

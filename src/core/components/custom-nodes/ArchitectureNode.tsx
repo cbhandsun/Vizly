@@ -1,5 +1,6 @@
 import React, { memo, useMemo } from 'react';
 import { Handle, Position, NodeProps, Node } from '@xyflow/react';
+import { Icon } from '@iconify/react';
 import {
     ArrowUpOutlined, ArrowDownOutlined, MinusOutlined, ExclamationCircleOutlined
 } from '@ant-design/icons';
@@ -20,6 +21,7 @@ export interface MetricBadge {
 export interface ArchitectureNodeData extends Record<string, unknown> {
     label: string;
     type: ArchitectureNodeType;
+    icon?: string;
     description?: string;
     status?: 'normal' | 'warning' | 'error';
     themeColor?: string;
@@ -209,7 +211,7 @@ const ArchitectureNode: React.FC<NodeProps<Node<ArchitectureNodeData>>> = ({ dat
         return <div style={{width: 130, height: 80, background: '#fafafa', border: '1px solid #d9d9d9', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>Invalid Node</div>;
     }
 
-    const { label, type, description, status = 'normal', themeColor, metrics = [], linterErrors = [] } = data;
+    const { label, type, icon, description, status = 'normal', themeColor, metrics = [], linterErrors = [] } = data;
     const color = themeColor || (type ? DEFAULT_COLORS[type] : null) || '#1890ff';
 
     const safeMetrics = Array.isArray(metrics) ? metrics : [];
@@ -268,7 +270,25 @@ const ArchitectureNode: React.FC<NodeProps<Node<ArchitectureNodeData>>> = ({ dat
             <Handle type="target" position={Position.Left} style={{ background: color, width: 8, height: 8, border: '2px solid #fff' }} />
 
             {/* 专属形状 SVG */}
-            {shapeEl}
+            <div style={{ position: 'relative' }}>
+                {shapeEl}
+                {icon && (
+                    <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -75%)',
+                        color: color,
+                        fontSize: 24,
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}>
+                        <Icon icon={icon} />
+                    </div>
+                )}
+            </div>
 
             {/* 描述区（仅在有描述时出现，且不与标题重复，挂在形状下方） */}
             {description && description !== label && (

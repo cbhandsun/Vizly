@@ -2,7 +2,7 @@ import { supabase } from '../supabase';
 
 export interface Message {
     id: string;
-    role: 'user' | 'assistant';
+    role: 'user' | 'assistant' | 'system';
     content: string;
     reasoningContent?: string;
     hasJson?: boolean;

@@ -8,6 +8,7 @@ import {
   FaBezierCurve,
   FaCodeBranch,
   FaEdit,
+  FaNetworkWired,
 } from 'react-icons/fa';
 
 export const diagramDefinitions: DiagramDefinition[] = [
@@ -131,5 +132,15 @@ export const diagramDefinitions: DiagramDefinition[] = [
     category: 'other',
     tags: ['flowchart', 'designer', 'tool'],
     icon: FaEdit,
+  },
+  {
+    id: 'network-topology-unified',
+    name: '🌟 统一架构：网络拓扑图',
+    component: lazy(() => import('@/core').then(m => ({
+      default: (props: any) => createElement(m.FlowchartDesigner, { ...props, pluginId: 'network' })
+    }))),
+    category: 'other',
+    tags: ['network', 'topology', 'aws', 'azure', 'gcp', 'unified', 'plugin'],
+    icon: FaNetworkWired,
   },
 ];

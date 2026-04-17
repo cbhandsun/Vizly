@@ -1,6 +1,22 @@
 import React from 'react';
 import type { Node, Edge } from '@xyflow/react';
 
+/** 命令面板分组类型 */
+export type CommandGroup = 'favorites' | 'recent' | 'actions' | 'diagrams';
+
+/** 命令面板项定义 */
+export interface CommandItem {
+  id: string;
+  group: CommandGroup;
+  title: string;
+  description?: string;
+  keywords?: string[];
+  meta?: string[];
+  shortcut?: string;
+  onSelect: () => void;
+  onAltSelect?: () => void;
+}
+
 export interface SidebarPanel {
   id: string;
   title: string;

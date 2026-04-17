@@ -269,6 +269,12 @@
             "manage": "打开图表管理",
             "clearFavorites": "清空收藏图表"
         },
+        "intelligence": {
+            "optimize": "智能优化",
+            "optimizeDesc": "智能全图优化 (解决重叠与对齐)",
+            "optimizing": "正在智能优化图表布局...",
+            "optimizeSuccess": "优化完成：解决了 {{rectified}} 处重叠，对齐了 {{aligned}} 个节点。"
+        },
         "settings": {
             "edgeMode": "连线模式",
             "smart": "智能连线",
@@ -607,7 +613,61 @@
         "invalidDiagram": "无效的图表数据",
         "requestFailed": "请求失败: {{error}}",
         "requestError": "❌ 请求出错: {{error}}",
-        "autoSwitched": "已自动切换到: {{name}}"
+        "autoSwitched": "已自动切换到: {{name}}",
+        "commands": {
+            "add": {
+                "label": "/add <节点描述>",
+                "desc": "⚡ 直接添加节点到画布"
+            },
+            "connect": {
+                "label": "/connect <A> <B>",
+                "desc": "⚡ 连接两个节点"
+            },
+            "layout": {
+                "label": "/layout [类型]",
+                "desc": "⚡ 自动布局 (dagre/grid/force)"
+            },
+            "delete": {
+                "label": "/delete <关键词>",
+                "desc": "⚡ 删除匹配的节点"
+            },
+            "group": {
+                "label": "/group <关键词>",
+                "desc": "⚡ 将匹配的节点进行智能分组"
+            },
+            "generate": {
+                "label": "/generate <描述>",
+                "desc": "🤖 AI 生成完整图表"
+            },
+            "analyze": {
+                "label": "/analyze",
+                "desc": "🤖 AI 分析当前图表结构"
+            },
+            "clear": {
+                "label": "/clear",
+                "desc": "清空对话"
+            },
+            "help": {
+                "label": "/help",
+                "desc": "显示帮助"
+            }
+        },
+        "status": {
+            "nodeAdded": "已添加节点: {{label}}",
+            "nodesDeleted": "已删除 {{count}} 个节点",
+            "connected": "已建立连接: {{label}}",
+            "layoutApplied": "正在应用布局: {{strategy}}",
+            "groupCreated": "已创建分组: {{name}}",
+            "analyzing": "正在进行架构巡检...",
+            "nodeNotFound": "未找到节点「{{name}}」",
+            "noMatchFound": "未找到匹配「{{query}}」的节点",
+            "savingTo": "正在保存到 {{target}}...",
+            "saveSuccess": "已保存到 {{target}}: {{title}}"
+        },
+        "help": {
+            "title": "📚 可用命令",
+            "footer": "⚡ 标记的命令会直接操纵画布，无需等待 AI 响应"
+        }
     },
     "export": {
         "backToTop": "回到顶部",

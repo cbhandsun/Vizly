@@ -5,6 +5,7 @@ import { pickReadableTextColor } from '../../../utils/colorUtils';
 import { hexToRgba } from '../../shared/layoutUtils';
 import { useDiagramStylePreset } from '../../shared/DiagramStyleManager';
 import { useBusinessData } from '../../diagrams/NodeUpdateContext';
+import { Icon as IconifyIcon } from '@iconify/react';
 
 import { FaPlay, FaSquare, FaCog, FaStop, FaDatabase, FaQuestion, FaArrowRight, FaLayerGroup, FaBox, FaThLarge, FaImage, FaEye, FaKeyboard, FaTrash, FaCopy, FaCircle, FaStar, FaFileAlt, FaCloud, FaClock, FaDesktop, FaStickyNote, FaHandPaper, FaDrawPolygon, FaServer, FaNetworkWired, FaLock, FaPlug, FaUser, FaEnvelope, FaBell, FaCode, FaTerminal, FaChevronUp, FaChevronRight, FaChevronDown, FaChevronLeft } from 'react-icons/fa';
 
@@ -99,7 +100,18 @@ export function useFlowchartNodeStyleResolution({ data, selected }: ResolutionPa
     const businessData = useBusinessData();
 
     return useMemo(() => {
-        let resolvedIcon = typeof data.icon === 'string' ? ICON_MAP[data.icon] : data.icon;
+        let resolvedIcon: React.ReactNode = null;
+        if (typeof data.icon === 'string') {
+            if (data.icon.includes(':')) {
+                // Iconify icon name like 'mdi:home'
+                resolvedIcon = <IconifyIcon icon={data.icon} width="1.1em" height="1.1em" style={{ verticalAlign: 'middle' }} />;
+            } else {
+                // Known built-in icon
+                resolvedIcon = ICON_MAP[data.icon] || null;
+            }
+        } else {
+            resolvedIcon = data.icon;
+        }
 
         const domainKey = resolveThemeDomainKey(theme, {
             domainClass: data?.domainClass,

@@ -145,7 +145,18 @@ export const MindMapActionBar: React.FC = () => {
       <ActionBtn icon={<SisternodeOutlined />} label="同级主题" disabled={!selectedNode} onClick={handleAddSibling} />
       <ActionBtn icon={<SubnodeOutlined />} label="子主题" disabled={!selectedNode} onClick={handleAddChild} />
       <ActionBtn icon={<LinkOutlined />} label="联系线" onClick={handleAddRelationship} />
-      <ActionBtn icon={<BlockOutlined />} label="概括总结" disabled={selectedNodes.length === 0} onClick={handleAddSummary} />
+      <ActionBtn icon={<BlockOutlined />} label="添加概要" disabled={selectedNodes.length === 0} onClick={handleAddSummary} />
+      <ActionBtn 
+        icon={<div style={{ width: 18, height: 18, border: '2px dashed #666', borderRadius: 4 }} />} 
+        label="逻辑外框" 
+        disabled={!selectedNode} 
+        onClick={() => {
+          const event = new CustomEvent('editor:add-boundary-node', {
+            detail: { nodeId: selectedNode?.id }
+          });
+          window.dispatchEvent(event);
+        }} 
+      />
 
       <Divider orientation="vertical" style={{ height: 32 }} />
 

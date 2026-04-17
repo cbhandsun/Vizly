@@ -166,6 +166,7 @@ export function symmetricMindMapLayout(
     nodes: Node[],
     edges: Edge[],
     options: LayoutOptions = {},
+    externalMaps?: { nodeMap?: Map<string, Node>, childrenMap?: Map<string, string[]> }
 ): Map<string, Point> {
     const nodeSpacing = options.nodeSpacing ?? 40;
     const levelSpacing = options.levelSpacing ?? 100;
@@ -178,19 +179,28 @@ export function symmetricMindMapLayout(
         height: n.measured?.height ?? (n as any).height ?? 50,
     });
 
-    const childrenMap = new Map<string, string[]>();
+    const nodeMap = externalMaps?.nodeMap || new Map<string, Node>();
+    if (!externalMaps?.nodeMap) {
+        for (const n of nodes) nodeMap.set(n.id, n);
+    }
+
+    const childrenMap = externalMaps?.childrenMap || new Map<string, string[]>();
     const parentSet = new Set<string>();
-    const nodeMap = new Map<string, Node>();
     
-    const summaryNodeIds = new Set(nodes.filter(n => n.data?.isSummary).map(n => n.id));
-    const realEdges = edges.filter(e => e.type !== 'relationshipEdge' && !summaryNodeIds.has(e.target));
-    
-    for (const n of nodes) nodeMap.set(n.id, n);
-    
-    for (const e of realEdges) {
-        if (!childrenMap.has(e.source)) childrenMap.set(e.source, []);
-        childrenMap.get(e.source)!.push(e.target);
-        parentSet.add(e.target);
+    if (!externalMaps?.childrenMap) {
+        const summaryNodeIds = new Set(nodes.filter(n => n.data?.isSummary).map(n => n.id));
+        const realEdges = edges.filter(e => e.type !== 'relationshipEdge' && !summaryNodeIds.has(e.target));
+        
+        for (const e of realEdges) {
+            if (!childrenMap.has(e.source)) childrenMap.set(e.source, []);
+            childrenMap.get(e.source)!.push(e.target);
+            parentSet.add(e.target);
+        }
+    } else {
+        // Build parentSet from childrenMap if not provided
+        for (const [parent, kids] of childrenMap.entries()) {
+            for (const kid of kids) parentSet.add(kid);
+        }
     }
 
     const roots = nodes.filter(n => !parentSet.has(n.id));
@@ -301,6 +311,7 @@ export function directionalMindMapLayout(
     edges: Edge[],
     direction: 'L' | 'R',
     options: LayoutOptions = {},
+    externalMaps?: { nodeMap?: Map<string, Node>, childrenMap?: Map<string, string[]> }
 ): Map<string, Point> {
     const nodeSpacing = options.nodeSpacing ?? 30;
     const levelSpacing = options.levelSpacing ?? 100;
@@ -313,18 +324,27 @@ export function directionalMindMapLayout(
         height: n.measured?.height ?? (n as any).height ?? 50,
     });
 
-    const childrenMap = new Map<string, string[]>();
+    const nodeMap = externalMaps?.nodeMap || new Map<string, Node>();
+    if (!externalMaps?.nodeMap) {
+        for (const n of nodes) nodeMap.set(n.id, n);
+    }
+
+    const childrenMap = externalMaps?.childrenMap || new Map<string, string[]>();
     const parentSet = new Set<string>();
-    const nodeMap = new Map<string, Node>();
     
-    const summaryNodeIds = new Set(nodes.filter(n => n.data?.isSummary).map(n => n.id));
-    const realEdges = edges.filter(e => e.type !== 'relationshipEdge' && !summaryNodeIds.has(e.target));
-    
-    for (const n of nodes) nodeMap.set(n.id, n);
-    for (const e of realEdges) {
-        if (!childrenMap.has(e.source)) childrenMap.set(e.source, []);
-        childrenMap.get(e.source)!.push(e.target);
-        parentSet.add(e.target);
+    if (!externalMaps?.childrenMap) {
+        const summaryNodeIds = new Set(nodes.filter(n => n.data?.isSummary).map(n => n.id));
+        const realEdges = edges.filter(e => e.type !== 'relationshipEdge' && !summaryNodeIds.has(e.target));
+        
+        for (const e of realEdges) {
+            if (!childrenMap.has(e.source)) childrenMap.set(e.source, []);
+            childrenMap.get(e.source)!.push(e.target);
+            parentSet.add(e.target);
+        }
+    } else {
+        for (const [parent, kids] of childrenMap.entries()) {
+            for (const kid of kids) parentSet.add(kid);
+        }
     }
 
     const roots = nodes.filter(n => !parentSet.has(n.id));
@@ -413,19 +433,205 @@ export function directionalMindMapLayout(
     return positions;
 }
 
+// ─────────────── 树形图 (Tree Map / Org Chart) 布局 ───────────────
+
+/**
+ * 组织结构图 / 树形图布局
+ * 类似于 treeLayout，但针对思维导图数据结构进行了深度适配，支持 TB (Top-to-Bottom) 和 BT (Bottom-to-Top)。
+ */
+export function treeMapLayout(
+    nodes: Node[],
+    edges: Edge[],
+    direction: 'TB' | 'BT' = 'TB',
+    options: LayoutOptions = {},
+    externalMaps?: { nodeMap?: Map<string, Node>, childrenMap?: Map<string, string[]> }
+): Map<string, Point> {
+    const nodeSpacing = options.nodeSpacing ?? 50;
+    const levelSpacing = options.levelSpacing ?? 80;
+
+    const positions = new Map<string, Point>();
+    if (nodes.length === 0) return positions;
+
+    const getSize = (n: Node) => ({
+        width: n.measured?.width ?? (n as any).width ?? 150,
+        height: n.measured?.height ?? (n as any).height ?? 50,
+    });
+
+    const nodeMap = externalMaps?.nodeMap || new Map<string, Node>();
+    if (!externalMaps?.nodeMap) {
+        for (const n of nodes) nodeMap.set(n.id, n);
+    }
+
+    const childrenMap = externalMaps?.childrenMap || new Map<string, string[]>();
+    const parentSet = new Set<string>();
+    
+    if (!externalMaps?.childrenMap) {
+        const summaryNodeIds = new Set(nodes.filter(n => n.data?.isSummary).map(n => n.id));
+        const realEdges = edges.filter(e => e.type !== 'relationshipEdge' && !summaryNodeIds.has(e.target));
+        
+        for (const e of realEdges) {
+            if (!childrenMap.has(e.source)) childrenMap.set(e.source, []);
+            childrenMap.get(e.source)!.push(e.target);
+            parentSet.add(e.target);
+        }
+    } else {
+        for (const [parent, kids] of childrenMap.entries()) {
+            for (const kid of kids) parentSet.add(kid);
+        }
+    }
+
+    const roots = nodes.filter(n => !parentSet.has(n.id));
+    if (roots.length === 0 && nodes.length > 0) roots.push(nodes[0]);
+
+    const visited = new Set<string>();
+
+    function buildTree(id: string): TreeNode {
+        visited.add(id);
+        const node = nodeMap.get(id);
+        const { width: w, height: h } = node ? getSize(node) : { width: 150, height: 50 };
+        const childIds = (childrenMap.get(id) || []).filter(cid => !visited.has(cid));
+        const children = childIds.map(cid => buildTree(cid));
+        const subtreeWidth = children.length > 0
+            ? children.reduce((sum, c) => sum + c.subtreeWidth, 0) + (children.length - 1) * nodeSpacing
+            : w;
+        return { id, children, width: w, height: h, x: 0, y: 0, subtreeWidth };
+    }
+
+    function layoutSubtree(tree: TreeNode, x: number, y: number): void {
+        tree.x = x + (tree.subtreeWidth - tree.width) / 2;
+        tree.y = y;
+        
+        let childX = x;
+        for (const child of tree.children) {
+            const nextY = direction === 'TB' ? y + tree.height + levelSpacing : y - child.height - levelSpacing;
+            layoutSubtree(child, childX, nextY);
+            childX += child.subtreeWidth + nodeSpacing;
+        }
+        positions.set(tree.id, { x: tree.x, y: tree.y });
+    }
+
+    let offsetX = 100;
+    for (const root of roots) {
+        const tree = buildTree(root.id);
+        const startY = direction === 'TB' ? 100 : 500; 
+        layoutSubtree(tree, offsetX, startY);
+        offsetX += tree.subtreeWidth + nodeSpacing * 2;
+    }
+
+    return positions;
+}
+
+// ─────────────── 鱼骨图 (Fishbone / Ishikawa) 布局 ───────────────
+
+/**
+ * 鱼骨图布局算法
+ * 根节点（Effect）在最右侧，骨架向左延伸。
+ * 第一层子节点（Main Causes）斜向排列，后续节点水平排列。
+ */
+export function fishboneLayout(
+    nodes: Node[],
+    edges: Edge[],
+    options: LayoutOptions = {},
+    externalMaps?: { nodeMap?: Map<string, Node>, childrenMap?: Map<string, string[]> }
+): Map<string, Point> {
+    const levelSpacing = options.levelSpacing ?? 120;
+    const ribSpacing = 160; 
+
+    const positions = new Map<string, Point>();
+    if (nodes.length === 0) return positions;
+
+    const getSize = (n: Node) => ({
+        width: n.measured?.width ?? (n as any).width ?? 140,
+        height: n.measured?.height ?? (n as any).height ?? 40,
+    });
+
+    const nodeMap = externalMaps?.nodeMap || new Map<string, Node>();
+    if (!externalMaps?.nodeMap) {
+        for (const n of nodes) nodeMap.set(n.id, n);
+    }
+
+    const childrenMap = externalMaps?.childrenMap || new Map<string, string[]>();
+    const parentSet = new Set<string>();
+    
+    if (!externalMaps?.childrenMap) {
+        for (const e of edges.filter(e => e.type !== 'relationshipEdge')) {
+            if (!childrenMap.has(e.source)) childrenMap.set(e.source, []);
+            childrenMap.get(e.source)!.push(e.target);
+            parentSet.add(e.target);
+        }
+    } else {
+        for (const [parent, kids] of childrenMap.entries()) {
+            for (const kid of kids) parentSet.add(kid);
+        }
+    }
+
+    const roots = nodes.filter(n => !parentSet.has(n.id) || n.data?.depth === 0);
+    if (roots.length === 0) return positions;
+    
+    const root = roots[0];
+    const { width: rw, height: rh } = getSize(root);
+    
+    const spineX = 1000;
+    const spineY = 400;
+    positions.set(root.id, { x: spineX, y: spineY - rh / 2 });
+
+    const mainCauses = childrenMap.get(root.id) || [];
+    
+    mainCauses.forEach((causeId, index) => {
+        const isUpper = index % 2 === 0;
+        const ribIndex = Math.floor(index / 2);
+        
+        const baseX = spineX - (ribIndex + 1) * ribSpacing;
+        const baseY = spineY;
+
+        const slantOffset = 150;
+        const causeX = baseX - slantOffset;
+        const causeY = isUpper ? baseY - slantOffset : baseY + slantOffset;
+        
+        const cNode = nodeMap.get(causeId);
+        const { width: cw, height: ch } = cNode ? getSize(cNode) : { width: 140, height: 40 };
+        positions.set(causeId, { x: causeX - cw / 2, y: causeY - ch / 2 });
+
+        const layoutSubCauses = (id: string, startX: number, startY: number, dir: 'up' | 'down') => {
+            const subIds = childrenMap.get(id) || [];
+            subIds.forEach((sid, sIdx) => {
+                const sn = nodeMap.get(sid);
+                const { width: sw, height: sh } = sn ? getSize(sn) : { width: 120, height: 35 };
+                
+                const subX = startX - (sIdx + 1) * 80;
+                const subY = startY; 
+                
+                positions.set(sid, { x: subX, y: subY });
+                layoutSubCauses(sid, subX, subY, dir);
+            });
+        };
+        
+        layoutSubCauses(causeId, causeX, causeY, isUpper ? 'up' : 'down');
+    });
+
+    return positions;
+}
+
 export function autoMindMapLayout(
     nodes: Node[],
     edges: Edge[],
     direction: string = 'LR',
-    options: LayoutOptions = {}
+    options: LayoutOptions = {},
+    externalMaps?: { nodeMap?: Map<string, Node>, childrenMap?: Map<string, string[]> }
 ): Map<string, Point> {
     if (direction === 'TB') {
-        return treeLayout(nodes, edges, { direction: 'TB', ...options });
+        return treeMapLayout(nodes, edges, 'TB', options, externalMaps);
+    }
+    if (direction === 'BT') {
+        return treeMapLayout(nodes, edges, 'BT', options, externalMaps);
+    }
+    if (direction === 'FISHBONE') {
+        return fishboneLayout(nodes, edges, options, externalMaps);
     }
     if (direction === 'R' || direction === 'L') {
-        return directionalMindMapLayout(nodes, edges, direction as 'L' | 'R', options);
+        return directionalMindMapLayout(nodes, edges, direction as 'L' | 'R', options, externalMaps);
     }
-    return symmetricMindMapLayout(nodes, edges, options);
+    return symmetricMindMapLayout(nodes, edges, options, externalMaps);
 }
 
 // ─────────────── 力导向布局 ───────────────
@@ -536,4 +742,110 @@ export function applyLayout(nodes: Node[], positions: Map<string, Point>): Node[
         if (!pos) return n;
         return { ...n, position: { x: pos.x, y: pos.y } };
     });
+}
+
+/**
+ * 计算概要大括号 (Summary Bracket) 的几何范围
+ * 
+ * @param targetIds     被归纳的主题 ID 集合
+ * @param nodePositions 当前所有节点的布局位置
+ * @param nodeMap       当前所有节点映射
+ * @param direction     布局主方向
+ */
+export function calculateSummaryGeometry(
+    targetIds: string[],
+    nodePositions: Map<string, Point>,
+    nodeMap: Map<string, Node>,
+    direction: string = 'LR'
+) {
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let maxX = -Infinity;
+    let minX = Infinity;
+
+    let hasValid = false;
+    for (const tid of targetIds) {
+        const tn = nodeMap.get(tid);
+        const pos = nodePositions.get(tid);
+        if (!tn || !pos) continue;
+
+        const h = tn.measured?.height ?? (tn as any).height ?? 40;
+        const w = tn.measured?.width ?? (tn as any).width ?? 120;
+        
+        minY = Math.min(minY, pos.y);
+        maxY = Math.max(maxY, pos.y + h);
+        maxX = Math.max(maxX, pos.x + w);
+        minX = Math.min(minX, pos.x);
+        hasValid = true;
+    }
+
+    if (!hasValid) return null;
+
+    const isLeft = direction === 'L'; 
+    const bracketX = isLeft ? minX - 15 : maxX + 15;
+
+    return {
+        minY,
+        maxY,
+        x: bracketX,
+        dir: isLeft ? 'L' : 'R'
+    };
+}
+
+/**
+ * 计算外框 (Boundary) 的几何范围，包裹指定节点及其所有子孙节点
+ * 
+ * @param rootId        子树根节点 ID
+ * @param nodePositions 布局坐标
+ * @param nodes         节点数组
+ * @param edges         边数组（用于遍历子树）
+ */
+export function calculateSubtreeBounds(
+    rootId: string,
+    nodePositions: Map<string, Point>,
+    nodeMap: Map<string, Node>,
+    childrenMap: Map<string, string[]>
+) {
+    const descendants = new Set<string>();
+    const stack = [rootId];
+    
+    // Optimized DFS using childrenMap
+    while (stack.length > 0) {
+        const id = stack.pop()!;
+        if (descendants.has(id)) continue;
+        descendants.add(id);
+        const kids = childrenMap.get(id) || [];
+        for (const k of kids) {
+            stack.push(k);
+        }
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const id of descendants) {
+        const pos = nodePositions.get(id);
+        const node = nodeMap.get(id);
+        if (!pos || !node) continue;
+        
+        const w = node.measured?.width ?? (node as any).width ?? 140;
+        const h = node.measured?.height ?? (node as any).height ?? 44;
+
+        minX = Math.min(minX, pos.x);
+        minY = Math.min(minY, pos.y);
+        maxX = Math.max(maxX, pos.x + w);
+        maxY = Math.max(maxY, pos.y + h);
+    }
+
+    if (minX === Infinity) return null;
+
+    const padding = 24; 
+    return {
+        x: minX - padding,
+        y: minY - padding,
+        width: (maxX - minX) + padding * 2,
+        height: (maxY - minY) + padding * 2
+    };
 }

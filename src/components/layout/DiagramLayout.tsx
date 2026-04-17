@@ -37,6 +37,7 @@ interface DiagramLayoutProps {
   };
 
   contentStyle?: React.CSSProperties;
+  isPresentationMode?: boolean;
   children: React.ReactNode;
 }
 
@@ -48,6 +49,7 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
   showFlowchartSidebar = false,
   flowchartSidebarProps,
   contentStyle,
+  isPresentationMode = false,
   children
 }) => {
   const { token } = theme.useToken();
@@ -174,25 +176,27 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
           transition: 'zoom 0.2s ease-out, height 0.2s ease-out, width 0.2s ease-out'
         }}
       >
-        <Header
-          style={{
-            padding: 0,
-            height: 0, // Zero height so layout flex-1 takes full screen
-            lineHeight: 'normal',
-            background: 'transparent', // Transparent to let the canvas show through
-            zIndex: 1000,
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            pointerEvents: 'none' // Important: let clicks pass through to canvas where there is no toolbar
-          }}
-        >
-          {header ? header : (toolbarProps ? <ModernTopToolbar {...toolbarProps} /> : null)}
-        </Header>
+        {!isPresentationMode && (
+          <Header
+            style={{
+              padding: 0,
+              height: 0, // Zero height so layout flex-1 takes full screen
+              lineHeight: 'normal',
+              background: 'transparent', // Transparent to let the canvas show through
+              zIndex: 1000,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              pointerEvents: 'none' // Important: let clicks pass through to canvas where there is no toolbar
+            }}
+          >
+            {header ? header : (toolbarProps ? <ModernTopToolbar {...toolbarProps} /> : null)}
+          </Header>
+        )}
         <Layout style={{ flex: 1, overflow: 'hidden', minHeight: 0, position: 'relative' }}>
           {/* Left Sider: Diagram Menu */}
-          {showMenu && menuProps && (
+          {!isPresentationMode && showMenu && menuProps && (
             <>
               <Sider
                 collapsible
@@ -280,7 +284,7 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
           )}
 
           {/* Optional Secondary Sider (Flowchart Tools) */}
-          {showFlowchartSidebar && flowchartSidebarProps && (
+          {!isPresentationMode && showFlowchartSidebar && flowchartSidebarProps && (
             <>
               <ModernFlowchartSidebar
                 isCollapsed={flowchartSidebarProps.isCollapsed}

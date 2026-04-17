@@ -11,17 +11,17 @@ import { MindMapCanvasContext } from '../components/diagrams/mindmap-pro/MindMap
 import { MindMapOutlinePanel } from '../components/diagrams/mindmap-pro/MindMapOutlinePanel';
 import { SidebarPanel } from '../types/plugin';
 import { UnorderedListOutlined, PartitionOutlined, FullscreenOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
-import { Button, Tooltip, Select, Divider } from 'antd';
+import { BaseDiagramPlugin } from '../sdk/BasePlugin';
 
-export class MindMapPlugin implements DiagramTypePlugin {
+export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugin {
   id = 'mindmap';
   name = 'Mind Map Pro';
   version = '1.1';
 
   async migrate(data: any, fromVersion: string | undefined): Promise<any> {
+    const migratedData = await super.migrate(data, fromVersion);
     console.log(`[MindMapPlugin] Migrating data from ${fromVersion || '1.0'} to ${this.version}`);
-    // Future-proof migration stub
-    return { ...data };
+    return migratedData;
   }
 
   // Professional Mind Map disables legacy generic panels
@@ -38,22 +38,15 @@ export class MindMapPlugin implements DiagramTypePlugin {
           id: 'root',
           type: 'mindmap',
           position: { x: 0, y: 0 },
-          data: { label: '中心主题 (Root)', direction: 'LR' }
+          data: { label: '中心主题 (Root)', direction: 'LR' },
+          selected: true
         }
       ],
       edges: []
     };
   }
 
-  // Parse & Serialize just passthrough data as React Flow format for now
-  parseData(source: any) {
-    if (!source || typeof source !== 'object') return { nodes: [], edges: [] };
-    return { nodes: source.nodes || [], edges: source.edges || [] };
-  }
-
-  serializeData(nodes: Node[], edges: Edge[]) {
-    return { nodes, edges };
-  }
+  // parseData and serializeData are now inherited from BaseDiagramPlugin
 
   // Layouts supported (We hook into the autoLayout engine for Mind Map)
   getSupportedLayouts() { return ['MindMapDirectionalLayout']; }

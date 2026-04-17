@@ -26,18 +26,25 @@ const MindMapBoundaryNode = ({ data, selected }: MindMapBoundaryNodeProps) => {
     const baseStyle = {
         width: `${width}px`,
         height: `${height}px`,
-        borderColor: color,
-        backgroundColor: styleType === 'fill' ? `${color}1A` : 'transparent', // 1A is ~10% opacity
-        borderStyle: styleType === 'dashed' ? 'dashed' : (styleType === 'solid' ? 'solid' : 'none'),
-        borderWidth: styleType !== 'fill' ? '2px' : '0',
+        borderColor: `${color}80`, // Half opacity
+        backgroundColor: styleType === 'fill' ? `${color}15` : 'transparent',
+        borderStyle: styleType === 'dashed' ? 'dashed' : 'solid',
+        borderWidth: styleType === 'fill' ? '1px' : '2px',
         zIndex: -1,
         pointerEvents: 'none',
+        backdropFilter: styleType === 'fill' ? 'blur(4px)' : 'none',
     } as React.CSSProperties;
 
     return (
-        <div className={`mindmap-boundary-node ${selected ? 'selected' : ''}`} style={baseStyle}>
+        <div className={`mindmap-boundary-node type-${styleType} ${selected ? 'selected' : ''}`} style={baseStyle}>
             {title && (
-                <div className="mindmap-boundary-title" style={{ color: color }}>
+                <div 
+                    className="mindmap-boundary-title" 
+                    style={{ 
+                        color: color,
+                        borderColor: `${color}40`,
+                    }}
+                >
                     {title}
                 </div>
             )}

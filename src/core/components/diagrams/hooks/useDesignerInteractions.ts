@@ -154,7 +154,7 @@ export function useDesignerInteractions({
     const handleReconnectEnd = useCallback((_event: any, edge: Edge) => {}, []);
 
     const { onDragOver, onDrop, onNodeDragStart, onNodeDrag, onNodeDragStop: originalOnNodeDragStop } = useDiagramDragDrop({
-        nodes, edges, setNodes, takeSnapshot, reactFlowInstance, setIsDragging, onSmartNodeDrag, clearGuides,
+        nodes, edges, setNodes, setEdges, takeSnapshot, reactFlowInstance, setIsDragging, onSmartNodeDrag, clearGuides,
         enableAltDuplicate: false, isConnecting, activeLayerId
     });
 

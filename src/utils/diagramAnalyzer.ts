@@ -7,7 +7,7 @@
 
 export interface AnalysisIssue {
   /** 问题类型 */
-  type: 'orphan_node' | 'duplicate_edge' | 'self_loop' | 'missing_label' | 'layout_suggestion' | 'connectivity';
+  type: 'orphan_node' | 'duplicate_edge' | 'self_loop' | 'missing_label' | 'layout_suggestion' | 'connectivity' | 'layer_violation' | 'cyclic_dependency';
   /** 严重程度 */
   severity: 'info' | 'warning' | 'error';
   /** 人类可读描述 */
@@ -156,6 +156,89 @@ export function analyzeDiagram(
     }
   }
 
+  // 7. 架构层级偏向性校验 (Domain Layer Check)
+  // 定义标准层级顺序: ch -> fe -> mid -> data
+  const LAYER_ORDER: Record<string, number> = {
+    'ch': 0,    // Channel/User
+    'fe': 1,    // Frontend/Gateway
+    'mid': 2,   // Middleware/Business
+    'data': 3   // Data/Storage
+  };
+
+  edges.forEach(e => {
+    const sourceNode = leafNodes.find(n => n.id === e.source);
+    const targetNode = leafNodes.find(n => n.id === e.target);
+    
+    if (sourceNode?.data?.domainClass && targetNode?.data?.domainClass) {
+        const sRank = LAYER_ORDER[sourceNode.data.domainClass];
+        const tRank = LAYER_ORDER[targetNode.data.domainClass];
+        
+        if (sRank !== undefined && tRank !== undefined) {
+            // 0. 安全风险：前端/用户端直连数据层
+            if ((sourceNode.data.domainClass === 'ch' || sourceNode.data.domainClass === 'fe') && targetNode.data.domainClass === 'data') {
+                issues.push({
+                    type: 'layer_violation',
+                    severity: 'error',
+                    message: `🚩 重大安全风险：${sourceNode.data.label || sourceNode.id} 直连数据库，建议增加 API 网关或后端服务进行中转`,
+                    relatedIds: [sourceNode.id, targetNode.id, e.id],
+                    suggestedPrompt: `请在 ${sourceNode.data.label || sourceNode.id} 和 ${targetNode.data.label || targetNode.id} 之间增加一个后端业务节点`
+                });
+            }
+            // 1. 逆向依赖检测 (e.g. data -> ch)
+            else if (sRank > tRank) {
+                issues.push({
+                    type: 'layer_violation',
+                    severity: 'warning',
+                    message: `检测到层级违规：从 ${sourceNode.data.domainClass} 层到 ${targetNode.data.domainClass} 层的逆向调用`,
+                    relatedIds: [sourceNode.id, targetNode.id, e.id]
+                });
+            }
+            // 2. 跨层跃迁检测 (e.g. ch -> mid, skipping fe)
+            else if (tRank - sRank > 1) {
+                issues.push({
+                    type: 'layer_violation',
+                    severity: 'info',
+                    message: `检测到跨层调用：从 ${sourceNode.data.domainClass} 层直接调用了 ${targetNode.data.domainClass} 层，建议通过中间层解耦`,
+                    relatedIds: [sourceNode.id, targetNode.id, e.id]
+                });
+            }
+        }
+    }
+  });
+
+  // 7.5 单点故障检测 (SPOF)
+  const inDegrees = new Map<string, number>();
+  leafNodes.forEach(n => inDegrees.set(n.id, 0));
+  edges.forEach(e => inDegrees.set(e.target, (inDegrees.get(e.target) || 0) + 1));
+
+  leafNodes.forEach(n => {
+    const inD = inDegrees.get(n.id) || 0;
+    if (inD >= 3) {
+      // 检查是否有兄弟节点（同父 ID 或 标签相似）
+      const siblings = leafNodes.filter(s => s.id !== n.id && (s.parentId === n.parentId && !!n.parentId));
+      if (siblings.length === 0) {
+        issues.push({
+          type: 'connectivity',
+          severity: 'warning',
+          message: `疑似单点故障：节点 "${n.data?.label || n.id}" 承载了 ${inD} 条入站流，建议增加冗余备份`,
+          relatedIds: [n.id],
+          suggestedPrompt: `请为 "${n.data?.label || n.id}" 增加一个冗余节点以提高系统可用性`
+        });
+      }
+    }
+  });
+
+  // 8. 循环依赖检测 (Tarjan 或简易 DFS)
+  const cycles = detectCycles(leafNodes, edges);
+  if (cycles.length > 0) {
+    issues.push({
+        type: 'cyclic_dependency',
+        severity: 'error',
+        message: `检测到 ${cycles.length} 个服务的循环依赖，这可能导致调用链死锁`,
+        relatedIds: cycles.flat()
+    });
+  }
+
   // 计算最大深度（从入度为 0 的节点出发的最长路径）
   const maxDepth = computeMaxDepth(leafNodes, edges);
 
@@ -251,6 +334,45 @@ function computeMaxDepth(
   }
 
   return maxD;
+}
+
+/**
+ * 简易 DFS 寻找循环依赖
+ */
+function detectCycles(nodes: AnalysisNode[], edges: AnalysisEdge[]): string[][] {
+    const adj = new Map<string, string[]>();
+    nodes.forEach(n => adj.set(n.id, []));
+    edges.forEach(e => adj.get(e.source)?.push(e.target));
+
+    const cycles: string[][] = [];
+    const visited = new Set<string>();
+    const stack = new Set<string>();
+    const path: string[] = [];
+
+    const dfs = (u: string) => {
+        visited.add(u);
+        stack.add(u);
+        path.push(u);
+
+        for (const v of adj.get(u) || []) {
+            if (stack.has(v)) {
+                // 发现环，提取路径
+                const cycleStartIdx = path.indexOf(v);
+                cycles.push([...path.slice(cycleStartIdx)]);
+            } else if (!visited.has(v)) {
+                dfs(v);
+            }
+        }
+
+        stack.delete(u);
+        path.pop();
+    };
+
+    nodes.forEach(n => {
+        if (!visited.has(n.id)) dfs(n.id);
+    });
+
+    return cycles;
 }
 
 /**
