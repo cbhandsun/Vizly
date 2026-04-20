@@ -1592,6 +1592,19 @@ export class EdgeRoutingCoordinator {
     }
 
     /**
+     * [DEV] 强制清空所有路由缓存并递增 graphVersion，让所有边重新计算路径。
+     * 用于修改了路由算法后无需重启即可验证效果。
+     */
+    public clearAllCaches(): void {
+        this.graphVersion++;
+        this.cache.clear();
+        this.dirtyEdges.clear();
+        this.allEdges.forEach(edge => this.dirtyEdges.add(edge.id));
+        this.workerPool.markDirty();
+        console.info(`[EdgeRoutingCoordinator] All caches cleared. graphVersion=${this.graphVersion}`);
+    }
+
+    /**
      * Cleanup resources
      */
     public cleanup(): void {
@@ -1601,3 +1614,15 @@ export class EdgeRoutingCoordinator {
         EdgeRoutingCoordinator.instance = null;
     }
 }
+
+// [DEV] 在 window 上挂载调试工具，开发模式下可在控制台直接调用
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
+    (window as any).__vizly_routing__ = {
+        /** 清空所有路由缓存，强制下一次渲染重新计算所有连线路径 */
+        clearCache: () => EdgeRoutingCoordinator.getInstance().clearAllCaches(),
+        /** 获取 Coordinator 实例 */
+        coordinator: () => EdgeRoutingCoordinator.getInstance(),
+    };
+    console.info('[Vizly Dev] Routing debug tools available: window.__vizly_routing__.clearCache()');
+}
+
