@@ -113,6 +113,7 @@ import { useDesignerGhostNodes } from './hooks/useDesignerGhostNodes';
 import { DesignerHeaderLayer } from './ui/DesignerHeaderLayer';
 import { DesignerOverlaysLayer } from './ui/DesignerOverlaysLayer';
 import { DesignerCanvasFeaturesLayer } from './ui/DesignerCanvasFeaturesLayer';
+import { LaserPointer } from './LaserPointer';
 import ArrowTimelineNode from './nodes/ArrowTimelineNode';
 import { LiveCursors } from '../../../components/diagrams/collaboration/LiveCursors';
 import ERDatabaseNode from '../custom-nodes/ERDatabaseNode';
@@ -317,6 +318,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     const [historyPanelVisible, setHistoryPanelVisible] = useState(false);
     const [jsonEditorVisible, setJsonEditorVisible] = useState(false);
     const [presentationActive, setPresentationActive] = useState(false);
+    const [laserEnabled, setLaserEnabled] = useState(false);
     const [diffResult, setDiffResult] = useState<DiffResult | null>(null);
     const [diagramMetadata, setDiagramMetadata] = useState<any>(null);
     const [canvasSearchVisible, setCanvasSearchVisible] = useState(false);
@@ -623,6 +625,21 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     }, [isCommentMode, contextMenuPaneClick]);
 
     const { layoutContainer } = useContainerAutoLayout();
+
+    // 演示模式激光笔：L 键切换，退出演示时自动关闭
+    useEffect(() => {
+        if (!presentationActive) {
+            setLaserEnabled(false);
+            return;
+        }
+        const onKey = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            if (['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable) return;
+            if (e.key.toLowerCase() === 'l') setLaserEnabled(v => !v);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [presentationActive]);
 
     // Features
     const multiPage = useMultiPage(
@@ -1531,6 +1548,9 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                 if (onVersionHistoryClose) onVersionHistoryClose();
                             }}
                         />
+
+                        {/* 激光笔 — 演示模式下 L 键切换 */}
+                        <LaserPointer active={presentationActive && laserEnabled} />
 
                         {/* GAP-11 Phase 2: Mobile Interaction Excellence Layer */}
                         {isMobile && (
