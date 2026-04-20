@@ -25,6 +25,15 @@ interface UseDesignerCommandsProps {
     handleSelectAll: () => void;
     handleGroupWithToast: () => void;
     handleUngroupWithToast: () => void;
+    // 隐藏功能暴露
+    handleMatchSize?: (mode: 'width' | 'height' | 'both') => void;
+    handleReverseEdge?: (targetId?: string) => void;
+    copyStyle?: (node: any) => void;
+    pasteStyle?: (nodeIds: string[]) => void;
+    hasCopiedStyle?: boolean;
+    saveAsTemplate?: (node: any, label: string) => void;
+    selectedNodes?: any[];
+    selectedEdges?: any[];
     // File
     handleExport: () => void;
     handleExportMermaid: () => void;
@@ -103,15 +112,28 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
             { id: 'file.editJson', label: t('designer.toolbar.edit'), category: 'File', icon: <FaEdit />, action: props.handleOpenJsonEditor },
             { id: 'file.plugins', label: '插件管理 (Plugin Manager)...', category: 'General', keywords: ['plugins', 'management', 'extensions', '插件', '管理'], icon: <FaProjectDiagram />, action: () => props.onOpenPlugins?.() },
 
-            // --- Layout ---
+            // --- 镭局 ---
             { id: 'layout.tb', label: t('designer.flowchart.commands.autoLayoutTB'), category: 'Action', icon: <FaProjectDiagram />, action: () => props.handleStrategyLayout('tree', undefined, 'TB') },
             { id: 'layout.lr', label: t('designer.flowchart.commands.autoLayoutLR'), category: 'Action', icon: <FaProjectDiagram />, action: () => props.handleStrategyLayout('tree', undefined, 'LR') },
             { id: 'layout.smart', label: '智能布局推荐 (Smart Layout)', category: 'Action', icon: <FaProjectDiagram />, action: props.handleSmartLayout },
 
-            // --- Phase 11: 评论系统 ---
+            // --- 统一尺寸 (Match Size) ---
+            { id: 'node.matchWidth', label: '统一宽度 (Match Width)', category: 'Nodes', keywords: ['match', 'width', 'size', '统一', '宽度'], icon: <FaProjectDiagram />, enabled: (props.selectedNodes?.length ?? 0) >= 2, action: () => props.handleMatchSize?.('width') },
+            { id: 'node.matchHeight', label: '统一高度 (Match Height)', category: 'Nodes', keywords: ['match', 'height', 'size', '统一', '高度'], icon: <FaProjectDiagram />, enabled: (props.selectedNodes?.length ?? 0) >= 2, action: () => props.handleMatchSize?.('height') },
+            { id: 'node.matchSize', label: '统一大小 (Match Size)', category: 'Nodes', keywords: ['match', 'size', 'both', '统一', '大小'], icon: <FaProjectDiagram />, enabled: (props.selectedNodes?.length ?? 0) >= 2, action: () => props.handleMatchSize?.('both') },
+
+            // --- 连线操作 ---
+            { id: 'edge.reverse', label: '反转连线方向 (Reverse Edge)', category: 'Edges', keywords: ['reverse', 'edge', 'direction', '反转', '连线'], icon: <FaCopy />, enabled: (props.selectedEdges?.length ?? 0) === 1, action: () => props.handleReverseEdge?.(props.selectedEdges?.[0]?.id) },
+
+            // --- 格式刷 (Style Painter) ---
+            { id: 'style.copy', label: '复制样式 (Copy Style) — Ctrl+Alt+C', category: 'Nodes', keywords: ['copy', 'style', 'format', 'painter', '格式刷', '样式'], icon: <FaCopy />, enabled: (props.selectedNodes?.length ?? 0) === 1, action: () => props.selectedNodes?.[0] && props.copyStyle?.(props.selectedNodes[0]) },
+            { id: 'style.paste', label: '粘贴样式 (Paste Style) — Ctrl+Alt+V', category: 'Nodes', keywords: ['paste', 'style', 'format', 'painter', '格式刷', '样式'], icon: <FaCopy />, enabled: !!props.hasCopiedStyle && (props.selectedNodes?.length ?? 0) > 0, action: () => props.pasteStyle?.(props.selectedNodes?.map(n => n.id) ?? []) },
+            { id: 'style.saveTemplate', label: '保存为模板 (Save as Template) — Ctrl+Alt+S', category: 'Nodes', keywords: ['save', 'template', 'style', '模板', '保存'], icon: <FaSave />, enabled: (props.selectedNodes?.length ?? 0) === 1, action: () => { const n = props.selectedNodes?.[0]; if (n) props.saveAsTemplate?.(n, (n.data as any)?.label ?? '未命名'); } },
+
+            // --- ⭐ Phase 11: 评论系统 ---
             { id: 'comment.toggle', label: '切换评论模式 (Toggle Comment Mode)', category: 'General', shortcut: 'C', icon: <FaEdit />, action: () => props.setIsCommentMode(!props.isCommentMode) },
         ]);
-    }, [props.canUndo, props.canRedo, props.isCommentMode, props.setIsCommentMode, isMac, mod, registerCommands, t]);
+    }, [props.canUndo, props.canRedo, props.isCommentMode, props.setIsCommentMode, props.selectedNodes, props.selectedEdges, props.hasCopiedStyle, isMac, mod, registerCommands, t]);
 
     const categoryMeta = useCallback((category: string) => {
         if (category === 'View') return t('designer.flowchart.commandCategory.view');

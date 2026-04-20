@@ -277,23 +277,42 @@ export const useDiagramActions = ({
         const sorted = [...selectedNodes].sort((a, b) =>
             type === 'horizontal' ? a.position.x - b.position.x : a.position.y - b.position.y
         );
-        const minPos = type === 'horizontal' ? sorted[0].position.x : sorted[0].position.y;
-        const maxPos = type === 'horizontal' ? sorted[sorted.length - 1].position.x : sorted[sorted.length - 1].position.y;
-        const step = (maxPos - minPos) / (sorted.length - 1);
 
-        const posMap = new Map<string, number>();
-        sorted.forEach((n, i) => posMap.set(n.id, minPos + step * i));
-
-        setNodes(nds => nds.map(n => {
-            if (!posMap.has(n.id)) return n;
-            return {
-                ...n,
-                position: {
-                    x: type === 'horizontal' ? posMap.get(n.id)! : n.position.x,
-                    y: type === 'vertical' ? posMap.get(n.id)! : n.position.y,
-                }
-            };
-        }));
+        if (type === 'horizontal') {
+            // 计算所有节点包括子常的总宽度
+            const totalWidth = sorted.reduce((s, n) => s + (n.measured?.width || (n.width as number) || 100), 0);
+            const firstX = sorted[0].position.x;
+            const lastNode = sorted[sorted.length - 1];
+            const lastX = lastNode.position.x + (lastNode.measured?.width || (lastNode.width as number) || 100);
+            // 可用间距空间均分给 (n-1) 个间隙
+            const gap = (lastX - firstX - totalWidth) / (sorted.length - 1);
+            let cursor = firstX;
+            const posMap = new Map<string, { x: number; y: number }>();
+            sorted.forEach(n => {
+                posMap.set(n.id, { x: cursor, y: n.position.y });
+                cursor += (n.measured?.width || (n.width as number) || 100) + gap;
+            });
+            setNodes(nds => nds.map(n => {
+                const p = posMap.get(n.id);
+                return p ? { ...n, position: p } : n;
+            }));
+        } else {
+            const totalHeight = sorted.reduce((s, n) => s + (n.measured?.height || (n.height as number) || 50), 0);
+            const firstY = sorted[0].position.y;
+            const lastNode = sorted[sorted.length - 1];
+            const lastY = lastNode.position.y + (lastNode.measured?.height || (lastNode.height as number) || 50);
+            const gap = (lastY - firstY - totalHeight) / (sorted.length - 1);
+            let cursor = firstY;
+            const posMap = new Map<string, { x: number; y: number }>();
+            sorted.forEach(n => {
+                posMap.set(n.id, { x: n.position.x, y: cursor });
+                cursor += (n.measured?.height || (n.height as number) || 50) + gap;
+            });
+            setNodes(nds => nds.map(n => {
+                const p = posMap.get(n.id);
+                return p ? { ...n, position: p } : n;
+            }));
+        }
     }, [selectedNodes, nodes, edges, setNodes, takeSnapshot]);
 
     // 统一选中节点尺寸（参照第一个选中节点）
@@ -411,6 +430,11 @@ export const useDiagramActions = ({
         handleBringToFront,
         handleSendToBack,
         onContextMenuAction,
-        handleLock
+        handleLock,
+        // 暴露之前仅内部使用的功能，供命令面板和统一入口使用
+        handleMatchSize,
+        handleReverseEdge,
+        handleDistribute,
+        handleAlign,
     };
 };

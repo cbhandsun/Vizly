@@ -79,7 +79,9 @@ export function useDesignerEventHandlers({
         handleBringToFront, 
         handleSendToBack, 
         onContextMenuAction,
-        handleLock
+        handleLock,
+        handleMatchSize,
+        handleReverseEdge,
     } = useDiagramActions({
         nodes, edges, setNodes, setEdges, selectedNodes, selectedEdges,
         takeSnapshot, reactFlowInstance, pluginCtx, activePlugin
@@ -232,6 +234,9 @@ export function useDesignerEventHandlers({
         handleGroupWithToast,
         handleUngroupWithToast,
         onContextMenuActionWithToast,
-        handleLock
+        handleLock,
+        // 暴露隐藏功能
+        handleMatchSize,
+        handleReverseEdge,
     };
 }

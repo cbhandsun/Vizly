@@ -570,7 +570,10 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         handleGroupWithToast,
         handleUngroupWithToast,
         onContextMenuActionWithToast,
-        handleLock
+        handleLock,
+        // 隐藏功能暴露
+        handleMatchSize,
+        handleReverseEdge,
     } = useDesignerEventHandlers({
         nodes, edges, setNodes, setEdges,
         selectedNodes, selectedEdges,
@@ -958,6 +961,15 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         onOpenPlugins: () => setPluginManagerVisible(true),
         isCommentMode,
         setIsCommentMode,
+        // 隐藏功能暴露到命令面板
+        handleMatchSize,
+        handleReverseEdge,
+        copyStyle,
+        pasteStyle,
+        hasCopiedStyle,
+        saveAsTemplate,
+        selectedNodes,
+        selectedEdges,
     });
 
     // commandPaletteVisible 现在直接使用 hook 内部 state，无需双向同步
