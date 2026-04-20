@@ -47,6 +47,8 @@ export interface UseDesignerEventHandlersProps {
     pasteStyle: any;
     hasCopiedStyle: boolean;
     saveAsTemplate: any;
+    /** 折叠/展开容器组 */
+    toggleGroupCollapse?: (groupId: string) => void;
 }
 
 export function useDesignerEventHandlers({
@@ -62,7 +64,8 @@ export function useDesignerEventHandlers({
     nodesRef, edgesRef,
     setCommandPaletteVisible, setShortcutHelpVisible,
     setCanvasSearchVisible,
-    copyStyle, pasteStyle, hasCopiedStyle, saveAsTemplate
+    copyStyle, pasteStyle, hasCopiedStyle, saveAsTemplate,
+    toggleGroupCollapse
 }: UseDesignerEventHandlersProps) {
 
     const FLOWCHART_CLIPBOARD_KEY = 'flowchart-clipboard';
@@ -108,6 +111,10 @@ export function useDesignerEventHandlers({
             layoutContainer(targetId);
             return;
         }
+        if (action === 'toggleCollapse' && targetId) {
+            toggleGroupCollapse?.(targetId);
+            return;
+        }
         if (action === 'undo') { undo(); return; }
         if (action === 'redo') { redo(); return; }
         if (action === 'zoomIn') { reactFlowInstance?.zoomIn(); return; }
@@ -115,7 +122,7 @@ export function useDesignerEventHandlers({
         if (action === 'selectAll') { handleSelectAll(); return; }
         
         onContextMenuActionWithToast(action, targetId);
-    }, [layoutContainer, onContextMenuActionWithToast, undo, redo, reactFlowInstance, handleSelectAll]);
+    }, [layoutContainer, toggleGroupCollapse, onContextMenuActionWithToast, undo, redo, reactFlowInstance, handleSelectAll]);
 
     const handleNudge = useCallback((direction: 'up' | 'down' | 'left' | 'right', distance: number) => {
         if (selectedNodes.length === 0) return;
@@ -280,6 +287,25 @@ export function useDesignerEventHandlers({
         window.addEventListener('keydown', handleStyleKeys);
         return () => window.removeEventListener('keydown', handleStyleKeys);
     }, [selectedNodes, copyStyle, pasteStyle, hasCopiedStyle, saveAsTemplate]);
+
+    // Alt+[ / Alt+] : 折叠/展开选中的容器节点
+    useEffect(() => {
+        const CONTAINER_TYPES = new Set(['titleGroup', 'subGroup', 'swimlane', 'group']);
+        const handleCollapseKey = (e: KeyboardEvent) => {
+            if (!e.altKey || e.ctrlKey || e.metaKey) return;
+            if (e.key !== '[' && e.key !== ']') return;
+            const target = e.target as HTMLElement;
+            if (['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable) return;
+
+            const containerNode = selectedNodes.find(n => CONTAINER_TYPES.has(n.type || ''));
+            if (!containerNode) return;
+
+            e.preventDefault();
+            toggleGroupCollapse?.(containerNode.id);
+        };
+        window.addEventListener('keydown', handleCollapseKey);
+        return () => window.removeEventListener('keydown', handleCollapseKey);
+    }, [selectedNodes, toggleGroupCollapse]);
 
     const { isSpacePressed } = useSpacePan();
 

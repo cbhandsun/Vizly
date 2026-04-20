@@ -34,6 +34,8 @@ interface UseDesignerCommandsProps {
     saveAsTemplate?: (node: any, label: string) => void;
     selectedNodes?: any[];
     selectedEdges?: any[];
+    /** 折叠/展开选中容器组 */
+    toggleGroupCollapse?: (groupId: string) => void;
     // File
     handleExport: () => void;
     handleExportMermaid: () => void;
@@ -130,10 +132,29 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
             { id: 'style.paste', label: '粘贴样式 (Paste Style) — Ctrl+Alt+V', category: 'Nodes', keywords: ['paste', 'style', 'format', 'painter', '格式刷', '样式'], icon: <FaCopy />, enabled: !!props.hasCopiedStyle && (props.selectedNodes?.length ?? 0) > 0, action: () => props.pasteStyle?.(props.selectedNodes?.map(n => n.id) ?? []) },
             { id: 'style.saveTemplate', label: '保存为模板 (Save as Template) — Ctrl+Alt+S', category: 'Nodes', keywords: ['save', 'template', 'style', '模板', '保存'], icon: <FaSave />, enabled: (props.selectedNodes?.length ?? 0) === 1, action: () => { const n = props.selectedNodes?.[0]; if (n) props.saveAsTemplate?.(n, (n.data as any)?.label ?? '未命名'); } },
 
+            // --- 折叠/展开 组容器 ---
+            { 
+                id: 'node.collapseGroup', 
+                label: '折叠/展开选中组 (Toggle Collapse) — Alt+[', 
+                category: 'Nodes', 
+                keywords: ['collapse', 'expand', 'group', '折叠', '展开', '容器'], 
+                icon: <FaProjectDiagram />,
+                shortcut: 'Alt + [',
+                enabled: (props.selectedNodes?.length ?? 0) > 0 && props.selectedNodes?.some(
+                    n => ['titleGroup', 'subGroup', 'swimlane', 'group'].includes(n.type || '')
+                ),
+                action: () => {
+                    const containerNode = props.selectedNodes?.find(
+                        n => ['titleGroup', 'subGroup', 'swimlane', 'group'].includes(n.type || '')
+                    );
+                    if (containerNode) props.toggleGroupCollapse?.(containerNode.id);
+                }
+            },
+
             // --- ⭐ Phase 11: 评论系统 ---
             { id: 'comment.toggle', label: '切换评论模式 (Toggle Comment Mode)', category: 'General', shortcut: 'C', icon: <FaEdit />, action: () => props.setIsCommentMode(!props.isCommentMode) },
         ]);
-    }, [props.canUndo, props.canRedo, props.isCommentMode, props.setIsCommentMode, props.selectedNodes, props.selectedEdges, props.hasCopiedStyle, isMac, mod, registerCommands, t]);
+    }, [props.canUndo, props.canRedo, props.isCommentMode, props.setIsCommentMode, props.selectedNodes, props.selectedEdges, props.hasCopiedStyle, props.toggleGroupCollapse, isMac, mod, registerCommands, t]);
 
     const categoryMeta = useCallback((category: string) => {
         if (category === 'View') return t('designer.flowchart.commandCategory.view');

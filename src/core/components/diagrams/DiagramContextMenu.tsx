@@ -126,10 +126,16 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
         // Container auto-layout
         const CONTAINER_TYPES = ['titleGroup', 'subGroup', 'swimlane', 'group'];
         if (targetNode && CONTAINER_TYPES.includes(targetNode.type || '')) {
+          const isCollapsed = !!targetNode.data?.collapsed;
           items.push({
             key: 'autoLayoutContainer',
             icon: <AppstoreOutlined />,
             label: '自动布局子节点 (Auto Layout)',
+          });
+          items.push({
+            key: 'toggleCollapse',
+            icon: isCollapsed ? <ExpandOutlined /> : <GroupOutlined />,
+            label: isCollapsed ? '展开组 (Expand Group)' : '折叠组 (Collapse Group)',
           });
         }
       }

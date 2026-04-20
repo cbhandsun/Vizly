@@ -539,6 +539,9 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     // 2.5 Linter Layer (Phase 8 integration)
     const { lintedNodes, lintedEdges } = useTopologyLinter(nodesWithGhost, finalEdgesWithGhost, { enabled: !isReadonly });
 
+    // 2.6 节点折叠层 — toggleGroupCollapse 供命令面板和右键菜单使用
+    const { toggleGroupCollapse } = useCollapsibleGroups({ nodes, edges, setNodes, takeSnapshot });
+
     // 协作层 diagramId：优先使用 id prop，回退到导出 ID，避免多画布协作时 ID 冲突
     const diagramId = id || diagramIdForExport || 'default';
     const { updateLocalCursor } = useDiagramCollaboration(diagramId, !isReadonly);
@@ -586,7 +589,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         handleGroup, handleUngroup,
         nodesRef, edgesRef,
         setCommandPaletteVisible, setShortcutHelpVisible, setCanvasSearchVisible,
-        copyStyle, pasteStyle, hasCopiedStyle, saveAsTemplate
+        copyStyle, pasteStyle, hasCopiedStyle, saveAsTemplate,
+        toggleGroupCollapse
     });
     // ?Reordered to avoid TDZ (Temporal Dead Zone) for handleFitView and messageApi
     useEffect(() => {
@@ -970,6 +974,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         saveAsTemplate,
         selectedNodes,
         selectedEdges,
+        toggleGroupCollapse,
     });
 
     // commandPaletteVisible 现在直接使用 hook 内部 state，无需双向同步
