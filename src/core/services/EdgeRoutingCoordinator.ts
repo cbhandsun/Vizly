@@ -155,10 +155,8 @@ export class EdgeRoutingCoordinator {
      */
     public scheduleBatchRouting(): void {
         if (this.pendingTimeout) return;
-        console.log(`[DEBUG-WORKER-COORD] scheduleBatchRouting called with ${this.dirtyEdges.size} dirty edges`);
         this.pendingTimeout = setTimeout(() => {
             this.pendingTimeout = null;
-            console.log(`[DEBUG-WORKER-COORD] Timeout fired, calling triggerBatchRouting...`);
             this.triggerBatchRouting();
         }, 16);
     }
@@ -191,7 +189,6 @@ export class EdgeRoutingCoordinator {
         try {
             this.parallelPool = new PathfindingWorkerPool();
             this.useParallelRouting = true;
-            console.log('[EdgeRoutingCoordinator] Parallel routing enabled');
         } catch (error) {
             console.warn('[EdgeRoutingCoordinator] Failed to initialize parallel pool:', error);
             this.useParallelRouting = false;
@@ -494,7 +491,6 @@ export class EdgeRoutingCoordinator {
             this.notifyGraphChange(Array.from(affectedNodes));
         }
 
-        console.log(`[EdgeRoutingCoordinator] Initialized ${edges.length} edges for incremental routing`);
     }
 
     /**
@@ -589,15 +585,12 @@ export class EdgeRoutingCoordinator {
     }
 
     private async triggerBatchRouting() {
-        console.log(`[DEBUG-WORKER-COORD] triggerBatchRouting: dirtyEdges=${this.dirtyEdges.size}, pendingResolvers=${this.pendingResolvers.size}`);
         if (!this.hasDirtyEdges()) return;
 
         try {
-            console.log(`[DEBUG-WORKER-COORD] calling batchRouteDirtyEdges...`);
-            const results = await this.batchRouteDirtyEdges();
-            console.log(`[DEBUG-WORKER-COORD] batchRouteDirtyEdges returned: ${results.size} results, remaining pendingResolvers=${this.pendingResolvers.size}`);
+            await this.batchRouteDirtyEdges();
         } catch (err: any) {
-            console.error(`[DEBUG-WORKER-COORD] batchRouteDirtyEdges failed:`, err);
+            console.error('[EdgeRoutingCoordinator] batchRouteDirtyEdges failed:', err);
             // [FIX] Ensure pending resolvers are cleared to avoid deadlocks
             for (const [edgeId, pending] of this.pendingResolvers.entries()) {
                 const entry = this.latestRequests.get(edgeId);
@@ -890,14 +883,10 @@ export class EdgeRoutingCoordinator {
             this.assignBusIndices(jobs, graph);
 
             // Use calculatePaths (alias for routeBatch) compatibility
-            console.log(`[DEBUG-WORKER-COORD] calling parallelPool.calculatePaths for ${jobs.length} jobs...`);
             const results = await this.parallelPool.calculatePaths(jobs, graph);
-            console.log(`[DEBUG-WORKER-COORD] parallelPool.calculatePaths returned ${results?.length} results`);
 
             if (!results || results.length !== jobs.length) {
-                console.error(`[DEBUG-WORKER-COORD] Parallel routing returned incomplete results. Expected ${jobs.length}, got ${results?.length}`);
-                // Fallback to serial? Or fill with errors?
-                // For now, let it crash to fallback in catch block if it throws, otherwise we might have partial results.
+                console.error(`[EdgeRoutingCoordinator] Parallel routing returned incomplete results. Expected ${jobs.length}, got ${results?.length}`);
             }
 
 

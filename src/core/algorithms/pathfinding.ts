@@ -766,11 +766,8 @@ export function findPath(
             );
 
             if (visibilityPath) {
-                console.log(`[Pathfinding] Visibility graph found path with ${visibilityPath.length} waypoints`);
                 return visibilityPath;
             }
-
-            console.log('[Pathfinding] Visibility graph failed, falling back to grid A*');
         }
     }
 
@@ -1361,13 +1358,6 @@ export function findPath(
                         // [FIX] Use 10px padding for L-shapes to match config buffer
                         const blockedA = isPathBlocked([parentCoords, cornerA, neighborCoords], obstacles, 10);
                         const blockedB = isPathBlocked([parentCoords, cornerB, neighborCoords], obstacles, 10);
-
-                        // [DEBUG] Trace e10 Theta* check
-                        if (Math.abs(parentCoords.x - 2276) < 100 && Math.abs(neighborCoords.x - 1225) < 100) {
-                            console.log(`[Theta*] Checking diagonal: (${Math.round(parentCoords.x)},${Math.round(parentCoords.y)}) -> (${Math.round(neighborCoords.x)},${Math.round(neighborCoords.y)})`);
-                            console.log(`[Theta*] SafeL: PathA (Horiz) Blocked=${blockedA}, PathB (Vert) Blocked=${blockedB}`);
-                            console.log(`[Theta*] OrthogonalSafe=${!(blockedA && blockedB)}`);
-                        }
 
                         if (blockedA && blockedB) {
                             orthogonalSafe = false;
