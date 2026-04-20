@@ -48,7 +48,7 @@ export interface DesignerCanvasFeaturesLayerProps {
 
     annotations: {
         items: any[];
-        mode: string;
+        mode: boolean;
         onAdd: (ann: any) => void;
         onUpdate: (id: string, updates: any) => void;
         onDelete: (id: string) => void;
@@ -125,7 +125,7 @@ export const DesignerCanvasFeaturesLayer = React.memo(
             
             <AnnotationLayer
                 annotations={annotations.items}
-                annotationMode={annotations.mode as any}
+                annotationMode={annotations.mode}
                 onAdd={annotations.onAdd}
                 onUpdate={annotations.onUpdate}
                 onDelete={annotations.onDelete}

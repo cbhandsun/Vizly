@@ -332,7 +332,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
 
     const [aiChatVisible, setAiChatVisible] = useState(false);
     const [activeRightTab, setActiveRightTab] = useState<'property' | 'ai'>('property');
-    // commandPaletteVisible 由 useDesignerCommands hook 管理（单一事实源，避免双向同步死循环）
+    // commandPaletteVisible: 单一事实源，必须在 useDesignerCommands 之前声明以避免 TDZ
+    const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
     const [shortcutHelpVisible, setShortcutHelpVisible] = useState(false);
     const [showShortcuts, setShowShortcutsModal] = useState(false);
     const [jsonEditorInitialContent] = useState<string | undefined>(undefined);
@@ -581,7 +582,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         canAlign, canDistribute, handleAlign, handleDistribute,
         handleGroup, handleUngroup,
         nodesRef, edgesRef,
-        setCommandPaletteVisible, setCanvasSearchVisible,
+        setCommandPaletteVisible, setShortcutHelpVisible, setCanvasSearchVisible,
         copyStyle, pasteStyle, hasCopiedStyle, saveAsTemplate
     });
     // ?Reordered to avoid TDZ (Temporal Dead Zone) for handleFitView and messageApi
@@ -931,11 +932,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         id, diagramIdForExport, nodes, edges, setNodes, setEdges, reactFlowInstance, isDragging, pluginId, messageApi
     });
 
-    const { 
-        commandPaletteVisible, 
-        setCommandPaletteVisible,
-        commandPaletteItems 
-    } = useDesignerCommands({
+    const { commandPaletteItems } = useDesignerCommands({
         reactFlowInstance: reactFlowInstance as any, 
         handleFitView, 
         handleGridRotate, 
@@ -1159,7 +1156,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                     onImportClick: () => fileInputRef.current?.click(),
                                     onEditJson: handleOpenJsonEditor,
                                     onStartPresentation: () => {
-                                        const slides = generateSlides(nodesRef.current, edgesRef.current);
+                                        const slides = generateSlides(nodesRef.current, 'vertical');
                                         setPresentationSlides(slides);
                                         setPresentationActive(true);
                                     },
