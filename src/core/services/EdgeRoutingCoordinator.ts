@@ -759,8 +759,7 @@ export class EdgeRoutingCoordinator {
                     // [FIX] Explicitly log to console to ensure Alt+Click works even if UI callback is detached
                     console.dir(result, { depth: null });
                     const trunkData = this.trunkDebugData.get(req.edgeId);
-                    if (trunkData)
-                    if (this.onDebugData) {
+                    if (trunkData && this.onDebugData) {
                         this.onDebugData({
                             edgeId: req.edgeId,
                             pathPoints: result.points,

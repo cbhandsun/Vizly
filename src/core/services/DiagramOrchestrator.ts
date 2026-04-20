@@ -1,4 +1,3 @@
-// @ts-nocheck
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Node, Edge } from '@xyflow/react'
 import { StandardDiagramData, StandardEdgeData, LayoutMetadata } from '../models/DiagramModels'
