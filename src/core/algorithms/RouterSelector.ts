@@ -45,10 +45,13 @@ export class RouterSelector {
         const dy = Math.abs(start.y - end.y);
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        // 2. 直线对齐检测 (极小误差)
-        if (dx < 1 || dy < 1) {
+        // [FIX T-6] 改为 &&：仅当两轴都严格对齐（几乎重叠）才走 DIRECT
+        // 原来 || 导致 X 轴相距 500px 但 Y 差 < 1px 的节点对走 DIRECT，
+        // 忽略中间可能存在的障碍物，路径直接穿越节点
+        if (dx < 1 && dy < 1) {
             return RoutingStrategy.DIRECT;
         }
+
 
         // 3. 同侧连接 => C-Shape
         if (startPos === endPos) {

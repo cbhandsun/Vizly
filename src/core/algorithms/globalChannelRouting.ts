@@ -43,7 +43,9 @@ export function globalChannelRouting(
     const segments: Segment[] = [];
 
     for (const [edgeId, pts] of edgePaths) {
-        if (pts.length < 4) continue; // 太短的路径无需处理
+        // [FIX T-5] 与 Sprint D N-5 保持一致，改为 < 2
+        // 原来 < 4 使得 3 点 L 形边全部被跳过，导致 useChannelRouting N-5 修复效果被内部抵消
+        if (pts.length < 2) continue;
 
         for (let j = 1; j < pts.length - 2; j++) {
             const p1 = pts[j];
@@ -144,7 +146,8 @@ export function globalChannelRouting(
     const result = new Map<string, Point[]>();
 
     for (const [edgeId, pts] of edgePaths) {
-        if (pts.length < 4) {
+        // [FIX T-5] 同上。路径重建阶段也需要放宽到 2 点
+        if (pts.length < 2) {
             result.set(edgeId, pts);
             continue;
         }

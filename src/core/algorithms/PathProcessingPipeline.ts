@@ -117,9 +117,12 @@ function checkSmallJog(p1: Point, p2: Point, p3: Point, threshold: number): bool
     const dist1 = manhattanDistance(p1, p2);
     const dist2 = manhattanDistance(p2, p3);
 
-    // If either segment is very short, it's likely a jog
-    return dist1 < threshold || dist2 < threshold;
+    // [FIX T-2] 改为 &&：两段都短于阈值才认为是无意义的 Jog
+    // 原来用 || 会误删端口附近的短首段（端口到节点边缘通常只有 8-10px），
+    // 导致路径从节点内部出发而不是从端口出发。
+    return dist1 < threshold && dist2 < threshold;
 }
+
 
 /**
  * Check if bend is redundant (can be removed without hitting obstacles)

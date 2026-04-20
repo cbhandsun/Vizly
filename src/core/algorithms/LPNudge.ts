@@ -242,8 +242,11 @@ export class LPNudge {
      */
     private log(message: string, ...args: unknown[]): void {
         if (this.config.debug) {
+            // [FIX T-1] 补上实际的日志输出，原先函数体为空导致 debug 模式完全无日志
+            console.log(`[LPNudge] ${message}`, ...args);
         }
     }
+
 
     /**
      * 更新配置

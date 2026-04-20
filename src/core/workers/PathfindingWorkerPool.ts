@@ -35,8 +35,8 @@ export class PathfindingWorkerPool {
     private totalTaskTime: number = 0;
     private readonly poolSize: number;
 
-    // [P1.1] Event-driven worker acquisition queue
-    private workerWaiters: Array<(workerIndex: number) => void> = [];
+    // [FIX T-4] 改为 {resolve, reject} 对，terminate 时可正确 reject 等待中的 Promise
+    private workerWaiters: Array<{ resolve: (workerIndex: number) => void; reject: (err: Error) => void }> = [];
 
     constructor(poolSize?: number) {
         const cpuCores = (navigator.hardwareConcurrency || 4);
@@ -79,8 +79,9 @@ export class PathfindingWorkerPool {
         }
 
         // Slow path: enqueue and wait for release
-        return new Promise<number>((resolve) => {
-            this.workerWaiters.push(resolve);
+        return new Promise<number>((resolve, reject) => {
+            // [FIX T-4] 存 resolve 和 reject，供 terminate 时调用
+            this.workerWaiters.push({ resolve, reject });
         });
     }
 
@@ -94,7 +95,7 @@ export class PathfindingWorkerPool {
         if (this.workerWaiters.length > 0) {
             // Direct hand-off to next waiter (no re-insertion to pool)
             const waiter = this.workerWaiters.shift()!;
-            waiter(workerIndex);
+            waiter.resolve(workerIndex);
         } else {
             this.availableWorkers.add(workerIndex);
         }
@@ -309,10 +310,10 @@ export class PathfindingWorkerPool {
         this.availableWorkers.clear();
         this.activeTasks.clear();
         this.taskQueue = [];
-        // Reject any pending waiters
-        this.workerWaiters.forEach(waiter => {
-            // Create and immediately reject - but since terminate is cleanup, just clear
-        });
+        // [FIX T-4] 正确 Reject 所有等待中的 waiter
+        // 原代码只清空数组但不调用 waiter，导致调用方的 routeBatch/calculatePath Promise 永久挂起
+        const terminationError = new Error('[WorkerPool] Pool terminated — all pending tasks rejected.');
+        this.workerWaiters.forEach(({ reject }) => reject(terminationError));
         this.workerWaiters = [];
     }
 

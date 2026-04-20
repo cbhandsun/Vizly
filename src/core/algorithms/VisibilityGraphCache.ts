@@ -251,18 +251,21 @@ export class VisibilityGraphCache {
     }
 
     /**
-     * Fast string hash (FNV-1a)
+     * Fast string hash (djb2)
+     * 
+     * [FIX T-3] 替换 FNV-1a：FNV 的 hash << 24 在 JS 中会进行 sign-extension，
+     * 导致中间计算溢出，高碰撞率场景下（如同坐标节点）可能返回错误可见性图。
+     * djb2 仅用乘法和 XOR，在 JS 32-bit 整数范围内行为可预测。
      */
     private hashString(str: string): string {
-        let hash = 2166136261; // FNV offset basis
-
+        let hash = 5381;
         for (let i = 0; i < str.length; i++) {
-            hash ^= str.charCodeAt(i);
-            hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+            // hash * 33 ^ charCode (djb2)
+            hash = ((hash << 5) + hash) ^ str.charCodeAt(i);
         }
-
-        return (hash >>> 0).toString(36); // Convert to base36
+        return (hash >>> 0).toString(36); // 强制无符号，转 base36
     }
+
 
     /**
      * Add entry to cache with eviction
