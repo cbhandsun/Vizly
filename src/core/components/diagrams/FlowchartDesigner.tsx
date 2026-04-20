@@ -677,6 +677,56 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         message.success(`优化完成：解决了 ${result.stats.rectifiedOverlaps} 处重叠，对齐?${result.stats.alignedNodes} 个节点。`);
     }, [setNodes, setEdges, takeSnapshot]);
 
+    // Gap 6: 双击连线，在中点插入新节点，将边一分为二
+    const handleEdgeDoubleClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
+        if (isReadonly) return;
+        const srcNode = nodesRef.current.find(n => n.id === edge.source);
+        const tgtNode = nodesRef.current.find(n => n.id === edge.target);
+        if (!srcNode || !tgtNode) return;
+
+        const sx = srcNode.position.x + (srcNode.measured?.width ?? 160) / 2;
+        const sy = srcNode.position.y + (srcNode.measured?.height ?? 60) / 2;
+        const tx = tgtNode.position.x + (tgtNode.measured?.width ?? 160) / 2;
+        const ty = tgtNode.position.y + (tgtNode.measured?.height ?? 60) / 2;
+        const mx = (sx + tx) / 2 - 60; // 节点宽度 120/2 偏移
+        const my = (sy + ty) / 2 - 20; // 节点高度 40/2 偏移
+
+        takeSnapshot(nodesRef.current, edgesRef.current);
+
+        const newNodeId = `inserted-${Date.now()}`;
+        const newNode: Node = {
+            id: newNodeId,
+            type: 'custom',
+            position: { x: mx, y: my },
+            data: { label: '新节点', shape: 'roundedRect' },
+        };
+
+        // 两条新连线继承原连线的视觉样式
+        const baseEdgeProps = {
+            type: edge.type,
+            style: edge.style,
+            markerEnd: edge.markerEnd,
+            markerStart: edge.markerStart,
+            animated: edge.animated,
+        };
+        const edgeA: Edge = {
+            ...baseEdgeProps,
+            id: `${edge.source}-${newNodeId}-${Date.now()}`,
+            source: edge.source,
+            target: newNodeId,
+        };
+        const edgeB: Edge = {
+            ...baseEdgeProps,
+            id: `${newNodeId}-${edge.target}-${Date.now()}`,
+            source: newNodeId,
+            target: edge.target,
+        };
+
+        setNodes(ns => [...ns, newNode]);
+        setEdges(es => [...es.filter(e => e.id !== edge.id), edgeA, edgeB]);
+        message.success('已在连线中点插入新节点');
+    }, [isReadonly, setNodes, setEdges, takeSnapshot]);
+
 
     const handleGridRotate = () => {
          const variants = [BackgroundVariant.Lines, BackgroundVariant.Dots, BackgroundVariant.Cross];
@@ -1353,6 +1403,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                         onPaneDoubleClick={onPaneDoubleClick}
                                         onNodeContextMenu={onNodeContextMenu}
                                         onEdgeContextMenu={onEdgeContextMenu}
+                                        onEdgeDoubleClick={handleEdgeDoubleClick}
                                         onPaneContextMenu={onPaneContextMenu}
                                         onNodeDragStart={wrappedOnNodeDragStart}
                                         onNodeDrag={onNodeDrag}

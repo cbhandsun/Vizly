@@ -30,7 +30,16 @@ const ARROW_STYLES = [
 export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ edge, onUpdateEdge }) => {
     // 根据边的数据解析当前状态
     const isAnimated = !!edge.animated;
-    const isDashed = edge.style?.strokeDasharray === '5,5';
+    const getDashStyle = (s?: React.CSSProperties) => {
+        const d = s?.strokeDasharray;
+        if (!d || d === 'none') return 'solid';
+        if (d === '2 4' || d === '2,4') return 'dotted';
+        if (d === '12 4' || d === '12,4') return 'long-dash';
+        if (d === '8 4 2 4' || d === '8,4,2,4') return 'dash-dot';
+        return 'dashed';
+    };
+    const currentDash = getDashStyle(edge.style);
+    const isDashed = currentDash !== 'solid';
     const isOrthogonal = edge.type === 'smart';
     const currentWidth = (edge.style?.strokeWidth as number) || 2;
 
@@ -56,11 +65,15 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
     };
 
     const toggleDashed = () => {
+        const DASH_CYCLE: Record<string, string | undefined> = {
+            'solid': '5 5',
+            'dashed': '2 4',
+            'dotted': '12 4',
+            'long-dash': '8 4 2 4',
+            'dash-dot': undefined,
+        };
         onUpdateEdge(edge.id, {
-            style: {
-                ...edge.style,
-                strokeDasharray: isDashed ? 'none' : '5,5'
-            }
+            style: { ...edge.style, strokeDasharray: DASH_CYCLE[currentDash] }
         });
     };
 
@@ -155,14 +168,14 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
 
             <Divider orientation="vertical" style={{ margin: '0 2px' }} />
 
-            {/* 线型 */}
-            <Tooltip title={isDashed ? "实线" : "虚线"}>
+            {/* 线型循环 */}
+            <Tooltip title={`线型：${{'solid':'实线','dashed':'虚线','dotted':'点线','long-dash':'长虚线','dash-dot':'点划线'}[currentDash] || '实线'}（点击切换）`}>
                 <Button 
                     type="text" 
                     size="small"
-                    icon={isDashed ? <LineOutlined /> : <DashOutlined />}
+                    icon={isDashed ? <DashOutlined /> : <LineOutlined />}
                     onClick={toggleDashed}
-                    style={{ color: '#64748b' }}
+                    style={{ color: isDashed ? '#6366f1' : '#64748b' }}
                 />
             </Tooltip>
 

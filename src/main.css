@@ -589,6 +589,35 @@ body {
   filter: drop-shadow(0 0 2px rgba(255, 87, 34, 0.8)) !important;
 }
 
+/* ===== Gap 5: 选中边高亮 Glow ===== */
+/* RF 默认给选中边加 .selected class */
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge.selected path {
+  filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.75)) drop-shadow(0 0 8px rgba(99, 102, 241, 0.35));
+  stroke-width: calc(var(--stroke-width, 2px) + 1px);
+}
+[data-theme='dark'] .react-flow__edge.selected .react-flow__edge-path,
+[data-theme='dark'] .react-flow__edge.selected path {
+  filter: drop-shadow(0 0 5px rgba(139, 92, 246, 0.9)) drop-shadow(0 0 12px rgba(139, 92, 246, 0.4));
+}
+
+/* ===== Gap 9: 宽命中区域 — RF 原生 interaction 路径扩宽 ===== */
+/* RF 在可见路径下方渲染了一条宽透明的 .react-flow__edge-interaction 用于命中检测 */
+.react-flow__edge-interaction {
+  stroke-width: 20px !important;
+  stroke: transparent !important;
+  fill: none !important;
+  cursor: pointer;
+}
+
+/* ===== Gap 3: 连接拖拽目标高亮 ===== */
+/* 当 data-connect-highlight="true" 时显示绿色外发光 */
+.react-flow__node[data-connect-highlight="true"] {
+  filter: drop-shadow(0 0 0 3px rgba(16, 185, 129, 0.6)) drop-shadow(0 0 12px rgba(16, 185, 129, 0.3));
+  z-index: 1000 !important;
+  transition: filter 0.15s ease;
+}
+
 /* ===== React Flow Node Overflow Handling ===== */
 /* 确保自定义节点内容不会超出其计算的边界 */
 /* 这是解决左右内边距不对称问题的关键 CSS */

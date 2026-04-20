@@ -97,6 +97,7 @@ interface BaseReactFlowProps {
   onPaneMouseLeave?: (event: React.MouseEvent) => void;
   onNodeClick?: (event: React.MouseEvent, node: Node) => void;
   onEdgeClick?: (event: React.MouseEvent, edge: Edge) => void;
+  onEdgeDoubleClick?: (event: React.MouseEvent, edge: Edge) => void;
   connectionRadius?: number;
   connectionLineType?: ConnectionLineType;
   connectionLineStyle?: React.CSSProperties;
@@ -181,6 +182,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   onPaneMouseLeave,
   onNodeClick,
   onEdgeClick,
+  onEdgeDoubleClick,
   connectionRadius = 20,
   connectionLineType,
   connectionLineStyle,
@@ -867,6 +869,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           onPaneMouseLeave={onPaneMouseLeave}
           onNodeClick={onNodeClick}
           onEdgeClick={onEdgeClick}
+          onEdgeDoubleClick={onEdgeDoubleClick}
           onDoubleClick={(e) => {
             const target = e.target as HTMLElement;
             // 确保只有双击在真正的背景画布上才唤出版面

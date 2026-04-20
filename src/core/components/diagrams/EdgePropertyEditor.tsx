@@ -9,7 +9,6 @@ import {
     ColorPicker,
     Typography,
     Space,
-    Radio,
     Form,
 } from 'antd';
 import {
@@ -68,8 +67,15 @@ export function useEdgePropertyItems(params: UseEdgePropertyItemsParams): Collap
     const commonEdgeRadius = getCommonValue(selectedEdges, (e) => e.data?.borderRadius as number | undefined);
     const commonEdgeColor = getCommonValue(selectedEdges, (e) => e.style?.stroke);
     const commonEdgeWidth = getCommonValue(selectedEdges, (e) => e.style?.strokeWidth);
-    const isDashed = (style: React.CSSProperties | undefined) => style?.strokeDasharray === '5 5' || style?.strokeDasharray === '4,4';
-    const commonEdgeLineStyle = getCommonValue(selectedEdges, (e) => (isDashed(e.style) ? 'dashed' : 'solid'));
+    const getDashStyle = (style: React.CSSProperties | undefined): string => {
+        const d = style?.strokeDasharray;
+        if (!d || d === 'none') return 'solid';
+        if (d === '2 4' || d === '2,4') return 'dotted';
+        if (d === '12 4' || d === '12,4') return 'long-dash';
+        if (d === '8 4 2 4' || d === '8,4,2,4') return 'dash-dot';
+        return 'dashed'; // default 5 5
+    };
+    const commonEdgeLineStyle = getCommonValue(selectedEdges, (e) => getDashStyle(e.style));
     const commonEdgeArrow = getCommonValue(selectedEdges, (e) => getArrowStyle(e));
 
     const items: CollapseProps['items'] = [];
@@ -124,13 +130,31 @@ export function useEdgePropertyItems(params: UseEdgePropertyItemsParams): Collap
                     </Form.Item>
                 )}
 
-                <Form.Item label={t('propertyPanel.style')}>
-                    <Radio.Group value={commonEdgeLineStyle}
-                        onChange={e => { armSnapshot(); updateEdges({ style: { strokeDasharray: e.target.value === 'dashed' ? '5 5' : undefined } }); }}
-                        optionType="button" buttonStyle="solid" size="small" style={{ width: '100%' }} disabled={disabled}>
-                        <Radio.Button value="solid" style={{ width: '50%', textAlign: 'center' }}>{t('propertyPanel.solid')}</Radio.Button>
-                        <Radio.Button value="dashed" style={{ width: '50%', textAlign: 'center' }}>{t('propertyPanel.dashed')}</Radio.Button>
-                    </Radio.Group>
+                <Form.Item label={t('propertyPanel.style', '线型')}>
+                    <Select
+                        value={commonEdgeLineStyle}
+                        onChange={val => {
+                            armSnapshot();
+                            const dashMap: Record<string, string | undefined> = {
+                                'solid': undefined,
+                                'dashed': '5 5',
+                                'dotted': '2 4',
+                                'long-dash': '12 4',
+                                'dash-dot': '8 4 2 4',
+                            };
+                            updateEdges({ style: { strokeDasharray: dashMap[val] } });
+                        }}
+                        disabled={disabled}
+                        style={{ width: '100%' }}
+                        placeholder={commonEdgeLineStyle === undefined ? mixedLabel : selectLabel}
+                        options={[
+                            { label: '─── 实线', value: 'solid' },
+                            { label: '- - - 虚线', value: 'dashed' },
+                            { label: '···· 点线', value: 'dotted' },
+                            { label: '――― 长虚线', value: 'long-dash' },
+                            { label: '—·— 点划线', value: 'dash-dot' },
+                        ]}
+                    />
                 </Form.Item>
 
                 <Form.Item label={t('propertyPanel.color')}>

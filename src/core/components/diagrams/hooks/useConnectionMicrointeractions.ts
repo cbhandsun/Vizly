@@ -81,6 +81,24 @@ export const useConnectionMicrointeractions = ({
         }
     }, []);
 
+    // Gap 3: 连接预高亮——给非源节点加 data-connect-highlight
+    const domSetConnectHighlight = useCallback((sourceNodeId: string | null, enable: boolean) => {
+        if (typeof document === 'undefined') return;
+        try {
+            const allNodes = document.querySelectorAll('.react-flow__node');
+            allNodes.forEach(el => {
+                const nodeId = (el as HTMLElement).dataset.id;
+                if (enable && nodeId && nodeId !== sourceNodeId) {
+                    (el as HTMLElement).dataset.connectHighlight = 'true';
+                } else {
+                    delete (el as HTMLElement).dataset.connectHighlight;
+                }
+            });
+        } catch (e) {
+            console.warn('[Vizly] domSetConnectHighlight failed:', e);
+        }
+    }, []);
+
     const domBatchRemoveClasses = useCallback((classes: readonly string[]) => {
         if (typeof document === 'undefined') return;
         try {
@@ -222,14 +240,15 @@ export const useConnectionMicrointeractions = ({
         connectSourceRef.current = { nodeId, handleId };
 
         // 🚀 P4: 直接 DOM 操作替代 setNodes — 连接开始时 O(n) DOM 批量操作
-        //   比 setNodes + React reconciliation 快 10x+
         domBatchAddClass('rf-connecting');
-        
+        // Gap 3: 给所有非源节点加高亮
+        domSetConnectHighlight(nodeId, true);
+
         // 🚀 P5: 启用全局性能模式
         if (typeof document !== 'undefined') {
             document.body.classList.add('performance-mode');
         }
-    }, [domBatchAddClass]);
+    }, [domBatchAddClass, domSetConnectHighlight]);
 
     const enhancedOnConnect = useCallback((connection: Connection) => {
         onConnect(connection);
@@ -251,6 +270,7 @@ export const useConnectionMicrointeractions = ({
 
         // 🚀 P4: 直接 DOM 操作批量清理所有连接类名
         domBatchRemoveClasses(ALL_CONNECT_CLASSES);
+        domSetConnectHighlight(null, false);
         
         // 🚀 P5: 清理全局性能模式
         if (typeof document !== 'undefined') {
@@ -313,6 +333,7 @@ export const useConnectionMicrointeractions = ({
 
             // 🚀 P4: 直接 DOM 操作批量清理
             domBatchRemoveClasses(ALL_CONNECT_CLASSES);
+            domSetConnectHighlight(null, false);
 
             // 🚀 P5: 清理全局性能模式
             if (typeof document !== 'undefined') {
