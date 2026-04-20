@@ -974,6 +974,26 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
 
     // commandPaletteVisible 现在直接使用 hook 内部 state，无需双向同步
 
+    // Phase 2：查找替换回调 — 通过 ref 读取最新数据，支持撤销
+    const handleSearchReplaceNode = useCallback((nodeId: string, newLabel: string) => {
+        setNodes(nds => nds.map(n => {
+            if (n.id !== nodeId) return n;
+            return { ...n, data: { ...n.data, label: newLabel } };
+        }));
+    }, [setNodes]);
+
+    const handleSearchReplaceAll = useCallback((matchIds: string[], newLabel: string) => {
+        const idSet = new Set(matchIds);
+        setNodes(nds => nds.map(n => {
+            if (!idSet.has(n.id)) return n;
+            return { ...n, data: { ...n.data, label: newLabel } };
+        }));
+    }, [setNodes]);
+
+    const handleBeforeReplace = useCallback(() => {
+        takeSnapshot(nodesRef.current, edgesRef.current);
+    }, [takeSnapshot, nodesRef, edgesRef]);
+
     // 🚀 P2 性能优化：稳定的 onInit 回调，避?CanvasShell memo 失效
     const handleReactFlowInit = useCallback((instance: ReactFlowInstance<any, any>) => {
         setReactFlowInstance(instance as unknown as ReactFlowInstance);
@@ -1402,7 +1422,10 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                                 visible: canvasSearchVisible,
                                                 onClose: () => setCanvasSearchVisible(false),
                                                 nodes,
-                                                onHighlightNode: setHighlightedNodeId
+                                                onHighlightNode: setHighlightedNodeId,
+                                                onReplaceNode: handleSearchReplaceNode,
+                                                onReplaceAll: handleSearchReplaceAll,
+                                                onBeforeReplace: handleBeforeReplace,
                                             }}
                                         />
                                         <FreehandDrawingLayer 

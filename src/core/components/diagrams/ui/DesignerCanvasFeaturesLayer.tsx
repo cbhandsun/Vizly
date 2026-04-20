@@ -82,6 +82,9 @@ export interface DesignerCanvasFeaturesLayerProps {
         onClose: () => void;
         nodes: Node[];
         onHighlightNode: (id: string | null) => void;
+        onReplaceNode?: (nodeId: string, newLabel: string) => void;
+        onReplaceAll?: (matchIds: string[], newLabel: string) => void;
+        onBeforeReplace?: () => void;
     };
 }
 
@@ -159,6 +162,9 @@ export const DesignerCanvasFeaturesLayer = React.memo(
                 onClose={search.onClose}
                 nodes={search.nodes}
                 onHighlightNode={search.onHighlightNode}
+                onReplaceNode={search.onReplaceNode}
+                onReplaceAll={search.onReplaceAll}
+                onBeforeReplace={search.onBeforeReplace}
             />
         </>
     );
