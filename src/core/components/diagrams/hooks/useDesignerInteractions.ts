@@ -157,10 +157,15 @@ export function useDesignerInteractions({
 
     const { isValidConnection } = useConnectionValidation(nodes, edges, pluginCtx, activePlugin, {});
 
+    const reconnectNodesRef = useRef(nodes);
+    const reconnectEdgesRef = useRef(edges);
+    reconnectNodesRef.current = nodes;
+    reconnectEdgesRef.current = edges;
+
     const handleReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
-        takeSnapshot(nodes, edges);
+        takeSnapshot(reconnectNodesRef.current, reconnectEdgesRef.current);
         setEdges((eds: any) => reconnectEdge(oldEdge, newConnection, eds));
-    }, [setEdges, takeSnapshot, nodes, edges]);
+    }, [setEdges, takeSnapshot]);
 
     const handleReconnectStart = useCallback((_event: any, edge: Edge, handleType: 'source' | 'target') => {}, []);
     const handleReconnectEnd = useCallback((_event: any, edge: Edge) => {}, []);
@@ -200,6 +205,30 @@ export function useDesignerInteractions({
         }
     }, [originalOnNodeDragStop]);
 
+    const addAnnotation = useCallback((x: number, y: number, text: string) => {
+        const user = useDiagramStore.getState().user;
+        addComment({
+            id: `comment-${Date.now()}`,
+            x, y,
+            authorId: user.id,
+            authorName: user.name,
+            authorColor: user.color,
+            content: text,
+            createdAt: Date.now(),
+            isResolved: false,
+            color: ANNOTATION_COLORS[0],
+            replies: []
+        });
+    }, [addComment]);
+
+    const updateAnnotation = useCallback((id: string, updates: any) => updateComment(id, updates), [updateComment]);
+    const deleteAnnotation = useCallback((id: string) => removeComment(id), [removeComment]);
+    const toggleResolved = useCallback((id: string) => {
+        // 通过 getState() 避免将 comments 加入 deps，防止每条评论变化时重建回调
+        const c = useDiagramStore.getState().comments.find((x: any) => x.id === id);
+        if (c) updateComment(id, { isResolved: !c.isResolved });
+    }, [updateComment]);
+
     return {
         layers, activeLayerId, setActiveLayerId, createLayer, deleteLayer, toggleVisibility, toggleLock, renameLayer, reorderLayers, getLayer, setLayerColor,
         layerSyncedNodes, visibleEdges, onNodesChangeWithLock, onEdgesChangeWithLock,
@@ -210,29 +239,12 @@ export function useDesignerInteractions({
         handleAlign, handleDistribute, canAlign, canDistribute,
         hasCopiedStyle, copyStyle, pasteStyle,
         templates, groupedTemplates, saveAsTemplate, saveGroupAsTemplate, createFromTemplate, deleteTemplate, renameTemplate,
-        annotations: comments, // 映射到旧名称以减少 FlowchartDesigner 的改动
-        annotationMode, 
-        addAnnotation: (x: number, y: number, text: string) => {
-            const user = useDiagramStore.getState().user;
-            addComment({
-                id: `comment-${Date.now()}`,
-                x, y,
-                authorId: user.id,
-                authorName: user.name,
-                authorColor: user.color,
-                content: text,
-                createdAt: Date.now(),
-                isResolved: false,
-                color: ANNOTATION_COLORS[0],
-                replies: []
-            });
-        },
-        updateAnnotation: (id: string, updates: any) => updateComment(id, updates),
-        deleteAnnotation: (id: string) => removeComment(id),
-        toggleResolved: (id: string) => {
-            const c = comments.find(x => x.id === id);
-            if (c) updateComment(id, { isResolved: !c.isResolved });
-        },
+        annotations: comments,
+        annotationMode,
+        addAnnotation,
+        updateAnnotation,
+        deleteAnnotation,
+        toggleResolved,
         ANNOTATION_COLORS,
         quickAddMenu, handleAddNode, closeMenu, openQuickAddMenu, getFlowPosition,
         setQuickConnectPreview, nodesWithGhost, finalEdgesWithGhost,

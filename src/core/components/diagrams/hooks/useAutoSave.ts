@@ -9,18 +9,18 @@ export interface AutoSaveState {
 }
 
 export interface AutoSaveOptions {
-    interval?: number; // 默认 60000ms (60秒)
+    interval?: number; // 默认 60000ms (60�?
     storageKey?: string; // 默认 'flowchart-autosave-default'
     enabled?: boolean; // 默认 true
-    diagramId?: string; // 用来验证存储数据的 ID 是否一致
+    diagramId?: string; // 用来验证存储数据�?ID 是否一�?
     onSaveSuccess?: () => void;
     onSaveError?: (error: Error) => void;
 }
 
 const AUTOSAVE_PREFIX = 'flowchart-autosave-v2-';
-const AUTOSAVE_GC_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 天
+const AUTOSAVE_GC_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 �?
 
-/** 清理超过 7 天未访问的 autosave 条目，防止 localStorage 无限增长 */
+/** 清理超过 7 天未访问�?autosave 条目，防�?localStorage 无限增长 */
 function gcAutosaveEntries() {
     try {
         const now = Date.now();
@@ -62,22 +62,30 @@ export const useAutoSave = (
         error: null
     });
 
-    // 脏检测用 content hash（排除 timestamp，避免永远 dirty）
+    // 脏检测用 content hash（排�?timestamp，避免永�?dirty�?
     const lastSavedContentRef = useRef<string>('');
     const retryCountRef = useRef(0);
     const MAX_RETRIES = 3;
 
+    // �� ref �������¿��գ����� save ��Ϊ setInterval �Ĳ��ȶ�����
+    const nodesRef = useRef(nodes);
+    const edgesRef = useRef(edges);
+    nodesRef.current = nodes;
+    edgesRef.current = edges;
+
     // GC: 组件挂载时执行一次，清理 7 天未访问的旧条目
     useEffect(() => {
         gcAutosaveEntries();
-    }, []); // 只在 mount 时运行一次
+    }, []); // 只在 mount 时运行一�?
 
     // 核心保存函数
     const save = useCallback(async () => {
         try {
             // 脏检测：只比较内容（nodes + edges），不含 timestamp
-            // 这样如果数据没变，就不会每 60 秒都写一次
-            const contentKey = JSON.stringify({ nodes, edges });
+            // 这样如果数据没变，就不会�?60 秒都写一�?
+            const currentNodes = nodesRef.current;
+            const currentEdges = edgesRef.current;
+            const contentKey = JSON.stringify({ nodes: currentNodes, edges: currentEdges });
             if (contentKey === lastSavedContentRef.current) {
                 return;
             }
@@ -87,8 +95,8 @@ export const useAutoSave = (
             const now = Date.now();
             const data = {
                 diagramId,
-                nodes,
-                edges,
+                nodes: currentNodes,
+                edges: currentEdges,
                 timestamp: now,
                 lastAccessedAt: now,
                 version: '1.0'
@@ -110,7 +118,7 @@ export const useAutoSave = (
             const errorMsg = error instanceof Error ? error.message : 'Unknown error';
             setSaveState(prev => ({ ...prev, saving: false, error: errorMsg }));
 
-            // 重试逻辑（最多3次，指数退避）
+            // 重试逻辑（最�?次，指数退避）
             if (retryCountRef.current < MAX_RETRIES) {
                 retryCountRef.current++;
                 const retryDelay = Math.pow(2, retryCountRef.current - 1) * 1000;
@@ -120,7 +128,7 @@ export const useAutoSave = (
                 message.error(`自动保存失败: ${errorMsg}`);
             }
         }
-    }, [nodes, edges, storageKey, diagramId, onSaveSuccess, onSaveError]);
+    }, [storageKey, diagramId, onSaveSuccess, onSaveError]);
 
     // 定时自动保存
     useEffect(() => {
@@ -138,7 +146,7 @@ export const useAutoSave = (
         save();
     }, [save]);
 
-    // 加载保存的数据（同时更新 lastAccessedAt 刷新 GC TTL）
+    // 加载保存的数据（同时更新 lastAccessedAt 刷新 GC TTL�?
     const loadSaved = useCallback((): { diagramId?: string; nodes: Node[]; edges: Edge[]; isFreshSeed?: boolean; timestamp?: number } | null => {
         try {
             const saved = localStorage.getItem(storageKey);
@@ -156,7 +164,7 @@ export const useAutoSave = (
                 nodes: data.nodes || [],
                 edges: data.edges || [],
                 isFreshSeed: !!data.isFreshSeed,
-                timestamp: data.timestamp   // ← required for isFreshSeed TTL check
+                timestamp: data.timestamp   // �?required for isFreshSeed TTL check
             };
         } catch (error) {
             console.error('Failed to load auto-saved data:', error);

@@ -64,8 +64,8 @@ export function useAutoRouting({
     }, [autoRoutingEnabled]);
 
     // 应用路由参数档位 + 设计器特有的缓存/数据清理
-    // 使用 useRef 避免初次挂载时触发全量重绘
-    const initialMountRef = Object.assign(useRef(true), { current: true });
+    // 标准 mount 检测：用 useRef + useEffect，避免每次渲染重置 current
+    const initialMountRef = useRef(true);
     
     useEffect(() => {
         initialMountRef.current = false;
