@@ -47,6 +47,8 @@
     "description": "全新的空白画布，从零开始自由绘制你的构想。",
     "author": "Vizly",
     "createdAt": "2024-01-01T00:00:00.000Z",
-    "tags": ["空白", "基础", "Blank", "Flowchart"]
+    "tags": [
+      "空白"
+    ]
   }
 }

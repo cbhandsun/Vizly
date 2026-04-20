@@ -18,7 +18,6 @@ import {
 import { RoutingStrategySelector, RoutingAlgorithm } from './RoutingStrategySelector';
 import { VisibilityGraphCache } from './VisibilityGraphCache';
 import { SpatialIndex } from './SpatialIndex';
-import { Position } from '../types/routing';
 
 /**
  * [P1-1] Pathfinding configuration
@@ -1542,7 +1541,8 @@ export function generateSmartCShapePath(
             !isPathBlocked(seg3, obstacles, gridSize)) {
 
             if (debug) {
-                //            }
+                // debug logging placeholder
+            }
             return path;
         }
     }

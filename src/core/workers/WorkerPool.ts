@@ -169,7 +169,7 @@ class WorkerPool {
                 };
 
                 worker.onerror = (err) => {
-                    console.error(`Worker ${i} error:`, err);
+                    console.error(`Worker [initPool] error:`, err);
                     // 拒绝所有待处理的任务
                     for (const job of poolWorker.jobs.values()) {
                         for (const sub of job.subJobs.values()) {
@@ -182,7 +182,6 @@ class WorkerPool {
                 };
 
                 this.workers.push(poolWorker);
-            }
 
             this.initialized = true;
         } catch (e) {

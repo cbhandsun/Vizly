@@ -294,38 +294,15 @@ export class DiagramOrchestrator {
           else if (nodeLayoutSel.includes('vertical')) (layoutOptions as any).direction = 'TB';
         }
       } catch { void 0; }
-      //    const absCache = new Map<string, { x: number, y: number }>();
-    const getAbsPos = (n: Node): { x: number, y: number } => {
-      if (absCache.has(n.id)) return absCache.get(n.id)!;
 
-      let x = n.position.x;
-      let y = n.position.y;
+      const result = await strategy.apply(layoutNodes, layoutEdges, layoutOptions)
+      layoutNodes = result.nodes || layoutNodes
+      layoutEdges = result.edges || layoutEdges
+    } // end if (layoutType)
 
-      // Memoized recursion with depth limit implicitly handled by DAG structure or stack
-      // Safety: parentId must exist in map and not be self
-      // To strictly avoid cycles or deep stacks, we could keep a localized visited set or depth counter, 
-      // but standard React Flow trees are DAGs usually. 
-      // The previous implementation capped depth at 10. We can replicate a simplified recursive lookup ensuring optimization.
-
-      if (n.parentId) {
-        const parent = nodeMapForAbs.get(n.parentId);
-        if (parent) {
-          const pAbs = getAbsPos(parent);
-          x += pAbs.x;
-          y += pAbs.y;
-        }
-      }
-
-      const res = { x, y };
-      absCache.set(n.id, res);
-      return res;
-    };
-    processedNodes.forEach(n => {
-      if (!(n as any).positionAbsolute) {
-        (n as any).positionAbsolute = getAbsPos(n);
-      }
-    });
-
+    const processedNodes: Node[] = layoutNodes
+    const idToDomain = new Map<string, string | undefined>()
+    const idToDomainClass = new Map<string, string | undefined>()
     for (const n of processedNodes) { idToDomain.set(n.id, (n.data as any)?.domain); idToDomainClass.set(n.id, (n.data as any)?.domainClass) }
     /**
      * 函数级注释：统一边渲染模式与路径类型的来源（LayeredConfig 优先 → DiagramConfig 回退）

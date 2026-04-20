@@ -125,7 +125,8 @@ const filterBusinessNodes = (nodes: any[]): NodeBBox[] => {
         const isPool = n.id.toLowerCase().includes('pool') || n?.data?.label?.toLowerCase().includes('pool');
 
         if (isPool) {
-            //        }
+            continue;
+        }
 
         // 显式控制优先
         const isObstacle = n?.data?.isObstacle;

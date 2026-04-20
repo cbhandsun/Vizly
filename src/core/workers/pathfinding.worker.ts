@@ -111,7 +111,8 @@ self.onmessage = (e: MessageEvent) => {
         } else {
             // Build New
             if (currentVersion !== undefined) {
-                //            }
+                // cache version is stale, rebuild
+            }
 
             // Calculate Bounds (From Nodes/Obstacles ONLY)
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -583,7 +584,7 @@ self.onmessage = (e: MessageEvent) => {
         const job: PathFindingJob = edgeProps as PathFindingJob;
 
         // No prebuilt grid (findPath will build it internally)
-        //        try {
+        try {
             const result = executeEdgePathfinding({
                 job,
                 graph: context,

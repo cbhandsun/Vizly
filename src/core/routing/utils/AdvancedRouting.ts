@@ -7,9 +7,44 @@
 
 import { EdgeType } from '../../factories/EdgeFactory';
 import { diagramConfigManager } from '../../components/config/DiagramConfig';
+import { Point } from '../types/routing';
+
+// ============================================================================
+// 本地类型与常量
+// ============================================================================
+
+/** 边端口候选方案 */
+interface Candidate {
+    edgeIndex: number;
+    sourceHandle: string;
+    targetHandle: string;
+    path: Point[];
+    cost: number;
+}
+
+/** 所有合法的 source→target handle 组合 */
+const HANDLES = ['l', 'r', 't', 'b'] as const;
+const candidateCombos: { source: string; target: string }[] = HANDLES.flatMap(
+    s => HANDLES.map(t => ({ source: s, target: t }))
+);
+
+/**
+ * 判断两条线段是否相交
+ * p1→p2 与 p3→p4
+ */
+function segmentsIntersect(p1: Point, p2: Point, p3: Point, p4: Point): boolean {
+    const d1x = p2.x - p1.x; const d1y = p2.y - p1.y;
+    const d2x = p4.x - p3.x; const d2y = p4.y - p3.y;
+    const cross = d1x * d2y - d1y * d2x;
+    if (Math.abs(cross) < 1e-10) return false; // 平行
+    const dx = p3.x - p1.x; const dy = p3.y - p1.y;
+    const t = (dx * d2y - dy * d2x) / cross;
+    const u = (dx * d1y - dy * d1x) / cross;
+    return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+}
 
 // Helper for logger
-const treeLog = (...args: any[]) => { /*}
+const treeLog = (..._args: any[]) => { /* noop */ };
 
 // 获取节点锚点
 function getAnchor(node: any, handle: string | null | undefined): Point {
