@@ -3,7 +3,7 @@ import { ReactFlowInstance } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { FaEdit, FaTrash, FaCopy, FaSave, FaFolderOpen, FaSearchPlus, FaSearchMinus, FaExpand, FaProjectDiagram } from 'react-icons/fa';
 import { useCommandRegistry } from './useCommandRegistry';
-import { type CommandItem } from '../../ui/CommandPalette';
+import { type CommandItem } from '../../../types/plugin';
 import { PluginContext, DiagramTypePlugin } from '../../../types/plugin';
 
 interface UseDesignerCommandsProps {
@@ -83,9 +83,9 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
             { id: 'ai.generate', label: 'AI 顾问 (AI Assistant)', category: 'Action', keywords: ['ai', 'generate', 'assistant', 'chat', '顾问', '生成'], icon: <FaProjectDiagram />, action: () => window.dispatchEvent(new CustomEvent('editor:command', { detail: { action: 'toggle-ai-chat' } })) },
             
             // --- Diagram Types ---
-            { id: 'diagram.flowchart', label: '切换图表: 流程图 (Flowchart)', category: 'Diagram', keywords: ['switch', 'flowchart', '流程图'], icon: <FaProjectDiagram />, action: () => window.dispatchEvent(new CustomEvent('diagram-global-format-changed', { detail: 'flowchart' })) },
-            { id: 'diagram.architecture', label: '切换图表: 架构图 (Architecture)', category: 'Diagram', keywords: ['switch', 'architecture', '架构图'], icon: <FaProjectDiagram />, action: () => window.dispatchEvent(new CustomEvent('diagram-global-format-changed', { detail: 'architecture' })) },
-            { id: 'diagram.mindmap', label: '切换图表: 思维导图 (Mind Map)', category: 'Diagram', keywords: ['switch', 'mindmap', '思维导图'], icon: <FaProjectDiagram />, action: () => window.dispatchEvent(new CustomEvent('diagram-global-format-changed', { detail: 'mindmap' })) },
+            { id: 'diagram.flowchart', label: '切换图表: 流程图 (Flowchart)', category: 'Action', keywords: ['switch', 'flowchart', '流程图'], icon: <FaProjectDiagram />, action: () => window.dispatchEvent(new CustomEvent('diagram-global-format-changed', { detail: 'flowchart' })) },
+            { id: 'diagram.architecture', label: '切换图表: 架构图 (Architecture)', category: 'Action', keywords: ['switch', 'architecture', '架构图'], icon: <FaProjectDiagram />, action: () => window.dispatchEvent(new CustomEvent('diagram-global-format-changed', { detail: 'architecture' })) },
+            { id: 'diagram.mindmap', label: '切换图表: 思维导图 (Mind Map)', category: 'Action', keywords: ['switch', 'mindmap', '思维导图'], icon: <FaProjectDiagram />, action: () => window.dispatchEvent(new CustomEvent('diagram-global-format-changed', { detail: 'mindmap' })) },
 
             // --- View ---
             { id: 'zoom.in', label: t('designer.toolbar.zoomIn'), category: 'View', shortcut: `${mod} + =`, icon: <FaSearchPlus />, action: () => props.reactFlowInstance?.zoomIn() },

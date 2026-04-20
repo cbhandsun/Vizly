@@ -27,6 +27,8 @@ export interface CanvasOperations {
     onTogglePresentation?: (active: boolean) => void;
     /** 演示指定链路路径 */
     onAnimatePath?: (edgeIds: string[], options?: { duration?: number; loop?: boolean }) => void;
+    /** [GAP-10] 批量更新节点数据 */
+    onUpdateNodes?: (ids: string[], updates: Record<string, unknown>) => void;
 }
 
 export interface AIChatPanelProps {

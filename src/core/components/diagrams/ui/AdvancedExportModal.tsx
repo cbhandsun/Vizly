@@ -31,7 +31,7 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
   const handleExport = async () => {
     setExporting(true);
     try {
-      await downloadImage(nodes, {
+      await downloadImage(nodes as any[], {
         format,
         pixelRatio,
         includeBackground,

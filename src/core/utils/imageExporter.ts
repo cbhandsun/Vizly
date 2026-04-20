@@ -1,3 +1,5 @@
+import { getNodesBounds } from '@xyflow/react';
+
 export interface ExportOptions {
     format: 'png' | 'svg' | 'pdf' | 'jpg' | 'json';
     pixelRatio?: number;
@@ -7,7 +9,7 @@ export interface ExportOptions {
 }
 
 export const downloadImage = async (
-    nodes: Node[],
+    nodes: { id: string; position?: { x: number; y: number }; measured?: { width: number; height: number }; [key: string]: unknown }[],
     options: ExportOptions = { format: 'png' }
 ) => {
     const { format = 'png', pixelRatio = 1, includeBackground = true, embedMetadata = true } = options;

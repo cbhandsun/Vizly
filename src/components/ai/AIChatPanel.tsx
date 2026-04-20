@@ -647,7 +647,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         // ⚡ /shortcuts — 显示快捷键指南
         if (cmd === '/shortcuts' || cmd === '/help') {
             addLocalMessage('user', trimmed);
-            addLocalMessage('assistant', '正在为您准备指南...', true); 
+            addLocalMessage('assistant', '正在为您准备指南...'); 
             return true;
         }
 
