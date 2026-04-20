@@ -15,7 +15,7 @@ export const downloadImage = async (
     const { format = 'png', pixelRatio = 1, includeBackground = true, embedMetadata = true } = options;
     // 1. Calculate Bounding Box
     // We want to export the VALID nodes only (not hidden ones if any)
-    const bounds = getNodesBounds(nodes);
+    const bounds = getNodesBounds(nodes as any);
 
     // 2. Viewport Transform
     // We want to shift the viewport so the nodes are centered/visible with padding.
