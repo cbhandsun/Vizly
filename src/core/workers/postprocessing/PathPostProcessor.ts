@@ -68,9 +68,15 @@ export class PathPostProcessor {
         // These paths are geometrically constructed to be 'perfect' (clean orthogonal routing)
         // and shouldn't be simplified or nudged, which destroys the strict structure.
         if (context.metadata.strategy && context.metadata.strategy.includes('Trunk Direct')) {
-            const svgPath = createFilletedPath(points, this.config.postProcessing.borderRadius);
-            // [DEBUG]
-            return { points, svgPath };
+            // [H-1] Apply snapAxis before return to eliminate sub-pixel diagonal artifacts
+            // that arise from fractional coordinate math in trunk geometry construction.
+            const snapped = points.map(p => ({ ...p }));
+            for (let i = 0; i < snapped.length - 1; i++) {
+                if (Math.abs(snapped[i].x - snapped[i + 1].x) < 1) snapped[i + 1].x = snapped[i].x;
+                if (Math.abs(snapped[i].y - snapped[i + 1].y) < 1) snapped[i + 1].y = snapped[i].y;
+            }
+            const svgPath = createFilletedPath(snapped, this.config.postProcessing.borderRadius);
+            return { points: snapped, svgPath };
         }
 
         let finalPoints = [...points];
@@ -127,11 +133,11 @@ export class PathPostProcessor {
                 nudgeOffset = (metadata.globalChannelIndex - (metadata.globalChannelCount - 1) / 2) * spacing;
             }
 
-            // [FIX Phase 2] Apply bidirectional separation
+            // [H-2] N-way bidirectional separation: evenly distribute N channels around center.
+            // Old formula only handled N=2 (0 → -1, else → +1), causing channels 1..N-1 to collapse.
             if (metadata.bidirectionalChannel !== undefined && metadata.bidirectionalSpacing) {
-                // For bidirectional pairs A↔B, apply additional offset
-                // Channel 0 gets negative offset, Channel 1 gets positive offset
-                const biOffset = (metadata.bidirectionalChannel === 0 ? -1 : 1) * (metadata.bidirectionalSpacing / 2);
+                const biCount = (metadata as any).bidirectionalCount ?? 2;
+                const biOffset = (metadata.bidirectionalChannel - (biCount - 1) / 2) * metadata.bidirectionalSpacing;
                 nudgeOffset += biOffset;
             }
 

@@ -148,21 +148,36 @@ export class EdgeRoutingCoordinator {
 
     private readonly MAX_PENDING_SEGMENTS = 400;
 
+    private isDragging: boolean = false;
+
+    /**
+     * [H-10] Notify coordinator that a drag operation is in progress.
+     * Increases debounce delay during drag to reduce CPU load (~75% fewer route calls).
+     */
+    public setDragging(dragging: boolean): void {
+        this.isDragging = dragging;
+        if (!dragging) {
+            // Immediately trigger routing on drag-end to snap to final position
+            this.scheduleBatchRouting();
+        }
+    }
+
     /**
      * [P0] Schedule a batch routing run (debounced).
      * Call this after manually marking edges as dirty.
      */
     public scheduleBatchRouting(): void {
         // [FIX C-1] 标准防抖：每次调用先清除旧计时器再重新设置。
-        // 原来的 "if (pendingTimeout) return" 会在 16ms 内忽略新请求，
-        // 导致拖拽到停止位置的最后坐标被丢弃，连线停在中途。
+        // [H-10] 拖拽中提升去抖到 60ms，减少 ~75% 的路由触发次数，
+        //        释放 Worker pool 给交互响应使用。拖拽结束后恢复 16ms。
         if (this.pendingTimeout) {
             clearTimeout(this.pendingTimeout);
         }
+        const delay = this.isDragging ? 60 : 16;
         this.pendingTimeout = setTimeout(() => {
             this.pendingTimeout = null;
             this.triggerBatchRouting();
-        }, 16);
+        }, delay);
     }
 
     private constructor() {
@@ -423,8 +438,21 @@ export class EdgeRoutingCoordinator {
     /**
      * [P2-3] Extract parameters relevant for caching key
      */
-    private extractCacheableParams(job: Partial<PathFindingJob> & { sourceRect?: Rectangle; targetRect?: Rectangle }, _graph: SharedGraphContext): Record<string, unknown> {
+    private extractCacheableParams(
+        job: Partial<PathFindingJob> & { sourceRect?: Rectangle; targetRect?: Rectangle },
+        _graph: SharedGraphContext,
+        pendingEdges?: Array<{ start: { x: number; y: number }; end: { x: number; y: number } }>
+    ): Record<string, unknown> {
         // We only care about things that affect pathfinding geometry
+        // [H-9] Compute lightweight XOR hash of pendingEdges so cache key changes when
+        // neighboring edges reroute (their new segments affect port selection).
+        let peHash = 0;
+        if (pendingEdges && pendingEdges.length > 0) {
+            peHash = pendingEdges.length;
+            for (const seg of pendingEdges) {
+                peHash = ((peHash * 31) + Math.round(seg.start.x + seg.end.y * 7)) >>> 0;
+            }
+        }
         return {
             s: job.source,
             t: job.target,
@@ -441,7 +469,7 @@ export class EdgeRoutingCoordinator {
             type: job.type || 's', // Smart
             // [FIX] Include Bus Routing params in cache key
             bus: `${!!(job as any).isOneToMany}|${!!(job as any).isManyToOne}|${(job as any).busTrunkSource?.x ?? 0},${(job as any).busTrunkSource?.y ?? 0}|${(job as any).busTrunkTarget?.x ?? 0},${(job as any).busTrunkTarget?.y ?? 0}`,
-            // Include port preferences/constraints if any
+            pe: peHash,  // [H-9] pendingEdges fingerprint
         };
     }
 
@@ -741,7 +769,7 @@ export class EdgeRoutingCoordinator {
                 const isBus = !!(req.job as any).isOneToMany || !!(req.job as any).isManyToOne;
                 if (!isBus) {
                     const cacheParams = {
-                        ...this.extractCacheableParams(req.job, group.graph),
+                        ...this.extractCacheableParams(req.job, group.graph, pendingEdges),
                         version: this.graphVersion
                     };
                     const key = this.cache.generateKey(req.edgeId, cacheParams);

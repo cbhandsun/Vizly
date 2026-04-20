@@ -37,7 +37,7 @@ export class EdgeRoutingCache {
         // [FIX C-2] 改为固定顺序的字段拼接，替代 JSON.stringify。
         // JSON.stringify 在不同调用路径构造的对象上 key 顺序可能不一致，
         // 导致相同坐标产生不同 cache key，缓存命中率趋近于零。
-        // 固定顺序：edgeId | s | t | sx | sy | tx | ty | sr | tr | type | bus | version
+        // 固定顺序：edgeId | s | t | sx | sy | tx | ty | sr | tr | type | bus | pe | version
         const p = params as any;
         return [
             edgeId,
@@ -51,6 +51,7 @@ export class EdgeRoutingCache {
             p.tr ?? '0',
             p.type ?? 's',
             p.bus ?? '',
+            p.pe ?? 0,  // [H-9] pendingEdges XOR hash — changes when neighboring edges reroute
             p.version ?? 0,
         ].join('|');
     }
