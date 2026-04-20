@@ -103,7 +103,7 @@ self.onmessage = (e: MessageEvent) => {
             globalCache.gridBounds &&
             globalCache.gridSize === targetGridSize) {
 
-            //            spatialIndex = globalCache.spatialIndex;
+            spatialIndex = globalCache.spatialIndex!;
             visibilityGraphCache = globalCache.visibilityGraph;
             grid = globalCache.grid;
             gridBounds = globalCache.gridBounds;
@@ -597,7 +597,7 @@ self.onmessage = (e: MessageEvent) => {
                 console.error('[Worker] Posting ERROR:', result.error);
                 self.postMessage({ jobId: result.jobId, error: result.error });
             } else {
-                //                self.postMessage(result);
+                self.postMessage(result);
             }
         } catch (err: any) {
             console.error('[Worker] CRITICAL FAILURE:', err);

@@ -48,7 +48,7 @@ import { readDomViewport } from '../../utils/domViewport';
 import { EdgeRoutingCoordinator } from '../../services/EdgeRoutingCoordinator';
 import { DiagramIntelligenceService } from '../../services/DiagramIntelligenceService';
 import { LayoutOptimizer } from '../layout/LayoutOptimizer';
-import { useDiagramStore } from '../../store/useDiagramStore';
+import { useDiagramStore, useDiagramStore as useDiagramStoreStatic } from '../../store/useDiagramStore';
 import './FlowchartDesigner.css';
 import './ModernControls.css';
 
@@ -137,7 +137,7 @@ const DEFAULT_NODE_TYPES: NodeTypes = {
     'mindmap-boundary': MindMapBoundaryNode as any,
     'sticky-note': StickyNoteNode,
     arrowTimeline: ArrowTimelineNode as any,
-    timelineNode: FallbackNode as any, 
+    timelineNode: ArrowTimelineNode as any,  // 兼容旧数据，映射到 ArrowTimelineNode
     iconNode: IconNode as any,
     erNode: ERDatabaseNode as any,
     'vizly:comment': CommentNode as any,
@@ -326,20 +326,19 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     const [mobileAddDrawerVisible, setMobileAddDrawerVisible] = useState(false);
     const [mobilePropertyDrawerVisible, setMobilePropertyDrawerVisible] = useState(false);
     
-    // 猸?Phase 10: 楂樼骇缁勪欢鍙鎬х姸鎬佹彁鍗?
+    // Phase 10: 高级组件可见性状态提取
     const [exportModalVisible, setExportModalVisible] = useState(false);
     const [pluginManagerVisible, setPluginManagerVisible] = useState(false);
 
-    // AIChat visibility handling
     const [aiChatVisible, setAiChatVisible] = useState(false);
     const [activeRightTab, setActiveRightTab] = useState<'property' | 'ai'>('property');
-    const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
+    // commandPaletteVisible 由 useDesignerCommands hook 管理（单一事实源，避免双向同步死循环）
     const [shortcutHelpVisible, setShortcutHelpVisible] = useState(false);
     const [showShortcuts, setShowShortcutsModal] = useState(false);
     const [jsonEditorInitialContent] = useState<string | undefined>(undefined);
     const [saveState] = useState<string>('idle');
     const [showPerformanceDashboard] = useState(false);
-    const [presentationSlides] = useState<any[]>([]);
+    const [presentationSlides, setPresentationSlides] = useState<any[]>([]);
     const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
 
     const {
@@ -427,7 +426,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                     message.success(`已添加 ${type}`);
                     
                     // 移动端添加后自动关闭抽屉
-                    if (window.innerWidth < 768) {
+                    if (isMobile) {
                         setLeftDrawerOpen(false);
                         setMobileAddDrawerVisible(false);
                     }
@@ -539,8 +538,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     // 2.5 Linter Layer (Phase 8 integration)
     const { lintedNodes, lintedEdges } = useTopologyLinter(nodesWithGhost, finalEdgesWithGhost, { enabled: !isReadonly });
 
-    // 2.6 Collaboration Layer (Phase 9 integration)
-    const diagramId = diagramMetadata?.id || 'default';
+    // 协作层 diagramId：优先使用 id prop，回退到导出 ID，避免多画布协作时 ID 冲突
+    const diagramId = id || diagramIdForExport || 'default';
     const { updateLocalCursor } = useDiagramCollaboration(diagramId, !isReadonly);
     const isCommentMode = useDiagramStore(state => state.isCommentMode);
     const setIsCommentMode = useDiagramStore(state => state.setIsCommentMode);
@@ -582,7 +581,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         canAlign, canDistribute, handleAlign, handleDistribute,
         handleGroup, handleUngroup,
         nodesRef, edgesRef,
-        setCommandPaletteVisible, setShortcutHelpVisible, setCanvasSearchVisible,
+        setCommandPaletteVisible, setCanvasSearchVisible,
         copyStyle, pasteStyle, hasCopiedStyle, saveAsTemplate
     });
     // ?Reordered to avoid TDZ (Temporal Dead Zone) for handleFitView and messageApi
@@ -604,16 +603,16 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         };
     }, [takeSnapshot, handleFitView, messageApi]);
 
-    const handlePaneClick = useCallback((event: React.MouseEvent) => {
+    const handlePaneClick = useCallback((_event: React.MouseEvent) => {
         // 先关闭可能存在的 Context Menu
         contextMenuPaneClick();
 
         if (isCommentMode) {
-            // ⭐ [GAP-02] 现在由 AnnotationLayer 的 handleCanvasClick 负责展示编辑器并添加评论
+            // [GAP-02] 由 AnnotationLayer 的 handleCanvasClick 负责展示编辑器并添加评论
             // 这里不再直接 addComment，以避免创建空评论。
             return;
         }
-    }, [isCommentMode, reactFlowInstance, addComment, setNodes, setIsCommentMode, contextMenuPaneClick, messageApi]);
+    }, [isCommentMode, contextMenuPaneClick]);
 
     const { layoutContainer } = useContainerAutoLayout();
 
@@ -865,7 +864,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         };
         reader.readAsText(file);
         event.target.value = '';
-    }, [setNodes, setEdges, handleFitView, pluginId, reactFlowInstance, messageApi]);
+    }, [setNodes, setEdges, handleFitView, pluginId, reactFlowInstance, messageApi, activePlugin]);
 
     const handleExportMermaid = useCallback(async () => {
         try {
@@ -906,11 +905,9 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     const onSelectionChange = useCallback(({ nodes: selNodes, edges: selEdges }: { nodes: Node[]; edges: Edge[] }) => {
         setSelectedNodes(selNodes);
         setSelectedEdges(selEdges);
-        // ?同步状态给 zustand store，修复因架构迁移导致 HoverToolbarsOverlay 读不到选中节点从而不显示胶囊工具栏的问题
-        import('../../store/useDiagramStore').then(({ useDiagramStore }) => {
-            useDiagramStore.getState().setSelectedNodes(selNodes);
-            useDiagramStore.getState().setSelectedEdges(selEdges);
-        });
+        // 同步状态给 zustand store（静态 import，避免异步滞后导致 HoverToolbarsOverlay 读到旧选区）
+        useDiagramStoreStatic.getState().setSelectedNodes(selNodes);
+        useDiagramStoreStatic.getState().setSelectedEdges(selEdges);
     }, [setSelectedNodes, setSelectedEdges]);
 
     const onPaneDoubleClick = useCallback((event: React.MouseEvent) => {
@@ -935,8 +932,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     });
 
     const { 
-        commandPaletteVisible: hookCommandPaletteVisible, 
-        setCommandPaletteVisible: setHookCommandPaletteVisible, 
+        commandPaletteVisible, 
+        setCommandPaletteVisible,
         commandPaletteItems 
     } = useDesignerCommands({
         reactFlowInstance: reactFlowInstance as any, 
@@ -966,19 +963,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         setIsCommentMode,
     });
 
-    // ?Sync command palette visibility between hook and local state
-    useEffect(() => {
-        if (hookCommandPaletteVisible !== commandPaletteVisible) {
-            setCommandPaletteVisible(hookCommandPaletteVisible);
-        }
-    }, [hookCommandPaletteVisible, commandPaletteVisible]);
-
-    useEffect(() => {
-        if (commandPaletteVisible !== hookCommandPaletteVisible) {
-            setHookCommandPaletteVisible(commandPaletteVisible);
-        }
-    }, [commandPaletteVisible, hookCommandPaletteVisible, setHookCommandPaletteVisible]);
-
+    // commandPaletteVisible 现在直接使用 hook 内部 state，无需双向同步
 
     // 🚀 P2 性能优化：稳定的 onInit 回调，避?CanvasShell memo 失效
     const handleReactFlowInit = useCallback((instance: ReactFlowInstance<any, any>) => {
@@ -1173,7 +1158,11 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                     onExportMermaid: handleExportMermaid,
                                     onImportClick: () => fileInputRef.current?.click(),
                                     onEditJson: handleOpenJsonEditor,
-                                    onStartPresentation: () => setPresentationActive(true),
+                                    onStartPresentation: () => {
+                                        const slides = generateSlides(nodesRef.current, edgesRef.current);
+                                        setPresentationSlides(slides);
+                                        setPresentationActive(true);
+                                    },
                                     onShowDiff: () => {
                                         const prevState = getPreviousState();
                                         if (prevState && pastEntries && pastEntries.length > 0) {
@@ -1212,9 +1201,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                     isCommentMode: isCommentMode,
                                     setIsCommentMode: setIsCommentMode,
                                     pluginToolbar: (() => {
-                                        if (!pluginCtx) return null; // Guard: ctx not ready on first render
-                                        const plugin = PluginRegistry.getInstance().getPlugin(pluginId) || PluginRegistry.getInstance().getPlugin('flowchart');
-                                        return plugin?.contributeToolbar ? plugin.contributeToolbar(pluginCtx) : null;
+                                        if (!pluginCtx || !activePlugin) return null; // Guard: ctx/plugin not ready on first render
+                                        return activePlugin?.contributeToolbar ? activePlugin.contributeToolbar(pluginCtx) : null;
                                     })()
                                 }}
                                 toolbar={{
@@ -1415,9 +1403,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                             currentColor={preset.name === 'sketch' ? '#555555' : '#000000'}
                                         />
                                         {(() => {
-                                            if (!pluginCtx) return null;
-                                            const plugin = PluginRegistry.getInstance().getPlugin(pluginId) || PluginRegistry.getInstance().getPlugin('flowchart');
-                                            return plugin?.contributeCanvasComponents ? plugin.contributeCanvasComponents(pluginCtx) : null;
+                                            if (!pluginCtx || !activePlugin) return null;
+                                            return activePlugin?.contributeCanvasComponents ? activePlugin.contributeCanvasComponents(pluginCtx) : null;
                                         })()}
                                         {activeUsers.length > 0 && yAwareness && (
                                             <LiveCursors activeUsers={activeUsers} yAwareness={yAwareness} />

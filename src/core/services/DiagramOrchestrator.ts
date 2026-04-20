@@ -295,7 +295,7 @@ export class DiagramOrchestrator {
         }
       } catch { void 0; }
 
-      const result = await strategy.apply(layoutNodes, layoutEdges, layoutOptions)
+      const result = await strategy.calculateLayout(layoutNodes, layoutEdges, layoutOptions)
       layoutNodes = result.nodes || layoutNodes
       layoutEdges = result.edges || layoutEdges
     } // end if (layoutType)
