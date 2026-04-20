@@ -188,6 +188,75 @@ export function useDesignerEventHandlers({
         return () => window.removeEventListener('keydown', handleCtrlF);
     }, [setCanvasSearchVisible]);
 
+    // Ctrl+H：打开查找替换
+    useEffect(() => {
+        const handleCtrlH = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+                const target = e.target as HTMLElement;
+                if (!['INPUT', 'TEXTAREA'].includes(target.tagName) && !target.isContentEditable) {
+                    e.preventDefault();
+                    setCanvasSearchVisible(true);
+                    // 延迟点击替换切换按钮（组件挂载后）
+                    setTimeout(() => {
+                        const replaceToggle = document.querySelector('[title="查找替换 (Ctrl+H)"]') as HTMLButtonElement;
+                        replaceToggle?.click();
+                    }, 80);
+                }
+            }
+        };
+        window.addEventListener('keydown', handleCtrlH);
+        return () => window.removeEventListener('keydown', handleCtrlH);
+    }, [setCanvasSearchVisible]);
+
+    // Tab / Shift+Tab：在节点间循环导航
+    useEffect(() => {
+        const handleTabNav = (e: KeyboardEvent) => {
+            if (e.key !== 'Tab') return;
+            const target = e.target as HTMLElement;
+            // 焦点在输入框时不拦截
+            if (['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable) return;
+            // 有模态框打开时不拦截
+            if (document.querySelector('.ant-modal-wrap:not([style*="display: none"])')) return;
+
+            const currentNodes = nodesRef.current;
+            if (currentNodes.length === 0) return;
+
+            e.preventDefault();
+
+            // 按空间位置排序：从左到右、从上到下（同行内按 x 排）
+            const sorted = [...currentNodes].sort((a, b) => {
+                const rowDiff = a.position.y - b.position.y;
+                return Math.abs(rowDiff) < 50 ? a.position.x - b.position.x : rowDiff;
+            });
+
+            const currentSelected = selectedNodes[0];
+            const currentIdx = currentSelected ? sorted.findIndex(n => n.id === currentSelected.id) : -1;
+            const nextIdx = e.shiftKey
+                ? (currentIdx - 1 + sorted.length) % sorted.length
+                : (currentIdx + 1) % sorted.length;
+            const nextNode = sorted[nextIdx];
+
+            if (!nextNode) return;
+
+            // 更新选中状态
+            setNodes((nds: Node[]) => nds.map(n => ({ ...n, selected: n.id === nextNode.id })));
+
+            // 自动居中到目标节点
+            if (reactFlowInstance) {
+                const w = nextNode.measured?.width || (nextNode.width as number) || 120;
+                const h = nextNode.measured?.height || (nextNode.height as number) || 60;
+                reactFlowInstance.setCenter(
+                    nextNode.position.x + w / 2,
+                    nextNode.position.y + h / 2,
+                    { zoom: Math.max(reactFlowInstance.getZoom(), 1.0), duration: 250 }
+                );
+            }
+        };
+
+        window.addEventListener('keydown', handleTabNav);
+        return () => window.removeEventListener('keydown', handleTabNav);
+    }, [nodesRef, selectedNodes, setNodes, reactFlowInstance]);
+
     useEffect(() => {
         const handleStyleKeys = (e: KeyboardEvent) => {
             const isCtrlOrCmd = e.ctrlKey || e.metaKey;
