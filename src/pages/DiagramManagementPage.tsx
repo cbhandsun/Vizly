@@ -516,21 +516,29 @@ const WorkspaceDashboardPage: React.FC = () => {
             {/* Global Top Navigation */}
             <header className="workspace-global-header">
                 <div className="workspace-header-brand" onClick={() => navigate('/manage')}>
-                    <div className="workspace-header-logo" style={{ transition: 'transform 0.2s ease' }}>
-                        <img 
-                            src="/favicon.svg" 
-                            alt="Vizly Logo" 
-                            style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 0 6px rgba(134,59,255,0.5))' }}
-                        />
+                    <div className="workspace-header-logo">
+                        <div style={{
+                            width: 28,
+                            height: 28,
+                            background: 'var(--vz-brand-gradient)',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#fff',
+                            fontSize: '16px',
+                            fontWeight: '800',
+                            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
+                        }}>V</div>
                     </div>
                     <div className="workspace-header-title">Vizly</div>
                 </div>
                 
                 <div className="workspace-header-search-container">
                     <div className="workspace-search">
-                        <SearchOutlined style={{ color: '#9ca3af' }}/>
+                        <SearchOutlined style={{ color: 'var(--vz-brand-from)', opacity: 0.7 }}/>
                         <input 
-                            placeholder="Search among all your documents..." 
+                            placeholder="Find your ideas..." 
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />

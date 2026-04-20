@@ -16,6 +16,7 @@ import transportDrivenData from './standardized/TransportDrivenStandardData.json
 import wmsArchitectureData from './standardized/WmsStandardData.json';
 import wmsOrderToTaskFlowData from './standardized/WmsOrderToTaskFlowData.json';
 import wmsProcessFlowData from './standardized/WmsProcessFlowStandardData.json';
+import blankCanvasStandardData from './standardized/BlankCanvasStandardData.json';
 
 /**
  * 数据注册中心类
@@ -93,6 +94,7 @@ export class DataRegistry {
       wmsArchitectureData,
       wmsOrderToTaskFlowData,
       wmsProcessFlowData,
+      blankCanvasStandardData,
     ];
 
     // 批量注册图表数据

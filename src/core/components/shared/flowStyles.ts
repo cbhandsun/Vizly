@@ -1,5 +1,6 @@
 import { MarkerType } from '@xyflow/react';
-import { useDiagramStylePreset, type EdgeStyleToken, type FlowStylePreset } from './DiagramStyleManager';
+import { type EdgeStyleToken, type FlowStylePreset } from './DiagramStyleManager';
+// useDiagramStylePreset_v2 import removed to break circular dependency.
 
 export const THEMES = {
   oms: { border: '#7E57C2', color: '#7E57C2' },
@@ -107,7 +108,5 @@ export function getFlowStylesForPreset(preset: FlowStylePreset) {
   } as const;
 }
 
-export function useFlowStyles() {
-  const preset = useDiagramStylePreset();
-  return getFlowStylesForPreset(preset);
-}
+// useFlowStyles removed to prevent circular dependencies. 
+// Consumers should import from src/core/hooks/useFlowStyles.

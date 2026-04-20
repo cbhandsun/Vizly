@@ -248,11 +248,7 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
                     />
                     {childrenCount > 0 && (
                         <div 
-                            className="mindmap-collapse-toggle" 
-                            style={['TB', 'BT'].includes(direction)
-                                ? { left: '50%', position: 'absolute', [direction === 'TB' ? 'bottom' : 'top']: '-15px', transform: 'translateX(-50%)', zIndex: 10 }
-                                : { [direction === 'L' || (direction === 'LR' && isLeft) ? 'left' : 'right']: '-22px', position: 'absolute', top: '50%', transform: 'translateY(-50%)', zIndex: 10 }
-                            }
+                            className={`mindmap-collapse-toggle ${direction === 'L' || (direction === 'LR' && isLeft) ? 'dir-left' : 'dir-right'} dir-${direction}`}
                             onClick={handleToggleCollapse}
                         >
                             {collapsed ? <span className="mindmap-collapse-count">{childrenCount}</span> : <FaMinus size={10} />}

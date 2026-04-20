@@ -12,7 +12,7 @@ const { Text } = Typography;
 
 export const CommentPanel: React.FC = () => {
     const { token } = theme.useToken();
-    const { comments, removeComment, updateComment } = useDiagramStore();
+    const { comments, removeComment, updateComment, setActiveCommentId } = useDiagramStore();
     const { setCenter } = useReactFlow();
     
     const [searchTerm, setSearchTerm] = useState('');
@@ -32,6 +32,11 @@ export const CommentPanel: React.FC = () => {
     const handleFocus = (c: any) => {
         if (c.x !== undefined && c.y !== undefined) {
             setCenter(c.x + 16, c.y + 16, { zoom: 1.5, duration: 800 });
+            setActiveCommentId(c.id);
+            // 3秒后取消高亮
+            setTimeout(() => {
+                setActiveCommentId(null);
+            }, 3000);
         }
     };
 

@@ -401,28 +401,29 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
             top: position.y,
             transform: 'none',
             zIndex: 1010,
-            boxShadow: isDragging ? '0 12px 40px rgba(31, 38, 135, 0.25)' : '0 8px 32px rgba(31, 38, 135, 0.15)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            background: 'rgba(255, 255, 255, 0.7)',
-            backdropFilter: 'blur(12px) saturate(180%)',
-            borderRadius: 99,
-            padding: '2px 12px',
-            transition: isDragging ? 'none' : 'box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            boxShadow: isDragging ? '0 20px 60px rgba(0, 0, 0, 0.25)' : '0 12px 48px rgba(0, 0, 0, 0.15)',
+            border: '1px solid rgba(255, 255, 255, 0.4)',
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.65))',
+            backdropFilter: 'blur(24px) saturate(200%)',
+            borderRadius: '24px',
+            padding: '4px 14px',
+            transition: isDragging ? 'none' : 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
             cursor: isDragging ? 'grabbing' : 'default',
         }
         : {
             position: 'absolute',
-            bottom: 24,
+            bottom: 32,
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 1010,
-            boxShadow: 'var(--designer-shadow, 0 8px 32px rgba(31, 38, 135, 0.15))',
-            border: '1px solid var(--designer-border, rgba(255, 255, 255, 0.2))',
-            background: 'var(--designer-panel-bg, rgba(255, 255, 255, 0.7))',
-            backdropFilter: 'var(--designer-blur, blur(12px) saturate(180%))',
-            borderRadius: 99,
-            padding: '2px 12px',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            boxShadow: 'var(--designer-shadow, 0 12px 48px rgba(0, 0, 0, 0.15))',
+            border: '1px solid rgba(255, 255, 255, 0.35)',
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.62))',
+            backdropFilter: 'blur(20px) saturate(190%)',
+            borderRadius: '24px',
+            padding: '4px 14px',
+            transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            animation: 'toolbarEnter 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
         };
 
     return (
@@ -436,19 +437,18 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
                     title={t('designer.toolbar.dragToMove')}
                     role="separator"
                     aria-roledescription="拖动手柄"
+                    className="toolbar-drag-handle"
                     style={{
                         cursor: isDragging ? 'grabbing' : 'grab',
-                        padding: '4px 6px 4px 2px',
-                        marginRight: 4,
+                        padding: '4px 8px',
+                        marginRight: 6,
                         display: 'flex',
                         alignItems: 'center',
-                        color: 'rgba(0, 0, 0, 0.35)',
-                        transition: 'color 0.2s',
+                        color: 'rgba(0, 0, 0, 0.25)',
+                        transition: 'all 0.3s ease',
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(0, 0, 0, 0.65)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(0, 0, 0, 0.35)')}
                 >
-                    <FaGripVertical size={14} />
+                    <FaGripVertical size={16} />
                 </div>
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -632,13 +632,16 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
                                                 <Button
                                                     type="text"
                                                     size="small"
+                                                    className={`toolbar-status-btn ${snapToGrid ? 'active' : ''}`}
                                                     onClick={onToggleSnap}
                                                     icon={<FaMagnet size={10} />}
                                                     style={{
-                                                        color: snapToGrid ? '#1976d2' : 'rgba(0,0,0,0.3)',
+                                                        color: snapToGrid ? '#1890ff' : 'rgba(0,0,0,0.3)',
                                                         fontSize: 10,
-                                                        width: 22, height: 22,
+                                                        width: 24, height: 24,
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        borderRadius: '6px',
+                                                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                                                     }}
                                                 />
                                             </Tooltip>

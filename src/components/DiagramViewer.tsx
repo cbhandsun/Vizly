@@ -75,6 +75,8 @@ const DiagramViewer: React.FC = () => {
         if (urlId) return urlId;
         return storedDiagramId;
     }, [searchParams, storedDiagramId]);
+    // refreshNonce: 仅用于手动刷新场景（如设置面板的 onRefreshRequest），
+    // 模板切换已改为 window.location.reload() 方式，不再依赖 nonce 触发 remount。
     const [refreshNonce, setRefreshNonce] = useState(0);
 
     // =============== Phase 5: IoC 依赖注入层 =================
@@ -382,10 +384,29 @@ const DiagramViewer: React.FC = () => {
     }, [setSearchParams, addRecentDiagram]);
 
     const seedAutoSaveAndNavigate = useCallback(async (data: any, id: string) => {
+        // ★ 安全检查：如果当前图表有节点数据，提示用户确认切换
+        try {
+            const { useDiagramStore } = await import('@/core/store/useDiagramStore');
+            const currentNodes = useDiagramStore.getState().nodes;
+            if (currentNodes && currentNodes.length > 0) {
+                const confirmed = await new Promise<boolean>(resolve => {
+                    Modal.confirm({
+                        title: '切换图表模板',
+                        content: `当前图表包含 ${currentNodes.length} 个节点。切换后当前的本地修改将被新模板覆盖，确定要继续吗？`,
+                        okText: '确定切换',
+                        cancelText: '取消',
+                        okButtonProps: { danger: true },
+                        onOk: () => resolve(true),
+                        onCancel: () => resolve(false),
+                    });
+                });
+                if (!confirmed) return;
+            }
+        } catch { /* 确认对话框失败时不阻塞切换 */ }
+
         let processedData = data;
         
         // Check if it's a standardized data payload that requires conversion to canvas format
-        // Standard Node Data usually has 'domain' at root and no 'data' object wrapper
         const needsConversion = data && data.nodes && data.nodes.length > 0 && 
             (!('data' in data.nodes[0]) || ('domain' in data.nodes[0]));
         
@@ -398,7 +419,6 @@ const DiagramViewer: React.FC = () => {
                     ...data,
                     nodes: layoutResult.nodes,
                     edges: layoutResult.edges || data.edges || [],
-                    // Ensure a layout config exists
                     layout: data.layout || { type: 'DomainDagreLayout', direction: 'TB' }
                 };
             } catch (err) {
@@ -406,21 +426,46 @@ const DiagramViewer: React.FC = () => {
             }
         }
 
+
+        // Clear old autosave to prevent stale data leak across diagrams
+        const oldStorageKey = `flowchart-autosave-v2-${selectedDiagramId}`;
+        if (oldStorageKey !== `flowchart-autosave-v2-${id}`) {
+            localStorage.removeItem(oldStorageKey);
+        }
+
         if (processedData && processedData.nodes) {
+            // Write to localStorage so the new component can reliably load it on mount,
+            // regardless of React reconciliation timing.
             const storageKey = `flowchart-autosave-v2-${id}`;
             localStorage.setItem(storageKey, JSON.stringify({
+                diagramId: id,
                 nodes: processedData.nodes,
                 edges: processedData.edges || [],
                 layout: processedData.layout,
                 metadata: processedData.metadata,
                 timestamp: Date.now(),
-                version: '1.0'
+                version: '1.0',
+                isFreshSeed: true
             }));
         }
-        handleSelectDiagram(id);
-    }, [handleSelectDiagram]);
 
+        // Persist the selected ID for the host storage
+        try { localStorage.setItem('diagramMenu.selectedDiagramId', id); } catch {}
 
+        // 清理旧图表的 bridge，防止失效引用在内存中积累
+        try {
+            const bridge = (window as any).__flowDataBridge;
+            if (bridge && selectedDiagramId && selectedDiagramId !== id) {
+                delete bridge[selectedDiagramId];
+            }
+        } catch { /* ignore */ }
+
+        // HashRouter 需要直接操作 hash 并重载，setSearchParams/setRefreshNonce
+        // 均无法在异步回调中可靠触发 React 重渲染。
+        // localStorage 已写入 isFreshSeed 数据，重载后会被 useDesignerSystemSync 消费。
+        window.location.hash = `#/?diagram=${id}`;
+        requestAnimationFrame(() => window.location.reload());
+    }, [selectedDiagramId]);
 
     // 构建通过 IoC 模式下发的商业级高级操作菜单
     const extraExportItems = useMemo(() => [
@@ -458,6 +503,9 @@ const DiagramViewer: React.FC = () => {
         }
     ], [hasFeature, showUpgradeModal]);
 
+    // 同步 selectedDiagramId → localStorage（供命令面板等非 reload 路径使用）
+    // 注意：seedAutoSaveAndNavigate 中有直接写 localStorage 的逻辑（用于 reload 前持久化），
+    // 此 useEffect 覆盖命令面板 handleSelectDiagram 等同步导航场景。
     useEffect(() => {
         if (selectedDiagramId) {
             saveSelectedDiagramId(selectedDiagramId);
@@ -871,7 +919,7 @@ const DiagramViewer: React.FC = () => {
                                                             cloud: { provider: providerName, id: savedDiagram.id, title: savedDiagram.title }
                                                         }
                                                     };
-                                                    seedAutoSaveAndNavigate(normalized, leafKey);
+                                                    seedAutoSaveAndNavigate(normalized, savedDiagram.id);
                                                 } else {
                                                     message.error(t('storage.manager.noContent'));
                                                 }
@@ -880,26 +928,39 @@ const DiagramViewer: React.FC = () => {
                                             } finally {
                                                 messageKey();
                                             }
-                                        } else if (rootGroup === 'local-workspace') {
-                                            const d = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY);
-                                            if (d) {
-                                                try {
-                                                    const maps = JSON.parse(d);
-                                                    const found = maps[leafKey];
-                                                    if (found) {
-                                                        seedAutoSaveAndNavigate(found, leafKey);
-                                                    }
-                                                } catch (e) { }
-                                            }
                                         } else {
+                                            if (rootGroup === 'local-workspace') {
+                                                const d = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY);
+                                                if (d) {
+                                                    try {
+                                                        const maps = JSON.parse(d);
+                                                        const found = maps[leafKey];
+                                                        if (found) {
+                                                            const trueId = found.id || leafKey;
+                                                            seedAutoSaveAndNavigate(found, trueId);
+                                                            return;
+                                                        }
+                                                    } catch (e) { }
+                                                }
+                                            }
+                                            
                                             const preset = PRESET_MAP[leafKey];
                                             if (preset) {
+                                                const trueId = preset.id || leafKey;
                                                 seedAutoSaveAndNavigate({
                                                     ...preset,
-                                                    id: leafKey,
+                                                    id: trueId,
                                                     metadata: { ...preset.metadata, title: preset.name }
-                                                }, leafKey);
+                                                }, trueId);
                                             } else {
+                                                // If there's no preset, this is a blank template or direct URL load via UI menu.
+                                                // We must clear any potentially poisoned autosave data before navigating to force a new blank/default canvas.
+                                                try {
+                                                    localStorage.removeItem(`flowchart-autosave-v2-${leafKey}`);
+                                                    localStorage.removeItem(`GenericStandardDiagram.customPresets.${leafKey}`);
+                                                } catch (e) {
+                                                    console.warn('Failed to clear autosave data:', e);
+                                                }
                                                 handleSelectDiagram(leafKey);
                                             }
                                         }
@@ -1044,7 +1105,7 @@ const DiagramViewer: React.FC = () => {
                                         const DynamicComponent: any = SelectedDiagramComponent;
                                         return (
                                             <DynamicComponent
-                                                key={selectedDiagramId}
+                                                key={`${selectedDiagramId}-${refreshNonce}`}
                                                 id={selectedDiagramId}
                                                 edgeMode={edgeMode}
                                                 layoutStrategy={layoutStrategy}

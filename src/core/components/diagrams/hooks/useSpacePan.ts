@@ -20,6 +20,7 @@ export const useSpacePan = () => {
                 event.preventDefault();
                 setIsSpacePressed(true);
                 document.body.style.cursor = 'grab';
+                document.body.classList.add('performance-mode');
             }
         };
 
@@ -29,6 +30,7 @@ export const useSpacePan = () => {
                 event.preventDefault();
                 setIsSpacePressed(false);
                 document.body.style.cursor = '';
+                document.body.classList.remove('performance-mode');
             }
         };
 
@@ -36,6 +38,7 @@ export const useSpacePan = () => {
         const handleBlur = () => {
             setIsSpacePressed(false);
             document.body.style.cursor = '';
+            document.body.classList.remove('performance-mode');
         };
 
         window.addEventListener('keydown', handleKeyDown);
@@ -47,6 +50,7 @@ export const useSpacePan = () => {
             window.removeEventListener('keyup', handleKeyUp);
             window.removeEventListener('blur', handleBlur);
             document.body.style.cursor = '';
+            document.body.classList.remove('performance-mode');
         };
     }, [isSpacePressed]);
 

@@ -104,7 +104,7 @@ const ShortcutsGuide: React.FC = () => {
                 margin: '8px 0',
                 overflow: 'hidden'
             }}
-            bodyStyle={{ padding: '16px' }}
+            styles={{ body: { padding: '16px' } }}
         >
             <Title level={5} style={{ marginTop: 0, marginBottom: 12, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <QuestionCircleOutlined /> 

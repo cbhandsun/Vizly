@@ -790,7 +790,7 @@ const renderConfigEditor = (item: ConfigItem) => {
           </select>
           {nodeLayoutDisabled && (
             <div className="text-[10px] text-amber-500 font-medium">
-              {t('config.layout.domainElkActive', '域ELK生效中')}
+              {t('config.layout.domainElkActive')}
             </div>
           )}
         </div>
@@ -888,13 +888,10 @@ const renderTabContent = () => {
                 const map: Record<string, string> = {
                   '基础设置': 'basic', '避障与容器': 'obstacle', '几何微调': 'geometry', '偏好权重': 'preference',
                   '高级采样': 'sampling', '贝塞尔微调': 'bezier', '核心策略': 'core', 'ELK 基础': 'elkBasic',
-                  'ELK 间距': 'elkSpacing', 'ELK 高级微调': 'elkAdvanced'
+                  'ELK 间距': 'elkSpacing', 'ELK 高级微调': 'elkAdvanced', 'other': 'other'
                 };
-                if (map[group.name]) {
-                  const tGroup = t(`config.groups.${map[group.name]}`);
-                  return tGroup.startsWith('config.') ? group.name : tGroup;
-                }
-                return group.name;
+                const groupKey = map[group.name] || group.name;
+                return t(`config.groups.${groupKey}`);
               })()}
             </h3>
           </div>
@@ -965,7 +962,7 @@ return createPortal(
             { id: 'layout', label: t('config.tabs.layout') },
             { id: 'performance', label: t('config.tabs.performance') }
           ] : [
-            { id: 'basic', label: t('config.tabs.basic', '基础设置') }
+            { id: 'basic', label: t('config.tabs.basic') }
           ]).map(tab => (
             <button
               key={tab.id}
@@ -981,7 +978,7 @@ return createPortal(
         <div className="px-5 py-4 border-t border-black/5 dark:border-white/5 bg-gray-50/50 dark:bg-black/20">
           <label className="flex items-center justify-between cursor-pointer group">
             <span className="text-[13px] font-medium text-gray-700 dark:text-gray-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-              {t('config.advancedMode', '专家模式')}
+              {t('config.groups.expertMode', 'Expert Mode')}
             </span>
             <div className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${isAdvancedMode ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-white/10'}`}>
               <span className="sr-only">Use advanced mode</span>
@@ -1006,7 +1003,7 @@ return createPortal(
         {/* 顶部标题栏 & 关闭按钮 */}
         <div className="flex-none flex items-center justify-between px-8 md:px-12 pt-7 pb-5">
           <h1 className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight leading-none">
-            {activeTab === 'basic' ? t('config.tabs.basic', '基础设置') : t(`config.tabs.${activeTab}`)}
+            {t(`config.tabs.${activeTab}`)}
           </h1>
           <button onClick={onClose} className="-mr-2 p-1.5 rounded-md text-gray-400 hover:text-gray-800 hover:bg-black/5 dark:hover:text-gray-100 dark:hover:bg-white/10 transition-colors" title={t('config.actions.close')}>
             <FaTimes className="w-4 h-4" />
@@ -1042,9 +1039,9 @@ return createPortal(
                   setEditingValues(next);
                   setHasChanges(false);
                 }}
-                title={t('config.actions.applyCompact') === 'config.actions.applyCompact' ? '应用紧凑排版预设' : t('config.actions.applyCompact')}
+                title={t('config.actions.applyCompact')}
               >
-                {t('config.actions.applyCompact') === 'config.actions.applyCompact' ? '应用紧凑排版预设' : t('config.actions.applyCompact')}
+                {t('config.actions.applyCompact')}
               </button>
               <button
                 className={`flex items-center justify-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors rounded-lg flex-1 sm:flex-none ${actionBtnSecondary}`}
@@ -1069,9 +1066,9 @@ return createPortal(
                   setEditingValues(next);
                   setHasChanges(false);
                 }}
-                title={t('config.actions.applyConsistent') === 'config.actions.applyConsistent' ? '应用标准排版预设' : t('config.actions.applyConsistent')}
+                title={t('config.actions.applyConsistent')}
               >
-                {t('config.actions.applyConsistent') === 'config.actions.applyConsistent' ? '应用标准排版预设' : t('config.actions.applyConsistent')}
+                {t('config.actions.applyConsistent')}
               </button>
             </div>
           )}
@@ -1087,12 +1084,12 @@ return createPortal(
             disabled={!hasChanges}
           >
             <FaUndo />
-            {t('config.actions.reset') === 'config.actions.reset' ? '重置' : t('config.actions.reset')}
+            {t('config.actions.reset')}
           </button>
           {hasChanges && (
             <div className="flex items-center gap-2 text-[13px] font-medium text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-md border border-amber-200 dark:border-amber-800/30">
               <FaExclamationTriangle className="w-3.5 h-3.5" />
-              {t('config.unsavedChanges') === 'config.unsavedChanges' ? '有未保存的更改' : t('config.unsavedChanges')}
+              {t('config.unsavedChanges')}
             </div>
           )}
         </div>
@@ -1101,7 +1098,7 @@ return createPortal(
             onClick={onClose}
             className={`px-6 py-2 text-[13px] font-medium transition-colors ${actionBtnSecondary}`}
           >
-            {t('config.actions.cancel') === 'config.actions.cancel' ? '取消' : t('config.actions.cancel')}
+            {t('config.actions.cancel', 'Cancel')}
           </button>
           <button
             onClick={handleSaveChanges}
@@ -1109,7 +1106,7 @@ return createPortal(
             className={`flex items-center justify-center gap-2 px-6 py-2 text-[13px] font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnPrimary}`}
           >
             <FaCheck />
-            {t('config.actions.save') === 'config.actions.save' ? '保存更改' : t('config.actions.save')}
+            {t('config.actions.save')}
           </button>
         </div>
       </div>

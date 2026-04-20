@@ -3,7 +3,7 @@ import { useTheme } from '../../../themes/useCoreTheme';
 import { getDomainTheme, resolveThemeDomainKey } from '../../../utils/domainKey';
 import { pickReadableTextColor, ensureReadableText } from '../../../utils/colorUtils';
 import { diagramConfigManager } from '../../config/DiagramConfig';
-import { useDiagramStylePreset } from '../../shared/DiagramStyleManager';
+import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v2';
 
 const DEFAULT_FONT_STACK = '"Microsoft YaHei", "PingFang SC", "Helvetica Neue", Helvetica, Arial, sans-serif';
 
@@ -35,7 +35,7 @@ export const useCustomNodeStyleResolution = ({
     nodeWidth
 }: UseCustomNodeStyleResolutionProps) => {
     const [theme] = useTheme({ autoInitialize: true });
-    const preset = useDiagramStylePreset();
+    const preset = useDiagramStylePreset_v2();
 
     // Debug checks
     const debugEnabled = useMemo(() => {

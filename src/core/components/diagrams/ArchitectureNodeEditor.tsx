@@ -100,7 +100,7 @@ export const ArchitectureNodeEditor: React.FC<ArchitectureNodeEditorProps> = ({
             </Form>
 
             {data.metrics && data.metrics.length > 0 && (
-                <Card size="small" title={<Space><DashboardOutlined /> 实况指标面板</Space>} bodyStyle={{ padding: '8px' }}>
+                <Card size="small" title={<Space><DashboardOutlined /> 实况指标面板</Space>} styles={{ body: { padding: '8px' } }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                         {data.metrics.map((m, idx) => (
                             <div key={idx} style={{ background: '#fafafa', padding: '6px 8px', borderRadius: 6, border: '1px solid #f0f0f0' }}>
@@ -113,7 +113,7 @@ export const ArchitectureNodeEditor: React.FC<ArchitectureNodeEditorProps> = ({
             )}
 
             {data.linterErrors && data.linterErrors.length > 0 && (
-                <Card size="small" title={<Space><SafetyCertificateOutlined style={{color: '#f5222d'}} /> 架构合规风险</Space>} bodyStyle={{ padding: '8px' }}>
+                <Card size="small" title={<Space><SafetyCertificateOutlined style={{color: '#f5222d'}} /> 架构合规风险</Space>} styles={{ body: { padding: '8px' } }}>
                      {data.linterErrors.map((err, idx) => (
                          <div key={idx} style={{ color: '#f5222d', fontSize: 12, marginBottom: 4, display: 'flex', alignItems: 'flex-start' }}>
                              <span style={{ marginRight: 4 }}>•</span> {err}

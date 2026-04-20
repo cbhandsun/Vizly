@@ -10,11 +10,11 @@ import { useTranslation } from 'react-i18next';
 import { FaPalette, FaCheck, FaTimes } from 'react-icons/fa';
 import {
     diagramStyleManager,
-    useDiagramStylePreset,
     FlowStylePreset,
     StylePresetCategory,
     STYLE_CATEGORIES,
 } from '@/core';
+import { useDiagramStylePreset_v2 } from '@/core/hooks/useDiagramStylePreset_v2';
 import { theme } from 'antd';
 
 export interface EnhancedStyleSwitcherProps {
@@ -168,7 +168,7 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
 }) => {
     const { t } = useTranslation();
     const { token } = theme.useToken();
-    const currentPreset = useDiagramStylePreset();
+    const currentPreset = useDiagramStylePreset_v2();
     const [isOpen, setIsOpen] = useState(false);
     const [hoveredPreset, setHoveredPreset] = useState<FlowStylePreset | null>(null);
     const panelRef = useRef<HTMLDivElement>(null);

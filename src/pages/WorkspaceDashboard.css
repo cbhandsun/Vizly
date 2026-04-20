@@ -11,17 +11,17 @@
   --vz-brand-from: #6366f1;
   --vz-brand-to: #a855f7;
   --vz-brand-gradient: linear-gradient(135deg, var(--vz-brand-from), var(--vz-brand-to));
-  --vz-surface: rgba(255, 255, 255, 0.85);
+  --vz-surface: rgba(255, 255, 255, 0.72);
   --vz-surface-solid: #ffffff;
   --vz-text-primary: #0f172a;
   --vz-text-secondary: #475569;
   --vz-text-tertiary: #94a3b8;
-  --vz-border: rgba(0, 0, 0, 0.08);
-  --vz-card-shadow: 0 1px 2px rgba(0,0,0,0.03);
-  --vz-card-hover-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
-  --vz-radius: 6px;
-  --vz-radius-sm: 4px;
-  --vz-transition: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --vz-border: rgba(0, 0, 0, 0.06);
+  --vz-card-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  --vz-card-hover-shadow: 0 12px 32px -8px rgba(99, 102, 241, 0.15), 0 4px 6px -2px rgba(0,0,0,0.02);
+  --vz-radius: 12px; /* 🚀 V3 Standard */
+  --vz-radius-sm: 8px;
+  --vz-transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html[data-theme='dark'] .workspace-dashboard {
@@ -93,6 +93,7 @@ html[data-theme='dark'] .workspace-dashboard {
   font-weight: 800;
   background: var(--vz-brand-gradient);
   -webkit-background-clip: text;
+  background-clip: text;
   color: transparent;
   letter-spacing: -0.2px;
 }
@@ -124,13 +125,9 @@ html[data-theme='dark'] .workspace-search {
 
 .workspace-search:focus-within {
   background: var(--vz-surface-solid);
-  border-color: #94a3b8;
-  box-shadow: 0 0 0 1px #94a3b8;
-}
-
-html[data-theme='dark'] .workspace-search:focus-within {
-  border-color: #64748b;
-  box-shadow: 0 0 0 1px #475569;
+  border-color: var(--vz-brand-from);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+  transform: scale(1.02);
 }
 
 .workspace-search input {
@@ -491,14 +488,14 @@ html[data-theme='dark'] .diagram-card {
 }
 
 .diagram-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-6px) scale(1.01);
   box-shadow: var(--vz-card-hover-shadow);
-  border-color: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.25);
 }
 
 html[data-theme='dark'] .diagram-card:hover {
-  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.12), 0 2px 8px rgba(0,0,0,0.3);
-  border-color: rgba(99, 102, 241, 0.2);
+  box-shadow: 0 16px 40px -10px rgba(99, 102, 241, 0.25), 0 4px 12px rgba(0,0,0,0.35);
+  border-color: rgba(99, 102, 241, 0.35);
 }
 
 /* Card Cover - Type-themed gradients */

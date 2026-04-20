@@ -28,6 +28,8 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
     fetchCloudList();
   }, [fetchCloudList]);
 
+  const [cascaderKey, setCascaderKey] = React.useState(0);
+
   const cascaderOptions = useMemo(() => {
     interface CascaderOption {
       value: string;
@@ -96,6 +98,13 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
 
   return (
     <Cascader
+      key={cascaderKey}
+      onDropdownVisibleChange={(visible) => {
+        if (!visible) {
+          // Reset cascader fully after popup close animation completes
+          setTimeout(() => setCascaderKey(k => k + 1), 300);
+        }
+      }}
       options={cascaderOptions}
       value={value}
       onChange={(val) => {
@@ -144,8 +153,9 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
           const input = inputValue.toLowerCase();
           return path.some(option => {
             const lbl = option.label;
-            const text = typeof lbl === 'string' ? lbl : (option.value as string) ?? '';
-            return text.toLowerCase().indexOf(input) > -1;
+            const text = typeof lbl === 'string' ? lbl : '';
+            const val = String(option.value || '');
+            return text.toLowerCase().indexOf(input) > -1 || val.toLowerCase().indexOf(input) > -1;
           });
         },
 

@@ -1,12 +1,13 @@
 import React from 'react';
-import { diagramStyleManager, useDiagramStylePreset } from './DiagramStyleManager';
+import { diagramStyleManager } from './DiagramStyleManager';
+import { useDiagramStylePreset_v2 } from '../../hooks/useDiagramStylePreset_v2';
 
 interface Props {
   size?: 'sm' | 'md';
 }
 
 export const DiagramStyleSwitcher: React.FC<Props> = ({ size = 'md' }) => {
-  const preset = useDiagramStylePreset();
+  const preset = useDiagramStylePreset_v2();
   const presets = diagramStyleManager.getPresets();
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {

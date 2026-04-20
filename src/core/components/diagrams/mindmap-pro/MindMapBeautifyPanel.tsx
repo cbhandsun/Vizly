@@ -68,12 +68,12 @@ export const MindMapBeautifyPanel: React.FC<{ ctx: PluginContext, selectedNodes:
     );
 
     return (
-        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="mindmap-beautify-container" style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
              <div>
                 <h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 600 }}>思维导图配置</h3>
              </div>
 
-             <Form layout="vertical" size="small">
+             <Form layout="vertical" size="small" className="mindmap-beautify-form">
                  <Form.Item label="结构布局" tooltip="默认由中心节点决定，修改将影响其子分支">
                      <Select 
                          value={direction} 
@@ -116,7 +116,6 @@ export const MindMapBeautifyPanel: React.FC<{ ctx: PluginContext, selectedNodes:
                      />
                  </Form.Item>
 
-
                  <Form.Item label="分支颜色" tooltip="改变当前分支的主题色">
                      <Popover content={ColorPickerContent} trigger="click" placement="bottomLeft">
                          <Button 
@@ -135,7 +134,6 @@ export const MindMapBeautifyPanel: React.FC<{ ctx: PluginContext, selectedNodes:
                      </Popover>
                  </Form.Item>
              </Form>
-
              <Divider style={{ margin: '8px 0' }} />
              <div style={{ fontSize: 12, color: '#888' }}>
                  提示：选中单个节点可独立修改其颜色和形状；选中「根节点」时，将修改全局思维导图结构配置。

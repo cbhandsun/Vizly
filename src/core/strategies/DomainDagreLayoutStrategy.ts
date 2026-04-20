@@ -186,6 +186,66 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             const dt: any = (n as any)?.data || {};
             return String(dt?.domain || '').trim();
         };
+
+        // ----------------------------------------------------
+        // [FIX] Convert Absolute Dagre Nodes to ReactFlow Parent/Relative Offset Hierarchy
+        // ----------------------------------------------------
+        const convertToHierarchicalFormat = (nodesToConvert: ReactFlowNode[], nodeToSg: Map<string, string>) => {
+            // First pass: capture all absolute positions before any mutation
+            const absolutePositions = new Map<string, {x: number, y: number}>();
+            nodesToConvert.forEach(n => {
+                // If a temporary positionAbsolute was explicitly set, prefer it
+                const absX = (n as any).positionAbsolute?.x ?? n.position.x;
+                const absY = (n as any).positionAbsolute?.y ?? n.position.y;
+                absolutePositions.set(n.id, { x: absX, y: absY });
+            });
+
+            // Second pass: safely compute relative positions
+            nodesToConvert.forEach(n => {
+                const sgId = nodeToSg.get(n.id);
+                if (sgId) {
+                    n.parentId = sgId;
+                    n.extent = 'parent';
+                    const parentAbs = absolutePositions.get(sgId);
+                    if (parentAbs) {
+                        n.position.x -= parentAbs.x;
+                        n.position.y -= parentAbs.y;
+                    }
+                } else {
+                    const dk = domainOf(n);
+                    if (dk && String(n.type) !== 'titleGroup') {
+                        const titleGroup = nodesToConvert.find(t => String(t.type) === 'titleGroup' && String((t.data as any)?.domain) === dk);
+                        if (titleGroup) {
+                            n.parentId = titleGroup.id;
+                            n.extent = 'parent';
+                            const parentAbs = absolutePositions.get(titleGroup.id);
+                            if (parentAbs) {
+                                n.position.x -= parentAbs.x;
+                                n.position.y -= parentAbs.y;
+                            }
+                        }
+                    }
+                }
+                // Cleanup temp absolute cache to prevent state mutation errors
+                delete (n as any).positionAbsolute;
+            });
+        };
+
+        const sortHierarchicalNodes = (nodesToSort: ReactFlowNode[]) => {
+            const typeOrders: Record<string, number> = {
+                'titleGroup': 0,
+                'domain': 0,
+                'subGroup': 1,
+                'group': 2,
+            };
+            
+            nodesToSort.sort((a, b) => {
+                const orderA = typeOrders[String(a.type)] ?? 99;
+                const orderB = typeOrders[String(b.type)] ?? 99;
+                return orderA - orderB;
+            });
+        };
+
         // [FIX] 忽略 RF measured，只用 style 确保一致性
 
         // 调试：显示所有节点的类型
@@ -279,6 +339,10 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
             // 并行边分离
             const separatedEdges = separateParallelEdges(validEdges, 12);
+
+            // Path 1 cleanup
+            updatedNodes.forEach(n => delete (n as any).positionAbsolute);
+            sortHierarchicalNodes(updatedNodes);
 
             return { nodes: updatedNodes, edges: separatedEdges };
         }
@@ -408,6 +472,10 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
             // 并行边分离
             const separatedEdges = separateParallelEdges(validEdges, 12);
+
+            // Path 2 hierarchy conversion
+            convertToHierarchicalFormat(updatedNodes, nodeToSubGroup);
+            sortHierarchicalNodes(updatedNodes);
 
             return { nodes: updatedNodes, edges: separatedEdges };
         }
@@ -933,6 +1001,10 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         console.log('[DomainDagre] Applying subdomain centering...');
         updatedNodes = centerSubGroupsInDomain(updatedNodes);
         console.log('[DomainDagre] Subdomain centering complete.');
+
+        // Path 3 hierarchy conversion
+        convertToHierarchicalFormat(updatedNodes, nodeToSubGroup);
+        sortHierarchicalNodes(updatedNodes);
 
         return { nodes: updatedNodes, edges: finalRoutedEdges };
     }

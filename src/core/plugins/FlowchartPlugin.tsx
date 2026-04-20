@@ -24,7 +24,12 @@ type NodeConfig = Record<string, unknown>;
 export class FlowchartPlugin extends BaseDiagramPlugin implements DiagramTypePlugin {
     id = 'flowchart';
     name = '通用画布';
-    version = '1.1';
+    version = '1.1.0';
+    description = 'Vizly 的核心画布引擎，支持自由布局、智能连线与全量基础形状。适用于大多数通用绘图场景。';
+    author = 'Vizly Core';
+    category = 'Core';
+    tags = ['General', 'Flowchart', 'Base'];
+    brandColor = '#1890ff';
 
     async migrate(data: any, fromVersion: string | undefined): Promise<any> {
         const migratedData = await super.migrate(data, fromVersion);
@@ -286,6 +291,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                 <div
                     draggable
                     onDragStart={(event) => onDragStart(event, type, typeName, label, config)}
+                    onClick={() => ctx.addNode(typeName, { label, ...config })}
                     style={{
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                         padding: '12px 8px', cursor: 'grab', 

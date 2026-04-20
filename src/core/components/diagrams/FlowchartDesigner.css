@@ -4,16 +4,17 @@
    统一设计器 UI / Glassmorphism Design Tokens (Hyper-Glass)
    ============================================ */
 :root {
-    --designer-panel-bg: rgba(255, 255, 255, 0.65);
-    --designer-blur: blur(32px) saturate(200%);
-    --designer-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4), 0 24px 48px -12px rgba(0, 0, 0, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    --designer-panel-bg: rgba(255, 255, 255, 0.72);
+    --designer-blur: 24px saturate(180%);
+    --designer-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45), 0 20px 40px -10px rgba(0, 0, 0, 0.1), 0 4px 6px -1px rgba(0, 0, 0, 0.04);
     --designer-border: transparent;
     --designer-radius: 20px;
+    --designer-accent: #6366f1;
 }
 
 [data-theme='dark'] {
-    --designer-panel-bg: rgba(30, 30, 46, 0.55);
-    --designer-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 24px 48px -12px rgba(0, 0, 0, 0.4), 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    --designer-panel-bg: rgba(28, 28, 41, 0.65);
+    --designer-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.05), 0 24px 48px -12px rgba(0, 0, 0, 0.45), 0 4px 6px -1px rgba(0, 0, 0, 0.25);
     --designer-border: transparent;
 }
 
@@ -36,6 +37,15 @@
     height: 100%;
     overflow: hidden;
     position: relative;
+    background-color: var(--designer-panel-bg); /* 背景通透感起点 */
+}
+
+/* 侧边栏空气感与间距优化 */
+.modern-sidebar-container {
+    padding: 16px 12px !important;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
 /* 画布主区域 — 占满剩余空间 */
@@ -49,7 +59,32 @@
     background-color: transparent;
 }
 
+/* 🎨 [GAP-63] 顶栏与画布的丝滑过渡 */
+.diagram-canvas-area::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 32px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.03) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0.8;
+}
+
 /* 🎨 P1-4: 浮动工具栏入场动画 */
+@keyframes toolbarEnter {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px) scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) scale(1);
+    }
+}
+
 @keyframes toolbarFadeIn {
     from {
         opacity: 0;
@@ -286,6 +321,20 @@
 /* 连接点基础样式 */
 .react-flow__handle {
     transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-width 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 🎯 扩充连接点热区 (Hit-box Expansion) */
+.react-flow__handle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    transform: translate(-50%, -50%);
+    background: transparent;
+    pointer-events: auto;
+    z-index: 10;
 }
 
 /* 连接点悬停效果 */
@@ -545,9 +594,41 @@ circle.custom-edge-updater {
     animation: none;
 }
 
+/* 🌈 [GAP-01] MiniMap 视觉重塑 */
+.react-flow__minimap {
+    background: var(--designer-panel-bg) !important;
+    backdrop-filter: blur(12px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12) !important;
+    overflow: hidden !important;
+    margin: 16px !important;
+}
+
+/* 增强 SVG 缩略图饱和度 */
+.react-flow__minimap svg {
+    filter: saturate(1.8) contrast(1.1);
+}
+
+/* 高亮当前视口蒙层 */
+.react-flow__minimap-mask {
+    fill: rgba(0, 0, 0, 0.15) !important;
+}
+
+[data-theme='dark'] .react-flow__minimap-mask {
+    fill: rgba(255, 255, 255, 0.08) !important;
+}
+
+.react-flow__minimap-viewport {
+    fill: rgba(99, 102, 241, 0.08) !important;
+    stroke: var(--designer-accent) !important;
+    stroke-width: 2px !important;
+}
+
 /* 拖动时隐藏 MiniMap 减少实时渲染开销 */
 .react-flow.performance-mode .react-flow__minimap {
-    opacity: 0.3;
+    opacity: 0.2;
     pointer-events: none;
     transition: opacity 0.2s ease;
 }
@@ -594,6 +675,35 @@ circle.custom-edge-updater {
     /* animation: none !important; [FIX] 禁用：防止动画重播闪屏 */
 }
 
+.react-flow__node.selected {
+    box-shadow: 0 0 0 2px var(--designer-accent), 0 0 16px rgba(99, 102, 241, 0.3) !important;
+    transition: box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* 选中态的渐变微光效果 */
+.react-flow__node.selected::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    background: linear-gradient(135deg, var(--designer-accent), #818cf8);
+    border-radius: inherit;
+    z-index: -1;
+    opacity: 0.2;
+    animation: pulseGlow 2s infinite alternate;
+    pointer-events: none;
+}
+
+@keyframes pulseGlow {
+    from { opacity: 0.1; transform: scale(0.99); }
+    to { opacity: 0.3; transform: scale(1.01); }
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+    stroke: var(--designer-accent) !important;
+    stroke-width: 3px !important;
+    filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.4));
+}
+
 /* 🚀 performance-mode 补充覆盖：smart-edge 和 SVG shapes */
 .react-flow.performance-mode .smart-edge,
 .react-flow.performance-mode .flowchart-shape,
@@ -636,9 +746,46 @@ circle.custom-edge-updater {
 }
 
 /* Floating Toolbars Hover */
+.modern-toolbar {
+    transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
 .modern-toolbar:hover {
-    background: rgba(255, 255, 255, 0.9) !important;
-    box-shadow: 0 12px 48px rgba(31, 38, 135, 0.2) !important;
+    background: rgba(255, 255, 255, 0.92) !important;
+    box-shadow: 0 20px 80px rgba(0, 0, 0, 0.22) !important;
+    transform: translateX(-50%) translateY(-2px) !important;
+}
+
+/* 拖动手柄打磨 */
+.toolbar-drag-handle:hover {
+    color: var(--designer-accent, #6366f1) !important;
+    transform: scale(1.1);
+}
+
+.toolbar-drag-handle:active {
+    transform: scale(0.9);
+}
+
+/* 按钮微交互 */
+.modern-toolbar .ant-btn {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.modern-toolbar .ant-btn:hover {
+    transform: translateY(-2px) scale(1.1);
+    background: rgba(0, 0, 0, 0.04) !important;
+}
+
+.modern-toolbar .ant-btn:active {
+    transform: translateY(0) scale(0.95);
+}
+
+.modern-toolbar .ant-btn.ant-btn-primary:not(.ant-btn-background-ghost) {
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.modern-toolbar .ant-btn.ant-btn-primary:not(.ant-btn-background-ghost):hover {
+    box-shadow: 0 8px 16px rgba(99, 102, 241, 0.6);
 }
 
 .floating-toolbar {
@@ -1261,9 +1408,64 @@ circle.custom-edge-updater {
 @keyframes handlePulse {
     0%, 100% {
         box-shadow: 0 0 0 0 var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.4));
+        transform: scale(1);
     }
     50% {
         box-shadow: 0 0 0 4px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.1)), 0 0 10px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.2));
+        transform: scale(1.2);
+    }
+}
+
+/* 🚀 P6: 连线预览路径升级 — 能量流动感 */
+.react-flow__connection-path {
+    stroke: var(--theme-primary-main, #3b82f6) !important;
+    stroke-width: 2px !important;
+    stroke-dasharray: 8, 4 !important;
+    animation: energyFlow 1s linear infinite !important;
+    filter: drop-shadow(0 0 4px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.3)));
+    pointer-events: none;
+}
+
+@keyframes energyFlow {
+    from {
+        stroke-dashoffset: 24;
+    }
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+/* 🚀 P6: 磁性吸附反馈 — 节点共鸣 */
+.react-flow__node.rf-connect-preview {
+    border-color: var(--theme-primary-main, #3b82f6) !important;
+    box-shadow: 
+        0 0 0 2px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.15)),
+        inset 0 0 15px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.1)) !important;
+    transform: scale(1.01) !important;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease !important;
+    z-index: 1000 !important;
+}
+
+/* 🚀 P6: 句柄点亮闪烁 — 捕捉状态 */
+.react-flow__handle.connectionindicator {
+    background: var(--theme-success-main, #10b981) !important;
+    border-color: #fff !important;
+    width: 12px !important;
+    height: 12px !important;
+    animation: handleCapture 0.4s cubic-bezier(0, 0, 0.2, 1) forwards !important;
+    box-shadow: 0 0 0 4px var(--theme-success-main-alpha, rgba(16, 185, 129, 0.2)) !important;
+}
+
+@keyframes handleCapture {
+    0% {
+        transform: scale(0.8);
+        background: #fff !important;
+        box-shadow: 0 0 20px 10px rgba(255, 255, 255, 0.8) !important;
+    }
+    100% {
+        transform: scale(1);
+        background: var(--theme-success-main, #10b981) !important;
+        box-shadow: 0 0 0 4px var(--theme-success-main-alpha, rgba(16, 185, 129, 0.2)) !important;
     }
 }
 
@@ -1340,5 +1542,91 @@ circle.custom-edge-updater {
 .diagram-zoomed-out .react-flow__edge-text,
 .diagram-zoomed-out .edge-label-container {
     display: none !important;
+}
+
+/* ============================================
+   GAP-11: Responsive Support (Phase 1)
+   ============================================ */
+@media (max-width: 768px) {
+    .diagram-root {
+        flex-direction: column;
+    }
+
+    /* Hide static sidebars and switch to drawers/modals */
+    .icon-rail-sidebar {
+        display: none !important;
+    }
+
+    .designer-right-sidebar {
+        display: none !important;
+    }
+
+    /* Canvas full screen on mobile */
+    .diagram-canvas-area {
+        height: 100vh;
+    }
+
+    /* Floating control islands adjustment */
+    .designer-top-action-island {
+        top: 8px !important;
+        transform: translateX(-50%) scale(0.9) !important;
+    }
+
+    .diagram-status-bar {
+        bottom: 12px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        font-size: 11px !important;
+        padding: 4px 12px !important;
+    }
+
+    /* Prevent text selection and long-press callouts on canvas */
+    .react-flow__pane {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+    }
+}
+
+/* 🎯 扩充连接点热区 (Hit-box Expansion) */
+.react-flow__handle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    transform: translate(-50%, -50%);
+    background: transparent;
+    pointer-events: auto;
+    z-index: 10;
+}
+
+/* ============================================
+   性能激进模式 (Performance Aggressive Mode)
+   当连线、拖拽时，挂载在 Body 上的 .performance-mode 会生效
+   ============================================ */
+body.performance-mode .react-flow__edge-path,
+body.performance-mode .react-flow__node,
+body.performance-mode .react-flow__viewport {
+    transition: none !important;
+    will-change: transform;
+}
+
+body.performance-mode .modern-toolbar,
+body.performance-mode .modern-sidebar-container,
+body.performance-mode .modern-controls-panel {
+    /* 拖动时禁用高开销滤镜，显著提升帧率 */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+html[data-theme='dark'] body.performance-mode .modern-toolbar,
+html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
+    background: rgba(30, 30, 40, 0.98) !important;
 }
 

@@ -85,6 +85,29 @@ export const diagramDefinitions: DiagramDefinition[] = [
     icon: FaSitemap,
   },
   {
+    id: 'hello-world-unified',
+    name: '🌟 统一架构：示例插件 (SDK)',
+    component: lazy(() => import('@/core').then(m => {
+      const ensureRegistered = async () => {
+        const { PluginRegistry } = m;
+        if (!PluginRegistry.getInstance().getPlugin('hello-world')) {
+            const { HelloWorldPlugin } = await import('../components/diagrams/plugins/HelloWorldPlugin');
+            PluginRegistry.getInstance().register(new HelloWorldPlugin());
+        }
+      };
+      
+      return { 
+        default: (props: any) => {
+           ensureRegistered();
+           return createElement(m.FlowchartDesigner, { ...props, pluginId: 'hello-world' });
+        }
+      };
+    })),
+    category: 'other',
+    tags: ['sdk', 'hello-world', 'unified', 'plugin'],
+    icon: FaSitemap,
+  },
+  {
     id: 'theme-color-comparison',
     name: '主题颜色对比',
     component: lazy(() => import('../pages/ThemeColorComparison')),

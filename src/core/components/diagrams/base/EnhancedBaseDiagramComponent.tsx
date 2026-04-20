@@ -7,7 +7,7 @@ import React, { useMemo, useEffect, useState, useCallback, memo } from 'react';
 import type { NodeTypes } from '@xyflow/react';
 import { Node, Edge, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
 import BaseReactFlow from '../../shared/BaseReactFlow';
-import { useFlowStyles } from '../../shared/flowStyles';
+import { useFlowStyles } from '../../../hooks/useFlowStyles';
 import CustomNode from '../../custom-nodes/CustomNode';
 import TitleGroupNode from '../../custom-nodes/TitleGroupNode';
 import SubGroupNode from '../../custom-nodes/SubGroupNode';

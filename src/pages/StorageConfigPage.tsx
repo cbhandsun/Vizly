@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Form, Input, Button, Card, Switch, Typography, Space, Select } from 'antd';
 import { appMessage as message, appModal } from '@/core';
 import { SaveOutlined, ApiOutlined, CloudServerOutlined } from '@ant-design/icons';
@@ -11,6 +12,7 @@ const StorageConfigPage: React.FC = () => {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const [testing, setTesting] = useState(false);
+    const navigate = useNavigate();
 
     useEffect(() => {
         const config = storageService.getConfig();
@@ -99,8 +101,37 @@ const StorageConfigPage: React.FC = () => {
     };
 
     return (
-        <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
+        <div style={{ minHeight: '100vh', background: 'var(--vz-dashboard-bg, #fcfcfc)' }}>
+            {/* Consistent Header */}
+            <header className="workspace-global-header" style={{ marginBottom: 0 }}>
+                <div className="workspace-header-brand" onClick={() => navigate('/manage')}>
+                    <div className="workspace-header-logo">
+                        <div style={{
+                            width: 28,
+                            height: 28,
+                            background: 'var(--vz-brand-gradient)',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#fff',
+                            fontSize: '16px',
+                            fontWeight: '800',
+                            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
+                        }}>V</div>
+                    </div>
+                    <div className="workspace-header-title">Vizly</div>
+                </div>
+                <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--vz-text-secondary)' }}>
+                    Settings & Storage
+                </div>
+                <div style={{ width: 220, display: 'flex', justifyContent: 'flex-end' }}>
+                     <Button type="text" onClick={() => navigate('/manage')}>Return to Workspace</Button>
+                </div>
+            </header>
+
+            <div style={{ padding: '48px 24px', maxWidth: '800px', margin: '0 auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%' }}>
                 <div>
                     <Title level={2}><CloudServerOutlined /> 云端存储配置</Title>
                     <Paragraph type="secondary">
@@ -108,7 +139,16 @@ const StorageConfigPage: React.FC = () => {
                     </Paragraph>
                 </div>
 
-                <Card title="连接设置" bordered={false} style={{ boxShadow: '0 1px 2px -2px rgba(0, 0, 0, 0.16), 0 3px 6px 0 rgba(0, 0, 0, 0.12), 0 5px 12px 4px rgba(0, 0, 0, 0.09)' }}>
+                <Card 
+                    title={<span style={{ fontWeight: 700, letterSpacing: '-0.2px' }}>Connection Settings</span>} 
+                    bordered={false} 
+                    style={{ 
+                        borderRadius: 12,
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 16px 32px -8px rgba(0,0,0,0.05)',
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        backdropFilter: 'blur(20px)'
+                    }}
+                >
                     <Form
                         form={form}
                         layout="vertical"
@@ -189,6 +229,7 @@ const StorageConfigPage: React.FC = () => {
                 </Card>
             </div>
         </div>
+    </div>
     );
 };
 

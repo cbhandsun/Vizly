@@ -30,6 +30,7 @@ export interface CommentThread {
     content: string;
     createdAt: number;
     isResolved: boolean;
+    color: string; // ⭐ [GAP-02] 用于 Pin 的视觉颜色标识
     replies: CommentReply[];
     nodeId?: string;
 }
@@ -46,6 +47,7 @@ interface DiagramState {
 
   // ⭐ Phase 11: 评论系统
   comments: CommentThread[];
+  activeCommentId: string | null; // ⭐ [GAP-02] 当前选中的评论 ID
   isCommentMode: boolean;
   user: {
       id: string;
@@ -53,6 +55,9 @@ interface DiagramState {
       color: string;
       avatar?: string;
   };
+  
+  // ⭐ [GAP-12] 插件沙盒状态存储
+  pluginStates: Record<string, any>;
   
   // Actions
   setNodes: (nodes: Node[] | ((nds: Node[]) => Node[])) => void;
@@ -68,6 +73,10 @@ interface DiagramState {
   addComment: (comment: CommentThread) => void;
   updateComment: (id: string, updates: Partial<CommentThread>) => void;
   removeComment: (id: string) => void;
+  setActiveCommentId: (id: string | null) => void; // ⭐ [GAP-02] 设置选中
+  
+  // ⭐ [GAP-12] 插件状态管理 Action
+  setPluginState: (pluginId: string, state: any | ((prev: any) => any)) => void;
   
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -81,12 +90,14 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   isDragging: false,
   contextMenu: null,
   comments: [],
+  activeCommentId: null,
   isCommentMode: false,
   user: {
       id: 'current-user',
       name: 'Admin User',
       color: '#1890ff'
   },
+  pluginStates: {},
 
   setNodes: (nodesOrUpdater) => {
     set((state) => ({
@@ -130,6 +141,22 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   removeComment: (id) => set((state) => ({
       comments: state.comments.filter(c => c.id !== id)
   })),
+
+  setActiveCommentId: (id) => set({ activeCommentId: id }),
+
+  setPluginState: (pluginId, stateOrUpdater) => set((state) => {
+    const currentPluginState = state.pluginStates[pluginId] || {};
+    const newState = typeof stateOrUpdater === 'function' 
+        ? stateOrUpdater(currentPluginState) 
+        : { ...currentPluginState, ...stateOrUpdater };
+    
+    return {
+      pluginStates: {
+        ...state.pluginStates,
+        [pluginId]: newState
+      }
+    };
+  }),
 
   onNodesChange: (changes: NodeChange[]) => {
     set((state) => ({

@@ -12,10 +12,17 @@ import { MindMapOutlinePanel } from '../components/diagrams/mindmap-pro/MindMapO
 import { SidebarPanel } from '../types/plugin';
 import { UnorderedListOutlined, PartitionOutlined, FullscreenOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
 import { BaseDiagramPlugin } from '../sdk/BasePlugin';
+import i18n from '@/i18n';
+import { useTranslation } from 'react-i18next';
+import { Select, Divider, Tooltip, Button } from 'antd';
 
 export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugin {
   id = 'mindmap';
-  name = 'Mind Map Pro';
+  
+  get name() {
+    return i18n.t('plugins.mindmap.title');
+  }
+
   version = '1.1';
 
   async migrate(data: any, fromVersion: string | undefined): Promise<any> {
@@ -90,6 +97,7 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
 const MindMapToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
     // Defense: ctx may be null during first render cycle
     if (!ctx) return null;
+    const { t } = useTranslation();
 
     const handleDirectionChange = (direction: string) => {
         // Update root node direction, triggering orchestrator cascade
@@ -129,27 +137,27 @@ const MindMapToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
                 variant="borderless"
                 value={currentDirection}
                 onChange={handleDirectionChange}
-                style={{ width: 120 }}
+                style={{ width: 140 }}
                 options={[
-                    { label: '↔ 双向展开', value: 'LR' },
-                    { label: '→ 向右展开', value: 'R' },
-                    { label: '← 向左展开', value: 'L' },
-                    { label: '↓ 向下展开', value: 'TB' }
+                    { label: t('plugins.mindmap.direction.LR'), value: 'LR' },
+                    { label: t('plugins.mindmap.direction.R'), value: 'R' },
+                    { label: t('plugins.mindmap.direction.L'), value: 'L' },
+                    { label: t('plugins.mindmap.direction.TB'), value: 'TB' }
                 ]}
             />
 
             <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
 
-            <Tooltip title="折叠所有分支">
+            <Tooltip title={t('plugins.mindmap.collapseAll')}>
                 <Button size="small" type="text" icon={<MenuFoldOutlined />} onClick={handleCollapseAll} />
             </Tooltip>
-            <Tooltip title="展开所有分支">
+            <Tooltip title={t('plugins.mindmap.expandAll')}>
                 <Button size="small" type="text" icon={<MenuUnfoldOutlined />} onClick={handleExpandAll} />
             </Tooltip>
 
             <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
 
-            <Tooltip title="适应视口">
+            <Tooltip title={t('plugins.mindmap.fitView')}>
                 <Button size="small" type="text" icon={<FullscreenOutlined />} onClick={handleFitView} />
             </Tooltip>
         </div>

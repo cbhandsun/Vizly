@@ -6,7 +6,7 @@ import { makeSoftTintGradient } from '../../utils/colorUtils';
 import { resolveThemeDomainKey, getDomainTheme } from '../../utils/domainKey';
 import { Theme } from '../../themes/types/ThemeTypes';
 import { ensureReadableText } from '../../utils/colorUtils';
-import { useDiagramStylePreset } from '../shared/DiagramStyleManager';
+import { useDiagramStylePreset_v2 } from '../../hooks/useDiagramStylePreset_v2';
 import { useContainerNode } from './useContainerNode';
 import './TitleGroupNode.css';
 
@@ -32,7 +32,7 @@ interface TitleGroupNodeProps extends Partial<NodeProps<any>> {
 
 const TitleGroupNode = React.memo(({ id, data, width = 200, height = 120, selected }: TitleGroupNodeProps & { selected?: boolean }) => {
   const [theme] = useTheme({ autoInitialize: true });
-  const preset = useDiagramStylePreset();
+  const preset = useDiagramStylePreset_v2();
 
   const barH = data.titleBarHeight || (preset?.domain?.titleBarHeight ?? 40);
   const {

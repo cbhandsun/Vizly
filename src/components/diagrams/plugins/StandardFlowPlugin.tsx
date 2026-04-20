@@ -17,6 +17,12 @@ import { PRESET_MAP, defaultStandardData } from '@/data/standardized';
 export class StandardFlowPlugin implements DiagramTypePlugin {
   id = 'standard-flow';
   name = '标准流程图';
+  version = '2.1.0';
+  description = '功能强大的通用流程图引擎，支持多种自动布局策略与智能连线，是业务逻辑编排的首选工具。';
+  author = 'Vizly Core Team';
+  category = 'Core';
+  tags = ['Flow', 'Logic', 'BPMN'];
+  brandColor = '#1890ff';
 
   parseData(_source: unknown) {
     // 依赖核心设计器的 parser，因此此处返回空，由加载方调用 designerUtils.standardDataToCanvas 处理
@@ -67,6 +73,37 @@ export class StandardFlowPlugin implements DiagramTypePlugin {
         content: <JsonEditorPanelWrapper ctx={ctx} />,
       },
     ];
+  }
+
+  // ====== AI Actions (GAP-10 Phase 2) ======
+  async onAIAction(action: string, params: any, ctx: PluginContext): Promise<boolean> {
+    console.log(`[StandardFlowPlugin] Handling AI action: ${action}`, params);
+    
+    switch (action) {
+      case 'smart-optimize':
+        // 插件特定的智能优化逻辑
+        import('@/core').then(({ recommendLayout }) => {
+          const recommendation = recommendLayout(ctx.getNodes(), ctx.getEdges());
+          if (recommendation) {
+            window.dispatchEvent(new CustomEvent('editor:command', { 
+              detail: { action: 'apply-layout', strategy: recommendation.strategy } 
+            }));
+          }
+        });
+        return true;
+
+      case 'add-service':
+        // 假设 AI 想专门添加一个微服务节点
+        ctx.addNode('customNode', { 
+          label: params.label || 'New Service', 
+          domainClass: params.domainClass || 'mid',
+          type: 'microservice'
+        });
+        return true;
+
+      default:
+        return false; // 继续由系统默认处理
+    }
   }
 }
 

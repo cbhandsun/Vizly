@@ -1,0 +1,75 @@
+.presence-header-container {
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    height: 48px;
+    z-index: 1000;
+}
+
+.presence-glass-capsule {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 12px 4px 8px;
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.presence-glass-capsule:hover {
+    background: rgba(255, 255, 255, 0.6);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+.presence-avatar-badge .ant-avatar {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease;
+}
+
+.presence-avatar-badge:hover .ant-avatar {
+    transform: scale(1.1);
+    z-index: 10;
+}
+
+.presence-labels {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.presence-count {
+    font-size: 13px;
+    font-weight: 600;
+    color: #434343;
+    letter-spacing: -0.01em;
+}
+
+/* Dark Mode Adaptation */
+[data-theme='dark'] .presence-glass-capsule {
+    background: rgba(30, 30, 46, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme='dark'] .presence-glass-capsule:hover {
+    background: rgba(30, 30, 46, 0.7);
+}
+
+[data-theme='dark'] .presence-count {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.presence-avatar-badge .ant-badge-status-dot {
+    width: 8px;
+    height: 8px;
+    border: 1.5px solid #fff;
+}
+
+[data-theme='dark'] .presence-avatar-badge .ant-badge-status-dot {
+    border-color: #1e1e2e;
+}

@@ -159,7 +159,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   zoomOnPinch = true,
   zoomOnDoubleClick = false, // 减少双击事件监听器
   panOnScroll = false,
-  preventScrolling = false, // 允许页面滚动，减少事件拦截
+  preventScrolling = undefined, // To be auto-detected if not provided
   nodesDraggable = true,
   nodesConnectable = true,
   elementsSelectable = true,
@@ -211,6 +211,22 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       return cfg.canvas?.zoom?.sensitivity ?? 1;
     } catch { return 1; }
   }, []);
+  // Mobile detection
+  const isTouchDevice = useMemo(() => {
+    return typeof window !== 'undefined' && (('ontouchstart' in window) || (navigator.maxTouchPoints > 0));
+  }, []);
+
+  const [isMobileScreen, setIsMobileScreen] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobileScreen(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const effectivePreventScrolling = preventScrolling !== undefined ? preventScrolling : (isTouchDevice || isMobileScreen);
+  const effectivePanOnScroll = panOnScroll || (isTouchDevice && !panOnDrag);
+
   // 新增：容器就绪防抖状态
   const [isContainerReady, setIsContainerReady] = useState(false);
   const readyTimeoutRef = useRef<number | null>(null);
@@ -831,8 +847,8 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           zoomOnScroll={false}
           zoomOnPinch={zoomOnPinch}
           zoomOnDoubleClick={zoomOnDoubleClick}
-          panOnScroll={panOnScroll}
-          preventScrolling={preventScrolling}
+          panOnScroll={effectivePanOnScroll}
+          preventScrolling={effectivePreventScrolling}
           nodesDraggable={nodesDraggable}
           nodesConnectable={nodesConnectable}
           elementsSelectable={elementsSelectable}

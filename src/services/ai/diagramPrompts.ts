@@ -11,7 +11,7 @@ import { analyzeDiagram } from '@/utils/diagramAnalyzer';
  * 主要 System Prompt — 架构图 AI 助手
  * 当用户请求生成/修改图表时，AI 应返回标准 JSON 格式
  */
-export const DIAGRAM_SYSTEM_PROMPT = `你是一个专业的架构图 AI 助手，帮助用户通过自然语言创建和优化 architecture 图、流程图和系统设计图。
+export const DIAGRAM_SYSTEM_PROMPT = `你是一个专业的架构图 AI 助手，帮助用户通过自然语言创建和优化 architecture 图、流程图、系统设计图及 UML 时序图。
 
 ## 核心能力
 1. **自然语言转图**：将用户的文字描述转化为图表 JSON 数据
@@ -61,7 +61,12 @@ export const DIAGRAM_SYSTEM_PROMPT = `你是一个专业的架构图 AI 助手�
 - **type**: 
   - 使用 "customNode" 适用于架构图标准节点
   - 使用 "flowchartNode" 适用于流程图节点
+  - 使用 "lifeline" 适用于 UML 时序图中的参与者节点。其 data.type 可设为 "actor" (人) 或 "system" (系统盒)。
   - 使用 "group" 适用于将多个相关节点包裹在一起的**容器**。它本身是一个大方框。
+
+- **edge type**:
+  - 默认为空（普通连线）
+  - 使用 "sequenceEdge" 适用于 UML 时序图。其 data.type 可设为 "sync" (同步), "async" (异步), "return" (返回虚线)。
 
 - **嵌套与聚合 (重点)**: 
   - 若你想表达多个服务/节点同属于一个逻辑模块或层级，你必须先定义一个 "type": "group" 的节点作为外壳。
@@ -221,18 +226,46 @@ export const SLASH_COMMAND_PROMPTS: Record<string, (args: string) => string> = {
 2. 生成 animatePath 指令：[COMMAND: {"action": "animatePath", "params": {"edgeIds": ["id1", "..."], "options": {"duration": 2000, "loop": true}}}]。
 3. 描述流量流向及关键观测点。`,
 
-  '/doc': (_args: string) => `请基于当前的图表，生成一份详尽的【技术架构文档】。
-你的文档应包含以下章节：
-1. **系统概述**：整体设计目标与核心业务价值。
-2. **组件详解**：按层级（如接入层、业务层、数据层）详细列出各节点的职责。
-3. **技术栈映射**：基于节点的 domainClass 和标签，推测可能的具体技术实现。
-4. **架构分析**：
-    - 伸缩性设计 (Scalability)
-    - 安全性考量 (Security) 
-    - 潜在风险与改进建议
-5. **交互流程**：描述核心的调用闭环。
+  '/doc': (_args: string) => `请基于当前的图表，生成一份详尽且专业的【技术架构说明书 (Technical Design Document)】。
+你的文档应采用以下标准生产级结构进行输出：
 
-请使用标准的 Markdown 格式输出，排版要专业且易读。结合下方的 [当前画布状态] 和 [图表分析] 数据生成文档。`
+# 1. 系统概述 (System Overview)
+- **设计目标**：阐述该架构旨在解决的核心业务问题。
+- **关键性能指标 (KPIs)**：基于组件规模推测系统吞吐量与延迟预期。
+
+# 2. 组件架构详解 (Component Architecture)
+请按物理/逻辑层级（Domain Layers）展开：
+- **接入与调度层 (ch/fe)**：职责、容灾策略。
+- **业务中台层 (mid)**：核心逻辑单元、有无状态设计。
+- **数据治理层 (data)**：存储选型理由（SQL/NoSQL）、备份与同步机制。
+
+# 3. 技术栈映射 (Tech Stack Mapping)
+根据节点标签（如 Redis, Kafka, K8s）及其域分类，补充具体的技术选型建议与最佳实践。
+
+# 4. 架构专项分析 (Non-Functional Requirements)
+- **高可用设计**：如何应对单点故障？
+- **安全性考量**：认证授权流、数据加密建议。
+- **伸缩性 (Scalability)**：水平扩展路径。
+
+# 5. 核心交互流程
+描述主业务链路在各组件间的流转逻辑。
+
+# 6. 巡检结论与演进建议
+引用 [图表分析] 中的数据，指出当前架构的薄弱环节（如层级违规、循环依赖）并给出重构方案。
+
+请使用标准的 GitHub Flavored Markdown 格式输出，排版要清晰、专业、利于阅读。结合下方的 [当前画布状态] 和 [图表分析] 数据生成。`,
+
+  '/sequence': (_args: string) => `请基于用户的描述，生成一份标准的 UML 时序图 JSON。
+
+## 时序图建模规则：
+1. **节点类型**：必须使用 "type": "lifeline"。
+2. **生命线排列**：X 坐标固定（如 100, 350, 600...），Y 坐标固定为 50。
+3. **消息连线**：必须使用 "type": "sequenceEdge"。
+4. **时间流向**：消息的 Y 坐标随时间推移（第一条消息在 100 左右，后续每条递增 60-80px）。
+5. **数据描述**：Edge 的 data.type 应根据语义设为 "sync", "async" 或 "return"。
+
+示例输入：“用户在登录页输入密码，请求网关鉴权，网关调用认证中心，中心返回成功，网关返回 200”
+输出应包含 User, Gateway, AuthCenter 三个生命线，及对应的四条水平消息边。`
 };
 
 /**

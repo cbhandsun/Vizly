@@ -60,6 +60,11 @@ export interface PluginContext {
   
   reactFlowInstance?: any;
   diagramId?: string;
+
+  /** 
+   * [NEW] 在画布中心或指定位置添加节点 (GAP-11 Mobile Tap-to-Add)
+   */
+  addNode: (type: string, data?: any, position?: { x: number, y: number }) => string;
   
   // ====== 插件状态沙箱 (Plugin State Sandbox) ======
   /** 获取当前激活插件的独立持久化状态 */
@@ -78,6 +83,20 @@ export interface DiagramTypePlugin {
   
   /** 插件数据结构兼容版本号，用于自动拦截并触发清洗机制 */
   version?: string;
+
+  // ====== 市场元数据 (Marketplace Metadata) ======
+  /** 插件用途的精炼描述 */
+  description?: string;
+  /** 作者或组织名称 */
+  author?: string;
+  /** 分类，用于市场筛选 */
+  category?: 'Core' | 'Productivity' | 'Integration' | 'Beta';
+  /** 功能标签 */
+  tags?: string[];
+  /** 预览图 URL (或 icon 增强) */
+  previewImage?: string;
+  /** 品牌主题色，用于市场卡片边框 */
+  brandColor?: string;
 
   // ====== 数据模型 ======
   /** 将外部数据源解析为 ReactFlow nodes/edges */
@@ -126,6 +145,10 @@ export interface DiagramTypePlugin {
   contributeCommands?(ctx: PluginContext): import('../components/ui/CommandPalette').CommandItem[];
 
   // ====== 被动监听钩子 (Passive Event Observers) ======
+  /** 插件初始化生命周期 */
+  onInit?(ctx: PluginContext): void;
+  /** 插件销毁生命周期 */
+  onDestroy?(ctx: PluginContext): void;
   /** 节点或连线选中状态变更时触发 */
   onSelectionChange?(selectedNodes: Node[], selectedEdges: Edge[], ctx: PluginContext): void;
   /** 画布视野 (缩放、平移) 发生变更时触发 */
@@ -168,4 +191,18 @@ export interface DiagramTypePlugin {
   supportsGrouping?: boolean;
   /** 是否支持智能路由 */
   supportsSmartRouting?: boolean;
+
+  // ====== AI & 指令自动化 (GAP-10 Phase 2) ======
+  /** 
+   * 处理 AI 生成的领域特定指令。
+   * 返回 true 表示已处理，false 表示忽略或由系统默认处理程序接管。
+   */
+  onAIAction?(action: string, params: any, ctx: PluginContext): boolean | Promise<boolean>;
+}
+
+export interface AIActionContext {
+  action: string;
+  params: any;
+  pluginId: string;
+  timestamp: number;
 }

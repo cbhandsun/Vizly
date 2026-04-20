@@ -577,10 +577,6 @@ export const diagramStyleManager = {
   },
 };
 
-// Stable references for useSyncExternalStore (MUST NOT be created inside the hook)
-const _subscribe = (cb: () => void) => diagramStyleManager.subscribe(cb);
-const _getSnapshot = () => diagramStyleManager.getPreset();
 
-export function useDiagramStylePreset(): FlowStylePreset {
-  return useSyncExternalStore(_subscribe, _getSnapshot, _getSnapshot);
-}
+// Removed re-export to break circular dependency with useDiagramStylePreset hook.
+// Consumers should import directly from src/core/hooks/useDiagramStylePreset.

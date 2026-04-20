@@ -12,11 +12,14 @@ Object.entries(PRESET_MODULES).forEach(([path, mod]) => {
   const key = file.replace(/\.json$/i, '');
   const title = String((data as any)?.metadata?.title || (data as any)?.name || key);
   
-  PRESET_MAP[key] = data;
-
   const metadata = (data as any)?.metadata || {};
   const tags: string[] = Array.isArray(metadata.tags) ? metadata.tags : [];
   tags.forEach(t => ALL_TAGS.add(t));
+  
+  PRESET_MAP[key] = data;
+  if (data.id && data.id !== key) {
+    PRESET_MAP[data.id] = data;
+  }
   
   PRESET_OPTIONS.push({ 
     title, 
@@ -57,5 +60,19 @@ try {
 } catch { void 0; }
 
 export const defaultStandardData = PRESET_MAP['SupplyChainReceivingFlow'] || Object.values(PRESET_MAP)[0];
+
+const LEGACY_ID_MAP: Record<string, string> = {
+  'supply-chain-arch': 'LogisticsStandardData', // 旧图表 ID 映射到新的物理图表 ID
+  'logistics-planning': 'LogisticsPlanningStandardData',
+  'wms-architecture': 'WmsStandardData',
+  'enterprise-architecture': 'ArchitectureStandardData',
+};
+
+// 为旧ID添加映射引用，保证向前兼容
+Object.entries(LEGACY_ID_MAP).forEach(([oldId, newId]) => {
+  if (PRESET_MAP[newId] && !PRESET_MAP[oldId]) {
+    PRESET_MAP[oldId] = PRESET_MAP[newId];
+  }
+});
 
 export { PRESET_MAP, PRESET_OPTIONS, ALL_TAGS };

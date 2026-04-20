@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Node } from '@xyflow/react';
+import { Node, Edge } from '@xyflow/react';
 
 export interface NodeTemplate {
     id: string;
@@ -70,16 +70,47 @@ export const useNodeTemplates = (activeLayerId: string = 'layer-0') => {
         return template;
     }, []);
 
-    /** 从模板创建节点数据（不含 position，调用者负责放置） */
-    const createFromTemplate = useCallback((templateId: string): Omit<Node, 'id' | 'position'> | null => {
-        const tpl = templates.find(t => t.id === templateId);
-        if (!tpl) return null;
+    /** 从模板创建节点和连线数据 */
+    const createFromTemplate = useCallback((template: NodeTemplate, viewportX: number, viewportY: number, viewportZoom: number): { nodes: Node[]; edges: Edge[] } => {
+        if (template.isGroup && template.nodes) {
+            const baseId = `group-${Date.now()}`;
+            // 批量创建节点
+            const newNodes: Node[] = template.nodes.map((n, i) => ({
+                id: `${baseId}-${i}`,
+                type: n.type,
+                position: { 
+                    x: viewportX + n.relativeX, 
+                    y: viewportY + n.relativeY 
+                },
+                data: { ...n.data, layer: activeLayerId },
+                style: n.style ? { ...n.style } : undefined,
+            }));
+
+            // 批量创建连线
+            const newEdges: Edge[] = (template.edges || []).map((e, i) => ({
+                id: `edge-${baseId}-${i}`,
+                source: `${baseId}-${e.sourceIndex}`,
+                target: `${baseId}-${e.targetIndex}`,
+                label: e.label,
+                type: e.type,
+                data: e.data ? { ...e.data } : undefined,
+            }));
+
+            return { nodes: newNodes, edges: newEdges };
+        }
+
+        // 单节点模板
         return {
-            type: tpl.nodeType,
-            data: { ...tpl.data, layer: activeLayerId },
-            style: tpl.style ? { ...tpl.style } : undefined,
+            nodes: [{
+                id: `node-${Date.now()}`,
+                type: template.nodeType,
+                position: { x: viewportX, y: viewportY },
+                data: { ...template.data, layer: activeLayerId },
+                style: template.style ? { ...template.style } : undefined,
+            }],
+            edges: []
         };
-    }, [templates, activeLayerId]);
+    }, [activeLayerId]);
 
     /** 删除模板 */
     const deleteTemplate = useCallback((templateId: string) => {

@@ -71,7 +71,16 @@ export function useDesignerEventHandlers({
         reactFlowWrapper, selectedNodes,
     });
 
-    const { handleDelete, handleDuplicate, handleSelectAll, handleFitView, handleBringToFront, handleSendToBack, onContextMenuAction } = useDiagramActions({
+    const { 
+        handleDelete, 
+        handleDuplicate, 
+        handleSelectAll, 
+        handleFitView, 
+        handleBringToFront, 
+        handleSendToBack, 
+        onContextMenuAction,
+        handleLock
+    } = useDiagramActions({
         nodes, edges, setNodes, setEdges, selectedNodes, selectedEdges,
         takeSnapshot, reactFlowInstance, pluginCtx, activePlugin
     });
@@ -213,6 +222,16 @@ export function useDesignerEventHandlers({
         handleFitView,
         handleBringToFront,
         handleSendToBack,
-        isSpacePressed
+        isSpacePressed,
+        // Toast actions
+        handleCopyWithToast,
+        handlePasteWithToast,
+        handleCutWithToast,
+        handleDeleteWithToast,
+        handleDuplicateWithToast,
+        handleGroupWithToast,
+        handleUngroupWithToast,
+        onContextMenuActionWithToast,
+        handleLock
     };
 }

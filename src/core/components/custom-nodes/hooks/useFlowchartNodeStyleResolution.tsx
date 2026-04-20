@@ -3,7 +3,7 @@ import { useTheme } from '../../../themes/useCoreTheme';
 import { getDomainTheme, resolveThemeDomainKey } from '../../../utils/domainKey';
 import { pickReadableTextColor } from '../../../utils/colorUtils';
 import { hexToRgba } from '../../shared/layoutUtils';
-import { useDiagramStylePreset } from '../../shared/DiagramStyleManager';
+import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v2';
 import { useBusinessData } from '../../diagrams/NodeUpdateContext';
 import { Icon as IconifyIcon } from '@iconify/react';
 
@@ -96,7 +96,7 @@ interface ResolutionParams {
 
 export function useFlowchartNodeStyleResolution({ data, selected }: ResolutionParams) {
     const [theme] = useTheme({ autoInitialize: true });
-    const preset = useDiagramStylePreset();
+    const preset = useDiagramStylePreset_v2();
     const businessData = useBusinessData();
 
     return useMemo(() => {
@@ -140,7 +140,24 @@ export function useFlowchartNodeStyleResolution({ data, selected }: ResolutionPa
             backdropFilter = 'blur(10px) saturate(180%)';
         }
 
-        let textColor = domainTheme?.text || pickReadableTextColor(finalBgColor, '#FFFFFF', '#333333');
+        let isHighlyTransparent = false;
+        const rgbaMatch = finalBgColor.match(/rgba?\s*\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(?:,\s*([\d.]+))?\)/i);
+        if (rgbaMatch && rgbaMatch[1]) {
+           const alpha = parseFloat(rgbaMatch[1]);
+           if (alpha < 0.4) {
+               isHighlyTransparent = true;
+           }
+        }
+
+        let textColor = domainTheme?.text;
+        if (!textColor) {
+            if (isHighlyTransparent) {
+                // For highly transparent node backgrounds, rely on the app theme mode instead of the raw tint
+                textColor = theme.mode === 'dark' ? '#E5E7EB' : '#111111';
+            } else {
+                textColor = pickReadableTextColor(finalBgColor, '#FFFFFF', '#333333');
+            }
+        }
 
         const businessState = data.businessKey && businessData ? businessData[data.businessKey] : null;
 

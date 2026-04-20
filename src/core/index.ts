@@ -158,6 +158,7 @@ import { MindMapPlugin as InternalMindMapPlugin } from './plugins/MindMapPlugin'
 import { SwimlanePlugin as InternalSwimlanePlugin } from './plugins/SwimlanePlugin';
 import { ERDiagramPlugin as InternalERDiagramPlugin } from './plugins/ERDiagramPlugin';
 import { NetworkTopologyPlugin as InternalNetworkTopologyPlugin } from './plugins/NetworkTopologyPlugin';
+import { SequencePlugin as InternalSequencePlugin } from './plugins/SequencePlugin';
 
 export function initializePlugins() {
   const __registry = InternalPluginRegistry.getInstance();
@@ -169,6 +170,7 @@ export function initializePlugins() {
     __registry.register(new InternalSwimlanePlugin());
     __registry.register(new InternalERDiagramPlugin());
     __registry.register(new InternalNetworkTopologyPlugin());
+    __registry.register(new InternalSequencePlugin());
   }
 }
 

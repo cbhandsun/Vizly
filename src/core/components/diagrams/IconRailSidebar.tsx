@@ -52,6 +52,7 @@ interface IconRailSidebarProps {
     onDrawerWidthChange?: (width: number) => void;
     // 插件化面板注入
     pluginPanels?: { id: string; title: string; icon: React.ReactNode; content: React.ReactNode }[];
+    isMobile?: boolean; // GAP-11
 }
 
 type NodeConfig = Record<string, unknown>;
@@ -77,6 +78,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
     onDrawerVisibleChange,
     onDrawerWidthChange,
     pluginPanels = [],
+    isMobile = false,
 }) => {
     const { t } = useTranslation();
     const { token } = theme.useToken();
@@ -185,17 +187,17 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
     }, [drawerWidth]);
 
     const togglePanel = useCallback((panel: string) => {
-        setActivePanel(prev => {
-            const next = prev === panel ? null : panel;
-            onDrawerVisibleChange?.(next !== null);
-            return next;
-        });
-    }, [onDrawerVisibleChange]);
+        setActivePanel(prev => prev === panel ? null : panel);
+    }, []);
 
     const closeDrawer = useCallback(() => {
         setActivePanel(null);
-        onDrawerVisibleChange?.(false);
-    }, [onDrawerVisibleChange]);
+    }, []);
+
+    // Effect to notify parent when activePanel changes (avoids rendering during render warning)
+    useEffect(() => {
+        onDrawerVisibleChange?.(activePanel !== null);
+    }, [activePanel, onDrawerVisibleChange]);
 
     // Esc 键关闭 Drawer
     useEffect(() => {
@@ -375,7 +377,16 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                 <>
                     {/* 透明遮罩，点击关闭 */}
                     <div className="side-drawer-backdrop" onClick={closeDrawer} />
-                    <div className="side-drawer" style={{ width: drawerWidth }}>
+                    <div 
+                        className={`side-drawer ${isMobile ? 'mobile-drawer' : ''}`} 
+                        style={{ 
+                            width: isMobile ? '100%' : drawerWidth,
+                            height: isMobile ? '80vh' : '100%',
+                            bottom: isMobile ? 0 : 'auto',
+                            top: isMobile ? 'auto' : 0,
+                            borderRadius: isMobile ? '24px 24px 0 0' : 0
+                        }}
+                    >
                         <div className="side-drawer-header">
                             <div className="side-drawer-header-title">
                                 {getDrawerTitle()}

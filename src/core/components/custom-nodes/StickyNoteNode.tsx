@@ -1,7 +1,7 @@
 import React, { memo, useRef, useEffect } from 'react';
 import { NodeProps, Node, NodeToolbar } from '@xyflow/react';
 import { useNodeUpdate } from '../diagrams/NodeUpdateContext';
-import { useDiagramStylePreset } from '../shared/DiagramStyleManager';
+import { useDiagramStylePreset_v2 } from '../../hooks/useDiagramStylePreset_v2';
 import './StickyNoteNode.css';
 
 export interface StickyNoteData {
@@ -22,7 +22,7 @@ const colorMap = {
 };
 
 const StickyNoteNode: React.FC<NodeProps<Node<StickyNoteData, 'sticky-note'>>> = ({ data, selected, id }) => {
-    const preset = useDiagramStylePreset();
+    const preset = useDiagramStylePreset_v2();
     const isSketch = preset.name === 'sketch';
     const onUpdateNodeData = useNodeUpdate();
     const textareaRef = useRef<HTMLTextAreaElement>(null);

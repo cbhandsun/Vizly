@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useTheme } from './useCoreTheme';
 import { themeToCSSVariables, applyCSSVariables, removeCSSVariables } from './ThemeUtils';
+import './TactileFeedback.css';
 
 export interface DiagramThemeProviderProps {
     children: React.ReactNode;

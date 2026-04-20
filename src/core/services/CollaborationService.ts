@@ -32,18 +32,24 @@ class CollaborationService {
         this.userName = user?.name || `用户 ${this.userId.slice(-4)}`;
         this.userColor = COLLAB_COLORS[Math.floor(Math.random() * COLLAB_COLORS.length)];
 
-        // 连接到公共测试服务器 (演示用途)
+        // 连接到协作服务器 (如果配置)
         const roomName = `vizly-room-${diagramId}`;
-        this.provider = new WebsocketProvider('wss://demos.yjs.dev', roomName, this.doc);
+        const wsUrl = import.meta.env.VITE_YJS_WS_URL as string | undefined;
+        
+        if (wsUrl) {
+            this.provider = new WebsocketProvider(wsUrl, roomName, this.doc);
+            
+            // 设置本地状态
+            this.provider.awareness.setLocalStateField('user', {
+                name: this.userName,
+                color: this.userColor,
+                id: this.userId
+            });
 
-        // 设置本地状态
-        this.provider.awareness.setLocalStateField('user', {
-            name: this.userName,
-            color: this.userColor,
-            id: this.userId
-        });
-
-        console.log(`[Collab] Connected to room: ${roomName} as ${this.userName}`);
+            console.log(`[Collab] Connected to room: ${roomName} as ${this.userName}`);
+        } else {
+            console.log(`[Collab] Collaboration is local-only (No VITE_YJS_WS_URL provided). Room: ${roomName}`);
+        }
     }
 
     getDoc() {

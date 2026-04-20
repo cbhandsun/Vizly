@@ -24,6 +24,7 @@ interface DesignerRightSidebarProps {
     onAiTabIntercept?: () => boolean;
     activePlugin?: DiagramTypePlugin;
     pluginCtx?: PluginContext;
+    isMobile?: boolean; // GAP-11
 }
 
 const RAIL_WIDTH = 44; // Matched with exact IconRailSidebar width
@@ -49,6 +50,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     onAiTabIntercept,
     activePlugin,
     pluginCtx,
+    isMobile = false,
 }) => {
     const { t } = useTranslation();
     const { token } = theme.useToken();
@@ -135,13 +137,15 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             style={{
-                position: 'absolute',
+                position: isMobile ? 'fixed' : 'absolute',
                 pointerEvents: 'auto',
-                right: 16,
-                top: 80, // Shifted to mirror IconRailSidebar exactly
-                maxHeight: 'calc(100% - 96px)', // 100% - 80px (top) - 16px (bottom margin)
-                height: isCollapsed ? 'max-content' : 'calc(100% - 96px)',
-                width: isCollapsed ? RAIL_WIDTH : panelWidth,
+                right: isMobile ? 0 : 16,
+                left: isMobile ? 0 : 'auto',
+                top: isMobile ? 'auto' : 80,
+                bottom: isMobile ? 0 : 'auto',
+                maxHeight: isMobile ? '85vh' : 'calc(100% - 96px)',
+                height: isCollapsed ? (isMobile ? 0 : 'max-content') : (isMobile ? '85vh' : 'calc(100% - 96px)'),
+                width: isMobile ? '100%' : (isCollapsed ? RAIL_WIDTH : panelWidth),
                 backgroundColor: 'var(--designer-panel-bg, rgba(255, 255, 255, 0.85))',
                 backdropFilter: 'var(--designer-blur, blur(20px) saturate(180%))',
                 WebkitBackdropFilter: 'var(--designer-blur, blur(20px) saturate(180%))',
@@ -149,10 +153,12 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                 flexDirection: 'row-reverse',
                 boxShadow: 'var(--designer-shadow, 0 8px 32px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.04))',
                 border: `1px solid var(--designer-border, ${token.colorBorderSecondary})`,
-                borderRadius: 'var(--designer-radius, 16px)',
+                borderRadius: isMobile ? '24px 24px 0 0' : 'var(--designer-radius, 16px)',
                 zIndex: 1020,
                 // 只在收起/展开时加动画，拖拽时关闭动画避免卡顿
-                transition: 'none',
+                transition: isMobile ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+                transform: isMobile && isCollapsed ? 'translateY(100%)' : 'none',
+                visibility: isMobile && isCollapsed ? 'hidden' : 'visible'
             }}
         >
             {/* 宽度拖拽把手 */}
@@ -282,7 +288,8 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                     flexDirection: 'column',
                     overflow: 'hidden',
                     minWidth: 0,
-                    animation: 'drawerSlideIn 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    animation: isMobile ? 'none' : 'drawerSlideIn 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    paddingBottom: isMobile ? 'env(safe-area-inset-bottom, 20px)' : 0,
                 }}>
                     <Tabs
                         activeKey={activeTab}

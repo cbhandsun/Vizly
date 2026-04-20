@@ -68,6 +68,12 @@ export class SupabaseStorageProvider implements IStorageProvider {
 
     // === Version History (GAP-05) ===
     async saveVersion(diagramId: string, data: any, message?: string) {
+        // Prevent UUID errors for string-based standard template IDs
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(diagramId)) {
+             throw new Error("Version history requires a saved Cloud Diagram (UUID format required).");
+        }
+
         const { data: dbData, error } = await supabase!
             .from('diagram_versions')
             .insert({
@@ -90,6 +96,12 @@ export class SupabaseStorageProvider implements IStorageProvider {
     }
 
     async listVersions(diagramId: string) {
+        // Prevent UUID errors for string-based standard template IDs
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(diagramId)) {
+             return [];
+        }
+
         const { data, error } = await supabase!
             .from('diagram_versions')
             .select('id, diagram_id, author_id, created_at, message') // Omit heavy snapshotData for list
@@ -108,6 +120,12 @@ export class SupabaseStorageProvider implements IStorageProvider {
     }
 
     async loadVersion(diagramId: string, versionId: string) {
+        // Prevent UUID errors
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(diagramId) || !uuidRegex.test(versionId)) {
+             return null;
+        }
+
         const { data, error } = await supabase!
             .from('diagram_versions')
             .select('*')

@@ -6,7 +6,7 @@ import { useTheme } from '../../themes/useCoreTheme';
 import { resolveThemeDomainKey, getDomainTheme } from '../../utils/domainKey';
 import { hexToRgba } from '../shared/layoutUtils';
 import { Theme, ThemeColor } from '../../themes/types/ThemeTypes';
-import { useDiagramStylePreset } from '../shared/DiagramStyleManager';
+import { useDiagramStylePreset_v2 } from '../../hooks/useDiagramStylePreset_v2';
 import { useContainerNode } from './useContainerNode';
 import './SubGroupNode.css';
 
@@ -70,9 +70,10 @@ const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<G
 
   const isDarkTheme = theme?.name === 'dark' || (theme as { mode?: string })?.mode === 'dark';
   const fallbackTextColor = isDarkTheme ? '#FFFFFF' : '#333';
-  const textColor = domainTheme.text || fallbackTextColor;
+  // Use domain theme text only for solid backgrounds. For highly transparent ones, rely on fallback.
+  const textColor = bgAlpha < 0.4 ? fallbackTextColor : (domainTheme.text || fallbackTextColor);
 
-  const preset = useDiagramStylePreset();
+  const preset = useDiagramStylePreset_v2();
   const isSvgShape = false;
 
   // Destructure style safely

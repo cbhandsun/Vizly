@@ -4,6 +4,8 @@ import { StandardDiagramData, StandardNodeData, StandardEdgeData, GroupNodeData,
 import dagre from 'dagre';
 import { DomainDagreLayoutStrategy } from '../../strategies/DomainDagreLayoutStrategy';
 import { getThemeManager } from '../../themes';
+import { LayoutOptimizer } from '../layout/LayoutOptimizer';
+import { validateAndFixNodes } from '../../utils/nodeValidation';
 
 /**
  * Converts React Flow canvas data into the application's StandardDiagramData format.
@@ -232,7 +234,7 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
         window.dispatchEvent(new CustomEvent('diagram-global-theme-changed', { detail: savedThemeId }));
     }
 
-    const nodes: Node[] = [];
+    let nodes: Node[] = [];
     const edges: Edge[] = [];
 
     // ═══ 检测是否有已保存坐标 ═══
@@ -274,9 +276,11 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
         const titleMatch = description.match(/<b>(.*?)<\/b>/);
         const label = titleMatch ? titleMatch[1] : description.replace(/<[^>]*>?/gm, '').substring(0, 20);
 
+        const contentWidth = metadata.width || LayoutOptimizer.getInstance().calculateNodeWidth(description);
+
         // 如果明确是 group 类型，转化为 titleGroup 并直接放入
         if (n.type === 'group' || (n as any).type === 'group') {
-            const rawWidth = metadata.width || (n as any).width || 400;
+            const rawWidth = contentWidth > 400 ? contentWidth : 400;
             const rawHeight = metadata.height || (n as any).height || 300;
             nodes.push({
                 id: n.id,
@@ -326,8 +330,8 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
                 sequence: metadata.sequence,
                 theme: metadata.theme
             },
-            style: metadata.style,
-            width: metadata.width || 150,
+            style: { ...metadata.style, width: contentWidth },
+            width: contentWidth,
             height: metadata.height || 50
         });
     });
@@ -349,6 +353,9 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
             });
         }
     });
+
+    // 2.8 Validate and fix node dimensions/positions before layout
+    nodes = validateAndFixNodes(nodes);
 
     // 3. Process Edges
     data.edges.forEach(e => {

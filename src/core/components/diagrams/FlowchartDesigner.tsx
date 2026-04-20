@@ -1,6 +1,7 @@
-// @ts-nocheck
+import { useDiagramStylePreset_v2 } from "../../hooks/useDiagramStylePreset_v2";
+import { diagramStyleManager } from "../shared/DiagramStyleManager";
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import { message, notification, Divider, Button, Tooltip } from 'antd';
+import { message, notification, Divider, Button, Tooltip, Modal } from 'antd';
 import { Node, Edge, MarkerType, BackgroundVariant, ReactFlowInstance, SelectionMode, ConnectionMode, NodeTypes, Connection, reconnectEdge, addEdge } from '@xyflow/react';
 
 import { useDesignerCanvasState } from './hooks/useDesignerCanvasState';
@@ -22,7 +23,6 @@ import CommentNode from '../custom-nodes/CommentNode';
 import { RelationshipEdge } from '../custom-edges/RelationshipEdge';
 import { useTranslation } from 'react-i18next';
 import { FaProjectDiagram, FaExchangeAlt } from 'react-icons/fa';
-// import { useDiagramHistory } from '../../hooks/useDiagramHistory';
 import { IconRailSidebar } from './IconRailSidebar';
 import { dispatchDiagramControl } from '../../components/shared/diagramControl';
 import { PluginRegistry } from '../../services/PluginRegistry';
@@ -40,9 +40,8 @@ import { LayoutStabilityContext } from '../../context/LayoutStabilityContext';
 import { useAutoLayout } from '../../hooks/useAutoLayout';
 import { EdgeUpdateProvider } from './EdgeUpdateContext';
 import { SmartGuideRenderer } from './SmartGuideRenderer';
-
-import { useDiagramStylePreset, diagramStyleManager } from '../shared/DiagramStyleManager';
 import { useDiagramControls } from '../../hooks/useDiagramControls';
+import { useResponsive } from '../../../hooks/useResponsive';
 import { useDiagramCollaboration } from '../../hooks/useDiagramCollaboration';
 import { useTopologyLinter } from '../../hooks/useTopologyLinter';
 import { readDomViewport } from '../../utils/domViewport';
@@ -55,6 +54,8 @@ import './ModernControls.css';
 
 import { useDiagramActions } from './hooks/useDiagramActions';
 import { useVirtualization } from '../../hooks/useVirtualization';
+import { useMobileInteractions } from '../../hooks/useMobileInteractions';
+import { GestureOverlay } from '../shared/GestureOverlay';
 import { useGrouping } from './hooks/useGrouping';
 import { useCollapsibleGroups } from './hooks/useCollapsibleGroups';
 import { useDiagramDragDrop } from './hooks/useDiagramDragDrop';
@@ -71,7 +72,7 @@ import { useContainerAutoLayout } from './hooks/useContainerAutoLayout';
 import { useConnectionValidation } from './hooks/useConnectionValidation';
 import { useStylePainter } from './hooks/useStylePainter';
 import { useNodeTemplates } from './hooks/useNodeTemplates';
-import { useAnnotations } from './hooks/useAnnotations';
+// useAnnotations removed (GAP-02 Unified)
 import { AnnotationLayer } from './AnnotationLayer';
 import { FreehandDrawingLayer } from './FreehandDrawingLayer';
 import { useMultiPage } from './hooks/useMultiPage';
@@ -116,6 +117,8 @@ import ArrowTimelineNode from './nodes/ArrowTimelineNode';
 import { LiveCursors } from '../../../components/diagrams/collaboration/LiveCursors';
 import ERDatabaseNode from '../custom-nodes/ERDatabaseNode';
 import { VersionHistoryPanel } from '../../../components/diagrams/ui/VersionHistoryPanel';
+// useLayerManagement already imported above
+import { MobileBottomDock } from '../layout/MobileBottomDock';
 // useMindMapOrchestrator decoupled
 
 const FallbackNode = ({ type, data }: any) => (
@@ -178,11 +181,11 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     pluginId = 'flowchart',
 }) => {
     const { t } = useTranslation();
-    const preset = useDiagramStylePreset();
+    const preset = useDiagramStylePreset_v2();
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
     const screenToFlowPosition = reactFlowInstance?.screenToFlowPosition;
 
-    // ⭐ Define handleFitView early to avoid TDZ (Temporal Dead Zone) in hooks and effects
+    // ?Define handleFitView early to avoid TDZ (Temporal Dead Zone) in hooks and effects
     const handleFitView = useCallback(() => {
         if (reactFlowInstance) {
             reactFlowInstance.fitView({ duration: 800 });
@@ -225,18 +228,18 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         if (onOpenSettings) {
             onOpenSettings();
         } else {
-            message.info('当前独立设计器模式未挂载高级首选项面板，请在主视图中或按快捷键 Ctrl+Shift+, 打开。');
+            message.info('当前独立设计器模式未挂载高级首选项面板，请在主视图中或按快捷键 Ctrl+Shift+, 打开');
         }
     }, [onOpenSettings]);
 
-    // ⭐ 图片导出支持 (PNG/SVG/PDF/GIF)
+    // ?图片导出支持 (PNG/SVG/PDF/GIF)
     const diagramIdForExport = id || 'flowchart-designer';
     const { exportToPNG, exportToSVG, exportToPDF, exportToGIF } = useDiagramControls(diagramIdForExport, false);
 
-    // ⭐ 统一主题控制：响应 ConfigIntegration 的全局主题切换
+    // ?统一主题控制：响?ConfigIntegration 的全局主题切换
     const [theme, setTheme] = useTheme({ autoInitialize: true });
 
-    // ⭐ 监听跨包架构的全局主题变更事件 (由于主工程和核心包存在 ThemeManager 隔离情况)
+    // ?监听跨包架构的全局主题变更事件 (由于主工程和核心包存?ThemeManager 隔离情况)
     useEffect(() => {
         const handleGlobalThemeChanged = (e: any) => {
             const newThemeId = e.detail;
@@ -248,12 +251,12 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         return () => window.removeEventListener('diagram-global-theme-changed', handleGlobalThemeChanged);
     }, [theme?.id, setTheme]);
     
-    // ⭐ 画布与网格颜色动态解析 (支持深白主题自适应)
+    // ?画布与网格颜色动态解?(支持深白主题自适应)
     const isDarkBg = theme?.mode === 'dark';
     const canvasBg = theme?.diagram?.canvas?.background || (isDarkBg ? '#1e1e2e' : 'transparent');
     const gridColor = theme?.diagram?.canvas?.grid?.color || (isDarkBg ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)');
 
-    // ⭐ 性能监控
+    // ?性能监控
     useComponentPerformance('FlowchartDesigner');
     useInteractionPerformance();
 
@@ -266,10 +269,24 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         diagramHistory
     } = useDesignerCanvasState({ externalEdgeMode: internalEdgeMode });
 
-    const { takeSnapshot, undo, redo, canUndo, canRedo, pastEntries, getPreviousState } = diagramHistory;
+    const { takeSnapshot, undo, redo, canUndo, canRedo, pastEntries, getPreviousState, jumpTo } = diagramHistory;
     const setViewport = useCallback((vp: any) => {}, []); // viewport is read-only from the hook
     const [selectedNodes, setSelectedNodes] = useState<Node[]>([]);
     const [selectedEdges, setSelectedEdges] = useState<Edge[]>([]);
+    const [isContextToolbarHidden, setIsContextToolbarHidden] = useState(false);
+    const handleBeforeUpdate = useCallback(() => {}, []);
+    const handleFocusNode = useCallback((nodeId: string) => {
+        if (!reactFlowInstance) return;
+        const node = nodesRef.current.find(n => n.id === nodeId);
+        if (node) {
+            reactFlowInstance.setCenter(node.position.x + (node.measured?.width || 100) / 2, node.position.y + (node.measured?.height || 50) / 2, { duration: 800, zoom: 1.2 });
+            setSelectedNodes(nodesRef.current.filter(n => n.id === nodeId));
+        }
+    }, [reactFlowInstance, setSelectedNodes]);
+
+    const handlePresentationFocus = useCallback((ids: string[]) => {
+        if (ids && ids.length > 0) handleFocusNode(ids[0]);
+    }, [handleFocusNode]);
 
     const nodesRef = useRef(nodes);
     const edgesRef = useRef(edges);
@@ -277,6 +294,10 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         nodesRef.current = nodes;
         edgesRef.current = edges;
     }, [nodes, edges]);
+
+    const {
+        layers, activeLayerId, setActiveLayerId, createLayer, deleteLayer, toggleVisibility, toggleLock, renameLayer, reorderLayers, getLayer, setLayerColor
+    } = useLayerManagement();
 
     const { updateNodesBatch, updateEdgesBatch } = useDesignerBatchUpdates({
         nodes,
@@ -300,9 +321,34 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     const [diagramMetadata, setDiagramMetadata] = useState<any>(null);
     const [canvasSearchVisible, setCanvasSearchVisible] = useState(false);
     
-    // ⭐ Phase 10: 高级组件可见性状态提升
+    // ?GAP-11: Mobile Response Logic
+    const { isMobile, isTouchDevice } = useResponsive();
+    const [mobileAddDrawerVisible, setMobileAddDrawerVisible] = useState(false);
+    const [mobilePropertyDrawerVisible, setMobilePropertyDrawerVisible] = useState(false);
+    
+    // 猸?Phase 10: 楂樼骇缁勪欢鍙鎬х姸鎬佹彁鍗?
     const [exportModalVisible, setExportModalVisible] = useState(false);
     const [pluginManagerVisible, setPluginManagerVisible] = useState(false);
+
+    // AIChat visibility handling
+    const [aiChatVisible, setAiChatVisible] = useState(false);
+    const [activeRightTab, setActiveRightTab] = useState<'property' | 'ai'>('property');
+    const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
+    const [shortcutHelpVisible, setShortcutHelpVisible] = useState(false);
+    const [showShortcuts, setShowShortcutsModal] = useState(false);
+    const [jsonEditorInitialContent] = useState<string | undefined>(undefined);
+    const [saveState] = useState<string>('idle');
+    const [showPerformanceDashboard] = useState(false);
+    const [presentationSlides] = useState<any[]>([]);
+    const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+
+    const {
+        isGesturing,
+        currentZoom,
+        showOverlay,
+        handleTouchStart,
+        handleTouchEnd
+    } = useMobileInteractions();
 
     const [onboardingDismissed, setOnboardingDismissed] = useState(true);
     useEffect(() => {
@@ -315,8 +361,9 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     const [showRuler, setShowRuler] = useState(false);
     const [gridVariant, setGridVariant] = useState<BackgroundVariant>(BackgroundVariant.Lines);
     useEffect(() => {
-        if (theme?.diagram?.canvas?.grid?.style) {
-            const style = theme.diagram.canvas.grid.style.toLowerCase();
+        const gridControl = (theme?.diagram?.canvas?.grid as any);
+        if (gridControl?.style) {
+            const style = gridControl.style.toLowerCase();
             if (style === 'dots') setGridVariant(BackgroundVariant.Dots);
             else if (style === 'lines') setGridVariant(BackgroundVariant.Lines);
             else if (style === 'cross') setGridVariant(BackgroundVariant.Cross);
@@ -347,7 +394,53 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                 setNodes,
                 setEdges,
                 reactFlowInstance,
-                reactFlowWrapper
+                reactFlowWrapper,
+                addNode: (type, data = {}, position) => {
+                    if (!reactFlowInstance) return;
+                    takeSnapshot(nodesRef.current, edgesRef.current);
+                    
+                    let finalPos = position;
+                    if (!finalPos) {
+                        // 如果没有指定位置，默认生成在视口中心
+                        const vp = reactFlowInstance.getViewport();
+                        const container = reactFlowWrapper.current;
+                        const cw = container ? container.offsetWidth : window.innerWidth;
+                        const ch = container ? container.offsetHeight : window.innerHeight;
+                        finalPos = {
+                            x: (cw / 2 - vp.x) / vp.zoom - 50,
+                            y: (ch / 2 - vp.y) / vp.zoom - 25
+                        };
+                    }
+
+                    const newNode: Node = {
+                        id: `${type}-${Date.now()}`,
+                        type: type as any,
+                        position: finalPos,
+                        data: { 
+                            label: '新节点',
+                            ...data,
+                            layer: activeLayerId 
+                        }
+                    };
+                    
+                    setNodes(nds => [...nds, newNode]);
+                    message.success(`已添加 ${type}`);
+                    
+                    // 移动端添加后自动关闭抽屉
+                    if (window.innerWidth < 768) {
+                        setLeftDrawerOpen(false);
+                        setMobileAddDrawerVisible(false);
+                    }
+                    return newNode.id;
+                },
+                
+                // ⭐ [GAP-12] 插件状态沙盒实现
+                getPluginState: () => {
+                    return useDiagramStore.getState().pluginStates[pluginId];
+                },
+                setPluginState: (patch) => {
+                    useDiagramStore.getState().setPluginState(pluginId, patch);
+                }
             };
             Object.defineProperty(ctx, 'nodes', { get: () => nodesRef.current });
             Object.defineProperty(ctx, 'edges', { get: () => edgesRef.current });
@@ -358,7 +451,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                 plugin.onInit(ctx);
             }
 
-            // [NEW] 生命周期：销毁处理
+            // [NEW] 生命周期：销毁处?
             return () => {
                 if (plugin.onDestroy) {
                     plugin.onDestroy(ctx);
@@ -408,13 +501,23 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                  return;
              }
              
-             setEdges(eds => reconnectEdge(undefined as any, params, eds));
+             setEdges(eds => addEdge(params, eds));
         },
-        preset, showOnlyMainFlow, highlightMainFlow
+        preset, showOnlyMainFlow, highlightMainFlow,
+        layers,
+        activeLayerId,
+        setActiveLayerId,
+        createLayer,
+        deleteLayer,
+        toggleVisibility,
+        toggleLock,
+        renameLayer,
+        reorderLayers,
+        getLayer,
+        setLayerColor
     });
 
     const {
-        layers, activeLayerId, setActiveLayerId, createLayer, deleteLayer, toggleVisibility, toggleLock, renameLayer, reorderLayers, getLayer, setLayerColor,
         layerSyncedNodes, visibleEdges, onNodesChangeWithLock, onEdgesChangeWithLock,
         handleLabelOffsetChange, handleLabelStyleChange, handleWaypointsChange, handleEdgeLabelChange,
         handleGroup, handleUngroup,
@@ -444,8 +547,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     const addComment = useDiagramStore(state => state.addComment);
 
     // 3. Event Handlers Domain Controller
-    const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
-    const [shortcutHelpVisible, setShortcutHelpVisible] = useState(false);
+    // commandPaletteVisible and shortcutHelpVisible already declared in Component root state section
+
 
     const {
         onNodeContextMenu,
@@ -455,10 +558,19 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         onPaneClick,
         handleContextMenuAction,
         handleSelectAll,
-        /* handleFitView now from local definition */
         handleBringToFront,
         handleSendToBack,
-        isSpacePressed
+        isSpacePressed,
+        // Toast actions
+        handleCopyWithToast,
+        handlePasteWithToast,
+        handleCutWithToast,
+        handleDeleteWithToast,
+        handleDuplicateWithToast,
+        handleGroupWithToast,
+        handleUngroupWithToast,
+        onContextMenuActionWithToast,
+        handleLock
     } = useDesignerEventHandlers({
         nodes, edges, setNodes, setEdges,
         selectedNodes, selectedEdges,
@@ -473,16 +585,15 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         setCommandPaletteVisible, setShortcutHelpVisible, setCanvasSearchVisible,
         copyStyle, pasteStyle, hasCopiedStyle, saveAsTemplate
     });
-    
-    // ⭐ Reordered to avoid TDZ (Temporal Dead Zone) for handleFitView and messageApi
+    // ?Reordered to avoid TDZ (Temporal Dead Zone) for handleFitView and messageApi
     useEffect(() => {
         const handleSnap = () => takeSnapshot(nodesRef.current, edgesRef.current);
         window.addEventListener('diagram:save-snapshot', handleSnap);
         
         const handleImportSuccess = (e: any) => {
             const { filename } = e.detail;
-            if (messageApi) messageApi.success(`成功从 [${filename}] 恢复画布内容`);
-            // 自动居中显示恢复的内容
+            if (messageApi) messageApi.success(`成功?[${filename}] 恢复画布内容`);
+            // 自动居中显示恢复的内?
             if (handleFitView) setTimeout(() => handleFitView(), 300);
         };
         window.addEventListener('vizly:reverse-import-success', handleImportSuccess);
@@ -498,47 +609,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         contextMenuPaneClick();
 
         if (isCommentMode) {
-            if (!reactFlowInstance) return;
-            const flowPos = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
-            const newId = `comment-${Date.now()}`;
-            
-            // 默认作者信息（后续可从 Auth 或 Collaboration Session 获取）
-            const authorInfo = {
-                id: 'me',
-                name: '我',
-                color: '#1890ff'
-            };
-
-            const newComment = {
-                id: newId,
-                x: flowPos.x,
-                y: flowPos.y,
-                authorId: authorInfo.id,
-                authorName: authorInfo.name,
-                authorColor: authorInfo.color,
-                content: '', // 初始为空，待用户编辑
-                timestamp: Date.now(),
-                isResolved: false,
-                replies: []
-            };
-
-            // 1. 同步到 Store (用于侧边栏列表和 Yjs 同步)
-            addComment(newComment);
-
-            // 2. 添加到画布节点 (用于渲染 Pin)
-            const newNode = {
-                id: newId,
-                type: 'vizly:comment',
-                position: { x: flowPos.x - 16, y: flowPos.y - 16 }, // Offset to center 32px avatar
-                data: { comment: newComment },
-                draggable: true
-            };
-            
-            setNodes(nds => [...nds, newNode]);
-            
-            // 可选：添加完后自动退出模式
-            // setIsCommentMode(false);
-            messageApi.success('评论标记已放置，点击可进行详细编辑');
+            // ⭐ [GAP-02] 现在由 AnnotationLayer 的 handleCanvasClick 负责展示编辑器并添加评论
+            // 这里不再直接 addComment，以避免创建空评论。
             return;
         }
     }, [isCommentMode, reactFlowInstance, addComment, setNodes, setIsCommentMode, contextMenuPaneClick, messageApi]);
@@ -566,7 +638,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
 
     const handleSmartLayout = useCallback(() => {
         const rec = recommendLayout(nodesRef.current, edgesRef.current);
-        message.info(`推荐布局：${rec.reason}（置信度 ${Math.round(rec.confidence * 100)}%）`);
+        message.info(`推荐布局?{rec.reason}（置信度 ${Math.round(rec.confidence * 100)}%）`);
         handleStrategyLayout(rec.domainStrategy, rec.nodeLayout, rec.direction);
     }, [handleStrategyLayout]);
 
@@ -578,7 +650,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         setNodes(result.nodes);
         setEdges(result.edges);
         
-        message.success(`优化完成：解决了 ${result.stats.rectifiedOverlaps} 处重叠，对齐了 ${result.stats.alignedNodes} 个节点。`);
+        message.success(`优化完成：解决了 ${result.stats.rectifiedOverlaps} 处重叠，对齐?${result.stats.alignedNodes} 个节点。`);
     }, [setNodes, setEdges, takeSnapshot]);
 
 
@@ -590,14 +662,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
          setShowGrid(true);
     };
 
-    const handleFocusNode = useCallback((nodeId: string) => {
-        if (!reactFlowInstance) return;
-        const node = nodesRef.current.find(n => n.id === nodeId);
-        if (node) {
-            reactFlowInstance.setCenter(node.position.x + (node.measured?.width || 100) / 2, node.position.y + (node.measured?.height || 50) / 2, { duration: 800, zoom: 1.2 });
-            setSelectedNodes(nodesRef.current.filter(n => n.id === nodeId));
-        }
-    }, [reactFlowInstance, setSelectedNodes]);
+    // handleFocusNode moved to line 278 to avoid TDZ error in handlePresentationFocus
 
     useEffect(() => {
         const handleFocusEntity = (e: CustomEvent) => {
@@ -667,7 +732,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
             } else if (action === 'clear-canvas') {
                 Modal.confirm({
                     title: '清空画布 (Clear Canvas)',
-                    content: '确定要清空画布吗？此操作不可撤销。(Are you sure you want to clear the canvas?)',
+                    content: '确定要清空画布吗？此操作不可撤销?Are you sure you want to clear the canvas?)',
                     okText: '确定 (OK)',
                     cancelText: '取消 (Cancel)',
                     onOk: () => {
@@ -682,51 +747,51 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         return () => window.removeEventListener('editor:command', handleCommand as EventListener);
     }, [handleSmartLayout, handleExport, setNodes, setEdges, takeSnapshot, reactFlowInstance, activePlugin]);
 
-    useEffect(() => {
-        const handleAddSummary = (e: CustomEvent) => {
-            const { sourceIds } = e.detail;
-            if (!sourceIds || sourceIds.length === 0) return;
-            
-            takeSnapshot(nodesRef.current, edgesRef.current);
-
-            // Compute center of selected nodes
-            let totalX = 0;
-            let totalY = 0;
-            let count = 0;
-            sourceIds.forEach(id => {
-                const n = nodesRef.current.find(node => node.id === id);
-                if (n) {
-                    totalX += n.position.x;
-                    totalY += n.position.y;
-                    count++;
-                }
-            });
-            const avgX = count > 0 ? totalX / count : 0;
-            const avgY = count > 0 ? totalY / count : 0;
-            
-            const newId = `node_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-            const summaryNode = {
-                id: newId,
-                type: 'mindmap',
-                position: { x: avgX + 300, y: avgY }, // Initially place it to the right, orchestrator will sync it
-                data: {
-                    label: '总结 (Summary)',
-                    isSummary: true,
-                    summaryTargets: sourceIds,
-                    direction: 'L'
-                }
-            };
-            setNodes(nds => [...nds, summaryNode as Node]);
-
-            // Auto-select the newly added summary node
-            setTimeout(() => {
-                setNodes(nds => nds.map(n => ({...n, selected: n.id === newId})));
-            }, 50);
-        };
+    const handleAddSummary = useCallback((e: CustomEvent) => {
+        const { sourceIds } = e.detail;
+        if (!sourceIds || sourceIds.length === 0) return;
         
+        takeSnapshot(nodesRef.current, edgesRef.current);
+
+        // Compute center of selected nodes
+        let totalX = 0;
+        let totalY = 0;
+        let count = 0;
+        sourceIds.forEach((id: string) => {
+            const n = nodesRef.current.find(node => node.id === id);
+            if (n) {
+                totalX += n.position.x;
+                totalY += n.position.y;
+                count++;
+            }
+        });
+        const avgX = count > 0 ? totalX / count : 0;
+        const avgY = count > 0 ? totalY / count : 0;
+        
+        const newId = `node_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        const summaryNode: Node = {
+            id: newId,
+            type: 'mindmap',
+            position: { x: avgX + 300, y: avgY }, // Initially place it to the right, orchestrator will sync it
+            data: {
+                label: '总结 (Summary)',
+                isSummary: true,
+                summaryTargets: sourceIds,
+                direction: 'L'
+            }
+        };
+        setNodes(nds => [...nds, summaryNode]);
+
+        // Auto-select the newly added summary node
+        setTimeout(() => {
+            setNodes(nds => nds.map(n => ({...n, selected: n.id === newId})));
+        }, 50);
+    }, [setNodes, takeSnapshot]);
+
+    useEffect(() => {
         window.addEventListener('editor:add-summary-node', handleAddSummary as EventListener);
         return () => window.removeEventListener('editor:add-summary-node', handleAddSummary as EventListener);
-    }, [setNodes, setEdges, takeSnapshot]);
+    }, [handleAddSummary]);
 
     const handleImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -737,7 +802,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
             if (file.name.endsWith('.json')) {
                 try {
                     const data = JSON.parse(content);
-                    // ⭐ 检测是否为 StandardDiagramData 格式（和示例文件/云端文件一致的结构）
+                    // ?检测是否为 StandardDiagramData 格式（和示例文件/云端文件一致的结构?
                     // 特征：顶层有 type/layout/version 等字段，nodes 内含 description/domain 而非 position
                     const isStandardData = data.nodes && data.edges &&
                         (data.type || data.layout || data.version) &&
@@ -746,7 +811,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                         (data.nodes[0].description !== undefined || data.nodes[0].domain !== undefined);
 
                     if (isStandardData || (activePlugin && activePlugin.parseData)) {
-                        // 【标准化适配】优先交由活跃插件解析数据
+                        // 【标准化适配】优先交由活跃插件解析数?
                         const parsed = activePlugin ? activePlugin.parseData(data) : null;
                         
                         if (parsed && parsed.nodes && parsed.nodes.length > 0) {
@@ -775,7 +840,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                             window.location.href = `/?diagram=${currentId}`;
                         }, 500);
                     } else if (data.nodes && data.edges) {
-                        // 原始 React Flow 画布数据：兜底确保每个节点都有 position 和 data
+                        // 原始 React Flow 画布数据：兜底确保每个节点都?position ?data
                         const safeNodes = data.nodes.map((n: any, i: number) => ({
                             ...n,
                             position: n.position || { x: 100 + (i % 5) * 200, y: 100 + Math.floor(i / 5) * 150 },
@@ -834,55 +899,20 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         message.success('已应用模板');
     }, [reactFlowInstance, takeSnapshot, createFromTemplate, viewport, setNodes, setEdges]);
     
-    // AIChat visibility handling
-    const [aiChatVisible, setAiChatVisible] = useState(false);
-    const [activeRightTab, setActiveRightTab] = useState<'property' | 'ai'>('property');
-    const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
-    useEffect(() => {
-        if (hasSelection) {
-            setActiveRightTab('property');
-        }
-    }, [selectedNodes.length, selectedEdges.length]);
-    useEffect(() => {
-        const handleToggleAI = () => {
-            setActiveRightTab(currentTab => {
-                if (currentTab !== 'ai') {
-                    setAiChatVisible(true);
-                    return 'ai';
-                } else {
-                    setAiChatVisible(false);
-                    return 'property';
-                }
-            });
-        };
-        window.addEventListener('designer:toggle-ai-chat', handleToggleAI);
-        return () => window.removeEventListener('designer:toggle-ai-chat', handleToggleAI);
-    }, []);
+    const handleOpacity = useCallback((opacity: number) => {
+        updateNodesBatch(selectedNodes.map(n => n.id), { style: { opacity } });
+    }, [selectedNodes, updateNodesBatch]);
 
-    const handleOpenJsonEditor = useCallback(() => setJsonEditorVisible(true), []);
-    const setShowShortcuts = useCallback(() => setShortcutHelpVisible(true), []);
-
-    // ─── Missing variable stubs from modular migration ───
-    const [showShortcuts, setShowShortcutsModal] = useState(false);
-    const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
-    const isContextToolbarHidden = isDragging || !!highlightedNodeId;
-    const [jsonEditorInitialContent] = useState<string | undefined>(undefined);
-    const [saveState] = useState<string>('idle');
-    const [showPerformanceDashboard] = useState(false);
-    const [presentationSlides] = useState<any[]>([]);
-    const handlePresentationFocus = useCallback((_nodeIds: string[]) => {}, []);
     const onSelectionChange = useCallback(({ nodes: selNodes, edges: selEdges }: { nodes: Node[]; edges: Edge[] }) => {
         setSelectedNodes(selNodes);
         setSelectedEdges(selEdges);
-        // ⭐ 同步状态给 zustand store，修复因架构迁移导致 HoverToolbarsOverlay 读不到选中节点从而不显示胶囊工具栏的问题
+        // ?同步状态给 zustand store，修复因架构迁移导致 HoverToolbarsOverlay 读不到选中节点从而不显示胶囊工具栏的问题
         import('../../store/useDiagramStore').then(({ useDiagramStore }) => {
             useDiagramStore.getState().setSelectedNodes(selNodes);
             useDiagramStore.getState().setSelectedEdges(selEdges);
         });
-    }, []);
-    const onViewportChange = useCallback((_vp: any) => {}, []);
-    const handleNodeClick = useCallback((_event: React.MouseEvent, _node: Node) => {}, []);
-    const handleEdgeClick = useCallback((_event: React.MouseEvent, _edge: Edge) => {}, []);
+    }, [setSelectedNodes, setSelectedEdges]);
+
     const onPaneDoubleClick = useCallback((event: React.MouseEvent) => {
         if (!reactFlowInstance) return;
         const flowPos = reactFlowInstance.screenToFlowPosition({
@@ -891,32 +921,12 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         });
         openQuickAddMenu(flowPos.x, flowPos.y);
     }, [openQuickAddMenu, reactFlowInstance]);
-    const handleDeleteWithToast = useCallback(() => {
-        takeSnapshot(nodesRef.current, edgesRef.current);
-        const selNodeIds = selectedNodes.map(n => n.id);
-        const selEdgeIds = selectedEdges.map(e => e.id);
-        if (selNodeIds.length > 0) setNodes(nds => nds.filter(n => !selNodeIds.includes(n.id)));
-        if (selEdgeIds.length > 0) setEdges(eds => eds.filter(e => !selEdgeIds.includes(e.id)));
-        message.success('已删除');
-    }, [selectedNodes, selectedEdges, setNodes, setEdges, takeSnapshot]);
-    const handleDuplicateWithToast = useCallback(() => {
-        // Simplified duplicate
-        message.info('克隆功能暂受架构重构保护');
-    }, []);
-    const handleLock = useCallback(() => {
-        const allLocked = selectedNodes.every(n => n.draggable === false);
-        updateNodesBatch(selectedNodes.map(n => n.id), { draggable: allLocked } as any);
-        setNodes(nds => nds.map(n => selectedNodes.find(s => s.id === n.id) ? { ...n, draggable: allLocked } : n));
-    }, [selectedNodes, updateNodesBatch, setNodes]);
-    const handleOpacity = useCallback((opacity: number) => {
-        updateNodesBatch(selectedNodes.map(n => n.id), { style: { opacity } });
-    }, [selectedNodes, updateNodesBatch]);
-    const jumpTo = useCallback((_index: number) => {}, []);
-    const handleBeforeUpdate = useCallback(() => {
-        takeSnapshot(nodesRef.current, edgesRef.current);
-    }, [takeSnapshot]);
-    const onSmartNodeDrag = useCallback(() => {}, []);
-    // ─── End stubs ───
+
+    const handleOpenJsonEditor = useCallback(() => setJsonEditorVisible(true), []);
+    const setShowShortcuts = useCallback(() => setShortcutHelpVisible(true), []);
+
+    // ─── Modular migration stubs removed ───
+
 
 
     // 4. System Sync Domain Controller
@@ -929,19 +939,34 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         setCommandPaletteVisible: setHookCommandPaletteVisible, 
         commandPaletteItems 
     } = useDesignerCommands({
-        reactFlowInstance, handleFitView, handleGridRotate, setAutoRoutingEnabled,
+        reactFlowInstance: reactFlowInstance as any, 
+        handleFitView, 
+        handleGridRotate, 
+        setAutoRoutingEnabled,
         canUndo, canRedo, undo, redo, handleSelectAll,
-        handleExport: () => setExportModalVisible(true), // ⭐ Use modal instead of direct download
-        handleExportMermaid, handleCopyAsMermaid,
-        fileInputRef, handleOpenJsonEditor,
-        handleStrategyLayout, handleSmartLayout,
-        setShowShortcuts, pluginCtx, activePlugin,
-        onOpenPlugins: () => setPluginManagerVisible(true), // ⭐ Register plugin manager command
+        handleCopyWithToast,
+        handlePasteWithToast,
+        handleCutWithToast,
+        handleDeleteWithToast,
+        handleDuplicateWithToast,
+        handleGroupWithToast,
+        handleUngroupWithToast,
+        handleExport: () => setExportModalVisible(true),
+        handleExportMermaid, 
+        handleCopyAsMermaid,
+        fileInputRef, 
+        handleOpenJsonEditor,
+        handleStrategyLayout, 
+        handleSmartLayout,
+        setShowShortcuts, 
+        pluginCtx, 
+        activePlugin,
+        onOpenPlugins: () => setPluginManagerVisible(true),
         isCommentMode,
         setIsCommentMode,
     });
 
-    // ⭐ Sync command palette visibility between hook and local state
+    // ?Sync command palette visibility between hook and local state
     useEffect(() => {
         if (hookCommandPaletteVisible !== commandPaletteVisible) {
             setCommandPaletteVisible(hookCommandPaletteVisible);
@@ -955,7 +980,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     }, [commandPaletteVisible, hookCommandPaletteVisible, setHookCommandPaletteVisible]);
 
 
-    // 🚀 P2 性能优化：稳定的 onInit 回调，避免 CanvasShell memo 失效
+    // 🚀 P2 性能优化：稳定的 onInit 回调，避?CanvasShell memo 失效
     const handleReactFlowInit = useCallback((instance: ReactFlowInstance<any, any>) => {
         setReactFlowInstance(instance as unknown as ReactFlowInstance);
         // 初始化后延迟 dispatch 'fit'，执行工业标准真理居中，等待节点测量完成
@@ -1026,7 +1051,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         if (updateLocalCursor) updateLocalCursor(null);
     }, [updateLocalCursor]);
 
-    // 🚀 P3 性能优化：稳定的边回调对象，通过 Context 传递
+    // 🚀 P3 性能优化：稳定的边回调对象，通过 Context 传?
     const edgeCallbacks = useMemo(() => ({
         onLabelOffsetChange: handleLabelOffsetChange,
         onLabelStyleChange: handleLabelStyleChange,
@@ -1086,7 +1111,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                             return (
                                 <IconRailSidebar
                                     nodes={nodes}
-                                    onFocusNode={handleFocusNode}
+                                    onFocusNode={(node: Node) => handleFocusNode(node.id)}
                                     layers={layers}
                                     activeLayerId={activeLayerId}
                                     onSetActiveLayer={setActiveLayerId}
@@ -1105,6 +1130,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                     onDrawerVisibleChange={setLeftDrawerOpen}
                                     onDrawerWidthChange={setLeftDrawerWidth}
                                     pluginPanels={pluginPanels}
+                                    isMobile={isMobile}
                                 />
                             );
                         })()
@@ -1172,12 +1198,13 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                     onReadonlyChange: handleReadonlyChange,
                                     onOpenSettings: handleOpenSettings,
                                     onSmartOptimize: handleSmartOptimize,
+                                    activeUsers: activeUsers, // ⭐ GAP-02
                                     highlightMainFlow: highlightMainFlow,
                                     handleToggleHighlightMainFlow: handleToggleHighlightMainFlow,
                                     showOnlyMainFlow: showOnlyMainFlow,
                                     handleToggleShowOnlyMainFlow: handleToggleShowOnlyMainFlow,
                                     topActionArea,
-                                    // ⭐ Phase 10
+                                    // ?Phase 10
                                     exportModalVisible: exportModalVisible,
                                     setExportModalVisible: setExportModalVisible,
                                     pluginManagerVisible: pluginManagerVisible,
@@ -1204,7 +1231,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                     showGrid,
                                     gridVariant,
                                     toggleGrid: handleGridRotate,
-                                    onShowShortcuts: () => setShowShortcuts(true),
+                                    onShowShortcuts: () => setShowShortcuts(),
                                     onStrategyLayout: handleStrategyLayout,
                                     lastDomainStrategy,
                                     lastDomainDirection,
@@ -1263,142 +1290,140 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                             />
 
                             <LayoutStabilityContext.Provider value={isLayoutStable}>
-                                <FlowchartCanvasShell
-                                    nodes={lintedNodes.map(n => n.position ? n : { ...n, position: { x: 0, y: 0 } })} // ⭐ 防御性：确保所有节点都有 position
-                                    displayEdges={lintedEdges} // ⭐ 使用经过主线高亮/过滤、幽灵边处理、以及 Linter 校验后的最终边缘组
-                                    nodeTypes={dynamicNodeTypes}
-                                    edgeTypes={dynamicEdgeTypes}
-                                    onInit={handleReactFlowInit}
-                                    onNodesChange={onNodesChangeWithLock}
-                                    onEdgesChange={onEdgesChangeWithLock}
-                                    onConnect={enhancedOnConnect}
-                                    onConnectStart={onConnectStart}
-                                    onConnectEnd={enhancedOnConnectEnd}
-                                    autoRoutingEnabled={autoRoutingEnabled}
-                                    enableSmartEdges={autoRoutingEnabled} // ⭐ 修复：传递enableSmartEdges以注册edge组件
-                                    showMinimap={showMinimap}
-                                    showGrid={showGrid}
-                                    gridVariant={gridVariant}
-                                    backgroundGridColor={gridColor} // ⭐ 动态应用全局网格配色
-                                    onNodeDrag={onNodeDrag}
-                                    onNodeDragStart={wrappedOnNodeDragStart as any}
-                                    onNodeDragStop={onNodeDragStop}
-                                    onSelectionChange={onSelectionChange}
-                                    onViewportChange={onViewportChange}
-                                    onPaneMouseMove={onPaneMouseMove}
-                                    onPaneMouseLeave={onPaneMouseLeave}
-                                    onNodeClick={handleNodeClick}
-                                    onEdgeClick={handleEdgeClick}
-                                    onPaneClick={handlePaneClick}
-                                    onPaneDoubleClick={onPaneDoubleClick}
-                                    selectionMode={selectionMode}
-                                    onNodeContextMenu={onNodeContextMenu}
-                                    onEdgeContextMenu={onEdgeContextMenu}
-                                    onPaneContextMenu={onPaneContextMenu}
-                                    isSpacePressed={isSpacePressed || (!isMarqueeActive && !isDrawingMode)}
-                                    isConnecting={isConnecting}
-                                    connectPreview={connectPreview}
-                                    connectionMode={ConnectionMode.Loose}
-                                    isDragging={isDragging}
-                                    snapEnabled={snapEnabled}
-                                    isValidConnection={isValidConnection}
-                                    selectionOnDrag={isMarqueeActive}
-                                    panOnDrag={isSpacePressed || !isMarqueeActive}
-                                    nodesConnectable={isReadonly ? false : !isMarqueeActive}
-                                    edgesReconnectable={!isReadonly}
-                                    onReconnect={handleReconnect}
-                                    onReconnectStart={handleReconnectStart}
-                                    onReconnectEnd={handleReconnectEnd}
-                                    nodesDraggable={!isReadonly}
+                                <div 
+                                    className="canvas-touch-wrapper" 
+                                    style={{ width: '100%', height: '100%', position: 'relative' }}
+                                    onTouchStart={handleTouchStart}
+                                    onTouchEnd={handleTouchEnd}
                                 >
-                                    <RemoteCursors />
-                                    <DesignerCanvasFeaturesLayer
-                                        quickConnect={{
-                                            visible: !!quickAddMenu?.visible,
-                                            x: quickAddMenu?.clientX || 0,
-                                            y: quickAddMenu?.clientY || 0,
-                                            sourceNodeId: quickAddMenu?.sourceNodeId,
-                                            onSelect: handleAddNode,
-                                            onClose: closeMenu,
-                                            onPreview: setQuickConnectPreview
-                                        }}
-                                        hoverToolbar={{
-                                            nodeTypes: dynamicNodeTypes,
-                                            pluginCtx,
-                                            activePlugin,
-                                            quickAddMenuVisible: !!quickAddMenu?.visible,
-                                            isContextToolbarHidden,
-                                            isConnecting,
-                                            updateNodesBatch,
-                                            updateEdgesBatch,
-                                            onUpdateNodes: (updates) => {
-                                                takeSnapshot(nodesRef.current, edgesRef.current);
-                                                setNodes(nds => nds.map(n => {
-                                                    const u = updates.find(update => update.id === n.id);
-                                                    return (u && u.position) ? { ...n, position: u.position } : n;
-                                                }));
-                                            },
-                                            handleDeleteWithToast,
-                                            handleDuplicateWithToast,
-                                            handleLock,
-                                            handleOpacity,
-                                            handleBringToFront,
-                                            handleSendToBack,
-                                            copyStyle,
-                                            pasteStyle,
-                                            hasCopiedStyle
-                                        }}
-                                        smartGuides={{ guides }}
-                                        annotations={{
-                                            items: annotations,
-                                            mode: annotationMode,
-                                            onAdd: addAnnotation,
-                                            onUpdate: updateAnnotation,
-                                            onDelete: deleteAnnotation,
-                                            onToggleResolved: toggleResolved,
-                                            activePageId: multiPage.activePageId,
-                                            colors: ANNOTATION_COLORS
-                                        }}
-                                        pages={{
-                                            items: multiPage.pages,
-                                            activePageId: multiPage.activePageId,
-                                            onSwitchPage: multiPage.switchPage,
-                                            onAddPage: multiPage.addPage,
-                                            onDeletePage: multiPage.deletePage,
-                                            onRenamePage: multiPage.renamePage
-                                        }}
-                                        history={{
-                                            visible: historyPanelVisible,
-                                            onClose: () => setHistoryPanelVisible(false),
-                                            pastEntries: pastEntries || [],
-                                            canUndo,
-                                            canRedo,
-                                            onUndo: undo,
-                                            onRedo: redo,
-                                            onJumpTo: jumpTo
-                                        }}
-                                        search={{
-                                            visible: canvasSearchVisible,
-                                            onClose: () => setCanvasSearchVisible(false),
-                                            nodes,
-                                            onHighlightNode: setHighlightedNodeId
-                                        }}
-                                    />
-                                    <FreehandDrawingLayer 
-                                        isDrawingMode={isDrawingMode} 
-                                        zoom={viewport.zoom} 
-                                        pan={{ x: viewport.x, y: viewport.y }} 
-                                        currentColor={preset.name === 'sketch' ? '#555555' : '#000000'}
-                                    />
-                                    {(() => {
-                                        if (!pluginCtx) return null;
-                                        const plugin = PluginRegistry.getInstance().getPlugin(pluginId) || PluginRegistry.getInstance().getPlugin('flowchart');
-                                        return plugin?.contributeCanvasComponents ? plugin.contributeCanvasComponents(pluginCtx) : null;
-                                    })()}
-                                    {activeUsers.length > 0 && yAwareness && (
-                                        <LiveCursors activeUsers={activeUsers} yAwareness={yAwareness} />
-                                    )}
-                                </FlowchartCanvasShell>
+                                    <GestureOverlay zoom={currentZoom} visible={showOverlay} />
+                                    <FlowchartCanvasShell
+                                        nodes={performanceMode ? nodes : layerSyncedNodes}
+                                        displayEdges={visibleEdges}
+                                        nodeTypes={dynamicNodeTypes}
+                                        edgeTypes={dynamicEdgeTypes}
+                                        onInit={handleReactFlowInit}
+                                        onNodesChange={onNodesChangeWithLock}
+                                        onEdgesChange={onEdgesChangeWithLock}
+                                        onConnect={enhancedOnConnect}
+                                        onConnectStart={onConnectStart}
+                                        onConnectEnd={enhancedOnConnectEnd}
+                                        onSelectionChange={onSelectionChange}
+                                        onPaneClick={() => handlePaneClick({ clientX: 0, clientY: 0 } as any)}
+                                        onPaneDoubleClick={onPaneDoubleClick}
+                                        onNodeContextMenu={onNodeContextMenu}
+                                        onEdgeContextMenu={onEdgeContextMenu}
+                                        onPaneContextMenu={onPaneContextMenu}
+                                        onNodeDragStart={wrappedOnNodeDragStart}
+                                        onNodeDrag={onNodeDrag}
+                                        onNodeDragStop={onNodeDragStop}
+                                        onReconnect={handleReconnect}
+                                        onReconnectStart={handleReconnectStart}
+                                        onReconnectEnd={handleReconnectEnd}
+                                        autoRoutingEnabled={autoRoutingEnabled}
+                                        enableSmartEdges={true}
+                                        showMinimap={showMinimap}
+                                        showGrid={showGrid}
+                                        gridVariant={gridVariant}
+                                        backgroundGridColor={gridColor}
+                                        isSpacePressed={isSpacePressed}
+                                        isConnecting={isConnecting}
+                                        connectPreview={connectPreview}
+                                        connectionMode={ConnectionMode.Loose}
+                                        selectionMode={SelectionMode.Partial}
+                                        isValidConnection={isValidConnection}
+                                        snapEnabled={snapEnabled}
+                                        isDragging={isDragging}
+                                    >
+                                        <RemoteCursors />
+                                        <DesignerCanvasFeaturesLayer
+                                            quickConnect={{
+                                                visible: !!quickAddMenu?.visible,
+                                                x: quickAddMenu?.clientX || 0,
+                                                y: quickAddMenu?.clientY || 0,
+                                                sourceNodeId: quickAddMenu?.sourceNodeId,
+                                                onSelect: handleAddNode,
+                                                onClose: closeMenu,
+                                                onPreview: setQuickConnectPreview
+                                            }}
+                                            hoverToolbar={{
+                                                nodeTypes: dynamicNodeTypes,
+                                                pluginCtx,
+                                                activePlugin,
+                                                quickAddMenuVisible: !!quickAddMenu?.visible,
+                                                isContextToolbarHidden,
+                                                isConnecting,
+                                                updateNodesBatch,
+                                                updateEdgesBatch,
+                                                onUpdateNodes: (updates) => {
+                                                    takeSnapshot(nodesRef.current, edgesRef.current);
+                                                    setNodes(nds => nds.map(n => {
+                                                        const u = updates.find(update => update.id === n.id);
+                                                        return (u && u.position) ? { ...n, position: u.position } : n;
+                                                    }));
+                                                },
+                                                handleDeleteWithToast,
+                                                handleDuplicateWithToast,
+                                                handleLock,
+                                                handleOpacity,
+                                                handleBringToFront,
+                                                handleSendToBack,
+                                                copyStyle,
+                                                pasteStyle,
+                                                hasCopiedStyle
+                                            }}
+                                            smartGuides={{ guides }}
+                                            annotations={{
+                                                items: annotations,
+                                                mode: annotationMode,
+                                                onAdd: (ann: any) => addAnnotation(ann.x, ann.y, ann.label || ann.text),
+                                                onUpdate: updateAnnotation,
+                                                onDelete: deleteAnnotation,
+                                                onToggleResolved: toggleResolved,
+                                                activePageId: multiPage.activePageId,
+                                                colors: ANNOTATION_COLORS
+                                            }}
+                                            pages={{
+                                                items: multiPage.pages,
+                                                activePageId: multiPage.activePageId,
+                                                onSwitchPage: multiPage.switchPage,
+                                                onAddPage: multiPage.addPage,
+                                                onDeletePage: multiPage.deletePage,
+                                                onRenamePage: multiPage.renamePage
+                                            }}
+                                            history={{
+                                                visible: historyPanelVisible,
+                                                onClose: () => setHistoryPanelVisible(false),
+                                                pastEntries: pastEntries || [],
+                                                canUndo,
+                                                canRedo,
+                                                onUndo: undo,
+                                                onRedo: redo,
+                                                onJumpTo: jumpTo
+                                            }}
+                                            search={{
+                                                visible: canvasSearchVisible,
+                                                onClose: () => setCanvasSearchVisible(false),
+                                                nodes,
+                                                onHighlightNode: setHighlightedNodeId
+                                            }}
+                                        />
+                                        <FreehandDrawingLayer 
+                                            isDrawingMode={isDrawingMode} 
+                                            zoom={viewport.zoom} 
+                                            pan={{ x: viewport.x, y: viewport.y }} 
+                                            currentColor={preset.name === 'sketch' ? '#555555' : '#000000'}
+                                        />
+                                        {(() => {
+                                            if (!pluginCtx) return null;
+                                            const plugin = PluginRegistry.getInstance().getPlugin(pluginId) || PluginRegistry.getInstance().getPlugin('flowchart');
+                                            return plugin?.contributeCanvasComponents ? plugin.contributeCanvasComponents(pluginCtx) : null;
+                                        })()}
+                                        {activeUsers.length > 0 && yAwareness && (
+                                            <LiveCursors activeUsers={activeUsers} yAwareness={yAwareness} />
+                                        )}
+                                    </FlowchartCanvasShell>
+                                </div>
                             </LayoutStabilityContext.Provider>
                         </div>
                         </>
@@ -1424,6 +1449,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                     onAiTabIntercept={onAiTabIntercept}
                                     activePlugin={activePlugin}
                                     pluginCtx={ctx}
+                                    isMobile={isMobile}
                                 />
                             );
                         })()
@@ -1480,6 +1506,40 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                 if (onVersionHistoryClose) onVersionHistoryClose();
                             }}
                         />
+
+                        {/* GAP-11 Phase 2: Mobile Interaction Excellence Layer */}
+                        {isMobile && (
+                            <MobileBottomDock 
+                                activeTab={mobilePropertyDrawerVisible ? 'property' : (activeRightTab === 'ai' ? 'ai' : null)}
+                                selectedCount={selectedNodes.length + selectedEdges.length}
+                                onAddClick={() => {
+                                    setLeftDrawerOpen(true);
+                                    setMobileAddDrawerVisible(true);
+                                }}
+                                onPropertyClick={() => {
+                                    setMobilePropertyDrawerVisible(!mobilePropertyDrawerVisible);
+                                    if (!mobilePropertyDrawerVisible) setActiveRightTab('property');
+                                }}
+                                onLayerClick={() => {
+                                    setLeftDrawerOpen(true);
+                                    // Optionally jump to layer tab in rail
+                                }}
+                                onAiClick={() => {
+                                    if (activeRightTab === 'ai') {
+                                        setAiChatVisible(false);
+                                        setActiveRightTab('property');
+                                    } else {
+                                        setActiveRightTab('ai');
+                                        setAiChatVisible(true);
+                                    }
+                                }}
+                                onUndo={undo}
+                                onRedo={redo}
+                                canUndo={canUndo}
+                                canRedo={canRedo}
+                                onSettingsClick={handleOpenSettings}
+                            />
+                        )}
                         </>
                     }
                 />

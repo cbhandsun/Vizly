@@ -45,39 +45,52 @@ export const useConnectionMicrointeractions = ({
         nodesRef.current = nodes;
     }, [nodes]);
 
-    // 🚀 P5: 连线期间直接通过 DOM 启用 performance-mode，禁用 CSS transitions
-    useEffect(() => {
-        const rfContainer = document.querySelector('.react-flow');
-        if (!rfContainer) return;
-        if (isConnecting) {
-            rfContainer.classList.add('performance-mode');
-        } else {
-            rfContainer.classList.remove('performance-mode');
-        }
-    }, [isConnecting]);
+    // [Performance Mode logic moved to useDesignerInteractions for unified monitoring]
 
     // 🚀 P1: 直接 DOM 操作辅助函数 — 不触发 React 重渲染
     const domRemoveClasses = useCallback((nodeId: string, classes: readonly string[]) => {
-        const el = document.querySelector(`[data-id="${nodeId}"]`);
-        if (el) el.classList.remove(...classes);
+        if (typeof document === 'undefined' || !nodeId) return;
+        try {
+            const el = document.querySelector(`[data-id="${nodeId}"]`);
+            if (el) el.classList.remove(...classes);
+        } catch (e) {
+            console.warn('[Vizly] domRemoveClasses failed:', e);
+        }
     }, []);
 
     const domAddClasses = useCallback((nodeId: string, classes: string[]) => {
-        const el = document.querySelector(`[data-id="${nodeId}"]`);
-        if (el) el.classList.add(...classes);
+        if (typeof document === 'undefined' || !nodeId) return;
+        try {
+            const el = document.querySelector(`[data-id="${nodeId}"]`);
+            if (el) el.classList.add(...classes);
+        } catch (e) {
+            console.warn('[Vizly] domAddClasses failed:', e);
+        }
     }, []);
 
     // 🚀 P4: 批量 DOM 操作 — 对所有节点添加/移除类名
     const domBatchAddClass = useCallback((className: string) => {
-        document.querySelectorAll('.react-flow__node').forEach(el => {
-            el.classList.add(className);
-        });
+        if (typeof document === 'undefined') return;
+        try {
+            const nodes = document.querySelectorAll('.react-flow__node');
+            if (nodes.length > 0) {
+                nodes.forEach(el => el.classList.add(className));
+            }
+        } catch (e) {
+            console.warn('[Vizly] domBatchAddClass failed:', e);
+        }
     }, []);
 
     const domBatchRemoveClasses = useCallback((classes: readonly string[]) => {
-        document.querySelectorAll('.react-flow__node').forEach(el => {
-            el.classList.remove(...classes);
-        });
+        if (typeof document === 'undefined') return;
+        try {
+            const nodes = document.querySelectorAll('.react-flow__node');
+            if (nodes.length > 0) {
+                nodes.forEach(el => el.classList.remove(...classes));
+            }
+        } catch (e) {
+            console.warn('[Vizly] domBatchRemoveClasses failed:', e);
+        }
     }, []);
 
     const computeConnectPreview = useCallback(() => {
@@ -211,6 +224,11 @@ export const useConnectionMicrointeractions = ({
         // 🚀 P4: 直接 DOM 操作替代 setNodes — 连接开始时 O(n) DOM 批量操作
         //   比 setNodes + React reconciliation 快 10x+
         domBatchAddClass('rf-connecting');
+        
+        // 🚀 P5: 启用全局性能模式
+        if (typeof document !== 'undefined') {
+            document.body.classList.add('performance-mode');
+        }
     }, [domBatchAddClass]);
 
     const enhancedOnConnect = useCallback((connection: Connection) => {
@@ -233,6 +251,11 @@ export const useConnectionMicrointeractions = ({
 
         // 🚀 P4: 直接 DOM 操作批量清理所有连接类名
         domBatchRemoveClasses(ALL_CONNECT_CLASSES);
+        
+        // 🚀 P5: 清理全局性能模式
+        if (typeof document !== 'undefined') {
+            document.body.classList.remove('performance-mode');
+        }
 
         // Add success animation to the new edge (with cleanup)
         edgeAnimationTimerRef.current = setTimeout(() => {
@@ -290,6 +313,11 @@ export const useConnectionMicrointeractions = ({
 
             // 🚀 P4: 直接 DOM 操作批量清理
             domBatchRemoveClasses(ALL_CONNECT_CLASSES);
+
+            // 🚀 P5: 清理全局性能模式
+            if (typeof document !== 'undefined') {
+                document.body.classList.remove('performance-mode');
+            }
         }
     }, [enhancedOnConnect, onConnectEnd, domBatchRemoveClasses]);
 

@@ -23,7 +23,12 @@ import { useDiagramStore } from '../store/useDiagramStore';
 export class ArchitecturePlugin implements DiagramTypePlugin {
   id = 'architecture-diagram';
   name = '企业数字化架构图';
-  version = '1.0';
+  version = '1.1.0';
+  description = '专为企业架构师设计的绘图工具，内置合规性校验 (Linter)、分层拓扑布局与标准化组件库。';
+  author = 'Vizly Core';
+  category = 'Productivity';
+  tags = ['Enterprise', 'Architecture', 'Governance'];
+  brandColor = '#722ed1';
 
   async migrate(data: any, fromVersion: string | undefined): Promise<any> {
     console.log(`[ArchitecturePlugin] Migrating data from ${fromVersion || 'legacy'} to ${this.version}`);
@@ -88,7 +93,7 @@ export class ArchitecturePlugin implements DiagramTypePlugin {
         id: 'arch-components',
         title: '架构组件库',
         icon: <BuildOutlined />,
-        content: <ArchitecturePalette />
+        content: <ArchitecturePalette ctx={ctx} />
       },
       {
         id: 'arch-linter',
@@ -123,7 +128,7 @@ const CATEGORIES: Array<{ key: string; title: string; types: string[] }> = [
 ];
 
 // ====== 侧边栏面板 ======
-const ArchitecturePalette: React.FC = () => {
+const ArchitecturePalette: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
     const [search, setSearch] = useState('');
 
     const onDragStart = (event: React.DragEvent, def: CompDef) => {
@@ -148,6 +153,12 @@ const ArchitecturePalette: React.FC = () => {
             key={def.type}
             draggable
             onDragStart={(e) => onDragStart(e, def)}
+            onClick={() => {
+                ctx.addNode(def.typeName || 'architectureNode', { 
+                    label: def.label.split(' ')[0],
+                    ...(def.typeName ? {} : { type: def.type, themeColor: def.color })
+                });
+            }}
             style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 padding: '12px 8px', cursor: 'grab', 

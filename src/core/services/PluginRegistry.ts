@@ -1,4 +1,4 @@
-import { DiagramTypePlugin } from '../types';
+import { DiagramTypePlugin, PluginContext } from '../types';
 
 export class PluginRegistry {
   private static instance: PluginRegistry;
@@ -12,6 +12,10 @@ export class PluginRegistry {
   public static getInstance(): PluginRegistry {
     if (!PluginRegistry.instance) {
       PluginRegistry.instance = new PluginRegistry();
+      // ⭐ [GAP-12] DX: 暴露至控制台用于实时调试
+      if (typeof window !== 'undefined') {
+        (window as any).__vizly_plugins = PluginRegistry.instance;
+      }
     }
     return PluginRegistry.instance;
   }
@@ -77,6 +81,28 @@ export class PluginRegistry {
     this.plugins.delete(id);
     if (this.defaultPluginId === id) {
       this.defaultPluginId = this.plugins.size > 0 ? (this.plugins.keys().next().value || null) : null;
+    }
+  }
+
+  /**
+   * [GAP-10] 指令分发器：执行特定插件的 AI 动作
+   */
+  public async executeAIAction(pluginId: string, action: string, params: any, ctx: PluginContext): Promise<boolean> {
+    const plugin = this.getPlugin(pluginId);
+    if (!plugin) {
+      console.warn(`[PluginRegistry] Plugin ${pluginId} not found, skipping AI action: ${action}`);
+      return false;
+    }
+
+    if (!plugin.onAIAction) {
+      return false; // 插件未实现 AI 处理逻辑，交由默认兜底
+    }
+
+    try {
+      return await plugin.onAIAction(action, params, ctx);
+    } catch (error) {
+      console.error(`[PluginRegistry] Error executing AI action "${action}" in plugin "${pluginId}":`, error);
+      return false;
     }
   }
 }

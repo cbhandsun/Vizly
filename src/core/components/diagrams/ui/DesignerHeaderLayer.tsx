@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaProjectDiagram, FaExchangeAlt } from 'react-icons/fa';
 import { Divider } from 'antd';
+import { PresenceHeader } from '../../../../components/diagrams/collaboration/PresenceHeader';
 
 import { TopActionButtons } from '../TopActionButtons';
 import { ModernFlowchartToolbar } from '../ModernFlowchartToolbar';
@@ -38,6 +39,7 @@ export interface DesignerHeaderLayerProps {
         handleToggleShowOnlyMainFlow: () => void;
         topActionArea?: React.ReactNode;
         pluginToolbar?: React.ReactNode;
+        activeUsers?: any[]; // ⭐ GAP-02
 
         // ⭐ Phase 10: 状态提升
         exportModalVisible: boolean;
@@ -163,6 +165,13 @@ export const DesignerHeaderLayer = React.memo(
                 {topActions.topActionArea && (
                     <div style={{ position: 'absolute', top: 16, left: 24, zIndex: 1020 }} className="designer-top-left-actions">
                         {topActions.topActionArea}
+                    </div>
+                )}
+
+                {/* GAP-02: Premium Collaboration Presence */}
+                {topActions.activeUsers && topActions.activeUsers.length > 0 && (
+                    <div style={{ position: 'absolute', top: 16, right: topActions.rightOffset + 280, zIndex: 1020 }} className="designer-top-presence">
+                        <PresenceHeader activeUsers={topActions.activeUsers} />
                     </div>
                 )}
                 

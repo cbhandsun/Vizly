@@ -31,12 +31,14 @@
 .mindmap-node.depth-0 {
     font-weight: 700;
     font-size: 18px;
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.95);
     color: #0f172a;
     border: 3px solid #6366f1;
     border-radius: 14px;
     padding: 14px 32px;
-    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15), 0 1px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 12px 30px rgba(99, 102, 241, 0.2), 0 2px 8px rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
 }
 
 .mindmap-node.depth-0:hover {
@@ -173,6 +175,67 @@
 
 .mindmap-node:hover .mindmap-handle {
     opacity: 1;
+}
+
+/* ---- MindMap Collapse Toggle ---- */
+.mindmap-collapse-toggle {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    background: #ffffff;
+    border: 1.5px solid var(--branch-color, #6366f1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 100;
+    color: var(--branch-color, #6366f1);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Spring back */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.mindmap-collapse-toggle:hover {
+    transform: scale(1.2) translateY(var(--tw-translate-y, 0));
+    background: var(--branch-color, #6366f1);
+    color: #ffffff;
+    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+}
+
+.mindmap-collapse-toggle.dir-right {
+    right: -24px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.mindmap-collapse-toggle.dir-left {
+    left: -24px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.mindmap-collapse-toggle.dir-TB {
+    bottom: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.mindmap-collapse-toggle.dir-BT {
+    top: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.mindmap-node.collapsed .mindmap-collapse-toggle {
+    background: var(--branch-color, #6366f1);
+    color: #ffffff;
+    width: 20px;
+    height: 20px;
+}
+
+.mindmap-collapse-count {
+    font-size: 10px;
+    font-weight: 800;
 }
 
 /* ---- Unified Tool Island ---- */

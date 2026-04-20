@@ -80,7 +80,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({
       onCancel={onClose}
       footer={null}
       width={800}
-      bodyStyle={{ height: '600px', display: 'flex', flexDirection: 'column', gap: '16px' }}
+      styles={{ body: { height: '600px', display: 'flex', flexDirection: 'column', gap: '16px' } }}
     >
       <Space direction="vertical" style={{ width: '100%' }} size="middle">
         <Input
@@ -129,14 +129,14 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({
                 key={iconName}
                 hoverable
                 size="small"
-                bodyStyle={{ 
+                styles={{ body: { 
                   display: 'flex', 
                   flexDirection: 'column', 
                   alignItems: 'center', 
                   justifyContent: 'center',
                   padding: '12px 4px',
                   height: '100%'
-                }}
+                } }}
                 className={initialValue === iconName ? 'selected-icon-card' : ''}
                 onClick={() => {
                   onSelect(iconName);

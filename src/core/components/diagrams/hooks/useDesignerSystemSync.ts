@@ -5,6 +5,7 @@ import { useAutoSave } from './useAutoSave';
 import { PluginRegistry } from '../../../services/PluginRegistry';
 import { LayoutOptimizer } from '../../layout/LayoutOptimizer';
 import { analyzeDiagram } from '@/utils/diagramAnalyzer';
+import { useDiagramSeedStore } from '../../../store/useDiagramSeedStore';
 
 export interface UseDesignerSystemSyncProps {
     id?: string;
@@ -360,27 +361,81 @@ export function useDesignerSystemSync({
         }
     }, [nodes.length, performanceMode]);
 
-    const { saveState, loadSaved } = useAutoSave(nodes, edges, {
+    const { saveState, loadSaved, clearSaved } = useAutoSave(nodes, edges, {
         interval: 60000,
         storageKey: `flowchart-autosave-v2-${id || 'default'}`,
         enabled: true,
+        diagramId: id,
         onSaveSuccess: () => console.log('Auto-save successful'),
         onSaveError: (error) => console.error('Auto-save failed:', error)
     });
 
     const hasRestoredAutoSave = useRef(false);
     const needsInitialFitView = useRef(false);
+    const processedDiagramId = useRef(id);
+
+    // If ID changed dynamically WITHOUT unmount, reset local initialization flags
+    if (processedDiagramId.current !== id) {
+        processedDiagramId.current = id;
+        hasRestoredAutoSave.current = false;
+        needsInitialFitView.current = true;
+    }
 
     useEffect(() => {
         if (hasRestoredAutoSave.current) return;
 
-        const saved = loadSaved();
-        
-        // Guard against corrupted autosave that contains RAW Standard Nodes instead of Canvas Nodes
-        const isCanvasData = saved && saved.nodes && saved.nodes.length > 0 && 
-            saved.nodes.some((n: any) => n.data !== undefined && (n.type === 'flowchart' || n.type === 'titleGroup' || n.type === 'subGroup' || n.type === 'group' || n.type === 'swimlane'));
+        let saved = useDiagramSeedStore.getState().consumeSeed(id || '');
+        const isFromSeed = !!saved;
 
-        if (isCanvasData) {
+        if (!saved) {
+            saved = loadSaved();
+        }
+        
+        let shouldLoadAutosave = false;
+        
+        if (saved) {
+            if (isFromSeed) {
+                // Seed data from useDiagramSeedStore is always trusted —
+                // it was just prepared by seedAutoSaveAndNavigate and is guaranteed to be valid.
+                shouldLoadAutosave = true;
+            } else if (saved.diagramId && saved.diagramId !== id) {
+                // Check for stale autosave leaking across diagrams
+                console.warn(`[DesignerSystemSync] Stale autosave detected! Expected ${id}, got ${saved.diagramId}. Clearing.`);
+                clearSaved();
+            } else {
+                // Guard against corrupted autosave that contains RAW Standard Nodes instead of Canvas Nodes.
+                // Also explicitly allow length 0 (valid empty canvas).
+                // isFreshSeed shortcut: if the flag is set AND within the 5-minute TTL,
+                // trust the data unconditionally (any node type, written by seedAutoSaveAndNavigate).
+                // If isFreshSeed is set but older than 5 min → stale crash remnant, ignore the flag.
+                const FRESH_SEED_TTL_MS = 5 * 60 * 1000;
+                const isFreshAndValid = saved.isFreshSeed && saved.timestamp &&
+                    (Date.now() - saved.timestamp) < FRESH_SEED_TTL_MS;
+
+                const isCanvasData = isFreshAndValid || (saved.nodes && (
+                    saved.nodes.length === 0 || 
+                    saved.nodes.some((n: any) => n.data !== undefined && (n.type === 'flowchart' || n.type === 'titleGroup' || n.type === 'subGroup' || n.type === 'group' || n.type === 'swimlane' || n.type === 'architectureNode' || n.type === 'mindmap'))
+                ));
+                
+                // If the isFreshSeed flag is stale (crash remnant), strip it from storage
+                if (saved.isFreshSeed && !isFreshAndValid) {
+                    try {
+                        const storageKey = `flowchart-autosave-v2-${id || 'default'}`;
+                        const raw = localStorage.getItem(storageKey);
+                        if (raw) {
+                            const parsed = JSON.parse(raw);
+                            delete parsed.isFreshSeed;
+                            localStorage.setItem(storageKey, JSON.stringify(parsed));
+                        }
+                    } catch { /* ignore */ }
+                    saved = { ...saved, isFreshSeed: false };
+                }
+                
+                shouldLoadAutosave = !!isCanvasData;
+            }
+        }
+
+        if (shouldLoadAutosave && saved) {
             hasRestoredAutoSave.current = true;
             const layoutOptimizer = LayoutOptimizer.getInstance();
             const containerTypes = new Set(['titleGroup', 'subGroup', 'swimlane', 'group']);
@@ -391,7 +446,7 @@ export function useDesignerSystemSync({
                 const desc = String(node.data?.description || node.data?.label || '');
                 if (!desc) return node;
 
-                const contentWidth = layoutOptimizer.calculateNodeWidth(desc);
+                const contentWidth = node.width || (node as any).measured?.width || layoutOptimizer.calculateNodeWidth(desc);
                 return {
                     ...node,
                     width: contentWidth,
@@ -403,7 +458,25 @@ export function useDesignerSystemSync({
             setNodes(recalculatedNodes);
             setEdges(saved.edges);
             needsInitialFitView.current = true;
-            messageApi?.info('已恢复上次编辑内容');
+
+            // ★ After consuming the fresh seed, clear the isFreshSeed flag from localStorage
+            // so that subsequent autosave cycles are no longer blocked by the guard.
+            if (saved.isFreshSeed || isFromSeed) {
+                messageApi?.success('加载模板成功');
+                if (!isFromSeed) {
+                    try {
+                        const storageKey = `flowchart-autosave-v2-${id || 'default'}`;
+                        const raw = localStorage.getItem(storageKey);
+                        if (raw) {
+                            const parsed = JSON.parse(raw);
+                            delete parsed.isFreshSeed;
+                            localStorage.setItem(storageKey, JSON.stringify(parsed));
+                        }
+                    } catch { /* ignore */ }
+                }
+            } else {
+                messageApi?.info('已恢复上次编辑内容');
+            }
         } else {
             hasRestoredAutoSave.current = true;
             console.log('[DesignerSystemSync] No autosave, checking PRESET_MAP for id:', id);
@@ -421,11 +494,9 @@ export function useDesignerSystemSync({
                         console.log('[DesignerSystemSync] Executing standardDataToCanvas for preset...');
                         standardDataToCanvas(preset).then(({ nodes: newNodes, edges: newEdges }) => {
                             console.log('[DesignerSystemSync] ELK.js layout complete:', newNodes.length, 'nodes derived.');
-                            if (newNodes.length > 0) {
-                                setNodes(newNodes);
-                                setEdges(newEdges);
-                                needsInitialFitView.current = true;
-                            }
+                            setNodes(newNodes);
+                            setEdges(newEdges);
+                            needsInitialFitView.current = true;
                         }).catch(e => console.error('[DesignerSystemSync] standardDataToCanvas error:', e));
                     }).catch(e => console.error('[DesignerSystemSync] Import designerUtils failed:', e));
                 } else {
@@ -434,17 +505,15 @@ export function useDesignerSystemSync({
                     const plugin = PluginRegistry.getInstance().getPlugin(pluginId);
                     if (plugin) {
                         const emptyState = plugin.getEmptyState();
-                        if (emptyState.nodes.length > 0) {
-                            setNodes(emptyState.nodes);
-                            setEdges(emptyState.edges);
-                        }
+                        setNodes(emptyState.nodes);
+                        setEdges(emptyState.edges);
                         // ALWAYS trigger initial viewport adjustment, even for empty canvases
                         needsInitialFitView.current = true;
                     }
                 }
             }).catch(e => console.error('[DesignerSystemSync] load PRESET_MAP failed:', e));
         }
-    }, [loadSaved, setNodes, setEdges, pluginId]);
+    }, [loadSaved, setNodes, setEdges, pluginId, id]);
 
     // Deferred view adjustment: waits for reactFlowInstance to become available
     useEffect(() => {

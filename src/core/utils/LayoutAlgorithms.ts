@@ -534,8 +534,10 @@ export function fishboneLayout(
     options: LayoutOptions = {},
     externalMaps?: { nodeMap?: Map<string, Node>, childrenMap?: Map<string, string[]> }
 ): Map<string, Point> {
-    const levelSpacing = options.levelSpacing ?? 120;
-    const ribSpacing = 160; 
+    const nodeSpacing = options.nodeSpacing ?? 40;
+    const ribSpacing = 180; // Distance between ribs on the spine
+    const slantHeight = 160; // Height of the slanted ribs
+    const slantWidth = 120;  // Horizontal offset of the slanted ribs
 
     const positions = new Map<string, Point>();
     if (nodes.length === 0) return positions;
@@ -568,37 +570,42 @@ export function fishboneLayout(
     const roots = nodes.filter(n => !parentSet.has(n.id) || n.data?.depth === 0);
     if (roots.length === 0) return positions;
     
+    // 1. Root (Effect) at the right
     const root = roots[0];
     const { width: rw, height: rh } = getSize(root);
     
-    const spineX = 1000;
+    const spineX = 1200;
     const spineY = 400;
     positions.set(root.id, { x: spineX, y: spineY - rh / 2 });
 
     const mainCauses = childrenMap.get(root.id) || [];
     
+    // 2. Main Causes (Ribs)
     mainCauses.forEach((causeId, index) => {
         const isUpper = index % 2 === 0;
         const ribIndex = Math.floor(index / 2);
         
+        // Base point on the spine (backwards from root)
         const baseX = spineX - (ribIndex + 1) * ribSpacing;
         const baseY = spineY;
 
-        const slantOffset = 150;
-        const causeX = baseX - slantOffset;
-        const causeY = isUpper ? baseY - slantOffset : baseY + slantOffset;
+        // Slant position
+        const causeX = baseX - slantWidth;
+        const causeY = isUpper ? baseY - slantHeight : baseY + slantHeight;
         
         const cNode = nodeMap.get(causeId);
         const { width: cw, height: ch } = cNode ? getSize(cNode) : { width: 140, height: 40 };
         positions.set(causeId, { x: causeX - cw / 2, y: causeY - ch / 2 });
 
+        // 3. Sub-causes (Horizontal branches from ribs)
         const layoutSubCauses = (id: string, startX: number, startY: number, dir: 'up' | 'down') => {
             const subIds = childrenMap.get(id) || [];
             subIds.forEach((sid, sIdx) => {
                 const sn = nodeMap.get(sid);
                 const { width: sw, height: sh } = sn ? getSize(sn) : { width: 120, height: 35 };
                 
-                const subX = startX - (sIdx + 1) * 80;
+                // Staggered horizontal layout
+                const subX = startX - (sIdx + 1) * 90;
                 const subY = startY; 
                 
                 positions.set(sid, { x: subX, y: subY });
@@ -608,6 +615,18 @@ export function fishboneLayout(
         
         layoutSubCauses(causeId, causeX, causeY, isUpper ? 'up' : 'down');
     });
+
+    // 4. Handle remaining nodes (orphans)
+    let orphanOffsetX = 100;
+    const minYFound = Math.min(...Array.from(positions.values()).map(p => p.y), spineY);
+    const maxYFound = Math.max(...Array.from(positions.values()).map(p => p.y), spineY);
+
+    for (const n of nodes) {
+        if (!positions.has(n.id)) {
+            positions.set(n.id, { x: orphanOffsetX, y: maxYFound + 200 });
+            orphanOffsetX += (getSize(n).width + nodeSpacing);
+        }
+    }
 
     return positions;
 }

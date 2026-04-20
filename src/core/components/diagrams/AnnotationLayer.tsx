@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { theme, Input, Button, Tooltip, Popconfirm } from 'antd';
 import { CheckOutlined, DeleteOutlined, EditOutlined, CloseOutlined } from '@ant-design/icons';
-import type { Annotation } from './hooks/useAnnotations';
+import type { CommentThread as Annotation } from '../../store/useDiagramStore';
+import { useDiagramStore } from '../../store/useDiagramStore';
 
 const { TextArea } = Input;
 
@@ -9,7 +10,7 @@ interface AnnotationLayerProps {
     annotations: Annotation[];
     annotationMode: boolean;
     onAdd: (x: number, y: number, text: string) => void;
-    onUpdate: (id: string, updates: Partial<Pick<Annotation, 'text' | 'color' | 'x' | 'y'>>) => void;
+    onUpdate: (id: string, updates: Partial<Pick<Annotation, 'content' | 'color' | 'x' | 'y'>>) => void;
     onDelete: (id: string) => void;
     onToggleResolved: (id: string) => void;
     colors: string[];
@@ -24,6 +25,7 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
     annotations, annotationMode, onAdd, onUpdate, onDelete, onToggleResolved, colors, activePageId,
 }) => {
     const { token } = theme.useToken();
+    const globalActiveId = useDiagramStore(state => state.activeCommentId);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [editText, setEditText] = useState('');
     const [pendingPos, setPendingPos] = useState<{ x: number; y: number } | null>(null);
@@ -68,7 +70,7 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
     // 保存编辑
     const handleSaveEdit = useCallback(() => {
         if (activeId) {
-            onUpdate(activeId, { text: editText });
+            onUpdate(activeId, { content: editText });
             setActiveId(null);
         }
     }, [activeId, editText, onUpdate]);
@@ -110,9 +112,14 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
             key={ann.id}
             annotation={ann}
             isActive={activeId === ann.id}
+            isHighlighted={globalActiveId === ann.id}
             editText={editText}
             onEditTextChange={setEditText}
-            onOpen={() => handleOpenEdit(ann)}
+            onOpen={() => {
+                setActiveId(ann.id);
+                setEditText(ann.content);
+                setPendingPos(null);
+            }}
             onSave={handleSaveEdit}
             onClose={() => setActiveId(null)}
             onDelete={() => onDelete(ann.id)}
@@ -179,6 +186,7 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
 const AnnotationPin: React.FC<{
     annotation: Annotation;
     isActive: boolean;
+    isHighlighted?: boolean;
     editText: string;
     onEditTextChange: (t: string) => void;
     onOpen: () => void;
@@ -190,7 +198,7 @@ const AnnotationPin: React.FC<{
     colors: string[];
     token: ReturnType<typeof theme.useToken>['token'];
 }> = ({ annotation, isActive, editText, onEditTextChange, onOpen, onSave, onClose, onDelete, onToggleResolved, onChangeColor, colors, token }) => {
-    const { x, y, color, text, resolved } = annotation;
+    const { x, y, color, content: text, isResolved: resolved } = annotation;
 
     return (
         <div
@@ -200,7 +208,7 @@ const AnnotationPin: React.FC<{
                 top: y,
                 transform: 'translate(-12px, -12px)',
                 pointerEvents: 'auto',
-                zIndex: isActive ? 10 : 6,
+                zIndex: (isActive || isHighlighted) ? 10 : 6,
             }}
             onClick={e => e.stopPropagation()}
         >
@@ -214,10 +222,11 @@ const AnnotationPin: React.FC<{
                             height: 24,
                             borderRadius: '50% 50% 50% 0',
                             background: resolved ? `${color}60` : color,
-                            border: `2px solid ${resolved ? '#9ca3af' : 'white'}`,
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                            border: `2px solid ${isHighlighted ? '#f59e0b' : (resolved ? '#9ca3af' : 'white')}`,
+                            boxShadow: isHighlighted ? '0 0 15px #f59e0b' : '0 2px 8px rgba(0,0,0,0.2)',
                             cursor: 'pointer',
                             transform: 'rotate(-45deg)',
+                            animation: isHighlighted ? 'pulse-highlight 1.5s infinite alternate' : 'none',
                             transition: 'transform 0.2s, box-shadow 0.2s',
                             display: 'flex',
                             alignItems: 'center',
@@ -232,8 +241,12 @@ const AnnotationPin: React.FC<{
                             e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
                         }}
                     >
-                        {resolved && (
+                        {resolved ? (
                             <CheckOutlined style={{ transform: 'rotate(45deg)', fontSize: 10, color: '#fff' }} />
+                        ) : (
+                            <div style={{ transform: 'rotate(45deg)', fontSize: 9, color: '#fff', fontWeight: 800 }}>
+                                {(annotation.authorName || '?').charAt(0).toUpperCase()}
+                            </div>
                         )}
                     </div>
                 </Tooltip>

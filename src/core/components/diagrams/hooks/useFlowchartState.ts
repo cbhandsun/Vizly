@@ -11,7 +11,7 @@ import {
     MarkerType,
 } from '@xyflow/react';
 import { useDiagramHistory } from '../../../hooks/useDiagramHistory';
-import { useDiagramStylePreset } from '../../shared/DiagramStyleManager';
+import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v2';
 import { useDiagramStore } from '../../../store/useDiagramStore';
 
 // Initial Toggle State
@@ -50,7 +50,7 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
     const { takeSnapshot, undo, redo, canUndo, canRedo, pastEntries, jumpTo, getPreviousState } = useDiagramHistory(nodes, edges);
 
     // Presets
-    const preset = useDiagramStylePreset();
+    const preset = useDiagramStylePreset_v2();
 
     // Track resizing state to prevent history flooding
     const isResizingRef = useRef(false);

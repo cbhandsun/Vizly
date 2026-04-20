@@ -650,6 +650,14 @@
             "help": {
                 "label": "/help",
                 "desc": "显示帮助"
+            },
+            "sequence": {
+                "label": "/sequence <交互逻辑>",
+                "desc": "🤖 AI 生成 UML 时序图"
+            },
+            "doc": {
+                "label": "/doc",
+                "desc": "🤖 生成专业技术架构说明书"
             }
         },
         "status": {
@@ -892,6 +900,7 @@
             "applyConsistent": "应用ELK一致性预设"
         },
         "tabs": {
+            "basic": "基础设置",
             "nodes": "节点设置",
             "containers": "容器设置",
             "spacing": "间距设置",
@@ -945,7 +954,11 @@
             "core": "核心策略",
             "elkBasic": "ELK 基础",
             "elkSpacing": "ELK 间距",
-            "elkAdvanced": "ELK 高级微调"
+            "elkAdvanced": "ELK 高级微调",
+            "expertMode": "专家模式"
+        },
+        "layout": {
+            "domainElkActive": "域ELK生效中"
         },
         "diagram": {
             "node": {
@@ -1304,7 +1317,46 @@
             "mono": "黑白高对比"
         },
         "switcher": {
-            "title": "风格方案"
+            "title": "皮肤方案"
+        }
+    },
+    "plugins": {
+        "sequence": {
+            "title": "UML 时序图",
+            "addActor": "添加参与者",
+            "autoLayout": "自动对齐生命线",
+            "layoutSuccess": "生命线 X 轴已对齐",
+            "newActor": "新参与者"
+        },
+        "mindmap": {
+            "title": "专业脑图",
+            "collapseAll": "折叠所有分支",
+            "expandAll": "展开所有分支",
+            "fitView": "适应视口",
+            "direction": {
+                "LR": "↔ 双向展开",
+                "R": "→ 向右展开",
+                "L": "← 向左展开",
+                "TB": "↓ 向下展开"
+            }
+        }
+    },
+    "services": {
+        "docGen": {
+            "title": "系统架构设计文档",
+            "author": "作者",
+            "generatedOn": "生成时间",
+            "overview": "1. 系统概览",
+            "overviewDesc": "本文件提供了在 Vizly 中建模的架构技术概览。该系统包含 **{{nodeCount}}** 个功能组件，分布在 **{{containerCount}}** 个逻辑容器中。",
+            "healthSummary": "1.1 架构健康度总结",
+            "risks": "检测到潜在风险",
+            "hierarchy": "2. 组件层级",
+            "interactions": "3. 服务交互",
+            "noInteractions": "*此图中未定义直接的交互关系。*",
+            "interactionDesc": "下表描述了各组件之间的数据流转和服务依赖关系：",
+            "containers": "4. 逻辑容器与分组",
+            "containerDesc": "- **{{label}}**: 由 {{children}} 组成。",
+            "footer": "*由 Vizly AI 引擎自动生成。专为“架构即代码”流程优化。*"
         }
     }
 }

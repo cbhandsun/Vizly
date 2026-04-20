@@ -607,7 +607,53 @@
         "invalidDiagram": "Invalid diagram data",
         "requestFailed": "Request failed: {{error}}",
         "requestError": "❌ Request error: {{error}}",
-        "autoSwitched": "Auto-switched to: {{name}}"
+        "autoSwitched": "Auto-switched to: {{name}}",
+        "commands": {
+            "add": {
+                "label": "/add <description>",
+                "desc": "⚡ Directly add node to canvas"
+            },
+            "connect": {
+                "label": "/connect <A> <B>",
+                "desc": "⚡ Connect two nodes"
+            },
+            "layout": {
+                "label": "/layout [type]",
+                "desc": "⚡ Auto layout (dagre/grid/force)"
+            },
+            "delete": {
+                "label": "/delete <keyword>",
+                "desc": "⚡ Delete matching nodes"
+            },
+            "group": {
+                "label": "/group <keyword>",
+                "desc": "⚡ Smart group matching nodes"
+            },
+            "generate": {
+                "label": "/generate <desc>",
+                "desc": "🤖 AI generate full diagram"
+            },
+            "analyze": {
+                "label": "/analyze",
+                "desc": "🤖 AI analyze current graph"
+            },
+            "sequence": {
+                "label": "/sequence <logic>",
+                "desc": "🤖 AI generate UML Sequence Diagram"
+            },
+            "doc": {
+                "label": "/doc",
+                "desc": "🤖 Generate professional architecture doc"
+            },
+            "clear": {
+                "label": "/clear",
+                "desc": "Clear conversation"
+            },
+            "help": {
+                "label": "/help",
+                "desc": "Show help"
+            }
+        }
     },
     "export": {
         "backToTop": "Back to Top",
@@ -832,6 +878,7 @@
             "applyConsistent": "Apply ELK Consistent Preset"
         },
         "tabs": {
+            "basic": "Basic Settings",
             "nodes": "Node Settings",
             "containers": "Container Settings",
             "spacing": "Spacing Settings",
@@ -861,356 +908,358 @@
             "DomainElkRadialLayout": "Global: ELK Radial (Manual)",
             "DomainElkForceLayout": "Global: ELK Force",
             "DomainElkTrueRadialLayout": "Global: ELK True Radial",
-            "HorizontalLayout": "Node: Horizontal",
-            "VerticalLayout": "Node: Vertical",
-            "GridLayout": "Node: Grid",
-            "CenteredLayout": "Node: Centered",
-            "ElkNodeLayout": "Node: ELK-first",
-            "DagreLayout": "Node: Dagre Layered",
-            "auth": {
-                "auto": "Industry Preset: Auto",
-                "strict_industry": "Industry Preset: Strict",
-                "balanced_industry": "Industry Preset: Balanced",
-                "relaxed_industry": "Industry Preset: Relaxed",
-                "NETWORK_SIMPLEX": "ELK: Network Simplex",
-                "LINEAR_SEGMENTS": "ELK: Linear Segments",
-                "BRANDES_KOEPF": "ELK: Brandes-Koepf"
-            },
-            "groups": {
-                "basic": "Basic Settings",
-                "obstacle": "Obstacles & Containers",
-                "geometry": "Geometry Tuning",
-                "preference": "Preference Weights",
-                "sampling": "Advanced Sampling",
-                "bezier": "Bezier Tuning",
-                "core": "Core Strategy",
-                "elkBasic": "ELK Basic",
-                "elkSpacing": "ELK Spacing",
-                "elkAdvanced": "ELK Advanced Tuning"
-            },
-            "diagram": {
-                "node": {
-                    "minWidth": {
-                        "label": "Node Min Width",
-                        "desc": "Minimum display width of the node when text is short. Prevents layout jitter."
-                    },
-                    "maxWidth": {
-                        "label": "Node Max Width",
-                        "desc": "Maximum width of the node. Content will wrap if exceeded."
-                    },
-                    "height": {
-                        "label": "Node Height",
-                        "desc": "Base height of the node. Will expand for multi-line text."
-                    },
-                    "padding": {
-                        "horizontal": {
-                            "label": "Node Horizontal Padding",
-                            "desc": "Left and right padding for node content."
-                        },
-                        "vertical": {
-                            "label": "Node Vertical Padding",
-                            "desc": "Top and bottom padding for node content."
-                        }
-                    },
-                    "boxShadow": {
-                        "label": "Node Shadow",
-                        "desc": "CSS box-shadow expression for nodes."
-                    }
+            "HorizontalLayout": "Nodes: Horizontal",
+            "VerticalLayout": "Nodes: Vertical",
+            "GridLayout": "Nodes: Grid",
+            "CenteredLayout": "Nodes: Centered",
+            "ElkNodeLayout": "Nodes: ELK-first",
+            "DagreLayout": "Nodes: Dagre Layered",
+            "auto": "Industry Preset: Auto",
+            "strict_industry": "Industry Preset: Strict",
+            "balanced_industry": "Industry Preset: Balanced",
+            "relaxed_industry": "Industry Preset: Relaxed",
+            "NETWORK_SIMPLEX": "ELK: Network Simplex",
+            "LINEAR_SEGMENTS": "ELK: Linear Segments",
+            "BRANDES_KOEPF": "ELK: Brandes-Koepf"
+        },
+        "groups": {
+            "basic": "Basic Settings",
+            "obstacle": "Obstacles & Containers",
+            "geometry": "Geometry Tuning",
+            "preference": "Preference Weights",
+            "sampling": "Advanced Sampling",
+            "bezier": "Bezier Tuning",
+            "core": "Core Strategy",
+            "elkBasic": "ELK Basic",
+            "elkSpacing": "ELK Spacing",
+            "elkAdvanced": "ELK Advanced Tuning",
+            "expertMode": "Expert Mode"
+        },
+        "layout": {
+            "domainElkActive": "Domain ELK Layout Active"
+        },
+        "diagram": {
+            "node": {
+                "minWidth": {
+                    "label": "Node Min Width",
+                    "desc": "Minimum display width of the node when text is short. Prevents layout jitter."
                 },
-                "font": {
-                    "size": {
-                        "label": "Font Size",
-                        "desc": "Font size for node text (px)."
-                    }
+                "maxWidth": {
+                    "label": "Node Max Width",
+                    "desc": "Maximum width of the node. Content will wrap if exceeded."
                 },
-                "domain": {
-                    "padding": {
-                        "horizontal": {
-                            "label": "Domain Horizontal Padding",
-                            "desc": "Internal padding for domains (left/right)."
-                        },
-                        "vertical": {
-                            "label": "Domain Vertical Padding",
-                            "desc": "Internal padding for domains (top/bottom)."
-                        }
-                    },
-                    "gap": {
-                        "label": "Domain Gap",
-                        "desc": "Spacing between different domains."
-                    },
-                    "sideSafeGap": {
-                        "label": "Domain Side Safe Gap",
-                        "desc": "Extra margin on domain sides for safety."
-                    },
-                    "bottomSafeGap": {
-                        "label": "Domain Bottom Safe Gap",
-                        "desc": "Extra margin at the bottom of the domain."
-                    },
-                    "title": {
-                        "height": {
-                            "label": "Domain Title Height",
-                            "desc": "Reserved height for domain title bar."
-                        },
-                        "safeGap": {
-                            "label": "Domain Title Safe Gap",
-                            "desc": "Safe gap between title and content."
-                        }
-                    }
+                "height": {
+                    "label": "Node Height",
+                    "desc": "Base height of the node. Will expand for multi-line text."
                 },
-                "subDomain": {
-                    "padding": {
-                        "horizontal": {
-                            "label": "SubDomain Horizontal Padding",
-                            "desc": "Internal padding for sub-domains."
-                        },
-                        "vertical": {
-                            "label": "SubDomain Vertical Padding",
-                            "desc": "Internal padding for sub-domains."
-                        }
-                    },
-                    "title": {
-                        "height": {
-                            "label": "SubDomain Title Height",
-                            "desc": "Reserved height for sub-domain title bar."
-                        }
-                    },
-                    "ensureTitleClearance": {
-                        "label": "Ensure Title Clearance",
-                        "desc": "Automatically shift content to avoid title overlap."
-                    }
-                },
-                "spacing": {
+                "padding": {
                     "horizontal": {
-                        "label": "Horizontal Node Spacing",
-                        "desc": "Horizontal distance between nodes in the same layer."
+                        "label": "Node Horizontal Padding",
+                        "desc": "Left and right padding for node content."
                     },
                     "vertical": {
-                        "label": "Vertical Node Spacing",
-                        "desc": "Vertical distance between layers."
+                        "label": "Node Vertical Padding",
+                        "desc": "Top and bottom padding for node content."
                     }
                 },
-                "edge": {
-                    "mode": {
-                        "label": "Edge Mode",
-                        "desc": "Select rendering mode for edges."
+                "boxShadow": {
+                    "label": "Node Shadow",
+                    "desc": "CSS box-shadow expression for nodes."
+                }
+            },
+            "font": {
+                "size": {
+                    "label": "Font Size",
+                    "desc": "Font size for node text (px)."
+                }
+            },
+            "domain": {
+                "padding": {
+                    "horizontal": {
+                        "label": "Domain Horizontal Padding",
+                        "desc": "Internal padding for domains (left/right)."
                     },
-                    "pathType": {
-                        "label": "Path Type",
-                        "desc": "Select path style (Step, Bezier, etc.)."
-                    },
-                    "directionalHandlePolicy": {
-                        "label": "Handle Direction Policy",
-                        "desc": "Strategy for handle placement (prefer, force, off)."
-                    },
-                    "forceDirect": {
-                        "label": "Force Direct",
-                        "desc": "Ignore obstacles and force direct path."
-                    },
-                    "intraContainerNoObstacle": {
-                        "label": "No Obstacles in Container",
-                        "desc": "Ignore internal obstacles for intra-container edges."
-                    },
-                    "pureObstacleMode": {
-                        "label": "Pure Obstacle Mode",
-                        "desc": "Ignore container walls, consider only node obstacles."
-                    },
-                    "ignoreContainers": {
-                        "label": "Ignore Containers",
-                        "desc": "Ignore container penalties and ownership."
-                    },
-                    "laneClamp": {
-                        "label": "Enable Lane Clamp",
-                        "desc": "Restrict path to container lane when within same container."
-                    },
-                    "obstaclePadding": {
-                        "label": "Obstacle Padding",
-                        "desc": "Safety margin around obstacles."
-                    },
-                    "minArrowOffset": {
-                        "label": "Min Arrow Offset",
-                        "desc": "Minimum offset for arrow from node boundary."
-                    },
-                    "stepLastSegmentMin": {
-                        "label": "Step Last Segment Min",
-                        "desc": "Minimum length for the final segment of a step line."
-                    },
-                    "disableDomainInfluence": {
-                        "label": "Disable Domain Influence",
-                        "desc": "Remove domain preferences, use geometry/obstacles only."
-                    },
-                    "crossDomainVerticalPrefer": {
-                        "label": "Cross-Domain Vertical Prefer",
-                        "desc": "Prefer vertical ports for cross-domain edges."
-                    },
-                    "crossDomainBias": {
-                        "label": "Cross-Domain Bias",
-                        "desc": "Weight for cross-domain vertical preference."
-                    },
-                    "preferOrthogonalInDomain": {
-                        "label": "Prefer Orthogonal in Domain",
-                        "desc": "Prefer orthogonal paths within domain."
-                    },
-                    "domainOrthogonalBias": {
-                        "label": "Domain Orthogonal Bias",
-                        "desc": "Weight for domain orthogonal preference."
-                    },
-                    "preferLROnHorizontal": {
-                        "label": "Prefer LR on Horizontal",
-                        "desc": "Prefer Left-Right ports for horizontal flow."
-                    },
-                    "horizontalBiasThreshold": {
-                        "label": "Horizontal Bias Threshold",
-                        "desc": "Threshold for determining horizontal flow."
-                    },
-                    "typePreferenceProfile": {
-                        "label": "Type Preference Profile",
-                        "desc": "Profile for edge type selection (Orthogonal/Balanced/Curved)."
-                    },
-                    "orthogonalSamplingEnabled": {
-                        "label": "Enable Orthogonal Sampling",
-                        "desc": "Use multi-channel sampling for step paths."
-                    },
-                    "orthogonalGridSize": {
-                        "label": "Orthogonal Grid Size",
-                        "desc": "Grid size for orthogonal sampling."
-                    },
-                    "orthogonalSampleBudget": {
-                        "label": "Orthogonal Sample Budget",
-                        "desc": "Max number of candidates for sampling."
-                    },
-                    "gridAStarEnabled": {
-                        "label": "Enable Grid A*",
-                        "desc": "Use Grid A* for pathfinding candidates."
-                    },
-                    "gridAStarGridSize": {
-                        "label": "Grid A* Step Size",
-                        "desc": "Grid size for A*."
-                    },
-                    "gridAStarMaxExpansions": {
-                        "label": "Grid A* Max Expansions",
-                        "desc": "Max expansions for A* search."
-                    },
-                    "beziersAllowedMinAngleDeg": {
-                        "label": "Bezier Min Angle",
-                        "desc": "Min angle to allow bezier curves."
-                    },
-                    "beziersAllowedMinDetourRatio": {
-                        "label": "Bezier Min Detour Ratio",
-                        "desc": "Min detour ratio to allow bezier curves."
-                    },
-                    "corridorObstacleHardThreshold": {
-                        "label": "Corridor Obstacle Threshold",
-                        "desc": "Obstacle count threshold to fallback to bezier."
+                    "vertical": {
+                        "label": "Domain Vertical Padding",
+                        "desc": "Internal padding for domains (top/bottom)."
                     }
                 },
-                "layout": {
-                    "INDUSTRY_PROFILE": {
-                        "label": "Industry Preset",
-                        "desc": "Apply industry standard presets."
+                "gap": {
+                    "label": "Domain Gap",
+                    "desc": "Spacing between different domains."
+                },
+                "sideSafeGap": {
+                    "label": "Domain Side Safe Gap",
+                    "desc": "Extra margin on domain sides for safety."
+                },
+                "bottomSafeGap": {
+                    "label": "Domain Bottom Safe Gap",
+                    "desc": "Extra margin at the bottom of the domain."
+                },
+                "title": {
+                    "height": {
+                        "label": "Domain Title Height",
+                        "desc": "Reserved height for domain title bar."
                     },
-                    "strategy": {
-                        "label": "Global Layout Strategy",
-                        "desc": "Choose the overall layout strategy."
-                    },
-                    "direction": {
-                        "label": "Domain Layout Direction",
-                        "desc": "Direction of the global layout (LR, TB, etc.)."
-                    },
-                    "nodeStrategy": {
-                        "label": "Node Layout Strategy",
-                        "desc": "Strategy for laying out nodes within domains."
-                    },
-                    "linkOrientation": {
-                        "label": "Link Orientation",
-                        "desc": "Link domain and node orientation."
-                    },
-                    "CONTAINMENT_POLICY": {
-                        "label": "Containment Policy",
-                        "desc": "Strict, Soft, or Elastic containment."
-                    },
-                    "ELK_ALGORITHM": {
-                        "label": "ELK Algorithm",
-                        "desc": "Underlying ELK algorithm (layered, force, etc.)."
-                    },
-                    "RANK_MODE": {
-                        "label": "Rank Mode",
-                        "desc": "Fine-tuning for ranking (ELK vs Dagre-like)."
-                    },
-                    "ELK_STRICT_MODE": {
-                        "label": "ELK Strict Mode",
-                        "desc": "Strictly follow ELK output, disable post-processing."
-                    },
-                    "ELK_DIRECTION": {
-                        "label": "ELK Direction",
-                        "desc": "Override ELK direction."
-                    },
-                    "ELK_NODE_SPACING": {
-                        "label": "ELK Node Spacing",
-                        "desc": "Spacing between nodes in ELK."
-                    },
-                    "ELK_LAYER_SPACING": {
-                        "label": "ELK Layer Spacing",
-                        "desc": "Spacing between layers in ELK."
-                    },
-                    "ELK_LABEL_SPACING": {
-                        "label": "ELK Label Spacing",
-                        "desc": "Spacing between labels."
-                    },
-                    "ELK_EDGE_NODE_SPACING": {
-                        "label": "ELK Edge-Node Spacing",
-                        "desc": "Spacing between edges and nodes."
-                    },
-                    "ELK_EDGE_EDGE_SPACING": {
-                        "label": "ELK Edge-Edge Spacing",
-                        "desc": "Spacing between edges."
-                    },
-                    "ELK_PORT_PORT_SPACING": {
-                        "label": "ELK Port Spacing",
-                        "desc": "Spacing between ports."
-                    },
-                    "ELK_PORT_BORDER_OFFSET": {
-                        "label": "ELK Port Border Offset",
-                        "desc": "Offset of ports from node border."
-                    },
-                    "ELK_NODE_PLACEMENT": {
-                        "label": "ELK Node Placement",
-                        "desc": "Strategy for node placement."
-                    },
-                    "ELK_LAYERING": {
-                        "label": "ELK Layering",
-                        "desc": "Strategy for layering."
-                    },
-                    "ELK_EDGE_ROUTING": {
-                        "label": "ELK Edge Routing",
-                        "desc": "Routing style for ELK edges."
-                    },
-                    "ELK_MERGE_EDGES": {
-                        "label": "ELK Merge Edges",
-                        "desc": "Merge multiple edges between same nodes."
-                    },
-                    "ELK_FIXED_ALIGNMENT": {
-                        "label": "ELK Fixed Alignment",
-                        "desc": "Alignment preference for nodes."
-                    },
-                    "ELK_CONSIDER_MODEL_ORDER": {
-                        "label": "ELK Consider Model Order",
-                        "desc": "Respect original order of nodes."
-                    },
-                    "ELK_CYCLE_BREAKING": {
-                        "label": "ELK Cycle Breaking",
-                        "desc": "Strategy for breaking cycles."
+                    "safeGap": {
+                        "label": "Domain Title Safe Gap",
+                        "desc": "Safe gap between title and content."
                     }
                 }
             },
-            "performance": {
-                "enableVirtualization": {
-                    "label": "Enable Virtualization",
-                    "desc": "Use virtualization for large diagrams."
+            "subDomain": {
+                "padding": {
+                    "horizontal": {
+                        "label": "SubDomain Horizontal Padding",
+                        "desc": "Internal padding for sub-domains."
+                    },
+                    "vertical": {
+                        "label": "SubDomain Vertical Padding",
+                        "desc": "Internal padding for sub-domains."
+                    }
                 },
-                "enableAnimations": {
-                    "label": "Enable Animations",
-                    "desc": "Enable transitions and animations."
+                "title": {
+                    "height": {
+                        "label": "SubDomain Title Height",
+                        "desc": "Reserved height for sub-domain title bar."
+                    }
+                },
+                "ensureTitleClearance": {
+                    "label": "Ensure Title Clearance",
+                    "desc": "Automatically shift content to avoid title overlap."
                 }
+            },
+            "spacing": {
+                "horizontal": {
+                    "label": "Horizontal Node Spacing",
+                    "desc": "Horizontal distance between nodes in the same layer."
+                },
+                "vertical": {
+                    "label": "Vertical Node Spacing",
+                    "desc": "Vertical distance between layers."
+                }
+            },
+            "edge": {
+                "mode": {
+                    "label": "Edge Mode",
+                    "desc": "Select rendering mode for edges."
+                },
+                "pathType": {
+                    "label": "Path Type",
+                    "desc": "Select path style (Step, Bezier, etc.)."
+                },
+                "directionalHandlePolicy": {
+                    "label": "Handle Direction Policy",
+                    "desc": "Strategy for handle placement (prefer, force, off)."
+                },
+                "forceDirect": {
+                    "label": "Force Direct",
+                    "desc": "Ignore obstacles and force direct path."
+                },
+                "intraContainerNoObstacle": {
+                    "label": "No Obstacles in Container",
+                    "desc": "Ignore internal obstacles for intra-container edges."
+                },
+                "pureObstacleMode": {
+                    "label": "Pure Obstacle Mode",
+                    "desc": "Ignore container walls, consider only node obstacles."
+                },
+                "ignoreContainers": {
+                    "label": "Ignore Containers",
+                    "desc": "Ignore container penalties and ownership."
+                },
+                "laneClamp": {
+                    "label": "Enable Lane Clamp",
+                    "desc": "Restrict path to container lane when within same container."
+                },
+                "obstaclePadding": {
+                    "label": "Obstacle Padding",
+                    "desc": "Safety margin around obstacles."
+                },
+                "minArrowOffset": {
+                    "label": "Min Arrow Offset",
+                    "desc": "Minimum offset for arrow from node boundary."
+                },
+                "stepLastSegmentMin": {
+                    "label": "Step Last Segment Min",
+                    "desc": "Minimum length for the final segment of a step line."
+                },
+                "disableDomainInfluence": {
+                    "label": "Disable Domain Influence",
+                    "desc": "Remove domain preferences, use geometry/obstacles only."
+                },
+                "crossDomainVerticalPrefer": {
+                    "label": "Cross-Domain Vertical Prefer",
+                    "desc": "Prefer vertical ports for cross-domain edges."
+                },
+                "crossDomainBias": {
+                    "label": "Cross-Domain Bias",
+                    "desc": "Weight for cross-domain vertical preference."
+                },
+                "preferOrthogonalInDomain": {
+                    "label": "Prefer Orthogonal in Domain",
+                    "desc": "Prefer orthogonal paths within domain."
+                },
+                "domainOrthogonalBias": {
+                    "label": "Domain Orthogonal Bias",
+                    "desc": "Weight for domain orthogonal preference."
+                },
+                "preferLROnHorizontal": {
+                    "label": "Prefer LR on Horizontal",
+                    "desc": "Prefer Left-Right ports for horizontal flow."
+                },
+                "horizontalBiasThreshold": {
+                    "label": "Horizontal Bias Threshold",
+                    "desc": "Threshold for determining horizontal flow."
+                },
+                "typePreferenceProfile": {
+                    "label": "Type Preference Profile",
+                    "desc": "Profile for edge type selection (Orthogonal/Balanced/Curved)."
+                },
+                "orthogonalSamplingEnabled": {
+                    "label": "Enable Orthogonal Sampling",
+                    "desc": "Use multi-channel sampling for step paths."
+                },
+                "orthogonalGridSize": {
+                    "label": "Orthogonal Grid Size",
+                    "desc": "Grid size for orthogonal sampling."
+                },
+                "orthogonalSampleBudget": {
+                    "label": "Orthogonal Sample Budget",
+                    "desc": "Max number of candidates for sampling."
+                },
+                "gridAStarEnabled": {
+                    "label": "Enable Grid A*",
+                    "desc": "Use Grid A* for pathfinding candidates."
+                },
+                "gridAStarGridSize": {
+                    "label": "Grid A* Step Size",
+                    "desc": "Grid size for A*."
+                },
+                "gridAStarMaxExpansions": {
+                    "label": "Grid A* Max Expansions",
+                    "desc": "Max expansions for A* search."
+                },
+                "beziersAllowedMinAngleDeg": {
+                    "label": "Bezier Min Angle",
+                    "desc": "Min angle to allow bezier curves."
+                },
+                "beziersAllowedMinDetourRatio": {
+                    "label": "Bezier Min Detour Ratio",
+                    "desc": "Min detour ratio to allow bezier curves."
+                },
+                "corridorObstacleHardThreshold": {
+                    "label": "Corridor Obstacle Threshold",
+                    "desc": "Obstacle count threshold to fallback to bezier."
+                }
+            },
+            "layout": {
+                "INDUSTRY_PROFILE": {
+                    "label": "Industry Preset",
+                    "desc": "Apply industry standard presets."
+                },
+                "strategy": {
+                    "label": "Global Layout Strategy",
+                    "desc": "Choose the overall layout strategy."
+                },
+                "direction": {
+                    "label": "Domain Layout Direction",
+                    "desc": "Direction of the global layout (LR, TB, etc.)."
+                },
+                "nodeStrategy": {
+                    "label": "Node Layout Strategy",
+                    "desc": "Strategy for laying out nodes within domains."
+                },
+                "linkOrientation": {
+                    "label": "Link Orientation",
+                    "desc": "Link domain and node orientation."
+                },
+                "CONTAINMENT_POLICY": {
+                    "label": "Containment Policy",
+                    "desc": "Strict, Soft, or Elastic containment."
+                },
+                "ELK_ALGORITHM": {
+                    "label": "ELK Algorithm",
+                    "desc": "Underlying ELK algorithm (layered, force, etc.)."
+                },
+                "RANK_MODE": {
+                    "label": "Rank Mode",
+                    "desc": "Fine-tuning for ranking (ELK vs Dagre-like)."
+                },
+                "ELK_STRICT_MODE": {
+                    "label": "ELK Strict Mode",
+                    "desc": "Strictly follow ELK output, disable post-processing."
+                },
+                "ELK_DIRECTION": {
+                    "label": "ELK Direction",
+                    "desc": "Override ELK direction."
+                },
+                "ELK_NODE_SPACING": {
+                    "label": "ELK Node Spacing",
+                    "desc": "Spacing between nodes in ELK."
+                },
+                "ELK_LAYER_SPACING": {
+                    "label": "ELK Layer Spacing",
+                    "desc": "Spacing between layers in ELK."
+                },
+                "ELK_LABEL_SPACING": {
+                    "label": "ELK Label Spacing",
+                    "desc": "Spacing between labels."
+                },
+                "ELK_EDGE_NODE_SPACING": {
+                    "label": "ELK Edge-Node Spacing",
+                    "desc": "Spacing between edges and nodes."
+                },
+                "ELK_EDGE_EDGE_SPACING": {
+                    "label": "ELK Edge-Edge Spacing",
+                    "desc": "Spacing between edges."
+                },
+                "ELK_PORT_PORT_SPACING": {
+                    "label": "ELK Port Spacing",
+                    "desc": "Spacing between ports."
+                },
+                "ELK_PORT_BORDER_OFFSET": {
+                    "label": "ELK Port Border Offset",
+                    "desc": "Offset of ports from node border."
+                },
+                "ELK_NODE_PLACEMENT": {
+                    "label": "ELK Node Placement",
+                    "desc": "Strategy for node placement."
+                },
+                "ELK_LAYERING": {
+                    "label": "ELK Layering",
+                    "desc": "Strategy for layering."
+                },
+                "ELK_EDGE_ROUTING": {
+                    "label": "ELK Edge Routing",
+                    "desc": "Routing style for ELK edges."
+                },
+                "ELK_MERGE_EDGES": {
+                    "label": "ELK Merge Edges",
+                    "desc": "Merge multiple edges between same nodes."
+                },
+                "ELK_FIXED_ALIGNMENT": {
+                    "label": "ELK Fixed Alignment",
+                    "desc": "Alignment preference for nodes."
+                },
+                "ELK_CONSIDER_MODEL_ORDER": {
+                    "label": "ELK Consider Model Order",
+                    "desc": "Respect original order of nodes."
+                },
+                "ELK_CYCLE_BREAKING": {
+                    "label": "ELK Cycle Breaking",
+                    "desc": "Strategy for breaking cycles."
+                }
+            }
+        },
+        "performance": {
+            "enableVirtualization": {
+                "label": "Enable Virtualization",
+                "desc": "Use virtualization for large diagrams."
+            },
+            "enableAnimations": {
+                "label": "Enable Animations",
+                "desc": "Enable transitions and animations."
             }
         }
     },
@@ -1247,6 +1296,45 @@
         },
         "switcher": {
             "title": "Style Schemes"
+        }
+    },
+    "plugins": {
+        "sequence": {
+            "title": "UML Sequence Diagram",
+            "addActor": "Add Participant",
+            "autoLayout": "Auto Align Lifelines",
+            "layoutSuccess": "Lifelines aligned on X-axis",
+            "newActor": "New Actor"
+        },
+        "mindmap": {
+            "title": "Mind Map Pro",
+            "collapseAll": "Collapse All Branches",
+            "expandAll": "Expand All Branches",
+            "fitView": "Fit to Viewport",
+            "direction": {
+                "LR": "↔ 2-Way Expansion",
+                "R": "→ Right Only",
+                "L": "← Left Only",
+                "TB": "↓ Top Down"
+            }
+        }
+    },
+    "services": {
+        "docGen": {
+            "title": "System Architecture Document",
+            "author": "Author",
+            "generatedOn": "Generated on",
+            "overview": "1. System Overview",
+            "overviewDesc": "This document provides a technical overview of the architecture modeled in Vizly. The system consists of **{{nodeCount}}** functional components organized within **{{containerCount}}** logical containers.",
+            "healthSummary": "1.1 Architecture Health Summary",
+            "risks": "Detected Potential Risks",
+            "hierarchy": "2. Component Hierarchy",
+            "interactions": "3. Service Interactions",
+            "noInteractions": "*No direct interactions defined in this diagram.*",
+            "interactionDesc": "The following table describes the data flow and service dependencies between components:",
+            "containers": "4. Logical Containers & Groups",
+            "containerDesc": "- **{{label}}**: Consists of {{children}}.",
+            "footer": "*Generated by Vizly AI Engine. Optimized for architecture-as-code workflows.*"
         }
     }
 }

@@ -12,6 +12,7 @@ export interface AutoSaveOptions {
     interval?: number; // 默认 60000ms (60秒)
     storageKey?: string; // 默认 'flowchart-autosave-default'
     enabled?: boolean; // 默认 true
+    diagramId?: string; // 用来验证存储数据的 ID 是否一致
     onSaveSuccess?: () => void;
     onSaveError?: (error: Error) => void;
 }
@@ -25,6 +26,7 @@ export const useAutoSave = (
         interval = 60000,
         storageKey = 'flowchart-autosave-default',
         enabled = true,
+        diagramId,
         onSaveSuccess,
         onSaveError
     } = options;
@@ -42,7 +44,9 @@ export const useAutoSave = (
     // 核心保存函数
     const save = useCallback(async () => {
         try {
+
             const data = {
+                diagramId,
                 nodes,
                 edges,
                 timestamp: Date.now(),
@@ -104,15 +108,17 @@ export const useAutoSave = (
     }, [save]);
 
     // 加载保存的数据
-    const loadSaved = useCallback((): { nodes: Node[]; edges: Edge[] } | null => {
+    const loadSaved = useCallback((): { diagramId?: string; nodes: Node[]; edges: Edge[]; isFreshSeed?: boolean } | null => {
         try {
             const saved = localStorage.getItem(storageKey);
             if (!saved) return null;
 
             const data = JSON.parse(saved);
             return {
+                diagramId: data.diagramId,
                 nodes: data.nodes || [],
-                edges: data.edges || []
+                edges: data.edges || [],
+                isFreshSeed: !!data.isFreshSeed
             };
         } catch (error) {
             console.error('Failed to load auto-saved data:', error);

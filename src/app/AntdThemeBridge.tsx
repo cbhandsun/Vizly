@@ -41,7 +41,7 @@ const toBridgeTokens = (theme: Theme | null): BridgeTokens => {
     warning: theme.palette?.warning?.main || fallbackTokens.warning,
     error: theme.palette?.error?.main || fallbackTokens.error,
     fontFamily,
-    borderRadius: Math.max(0, Number(theme.borderRadius?.md ?? fallbackTokens.borderRadius) || fallbackTokens.borderRadius)
+    borderRadius: 12 // 🚀 Universal V3 Standard
   };
 };
 
@@ -153,7 +153,22 @@ export const AntdThemeBridge: React.FC<{ children: React.ReactNode }> = ({ child
         colorSuccess: tokens.success,
         colorWarning: tokens.warning,
         colorError: tokens.error,
-        borderRadius: tokens.borderRadius
+        borderRadius: tokens.borderRadius,
+        // 🚀 V3: 增加组件级的玻璃态与高级投影
+        components: {
+          Card: {
+            boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+            colorBorderSecondary: 'rgba(0,0,0,0.06)'
+          },
+          Input: {
+            colorBgContainer: 'rgba(255, 255, 255, 0.45)',
+            colorBorder: 'rgba(0, 0, 0, 0.1)'
+          },
+          Modal: {
+            contentBg: 'rgba(255, 255, 255, 0.85)',
+            boxShadow: '0 24px 48px -12px rgba(0,0,0,0.15)'
+          }
+        }
       }
     } as const;
   }, [algorithm, tokens]);

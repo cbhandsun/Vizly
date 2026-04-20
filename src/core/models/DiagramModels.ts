@@ -256,6 +256,7 @@ export interface StandardDiagramData {
     updatedAt?: string;
     tags?: string[];
     icon?: string;
+    themeId?: string;
     preview?: {
       mime: string;
       dataUrl: string;

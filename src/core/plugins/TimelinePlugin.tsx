@@ -15,17 +15,14 @@ import dayjs from 'dayjs';
 export class TimelinePlugin implements DiagramTypePlugin {
   id = 'timeline-diagram';
   name = '项目级时间线图 (Pro)';
-  hideDefaultSidebar = true;
-  hideContextToolbar = true;
-  hideMiniMap = true;
-  hideZoomControls = true;
-  hideLayoutControls = true;
-  hideGridControls = true;
-  hideFlowFocusControls = true;
-  disablePaneDoubleClick = true;
+  version = '1.1.0';
+  description = 'Pro 级甘特图与时间线引擎，支持阶段推演、依赖联动与原子级随动演练，是项目管理与路线图规划的神兵利器。';
+  author = 'Vizly Core';
+  category = 'Productivity';
+  tags = ['Gantt', 'Project', 'Timeline'];
+  brandColor = '#52c41a';
 
-  // Plugin Versioning & Migration
-  version = '1.1';
+  hideDefaultSidebar = true;
   
   async migrate(data: any, fromVersion: string | undefined): Promise<any> {
       console.log(`[TimelinePlugin] Migrating data from version ${fromVersion || '1.0'} to ${this.version}`);

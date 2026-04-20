@@ -1,0 +1,52 @@
+{
+  "id": "blank-canvas-template",
+  "name": "空白画布 (Blank Canvas)",
+  "type": "flowchart",
+  "version": "2.0.0",
+  "nodes": [],
+  "edges": [],
+  "layout": {
+    "direction": "TB",
+    "spacing": {
+      "horizontal": 80,
+      "vertical": 60
+    },
+    "padding": {
+      "horizontal": 24,
+      "vertical": 16
+    },
+    "groupPadding": 36,
+    "constraints": {
+      "minWidth": 120,
+      "minHeight": 60
+    },
+    "generateDomainGroups": true,
+    "generateSubDomainGroups": true,
+    "domainOrder": [],
+    "subDomainOrder": []
+  },
+  "theme": {
+    "name": "light",
+    "displayName": "Light Theme",
+    "domains": {},
+    "isCustom": false
+  },
+  "config": {
+    "NODE_WIDTH": 160,
+    "NODE_HEIGHT": 80,
+    "NODE_PADDING": {
+      "horizontal": 20,
+      "vertical": 14
+    },
+    "SPACING": {
+      "H": 80,
+      "V": 60
+    }
+  },
+  "metadata": {
+    "description": "全新的空白画布，从零开始自由绘制你的构想。",
+    "author": "Vizly",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "tags": ["空白", "基础", "Blank", "Flowchart"]
+  }
+}

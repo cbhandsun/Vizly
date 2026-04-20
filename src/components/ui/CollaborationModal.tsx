@@ -42,7 +42,7 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({
             open={open}
             onCancel={onClose}
             footer={null}
-            destroyOnClose
+            destroyOnHidden
             width={480}
             className="modern-glass-modal"
         >

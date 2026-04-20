@@ -371,8 +371,37 @@ export const useDiagramActions = ({
             case 'stopEditing':
                 handleStopEditing(targetId);
                 break;
+            default:
+                if (action.startsWith('context:add:flowchart:')) {
+                    const suffix = action.split(':').pop();
+                    if (suffix && reactFlowInstance && pluginCtx) {
+                        // Map shorthand types to internal flowchart shapes
+                        const configMap: Record<string, { shape: string, icon: string, main: string }> = {
+                            'rect':     { shape: 'rectangle', icon: 'square-o', main: '#1890ff' },
+                            'diamond':  { shape: 'diamond',   icon: 'diamond',  main: '#722ed1' },
+                            'database': { shape: 'database',  icon: 'database', main: '#fa8c16' },
+                            'step':     { shape: 'rectangle', icon: 'file-text',main: '#52c41a' }
+                        };
+                        const config = configMap[suffix] || { shape: 'rectangle', icon: 'plus', main: '#1890ff' };
+                        
+                        // Add with slight random offset to prevent perfect overlapping
+                        const offset = {
+                            x: (Math.random() - 0.5) * 60,
+                            y: (Math.random() - 0.5) * 60
+                        };
+                        
+                        pluginCtx.addNode('flowchart', { 
+                            shape: config.shape,
+                            icon: config.icon,
+                            theme: { main: config.main, border: config.main, text: '#fff' },
+                            label: `New ${suffix.charAt(0).toUpperCase() + suffix.slice(1)}`,
+                            position: offset 
+                        });
+                    }
+                }
+                break;
         }
-    }, [handleDelete, handleDuplicate, handleBringToFront, handleSendToBack, handleFitView, handleLock, handleReverseEdge, handleResetWaypoints, handleConvertToEditable, handleStopEditing, handleAlign, handleDistribute, handleMatchSize]);
+    }, [handleDelete, handleDuplicate, handleBringToFront, handleSendToBack, handleFitView, handleLock, handleReverseEdge, handleResetWaypoints, handleConvertToEditable, handleStopEditing, handleAlign, handleDistribute, handleMatchSize, reactFlowInstance, pluginCtx]);
 
     return {
         handleDelete,

@@ -255,6 +255,17 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
 
       items.push(
         { key: 'fitView', icon: <ExpandOutlined />, label: '适应屏幕 (Fit View)' },
+        {
+          key: 'add-node-submenu',
+          icon: <AppstoreOutlined />,
+          label: '添加节点 (Add Node)',
+          children: [
+            { key: 'context:add:flowchart:rect', icon: <EditOutlined />, label: '过程 (Process)' },
+            { key: 'context:add:flowchart:database', icon: <ColumnWidthOutlined />, label: '数据库 (Database)' },
+            { key: 'context:add:flowchart:diamond', icon: <CheckOutlined />, label: '判定 (Decision)' },
+            { key: 'context:add:flowchart:step', icon: <AppstoreOutlined />, label: '步骤 (Step)' },
+          ]
+        },
         { key: 'zoomIn', icon: <ZoomInOutlined />, label: '放大 (Zoom In)' },
         { key: 'zoomOut', icon: <ZoomOutOutlined />, label: '缩小 (Zoom Out)' }
       );

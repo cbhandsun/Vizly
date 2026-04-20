@@ -20,7 +20,6 @@ export function useDiagramCollaboration(diagramId: string, enabled: boolean = tr
         // 1. 初始化服务
         collaborationService.init(diagramId);
         const doc = collaborationService.getDoc();
-        const provider = collaborationService.getProvider();
 
         // 2. 获取共享类型
         const yNodes = doc.getMap<Node>('nodes');
@@ -138,8 +137,12 @@ export function useDiagramCollaboration(diagramId: string, enabled: boolean = tr
     // 6. 光标同步
     const updateLocalCursor = useCallback((pos: XYPosition | null) => {
         if (!enabled) return;
-        const awareness = collaborationService.getAwareness();
-        awareness.setLocalStateField('cursor', pos);
+        try {
+            const awareness = collaborationService.getAwareness();
+            awareness.setLocalStateField('cursor', pos);
+        } catch (e) {
+            // Local only mode
+        }
     }, [enabled]);
 
     return {

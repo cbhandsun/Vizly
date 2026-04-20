@@ -40,6 +40,7 @@ import { getAIConfig } from './AIConfigModal';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { unifiedStorage } from '@/services/UnifiedStorageService';
+import { PluginRegistry } from '@/core/services/PluginRegistry';
 import { aiConversationService, Conversation, Message } from '@/services/ai/AIConversationService';
 import { 
     DIAGRAM_SYSTEM_PROMPT, 
@@ -218,6 +219,8 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         { key: '/group', label: t('aiChat.commands.group.label'), description: t('aiChat.commands.group.desc') },
         { key: '/generate', label: t('aiChat.commands.generate.label'), description: t('aiChat.commands.generate.desc') },
         { key: '/analyze', label: t('aiChat.commands.analyze.label'), description: t('aiChat.commands.analyze.desc') },
+        { key: '/sequence', label: t('aiChat.commands.sequence.label'), description: t('aiChat.commands.sequence.desc') },
+        { key: '/doc', label: t('aiChat.commands.doc.label'), description: t('aiChat.commands.doc.desc') },
         { key: '/clear', label: t('aiChat.commands.clear.label'), description: t('aiChat.commands.clear.desc') },
         { key: '/help', label: t('aiChat.commands.help.label'), description: t('aiChat.commands.help.desc') },
     ];
@@ -384,9 +387,29 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                 const cmdJson = match[1];
                 const cmd = JSON.parse(cmdJson);
                 
-                console.log('[AI Pilot] Executing command:', cmd);
-                executedCount++;
+                console.log('[AI Pilot] Processing command:', cmd);
+                
+                // [GAP-10] 首选：尝试通过插件分发器执行 (Architecture First)
+                if (pluginId) {
+                    const ctx = pluginId === 'flowchart' ? ((window as any).__flowContextBridge) : (diagramNodesRef ? {
+                        getNodes: () => diagramNodesRef.current,
+                        getEdges: () => diagramEdgesRef?.current || [],
+                        addNode: canvasOps?.onAddNode,
+                        updateNodesBatch: (ids: any, updates: any) => canvasOps?.onUpdateNodes?.(ids, updates),
+                        takeSnapshot: () => {} 
+                    } : null);
 
+                    if (ctx) {
+                        const handled = await PluginRegistry.getInstance().executeAIAction(pluginId, cmd.action, cmd, ctx as any);
+                        if (handled) {
+                            executedCount++;
+                            continue; 
+                        }
+                    }
+                }
+
+                // 次选：回退到通用内置指令处理
+                executedCount++;
                 switch (cmd.action) {
                     case 'addNode':
                         if (canvasOps.onAddNode) {
@@ -419,27 +442,6 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                             message.success(t('aiChat.status.groupCreated', { name: cmd.name || cmd.label || t('aiChat.status.smartGroup') }));
                         }
                         break;
-                    case 'addChild':
-                        if (pluginId === 'mindmap' && canvasOps.onAddNode) {
-                            // 在脑图模式下，addChild 逻辑上等同于带 parentId 的 addNode
-                            // 这里我们可能需要扩展 onAddNode 以支持 parentId，或者通过全局事件触发
-                            const childId = canvasOps.onAddNode(cmd.label);
-                            if (childId && cmd.parentId) {
-                                // 触发一个事件让脑图引擎建立父子链接
-                                window.dispatchEvent(new CustomEvent('mindmap:add-child', { 
-                                    detail: { parentId: cmd.parentId, childId, label: cmd.label, side: cmd.side } 
-                                }));
-                            }
-                            message.success(`已添加脑图分子: ${cmd.label}`);
-                        }
-                        break;
-                    case 'collapse':
-                        if (pluginId === 'mindmap') {
-                            window.dispatchEvent(new CustomEvent('mindmap:collapse', { 
-                                detail: { nodeId: cmd.id, collapsed: cmd.collapsed } 
-                            }));
-                        }
-                        break;
                     case 'export':
                         if (canvasOps.onExport) {
                             canvasOps.onExport(cmd.type || 'png');
@@ -469,14 +471,14 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                         }
                         break;
                     default:
-                        console.log('Unknown command:', cmd.action);
+                        console.log('Action not handled by general switch:', cmd.action);
                         break;
                 }
                 
                 // [Phase 15] 为连续指令增加微小延迟，确保 React Flow 状态稳定同步
                 await new Promise(resolve => setTimeout(resolve, 100));
             } catch (e) {
-                console.error('[AI Pilot] Command parse error:', e, match[1]);
+                console.error('[AI Pilot] Command execution error:', e, match[1]);
             }
         }
 

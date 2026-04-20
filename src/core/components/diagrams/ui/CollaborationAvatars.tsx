@@ -16,6 +16,8 @@ export const CollaborationAvatars: React.FC = () => {
     const [users, setUsers] = useState<PresenceUser[]>([]);
 
     useEffect(() => {
+        if (!collaborationService.isInitialized()) return;
+
         const awareness = collaborationService.getAwareness();
         
         const updateUsers = () => {

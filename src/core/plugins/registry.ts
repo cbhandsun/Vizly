@@ -14,6 +14,7 @@ export const TYPE_TO_PLUGIN_ID: Record<string, string> = {
     'swimlane':     'swimlane-diagram',
     'er-diagram':   'er-diagram',
     'network':      'network',
+    'sequence':     'sequence-diagram',
 };
 
 /**

@@ -1070,14 +1070,88 @@ export function useMindMapOrchestrator(
         }
     }, [setNodes]);
 
+    const handleSmartDelete = useCallback((e: Event) => {
+        const detail = (e as CustomEvent).detail;
+        const targetIds = detail?.nodeIds || [];
+        if (targetIds.length === 0) return;
+
+        takeSnapshot();
+
+        const nodeIdsToDelete = new Set<string>(targetIds);
+        
+        setEdges(currentEdges => {
+            const nextEdges: Edge[] = [];
+            const edgesToTransfer: { source: string, target: string, color?: string }[] = [];
+
+            // 1. Identify edges to preserve and edges to "repair"
+            currentEdges.forEach(edge => {
+                const isSourceDeleted = nodeIdsToDelete.has(edge.source);
+                const isTargetDeleted = nodeIdsToDelete.has(edge.target);
+
+                if (isTargetDeleted) {
+                    // Edge going to a deleted node -> ignore it, but check its children
+                    return;
+                }
+
+                if (isSourceDeleted) {
+                    // Edge coming from a deleted node -> this child is now orphaned
+                    // Find the deleted node's parent to re-graft
+                    const deletedNodeId = edge.source;
+                    const parentEdge = currentEdges.find(ed => ed.target === deletedNodeId && ed.type !== 'relationshipEdge');
+                    
+                    if (parentEdge) {
+                        // Re-graft to grandparent
+                        edgesToTransfer.push({ 
+                            source: parentEdge.source, 
+                            target: edge.target,
+                            color: edge.style?.stroke as string
+                        });
+                    }
+                    return;
+                }
+
+                nextEdges.push(edge);
+            });
+
+            // 2. Add repaired edges
+            edgesToTransfer.forEach(({ source, target, color }) => {
+                const newId = `re-edge-${source}-${target}-${Date.now()}`;
+                const targetNode = nodes.find(n => n.id === target);
+                const depth = targetNode?.data?.depth as number ?? 1;
+                
+                nextEdges.push({
+                    id: newId,
+                    source,
+                    target,
+                    type: 'mindmapEdge',
+                    style: {
+                        strokeWidth: Math.max(1.5, 4 - (depth - 1) * 0.8),
+                        stroke: color || '#6366f1'
+                    },
+                    data: { kind: 'mindmap' }
+                });
+            });
+
+            // 3. Filter Nodes
+            setNodes(currentNodes => {
+                const nextNodes = currentNodes.filter(n => !nodeIdsToDelete.has(n.id));
+                return nextNodes;
+            });
+
+            return nextEdges;
+        });
+    }, [nodes, edges, setNodes, setEdges, takeSnapshot]);
+
     useEffect(() => {
+        window.addEventListener('mindmap:smart-delete', handleSmartDelete);
         window.addEventListener('editor:add-summary-node', handleAddSummary);
         window.addEventListener('editor:add-boundary-node', handleAddBoundary);
         window.addEventListener('editor:create-relationship-edge', handleCreateRelationship);
         return () => {
+            window.removeEventListener('mindmap:smart-delete', handleSmartDelete);
             window.removeEventListener('editor:add-summary-node', handleAddSummary);
             window.removeEventListener('editor:add-boundary-node', handleAddBoundary);
             window.removeEventListener('editor:create-relationship-edge', handleCreateRelationship);
         };
-    }, [handleAddSummary, handleAddBoundary, handleCreateRelationship]);
+    }, [handleSmartDelete, handleAddSummary, handleAddBoundary, handleCreateRelationship]);
 }
