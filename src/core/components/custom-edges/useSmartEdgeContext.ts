@@ -12,6 +12,11 @@ import { diagramConfigManager } from '../config/DiagramConfig';
 import { LayeredConfigManager } from '../../config/LayeredConfigManager';
 import type { CenteredCoords } from './hooks/useSmartPathWorker';
 
+// [FIX C-6] 模块级方向投票缓存：相同拓扑签名 → 复用计算结果，避免每条边重复 O(E) 计算。
+// 整个应用生命周期内 key 数量 << 20，不存在内存泄漏风险（每次签名变化 clear 一次）。
+const _directionVoteCache = new Map<string, 'LR' | 'RL' | 'TB' | 'BT'>();
+
+
 /**
  * Return type for useSmartEdgeContext hook
  */
@@ -318,20 +323,27 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
     // [FIX] Use **global** layout direction as baseline for reverse detection,
     // NOT the per-edge inferred `layoutDirection` which self-defeats:
     // e.g. a bottom→top edge infers BT, making target-above-source "forward" in BT.
+    // [FIX C-6] O(E²)→O(E)：全局方向投票不再依赖 storeEdges（每帧引用变化），
+    // 改为仅依赖 edgeTopologySig（连接关系字符串签名），同一渲染批次内只计算一次。
+    // 使用模块级缓存：相同签名复用上次结果，避免每条边组件重复投票。
     const globalBaseDirection = useMemo((): 'LR' | 'RL' | 'TB' | 'BT' => {
-        // Priority 1: Explicit edge-level override
+        // Priority 1: Explicit edge-level override（每条边可独立覆盖）
         const edgeDir = (props.data as any)?.layoutDirection;
         if (edgeDir === 'LR' || edgeDir === 'RL' || edgeDir === 'TB' || edgeDir === 'BT') return edgeDir;
 
-        // [NEW] Priority 2: Dynamic Diagram Flow (Industry Standard Majority Vote)
+        // Priority 2: 基于拓扑签名缓存的多数投票
+        // 签名相同 → 返回上次缓存结果，无需重新遍历所有边
+        const cached = _directionVoteCache.get(edgeTopologySig);
+        if (cached) return cached;
+
+        let result: 'LR' | 'RL' | 'TB' | 'BT' = 'TB';
         if (storeEdges && storeEdges.length > 0) {
-            let votes = { TB: 0, BT: 0, LR: 0, RL: 0 };
-            storeEdges.forEach((e) => {
+            const votes = { TB: 0, BT: 0, LR: 0, RL: 0 };
+            for (const e of storeEdges) {
                 const sAbs = getAbsPos(e.source);
                 const tAbs = getAbsPos(e.target);
                 const dx = tAbs.x - sAbs.x;
                 const dy = tAbs.y - sAbs.y;
-                // Only count edges that have a visible displacement
                 if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
                     if (Math.abs(dy) > Math.abs(dx)) {
                         if (dy > 0) votes.TB++; else votes.BT++;
@@ -339,26 +351,29 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
                         if (dx > 0) votes.LR++; else votes.RL++;
                     }
                 }
-            });
-            let majorityDir = 'TB';
+            }
             let maxVotes = -1;
             for (const [dir, count] of Object.entries(votes)) {
-                if (count > maxVotes) {
-                    maxVotes = count;
-                    majorityDir = dir;
-                }
+                if (count > maxVotes) { maxVotes = count; result = dir as any; }
             }
-            if (maxVotes > 0) return majorityDir as 'LR' | 'RL' | 'TB' | 'BT';
         }
 
-        // Priority 3: Global diagram config
-        const globalDir = (() => {
-            try { return (diagramConfigManager.getConfig() as any)?.layout?.direction; } catch { return undefined; }
-        })();
-        if (globalDir === 'LR' || globalDir === 'RL' || globalDir === 'TB' || globalDir === 'BT') return globalDir;
-        // Priority 4: Default TB (most common for flowcharts)
-        return 'TB';
-    }, [props.data, storeEdges, getAbsPos, edgeTopologySig]);
+        // Priority 3: Global diagram config fallback
+        if (result === 'TB') {
+            try {
+                const globalDir = (diagramConfigManager.getConfig() as any)?.layout?.direction;
+                if (globalDir === 'LR' || globalDir === 'RL' || globalDir === 'TB' || globalDir === 'BT') {
+                    result = globalDir;
+                }
+            } catch { /* keep TB */ }
+        }
+
+        // 缓存本次结果（限制缓存大小，避免内存泄漏）
+        if (_directionVoteCache.size > 20) _directionVoteCache.clear();
+        _directionVoteCache.set(edgeTopologySig, result);
+        return result;
+    }, [props.data, edgeTopologySig, storeEdges, getAbsPos]);
+
 
     const isReverseEdge = useMemo(() => {
         const sourceNode = simpleNodeMap.get(source);

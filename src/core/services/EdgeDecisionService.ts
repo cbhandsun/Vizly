@@ -158,19 +158,21 @@ export class EdgeDecisionService {
                 const crossDomain = sDomain !== tDomain;
                 const crossPrefer = Boolean((cfgEdgeLocal as any)?.crossDomainVerticalPrefer ?? true);
 
-                // Force vertical orientation if vertical layout and conditions met
+                // [FIX C-8] 使用互斥分支（if...else if）防止垂直和水平修正互相覆盖 handle
+                // 原来两段独立 if 都会写 sourceHandle/targetHandle，第二段会覆盖第一段
                 if (!preferSmart && preferVerticalByLayout && (isVerticalMain || (crossDomain && crossPrefer))) {
                     const desired = dy2 >= 0 ? { s: 'b', t: 't' } : { s: 't', t: 'b' };
                     (routing as any).sourceHandle = desired.s;
                     (routing as any).targetHandle = desired.t;
+                } else {
+                    const preferLR = !!(((diagramConfigManager.getConfig() as any)?.edge || {}).preferLROnHorizontal ?? true);
+                    if (preferLR && isHorizontalMain) {
+                        const desiredLR = dx2 >= 0 ? { s: 'r', t: 'l' } : { s: 'l', t: 'r' };
+                        (routing as any).sourceHandle = desiredLR.s;
+                        (routing as any).targetHandle = desiredLR.t;
+                    }
                 }
 
-                const preferLR = !!(((diagramConfigManager.getConfig() as any)?.edge || {}).preferLROnHorizontal ?? true);
-                if (preferLR && isHorizontalMain) {
-                    const desiredLR = dx2 >= 0 ? { s: 'r', t: 'l' } : { s: 'l', t: 'r' };
-                    (routing as any).sourceHandle = desiredLR.s;
-                    (routing as any).targetHandle = desiredLR.t;
-                }
             }
         } catch {
             // Safe failure, keep original routing

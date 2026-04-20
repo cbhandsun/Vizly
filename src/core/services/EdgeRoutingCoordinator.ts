@@ -153,7 +153,12 @@ export class EdgeRoutingCoordinator {
      * Call this after manually marking edges as dirty.
      */
     public scheduleBatchRouting(): void {
-        if (this.pendingTimeout) return;
+        // [FIX C-1] 标准防抖：每次调用先清除旧计时器再重新设置。
+        // 原来的 "if (pendingTimeout) return" 会在 16ms 内忽略新请求，
+        // 导致拖拽到停止位置的最后坐标被丢弃，连线停在中途。
+        if (this.pendingTimeout) {
+            clearTimeout(this.pendingTimeout);
+        }
         this.pendingTimeout = setTimeout(() => {
             this.pendingTimeout = null;
             this.triggerBatchRouting();
@@ -830,17 +835,54 @@ export class EdgeRoutingCoordinator {
      * Called by UI loop or scheduler.
      */
     public async routeIncremental(context: SharedGraphContext): Promise<Map<string, PathFindingResult>> {
-        const _changedNodes = this.identifyChangedNodes(context.nodes as any[], this.allEdges); // Need previous state?
-        // Actually, dirtyEdges should be maintained by markNodesChanged calls from UI.
-        // If not, we can diff here. For now assume external marking.
+        // [FIX C-9] 使用真实的节点变化检测（取代原来的空函数）
+        const changedNodeIds = this.identifyChangedNodes(context.nodes as any[], this.allEdges);
+        if (changedNodeIds.length > 0) {
+            // 将检测到的移动节点标记为 dirty，使外部无需手动调用 markNodesChanged
+            this.markNodesChanged(changedNodeIds);
+        }
 
         return this.batchRouteDirtyEdges();
     }
 
-    // Identifies nodes that moved significantly - Placeholder
-    private identifyChangedNodes(_allNodes: any[], _allEdges: Edge[]): string[] {
-        return [];
+
+    // [FIX C-9] 节点位置快照，用于增量检测
+    private _nodePositionSnapshot = new Map<string, { x: number; y: number }>();
+
+    /**
+     * [FIX C-9] 基于位置快照检测显著移动的节点。
+     * 与上次路由时的坐标对比，超过阈值（2px）则标记为"已变化"。
+     * 同时更新快照以备下次对比。
+     */
+    private identifyChangedNodes(allNodes: any[], _allEdges: Edge[]): string[] {
+        const MOVE_THRESHOLD = 2; // px，小于此值认为是数值噪声
+        const changedIds: string[] = [];
+
+        for (const node of allNodes) {
+            const id: string = node.id;
+            const posAbs = node.positionAbsolute || node.computed?.positionAbsolute || node.position;
+            if (!posAbs) continue;
+            const x = posAbs.x ?? 0;
+            const y = posAbs.y ?? 0;
+
+            const prev = this._nodePositionSnapshot.get(id);
+            if (!prev || Math.abs(x - prev.x) > MOVE_THRESHOLD || Math.abs(y - prev.y) > MOVE_THRESHOLD) {
+                changedIds.push(id);
+                this._nodePositionSnapshot.set(id, { x, y });
+            }
+        }
+
+        // 清理已删除的节点快照（防内存泄漏）
+        if (this._nodePositionSnapshot.size > allNodes.length + 50) {
+            const aliveIds = new Set(allNodes.map((n: any) => n.id));
+            for (const id of this._nodePositionSnapshot.keys()) {
+                if (!aliveIds.has(id)) this._nodePositionSnapshot.delete(id);
+            }
+        }
+
+        return changedIds;
     }
+
 
     /**
      * [P0] Route all edges using parallel worker pool
@@ -1159,47 +1201,52 @@ export class EdgeRoutingCoordinator {
     }
 
     /**
-     * [FIX Phase 2] Assign Bidirectional Channels
-     * Detects A↔B bidirectional edge pairs and assigns separation channels.
+     * [FIX C-4] Assign Bidirectional / Parallel Channels
+     * 原来只处理 pair.length === 2 的双向对，N>2 的同向平行边全部重叠。
+     * 新逻辑：按 (source, target) 分组（无方向），对组内每条边分配独立的 channel index。
+     * 
+     * 分道策略：
+     *   - 2 条边：channel 0 和 1，视觉上向两侧各偏移 spacing/2
+     *   - N 条边：channel 0..N-1，均匀分配，视觉上整体居中
      */
     private assignBidirectionalChannels(jobs: PathFindingJob[]): void {
-        const pairMap = new Map<string, PathFindingJob[]>();
         const defaultConfig = createDefaultRoutingConfig();
-        const spacing = defaultConfig.bus.bidirectionalSpacing || 25;
+        const baseSpacing = defaultConfig.bus.bidirectionalSpacing || 25;
 
-        // Group jobs by node pair (A-B is same as B-A)
+        // 用无方向的 canonical key 分组：key(A,B) === key(B,A)
+        const pairMap = new Map<string, PathFindingJob[]>();
         jobs.forEach(job => {
-            const key1 = `${job.source}-${job.target}`;
-            const key2 = `${job.target}-${job.source}`;
-            const key = key1 < key2 ? key1 : key2;
+            const k1 = `${job.source}\u0000${job.target}`;
+            const k2 = `${job.target}\u0000${job.source}`;
+            const key = k1 < k2 ? k1 : k2;
             if (!pairMap.has(key)) pairMap.set(key, []);
-            pairMap.get(key)?.push(job);
+            pairMap.get(key)!.push(job);
         });
 
-        // Process each pair
-        pairMap.forEach((pair, _pairKey) => {
-            if (pair.length === 2) {
-                // Bidirectional pair detected (A→B and B→A)
-                // Sort to ensure deterministic channel assignment
-                pair.sort((a, b) => {
-                    const keyA = `${a.source}-${a.target}`;
-                    const keyB = `${b.source}-${b.target}`;
-                    return keyA.localeCompare(keyB);
-                });
+        pairMap.forEach((group) => {
+            if (group.length < 2) return; // 单条边不需要分道
 
-                // Assign channels: 0 for "forward", 1 for "backward"
-                pair[0].bidirectionalChannel = 0;
-                pair[1].bidirectionalChannel = 1;
-                pair[0].bidirectionalSpacing = spacing;
-                pair[1].bidirectionalSpacing = spacing;
+            // 确定性排序：先按方向（source-target 字符串），再按 edgeId
+            group.sort((a, b) => {
+                const dirA = `${a.source}→${a.target}`;
+                const dirB = `${b.source}→${b.target}`;
+                const cmp = dirA.localeCompare(dirB);
+                return cmp !== 0 ? cmp : a.edgeId.localeCompare(b.edgeId);
+            });
 
-                // Debug log
-                if (this.debugEdgeId) {
-                }
-            }
-            // For single-direction or >2 edges (rare), no special handling
+            const n = group.length;
+            // 间距随条数适度收窄（避免 N=5 时间距过大）
+            const spacing = n <= 2 ? baseSpacing : Math.max(12, baseSpacing * (2 / n));
+
+            group.forEach((job, index) => {
+                job.bidirectionalChannel = index;
+                job.bidirectionalSpacing = spacing;
+                // [NEW] 总通道数，供 Worker 居中计算偏移
+                (job as any).bidirectionalCount = n;
+            });
         });
     }
+
 
     /**
      * [P2-3] Inject Congestion Context
@@ -1491,9 +1538,41 @@ export class EdgeRoutingCoordinator {
             nudgedPaths.forEach((newPoints, i) => {
                 const res = nudgeableResults[i];
                 res.points = newPoints;
-                // Rebuild SVG path based on updated points
+                // [FIX C-5] 路径重建：在正交折角处补圆角（Q 二次贝塞尔）
+                // 原来用纯 M L L L，Nudge 后圆角全丢失。
                 if (newPoints.length > 0) {
-                    res.path = `M ${newPoints[0].x} ${newPoints[0].y} ` + newPoints.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
+                    const r = Math.min(6, (config as any)?.borderRadius ?? 6); // 圆角半径
+                    const buildRoundedPath = (pts: Point[], radius: number): string => {
+                        if (pts.length < 2) return '';
+                        if (pts.length === 2 || radius <= 0) {
+                            return `M ${pts[0].x} ${pts[0].y} ` + pts.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
+                        }
+                        let d = `M ${pts[0].x} ${pts[0].y}`;
+                        for (let j = 1; j < pts.length - 1; j++) {
+                            const prev = pts[j - 1];
+                            const curr = pts[j];
+                            const next = pts[j + 1];
+                            const len1 = Math.hypot(curr.x - prev.x, curr.y - prev.y);
+                            const len2 = Math.hypot(next.x - curr.x, next.y - curr.y);
+                            // 确保圆角不超过线段长度的一半
+                            const clipped = Math.min(radius, len1 / 2, len2 / 2);
+                            if (clipped < 1) {
+                                d += ` L ${curr.x} ${curr.y}`;
+                                continue;
+                            }
+                            // 从 prev 到 curr 方向上的进入点
+                            const t1x = curr.x - (curr.x - prev.x) / len1 * clipped;
+                            const t1y = curr.y - (curr.y - prev.y) / len1 * clipped;
+                            // 从 curr 到 next 方向上的离开点
+                            const t2x = curr.x + (next.x - curr.x) / len2 * clipped;
+                            const t2y = curr.y + (next.y - curr.y) / len2 * clipped;
+                            d += ` L ${t1x} ${t1y} Q ${curr.x} ${curr.y} ${t2x} ${t2y}`;
+                        }
+                        const last = pts[pts.length - 1];
+                        d += ` L ${last.x} ${last.y}`;
+                        return d;
+                    };
+                    res.path = buildRoundedPath(newPoints, r);
                     // Also update label pos if it's the middle segment
                     if (newPoints.length >= 2) {
                         const midIndex = Math.floor(newPoints.length / 2);
@@ -1504,6 +1583,7 @@ export class EdgeRoutingCoordinator {
                     }
                 }
             });
+
             if (config?.debug) {
             }
         } catch (err) {

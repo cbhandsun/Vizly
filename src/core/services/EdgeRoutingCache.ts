@@ -9,12 +9,15 @@ interface CacheItem {
     paramsHash: string;
     result: CachedPathResult;
     timestamp: number;
+    expiresAt: number; // [FIX C-7] TTL 过期时间戳
 }
+
 
 export class EdgeRoutingCache {
     private static instance: EdgeRoutingCache;
     private cache = new Map<string, CacheItem>();
     private maxSize: number = 2000;
+    private defaultMaxAgeMs: number = 60_000; // [FIX C-7] 默认 60s TTL
 
     private constructor() { }
 
@@ -31,39 +34,57 @@ export class EdgeRoutingCache {
      * We don't need a cryptographic hash, just a robust unique string.
      */
     public generateKey(edgeId: string, params: Record<string, unknown>): string {
-        // Critical dependencies for routing:
-        // 1. Source/Target Node Geometry (Position, Size)
-        // 2. Port Restrictions (Handles, Direction)
-        // 3. Layout Direction
-        // 4. Graph Architecture (IsBus, BusTrunk) - implies dependence on neighbors
-        // 5. Config (Gap, Radius)
-
-        // For performance, we assume 'params' is already a flat object or structured deterministically.
-        // But calculating a hash of the ENTIRE graph context (obstacles) for every edge is too slow.
-        // COMPROMISE: We trust the caller (Coordinator) to invalidate us if the global graph topology changes significantly,
-        // OR we include a "GraphVersion" ID in the params.
-
-        return `${edgeId}:${JSON.stringify(params)}`;
+        // [FIX C-2] 改为固定顺序的字段拼接，替代 JSON.stringify。
+        // JSON.stringify 在不同调用路径构造的对象上 key 顺序可能不一致，
+        // 导致相同坐标产生不同 cache key，缓存命中率趋近于零。
+        // 固定顺序：edgeId | s | t | sx | sy | tx | ty | sr | tr | type | bus | version
+        const p = params as any;
+        return [
+            edgeId,
+            p.s ?? '',
+            p.t ?? '',
+            p.sx ?? 0,
+            p.sy ?? 0,
+            p.tx ?? 0,
+            p.ty ?? 0,
+            p.sr ?? '0',
+            p.tr ?? '0',
+            p.type ?? 's',
+            p.bus ?? '',
+            p.version ?? 0,
+        ].join('|');
     }
 
     public get(key: string): CachedPathResult | undefined {
         const item = this.cache.get(key);
         if (item) {
+            // [FIX C-7] 校验 TTL，过期直接删除并返回 undefined
+            if (Date.now() > item.expiresAt) {
+                this.cache.delete(key);
+                return undefined;
+            }
             item.timestamp = Date.now(); // LRU update
             return item.result;
         }
         return undefined;
     }
 
-    public set(key: string, result: CachedPathResult): void {
+    public set(key: string, result: CachedPathResult, maxAgeMs?: number): void {
         if (this.cache.size >= this.maxSize) {
             this.prune();
         }
+        const ttl = maxAgeMs ?? this.defaultMaxAgeMs;
         this.cache.set(key, {
             paramsHash: key,
             result,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            expiresAt: Date.now() + ttl, // [FIX C-7]
         });
+    }
+
+    // [FIX C-7] 允许调用方动态调整全局默认 TTL
+    public setMaxAge(ms: number): void {
+        this.defaultMaxAgeMs = Math.max(1000, ms);
     }
 
     private prune(): void {
