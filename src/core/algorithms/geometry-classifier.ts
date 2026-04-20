@@ -119,6 +119,16 @@ export function analyzeGeometry(
     // If one dimension is significantly larger (0.5x) than the other,
     // treat as pure orthogonal (horizontal or vertical), even if angle suggests diagonal.
     //
+    // [FIX P2] Hard angle dead zone: treat near-orthogonal angles as purely orthogonal.
+    // If dy/dx < 0.15, the path is visually indistinguishable from horizontal.
+    // If dx/dy < 0.15, same for vertical. Prevents port rule jitter at small angular deviations.
+    if (absDx > 0.1 && absDy / absDx < 0.15) {
+        return dx > 0 ? 'horizontal-forward' : 'horizontal-reverse';
+    }
+    if (absDy > 0.1 && absDx / absDy < 0.15) {
+        return dy > 0 ? 'vertical-forward' : 'vertical-reverse';
+    }
+
     // [OPTIMIZATION] Set threshold to 1.5 (was 3.0) to aggressively classify as orthogonal.
     // If one dimension is just 50% larger than the other, we treat it as orthogonal.
     // This prevents "Squarish" layouts from falling into Diagonal buckets which allow weird side-ports.

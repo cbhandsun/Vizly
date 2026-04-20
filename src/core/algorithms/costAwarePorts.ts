@@ -75,7 +75,7 @@ export interface PortCandidate {
 const DEFAULT_CONFIG: Required<Omit<PortSelectionConfig, 'portUsage' | 'sourceId' | 'targetId' | 'globalChannelIndex' | 'globalChannelCount' | 'globalChannelType' | 'portUsageData' | 'preferredSourcePort' | 'preferredTargetPort'>> & { portUsage: Record<string, number>, sourceId: string, targetId: string } = {
     bendPenalty: 50,
     obstaclePenalty: 100,
-    crossingPenalty: 80,
+    crossingPenalty: 1200,
     layoutDirection: 'TB',
 
     // Default values for standard config

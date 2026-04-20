@@ -146,7 +146,7 @@ export class EdgeRoutingCoordinator {
         { resolve: (value: PathFindingResult | PromiseLike<PathFindingResult>) => void; seq: number }
     > = new Map();
 
-    private readonly MAX_PENDING_SEGMENTS = 50;
+    private readonly MAX_PENDING_SEGMENTS = 400;
 
     /**
      * [P0] Schedule a batch routing run (debounced).
@@ -805,18 +805,52 @@ export class EdgeRoutingCoordinator {
 
     private collectPendingEdges(graphKey: string, relatedNodeIds: Set<string>, maxSegments: number): LineObstacle[] {
         const pendingEdges: LineObstacle[] = [];
+
+        // [FIX P3] Compute spatial bounding box of current batch so we can collect
+        // nearby cached edges even if they share no nodes with the current batch.
+        // This ensures A* can avoid crossings with edges outside the current node set.
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        const SPATIAL_MARGIN = 300; // px buffer around the batch bounding box
+
+        for (const [edgeId, entry] of this.latestRequests.entries()) {
+            if (!relatedNodeIds.has(entry.request.job?.source ?? '') &&
+                !relatedNodeIds.has(entry.request.job?.target ?? '')) continue;
+            const cached = this.getCachedResult(entry.request);
+            if (!cached?.points) continue;
+            for (const pt of cached.points) {
+                if (pt.x < minX) minX = pt.x;
+                if (pt.y < minY) minY = pt.y;
+                if (pt.x > maxX) maxX = pt.x;
+                if (pt.y > maxY) maxY = pt.y;
+            }
+        }
+        const hasBounds = minX !== Infinity;
+        const bboxMinX = minX - SPATIAL_MARGIN;
+        const bboxMinY = minY - SPATIAL_MARGIN;
+        const bboxMaxX = maxX + SPATIAL_MARGIN;
+        const bboxMaxY = maxY + SPATIAL_MARGIN;
+
         for (const [edgeId, entry] of this.latestRequests.entries()) {
             if (this.dirtyEdges.has(edgeId)) continue;
             if (entry.graphKey !== graphKey) continue;
-            if (relatedNodeIds.size > 0) {
-                const sourceId = entry.request.job?.source;
-                const targetId = entry.request.job?.target;
-                if (sourceId && relatedNodeIds.has(sourceId) === false && targetId && relatedNodeIds.has(targetId) === false) {
-                    continue;
-                }
-            }
+
             const cached = this.getCachedResult(entry.request);
             if (!cached?.points || cached.points.length < 2) continue;
+
+            // [FIX P3] Spatial filter: include edges whose ANY segment falls within the expanded bbox.
+            // Fallback to node-ID filter only if we couldn't compute a bounding box.
+            if (hasBounds) {
+                const inBounds = cached.points.some(pt =>
+                    pt.x >= bboxMinX && pt.x <= bboxMaxX &&
+                    pt.y >= bboxMinY && pt.y <= bboxMaxY
+                );
+                if (!inBounds) continue;
+            } else if (relatedNodeIds.size > 0) {
+                const sourceId = entry.request.job?.source;
+                const targetId = entry.request.job?.target;
+                if (sourceId && !relatedNodeIds.has(sourceId) && targetId && !relatedNodeIds.has(targetId)) continue;
+            }
+
             for (let i = 0; i < cached.points.length - 1; i++) {
                 pendingEdges.push({
                     start: cached.points[i],
@@ -1144,7 +1178,10 @@ export class EdgeRoutingCoordinator {
 
         const horizontalGroups = new Map<number, PathFindingJob[]>();
         const verticalGroups = new Map<number, PathFindingJob[]>();
-        const GROUP_SIZE = 150; // Band height/width (increased to capture more parallel edges)
+        // [FIX P3] Config-driven group size: based on gridSize * 10 to adapt to different grid configs.
+        // Default 150px (= 10px grid * 10). Users with larger grids get proportionally larger bands.
+        const gridSize = (jobs[0] as any)?._graphConfig?.algorithm?.gridSize ?? 15;
+        const GROUP_SIZE = Math.max(100, gridSize * 10);
 
         jobs.forEach(job => {
             const dx = Math.abs(job.targetX - job.sourceX);
@@ -1236,7 +1273,7 @@ export class EdgeRoutingCoordinator {
 
             const n = group.length;
             // 间距随条数适度收窄（避免 N=5 时间距过大）
-            const spacing = n <= 2 ? baseSpacing : Math.max(12, baseSpacing * (2 / n));
+            const spacing = Math.max(16, baseSpacing * Math.min(1, 3 / n));
 
             group.forEach((job, index) => {
                 job.bidirectionalChannel = index;
@@ -1625,4 +1662,5 @@ if (typeof window !== 'undefined' && import.meta.env.DEV) {
     };
     console.info('[Vizly Dev] Routing debug tools available: window.__vizly_routing__.clearCache()');
 }
+
 

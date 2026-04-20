@@ -28,13 +28,15 @@ export class PortSelector {
             portUsage?: Record<string, number>;
             sourceId: string;
             targetId: string;
+            /** [FIX P0] Already-routed line segments for crossing avoidance at port selection layer */
+            lineObstacles?: import('../../algorithms/pathfinding').LineObstacle[];
         }
     ) {
         return selectOptimalPorts(
             sourceRect,
             targetRect,
             obstacles,
-            [], // Sanitized obstacles if any
+            options.lineObstacles ?? [], // [FIX P0] Pass pending edge segments so CROSSING_PENALTY is effective
             {
                 ...this.config.portSelection,
                 layoutDirection: options.effectiveDir as 'TB' | 'LR' | 'BT' | 'RL',
@@ -85,7 +87,11 @@ export class PortSelector {
     ): Point {
         const cx = rect.x + rect.width / 2;
         const cy = rect.y + rect.height / 2;
-        const enableSlide = Boolean(this.config.portSelection.enableDynamicPorts && targetCenter);
+        // [FIX P3] Self-loop: targetCenter equals the node's own center → dynamic sliding
+        // would push the port inward. Force static center ports for self-loop edges.
+        const isSelfLoop = this.config.portSelection?.sourceId !== undefined &&
+            this.config.portSelection.sourceId === this.config.portSelection.targetId;
+        const enableSlide = Boolean(this.config.portSelection.enableDynamicPorts && targetCenter && !isSelfLoop);
 
         if (!enableSlide || !targetCenter) {
             if (pos === Position.Top) return { x: cx, y: rect.y };
@@ -133,7 +139,10 @@ export class PortSelector {
         }
 
         const isVerticalPort = pos === Position.Top || pos === Position.Bottom;
-        const PORT_SPREAD = isVerticalPort ? 20 : 20;
+        // [FIX P2] Dynamic port spread: scale with node extent to avoid overflow on small nodes
+        // and over-crowding on large nodes. Clamped to [12, 30] px.
+        const nodeExtent = isVerticalPort ? rect.width : rect.height;
+        const PORT_SPREAD = Math.max(12, Math.min(30, nodeExtent / Math.max(count + 1, 2)));
 
         const sideOffset = (index - (count - 1) / 2) * PORT_SPREAD;
         const basePt = this.getPortPointWithSlide(rect, pos, targetCenter);

@@ -421,7 +421,8 @@ export class EdgeRoutingWorker {
             effectiveDir: busOrientation.busDir,
             portUsage,
             sourceId: job.source,
-            targetId: job.target
+            targetId: job.target,
+            lineObstacles: graph.pendingEdges // [FIX P0] Enable crossing-aware port selection
         });
         const geometryForRules = analyzeGeometry(
             (tRect.x + tRect.width / 2) - (sRect.x + sRect.width / 2),
@@ -666,11 +667,19 @@ export class EdgeRoutingWorker {
                     // Check for obstacles on this strict path
                     let isBlocked = false;
                     
+                    // [FIX P2] Dynamic collision padding: use 30% of the actual gap to trunk, capped at 8px.
+                    // Fixed 10px was too large for dense graphs (gap ~15px), causing most trunks to fall back to A*.
+                    const trunkGapDist = Math.hypot(
+                        trunkStart.x - startWithOffset.x,
+                        trunkStart.y - startWithOffset.y
+                    );
+                    const dynamicPadding = Math.min(8, trunkGapDist * 0.3);
+
                     // [RESTORED] Always check for obstacles to maintain good obstacle avoidance.
                     // Previously this was skipped for Precomputed Trunks, which caused lines to plow through nodes.
-                    if (analyzer.intersectsAnyObstacle(startWithOffset, trunkStart, routingObstacles, 10)) isBlocked = true;
-                    if (!isBlocked && analyzer.intersectsAnyObstacle(trunkStart, trunkEnd, routingObstacles, 10)) isBlocked = true;
-                    if (!isBlocked && analyzer.intersectsAnyObstacle(trunkEnd, endWithOffset, routingObstacles, 10)) isBlocked = true;
+                    if (analyzer.intersectsAnyObstacle(startWithOffset, trunkStart, routingObstacles, dynamicPadding)) isBlocked = true;
+                    if (!isBlocked && analyzer.intersectsAnyObstacle(trunkStart, trunkEnd, routingObstacles, dynamicPadding)) isBlocked = true;
+                    if (!isBlocked && analyzer.intersectsAnyObstacle(trunkEnd, endWithOffset, routingObstacles, dynamicPadding)) isBlocked = true;
 
                     if (!isBlocked) {
                         pathPoints = waypoints;
