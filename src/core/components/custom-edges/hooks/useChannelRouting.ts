@@ -10,7 +10,7 @@
  * - 调整路径用于替代原始 workerSmartPoints 进行 filleting
  */
 
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { LineJumpEngine } from '../../../services/LineJumpEngine';
 import { globalChannelRouting } from '../../../algorithms/globalChannelRouting';
 import type { Point } from '../../../services/LineJumpEngine';
@@ -30,10 +30,21 @@ interface UseChannelRoutingOptions {
 export function useChannelRouting({ edgeId, points, enabled = true }: UseChannelRoutingOptions): Point[] | null {
     const engine = LineJumpEngine.getInstance();
 
+    // [FIX N-6] 同 useLineJumps：用 useSyncExternalStore 订阅引擎版本变化
+    const engineVersion = useSyncExternalStore(
+        (cb) => engine.subscribe(cb),
+        () => engine.getVersion(),
+        () => 0
+    );
+
     return useMemo(() => {
-        if (!enabled || !points || points.length < 4) {
+        // [FIX N-5] 最小点数从 4 降低到 2：
+        // 3 点的 L 形边（最常见路径）原先会被直接跳过通道分配，
+        // 导致最普通的折线也会与其他边重叠，无法分离。
+        if (!enabled || !points || points.length < 2) {
             return null;
         }
+
 
         // 从 LineJumpEngine 获取所有已注册的路径
         const allPaths = engine.getAllEdgePaths();
@@ -59,6 +70,6 @@ export function useChannelRouting({ edgeId, points, enabled = true }: UseChannel
         }
 
         return changed ? myAdjusted : null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [edgeId, points, enabled, engine.getVersion()]);
+    // engineVersion 由 useSyncExternalStore 响应式维护
+    }, [edgeId, points, enabled, engine, engineVersion]);
 }

@@ -117,6 +117,8 @@ class LineJumpEngine {
     private intersectionsCache: IntersectionInfo[] | null = null;
     /** 版本号（每次注册/注销递增，供外部检测变化） */
     private version: number = 0;
+    // [FIX N-6] 订阅者集合，供 useSyncExternalStore 使用
+    private subscribers: Set<() => void> = new Set();
 
     static getInstance(): LineJumpEngine {
         if (!LineJumpEngine.instance) {
@@ -156,6 +158,12 @@ class LineJumpEngine {
         return this.version;
     }
 
+    // [FIX N-6] 订阅接口：供 useSyncExternalStore 注册回调
+    subscribe(callback: () => void): () => void {
+        this.subscribers.add(callback);
+        return () => this.subscribers.delete(callback);
+    }
+
     /** 获取某条边需要画弧的交叉点（按 X 坐标排序） */
     getJumpsForEdge(edgeId: string): IntersectionInfo[] {
         const intersections = this.computeIntersections();
@@ -185,6 +193,8 @@ class LineJumpEngine {
         this.segmentsCache = null;
         this.intersectionsCache = null;
         this.version++;
+        // [FIX N-6] 通知所有订阅者版本已变化
+        this.subscribers.forEach(cb => cb());
     }
 
     private computeIntersections(): IntersectionInfo[] {

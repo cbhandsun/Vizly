@@ -145,7 +145,9 @@ const useHydratedPath = (
             setTimeout(() => {
                 if (!isMountedRef.current) return;
                 if (path !== svgPath) {
-                    //                    setPath(svgPath);
+                    // [FIX N-1] 取消注释：computedPoints 分支必须同步更新 path，
+                    // 否则 ELK 布局完成后边路径永远停在旧布局形状
+                    setPath(svgPath);
                     setSmartPoints(computedPoints);
                     setIsLoading(false);
                     isHydratedRef.current = true;
@@ -589,10 +591,13 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
             const getPorts = (nodeId: string, overrideNode?: SimpleNode) => {
                 const n = overrideNode || simpleNodeMap.get(nodeId) as SimpleNode | undefined;
                 if (!n) return [];
-                const w = n.width || 100;
-                const h = n.height || 40;
-                // n.x/y are now fresh from getFreshNode if override is used
-                const x = n.x, y = n.y;
+                const w = n.measured?.width || n.width || 100;
+                const h = n.measured?.height || n.height || 40;
+                // [FIX N-2] 使用绝对坐标而不是 n.x/n.y（子节点 x/y 是相对父节点的偏移）
+                // 嵌套在 Group 内的节点若用相对坐标，候选端口会整体偏移，路径起终点错位
+                const absPos = getAbsPos(n);
+                const x = absPos.x;
+                const y = absPos.y;
                 return [
                     { id: nodeId, x: x + w / 2, y, dir: 't' },
                     { id: nodeId, x: x + w / 2, y: y + h, dir: 'b' },

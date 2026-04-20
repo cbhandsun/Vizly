@@ -104,6 +104,13 @@ const makeSignature = (nodes: any[]): string => {
     }
 };
 
+// [FIX N-3] Pool/Lane 类型通过 type 字段识别，不应通过字符串匹配 ID/label
+// 用字符串 includes 会误杀 'carpool-node'、'pool-service' 等合法业务节点
+const POOL_CONTAINER_TYPES = new Set([
+    'pool', 'lane', 'bpmnPool', 'bpmnLane',
+    'horizontal-pool', 'vertical-pool',
+]);
+
 /**
  * 过滤出业务节点（排除容器）
  */
@@ -122,9 +129,8 @@ const filterBusinessNodes = (nodes: any[]): NodeBBox[] => {
         const hidden = !!((n?.data || {}) as any)?.hidden;
         if (hidden) continue;
 
-        const isPool = n.id.toLowerCase().includes('pool') || n?.data?.label?.toLowerCase().includes('pool');
-
-        if (isPool) {
+        // [FIX N-3] 通过 type 集合识别 Pool/Lane 容器，不再用字符串匹配
+        if (POOL_CONTAINER_TYPES.has(t)) {
             continue;
         }
 
@@ -159,6 +165,7 @@ const filterBusinessNodes = (nodes: any[]): NodeBBox[] => {
 
     return result;
 };
+
 
 // ==================== Provider 组件 ====================
 

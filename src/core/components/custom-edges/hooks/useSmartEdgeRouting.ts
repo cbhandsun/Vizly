@@ -263,8 +263,11 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       if (posFromData && typeof posFromData.x === 'number' && isFinite(posFromData.x) && typeof posFromData.y === 'number' && isFinite(posFromData.y)) {
           let isValid = true;
           if (canRunSanityCheck && candidatePoints && candidatePoints.length > 1) {
-              const dist = getClosestDistanceToPath({ x: posFromData.x, y: posFromData.y }, candidatePoints);
-              if (dist > 2) isValid = false;
+            // [FIX N-4] 阈值从 2px 放宽到 80px。
+            // 2px 过于严苛：路径点 Math.round 精度误差、Nudge 偏移等都会超过 2px，
+            // 导致用户手动调整的标签每次路由更新后跳回默认位置。
+            // 80px 可过滤真正游离的位置，同时允许标签合理偏离路径中心。
+            if (dist > 80) isValid = false;
           } else if (isUsingWorker && !hasWorkerPoints) {
               isValid = false;
           }
@@ -284,7 +287,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
               const checkY = (typeof edgeData?.absoluteLabelY === 'number' && isFinite(edgeData.absoluteLabelY))
                   ? edgeData.absoluteLabelY : y;
               const dist = getClosestDistanceToPath({ x: edgeData.absoluteLabelX, y: checkY }, candidatePoints);
-              if (dist > 5) validAbs = false;
+              if (dist > 80) validAbs = false; // [FIX N-4]
           }
           if (validAbs || !candidatePoints) x = edgeData.absoluteLabelX;
       }
@@ -295,7 +298,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
               const checkX = (typeof edgeData?.absoluteLabelX === 'number' && isFinite(edgeData.absoluteLabelX))
                   ? edgeData.absoluteLabelX : x;
               const dist = getClosestDistanceToPath({ x: checkX, y: edgeData.absoluteLabelY }, candidatePoints);
-              if (dist > 5) validAbs = false;
+              if (dist > 80) validAbs = false;  // [FIX N-4] 同上：80px
           }
           if (validAbs || !candidatePoints) y = edgeData.absoluteLabelY;
       }

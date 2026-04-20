@@ -1,13 +1,4 @@
-/**
- * useLineJumps — 为边注册路径并获取跳线弧信息
- * 
- * 使用 LineJumpEngine 全局单例：
- * 1. 当 points 变化时注册到引擎
- * 2. 组件卸载时注销
- * 3. 返回该边的交叉点（供渲染使用）
- */
-
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { LineJumpEngine, injectLineJumps } from '../../../services/LineJumpEngine';
 import type { Point, IntersectionInfo } from '../../../services/LineJumpEngine';
 
@@ -28,7 +19,16 @@ interface UseLineJumpsResult {
 
 export function useLineJumps({ edgeId, points, enabled = true }: UseLineJumpsOptions): UseLineJumpsResult {
     const engine = LineJumpEngine.getInstance();
-    const prevVersionRef = useRef(-1);
+
+    // [FIX N-6] 用 useSyncExternalStore 订阅 engine 的版本变化
+    // 原来 engine.getVersion() 作为 useMemo deps 无法响应式更新：
+    // React 只在渲染时读取该值，engine 内部变化不触发重渲染。
+    // useSyncExternalStore 注册回调，当 invalidateCache 触发时自动通知 React。
+    const engineVersion = useSyncExternalStore(
+        (cb) => engine.subscribe(cb),
+        () => engine.getVersion(),
+        () => 0
+    );
 
     // 注册/更新路径点
     useEffect(() => {
@@ -56,8 +56,9 @@ export function useLineJumps({ edgeId, points, enabled = true }: UseLineJumpsOpt
 
         const jumpPath = injectLineJumps(points, jumps, engine.getJumpRadius());
         return { jumps, jumpPath: jumpPath || null };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [edgeId, points, enabled, engine.getVersion()]);
+    // engineVersion 作为依赖，useSyncExternalStore 保证它在引擎变化时更新
+    }, [edgeId, points, enabled, engine, engineVersion]);
 
     return result;
 }
+
