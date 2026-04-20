@@ -49,19 +49,12 @@ export class PathfindingWorkerPool {
     private initializePool(): void {
         if (this.initialized) return;
 
-        console.log(`[DEBUG-WORKER-POOL] Initializing pool with ${this.poolSize} workers...`);
         for (let i = 0; i < this.poolSize; i++) {
             try {
                 const worker = new PathfindingWorker();
-                console.log(`[DEBUG-WORKER-POOL] Worker ${i} created successfully. typeof=`, typeof worker);
                 // [FIX] Catch startup crashes. If worker dies on load, it won't trigger later event listeners.
                 worker.addEventListener('error', (e: ErrorEvent) => {
-                    console.error(`[DEBUG-WORKER-POOL] Worker ${i} global error (possibly crashed on load):`, e.message, e.filename, e.lineno);
-                });
-                // [FIX] Listen for the first message to confirm worker is alive
-                worker.addEventListener('message', function onFirstMessage(e: MessageEvent) {
-                    console.log(`[DEBUG-WORKER-POOL] Worker ${i} sent first message:`, e.data?.type || JSON.stringify(e.data).substring(0, 100));
-                    worker.removeEventListener('message', onFirstMessage);
+                    console.error(`[WorkerPool] Worker ${i} startup error:`, e.message, e.filename, e.lineno);
                 });
                 this.workers.push(worker);
                 this.availableWorkers.add(i);

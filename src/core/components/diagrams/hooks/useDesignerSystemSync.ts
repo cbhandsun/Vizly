@@ -366,7 +366,7 @@ export function useDesignerSystemSync({
         storageKey: `flowchart-autosave-v2-${id || 'default'}`,
         enabled: true,
         diagramId: id,
-        onSaveSuccess: () => console.log('Auto-save successful'),
+        onSaveSuccess: undefined,
         onSaveError: (error) => console.error('Auto-save failed:', error)
     });
 
@@ -469,28 +469,22 @@ export function useDesignerSystemSync({
             }
         } else {
             hasRestoredAutoSave.current = true;
-            console.log('[DesignerSystemSync] No autosave, checking PRESET_MAP for id:', id);
             
             // Core Fallback & Preset Injection Logic
             import('@/data/standardized').then(({ PRESET_MAP }) => {
                 const preset = id ? PRESET_MAP[id] : null;
-                console.log('[DesignerSystemSync] PRESET_MAP loaded. Keys available:', Object.keys(PRESET_MAP));
-                console.log('[DesignerSystemSync] Target preset found:', !!preset);
 
                 if (preset) {
                     // IF the requested diagram matches a known standard preset map
                     // WE securely run standardDataToCanvas to apply ELK.js layout mapping!
                     import('../designerUtils').then(({ standardDataToCanvas }) => {
-                        console.log('[DesignerSystemSync] Executing standardDataToCanvas for preset...');
                         standardDataToCanvas(preset).then(({ nodes: newNodes, edges: newEdges }) => {
-                            console.log('[DesignerSystemSync] ELK.js layout complete:', newNodes.length, 'nodes derived.');
                             setNodes(newNodes);
                             setEdges(newEdges);
                             needsInitialFitView.current = true;
                         }).catch(e => console.error('[DesignerSystemSync] standardDataToCanvas error:', e));
                     }).catch(e => console.error('[DesignerSystemSync] Import designerUtils failed:', e));
                 } else {
-                    console.log('[DesignerSystemSync] Render fallback empty state for plugin:', pluginId);
                     // Normal plugin fallback empty state
                     const plugin = PluginRegistry.getInstance().getPlugin(pluginId);
                     if (plugin) {

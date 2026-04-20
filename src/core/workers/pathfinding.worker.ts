@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-console.log('[DEBUG-WORKER] pathfinding.worker module evaluating...');
 import {
     buildPathfindingGrid,
     PathfindingGrid
@@ -76,7 +75,7 @@ self.onmessage = (e: MessageEvent) => {
     if (data.mode === 'batch') {
         const { jobId: batchId, context, tasks } = data as BatchPathFindingJob;
 
-        if (context.config?.debug || true) {
+        if (context.config?.debug) {
             console.log('[DEBUG-WORKER] Batch Received. TaskCount:', tasks?.length);
             console.log('[DEBUG-WORKER] Batch Context:', {
                 nodeCount: context.nodes?.length,
@@ -185,7 +184,7 @@ self.onmessage = (e: MessageEvent) => {
                 };
             }
         }
-        console.log('[DEBUG-WORKER] Grid & Spatial Index built.');
+
 
         // [NEW] Global Congestion Grid for Batch
         // Stores accumulated path costs to discourage overcrowding
@@ -452,7 +451,7 @@ self.onmessage = (e: MessageEvent) => {
             ...DEFAULT_CHANNEL_CONFIG,
             ...(unifiedConfig.channel || {})
         };
-        console.log('[DEBUG-WORKER] Batch execution loop finished. Starting channel routing/bundling (if enabled).');
+
         if (channelConfig.enableChannelRouting || channelConfig.enableEdgeBundling) {
             const successfulResults = results
                 .filter(r => r.result && !r.error && r.result.points && r.result.points.length > 1)
@@ -502,7 +501,7 @@ self.onmessage = (e: MessageEvent) => {
                 batchId,
                 results: sanitizedResults
             });
-            console.log('[DEBUG-WORKER] BATCH_RESULT posted successfully.');
+    
         } catch (err: any) {
             console.error('[DEBUG-WORKER] Return serialization failed:', err);
             self.postMessage({
