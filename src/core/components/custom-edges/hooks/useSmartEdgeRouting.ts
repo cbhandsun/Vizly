@@ -267,6 +267,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
             // 2px 过于严苛：路径点 Math.round 精度误差、Nudge 偏移等都会超过 2px，
             // 导致用户手动调整的标签每次路由更新后跳回默认位置。
             // 80px 可过滤真正游离的位置，同时允许标签合理偏离路径中心。
+            const dist = getClosestDistanceToPath({ x: posFromData.x, y: posFromData.y }, candidatePoints);
             if (dist > 80) isValid = false;
           } else if (isUsingWorker && !hasWorkerPoints) {
               isValid = false;
