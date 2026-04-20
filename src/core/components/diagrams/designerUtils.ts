@@ -216,7 +216,6 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
     // Execute data migration if a valid plugin provides versioining & migration logic
     if (plugin && plugin.version && plugin.migrate) {
         if (!data.version || data.version !== plugin.version) {
-            console.log(`[Plugin Migration Pipeline] Migrating diagram "${data.name}" (Type: ${targetPluginId}) from version ${data.version || 'Unknown'} to ${plugin.version}`);
             try {
                 data = (await plugin.migrate(data, data.version)) as StandardDiagramData;
                 data.version = plugin.version; // Mark as migrated
@@ -412,7 +411,6 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
 
         if (hasDomains) {
             // ═══ 有多域 → DomainDagreLayoutStrategy（对等新项目 domainGroupLayout） ═══
-            console.log(`[standardDataToCanvas] 检测到 ${domainSet.size} 个域，使用 DomainDagreLayoutStrategy`);
             try {
                 const strategy = new DomainDagreLayoutStrategy();
                 const result = await strategy.calculateLayout(nodes, edges, {
@@ -424,7 +422,6 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
                     generateSubDomainGroups: true,
                     fitDomainContent: true,
                 } as any);
-                console.log(`[standardDataToCanvas] 域布局完成: ${result.nodes.length} 节点, ${result.edges.length} 条边`);
                 return { nodes: result.nodes, edges: result.edges };
             } catch (err) {
                 console.error('[standardDataToCanvas] 域布局失败，回退到扁平 dagre:', err);
@@ -466,7 +463,6 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
             (node as any).sourcePosition = isHorizontal ? Position.Right : Position.Bottom;
         }
 
-        console.log(`[standardDataToCanvas] dagre 布局完成: direction=${direction}, ${flowNodes.length} 节点, ${edges.length} 条边`);
     }
 
     return { nodes, edges };

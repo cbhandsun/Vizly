@@ -172,7 +172,6 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
             const nodeIdSet = new Set(nodes.map(n => n.id));
             const edges = allEdges.filter(e => nodeIdSet.has(e.source) && nodeIdSet.has(e.target));
 
-            console.log(`[AutoLayout] strategy=${options.strategyName}, dir=${direction}, nodes=${nodes.length}(容器${allNodes.length - nodes.length}), edges=${edges.length}`);
 
             if (nodes.length === 0) {
                 console.warn('[AutoLayout] 没有可布局的节点');
@@ -226,7 +225,6 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
                     };
                 });
 
-                console.log(`[AutoLayout][${options.strategyName}] 计算完成, newNodes=${newNodes.length}`);
                 // ⭐ 平滑过渡动画
                 await animateLayoutTransition(setNodes, newNodes);
                 // 更新边的 handle（FlowchartNode 的 Handle 都有 id，边必须指定）
@@ -251,7 +249,6 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
                 const resolvedName = strategyMap[options.strategyName] || options.strategyName;
                 const strategy = manager.getStrategy(resolvedName);
 
-                console.log(`[AutoLayout][domain] strategy=${resolvedName}, found=${!!strategy}`);
                 if (!strategy) {
                     console.error(`[AutoLayout] 布局策略 "${resolvedName}" 未找到`);
                     return;
@@ -270,7 +267,6 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
 
                 const result = await strategy.calculateLayout(nodes, edges, layoutOptions);
 
-                console.log(`[AutoLayout][domain] 结果: nodes=${result.nodes.length}, edges=${result.edges.length}`);
                 if (result.nodes.length > 0) {
                     // ⭐ 平滑过渡动画
                     setEdges(result.edges);

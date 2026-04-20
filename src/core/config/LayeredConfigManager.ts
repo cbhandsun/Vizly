@@ -130,9 +130,7 @@ export class LayeredConfigManager {
    * 初始化配置层
    */
   private initializeLayers(): void {
-    console.log('LayeredConfigManager: Initializing layers...');
     Object.values(ConfigLayer).forEach(layer => {
-      console.log(`LayeredConfigManager: Initializing layer ${layer}`);
       this.layers.set(layer, {
         layer,
         data: new Map(),
@@ -142,14 +140,12 @@ export class LayeredConfigManager {
         }
       });
     });
-    console.log('LayeredConfigManager: All layers initialized');
   }
 
   /**
    * 初始化默认配置模式
    */
   private initializeDefaultSchemas(): void {
-    console.log('LayeredConfigManager: Initializing default schemas...');
     // 主题性能配置模式
     this.registerSchema({
       key: 'theme.performance',
@@ -294,7 +290,6 @@ export class LayeredConfigManager {
    * 加载持久化配置
    */
   private loadPersistedConfigs(): void {
-    console.log('LayeredConfigManager: Loading persisted configs...');
     try {
       // Check if storage is available
       const hasLocalStorage = typeof localStorage !== 'undefined';
@@ -304,7 +299,6 @@ export class LayeredConfigManager {
       if (hasLocalStorage) {
         const globalConfig = localStorage.getItem('layered-config-global');
         if (globalConfig) {
-          console.log('LayeredConfigManager: Loading global config from localStorage');
           const data = JSON.parse(globalConfig);
           this.setLayerData(ConfigLayer.GLOBAL, data, 'localStorage');
         }
@@ -312,7 +306,6 @@ export class LayeredConfigManager {
         // 加载用户配置
         const userConfig = localStorage.getItem('layered-config-user');
         if (userConfig) {
-          console.log('LayeredConfigManager: Loading user config from localStorage');
           const data = JSON.parse(userConfig);
           this.setLayerData(ConfigLayer.USER, data, 'localStorage');
         }
@@ -322,13 +315,11 @@ export class LayeredConfigManager {
       if (hasSessionStorage) {
         const sessionConfig = sessionStorage.getItem('layered-config-session');
         if (sessionConfig) {
-          console.log('LayeredConfigManager: Loading session config from sessionStorage');
           const data = JSON.parse(sessionConfig);
           this.setLayerData(ConfigLayer.SESSION, data, 'sessionStorage');
         }
       }
 
-      console.log('LayeredConfigManager: Persisted configs loaded successfully');
 
       // 尝试从云端加载配置 (如果已登录)
       this.syncWithCloud();
@@ -352,7 +343,6 @@ export class LayeredConfigManager {
           this.setLayerData(ConfigLayer.GLOBAL, value, 'cloud');
         }
       });
-      console.log('LayeredConfigManager: Cloud sync complete via adapter');
     } catch (e) {
       console.error('LayeredConfigManager: Cloud sync failed', e);
     }

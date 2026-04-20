@@ -88,7 +88,6 @@ export class EdgeRoutingWorker {
         const tNode = nodeMap.get(job.target);
 
         if (!sNode || !tNode) {
-            console.log(`[EdgeRoutingWorker] Node not found: source=${job.source} found=${!!sNode}, target=${job.target} found=${!!tNode}`);
             return this.errorResult(job, 'Source or Target node not found');
         }
 
@@ -517,8 +516,7 @@ export class EdgeRoutingWorker {
 
         // [DEBUG] Log Port Coordinates
         // if (job.edgeId === 'e7' || job.edgeId === 'e8') {
-        //     console.log(`[Worker] Coords for ${job.edgeId}: Start(${Math.round(startPt.x)},${Math.round(startPt.y)}) End(${Math.round(endPt.x)},${Math.round(endPt.y)}) OffsetEnd(${Math.round(endWithOffset.x)},${Math.round(endWithOffset.y)})`);
-        // }
+        //        // }
 
         // 7. Pathfinding Strategy
         let pathPoints: Point[] | null = null;
@@ -558,8 +556,7 @@ export class EdgeRoutingWorker {
                 }
 
                 // if (['e21', 'e22', 'e23'].includes(job.edgeId)) {
-                //     console.log(`[Worker] Using Precomputed Trunk for ${job.edgeId}: Axis=${trunkAxis}, Vertical=${isVertical}`);
-                // }
+                //                // }
             }
             // Priority 2: Local Calculation (Fallback)
             else {
@@ -623,8 +620,7 @@ export class EdgeRoutingWorker {
                     }
                 } else {
                     // if (['e21', 'e22'].includes(job.edgeId)) {
-                    //     console.log(`[Worker] Trunk Skipped for ${job.edgeId}: Coherent Peers < 2 (${coherentPeerEdges.length})`);
-                    // }
+                    //                    // }
                 }
             }
 

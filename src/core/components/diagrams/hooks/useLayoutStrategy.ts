@@ -61,8 +61,7 @@ function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], dir: 'TB'
             return edge;
         });
 
-    if (orphan || expanded || defaulted) console.log(`[Layout] 边验证: 孤立=${orphan}, 短格式展开=${expanded}, 默认回退=${defaulted}`);
-    return sanitized;
+    if (orphan || expanded || defaulted)    return sanitized;
 }
 
 export function useLayoutStrategy({
@@ -94,7 +93,6 @@ export function useLayoutStrategy({
      * ═══════════════════════════════════════════════════════════════ */
     const handleStrategyLayout = useCallback(async (strategyName: string, nodeLayout?: string, direction?: 'TB' | 'LR') => {
         const dir = direction || 'TB';
-        console.log(`[Layout] ▶ handleStrategyLayout: strategy=${strategyName} dir=${dir} nodeLayout=${nodeLayout}`);
 
         // [对齐 SVG 版] 跟踪当前域布局策略和方向
         if (strategyName.startsWith('domain-')) {
@@ -133,7 +131,6 @@ export function useLayoutStrategy({
             }));
             const nodeIdSet = new Set(layoutNodes.map(n => n.id));
             const layoutEdges = allEdges.filter(e => nodeIdSet.has(e.source) && nodeIdSet.has(e.target));
-            console.log(`[Layout] 过滤后: layoutNodes=${layoutNodes.length} layoutEdges=${layoutEdges.length}`);
             if (layoutNodes.length === 0) { console.warn('[Layout] 没有可布局的节点'); return; }
 
             if (strategyName === 'tree') {
@@ -192,7 +189,6 @@ export function useLayoutStrategy({
                     ? 'dagre'
                     : (nodeLayout || 'flow');
 
-                console.log(`[Layout] 域策略: ${strategyName} dir=${dir} nodeLayout=${finalNodeLayout}`);
                 let strategy: any;
                 if (strategyName === 'domain-vertical' || (isDomainDagre && dir === 'TB')) {
                     const { DomainVerticalLayoutStrategy } = await import('../../../strategies/DomainVerticalLayoutStrategy');
@@ -216,7 +212,6 @@ export function useLayoutStrategy({
                     fitDomainContent: true,
                 });
 
-                console.log(`[Layout][domain] ✅ nodes=${result.nodes.length} edges=${result.edges.length}`);
                 if (result.nodes.length > 0) {
                     // [FIX] Clear edges + cache BEFORE animation
                     setEdges(sanitizeLayoutEdges(result.nodes, result.edges, dir));

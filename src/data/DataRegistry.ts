@@ -61,7 +61,6 @@ export class DataRegistry {
       await this.validateData();
 
       this.initialized = true;
-      console.log('✅ 数据注册中心初始化完成');
     } catch (error) {
       console.error('❌ 数据注册中心初始化失败:', error);
       throw error;
@@ -77,7 +76,6 @@ export class DataRegistry {
     // 移除ArchitectureDataAdapter，直接使用标准格式
     // dataService.registerAdapter('architecture', new ArchitectureDataAdapter());
 
-    console.log('📦 数据适配器注册完成');
   }
 
   /**
@@ -102,7 +100,6 @@ export class DataRegistry {
       await this.dataService.registerDiagram(diagram as StandardDiagramData);
     }
 
-    console.log(`📊 已注册 ${diagrams.length} 个标准化架构图`);
   }
 
   /**
@@ -126,7 +123,6 @@ export class DataRegistry {
       }
     }
 
-    console.log('✅ 数据完整性验证通过');
   }
 
   /**

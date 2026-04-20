@@ -76,12 +76,6 @@ self.onmessage = (e: MessageEvent) => {
         const { jobId: batchId, context, tasks } = data as BatchPathFindingJob;
 
         if (context.config?.debug) {
-            console.log('[DEBUG-WORKER] Batch Received. TaskCount:', tasks?.length);
-            console.log('[DEBUG-WORKER] Batch Context:', {
-                nodeCount: context.nodes?.length,
-                edgeCount: context.edges?.length,
-                taskCount: tasks?.length
-            });
         }
 
         // [P2-3] Build UnifiedRoutingConfig early for batch context
@@ -109,8 +103,7 @@ self.onmessage = (e: MessageEvent) => {
             globalCache.gridBounds &&
             globalCache.gridSize === targetGridSize) {
 
-            // console.log(`[Worker] Cache HIT (v${currentVersion})`);
-            spatialIndex = globalCache.spatialIndex;
+            //            spatialIndex = globalCache.spatialIndex;
             visibilityGraphCache = globalCache.visibilityGraph;
             grid = globalCache.grid;
             gridBounds = globalCache.gridBounds;
@@ -118,8 +111,7 @@ self.onmessage = (e: MessageEvent) => {
         } else {
             // Build New
             if (currentVersion !== undefined) {
-                // console.log(`[Worker] Cache MISS/UPDATE (v${currentVersion} vs v${globalCache.version})`);
-            }
+                //            }
 
             // Calculate Bounds (From Nodes/Obstacles ONLY)
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -198,7 +190,6 @@ self.onmessage = (e: MessageEvent) => {
         // we encourage the A* algorithm (with MERGE_PATH cost) to bundle edges together.
 
         if (unifiedConfig.debug) {
-            console.log('[Worker] Starting Task Execution Loop. Debug:', unifiedConfig.debug);
         }
 
         // A. Pre-process Priorities
@@ -462,10 +453,8 @@ self.onmessage = (e: MessageEvent) => {
             }));
             let optimizedPaths = basePaths;
             if (channelConfig.enableEdgeBundling) {
-                console.log('[Worker] Starting edge bundling...');
                 // [FIX] Pass spatialIndex (includes nodes) to prevent invalid bundling collisions
                 optimizedPaths = bundleEdges(optimizedPaths, channelConfig.bundleStrength, spatialIndex);
-                console.log(`[Worker] Bundling complete. Paths count: ${optimizedPaths.length}`);
             } else if (channelConfig.enableChannelRouting) {
                 optimizedPaths = separateParallelPaths(optimizedPaths, channelConfig.channelSpacing, spatialIndex);
             }
@@ -594,8 +583,7 @@ self.onmessage = (e: MessageEvent) => {
         const job: PathFindingJob = edgeProps as PathFindingJob;
 
         // No prebuilt grid (findPath will build it internally)
-        // console.log('[Worker] Executing Logic for job:', job.edgeId);
-        try {
+        //        try {
             const result = executeEdgePathfinding({
                 job,
                 graph: context,
@@ -608,8 +596,7 @@ self.onmessage = (e: MessageEvent) => {
                 console.error('[Worker] Posting ERROR:', result.error);
                 self.postMessage({ jobId: result.jobId, error: result.error });
             } else {
-                // console.log('[Worker] Posting SUCCESS:', result.edgeId, 'Points:', result.points?.length);
-                self.postMessage(result);
+                //                self.postMessage(result);
             }
         } catch (err: any) {
             console.error('[Worker] CRITICAL FAILURE:', err);

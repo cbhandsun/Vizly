@@ -145,8 +145,7 @@ const useHydratedPath = (
             setTimeout(() => {
                 if (!isMountedRef.current) return;
                 if (path !== svgPath) {
-                    // console.log(`[SmartWorker:${id}] Hydrating from computedPath (` + computedPoints.length + ' points). Algo:', edgeData.algorithm);
-                    setPath(svgPath);
+                    //                    setPath(svgPath);
                     setSmartPoints(computedPoints);
                     setIsLoading(false);
                     isHydratedRef.current = true;
@@ -448,7 +447,6 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
         };
 
         if (!isLayoutStable && !nodesDragging) {
-            console.log(`[DEBUG-WORKER:${id}] SKIP: layout unstable`);
             return;
         }
 
@@ -480,12 +478,10 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
         // This leaves isLoading permanently locked at true and permanently falls back.
         if (!isLoading && !justStoppedDragging && !nodesDragging && lastFingerprintRef.current === fp && !isHydratedRef.current) {
             if (edgeData?.algorithm !== 'fallback') {
-                console.log(`[DEBUG-WORKER:${id}] SKIP: fingerprint match. FP: ${fp.substring(0, 10)}... (isLoading=${isLoading}, nodesDragging=${nodesDragging})`);
                 return;
             }
         }
         
-        console.log(`[DEBUG-WORKER:${id}] DISPATCHING Worker. fp changed/retained for dispatch. FP: ${fp.substring(0, 10)}... isLoading=${isLoading}`);
 
         // Store current dragging state for justStoppedDragging detection
         lastArgsRef.current = { ...currentArgs, wasDragging: nodesDragging };
@@ -695,7 +691,6 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
             // to avoid calculating paths against intermediate/stale node positions.
             // We allow running if dragging (for feedback) or if not yet hydrated (initial render).
             if (!isLayoutStable && !nodesDragging && isHydratedRef.current) {
-                console.log(`[SmartWorker:${id}] Layout unstable. Waiting. (isHydratedRef=${isHydratedRef.current})`);
                 setIsLoading(false); // [BUG FIX] Crucial release. Otherwise stuck in fallback!
                 return;
             }
@@ -740,7 +735,6 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                     console.warn(`[SmartWorker:${id}] Worker returned error or empty path:`, res?.error || 'Empty path');
                     // Fallback or retry logic could go here
                 } else {
-                    console.log(`[DEBUG-WORKER:${id}] Path received: ${res.path.substring(0, 40)}...`);
                 }
 
                 if (isMountedRef.current) {

@@ -367,7 +367,6 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
         } catch { return 'horizontal'; }
       })();
     })();
-    console.log(`[DomainVerticalLayout] nodeLayoutName="${nodeLayoutName}" | options.nodeLayout="${JSON.stringify(nodeLayoutRaw)}"`);
 
 
 
@@ -428,14 +427,12 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
     }
 
     // [CHECKPOINT 1] Dagre 布局完成后，记录子节点**相对位置**
-    console.log(`[POSITION-TRACE] === CHECKPOINT 1: Dagre 布局完成 ===`);
     const sgsCheck1 = updatedNodes.filter(n => String(n.type || '') === 'subGroup');
     for (const sg of sgsCheck1) {
       const sgDesc = String((sg.data as any)?.description || sg.id);
       const sgX = (sg.position as any)?.x || 0;
       const sgY = (sg.position as any)?.y || 0;
       const children = Array.isArray((sg.data as any)?.children) ? (sg.data as any).children as string[] : [];
-      console.log(`[POSITION-TRACE] 子域: "${sgDesc}" pos=(${Math.round(sgX)}, ${Math.round(sgY)})`);
       children.slice(0, 5).forEach(cid => {
         const child = updatedNodes.find(n => n.id === cid);
         if (child) {
@@ -444,7 +441,6 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
           const relX = cx - sgX;
           const relY = cy - sgY;
           const dagreRel = (child.data as any)?.__dagreRel;
-          console.log(`  [CP1] ${cid}: relPos=(${Math.round(relX)}, ${Math.round(relY)}) | __dagreRel=(${dagreRel?.x || 'N/A'}, ${dagreRel?.y || 'N/A'})`);
         }
       });
     }
@@ -626,7 +622,6 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
 
           // ✨ 域宽度确定后,重新居中子域
           {
-            console.log('[SUBDOMAIN-CENTER] === 开始子域居中 ===');
             const tgs = updatedNodes.filter(n => String(n.type || '') === 'titleGroup');
             const idMap = new Map<string, ReactFlowNode>(updatedNodes.map(n => [n.id, n] as const));
 
@@ -649,11 +644,6 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
               const spaceRemaining = Math.max(0, availWidth - totalWidthNeeded);
               const centeredStartX = domainInnerLeft + (spaceRemaining / 2);
 
-              console.log(`[SUBDOMAIN-CENTER] 域 "${dId}":`);
-              console.log(`  域宽度=${tgW}, 可用宽度=${availWidth}`);
-              console.log(`  子域数量=${sgs.length}, 总宽度=${totalSubWidth}, 总间距=${totalGaps}`);
-              console.log(`  需要宽度=${totalWidthNeeded}, 剩余=${spaceRemaining}`);
-              console.log(`  居中起点=${centeredStartX} (域左=${domainInnerLeft})`);
 
               sgs.sort((a, b) => num((a as any)?.position?.x, 0) - num((b as any)?.position?.x, 0));
               let cursorX = centeredStartX;
@@ -665,7 +655,6 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
                 const newX = Math.round(cursorX);
                 const dx = newX - oldX;
 
-                console.log(`  子域[${i}]: ${oldX} -> ${newX} (dx=${dx})`);
 
                 (sg as any).position = { x: newX, y: oldY };
 
@@ -3218,14 +3207,12 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
     }
 
     // [CHECKPOINT 3] 布局策略最终返回前 - 检查最终位置
-    console.log(`[POSITION-TRACE] === CHECKPOINT 3: 策略返回前最终位置 ===`);
     const sgsCheck3 = updatedNodes.filter(n => String(n.type || '') === 'subGroup');
     for (const sg of sgsCheck3) {
       const sgDesc = String((sg.data as any)?.description || sg.id);
       const sgX = (sg.position as any)?.x || 0;
       const sgY = (sg.position as any)?.y || 0;
       const children = Array.isArray((sg.data as any)?.children) ? (sg.data as any).children as string[] : [];
-      console.log(`[POSITION-TRACE] [FINAL] 子域: "${sgDesc}" pos=(${Math.round(sgX)}, ${Math.round(sgY)})`);
       children.slice(0, 5).forEach(cid => {
         const child = updatedNodes.find(n => n.id === cid);
         if (child) {
@@ -3234,7 +3221,6 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
           const relX = cx - sgX;
           const relY = cy - sgY;
           const dagreRel = (child.data as any)?.__dagreRel;
-          console.log(`  [FINAL] ${cid}: relPos=(${Math.round(relX)}, ${Math.round(relY)}) | __dagreRel=(${dagreRel?.x || 'N/A'}, ${dagreRel?.y || 'N/A'})`);
         }
       });
     }

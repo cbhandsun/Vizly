@@ -43,7 +43,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         edges: Edge[],
         options: LayoutOptions
     ): Promise<{ nodes: ReactFlowNode[]; edges: Edge[] }> {
-        console.log(`[DomainDagre] calculateLayout CALLED with ${nodes.length} nodes, ${edges.length} edges`);
 
         // ===== [CRITICAL FIX] 强制归一化 measured =====
         // React Flow 的 measured 属性是异步填充的，在不同渲染周期可能有不同值（或不存在）。
@@ -67,9 +66,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
 
         // [DEBUG] 确认代码执行
-        console.log('=====================================================');
-        console.log('[DomainDagre] calculateLayout 方法开始执行!');
-        console.log('=====================================================');
 
         // 配置参数
         const domainGap = num(cfg?.domain?.gap, 80);
@@ -86,8 +82,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         const widthCompensation = num((cfg?.domain?.widthCompensation), 1.0);
 
         // 调试：打印实际使用的间距值
-        console.log(`[DomainDagre] Gap values: domainGap=${domainGap}, nodeGapH=${nodeGapH}, nodeGapV=${nodeGapV}, direction=${direction}, isHorizontal=${isHorizontal}`);
-        console.log(`[DomainDagre] Config source:`, { domain: cfg?.domain?.gap, nodeH: cfg?.node?.gap?.horizontal, nodeV: cfg?.node?.gap?.vertical });
 
         // 内边距配置
         const dPadH = num(cfg?.domain?.padding?.horizontal, 24);
@@ -249,13 +243,11 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // [FIX] 忽略 RF measured，只用 style 确保一致性
 
         // 调试：显示所有节点的类型
-        console.log(`[DomainDagre] Input nodes: ${updatedNodes.length}`);
         const typeCount: Record<string, number> = {};
         updatedNodes.forEach(n => {
             const t = String(n.type || 'undefined');
             typeCount[t] = (typeCount[t] || 0) + 1;
         });
-        console.log(`[DomainDagre] Node types:`, typeCount);
 
         // 辅助函数：检查节点是否隐藏
         const isHidden = (n: ReactFlowNode): boolean => !!(((n as any)?.data) || {})?.hidden;
@@ -265,22 +257,16 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         const subGroups = updatedNodes.filter(n => String(n.type || '') === 'subGroup' && !isHidden(n));
         const leafNodes = updatedNodes.filter(n => !isGroupType(n.type) && !isHidden(n));
 
-        console.log(`[DomainDagre] Classified: ${domains.length} domains, ${subGroups.length} subGroups, ${leafNodes.length} leafNodes`);
         // [DEBUG] 详细调试：输出布局模式选择原因
-        console.log(`[DomainDagre] 布局模式判断: domains=${domains.length}, subGroups=${subGroups.length}`);
         if (domains.length === 0 && subGroups.length === 0) {
-            console.log(`[DomainDagre] >>> 进入【简化模式】：无域容器`);
         } else if (domains.length === 0 && subGroups.length > 0) {
-            console.log(`[DomainDagre] >>> 进入【扩展简化模式】：有子域无域`);
         } else {
-            console.log(`[DomainDagre] >>> 进入【完整域级模式】：有 ${domains.length} 个域`);
         }
 
         // ============================================
         // 简化模式：没有域容器时，直接布局所有叶节点
         // ============================================
         if (domains.length === 0 && subGroups.length === 0) {
-            console.log(`[DomainDagre] No domain containers found, using simple Dagre layout for ${leafNodes.length} leaf nodes`);
 
             // 直接使用 Dagre 布局所有叶节点
             const result = this.layoutWithDagre(
@@ -310,17 +296,9 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 }
             });
 
-            console.log(`[DomainDagre] Simple layout complete: ${result.length} nodes positioned`);
 
             // 调试：打印节点尺寸信息
             const sampleNodes = leafNodes.slice(0, 3);
-            console.log(`[DomainDagre] Sample node dimensions:`, sampleNodes.map(n => ({
-                id: n.id,
-                pos: n.position,
-                absPos: (n as any).positionAbsolute,
-                measured: (n as any).measured,
-                style: { w: (n as any).style?.width, h: (n as any).style?.height }
-            })));
 
             // 过滤边：移除引用不存在或隐藏节点的边
             const visibleNodeIds = new Set(leafNodes.map(n => n.id));
@@ -328,11 +306,9 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 const srcExists = visibleNodeIds.has(e.source);
                 const tgtExists = visibleNodeIds.has(e.target);
                 if (!srcExists || !tgtExists) {
-                    console.log(`[DomainDagre] Filtering edge ${e.source} -> ${e.target}: src=${srcExists}, tgt=${tgtExists}`);
                 }
                 return srcExists && tgtExists;
             });
-            console.log(`[DomainDagre] Edges: ${edges.length} total, ${validEdges.length} valid`);
 
             // 智能边路由
             this.applyEdgeRouting(updatedNodes, validEdges, idMap, cfg, options);
@@ -351,7 +327,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // 扩展简化模式：有子域但没有域容器时，直接布局子域+叶节点
         // ============================================
         if (domains.length === 0 && subGroups.length > 0) {
-            console.log(`[DomainDagre] No visible domains but ${subGroups.length} subGroups found, using flat layout for subGroups + leafNodes`);
 
             // 先布局每个子域内部
             const childrenBySub = new Map<string, string[]>();
@@ -459,7 +434,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 }
             });
 
-            console.log(`[DomainDagre] Flat layout complete: ${topLevelItems.length} top-level items`);
 
             // 过滤边并克隆，确保 React 能检测到 handle 修改
             const visibleNodeIds = new Set(leafNodes.map(n => n.id));
@@ -552,15 +526,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     const sgHeight = bounds.height + sdTitleH + sdPadV * 2;
 
                     // 调试：打印子域边界计算详情
-                    console.log(`[DomainDagre] SubGroup ${sg.id} bounds calculation:`);
-                    console.log(`  - bounds: minX=${bounds.minX}, maxX=${bounds.minX + bounds.width}, width=${bounds.width}`);
-                    console.log(`  - padding: sdPadHEffective=${sdPadHEffective}, sdPadV=${sdPadV}, sdTitleH=${sdTitleH}`);
-                    console.log(`  - result: sgWidth=${sgWidth}, sgHeight=${sgHeight}`);
-                    console.log(`  - children:`, sgChildren.map(c => ({
-                        id: c.id,
-                        pos: c.position,
-                        dims: getNodeDimensions(c)
-                    })));
 
                     (sg as any).measured = { width: sgWidth, height: sgHeight };
                     (sg as any).style = { ...(sg as any).style, width: sgWidth, height: sgHeight };
@@ -642,14 +607,12 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // 子域整体居中处理
         // ============================================
         // 在域内布局完成、域尺寸确定后,使域内多个子域作为整体相对父域居中
-        console.log('[DomainDagre] Applying subdomain centering...');
         updatedNodes = centerSubGroupsInDomain(updatedNodes);
 
         // 更新节点映射以保持引用同步
         idMap.clear();
         updatedNodes.forEach(n => idMap.set(n.id, n));
 
-        console.log('[DomainDagre] Subdomain centering complete.');
 
         // ============================================
         // 第二阶段：域级布局（使用 Dagre 基于跨域边排列）
@@ -694,14 +657,11 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         const domainLayoutNodes: ReactFlowNode[] = [...domains, ...orphanNodes];
 
         // 调试：打印域的尺寸
-        console.log(`[DomainDagre] Domain sizes before layout:`);
         domainLayoutNodes.forEach(d => {
             // [FIX] 忽略 RF measured，只用 style
             const w = (d as any).style?.width || 200;
             const h = (d as any).style?.height || 80;
-            console.log(`  - ${d.id}: ${w}x${h}`);
         });
-        console.log(`[DomainDagre] Cross-domain edges: ${crossDomainEdges.length}`, crossDomainEdges.map(e => `${e.source} -> ${e.target}`));
 
         if (domainLayoutNodes.length > 0) {
             const result = this.layoutWithDagre(
@@ -715,7 +675,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             );
 
             // 应用域级布局
-            console.log(`[DomainDagre] Domain layout results:`, result.map(r => `${r.id}: (${r.x.toFixed(0)}, ${r.y.toFixed(0)})`));
 
             result.forEach(pos => {
                 const node = idMap.get(pos.id);
@@ -737,7 +696,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     const deltaX = newX - oldX;
                     const deltaY = newY - oldY;
 
-                    console.log(`[DomainDagre] Moving domain "${dk}": (${oldX}, ${oldY}) -> (${newX.toFixed(0)}, ${newY.toFixed(0)}), delta=(${deltaX.toFixed(0)}, ${deltaY.toFixed(0)})`);
 
                     // 移动该域下的所有子节点
                     updatedNodes.forEach(child => {
@@ -840,14 +798,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
         // 调试日志：检查几个节点的尺寸信息
         const sampleLeafs = leafNodes.slice(0, 3);
-        console.log(`[DomainDagre] Node dimensions before edge routing:`, sampleLeafs.map(n => ({
-            id: n.id,
-            pos: n.position,
-            absPos: (n as any).positionAbsolute,
-            width: (n as any).width,
-            height: (n as any).height,
-            measured: (n as any).measured
-        })));
 
         const cfgEdge = cfg?.edge || {};
         const routingConfig = {
@@ -982,7 +932,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 (nodeUsage[target.id][routingResult.targetHandle] || 0) + 1;
         });
 
-        console.log(`[DomainDagre] Layout complete: ${domains.length} domains, ${crossDomainEdges.length} cross-domain edges`);
 
         // ═══════════════════════════════════════════════════════════════
         // [FIX] 禁用 P4-P8 后处理管道（对齐 DiagramView-SVG 设计）
@@ -998,9 +947,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // ============================================
         // 🎯 子域整体居中处理
         // ============================================
-        console.log('[DomainDagre] Applying subdomain centering...');
         updatedNodes = centerSubGroupsInDomain(updatedNodes);
-        console.log('[DomainDagre] Subdomain centering complete.');
 
         // Path 3 hierarchy conversion
         convertToHierarchicalFormat(updatedNodes, nodeToSubGroup);
@@ -1064,14 +1011,12 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         g.setDefaultEdgeLabel(() => ({}));
 
         // 添加节点（按输入顺序，Dagre 会尊重这个顺序进行层级分配）
-        console.log(`[DomainDagre] layoutWithDagre: Processing ${nodes.length} nodes, align=${alignStrategy}`);
         nodes.forEach(node => {
             // 使用传入的尺寸获取器，或者默认逻辑
             const dims = getNodeDimensions ? getNodeDimensions(node) : this.getNodeDimensions(node);
             const w = dims.width;
             const h = dims.height;
 
-            console.log(`[DomainDagre] Node ${node.id}: resolved size = ${w}x${h}`);
             g.setNode(node.id, { width: w, height: h });
         });
 
@@ -1302,7 +1247,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 const sources = edgeList.map(e => idMap.get(e.source)).filter(Boolean) as ReactFlowNode[];
                 const unifiedHandle = getDominantHandle(targetNode, sources);
                 manyToOneTargetHandle[targetId] = unifiedHandle;
-                console.log(`[DomainDagre] Many-to-one detected: ${edgeList.length} edges -> ${targetId}, unified handle: ${unifiedHandle}`);
             }
         }
 
@@ -1316,7 +1260,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 const targets = edgeList.map(e => idMap.get(e.target)).filter(Boolean) as ReactFlowNode[];
                 const unifiedHandle = getDominantHandle(sourceNode, targets);
                 oneToManySourceHandle[sourceId] = unifiedHandle;
-                console.log(`[DomainDagre] One-to-many detected: ${sourceId} -> ${edgeList.length} edges, unified handle: ${unifiedHandle}`);
             }
         }
 
@@ -1369,15 +1312,9 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
             // 调试：打印边路由决策
             if (manyToOneTargetHandle[target.id] || oneToManySourceHandle[source.id]) {
-                console.log(`[DomainDagre] Edge ${edge.id}: ${source.id} -> ${target.id}`);
-                console.log(`  - unifiedSourceHandle: ${oneToManySourceHandle[source.id] || 'none'}`);
-                console.log(`  - unifiedTargetHandle: ${manyToOneTargetHandle[target.id] || 'none'}`);
-                console.log(`  - result: sourceHandle=${routingResult.sourceHandle}, targetHandle=${routingResult.targetHandle}`);
-                console.log(`[DomainDagre] FIXING edge ${edge.id} type to '${routingResult.type}'`);
             }
 
             if (edge.type !== routingResult.type) {
-                console.log(`[DomainDagre] MUTATING edge ${edge.id} type from '${edge.type}' to '${routingResult.type}'`);
             }
             edge.type = routingResult.type;
             edge.sourceHandle = routingResult.sourceHandle;

@@ -4,7 +4,6 @@ import { ErrorBoundary } from '@/core/components/shared/ErrorBoundary';
 import { AppProviders, AppRoutes } from '@/app/index';
 import { UpgradeModal } from '@/components/ui/UpgradeModal';
 
-console.log('📦 [@diagramview/core] loaded v1.0.0 (lazy initialized)');
 
 /**
  * 主应用组件
