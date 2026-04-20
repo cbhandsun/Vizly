@@ -97,6 +97,9 @@ export interface DesignerHeaderLayerProps {
         onExport?: () => void;
         onImportClick?: () => void;
         renderThemeSelector?: React.ReactNode;
+        /** 历史面板入口 */
+        onShowHistory?: () => void;
+        historyCount?: number;
     };
 }
 
@@ -227,6 +230,8 @@ export const DesignerHeaderLayer = React.memo(
                     onImportClick={toolbar.onImportClick}
                     isCommentMode={topActions.isCommentMode}
                     setIsCommentMode={topActions.setIsCommentMode}
+                    onShowHistory={topActions.onShowHistory}
+                    historyCount={toolbar.historyCount}
                 >
                     {toolbar.renderThemeSelector && (
                         <>
@@ -260,7 +265,8 @@ export const DesignerHeaderLayer = React.memo(
             prevProps.topActions.highlightMainFlow === nextProps.topActions.highlightMainFlow &&
             prevProps.topActions.showOnlyMainFlow === nextProps.topActions.showOnlyMainFlow &&
             prevProps.topActions.isDirectSaveDisabled === nextProps.topActions.isDirectSaveDisabled &&
-            prevProps.topActions.isCommentMode === nextProps.topActions.isCommentMode
+            prevProps.topActions.isCommentMode === nextProps.topActions.isCommentMode &&
+            prevProps.toolbar.historyCount === nextProps.toolbar.historyCount
         );
     }
 );

@@ -78,6 +78,9 @@ interface FlowchartToolbarProps {
     // --- Phase 11: Comments ---
     isCommentMode?: boolean;
     setIsCommentMode?: (v: boolean) => void;
+    // --- Phase 1.4: History Panel ---
+    onShowHistory?: () => void;
+    historyCount?: number;
 }
 
 export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
@@ -124,6 +127,8 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
     onExport,
     isCommentMode,
     setIsCommentMode,
+    onShowHistory,
+    historyCount,
 }) => {
     const { t } = useTranslation();
     const onLabel = t('common.on');
@@ -519,9 +524,36 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
                     )}
 
                     {/* ── 历史 ── */}
-                    <Tooltip title={t('designer.toolbar.undo')}>
-                        <Button type="text" icon={<FaUndo />} onClick={onUndo} disabled={!canUndo} aria-label={t('designer.toolbar.undo')} />
-                    </Tooltip>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                        <Tooltip title={t('designer.toolbar.undo')}>
+                            <Button type="text" icon={<FaUndo />} onClick={onUndo} disabled={!canUndo} aria-label={t('designer.toolbar.undo')} style={{ borderRadius: '6px 0 0 6px' }} />
+                        </Tooltip>
+                        {onShowHistory && (
+                            <Tooltip title={`历史记录${historyCount ? ` (${historyCount})` : ''}`}>
+                                <Button
+                                    type="text"
+                                    size="small"
+                                    onClick={onShowHistory}
+                                    aria-label="历史记录"
+                                    style={{
+                                        width: 14,
+                                        height: 32,
+                                        padding: 0,
+                                        borderRadius: '0 6px 6px 0',
+                                        fontSize: 8,
+                                        color: historyCount ? '#6366f1' : 'rgba(0,0,0,0.3)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        borderLeft: '1px solid rgba(0,0,0,0.08)',
+                                        marginLeft: 0,
+                                    }}
+                                >
+                                    ▾
+                                </Button>
+                            </Tooltip>
+                        )}
+                    </div>
                     <Tooltip title={t('designer.toolbar.redo')}>
                         <Button type="text" icon={<FaRedo />} onClick={onRedo} disabled={!canRedo} aria-label={t('designer.toolbar.redo')} />
                     </Tooltip>

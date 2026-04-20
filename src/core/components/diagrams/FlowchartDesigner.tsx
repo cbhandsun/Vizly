@@ -1307,7 +1307,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                     onAddMindMap: handleAddMindMap,
                                     onExport: handleExport,
                                     onImportClick: () => fileInputRef.current?.click(),
-                                    renderThemeSelector
+                                    renderThemeSelector,
+                                    historyCount: pastEntries?.length ?? 0,
                                 }}
                             />
 
