@@ -405,8 +405,7 @@ function evaluatePortCombination(
     dynamicObstacles: Rectangle[] = []
 ): PortCandidate {
     // DEBUG: Confirm evaluation is running
-    // console.log(`[costAware] Evaluating ${sourcePos} -> ${targetPos}`);
-
+    //
     const sourceCenter = { x: sourceNode.x + sourceNode.width / 2, y: sourceNode.y + sourceNode.height / 2 };
     const targetCenter = { x: targetNode.x + targetNode.width / 2, y: targetNode.y + targetNode.height / 2 };
     const sourcePort = getPortPoint(sourceNode, sourcePos, targetCenter, config);

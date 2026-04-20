@@ -38,7 +38,6 @@ function gcAutosaveEntries() {
         }
         toRemove.forEach(key => {
             localStorage.removeItem(key);
-            console.log(`[AutoSave GC] Removed stale entry: ${key}`);
         });
     } catch { /* ignore */ }
 }

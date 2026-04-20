@@ -70,7 +70,6 @@ export class PathPostProcessor {
         if (context.metadata.strategy && context.metadata.strategy.includes('Trunk Direct')) {
             const svgPath = createFilletedPath(points, this.config.postProcessing.borderRadius);
             // [DEBUG]
-            console.log(`[DEBUG-WORKER-POST] Strategy: ${context.metadata.strategy}, Points:`, points, `Filleted SVG:`, svgPath);
             return { points, svgPath };
         }
 

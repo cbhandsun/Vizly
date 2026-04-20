@@ -90,7 +90,6 @@ export function useToastActions({
             return; // 无选中 → 静默忽略
         }
         handleCopy();
-        console.log(`[Clipboard] Copied ${selectedNodes.length} nodes, ${selectedEdges.length} edges`);
     }, [handleCopy, selectedEdges.length, selectedNodes.length]);
 
     const handlePasteWithToast = useCallback(() => {

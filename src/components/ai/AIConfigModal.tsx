@@ -182,7 +182,6 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             if (user) {
                 storageService.loadConfig('ai_config').then(async (cloudConfig) => {
                     if (cloudConfig && Array.isArray(cloudConfig.providers)) {
-                        console.log('AIConfigModal: Loaded config from cloud, decrypting...');
 
                         // Decrypt API Keys
                         const decryptedProviders = await Promise.all(cloudConfig.providers.map(async (p: AIProviderConfig) => {
@@ -349,7 +348,6 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             };
             // 立即保存到 localStorage
             localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(newConfig));
-            console.log('[AI Config] Active model saved:', newActiveModelKey);
             return newConfig;
         });
         message.success(`已切换到: ${modelId}`);

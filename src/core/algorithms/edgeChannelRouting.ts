@@ -309,8 +309,7 @@ export function bundleEdges(
         const key = `${Math.round(first.x / bucketSize)},${Math.round(first.y / bucketSize)}_${Math.round(last.x / bucketSize)},${Math.round(last.y / bucketSize)}`;
 
         // if (path.edgeId === 'e7' || path.edgeId === 'e8') {
-        //     console.log(`[EdgeBundler] Key for ${path.edgeId}: ${key} (Start: ${first.x},${first.y} End: ${last.x},${last.y})`);
-        // }
+        //        // }
 
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(path);

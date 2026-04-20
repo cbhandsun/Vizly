@@ -494,7 +494,6 @@ export class EnhancedThemeManager {
    */
   private emitEvent(event: ThemeManagerEvent): void {
     if (this.config.debug) {
-      console.log('🎨 EnhancedThemeManager - 触发事件:', event);
     }
 
     this.listeners.forEach(listener => {

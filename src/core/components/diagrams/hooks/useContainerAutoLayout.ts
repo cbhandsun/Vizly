@@ -113,7 +113,6 @@ export function useContainerAutoLayout() {
       return n;
     }));
 
-    console.log(`[ContainerAutoLayout] ✅ 容器 ${containerId} 内 ${childIds.size} 个子节点已布局 (${direction})`);
   }, [getNodes, getEdges, setNodes]);
 
   return { layoutContainer };

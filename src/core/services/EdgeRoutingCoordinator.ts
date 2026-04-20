@@ -136,7 +136,6 @@ export class EdgeRoutingCoordinator {
 
     public clearDebugEdge(): void {
         this.setDebugEdge(null);
-        console.log(`[EdgeRoutingCoordinator] Debug edge cleared.`);
     }
 
     // [FIX] Debounce Timer
@@ -284,7 +283,6 @@ export class EdgeRoutingCoordinator {
             }
         } catch (e) {}
 
-        console.log('[EdgeRoutingCoordinator] All caches forcefully cleared');
     }
 
     private onSelectionChange: ((edgeId: string | null) => void) | null = null;
@@ -661,9 +659,7 @@ export class EdgeRoutingCoordinator {
         groups.set(unifiedKey, { graph: freshest.request.graph, requests, graphKey: freshest.graphKey, seqByEdge });
 
         // [DEBUG] Check Grouping
-        // console.log(`[Coordinator] Batch Routing: ${dirtyIds.length} dirty edges grouped into ${groups.size} batches.`);
-        // groups.forEach((g, k) => console.log(`  Batch Key (short): ${k.substring(0, 20)}... Size: ${g.requests.length}`));
-
+        //        // groups.forEach((g, k) =>
         for (const group of groups.values()) {
             const startTime = performance.now();
             const jobs = group.requests.map(req => {
@@ -761,14 +757,9 @@ export class EdgeRoutingCoordinator {
                     group.graph.config?.debug;
                 if (shouldEmitDebug) {
                     // [FIX] Explicitly log to console to ensure Alt+Click works even if UI callback is detached
-                    console.log(`\n======================================================`);
-                    console.log(`[EdgeRoutingCoordinator] 🐞 DEBUG DATA FOR EDGE: ${req.edgeId}`);
-                    console.log(`======================================================`);
                     console.dir(result, { depth: null });
                     const trunkData = this.trunkDebugData.get(req.edgeId);
-                    if (trunkData) console.log(`[EdgeRoutingCoordinator] Trunk classification:`, trunkData);
-                    console.log(`======================================================\n`);
-
+                    if (trunkData)
                     if (this.onDebugData) {
                         this.onDebugData({
                             edgeId: req.edgeId,
@@ -876,8 +867,7 @@ export class EdgeRoutingCoordinator {
             return this.routeSerialFallback(jobs, graph);
         }
 
-        // console.log(`[P0 Parallel] Routing ${jobs.length} edges with worker pool`);
-
+        //
         try {
             // [FIX] Assign Bus Indices for Nudge
             this.assignBusIndices(jobs, graph);
@@ -916,7 +906,6 @@ export class EdgeRoutingCoordinator {
      */
     public setParallelRoutingEnabled(enabled: boolean): void {
         this.useParallelRouting = enabled && !!this.parallelPool;
-        console.log(`[P0] Parallel routing ${this.useParallelRouting ? 'enabled' : 'disabled'}`);
     }
 
     /**
@@ -924,7 +913,6 @@ export class EdgeRoutingCoordinator {
      */
     public clearVisibilityGraphCache(): void {
         this.vgCacheManager.clear();
-        console.log('[P1.2] VG cache cleared');
     }
 
     /**
@@ -939,7 +927,6 @@ export class EdgeRoutingCoordinator {
      */
     public setVGCacheSize(maxSize: number): void {
         this.vgCacheManager.setMaxSize(maxSize);
-        console.log(`[P1.2] VG cache size set to ${maxSize}`);
     }
 
     // [P0] Assign Bus Indices (outgoingIndex, outgoingCount, etc.)
@@ -1209,7 +1196,6 @@ export class EdgeRoutingCoordinator {
 
                 // Debug log
                 if (this.debugEdgeId) {
-                    console.log(`[Bidirectional] Pair detected: ${pair[0].edgeId} ↔ ${pair[1].edgeId}, spacing=${spacing}`);
                 }
             }
             // For single-direction or >2 edges (rare), no special handling
@@ -1520,7 +1506,6 @@ export class EdgeRoutingCoordinator {
                 }
             });
             if (config?.debug) {
-                console.log(`[LPNudge] Successfully nudged ${nudgedPaths.length} parallel paths.`);
             }
         } catch (err) {
             console.error('[LPNudge] Global Nudging failed, falling back to original paths:', err);

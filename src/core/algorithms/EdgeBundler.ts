@@ -65,8 +65,7 @@ export class GlobalEdgeBundler {
 
         this.clusters = [];
 
-        // console.log(`[EdgeBundler] Analyzing ${edges.length} edges for bundling...`);
-
+        //
         // 1. Generate or use existing rough paths
         const paths = this.generateRoughPaths(edges, nodes, existingPaths);
 
@@ -95,8 +94,7 @@ export class GlobalEdgeBundler {
             }
         });
 
-        // console.log(`[EdgeBundler] Created ${this.clusters.length} bundles`);
-        return bundleMap;
+        //        return bundleMap;
     }
 
     /**

@@ -9,51 +9,7 @@ import { EdgeType } from '../../factories/EdgeFactory';
 import { diagramConfigManager } from '../../components/config/DiagramConfig';
 
 // Helper for logger
-const treeLog = (...args: any[]) => { /* console.log('[TreeRouting]', ...args); */ };
-
-// ===================================
-// Helper Types & Functions
-// ===================================
-
-interface Point {
-    x: number;
-    y: number;
-}
-
-interface Candidate {
-    edgeIndex: number;
-    sourceHandle: string;
-    targetHandle: string;
-    path: Point[];
-    cost: number;
-    sourcePortOrder?: number;
-    sourcePortTotal?: number;
-    targetPortOrder?: number;
-    targetPortTotal?: number;
-}
-
-// 候选端口组合
-const candidateCombos = [
-    { source: 'r', target: 'l' },
-    { source: 'l', target: 'r' },
-    { source: 'b', target: 't' },
-    { source: 't', target: 'b' },
-    { source: 'r', target: 't' },
-    { source: 'r', target: 'b' },
-    { source: 'l', target: 't' },
-    { source: 'l', target: 'b' },
-    // Same-side candidates (needed for U-turns / Backward edges)
-    { source: 't', target: 't' },
-    { source: 'b', target: 'b' },
-    { source: 'l', target: 'l' },
-    { source: 'r', target: 'r' }
-];
-
-// 计算线段相交
-function segmentsIntersect(a: Point, b: Point, c: Point, d: Point): boolean {
-    const ccw = (p1: Point, p2: Point, p3: Point) => (p3.y - p1.y) * (p2.x - p1.x) > (p2.y - p1.y) * (p3.x - p1.x);
-    return (ccw(a, c, d) !== ccw(b, c, d)) && (ccw(a, b, c) !== ccw(a, b, d));
-}
+const treeLog = (...args: any[]) => { /*}
 
 // 获取节点锚点
 function getAnchor(node: any, handle: string | null | undefined): Point {

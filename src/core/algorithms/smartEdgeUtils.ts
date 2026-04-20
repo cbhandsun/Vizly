@@ -1792,9 +1792,7 @@ export function makePathOrthogonal(
 
             // [DEBUG] Log decision for e10-like coordinates
             // if (Math.abs(curr.x - 2276) < 100 || Math.abs(next.x - 1225) < 100) {
-            //     console.log(`[Orthogonal] Checking options for (${Math.round(curr.x)},${Math.round(curr.y)}) -> (${Math.round(next.x)},${Math.round(next.y)})`);
-            //     console.log(`[Orthogonal] PathA (Horiz): Blocked=${blockedA}. PathB (Vert): Blocked=${blockedB}`);
-            // }
+            //            //            // }
 
             let preferHorizontal = true; // Default
 

@@ -27,7 +27,6 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
 
   async migrate(data: any, fromVersion: string | undefined): Promise<any> {
     const migratedData = await super.migrate(data, fromVersion);
-    console.log(`[MindMapPlugin] Migrating data from ${fromVersion || '1.0'} to ${this.version}`);
     return migratedData;
   }
 

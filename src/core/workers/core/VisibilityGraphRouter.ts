@@ -81,14 +81,12 @@ export class VisibilityGraphRouter {
 
             if (quickResult) {
                 // if (this.config.debug) {
-                //     console.log(`[VGRouter] 1-Bend optimization succeeded (${quickResult.bendType})`);
-                // }
+                //                // }
                 return quickResult.path;
             }
 
             // if (this.config.debug) {
-            //     console.log('[VGRouter] 1-Bend optimization failed, trying full VG');
-            // }
+            //            // }
         }
 
         // Fall back to full VG

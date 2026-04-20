@@ -56,7 +56,6 @@ export const LazyMonacoEditor: React.FC<LazyMonacoEditorProps> = ({
                     })
                 );
                 loader.config({ paths: { vs: fastest } });
-                console.log('[LazyMonacoEditor] Using fastest CDN:', fastest);
             } catch (e) {
                 console.warn('[LazyMonacoEditor] CDN race failed, falling back to jsdelivr.');
                 loader.config({ paths: { vs: CDNS[2] } }); // 故障兜底

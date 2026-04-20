@@ -717,7 +717,6 @@ const handleSaveChanges = useCallback(async () => {
       await actions.setConfig(key, value);
     }
     setHasChanges(false);
-    console.log('配置已保存');
   } catch (error) {
     console.error('保存配置失败:', error);
   }

@@ -172,7 +172,6 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
         const edgeEdgeSpacing = Number(LayeredConfigManager.getInstance().get<number>('diagram.layout.ELK_EDGE_EDGE_SPACING', 4) || 4)
         const portPortSpacing = Number(LayeredConfigManager.getInstance().get<number>('diagram.layout.ELK_PORT_PORT_SPACING', 4) || 4)
         let elkAlgorithm = String(LayeredConfigManager.getInstance().get<string>('diagram.layout.ELK_ALGORITHM', 'layered') || 'layered').toLowerCase()
-        console.log('[DomainElkLayout] Using ELK Algorithm:', elkAlgorithm);
 
         // Map short names to full qualified names
         const algoMap: Record<string, string> = {

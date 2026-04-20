@@ -768,29 +768,8 @@ export function useMindMapOrchestrator(
                 return n;
             });
 
-            // 3. Layout the branch again using only visible nodes
-            setEdges(currentEdges => {
-                const nextEdges = currentEdges.map(e => {
-                    const targetViz = visibilityMap.get(e.target);
-                    if (targetViz) return { ...e, hidden: targetViz.hidden };
-                    return e;
-                });
-
-                const visibleNodes = nextNodes.filter(n => n.type === 'mindmap' && !n.hidden);
-                const visibleEdges = nextEdges.filter(e => !e.hidden);
-
-                const rootNode = visibleNodes.find(n => n.data?.depth === 0);
-                const direction = rootNode?.data?.direction as string || 'LR';
-
-                const positions = autoMindMapLayout(visibleNodes, visibleEdges, direction, {
-                    nodeSpacing: 48,
-                    levelSpacing: 140
-                });
-
-                return nextEdges; // Wait, setEdges should return edges. We need to set node positions carefully since we're in setNodes.
-                // Wait, we can't `setEdges` and process node layout inside it cleanly without side effects.
-                // See later fix: layout will be applied below.
-            });
+            // Note: edge hidden-state sync is handled by React Flow natively —
+            // RF auto-hides edges whose source or target node is hidden.
 
             // Applying layout to nodes directly within setNodes
             const visibleNodes = nextNodes.filter(n => n.type === 'mindmap' && !n.hidden);
@@ -815,19 +794,9 @@ export function useMindMapOrchestrator(
             });
         });
 
-        // Update edges state directly as well
-        setEdges(currentEdges => {
-             const childrenMap = new Map<string, string[]>();
-             const parentSet = new Set<string>();
-             // We need to re-evaluate the target node visibility here, or just let target node `.hidden` sync via FlowchartDesigner? 
-             // React Flow's native `.hidden` on Node automatically ignores attached edges. But it's safer to explicitly set it.
-             // But we don't have nextNodes here. 
-             // That's fine, we will just manually hide edges based on target's visibility we calculate again or rely on Node's hidden property directly (RF hides edges of hidden nodes).
-             // Actually, we SHOULD sync edge hidden state. For simplicity, we just use the event to trigger layout, RF hides edges automatically if nodes are hidden!
-             return currentEdges;
-        });
 
-    }, [nodes, edges, setNodes, setEdges, takeSnapshot]);
+
+    }, [nodes, edges, setNodes, takeSnapshot]);
 
 
     useEffect(() => {

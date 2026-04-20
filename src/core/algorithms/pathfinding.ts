@@ -747,7 +747,6 @@ export function findPath(
             }
 
             // VG failed, fallback to Grid A*
-            console.log('[Pathfinding] Visibility graph failed, falling back to grid A*');
         }
         // Otherwise use Grid A* (strategy already selected it)
     } else {
@@ -1543,8 +1542,7 @@ export function generateSmartCShapePath(
             !isPathBlocked(seg3, obstacles, gridSize)) {
 
             if (debug) {
-                // console.log(`[SmartCShape] Found path with margin ${margin}`);
-            }
+                //            }
             return path;
         }
     }

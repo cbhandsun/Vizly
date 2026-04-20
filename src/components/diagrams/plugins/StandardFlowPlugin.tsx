@@ -77,7 +77,6 @@ export class StandardFlowPlugin implements DiagramTypePlugin {
 
   // ====== AI Actions (GAP-10 Phase 2) ======
   async onAIAction(action: string, params: any, ctx: PluginContext): Promise<boolean> {
-    console.log(`[StandardFlowPlugin] Handling AI action: ${action}`, params);
     
     switch (action) {
       case 'smart-optimize':

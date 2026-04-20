@@ -33,7 +33,6 @@ export class FlowchartPlugin extends BaseDiagramPlugin implements DiagramTypePlu
 
     async migrate(data: any, fromVersion: string | undefined): Promise<any> {
         const migratedData = await super.migrate(data, fromVersion);
-        console.log(`[FlowchartPlugin] Migrating data from version ${fromVersion || '1.0'} to ${this.version}`);
         
         if (!fromVersion || fromVersion === '1.0') {
             if (Array.isArray(migratedData.nodes)) {

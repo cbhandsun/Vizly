@@ -25,7 +25,6 @@ export class TimelinePlugin implements DiagramTypePlugin {
   hideDefaultSidebar = true;
   
   async migrate(data: any, fromVersion: string | undefined): Promise<any> {
-      console.log(`[TimelinePlugin] Migrating data from version ${fromVersion || '1.0'} to ${this.version}`);
       let migratedData = { ...data };
       
       // Example Migration: From 1.0 (or undefined) to 1.1

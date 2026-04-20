@@ -652,9 +652,7 @@ export class DiagramConfigManager {
    * 更新配置
    */
   public updateConfig(updates: Partial<DiagramConfig>): void {
-    console.log('Updating config with:', updates);
     if (updates.node && typeof updates.node.height !== 'undefined') {
-      console.log('Node height update:', updates.node.height, 'Type:', typeof updates.node.height, 'Is NaN:', isNaN(updates.node.height));
     }
     this.config = this.mergeConfig(this.config, updates);
     // 每次更新后规范化关键间距

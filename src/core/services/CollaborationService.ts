@@ -46,9 +46,7 @@ class CollaborationService {
                 id: this.userId
             });
 
-            console.log(`[Collab] Connected to room: ${roomName} as ${this.userName}`);
         } else {
-            console.log(`[Collab] Collaboration is local-only (No VITE_YJS_WS_URL provided). Room: ${roomName}`);
         }
     }
 

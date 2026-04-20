@@ -97,8 +97,7 @@ class WorkerPool {
         if (this.initialized) return;
 
         try {
-            // console.log(`[WorkerPool] Initializing Worker Pool (${this.poolSize} workers) at ${new Date().toISOString()}`);
-            for (let i = 0; i < this.poolSize; i++) {
+            //            for (let i = 0; i < this.poolSize; i++) {
                 const worker = new PathfindingWorker();
                 const poolWorker: PoolWorker = {
                     worker,

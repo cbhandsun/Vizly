@@ -212,8 +212,7 @@ export class OneBendVisibilityGraph {
      */
     private log(message: string, ...args: unknown[]): void {
         // if (this.config.debug) {
-        //     console.log(`[OneBendVG] ${message}`, ...args);
-        // }
+        //        // }
     }
 
     /**

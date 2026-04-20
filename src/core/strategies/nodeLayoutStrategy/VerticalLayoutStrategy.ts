@@ -127,7 +127,6 @@ export class VerticalLayoutStrategy implements ILayoutStrategy {
         // Debug log for '作业域' to help troubleshooting
         if ((dTrim.includes('作业域') || dTrim.includes('Job')) && (import.meta as any)?.env?.DEV) {
            const idx = Array.isArray(arr) ? findInArr(arr) : 'N/A';
-           console.log(`[VerticalLayout] Check explicit: Domain='${dTrim}', Sub='${sTrim}', MatchKey=${arr ? 'FOUND' : 'NULL'}, Index=${idx}`);
         }
 
         if (Array.isArray(arr)) { 

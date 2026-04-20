@@ -280,7 +280,6 @@ export class NodeFactory {
     // 确定主题
     const theme = diagramTheme;
     if (debugEnabled) {
-      console.log(`[NodeFactory] Using theme for node ${config.id}:`, theme ? 'Theme Present' : 'Theme Not Present');
     }
 
     // 以 domainClass 优先解析域主题颜色；若缺失则最小回退
@@ -291,7 +290,6 @@ export class NodeFactory {
       domainClass,
     } as any);
     if (debugEnabled) {
-      console.log(`[NodeFactory] Node ${config.id} (domain: ${domainKey}, norm: ${normalizedDomainKey}, domainClass: ${domainClass}) resolved theme color:`, domainThemeColor);
     }
 
     // 规范化文案字段：统一使用 description（函数级注释）

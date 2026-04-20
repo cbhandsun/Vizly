@@ -31,7 +31,6 @@ export class ArchitecturePlugin implements DiagramTypePlugin {
   brandColor = '#722ed1';
 
   async migrate(data: any, fromVersion: string | undefined): Promise<any> {
-    console.log(`[ArchitecturePlugin] Migrating data from ${fromVersion || 'legacy'} to ${this.version}`);
     let migratedData = { ...data };
     if (!fromVersion) {
       // Legacy data: ensure all architecture nodes have a type field

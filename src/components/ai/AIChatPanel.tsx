@@ -387,7 +387,6 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                 const cmdJson = match[1];
                 const cmd = JSON.parse(cmdJson);
                 
-                console.log('[AI Pilot] Processing command:', cmd);
                 
                 // [GAP-10] 首选：尝试通过插件分发器执行 (Architecture First)
                 if (pluginId) {
@@ -471,7 +470,6 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                         }
                         break;
                     default:
-                        console.log('Action not handled by general switch:', cmd.action);
                         break;
                 }
                 
@@ -483,7 +481,6 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         }
 
         if (executedCount > 0) {
-            console.log(`[AI Pilot] Successfully executed ${executedCount} commands.`);
         }
     };
 
@@ -772,14 +769,9 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         let activeModel = activeProvider?.models.find(m => m.id === mId);
 
         // 调试日志
-        console.log('[AI Debug] activeModelKey:', config.activeModelKey);
-        console.log('[AI Debug] pId:', pId, 'mId:', mId);
-        console.log('[AI Debug] activeProvider:', activeProvider?.id, 'enabled:', activeProvider?.enabled, 'hasApiKey:', !!activeProvider?.apiKey);
-        console.log('[AI Debug] activeModel:', activeModel?.id, 'enabled:', activeModel?.enabled);
 
         // 如果当前选择的模型不可用，尝试自动回退到第一个可用的模型
         if (!activeProvider || !activeProvider.apiKey || !activeModel) {
-            console.log('[AI Debug] Current model not available, trying to find fallback...');
 
             // 查找第一个可用的 provider 和 model
             for (const provider of config.providers) {
@@ -796,7 +788,6 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
                         config.activeModelKey = newActiveModelKey;
                         localStorage.setItem('DiagramView.AIConfig_V2_Advanced', JSON.stringify(config));
 
-                        console.log('[AI Debug] Auto-switched to:', newActiveModelKey);
                         message.info(t('aiChat.autoSwitched', { name: `${provider.name} - ${enabledModel.name}` }));
                         break;
                     }
@@ -806,7 +797,6 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
 
         // 再次检查
         if (!activeProvider || !activeProvider.apiKey || !activeModel) {
-            console.log('[AI Debug] No available model found');
             message.warning('没有找到可用的模型，请先在设置中配置 API Key 并启用模型');
             onOpenConfig();
             return;

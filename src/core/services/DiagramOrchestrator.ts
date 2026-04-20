@@ -294,33 +294,7 @@ export class DiagramOrchestrator {
           else if (nodeLayoutSel.includes('vertical')) (layoutOptions as any).direction = 'TB';
         }
       } catch { void 0; }
-      // console.log(`[DEBUG-ORCHESTRATOR] 获取策略: layoutType="${layoutType}", strategy.getName()="${strategy?.getName?.() || '???'}"`)
-      const result = await strategy.calculateLayout(initialNodes, layoutEdges, layoutOptions)
-      // console.log(`[DEBUG-ORCHESTRATOR] calculateLayout 完成: nodes=${result.nodes.length}, edges=${result.edges.length}`)
-      layoutNodes = result.nodes
-      layoutEdges = result.edges
-    }
-
-    const initialNodesById = new Map(initialNodes.map(n => [n.id, n] as const))
-    const processedNodes: Node[] = (layoutNodes || initialNodes).map(n => {
-      const initialNode = initialNodesById.get(n.id)
-      if (!initialNode) return n
-      const layoutData = n.data || {}
-      const initialData = initialNode.data || {}
-      const mergedData = { ...initialData, ...layoutData }
-      const mergedNode: any = { ...initialNode, ...n, data: mergedData, style: { ...(initialNode.style || {}), ...(n.style || {}) }, width: (n as any).width ?? (initialNode as any).width, height: (n as any).height ?? (initialNode as any).height, measured: (n as any).measured ?? (initialNode as any).measured }
-      if ((initialData as any).theme) mergedNode.data.theme = (initialData as any).theme
-      return mergedNode as Node
-    })
-
-    const idToDomain = new Map<string, string | undefined>()
-    const idToDomainClass = new Map<string, string | undefined>()
-
-    // 函数级注释：预计算绝对坐标以支持智能连线路由
-    // 目标：LayoutStrategy 可能仅返回相对父容器的 position，而连线路由算法需要基于全局坐标（positionAbsolute）进行曼哈顿距离评估；
-    // 行为：遍历节点树，累加父节点坐标，注入 positionAbsolute。
-    const nodeMapForAbs = new Map(processedNodes.map(n => [n.id, n]));
-    const absCache = new Map<string, { x: number, y: number }>();
+      //    const absCache = new Map<string, { x: number, y: number }>();
     const getAbsPos = (n: Node): { x: number, y: number } => {
       if (absCache.has(n.id)) return absCache.get(n.id)!;
 

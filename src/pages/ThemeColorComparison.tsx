@@ -68,22 +68,12 @@ const ThemeColorComparison: React.FC = () => {
   
   // 添加控制台日志来显示实际的颜色值
   React.useEffect(() => {
-    console.log(`🔍 当前主题颜色详情:`, {
-      theme: selectedPreset.id,
-      domains: theme.diagram?.domains
-    });
     
     // 对比几个关键域的颜色差异
     const sampleDomains = ['frontend', 'backend', 'middleware', 'database'];
     sampleDomains.forEach(domain => {
       const colors = theme.diagram?.domains?.[domain];
       if (colors) {
-        console.log(`📊 ${domain}域颜色:`, {
-          domain,
-          background: colors.background,
-          border: colors.border,
-          text: colors.text
-        });
       }
     });
   }, [currentThemeId, selectedPreset.id, theme.diagram?.domains]);
