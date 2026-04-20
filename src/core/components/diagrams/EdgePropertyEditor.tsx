@@ -100,7 +100,7 @@ export function useEdgePropertyItems(params: UseEdgePropertyItemsParams): Collap
             <Form layout="vertical" size="small">
                 <Form.Item label={t('propertyPanel.lineType')}>
                     <Select value={commonEdgeType} onChange={val => updateEdges({ type: val })}
-                        onDropdownVisibleChange={(open) => { if (open) armSnapshot(); }}
+                        onOpenChange={(open) => { if (open) armSnapshot(); }}
                         placeholder={commonEdgeType === undefined ? mixedLabel : selectLabel}
                         allowClear disabled={disabled}
                         options={[

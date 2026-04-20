@@ -54,7 +54,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                 onClose();
             }}
             open={isOpen}
-            width={380}
+            size="default"
             styles={{
                 header: { padding: '16px 20px', borderBottom: '1px solid #f0f0f0' },
                 body: { padding: 0, display: 'flex', flexDirection: 'column' }

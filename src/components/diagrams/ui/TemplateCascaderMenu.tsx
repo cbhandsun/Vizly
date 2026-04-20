@@ -99,7 +99,7 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
   return (
     <Cascader
       key={cascaderKey}
-      onDropdownVisibleChange={(visible) => {
+      onOpenChange={(visible) => {
         if (!visible) {
           // Reset cascader fully after popup close animation completes
           setTimeout(() => setCascaderKey(k => k + 1), 300);

@@ -199,7 +199,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                     </Form.Item>
                     <Form.Item label={t('propertyPanel.domainClass')}>
                         <Select value={commonDomainClass} onChange={val => updateNodes({ domainClass: val })}
-                            onDropdownVisibleChange={(open) => { if (open) armSnapshot(); }}
+                            onOpenChange={(open) => { if (open) armSnapshot(); }}
                             placeholder={commonDomainClass === undefined ? mixedLabel : selectLabel}
                             allowClear disabled={disabled}
                             options={[
@@ -228,7 +228,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                 <Form layout="vertical" size="small">
                     <Form.Item label={t('propertyPanel.shape')}>
                         <Select value={commonShape} onChange={val => updateNodes({ shape: val })}
-                            onDropdownVisibleChange={(open) => { if (open) armSnapshot(); }}
+                            onOpenChange={(open) => { if (open) armSnapshot(); }}
                             placeholder={commonShape === undefined ? mixedLabel : selectLabel}
                             allowClear disabled={disabled}
                             options={[
@@ -256,7 +256,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                             <Select 
                                 value={commonNodeIcon}
                                 onChange={val => updateNodes({ icon: typeof val === 'string' ? val : undefined })}
-                                onDropdownVisibleChange={(open) => { if (open) armSnapshot(); }}
+                                onOpenChange={(open) => { if (open) armSnapshot(); }}
                                 placeholder={commonNodeIcon === undefined ? mixedLabel : selectLabel}
                                 allowClear 
                                 disabled={disabled}

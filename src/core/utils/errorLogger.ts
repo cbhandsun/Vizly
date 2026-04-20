@@ -18,7 +18,7 @@ export interface ErrorLog {
 
 class ErrorLogger {
     private logs: ErrorLog[] = [];
-    private readonly maxLogs = 100;
+    private readonly maxLogs = 50;
     private readonly storageKey = 'app_error_logs';
 
     constructor() {
@@ -39,7 +39,8 @@ class ErrorLogger {
         if (
             message.includes('ResizeObserver loop completed with undelivered notifications') ||
             message.includes('signal is aborted without reason') ||
-            message.includes('AbortError')
+            message.includes('AbortError') ||
+            message.includes('Lock broken by another request')  // Web Locks steal — benign during tab switching
         ) {
             return 'ignored';
         }

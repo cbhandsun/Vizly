@@ -5,7 +5,7 @@ import { useAutoSave } from './useAutoSave';
 import { PluginRegistry } from '../../../services/PluginRegistry';
 import { LayoutOptimizer } from '../../layout/LayoutOptimizer';
 import { analyzeDiagram } from '@/utils/diagramAnalyzer';
-import { useDiagramSeedStore } from '../../../store/useDiagramSeedStore';
+
 
 export interface UseDesignerSystemSyncProps {
     id?: string;
@@ -384,21 +384,13 @@ export function useDesignerSystemSync({
     useEffect(() => {
         if (hasRestoredAutoSave.current) return;
 
-        let saved = useDiagramSeedStore.getState().consumeSeed(id || '');
-        const isFromSeed = !!saved;
-
-        if (!saved) {
-            saved = loadSaved();
-        }
-        
+        // Seed switching now uses localStorage + reload exclusively.
+        // useDiagramSeedStore is no longer used for handoff.
+        let saved = loadSaved();
         let shouldLoadAutosave = false;
         
         if (saved) {
-            if (isFromSeed) {
-                // Seed data from useDiagramSeedStore is always trusted —
-                // it was just prepared by seedAutoSaveAndNavigate and is guaranteed to be valid.
-                shouldLoadAutosave = true;
-            } else if (saved.diagramId && saved.diagramId !== id) {
+            if (saved.diagramId && saved.diagramId !== id) {
                 // Check for stale autosave leaking across diagrams
                 console.warn(`[DesignerSystemSync] Stale autosave detected! Expected ${id}, got ${saved.diagramId}. Clearing.`);
                 clearSaved();
@@ -461,19 +453,17 @@ export function useDesignerSystemSync({
 
             // ★ After consuming the fresh seed, clear the isFreshSeed flag from localStorage
             // so that subsequent autosave cycles are no longer blocked by the guard.
-            if (saved.isFreshSeed || isFromSeed) {
+            if (saved.isFreshSeed) {
                 messageApi?.success('加载模板成功');
-                if (!isFromSeed) {
-                    try {
-                        const storageKey = `flowchart-autosave-v2-${id || 'default'}`;
-                        const raw = localStorage.getItem(storageKey);
-                        if (raw) {
-                            const parsed = JSON.parse(raw);
-                            delete parsed.isFreshSeed;
-                            localStorage.setItem(storageKey, JSON.stringify(parsed));
-                        }
-                    } catch { /* ignore */ }
-                }
+                try {
+                    const storageKey = `flowchart-autosave-v2-${id || 'default'}`;
+                    const raw = localStorage.getItem(storageKey);
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        delete parsed.isFreshSeed;
+                        localStorage.setItem(storageKey, JSON.stringify(parsed));
+                    }
+                } catch { /* ignore */ }
             } else {
                 messageApi?.info('已恢复上次编辑内容');
             }
