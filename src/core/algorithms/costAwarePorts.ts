@@ -40,12 +40,15 @@ import {
 const WEIGHT = {
     SEMANTIC_VIOLATION: 10000,
     GEOMETRIC_INVALID: 15000,
-    GEOMETRIC_UNLISTED: 1500,     // [FIX] Reduced from 2500
-    PRIMARY_BONUS: -1000,         // [FIX] Reduced from -1500
-    DIRECT_BONUS: -2000,          // [FIX] Reduced from -3500
+    GEOMETRIC_UNLISTED: 1500,
+    PRIMARY_BONUS: -600,          // [TUNE] 降低奖励，防止掩盖交叉惩罚
+    DIRECT_BONUS: -1200,          // [TUNE] 同上
     PATH_LENGTH_MULTIPLIER: 3,
     BEND_PENALTY: 800,
-    CROSSING_PENALTY: 80,
+    // [FIX] 交叉惩罚从 80 提升到 1200。
+    // 每次交叉代价 ≈ 1.5 个弯折，迫使算法主动选择稍长但不交叉的路径。
+    // 原来 80 远低于任何路径代价，导致算法完全忽略交叉问题。
+    CROSSING_PENALTY: 1200,
     OBSTACLE_HEAVY_PENALTY: 2000000
 };
 

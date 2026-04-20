@@ -918,12 +918,18 @@ export class EdgeRoutingWorker {
                 // [FIX] Use activeObstacles for grid building too
                 const grid = prebuiltGrid || gridBuilder.buildGrid(activeObstacles, bounds, job.source, job.target);
 
+                // [FIX] 将已路由完成的其他边的路径线段传入 A*
+                // graph.pendingEdges 由 Coordinator 收集并注入，包含其他边的路径段
+                // A* 通过 lineCross 代价（300）主动避开并行，不是硬队
+                const lineObstacles = (graph.pendingEdges ?? []) as import('../../algorithms/pathfinding').LineObstacle[];
+
                 // Route from offset to offset, then we will stitch startPt/endPt
                 const offsetPath = astar.findPath(startWithOffset, endWithOffset, {
                     grid,
                     obstacles: activeObstacles,
                     clearanceRects,
                     config: activeConfig,
+                    lineObstacles,               // [FIX] 将已路由边作为软避障目标
                     congestionGrid: runtime.congestionGrid, // [NEW] 
                     debugOut: shouldCollectDebugData ? debugData : undefined // [DEBUG]
                 });

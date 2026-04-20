@@ -20,6 +20,8 @@ export interface PathfinderOptions {
     config: UnifiedRoutingConfig;
     congestionGrid?: Int32Array;
     clearanceRects?: Rectangle[]; // [NEW] Areas to clear (e.g. source/target nodes)
+    // [FIX] 接收其他边的路径线段作为软避障目标（A* 会尝试绕开但不硬性拦截）
+    lineObstacles?: import('../../algorithms/pathfinding').LineObstacle[];
     debugOut?: { visited?: Point[]; grid?: { minX: number, minY: number, cols: number, rows: number, size: number, data: Int32Array } };
 }
 
@@ -44,13 +46,17 @@ export class AStarPathfinder {
         options: PathfinderOptions
     ): Point[] | null {
         try {
+            // [FIX] 将其他边的路径线段传入 A*，使其知晓并尝试绕开
+            // 原来硬编码 [] 导致 A* 对其他边完全无感知，路径随意穿越
+            const lineObs = options.lineObstacles ?? [];
+
             // Forward to core pathfinding algorithm
             const result = findPath(
                 start,
                 end,
                 options.obstacles,
                 options.grid.size,   // gridSize
-                [],                  // lineObstacles
+                lineObs,             // [FIX] lineObstacles (was always [])
                 options.debugOut,    // debugOut
                 options.grid,        // prebuiltGrid
                 undefined,           // guideLines
@@ -79,3 +85,5 @@ export class AStarPathfinder {
         return !isPathBlocked([start, end], obstacles);
     }
 }
+
+
