@@ -250,19 +250,26 @@ export function getPortRulesForGeometry(type: GeometryType): PortRules {
 
         /**
          * VERTICAL REVERSE (Target is ABOVE)
-         * Feedback loop
+         * Feedback loop — source is BELOW target
+         * 
+         * [FIX] 原来 forbidden 包含 B->T，这是错的。
+         * Decision(Bottom) → 上方 Start/End(Top) 是 2 弯的合理路径（Z形）。
+         * 禁止 B->T 导致路由器被迫选 L->L 或 R->R C形，形成矩形环路。
          */
         'vertical-reverse': {
             preferred: [
-                'L->L',  // Primary: Left -> Left (C-Shape, 2 bends)
-                'R->R',  // Primary: Right -> Right (C-Shape, 2 bends)
-                // 'B->T' is technically Direct but "wrong direction" for reverse flow logic (Input->Output)
+                'L->L',  // Primary: Left->Left (C-Shape, 2 bends)
+                'R->R',  // Primary: Right->Right (C-Shape, 2 bends)
+                'B->T',  // [FIX] Secondary: Bottom->Top (Z-Shape 2 bends, was wrongly forbidden)
+                'L->R',  // Secondary: Left->Right (cross-side)
+                'R->L',  // Secondary: Right->Left (cross-side)
             ],
             forbidden: [
-                'T->L', 'T->R', 'T->T', 'T->B', // Top is Input
-                'B->T', 'B->B'
+                'T->T', 'T->B',  // Top as source output is wrong direction
+                'B->B',          // Same-side bottom creates unnecessary U-turn
+                'T->L', 'T->R',  // Top as source: semantically wrong for upward flow
             ],
-            neutral: [] // [STRICT]
+            neutral: []
         },
 
         /**
@@ -280,7 +287,7 @@ export function getPortRulesForGeometry(type: GeometryType): PortRules {
             forbidden: [
                 'R->R',  // Same-side creates arc
                 'L->L',  // Same-side creates arc
-                'T->L',  // Top as output (moved to preferred as L-shape option)
+                // [FIX] 移除 'T->L'——它同时出现在 preferred 和 forbidden 里（矛盾）
                 'T->R',  // Top as output
                 'B->T'   // Bottom to Top (Vertical Forward in Reverse Geometry?)
             ],

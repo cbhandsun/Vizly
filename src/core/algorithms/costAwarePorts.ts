@@ -707,9 +707,11 @@ function evaluatePortCombination(
     // Disable Vertical Penalty if we are in TB layout and flowing downward
     if (config.layoutDirection === 'TB' && dy > 0) {
         applyVerticalPenalty = false;
-        // [FORCE] In TB layout, if it's clearly downward, FORCE applyHorizontalPenalty
-        if (dy > 100) applyHorizontalPenalty = true;
+        // [FIX] 仅在顺向流（dy > 0）且比例明显时才强制惩罚水平端口
+        // 原来无条件 dy > 100 就打开，导致反向流（Decision→上方节点）的 B->T 也被牵连惩罚
+        if (dy > 100 && absDy > absDx * 1.5) applyHorizontalPenalty = true;
     }
+
     // Disable Horizontal Penalty if we are in LR layout and flowing rightward
     if (config.layoutDirection === 'LR' && dx > 0) {
         applyHorizontalPenalty = false;
