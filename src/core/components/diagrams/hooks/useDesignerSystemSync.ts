@@ -25,12 +25,21 @@ export function useDesignerSystemSync({
     reactFlowInstance, isDragging, pluginId, messageApi
 }: UseDesignerSystemSyncProps) {
 
+    // 用 ref 持有最新快照，避免 __flowDataBridge Effect 因 nodes/edges 变化频繁重建整个 API 对象
+    const nodesRef = useRef(nodes);
+    const edgesRef = useRef(edges);
+    const reactFlowRef = useRef(reactFlowInstance);
+    useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+    useEffect(() => { edgesRef.current = edges; }, [edges]);
+    useEffect(() => { reactFlowRef.current = reactFlowInstance; }, [reactFlowInstance]);
+
     useEffect(() => {
         import('../designerUtils').then(async ({ canvasToStandardData }) => {
             if (!(window as any).__flowDataBridge) {
                 (window as any).__flowDataBridge = {};
             }
-            let standardData = canvasToStandardData(nodes, edges, diagramIdForExport);
+            // 通过 ref 读取最新的 nodes/edges，避免闭包损坏
+            let standardData = canvasToStandardData(nodesRef.current, edgesRef.current, diagramIdForExport);
             
             // 尝试从 DataRegistry 中恢复 Layout/Metadata 配置，防止在同步时丢失
             try {
@@ -287,7 +296,7 @@ export function useDesignerSystemSync({
             Object.defineProperty(standardData, 'analyze', {
                 enumerable: false,
                 value: () => {
-                    return analyzeDiagram(nodes as any, edges as any);
+                    return analyzeDiagram(nodesRef.current as any, edgesRef.current as any);
                 }
             });
 
@@ -324,7 +333,8 @@ export function useDesignerSystemSync({
         return () => {
             delete (window as any).__flowDataBridge?.[diagramIdForExport];
         };
-    }, [nodes, edges, diagramIdForExport, id]);
+    // nodes/edges 通过 ref 读取，不再作为 dep，防止每次编辑重建整个 API
+    }, [diagramIdForExport, id, setNodes, setEdges, pluginId, messageApi]);
 
     useEffect(() => {
         (window as any).__flowDesignerOpenCloud = async (data: any) => {
@@ -351,15 +361,8 @@ export function useDesignerSystemSync({
         }
     }, [performanceMode]);
 
-    useEffect(() => {
-        if (nodes.length > 300 && !performanceMode) {
-            console.info('[Performance] High node count detected', {
-                nodeCount: nodes.length,
-                performanceMode: false,
-                recommendation: 'Performance mode will be enabled automatically during drag operations'
-            });
-        }
-    }, [nodes.length, performanceMode]);
+    // performanceMode = nodes.length > 300 || isDragging
+    // 所以 nodes.length > 300 && !performanceMode 永远为 false（条件互斥），移除该死代码 Effect
 
     const { saveState, loadSaved, clearSaved } = useAutoSave(nodes, edges, {
         interval: 60000,

@@ -6,6 +6,7 @@ import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v
 import { diagramStyleManager } from '../../shared/DiagramStyleManager';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { useFlowchartState } from './useFlowchartState';
+import { subscribeViewport } from '../../shared/viewportStore';
 
 export interface UseDesignerCanvasStateProps {
     id?: string;
@@ -78,13 +79,9 @@ export function useDesignerCanvasState({
     }, [onOpenSettings]);
 
     useEffect(() => {
-        let unsubscribe: (() => void) | undefined;
-        import('../../shared/viewportStore').then(({ subscribeViewport }) => {
-            unsubscribe = subscribeViewport((vp) => setViewport(vp));
-        });
-        return () => {
-            if (unsubscribe) unsubscribe();
-        };
+        // 静态 import，避免动态异步导入导致组件卸载时 unsubscribe 丢失内存泄漏
+        const unsubscribe = subscribeViewport((vp) => setViewport(vp));
+        return () => unsubscribe();
     }, []);
 
     const [theme, setTheme] = useTheme({ autoInitialize: true });
