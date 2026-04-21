@@ -83,7 +83,7 @@ interface FlowchartToolbarProps {
     historyCount?: number;
 }
 
-export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
+export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     canUndo, canRedo, onUndo, onRedo,
     onZoomIn, onZoomOut, onFitView, onFitWidth,
     autoRouting, toggleAutoRouting,
