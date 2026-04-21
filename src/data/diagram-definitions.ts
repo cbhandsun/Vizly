@@ -64,22 +64,21 @@ export const diagramDefinitions: DiagramDefinition[] = [
   {
     id: 'standard-flow-unified',
     name: '🌟 统一架构：标准流程图',
-    component: lazy(() => import('@/core').then(m => {
-      const ensureRegistered = async () => {
+    // [Fix] 注册逻辑提升到 .then() 链中：lazy() 的 Promise resolve 前注册完毕，
+    // 消除了在渲染路径中 fire-and-forget async 调用导致的竞态窗口。
+    component: lazy(() =>
+      import('@/core').then(async m => {
         const { PluginRegistry } = m;
         if (!PluginRegistry.getInstance().getPlugin('standard-flow')) {
-            const { StandardFlowPlugin } = await import('../components/diagrams/plugins/StandardFlowPlugin');
-            PluginRegistry.getInstance().register(new StandardFlowPlugin(), true);
+          const { StandardFlowPlugin } = await import('../components/diagrams/plugins/StandardFlowPlugin');
+          PluginRegistry.getInstance().register(new StandardFlowPlugin(), true);
         }
-      };
-      
-      return { 
-        default: (props: any) => {
-           ensureRegistered();
-           return createElement(m.FlowchartDesigner, { ...props, pluginId: 'standard-flow' });
-        }
-      };
-    })),
+        return {
+          default: (props: any) =>
+            createElement(m.FlowchartDesigner, { ...props, pluginId: 'standard-flow' })
+        };
+      })
+    ),
     category: 'other',
     tags: ['standard', 'flow', 'unified', 'plugin'],
     icon: FaSitemap,
@@ -87,22 +86,20 @@ export const diagramDefinitions: DiagramDefinition[] = [
   {
     id: 'hello-world-unified',
     name: '🌟 统一架构：示例插件 (SDK)',
-    component: lazy(() => import('@/core').then(m => {
-      const ensureRegistered = async () => {
+    // [Fix] 注册逻辑提升到 .then() 链中（同 standard-flow-unified）
+    component: lazy(() =>
+      import('@/core').then(async m => {
         const { PluginRegistry } = m;
         if (!PluginRegistry.getInstance().getPlugin('hello-world')) {
-            const { HelloWorldPlugin } = await import('../components/diagrams/plugins/HelloWorldPlugin');
-            PluginRegistry.getInstance().register(new HelloWorldPlugin());
+          const { HelloWorldPlugin } = await import('../components/diagrams/plugins/HelloWorldPlugin');
+          PluginRegistry.getInstance().register(new HelloWorldPlugin());
         }
-      };
-      
-      return { 
-        default: (props: any) => {
-           ensureRegistered();
-           return createElement(m.FlowchartDesigner, { ...props, pluginId: 'hello-world' });
-        }
-      };
-    })),
+        return {
+          default: (props: any) =>
+            createElement(m.FlowchartDesigner, { ...props, pluginId: 'hello-world' })
+        };
+      })
+    ),
     category: 'other',
     tags: ['sdk', 'hello-world', 'unified', 'plugin'],
     icon: FaSitemap,
