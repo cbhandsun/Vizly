@@ -404,6 +404,16 @@
             "snapOff": "网格吸附：关",
             "historyWithCount": "历史记录 ({{count}})"
         },
+        "virtualization": {
+            "enabled": "虚拟化已启用",
+            "tag": "虚拟化",
+            "total": "总节点数: {{count}}",
+            "totalLabel": "总计",
+            "visible": "可见节点数: {{count}}",
+            "hidden": "隐藏节点数: {{count}}",
+            "optimizationRateTooltip": "优化率：隐藏节点占总节点的百分比",
+            "optimizationRate": "优化率: {{rate}}%"
+        },
         "jsonEditor": {
             "title": "编辑图表数据 (JSON)",
             "formatStandard": "标准数据 (可双向编辑)",

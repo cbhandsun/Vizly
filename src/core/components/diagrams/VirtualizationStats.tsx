@@ -1,6 +1,7 @@
 import React from 'react';
 import { Tag, Tooltip } from 'antd';
 import { EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 
 interface VirtualizationStatsProps {
     stats: {
@@ -20,15 +21,17 @@ export const VirtualizationStats: React.FC<VirtualizationStatsProps> = React.mem
     stats,
     enabled
 }) => {
+    const { t } = useTranslation();
+
     if (!enabled || stats.totalNodes === 0) {
         return null;
     }
 
     // 根据优化率选择颜色
     const getRateColor = (rate: number): string => {
-        if (rate >= 50) return 'success';  // 绿色：优化率>=50%
+        if (rate >= 50) return 'success';   // 绿色：优化率>=50%
         if (rate >= 20) return 'processing'; // 蓝色：优化率20-50%
-        return 'default';  // 灰色：优化率<20%
+        return 'default';                    // 灰色：优化率<20%
     };
 
     return (
@@ -38,33 +41,33 @@ export const VirtualizationStats: React.FC<VirtualizationStatsProps> = React.mem
             gap: '8px',
             fontSize: '12px'
         }}>
-            <Tooltip title="虚拟化已启用">
+            <Tooltip title={t('designer.virtualization.enabled')}>
                 <Tag icon={<EyeOutlined />} color="blue">
-                    虚拟化
+                    {t('designer.virtualization.tag')}
                 </Tag>
             </Tooltip>
 
-            <Tooltip title={`总节点数: ${stats.totalNodes}`}>
+            <Tooltip title={t('designer.virtualization.total', { count: stats.totalNodes })}>
                 <span style={{ color: '#666' }}>
-                    总计: <strong>{stats.totalNodes}</strong>
+                    {t('designer.virtualization.totalLabel')}: <strong>{stats.totalNodes}</strong>
                 </span>
             </Tooltip>
 
-            <Tooltip title={`可见节点数: ${stats.visibleNodes}`}>
+            <Tooltip title={t('designer.virtualization.visible', { count: stats.visibleNodes })}>
                 <span style={{ color: '#52c41a' }}>
                     <EyeOutlined /> <strong>{stats.visibleNodes}</strong>
                 </span>
             </Tooltip>
 
-            <Tooltip title={`隐藏节点数: ${stats.hiddenNodes}`}>
+            <Tooltip title={t('designer.virtualization.hidden', { count: stats.hiddenNodes })}>
                 <span style={{ color: '#999' }}>
                     <EyeInvisibleOutlined /> <strong>{stats.hiddenNodes}</strong>
                 </span>
             </Tooltip>
 
-            <Tooltip title="优化率：隐藏节点占总节点的百分比">
+            <Tooltip title={t('designer.virtualization.optimizationRateTooltip')}>
                 <Tag color={getRateColor(stats.optimizationRate)}>
-                    优化率: {stats.optimizationRate}%
+                    {t('designer.virtualization.optimizationRate', { rate: stats.optimizationRate })}
                 </Tag>
             </Tooltip>
         </div>
