@@ -367,8 +367,11 @@ export function generateSimplePath(
         // We now check BOTH H-V-H and V-H-V orientations.
 
         // --- Try H-V-H 形状: 横-竖-横 ---
+        // [I-3] Reduce STEPS: boundary-edge candidates (leftSweep/rightSweep) already cover
+        // the critical narrow-corridor x-values. Uniform steps are a coarse backup,
+        // so cap at 8 (was 20) to cut ~60% of isPathBlocked calls per Z-path probe.
         let candidates: number[] = [];
-        let STEPS = Math.min(20, Math.max(3, Math.floor(Math.abs(dx) / 10))); 
+        let STEPS = Math.min(8, Math.max(3, Math.floor(Math.abs(dx) / 20)));
         for (let i = 1; i < STEPS; i++) {
             candidates.push(start.x + (dx * i) / STEPS);
         }
@@ -390,6 +393,9 @@ export function generateSimplePath(
             if (rightSweep > Math.min(start.x, end.x) && rightSweep < Math.max(start.x, end.x)) candidates.push(rightSweep);
         }
         
+        // [I-3] Deduplicate and cap candidates to avoid redundant isPathBlocked calls.
+        // Snap to 1px grid to cluster near-identical values, then keep closest-to-midpoint first.
+        candidates = [...new Set(candidates.map(v => Math.round(v)))].slice(0, 10);
         let midP = start.x + dx / 2;
         candidates.sort((a, b) => Math.abs(a - midP) - Math.abs(b - midP));
 
@@ -402,7 +408,7 @@ export function generateSimplePath(
 
         // --- Try V-H-V 形状: 竖-横-竖 ---
         candidates = [];
-        STEPS = Math.min(20, Math.max(3, Math.floor(Math.abs(dy) / 10)));
+        STEPS = Math.min(8, Math.max(3, Math.floor(Math.abs(dy) / 20)));
         for (let i = 1; i < STEPS; i++) {
             candidates.push(start.y + (dy * i) / STEPS);
         }
@@ -414,6 +420,8 @@ export function generateSimplePath(
             if (bottomSweep > Math.min(start.y, end.y) && bottomSweep < Math.max(start.y, end.y)) candidates.push(bottomSweep);
         }
         
+        // [I-3] Deduplicate V-H-V candidates
+        candidates = [...new Set(candidates.map(v => Math.round(v)))].slice(0, 10);
         midP = start.y + dy / 2;
         candidates.sort((a, b) => Math.abs(a - midP) - Math.abs(b - midP));
 
@@ -626,7 +634,11 @@ export function buildPathfindingGrid(
     for (const obs of relevantObstacles) {
         rasterizeRect(obs, bufferDistanceFar, COSTS.BUFFER_ZONE_FAR);
         rasterizeRect(obs, bufferDistanceClose, COSTS.BUFFER_ZONE_CLOSE);
-        rasterizeRect(obs, 15, COSTS.OBSTACLE);
+        // [I-2] Changed from 15px to 0px to match GridBuilder.rasterizeObstacles behavior.
+        // GridBuilder (used in batch mode) uses 0px hard padding + two graduated buffer zones.
+        // The old 15px was an undocumented inconsistency that made single-mode obstacles slightly
+        // larger than batch-mode obstacles, causing visual path differences.
+        rasterizeRect(obs, 0, COSTS.OBSTACLE);
     }
 
     return {
@@ -664,29 +676,26 @@ export function findPath(
     if (simplePath) {
         const hasDynamicObstacles = dynamicObstacles.length > 0;
 
-        // [FIX] Bypassed artificial distance limit and redundant lineObstacles check.
-        // generateSimplePath already rigorously checks lineObstacles. If it found a safe path, we should always use it!
+        // [I-1] Removed dead `const isBlocked = false` branch.
+        // generateSimplePath already checks all obstacles. If it returns a path, always use it
+        // (unless dynamic obstacles are present, which require A* for precise avoidance).
         if (!hasDynamicObstacles) {
-            const isBlocked = false;
-
-            if (!isBlocked) {
-                if (debugOut) {
-                    const debugGrid = buildPathfindingGrid(
-                        obstacles,
-                        { startX: start.x, startY: start.y, endX: end.x, endY: end.y },
-                        gridSize
-                    );
-                    debugOut.grid = {
-                        minX: debugGrid.minX,
-                        minY: debugGrid.minY,
-                        cols: debugGrid.cols,
-                        rows: debugGrid.rows,
-                        size: debugGrid.size,
-                        data: new Int32Array(debugGrid.data)
-                    };
-                }
-                return simplePath;
+            if (debugOut) {
+                const debugGrid = buildPathfindingGrid(
+                    obstacles,
+                    { startX: start.x, startY: start.y, endX: end.x, endY: end.y },
+                    gridSize
+                );
+                debugOut.grid = {
+                    minX: debugGrid.minX,
+                    minY: debugGrid.minY,
+                    cols: debugGrid.cols,
+                    rows: debugGrid.rows,
+                    size: debugGrid.size,
+                    data: new Int32Array(debugGrid.data)
+                };
             }
+            return simplePath;
         }
     }
 

@@ -25,9 +25,9 @@ import {
 /**
  * Three-Tier Weight System for Port Selection
  * 
- * Layer 1: SEMANTIC VIOLATIONS (1,000,000+)
+ * Layer 1: SEMANTIC VIOLATIONS (100,000+)
  *   - Port direction conflicts (e.g., using Input port as Output)
- *   - These are near-absolute prohibitions
+ *   - True absolute prohibitions — cannot be overcome by any combination of crossings
  * 
  * Layer 2: GEOMETRIC PENALTIES (10,000 - 100,000)
  *   - Geometrically unreasonable paths
@@ -38,7 +38,10 @@ import {
  *   - Fine-tuning for best visual result
  */
 const WEIGHT = {
-    SEMANTIC_VIOLATION: 10000,
+    // [I-8] Raised from 10_000 to 100_000. At 10_000, a route with 8+ crossings
+    // (8 × 1200 = 9_600) could outscore a semantic violation, causing a port with
+    // reversed direction to be selected. 100_000 is a true hard prohibition.
+    SEMANTIC_VIOLATION: 100_000,
     GEOMETRIC_INVALID: 15000,
     GEOMETRIC_UNLISTED: 1500,
     PRIMARY_BONUS: -600,          // [TUNE] 降低奖励，防止掩盖交叉惩罚

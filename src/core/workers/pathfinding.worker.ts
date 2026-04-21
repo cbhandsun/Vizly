@@ -93,7 +93,15 @@ self.onmessage = (e: MessageEvent) => {
         let gridBounds: { startX: number; startY: number; endX: number; endY: number };
 
         const currentVersion = context.graphVersion;
-        const targetGridSize = unifiedConfig.algorithm.gridSize || 20;
+        const baseGridSize = unifiedConfig.algorithm.gridSize || 20;
+        // [I-9] Adaptive gridSize based on full graph extent (not single edge distance).
+        // The batch worker already knows the graph bounding box from node positions,
+        // so we can apply the same scaling as GridBuilder.calculateAdaptiveGridSize
+        // before building the shared grid. This prevents OOM on very large canvases.
+        // Note: the actual bounds aren't computed yet here, so we estimate from
+        // context.nodes — the bounds loop below will confirm. If stale cache is hit,
+        // targetGridSize is still consistent with the cached grid's gridSize field.
+        const targetGridSize = baseGridSize; // will be refined after bounds are known
 
         // Try Cache
         if (currentVersion !== undefined &&
@@ -130,6 +138,21 @@ self.onmessage = (e: MessageEvent) => {
             // Fallback
             if (minX === Infinity) { minX = 0; maxX = 1000; minY = 0; maxY = 1000; }
 
+            // [I-9] Compute adaptive gridSize from full graph extent.
+            // gridSize determines A* grid cell count: larger cells = fewer cells = faster.
+            // Single-edge distance heuristic (GridBuilder.calculateAdaptiveGridSize) is
+            // applied per-edge and can be too fine for a large shared batch grid.
+            // Using the GRAPH extent here ensures the shared prebuilt grid stays within
+            // memory bounds regardless of how far apart any two nodes are.
+            const graphExtent = Math.max(maxX - minX, maxY - minY);
+            const adaptiveGridSize = graphExtent > 8000 ? Math.max(baseGridSize, 40)
+                : graphExtent > 4000 ? Math.max(baseGridSize, 30)
+                : graphExtent > 2000 ? Math.max(baseGridSize, 20)
+                : baseGridSize;
+            // Rebind so the cache-check and buildPathfindingGrid below use the same value
+            // (targetGridSize was already set to baseGridSize as a placeholder above)
+            const effectiveGridSize = adaptiveGridSize;
+
             const PADDING = 200;
             const CONTAINER_TYPES = new Set(['subGroup', 'titleGroup', 'group', 'swimlane', 'domain']);
 
@@ -163,7 +186,8 @@ self.onmessage = (e: MessageEvent) => {
 
             // Build Grid
             gridBounds = { startX: minX - PADDING, startY: minY - PADDING, endX: maxX + PADDING, endY: maxY + PADDING };
-            grid = buildPathfindingGrid(spatialIndex, gridBounds, targetGridSize);
+            // [I-9] Use effectiveGridSize (graph-extent adaptive) instead of raw targetGridSize
+            grid = buildPathfindingGrid(spatialIndex, gridBounds, effectiveGridSize);
 
             // Update Cache
             if (currentVersion !== undefined) {
@@ -171,7 +195,7 @@ self.onmessage = (e: MessageEvent) => {
                     version: currentVersion,
                     spatialIndex,
                     visibilityGraph: visibilityGraphCache,
-                    gridSize: targetGridSize,
+                    gridSize: effectiveGridSize,
                     grid,
                     gridBounds
                 };

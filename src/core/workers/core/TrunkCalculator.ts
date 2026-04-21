@@ -210,12 +210,6 @@ export class TrunkCalculator {
             // Horizontal Trunk Line (y = constant)
             let isTop = false;
 
-            if (isManyToOne) {
-                isTop = peersCenter.y < hubCenter.y;
-            } else {
-                isTop = peersCenter.y < hubCenter.y;
-            }
-
             if (isTop) {
                 // Trunk on Top: Between PeersMaxY and HubMinY
                 const minSafe = hubNode.y - spacing;
@@ -381,12 +375,12 @@ export class TrunkCalculator {
                     offset = -dynamicSpacing;
                 }
                 const offsetAxis = baseTrunk.axis + offset;
-                const subTrunk = this.calculateTreeTrunk(hubNode, forwardPeers, isManyToOne, config, layoutDirection);
-
+                // [I-5] forwardTrunkRaw already has the correct range — no need to re-call calculateTreeTrunk.
+                // Only axis/direction/suggestedPort change; range comes from the pre-computed forward trunk.
                 results.forward = {
-                    ...subTrunk,
                     axis: offsetAxis,
                     direction: baseTrunk.direction,
+                    range: forwardTrunkRaw!.range,
                     suggestedPort: baseTrunk.suggestedPort
                 };
             }
@@ -406,12 +400,11 @@ export class TrunkCalculator {
                     offset = -dynamicSpacing;
                 }
                 const offsetAxis = baseTrunk.axis + offset;
-                const subTrunk = this.calculateTreeTrunk(hubNode, backwardPeers, isManyToOne, config, layoutDirection);
-
+                // [I-5] backwardTrunkRaw already has the correct range — no need to re-call calculateTreeTrunk.
                 results.backward = {
-                    ...subTrunk,
                     axis: offsetAxis,
                     direction: baseTrunk.direction,
+                    range: backwardTrunkRaw!.range,
                     suggestedPort: baseTrunk.suggestedPort
                 };
             }

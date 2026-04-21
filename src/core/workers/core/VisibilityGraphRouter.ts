@@ -14,6 +14,12 @@ import { VisibilityGraphCache } from '../../algorithms/VisibilityGraphCache';
 import { RoutingStrategySelector, RoutingAlgorithm } from '../../algorithms/RoutingStrategySelector';
 import { OneBendVisibilityGraph } from '../../algorithms/OneBendVisibilityGraph';
 
+// [I-4] Module-level singletons — survive across VisibilityGraphRouter instances.
+// This ensures the VG cache remains warm even when EdgeRoutingWorker.getModules()
+// recreates a new VGRouter on config change (e.g. borderRadius update).
+const _moduleVGCache = new VisibilityGraphCache({ maxSize: 10 });
+const _moduleStrategySelector = new RoutingStrategySelector();
+
 export class VisibilityGraphRouter {
     private config: UnifiedRoutingConfig;
     private vgCache: VisibilityGraphCache;
@@ -22,8 +28,9 @@ export class VisibilityGraphRouter {
 
     constructor(config: UnifiedRoutingConfig) {
         this.config = config;
-        this.vgCache = new VisibilityGraphCache({ maxSize: 10 });
-        this.strategySelector = new RoutingStrategySelector();
+        // [I-4] Share module-level singletons — no new instances on every config change
+        this.vgCache = _moduleVGCache;
+        this.strategySelector = _moduleStrategySelector;
         this.oneBendOptimizer = new OneBendVisibilityGraph({
             debug: config.debug
         });
@@ -52,8 +59,18 @@ export class VisibilityGraphRouter {
         const isSpatialIndex = (obs: any): obs is SpatialIndex =>
             typeof (obs as SpatialIndex).query === 'function';
 
+        // [I-11] Use local bounding-box query instead of getAll().
+        // getAll() fetches every obstacle in the graph, causing O(N²) VG construction
+        // for large diagrams. A Visibility Graph only needs obstacles near the route.
+        // ±300px margin ensures correct path even when detours are needed.
+        const localBounds = {
+            x: Math.min(start.x, end.x) - 300,
+            y: Math.min(start.y, end.y) - 300,
+            width: Math.abs(end.x - start.x) + 600,
+            height: Math.abs(end.y - start.y) + 600
+        };
         const obstacleList: Rectangle[] = isSpatialIndex(obstacles)
-            ? obstacles.getAll()
+            ? obstacles.query(localBounds)
             : obstacles;
 
         // Smart strategy selection
