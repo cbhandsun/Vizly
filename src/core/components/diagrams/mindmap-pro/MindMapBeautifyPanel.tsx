@@ -167,6 +167,24 @@ export const MindMapBeautifyPanel: React.FC<{ ctx: PluginContext, selectedNodes:
                          <Radio.Button value={3} style={{ flex: 1, textAlign: 'center', fontSize: 11, color: '#ef4444' }}>!!! 高</Radio.Button>
                      </Radio.Group>
                  </Form.Item>
+
+                 {/* [T-5] Progress marker */}
+                 <Form.Item label="进度" tooltip="标记节点完成进度，显示在节点底部进度圆环">
+                     <Radio.Group
+                         value={(activeNode.data?.progress as number) ?? 0}
+                         onChange={e => handleBatchUpdate('progress', e.target.value === 0 ? undefined : e.target.value)}
+                         optionType="button"
+                         buttonStyle="solid"
+                         size="small"
+                         style={{ display: 'flex', width: '100%' }}
+                     >
+                         <Radio.Button value={0}   style={{ flex: 1, textAlign: 'center', fontSize: 11 }}>—</Radio.Button>
+                         <Radio.Button value={25}  style={{ flex: 1, textAlign: 'center', fontSize: 11 }}>25%</Radio.Button>
+                         <Radio.Button value={50}  style={{ flex: 1, textAlign: 'center', fontSize: 11 }}>50%</Radio.Button>
+                         <Radio.Button value={75}  style={{ flex: 1, textAlign: 'center', fontSize: 11 }}>75%</Radio.Button>
+                         <Radio.Button value={100} style={{ flex: 1, textAlign: 'center', fontSize: 11, color: '#10b981' }}>✓</Radio.Button>
+                     </Radio.Group>
+                 </Form.Item>
              </Form>
 
              <Divider style={{ margin: '8px 0' }} />

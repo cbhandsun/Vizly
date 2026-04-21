@@ -593,3 +593,24 @@
     background: #ef4444;
     color: #fff;
 }
+
+/* ====================================================================
+   T-5: Progress Ring
+   ==================================================================== */
+.mindmap-progress-ring {
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    cursor: default;
+    transition: transform 0.2s ease;
+    z-index: 5;
+}
+
+.mindmap-node:hover .mindmap-progress-ring {
+    transform: translateX(-50%) scale(1.15);
+}

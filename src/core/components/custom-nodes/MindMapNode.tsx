@@ -25,6 +25,8 @@ export interface MindMapNodeData extends Record<string, unknown> {
     url?: string;
     /** T-4: Priority marker. 1=Low (blue), 2=Medium (orange), 3=High (red). */
     priority?: 1 | 2 | 3;
+    /** T-5: Progress marker (0/25/50/75/100). Renders a small SVG arc ring at the bottom of the node. */
+    progress?: 0 | 25 | 50 | 75 | 100;
     summaryBracket?: {
         minY: number;
         maxY: number;
@@ -50,6 +52,8 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
     const url = data?.url as string | undefined;
     // [T-4] Priority marker
     const priority = data?.priority as (1 | 2 | 3) | undefined;
+    // [T-5] Progress ring
+    const progress = data?.progress as (0 | 25 | 50 | 75 | 100) | undefined;
     
     // Inline Edit State
     const [isEditing, setIsEditing] = useState(false);
@@ -191,6 +195,33 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
                     {priority === 1 ? '!' : priority === 2 ? '!!' : '!!!'}
                 </span>
             )}
+
+            {/* [T-5] Progress ring — bottom-center SVG arc, XMind-style */}
+            {progress !== undefined && progress > 0 && (() => {
+                const R = 7; // radius
+                const C = 2 * Math.PI * R; // circumference ≈ 43.98
+                const dash = (progress / 100) * C;
+                const color = progress === 100 ? '#10b981' : branchColor || '#6366f1';
+                return (
+                    <span className="mindmap-progress-ring" title={`进度 ${progress}%`}>
+                        <svg width="18" height="18" viewBox="0 0 18 18">
+                            {/* Track */}
+                            <circle cx="9" cy="9" r={R} fill="none" stroke="#e2e8f0" strokeWidth="2.5" />
+                            {/* Progress arc — starts at 12 o'clock (-90deg) */}
+                            <circle
+                                cx="9" cy="9" r={R}
+                                fill="none"
+                                stroke={color}
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeDasharray={`${dash} ${C}`}
+                                transform="rotate(-90 9 9)"
+                                style={{ transition: 'stroke-dasharray 0.4s ease' }}
+                            />
+                        </svg>
+                    </span>
+                );
+            })()}
 
             {(note || tags.length > 0) && !isEditing && (
                 <div className="mindmap-rich-footer">
