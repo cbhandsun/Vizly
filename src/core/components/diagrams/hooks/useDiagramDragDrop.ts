@@ -90,7 +90,7 @@ export const useDiagramDragDrop = ({
                         }
 
                         if (diagramState && diagramState.nodes && diagramState.edges) {
-                            takeSnapshot(nodes, edges);
+                            takeSnapshot(nodesRef.current, edgesRef.current);
                             // 优雅地合并或替换
                             // 这里采用“智能提示/直接恢复”策略，Phase 10 默认为直接恢复
                             setNodes(diagramState.nodes);
@@ -170,12 +170,13 @@ export const useDiagramDragDrop = ({
                     y: Math.round(flowY / 5) * 5,
                 };
 
-                takeSnapshot(nodes, edges);
+                takeSnapshot(nodesRef.current, edgesRef.current);
 
-                const newNodeId = `node-${nodes.length + 1}-${Date.now()}`;
+                const currentNodes = nodesRef.current;
+                const newNodeId = `node-${currentNodes.length + 1}-${Date.now()}`;
 
                 // Check for drop target (Parenting)
-                const parentCandidate = nodes.find(n => {
+                const parentCandidate = currentNodes.find(n => {
                     if (n.type !== 'titleGroup' && n.type !== 'subGroup' && n.type !== 'swimlane') return false;
                     const x = n.position.x;
                     const y = n.position.y;
@@ -286,7 +287,10 @@ export const useDiagramDragDrop = ({
                 console.error('Drop failed', err);
             }
         },
-        [reactFlowInstance, nodes, edges, takeSnapshot, setNodes, activeLayerId]
+        // [P-2] Use nodesRef/edgesRef instead of nodes/edges in deps.
+        // nodes/edges in the dep array caused onDrop to rebuild on every node state change
+        // (selection, drag, position), making the callback always fresh but expensively.
+        [reactFlowInstance, takeSnapshot, setNodes, activeLayerId]
     );
 
     const onNodeDragStart = useCallback((event: React.MouseEvent, node: Node) => {
@@ -375,6 +379,9 @@ export const useDiagramDragDrop = ({
                 return;
             }
 
+            // [P-1] Pre-build nodeMap for O(1) parent chain resolution
+            // Avoids O(N) find() inside the while-loop for absolute position calculation.
+            const nodeMap = new Map<string, Node>(allNodes.map(n => [n.id, n]));
             // Calculate Center
             const nodeCenterX = node.position.x + (node.measured?.width || node.width || 0) / 2;
             const nodeCenterY = node.position.y + (node.measured?.height || node.height || 0) / 2;
@@ -401,7 +408,7 @@ export const useDiagramDragDrop = ({
                 let absY = n.position.y;
                 let currentParentId = n.parentId;
                 while (currentParentId) {
-                    const parentNode = allNodes.find(p => p.id === currentParentId);
+                    const parentNode = nodeMap.get(currentParentId); // [P-1] O(1)
                     if (parentNode) {
                         absX += parentNode.position.x;
                         absY += parentNode.position.y;
