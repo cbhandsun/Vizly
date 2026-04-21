@@ -842,7 +842,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         const avgX = count > 0 ? totalX / count : 0;
         const avgY = count > 0 ? totalY / count : 0;
         
-        const newId = `node_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        const newId = `node_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
         const summaryNode: Node = {
             id: newId,
             type: 'mindmap',
@@ -1448,8 +1448,10 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                                 updateEdgesBatch,
                                                 onUpdateNodes: (updates) => {
                                                     takeSnapshot(nodesRef.current, edgesRef.current);
+                                                    // [Q-2] Pre-build Map for O(1) lookup — avoids O(N×M) updates.find() inside setNodes
+                                                    const updatesMap = new Map(updates.map(u => [u.id, u]));
                                                     setNodes(nds => nds.map(n => {
-                                                        const u = updates.find(update => update.id === n.id);
+                                                        const u = updatesMap.get(n.id);
                                                         return (u && u.position) ? { ...n, position: u.position } : n;
                                                     }));
                                                 },
