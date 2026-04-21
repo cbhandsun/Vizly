@@ -565,6 +565,48 @@
             "multiDocument": "Multi-Document",
             "offPageConnector": "Off-page Connector",
             "internalStorage": "Internal Storage"
+        },
+        "virtualization": {
+            "enabled": "Virtualization enabled",
+            "tag": "Virtualized",
+            "total": "Total nodes: {{count}}",
+            "totalLabel": "Total",
+            "visible": "Visible nodes: {{count}}",
+            "hidden": "Hidden nodes: {{count}}",
+            "optimizationRateTooltip": "Optimization rate: % of nodes hidden",
+            "optimizationRate": "Rate: {{rate}}%"
+        },
+        "flowchart": {
+            "newNode": "New Node",
+            "nodeAdded": "Added {{type}}",
+            "edgeNodeInserted": "Inserted new node at edge midpoint",
+            "clearCanvas": {
+                "title": "Clear Canvas",
+                "content": "Are you sure you want to clear the canvas? This cannot be undone.",
+                "ok": "OK",
+                "cancel": "Cancel"
+            },
+            "import": {
+                "standardSuccess": "Imported successfully ({{count}} nodes)",
+                "reloading": "Reloading view theme and layout...",
+                "rfSuccess": "Imported {{nodes}} nodes and {{edges}} edges",
+                "invalidFormat": "Invalid data format",
+                "jsonFailed": "JSON import failed: {{message}}",
+                "mermaidSuccess": "Mermaid text imported successfully",
+                "mermaidLayout": "Tip: click \"Smart Layout\" to organize nodes",
+                "mermaidFailed": "Mermaid parse failed",
+                "reverseSuccess": "Canvas restored from [{{filename}}]"
+            },
+            "mermaidCopied": "Mermaid code copied to clipboard",
+            "templateApplied": "Template applied",
+            "smartLayout": "Recommended layout: {{reason}} (confidence {{confidence}}%)",
+            "optimize": "Optimized: resolved {{overlaps}} overlaps, aligned {{nodes}} nodes.",
+            "noHistory": "No history to compare",
+            "settingsNotAvailable": "Advanced settings panel not mounted in standalone mode. Open from main view or press Ctrl+Shift+,",
+            "mindMapCenter": "Central Topic",
+            "summaryLabel": "Summary",
+            "pluginMissing": "Plugin missing [{{type}}]",
+            "relationshipEdgeLabel": "Related"
         }
     },
     "header": {
@@ -1318,6 +1360,111 @@
                 "TB": "↓ Top Down"
             }
         }
+    },
+    "diagramViewer": {
+        "canvasNotFound": "Cannot connect to canvas, please retry",
+        "saveAs": {
+            "title": "Save As to {{target}}...",
+            "namePlaceholder": "Enter diagram name:",
+            "nameRequired": "Name cannot be empty",
+            "saving": "Saving to {{target}}...",
+            "localSuccess": "Saved to local template library",
+            "cloudSuccess": "Saved to cloud",
+            "error": "Save failed: {{message}}"
+        },
+        "directSave": {
+            "saving": "Overwriting to {{provider}}...",
+            "success": "Overwrite saved",
+            "error": "Save error: {{message}}"
+        },
+        "cloudLoad": {
+            "error": "Failed to load cloud diagram: {{message}}"
+        },
+        "presentation": {
+            "exit": "Presentation mode exited",
+            "hint": "🎬 Click or press ESC to exit presentation"
+        },
+        "export": {
+            "pdf": "Multi-page seamless PDF export",
+            "svg": "Ultra-HD vector SVG"
+        },
+        "versionHistory": "Version History",
+        "cloudDrive": "Cloud Drive",
+        "aiThemeApplied": "🎨 AI aesthetic applied",
+        "aiAssistant": "AI Architecture Assistant",
+        "collab": {
+            "active": "Collaboration session active",
+            "start": "Start real-time collaboration",
+            "share": "Collab Share"
+        },
+        "readonlyTooltip": "Read-only lock (recommended for presentations)",
+        "ai": {
+            "analyzeError": "Cannot analyze: Bridge not ready"
+        }
+    },
+    "aiConfig": {
+        "title": "AI Platform & Model Configuration",
+        "saveAll": "Save All",
+        "cancel": "Cancel",
+        "globalSettings": "Global Settings",
+        "providerList": "Model Providers",
+        "searchPlaceholder": "Search providers...",
+        "addCustomProvider": "Add Custom Provider",
+        "deleteProvider": "Delete Provider",
+        "systemPromptLabel": "System Prompt",
+        "systemPromptDesc": "This prompt applies to all conversations and defines the AI assistant's baseline behavior.",
+        "apiConfig": "API Connection Config",
+        "testConnection": "Test Connection",
+        "platformName": "Platform Name",
+        "modelList": "Model List ({{count}})",
+        "addModel": "Add Model",
+        "modelIdPlaceholder": "Model ID (e.g. gpt-4o)",
+        "displayNamePlaceholder": "Display Name",
+        "groupPlaceholder": "Group (e.g. Anthropic)",
+        "confirmAdd": "Confirm Add",
+        "setActive": "Set Active",
+        "deleteModel": "Delete Model",
+        "noModels": "No models configured",
+        "providerNameRequired": "Provider name is required",
+        "baseUrlRequired": "Base URL is required",
+        "apiKeyRequired": "API Key is required",
+        "savedLocal": "Saved locally",
+        "savedCloud": "Saved to cloud",
+        "saveError": "Save failed: {{message}}",
+        "testSuccess": "Connection successful ({{model}})",
+        "testNoModel": "Connection OK but no models returned",
+        "testError": "Connection failed: {{message}}"
+    },
+    "storageConfig": {
+        "title": "Storage Configuration",
+        "localMode": "Local Storage Mode",
+        "cloudMode": "Cloud Storage Mode",
+        "save": "Save Configuration",
+        "test": "Test Connection",
+        "testing": "Testing...",
+        "testSuccess": "Connection successful",
+        "testFailed": "Connection failed: {{message}}",
+        "corsHint": "If you see CORS errors, check your S3 bucket CORS settings.",
+        "saveSuccess": "Configuration saved",
+        "saveError": "Save failed",
+        "providerLabel": "Storage Provider",
+        "bucketLabel": "Bucket Name",
+        "regionLabel": "Region",
+        "accessKeyLabel": "Access Key ID",
+        "secretKeyLabel": "Secret Access Key",
+        "endpointLabel": "Custom Endpoint (optional)",
+        "requiredField": "This field is required"
+    },
+    "upgrade": {
+        "title": "Upgrade to Pro",
+        "confirm": "Confirm Upgrade",
+        "cancel": "Cancel",
+        "loading": "Processing upgrade...",
+        "success": "Upgrade successful! Welcome to Pro.",
+        "alreadyPro": "You are already a Pro member.",
+        "notLoggedIn": "Please log in first.",
+        "failed": "Upgrade failed: {{message}}",
+        "networkError": "Network error, please retry."
     },
     "services": {
         "docGen": {
