@@ -516,7 +516,10 @@ class WorkerPool {
             // Check cache if not dirty
             // Cache by job data + graph state identifier (version)
             if (!dirty) {
-                const cacheKey = JSON.stringify({ job, version: this.graphVersion });
+                // [K-7] Use lightweight string key instead of JSON.stringify(job) which
+                // serializes the entire job object (O(N) per call) on every route request.
+                // jobId is already unique per edge; graphVersion differentiates graph states.
+                const cacheKey = `${job.jobId ?? ''}@${this.graphVersion}`;
                 const cached = this.resultCache.get(cacheKey);
                 if (cached) {
                     this.cacheHits++;
@@ -535,9 +538,9 @@ class WorkerPool {
                 return;
             }
 
-            // Wrap resolve to cache result
+            // [K-7] Wrap resolve to cache result with lightweight key
             const cachedResolve = (result: PathFindingResult) => {
-                const cacheKey = JSON.stringify({ job, version: this.graphVersion });
+                const cacheKey = `${jobId}@${this.graphVersion}`;
                 this.resultCache.set(cacheKey, result);
                 resolve(result);
             };
