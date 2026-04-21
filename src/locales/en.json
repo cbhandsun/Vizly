@@ -13,7 +13,8 @@
         "error": "Error",
         "success": "Success",
         "confirm": "Confirm",
-        "delete": "Delete"
+        "delete": "Delete",
+        "proFeature": "Pro Feature"
     },
     "templates": {
         "title": "Template Library",
@@ -358,7 +359,44 @@
             },
             "showRuler": "Show Ruler",
             "hideRuler": "Hide Ruler",
-            "dragToMove": "Drag to move toolbar (double-click to reset)"
+            "dragToMove": "Drag to move toolbar (double-click to reset)",
+            "share": "Share",
+            "presentationMode": "Presentation Mode",
+            "diffView": "Diff View",
+            "historyPanel": "History",
+            "smartOptimize": "Smart Optimize (resolve overlaps & align)",
+            "pluginManager": "Plugin Manager",
+            "commentMode": "Comment Mode (C)",
+            "commentModeExit": "Exit Comment Mode (C)",
+            "hideMinimap": "Hide Minimap",
+            "showMinimap": "Show Minimap",
+            "saveToCloud": "Save to Cloud",
+            "directSave": "Overwrite Save",
+            "directSaveDisabled": "Cannot save directly in current state",
+            "yjsSynced": "Cloud collaboration connected",
+            "fileGroup": "File Operations",
+            "viewGroup": "View Controls",
+            "clearCache": "Clear Local Cache",
+            "clearCacheTitle": "Clear Cache",
+            "clearCacheContent": "This will clear all local cache data. The page will reload. Continue?",
+            "clearCacheConfirm": "Confirm Clear",
+            "toolbarAriaLabel": "Diagram Toolbar",
+            "dragHandle": "Drag Handle",
+            "pointer": "Select (V)",
+            "marqueeEnter": "Marquee Select (S)",
+            "marqueeExit": "Exit Marquee (Esc)",
+            "drawingMode": "Freehand Draw (P)",
+            "stickyNote": "Sticky Note (S)",
+            "mindMap": "Mind Map (M)",
+            "moreActions": "More Actions",
+            "fitWidth": "Fit Width",
+            "highlightMainFlow": "Highlight Main Flow",
+            "unhighlightMainFlow": "Unhighlight Main Flow",
+            "showOnlyMainFlow": "Show Main Flow Only",
+            "restoreFullFlow": "Restore Full Flow",
+            "snapOn": "Snap to Grid: On",
+            "snapOff": "Snap to Grid: Off",
+            "historyWithCount": "History ({{count}})"
         },
         "jsonEditor": {
             "title": "Edit Diagram Data (JSON)",
@@ -381,12 +419,42 @@
             "directRoutingEnabled": "Direct routing enabled"
         },
         "flowchart": {
-            "importFailed": "Import failed: invalid JSON or unsupported data format",
+            "newNode": "New Node",
+            "nodeAdded": "Added {{type}}",
+            "edgeNodeInserted": "Inserted new node at edge midpoint",
+            "clearCanvas": {
+                "title": "Clear Canvas",
+                "content": "Are you sure you want to clear the canvas? This cannot be undone.",
+                "ok": "OK",
+                "cancel": "Cancel"
+            },
+            "import": {
+                "standardSuccess": "Imported successfully ({{count}} nodes)",
+                "reloading": "Reloading view theme and layout...",
+                "rfSuccess": "Imported {{nodes}} nodes and {{edges}} edges",
+                "invalidFormat": "Invalid data format",
+                "jsonFailed": "JSON import failed: {{message}}",
+                "mermaidSuccess": "Mermaid text imported successfully",
+                "mermaidLayout": "Tip: click \"Smart Layout\" to organize nodes",
+                "mermaidFailed": "Mermaid parse failed",
+                "reverseSuccess": "Canvas restored from [{{filename}}]"
+            },
+            "mermaidCopied": "Mermaid code copied to clipboard",
+            "templateApplied": "Template applied",
+            "smartLayout": "Recommended layout: {{reason}} (confidence {{confidence}}%)",
+            "optimize": "Optimized: resolved {{overlaps}} overlaps, aligned {{nodes}} nodes.",
+            "noHistory": "No history to compare",
+            "settingsNotAvailable": "Advanced settings panel not mounted in standalone mode. Open from main view or press Ctrl+Shift+,",
+            "mindMapCenter": "Central Topic",
+            "summaryLabel": "Summary",
+            "pluginMissing": "Plugin missing [{{type}}]",
+            "relationshipEdgeLabel": "Related",
+            "importFailed": "Import failed: invalid format",
             "invalidJson": "Invalid JSON: {{reason}}",
-            "commandPaletteHint": "Press {{mod}}+K or / to open Command Palette",
-            "commandDisabled": "Currently unavailable",
+            "commandPaletteHint": "Press {{mod}}+K to open command palette",
+            "commandDisabled": "Not available",
             "undo": {
-                "title": "Undo available",
+                "title": "Undo supported",
                 "action": "Undo",
                 "done": "Undone",
                 "desc": {
@@ -426,16 +494,16 @@
             },
             "group": {
                 "defaultLabel": "New Group",
-                "defaultDescription": "Grouped Selection"
+                "defaultDescription": "Group selected items"
             },
             "toast": {
                 "nothingToCopy": "Nothing to copy",
                 "nothingToPaste": "Nothing to paste",
                 "nothingToCut": "Nothing to cut",
-                "nothingToDuplicate": "Nothing to duplicate",
+                "nothingToDuplicate": "No nodes to duplicate",
                 "needTwoNodesToGroup": "Select at least two nodes to group",
-                "groupSameLevel": "Please select nodes within the same level to group them",
-                "nothingToUngroup": "Nothing to ungroup",
+                "groupSameLevel": "Select nodes at the same level to group",
+                "nothingToUngroup": "No groups to ungroup",
                 "copied": "Copied: {{nodes}} nodes, {{edges}} edges",
                 "pasted": "Pasted: {{nodes}} nodes, {{edges}} edges",
                 "cut": "Cut: {{nodes}} nodes, {{edges}} edges",
@@ -449,13 +517,13 @@
             },
             "onboarding": {
                 "title": "Quick Start",
-                "openPalette": "Open palette ({{mod}}+K)",
-                "dismiss": "Dismiss",
+                "openPalette": "Open command palette ({{mod}}+K)",
+                "dismiss": "Do not show again",
                 "step": {
-                    "drag": "Drag a component from the left sidebar onto the canvas",
-                    "connect": "Drag a handle to connect; drop on blank space to Quick Add",
-                    "palette": "Use {{mod}}+K or / to search and run commands",
-                    "pan": "Hold Space and drag to pan the canvas"
+                    "drag": "Drag from left panel to canvas",
+                    "connect": "Drag node handles to connect",
+                    "palette": "Use {{mod}}+K or / for commands",
+                    "pan": "Hold Space and drag to pan"
                 }
             },
             "layout": {
@@ -465,21 +533,21 @@
                 "elkTB": "ELK Vertical (Layered)",
                 "elkLR": "ELK Horizontal (Layered)",
                 "treeGroup": "Tree Layout",
-                "treeTB": "↕ Tree (Top→Bottom)",
-                "treeLR": "↔ Tree (Left→Right)",
-                "forceGroup": "Force-Directed",
-                "force": "⊙ Force-Directed",
+                "treeTB": "Tree Top-Bottom",
+                "treeLR": "Tree Left-Right",
+                "forceGroup": "Force Directed",
+                "force": "Force",
                 "domainGroup": "Domain-Aware Layout",
-                "domainDagreLR": "◈ DomainDagre (Left→Right)",
-                "domainDagreTB": "◈ DomainDagre (Top→Bottom) (Default)",
-                "domainVertical": "▥ DomainVertical (Top→Bottom)",
-                "domainHorizontal": "▦ DomainHorizontal (Left→Right)",
-                "nodeLayoutGroup": "Node Layout Within Domain",
-                "nodeFlow": "▷ Flow",
-                "nodeGrid": "⊞ Grid",
-                "nodeHorizontal": "⊟ Horizontal",
-                "nodeVertical": "⊞ Vertical",
-                "nodeDagre": "◈ Dagre Layered (Default)"
+                "domainDagreLR": "DomainDagre (LR)",
+                "domainDagreTB": "DomainDagre (TB) Default",
+                "domainVertical": "DomainVertical (TB)",
+                "domainHorizontal": "DomainHorizontal (LR)",
+                "nodeLayoutGroup": "Node Arrangement",
+                "nodeFlow": "Flow",
+                "nodeGrid": "Grid",
+                "nodeHorizontal": "Horizontal",
+                "nodeVertical": "Vertical",
+                "nodeDagre": "Dagre Layered (Default)"
             }
         },
         "flowchartShortcuts": {
@@ -576,37 +644,14 @@
             "optimizationRateTooltip": "Optimization rate: % of nodes hidden",
             "optimizationRate": "Rate: {{rate}}%"
         },
-        "flowchart": {
-            "newNode": "New Node",
-            "nodeAdded": "Added {{type}}",
-            "edgeNodeInserted": "Inserted new node at edge midpoint",
-            "clearCanvas": {
-                "title": "Clear Canvas",
-                "content": "Are you sure you want to clear the canvas? This cannot be undone.",
-                "ok": "OK",
-                "cancel": "Cancel"
-            },
-            "import": {
-                "standardSuccess": "Imported successfully ({{count}} nodes)",
-                "reloading": "Reloading view theme and layout...",
-                "rfSuccess": "Imported {{nodes}} nodes and {{edges}} edges",
-                "invalidFormat": "Invalid data format",
-                "jsonFailed": "JSON import failed: {{message}}",
-                "mermaidSuccess": "Mermaid text imported successfully",
-                "mermaidLayout": "Tip: click \"Smart Layout\" to organize nodes",
-                "mermaidFailed": "Mermaid parse failed",
-                "reverseSuccess": "Canvas restored from [{{filename}}]"
-            },
-            "mermaidCopied": "Mermaid code copied to clipboard",
-            "templateApplied": "Template applied",
-            "smartLayout": "Recommended layout: {{reason}} (confidence {{confidence}}%)",
-            "optimize": "Optimized: resolved {{overlaps}} overlaps, aligned {{nodes}} nodes.",
-            "noHistory": "No history to compare",
-            "settingsNotAvailable": "Advanced settings panel not mounted in standalone mode. Open from main view or press Ctrl+Shift+,",
-            "mindMapCenter": "Central Topic",
-            "summaryLabel": "Summary",
-            "pluginMissing": "Plugin missing [{{type}}]",
-            "relationshipEdgeLabel": "Related"
+        "intelligence": {
+            "analyze": "Analyze Diagram",
+            "suggest": "Suggest Layout",
+            "optimize": "Optimize",
+            "generating": "Generating...",
+            "optimizeDesc": "Resolve overlaps and align nodes automatically",
+            "optimizing": "Optimizing...",
+            "optimizeSuccess": "Optimization complete"
         }
     },
     "header": {
@@ -695,6 +740,38 @@
                 "label": "/help",
                 "desc": "Show help"
             }
+        },
+        "status": {
+            "nodeAdded": "Node added: {{label}}",
+            "nodesDeleted": "{{count}} node(s) deleted",
+            "connected": "Connected: {{source}} to {{target}}",
+            "layoutApplied": "Layout applied: {{type}}",
+            "groupCreated": "Group created: {{label}}",
+            "analyzing": "Analyzing...",
+            "nodeNotFound": "Node not found: {{label}}",
+            "noMatchFound": "No match: {{keyword}}",
+            "savingTo": "Saving to {{target}}...",
+            "saveSuccess": "Saved",
+            "smartLayout": "Smart layout applied",
+            "smartGroup": "Smart group applied",
+            "resetSuccess": "Cleared",
+            "connectFormat": "Format: /connect NodeA NodeB",
+            "cmdReset": "/clear - clear conversation",
+            "cmdGuide": "/help - show help",
+            "cmdPresent": "/present - presentation mode",
+            "cmdExit": "/exit - exit presentation",
+            "cmdAnimate": "/animate - toggle animation",
+            "cmdFlow": "/flow - highlight main flow",
+            "cmdStyle": "/style [name] - apply style",
+            "cmdAnalyze": "/analyze - analyze diagram",
+            "cmdSuggest": "/suggest - suggestions",
+            "cmdDoc": "/doc - generate docs",
+            "voiceBeta": "Voice input (Beta)",
+            "cmdBrainstormOnlyMindmap": "/brainstorm - mind map only"
+        },
+        "help": {
+            "title": "Command Reference",
+            "footer": "Type / for commands"
         }
     },
     "export": {
@@ -1357,7 +1434,63 @@
                 "LR": "↔ 2-Way Expansion",
                 "R": "→ Right Only",
                 "L": "← Left Only",
-                "TB": "↓ Top Down"
+                "TB": "↓ Top Down",
+                "BT": "Bottom Up",
+                "FISHBONE": "Fishbone"
+            },
+            "actions": {
+                "copyBranch": "Copy Branch",
+                "pasteBranch": "Paste Branch",
+                "exportMd": "Export Markdown",
+                "exportMdSuccess": "Exported",
+                "addChild": "Add Child",
+                "addSibling": "Add Sibling",
+                "deleteNode": "Delete",
+                "collapse": "Collapse",
+                "expand": "Expand"
+            },
+            "actionBar": {
+                "addSibling": "Add Sibling",
+                "addChild": "Add Child",
+                "addRelationship": "Add Relationship",
+                "addSummary": "Add Summary",
+                "addBoundary": "Add Boundary",
+                "copyBranch": "Copy Branch",
+                "exportMd": "Export MD",
+                "beautify": "Style"
+            },
+            "beautify": {
+                "title": "Style",
+                "layout": "Layout",
+                "shape": "Shape",
+                "shapeUnderline": "Underline",
+                "shapePill": "Pill",
+                "shapeBox": "Box",
+                "pathStyle": "Branch Style",
+                "branchColor": "Branch Color",
+                "urlLink": "URL",
+                "urlPlaceholder": "https://",
+                "priority": "Priority",
+                "priorityNone": "None",
+                "priorityLow": "Low",
+                "priorityMedium": "Medium",
+                "priorityHigh": "High",
+                "progress": "Progress",
+                "progressDone": "Done",
+                "hint": "Click node to open"
+            },
+            "outline": {
+                "title": "Outline",
+                "editHint": "Click to edit",
+                "noNodes": "No nodes"
+            },
+            "shortcuts": {
+                "copyBranch": "Copy Branch",
+                "pasteBranch": "Paste Branch",
+                "exportMd": "Export MD",
+                "addChild": "Add Child (Tab)",
+                "addSibling": "Add Sibling (Enter)",
+                "delete": "Delete (Backspace)"
             }
         }
     },
@@ -1433,7 +1566,19 @@
         "saveError": "Save failed: {{message}}",
         "testSuccess": "Connection successful ({{model}})",
         "testNoModel": "Connection OK but no models returned",
-        "testError": "Connection failed: {{message}}"
+        "testError": "Connection failed: {{message}}",
+        "currentActive": "Active: {{name}}",
+        "selectProvider": "Select provider",
+        "newProviderName": "New Provider",
+        "saveSuccess": "Saved locally",
+        "saveSuccessCloud": "Saved to cloud",
+        "cloudSyncFail": "Cloud sync failed, saved locally",
+        "switchedTo": "Switched to: {{name}}",
+        "noModelId": "Model ID required",
+        "modelAdded": "Model added: {{id}}",
+        "testFillRequired": "Fill API Key and Base URL first",
+        "testFailHtml": "Connection failed",
+        "testFail": "Connection failed: {{message}}"
     },
     "storageConfig": {
         "title": "Storage Configuration",
@@ -1453,7 +1598,42 @@
         "accessKeyLabel": "Access Key ID",
         "secretKeyLabel": "Secret Access Key",
         "endpointLabel": "Custom Endpoint (optional)",
-        "requiredField": "This field is required"
+        "requiredField": "This field is required",
+        "pageTitle": "Storage Configuration",
+        "pageDescription": "Configure your cloud storage provider.",
+        "saveFail": "Save failed",
+        "testFail": {
+            "title": "Connection Failed",
+            "corsTitle": "CORS Required",
+            "corsDesc": "Add CORS rules to your S3 bucket:",
+            "corsOrigin": "AllowedOrigins",
+            "corsMethods": "AllowedMethods",
+            "genericTitle": "Connection Error",
+            "check1": "Verify endpoint and bucket",
+            "check2": "Check Access Key and Secret",
+            "check3": "Verify bucket and region",
+            "check4": "Confirm CORS allows this origin",
+            "errorDetail": "Error: {{message}}"
+        },
+        "form": {
+            "endpointLabel": "Endpoint URL",
+            "endpointRequired": "Endpoint is required",
+            "bucketLabel": "Bucket Name",
+            "bucketRequired": "Bucket is required",
+            "regionLabel": "Region",
+            "regionRequired": "Region is required",
+            "forcePathStyleLabel": "Force Path Style",
+            "forcePathStyleTooltip": "Enable for MinIO or non-AWS S3",
+            "accessKeyRequired": "Access Key is required",
+            "secretKeyRequired": "Secret Key is required",
+            "saveBtn": "Save",
+            "testBtn": "Test Connection"
+        },
+        "notes": {
+            "title": "Notes",
+            "cors": "Ensure S3 CORS allows this origin.",
+            "security": "Credentials are stored locally only."
+        }
     },
     "upgrade": {
         "title": "Upgrade to Pro",
@@ -1464,7 +1644,23 @@
         "alreadyPro": "You are already a Pro member.",
         "notLoggedIn": "Please log in first.",
         "failed": "Upgrade failed: {{message}}",
-        "networkError": "Network error, please retry."
+        "networkError": "Network error, please retry.",
+        "featureContext": "Upgrade to Pro to unlock",
+        "subtitle": "Unlock the full power of Vizly",
+        "features": {
+            "pdf": "Multi-page PDF export",
+            "collab": "Real-time collaboration",
+            "history": "Version history",
+            "ai": "Unlimited AI"
+        },
+        "later": "Maybe later",
+        "subscribe": "Subscribe to Pro",
+        "loginFirst": "Please log in first",
+        "checkoutFail": "Checkout failed, retry",
+        "gatewayFail": "Payment gateway error",
+        "unknownError": "Unknown error",
+        "unknownResponse": "Unexpected response",
+        "statusError": "Cannot verify upgrade"
     },
     "pluginMarketplace": {
         "title": "Plugin Marketplace",
@@ -1483,7 +1679,14 @@
         "emptyCategory": "No plugins found in this category",
         "deliveryTitle": "Load from Remote Delivery Center",
         "deliveryDesc": "Enter a third-party plugin Manifest URL for dynamic loading.",
-        "configDevUrl": "Configure Developer URL"
+        "configDevUrl": "Configure Developer URL",
+        "subtitle": "Extend diagramming with plugins",
+        "discoverMore": "Discover More",
+        "tabAll": "All",
+        "tabCore": "Core",
+        "tabProductivity": "Productivity",
+        "tabInstalled": "Installed",
+        "searchPlaceholder": "Search plugins..."
     },
     "comment": {
         "searchPlaceholder": "Search comments or authors...",
