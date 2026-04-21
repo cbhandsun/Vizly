@@ -147,17 +147,24 @@ export class QuadTree implements SpatialIndex {
 
     /**
      * 获取树中所有对象
+     * [J-3] Use a pre-allocated output array passed by reference to avoid
+     * O(2^depth) temporary array allocations from recursive concat.
      */
     public getAll(): Rectangle[] {
-        let allObjects: Rectangle[] = [...this.objects];
+        const result: Rectangle[] = [];
+        this.collectAll(result);
+        return result;
+    }
 
+    private collectAll(out: Rectangle[]): void {
+        for (let i = 0; i < this.objects.length; i++) {
+            out.push(this.objects[i]);
+        }
         for (let i = 0; i < this.nodes.length; i++) {
             if (this.nodes[i]) {
-                allObjects = allObjects.concat(this.nodes[i].getAll());
+                this.nodes[i].collectAll(out);
             }
         }
-
-        return allObjects;
     }
 
     /**

@@ -54,8 +54,13 @@ export interface VGCacheConfig {
  * Maintains an LRU cache of visibility graphs to avoid repeated construction.
  */
 export class VisibilityGraphCache {
+    // [J-2] Use Map insertion order as LRU instead of a separate lruList array.
+    // JS Map preserves insertion order and supports O(1) delete+set for LRU promotion.
+    // This eliminates:
+    //   - updateLRU: indexOf O(N) + splice O(N) + push O(1)
+    //   - evictLRU:  shift O(N)
+    // Both become O(1) operations on the Map itself.
     private cache: Map<string, CacheEntry>;
-    private lruList: string[]; // LRU queue (oldest first)
     private config: Required<VGCacheConfig>;
 
     private hitCount: number = 0;
@@ -70,7 +75,6 @@ export class VisibilityGraphCache {
         };
 
         this.cache = new Map();
-        this.lruList = [];
     }
 
     /**
@@ -160,13 +164,13 @@ export class VisibilityGraphCache {
     invalidate(predicate: (entry: CacheEntry) => boolean): number {
         let invalidatedCount = 0;
 
-        this.cache.forEach((entry, key) => {
+        // [J-2] Iterate cache directly; no need to rebuild lruList separately
+        for (const [key, entry] of this.cache) {
             if (predicate(entry)) {
                 this.cache.delete(key);
-                this.lruList = this.lruList.filter(k => k !== key);
                 invalidatedCount++;
             }
-        });
+        }
 
         return invalidatedCount;
     }
@@ -176,7 +180,6 @@ export class VisibilityGraphCache {
      */
     clear(): void {
         this.cache.clear();
-        this.lruList = [];
         this.hitCount = 0;
         this.missCount = 0;
         this.totalBuildTime = 0;
@@ -276,30 +279,32 @@ export class VisibilityGraphCache {
             this.evictLRU();
         }
 
-        // Add to cache
+        // [J-2] Set inserts at the end (most recently used position in Map order)
         this.cache.set(key, entry);
-        this.lruList.push(key);
     }
 
     /**
-     * Update LRU position (move to end = most recently used)
+     * [J-2] Update LRU position — O(1) via delete+set.
+     * JS Map.set() for an existing key does NOT change insertion order;
+     * we must delete first, then re-set to move the key to the "newest" position.
      */
     private updateLRU(key: string): void {
-        const index = this.lruList.indexOf(key);
-        if (index !== -1) {
-            this.lruList.splice(index, 1);
+        const entry = this.cache.get(key);
+        if (entry) {
+            this.cache.delete(key);
+            this.cache.set(key, entry);
         }
-        this.lruList.push(key);
     }
 
     /**
-     * Evict least recently used entry
+     * [J-2] Evict least recently used entry — O(1) via Map.keys().next().
+     * The first key in Map iteration order is the oldest (LRU) entry.
      */
     private evictLRU(): void {
-        if (this.lruList.length === 0) return;
-
-        const evictKey = this.lruList.shift()!;
-        this.cache.delete(evictKey);
+        const oldestKey = this.cache.keys().next().value;
+        if (oldestKey !== undefined) {
+            this.cache.delete(oldestKey);
+        }
     }
 
     /**
