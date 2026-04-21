@@ -1452,9 +1452,9 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                                 onUpdateNodes: (updates) => {
                                                     takeSnapshot(nodesRef.current, edgesRef.current);
                                                     // [Q-2] Pre-build Map for O(1) lookup — avoids O(N×M) updates.find() inside setNodes
-                                                    const updatesMap = new Map(updates.map(u => [u.id, u]));
+                                                    const updatesMap = new Map(updates.map((u: any) => [u.id, u]));
                                                     setNodes(nds => nds.map(n => {
-                                                        const u = updatesMap.get(n.id);
+                                                        const u = updatesMap.get(n.id) as any;
                                                         return (u && u.position) ? { ...n, position: u.position } : n;
                                                     }));
                                                 },
