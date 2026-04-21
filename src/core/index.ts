@@ -135,6 +135,7 @@ export * from './hooks/useConfigIntegration';
 // ---- Json & Utils System ----
 export { JsonEditorModal } from './components/diagrams/JsonEditorModal';
 export * from './components/diagrams/designerUtils';
+export * from './utils/jsonUtils';
 
 // ---- Plugin System ----
 export * from './types/plugin';

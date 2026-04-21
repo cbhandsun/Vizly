@@ -9,6 +9,7 @@ export * from './ErrorHandler';
 export * from './Logger';
 export * from './performanceMonitor';
 export * from './EnhancedTextMeasurement';
+export * from './jsonUtils';
 
 // 重新导出增强主题管理器相关工具
 export {

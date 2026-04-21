@@ -1190,7 +1190,6 @@ export function useMindMapOrchestrator(
                 setNodes(nds => nds.map(n => n.id === detail.sourceId ? { ...n, className: '' } : n));
             }, 2000);
             
-            // @ts-ignore
             appMessage.info('请拖动节点右侧红色手柄到目标节点');
         }
     }, [setNodes]);
