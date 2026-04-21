@@ -334,6 +334,7 @@ export function useMindMapOrchestrator(
             branchColor = PALETTE[siblingCount % PALETTE.length];
         } else {
             // Inherit from parent
+            // [M-5] Use setNodes functional update's snapshot via nodes closure (already updated by the time callback runs)
             const parentNode = nodes.find(n => n.id === parentId);
             branchColor = parentNode?.data?.branchColor as string | undefined;
         }
@@ -477,12 +478,15 @@ export function useMindMapOrchestrator(
                 };
 
                 const getParentId = (nodeId: string) => edges.find(ed => ed.target === nodeId && ed.type !== 'relationshipEdge')?.source;
-                
+
+                // [M-6] Build a local nodeMap for O(1) position lookups inside sort comparator.
+                // Previous: nodes.find() inside sort = O(K·log(K)·N). Now: O(K·log(K)).
+                const localNodeMap = new Map<string, Node>(nodes.map(n => [n.id, n]));
                 const getChildrenIds = (nodeId: string) => edges.filter(ed => ed.source === nodeId && ed.type !== 'relationshipEdge')
                     .map(ed => ed.target)
                     .sort((a, b) => {
-                        const na = nodes.find(n => n.id === a);
-                        const nb = nodes.find(n => n.id === b);
+                        const na = localNodeMap.get(a);
+                        const nb = localNodeMap.get(b);
                         return (na?.position?.y || 0) - (nb?.position?.y || 0); // Top to bottom sort
                     });
 
@@ -731,23 +735,28 @@ export function useMindMapOrchestrator(
                 parentSet.add(e.target);
             });
 
+            // [M-5] Build O(1) lookup map for nextNodes to avoid O(N) find() inside traverse().
+            // Previous: nextNodes.find() inside each recursive call = O(N²) for large trees.
+            const nextNodeMap = new Map<string, Node>(nextNodes.map(n => [n.id, n]));
+
             const roots = nextNodes.filter(n => n.type === 'mindmap' && !parentSet.has(n.id));
             const visibilityMap = new Map<string, { hidden: boolean, count: number }>();
 
             function traverse(currentId: string, parentHidden: boolean, parentCollapsed: boolean): number {
-                const node = nextNodes.find(n => n.id === currentId);
+                // [M-5] O(1) map lookup instead of O(N) find()
+                const node = nextNodeMap.get(currentId);
                 const selfCollapsed = !!node?.data?.collapsed;
                 const isHidden = parentHidden || parentCollapsed;
                 
                 let descendants = 0;
                 const children = childrenMap.get(currentId) || [];
-                for (const childId of children) { // Only direct children count towards the 1 increment, then their descendants add recursively
+                for (const childId of children) {
                     descendants += 1; 
                     const childDescendants = traverse(childId, isHidden, selfCollapsed);
                     descendants += childDescendants;
                 }
 
-                visibilityMap.set(currentId, { hidden: isHidden, count: children.length }); // Only showing direct children count looks cleaner
+                visibilityMap.set(currentId, { hidden: isHidden, count: children.length });
                 return descendants;
             }
 

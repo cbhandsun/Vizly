@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Drawer from 'antd/es/drawer';
 import Modal from 'antd/es/modal';
 import Input from 'antd/es/input';
@@ -64,7 +64,7 @@ import './AIChatPanel.css';
 
 // --- Utilities ---
 const generateId = (prefix: string = 'msg') => 
-    `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
 // --- Typing Indicator Component ---
 const TypingIndicator: React.FC = () => (
@@ -211,7 +211,9 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     const { user } = useAuth();
 
     // --- State ---
-    const SLASH_COMMANDS = [
+    // [M-8] Memoize SLASH_COMMANDS: t() results are stable between renders unless locale changes.
+    // Previously rebuilt on every render, causing filteredCommands comparison instability.
+    const SLASH_COMMANDS = useMemo(() => [
         { key: '/add', label: t('aiChat.commands.add.label'), description: t('aiChat.commands.add.desc') },
         { key: '/connect', label: t('aiChat.commands.connect.label'), description: t('aiChat.commands.connect.desc') },
         { key: '/layout', label: t('aiChat.commands.layout.label'), description: t('aiChat.commands.layout.desc') },
@@ -223,7 +225,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         { key: '/doc', label: t('aiChat.commands.doc.label'), description: t('aiChat.commands.doc.desc') },
         { key: '/clear', label: t('aiChat.commands.clear.label'), description: t('aiChat.commands.clear.desc') },
         { key: '/help', label: t('aiChat.commands.help.label'), description: t('aiChat.commands.help.desc') },
-    ];
+    ], [t]);
 
     const [conversations, setConversations] = useState<Conversation[]>(() => aiConversationService.getConversations());
     const [activeId, setActiveId] = useState<string | null>(() => aiConversationService.getActiveConversationId());
