@@ -266,7 +266,13 @@ export const DesignerHeaderLayer = React.memo(
             prevProps.topActions.showOnlyMainFlow === nextProps.topActions.showOnlyMainFlow &&
             prevProps.topActions.isDirectSaveDisabled === nextProps.topActions.isDirectSaveDisabled &&
             prevProps.topActions.isCommentMode === nextProps.topActions.isCommentMode &&
-            prevProps.toolbar.historyCount === nextProps.toolbar.historyCount
+            prevProps.toolbar.historyCount === nextProps.toolbar.historyCount &&
+            // ⭐ Phase 10: 弹窗状态 — 必须纳入比较，否则 setExportModalVisible(true) 后组件不重渲染
+            prevProps.topActions.exportModalVisible === nextProps.topActions.exportModalVisible &&
+            prevProps.topActions.pluginManagerVisible === nextProps.topActions.pluginManagerVisible &&
+            // 工具栏外观 — gridVariant 影响 gridInfo memo，showMinimap 影响 moreMenuItems
+            prevProps.toolbar.gridVariant === nextProps.toolbar.gridVariant &&
+            prevProps.toolbar.showMinimap === nextProps.toolbar.showMinimap
         );
     }
 );
