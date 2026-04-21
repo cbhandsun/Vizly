@@ -1411,6 +1411,24 @@
             }
         }
     },
+    "pluginMarketplace": {
+        "title": "Vizly 插件市场",
+        "subtitle": "通过精心挑选的插件，将您的画布转化为专业的工作引擎。",
+        "discoverMore": "发现更多在线扩展",
+        "tabAll": "全部插件",
+        "tabCore": "官方推荐",
+        "tabProductivity": "效率工具",
+        "tabInstalled": "我安装的",
+        "searchPlaceholder": "搜索名称、ID 或标签...",
+        "statusActive": "已激活",
+        "statusInactive": "未启用",
+        "defaultDesc": "由专业团队开发的扩展组件，提升绘图效率与感知力。",
+        "emptySearch": "未找到匹配 \"{{query}}\" 的插件",
+        "emptyCategory": "还没有发现符合该分类的插件",
+        "deliveryTitle": "从远程交付中心加载 (Delivery)",
+        "deliveryDesc": "输入第三方插件的 Manifest URL 进行动态加载。",
+        "configDevUrl": "配置开发者 URL"
+    },
     "services": {
         "docGen": {
             "title": "系统架构设计文档",

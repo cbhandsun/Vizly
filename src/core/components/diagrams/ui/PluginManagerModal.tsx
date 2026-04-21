@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal, Input, Tabs, Switch, Tag, Button, Typography, Space, Tooltip, Empty, Badge, Skeleton } from 'antd';
 import { 
   ApiOutlined, 
@@ -28,6 +29,7 @@ interface PluginManagerModalProps {
  * 提供 Premium 级的插件发现与管理体验
  */
 export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible, onClose }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [plugins, setPlugins] = useState<DiagramTypePlugin[]>([]);
   const [activeMap, setActiveMap] = useState<Record<string, boolean>>({});
@@ -115,7 +117,7 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
 
         <div className="plugin-card-body">
           <Paragraph className="plugin-card-desc">
-            {plugin.description || '由专业团队开发的扩展组件，提升绘图效率与感知力。'}
+            {plugin.description || t('pluginMarketplace.defaultDesc')}
           </Paragraph>
           
           <Space size={16} style={{ marginTop: 8 }}>
@@ -133,9 +135,9 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
         <div className="plugin-card-footer">
           <Space>
             {isActive ? (
-              <Text type="success" style={{ fontSize: 12 }}><CheckCircleFilled /> 已激活</Text>
+              <Text type="success" style={{ fontSize: 12 }}><CheckCircleFilled /> {t('pluginMarketplace.statusActive')}</Text>
             ) : (
-              <Text type="secondary" style={{ fontSize: 12 }}>未启用</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>{t('pluginMarketplace.statusInactive')}</Text>
             )}
           </Space>
           <Switch 
@@ -173,9 +175,9 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
             }} />
             
             <div style={{ position: 'relative', zIndex: 1, color: '#fff' }}>
-                <Title level={2} style={{ color: '#fff', margin: 0, letterSpacing: -0.5 }}>Vizly 插件市场</Title>
+                <Title level={2} style={{ color: '#fff', margin: 0, letterSpacing: -0.5 }}>{t('pluginMarketplace.title')}</Title>
                 <Paragraph style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, marginTop: 4 }}>
-                    通过精心挑选的插件，将您的画布转化为专业的工作引擎。
+                    {t('pluginMarketplace.subtitle')}
                 </Paragraph>
             </div>
 
@@ -184,7 +186,7 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
                 icon={<GlobalOutlined />} 
                 style={{ position: 'absolute', bottom: 24, right: 24, borderRadius: 20 }}
             >
-                发现更多在线扩展
+                {t('pluginMarketplace.discoverMore')}
             </Button>
         </div>
 
@@ -198,14 +200,14 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
                         onChange={setActiveTab}
                         tabBarStyle={{ marginBottom: 0 }}
                     >
-                        <TabPane tab="全部插件" key="all" />
-                        <TabPane tab="官方推荐" key="core" />
-                        <TabPane tab="效率工具" key="productivity" />
-                        <TabPane tab="我安装的" key="installed" />
+                        <TabPane tab={t('pluginMarketplace.tabAll')} key="all" />
+                        <TabPane tab={t('pluginMarketplace.tabCore')} key="core" />
+                        <TabPane tab={t('pluginMarketplace.tabProductivity')} key="productivity" />
+                        <TabPane tab={t('pluginMarketplace.tabInstalled')} key="installed" />
                     </Tabs>
                     <Input
                         prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                        placeholder="搜索名称、ID 或标签..."
+                        placeholder={t('pluginMarketplace.searchPlaceholder')}
                         style={{ width: 240, borderRadius: 20 }}
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
@@ -228,7 +230,9 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
             ) : (
                 <Empty 
                     image={Empty.PRESENTED_IMAGE_SIMPLE} 
-                    description={searchQuery ? `未找到匹配 "${searchQuery}" 的插件` : "还没有发现符合该分类的插件"}
+                    description={searchQuery 
+                        ? t('pluginMarketplace.emptySearch', { query: searchQuery })
+                        : t('pluginMarketplace.emptyCategory')}
                     style={{ padding: 48 }}
                 />
             )}
@@ -249,11 +253,11 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
                         <CloudDownloadOutlined />
                     </div>
                     <div>
-                        <Text strong>从远程交付中心加载 (Delivery)</Text>
-                        <div style={{ fontSize: 12, color: '#8c8c8c' }}>输入第三方插件的 Manifest URL 进行动态加载。</div>
+                        <Text strong>{t('pluginMarketplace.deliveryTitle')}</Text>
+                        <div style={{ fontSize: 12, color: '#8c8c8c' }}>{t('pluginMarketplace.deliveryDesc')}</div>
                     </div>
                 </Space>
-                <Button type="link">配置开发者 URL</Button>
+                <Button type="link">{t('pluginMarketplace.configDevUrl')}</Button>
             </div>
         </div>
       </div>
