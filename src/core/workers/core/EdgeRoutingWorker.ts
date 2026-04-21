@@ -120,6 +120,12 @@ export class EdgeRoutingWorker {
         const sNode = nodeMap.get(job.source);
         const tNode = nodeMap.get(job.target);
 
+        // [L-1] Build edgeMap alongside nodeMap for O(1) edge lookups (used in pickPeerGroup)
+        const edgeMap = new Map<string, GraphEdge>();
+        for (const e of graph.edges as unknown as GraphEdge[]) {
+            edgeMap.set(e.id, e);
+        }
+
         if (!sNode || !tNode) {
             return this.errorResult(job, 'Source or Target node not found');
         }
@@ -290,13 +296,14 @@ export class EdgeRoutingWorker {
         }
 
         const pickPeerGroup = (originId: string, isSource: boolean, allPeers: GraphEdge[], _orientationIsHorz: boolean): { edges: GraphEdge[]; key: string; members: string[] } => {
-            const nodes = graph.nodes as unknown as GraphNode[];
-            const edges = graph.edges as unknown as GraphEdge[];
-            const refEdge = edges.find(e => e.id === job.edgeId);
+            // [L-1] Use pre-built nodeMap and edgeMap for O(1) lookups.
+            // Previously used edges.find() and nodes.find() which were O(N) each,
+            // and nodes.find() inside the filter loop was O(N×M).
+            const refEdge = edgeMap.get(job.edgeId);
             if (!refEdge) return { edges: allPeers, key: 'ALL', members: allPeers.map(e => e.id) };
-            const originNode = nodes.find(n => n.id === originId);
+            const originNode = nodeMap.get(originId);
             const otherId = isSource ? refEdge.target : refEdge.source;
-            const otherNode = nodes.find(n => n.id === otherId);
+            const otherNode = nodeMap.get(otherId);
             if (!originNode || !otherNode) return { edges: allPeers, key: 'ALL', members: allPeers.map(e => e.id) };
             const oPos = getNodePosition(originNode);
             const oW = originNode.measured?.width || (originNode as unknown as Record<string, any>).width || 0;
@@ -322,7 +329,8 @@ export class EdgeRoutingWorker {
             const filtered = allPeers.filter(pe => {
                 if (pe.id === job.edgeId) return true;
                 const pid = isSource ? pe.target : pe.source;
-                const pn = nodes.find(n => n.id === pid);
+                // [L-1] O(1) nodeMap lookup instead of O(N) nodes.find()
+                const pn = nodeMap.get(pid);
                 if (!pn) return false;
                 const pPos = getNodePosition(pn);
                 const pW = pn.measured?.width || (pn as unknown as Record<string, any>).width || 0;
@@ -622,7 +630,8 @@ export class EdgeRoutingWorker {
                 if (hubNode && peerEdgesForTrunk.length >= 2) {
                     const peerNodes = peerEdgesForTrunk.map(e => {
                         const pid = job.isOneToMany ? e.target : e.source;
-                        const n = (graph.nodes as unknown as GraphNode[]).find(ng => ng.id === pid);
+                        // [L-1] O(1) nodeMap lookup instead of O(N) nodes.find() inside a loop
+                        const n = nodeMap.get(pid);
                         if (!n) return null;
                         return {
                             x: getNodePosition(n).x,
