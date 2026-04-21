@@ -154,12 +154,14 @@ export class EdgeRoutingWorker {
 
 
         // 4. Pre-processing: Bus Consensus & Direction
+        // [H-6] Pass pre-built nodeMap to avoid O(N) Array.find() inside resolveBusOrientation
         const busOrientation = busDetector.resolveBusOrientation(
             !!job.isManyToOne,
             job.isManyToOne ? job.target : job.source,
             graph.edges,
             graph.nodes,
-            job.layoutDirection || 'LR'
+            job.layoutDirection || 'LR',
+            nodeMap
         );
 
         let startPos = job.sourcePosition || Position.Right;
@@ -708,11 +710,15 @@ export class EdgeRoutingWorker {
                     );
                     const dynamicPadding = Math.min(8, trunkGapDist * 0.3);
 
+                    // [H-7] Use spatialIndex for trunk obstacle checks when available.
+                    // Falls back to raw array — ObstacleAnalyzer.intersectsAnyObstacle handles both.
+                    const trunkObstacles = spatialIndex ?? routingObstacles;
+
                     // [RESTORED] Always check for obstacles to maintain good obstacle avoidance.
                     // Previously this was skipped for Precomputed Trunks, which caused lines to plow through nodes.
-                    if (analyzer.intersectsAnyObstacle(startWithOffset, trunkStart, routingObstacles, dynamicPadding)) isBlocked = true;
-                    if (!isBlocked && analyzer.intersectsAnyObstacle(trunkStart, trunkEnd, routingObstacles, dynamicPadding)) isBlocked = true;
-                    if (!isBlocked && analyzer.intersectsAnyObstacle(trunkEnd, endWithOffset, routingObstacles, dynamicPadding)) isBlocked = true;
+                    if (analyzer.intersectsAnyObstacle(startWithOffset, trunkStart, trunkObstacles, dynamicPadding)) isBlocked = true;
+                    if (!isBlocked && analyzer.intersectsAnyObstacle(trunkStart, trunkEnd, trunkObstacles, dynamicPadding)) isBlocked = true;
+                    if (!isBlocked && analyzer.intersectsAnyObstacle(trunkEnd, endWithOffset, trunkObstacles, dynamicPadding)) isBlocked = true;
 
                     if (!isBlocked) {
                         pathPoints = waypoints;

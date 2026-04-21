@@ -38,11 +38,15 @@ export class BusDetector {
         focusNodeId: string,
         allEdges: any[],
         allNodes: any[],
-        globalDir: string
+        globalDir: string,
+        nodeMap?: Map<string, any>  // [H-6] Optional O(1) lookup map to avoid O(N) find() per edge
     ): BusOrientation {
         if (!focusNodeId || !allEdges || !allNodes) {
             return { busDir: globalDir, isHorz: globalDir === 'LR' || globalDir === 'RL' };
         }
+
+        // [H-6] Build nodeMap lazily if not provided (for backwards compatibility)
+        const nMap = nodeMap ?? new Map<string, any>(allNodes.map((n: any) => [n.id, n]));
 
         let horzVotes = 0;
         let vertVotes = 0;
@@ -51,8 +55,9 @@ export class BusDetector {
             : allEdges.filter(e => e.source === focusNodeId);
 
         relevantEdges.forEach(e => {
-            const s = allNodes.find(n => n.id === e.source);
-            const t = allNodes.find(n => n.id === e.target);
+            // [H-6] O(1) map lookup instead of O(N) find()
+            const s = nMap.get(e.source);
+            const t = nMap.get(e.target);
             if (s && t) {
                 const sPos = getNodePosition(s);
                 const tPos = getNodePosition(t);
