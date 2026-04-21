@@ -85,7 +85,10 @@ class AIConversationService {
         try {
             const saved = localStorage.getItem(CONVERSATIONS_STORAGE_KEY);
             if (saved) {
-                return JSON.parse(saved);
+                const parsed = JSON.parse(saved);
+                // Guard against corrupted or migrated data (e.g., a non-array was serialised)
+                if (Array.isArray(parsed)) return parsed as Conversation[];
+                console.warn('AIConversationService: stored conversations is not an array, resetting.');
             }
         } catch (e) {
             console.error('Failed to load conversations', e);

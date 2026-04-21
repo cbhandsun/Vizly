@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { Space, Button, Dropdown, Tooltip, MenuProps } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -72,6 +72,21 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     setIsCommentMode = () => {},
 }) => {
     const { t } = useTranslation();
+
+    // [Fix] Modals must render regardless of portal vs fallback path.
+    // Extract them here so both branches can render the portal content + these modals.
+    const modals = (
+        <>
+            <AdvancedExportModal 
+                visible={exportModalVisible} 
+                onClose={() => setExportModalVisible(false)} 
+            />
+            <PluginManagerModal 
+                visible={pluginManagerVisible} 
+                onClose={() => setPluginManagerVisible(false)} 
+            />
+        </>
+    );
 
     // [M-4] Memoize menu items to avoid recreating on every render (Antd Dropdown does vdom diff on items ref).
     const exportMenu: MenuProps['items'] = useMemo(() => [
@@ -210,7 +225,12 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     );
 
     if (portalTarget) {
-        return createPortal(content, portalTarget);
+        return (
+            <>
+                {createPortal(content, portalTarget)}
+                {modals}
+            </>
+        );
     }
 
     // Fallback if portal missing
@@ -319,14 +339,9 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
 
             {children}
 
-            <AdvancedExportModal 
-                visible={exportModalVisible} 
-                onClose={() => setExportModalVisible(false)} 
-            />
-            <PluginManagerModal 
-                visible={pluginManagerVisible} 
-                onClose={() => setPluginManagerVisible(false)} 
-            />
+            {modals}
         </div>
     );
 };
+
+TopActionButtons.displayName = 'TopActionButtons';
