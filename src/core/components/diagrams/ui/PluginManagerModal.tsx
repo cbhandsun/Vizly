@@ -38,7 +38,6 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
 
   const refresh = () => {
     setLoading(true);
-    // 模拟从注册表获取数据（实际是同步但为了动效加个延迟）
     setTimeout(() => {
         const all = registry.getAllPlugins();
         setPlugins(all);
@@ -52,7 +51,20 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
   };
 
   useEffect(() => {
-    if (visible) refresh();
+    let cancelled = false;
+    if (visible) {
+      setLoading(true);
+      const timer = setTimeout(() => {
+        if (cancelled) return; // [Fix] prevent setState after unmount / close
+        const all = registry.getAllPlugins();
+        setPlugins(all);
+        const m: Record<string, boolean> = {};
+        all.forEach(p => { m[p.id] = registry.isPluginActive(p.id); });
+        setActiveMap(m);
+        setLoading(false);
+      }, 400);
+      return () => { cancelled = true; clearTimeout(timer); };
+    }
   }, [visible]);
 
   const togglePlugin = (id: string, active: boolean) => {

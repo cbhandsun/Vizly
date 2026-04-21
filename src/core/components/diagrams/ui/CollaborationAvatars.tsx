@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Avatar, Tooltip } from 'antd';
 import { collaborationService } from '../../../services/CollaborationService';
 
@@ -14,6 +14,10 @@ interface PresenceUser {
  */
 export const CollaborationAvatars: React.FC = () => {
     const [users, setUsers] = useState<PresenceUser[]>([]);
+    // [Perf] Keep a ref of the current user IDs for shallow-comparison.
+    // awareness.on('change') fires on every cursor move — user list itself
+    // changes only when someone joins or leaves. Skip setState if list is identical.
+    const usersSignatureRef = useRef<string>('');
 
     useEffect(() => {
         if (!collaborationService.isInitialized()) return;
@@ -31,6 +35,12 @@ export const CollaborationAvatars: React.FC = () => {
                     seenIds.add(s.user.id);
                 }
             });
+
+            // Shallow signature: join of sorted IDs. Avoids re-render when only
+            // cursor positions changed but the user list composition is identical.
+            const signature = activeUsers.map(u => u.id).sort().join(',');
+            if (signature === usersSignatureRef.current) return;
+            usersSignatureRef.current = signature;
 
             setUsers(activeUsers);
         };

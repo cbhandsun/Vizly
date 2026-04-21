@@ -1337,7 +1337,53 @@
                 "LR": "↔ 双向展开",
                 "R": "→ 向右展开",
                 "L": "← 向左展开",
-                "TB": "↓ 向下展开"
+                "TB": "↓ 向下展开",
+                "BT": "↑ 向上展开",
+                "FISHBONE": "🐟 鱼骨图"
+            },
+            "actions": {
+                "copyBranch": "复制分支 (Ctrl+C)",
+                "pasteBranch": "粘贴分支 (Ctrl+V)",
+                "exportMd": "导出 Markdown",
+                "exportMdSuccess": "Markdown 已导出",
+                "addChild": "添加子节点 (Tab)",
+                "addSibling": "添加同级节点 (Enter)",
+                "deleteNode": "删除节点 (Del)",
+                "collapse": "折叠分支",
+                "expand": "展开分支"
+            },
+            "beautify": {
+                "title": "思维导图配置",
+                "layout": "结构布局",
+                "shape": "节点形状",
+                "shapeUnderline": "下划线",
+                "shapePill": "胶囊",
+                "shapeBox": "矩形",
+                "pathStyle": "连线风格",
+                "branchColor": "分支颜色",
+                "urlLink": "链接 (URL)",
+                "urlPlaceholder": "https://example.com",
+                "priority": "优先级",
+                "priorityNone": "无",
+                "priorityLow": "! 低",
+                "priorityMedium": "!! 中",
+                "priorityHigh": "!!! 高",
+                "progress": "进度",
+                "progressDone": "✓ 完成",
+                "hint": "提示：选中单个节点可独立修改其颜色和形状；选中「根节点」时，将修改全局思维导图结构配置。"
+            },
+            "outline": {
+                "title": "大纲视图",
+                "editHint": "💡 双击节点名称可直接编辑",
+                "noNodes": "暂无导图节点"
+            },
+            "shortcuts": {
+                "copyBranch": "Ctrl+C 复制当前分支（含子树）",
+                "pasteBranch": "Ctrl+V 粘贴到选中节点下",
+                "exportMd": "Ctrl+Shift+E 导出 Markdown",
+                "addChild": "Tab 添加子节点",
+                "addSibling": "Enter 添加同级节点",
+                "delete": "Del / Backspace 删除节点"
             }
         }
     },
