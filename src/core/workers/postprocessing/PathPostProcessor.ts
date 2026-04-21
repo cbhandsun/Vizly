@@ -168,7 +168,13 @@ export class PathPostProcessor {
         // Phase 5: Final Refinement (Be cautious not to collapse nudged offsets)
         // [FIX] Use configurable threshold to preserve pathfinding results
         const finalSimplificationThreshold = config.postProcessing.finalSimplificationThreshold || Math.max(config.algorithm.gridSize * 2, 30);
-        finalPoints = simplifyPath(finalPoints, finalSimplificationThreshold, obstacles, posOptions);
+        // [H-5] Skip Phase 5 simplify when threshold is not larger than Phase 1's (gridSize*2).
+        // Phase 1 already ran simplifyPath at gridSize*2; a second pass with the same threshold
+        // is pure O(N²) waste. Only run if finalThreshold adds meaningful resolution.
+        const phase1Threshold = config.algorithm.gridSize * 2;
+        if (finalSimplificationThreshold > phase1Threshold + 5) {
+            finalPoints = simplifyPath(finalPoints, finalSimplificationThreshold, obstacles, posOptions);
+        }
         
         // [FIX] Aggressively eliminate tiny orthogonal stair-steps created by A* grid snapping 
         // to continuous anchor coordinates before final simplification. 

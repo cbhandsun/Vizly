@@ -35,8 +35,8 @@ export class PathfindingWorkerPool {
     private totalTaskTime: number = 0;
     private readonly poolSize: number;
 
-    // [FIX T-4] 改为 {resolve, reject} 对，terminate 时可正确 reject 等待中的 Promise
-    private workerWaiters: Array<{ resolve: (workerIndex: number) => void; reject: (err: Error) => void }> = [];
+    // [H-8] Priority-aware waiter queue — entries with lower priority number are served first
+    private workerWaiters: Array<{ resolve: (workerIndex: number) => void; reject: (err: Error) => void; priority: number }> = [];
 
     constructor(poolSize?: number) {
         const cpuCores = (navigator.hardwareConcurrency || 4);
@@ -79,9 +79,26 @@ export class PathfindingWorkerPool {
         }
 
         // Slow path: enqueue and wait for release
+        // [H-8] Default priority 1 (normal). Use acquireWorkerWithPriority for interactive tasks.
         return new Promise<number>((resolve, reject) => {
-            // [FIX T-4] 存 resolve 和 reject，供 terminate 时调用
-            this.workerWaiters.push({ resolve, reject });
+            this.workerWaiters.push({ resolve, reject, priority: 1 });
+            // Keep sorted: lowest priority number = highest urgency
+            this.workerWaiters.sort((a, b) => a.priority - b.priority);
+        });
+    }
+
+    /**
+     * [H-8] Acquire a worker with explicit priority (0 = interactive, 1 = normal, 2 = background)
+     */
+    private acquireWorkerWithPriority(priority: number): Promise<number> {
+        if (this.availableWorkers.size > 0) {
+            const workerIndex = this.availableWorkers.values().next().value!;
+            this.availableWorkers.delete(workerIndex);
+            return Promise.resolve(workerIndex);
+        }
+        return new Promise<number>((resolve, reject) => {
+            this.workerWaiters.push({ resolve, reject, priority });
+            this.workerWaiters.sort((a, b) => a.priority - b.priority);
         });
     }
 
@@ -93,7 +110,7 @@ export class PathfindingWorkerPool {
         this.activeTasks.delete(workerIndex);
 
         if (this.workerWaiters.length > 0) {
-            // Direct hand-off to next waiter (no re-insertion to pool)
+            // [H-8] Always serve highest-priority waiter first (already sorted by priority)
             const waiter = this.workerWaiters.shift()!;
             waiter.resolve(workerIndex);
         } else {
@@ -156,8 +173,9 @@ export class PathfindingWorkerPool {
     /**
      * Execute a BATCH task on an available worker
      */
-    private async executeBatchTask(payload: { jobs: PathFindingJob[], graph: SharedGraphContext }): Promise<PathFindingResult[]> {
-        const workerIndex = await this.acquireWorker();
+    private async executeBatchTask(payload: { jobs: PathFindingJob[], graph: SharedGraphContext }, priority = 1): Promise<PathFindingResult[]> {
+        // [H-8] Use priority-aware acquisition: interactive jobs (priority 0) jump the queue
+        const workerIndex = await this.acquireWorkerWithPriority(priority);
         this.activeTasks.set(workerIndex, { job: payload.jobs[0], graph: payload.graph, priority: 0 });
 
         const worker = this.workers[workerIndex];
@@ -310,8 +328,7 @@ export class PathfindingWorkerPool {
         this.availableWorkers.clear();
         this.activeTasks.clear();
         this.taskQueue = [];
-        // [FIX T-4] 正确 Reject 所有等待中的 waiter
-        // 原代码只清空数组但不调用 waiter，导致调用方的 routeBatch/calculatePath Promise 永久挂起
+        // [FIX T-4] + [H-8] Reject all priority-sorted waiters on terminate
         const terminationError = new Error('[WorkerPool] Pool terminated — all pending tasks rejected.');
         this.workerWaiters.forEach(({ reject }) => reject(terminationError));
         this.workerWaiters = [];
