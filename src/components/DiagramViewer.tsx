@@ -109,7 +109,7 @@ const DiagramViewer: React.FC = () => {
     const handleImportMermaidNodes = useCallback(async (nodes: any[], edges: any[]) => {
         const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
         if (!bridge) {
-            message.error('无法连接到画布，请重试');
+            message.error(t('diagramViewer.canvasNotFound'));
             return;
         }
 
@@ -261,10 +261,10 @@ const DiagramViewer: React.FC = () => {
         let newName = defaultName;
         // 使用简易模态交互提供命名的机会
         Modal.confirm({
-            title: `另存为至 ${target.toUpperCase()}...`,
+            title: t('diagramViewer.saveAs.title', { target: target.toUpperCase() }),
             content: (
                 <div style={{ marginTop: 16 }}>
-                    <p style={{ marginBottom: 8, color: '#666' }}>请输入图表名称：</p>
+                    <p style={{ marginBottom: 8, color: '#666' }}>{t('diagramViewer.saveAs.namePlaceholder')}</p>
                     <Input
                         defaultValue={defaultName}
                         onChange={e => newName = e.target.value} />
@@ -272,11 +272,11 @@ const DiagramViewer: React.FC = () => {
             ),
             onOk: async () => {
                 if (!newName || !newName.trim()) {
-                    message.error('名称不能为空');
+                    message.error(t('diagramViewer.saveAs.nameRequired'));
                     return;
                 }
                 const nameStr = newName.trim();
-                const hide = message.loading(`正在保存至 ${target}...`, 0);
+                const hide = message.loading(t('diagramViewer.saveAs.saving', { target }), 0);
                 try {
                     const dataToSave = {
                         ...bridge,
@@ -296,7 +296,7 @@ const DiagramViewer: React.FC = () => {
                         const map: Record<string, unknown> = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
                         map[nameStr] = dataToSave;
                         localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(map));
-                        message.success('已存入本地模板库');
+                        message.success(t('diagramViewer.saveAs.localSuccess'));
 
                         // Sync current
                         // selectedDiagramId && dispatchDiagramControl('loadLocalJson', { json: JSON.stringify(dataToSave) });
@@ -322,10 +322,10 @@ const DiagramViewer: React.FC = () => {
 
                         // URL 刷新指引
                         setSearchParams(prev => { prev.set('diagram', dataToSave.id); return prev; });
-                        message.success('存入云端成功');
+                        message.success(t('diagramViewer.saveAs.cloudSuccess'));
                     }
                 } catch (e: any) {
-                    message.error(`保存失败：${e.message || String(e)}`);
+                    message.error(t('diagramViewer.saveAs.error', { message: e.message || String(e) }));
                 } finally {
                     hide();
                 }
@@ -339,7 +339,7 @@ const DiagramViewer: React.FC = () => {
         const cloudMeta = bridge?.metadata?.cloud;
         if (cloudMeta && cloudMeta.provider && cloudMeta.title) {
             // 已存在云记录，静默同名同 id 覆盖更新
-            const hide = message.loading(`覆盖保存至 ${cloudMeta.provider}...`, 0);
+            const hide = message.loading(t('diagramViewer.directSave.saving', { provider: cloudMeta.provider }), 0);
             try {
                 const snap = await tryAttachDiagramSnapshot(bridge, selectedDiagramId);
                 const provider = unifiedStorage.getProvider(cloudMeta.provider);
@@ -351,9 +351,9 @@ const DiagramViewer: React.FC = () => {
                     user_id: 'anonymous',
                 });
                 invalidateRemoteDiagramPreview(cloudMeta.id || bridge.id);
-                message.success('覆盖保存成功');
+                message.success(t('diagramViewer.directSave.success'));
             } catch (e: any) {
-                message.error(`覆盖出错: ${e.message}`);
+                message.error(t('diagramViewer.directSave.error', { message: e.message }));
             } finally { hide(); }
         } else {
             // 首次未知归属文件强制另存为至 supabase 后端
@@ -458,20 +458,19 @@ const DiagramViewer: React.FC = () => {
         window.location.hash = `#/?diagram=${id}`;
         requestAnimationFrame(() => window.location.reload());
     }, [selectedDiagramId]);
-
     // 构建通过 IoC 模式下发的商业级高级操作菜单
     const extraExportItems = useMemo(() => [
         {
             key: 'pro-export-pdf',
             label: (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', minWidth: '140px' }}>
-                    <span>多页无缝 PDF 导出</span>
-                    <span style={{ fontSize: '14px', marginLeft: 8 }} title="Pro 功能">👑</span>
+                    <span>{t('diagramViewer.export.pdf')}</span>
+                    <span style={{ fontSize: '14px', marginLeft: 8 }} title={t('common.proFeature')}>👑</span>
                 </div>
             ),
             onClick: () => {
                 if (!hasFeature('export-pdf')) {
-                    showUpgradeModal('多页无缝 PDF 导出');
+                    showUpgradeModal(t('diagramViewer.export.pdf'));
                 } else {
                     // TODO: 真正的云渲染
                 }
@@ -481,19 +480,19 @@ const DiagramViewer: React.FC = () => {
             key: 'pro-export-svg',
             label: (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', minWidth: '140px' }}>
-                    <span>超高清矢量 SVG</span>
-                    <span style={{ fontSize: '14px', marginLeft: 8 }} title="Pro 功能">👑</span>
+                    <span>{t('diagramViewer.export.svg')}</span>
+                    <span style={{ fontSize: '14px', marginLeft: 8 }} title={t('common.proFeature')}>👑</span>
                 </div>
             ),
             onClick: () => {
                 if (!hasFeature('export-hd-svg')) {
-                    showUpgradeModal('超高清矢量 SVG 导出');
+                    showUpgradeModal(t('diagramViewer.export.svg'));
                 } else {
                     // TODO: 真正的云渲染
                 }
             }
         }
-    ], [hasFeature, showUpgradeModal]);
+    ], [hasFeature, showUpgradeModal, t]);
 
     // 同步 selectedDiagramId → localStorage（供命令面板等非 reload 路径使用）
     // 注意：seedAutoSaveAndNavigate 中有直接写 localStorage 的逻辑（用于 reload 前持久化），
@@ -615,12 +614,12 @@ const DiagramViewer: React.FC = () => {
             if (e.key === 'Escape' && isPresentationMode) {
                 setIsPresentationMode(false);
                 // 演示模式退出提示（使用 appMessage 避免 ConfigProvider 外调用崩溃）
-                appMessage.info('演示模式已退出');
+                appMessage.info(t('diagramViewer.presentation.exit'));
             }
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [handleFsControl, isPresentationMode]);
+    }, [handleFsControl, isPresentationMode, t]);
 
     /**
      * 函数级注释：初始化连线模式的默认值
@@ -918,7 +917,7 @@ const DiagramViewer: React.FC = () => {
                                                     message.error(t('storage.manager.noContent'));
                                                 }
                                             } catch (e: any) {
-                                                message.error("加载云端图表失败: " + e.message);
+                                                message.error(t('diagramViewer.cloudLoad.error', { message: e.message }));
                                             } finally {
                                                 messageKey();
                                             }
@@ -976,13 +975,13 @@ const DiagramViewer: React.FC = () => {
                                 onClick={() => setVersionHistoryOpen(true)}
                             >
                                 <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 512 512" height="12px" width="12px" xmlns="http://www.w3.org/2000/svg"><path d="M256 8C119 8 8 119 8 256s111 248 248 248 248-111 248-248S393 8 256 8zm0 448c-110.5 0-200-89.5-200-200S145.5 56 256 56s200 89.5 200 200-89.5 200-200 200zm61.8-104.4l-84.9-61.7c-3.1-2.3-4.9-5.9-4.9-9.7V116c0-6.6 5.4-12 12-12h32c6.6 0 12 5.4 12 12v141.7l66.8 48.6c5.4 3.9 6.5 11.4 2.6 16.8L334.6 349c-3.9 5.3-11.4 6.5-16.8 2.6z"></path></svg> 
-                                版本历史
+                                {t('diagramViewer.versionHistory')}
                             </button>
                             <button
                                 className="flex items-center justify-center gap-1 px-2 py-1.5 bg-white/50 hover:bg-black/5 dark:bg-[#1e293b]/50 dark:hover:bg-white/10 text-xs font-medium text-gray-700 dark:text-gray-300 rounded-md transition-colors border-none outline-none cursor-pointer"
                                 onClick={() => setCloudManagerVisible(true)}
                             >
-                                <CloudOutlined /> 网盘 <span style={{ fontSize: '11px', opacity: 0.5 }}>👑</span>
+                                <CloudOutlined /> {t('diagramViewer.cloudDrive')} <span style={{ fontSize: '11px', opacity: 0.5 }}>👑</span>
                             </button>
                             <div className="flex items-center gap-2">
                                 {activeUsers && activeUsers.length > 0 && (
@@ -1002,13 +1001,13 @@ const DiagramViewer: React.FC = () => {
                                         ))}
                                     </Avatar.Group>
                                 )}
-                                <Tooltip title={isCollabEnabled ? "协同会话进行中" : "开启实时协作分享"}>
+                                <Tooltip title={isCollabEnabled ? t('diagramViewer.collab.active') : t('diagramViewer.collab.start')}>
                                     <button
                                         className="flex items-center justify-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-xs font-semibold text-blue-600 dark:text-blue-400 rounded-lg transition-all border-none outline-none cursor-pointer shadow-sm"
                                         onClick={() => setCollabModalVisible(true)}
                                     >
                                         <TeamOutlined style={{ fontSize: '14px' }} />
-                                        协作分享
+                                        {t('diagramViewer.collab.share')}
                                         {isCollabEnabled && (
                                             <div className="relative flex h-2 w-2 ml-0.5">
                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
@@ -1018,7 +1017,7 @@ const DiagramViewer: React.FC = () => {
                                     </button>
                                 </Tooltip>
                             </div>
-                            <Tooltip title="防误触保护只读锁 (阅览展示推荐)">
+                            <Tooltip title={t('diagramViewer.readonlyTooltip')}>
                                 <Switch
                                     size="small"
                                     checked={isReadonly}
@@ -1184,7 +1183,7 @@ const DiagramViewer: React.FC = () => {
                                                                     if (bridge?.onAnalyze) {
                                                                         return bridge.onAnalyze();
                                                                     }
-                                                                    return { summary: '无法执行分析: Bridge 未就绪', nodes: [], issues: [] };
+                                                                    return { summary: t('diagramViewer.ai.analyzeError'), nodes: [], issues: [] };
                                                                 },
                                                                 onExport: (type) => {
                                                                     if (type === 'png') exportToPNG();
@@ -1209,7 +1208,7 @@ const DiagramViewer: React.FC = () => {
                                                                         .map(([key, value]) => `  --${key}: ${value} !important;`)
                                                                         .join('\n');
                                                                     styleTag.innerHTML = `:root {\n${cssVars}\n}`;
-                                                                    message.success('🎨 AI 审美方案已应用');
+                                                                    message.success(t('diagramViewer.aiThemeApplied'));
                                                                 },
                                                                 onTogglePresentation: (active) => {
                                                                     setIsPresentationMode(active);
@@ -1233,11 +1232,11 @@ const DiagramViewer: React.FC = () => {
                                                 }
                                                 onAiTabIntercept={useCallback(() => {
                                                     if (!hasFeature('ai-assistant')) {
-                                                        showUpgradeModal('AI 架构助手');
+                                                        showUpgradeModal(t('diagramViewer.aiAssistant'));
                                                         return false;
                                                     }
                                                     return true;
-                                                }, [hasFeature, showUpgradeModal])}
+                                                }, [hasFeature, showUpgradeModal, t])}
                                                 renderThemeSelector={
                                                     <EnhancedThemeSelector />
                                                 }

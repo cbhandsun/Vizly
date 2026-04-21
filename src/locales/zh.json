@@ -13,7 +13,8 @@
         "error": "错误",
         "success": "成功",
         "confirm": "确定",
-        "delete": "删除"
+        "delete": "删除",
+        "proFeature": "Pro 功能"
     },
     "templates": {
         "title": "模板库",
@@ -585,6 +586,47 @@
             "multiDocument": "多文档",
             "offPageConnector": "页外连接器",
             "internalStorage": "内部存储"
+        }
+    },
+    "diagramViewer": {
+        "canvasNotFound": "无法连接到画布，请重试",
+        "saveAs": {
+            "title": "另存为至 {{target}}...",
+            "namePlaceholder": "请输入图表名称：",
+            "nameRequired": "名称不能为空",
+            "saving": "正在保存至 {{target}}...",
+            "localSuccess": "已存入本地模板库",
+            "cloudSuccess": "存入云端成功",
+            "error": "保存失败：{{message}}"
+        },
+        "directSave": {
+            "saving": "覆盖保存至 {{provider}}...",
+            "success": "覆盖保存成功",
+            "error": "覆盖出错: {{message}}"
+        },
+        "cloudLoad": {
+            "error": "加载云端图表失败: {{message}}"
+        },
+        "presentation": {
+            "exit": "演示模式已退出",
+            "hint": "🎬 点击或按 ESC 退出演示模式"
+        },
+        "export": {
+            "pdf": "多页无缝 PDF 导出",
+            "svg": "超高清矢量 SVG"
+        },
+        "versionHistory": "版本历史",
+        "cloudDrive": "网盘",
+        "aiThemeApplied": "🎨 AI 审美方案已应用",
+        "aiAssistant": "AI 架构助手",
+        "collab": {
+            "active": "协同会话进行中",
+            "start": "开启实时协作分享",
+            "share": "协作分享"
+        },
+        "readonlyTooltip": "防误触保护只读锁 (阅览展示推荐)",
+        "ai": {
+            "analyzeError": "无法执行分析: Bridge 未就绪"
         }
     },
     "header": {
