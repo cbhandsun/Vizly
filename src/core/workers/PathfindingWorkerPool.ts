@@ -81,9 +81,11 @@ export class PathfindingWorkerPool {
         // Slow path: enqueue and wait for release
         // [H-8] Default priority 1 (normal). Use acquireWorkerWithPriority for interactive tasks.
         return new Promise<number>((resolve, reject) => {
-            this.workerWaiters.push({ resolve, reject, priority: 1 });
-            // Keep sorted: lowest priority number = highest urgency
-            this.workerWaiters.sort((a, b) => a.priority - b.priority);
+            // [K-5] Binary-search sorted insertion instead of push+sort.
+            // workerWaiters is always maintained sorted by priority.
+            // splice position found via binary search in O(log N), total O(N) for element shifts.
+            // For pool sizes < 8 this is essentially O(1) vs O(N log N) for sort.
+            this.insertWaiterSorted({ resolve, reject, priority: 1 });
         });
     }
 
@@ -97,9 +99,19 @@ export class PathfindingWorkerPool {
             return Promise.resolve(workerIndex);
         }
         return new Promise<number>((resolve, reject) => {
-            this.workerWaiters.push({ resolve, reject, priority });
-            this.workerWaiters.sort((a, b) => a.priority - b.priority);
+            this.insertWaiterSorted({ resolve, reject, priority });
         });
+    }
+
+    /** [K-5] Insert a waiter into the sorted workerWaiters array using binary search. */
+    private insertWaiterSorted(waiter: { resolve: (idx: number) => void; reject: (err: Error) => void; priority: number }): void {
+        let lo = 0, hi = this.workerWaiters.length;
+        while (lo < hi) {
+            const mid = (lo + hi) >>> 1;
+            if (this.workerWaiters[mid].priority <= waiter.priority) lo = mid + 1;
+            else hi = mid;
+        }
+        this.workerWaiters.splice(lo, 0, waiter);
     }
 
     /**

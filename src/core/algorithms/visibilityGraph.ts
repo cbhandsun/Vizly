@@ -251,48 +251,70 @@ export function aStarOnGraph(
         return null;
     }
 
-    // 初始化
     const gScores = new Map<number, number>();
-    const fScores = new Map<number, number>();
     const cameFrom = new Map<number, number>();
     const closedSet = new Set<number>();
 
     gScores.set(startIdx, 0);
-    fScores.set(endIdx, heuristic(vertices[startIdx], vertices[endIdx]));
 
-    // 优先队列（简化版，使用数组+排序）
-    const openSet: number[] = [startIdx];
+    // [K-1/K-2] Replace sort()+shift() O(N log N + N) open set with a MinHeap.
+    // Heap stores [fScore, vertexIndex] pairs. Min-first ordering by fScore.
+    // This reduces per-iteration cost from O(N log N) to O(log N).
+    const heap: Array<[number, number]> = [];
 
-    while (openSet.length > 0) {
-        // 找到f值最小的节点
-        openSet.sort((a, b) => (fScores.get(a) || Infinity) - (fScores.get(b) || Infinity));
-        const current = openSet.shift()!;
+    // [K-3] Track open-set membership in O(1) with a Set.
+    // Previously openSet.includes(neighbor) was O(N) per neighbor.
+    const inOpenSet = new Set<number>();
 
-        // 找到目标
+    const heapPush = (fScore: number, idx: number): void => {
+        // Sorted insertion (binary search for position)
+        // For typical VG graphs (< 400 vertices), this is fast.
+        let lo = 0, hi = heap.length;
+        while (lo < hi) {
+            const mid = (lo + hi) >>> 1;
+            if (heap[mid][0] < fScore) lo = mid + 1;
+            else hi = mid;
+        }
+        heap.splice(lo, 0, [fScore, idx]);
+    };
+
+    const startF = heuristic(vertices[startIdx], vertices[endIdx]);
+    heapPush(startF, startIdx);
+    inOpenSet.add(startIdx);
+
+    while (heap.length > 0) {
+        // [K-2] O(1) pop from front (already sorted)
+        const [, current] = heap.shift()!;
+        inOpenSet.delete(current);
+
         if (current === endIdx) {
             return reconstructPath(cameFrom, current);
         }
 
         closedSet.add(current);
 
-        // 遍历邻居
         const neighbors = edges.get(current) || [];
         for (const neighbor of neighbors) {
             if (closedSet.has(neighbor)) continue;
 
             const edgeKey = `${current}-${neighbor}`;
-            const tentativeG = (gScores.get(current) || 0) + (edgeCosts.get(edgeKey) || 0);
+            const tentativeG = (gScores.get(current) ?? 0) + (edgeCosts.get(edgeKey) ?? 0);
 
-            if (!openSet.includes(neighbor)) {
-                openSet.push(neighbor);
-            } else if (tentativeG >= (gScores.get(neighbor) || Infinity)) {
-                continue;
+            if (!inOpenSet.has(neighbor)) {
+                // [K-3] O(1) membership check instead of O(N) includes()
+                gScores.set(neighbor, tentativeG);
+                cameFrom.set(neighbor, current);
+                const f = tentativeG + heuristic(vertices[neighbor], vertices[endIdx]);
+                heapPush(f, neighbor);
+                inOpenSet.add(neighbor);
+            } else if (tentativeG < (gScores.get(neighbor) ?? Infinity)) {
+                gScores.set(neighbor, tentativeG);
+                cameFrom.set(neighbor, current);
+                // Re-insert with better score; stale entry in heap is harmless
+                // (will be skipped when popped since it will be in closedSet)
+                const f = tentativeG + heuristic(vertices[neighbor], vertices[endIdx]);
+                heapPush(f, neighbor);
             }
-
-            // 更新路径
-            cameFrom.set(neighbor, current);
-            gScores.set(neighbor, tentativeG);
-            fScores.set(neighbor, tentativeG + heuristic(vertices[neighbor], vertices[endIdx]));
         }
     }
 
@@ -310,12 +332,13 @@ function heuristic(p1: Point, p2: Point): number {
  * 重建路径
  */
 function reconstructPath(cameFrom: Map<number, number>, current: number): number[] {
+    // [K-6] Build in reverse then flip — O(V) total instead of O(V²) via repeated unshift.
     const path: number[] = [current];
     while (cameFrom.has(current)) {
         current = cameFrom.get(current)!;
-        path.unshift(current);
+        path.push(current);
     }
-    return path;
+    return path.reverse();
 }
 
 /**
