@@ -317,7 +317,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
     // ---- "更多"菜单：低频功能收纳 ----
     const moreMenuItems: MenuProps['items'] = useMemo(() => [
         {
-            key: 'file-group', label: '文件操作', type: 'group' as const, children: [
+            key: 'file-group', label: t('designer.toolbar.fileGroup'), type: 'group' as const, children: [
                 ...(onImportClick ? [{
                     key: 'import',
                     label: t('designer.toolbar.import', '打开本地 JSON...'),
@@ -334,7 +334,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
         },
         { type: 'divider' as const },
         {
-            key: 'view-group', label: '视图控制', type: 'group' as const, children: [
+            key: 'view-group', label: t('designer.toolbar.viewGroup'), type: 'group' as const, children: [
                 {
                     key: 'grid',
                     label: gridInfo.title,
@@ -365,15 +365,15 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
         { type: 'divider' as const },
         {
             key: 'clear-cache',
-            label: '清除本地缓存',
+            label: t('designer.toolbar.clearCache'),
             icon: <FaTrashAlt />,
             danger: true,
             onClick: () => {
                 appModal.confirm({
-                    title: '清除缓存',
-                    content: '将清除所有本地缓存数据（包括设置和自动保存），页面将自动刷新。确定继续？',
-                    okText: '确认清除',
-                    cancelText: '取消',
+                    title: t('designer.toolbar.clearCacheTitle'),
+                    content: t('designer.toolbar.clearCacheContent'),
+                    okText: t('designer.toolbar.clearCacheConfirm'),
+                    cancelText: t('common.cancel'),
                     okButtonProps: { danger: true },
                     onOk: () => {
                         // 1. 抢救当前进度 ID（从 URL 查询参数 或 LocalStorage 中临时保存）
@@ -433,7 +433,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
         };
 
     return (
-        <div ref={toolbarRef} style={toolbarStyle} className="modern-toolbar" role="toolbar" aria-label="图表工具栏">
+        <div ref={toolbarRef} style={toolbarStyle} className="modern-toolbar" role="toolbar" aria-label={t('designer.toolbar.toolbarAriaLabel')}>
             {/* 内部 Flex 容器 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {/* 拖动手柄 */}
@@ -442,7 +442,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
                     onDoubleClick={handleDoubleClick}
                     title={t('designer.toolbar.dragToMove')}
                     role="separator"
-                    aria-roledescription="拖动手柄"
+                    aria-roledescription={t('designer.toolbar.dragHandle')}
                     className="toolbar-drag-handle"
                     style={{
                         cursor: isDragging ? 'grabbing' : 'grab',
@@ -461,7 +461,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
                     {/* ── 创作工具栏 (Creation Tools) ── */}
                     {onActivatePointer && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginRight: 4, paddingRight: 6, borderRight: '1px solid var(--designer-border)' }}>
-                            <Tooltip title="普通选择器 (V)">
+                            <Tooltip title={t('designer.toolbar.pointer')}>
                                 <Button 
                                     type={!isDrawingMode && !isMarqueeActive ? 'primary' : 'text'} 
                                     icon={<FaMousePointer />} 
@@ -470,7 +470,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
                             </Tooltip>
                             
                             {toggleSelectionMode && (
-                            <Tooltip title={isMarqueeActive ? "退出框选模式 (Esc)" : "框选模式 (S)"}>
+                            <Tooltip title={isMarqueeActive ? t('designer.toolbar.marqueeExit') : t('designer.toolbar.marqueeEnter')}>
                                 <Button 
                                     type={isMarqueeActive ? 'primary' : 'text'} 
                                     icon={<FaRegObjectGroup />} 
@@ -480,7 +480,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
                             )}
 
                             {onToggleDrawingMode && (
-                                <Tooltip title="自由画笔 (P)">
+                                <Tooltip title={t('designer.toolbar.drawingMode')}>
                                     <Button 
                                         type={isDrawingMode ? 'primary' : 'text'} 
                                         icon={<FaPen />} 
@@ -490,7 +490,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
                             )}
 
                             {onAddStickyNote && (
-                                <Tooltip title="便签 (S)">
+                                <Tooltip title={t('designer.toolbar.stickyNote')}>
                                     <Button 
                                         type="text" 
                                         icon={<FaStickyNote />} 
@@ -501,7 +501,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
                             )}
 
                             {onAddMindMap && (
-                                <Tooltip title="思维导图 (M)">
+                                <Tooltip title={t('designer.toolbar.mindMap')}>
                                     <Button 
                                         type="text" 
                                         icon={<FaProjectDiagram />} 
@@ -512,7 +512,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
                             )}
 
                             {setIsCommentMode && (
-                                <Tooltip title={isCommentMode ? "退出评论模式 (C)" : "评论模式 (C)"}>
+                                <Tooltip title={isCommentMode ? t('designer.toolbar.commentModeExit') : t('designer.toolbar.commentMode')}>
                                     <Button 
                                         type={isCommentMode ? 'primary' : 'text'} 
                                         icon={<FaRegComment />} 
@@ -530,12 +530,12 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
                             <Button type="text" icon={<FaUndo />} onClick={onUndo} disabled={!canUndo} aria-label={t('designer.toolbar.undo')} style={{ borderRadius: '6px 0 0 6px' }} />
                         </Tooltip>
                         {onShowHistory && (
-                            <Tooltip title={`历史记录${historyCount ? ` (${historyCount})` : ''}`}>
+                            <Tooltip title={historyCount ? t('designer.toolbar.historyWithCount', { count: historyCount }) : t('designer.toolbar.historyPanel')}>
                                 <Button
                                     type="text"
                                     size="small"
                                     onClick={onShowHistory}
-                                    aria-label="历史记录"
+                                    aria-label={t('designer.toolbar.historyPanel')}
                                     style={{
                                         width: 14,
                                         height: 32,
@@ -603,7 +603,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
 
                     {/* ── AI 助手 ── */}
                     {onToggleAI && (
-                        <Tooltip title={<>{t('aiChat.title')} {showAiCrown && <span style={{ marginLeft: 4, fontSize: '13px' }} title="Pro 功能">👑</span>}</>}>
+                        <Tooltip title={<>{t('aiChat.title')} {showAiCrown && <span style={{ marginLeft: 4, fontSize: '13px' }} title={t('common.proFeature')}>👑</span>}</>}>
                             <Button
                                 type={aiChatActive ? 'primary' : 'text'}
                                 ghost={aiChatActive}
@@ -618,18 +618,18 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
                     {/* ── 主链路相关 (Flow Focus) ── */}
                     {!hideFlowFocusControls && onToggleHighlightMainFlow && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 4, paddingLeft: 6, borderLeft: '1px solid var(--designer-border)' }}>
-                            <Tooltip title={highlightMainFlow ? '取消高亮主链路' : '高亮主干链路'}>
+                            <Tooltip title={highlightMainFlow ? t('designer.toolbar.unhighlightMainFlow') : t('designer.toolbar.highlightMainFlow')}>
                                 <Button
                                     type={highlightMainFlow ? 'primary' : 'text'}
                                     ghost={highlightMainFlow}
                                     icon={<FaProjectDiagram />}
                                     onClick={onToggleHighlightMainFlow}
-                                    aria-label={highlightMainFlow ? '取消高亮主链路' : '高亮主干链路'}
+                                    aria-label={highlightMainFlow ? t('designer.toolbar.unhighlightMainFlow') : t('designer.toolbar.highlightMainFlow')}
                                     aria-pressed={highlightMainFlow}
                                 />
                             </Tooltip>
                             {onToggleShowOnlyMainFlow && (
-                                <Tooltip title={showOnlyMainFlow ? '恢复完整链路体验' : '过滤精简直视主干'}>
+                                <Tooltip title={showOnlyMainFlow ? t('designer.toolbar.restoreFullFlow') : t('designer.toolbar.showOnlyMainFlow')}>
                                     <Button
                                         type={showOnlyMainFlow ? 'primary' : 'text'}
                                         ghost={showOnlyMainFlow}
@@ -645,8 +645,8 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
 
                     {/* ── 更多菜单（低频功能） ── */}
                     <Dropdown menu={{ items: moreMenuItems }} placement="top" trigger={['click']} styles={{ root: { minWidth: 220, whiteSpace: 'nowrap' } }}>
-                        <Tooltip title="更多操作">
-                            <Button type="text" icon={<FaEllipsisH />} aria-label="更多操作" />
+                        <Tooltip title={t('designer.toolbar.moreActions')}>
+                            <Button type="text" icon={<FaEllipsisH />} aria-label={t('designer.toolbar.moreActions')} />
                         </Tooltip>
                     </Dropdown>
 
@@ -661,7 +661,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
                                             </span>
                                         )}
                                         {!hideGridControls && onToggleSnap && (
-                                            <Tooltip title={snapToGrid ? '网格吸附：开' : '网格吸附：关'}>
+                                            <Tooltip title={snapToGrid ? t('designer.toolbar.snapOn') : t('designer.toolbar.snapOff')}>
                                                 <Button
                                                     type="text"
                                                     size="small"
