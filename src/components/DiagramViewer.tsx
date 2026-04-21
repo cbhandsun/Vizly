@@ -51,6 +51,7 @@ import DiagramControlBridge from '@/core/components/shared/DiagramControlBridge'
 
 
 const DraggableSettingsPanel = React.lazy(() => import('./ui/DraggableSettingsPanel').then(m => ({ default: m.DraggableSettingsPanel })));
+import { appMessage } from '@/core/utils/antdStaticBridge';
 import { resolvePluginId } from '@/core/plugins/registry';
 
 import { ErrorBoundary } from './ui/ErrorBoundary';
@@ -246,17 +247,6 @@ const DiagramViewer: React.FC = () => {
     /** 沉浸式演示模式：隐藏 UI 侧边栏与工具栏 */
     const [isPresentationMode, setIsPresentationMode] = useState<boolean>(false);
 
-    // ESC 退出演示模式监听
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && isPresentationMode) {
-                setIsPresentationMode(false);
-                message.info('演示模式已退出');
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isPresentationMode]);
 
     /** 更强大的多端另存为统筹逻辑 */
     const handleSaveTo = useCallback(async (target: 's3' | 'supabase' | 'local') => {
@@ -624,6 +614,8 @@ const DiagramViewer: React.FC = () => {
             }
             if (e.key === 'Escape' && isPresentationMode) {
                 setIsPresentationMode(false);
+                // 演示模式退出提示（使用 appMessage 避免 ConfigProvider 外调用崩溃）
+                appMessage.info('演示模式已退出');
             }
         };
         window.addEventListener('keydown', onKeyDown);
