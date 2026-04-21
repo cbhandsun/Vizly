@@ -1580,5 +1580,63 @@
         "connecting": "正在连接协作服务...",
         "connected": "已连接协作服务",
         "disconnected": "协作连接已断开"
+    },
+    "storageConfig": {
+        "pageTitle": "云端存储配置",
+        "pageDescription": "配置 S3 兼容的云存储服务（如 AWS S3, MinIO, 阿里云 OSS, 七牛云等），用于同步和管理架构图。",
+        "saveSuccess": "配置已保存",
+        "saveFail": "保存失败",
+        "testSuccess": "连接成功！S3 配置有效。",
+        "testFail": {
+            "title": "连接失败",
+            "corsTitle": "检测到网络/CORS 错误",
+            "corsDesc": "从浏览器直接访问对象存储通常需要配置 跨域资源共享 (CORS)。请登录云服务商控制台（如七牛云、AWS），找到 Bucket 的 CORS 设置，并添加允许规则：",
+            "corsOrigin": "Origin (来源): * 或本站地址",
+            "corsMethods": "Methods (方法): GET, PUT, POST, HEAD",
+            "genericTitle": "无法连接到 S3 服务，请检查以下几点：",
+            "check1": "Endpoint 地址是否正确（需包含 http/https）",
+            "check2": "Access Key / Secret Key 是否正确",
+            "check3": "Bucket 是否存在且有权限访问",
+            "check4": "网络是否允许跨域 (CORS) 请求",
+            "errorDetail": "详细错误信息："
+        },
+        "form": {
+            "endpointLabel": "Endpoint API地址",
+            "endpointRequired": "请输入 Endpoint",
+            "bucketLabel": "Bucket 桶名称",
+            "bucketRequired": "请输入 Bucket 名称",
+            "regionLabel": "Region 区域",
+            "regionRequired": "请输入 Region",
+            "forcePathStyleLabel": "强制路径样式 (Path Style)",
+            "forcePathStyleTooltip": "许多 S3 兼容服务（如 MinIO）需要开启此选项",
+            "accessKeyRequired": "请输入 Access Key",
+            "secretKeyRequired": "请输入 Secret Key",
+            "saveBtn": "保存配置",
+            "testBtn": "测试连接"
+        },
+        "notes": {
+            "title": "说明",
+            "cors": "请确保您的 Bucket 允许跨域 (CORS) 访问，如果您是通过浏览器直接访问。",
+            "security": "Access Key 和 Secret Key 将仅保存在本地浏览器存储中。"
+        }
+    },
+    "upgrade": {
+        "title": "解锁高级功能",
+        "featureContext": "正在尝试使用：",
+        "subtitle": "升级至 Pro 版本，提升体验与效能！",
+        "features": {
+            "pdf": "多页高清 PDF 及 SVG 无损导出",
+            "collab": "云端多人实时协同编辑",
+            "history": "无限制的云端全量历史记录追溯",
+            "ai": "云端智能 AI 架构生成库"
+        },
+        "later": "暂不升级",
+        "subscribe": "立即订阅 Pro",
+        "loginFirst": "⚠️ 请先登录您的账号再进行订阅操作。",
+        "checkoutFail": "创建结账会话失败：{{error}}",
+        "gatewayFail": "请求网关失败：{{error}}",
+        "unknownError": "未知错误",
+        "unknownResponse": "未知服务器响应",
+        "statusError": "状态码 {{status}}: {{message}}"
     }
 }

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Form, Input, Button, Card, Switch, Typography, Space, Select } from 'antd';
 import { appMessage as message, appModal } from '@/core';
 import { SaveOutlined, ApiOutlined, CloudServerOutlined } from '@ant-design/icons';
@@ -9,6 +10,7 @@ const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
 const StorageConfigPage: React.FC = () => {
+    const { t } = useTranslation();
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const [testing, setTesting] = useState(false);
@@ -25,9 +27,9 @@ const StorageConfigPage: React.FC = () => {
         setLoading(true);
         try {
             storageService.saveConfig(values);
-            message.success('配置已保存');
+            message.success(t('storageConfig.saveSuccess'));
         } catch (error) {
-            message.error('保存失败');
+            message.error(t('storageConfig.saveFail'));
         } finally {
             setLoading(false);
         }
@@ -41,7 +43,7 @@ const StorageConfigPage: React.FC = () => {
             storageService.saveConfig(values);
 
             await storageService.testConnection();
-            message.success('连接成功！S3 配置有效。');
+            message.success(t('storageConfig.testSuccess'));
         } catch (error: any) {
             console.error(error);
             const errorDetails = JSON.stringify({
@@ -52,35 +54,34 @@ const StorageConfigPage: React.FC = () => {
             }, null, 2);
 
             appModal.error({
-                title: '连接失败',
+                title: t('storageConfig.testFail.title'),
                 width: 600,
                 content: (
                     <div>
                         {(error.message === 'Failed to fetch' || error.name === 'TypeError') && (
                             <div style={{ background: '#fff2f0', border: '1px solid #ffccc7', padding: '8px 12px', borderRadius: 4, marginBottom: 16 }}>
                                 <Paragraph type="danger" style={{ margin: 0, fontWeight: 'bold' }}>
-                                    检测到网络/CORS 错误
+                                    {t('storageConfig.testFail.corsTitle')}
                                 </Paragraph>
                                 <Paragraph style={{ margin: 0, fontSize: 12 }}>
-                                    从浏览器直接访问对象存储通常需要配置 <strong>跨域资源共享 (CORS)</strong>。
+                                    {t('storageConfig.testFail.corsDesc')}
                                     <br />
-                                    请登录云服务商控制台（如七牛云、AWS），找到 Bucket 的 CORS 设置，并添加允许规则：
                                     <ul style={{ paddingLeft: 20, marginTop: 4 }}>
-                                        <li>Origin (来源): <code>*</code> 或本站地址</li>
+                                        <li>Origin (来源): <code>*</code> {t('storageConfig.testFail.corsOrigin').replace('Origin (来源): * 或本站地址', '或本站地址')}</li>
                                         <li>Methods (方法): <code>GET, PUT, POST, HEAD</code></li>
                                     </ul>
                                 </Paragraph>
                             </div>
                         )}
-                        <p>无法连接到 S3 服务，请检查以下几点：</p>
+                        <p>{t('storageConfig.testFail.genericTitle')}</p>
                         <ul>
-                            <li>Endpoint 地址是否正确（需包含 http/https）</li>
-                            <li>Access Key / Secret Key 是否正确</li>
-                            <li>Bucket 是否存在且有权限访问</li>
-                            <li>网络是否允许跨域 (CORS) 请求</li>
+                            <li>{t('storageConfig.testFail.check1')}</li>
+                            <li>{t('storageConfig.testFail.check2')}</li>
+                            <li>{t('storageConfig.testFail.check3')}</li>
+                            <li>{t('storageConfig.testFail.check4')}</li>
                         </ul>
                         <div style={{ marginTop: 10 }}>
-                            <Text type="secondary">详细错误信息：</Text>
+                            <Text type="secondary">{t('storageConfig.testFail.errorDetail')}</Text>
                             <pre style={{
                                 background: '#f5f5f5',
                                 padding: 10,
@@ -123,7 +124,7 @@ const StorageConfigPage: React.FC = () => {
                     <div className="workspace-header-title">Vizly</div>
                 </div>
                 <div style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--vz-text-secondary)' }}>
-                    Settings & Storage
+                    Settings &amp; Storage
                 </div>
                 <div style={{ width: 220, display: 'flex', justifyContent: 'flex-end' }}>
                      <Button type="text" onClick={() => navigate('/manage')}>Return to Workspace</Button>
@@ -133,16 +134,16 @@ const StorageConfigPage: React.FC = () => {
             <div style={{ padding: '48px 24px', maxWidth: '800px', margin: '0 auto' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%' }}>
                 <div>
-                    <Title level={2}><CloudServerOutlined /> 云端存储配置</Title>
+                    <Title level={2}><CloudServerOutlined /> {t('storageConfig.pageTitle')}</Title>
                     <Paragraph type="secondary">
-                        配置 S3 兼容的云存储服务（如 AWS S3, MinIO, 阿里云 OSS, 七牛云等），用于同步和管理架构图。
+                        {t('storageConfig.pageDescription')}
                     </Paragraph>
                 </div>
 
-                <Card 
-                    title={<span style={{ fontWeight: 700, letterSpacing: '-0.2px' }}>Connection Settings</span>} 
-                    bordered={false} 
-                    style={{ 
+                <Card
+                    title={<span style={{ fontWeight: 700, letterSpacing: '-0.2px' }}>Connection Settings</span>}
+                    bordered={false}
+                    style={{
                         borderRadius: 12,
                         boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 16px 32px -8px rgba(0,0,0,0.05)',
                         background: 'rgba(255, 255, 255, 0.8)',
@@ -160,25 +161,25 @@ const StorageConfigPage: React.FC = () => {
                     >
                         <Form.Item
                             name="endpoint"
-                            label="Endpoint API地址"
+                            label={t('storageConfig.form.endpointLabel')}
                             tooltip="例如: https://s3.amazonaws.com 或 https://play.min.io"
-                            rules={[{ required: true, message: '请输入 Endpoint' }]}
+                            rules={[{ required: true, message: t('storageConfig.form.endpointRequired') }]}
                         >
                             <Input placeholder="https://..." />
                         </Form.Item>
 
                         <Form.Item
                             name="bucket"
-                            label="Bucket 桶名称"
-                            rules={[{ required: true, message: '请输入 Bucket 名称' }]}
+                            label={t('storageConfig.form.bucketLabel')}
+                            rules={[{ required: true, message: t('storageConfig.form.bucketRequired') }]}
                         >
                             <Input placeholder="my-diagrams-bucket" />
                         </Form.Item>
 
                         <Form.Item
                             name="region"
-                            label="Region 区域"
-                            rules={[{ required: true, message: '请输入 Region' }]}
+                            label={t('storageConfig.form.regionLabel')}
+                            rules={[{ required: true, message: t('storageConfig.form.regionRequired') }]}
                         >
                             <Input placeholder="us-east-1" />
                         </Form.Item>
@@ -186,7 +187,7 @@ const StorageConfigPage: React.FC = () => {
                         <Form.Item
                             name="accessKeyId"
                             label="Access Key ID"
-                            rules={[{ required: true, message: '请输入 Access Key' }]}
+                            rules={[{ required: true, message: t('storageConfig.form.accessKeyRequired') }]}
                         >
                             <Input.Password placeholder="Access Key" />
                         </Form.Item>
@@ -194,16 +195,16 @@ const StorageConfigPage: React.FC = () => {
                         <Form.Item
                             name="secretAccessKey"
                             label="Secret Access Key"
-                            rules={[{ required: true, message: '请输入 Secret Key' }]}
+                            rules={[{ required: true, message: t('storageConfig.form.secretKeyRequired') }]}
                         >
                             <Input.Password placeholder="Secret Key" />
                         </Form.Item>
 
                         <Form.Item
                             name="s3ForcePathStyle"
-                            label="强制路径样式 (Path Style)"
+                            label={t('storageConfig.form.forcePathStyleLabel')}
                             valuePropName="checked"
-                            tooltip="许多 S3 兼容服务（如 MinIO）需要开启此选项"
+                            tooltip={t('storageConfig.form.forcePathStyleTooltip')}
                         >
                             <Switch />
                         </Form.Item>
@@ -211,20 +212,20 @@ const StorageConfigPage: React.FC = () => {
                         <Form.Item>
                             <Space>
                                 <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading}>
-                                    保存配置
+                                    {t('storageConfig.form.saveBtn')}
                                 </Button>
                                 <Button icon={<ApiOutlined />} onClick={handleTestConnection} loading={testing}>
-                                    测试连接
+                                    {t('storageConfig.form.testBtn')}
                                 </Button>
                             </Space>
                         </Form.Item>
                     </Form>
                 </Card>
 
-                <Card title="说明" size="small">
+                <Card title={t('storageConfig.notes.title')} size="small">
                     <ul>
-                        <li>请确保您的 Bucket 允许跨域 (CORS) 访问，如果您是通过浏览器直接访问。</li>
-                        <li>Access Key 和 Secret Key 将仅保存在本地浏览器存储中。</li>
+                        <li>{t('storageConfig.notes.cors')}</li>
+                        <li>{t('storageConfig.notes.security')}</li>
                     </ul>
                 </Card>
             </div>
