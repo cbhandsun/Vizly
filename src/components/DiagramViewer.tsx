@@ -301,7 +301,9 @@ const DiagramViewer: React.FC = () => {
                     if (target === 'local') {
                         // 本地存储写入逻辑
                         const raw = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY);
-                        const map = raw ? JSON.parse(raw) : {};
+                        const parsed = raw ? JSON.parse(raw) : {};
+                        // Guard: 如果存储损坏（非对象），回退到空对象防止后续赋值崩溃
+                        const map: Record<string, unknown> = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
                         map[nameStr] = dataToSave;
                         localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(map));
                         message.success('已存入本地模板库');
