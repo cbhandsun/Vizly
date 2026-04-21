@@ -22,18 +22,14 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
             childrenMap.get(e.source)!.push(e.target);
         }
 
-        const buildNode = (nodeId: string): DataNode => {
-            const node = nodes.find(n => n.id === nodeId);
-            // Support simple text fallback if label is complex HTML, or just strip tags
-            
-            // Note: Since React Flow nodes might store HTML in label, 
-            // for outline purposes we might want to strip HTML or parse it.
-            // But we can just render the raw string for simplicity if it's mostly text.
-            let rawTitle = (node?.data?.label as string) || 'Untitled';
-            
-            // Simple HTML tag stripper for safe tree rendering
-            const cleanTitle = rawTitle.replace(/<[^>]+>/g, '').trim() || 'Untitled';
+        // [S-2] Pre-build nodeMap: O(N) once, so buildNode lookups are O(1) instead of O(N).
+        // Without this, each buildNode call is O(N) via nodes.find(), making the full tree O(N²).
+        const nodeMap = new Map(nodes.map(n => [n.id, n]));
 
+        const buildNode = (nodeId: string): DataNode => {
+            const node = nodeMap.get(nodeId); // [S-2] O(1)
+            let rawTitle = (node?.data?.label as string) || 'Untitled';
+            const cleanTitle = rawTitle.replace(/<[^>]+>/g, '').trim() || 'Untitled';
             const childrenIds = childrenMap.get(nodeId) || [];
             return {
                 title: cleanTitle,

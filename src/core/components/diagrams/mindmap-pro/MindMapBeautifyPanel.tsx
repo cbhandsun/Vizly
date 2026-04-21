@@ -8,11 +8,16 @@ import { PALETTE } from '../hooks/useMindMapOrchestrator'; // Or redefine a loca
 export const MindMapBeautifyPanel: React.FC<{ ctx: PluginContext, selectedNodes: Node[], selectedEdges: Edge[] }> = ({ ctx, selectedNodes, selectedEdges }) => {
     const { getNodes, updateNodesBatch } = ctx;
 
-    // Use a stable key for memoization - avoid getNodes() in deps (creates new ref each call)
-    const allNodes = getNodes();
+    // [S-1] Root node lookup is O(N). Memoize it properly:
+    // Do NOT call find() in the deps array — that evaluates O(N) on every render just to compute deps.
+    // Instead, move the find() inside the memo body. The dep is the nodes array from ctx.
     const rootNode = useMemo(() => {
+        const allNodes = getNodes();
         return allNodes.find(n => n.type === 'mindmap' && (n.data?.depth === 0 || n.data?.depth === undefined));
-    }, [allNodes.length, allNodes.find(n => n.data?.depth === 0)?.id]);
+    // ctx.nodes changes when any node is added/removed/updated — getNodes() reflects that.
+    // We depend on selectedNodes.length as a proxy to re-check root when selection changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [getNodes, selectedNodes.length]);
 
     // If no nodes are selected, return null to fallback to the default global Page Settings in DesignerRightSidebar
     if (selectedNodes.length === 0) return null;

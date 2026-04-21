@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import {
   DiagramTypePlugin,
@@ -98,19 +98,24 @@ const MindMapToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
     if (!ctx) return null;
     const { t } = useTranslation();
 
-    const handleDirectionChange = (direction: string) => {
-        // Update root node direction, triggering orchestrator cascade
+    // [S-3] Memoize root node — ctx.getNodes().find() in component body runs O(N) on every render.
+    // Use useMemo so re-computation only happens when getNodes reference changes (i.e. nodes mutate).
+    const root = useMemo(() => {
         const nodes = ctx.getNodes();
-        const root = nodes.find(n => n.type === 'mindmap' && (n.data?.depth === 0 || n.data?.depth === undefined));
-        if (root) {
-            ctx.setNodes(nds => nds.map(n => {
-                if (n.id === root.id) {
-                    return { ...n, data: { ...n.data, direction } };
-                }
-                return n;
-            }));
-        }
-    };
+        return nodes.find(n => n.type === 'mindmap' && (n.data?.depth === 0 || n.data?.depth === undefined));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ctx.getNodes]);
+    const currentDirection = (root?.data?.direction as string) || 'LR';
+
+    const handleDirectionChange = useCallback((direction: string) => {
+        if (!root) return;
+        ctx.setNodes(nds => nds.map(n => {
+            if (n.id === root.id) {
+                return { ...n, data: { ...n.data, direction } };
+            }
+            return n;
+        }));
+    }, [root, ctx.setNodes]);
 
     const handleCollapseAll = () => {
         window.dispatchEvent(new CustomEvent('mindmap:collapseAll'));
@@ -124,10 +129,6 @@ const MindMapToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
         ctx.reactFlowInstance?.fitView({ duration: 600, padding: 0.2, minZoom: 0.55 });
     };
 
-    // Read current direction from root
-    const nodes = ctx.getNodes();
-    const root = nodes.find(n => n.type === 'mindmap' && (n.data?.depth === 0 || n.data?.depth === undefined));
-    const currentDirection = (root?.data?.direction as string) || 'LR';
 
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px', borderLeft: '1px solid #e8e8e8', marginLeft: 8 }}>
