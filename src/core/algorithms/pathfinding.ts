@@ -69,31 +69,49 @@ export interface LineObstacle {
 
 // Minimal Priority Queue Implementation
 class MinHeap {
-    private heap: number[] = [];
+    // [I-6] Use Int32Array instead of number[] to eliminate per-push GC allocations.
+    // The heap stores grid indices (Int32), not floating-point values.
+    // Initial capacity = min(maxIndex, 65536) balances pre-allocation cost vs. coverage:
+    //   - A typical 100×100 grid (10K cells) easily fits in 65536 slots.
+    //   - For a 2M-cell grid, 65536 is still generous (open set peaks at sqrt(N) ~ 1414).
+    // Growth: capacity doubles on overflow (rare, only on pathologically dense graphs).
+    private heap: Int32Array;
+    private capacity: number;
+    private _size: number = 0;
     private weights: Float32Array;
 
     constructor(weights: Float32Array) {
         this.weights = weights;
+        this.capacity = Math.min(weights.length, 65536);
+        this.heap = new Int32Array(this.capacity);
     }
 
     push(index: number) {
-        this.heap.push(index);
-        this.bubbleUp(this.heap.length - 1);
+        if (this._size >= this.capacity) {
+            // Grow: double capacity (rare path)
+            const newCapacity = Math.min(this.capacity * 2, this.weights.length);
+            const newHeap = new Int32Array(newCapacity);
+            newHeap.set(this.heap.subarray(0, this._size));
+            this.heap = newHeap;
+            this.capacity = newCapacity;
+        }
+        this.heap[this._size] = index;
+        this.bubbleUp(this._size++);
     }
 
     pop(): number | undefined {
-        if (this.heap.length === 0) return undefined;
+        if (this._size === 0) return undefined;
         const top = this.heap[0];
-        const bottom = this.heap.pop();
-        if (this.heap.length > 0 && bottom !== undefined) {
-            this.heap[0] = bottom;
+        this._size--;
+        if (this._size > 0) {
+            this.heap[0] = this.heap[this._size];
             this.bubbleDown(0);
         }
         return top;
     }
 
     size(): number {
-        return this.heap.length;
+        return this._size;
     }
 
     private bubbleUp(i: number) {
@@ -109,7 +127,8 @@ class MinHeap {
     }
 
     private bubbleDown(i: number) {
-        const len = this.heap.length;
+        // [I-6] Use this._size (not heap.length) to avoid comparing uninitialized slots
+        const len = this._size;
         while (i >= 0) {
             const l = (i << 1) + 1;
             const r = l + 1;
