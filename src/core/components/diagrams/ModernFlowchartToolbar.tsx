@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
 import {
     FaUndo, FaRedo, FaSearchPlus, FaSearchMinus, FaCompressArrowsAlt, FaArrowsAltH,
     FaMagic, FaTh, FaKeyboard, FaBorderAll, FaBorderNone,
@@ -83,7 +83,7 @@ interface FlowchartToolbarProps {
     historyCount?: number;
 }
 
-export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
+export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo((
     canUndo, canRedo, onUndo, onRedo,
     onZoomIn, onZoomOut, onFitView, onFitWidth,
     autoRouting, toggleAutoRouting,
@@ -192,7 +192,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
         setPosition(null);
     }, []);
 
-    const getActiveLayoutKey = () => {
+    const activeLayoutKey = useMemo(() => {
         if (!lastDomainStrategy) return undefined;
         if (lastDomainStrategy === 'force') return 'force';
         if (lastDomainStrategy === 'domain-vertical') return 'domain-vertical';
@@ -201,13 +201,15 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
             return `${lastDomainStrategy}-${lastDomainDirection.toLowerCase()}`;
         }
         return lastDomainStrategy;
-    };
-    
-    const activeLayoutKey = getActiveLayoutKey();
-    const activeNodeLayoutKey = lastNodeLayout ? `node-${lastNodeLayout}` : undefined;
-    const selectedLayoutKeys = [activeLayoutKey, activeNodeLayoutKey].filter(Boolean) as string[];
+    }, [lastDomainStrategy, lastDomainDirection]);
 
-    const layoutMenu: MenuProps['items'] = [
+    const activeNodeLayoutKey = lastNodeLayout ? `node-${lastNodeLayout}` : undefined;
+    const selectedLayoutKeys = useMemo(
+        () => [activeLayoutKey, activeNodeLayoutKey].filter(Boolean) as string[],
+        [activeLayoutKey, activeNodeLayoutKey]
+    );
+
+    const layoutMenu: MenuProps['items'] = useMemo(() => [
         // ── 树形布局 ──
         {
             key: 'group-tree', label: t('designer.flowchart.layout.treeGroup', '树形布局'), type: 'group' as const, children: [
@@ -300,9 +302,9 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
                 ]
             },
         ] : []),
-    ];
+    ], [t, onStrategyLayout, lastNodeLayout, lastDomainStrategy, lastDomainDirection]);
 
-    const getGridInfo = () => {
+    const gridInfo = useMemo(() => {
         if (!showGrid) return { title: t('designer.toolbar.gridOff'), icon: <FaBorderNone /> };
         switch (gridVariant) {
             case BackgroundVariant.Dots: return { title: t('designer.toolbar.gridDots'), icon: <FaTh /> };
@@ -310,11 +312,10 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
             case BackgroundVariant.Cross: return { title: t('designer.toolbar.gridCross'), icon: <FaTh style={{ transform: 'rotate(45deg)' }} /> };
             default: return { title: t('designer.toolbar.showGrid'), icon: <FaTh /> };
         }
-    };
-    const gridInfo = getGridInfo();
+    }, [showGrid, gridVariant, t]);
 
     // ---- "更多"菜单：低频功能收纳 ----
-    const moreMenuItems: MenuProps['items'] = [
+    const moreMenuItems: MenuProps['items'] = useMemo(() => [
         {
             key: 'file-group', label: '文件操作', type: 'group' as const, children: [
                 ...(onImportClick ? [{
@@ -349,7 +350,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
                 ...(toggleMinimap ? [{
                     key: 'minimap',
                     label: showMinimap ? t('designer.toolbar.hideMinimap', '隐藏小地图') : t('designer.toolbar.showMinimap', '显示小地图'),
-                    icon: <FaMap />, // We'll use FaMap from the existing react-icons/fa which should be imported
+                    icon: <FaMap />,
                     onClick: toggleMinimap,
                 }] : []),
             ]
@@ -396,7 +397,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
                 });
             },
         },
-    ];
+    ], [t, gridInfo, showRuler, toggleRuler, toggleMinimap, showMinimap, onShowShortcuts, onImportClick, onExport]);
 
     // 计算工具栏样式
     const toolbarStyle: React.CSSProperties = position
@@ -689,4 +690,6 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
             </div>
         </div>
     );
-};
+});
+
+ModernFlowchartToolbar.displayName = 'ModernFlowchartToolbar';

@@ -1,4 +1,4 @@
-import React, { memo, useState } from 'react';
+import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { Popover, Avatar, Badge, theme } from 'antd';
 import { useDiagramStore } from '../../store/useDiagramStore';
@@ -8,13 +8,17 @@ import './CommentNode.css';
 /**
  * 评论 Pin 节点 (Phase 11)
  * 用于在画布上显示一个可交互的评论标记，点击后展示详情和回复界面
+ *
+ * [Perf] Uses a selector to subscribe only to the specific comment object,
+ * avoiding re-renders when unrelated comments change.
  */
 const CommentNode = ({ id, selected }: NodeProps) => {
     const { token } = theme.useToken();
-    const { comments } = useDiagramStore();
-    const [open, setOpen] = useState(false);
+    // [Perf] Targeted selector: only re-renders when *this* comment changes,
+    // not when other comments are added/updated/deleted.
+    const comment = useDiagramStore(state => state.comments.find(c => c.id === id));
+    const [open, setOpen] = React.useState(false);
 
-    const comment = comments.find(c => c.id === id);
     if (!comment) return null;
 
     const { authorName, authorColor, replies, isResolved } = comment;
