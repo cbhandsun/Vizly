@@ -209,18 +209,20 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [activePanel, closeDrawer]);
 
-    // ---- Rail 按钮定义 ----
-    const builtInButtons = [
+    // [O-2] Memoize rail button definitions — inline arrays rebuild on every render,
+    // causing railButtons.map() children to create new object references and
+    // Tooltip/button components to unnecessarily diff on each keystroke/drag.
+    const builtInButtons = useMemo(() => [
         { key: 'navigator', icon: <FaCompass />, label: t('designer.sidebar.navigator') },
         { key: 'comments', icon: <FaRegComment />, label: '评论反馈' },
         ...(onCreateLayer ? [{ key: 'layers', icon: <FaStream />, label: t('designer.sidebar.layers') }] : []),
         ...(templates && templates.length > 0 ? [{ key: 'templates', icon: <FaStar />, label: `模板 (${templates.length})` }] : []),
-    ];
+    ], [t, onCreateLayer, templates]);
 
-    const railButtons = [
+    const railButtons = useMemo(() => [
         ...pluginPanels.map(p => ({ key: p.id, icon: p.icon, label: p.title })),
         ...builtInButtons
-    ];
+    ], [pluginPanels, builtInButtons]);
 
     // ---- 渲染 Drawer 内容 ----
     const renderDrawerContent = () => {

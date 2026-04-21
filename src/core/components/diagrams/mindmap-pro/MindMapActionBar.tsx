@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useReactFlow, Node, Edge } from '@xyflow/react';
+import { useReactFlow, Node, Edge, useStore } from '@xyflow/react';
 import { Popover, Divider } from 'antd';
 import { 
   SisternodeOutlined, 
@@ -59,9 +59,11 @@ export const MindMapActionBar: React.FC = () => {
       } as any;
   }, [getNodes, getEdges, setNodes]);
   
-  // Real-time getters
-  const selectedNodes = getNodes().filter(n => n.selected);
-  const selectedEdges = getEdges().filter(e => e.selected);
+  // [O-1] Use useStore selectors instead of getNodes().filter() in component body.
+  // getNodes() in body = O(N) on every parent re-render with no subscription.
+  // useStore subscribes only to selection changes, preventing unnecessary re-renders.
+  const selectedNodes = useStore(s => s.nodes.filter(n => n.selected));
+  const selectedEdges = useStore(s => s.edges.filter(e => e.selected));
   const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
 
   const handleAddChild = () => {
