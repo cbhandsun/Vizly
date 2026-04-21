@@ -671,9 +671,9 @@ export class NodeFactory {
       type,
       position,
       description: data.description || id,
-      // Provide empty domainClass to bypass the domainClass guard in createNode;
+      // Provide a fallback domainClass so the guard in createNode doesn't throw.
       // createNodeByType is a generic utility that doesn't operate in domain context.
-      domainClass: data.domainClass || '',
+      domainClass: data.domainClass || 'generic',
       data,
       style
     };
