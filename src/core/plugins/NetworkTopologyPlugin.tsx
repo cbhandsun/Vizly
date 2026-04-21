@@ -117,7 +117,24 @@ const NetworkPalette: React.FC = () => {
           background: 'rgba(255, 255, 255, 0.6)', border: '1px solid #f0f0f0'
         }}
       >
-        <div style={{ fontSize: 24, height: 28 }}><img src={`https://api.iconify.design/${def.icon}.svg`} style={{ width: 24, height: 24 }} alt="" /></div>
+        <div style={{ fontSize: 24, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <img
+            src={`https://api.iconify.design/${def.icon}.svg`}
+            style={{ width: 24, height: 24 }}
+            loading="lazy"
+            decoding="async"
+            alt={def.label}
+            onError={(e) => {
+              // Fallback: hide broken img, show colored first-letter badge
+              const img = e.currentTarget;
+              img.style.display = 'none';
+              const badge = document.createElement('span');
+              badge.textContent = def.label[0];
+              badge.style.cssText = `display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:${def.color}20;color:${def.color};font-weight:700;font-size:13px;`;
+              img.parentElement?.appendChild(badge);
+            }}
+          />
+        </div>
         <span style={{ fontSize: 10, textAlign: 'center', overflow: 'hidden', width: '100%', textOverflow: 'ellipsis' }}>{def.label}</span>
       </div>
     </Tooltip>

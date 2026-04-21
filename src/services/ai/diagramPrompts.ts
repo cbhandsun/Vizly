@@ -138,7 +138,35 @@ export const MINDMAP_SYSTEM_PROMPT = `你是一个专业的思维导图 (MindMap
 所有节点必须包含以下 data 属性：
 - **"side"**: "left" | "right" (决定分支向左还是向右生长。根节点的分支通常均匀分布在两侧)
 - **"depth"**: 数值 (根节点为 0, 子节点依此类推)
-- **"label"**: 节点标题
+- **"label"**: 节点标题（纯文本，不包含 HTML）
+
+## 可选扩展字段（让导图更丰富）
+节点 data 还支持以下可选字段，按需生成：
+- **"url"**: 字符串，节点关联的外部链接（如 "https://example.com"）。节点上会显示跳转图标。
+- **"priority"**: 1 | 2 | 3，优先级标记。1=低(蓝色)，2=中(橙色)，3=高(红色)。右上角显示角标 !/!!/!!!。
+- **"progress"**: 0 | 25 | 50 | 75 | 100，完成进度百分比。节点底部显示 SVG 进度圆环。100 时显示为完成绿色。
+- **"icon"**: emoji 字符，如 "🚀" "💡" "⚠️"，显示在节点标签左侧。
+- **"note"**: 字符串，节点备注说明，显示在节点下方。
+- **"tags"**: 字符串数组，如 ["前端", "高优"]，显示为小标签。
+
+**示例节点（含扩展字段）**：
+\`\`\`json
+{
+  "id": "task-login",
+  "type": "mindmap",
+  "position": { "x": 200, "y": 0 },
+  "data": {
+    "label": "用户登录模块",
+    "depth": 1,
+    "side": "right",
+    "priority": 3,
+    "progress": 75,
+    "url": "https://confluence.example.com/login-spec",
+    "icon": "🔐",
+    "note": "需要支持 SSO"
+  }
+}
+\`\`\`
 
 ## 原子化脑图指令 (Design Pilot MindMap)
 对于思维导图，你应当大量使用原子指令：
@@ -146,8 +174,9 @@ export const MINDMAP_SYSTEM_PROMPT = `你是一个专业的思维导图 (MindMap
 1. **添加子节点**：[COMMAND: {"action": "addChild", "parentId": "parent-id", "label": "子节点名称", "side": "right|left"}]
 2. **头脑风暴** (Brainstorm)：针对某个节点生成多个点子。
 3. **折叠分支**：[COMMAND: {"action": "collapse", "id": "node-id", "collapsed": true}]
-4. **项目管理**：
-    - 导出文件：[COMMAND: {"action": "export", "type": "png|pdf|svg|gif"}]
+4. **导出 Markdown**：[COMMAND: {"action": "exportMindmapMd"}]（触发 Ctrl+Shift+E 导出为 .md 文件）
+5. **项目管理**：
+    - 导出图片：[COMMAND: {"action": "export", "type": "png|pdf|svg"}]
     - 保存进云端：[COMMAND: {"action": "save"}]
     - 发起分享：[COMMAND: {"action": "share"}]
 
@@ -309,7 +338,7 @@ export function buildDiagramContext(
 节点 (${nodes.length}):
 ${nodeList}${nodes.length > 30 ? `\n  ... 还有 ${nodes.length - 30} 个节点` : ''}
 连线 (${edges.length}):
-${edgeList}${nodes.length > 30 ? `\n  ... 还有 ${nodes.length - 30} 条连线` : ''}`;
+${edgeList}${edges.length > 30 ? `\n  ... 还有 ${edges.length - 30} 条连线` : ''}`;
 }
 
 /**
