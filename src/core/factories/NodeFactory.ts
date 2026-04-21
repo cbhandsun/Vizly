@@ -8,6 +8,22 @@ import { getDomainTheme, resolveThemeDomainKey } from '../utils/domainKey';
 import { diagramStyleManager } from '../components/shared/DiagramStyleManager';
 
 /**
+ * 模块级调试开关 — 避免每次 createNode 都读 localStorage
+ */
+const debugEnabled = (() => {
+  try { const v = localStorage.getItem('architecture-diagram-debug'); return v === '1' || v === 'true'; } catch { return false; }
+})();
+
+/**
+ * 紧凑域缩放系数（模块级常量，保证 createNode 与 createNodes 一致）
+ */
+const COMPACT_DOMAINS: Record<string, { fontScale: number; widthScale: number; paddingHScale: number; paddingVScale: number }> = {
+  strategy: { fontScale: 0.85, widthScale: 0.85, paddingHScale: 0.85, paddingVScale: 0.85 },
+  data:     { fontScale: 0.85, widthScale: 0.85, paddingHScale: 0.85, paddingVScale: 0.85 },
+  interface:{ fontScale: 0.85, widthScale: 0.85, paddingHScale: 0.85, paddingVScale: 0.85 },
+};
+
+/**
  * 节点类型枚举
  */
 export enum NodeType {
@@ -95,9 +111,6 @@ export class NodeFactory {
    * - 避免使用过期的 `DiagramTheme`，以保证与 `utils/domainKey.getDomainTheme` 的签名一致。
    */
   createNode(config: NodeConfig, diagramTheme?: Theme, precalculatedSize?: { width: number, height: number }): Node {
-    const debugEnabled = (() => {
-      try { const v = localStorage.getItem('architecture-diagram-debug'); return v === '1' || v === 'true'; } catch { return false; }
-    })();
     /**
      * 函数级注释：域主题解析（domainClass 优先）
      * - 修复域读取：从 config.domain 读取业务域，避免错误从 data.domain 导致颜色兜底
@@ -159,19 +172,19 @@ export class NodeFactory {
       interface: { fontScale: 0.85, widthScale: 0.85, paddingHScale: 0.85, paddingVScale: 0.85 },
     };
 
-    const isCompact = domainKey && compactDomains[String(domainKey)] !== undefined;
+    const isCompact = domainKey && COMPACT_DOMAINS[String(domainKey)] !== undefined;
     const fontSizeOverride = isCompact
-      ? Math.round(diagramConfig.node.font.size * compactDomains[domainKey].fontScale)
+      ? Math.round(diagramConfig.node.font.size * COMPACT_DOMAINS[domainKey].fontScale)
       : diagramConfig.node.font.size;
     // 结合样式预设缩放内边距
     const preset = diagramStyleManager.getPreset();
     const paddingScale = Math.max(0.6, Math.min(1.5, preset?.node?.paddingScale ?? 1));
     const paddingOverride = {
-      horizontal: Math.round(((isCompact ? Math.round((diagramConfig.node.padding?.horizontal ?? 14) * compactDomains[domainKey].paddingHScale) : (diagramConfig.node.padding?.horizontal ?? 14)) * paddingScale)),
-      vertical: Math.round(((isCompact ? Math.round((diagramConfig.node.padding?.vertical ?? 10) * compactDomains[domainKey].paddingVScale) : (diagramConfig.node.padding?.vertical ?? 10)) * paddingScale)),
+      horizontal: Math.round(((isCompact ? Math.round((diagramConfig.node.padding?.horizontal ?? 14) * COMPACT_DOMAINS[domainKey].paddingHScale) : (diagramConfig.node.padding?.horizontal ?? 14)) * paddingScale)),
+      vertical: Math.round(((isCompact ? Math.round((diagramConfig.node.padding?.vertical ?? 10) * COMPACT_DOMAINS[domainKey].paddingVScale) : (diagramConfig.node.padding?.vertical ?? 10)) * paddingScale)),
     };
 
-    const widthScale = isCompact ? compactDomains[domainKey].widthScale : 1;
+    const widthScale = isCompact ? COMPACT_DOMAINS[domainKey].widthScale : 1;
 
     // 形状内边距补尝（函数级注释）
     // - 必须与 CustomNode.tsx 中的 shapePaddingH / shapePaddingV 保持一致
@@ -493,25 +506,20 @@ export class NodeFactory {
 
     const diagramConfig = diagramConfigManager.getConfig();
     const preset = diagramStyleManager.getPreset();
-    const compactDomains: Record<string, { fontScale: number; widthScale: number; paddingHScale: number; paddingVScale: number }> = {
-      strategy: { fontScale: 0.9, widthScale: 0.9, paddingHScale: 0.9, paddingVScale: 0.9 },
-      data: { fontScale: 0.9, widthScale: 0.9, paddingHScale: 0.9, paddingVScale: 0.9 },
-      interface: { fontScale: 0.9, widthScale: 0.9, paddingHScale: 0.9, paddingVScale: 0.9 },
-    };
 
     configs.forEach((config, index) => {
       // 不跳过已有宽高的节点 — 始终根据内容重新计算宽度
 
       const domainKey: string | undefined = (config as any).domain ?? ((config.data as any)?.domain);
-      const isCompact = domainKey && compactDomains[String(domainKey)] !== undefined;
+      const isCompact = domainKey && COMPACT_DOMAINS[String(domainKey)] !== undefined;
       const fontSizeOverride = isCompact
-        ? Math.round(diagramConfig.node.font.size * compactDomains[domainKey].fontScale)
+        ? Math.round(diagramConfig.node.font.size * COMPACT_DOMAINS[domainKey].fontScale)
         : diagramConfig.node.font.size;
 
       const paddingScale = Math.max(0.6, Math.min(1.5, preset?.node?.paddingScale ?? 1));
       const paddingOverride = {
-        horizontal: Math.round(((isCompact ? Math.round((diagramConfig.node.padding?.horizontal ?? 14) * compactDomains[domainKey].paddingHScale) : (diagramConfig.node.padding?.horizontal ?? 14)) * paddingScale)),
-        vertical: Math.round(((isCompact ? Math.round((diagramConfig.node.padding?.vertical ?? 10) * compactDomains[domainKey].paddingVScale) : (diagramConfig.node.padding?.vertical ?? 10)) * paddingScale)),
+        horizontal: Math.round(((isCompact ? Math.round((diagramConfig.node.padding?.horizontal ?? 14) * COMPACT_DOMAINS[domainKey].paddingHScale) : (diagramConfig.node.padding?.horizontal ?? 14)) * paddingScale)),
+        vertical: Math.round(((isCompact ? Math.round((diagramConfig.node.padding?.vertical ?? 10) * COMPACT_DOMAINS[domainKey].paddingVScale) : (diagramConfig.node.padding?.vertical ?? 10)) * paddingScale)),
       };
 
       const params = {
@@ -663,6 +671,9 @@ export class NodeFactory {
       type,
       position,
       description: data.description || id,
+      // Provide empty domainClass to bypass the domainClass guard in createNode;
+      // createNodeByType is a generic utility that doesn't operate in domain context.
+      domainClass: data.domainClass || '',
       data,
       style
     };
