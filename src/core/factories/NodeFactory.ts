@@ -705,7 +705,8 @@ export class NodeFactory {
 
       // 重新计算宽高（按内容）
       if (!updates.width || !updates.height) {
-        const layoutOptimizer = new LayoutOptimizer();
+        // [N-3] Use singleton instance instead of creating a new LayoutOptimizer on every edit.
+        const layoutOptimizer = LayoutOptimizer.getInstance();
         const newWidth = updates.width ?? layoutOptimizer.calculateNodeWidth(nextDesc);
         const newHeight = updates.height ?? layoutOptimizer.calculateNodeHeight(nextDesc);
         updatedNode.style = {

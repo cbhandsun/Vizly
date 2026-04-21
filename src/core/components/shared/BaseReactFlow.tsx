@@ -362,7 +362,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 
     prevNodesRef.current = [...nodes];
     prevNodesSigRef.current = currentSig;
-  }, [nodes, debugEnabled]);
+  }, [nodes]);
 
   // 执行fitWidthTop的核心逻辑 - 复用回到顶部的逻辑
   /**
@@ -632,7 +632,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       editable: EditableEdge,
       ...(edgeTypes || {}),
     } as EdgeTypes;
-  }, [edgeTypes, enableSmartEdges]);
+  }, [edgeTypes]);
 
   const displayEdges = useMemo((): Edge[] => {
     // P2: Canvas Hybrid Rendering Mode for Large Graphs
