@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { useReactFlow, Node, Edge, useStore } from '@xyflow/react';
 import { Popover, Divider } from 'antd';
 import { 
@@ -7,8 +7,11 @@ import {
   BlockOutlined, 
   LinkOutlined, 
   FormatPainterOutlined,
+  CopyOutlined,
+  FileMarkdownOutlined,
 } from '@ant-design/icons';
 import { MindMapBeautifyPanel } from './MindMapBeautifyPanel';
+import { exportMindMapToMarkdown } from '../hooks/useMindMapOrchestrator';
 
 interface ActionBtnProps {
   icon: React.ReactNode;
@@ -122,6 +125,29 @@ export const MindMapActionBar: React.FC = () => {
       window.dispatchEvent(event);
   };
 
+  // [T-1] Copy branch — dispatches Ctrl+C keyboard event to trigger orchestrator copy handler
+  const handleCopyBranch = useCallback(() => {
+      if (!selectedNode) return;
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'c', ctrlKey: true, bubbles: true, cancelable: true
+      }));
+  }, [selectedNode]);
+
+  // [T-2] Export Markdown — directly calls exportMindMapToMarkdown and triggers download
+  const handleExportMd = useCallback(() => {
+      const nodes = getNodes();
+      const edges = getEdges();
+      const md = exportMindMapToMarkdown(nodes, edges);
+      if (!md) return;
+      const rootLabel = nodes.find(n => n.type === 'mindmap' && n.data?.depth === 0)?.data?.label as string || 'mindmap';
+      const safeFilename = rootLabel.replace(/[^a-zA-Z0-9一-龥]/g, '_').substring(0, 40);
+      const blob = new Blob([md], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${safeFilename}.md`; a.click();
+      URL.revokeObjectURL(url);
+  }, [getNodes, getEdges]);
+
   // Do not render anything if nothing is selected or if we are not a mindmap branch
   // We rely on NodeToolbar to mount this anyway, but just in case:
   if (selectedNodes.length === 0) {
@@ -159,6 +185,12 @@ export const MindMapActionBar: React.FC = () => {
           window.dispatchEvent(event);
         }} 
       />
+
+      <Divider orientation="vertical" style={{ height: 32 }} />
+
+      {/* T-1: 复制分支 / T-2: 导出 Markdown */}
+      <ActionBtn icon={<CopyOutlined />} label="复制分支" disabled={!selectedNode} onClick={handleCopyBranch} />
+      <ActionBtn icon={<FileMarkdownOutlined />} label="导出 MD" onClick={handleExportMd} />
 
       <Divider orientation="vertical" style={{ height: 32 }} />
 

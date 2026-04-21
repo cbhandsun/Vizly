@@ -6,6 +6,60 @@ import { parseIndentedText } from '../../../utils/textTreeParser';
 
 export const PALETTE = ['#f43f5e', '#f97316', '#eab308', '#10b981', '#0ea5e9', '#6366f1', '#d946ef'];
 
+// ─── T-1: Module-level mindmap clipboard (subtree copy/paste) ───────────────
+// Stored at module scope so it persists across renders without triggering re-renders.
+interface MindMapClipboard {
+    nodes: Node[];
+    edges: Edge[];
+    rootId: string;
+}
+let mindmapClipboard: MindMapClipboard | null = null;
+
+// ─── T-2: Markdown export utility ───────────────────────────────────────────
+/**
+ * Exports a mindmap to Markdown format (XMind-compatible indented structure).
+ * Root becomes # heading, children become nested - list items.
+ */
+export function exportMindMapToMarkdown(nodes: Node[], edges: Edge[]): string {
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+    const childrenMap = new Map<string, string[]>();
+    for (const e of edges) {
+        if (e.type === 'relationshipEdge') continue;
+        if (!childrenMap.has(e.source)) childrenMap.set(e.source, []);
+        childrenMap.get(e.source)!.push(e.target);
+    }
+    const root = nodes.find(n => n.type === 'mindmap' && (n.data?.depth === 0 || n.data?.depth === undefined));
+    if (!root) return '';
+
+    const lines: string[] = [];
+    function dfs(nodeId: string, depth: number) {
+        const node = nodeMap.get(nodeId);
+        if (!node) return;
+        // Strip HTML tags from label for clean Markdown output
+        const label = ((node.data?.label as string) || 'Untitled').replace(/<[^>]+>/g, '').trim();
+        lines.push(depth === 0 ? `# ${label}` : `${'  '.repeat(depth - 1)}- ${label}`);
+        const children = (childrenMap.get(nodeId) || []).sort((a, b) => {
+            const na = nodeMap.get(a);
+            const nb = nodeMap.get(b);
+            return (na?.position?.y ?? 0) - (nb?.position?.y ?? 0);
+        });
+        children.forEach(c => dfs(c, depth + 1));
+    }
+    dfs(root.id, 0);
+    return lines.join('\n');
+}
+
+/** Triggers a browser file download with the given text content */
+function downloadTextFile(filename: string, content: string, mimeType = 'text/plain') {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
 export function useMindMapOrchestrator(
     nodes: Node[],
     edges: Edge[],
@@ -592,6 +646,96 @@ export function useMindMapOrchestrator(
                     }
                 }
             }
+
+            // ── T-1: Ctrl+C — Copy selected subtree to mindmapClipboard ────────
+            if ((e.ctrlKey || e.metaKey) && e.key === 'c' && !e.shiftKey) {
+                const selectedMindNodes = nodes.filter(n => n.selected && n.type === 'mindmap');
+                if (selectedMindNodes.length === 1) {
+                    const copyRoot = selectedMindNodes[0];
+                    // DFS collect entire subtree
+                    const subtreeNodeIds = new Set<string>();
+                    const stack = [copyRoot.id];
+                    const edgeChildMap = new Map<string, string[]>();
+                    for (const ed of edges) {
+                        if (ed.type === 'relationshipEdge') continue;
+                        if (!edgeChildMap.has(ed.source)) edgeChildMap.set(ed.source, []);
+                        edgeChildMap.get(ed.source)!.push(ed.target);
+                    }
+                    while (stack.length > 0) {
+                        const cur = stack.pop()!;
+                        subtreeNodeIds.add(cur);
+                        (edgeChildMap.get(cur) || []).forEach(c => stack.push(c));
+                    }
+                    const subtreeNodes = nodes.filter(n => subtreeNodeIds.has(n.id));
+                    const subtreeEdges = edges.filter(ed => subtreeNodeIds.has(ed.source) && subtreeNodeIds.has(ed.target));
+                    mindmapClipboard = { nodes: subtreeNodes, edges: subtreeEdges, rootId: copyRoot.id };
+                    // Also write plain text label to system clipboard for cross-app paste
+                    try { navigator.clipboard?.writeText((copyRoot.data?.label as string) || ''); } catch { /* ignore */ }
+                    e.stopPropagation(); // Don't let designer's copy handler fire
+                }
+            }
+
+            // ── T-1: Ctrl+V — Paste mindmapClipboard subtree ───────────────────
+            if ((e.ctrlKey || e.metaKey) && e.key === 'v' && !e.shiftKey && mindmapClipboard) {
+                const targetNodes = nodes.filter(n => n.selected && n.type === 'mindmap');
+                if (targetNodes.length === 1) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const target = targetNodes[0];
+                    const clip = mindmapClipboard;
+
+                    takeSnapshot();
+
+                    // Remap IDs to avoid collisions
+                    const idMap = new Map<string, string>();
+                    const ts = Date.now();
+                    clip.nodes.forEach((n, i) => { idMap.set(n.id, `mindmap-paste-${ts}-${i}`); });
+
+                    const pastedNodes: Node[] = clip.nodes.map(n => ({
+                        ...n,
+                        id: idMap.get(n.id)!,
+                        position: {
+                            x: n.position.x + 40,
+                            y: n.position.y + 40,
+                        },
+                        selected: n.id === clip.rootId,
+                        data: { ...n.data }
+                    }));
+                    const pastedEdges: Edge[] = [
+                        // Edge connecting target -> paste root
+                        {
+                            id: `edge-${target.id}-${idMap.get(clip.rootId)}`,
+                            source: target.id,
+                            target: idMap.get(clip.rootId)!,
+                            type: 'mindmapEdge',
+                            animated: false,
+                            markerEnd: '' as any,
+                            data: { kind: 'mindmap' }
+                        },
+                        // Internal subtree edges with remapped IDs
+                        ...clip.edges.map(ed => ({
+                            ...ed,
+                            id: `edge-${idMap.get(ed.source)}-${idMap.get(ed.target)}`,
+                            source: idMap.get(ed.source)!,
+                            target: idMap.get(ed.target)!
+                        }))
+                    ];
+
+                    setEdges(eds => [...eds, ...pastedEdges]);
+                    setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...pastedNodes]);
+                }
+            }
+
+            // ── T-2: Ctrl+Shift+E — Export current mindmap as Markdown ─────────
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'e') {
+                e.preventDefault();
+                const md = exportMindMapToMarkdown(nodes, edges);
+                if (md) {
+                    const rootLabel = nodes.find(n => n.type === 'mindmap' && n.data?.depth === 0)?.data?.label as string || 'mindmap';
+                    const safeFilename = rootLabel.replace(/[^a-zA-Z0-9一-龥]/g, '_').substring(0, 40);
+                    downloadTextFile(`${safeFilename}.md`, md, 'text/markdown');
+                }
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown, { capture: true });
@@ -603,6 +747,11 @@ export function useMindMapOrchestrator(
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
                 return; // Let native inputs handle paste normally
             }
+
+            // [T-1] If there's a mindmap subtree in our internal clipboard, the Ctrl+V
+            // handler in handleKeyDown above will handle it. Bail out here so we
+            // don't also try to parse the system clipboard text as indented structure.
+            if (mindmapClipboard && (e as any)._mindmapHandled) return;
 
             const clipboardData = e.clipboardData;
             if (!clipboardData) return;
