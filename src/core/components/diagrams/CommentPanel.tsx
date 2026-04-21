@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Input, List, Button, Tag, Typography, Empty, Flex, theme, Space, Badge, Tooltip } from 'antd';
 import { FaSearch, FaCheck, FaTrash, FaChevronRight, FaRegCommentDots } from 'react-icons/fa';
 import { useDiagramStore } from '../../store/useDiagramStore';
@@ -17,6 +17,14 @@ export const CommentPanel: React.FC = () => {
     
     const [searchTerm, setSearchTerm] = useState('');
     const [filter, setFilter] = useState<'all' | 'unresolved' | 'resolved'>('unresolved');
+    // [Fix] Keep a ref to the highlight-reset timer so we can cancel it on unmount
+    // or if the user focuses another comment before 3s is up.
+    const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Cancel the highlight timer when the panel unmounts
+    useEffect(() => () => {
+        if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    }, []);
 
     const filteredComments = useMemo(() => {
         return (comments || []).filter(c => {
@@ -33,9 +41,11 @@ export const CommentPanel: React.FC = () => {
         if (c.x !== undefined && c.y !== undefined) {
             setCenter(c.x + 16, c.y + 16, { zoom: 1.5, duration: 800 });
             setActiveCommentId(c.id);
-            // 3秒后取消高亮
-            setTimeout(() => {
+            // Cancel any previous pending clear before scheduling a new one
+            if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+            highlightTimerRef.current = setTimeout(() => {
                 setActiveCommentId(null);
+                highlightTimerRef.current = null;
             }, 3000);
         }
     };

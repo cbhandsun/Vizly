@@ -67,7 +67,7 @@ interface UseDesignerCommandsProps {
  */
 export function useDesignerCommands(props: UseDesignerCommandsProps) {
     const { t } = useTranslation();
-    const isMac = navigator.platform.toUpperCase().includes('MAC');
+    const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const mod = isMac ? '⌘' : 'Ctrl';
 
     const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
