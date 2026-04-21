@@ -3,6 +3,7 @@ import { Handle, Position, NodeProps, Node, useReactFlow } from '@xyflow/react';
 import { NodeToolbar } from '@xyflow/react';
 import { MindMapActionBar } from '../diagrams/mindmap-pro/MindMapActionBar';
 import { FaMinus } from 'react-icons/fa';
+import { ExportOutlined } from '@ant-design/icons';
 import './MindMapNode.css';
 
 export interface MindMapNodeData extends Record<string, unknown> {
@@ -20,12 +21,17 @@ export interface MindMapNodeData extends Record<string, unknown> {
     image?: string;
     note?: string;
     tags?: string[];
+    /** T-3: External URL link for this node. Shows a link icon; click opens in new tab. */
+    url?: string;
+    /** T-4: Priority marker. 1=Low (blue), 2=Medium (orange), 3=High (red). */
+    priority?: 1 | 2 | 3;
     summaryBracket?: {
         minY: number;
         maxY: number;
         dir: 'L' | 'R';
     };
 }
+
 
 const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindMapNodeData, 'mindmap'>>) => {
     const depth = data?.depth ?? 1; 
@@ -40,6 +46,10 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
     const image = data?.image;
     const note = data?.note;
     const tags = data?.tags || [];
+    // [T-3] URL link
+    const url = data?.url as string | undefined;
+    // [T-4] Priority marker
+    const priority = data?.priority as (1 | 2 | 3) | undefined;
     
     // Inline Edit State
     const [isEditing, setIsEditing] = useState(false);
@@ -159,7 +169,28 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
                         data?.label || (depth === 0 ? 'Main Idea' : 'Branch')
                     )}
                 </div>
+                {/* [T-3] URL link icon — click opens URL in new tab */}
+                {url && !isEditing && (
+                    <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mindmap-url-icon"
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        title={url}
+                    >
+                        <ExportOutlined style={{ fontSize: 11, color: '#6366f1', opacity: 0.7 }} />
+                    </a>
+                )}
             </div>
+
+            {/* [T-4] Priority badge — absolute positioned top-right corner */}
+            {priority && (
+                <span className={`mindmap-priority-badge priority-${priority}`}>
+                    {priority === 1 ? '!' : priority === 2 ? '!!' : '!!!'}
+                </span>
+            )}
 
             {(note || tags.length > 0) && !isEditing && (
                 <div className="mindmap-rich-footer">

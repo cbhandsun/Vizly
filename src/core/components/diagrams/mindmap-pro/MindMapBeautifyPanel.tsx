@@ -2,8 +2,8 @@ import React, { useMemo } from 'react';
 import { PluginContext } from '../../../types/plugin';
 import { Node, Edge } from '@xyflow/react';
 import { Select, Radio, Form, Divider, Popover, Button, Input } from 'antd';
-import { BgColorsOutlined } from '@ant-design/icons';
-import { PALETTE } from '../hooks/useMindMapOrchestrator'; // Or redefine a local palette
+import { BgColorsOutlined, LinkOutlined } from '@ant-design/icons';
+import { PALETTE } from '../hooks/useMindMapOrchestrator';
 
 export const MindMapBeautifyPanel: React.FC<{ ctx: PluginContext, selectedNodes: Node[], selectedEdges: Edge[] }> = ({ ctx, selectedNodes, selectedEdges }) => {
     const { getNodes, updateNodesBatch } = ctx;
@@ -138,7 +138,37 @@ export const MindMapBeautifyPanel: React.FC<{ ctx: PluginContext, selectedNodes:
                          </Button>
                      </Popover>
                  </Form.Item>
+
+                 {/* [T-3] URL Link node */}
+                 <Form.Item label="链接 (URL)" tooltip="为节点添加外部链接，节点上会显示跳转图标">
+                     <Input
+                         prefix={<LinkOutlined style={{ color: '#6366f1' }} />}
+                         placeholder="https://example.com"
+                         value={(activeNode.data?.url as string) || ''}
+                         onChange={e => handleBatchUpdate('url', e.target.value || undefined)}
+                         allowClear
+                         size="small"
+                     />
+                 </Form.Item>
+
+                 {/* [T-4] Priority marker */}
+                 <Form.Item label="优先级" tooltip="标记节点重要程度，显示在节点右上角角标">
+                     <Radio.Group
+                         value={(activeNode.data?.priority as number) || 0}
+                         onChange={e => handleBatchUpdate('priority', e.target.value === 0 ? undefined : e.target.value)}
+                         optionType="button"
+                         buttonStyle="solid"
+                         size="small"
+                         style={{ display: 'flex', width: '100%' }}
+                     >
+                         <Radio.Button value={0} style={{ flex: 1, textAlign: 'center', fontSize: 11 }}>无</Radio.Button>
+                         <Radio.Button value={1} style={{ flex: 1, textAlign: 'center', fontSize: 11, color: '#2563eb' }}>! 低</Radio.Button>
+                         <Radio.Button value={2} style={{ flex: 1, textAlign: 'center', fontSize: 11, color: '#f59e0b' }}>!! 中</Radio.Button>
+                         <Radio.Button value={3} style={{ flex: 1, textAlign: 'center', fontSize: 11, color: '#ef4444' }}>!!! 高</Radio.Button>
+                     </Radio.Group>
+                 </Form.Item>
              </Form>
+
              <Divider style={{ margin: '8px 0' }} />
              <div style={{ fontSize: 12, color: '#888' }}>
                  提示：选中单个节点可独立修改其颜色和形状；选中「根节点」时，将修改全局思维导图结构配置。

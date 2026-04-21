@@ -521,3 +521,75 @@
     opacity: 1;
     transform: scale(1.2);
 }
+
+/* ====================================================================
+   T-3: URL Link Icon
+   ==================================================================== */
+.mindmap-url-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    opacity: 0;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.mindmap-node:hover .mindmap-url-icon,
+.mindmap-node.selected .mindmap-url-icon {
+    opacity: 1;
+}
+
+.mindmap-url-icon:hover {
+    opacity: 1 !important;
+    transform: scale(1.15);
+    background: rgba(99, 102, 241, 0.08);
+}
+
+/* ====================================================================
+   T-4: Priority Badge
+   ==================================================================== */
+.mindmap-priority-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 16px;
+    text-align: center;
+    pointer-events: none;
+    z-index: 10;
+    letter-spacing: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    border: 1.5px solid #fff;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mindmap-node:hover .mindmap-priority-badge {
+    transform: scale(1.1);
+}
+
+/* Low priority — blue */
+.mindmap-priority-badge.priority-1 {
+    background: #2563eb;
+    color: #fff;
+}
+
+/* Medium priority — amber/orange */
+.mindmap-priority-badge.priority-2 {
+    background: #f59e0b;
+    color: #fff;
+}
+
+/* High priority — red */
+.mindmap-priority-badge.priority-3 {
+    background: #ef4444;
+    color: #fff;
+}
