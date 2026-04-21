@@ -1,4 +1,4 @@
-// @ts-nocheck
+// diagram-definitions.ts
 import { lazy, createElement } from 'react';
 import { DiagramDefinition } from '@/core';
 import {
