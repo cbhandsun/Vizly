@@ -71,44 +71,6 @@ export function useDiagramCollaboration(diagramId: string, enabled: boolean = tr
         };
     }, [diagramId, enabled]);
 
-    // 5. 监听本地变化并广播 (State -> Yjs)
-    useEffect(() => {
-        if (!enabled || isRemoteUpdateRef.current) return;
-
-        const doc = collaborationService.getDoc();
-        const yNodes = doc.getMap<Node>('nodes');
-        const yEdges = doc.getMap<Edge>('edges');
-
-        doc.transact(() => {
-            // 这里可以做差异对比，但为了简单起见先做全量同步（Yjs Map 会处理同值优化）
-            nodes.forEach(n => {
-                const current = yNodes.get(n.id);
-                if (JSON.stringify(current) !== JSON.stringify(n)) {
-                    yNodes.set(n.id, n);
-                }
-            });
-            
-            // 检查删除
-            const nodeIds = new Set(nodes.map(n => n.id));
-            yNodes.forEach((_, id) => {
-                if (!nodeIds.has(id)) yNodes.delete(id);
-            });
-
-            edges.forEach(e => {
-                const current = yEdges.get(e.id);
-                if (JSON.stringify(current) !== JSON.stringify(e)) {
-                    yEdges.set(e.id, e);
-                }
-            });
-
-            const edgeIds = new Set(edges.map(e => e.id));
-            yEdges.forEach((_, id) => {
-                if (!edgeIds.has(id)) yEdges.delete(id);
-            });
-        }, 'local');
-
-    }, [nodes, edges, enabled]);
-
     const comments = useDiagramStore(state => state.comments);
 
     // 7. 监听本地评论变化并广播 (State -> Yjs)
@@ -137,12 +99,9 @@ export function useDiagramCollaboration(diagramId: string, enabled: boolean = tr
     // 6. 光标同步
     const updateLocalCursor = useCallback((pos: XYPosition | null) => {
         if (!enabled) return;
-        try {
-            const awareness = collaborationService.getAwareness();
-            awareness.setLocalStateField('cursor', pos);
-        } catch (e) {
-            // Local only mode
-        }
+        const awareness = collaborationService.getAwarenessSafe();
+        if (!awareness) return; // offline/local-only mode — silently skip
+        awareness.setLocalStateField('cursor', pos);
     }, [enabled]);
 
     return {

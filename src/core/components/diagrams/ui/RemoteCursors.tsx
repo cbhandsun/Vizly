@@ -63,9 +63,10 @@ export const RemoteCursors: React.FC = () => {
     const [cursors, setCursors] = useState<RemoteCursor[]>([]);
 
     useEffect(() => {
-        if (!collaborationService.isInitialized()) return;
+        if (!collaborationService.isConnected()) return;
 
-        const awareness = collaborationService.getAwareness();
+        const awareness = collaborationService.getAwarenessSafe();
+        if (!awareness) return;
         const localUser = collaborationService.getLocalUser();
 
         const updateCursors = () => {

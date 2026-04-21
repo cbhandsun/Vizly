@@ -20,9 +20,10 @@ export const CollaborationAvatars: React.FC = () => {
     const usersSignatureRef = useRef<string>('');
 
     useEffect(() => {
-        if (!collaborationService.isInitialized()) return;
+        if (!collaborationService.isConnected()) return;
 
-        const awareness = collaborationService.getAwareness();
+        const awareness = collaborationService.getAwarenessSafe();
+        if (!awareness) return;
         
         const updateUsers = () => {
             const states = Array.from(awareness.getStates().values());
