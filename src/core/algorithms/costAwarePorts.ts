@@ -187,22 +187,29 @@ function estimateBendCount(sourcePort: Point, targetPort: Point, sourcePos: Posi
     // L-shape: 1 bend
     if (!sameAxisType) return 1;
 
-    // Z-shape or U-shape: 2+ bends
-    if (sameAxisType) {
-        // Detect "Backwards" vertical flow (requiring 3 bends)
-        if (!isSourceHorizontal) {
-            // Bottom -> Top but Target is ABOVE Source (y < y)
-            // Path: Down -> Side -> Up -> Down (3 bends)
-            if (sourcePos === Position.Bottom && targetPos === Position.Top && targetPort.y < sourcePort.y) return 3;
+    // Same-side ports (C/U-shape): always 3 bends regardless of direction.
+    // e.g. Bottom→Bottom, Top→Top, Left→Left, Right→Right
+    // These require: exit stub → side bypass → re-entry stub → final approach
+    if (sourcePos === targetPos) return 3;
 
-            // Top -> Bottom but Target is BELOW Source (y > y)
-            // Path: Up -> Side -> Down -> Up (3 bends)
+    // Z-shape or backward-flow: 2+ bends
+    if (sameAxisType) {
+        if (!isSourceHorizontal) {
+            // Bottom → Top but target is ABOVE source: U-turn, 3 bends
+            if (sourcePos === Position.Bottom && targetPos === Position.Top && targetPort.y < sourcePort.y) return 3;
+            // Top → Bottom but target is BELOW source: U-turn, 3 bends
             if (sourcePos === Position.Top && targetPos === Position.Bottom && targetPort.y > sourcePort.y) return 3;
+        } else {
+            // Right → Left but target is to the LEFT of source: U-turn, 3 bends
+            if (sourcePos === Position.Right && targetPos === Position.Left && targetPort.x < sourcePort.x) return 3;
+            // Left → Right but target is to the RIGHT of source: U-turn, 3 bends
+            if (sourcePos === Position.Left && targetPos === Position.Right && targetPort.x > sourcePort.x) return 3;
         }
     }
 
     return 2;
 }
+
 
 /**
  * Check if the port direction is geometrically valid
