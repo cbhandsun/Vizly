@@ -52,12 +52,18 @@ export interface StrategyStats {
  * Analyzes graph characteristics and selects the optimal routing algorithm.
  */
 export class RoutingStrategySelector {
+    // [J-1] Circular buffer instead of Array + shift().
+    // shift() is O(N) — for a 100-edge batch with N=100 history slots, that's
+    // 10,000 element moves per routing batch. A circular buffer is O(1) for both
+    // push and eviction, with identical external semantics.
     private strategyHistory: Array<{
         timestamp: number;
         context: StrategyContext;
         selected: RoutingAlgorithm;
         actualCost?: number;
     }> = [];
+    private strategyHistoryHead = 0;       // points to oldest entry (for circular eviction)
+    private readonly HISTORY_CAPACITY = 100;
 
     private readonly GRID_THRESHOLD = 6;        // Min obstacles for VG
     private readonly DENSE_THRESHOLD = 30;      // Obstacle count for density check
@@ -72,16 +78,19 @@ export class RoutingStrategySelector {
     selectStrategy(context: StrategyContext): RoutingAlgorithm {
         const algorithm = this.selectStrategyInternal(context);
 
-        // Record decision for analysis
-        this.strategyHistory.push({
+        // [J-3] Only record history when the array hasn't reached capacity yet,
+        // or overwrite the oldest slot (circular). Avoids O(N) shift.
+        const entry = {
             timestamp: Date.now(),
             context,
             selected: algorithm
-        });
-
-        // Keep history bounded
-        if (this.strategyHistory.length > 100) {
-            this.strategyHistory.shift();
+        };
+        if (this.strategyHistory.length < this.HISTORY_CAPACITY) {
+            this.strategyHistory.push(entry);
+        } else {
+            // Overwrite oldest entry in-place (circular)
+            this.strategyHistory[this.strategyHistoryHead] = entry;
+            this.strategyHistoryHead = (this.strategyHistoryHead + 1) % this.HISTORY_CAPACITY;
         }
 
         return algorithm;
@@ -125,6 +134,7 @@ export class RoutingStrategySelector {
 
     /**
      * Get strategy selection statistics
+     * Returns the last N decisions in chronological order (from circular buffer).
      */
     getStats() {
         const totalDecisions = this.strategyHistory.length;
@@ -137,10 +147,20 @@ export class RoutingStrategySelector {
             );
         }
 
+        // For recent decisions: reconstruct chronological order from circular buffer
+        const recentStart = this.strategyHistory.length >= this.HISTORY_CAPACITY
+            ? this.strategyHistoryHead
+            : 0;
+        const recentOrdered: typeof this.strategyHistory = [];
+        for (let i = 0; i < Math.min(10, totalDecisions); i++) {
+            const idx = (recentStart + totalDecisions - 10 + i + this.HISTORY_CAPACITY) % this.HISTORY_CAPACITY;
+            if (this.strategyHistory[idx]) recentOrdered.push(this.strategyHistory[idx]);
+        }
+
         return {
             totalDecisions,
             distributionByAlgorithm: Object.fromEntries(algorithmCounts),
-            recentDecisions: this.strategyHistory.slice(-10)
+            recentDecisions: recentOrdered
         };
     }
 
@@ -149,6 +169,7 @@ export class RoutingStrategySelector {
      */
     clearHistory(): void {
         this.strategyHistory = [];
+        this.strategyHistoryHead = 0;
     }
 
     // ==================== Private Methods ====================
