@@ -658,6 +658,40 @@ function evaluatePortCombination(
         // We apply a soft penalty safely discourage it without forbidding it entirely.
         estimatedCost += WEIGHT.GEOMETRIC_UNLISTED;
     }
+
+    // =========================================================================
+    // [FIX] Step 3.5: Same-Side Overshoot Penalty
+    // =========================================================================
+    // Same-side ports (B→B, T→T, L→L, R→R) are only appropriate when the
+    // connection is a feedback/reverse-flow (e.g. horizontal-reverse uses B→B for U-arcs).
+    // However when the node-to-node vector is ALIGNED with the same-side exit direction,
+    // the router must overshoot PAST the target and loop back — creating a huge detour.
+    //
+    // Examples of overshoot:
+    //   B→B when dy > 0 : exits bottom→goes further down past target→loops back up into bottom
+    //   T→T when dy < 0 : exits top→goes further up past target→loops back down into top
+    //   R→R when dx > 0 : exits right→goes further right past target→loops back left into right
+    //   L→L when dx < 0 : exits left→goes further left past target→loops back right into left
+    //
+    // This is the root cause of the "Bottom→Bottom loop" bug seen with horizontal-reverse
+    // geometry when the target has a meaningful vertical offset (dy ≠ 0).
+    //
+    // Penalty: 6000 — enough to override DIRECT_BONUS (-1200) + PRIMARY_BONUS (-600),
+    // but weaker than SEMANTIC_VIOLATION (100,000) to remain adjustable.
+    const SAME_SIDE_OVERSHOOT_PENALTY = 6000;
+    const OVERSHOOT_THRESHOLD = 30; // px; ignore tiny offsets
+
+    if (sourcePos === targetPos && !isPreferred) {
+        let isOvershoot = false;
+        if (sourcePos === Position.Bottom && dy > OVERSHOOT_THRESHOLD) isOvershoot = true;
+        if (sourcePos === Position.Top    && dy < -OVERSHOOT_THRESHOLD) isOvershoot = true;
+        if (sourcePos === Position.Right  && dx > OVERSHOOT_THRESHOLD) isOvershoot = true;
+        if (sourcePos === Position.Left   && dx < -OVERSHOOT_THRESHOLD) isOvershoot = true;
+        if (isOvershoot) {
+            estimatedCost += SAME_SIDE_OVERSHOOT_PENALTY;
+        }
+    }
+
     // Neutral combinations: no bonus or penalty (rely on path length)
 
     // =========================================================================
