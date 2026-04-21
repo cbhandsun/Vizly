@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+﻿import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Drawer from 'antd/es/drawer';
 import Modal from 'antd/es/modal';
 import Input from 'antd/es/input';
@@ -536,7 +536,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
 
         if (lower.startsWith('/brainstorm')) {
             if (pluginId !== 'mindmap') {
-                addLocalMessage('assistant', '⚠️ 「头脑风暴」指令目前仅在**思维导图**模式下可用。');
+                addLocalMessage('assistant', t('aiChat.status.cmdBrainstormOnlyMindmap'));
                 return true;
             }
             // 劫持输入，注入特定的 brainstorm prompt
@@ -620,7 +620,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
                         addLocalMessage('assistant', `⚠️ ${t('aiChat.status.nodeNotFound', { name: missing })}`);
                     }
                 } else {
-                    addLocalMessage('assistant', '⚠️ 格式: `/connect 节点A 节点B`');
+                    addLocalMessage('assistant', t('aiChat.status.connectFormat'));
                 }
                 return true;
             }
@@ -641,7 +641,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
             if (activeId) {
                 aiConversationService.updateConversation(activeId, { messages: [] });
                 setConversations(aiConversationService.getConversations());
-                message.success('会话已重置');
+                message.success(t('aiChat.status.resetSuccess'));
                 return true;
             }
         }
@@ -649,7 +649,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         // ⚡ /shortcuts — 显示快捷键指南
         if (cmd === '/shortcuts' || cmd === '/help') {
             addLocalMessage('user', trimmed);
-            addLocalMessage('assistant', '正在为您准备指南...'); 
+            addLocalMessage('assistant', t('aiChat.status.cmdGuide')); 
             return true;
         }
 
@@ -658,7 +658,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
             if (canvasOps?.onTogglePresentation) {
                 addLocalMessage('user', trimmed);
                 canvasOps.onTogglePresentation(true);
-                addLocalMessage('assistant', '🎬 演示模式已开启。按 ESC 或使用 /exit 退出。');
+                addLocalMessage('assistant', t('aiChat.status.cmdPresent'));
                 return true;
             }
         }
@@ -668,7 +668,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
             if (canvasOps?.onTogglePresentation) {
                 addLocalMessage('user', trimmed);
                 canvasOps.onTogglePresentation(false);
-                addLocalMessage('assistant', '✅ 已退出演示模式。');
+                addLocalMessage('assistant', t('aiChat.status.cmdExit'));
                 return true;
             }
         }
@@ -676,7 +676,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         // ⚡ /animate — 演练链路
         if (cmd === '/animate') {
             addLocalMessage('user', trimmed);
-            addLocalMessage('assistant', '🔄 正在分析业务路径并准备动态演练...');
+            addLocalMessage('assistant', t('aiChat.status.cmdAnimate'));
             // AI 会通过增强 prompt 生成 animatePath 指令
             return true;
         }
@@ -692,7 +692,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         // ⚡ /style — 样式实验室
         if (cmd === '/style') {
             addLocalMessage('user', trimmed);
-            addLocalMessage('assistant', '✨ 正在分析图表并生成推荐样式方案...');
+            addLocalMessage('assistant', t('aiChat.status.cmdStyle'));
             // AI 会通过增强 prompt 生成 updateTheme 指令
             return true;
         }
@@ -700,21 +700,21 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         // ⚡ /analyze — 架构巡检
         if (cmd === '/analyze') {
             addLocalMessage('user', trimmed);
-            addLocalMessage('assistant', '🔍 正在进行深度架构巡检与合规性检查...');
+            addLocalMessage('assistant', t('aiChat.status.cmdAnalyze'));
             return false; // 继续发送给 AI
         }
 
         // ⚡ /suggest — 补全建议
         if (cmd === '/suggest') {
             addLocalMessage('user', trimmed);
-            addLocalMessage('assistant', '💡 正在扫描当前架构并生成补全建议...');
+            addLocalMessage('assistant', t('aiChat.status.cmdSuggest'));
             return false; // 继续发送给 AI
         }
 
         // ⚡ /doc — 生成文档
         if (cmd === '/doc') {
             addLocalMessage('user', trimmed);
-            addLocalMessage('assistant', '📄 正在基于当前设计编写深度技术文档...');
+            addLocalMessage('assistant', t('aiChat.status.cmdDoc'));
             return false;
         }
 
@@ -740,7 +740,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         if (!isListening) {
             setIsListening(true);
             message.info({
-                content: 'Vizly Voice Beta: 正在调优语音模型，当前仅提供视觉预览。',
+                content: t('aiChat.status.voiceBeta'),
                 key: 'voice-beta',
                 duration: 3
             });
