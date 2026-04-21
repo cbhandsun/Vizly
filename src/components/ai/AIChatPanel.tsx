@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Drawer from 'antd/es/drawer';
 import Modal from 'antd/es/modal';
 import Input from 'antd/es/input';
@@ -1007,7 +1007,9 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
 
                 if (target === 'local') {
                     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY) : null;
-                    const map = raw ? JSON.parse(raw) : {};
+                    const parsedPresets = raw ? JSON.parse(raw) : {};
+                    // Guard: 存储损坏时回退到空对象，防止非对象类型赋值崩溃
+                    const map: Record<string, unknown> = (parsedPresets && typeof parsedPresets === 'object' && !Array.isArray(parsedPresets)) ? parsedPresets : {};
                     map[title] = obj;
                     if (typeof localStorage !== 'undefined') {
                         localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(map));
