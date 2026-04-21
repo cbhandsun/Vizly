@@ -524,7 +524,37 @@
                 "nodeHorizontal": "⊟ 水平",
                 "nodeVertical": "⊞ 垂直",
                 "nodeDagre": "◈ Dagre分层 (默认)"
-            }
+            },
+            "newNode": "新节点",
+            "nodeAdded": "已添加 {{type}}",
+            "edgeNodeInserted": "已在连线中点插入新节点",
+            "clearCanvas": {
+                "title": "清空画布 (Clear Canvas)",
+                "content": "确定要清空画布吗？此操作不可撤销。(Are you sure you want to clear the canvas?)",
+                "ok": "确定 (OK)",
+                "cancel": "取消 (Cancel)"
+            },
+            "import": {
+                "standardSuccess": "成功导入标准化配置（{{count}} 节点）",
+                "reloading": "正在重载视图主题与布局配置...",
+                "rfSuccess": "成功导入 {{nodes}} 个节点和 {{edges}} 条边",
+                "invalidFormat": "无效的数据格式",
+                "jsonFailed": "JSON导入失败: {{message}}",
+                "mermaidSuccess": "成功导入 Mermaid 文本",
+                "mermaidLayout": "建议点击\"智能布局\"整理节点",
+                "mermaidFailed": "Mermaid解析失败",
+                "reverseSuccess": "成功从 [{{filename}}] 恢复画布内容"
+            },
+            "mermaidCopied": "已复制 Mermaid 代码到剪贴板",
+            "templateApplied": "已应用模板",
+            "smartLayout": "推荐布局：{{reason}}（置信度 {{confidence}}%）",
+            "optimize": "优化完成：解决了 {{overlaps}} 处重叠，对齐了 {{nodes}} 个节点。",
+            "noHistory": "没有历史记录可以对比",
+            "settingsNotAvailable": "当前独立设计器模式未挂载高级首选项面板，请在主视图中或按快捷键 Ctrl+Shift+, 打开",
+            "mindMapCenter": "中心主题",
+            "summaryLabel": "总结 (Summary)",
+            "pluginMissing": "插件缺失 [{{type}}]",
+            "relationshipEdgeLabel": "相关说明"
         },
         "flowchartShortcuts": {
             "title": "流程图快捷键",

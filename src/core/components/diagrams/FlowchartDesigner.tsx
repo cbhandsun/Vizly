@@ -122,11 +122,14 @@ import { VersionHistoryPanel } from '../../../components/diagrams/ui/VersionHist
 import { MobileBottomDock } from '../layout/MobileBottomDock';
 // useMindMapOrchestrator decoupled
 
-const FallbackNode = ({ type, data }: any) => (
-    <div style={{ padding: 8, background: '#fff1f0', border: '1px dashed #ffa39e', borderRadius: 4, fontSize: 12, color: '#cf1322', textAlign: 'center', opacity: 0.8 }}>
-        ⚠️ 插件缺失 [{type}]
-    </div>
-);
+const FallbackNode = ({ type, data }: any) => {
+    const { t } = useTranslation();
+    return (
+        <div style={{ padding: 8, background: '#fff1f0', border: '1px dashed #ffa39e', borderRadius: 4, fontSize: 12, color: '#cf1322', textAlign: 'center', opacity: 0.8 }}>
+            ⚠️ {t('designer.flowchart.pluginMissing', { type })}
+        </div>
+    );
+};
 
 const DEFAULT_NODE_TYPES: NodeTypes = {
     custom: CustomNode,
@@ -229,7 +232,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         if (onOpenSettings) {
             onOpenSettings();
         } else {
-            message.info('当前独立设计器模式未挂载高级首选项面板，请在主视图中或按快捷键 Ctrl+Shift+, 打开');
+            message.info(t('designer.flowchart.settingsNotAvailable'));
         }
     }, [onOpenSettings]);
 
@@ -419,14 +422,14 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                         type: type as any,
                         position: finalPos,
                         data: { 
-                            label: '新节点',
+                            label: t('designer.flowchart.newNode'),
                             ...data,
                             layer: activeLayerId 
                         }
                     };
                     
                     setNodes(nds => [...nds, newNode]);
-                    message.success(`已添加 ${type}`);
+                    message.success(t('designer.flowchart.nodeAdded', { type }));
                     
                     // 移动端添加后自动关闭抽屉
                     if (isMobile) {
@@ -496,7 +499,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                      ...params,
                      id,
                      type: 'relationshipEdge',
-                     data: { label: '相关说明' },
+                     data: { label: t('designer.flowchart.relationshipEdgeLabel') },
                      animated: true
                  };
                  setEdges(eds => addEdge(newEdge, eds));
@@ -601,7 +604,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         
         const handleImportSuccess = (e: any) => {
             const { filename } = e.detail;
-            if (messageApi) messageApi.success(`成功?[${filename}] 恢复画布内容`);
+            if (messageApi) messageApi.success(t('designer.flowchart.import.reverseSuccess', { filename }));
             // 自动居中显示恢复的内?
             if (handleFitView) setTimeout(() => handleFitView(), 300);
         };
@@ -662,7 +665,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
 
     const handleSmartLayout = useCallback(() => {
         const rec = recommendLayout(nodesRef.current, edgesRef.current);
-        message.info(`推荐布局?{rec.reason}（置信度 ${Math.round(rec.confidence * 100)}%）`);
+        message.info(t('designer.flowchart.smartLayout', { reason: rec.reason, confidence: Math.round(rec.confidence * 100) }));
         handleStrategyLayout(rec.domainStrategy, rec.nodeLayout, rec.direction);
     }, [handleStrategyLayout]);
 
@@ -674,7 +677,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         setNodes(result.nodes);
         setEdges(result.edges);
         
-        message.success(`优化完成：解决了 ${result.stats.rectifiedOverlaps} 处重叠，对齐?${result.stats.alignedNodes} 个节点。`);
+        message.success(t('designer.flowchart.optimize', { overlaps: result.stats.rectifiedOverlaps, nodes: result.stats.alignedNodes }));
     }, [setNodes, setEdges, takeSnapshot]);
 
     // Gap 6: 双击连线，在中点插入新节点，将边一分为二
@@ -698,7 +701,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
             id: newNodeId,
             type: 'custom',
             position: { x: mx, y: my },
-            data: { label: '新节点', shape: 'roundedRect' },
+            data: { label: t('designer.flowchart.newNode'), shape: 'roundedRect' },
         };
 
         // 两条新连线继承原连线的视觉样式
@@ -724,7 +727,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
 
         setNodes(ns => [...ns, newNode]);
         setEdges(es => [...es.filter(e => e.id !== edge.id), edgeA, edgeB]);
-        message.success('已在连线中点插入新节点');
+        message.success(t('designer.flowchart.edgeNodeInserted'));
     }, [isReadonly, setNodes, setEdges, takeSnapshot]);
 
 
@@ -805,10 +808,10 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                 } as Node]);
             } else if (action === 'clear-canvas') {
                 Modal.confirm({
-                    title: '清空画布 (Clear Canvas)',
-                    content: '确定要清空画布吗？此操作不可撤销?Are you sure you want to clear the canvas?)',
-                    okText: '确定 (OK)',
-                    cancelText: '取消 (Cancel)',
+                    title: t('designer.flowchart.clearCanvas.title'),
+                    content: t('designer.flowchart.clearCanvas.content'),
+                    okText: t('designer.flowchart.clearCanvas.ok'),
+                    cancelText: t('designer.flowchart.clearCanvas.cancel'),
                     onOk: () => {
                         setNodes([]);
                         setEdges([]);
@@ -848,7 +851,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
             type: 'mindmap',
             position: { x: avgX + 300, y: avgY }, // Initially place it to the right, orchestrator will sync it
             data: {
-                label: '总结 (Summary)',
+                label: t('designer.flowchart.summaryLabel'),
                 isSummary: true,
                 summaryTargets: sourceIds,
                 direction: 'L'
@@ -891,7 +894,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                         if (parsed && parsed.nodes && parsed.nodes.length > 0) {
                             setNodes(parsed.nodes);
                             setEdges(parsed.edges || []);
-                            messageApi.success(`成功导入标准化配置（${parsed.nodes.length} 节点）`);
+                            messageApi.success(t('designer.flowchart.import.standardSuccess', { count: parsed.nodes.length }));
                             setTimeout(() => handleFitView(), 500);
                             return;
                         }
@@ -909,7 +912,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                             }
                         };
                         localSvc.registerDiagram(normalized);
-                        messageApi.success(`正在重载视图主题与布局配置...`);
+                        messageApi.success(t('designer.flowchart.import.reloading'));
                         setTimeout(() => {
                             window.location.href = `/?diagram=${currentId}`;
                         }, 500);
@@ -922,19 +925,19 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                         }));
                         setNodes(safeNodes);
                         setEdges(data.edges);
-                        messageApi.info(`成功导入 ${safeNodes.length} 个节点和 ${data.edges.length} 条边`);
+                        messageApi.info(t('designer.flowchart.import.rfSuccess', { nodes: safeNodes.length, edges: data.edges.length }));
                         setTimeout(() => handleFitView(), 500);
-                    } else { throw new Error('无效的数据格式'); }
-                } catch (err: any) { messageApi.error('JSON导入失败: ' + err.message); }
+                    } else { throw new Error(t('designer.flowchart.import.invalidFormat')); }
+                } catch (err: any) { messageApi.error(t('designer.flowchart.import.jsonFailed', { message: err.message })); }
             } else if (file.name.endsWith('.txt') || file.name.endsWith('.mmd') || file.name.endsWith('.mermaid')) {
                 try {
                      const { nodes: newNodes, edges: newEdges } = await fromMermaid(content);
                      setNodes(newNodes); setEdges(newEdges);
-                     messageApi.info('成功导入 Mermaid 文本');
+                     messageApi.info(t('designer.flowchart.import.mermaidSuccess'));
                      setTimeout(() => {
-                         messageApi.info('建议点击"智能布局"整理节点');
+                         messageApi.info(t('designer.flowchart.import.mermaidLayout'));
                      }, 500);
-                } catch(e:any) { messageApi.error('Mermaid解析失败'); }
+                } catch(e:any) { messageApi.error(t('designer.flowchart.import.mermaidFailed')); }
             }
         };
         reader.readAsText(file);
@@ -959,7 +962,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
              const m = await toMermaid(nodesRef.current, edgesRef.current);
              if (navigator.clipboard) {
                  await navigator.clipboard.writeText(m);
-                 message.success('已复制 Mermaid 代码到剪贴板');
+                 message.success(t('designer.flowchart.mermaidCopied'));
              }
          } catch(e:any) { message.error(e.message); }
     }, []);
@@ -970,7 +973,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         const { nodes: newN, edges: newE } = createFromTemplate(tpl, viewport.x, viewport.y, viewport.zoom);
         setNodes(nds => [...nds, ...newN]);
         setEdges(eds => [...eds, ...newE]);
-        message.success('已应用模板');
+        message.success(t('designer.flowchart.templateApplied'));
     }, [reactFlowInstance, takeSnapshot, createFromTemplate, viewport, setNodes, setEdges]);
     
     const handleOpacity = useCallback((opacity: number) => {
@@ -1119,7 +1122,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
             id: `mindmap-${Date.now()}`,
             type: 'mindmap',
             position: { x: centerX - 60, y: centerY - 20 },
-            data: { label: '中心主题', layer: activeLayerId, isEditing: true },
+            data: { label: t('designer.flowchart.mindMapCenter'), layer: activeLayerId, isEditing: true },
             style: { width: 120, height: 40 },
         };
         
@@ -1273,7 +1276,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                             );
                                             setDiffResult(result);
                                         } else {
-                                            message.info('没有历史记录可以对比');
+                                            message.info(t('designer.flowchart.noHistory'));
                                         }
                                     },
                                     onShowHistory: () => setHistoryPanelVisible(prev => !prev),
