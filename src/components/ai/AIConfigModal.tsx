@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import Modal from 'antd/es/modal';
 import Form from 'antd/es/form';
 import Input from 'antd/es/input';
@@ -164,6 +165,7 @@ import { storageService } from '@/services/SupabaseStorage';
 import { CryptoService } from '@/core';
 
 const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave }) => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const [config, setConfig] = useState<AIConfigState>(getAIConfig());
     const [selectedProviderId, setSelectedProviderId] = useState<string>('global_settings');
@@ -224,13 +226,13 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 const cloudConfig = { ...config, providers: encryptedProviders };
 
                 await storageService.saveConfig('ai_config', cloudConfig, user.id);
-                message.success('配置已保存 (本地 + 云端加密)');
+                message.success(t('aiConfig.saveSuccessCloud'));
             } catch (err) {
                 console.error('Cloud save failed', err);
-                message.warning('已保存到本地，但云端同步失败');
+                message.warning(t('aiConfig.cloudSyncFail'));
             }
         } else {
-            message.success('配置已保存 (本地)');
+            message.success(t('aiConfig.saveSuccess'));
         }
 
         onSave();
@@ -269,7 +271,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
         const newId = `custom_${Date.now()}`;
         const newProvider: AIProviderConfig = {
             id: newId,
-            name: '新建平台',
+            name: t('aiConfig.newProviderName'),
             enabled: true,
             baseUrl: '',
             apiKey: '',
@@ -291,7 +293,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     // --- Model Actions ---
     const addModel = (providerId: string) => {
         if (!newModelData.id) {
-            message.error('请输入模型ID');
+            message.error(t('aiConfig.noModelId'));
             return;
         }
         setConfig(prev => ({
@@ -312,7 +314,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
         }));
         setNewModelFormVisible(false);
         setNewModelData({ id: '', name: '', group: '' });
-        message.success('模型已添加');
+        message.success(t('aiConfig.modelAdded'));
     };
 
     const deleteModel = (providerId: string, modelId: string) => {
@@ -350,7 +352,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(newConfig));
             return newConfig;
         });
-        message.success(`已切换到: ${modelId}`);
+        message.success(t('aiConfig.switchedTo', { model: modelId }));
     };
 
     const selectedProvider = config.providers.find(p => p.id === selectedProviderId);
@@ -377,7 +379,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
 
     const handleTestConnection = async (provider: AIProviderConfig) => {
         if (!provider.apiKey || !provider.baseUrl) {
-            message.warning('请先填写 API Key 和 Base URL');
+            message.warning(t('aiConfig.testFillRequired'));
             return;
         }
         setIsTesting(true);
@@ -397,18 +399,18 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             });
 
             if (response.ok) {
-                message.success('连接成功！API 配置有效。');
+                message.success(t('aiConfig.testSuccess'));
             } else {
                 const errText = await response.text();
                 // Check if HTML
                 if (errText.trim().startsWith('<')) {
-                    message.error(`连接失败: 返回了 HTML 错误页 (${response.status})。请检查 Base URL (通常应以 /v1 结尾)。`);
+                    message.error(t('aiConfig.testFailHtml', { status: response.status }));
                 } else {
-                    message.error(`连接失败: ${response.status} - ${errText.substring(0, 100)}`);
+                    message.error(t('aiConfig.testFail', { status: response.status, message: errText.substring(0, 100) }));
                 }
             }
         } catch (error: any) {
-            message.error(`请求异常: ${error.message}`);
+            message.error(t('aiConfig.testError', { message: error.message }));
         } finally {
             setIsTesting(false);
         }
@@ -416,12 +418,12 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
 
     return (
         <Modal
-            title="AI 平台与模型配置"
+            title={t('aiConfig.title')}
             open={open}
             onOk={handleSave}
             onCancel={onCancel}
-            okText="保存全部"
-            cancelText="取消"
+            okText={t('aiConfig.saveAll')}
+            cancelText={t('aiConfig.cancel')}
             width={900}
             styles={{ body: { padding: 0, height: 550 } }}
         >
@@ -430,7 +432,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 <div style={{ width: 280, borderRight: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column', backgroundColor: '#fafafa' }}>
                     <div style={{ padding: 12 }}>
                         <Input.Search
-                            placeholder="搜索平台..."
+                            placeholder={t('aiConfig.searchPlaceholder')}
                             allowClear
                             value={searchText}
                             onChange={e => setSearchText(e.target.value)}
@@ -449,12 +451,12 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                 border: selectedProviderId === 'global_settings' ? '1px solid #91caff' : '1px solid transparent'
                             }}
                         >
-                            <SettingOutlined /> 全局设置
+                            <SettingOutlined /> {t('aiConfig.globalSettings')}
                         </div>
                     </div>
 
                     <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px' }}>
-                        <Text type="secondary" style={{ fontSize: 12, marginBottom: 4, display: 'block' }}>模型平台列表</Text>
+                        <Text type="secondary" style={{ fontSize: 12, marginBottom: 4, display: 'block' }}>{t('aiConfig.providerList')}</Text>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                             {filteredProviders.map(item => (
                                 <div
@@ -487,7 +489,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                     </div>
                     <div style={{ padding: 12, borderTop: '1px solid #f0f0f0' }}>
                         <Button type="dashed" block icon={<PlusOutlined />} onClick={addCustomProvider}>
-                            添加自定义平台
+                            {t('aiConfig.addCustomProvider')}
                         </Button>
                     </div>
                 </div>
@@ -501,15 +503,15 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                             {selectedProviderId === 'global_settings' ? 'Global Settings' : selectedProvider?.name}
                         </Title>
                         {selectedProvider && selectedProvider.id.startsWith('custom_') && (
-                            <Button danger type="text" icon={<DeleteOutlined />} onClick={() => deleteProvider(selectedProvider.id)}>删除平台</Button>
+                            <Button danger type="text" icon={<DeleteOutlined />} onClick={() => deleteProvider(selectedProvider.id)}>{t('aiConfig.deleteProvider')}</Button>
                         )}
                     </div>
 
                     <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
                         {selectedProviderId === 'global_settings' ? (
                             <Form layout="vertical">
-                                <Form.Item label="系统提示词 (System Prompt)">
-                                    <Paragraph type="secondary">此提示词将应用于所有对话，定义 AI 助手的基本行为。</Paragraph>
+                                <Form.Item label={t('aiConfig.systemPromptLabel')}>
+                                    <Paragraph type="secondary">{t('aiConfig.systemPromptDesc')}</Paragraph>
                                     <Input.TextArea
                                         rows={12}
                                         value={config.systemPrompt}
@@ -523,14 +525,14 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                 {/* Platform Config */}
                                 <div style={{ marginBottom: 24, padding: 16, border: '1px solid #f0f0f0', borderRadius: 8, background: '#fafafa' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <Text strong>API 连接配置</Text>
+                                        <Text strong>{t('aiConfig.apiConfig')}</Text>
                                         <Button
                                             size="small"
                                             icon={<RocketOutlined />}
                                             loading={isTesting}
                                             onClick={() => handleTestConnection(selectedProvider)}
                                         >
-                                            测试连接
+                                            {t('aiConfig.testConnection')}
                                         </Button>
                                     </div>
                                     <Divider style={{ margin: '12px 0' }} />
@@ -549,7 +551,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                         />
                                     </Form.Item>
                                     {selectedProvider.id.startsWith('custom_') && (
-                                        <Form.Item label="平台名称">
+                                        <Form.Item label={t('aiConfig.platformName')}>
                                             <Input value={selectedProvider.name} onChange={e => updateProvider(selectedProvider.id, { name: e.target.value })} />
                                         </Form.Item>
                                     )}
@@ -558,35 +560,35 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                 {/* Models List */}
                                 <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                                        <Text strong>模型列表 ({selectedProvider.models.length})</Text>
-                                        <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => setNewModelFormVisible(true)}>添加模型</Button>
+                                        <Text strong>{t('aiConfig.modelList', { count: selectedProvider.models.length })}</Text>
+                                        <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => setNewModelFormVisible(true)}>{t('aiConfig.addModel')}</Button>
                                     </div>
 
                                     {newModelFormVisible && (
                                         <div style={{ marginBottom: 16, padding: 12, border: '1px dashed #1890ff', borderRadius: 6, background: '#e6f7ff' }}>
                                             <div style={{ width: '100%', marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                                                 <Input
-                                                    placeholder="模型 ID (如 gpt-4o)"
+                                                    placeholder={t('aiConfig.modelIdPlaceholder')}
                                                     value={newModelData.id}
                                                     onChange={e => setNewModelData({ ...newModelData, id: e.target.value })}
                                                     prefix={<span style={{ color: '#999', marginRight: 4 }}>ID:</span>}
                                                 />
                                                 <Input
-                                                    placeholder="显示名称"
+                                                    placeholder={t('aiConfig.displayNamePlaceholder')}
                                                     value={newModelData.name}
                                                     onChange={e => setNewModelData({ ...newModelData, name: e.target.value })}
                                                     prefix={<span style={{ color: '#999', marginRight: 4 }}>Name:</span>}
                                                 />
                                                 <Input
-                                                    placeholder="分组 (如 Anthropic)"
+                                                    placeholder={t('aiConfig.groupPlaceholder')}
                                                     value={newModelData.group}
                                                     onChange={e => setNewModelData({ ...newModelData, group: e.target.value })}
                                                     prefix={<span style={{ color: '#999', marginRight: 4 }}>Group:</span>}
                                                 />
                                             </div>
                                             <Space>
-                                                <Button size="small" type="primary" onClick={() => addModel(selectedProvider.id)}>确认添加</Button>
-                                                <Button size="small" onClick={() => setNewModelFormVisible(false)}>取消</Button>
+                                                <Button size="small" type="primary" onClick={() => addModel(selectedProvider.id)}>{t('aiConfig.confirmAdd')}</Button>
+                                                <Button size="small" onClick={() => setNewModelFormVisible(false)}>{t('aiConfig.cancel')}</Button>
                                             </Space>
                                         </div>
                                     )}
@@ -620,7 +622,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                                                             disabled={!model.enabled || !selectedProvider.enabled}
                                                                             onClick={() => setActiveModel(selectedProvider.id, model.id)}
                                                                         >
-                                                                            {isGlobalActive ? '当前使用' : '设为使用'}
+                                                                            {isGlobalActive ? t('aiConfig.currentActive') : t('aiConfig.setActive')}
                                                                         </Button>
                                                                         <Switch
                                                                             size="small"
@@ -643,7 +645,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                             </Form>
                         ) : (
                             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#999' }}>
-                                请选择左侧平台进行配置
+                                {t('aiConfig.selectProvider')}
                             </div>
                         )}
                     </div>
