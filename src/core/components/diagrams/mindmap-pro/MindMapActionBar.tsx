@@ -1,4 +1,5 @@
 import React, { useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useReactFlow, Node, Edge, useStore } from '@xyflow/react';
 import { Popover, Divider } from 'antd';
 import { 
@@ -48,6 +49,7 @@ const ActionBtn: React.FC<ActionBtnProps> = ({ icon, label, onClick, disabled })
 };
 
 export const MindMapActionBar: React.FC = () => {
+  const { t } = useTranslation();
   const { getNodes, getEdges, setNodes } = useReactFlow();
 
   // Create mock context to pass to Beautify panel without needing the global plugin context
@@ -170,13 +172,13 @@ export const MindMapActionBar: React.FC = () => {
       animation: 'toolbarFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
     }}>
       {/* 结构操作 */}
-      <ActionBtn icon={<SisternodeOutlined />} label="同级主题" disabled={!selectedNode} onClick={handleAddSibling} />
-      <ActionBtn icon={<SubnodeOutlined />} label="子主题" disabled={!selectedNode} onClick={handleAddChild} />
-      <ActionBtn icon={<LinkOutlined />} label="联系线" onClick={handleAddRelationship} />
-      <ActionBtn icon={<BlockOutlined />} label="添加概要" disabled={selectedNodes.length === 0} onClick={handleAddSummary} />
+      <ActionBtn icon={<SisternodeOutlined />} label={t('mindmap.actionBar.addSibling')} disabled={!selectedNode} onClick={handleAddSibling} />
+      <ActionBtn icon={<SubnodeOutlined />} label={t('mindmap.actionBar.addChild')} disabled={!selectedNode} onClick={handleAddChild} />
+      <ActionBtn icon={<LinkOutlined />} label={t('mindmap.actionBar.addRelationship')} onClick={handleAddRelationship} />
+      <ActionBtn icon={<BlockOutlined />} label={t('mindmap.actionBar.addSummary')} disabled={selectedNodes.length === 0} onClick={handleAddSummary} />
       <ActionBtn 
         icon={<div style={{ width: 18, height: 18, border: '2px dashed #666', borderRadius: 4 }} />} 
-        label="逻辑外框" 
+        label={t('mindmap.actionBar.addBoundary')} 
         disabled={!selectedNode} 
         onClick={() => {
           const event = new CustomEvent('editor:add-boundary-node', {
@@ -189,8 +191,8 @@ export const MindMapActionBar: React.FC = () => {
       <Divider orientation="vertical" style={{ height: 32 }} />
 
       {/* T-1: 复制分支 / T-2: 导出 Markdown */}
-      <ActionBtn icon={<CopyOutlined />} label="复制分支" disabled={!selectedNode} onClick={handleCopyBranch} />
-      <ActionBtn icon={<FileMarkdownOutlined />} label="导出 MD" onClick={handleExportMd} />
+      <ActionBtn icon={<CopyOutlined />} label={t('mindmap.actionBar.copyBranch')} disabled={!selectedNode} onClick={handleCopyBranch} />
+      <ActionBtn icon={<FileMarkdownOutlined />} label={t('mindmap.actionBar.exportMd')} onClick={handleExportMd} />
 
       <Divider orientation="vertical" style={{ height: 32 }} />
 
@@ -202,7 +204,7 @@ export const MindMapActionBar: React.FC = () => {
           styles={{ root: {}, container: { padding: 0 } }}
       >
           <div>
-            <ActionBtn icon={<FormatPainterOutlined />} label="美化" />
+            <ActionBtn icon={<FormatPainterOutlined />} label={t('mindmap.actionBar.beautify')} />
           </div>
       </Popover>
 

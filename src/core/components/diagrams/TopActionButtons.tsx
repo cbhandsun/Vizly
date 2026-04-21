@@ -134,7 +134,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     const content = (
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             {onStartPresentation && (
-                <Tooltip title="演示模式">
+                <Tooltip title={t('designer.toolbar.presentationMode')}>
                     <Button 
                         type="text" 
                         icon={<FaPlay className="text-[12px]" />} 
@@ -146,7 +146,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             )}
 
             {onShowDiff && (
-                <Tooltip title="差异对比">
+                <Tooltip title={t('designer.toolbar.diffView')}>
                     <Button 
                         type="text" 
                         icon={<FaExchangeAlt className="text-[12px]" />} 
@@ -158,7 +158,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             )}
 
             {onShowHistory && (
-                <Tooltip title="历史记录">
+                <Tooltip title={t('designer.toolbar.historyPanel')}>
                     <Button 
                         type="text" 
                         icon={<FaHistory className="text-[12px]" />} 
@@ -170,7 +170,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             )}
 
             {onSmartOptimize && (
-                <Tooltip title="智能全图优化 (解决重叠与对齐)">
+                <Tooltip title={t('designer.toolbar.smartOptimize')}>
                     <Button 
                         type="text" 
                         icon={<FaMagic className="text-[12px] text-purple-500" />} 
@@ -181,7 +181,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                 </Tooltip>
             )}
 
-            <Tooltip title="插件管理中心">
+            <Tooltip title={t('designer.toolbar.pluginManager')}>
                 <Button 
                     type="text" 
                     icon={<ApiOutlined style={{ fontSize: 13 }} />} 
@@ -192,7 +192,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             </Tooltip>
 
             {setIsCommentMode && (
-                <Tooltip title={isCommentMode ? "退出评论模式 (C)" : "评论模式 (C)"}>
+                <Tooltip title={isCommentMode ? t('designer.toolbar.commentModeExit') : t('designer.toolbar.commentMode')}>
                     <Button 
                         type="text" 
                         icon={<FaRegComment className={`text-[12px] ${isCommentMode ? 'text-green-500' : ''}`} />} 
@@ -215,7 +215,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                     style={{ height: 32, borderRadius: 9999, border: 'none', padding: '0 12px', fontSize: 13, background: 'var(--designer-primary, #6366f1)', boxShadow: '0 2px 8px rgba(99, 102, 241, 0.25)' }}
                     className="flex items-center gap-1.5 transition-transform active:scale-95 ml-1"
                 >
-                    {t('designer.toolbar.share', '分享')}
+                {t('designer.toolbar.share')}
                 </Button>
             )}
 

@@ -3,6 +3,7 @@ import { Node, Edge, XYPosition } from '@xyflow/react';
 import { autoMindMapLayout, calculateSummaryGeometry, calculateSubtreeBounds } from '../../../utils/LayoutAlgorithms';
 import { useRef } from 'react';
 import { parseIndentedText } from '../../../utils/textTreeParser';
+import { appMessage } from '../../../utils/antdStaticBridge';
 
 export const PALETTE = ['#f43f5e', '#f97316', '#eab308', '#10b981', '#0ea5e9', '#6366f1', '#d946ef'];
 
@@ -1190,10 +1191,7 @@ export function useMindMapOrchestrator(
             }, 2000);
             
             // @ts-ignore
-            if (window.antdMessage) {
-                // @ts-ignore
-                window.antdMessage.info('请拖动节点右侧红色手柄到目标节点');
-            }
+            appMessage.info('请拖动节点右侧红色手柄到目标节点');
         }
     }, [setNodes]);
 

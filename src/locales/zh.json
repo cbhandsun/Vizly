@@ -364,7 +364,21 @@
             },
             "showRuler": "显示标尺",
             "hideRuler": "隐藏标尺",
-            "dragToMove": "拖动移动工具栏（双击重置位置）"
+            "dragToMove": "拖动移动工具栏（双击重置位置）",
+            "share": "分享",
+            "presentationMode": "演示模式",
+            "diffView": "差异对比",
+            "historyPanel": "历史记录",
+            "smartOptimize": "智能全图优化 (解决重叠与对齐)",
+            "pluginManager": "插件管理中心",
+            "commentMode": "评论模式 (C)",
+            "commentModeExit": "退出评论模式 (C)",
+            "hideMinimap": "隐藏小地图",
+            "showMinimap": "显示小地图",
+            "saveToCloud": "保存到云端",
+            "directSave": "覆盖保存 (直接存储)",
+            "directSaveDisabled": "当前状态无法直接保存",
+            "yjsSynced": "云端协同已连接"
         },
         "jsonEditor": {
             "title": "编辑图表数据 (JSON)",
@@ -1351,6 +1365,16 @@
                 "deleteNode": "删除节点 (Del)",
                 "collapse": "折叠分支",
                 "expand": "展开分支"
+            },
+            "actionBar": {
+                "addSibling": "同级主题",
+                "addChild": "子主题",
+                "addRelationship": "联系线",
+                "addSummary": "添加概要",
+                "addBoundary": "逻辑外框",
+                "copyBranch": "复制分支",
+                "exportMd": "导出 MD",
+                "beautify": "美化"
             },
             "beautify": {
                 "title": "思维导图配置",
