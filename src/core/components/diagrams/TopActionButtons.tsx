@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Space, Button, Dropdown, Tooltip, MenuProps } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -73,7 +73,8 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
 }) => {
     const { t } = useTranslation();
 
-    const exportMenu: MenuProps['items'] = [
+    // [M-4] Memoize menu items to avoid recreating on every render (Antd Dropdown does vdom diff on items ref).
+    const exportMenu: MenuProps['items'] = useMemo(() => [
         { key: 'png', label: '导出为 PNG', icon: <FaImage />, onClick: onExportPNG, disabled: !onExportPNG },
         { key: 'svg', label: '导出为 SVG', icon: <FaFileCode />, onClick: onExportSVG, disabled: !onExportSVG },
         { key: 'pdf', label: '导出为 PDF', icon: <FaFilePdf />, onClick: onExportPDF, disabled: !onExportPDF },
@@ -82,9 +83,9 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         { key: 'json', label: '导出为 JSON', icon: <FaFileExport />, onClick: onExportJSON },
         { key: 'mermaid', label: '导出为 Mermaid', icon: <FaProjectDiagram />, onClick: onExportMermaid, disabled: !onExportMermaid },
         ...((extraExportItems && (extraExportItems as any[]).length > 0) ? [{ type: 'divider' as const }, ...(extraExportItems as any[])] : [])
-    ];
+    ], [onExportPNG, onExportSVG, onExportPDF, onExportGIF, onExportJSON, onExportMermaid, extraExportItems]);
 
-    const moreMenu: MenuProps['items'] = [
+    const moreMenu: MenuProps['items'] = useMemo(() => [
         ...(onEditJson ? [{
             key: 'edit-json',
             label: t('designer.toolbar.edit'),
@@ -104,7 +105,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             onClick: onShowHistory,
         }] : []),
         ...((extraMoreItems && (extraMoreItems as any[]).length > 0) ? [{ type: 'divider' as const }, ...(extraMoreItems as any[])] : [])
-    ];
+    ], [onEditJson, onShowDiff, onShowHistory, extraMoreItems, t]);
 
     const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 

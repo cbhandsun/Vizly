@@ -65,7 +65,10 @@ class AIConversationService {
             const { error } = await supabase
                 .from('ai_conversations')
                 .upsert({
-                    id: conv.id.includes('conv_') ? undefined : conv.id, // 如果是本地临时 ID，由数据库生成或保留
+                    // [M-2] Always pass conv.id so upsert+onConflict can match the existing row.
+                    // Previous logic (id: includes('conv_') ? undefined : id) passed undefined for local IDs,
+                    // causing every sync to INSERT a new row instead of updating the existing one.
+                    id: conv.id,
                     user_id: this.currentUserId,
                     title: conv.title,
                     messages: conv.messages,
@@ -112,7 +115,7 @@ class AIConversationService {
     }
 
     createConversation(initialMessage?: Message): Conversation {
-        const id = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const id = `conv_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
         const conversation: Conversation = {
             id,
             title: initialMessage ? this.generateTitle(initialMessage.content) : '新对话',
