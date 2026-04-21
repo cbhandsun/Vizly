@@ -1404,5 +1404,45 @@
             "containerDesc": "- **{{label}}**: 由 {{children}} 组成。",
             "footer": "*由 Vizly AI 引擎自动生成。专为“架构即代码”流程优化。*"
         }
+    },
+    "comment": {
+        "searchPlaceholder": "搜索评论或作者...",
+        "filterUnresolved": "未解决",
+        "filterResolved": "已解决",
+        "filterAll": "全部",
+        "replies": "{{count}} 条回复",
+        "resolved": "已解决",
+        "markResolved": "标记为完成",
+        "markUnresolved": "取消解决",
+        "delete": "删除",
+        "emptySearch": "未找到匹配的评论",
+        "emptyAll": "暂无评论反馈"
+    },
+    "advancedExport": {
+        "title": "高级图表导出",
+        "formatLabel": "选择导出格式",
+        "dpiLabel": "图片清晰度 (DPI)",
+        "dpi1x": "1x - 标准 (Standard)",
+        "dpi2x": "2x - 适配 Retina (Recommended)",
+        "dpi4x": "4x - 印刷级超清 (Ultra High Definition)",
+        "includeBackground": "包含底色背景 (透明背景建议使用 PNG)",
+        "embedMetadata": "注入元数据 (支持图片拖入 Vizly 自动恢复编辑)",
+        "svgHint": "提示：SVG 格式支持无限放大且不失真，适合在 PPT 或专业设计软件中使用。",
+        "copyClipboard": "拷贝到剪贴板",
+        "cancel": "取消",
+        "confirm": "确认导出",
+        "successMsg": "成功导出 {{format}}",
+        "errorMsg": "导出失败，请重试",
+        "copySuccess": "已复制到剪贴板，可直接在飞书/钉钉等粘贴",
+        "copyFailed": "复制失败"
+    },
+    "collaboration": {
+        "onlineIndicator": "在线",
+        "users": "{{count}} 位协作者",
+        "you": "（你）",
+        "offlineMode": "离线模式",
+        "connecting": "正在连接协作服务...",
+        "connected": "已连接协作服务",
+        "disconnected": "协作连接已断开"
     }
 }

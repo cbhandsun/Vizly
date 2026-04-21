@@ -8,6 +8,7 @@ import {
   CodeOutlined,
   CameraOutlined
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { downloadImage, copyImageToClipboard, ExportOptions } from '../../../utils/imageExporter';
 import { useDiagramStore } from '../../../store/useDiagramStore';
 
@@ -21,6 +22,7 @@ interface AdvancedExportModalProps {
  * 提供清晰度选择、背景控制、元数据注入及一键拷贝功能
  */
 export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visible, onClose }) => {
+  const { t } = useTranslation();
   const { nodes } = useDiagramStore();
   const [format, setFormat] = useState<ExportOptions['format']>('png');
   const [pixelRatio, setPixelRatio] = useState<number>(2);
@@ -37,10 +39,10 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
         includeBackground,
         embedMetadata
       });
-      message.success(`成功导出 ${format.toUpperCase()}`);
+      message.success(t('advancedExport.successMsg', { format: format.toUpperCase() }));
       onClose();
     } catch (e) {
-      message.error('导出失败，请重试');
+      message.error(t('advancedExport.errorMsg'));
     } finally {
       setExporting(false);
     }
@@ -49,33 +51,33 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
   const handleCopyClipboard = async () => {
     const success = await copyImageToClipboard(nodes);
     if (success) {
-      message.success('已复制到剪贴板，可直接在飞书/钉钉等粘贴');
+      message.success(t('advancedExport.copySuccess'));
       onClose();
     } else {
-      message.error('复制失败');
+      message.error(t('advancedExport.copyFailed'));
     }
   };
 
   return (
     <Modal
-      title={<span><DownloadOutlined /> 高级图表导出</span>}
+      title={<span><DownloadOutlined /> {t('advancedExport.title')}</span>}
       open={visible}
       onCancel={onClose}
       footer={[
         <Button key="copy" icon={<CopyOutlined />} onClick={handleCopyClipboard}>
-          拷贝到剪贴板
+          {t('advancedExport.copyClipboard')}
         </Button>,
         <Button key="cancel" onClick={onClose}>
-          取消
+          {t('advancedExport.cancel')}
         </Button>,
         <Button key="submit" type="primary" icon={<DownloadOutlined />} loading={exporting} onClick={handleExport}>
-          确认导出
+          {t('advancedExport.confirm')}
         </Button>,
       ]}
       width={480}
     >
       <div style={{ padding: '8px 0' }}>
-        <p style={{ fontWeight: 500, marginBottom: 8 }}>选择导出格式</p>
+        <p style={{ fontWeight: 500, marginBottom: 8 }}>{t('advancedExport.formatLabel')}</p>
         <Radio.Group 
           value={format} 
           onChange={(e) => setFormat(e.target.value)}
@@ -91,16 +93,16 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
 
         <Divider style={{ margin: '16px 0' }} />
 
-        <p style={{ fontWeight: 500, marginBottom: 8 }}>图片清晰度 (DPI)</p>
+        <p style={{ fontWeight: 500, marginBottom: 8 }}>{t('advancedExport.dpiLabel')}</p>
         <Select 
           value={pixelRatio} 
           disabled={format === 'json' || format === 'svg'}
           onChange={setPixelRatio}
           style={{ width: '100%' }}
           options={[
-            { label: '1x - 标准 (Standard)', value: 1 },
-            { label: '2x - 适配 Retina (Recommended)', value: 2 },
-            { label: '4x - 印刷级超清 (Ultra High Definition)', value: 4 },
+            { label: t('advancedExport.dpi1x'), value: 1 },
+            { label: t('advancedExport.dpi2x'), value: 2 },
+            { label: t('advancedExport.dpi4x'), value: 4 },
           ]}
         />
 
@@ -112,20 +114,20 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
             onChange={(e) => setIncludeBackground(e.target.checked)}
             disabled={format === 'pdf' || format === 'jpg'}
           >
-            包含底色背景 (透明背景建议使用 PNG)
+            {t('advancedExport.includeBackground')}
           </Checkbox>
           <Checkbox 
             checked={embedMetadata} 
             onChange={(e) => setEmbedMetadata(e.target.checked)}
           >
-            注入元数据 (支持图片拖入 Vizly 自动恢复编辑)
+            {t('advancedExport.embedMetadata')}
           </Checkbox>
         </div>
 
         <div style={{ marginTop: 20, padding: '12px', background: '#f5f5f5', borderRadius: 8, fontSize: '12px', color: '#666' }}>
           <Space>
             <CameraOutlined /> 
-            <span>提示：SVG 格式支持无限放大且不失真，适合在 PPT 或专业设计软件中使用。</span>
+            <span>{t('advancedExport.svgHint')}</span>
           </Space>
         </div>
       </div>

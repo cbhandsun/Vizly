@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Input, List, Button, Tag, Typography, Empty, Flex, theme, Space, Badge, Tooltip } from 'antd';
 import { FaSearch, FaCheck, FaTrash, FaChevronRight, FaRegCommentDots } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 import { useDiagramStore } from '../../store/useDiagramStore';
 import { useReactFlow } from '@xyflow/react';
 import dayjs from 'dayjs';
@@ -11,6 +12,7 @@ dayjs.extend(relativeTime);
 const { Text } = Typography;
 
 export const CommentPanel: React.FC = () => {
+    const { t } = useTranslation();
     const { token } = theme.useToken();
     const { comments, removeComment, updateComment, setActiveCommentId } = useDiagramStore();
     const { setCenter } = useReactFlow();
@@ -65,7 +67,7 @@ export const CommentPanel: React.FC = () => {
             <div style={{ padding: '12px 16px', borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
                 <Input
                     prefix={<FaSearch style={{ color: token.colorTextDescription }} />}
-                    placeholder="搜索评论或作者..."
+                    placeholder={t('comment.searchPlaceholder')}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     allowClear
@@ -78,7 +80,7 @@ export const CommentPanel: React.FC = () => {
                         onClick={() => setFilter('unresolved')}
                         className="rounded-full"
                     >
-                        未解决
+                        {t('comment.filterUnresolved')}
                     </Button>
                     <Button 
                         size="small" 
@@ -86,7 +88,7 @@ export const CommentPanel: React.FC = () => {
                         onClick={() => setFilter('resolved')}
                         className="rounded-full"
                     >
-                        已解决
+                        {t('comment.filterResolved')}
                     </Button>
                     <Button 
                         size="small" 
@@ -94,7 +96,7 @@ export const CommentPanel: React.FC = () => {
                         onClick={() => setFilter('all')}
                         className="rounded-full"
                     >
-                        全部
+                        {t('comment.filterAll')}
                     </Button>
                 </Flex>
             </div>
@@ -150,18 +152,18 @@ export const CommentPanel: React.FC = () => {
                                             <Space size={8}>
                                                 {item.replies.length > 0 && (
                                                     <Tag color="blue" icon={<FaRegCommentDots />} style={{ margin: 0, fontSize: 10 }}>
-                                                        {item.replies.length} 条回复
+                                                        {t('comment.replies', { count: item.replies.length })}
                                                     </Tag>
                                                 )}
                                                 {item.isResolved && (
                                                     <Tag color="success" icon={<FaCheck />} style={{ margin: 0, fontSize: 10 }}>
-                                                        已解决
+                                                        {t('comment.resolved')}
                                                     </Tag>
                                                 )}
                                             </Space>
                                             
                                             <Space size={4}>
-                                                <Tooltip title={item.isResolved ? "取消解决" : "标记为完成"}>
+                                                <Tooltip title={item.isResolved ? t('comment.markUnresolved') : t('comment.markResolved')}>
                                                     <Button 
                                                         size="small" 
                                                         type="text" 
@@ -170,7 +172,7 @@ export const CommentPanel: React.FC = () => {
                                                         className={item.isResolved ? 'text-green-500' : 'text-slate-400'}
                                                     />
                                                 </Tooltip>
-                                                <Tooltip title="删除">
+                                                <Tooltip title={t('comment.delete')}>
                                                     <Button 
                                                         size="small" 
                                                         type="text" 
@@ -191,7 +193,7 @@ export const CommentPanel: React.FC = () => {
                     <div style={{ padding: '64px 32px' }}>
                         <Empty 
                             image={Empty.PRESENTED_IMAGE_SIMPLE} 
-                            description={searchTerm ? "未找到匹配的评论" : "暂无评论反馈"} 
+                            description={searchTerm ? t('comment.emptySearch') : t('comment.emptyAll')} 
                         />
                     </div>
                 )}
