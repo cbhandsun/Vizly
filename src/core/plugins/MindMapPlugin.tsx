@@ -1,167 +1,125 @@
-import React, { useMemo, useCallback } from 'react';
+/**
+ * MindMapPlugin.tsx — Vizly MindMap Plugin (v2, powered by mind-elixir)
+ *
+ * Architecture:
+ *   - mind-elixir handles all rendering, layout, keyboard, undo/redo
+ *   - Vizly's PluginContext only used for save/load/toolbar/sidebar
+ *   - React Flow is retained as the outer canvas shell (pan/zoom/minimap)
+ *     but no RF nodes/edges are used for mindmap content
+ */
+
+import React from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import {
-  DiagramTypePlugin,
-  PluginContext,
+    DiagramTypePlugin,
+    PluginContext,
 } from '../types/plugin';
-
-import MindMapNode from '../components/custom-nodes/MindMapNode';
-import { MindMapBeautifyPanel } from '../components/diagrams/mindmap-pro/MindMapBeautifyPanel';
-import { MindMapCanvasContext } from '../components/diagrams/mindmap-pro/MindMapCanvasContext';
-import { MindMapOutlinePanel } from '../components/diagrams/mindmap-pro/MindMapOutlinePanel';
 import { SidebarPanel } from '../types/plugin';
-import { UnorderedListOutlined, PartitionOutlined, FullscreenOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
+import { UnorderedListOutlined } from '@ant-design/icons';
 import { BaseDiagramPlugin } from '../sdk/BasePlugin';
 import i18n from '@/i18n';
-import { useTranslation } from 'react-i18next';
-import { Select, Divider, Tooltip, Button } from 'antd';
+import MindElixirWrapper from '../components/mindmap-v2/MindElixirWrapper';
+import MindElixirToolbar from '../components/mindmap-v2/MindElixirToolbar';
+import { migrateV1ToV2 } from '../components/mindmap-v2/migrate';
+import { isMindMapV2 } from '../components/mindmap-v2/types';
 
+// ── Inline Outline Panel (lightweight placeholder for Phase 1) ────────────────
+const MindElixirOutlinePanelPlaceholder: React.FC<{ ctx: PluginContext }> = () => (
+    <div style={{ padding: 16, color: '#94a3b8', fontSize: 13, textAlign: 'center' }}>
+        <div style={{ fontSize: 24, marginBottom: 8 }}>🌿</div>
+        <div>大纲视图将在 Phase 2 提供</div>
+        <div style={{ marginTop: 8, fontSize: 11 }}>使用画布上的键盘导航即可</div>
+    </div>
+);
+
+// ── Plugin Class ───────────────────────────────────────────────────────────────
 export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugin {
-  id = 'mindmap';
-  
-  get name() {
-    return i18n.t('plugins.mindmap.title');
-  }
+    id = 'mindmap';
 
-  version = '1.1';
+    get name() {
+        return i18n.t('plugins.mindmap.title');
+    }
 
-  async migrate(data: any, fromVersion: string | undefined): Promise<any> {
-    const migratedData = await super.migrate(data, fromVersion);
-    return migratedData;
-  }
+    version = '2.0';
 
-  // Professional Mind Map disables legacy generic panels
-  hideDefaultSidebar = true;
-  hideContextToolbar = true;
-  hideGridControls = true;
-  hideLayoutControls = true;
+    /**
+     * Migrate old data formats to current format.
+     * v1 (RF nodes/edges) → v2 (mind-elixir tree) is handled in MindElixirWrapper.
+     * This method is a pass-through for any base plugin migration needed.
+     */
+    async migrate(data: any, fromVersion: string | undefined): Promise<any> {
+        const migratedData = await super.migrate(data, fromVersion);
 
-  // Initial structure for an empty diagram
-  getEmptyState() {
-    return {
-      nodes: [
-        {
-          id: 'root',
-          type: 'mindmap',
-          position: { x: 0, y: 0 },
-          data: { label: i18n.t('designer.flowchart.mindMapCenter') || '中心主题 (Root)', direction: 'LR' },
-          selected: true
-        }
-      ],
-      edges: []
-    };
-  }
-
-  // parseData and serializeData are now inherited from BaseDiagramPlugin
-
-  // Layouts supported (We hook into the autoLayout engine for Mind Map)
-  getSupportedLayouts() { return ['MindMapDirectionalLayout']; }
-  getDefaultLayout() { return 'MindMapDirectionalLayout'; }
-
-  // Custom Types registration
-  getNodeTypes(): Record<string, any> {
-    return {
-      mindmap: MindMapNode
-    };
-  }
-
-  
-  getEdgeTypes() {
-    return {};
-  }
-
-  renderCustomPropertyPanel(ctx: PluginContext, selectedNodes: Node[], selectedEdges: Edge[]) {
-    return <MindMapBeautifyPanel ctx={ctx} selectedNodes={selectedNodes} selectedEdges={selectedEdges} />;
-  }
-
-  contributeToolbar(ctx: PluginContext) {
-    return <MindMapToolbar ctx={ctx} />;
-  }
-
-  contributeCanvasComponents(ctx: PluginContext) {
-    return <MindMapCanvasContext />;
-  }
-
-  contributeSidebarPanels(ctx: PluginContext): SidebarPanel[] {
-    return [{
-      id: 'mindmap-outline',
-      title: i18n.t('plugins.mindmap.outline.title') || '大纲视图',
-      icon: <UnorderedListOutlined />,
-      content: <MindMapOutlinePanel ctx={ctx} />
-    }];
-  }
-}
-
-// ====== 思维导图专属工具栏 ======
-const MindMapToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
-    // Defense: ctx may be null during first render cycle
-    if (!ctx) return null;
-    const { t } = useTranslation();
-
-    // [S-3] Memoize root node — ctx.getNodes().find() in component body runs O(N) on every render.
-    // Use useMemo so re-computation only happens when getNodes reference changes (i.e. nodes mutate).
-    const root = useMemo(() => {
-        const nodes = ctx.getNodes();
-        return nodes.find(n => n.type === 'mindmap' && (n.data?.depth === 0 || n.data?.depth === undefined));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ctx.getNodes]);
-    const currentDirection = (root?.data?.direction as string) || 'LR';
-
-    const handleDirectionChange = useCallback((direction: string) => {
-        if (!root) return;
-        ctx.setNodes(nds => nds.map(n => {
-            if (n.id === root.id) {
-                return { ...n, data: { ...n.data, direction } };
+        // If data is in v1 RF format, convert to v2 now at the plugin level
+        // so it gets stored in the correct format on next save.
+        if (!isMindMapV2(migratedData) && Array.isArray(migratedData?.nodes)) {
+            const mindmapNodes = migratedData.nodes.filter((n: any) => n.type === 'mindmap');
+            if (mindmapNodes.length > 0) {
+                const v2 = migrateV1ToV2({ nodes: mindmapNodes, edges: migratedData.edges ?? [] });
+                // Embed v2 payload in the meta node convention that MindElixirWrapper reads
+                return {
+                    nodes: [
+                        {
+                            id: '__mindmap_meta__',
+                            type: 'mindmap',
+                            position: { x: -9999, y: -9999 },
+                            hidden: true,
+                            data: { mindmapV2: v2, depth: -1, label: '' },
+                        },
+                    ],
+                    edges: [],
+                };
             }
-            return n;
-        }));
-    }, [root, ctx.setNodes]);
+        }
 
-    const handleCollapseAll = () => {
-        window.dispatchEvent(new CustomEvent('mindmap:collapseAll'));
-    };
+        return migratedData;
+    }
 
-    const handleExpandAll = () => {
-        window.dispatchEvent(new CustomEvent('mindmap:expandAll'));
-    };
+    // ── Plugin Flags ─────────────────────────────────────────────────────────
+    hideDefaultSidebar = true;
+    hideContextToolbar = true;
+    hideGridControls = true;
+    hideLayoutControls = true;
 
-    const handleFitView = () => {
-        ctx.reactFlowInstance?.fitView({ duration: 600, padding: 0.2, minZoom: 0.55 });
-    };
+    // ── Initial State ─────────────────────────────────────────────────────────
+    // We only need a placeholder — mind-elixir will init with DEFAULT_DATA if meta is empty
+    getEmptyState() {
+        return { nodes: [], edges: [] };
+    }
 
+    getSupportedLayouts() { return ['MindElixirLayout']; }
+    getDefaultLayout() { return 'MindElixirLayout'; }
 
-    return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px', borderLeft: '1px solid #e8e8e8', marginLeft: 8 }}>
-            <Select
-                size="small"
-                variant="borderless"
-                value={currentDirection}
-                onChange={handleDirectionChange}
-                style={{ width: 140 }}
-                options={[
-                    { label: t('plugins.mindmap.direction.LR'), value: 'LR' },
-                    { label: t('plugins.mindmap.direction.R'), value: 'R' },
-                    { label: t('plugins.mindmap.direction.L'), value: 'L' },
-                    { label: t('plugins.mindmap.direction.TB'), value: 'TB' },
-                    { label: t('plugins.mindmap.direction.BT'), value: 'BT' },
-                    { label: t('plugins.mindmap.direction.FISHBONE'), value: 'FISHBONE' },
-                ]}
-            />
+    // mind-elixir doesn't use RF custom node types (all rendering is internal SVG)
+    getNodeTypes(): Record<string, any> { return {}; }
+    getEdgeTypes() { return {}; }
 
-            <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
+    // ── Canvas Component ── mind-elixir renders here ──────────────────────────
+    contributeCanvasComponents(ctx: PluginContext) {
+        // isDark: detect from body class or localStorage (simple heuristic)
+        const isDark = document.documentElement.classList.contains('dark')
+            || localStorage.getItem('vizly-theme') === 'dark';
+        return <MindElixirWrapper ctx={ctx} isDark={isDark} />;
+    }
 
-            <Tooltip title={t('plugins.mindmap.collapseAll')}>
-                <Button size="small" type="text" icon={<MenuFoldOutlined />} onClick={handleCollapseAll} />
-            </Tooltip>
-            <Tooltip title={t('plugins.mindmap.expandAll')}>
-                <Button size="small" type="text" icon={<MenuUnfoldOutlined />} onClick={handleExpandAll} />
-            </Tooltip>
+    // ── Toolbar ───────────────────────────────────────────────────────────────
+    contributeToolbar(_ctx: PluginContext) {
+        return <MindElixirToolbar />;
+    }
 
-            <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />
+    // ── Property Panel ────────────────────────────────────────────────────────
+    renderCustomPropertyPanel(_ctx: PluginContext, _selectedNodes: Node[], _selectedEdges: Edge[]) {
+        // Phase 1: no property panel, mind-elixir handles in-place editing
+        return null;
+    }
 
-            <Tooltip title={t('plugins.mindmap.fitView')}>
-                <Button size="small" type="text" icon={<FullscreenOutlined />} onClick={handleFitView} />
-            </Tooltip>
-        </div>
-    );
-};
+    // ── Sidebar Panels ────────────────────────────────────────────────────────
+    contributeSidebarPanels(ctx: PluginContext): SidebarPanel[] {
+        return [{
+            id: 'mindmap-outline',
+            title: i18n.t('plugins.mindmap.outline.title') || '大纲视图',
+            icon: <UnorderedListOutlined />,
+            content: <MindElixirOutlinePanelPlaceholder ctx={ctx} />,
+        }];
+    }
+}
