@@ -68,6 +68,10 @@ export class PathPostProcessor {
         // [Trunk Direct] Bypass heavy post-processing for calculated trunk paths
         // These paths are geometrically constructed to be 'perfect' (clean orthogonal routing)
         // and shouldn't be simplified or nudged, which destroys the strict structure.
+        const { config } = this;
+        const { obstacles, startPos, endPos, metadata, extraObstacles } = context;
+        const isBus = metadata.isOneToMany || metadata.isManyToOne;
+
         if (context.metadata.strategy && context.metadata.strategy.includes('Trunk Direct')) {
             // [H-1] Apply snapAxis before return to eliminate sub-pixel diagonal artifacts
             // that arise from fractional coordinate math in trunk geometry construction.
@@ -83,9 +87,6 @@ export class PathPostProcessor {
         }
 
         let finalPoints = [...points];
-        const { config } = this;
-        const { obstacles, startPos, endPos, metadata, extraObstacles } = context;
-        const isBus = metadata.isOneToMany || metadata.isManyToOne;
         const snapAxis = (pts: Point[]): Point[] => {
             if (pts.length < 2) return pts;
             const res = pts.map(p => ({ ...p }));
