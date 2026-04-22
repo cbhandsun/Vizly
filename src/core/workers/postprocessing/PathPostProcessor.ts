@@ -111,10 +111,10 @@ export class PathPostProcessor {
         const posOptions = { sourcePos: startPos, targetPos: endPos };
         finalPoints = simplifyPath(finalPoints, config.algorithm.gridSize * 2, obstacles, posOptions);
         // [BACKTRACK-V2] Orthogonal-safe large backtrack removal.
-        // Only fires when: dominant direction is clear (≥2:1), backtrack ≥60px, AND
+        // Threshold: 20px minimum (catches trunk junction micro-backtracks like 52px)
+        // Only fires when: dominant direction is clear (≥2:1), AND
         // corner is provably perpendicular to both incoming and outgoing segments.
-        // makePathOrthogonal (Phase 4) still runs after this as a safety net.
-        finalPoints = removeLargeBacktrack(finalPoints, obstacles, posOptions);
+        finalPoints = removeLargeBacktrack(finalPoints, obstacles, posOptions, 20);
         finalPoints = collapseRedundantBends(finalPoints, obstacles, config.postProcessing.redundantBendThreshold, posOptions);
 
         // Phase 2: Cleanup (Jogs, Backtracks)
@@ -199,6 +199,11 @@ export class PathPostProcessor {
         }
 
         finalPoints = snapAxis(finalPoints);
+        // [BACKTRACK-BUS] Run collapseCollinearBacktracks on bus/trunk edges too,
+        // to clean up any small directional backtracks introduced by nudging or
+        // trunk junction alignment (e.g. 52px overshoot at merge point).
+        // This is safe after snapAxis because the points are already axis-snapped.
+        finalPoints = collapseCollinearBacktracks(finalPoints);
 
         // Phase 6: SVG Path Generation
         const svgPath = createFilletedPath(finalPoints, config.postProcessing.borderRadius);

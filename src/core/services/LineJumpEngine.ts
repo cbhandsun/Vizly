@@ -236,13 +236,26 @@ export function injectLineJumps(
         return '';  // 调用方应使用原始路径
     }
 
-    const parts: string[] = [];
-    parts.push(`M ${points[0].x} ${points[0].y}`);
+    // [FIX] 去除连续重复点（容差 0.5px），防止零长段导致同一跳弧被处理两次
+    const deduped: Point[] = [points[0]];
+    for (let i = 1; i < points.length; i++) {
+        const prev = deduped[deduped.length - 1];
+        const curr = points[i];
+        if (Math.abs(curr.x - prev.x) + Math.abs(curr.y - prev.y) > 0.5) {
+            deduped.push(curr);
+        }
+    }
 
-    for (let i = 0; i < points.length - 1; i++) {
-        const p1 = points[i];
-        const p2 = points[i + 1];
+    const parts: string[] = [];
+    parts.push(`M ${deduped[0].x} ${deduped[0].y}`);
+
+    for (let i = 0; i < deduped.length - 1; i++) {
+        const p1 = deduped[i];
+        const p2 = deduped[i + 1];
         const isHorizontal = Math.abs(p1.y - p2.y) < 0.5;
+
+        // [FIX] 跳过零长段（去重后仍可能出现）
+        if (Math.abs(p2.x - p1.x) + Math.abs(p2.y - p1.y) < 0.5) continue;
 
         if (!isHorizontal) {
             // 非水平段直接画线
@@ -255,13 +268,24 @@ export function injectLineJumps(
         const segMaxX = Math.max(p1.x, p2.x);
         const goingRight = p2.x > p1.x;
 
-        const segJumps = jumps
+        const rawJumps = jumps
             .filter(j => {
                 const jx = j.point.x;
                 return Math.abs(j.point.y - p1.y) < 1 && 
                        jx > segMinX + radius && jx < segMaxX - radius;
             })
             .sort((a, b) => goingRight ? a.point.x - b.point.x : b.point.x - a.point.x);
+
+        // [FIX] 过滤掉间距 < 2×radius 的重叠跳弧，避免弧线相互干扰产生回折段
+        const segJumps: IntersectionInfo[] = [];
+        let lastJumpX = -Infinity;
+        for (const j of rawJumps) {
+            const jx = j.point.x;
+            if (Math.abs(jx - lastJumpX) >= radius * 2 + 1) {
+                segJumps.push(j);
+                lastJumpX = jx;
+            }
+        }
 
         if (segJumps.length === 0) {
             parts.push(`L ${p2.x} ${p2.y}`);
