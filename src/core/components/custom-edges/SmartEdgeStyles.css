@@ -70,3 +70,31 @@
 .nodrag.nopan:hover .bend-delete-btn {
   opacity: 1 !important;
 }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   路由调试器「扫描全图」高亮状态
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* 异常边：红色脉冲描边 */
+@keyframes debug-anomaly-pulse {
+  0%, 100% { stroke: #ff4d4f; stroke-opacity: 1; stroke-width: 3px; }
+  50%       { stroke: #ff7875; stroke-opacity: 0.6; stroke-width: 2px; }
+}
+
+.react-flow__edge.vizly-debug-anomaly path.react-flow__edge-path,
+.react-flow__edge.vizly-debug-anomaly path {
+  animation: debug-anomaly-pulse 1.2s ease-in-out infinite;
+  filter: drop-shadow(0 0 4px rgba(255, 77, 79, 0.8));
+}
+
+/* 正常边：绿色淡入提示（不循环，0.5s 后还原） */
+@keyframes debug-ok-flash {
+  0%   { stroke: #52c41a; stroke-opacity: 0.9; }
+  60%  { stroke: #52c41a; stroke-opacity: 0.5; }
+  100% { stroke-opacity: 0; }
+}
+
+.react-flow__edge.vizly-debug-ok path.react-flow__edge-path,
+.react-flow__edge.vizly-debug-ok path {
+  animation: debug-ok-flash 1.5s ease-out forwards;
+}

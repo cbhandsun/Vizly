@@ -78,9 +78,18 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
 
     // 🚀 [PERF] 连接拓扑签名：仅在边的连接关系变化时才重算 multiEdgeInfo
     // storeEdges 引用在拖拽时因 _dragUpdate 频繁变化，但 multiEdgeInfo 只关心 id/source/target
+    // [PERF-2] 改用 djb2 滚动哈希替代字符串 join：相同 O(E) 计算，
+    //   但不产生中间字符串数组和超长拼接字符串，消除拖拽时的 GC 压力。
     const edgeTopologySig = useMemo(() => {
-        return storeEdges.map((e: Edge) => `${e.id}:${e.source}>${e.target}`).join('|');
+        let h = 5381;
+        for (const e of storeEdges as Edge[]) {
+            for (let i = 0; i < e.id.length; i++)     h = (h * 33) ^ e.id.charCodeAt(i);
+            for (let i = 0; i < e.source.length; i++) h = (h * 33) ^ e.source.charCodeAt(i);
+            for (let i = 0; i < e.target.length; i++) h = (h * 33) ^ e.target.charCodeAt(i);
+        }
+        return h >>> 0; // unsigned 32-bit integer
     }, [storeEdges]);
+
 
     // 🚀 [PERF] 使用 nodeLookup 精准订阅替代 useNodes() 全量订阅
     // useNodes() 每条边都订阅全量节点数组 → O(N×E) 重算
@@ -409,18 +418,32 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             geomReverse = dx > 0 && Math.abs(dx) > Math.abs(dy);
         }
 
-        if (geomReverse) return true;
+        // [FIX] same-handle-side alone is NOT sufficient to declare a reverse edge.
+        // Default node templates often have top/bottom handles on all nodes; treating
+        // every same-side pair as a U-Turn feedback loop causes widespread bypass misfire.
+        // Requirement: handle directions must CORROBORATE geomReverse, not override it.
+        const result = geomReverse || (() => {
+            const sDir = parseHandleDirection(sourceHandleId);
+            const tDir = parseHandleDirection(targetHandleId);
+            if (sDir && tDir && sDir === tDir) {
+                const isHorizontal = sDir === Position.Left || sDir === Position.Right;
+                // Only treat same-side horizontal handles as reverse in LR/RL when geometry
+                // also confirms backward displacement (geomReverse already calculated above).
+                if (isHorizontal && ['LR', 'RL'].includes(refDir) && geomReverse) return true;
+                // Same for vertical handles in TB/BT: require geometric confirmation.
+                if (!isHorizontal && ['TB', 'BT'].includes(refDir) && geomReverse) return true;
+            }
+            return false;
+        })();
 
-        const sDir = parseHandleDirection(sourceHandleId);
-        const tDir = parseHandleDirection(targetHandleId);
-
-        if (sDir && tDir && sDir === tDir) {
-            const isHorizontal = sDir === Position.Left || sDir === Position.Right;
-            if (isHorizontal && ['LR', 'RL'].includes(refDir)) return true;
-            if (!isHorizontal && ['TB', 'BT'].includes(refDir)) return true;
+        if (result) {
+            // [FIX] Only log in development — avoids console flooding in production
+            // (this runs inside useMemo, firing on every drag frame for each reverse edge)
+            import.meta.env.DEV && console.log(`[ReverseEdge] ${source}→${target} isReverse=TRUE  dx=${Math.round(dx)} dy=${Math.round(dy)} refDir=${refDir} geomReverse=${geomReverse} sHandle=${sourceHandleId} tHandle=${targetHandleId}`);
         }
 
-        return false;
+
+        return result;
     }, [sourceHandleId, targetHandleId, globalBaseDirection, source, target, simpleNodeMap, sourceX, sourceY, targetX, targetY, getAbsPos]);
 
     // ---------- 1.5️⃣ Smart Port Selection ----------

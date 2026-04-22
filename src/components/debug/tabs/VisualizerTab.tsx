@@ -133,10 +133,18 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
     const [showQuadTree, setShowQuadTree] = useState(false);
     const [isMaximized, setIsMaximized] = useState(false);
 
+    // [SCAN] Batch scan state
+    interface ScanRow { edgeId: string; port: string; strategy: string; geo: string; isM2O: boolean; anomaly: boolean; }
+    const [scanResults, setScanResults] = useState<ScanRow[] | null>(null);
+    const [isScanning, setIsScanning] = useState(false);
+    const [showScan, setShowScan] = useState(false);
+
     // Zoom & Pan State
     const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
     const [isDragging, setIsDragging] = useState(false);
     const lastMouseRef = useRef({ x: 0, y: 0 });
+    // [FIX] Keep a ref to the React debug listener so scanAllEdges can restore it after clearing
+    const debugListenerRef = useRef<((data: DebugPayload) => void) | null>(null);
 
     const targetEdgeIdRef = useRef(targetEdgeId);
 
@@ -204,39 +212,60 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
             ? (data.algorithmDebug as AlgorithmDebugPayload)
             : null;
 
-        // Check Grid
-        const grid = data.grid ?? algorithmDebug?.grid;
-        if (grid && 'data' in grid) {
-            updateRect(grid.minX, grid.minY, grid.cols * grid.size, grid.rows * grid.size);
-        }
-
-        // Check Obstacles
-        const obstacles = data.obstacles ?? algorithmDebug?.obstacles;
-        if (obstacles && Array.isArray(obstacles)) {
-            obstacles.forEach((o) => updateRect(o.x, o.y, o.w ?? o.width ?? 0, o.h ?? o.height ?? 0));
-        }
-
-        // Check Path
+        // === PRIORITY BOUNDS: Path + Source/Target rects ===
+        // Fit tightly around the "hero" elements first.
+        // Without this, 21 obstacles spread over 4742px collapse scale to 0.063x,
+        // making the 2px path line render at 0.13px — effectively invisible.
         const path = data.pathPoints || data.path;
         if (path && Array.isArray(path)) {
             path.forEach((p) => updateBounds(p.x, p.y));
         }
 
-        // Check Raw Path
         const rawPoints = algorithmDebug?.rawPoints;
         if (rawPoints && Array.isArray(rawPoints)) {
             rawPoints.forEach((p) => updateBounds(p.x, p.y));
         }
 
-        // Check Raw Visited (search graph)
+        const srcRect = algorithmDebug?.sourceRect;
+        const tgtRect = algorithmDebug?.targetRect;
+        if (srcRect) updateRect(srcRect.x, srcRect.y, srcRect.w ?? (srcRect as any).width ?? 0, srcRect.h ?? (srcRect as any).height ?? 0);
+        if (tgtRect) updateRect(tgtRect.x, tgtRect.y, tgtRect.w ?? (tgtRect as any).width ?? 0, tgtRect.h ?? (tgtRect as any).height ?? 0);
+
+        if (data.points && Array.isArray(data.points)) {
+            data.points.forEach((p) => updateBounds(p.x, p.y));
+        }
+
+        // === SECONDARY BOUNDS: Obstacles filtered by proximity ===
+        // Only include obstacles within 2x the primary content span.
+        // Distant obstacles in unrelated graph regions are excluded.
+        const primaryMinX = hasContent ? minX : -Infinity;
+        const primaryMinY = hasContent ? minY : -Infinity;
+        const primaryMaxX = hasContent ? maxX : Infinity;
+        const primaryMaxY = hasContent ? maxY : Infinity;
+        const primaryW = Math.max(primaryMaxX - primaryMinX, 200);
+        const primaryH = Math.max(primaryMaxY - primaryMinY, 200);
+        const OBSTACLE_MARGIN = 2.0;
+
+        const obstacles = data.obstacles ?? algorithmDebug?.obstacles;
+        if (obstacles && Array.isArray(obstacles)) {
+            obstacles.forEach((o) => {
+                const ox = o.x, oy = o.y;
+                const ow = o.w ?? o.width ?? 0, oh = o.h ?? o.height ?? 0;
+                const inX = ox + ow >= primaryMinX - primaryW * OBSTACLE_MARGIN && ox <= primaryMaxX + primaryW * OBSTACLE_MARGIN;
+                const inY = oy + oh >= primaryMinY - primaryH * OBSTACLE_MARGIN && oy <= primaryMaxY + primaryH * OBSTACLE_MARGIN;
+                if (inX && inY) updateRect(ox, oy, ow, oh);
+            });
+        }
+
+        // Grid (always include — defines the search space scope)
+        const grid = data.grid ?? algorithmDebug?.grid;
+        if (grid && 'data' in grid) {
+            updateRect(grid.minX, grid.minY, grid.cols * grid.size, grid.rows * grid.size);
+        }
+
         const visitedForFit = data.visited ?? algorithmDebug?.visited;
         if (visitedForFit && Array.isArray(visitedForFit)) {
             visitedForFit.forEach((p) => updateBounds(p.x, p.y));
-        }
-
-        // Check Points (Start/End)
-        if (data.points && Array.isArray(data.points)) {
-            data.points.forEach((p) => updateBounds(p.x, p.y));
         }
 
         const vgRaw: VisibilityGraphLike | undefined =
@@ -265,7 +294,9 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
             scale = 1;
         }
         const MAX_SCALE = 4;
-        const MIN_SCALE = 0.1;
+        // [FIX] MIN_SCALE lowered to 0.05: proximity filtering above prevents the scale
+        // from going very low in practice; this is a safety floor for edge cases.
+        const MIN_SCALE = 0.05;
         scale = Math.max(MIN_SCALE, Math.min(scale, MAX_SCALE));
 
         const centerX = (minX + maxX) / 2;
@@ -609,6 +640,8 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                 fitToContent(data);
             }
         };
+        // [FIX] Save listener ref so scanAllEdges can restore it
+        debugListenerRef.current = handleDebugData;
 
         const handleSelectionChange = (edgeId: string | null) => {
             if (edgeId) setTargetEdgeId(edgeId);
@@ -617,10 +650,23 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
         coordinator.registerDebugListener(handleDebugData);
         coordinator.registerSelectionListener(handleSelectionChange);
 
+        // [FALLBACK] Also listen to the window CustomEvent fired by Ctrl+click on edges.
+        // This ensures VisualizerTab receives edge selection even if coordinator listener
+        // was registered before coordinator was ready, or after coordinator reset.
+        const handleWindowEdgeSelect = (e: Event) => {
+            const edgeId = (e as CustomEvent<{ edgeId: string }>).detail?.edgeId;
+            if (edgeId) {
+                setTargetEdgeId(edgeId);
+            }
+        };
+        window.addEventListener('vizly:selectDebugEdge', handleWindowEdgeSelect);
+
         return () => {
             coordinator.registerDebugListener(null);
             coordinator.registerSelectionListener(null);
+            window.removeEventListener('vizly:selectDebugEdge', handleWindowEdgeSelect);
         };
+
     }, [fitToContent]);
 
     useEffect(() => {
@@ -797,9 +843,85 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
         }
     };
 
+    // [SCAN] Scan all edges in the current diagram and collect routing metadata
+    const scanAllEdges = useCallback(async () => {
+        const coordinator = EdgeRoutingCoordinator.getInstance() as unknown as DebuggableCoordinator;
+        if (!('setDebugEdge' in coordinator) || !('forceDebugReRoute' in coordinator)) return;
+
+        // Collect all edge IDs from the DOM
+        const edgeEls = document.querySelectorAll('.react-flow__edge');
+        const edgeIds = [...edgeEls].map(e => e.getAttribute('data-id')).filter(Boolean) as string[];
+        if (edgeIds.length === 0) return;
+
+        setIsScanning(true);
+        setScanResults(null);
+        setShowScan(true);
+
+        const rows: ScanRow[] = [];
+
+        for (const eid of edgeIds) {
+            await new Promise<void>((resolve) => {
+                const onDebug = (data: DebugPayload) => {
+                    // Field paths match what renderLegend uses (line ~737):
+                    //   data.algorithmDebug.portSelection → ps
+                    //   ps.selected.source / ps.selected.target → ports
+                    //   data.selectedSourcePos / data.selectedTargetPos → port fallback
+                    const ad = data.algorithmDebug && typeof data.algorithmDebug === 'object'
+                        ? (data.algorithmDebug as Record<string, any>)
+                        : null;
+                    const ps = ad?.portSelection;
+                    const dataAny = data as unknown as Record<string, any>;
+                    const strategy = data.metadata?.strategy ?? ad?.strategy ?? 'Unknown';
+                    const s = dataAny.selectedSourcePos ?? ps?.selected?.source ?? '?';
+                    const tt = dataAny.selectedTargetPos ?? ps?.selected?.target ?? '?';
+                    const geo = ps?.geometry ?? ps?.detectedGeometry ?? '?';
+                    const isM2O = ps?.isManyToOne === true;
+                    const layoutDir = ps?.layoutDirection ?? '';
+                    // Anomaly detection
+                    const backward = typeof geo === 'string' && geo.includes('backward');
+                    const tbMismatch = layoutDir === 'TB' && (s === 'left' || s === 'right' || tt === 'left' || tt === 'right');
+                    const lrMismatch = (layoutDir === 'LR' || layoutDir === 'RL') && (s === 'top' || s === 'bottom' || tt === 'top' || tt === 'bottom');
+                    const anomaly = backward || tbMismatch || lrMismatch;
+                    rows.push({ edgeId: eid, port: `${s}→${tt}`, strategy, geo, isM2O, anomaly });
+                    // [FIX] Restore React component listener before resolving
+                    coordinator.registerDebugListener(debugListenerRef.current);
+                    resolve();
+                };
+                coordinator.registerDebugListener(onDebug);
+                coordinator.setDebugEdge(eid);
+                coordinator.forceDebugReRoute(eid);
+                // Timeout fallback
+                setTimeout(() => { coordinator.registerDebugListener(debugListenerRef.current); resolve(); }, 1500);
+            });
+        }
+
+        // Restore previous debug edge
+        coordinator.setDebugEdge(targetEdgeIdRef.current || null);
+        setScanResults(rows);
+        setIsScanning(false);
+
+        // [VISUAL] Highlight anomalous edges in the diagram with a CSS class
+        // Clear any previous highlights first
+        document.querySelectorAll('.react-flow__edge').forEach(el => {
+            el.classList.remove('vizly-debug-anomaly', 'vizly-debug-ok');
+        });
+        rows.forEach(row => {
+            const el = document.querySelector(`.react-flow__edge[data-id="${row.edgeId}"]`);
+            if (el) el.classList.add(row.anomaly ? 'vizly-debug-anomaly' : 'vizly-debug-ok');
+        });
+    }, []);
+
+    // Clear edge highlights when scan panel is closed
+    const clearScanHighlights = useCallback(() => {
+        document.querySelectorAll('.react-flow__edge').forEach(el => {
+            el.classList.remove('vizly-debug-anomaly', 'vizly-debug-ok');
+        });
+        setShowScan(false);
+    }, []);
+
     return (
         <div style={{ padding: 10, height: '100%', display: 'flex', flexDirection: 'column', color: token.colorText, overflowY: 'auto' }}>
-            <div style={{ marginBottom: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ marginBottom: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <Input
                     placeholder={t('designer.debug.visualizer.edgeIdPlaceholder')}
                     value={targetEdgeId}
@@ -811,6 +933,16 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                 <Button type="primary" size="small" onClick={runDebug}>
                     {t('designer.debug.visualizer.debug')}
                 </Button>
+                <Tooltip title="扫描图中所有边，列出端口异常">
+                    <Button
+                        size="small"
+                        loading={isScanning}
+                        onClick={scanAllEdges}
+                        style={{ background: showScan ? '#1d3557' : undefined }}
+                    >
+                        🔍 扫描全图
+                    </Button>
+                </Tooltip>
                 <Tooltip title={isMaximized ? t('designer.debug.visualizer.restore') : t('designer.debug.visualizer.maximize')}>
                     <Button
                         size="small"
@@ -821,6 +953,101 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                     </Button>
                 </Tooltip>
             </div>
+
+            {/* [SCAN] Visual scan results */}
+            {showScan && scanResults && (() => {
+                const total = scanResults.length;
+                const anomalyCount = scanResults.filter(r => r.anomaly).length;
+                const okCount = total - anomalyCount;
+                const m2oCount = scanResults.filter(r => r.isM2O).length;
+                const healthPct = total > 0 ? Math.round((okCount / total) * 100) : 100;
+                const anomalies = scanResults.filter(r => r.anomaly);
+                const healthColor = anomalyCount === 0 ? '#52c41a' : anomalyCount <= 2 ? '#faad14' : '#ff4d4f';
+
+                return (
+                    <div style={{
+                        marginBottom: 8,
+                        background: 'rgba(0,0,0,0.3)',
+                        border: `1px solid ${anomalyCount > 0 ? '#ff4d4f44' : '#52c41a44'}`,
+                        borderRadius: 6,
+                        padding: '8px 10px',
+                        fontSize: 11,
+                    }}>
+                        {/* Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <span style={{ fontWeight: 600, color: token.colorText }}>路由健康检查</span>
+                            <Button type="text" size="small" onClick={clearScanHighlights}
+                                style={{ padding: '0 4px', height: 16, fontSize: 11, color: token.colorTextSecondary }}>
+                                ✕ 清除高亮
+                            </Button>
+                        </div>
+
+                        {/* Health bar */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                            <div style={{
+                                flex: 1, height: 6, borderRadius: 3,
+                                background: '#333', overflow: 'hidden', position: 'relative'
+                            }}>
+                                <div style={{
+                                    position: 'absolute', left: 0, top: 0,
+                                    width: `${healthPct}%`, height: '100%',
+                                    background: healthColor,
+                                    transition: 'width 0.4s ease'
+                                }} />
+                            </div>
+                            <span style={{ color: healthColor, fontWeight: 700, minWidth: 32 }}>{healthPct}%</span>
+                        </div>
+
+                        {/* Stats row */}
+                        <div style={{ display: 'flex', gap: 12, marginBottom: anomalies.length > 0 ? 8 : 0 }}>
+                            <span style={{ color: '#52c41a' }}>✅ 正常 {okCount}</span>
+                            <span style={{ color: anomalyCount > 0 ? '#ff4d4f' : token.colorTextSecondary }}>
+                                {anomalyCount > 0 ? '🔴' : '◎'} 异常 {anomalyCount}
+                            </span>
+                            <span style={{ color: '#1890ff' }}>⇉ M2O {m2oCount}</span>
+                            <span style={{ color: token.colorTextSecondary }}>共 {total} 条</span>
+                        </div>
+
+                        {/* Anomaly list — only show if there are any */}
+                        {anomalies.length > 0 && (
+                            <div style={{ borderTop: '1px solid #333', paddingTop: 6 }}>
+                                <div style={{ color: '#ff4d4f', marginBottom: 4, fontWeight: 600 }}>⚠ 异常边（点击调试）</div>
+                                {anomalies.map(row => (
+                                    <div
+                                        key={row.edgeId}
+                                        onClick={() => {
+                                            // [FIX] Update ref immediately so runDebug uses the new edgeId
+                                            // (setTargetEdgeId is async, targetEdgeIdRef.current would still be stale)
+                                            setTargetEdgeId(row.edgeId);
+                                            targetEdgeIdRef.current = row.edgeId;
+                                            runDebug();
+                                        }}
+                                        style={{
+                                            display: 'flex', gap: 8, alignItems: 'center',
+                                            padding: '3px 6px', borderRadius: 4, cursor: 'pointer',
+                                            background: 'rgba(255,77,79,0.1)',
+                                            marginBottom: 2,
+                                            transition: 'background 0.15s'
+                                        }}
+                                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,77,79,0.22)')}
+                                        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,77,79,0.1)')}
+                                    >
+                                        <span style={{ color: '#ff7875', fontWeight: 600, minWidth: 32 }}>{row.edgeId}</span>
+                                        <span style={{ color: token.colorTextSecondary, flex: 1 }}>{row.port}</span>
+                                        <span style={{ color: '#faad14' }}>{row.geo}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {anomalies.length === 0 && (
+                            <div style={{ color: '#52c41a', textAlign: 'center', padding: '4px 0', fontWeight: 500 }}>
+                                🎉 所有连线路由正常！
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
 
             <div style={{ marginBottom: '8px' }}>
                 {renderControls()}

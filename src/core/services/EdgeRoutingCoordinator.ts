@@ -217,6 +217,9 @@ export class EdgeRoutingCoordinator {
     public static getInstance(): EdgeRoutingCoordinator {
         if (!EdgeRoutingCoordinator.instance) {
             EdgeRoutingCoordinator.instance = new EdgeRoutingCoordinator();
+            // [DEBUG] Expose globally for console debugging
+            // Usage: window.__vizly_coordinator__.forceClearAllCaches()
+            try { (window as any).__vizly_coordinator__ = EdgeRoutingCoordinator.instance; } catch {}
         }
         return EdgeRoutingCoordinator.instance;
     }
@@ -289,13 +292,12 @@ export class EdgeRoutingCoordinator {
     public forceClearAllCaches(): void {
         this.cache.clear();
         this.workerPool.markDirty();
-        // this.portUsageStats = {};
         this.dirtyEdges.clear();
         this.edgeDependencies.clear();
-        this.latestRequests.clear(); // [NEW] Prevent batchRouteDirtyEdges from using old coords
+        this.latestRequests.clear();
         this.graphVersion++;
         
-        // [NEW] Clear global SVG path cache to prevent "flying lines" UI fallback
+        // Clear global SVG path cache to prevent "flying lines" UI fallback
         try {
             const cache = (window as any).__dv_rendered_path_cache__;
             if (cache instanceof Map) {
@@ -303,6 +305,11 @@ export class EdgeRoutingCoordinator {
             }
         } catch (e) {}
 
+        // Re-mark all known edges as dirty so they re-route on next render
+        this.allEdges.forEach(edge => this.dirtyEdges.add(edge.id));
+        this.scheduleBatchRouting();
+
+        console.info('[EdgeRoutingCoordinator] All caches cleared. Edges will re-route.');
     }
 
     private onSelectionChange: ((edgeId: string | null) => void) | null = null;
@@ -327,6 +334,34 @@ export class EdgeRoutingCoordinator {
             return;
         }
 
+        // [FIX] Refresh source/target coordinates from the latest stored graph context.
+        // If nodes moved since the last route, the cached job has stale sourceX/Y/targetX/Y.
+        // Pull fresh center-point coordinates so debug routing reflects the current layout.
+        try {
+            const freshNodes: any[] = entry.request.graph?.nodes ?? [];
+            const freshNodeMap = new Map<string, any>(freshNodes.map((n: any) => [n.id, n]));
+            const srcNode = freshNodeMap.get(entry.request.job.source);
+            const tgtNode = freshNodeMap.get(entry.request.job.target);
+            if (srcNode) {
+                const sx = srcNode.positionAbsolute?.x ?? srcNode.position?.x ?? srcNode.x ?? entry.request.job.sourceX;
+                const sy = srcNode.positionAbsolute?.y ?? srcNode.position?.y ?? srcNode.y ?? entry.request.job.sourceY;
+                const sw = srcNode.measured?.width ?? srcNode.width ?? 150;
+                const sh = srcNode.measured?.height ?? srcNode.height ?? 80;
+                entry.request.job.sourceX = sx + sw / 2;
+                entry.request.job.sourceY = sy + sh / 2;
+            }
+            if (tgtNode) {
+                const tx = tgtNode.positionAbsolute?.x ?? tgtNode.position?.x ?? tgtNode.x ?? entry.request.job.targetX;
+                const ty = tgtNode.positionAbsolute?.y ?? tgtNode.position?.y ?? tgtNode.y ?? entry.request.job.targetY;
+                const tw = tgtNode.measured?.width ?? tgtNode.width ?? 150;
+                const th = tgtNode.measured?.height ?? tgtNode.height ?? 80;
+                entry.request.job.targetX = tx + tw / 2;
+                entry.request.job.targetY = ty + th / 2;
+            }
+        } catch {
+            // Non-critical: proceed with stale coords if refresh fails
+        }
+
         this.dirtyEdges.add(targetId);
 
         if (this.pendingTimeout) {
@@ -338,13 +373,15 @@ export class EdgeRoutingCoordinator {
         }, 0);
     }
 
-    public registerDebugListener(callback: (data: unknown) => void) {
+
+    public registerDebugListener(callback: ((data: unknown) => void) | null) {
         this.onDebugData = callback;
     }
 
-    public registerSelectionListener(callback: (edgeId: string | null) => void) {
+    public registerSelectionListener(callback: ((edgeId: string | null) => void) | null) {
         this.onSelectionChange = callback;
     }
+
 
     /**
      * Route an edge using Cache -> Worker fallback.
@@ -791,14 +828,17 @@ export class EdgeRoutingCoordinator {
                 if (shouldEmitDebug) {
                     // [FIX] Explicitly log to console to ensure Alt+Click works even if UI callback is detached
                     console.dir(result, { depth: null });
-                    const trunkData = this.trunkDebugData.get(req.edgeId);
-                    if (trunkData && this.onDebugData) {
+                    if (this.onDebugData) {
+                        // [BUG FIX] trunkData was gating onDebugData — non-bus edges never had trunkData,
+                        // so the debug callback was never called for regular edges.
+                        // Now trunkData is always optional, not a gate.
+                        const trunkData = this.trunkDebugData.get(req.edgeId);
                         this.onDebugData({
                             edgeId: req.edgeId,
                             pathPoints: result.points,
                             metadata: result.metadata,
                             ...(result.debugInfo || {}),
-                            // [Phase 2] Trunk classification info
+                            // [Phase 2] Trunk classification info (optional for bus edges)
                             trunkClassification: trunkData ? {
                                 side: trunkData.side > 0 ? 'FORWARD' : 'BACKWARD',
                                 edgeType: trunkData.edgeType,
@@ -809,6 +849,7 @@ export class EdgeRoutingCoordinator {
                         });
                     }
                 }
+
                 resultsMap.set(req.edgeId, result);
                 // Only clear dirty flag if this is the latest request
                 if (!isSuperseded) {
@@ -1532,18 +1573,9 @@ export class EdgeRoutingCoordinator {
                 job.busTrunkTarget = { x: trunk.range.max, y: trunk.axis };
             }
 
-            // Assign Port
-            if (trunk.suggestedPort) {
-                const port = trunk.suggestedPort === 'top' ? Position.Top :
-                    trunk.suggestedPort === 'bottom' ? Position.Bottom :
-                        trunk.suggestedPort === 'left' ? Position.Left : Position.Right;
-
-                if (isManyToOne) {
-                    job.busTargetPort = port;
-                } else {
-                    job.busSourcePort = port;
-                }
-            }
+            // [S4] Port 注入已移至 Worker 内部（几何推算）。
+            // Coordinator 仅传递 busTrunkSource/busTrunkTarget 几何元数据，
+            // 端口方向由 Worker 的 L263-305 几何逻辑自主决定，消除双层决策冲突。
 
             job.layoutDirection = layoutDir;
         });

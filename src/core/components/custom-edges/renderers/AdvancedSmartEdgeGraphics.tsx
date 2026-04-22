@@ -1,5 +1,5 @@
 // packages/core/src/components/custom-edges/renderers/AdvancedSmartEdgeGraphics.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useRef, useEffect } from 'react';
 import { BaseEdge, EdgeLabelRenderer, EdgeProps } from '@xyflow/react';
 import { Dropdown } from 'antd';
 import { getEdgeLabelStyleMenuItems } from '../../diagrams/EdgeLabelStyleMenu';
@@ -75,11 +75,56 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
 
     const currentLabelStyle = (labelStyle || {}) as any;
 
+    const handleClick = (e: React.MouseEvent) => {
+        // [DEBUG] Alt+Click or Ctrl+Click → select this edge in the Routing Debugger
+        if (e.altKey || (e.ctrlKey && !e.shiftKey && !e.metaKey)) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.dispatchEvent(new CustomEvent('vizly:selectDebugEdge', { detail: { edgeId: id } }));
+            import('../../../services/EdgeRoutingCoordinator').then(({ EdgeRoutingCoordinator }) => {
+                const coord = EdgeRoutingCoordinator.getInstance() as unknown as {
+                    setDebugEdge(id: string | null): void;
+                    forceDebugReRoute(id: string | null): void;
+                };
+                coord.setDebugEdge(id);
+                coord.forceDebugReRoute(id);
+            }).catch(() => {});
+        }
+    };
+
+    const gRef = useRef<SVGGElement>(null);
+
+    // [DEBUG] Use native DOM listener instead of React synthetic event so that
+    // CDP-simulated clicks (which may lose altKey in synthetic event path) also work.
+    useEffect(() => {
+        const el = gRef.current;
+        if (!el) return;
+        const handler = (e: MouseEvent) => {
+            if (e.altKey || (e.ctrlKey && !e.shiftKey && !e.metaKey)) {
+                e.stopPropagation();
+                window.dispatchEvent(new CustomEvent('vizly:selectDebugEdge', { detail: { edgeId: id } }));
+                import('../../../services/EdgeRoutingCoordinator').then(({ EdgeRoutingCoordinator }) => {
+                    const coord = EdgeRoutingCoordinator.getInstance() as unknown as {
+                        setDebugEdge(id: string | null): void;
+                        forceDebugReRoute(id: string | null): void;
+                    };
+                    coord.setDebugEdge(id);
+                    coord.forceDebugReRoute(id);
+                }).catch(() => {});
+            }
+        };
+        el.addEventListener('click', handler, { capture: true });
+        return () => el.removeEventListener('click', handler, { capture: true });
+    }, [id]);
+
     return (
-        <g 
+        <g
+            ref={gRef}
             className="edge-cyber-flow"
+            onClick={handleClick}
             style={{ cursor: 'pointer', opacity: opacity * crossfadeOpacity, transition: nodesDragging ? 'none' : 'opacity 0.25s ease-in-out' }}
         >
+
             <BaseEdge {...({
                 id,
                 path: safeFinalPath,

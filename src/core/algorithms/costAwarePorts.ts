@@ -461,15 +461,9 @@ function evaluatePortCombination(
         return Math.abs(c1x - c2x) < 10 && Math.abs(c1y - c2y) < 10;
     };
 
-    // Filter Logic
-    if ('query' in obstacles && typeof (obstacles as SpatialIndex).query === 'function') {
-        // For SpatialIndex, we can't easily filter during query without modifying the tree.
-        // Instead, we query and then filter the RESULTS.
-        // NOTE: We don't have the full query range here easily without duplicating logic.
-        // BUT, we are passing 'obstacles' to isPathBlocked which does the query internally.
-        // So we cannot easily intervene unless we wrappers it.
-        // ALTERNATIVE: Use a Custom Blocked Check here that ignores specific rects.
-    }
+    // Filter Logic: remove source/target nodes from obstacle set to avoid false port-blocked positives.
+    // Implementation: query SpatialIndex by probe-path bounds, then filter results with filterSelf.
+    // (Actual implementation at obstaclesForCheck assignment below)
 
     // Defined a custom checker or filter obstacles before passing
     const filterSelf = (obs: Rectangle) => {
@@ -622,7 +616,14 @@ function evaluatePortCombination(
     const nodeCenterDy = (targetNode.y + targetNode.height / 2) - (sourceNode.y + sourceNode.height / 2);
 
     // [UPDATED] Pass center coordinates for geometry analysis
-    const geometry: GeometryType = analyzeGeometry(nodeCenterDx, nodeCenterDy);
+    // [S4-P11] Also provide bounding boxes for accurate boundary-gap collocated detection
+    const geometry: GeometryType = analyzeGeometry(nodeCenterDx, nodeCenterDy, {
+        sourceBounds: { x: sourceNode.x, y: sourceNode.y, width: sourceNode.width, height: sourceNode.height },
+        targetBounds: { x: targetNode.x, y: targetNode.y, width: targetNode.width, height: targetNode.height },
+        sourceSize: { width: sourceNode.width, height: sourceNode.height },
+        targetSize: { width: targetNode.width, height: targetNode.height },
+    });
+
 
     // [UPDATED] Pass layout direction to enforce Strict TB rules if needed
     const portRules = getPortRulesForGeometry(geometry);
@@ -660,28 +661,29 @@ function evaluatePortCombination(
     }
 
     // =========================================================================
-    // [FIX] Step 3.5: Same-Side Overshoot Penalty
+    // [FIX v2] Step 3.5: Same-Side Overshoot Penalty (UNCONDITIONAL)
     // =========================================================================
-    // Same-side ports (B→B, T→T, L→L, R→R) are only appropriate when the
-    // connection is a feedback/reverse-flow (e.g. horizontal-reverse uses B→B for U-arcs).
-    // However when the node-to-node vector is ALIGNED with the same-side exit direction,
-    // the router must overshoot PAST the target and loop back — creating a huge detour.
+    // Same-side ports (B→B, T→T, L→L, R→R) create U-turn loops when the
+    // node-to-node vector is ALIGNED with the exit direction.
     //
-    // Examples of overshoot:
-    //   B→B when dy > 0 : exits bottom→goes further down past target→loops back up into bottom
-    //   T→T when dy < 0 : exits top→goes further up past target→loops back down into top
-    //   R→R when dx > 0 : exits right→goes further right past target→loops back left into right
-    //   L→L when dx < 0 : exits left→goes further left past target→loops back right into left
+    // This penalty is UNCONDITIONAL — it overrides even "preferred" geometry rules.
+    // Physical geometry (where the target actually is) always beats soft rule preferences.
     //
-    // This is the root cause of the "Bottom→Bottom loop" bug seen with horizontal-reverse
-    // geometry when the target has a meaningful vertical offset (dy ≠ 0).
+    // Examples:
+    //   B→B when dy > 0 : exits bottom → overshoots below target → loops back up → BAD
+    //   T→T when dy < 0 : exits top → overshoots above target → loops back down → BAD
+    //   R→R when dx > 0 : exits right → overshoots past target right → loops back → BAD
+    //   L→L when dx < 0 : exits left → overshoots past target left → loops back → BAD
     //
-    // Penalty: 6000 — enough to override DIRECT_BONUS (-1200) + PRIMARY_BONUS (-600),
-    // but weaker than SEMANTIC_VIOLATION (100,000) to remain adjustable.
-    const SAME_SIDE_OVERSHOOT_PENALTY = 6000;
-    const OVERSHOOT_THRESHOLD = 30; // px; ignore tiny offsets
+    // Root cause of: "horizontal-reverse" geometry marking B→B as preferred, but
+    // when dy is significant the physical path is a massive detour.
+    //
+    // Penalty: 50000 — stronger than DIRECT_BONUS+PRIMARY_BONUS combined,
+    //          weaker than SEMANTIC_VIOLATION (100,000).
+    const SAME_SIDE_OVERSHOOT_PENALTY = 50000;
+    const OVERSHOOT_THRESHOLD = 30; // px; ignore negligible offsets
 
-    if (sourcePos === targetPos && !isPreferred) {
+    if (sourcePos === targetPos) {
         let isOvershoot = false;
         if (sourcePos === Position.Bottom && dy > OVERSHOOT_THRESHOLD) isOvershoot = true;
         if (sourcePos === Position.Top    && dy < -OVERSHOOT_THRESHOLD) isOvershoot = true;
@@ -691,6 +693,7 @@ function evaluatePortCombination(
             estimatedCost += SAME_SIDE_OVERSHOOT_PENALTY;
         }
     }
+
 
     // Neutral combinations: no bonus or penalty (rely on path length)
 
@@ -976,9 +979,18 @@ export function selectOptimalPorts(
     const positions = [Position.Top, Position.Bottom, Position.Left, Position.Right];
     const candidates: PortCandidate[] = [];
 
-    // Evaluate all 16 combinations
-    for (const sourcePos of positions) {
-        for (const targetPos of positions) {
+    // [S5-P9] Constrained port optimization: if one side is fixed by the bus trunk axis,
+    // only evaluate combinations where that side matches the fixed position.
+    // This reduces 16 combinations to 4, ensuring hub-side ports are never overridden
+    // by cost optimization while still applying crossing/obstacle avoidance to the peer side.
+    const constrainedSrc = (inputConfig as any).constrainedSourcePos as Position | undefined;
+    const constrainedTgt = (inputConfig as any).constrainedTargetPos as Position | undefined;
+    const sourceCandidates = constrainedSrc ? [constrainedSrc] : positions;
+    const targetCandidates = constrainedTgt ? [constrainedTgt] : positions;
+
+    // Evaluate all valid combinations (4–16 depending on constraints)
+    for (const sourcePos of sourceCandidates) {
+        for (const targetPos of targetCandidates) {
             const candidate = evaluatePortCombination(
                 sourceNode,
                 targetNode,
@@ -992,6 +1004,7 @@ export function selectOptimalPorts(
             candidates.push(candidate);
         }
     }
+
 
     // Sort by cost (lowest first)
     candidates.sort((a, b) => a.estimatedCost - b.estimatedCost);

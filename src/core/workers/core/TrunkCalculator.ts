@@ -122,7 +122,28 @@ export class TrunkCalculator {
             y: hubNode.y + hubNode.height / 2
         };
 
-        // 1. Determine Major Direction based on layout or geometry
+        // [S4-P12] Guard: empty peerNodes would produce NaN/Infinity in all calculations.
+        // Return a safe fallback trunk directly below/to-the-right of the hub.
+        if (peerNodes.length === 0) {
+            const isHorzFallback = layoutDirection === 'LR' || layoutDirection === 'RL';
+            const spacing = Math.max(config.bus.trunkBase || 40, 30);
+            if (isHorzFallback) {
+                return {
+                    axis: hubNode.x + hubNode.width + spacing,
+                    direction: 'vertical',
+                    range: { min: hubCenter.y, max: hubCenter.y },
+                    suggestedPort: 'right'
+                };
+            } else {
+                return {
+                    axis: hubNode.y + hubNode.height + spacing,
+                    direction: 'horizontal',
+                    range: { min: hubCenter.x, max: hubCenter.x },
+                    suggestedPort: 'bottom'
+                };
+            }
+        }
+
         // Default to layoutDirection, refine by geometry if needed
         let isHorizontal = layoutDirection === 'LR' || layoutDirection === 'RL';
 
@@ -203,21 +224,32 @@ export class TrunkCalculator {
             });
             range.min = Math.min(range.min, hubCenter.y);
             range.max = Math.max(range.max, hubCenter.y);
+            // [S4-P12] Guard: range must always be finite (peerNodes was verified non-empty above)
+            if (!isFinite(range.min) || !isFinite(range.max)) {
+                range.min = hubCenter.y;
+                range.max = hubCenter.y;
+            }
 
             return { axis, direction: 'vertical', range, suggestedPort };
 
         } else {
             // Horizontal Trunk Line (y = constant)
-            let isTop = false;
+            // Determine which side the trunk should be on:
+            //   M2O (hub=target): peers are sources → if peers are ABOVE hub → trunk above hub → isTop=true
+            //   O2M (hub=source): peers are targets → if peers are BELOW hub → trunk below hub → isTop=false
+            // In both cases: isTop = (peersCenter.y < hubCenter.y), because:
+            //   - peers above hub (peersCenter.y < hubCenter.y) → trunk sits above hub → isTop
+            //   - peers below hub (peersCenter.y > hubCenter.y) → trunk sits below hub → !isTop
+            const isTop: boolean = peersCenter.y < hubCenter.y;
 
             if (isTop) {
-                // Trunk on Top: Between PeersMaxY and HubMinY
+                // Trunk on Top: midpoint between peers' bottom and hub's top
                 const minSafe = hubNode.y - spacing;
                 const ideal = (pBounds.maxY + hubNode.y) / 2;
                 axis = Math.min(ideal, minSafe);
                 suggestedPort = 'top';
             } else {
-                // Trunk on Bottom: Between HubMaxY and PeersMinY
+                // Trunk on Bottom: midpoint between hub's bottom and peers' top
                 const minSafe = hubNode.y + hubNode.height + spacing;
                 const ideal = (pBounds.minY + hubNode.y + hubNode.height) / 2;
                 axis = Math.max(ideal, minSafe);
@@ -232,8 +264,20 @@ export class TrunkCalculator {
             });
             range.min = Math.min(range.min, hubCenter.x);
             range.max = Math.max(range.max, hubCenter.x);
+            // [S4-P12] Guard: range must always be finite
+            if (!isFinite(range.min) || !isFinite(range.max)) {
+                range.min = hubCenter.x;
+                range.max = hubCenter.x;
+            }
+
+            // [ASSERT] suggestedPort must be assigned by both branches above.
+            // If not, it means a new branch was added without port logic — fail loudly.
+            if (!suggestedPort) {
+                console.error('[TrunkCalculator] suggestedPort was never assigned for horizontal trunk!', { isManyToOne, isTop });
+            }
 
             return { axis, direction: 'horizontal', range, suggestedPort };
+
         }
     }
 

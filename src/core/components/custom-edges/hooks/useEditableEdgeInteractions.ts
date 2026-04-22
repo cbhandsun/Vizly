@@ -242,6 +242,26 @@ export function useEditableEdgeInteractions({
     const handleEdgeClick = useCallback((e: React.MouseEvent<SVGPathElement>) => {
         e.stopPropagation();
 
+        // [DEBUG] Alt+Click or Ctrl+Click: Select this edge for the Routing Debugger
+        // Alt: quick ergonomic shortcut (works in most browsers when clicking SVG)
+        // Ctrl: fallback for Windows where Alt may focus browser menu bar
+        if (e.altKey || (e.ctrlKey && !e.shiftKey && !e.metaKey)) {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+                window.dispatchEvent(new CustomEvent('vizly:selectDebugEdge', { detail: { edgeId: id } }));
+                import('../../../services/EdgeRoutingCoordinator').then(({ EdgeRoutingCoordinator }) => {
+                    const coordinator = EdgeRoutingCoordinator.getInstance() as unknown as {
+                        setDebugEdge(id: string | null): void;
+                        forceDebugReRoute(id: string | null): void;
+                    };
+                    coordinator.setDebugEdge(id);
+                    coordinator.forceDebugReRoute(id);
+                }).catch(() => {/* ignore */});
+            } catch {/* ignore */}
+            return;
+        }
+
         const svg = e.currentTarget.ownerSVGElement;
         if (!svg) return;
 
@@ -299,6 +319,7 @@ export function useEditableEdgeInteractions({
             edgeCallbacks.onWaypointsChange(id, middlePoints);
         }
     }, [segments, edgeCallbacks, id]);
+
 
     const handleDeleteWaypoint = useCallback((bp: any, e: React.MouseEvent) => {
         e.stopPropagation();

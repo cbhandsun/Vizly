@@ -17,7 +17,10 @@ export class PortSelector {
     }
 
     /**
-     * Get optimal ports for a connection
+     * Get optimal ports for a connection.
+     * [S5-P9] constrainedSourcePos / constrainedTargetPos: when provided, locks that port side
+     * and only optimizes the other. Used for Bus peers to prevent hub-side ports from
+     * overriding the trunk axis decision while still applying crossing avoidance to peer side.
      */
     selectPorts(
         sourceRect: Rectangle,
@@ -30,6 +33,10 @@ export class PortSelector {
             targetId: string;
             /** [FIX P0] Already-routed line segments for crossing avoidance at port selection layer */
             lineObstacles?: import('../../algorithms/pathfinding').LineObstacle[];
+            /** [S5-P9] When set, locks the source port and only optimizes the target port */
+            constrainedSourcePos?: Position;
+            /** [S5-P9] When set, locks the target port and only optimizes the source port */
+            constrainedTargetPos?: Position;
         }
     ) {
         return selectOptimalPorts(
@@ -44,10 +51,14 @@ export class PortSelector {
                 sourceId: options.sourceId,
                 targetId: options.targetId,
                 enableDynamicPorts: this.config.portSelection.enableDynamicPorts,
-                portSlidePadding: this.config.portSelection.portSlidePadding
+                portSlidePadding: this.config.portSelection.portSlidePadding,
+                // [S5-P9] Constrained port pass-through
+                constrainedSourcePos: options.constrainedSourcePos,
+                constrainedTargetPos: options.constrainedTargetPos,
             }
         );
     }
+
 
     /**
      * Map Position enum to string direction (t, b, l, r)
@@ -102,12 +113,15 @@ export class PortSelector {
 
         const bounds = this.getSlideBounds(rect);
         // [FIX] Strict Centering: Constrain the dynamic sliding to the central 50% of the node.
-        // This ensures that single ports are not pushed to the far corners ("sides"),
-        // satisfying the requirement: "Ports distributed close to center, not on sides".
-        const strictMinX = Math.max(bounds.minX, rect.x + rect.width * 0.25);
-        const strictMaxX = Math.min(bounds.maxX, rect.x + rect.width * 0.75);
-        const strictMinY = Math.max(bounds.minY, rect.y + rect.height * 0.25);
-        const strictMaxY = Math.min(bounds.maxY, rect.y + rect.height * 0.75);
+        // [S5-P5] Additional pixel cap: even on wide nodes, port won't slide more than MAX_SLIDE_HALF px
+        // from center. Prevents long parallel-line artifacts on 600px+ nodes.
+        // Note: cx/cy are already declared at L88-89 (reused here)
+        const MAX_SLIDE_HALF = 60;
+        const strictMinX = Math.max(bounds.minX, rect.x + rect.width * 0.25, cx - MAX_SLIDE_HALF);
+        const strictMaxX = Math.min(bounds.maxX, rect.x + rect.width * 0.75, cx + MAX_SLIDE_HALF);
+        const strictMinY = Math.max(bounds.minY, rect.y + rect.height * 0.25, cy - MAX_SLIDE_HALF);
+        const strictMaxY = Math.min(bounds.maxY, rect.y + rect.height * 0.75, cy + MAX_SLIDE_HALF);
+
 
         // Safety check for small nodes
         const safeMinX = Math.min(strictMinX, strictMaxX);
@@ -140,9 +154,12 @@ export class PortSelector {
 
         const isVerticalPort = pos === Position.Top || pos === Position.Bottom;
         // [FIX P2] Dynamic port spread: scale with node extent to avoid overflow on small nodes
-        // and over-crowding on large nodes. Clamped to [12, 30] px.
+        // and over-crowding on large nodes.
+        // [S5-P6] Upper bound is now dynamic: min(nodeExtent/4, 40) instead of fixed 30px.
+        // Wide nodes (400px+) get more breathing room between fan-out ports.
         const nodeExtent = isVerticalPort ? rect.width : rect.height;
-        const PORT_SPREAD = Math.max(12, Math.min(30, nodeExtent / Math.max(count + 1, 2)));
+        const dynamicMax = Math.min(40, nodeExtent / 4);
+        const PORT_SPREAD = Math.max(12, Math.min(dynamicMax, nodeExtent / Math.max(count + 1, 2)));
 
         const sideOffset = (index - (count - 1) / 2) * PORT_SPREAD;
         const basePt = this.getPortPointWithSlide(rect, pos, targetCenter);

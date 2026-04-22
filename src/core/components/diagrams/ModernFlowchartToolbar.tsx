@@ -376,23 +376,26 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     cancelText: t('common.cancel'),
                     okButtonProps: { danger: true },
                     onOk: () => {
-                        // 1. 抢救当前进度 ID（从 URL 查询参数 或 LocalStorage 中临时保存）
+                        // 1. 先读取当前选中的图表 ID（localStorage 清空前）
                         const urlParams = new URLSearchParams(window.location.search);
-                        let diagramId = urlParams.get('diagram');
-                        if (!diagramId) {
-                            diagramId = localStorage.getItem('diagramMenu.selectedDiagramId');
-                        }
+                        const diagramIdFromUrl = urlParams.get('diagram');
+                        const diagramId = diagramIdFromUrl
+                            || localStorage.getItem('diagramMenu.selectedDiagramId');
 
-                        // 2. 彻底执行出厂化清理
+                        // 2. 彻底清空所有缓存
                         localStorage.clear();
                         sessionStorage.clear();
 
-                        // 3. 携带记忆 ID 执行原地硬刷新，防止路由由于失去 LocalStorage 而回退到第一张图(也就是主页)
+                        // 3. 把图表 ID 写回 localStorage，让应用重启后能正常恢复
+                        // 这样无需依赖 URL 参数，与 useDiagramHostStorage 的读取逻辑完全对齐
                         if (diagramId) {
-                            window.location.href = `${window.location.pathname}?diagram=${diagramId}`;
-                        } else {
-                            window.location.reload();
+                            try {
+                                localStorage.setItem('diagramMenu.selectedDiagramId', diagramId);
+                            } catch { void 0; }
                         }
+
+                        // 4. 硬刷新（不携带 URL 参数，避免参数遗留）
+                        window.location.reload();
                     },
                 });
             },

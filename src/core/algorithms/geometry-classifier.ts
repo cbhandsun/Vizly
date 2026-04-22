@@ -47,6 +47,15 @@ export interface GeometryAnalysisOptions {
     /** Target node dimensions (for aspect ratio analysis) */
     targetSize?: { width: number; height: number };
 
+    /**
+     * [S4-P11] Bounding boxes of source and target nodes (absolute positions).
+     * When provided, collocated detection uses BOUNDARY GAP instead of center distance.
+     * This prevents large overlapping nodes from being misclassified when their centers
+     * are far apart but their edges actually touch or nearly touch.
+     */
+    sourceBounds?: { x: number; y: number; width: number; height: number };
+    targetBounds?: { x: number; y: number; width: number; height: number };
+
     /** Enable distance-adaptive thresholds (default: true) */
     enableDistanceAdaptive?: boolean;
 
@@ -70,16 +79,31 @@ export function analyzeGeometry(
     const absDx = Math.abs(dx);
     const absDy = Math.abs(dy);
 
-    // Collocated: nodes are very close or overlapping
-    // Adaptive threshold based on node size if available
-    const avgNodeSize = options?.sourceSize && options?.targetSize
-        ? (options.sourceSize.width + options.sourceSize.height +
-            options.targetSize.width + options.targetSize.height) / 4
-        : 100; // Default average size
+    // [S4-P11] Collocated detection: prefer boundary-gap method when bounds are provided.
+    // Center-to-center distance is misleading for large nodes — two 300×300 nodes with
+    // centers 200px apart actually have a 0px gap between their edges.
+    // Boundary gap = max(0, separation along each axis between the two bounding boxes).
+    let isCollocated = false;
+    if (options?.sourceBounds && options?.targetBounds) {
+        const sb = options.sourceBounds;
+        const tb = options.targetBounds;
+        // Signed gap: negative means overlap
+        const gapX = Math.max(sb.x, tb.x) - Math.min(sb.x + sb.width, tb.x + tb.width);
+        const gapY = Math.max(sb.y, tb.y) - Math.min(sb.y + sb.height, tb.y + tb.height);
+        // Nodes are collocated if they overlap or are within a small boundary margin
+        const BOUNDARY_COLLOCATED_MARGIN = 20;
+        isCollocated = gapX < BOUNDARY_COLLOCATED_MARGIN && gapY < BOUNDARY_COLLOCATED_MARGIN;
+    } else {
+        // Fallback: center-to-center threshold (legacy behavior)
+        const avgNodeSize = options?.sourceSize && options?.targetSize
+            ? (options.sourceSize.width + options.sourceSize.height +
+                options.targetSize.width + options.targetSize.height) / 4
+            : 100;
+        const collocatedThreshold = Math.max(30, avgNodeSize * 0.3);
+        isCollocated = absDx < collocatedThreshold && absDy < collocatedThreshold;
+    }
 
-    const collocatedThreshold = Math.max(30, avgNodeSize * 0.3);
-
-    if (absDx < collocatedThreshold && absDy < collocatedThreshold) {
+    if (isCollocated) {
         return 'collocated';
     }
 
@@ -223,19 +247,21 @@ export function getPortRulesForGeometry(type: GeometryType): PortRules {
         /**
          * HORIZONTAL REVERSE (Target is to the LEFT)
          * Feedback loop / reverse flow
+         * [S5-P7] Corrected priority: R->L is the direct L-shape (0-1 bends) when target is left.
+         * L->R is the cross-over path (2 bends). T->T/B->B are U-turn fallbacks (3 bends).
          */
         'horizontal-reverse': {
             preferred: [
-                'L->R',  // Primary: Left -> Right (Direct "through", 0 bends if overlapping)
-                'T->T',  // Secondary: Top -> Top (U-Shape, 2 bends)
-                'B->B',  // Secondary: Bottom -> Bottom (U-Shape, 2 bends)
-                'R->L'   // Tertiary: Right -> Left (Pass through, risky)
+                'R->L',  // Primary: Right exit → Left entry (shortest L-shape when target is left)
+                'L->R',  // Secondary: Left exit → Right entry (cross-over, 2 bends)
+                'T->T',  // Fallback: U-shape top (when right side is blocked)
+                'B->B'   // Fallback: U-shape bottom (when right side is blocked)
             ],
             forbidden: [
-                'R->R',  // Same-side would create huge arc
-                'L->L',  // Same-side would create huge arc
-                'T->B',  // Forward vertical flow
-                'B->T'   // Forward vertical flow
+                'R->R',  // Same-side → large arc
+                'L->L',  // Same-side → large arc
+                'T->B',  // Vertical forward (wrong direction for horizontal reverse)
+                'B->T'   // Vertical forward (wrong direction for horizontal reverse)
             ],
             neutral: [] // [STRICT]
         },
@@ -319,9 +345,11 @@ export function getPortRulesForGeometry(type: GeometryType): PortRules {
             forbidden: [
                 'L->L',  // Same-side creates arc
                 'R->R',  // Same-side creates arc
-                'T->L',  // Top as output
-                'T->R',  // Top as output (moved to preferred as L-shape option)
-                'B->T'   // Bottom to Top
+                'T->L',  // Top as output (exit top going left = awkward)
+                // [FIX S5-P3] Removed 'T->R' — it was listed in both preferred AND forbidden
+                // (contradiction). forbidden took priority, making the preferred entry dead code.
+                // T->R is a valid L-shape for diagonal-nw and should be allowed.
+                'B->T'   // Bottom to Top (wrong direction)
             ],
             neutral: [] // [STRICT] Removed mixed ports
         },
@@ -372,13 +400,19 @@ export function getPortRulesForGeometry(type: GeometryType): PortRules {
 
         /**
          * COLLOCATED (Nodes overlap or very close)
-         * All combinations are neutral, let path length decide
+         * [S5-P8] Give 4 direct-connect combinations priority so that collocated nodes
+         * don't randomly flip ports when all path costs are near-zero (tie-breaking by array order).
+         * The remaining 12 combinations are neutral (rely on path length).
          */
         'collocated': {
-            preferred: [],
+            preferred: [
+                'R->L',  // Horizontal direct connect
+                'B->T',  // Vertical direct connect
+                'L->R',  // Horizontal reverse
+                'T->B',  // Vertical reverse
+            ],
             forbidden: [],
             neutral: [
-                'R->L', 'L->R', 'T->B', 'B->T',
                 'L->L', 'R->R', 'T->T', 'B->B',
                 'R->T', 'R->B', 'L->T', 'L->B',
                 'T->L', 'T->R', 'B->L', 'B->R'
