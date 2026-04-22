@@ -865,10 +865,25 @@ function evaluatePortCombination(
         }
     }
 
-    // [PORT USAGE PENALTY - Moved below layout bonus to maintain priority order]
-    // If we have usage data, penalize overused ports to encourage distribution.
+    // =========================================================================
+    // [SMART] Approach-Direction-Aware Port Conflict Resolution
+    // =========================================================================
+    // Strategy: distinguish between two types of port reuse:
+    //
+    //   MERGE (same approach direction):
+    //     e.g. two edges both coming from above → both enter via Top.
+    //     This is GOOD — they bundle naturally. Give a small bonus.
+    //
+    //   CONFLICT (different approach directions):
+    //     e.g. edge from above + edge from left both entering Top.
+    //     This is BAD — they collide visually. Apply STRONG penalty.
+    //
+    // Detection uses approach-direction keys stored by the worker:
+    //   "${nodeId}-${portDir}-from-${approachDir}" = count of edges from that direction
+    //   "${nodeId}-${portDir}"                      = total count at port
+    //
     if (config.portUsage) {
-        const portKey = (pos: Position) => {
+        const portKey = (pos: Position): string => {
             switch (pos) {
                 case Position.Top: return 'top';
                 case Position.Bottom: return 'bottom';
@@ -877,39 +892,47 @@ function evaluatePortCombination(
             }
         };
 
-        const sKey = config.sourceId ? `${config.sourceId}-${portKey(sourcePos)}` : portKey(sourcePos);
-        const tKey = config.targetId ? `${config.targetId}-${portKey(targetPos)}` : portKey(targetPos);
+        const tPortDir = portKey(targetPos);
+        const sPortDir = portKey(sourcePos);
 
-        // Lookup usage (default to 0)
-        // Note: usage keys should be verified to match what the worker sends.
-        // The worker sends "sourceId_DIR" or similar?
-        // Let's assume the worker sends generic direction usage for the NODE, or specific port usage.
-        // The workerPortSelection.ts logic used "top", "bottom" etc.
-        // We should check what the worker sends.
-        // Assuming the worker maps strictly to "top", "bottom".
+        // ── Approach direction of THIS edge (source center → target center dominant axis) ──
+        const absDxCenter = Math.abs(targetCenter.x - sourceCenter.x);
+        const absDyCenter = Math.abs(targetCenter.y - sourceCenter.y);
+        let myApproachDir: string;
+        if (absDxCenter > absDyCenter) {
+            myApproachDir = (targetCenter.x - sourceCenter.x) > 0 ? 'right' : 'left';
+        } else {
+            myApproachDir = (targetCenter.y - sourceCenter.y) > 0 ? 'bottom' : 'top';
+        }
 
-        // Actually, config.portUsage in PortSelectionConfig is Record<string, number>.
-        // Detailed implementation implies we rely on the specific keys passed by caller.
+        // ── Target port: smart merge/diverge ──
+        if (config.targetId) {
+            const tTotalKey = `${config.targetId}-${tPortDir}`;
+            const tSameDirKey = `${config.targetId}-${tPortDir}-from-${myApproachDir}`;
 
-        const sUsage = config.portUsage[sKey] || config.portUsage[portKey(sourcePos)] || 0;
-        const tUsage = config.portUsage[tKey] || config.portUsage[portKey(targetPos)] || 0;
+            const tTotal = config.portUsage[tTotalKey] || 0;
+            const tSameDir = config.portUsage[tSameDirKey] || 0;
+            const tDiffDir = tTotal - tSameDir; // edges already at this port from OTHER directions
 
-        // [INDUSTRY STANDARD] Scaled/Stepped Penalty for Port Crowding
-        // We use a non-linear penalty to ensure hard-clustering is suppressed.
-        // Penalty steps:
-        // - 1st edge: 0 cost
-        // - 2nd edge: 6000 cost (immediately overrides -5000 preferred bonus)
-        // - 3rd+ edge: 10000+ cost (highly discourages further reuse)
-        const getStepPenalty = (count: number) => {
-            if (count === 0) return 0;
-            return 6000 + (count - 1) * 4000;
-        };
+            if (tDiffDir > 0) {
+                // CONFLICT: different-direction edges already here → strongly push away
+                estimatedCost += 14000 * tDiffDir;
+            } else if (tSameDir > 0) {
+                // MERGE: same-direction edges → small bundling bonus
+                estimatedCost -= 300 * Math.min(tSameDir, 3);
+            }
+        }
 
-        const usagePenalty = getStepPenalty(sUsage) + getStepPenalty(tUsage);
-        if (usagePenalty > 0) {
-            estimatedCost += usagePenalty;
+        // ── Source port: mild crowding penalty only ──
+        if (config.sourceId) {
+            const sTotalKey = `${config.sourceId}-${sPortDir}`;
+            const sTotal = config.portUsage[sTotalKey] || 0;
+            if (sTotal > 0) {
+                estimatedCost += Math.min(sTotal, 3) * 1500;
+            }
         }
     }
+
 
     // [REMOVED] Legacy layout-based penalties
     //

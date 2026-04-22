@@ -240,15 +240,35 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
                 {miniMapReady && minimapRef.current ? (
                   (() => {
                     const nodes = reactFlowInstance.getNodes();
+                    // [FIX] Build a lookup map and compute absolute positions by walking
+                    // the parentId chain. internals.positionAbsolute is null at this
+                    // call-site (getNodes() returns the external node array without
+                    // internal resolution), so we must accumulate manually.
+                    const nodeMap = new Map<string, any>();
+                    nodes.forEach(n => nodeMap.set(n.id, n));
+                    const getAbsPos = (node: any): { x: number; y: number } => {
+                      let x = safeNumber(node.position?.x, 0);
+                      let y = safeNumber(node.position?.y, 0);
+                      let curr = node;
+                      let guard = 0;
+                      while (curr.parentId && guard++ < 20) {
+                        const parent = nodeMap.get(curr.parentId);
+                        if (!parent) break;
+                        x += safeNumber(parent.position?.x, 0);
+                        y += safeNumber(parent.position?.y, 0);
+                        curr = parent;
+                      }
+                      return { x, y };
+                    };
+
                     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
                     nodes.forEach(n => {
-                      const x = safeNumber(n.position?.x, 0);
-                      const y = safeNumber(n.position?.y, 0);
+                      const abs = getAbsPos(n);
                       const w = extractValidNumber((n as any).measured?.width ?? (n as any).width ?? (n as any).style?.width, 200);
                       const h = extractValidNumber((n as any).measured?.height ?? (n as any).height ?? (n as any).style?.height, 100);
-                      if (isFinite(x) && isFinite(y) && w > 0 && h > 0) {
-                        minX = Math.min(minX, x); minY = Math.min(minY, y);
-                        maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + h);
+                      if (isFinite(abs.x) && isFinite(abs.y) && w > 0 && h > 0) {
+                        minX = Math.min(minX, abs.x); minY = Math.min(minY, abs.y);
+                        maxX = Math.max(maxX, abs.x + w); maxY = Math.max(maxY, abs.y + h);
                       }
                     });
                     if (minX === Infinity || minY === Infinity || maxX === -Infinity || maxY === -Infinity) {
@@ -306,8 +326,10 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
                         })()}
                         <rect x={0} y={0} width={rect.width} height={rect.height} fill="var(--glass-bg, rgba(255, 255, 255, 0.45))" />
                         {nodes.map((n, idx) => {
-                          const x = safeNumber(n.position?.x, 0);
-                          const y = safeNumber(n.position?.y, 0);
+                          // Use the same getAbsPos helper for consistent positioning
+                          const abs = getAbsPos(n);
+                          const x = abs.x;
+                          const y = abs.y;
                           const w = extractValidNumber((n as any).measured?.width ?? (n as any).width ?? (n as any).style?.width, 200);
                           const h = extractValidNumber((n as any).measured?.height ?? (n as any).height ?? (n as any).style?.height, 100);
                           if (!isFinite(x) || !isFinite(y) || w <= 0 || h <= 0) return null;

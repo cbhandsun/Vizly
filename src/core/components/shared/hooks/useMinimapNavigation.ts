@@ -112,6 +112,8 @@ export function useMinimapNavigation(
         if (nodes.length === 0) return;
 
         const canvasSize = getCanvasPixelSize();
+        // [FIX] Use startViewport consistently for drag ratio — bounds must match
+        // what was used when dragging started to keep ratio stable throughout drag
         const bounds = computeMinimapBounds(nodes, minimapDragStartRef.current.startViewport, canvasSize.width, canvasSize.height);
         if (!bounds) return;
 
@@ -204,21 +206,30 @@ export function useMinimapNavigation(
         event.stopPropagation();
 
         const minimapRect = minimapRef.current.getBoundingClientRect();
-        const x = event.clientX - minimapRect.left;
-        const y = event.clientY - minimapRect.top;
+        // Mouse position within the minimap (0..1 ratios)
+        const mx = event.clientX - minimapRect.left;
+        const my = event.clientY - minimapRect.top;
+        const xRatio = minimapRect.width  > 0 ? mx / minimapRect.width  : 0.5;
+        const yRatio = minimapRect.height > 0 ? my / minimapRect.height : 0.5;
 
         const viewport = reactFlowInstance.getViewport();
         const currentZoom = safeNumber(viewport.zoom, 1);
 
-        const rfRoot = (anchorRef.current?.closest?.('.react-flow') as HTMLElement | null) || (document.querySelector('.react-flow') as HTMLElement | null);
-        const pane = (rfRoot?.querySelector?.('.react-flow__pane') as HTMLElement | null) || rfRoot;
-        if (!pane) return;
-        const paneRect = pane.getBoundingClientRect();
+        // [FIX] Convert minimap ratio → world coordinate using the same bounds
+        // the renderer uses, so the zoom anchor stays exactly under the cursor.
+        const canvasSize = getCanvasPixelSize();
+        const nodes = reactFlowInstance.getNodes();
+        const bounds = nodes.length > 0
+            ? computeMinimapBounds(nodes, viewport, canvasSize.width, canvasSize.height)
+            : null;
 
-        const anchorScreenX = (x / minimapRect.width) * paneRect.width;
-        const anchorScreenY = (y / minimapRect.height) * paneRect.height;
-        const anchorWorldX = (anchorScreenX - viewport.x) / currentZoom;
-        const anchorWorldY = (anchorScreenY - viewport.y) / currentZoom;
+        // World coordinate under the mouse in the minimap
+        const anchorWorldX = bounds
+            ? safeNumber(bounds.unionMinX + bounds.totalWidth  * xRatio, 0)
+            : (xRatio * canvasSize.width  - viewport.x) / currentZoom;
+        const anchorWorldY = bounds
+            ? safeNumber(bounds.unionMinY + bounds.totalHeight * yRatio, 0)
+            : (yRatio * canvasSize.height - viewport.y) / currentZoom;
 
         const cfg = diagramConfigManager.getConfig();
         const minZoomCfg = cfg.canvas?.zoom?.min ?? 0.05;
@@ -230,11 +241,22 @@ export function useMinimapNavigation(
         const zoomFactor = Math.exp(direction * (0.0025 * sensitivity));
         const targetZoom = Math.max(minZoomCfg, Math.min(maxZoomCfg, currentZoom * zoomFactor));
 
+        // Preserve anchor world position after zoom change:
+        //   newViewport.x = anchorScreenX - anchorWorldX * targetZoom
+        // We want the anchor to stay at the same screen fraction of the canvas.
+        const rfRoot = (anchorRef.current?.closest?.('.react-flow') as HTMLElement | null)
+            || (document.querySelector('.react-flow') as HTMLElement | null);
+        const pane = (rfRoot?.querySelector?.('.react-flow__pane') as HTMLElement | null) || rfRoot;
+        const paneRect = pane?.getBoundingClientRect();
+        // Map minimap ratio back to pane screen position for the anchor screen point
+        const anchorScreenX = paneRect ? paneRect.left + xRatio * paneRect.width  - paneRect.left : xRatio * canvasSize.width;
+        const anchorScreenY = paneRect ? paneRect.top  + yRatio * paneRect.height - paneRect.top  : yRatio * canvasSize.height;
+
         const targetX = anchorScreenX - anchorWorldX * targetZoom;
         const targetY = anchorScreenY - anchorWorldY * targetZoom;
 
         reactFlowInstance.setViewport({ x: targetX, y: targetY, zoom: targetZoom });
-    }, [reactFlowInstance, minimapRef, anchorRef]);
+    }, [reactFlowInstance, minimapRef, anchorRef, getCanvasPixelSize]);
 
     const zoomIn = useCallback(() => {
         const viewport = reactFlowInstance.getViewport();

@@ -384,7 +384,14 @@ self.onmessage = (e: MessageEvent) => {
             }
 
 
-            // [NEW] Update Port Usage
+            // [SMART] Update Port Usage with approach-direction awareness.
+            // Key format:
+            //   "${nodeId}-${portDir}"                    → total count at port (legacy)
+            //   "${nodeId}-${portDir}-from-${approachDir}" → count from a specific approach direction
+            //
+            // This allows cost evaluation to distinguish:
+            //   - Same approach   → MERGE  (e.g. two edges from above entering Top → bundle)
+            //   - Cross approach  → DIVERGE (e.g. edge from left + edge from above both at Top → conflict)
             if (result && result.sourcePos && result.targetPos) {
                 const posToDir = (pos: any) => {
                     if (pos === Position.Top) return 'top';
@@ -394,11 +401,38 @@ self.onmessage = (e: MessageEvent) => {
                     return 'bottom';
                 };
 
-                const sKey = `${task.source}-${posToDir(result.sourcePos)}`;
-                const tKey = `${task.target}-${posToDir(result.targetPos)}`;
+                // Compute approach direction of this edge (source → target dominant axis)
+                const srcNode = nodeLookup.get(task.source);
+                const tgtNode = nodeLookup.get(task.target);
+                let approachDir = 'top';
+                if (srcNode && tgtNode) {
+                    const { x: sx, y: sy } = getNodeXY(srcNode);
+                    const { x: tx, y: ty } = getNodeXY(tgtNode);
+                    const dx = tx - sx;
+                    const dy = ty - sy;
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        approachDir = dx > 0 ? 'right' : 'left';
+                    } else {
+                        approachDir = dy > 0 ? 'bottom' : 'top';
+                    }
+                }
 
+                const sPortDir = posToDir(result.sourcePos);
+                const tPortDir = posToDir(result.targetPos);
+
+                // Legacy total keys (for backward compatibility)
+                const sKey = `${task.source}-${sPortDir}`;
+                const tKey = `${task.target}-${tPortDir}`;
                 portUsageMap[sKey] = (portUsageMap[sKey] || 0) + 1;
                 portUsageMap[tKey] = (portUsageMap[tKey] || 0) + 1;
+
+                // Direction-aware keys for smart merge/diverge decision
+                const tDirKey = `${task.target}-${tPortDir}-from-${approachDir}`;
+                portUsageMap[tDirKey] = (portUsageMap[tDirKey] || 0) + 1;
+
+                // Also track source approach for outgoing edges (future use)
+                const sDirKey = `${task.source}-${sPortDir}-exit`;
+                portUsageMap[sDirKey] = (portUsageMap[sDirKey] || 0) + 1;
             }
 
             // [FIX] Ensure ID propagation

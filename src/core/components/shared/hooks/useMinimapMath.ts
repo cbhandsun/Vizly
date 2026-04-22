@@ -30,16 +30,37 @@ export const computeMinimapBounds = (
   visiblePixelHeight: number
 ): MinimapBounds | null => {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+  // Build lookup map for parentId chain traversal
+  const nodeMap = new Map<string, any>();
+  nodes.forEach(n => nodeMap.set(n.id, n));
+
+  // Compute absolute position by walking the parentId chain.
+  // internals.positionAbsolute is unavailable here (external API returns relative positions).
+  const getAbsPos = (node: any): { x: number; y: number } => {
+    let x = safeNumber(node.position?.x, 0);
+    let y = safeNumber(node.position?.y, 0);
+    let curr = node;
+    let guard = 0;
+    while (curr.parentId && guard++ < 20) {
+      const parent = nodeMap.get(curr.parentId);
+      if (!parent) break;
+      x += safeNumber(parent.position?.x, 0);
+      y += safeNumber(parent.position?.y, 0);
+      curr = parent;
+    }
+    return { x, y };
+  };
+
   nodes.forEach((n) => {
-    const x = safeNumber(n.position?.x, 0);
-    const y = safeNumber(n.position?.y, 0);
+    const abs = getAbsPos(n);
     const w = extractValidNumber(n.measured?.width ?? n.width ?? n.style?.width, 200);
     const h = extractValidNumber(n.measured?.height ?? n.height ?? n.style?.height, 100);
-    if (isFinite(x) && isFinite(y) && w > 0 && h > 0) {
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x + w);
-      maxY = Math.max(maxY, y + h);
+    if (isFinite(abs.x) && isFinite(abs.y) && w > 0 && h > 0) {
+      minX = Math.min(minX, abs.x);
+      minY = Math.min(minY, abs.y);
+      maxX = Math.max(maxX, abs.x + w);
+      maxY = Math.max(maxY, abs.y + h);
     }
   });
   if (minX === Infinity || minY === Infinity || maxX === -Infinity || maxY === -Infinity) return null;

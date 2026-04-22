@@ -268,7 +268,10 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   // 稳定 defaultEdgeOptions 引用，避免 StoreUpdater 每帧 setState 导致无限循环
   const defaultEdgeOptions = useMemo(() => ({
     type: 'advanced-smart-step',
-    markerEnd: { type: 'arrowclosed' as const, width: 20, height: 20 },
+    // [FIX] React Flow's arrowclosed marker has viewBox="-10 -10 20 20" but the
+    // triangle polyline only occupies ~25% of that width. Multiply by 4 to
+    // compensate so the visible arrowhead is ~10px wide instead of ~3px.
+    markerEnd: { type: 'arrowclosed' as const, width: 80, height: 80 },
     style: {
       strokeOpacity: 0.98,
       filter: isLargeGraph ? 'none' : 'drop-shadow(0 0 0.6px rgba(0,0,0,0.35))'

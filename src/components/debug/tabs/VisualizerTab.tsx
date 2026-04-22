@@ -121,7 +121,40 @@ interface DebuggableCoordinator {
     notifyGraphChange(): void;
 }
 
+/** [UX] Reusable scan result row — used in both anomaly list and full-edge list */
+interface ScanRowItemProps {
+    row: { edgeId: string; port: string; strategy: string; geo: string; isM2O: boolean; anomaly: boolean };
+    geoColor: (geo: string) => string;
+    token: any;
+    onClick: () => void;
+}
+const ScanRowItem: React.FC<ScanRowItemProps> = ({ row, geoColor, token, onClick }) => {
+    const bg = row.anomaly ? 'rgba(255,77,79,0.08)' : 'rgba(82,196,26,0.05)';
+    const bgHover = row.anomaly ? 'rgba(255,77,79,0.2)' : 'rgba(82,196,26,0.12)';
+    const idColor = row.anomaly ? '#ff7875' : '#95de64';
+    return (
+        <div
+            onClick={onClick}
+            style={{
+                display: 'flex', gap: 6, alignItems: 'center',
+                padding: '2px 6px', borderRadius: 4, cursor: 'pointer',
+                background: bg, marginBottom: 2, transition: 'background 0.12s',
+                fontSize: 11,
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = bgHover)}
+            onMouseLeave={e => (e.currentTarget.style.background = bg)}
+        >
+            {row.anomaly ? <span style={{ color: '#ff4d4f', fontSize: 9 }}>●</span> : <span style={{ color: '#52c41a', fontSize: 9 }}>●</span>}
+            <span style={{ color: idColor, fontWeight: 600, minWidth: 30 }}>{row.edgeId}</span>
+            <span style={{ color: token.colorTextTertiary, minWidth: 70 }}>{row.port}</span>
+            <span style={{ color: geoColor(row.geo), flex: 1, fontSize: 10 }}>{row.geo}</span>
+            {row.isM2O && <span style={{ color: '#1890ff', fontSize: 9 }}>M2O</span>}
+        </div>
+    );
+};
+
 export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeight }) => {
+
     const { t } = useTranslation();
     const { token } = theme.useToken();
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -132,6 +165,10 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
     const [showVG, setShowVG] = useState(true);
     const [showQuadTree, setShowQuadTree] = useState(false);
     const [isMaximized, setIsMaximized] = useState(false);
+    // [UX] Mouse world-coordinate tracking for HUD crosshair display
+    const [mouseWorldPos, setMouseWorldPos] = useState<{ x: number; y: number } | null>(null);
+    // [UX] Expand all edges in scan (not just anomalies)
+    const [showAllScanEdges, setShowAllScanEdges] = useState(false);
 
     // [SCAN] Batch scan state
     interface ScanRow { edgeId: string; port: string; strategy: string; geo: string; isM2O: boolean; anomaly: boolean; }
@@ -147,6 +184,8 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
     const debugListenerRef = useRef<((data: DebugPayload) => void) | null>(null);
 
     const targetEdgeIdRef = useRef(targetEdgeId);
+    // [UX] Ref to fitToContent so reset button can reuse it without stale closure
+    const debugDataRef = useRef<DebugPayload | null>(null);
 
     // Canvas sizing state
     const containerRef = useRef<HTMLDivElement>(null);
@@ -619,6 +658,16 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
     };
 
     const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        // [UX] Track world coordinates for HUD display
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (rect) {
+            const sx = e.clientX - rect.left;
+            const sy = e.clientY - rect.top;
+            setMouseWorldPos({
+                x: Math.round((sx - transform.x) / transform.k),
+                y: Math.round((sy - transform.y) / transform.k),
+            });
+        }
         if (!isDragging) return;
         const dx = e.clientX - lastMouseRef.current.x;
         const dy = e.clientY - lastMouseRef.current.y;
@@ -630,6 +679,11 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
         setIsDragging(false);
     };
 
+    const handleMouseLeaveCanvas = () => {
+        setIsDragging(false);
+        setMouseWorldPos(null);
+    };
+
     useEffect(() => {
         const coordinator = EdgeRoutingCoordinator.getInstance() as unknown as DebuggableCoordinator;
 
@@ -637,6 +691,7 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
             const want = targetEdgeIdRef.current;
             if (data && (!want || !data.edgeId || data.edgeId === want)) {
                 setDebugData(data);
+                debugDataRef.current = data;
                 fitToContent(data);
             }
         };
@@ -674,6 +729,21 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
         coordinator.setDebugEdge(targetEdgeId || null);
     }, [targetEdgeId]);
 
+    // [UX] Extract strategy info for HUD display
+    const hudInfo = (() => {
+        if (!debugData) return null;
+        const ad = debugData.algorithmDebug && typeof debugData.algorithmDebug === 'object'
+            ? (debugData.algorithmDebug as Record<string, any>) : null;
+        const ps = ad?.portSelection;
+        const dataAny = debugData as unknown as Record<string, any>;
+        const strategy = debugData.metadata?.strategy ?? ad?.strategy ?? '?';
+        const s = dataAny.selectedSourcePos ?? ps?.selected?.source ?? '?';
+        const tt = dataAny.selectedTargetPos ?? ps?.selected?.target ?? '?';
+        const geo = ps?.geometry ?? ps?.detectedGeometry ?? '?';
+        const ms = debugData.metadata?.duration?.toFixed(1) ?? '?';
+        return { strategy, portStr: `${s} → ${tt}`, geo, ms };
+    })();
+
     const canvasContent = (
         <>
             <canvas
@@ -684,7 +754,7 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
+                onMouseLeave={handleMouseLeaveCanvas}
                 style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain', cursor: isDragging ? 'grabbing' : 'grab' }}
             />
             {!debugData && (
@@ -692,8 +762,49 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                     {t('designer.debug.visualizer.noDebugData')}
                 </div>
             )}
+            {/* [UX] HUD overlay — always visible, no scrolling needed */}
+            {hudInfo && (
+                <div style={{
+                    position: 'absolute', top: 6, right: 8,
+                    background: 'rgba(0,0,0,0.72)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 6, padding: '5px 10px',
+                    fontSize: 11, lineHeight: '18px',
+                    pointerEvents: 'none',
+                    backdropFilter: 'blur(4px)',
+                }}>
+                    <div style={{ color: '#52c41a', fontWeight: 700, letterSpacing: 0.4 }}>{hudInfo.strategy}</div>
+                    <div style={{ color: '#69b1ff' }}>Port: <span style={{ color: '#fff', fontWeight: 600 }}>{hudInfo.portStr}</span></div>
+                    <div style={{ color: '#aaa' }}>Geo: <span style={{ color: geoColor(hudInfo.geo) }}>{hudInfo.geo}</span></div>
+                    <div style={{ color: '#888' }}>{hudInfo.ms}ms · {(transform.k * 100).toFixed(0)}%</div>
+                </div>
+            )}
+            {/* [UX] Mouse world-coordinate crosshair display */}
+            {mouseWorldPos && (
+                <div style={{
+                    position: 'absolute', bottom: 8, right: 8,
+                    background: 'rgba(0,0,0,0.6)',
+                    borderRadius: 4, padding: '2px 8px',
+                    fontSize: 10, color: '#888',
+                    pointerEvents: 'none',
+                    fontFamily: 'monospace',
+                }}>
+                    {mouseWorldPos.x}, {mouseWorldPos.y}
+                </div>
+            )}
         </>
     );
+
+    // [UX] Geometry type color coding — same palette used in HUD and scan results
+    function geoColor(geo: string): string {
+        if (!geo || geo === '?') return '#888';
+        if (geo.includes('diagonal')) return '#ffa940';   // orange — ambiguous
+        if (geo.includes('backward') || geo.includes('reverse')) return '#ff4d4f'; // red — problem
+        if (geo.includes('forward') || geo.includes('horizontal')) return '#52c41a'; // green — ideal
+        if (geo.includes('vertical')) return '#69b1ff';   // blue — vertical
+        if (geo.includes('collocated') || geo.includes('overlap')) return '#b37feb'; // purple — special
+        return '#aaa';
+    }
 
     const renderControls = () => (
         <Space size={12} style={{ fontSize: 11, color: token.colorTextSecondary, flexWrap: 'wrap' }}>
@@ -713,6 +824,19 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                 <Switch size="small" checked={showQuadTree} onChange={setShowQuadTree} />
                 <span>{t('designer.debug.visualizer.quadTree')}</span>
             </Space>
+            {/* [UX] Reset view button + zoom indicator */}
+            <Tooltip title="重置视图 (fit to content)">
+                <Button
+                    size="small"
+                    onClick={() => { if (debugDataRef.current) fitToContent(debugDataRef.current); }}
+                    style={{ fontSize: 11, padding: '0 6px', height: 20, lineHeight: '18px' }}
+                >
+                    ⊡ 重置
+                </Button>
+            </Tooltip>
+            <span style={{ color: token.colorTextQuaternary, fontFamily: 'monospace' }}>
+                {(transform.k * 100).toFixed(0)}%
+            </span>
         </Space>
     );
 
@@ -1008,37 +1132,35 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                             <span style={{ color: token.colorTextSecondary }}>共 {total} 条</span>
                         </div>
 
-                        {/* Anomaly list — only show if there are any */}
+                        {/* Anomaly list + optional full list */}
                         {anomalies.length > 0 && (
                             <div style={{ borderTop: '1px solid #333', paddingTop: 6 }}>
                                 <div style={{ color: '#ff4d4f', marginBottom: 4, fontWeight: 600 }}>⚠ 异常边（点击调试）</div>
                                 {anomalies.map(row => (
-                                    <div
-                                        key={row.edgeId}
-                                        onClick={() => {
-                                            // [FIX] Update ref immediately so runDebug uses the new edgeId
-                                            // (setTargetEdgeId is async, targetEdgeIdRef.current would still be stale)
-                                            setTargetEdgeId(row.edgeId);
-                                            targetEdgeIdRef.current = row.edgeId;
-                                            runDebug();
-                                        }}
-                                        style={{
-                                            display: 'flex', gap: 8, alignItems: 'center',
-                                            padding: '3px 6px', borderRadius: 4, cursor: 'pointer',
-                                            background: 'rgba(255,77,79,0.1)',
-                                            marginBottom: 2,
-                                            transition: 'background 0.15s'
-                                        }}
-                                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,77,79,0.22)')}
-                                        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,77,79,0.1)')}
-                                    >
-                                        <span style={{ color: '#ff7875', fontWeight: 600, minWidth: 32 }}>{row.edgeId}</span>
-                                        <span style={{ color: token.colorTextSecondary, flex: 1 }}>{row.port}</span>
-                                        <span style={{ color: '#faad14' }}>{row.geo}</span>
-                                    </div>
+                                    <ScanRowItem key={row.edgeId} row={row} geoColor={geoColor} token={token}
+                                        onClick={() => { setTargetEdgeId(row.edgeId); targetEdgeIdRef.current = row.edgeId; runDebug(); }}
+                                    />
                                 ))}
                             </div>
                         )}
+                        {/* [UX] Expandable list of all edges */}
+                        <div style={{ borderTop: '1px solid #222', paddingTop: 4, marginTop: 4 }}>
+                            <Button type="text" size="small"
+                                style={{ fontSize: 10, color: token.colorTextTertiary, padding: '0 2px', height: 18 }}
+                                onClick={() => setShowAllScanEdges(v => !v)}
+                            >
+                                {showAllScanEdges ? '▲ 收起全部边' : `▼ 查看全部 ${scanResults.length} 条边`}
+                            </Button>
+                            {showAllScanEdges && (
+                                <div style={{ marginTop: 4, maxHeight: 160, overflowY: 'auto' }}>
+                                    {scanResults.map(row => (
+                                        <ScanRowItem key={row.edgeId} row={row} geoColor={geoColor} token={token}
+                                            onClick={() => { setTargetEdgeId(row.edgeId); targetEdgeIdRef.current = row.edgeId; runDebug(); }}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
 
                         {anomalies.length === 0 && (
                             <div style={{ color: '#52c41a', textAlign: 'center', padding: '4px 0', fontWeight: 500 }}>

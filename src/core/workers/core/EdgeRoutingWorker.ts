@@ -291,20 +291,76 @@ export class EdgeRoutingWorker {
         const isGlobalTrunkMember = !!(job.busTrunkSource && job.busTrunkTarget);
 
         /**
-         * [S5-P2] Unified trunk axis port resolver.
-         * Calculates the port direction a node should face given the global trunk geometry.
-         * Eliminates symmetric duplication between O2M hub, M2O hub, O2M peer, and M2O peer blocks.
+         * [S5-P2] Unified trunk axis port resolver — with approach-direction conflict guard.
+         *
+         * Calculates the port a node should face given the global trunk geometry.
+         * IMPROVEMENT: If the trunk-facing port is the SAME as the direct approach direction
+         * from the other node, it means entry and exit would be on the same side (same-side
+         * in/out). In that case, fall back to the direct geometric port to avoid the U-turn.
+         *
+         * @param rect        The node rectangle
+         * @param otherRect   The other endpoint rectangle (used for conflict detection)
+         * @param isTargetSide  true if resolving the target (entry) port, false for source (exit)
          */
-        const resolvePortFromTrunkAxis = (rect: Rectangle): Position => {
+        const resolvePortFromTrunkAxis = (
+            rect: Rectangle,
+            otherRect?: Rectangle,
+            isTargetSide?: boolean
+        ): Position => {
             const ts = job.busTrunkSource!;
             const tt = job.busTrunkTarget!;
             const isVertTrunk = Math.abs(ts.x - tt.x) < 1.0;
             const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+
+            let trunkPort: Position;
             if (isVertTrunk) {
-                return center.x > ts.x ? Position.Left : Position.Right;
+                trunkPort = center.x > ts.x ? Position.Left : Position.Right;
             } else {
-                return center.y > ts.y ? Position.Top : Position.Bottom;
+                trunkPort = center.y > ts.y ? Position.Top : Position.Bottom;
             }
+
+            // [CONFLICT GUARD] Check if trunk port causes same-side entry/exit.
+            // e.g. trunk-facing port = Top, but source is ALSO above this node (direct approach = Top).
+            // In that case the path would enter from the same side it exits → visual loop/overlap.
+            if (otherRect) {
+                const otherCenter = { x: otherRect.x + otherRect.width / 2, y: otherRect.y + otherRect.height / 2 };
+                const dx = isTargetSide
+                    ? (otherCenter.x - center.x)  // source → target: dx from target's perspective is source-direction
+                    : (center.x - otherCenter.x);  // source side: dx toward target
+                const dy = isTargetSide
+                    ? (otherCenter.y - center.y)
+                    : (center.y - otherCenter.y);
+
+                // Direct approach port (from-source direction when isTargetSide)
+                let directPort: Position;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    directPort = dx > 0 ? Position.Left : Position.Right;  // source is to the left → enter Left
+                } else {
+                    directPort = dy > 0 ? Position.Top : Position.Bottom;  // source is above → enter Top
+                }
+                if (isTargetSide) {
+                    // For target entry: directPort is the side facing the source.
+                    // Conflict: if trunkPort === directPort, both source and trunk approach from same side.
+                    // Use directPort (geometry wins — it IS the correct entry).
+                    if (trunkPort === directPort) {
+                        return directPort;
+                    }
+                } else {
+                    // For source exit: directPort is the side facing the target.
+                    // Same conflict: if trunkPort === directPort, exit toward target directly — OK.
+                    // Conflict only if trunkPort === OPPOSITE of directPort (exiting away from target).
+                    const opposite = (p: Position) => (
+                        p === Position.Top ? Position.Bottom :
+                        p === Position.Bottom ? Position.Top :
+                        p === Position.Left ? Position.Right : Position.Left
+                    );
+                    if (trunkPort === opposite(directPort)) {
+                        return directPort;
+                    }
+                }
+            }
+
+            return trunkPort;
         };
 
 
@@ -314,7 +370,7 @@ export class EdgeRoutingWorker {
 
         // O2M: hub（源）面向 trunk axis
         if (job.isOneToMany && job.busTrunkSource && job.busTrunkTarget && !hasFixedSourcePort) {
-            startPos = resolvePortFromTrunkAxis(sRect);
+            startPos = resolvePortFromTrunkAxis(sRect, tRect, false);
             hasFixedSourcePort = true;
         }
 
@@ -324,7 +380,7 @@ export class EdgeRoutingWorker {
         // → If trunk is ABOVE target: target faces UP → Position.Top
         // → If trunk is BELOW target: target faces DOWN → Position.Bottom
         if (job.isManyToOne && job.busTrunkSource && job.busTrunkTarget && !hasFixedTargetPort) {
-            endPos = resolvePortFromTrunkAxis(tRect);
+            endPos = resolvePortFromTrunkAxis(tRect, sRect, true);
             hasFixedTargetPort = true;
         }
 
@@ -423,7 +479,7 @@ export class EdgeRoutingWorker {
         // 若无 trunk 信息，回退到中心点几何计算
         if (!hasFixedTargetPort && (job.isOneToMany || (job.busTrunkSource && job.busTrunkTarget))) {
             if (job.busTrunkSource && job.busTrunkTarget) {
-                endPos = resolvePortFromTrunkAxis(tRect);
+                endPos = resolvePortFromTrunkAxis(tRect, sRect, true);
             } else {
                 // Fallback: Center-to-Center Logic（无 trunk 时）
                 const sCenter = { x: sRect.x + sRect.width / 2, y: sRect.y + sRect.height / 2 };
@@ -451,7 +507,7 @@ export class EdgeRoutingWorker {
         // [S5-P2] M2O peer 源端口：使用 resolvePortFromTrunkAxis() 统一推算
         if (!hasFixedSourcePort && (job.isManyToOne || (job.busTrunkSource && job.busTrunkTarget))) {
             if (job.busTrunkSource && job.busTrunkTarget) {
-                startPos = resolvePortFromTrunkAxis(sRect);
+                startPos = resolvePortFromTrunkAxis(sRect, tRect, false);
             } else {
                 // Fallback: Center-to-Center Logic（无 trunk 时）
                 const sCenter = { x: sRect.x + sRect.width / 2, y: sRect.y + sRect.height / 2 };
