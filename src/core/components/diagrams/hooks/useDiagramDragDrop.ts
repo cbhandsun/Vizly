@@ -22,6 +22,7 @@ export const useDiagramDragDrop = ({
     nodes,
     edges,
     setNodes,
+    setEdges, // ⭐ Fix: add setEdges here
     takeSnapshot,
     reactFlowInstance,
     setIsDragging,
@@ -395,7 +396,7 @@ export const useDiagramDragDrop = ({
                     const absY = n.position.y;
                     const w = n.measured?.width || n.width || 0;
                     const h = n.measured?.height || n.height || 0;
-                    const hitPadding = 20; // 增大磁性吸附范围
+                    const hitPadding = 80; // 增大磁性吸附范围，让MindMap换绑更容易触发
                     return nodeCenterX >= absX - hitPadding && nodeCenterX <= absX + w + hitPadding &&
                            nodeCenterY >= absY - hitPadding && nodeCenterY <= absY + h + hitPadding;
                 }
@@ -515,7 +516,7 @@ export const useDiagramDragDrop = ({
                     const absY = n.position.y;
                     const w = n.measured?.width || n.width || 0;
                     const h = n.measured?.height || n.height || 0;
-                    const hitPadding = 20; // 增大磁性吸附范围
+                    const hitPadding = 80; // 增大磁性吸附范围，让MindMap换绑更容易触发
                     return nodeCenterX >= absX - hitPadding && nodeCenterX <= absX + w + hitPadding &&
                            nodeCenterY >= absY - hitPadding && nodeCenterY <= absY + h + hitPadding;
                 }

@@ -4,6 +4,7 @@ import { NodeToolbar } from '@xyflow/react';
 import { MindMapActionBar } from '../diagrams/mindmap-pro/MindMapActionBar';
 import { FaMinus } from 'react-icons/fa';
 import { ExportOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import './MindMapNode.css';
 
 export interface MindMapNodeData extends Record<string, unknown> {
@@ -36,12 +37,16 @@ export interface MindMapNodeData extends Record<string, unknown> {
 
 
 const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindMapNodeData, 'mindmap'>>) => {
-    const depth = data?.depth ?? 1; 
+    // depth=0 for root node. Root nodes may not have depth set, but they always have 'direction'.
+    // When depth is undefined, check for 'direction' (root-only prop) to detect root node.
+    const rawDepth = data?.depth;
+    const depth = rawDepth !== undefined ? rawDepth : (data?.direction !== undefined ? 0 : 1);
     const direction = data?.direction ?? 'LR';
     const branchColor = data?.branchColor;
     const shape = data?.shape || 'underline';
     const collapsed = !!data?.collapsed;
     const childrenCount = data?.childrenCount ?? 0;
+    const { t } = useTranslation();
     
     // Rich Content
     const icon = data?.icon;
@@ -57,19 +62,33 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
     
     // Inline Edit State
     const [isEditing, setIsEditing] = useState(false);
-    const [editValue, setEditValue] = useState(data?.label || (depth === 0 ? 'Main Idea' : 'Branch'));
+    const [editValue, setEditValue] = useState(data?.label || '');
     const inputRef = useRef<HTMLInputElement>(null);
     const { updateNodeData } = useReactFlow();
 
+    // Sync editValue when label changes externally (e.g. via undo/redo or outline panel)
+    useEffect(() => {
+        if (!isEditing) {
+            setEditValue(data?.label || '');
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data?.label]);
+
     useEffect(() => {
         if (isEditing && inputRef.current) {
-            inputRef.current.focus();
-            inputRef.current.select();
+            // Guarantee DOM attachment for rock-solid continuous input workflow
+            requestAnimationFrame(() => {
+                if (inputRef.current) {
+                    inputRef.current.focus();
+                    inputRef.current.select();
+                }
+            });
         }
     }, [isEditing]);
 
     useEffect(() => {
         if (data?.isNew) {
+            setEditValue(''); // Start fresh for new nodes
             setIsEditing(true);
             updateNodeData(id, { isNew: undefined });
         }
@@ -115,7 +134,9 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
         }
     };
 
-    const themeStyle = branchColor && depth > 0 ? {
+    // depth-0: no branch-color (handled by CSS gradient directly)
+    // depth>0: inject --branch-color CSS variable to drive all styling
+    const themeStyle = depth > 0 && branchColor ? {
         '--branch-color': branchColor,
     } as React.CSSProperties : {};
 
@@ -170,7 +191,11 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
                             onPointerDown={(e) => e.stopPropagation()}
                         />
                     ) : (
-                        data?.label || (depth === 0 ? 'Main Idea' : 'Branch')
+                        data?.label
+                            ? data.label
+                            : <span style={{ opacity: 0.35, fontStyle: 'italic', userSelect: 'none' }}>
+                                {depth === 0 ? t('designer.flowchart.mindMapCenter') : t('plugins.mindmap.actionBar.addChild')}
+                              </span>
                     )}
                 </div>
                 {/* [T-3] URL link icon — click opens URL in new tab */}

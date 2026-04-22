@@ -208,6 +208,8 @@
 /* 限制每个节点的重排范围 — 子节点变化不影响其他节点 */
 .react-flow__node {
     contain: layout style;
+    /* Phase 3: Fluid Physics & Animation for Tree Structure Changes */
+    transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s ease, opacity 0.3s ease;
 }
 
 /* 拖拽中的节点 — GPU 层提升 + 最高 z-index */
@@ -1628,5 +1630,70 @@ body.performance-mode .modern-controls-panel {
 html[data-theme='dark'] body.performance-mode .modern-toolbar,
 html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
     background: rgba(30, 30, 40, 0.98) !important;
+}
+
+/* ============================================
+   Magnetic Reparenting Drop Highlights
+   ============================================ */
+
+/* 基础目标高亮 (内发光 + 脉冲) */
+.drop-target-highlight {
+    outline: 2px solid var(--theme-primary-main, #3b82f6) !important;
+    outline-offset: 4px !important;
+    border-radius: var(--node-radius, 10px) !important;
+    box-shadow: 0 0 0 4px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.2)), 0 0 20px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.4)) !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    position: relative;
+    z-index: 100 !important;
+}
+
+/* 伪元素用于指示具体的插入位置 (above, below, inside) */
+.drop-target-highlight::before {
+    content: '';
+    position: absolute;
+    background: var(--theme-primary-main, #3b82f6);
+    border-radius: 4px;
+    opacity: 0.8;
+    z-index: -1;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 8px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.6));
+}
+
+/* 插入上方 (上方发光条) */
+.drop-target-highlight.drop-above::before {
+    top: -12px;
+    left: 10%;
+    right: 10%;
+    height: 6px;
+    animation: drop-pulse-horizontal 1.5s infinite;
+}
+
+/* 插入下方 (下方发光条) */
+.drop-target-highlight.drop-below::before {
+    bottom: -12px;
+    left: 10%;
+    right: 10%;
+    height: 6px;
+    animation: drop-pulse-horizontal 1.5s infinite;
+}
+
+/* 作为子节点插入 (内部填充发光) */
+.drop-target-highlight.drop-inside::before {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    opacity: 0.15;
+    animation: drop-pulse-fill 1.5s infinite;
+}
+
+@keyframes drop-pulse-horizontal {
+    0%, 100% { transform: scaleX(0.9); opacity: 0.6; }
+    50% { transform: scaleX(1); opacity: 1; }
+}
+
+@keyframes drop-pulse-fill {
+    0%, 100% { transform: scale(0.98); opacity: 0.1; }
+    50% { transform: scale(1.02); opacity: 0.25; }
 }
 

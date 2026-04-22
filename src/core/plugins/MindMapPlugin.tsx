@@ -44,7 +44,7 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
           id: 'root',
           type: 'mindmap',
           position: { x: 0, y: 0 },
-          data: { label: '中心主题 (Root)', direction: 'LR' },
+          data: { label: i18n.t('designer.flowchart.mindMapCenter') || '中心主题 (Root)', direction: 'LR' },
           selected: true
         }
       ],
@@ -85,7 +85,7 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
   contributeSidebarPanels(ctx: PluginContext): SidebarPanel[] {
     return [{
       id: 'mindmap-outline',
-      title: '大纲与导航',
+      title: i18n.t('plugins.mindmap.outline.title') || '大纲视图',
       icon: <UnorderedListOutlined />,
       content: <MindMapOutlinePanel ctx={ctx} />
     }];
@@ -142,7 +142,9 @@ const MindMapToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
                     { label: t('plugins.mindmap.direction.LR'), value: 'LR' },
                     { label: t('plugins.mindmap.direction.R'), value: 'R' },
                     { label: t('plugins.mindmap.direction.L'), value: 'L' },
-                    { label: t('plugins.mindmap.direction.TB'), value: 'TB' }
+                    { label: t('plugins.mindmap.direction.TB'), value: 'TB' },
+                    { label: t('plugins.mindmap.direction.BT'), value: 'BT' },
+                    { label: t('plugins.mindmap.direction.FISHBONE'), value: 'FISHBONE' },
                 ]}
             />
 

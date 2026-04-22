@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useReactFlow, Node, Edge, useStore } from '@xyflow/react';
-import { Popover, Divider } from 'antd';
+import { Popover, Divider, Tooltip } from 'antd';
 import { 
   SisternodeOutlined, 
   SubnodeOutlined, 
@@ -10,6 +10,7 @@ import {
   FormatPainterOutlined,
   CopyOutlined,
   FileMarkdownOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import { MindMapBeautifyPanel } from './MindMapBeautifyPanel';
 import { exportMindMapToMarkdown } from '../hooks/useMindMapOrchestrator';
@@ -19,56 +20,95 @@ interface ActionBtnProps {
   label: string;
   onClick?: () => void;
   disabled?: boolean;
+  danger?: boolean;
 }
 
-const ActionBtn: React.FC<ActionBtnProps> = ({ icon, label, onClick, disabled }) => {
+const ActionBtn: React.FC<ActionBtnProps> = ({ icon, label, onClick, disabled, danger }) => {
   return (
-    <div 
-      onClick={disabled ? undefined : onClick}
-      style={{
-        display: 'flex', 
-        flexDirection: 'column', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        gap: 4,
-        padding: '8px 10px', 
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.4 : 1,
-        color: '#555', 
-        fontSize: 12, 
-        borderRadius: 8,
-        transition: 'all 0.2s',
-      }}
-      onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.backgroundColor = '#f0f2f5'; }}
-      onMouseLeave={(e) => { if (!disabled) e.currentTarget.style.backgroundColor = 'transparent'; }}
-    >
-      <div style={{ fontSize: 18, color: disabled ? '#aaa' : '#333' }}>{icon}</div>
-      <div style={{ whiteSpace: 'nowrap', transform: 'scale(0.9)', transformOrigin: 'top' }}>{label}</div>
-    </div>
+    <Tooltip title={label} placement="top" mouseEnterDelay={0.3}>
+      <div 
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          if (disabled) return;
+          onClick?.();
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+        style={{
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          width: 32,
+          height: 32,
+          margin: '0 1px',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.35 : 1,
+          color: disabled ? '#aaa' : (danger ? '#ef4444' : '#475569'), 
+          borderRadius: 8,
+          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+          flexShrink: 0,
+        }}
+        onMouseEnter={(e) => { 
+          if (!disabled) { 
+            e.currentTarget.style.backgroundColor = danger
+              ? 'rgba(239, 68, 68, 0.08)'
+              : 'rgba(99, 102, 241, 0.08)';
+            e.currentTarget.style.color = danger ? '#dc2626' : '#6366f1'; 
+            e.currentTarget.style.transform = 'translateY(-1px) scale(1.08)';
+          } 
+        }}
+        onMouseLeave={(e) => { 
+          if (!disabled) { 
+            e.currentTarget.style.backgroundColor = 'transparent'; 
+            e.currentTarget.style.color = disabled ? '#aaa' : (danger ? '#ef4444' : '#475569');
+            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+          } 
+        }}
+      >
+        <div style={{ fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {icon}
+        </div>
+      </div>
+    </Tooltip>
   );
 };
 
 export const MindMapActionBar: React.FC = () => {
   const { t } = useTranslation();
-  const { getNodes, getEdges, setNodes } = useReactFlow();
+  const { getNodes, getEdges, setNodes, setEdges } = useReactFlow();
 
   // Create mock context to pass to Beautify panel without needing the global plugin context
+  // updateNodesBatch(ids, partialData): partialData is merged into node.data for ALL ids
   const mockCtx = useMemo(() => {
-      // Create a mocked PluginContext object containing only the necessary parts needed by the panel
       return {
           getNodes,
           getEdges,
-          updateNodesBatch: (ids: string[], updates: any) => {
-              setNodes((nds) => nds.map(n => ids.includes(n.id) ? { ...n, data: { ...n.data, ...updates[n.id] } } : n));
+          updateNodesBatch: (ids: string[], partialData: any) => {
+              setNodes((nds) => nds.map(n =>
+                  ids.includes(n.id)
+                      ? { ...n, data: { ...n.data, ...partialData } }
+                      : n
+              ));
           }
       } as any;
   }, [getNodes, getEdges, setNodes]);
   
-  // [O-1] Use useStore selectors instead of getNodes().filter() in component body.
-  // getNodes() in body = O(N) on every parent re-render with no subscription.
-  // useStore subscribes only to selection changes, preventing unnecessary re-renders.
-  const selectedNodes = useStore(s => s.nodes.filter(n => n.selected));
-  const selectedEdges = useStore(s => s.edges.filter(e => e.selected));
+  // [O-1] Use useStore selectors — subscribe only to selection changes
+  const selectedNodeIds = useStore(s => s.nodes.filter(n => n.selected).map(n => n.id).join(','));
+  const selectedNodes = useMemo(() => {
+    if (!selectedNodeIds) return [];
+    const ids = selectedNodeIds.split(',');
+    return getNodes().filter(n => ids.includes(n.id));
+  }, [selectedNodeIds, getNodes]);
+
+  const selectedEdgeIds = useStore(s => s.edges.filter(e => e.selected).map(e => e.id).join(','));
+  const selectedEdges = useMemo(() => {
+    if (!selectedEdgeIds) return [];
+    const ids = selectedEdgeIds.split(',');
+    return getEdges().filter(e => ids.includes(e.id));
+  }, [selectedEdgeIds, getEdges]);
+
   const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
 
   const handleAddChild = () => {
@@ -87,12 +127,10 @@ export const MindMapActionBar: React.FC = () => {
     if (!selectedNode) return;
     const depth = (selectedNode.data?.depth as number) ?? 0;
     if (depth === 0) {
-      // Root selected, act like Add Child
       handleAddChild();
       return;
     }
     
-    // Find parent edge
     const edges = getEdges();
     const parentEdge = edges.find(edge => edge.target === selectedNode.id && edge.type !== 'relationshipEdge');
     if (parentEdge) {
@@ -127,7 +165,7 @@ export const MindMapActionBar: React.FC = () => {
       window.dispatchEvent(event);
   };
 
-  // [T-1] Copy branch — dispatches Ctrl+C keyboard event to trigger orchestrator copy handler
+  // [T-1] Copy branch — dispatches Ctrl+C keyboard event
   const handleCopyBranch = useCallback(() => {
       if (!selectedNode) return;
       window.dispatchEvent(new KeyboardEvent('keydown', {
@@ -135,7 +173,7 @@ export const MindMapActionBar: React.FC = () => {
       }));
   }, [selectedNode]);
 
-  // [T-2] Export Markdown — directly calls exportMindMapToMarkdown and triggers download
+  // [T-2] Export Markdown
   const handleExportMd = useCallback(() => {
       const nodes = getNodes();
       const edges = getEdges();
@@ -150,35 +188,86 @@ export const MindMapActionBar: React.FC = () => {
       URL.revokeObjectURL(url);
   }, [getNodes, getEdges]);
 
-  // Do not render anything if nothing is selected or if we are not a mindmap branch
-  // We rely on NodeToolbar to mount this anyway, but just in case:
+  // Delete selected node(s) — route through smart-delete to get takeSnapshot + child-grafting
+  const handleDeleteNode = useCallback(() => {
+    if (selectedNodes.length === 0) return;
+
+    // Filter out root nodes (depth-0 cannot be deleted)
+    const deletableIds = selectedNodes
+      .filter(n => {
+        // Robust root detection: depth===0 OR (depth undefined AND has direction prop)
+        const d = n.data?.depth as number | undefined;
+        const isRoot = d === 0 || (d === undefined && n.data?.direction !== undefined);
+        return !isRoot;
+      })
+      .map(n => n.id);
+
+    if (deletableIds.length === 0) return;
+
+    // Use smart-delete which handles takeSnapshot + child re-grafting
+    window.dispatchEvent(new CustomEvent('mindmap:smart-delete', {
+      detail: { nodeIds: deletableIds }
+    }));
+  }, [selectedNodes]);
+
   if (selectedNodes.length === 0) {
     return null;
   }
+
+  // Robust root detection: depth===0 OR (depth undefined AND has 'direction' prop — root-only)
+  const nodeDepth = selectedNode?.data?.depth as number | undefined;
+  const isRoot = nodeDepth === 0 || (nodeDepth === undefined && selectedNode?.data?.direction !== undefined);
 
   return (
     <div style={{
       display: 'flex',
       alignItems: 'center',
-      padding: '2px 6px',
-      background: 'rgba(255, 255, 255, 0.70)',
-      backdropFilter: 'blur(24px) saturate(180%)',
-      WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-      borderRadius: 24,
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.4) inset, 0 0 0 1px rgba(0, 0, 0, 0.05)',
+      padding: '3px 8px',
+      background: 'rgba(255, 255, 255, 0.85)',
+      backdropFilter: 'blur(28px) saturate(200%)',
+      WebkitBackdropFilter: 'blur(28px) saturate(200%)',
+      borderRadius: 28,
+      boxShadow:
+        '0 8px 32px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.06), inset 0 0 0 1px rgba(255, 255, 255, 0.6), inset 0 -1px 0 rgba(0,0,0,0.04)',
       pointerEvents: 'all',
       border: 'none',
-      transition: 'left 0.25s cubic-bezier(0.2, 0.9, 0.3, 1), top 0.25s cubic-bezier(0.2, 0.9, 0.3, 1)',
-      animation: 'toolbarFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+      animation: 'toolbarFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+      gap: 2,
     }}>
-      {/* 结构操作 */}
-      <ActionBtn icon={<SisternodeOutlined />} label={t('mindmap.actionBar.addSibling')} disabled={!selectedNode} onClick={handleAddSibling} />
-      <ActionBtn icon={<SubnodeOutlined />} label={t('mindmap.actionBar.addChild')} disabled={!selectedNode} onClick={handleAddChild} />
-      <ActionBtn icon={<LinkOutlined />} label={t('mindmap.actionBar.addRelationship')} onClick={handleAddRelationship} />
-      <ActionBtn icon={<BlockOutlined />} label={t('mindmap.actionBar.addSummary')} disabled={selectedNodes.length === 0} onClick={handleAddSummary} />
+      {/* 结构操作区 */}
+      <ActionBtn
+        icon={<SisternodeOutlined />}
+        label={t('plugins.mindmap.actionBar.addSibling')}
+        disabled={!selectedNode}
+        onClick={handleAddSibling}
+      />
+      <ActionBtn
+        icon={<SubnodeOutlined />}
+        label={t('plugins.mindmap.actionBar.addChild')}
+        disabled={!selectedNode}
+        onClick={handleAddChild}
+      />
+
+      <div style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.08)', margin: '0 4px', borderRadius: 1, flexShrink: 0 }} />
+
+      <ActionBtn
+        icon={<LinkOutlined />}
+        label={t('plugins.mindmap.actionBar.addRelationship')}
+        onClick={handleAddRelationship}
+      />
+      <ActionBtn
+        icon={<BlockOutlined />}
+        label={t('plugins.mindmap.actionBar.addSummary')}
+        disabled={selectedNodes.length === 0}
+        onClick={handleAddSummary}
+      />
       <ActionBtn 
-        icon={<div style={{ width: 18, height: 18, border: '2px dashed #666', borderRadius: 4 }} />} 
-        label={t('mindmap.actionBar.addBoundary')} 
+        icon={
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <rect x="1" y="1" width="12" height="12" rx="2" strokeDasharray="3 2" />
+          </svg>
+        } 
+        label={t('plugins.mindmap.actionBar.addBoundary')} 
         disabled={!selectedNode} 
         onClick={() => {
           const event = new CustomEvent('editor:add-boundary-node', {
@@ -188,13 +277,22 @@ export const MindMapActionBar: React.FC = () => {
         }} 
       />
 
-      <Divider orientation="vertical" style={{ height: 32 }} />
+      <div style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.08)', margin: '0 4px', borderRadius: 1, flexShrink: 0 }} />
 
-      {/* T-1: 复制分支 / T-2: 导出 Markdown */}
-      <ActionBtn icon={<CopyOutlined />} label={t('mindmap.actionBar.copyBranch')} disabled={!selectedNode} onClick={handleCopyBranch} />
-      <ActionBtn icon={<FileMarkdownOutlined />} label={t('mindmap.actionBar.exportMd')} onClick={handleExportMd} />
+      {/* 编辑操作区 */}
+      <ActionBtn
+        icon={<CopyOutlined />}
+        label={t('plugins.mindmap.actionBar.copyBranch')}
+        disabled={!selectedNode}
+        onClick={handleCopyBranch}
+      />
+      <ActionBtn
+        icon={<FileMarkdownOutlined />}
+        label={t('plugins.mindmap.actionBar.exportMd')}
+        onClick={handleExportMd}
+      />
 
-      <Divider orientation="vertical" style={{ height: 32 }} />
+      <div style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.08)', margin: '0 4px', borderRadius: 1, flexShrink: 0 }} />
 
       {/* 美化 */}
       <Popover 
@@ -204,10 +302,23 @@ export const MindMapActionBar: React.FC = () => {
           styles={{ root: {}, container: { padding: 0 } }}
       >
           <div>
-            <ActionBtn icon={<FormatPainterOutlined />} label={t('mindmap.actionBar.beautify')} />
+            <ActionBtn icon={<FormatPainterOutlined />} label={t('plugins.mindmap.actionBar.beautify')} />
           </div>
       </Popover>
 
+      {/* 危险操作区 — 删除（根节点不可删）*/}
+      {!isRoot && (
+        <>
+          <div style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.08)', margin: '0 4px', borderRadius: 1, flexShrink: 0 }} />
+          <ActionBtn
+            icon={<DeleteOutlined />}
+            label={t('plugins.mindmap.actions.deleteNode')}
+            disabled={false}
+            danger
+            onClick={handleDeleteNode}
+          />
+        </>
+      )}
     </div>
   );
 };

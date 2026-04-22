@@ -1,188 +1,229 @@
 /* ========================================
-   Mind Map Node Styles
-   发散脑图节点，带有胶囊风格和嵌入式加号按钮
+   Mind Map Node Styles — Premium Edition
+   参考 XMind / MindMeister 行业设计标准
    ======================================== */
 
+/* ---- Base Node ---- */
 .mindmap-node {
     box-sizing: border-box;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 12px 24px;
+    padding: 10px 20px;
     border-radius: 8px;
     background: transparent;
-    color: #334155;
+    color: #1e293b;
     font-size: 14px;
     font-weight: 500;
     position: relative;
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+                background 0.15s ease;
     cursor: default;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     letter-spacing: -0.01em;
+    white-space: nowrap;
 }
 
-.mindmap-node.selected {
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4);
-    background: #fff;
-    border-radius: 8px;
-}
-
-/* 根节点特殊样式 (Root) - Premium Modern Pill */
+/* ========================================
+   根节点 (depth-0) — XMind 风格渐变卡片
+   ======================================== */
 .mindmap-node.depth-0 {
     font-weight: 700;
-    font-size: 18px;
-    background: rgba(255, 255, 255, 0.95);
-    color: #0f172a;
-    border: 3px solid #6366f1;
-    border-radius: 14px;
-    padding: 14px 32px;
-    box-shadow: 0 12px 30px rgba(99, 102, 241, 0.2), 0 2px 8px rgba(0, 0, 0, 0.05);
-    backdrop-filter: blur(12px) saturate(180%);
-    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    font-size: 17px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 16px;
+    padding: 16px 36px;
+    box-shadow:
+        0 12px 40px rgba(99, 102, 241, 0.35),
+        0 4px 12px rgba(99, 102, 241, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    min-width: 120px;
+    text-align: center;
 }
 
 .mindmap-node.depth-0:hover {
-    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.25), 0 2px 6px rgba(0, 0, 0, 0.05);
-    transform: translateY(-1px);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow:
+        0 20px 60px rgba(99, 102, 241, 0.45),
+        0 8px 20px rgba(99, 102, 241, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .mindmap-node.depth-0.selected {
-    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2), 0 8px 24px rgba(99, 102, 241, 0.3);
-    border-color: #4f46e5;
+    box-shadow:
+        0 0 0 3px rgba(255, 255, 255, 0.8),
+        0 0 0 5px rgba(99, 102, 241, 0.6),
+        0 16px 48px rgba(99, 102, 241, 0.4);
 }
 
-/* 一级分支样式 (Main Topics) - Emphasized Underline */
+/* ========================================
+   一级分支 (depth-1) — 带左边accent bar的卡片
+   ======================================== */
+
+/* Underline shape for depth-1 */
 .mindmap-node.depth-1.shape-underline {
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 650;
     background: transparent;
     border: none;
-    border-bottom: 3px solid var(--branch-color, #cbd5e1);
+    border-bottom: 2.5px solid var(--branch-color, #6366f1);
     border-radius: 0;
-    padding: 6px 12px;
-    min-width: 100px;
+    padding: 6px 14px 8px 14px;
+    min-width: 90px;
     box-shadow: none;
-    color: #1e293b;
-    position: relative;
-    /* Adding subtle gradient highlight on hover */
-    background-image: linear-gradient(to top, rgba(248, 250, 252, 0.0) 0%, transparent 100%);
+    color: #0f172a;
 }
 
-.mindmap-node.depth-1.shape-underline:hover { 
-    background: rgba(248, 250, 252, 0.8); 
-    border-bottom-color: var(--branch-color, #818cf8);
-}
-.mindmap-node.depth-1.shape-underline.selected { 
-    background: rgba(241, 245, 249, 0.9); 
+.mindmap-node.depth-1.shape-underline:hover {
+    background: color-mix(in srgb, var(--branch-color, #6366f1) 6%, transparent);
+    border-bottom-color: var(--branch-color, #6366f1);
+    border-bottom-width: 3px;
 }
 
-/* 叶子节点样式 (Subtopics) - Delicate Underline */
+.mindmap-node.depth-1.shape-underline.selected {
+    background: color-mix(in srgb, var(--branch-color, #6366f1) 8%, white);
+    box-shadow: none;
+}
+
+/* Pill / Box shapes — depth-1 */
+.mindmap-node.depth-1.shape-pill,
+.mindmap-node.depth-1.shape-box {
+    font-size: 15px;
+    font-weight: 650;
+}
+
+/* ========================================
+   二级及以下 — 细腻的下划线 or 卡片
+   ======================================== */
 .mindmap-node.shape-underline[class*="depth-"]:not(.depth-0):not(.depth-1) {
-    font-size: 14px;
-    font-weight: 400;
+    font-size: 13.5px;
+    font-weight: 450;
     background: transparent;
     border: none;
     border-bottom: 2px solid var(--branch-color, #cbd5e1);
     border-radius: 0;
-    padding: 4px 10px;
-    min-width: 80px;
+    padding: 4px 10px 6px 10px;
+    min-width: 70px;
     box-shadow: none;
-    color: #475569;
-    transition: all 0.2s ease;
+    color: #334155;
+    transition: all 0.18s ease;
 }
 
 .mindmap-node.shape-underline[class*="depth-"]:not(.depth-0):not(.depth-1):hover {
-    background: rgba(248, 250, 252, 0.6);
-    color: #1e293b;
+    background: color-mix(in srgb, var(--branch-color, #6366f1) 5%, transparent);
+    color: #0f172a;
+    border-bottom-color: var(--branch-color, #818cf8);
+    border-bottom-width: 2.5px;
 }
 
 .mindmap-node.shape-underline[class*="depth-"]:not(.depth-0):not(.depth-1).selected {
-    background: rgba(241, 245, 249, 0.8);
+    background: color-mix(in srgb, var(--branch-color, #6366f1) 7%, white);
     color: #0f172a;
     box-shadow: none;
 }
 
-/* Custom Shapes */
+/* ========================================
+   Pill Shape — 所有深度
+   ======================================== */
 .mindmap-node.shape-pill[class*="depth-"]:not(.depth-0) {
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 500;
-    background: #ffffff;
-    border: 2px solid var(--branch-color, #cbd5e1);
-    border-radius: 20px;
-    padding: 6px 16px;
+    background: color-mix(in srgb, var(--branch-color, #6366f1) 8%, white);
+    border: 1.5px solid color-mix(in srgb, var(--branch-color, #6366f1) 40%, transparent);
+    border-radius: 999px;
+    padding: 6px 18px;
     min-width: 80px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.03);
+    color: color-mix(in srgb, var(--branch-color, #4338ca) 80%, #0f172a);
 }
-.mindmap-node.shape-pill[class*="depth-"]:not(.depth-0):hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); transform: translateY(-1px); }
-.mindmap-node.shape-pill[class*="depth-"]:not(.depth-0).selected { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(0,0,0,0.05); }
 
+.mindmap-node.shape-pill[class*="depth-"]:not(.depth-0):hover {
+    background: color-mix(in srgb, var(--branch-color, #6366f1) 14%, white);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+}
+
+.mindmap-node.shape-pill[class*="depth-"]:not(.depth-0).selected {
+    box-shadow:
+        0 0 0 2.5px white,
+        0 0 0 4.5px var(--branch-color, #6366f1),
+        0 4px 14px rgba(0,0,0,0.08);
+}
+
+/* ========================================
+   Box Shape — 所有深度
+   ======================================== */
 .mindmap-node.shape-box[class*="depth-"]:not(.depth-0) {
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 500;
-    background: #ffffff;
-    border: 2px solid var(--branch-color, #cbd5e1);
-    border-radius: 6px;
-    padding: 8px 16px;
-    min-width: 80px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-}
-.mindmap-node.shape-box[class*="depth-"]:not(.depth-0):hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); transform: translateY(-1px); }
-.mindmap-node.shape-box[class*="depth-"]:not(.depth-0).selected { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(0,0,0,0.05); }
-
-/* Toolbar styles */
-.mindmap-toolbar {
-    display: flex;
-    gap: 4px;
-    padding: 4px;
-    background: #fff;
-    border: 1px solid #e2e8f0;
+    background: white;
+    border: 1.5px solid color-mix(in srgb, var(--branch-color, #6366f1) 35%, #e2e8f0);
+    border-left: 3.5px solid var(--branch-color, #6366f1);
     border-radius: 8px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    padding: 7px 14px;
+    min-width: 80px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    color: #1e293b;
 }
 
-.mindmap-toolbar-btn {
-    background: transparent;
-    border: none;
-    padding: 6px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    color: #475569;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.mindmap-node.shape-box[class*="depth-"]:not(.depth-0):hover {
+    box-shadow: 0 6px 20px rgba(0,0,0,0.09);
+    transform: translateY(-1px);
 }
 
-.mindmap-toolbar-btn:hover {
-    background: #f1f5f9;
-    color: #0f172a;
-}
-.mindmap-toolbar-btn.active {
-    background: #eef2ff;
-    color: #4f46e5;
+.mindmap-node.shape-box[class*="depth-"]:not(.depth-0).selected {
+    box-shadow:
+        0 0 0 2.5px white,
+        0 0 0 4.5px var(--branch-color, #6366f1),
+        0 4px 14px rgba(0,0,0,0.07);
 }
 
-/* ---- Handles ---- */
+/* ========================================
+   通用选中状态
+   ======================================== */
+.mindmap-node.selected:not(.depth-0) {
+    outline: none;
+}
+
+/* ========================================
+   Handles
+   ======================================== */
 .mindmap-handle {
-    width: 6px !important;
-    height: 6px !important;
-    background: #cbd5e1 !important;
-    border: none !important;
+    width: 8px !important;
+    height: 8px !important;
+    background: #fff !important;
+    border: 2px solid var(--branch-color, #94a3b8) !important;
     opacity: 0;
-    transition: opacity 0.2s;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    z-index: 10;
 }
 
-.mindmap-node:hover .mindmap-handle {
+.mindmap-node:hover .mindmap-handle,
+.mindmap-node.selected .mindmap-handle {
     opacity: 1;
 }
 
-/* ---- MindMap Collapse Toggle ---- */
+.mindmap-handle:hover {
+    width: 12px !important;
+    height: 12px !important;
+    background: var(--branch-color, #6366f1) !important;
+    border-color: #fff !important;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4) !important;
+    cursor: crosshair !important;
+}
+
+/* ========================================
+   折叠/展开 Toggle 按钮 — Premium Style
+   ======================================== */
 .mindmap-collapse-toggle {
     position: absolute;
-    width: 18px;
-    height: 18px;
-    background: #ffffff;
+    width: 20px;
+    height: 20px;
+    background: white;
     border: 1.5px solid var(--branch-color, #6366f1);
     border-radius: 50%;
     display: flex;
@@ -191,37 +232,58 @@
     cursor: pointer;
     z-index: 100;
     color: var(--branch-color, #6366f1);
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Spring back */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08), 0 0 0 2px white;
 }
 
-.mindmap-collapse-toggle:hover {
-    transform: scale(1.2) translateY(var(--tw-translate-y, 0));
+.mindmap-collapse-toggle.dir-right:hover {
+    transform: translateY(-50%) scale(1.22);
     background: var(--branch-color, #6366f1);
     color: #ffffff;
-    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 2px white;
+}
+
+.mindmap-collapse-toggle.dir-left:hover {
+    transform: translateY(-50%) scale(1.22);
+    background: var(--branch-color, #6366f1);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 2px white;
+}
+
+.mindmap-collapse-toggle.dir-TB:hover {
+    transform: translateX(-50%) scale(1.22);
+    background: var(--branch-color, #6366f1);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 2px white;
+}
+
+.mindmap-collapse-toggle.dir-BT:hover {
+    transform: translateX(-50%) scale(1.22);
+    background: var(--branch-color, #6366f1);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 2px white;
 }
 
 .mindmap-collapse-toggle.dir-right {
-    right: -24px;
+    right: -26px;
     top: 50%;
     transform: translateY(-50%);
 }
 
 .mindmap-collapse-toggle.dir-left {
-    left: -24px;
+    left: -26px;
     top: 50%;
     transform: translateY(-50%);
 }
 
 .mindmap-collapse-toggle.dir-TB {
-    bottom: -24px;
+    bottom: -26px;
     left: 50%;
     transform: translateX(-50%);
 }
 
 .mindmap-collapse-toggle.dir-BT {
-    top: -24px;
+    top: -26px;
     left: 50%;
     transform: translateX(-50%);
 }
@@ -229,36 +291,40 @@
 .mindmap-node.collapsed .mindmap-collapse-toggle {
     background: var(--branch-color, #6366f1);
     color: #ffffff;
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--branch-color, #6366f1) 40%, transparent);
 }
 
 .mindmap-collapse-count {
     font-size: 10px;
     font-weight: 800;
+    line-height: 1;
 }
 
-/* ---- Unified Tool Island ---- */
+/* ========================================
+   Tool Island (Legacy - kept for compat)
+   ======================================== */
 .mindmap-tool-island {
     position: absolute;
-    top: -48px;
+    top: -52px;
     left: 50%;
     transform: translateX(-50%) translateY(8px) scale(0.95);
     display: flex;
     align-items: center;
     gap: 4px;
     padding: 6px 10px;
-    background: rgba(255, 255, 255, 0.85);
-    border: 1px solid rgba(226, 232, 240, 0.6);
-    border-radius: 9999px; /* Pill shape */
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0,0,0,0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 9999px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0,0,0,0.06), inset 0 0 0 1px rgba(255,255,255,0.6);
     opacity: 0;
     visibility: hidden;
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     z-index: 50;
     pointer-events: none;
-    backdrop-filter: blur(16px) saturate(1.5);
-    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+    backdrop-filter: blur(20px) saturate(1.8);
+    -webkit-backdrop-filter: blur(20px) saturate(1.8);
 }
 
 .mindmap-node:hover .mindmap-tool-island,
@@ -269,23 +335,13 @@
     pointer-events: all;
 }
 
-/* Tool Island internal divider */
-.mindmap-tool-island .divider {
-    width: 1px;
-    height: 14px;
-    background: #cbd5e1;
-    margin: 0 4px;
-    border-radius: 1px;
-}
-
-/* Base button for tool island */
 .mindmap-island-btn {
     background: transparent;
     border: none;
-    padding: 6px;
+    padding: 5px;
     border-radius: 50%;
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     cursor: pointer;
     font-size: 13px;
     color: #64748b;
@@ -296,32 +352,14 @@
 }
 
 .mindmap-island-btn:hover {
-    background: rgba(241, 245, 249, 0.8);
+    background: rgba(241, 245, 249, 0.9);
     color: #0f172a;
-    transform: scale(1.05);
+    transform: scale(1.1);
 }
 
-.mindmap-island-btn.active {
-    background: #eef2ff;
-    color: #4f46e5;
-    box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.2);
-}
-
-.mindmap-island-btn.primary {
-    color: var(--branch-color, #6366f1);
-    background: rgba(99, 102, 241, 0.05);
-}
-.mindmap-island-btn.primary:hover {
-    background: var(--branch-color, #6366f1);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.mindmap-island-btn .collapse-count {
-    font-size: 11px;
-    font-weight: 700;
-}
-/* ---- Inline Editing ---- */
+/* ========================================
+   Inline Editing
+   ======================================== */
 .mindmap-inline-input {
     background: transparent;
     border: none;
@@ -333,79 +371,80 @@
     text-align: center;
     width: 100%;
     min-width: 60px;
+    max-width: 280px;
     padding: 0;
     margin: 0;
+    caret-color: var(--branch-color, #6366f1);
+}
+
+/* 根节点编辑时 */
+.depth-0 .mindmap-inline-input {
+    color: white;
+    caret-color: rgba(255, 255, 255, 0.9);
 }
 
 .mindmap-inline-input::selection {
-    background: rgba(99, 102, 241, 0.3);
+    background: rgba(99, 102, 241, 0.25);
 }
 
-/* ---- Magnetic Drop Indicators ---- */
-.drop-target-highlight .mindmap-node {
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5), 0 8px 16px rgba(0, 0, 0, 0.1);
-    background: #eff6ff !important;
+/* ========================================
+   Layout Transition (React Flow wrapper)
+   ======================================== */
+.react-flow__node-mindmap:not(.dragging) {
+    transition: transform 0.32s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease;
 }
 
-.drop-above::before, .drop-below::after {
-    content: "";
-    position: absolute;
-    left: -10px;
-    right: -10px;
-    height: 3px;
-    background: #3b82f6;
-    border-radius: 4px;
-    box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
-    z-index: 100;
-    pointer-events: none;
+/* ========================================
+   Drag & Drop Indicators
+   ======================================== */
+.react-flow__node-mindmap.drop-target-highlight .mindmap-node {
+    outline: 2px solid #22c55e;
+    outline-offset: 3px;
+    background: rgba(240, 253, 244, 0.8);
 }
 
-.drop-above::before {
-    top: -8px;
+.react-flow__node-mindmap.drop-above .mindmap-node {
+    outline: none;
+    box-shadow: 0 -4px 0 0 #22c55e;
 }
 
-.drop-below::after {
-    bottom: -8px;
+.react-flow__node-mindmap.drop-below .mindmap-node {
+    outline: none;
+    box-shadow: 0 4px 0 0 #22c55e;
 }
 
-/* Insertion Line Caps */
-.drop-above::after, .drop-below::before {
-    display: none; /* Hide conflicting defaults if any */
+/* ========================================
+   Relationship Handles (关联线把手)
+   ======================================== */
+.mindmap-node .mindmap-relationship-handle {
+    width: 14px;
+    height: 14px;
+    background: #ec4899;
+    border: 2.5px solid #fff;
+    opacity: 0;
+    transition: all 0.2s;
+    border-radius: 50%;
+    z-index: 20;
+    box-shadow: 0 2px 6px rgba(236, 72, 153, 0.35);
 }
 
-/* Add dots at the end of the insertion line for a premium look */
-.drop-above::before, .drop-below::after {
-    background-image: radial-gradient(circle at 2px center, #3b82f6 2px, transparent 2px),
-                      radial-gradient(circle at calc(100% - 2px) center, #3b82f6 2px, transparent 2px);
+.mindmap-node:hover .mindmap-relationship-handle {
+    opacity: 0.7;
 }
 
-.drop-inside .mindmap-node {
-    border: 2px solid #3b82f6 !important;
-    background: #f0f9ff !important;
+.mindmap-node .mindmap-relationship-handle:hover {
+    opacity: 1;
+    transform: scale(1.25);
+    box-shadow: 0 4px 12px rgba(236, 72, 153, 0.45);
 }
 
-.relationship-hint {
-    animation: pulse-relationship 1s infinite alternate;
-}
-
-@keyframes pulse-relationship {
-    0% { box-shadow: 0 0 0 0px rgba(244, 63, 94, 0.4); }
-    100% { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); }
-}
-
-@keyframes pulse-drop {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-}
-
-/* ====================================================================
-   3. Rich Content (Phase 3)
-   ==================================================================== */
-
+/* ========================================
+   Rich Content — Images, Icons, Notes, Tags
+   ======================================== */
 .mindmap-image-wrapper {
     width: 100%;
     margin-bottom: 8px;
-    border-radius: 4px;
+    border-radius: 6px;
     overflow: hidden;
     display: flex;
     justify-content: center;
@@ -422,6 +461,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    justify-content: center;
 }
 
 .mindmap-icon {
@@ -434,97 +474,50 @@
 .mindmap-rich-footer {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
     margin-top: 6px;
     width: 100%;
 }
 
 .mindmap-note {
     font-size: 11px;
-    color: #8c8c8c;
-    line-height: 1.4;
-    max-width: 180px;
+    color: #94a3b8;
+    line-height: 1.45;
+    max-width: 200px;
     white-space: pre-wrap;
     word-break: break-word;
-    background: rgba(0, 0, 0, 0.02);
-    padding: 4px 6px;
+    background: rgba(0, 0, 0, 0.025);
+    padding: 4px 7px;
     border-radius: 4px;
-    border-left: 2px solid var(--branch-color, #d9d9d9);
+    border-left: 2px solid var(--branch-color, #cbd5e1);
 }
 
 .mindmap-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 3px;
 }
 
 .mindmap-tag {
     font-size: 10px;
-    color: #595959;
-    background: #f0f0f0;
-    padding: 2px 6px;
+    color: color-mix(in srgb, var(--branch-color, #6366f1) 70%, #334155);
+    background: color-mix(in srgb, var(--branch-color, #6366f1) 8%, white);
+    padding: 2px 7px;
     border-radius: 10px;
-    border: 1px solid #d9d9d9;
+    border: 1px solid color-mix(in srgb, var(--branch-color, #6366f1) 20%, transparent);
     white-space: nowrap;
+    font-weight: 500;
+    transition: all 0.15s ease;
 }
 
-/* Hover effects for tags */
 .mindmap-node:hover .mindmap-tag {
-    background: #e6f7ff;
-    border-color: #91d5ff;
-    color: #1890ff;
+    background: color-mix(in srgb, var(--branch-color, #6366f1) 14%, white);
+    border-color: color-mix(in srgb, var(--branch-color, #6366f1) 30%, transparent);
 }
 
-/* ---- Layout Transition ---- */
-/* Apply smooth transitions to React Flow's wrapper div. Ignore when user is actively dragging. */
-.react-flow__node-mindmap:not(.dragging) {
-    transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease;
-}
-
-/* ---- Drag & Drop Indicators (Phase 4) ---- */
-.react-flow__node-mindmap.drop-target-highlight .mindmap-node {
-    /* Base highlight for 'inside' (reparenting as child) */
-    outline: 2px solid #52c41a;
-    outline-offset: 2px;
-    background: #f6ffed;
-}
-
-.react-flow__node-mindmap.drop-above .mindmap-node {
-    outline: none;
-    box-shadow: 0 -4px 0 0 #52c41a;
-    background: #ffffff;
-}
-
-.react-flow__node-mindmap.drop-below .mindmap-node {
-    outline: none;
-    box-shadow: 0 4px 0 0 #52c41a;
-    background: #ffffff;
-}
-
-/* ---- Relationship Handles ---- */
-.mindmap-node .mindmap-relationship-handle {
-    width: 14px;
-    height: 14px;
-    background: #f43f5e;
-    border: 3px solid #fff;
-    opacity: 0;
-    transition: all 0.2s;
-    border-radius: 50%;
-    z-index: 20;
-}
-
-.mindmap-node:hover .mindmap-relationship-handle {
-    opacity: 0.8;
-}
-
-.mindmap-node .mindmap-relationship-handle:hover {
-    opacity: 1;
-    transform: scale(1.2);
-}
-
-/* ====================================================================
+/* ========================================
    T-3: URL Link Icon
-   ==================================================================== */
+   ======================================== */
 .mindmap-url-icon {
     display: inline-flex;
     align-items: center;
@@ -545,13 +538,13 @@
 
 .mindmap-url-icon:hover {
     opacity: 1 !important;
-    transform: scale(1.15);
-    background: rgba(99, 102, 241, 0.08);
+    transform: scale(1.2);
+    background: rgba(99, 102, 241, 0.1);
 }
 
-/* ====================================================================
+/* ========================================
    T-4: Priority Badge
-   ==================================================================== */
+   ======================================== */
 .mindmap-priority-badge {
     position: absolute;
     top: -6px;
@@ -567,39 +560,25 @@
     pointer-events: none;
     z-index: 10;
     letter-spacing: 0;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    box-shadow: 0 1px 5px rgba(0,0,0,0.18);
     border: 1.5px solid #fff;
     transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .mindmap-node:hover .mindmap-priority-badge {
-    transform: scale(1.1);
+    transform: scale(1.15);
 }
 
-/* Low priority — blue */
-.mindmap-priority-badge.priority-1 {
-    background: #2563eb;
-    color: #fff;
-}
+.mindmap-priority-badge.priority-1 { background: #3b82f6; color: #fff; }
+.mindmap-priority-badge.priority-2 { background: #f59e0b; color: #fff; }
+.mindmap-priority-badge.priority-3 { background: #ef4444; color: #fff; }
 
-/* Medium priority — amber/orange */
-.mindmap-priority-badge.priority-2 {
-    background: #f59e0b;
-    color: #fff;
-}
-
-/* High priority — red */
-.mindmap-priority-badge.priority-3 {
-    background: #ef4444;
-    color: #fff;
-}
-
-/* ====================================================================
+/* ========================================
    T-5: Progress Ring
-   ==================================================================== */
+   ======================================== */
 .mindmap-progress-ring {
     position: absolute;
-    bottom: -10px;
+    bottom: -11px;
     left: 50%;
     transform: translateX(-50%);
     display: inline-flex;
@@ -612,5 +591,54 @@
 }
 
 .mindmap-node:hover .mindmap-progress-ring {
-    transform: translateX(-50%) scale(1.15);
+    transform: translateX(-50%) scale(1.18);
+}
+
+/* ========================================
+   Relationship pulse animation
+   ======================================== */
+.relationship-hint {
+    animation: pulse-relationship 1s infinite alternate;
+}
+
+@keyframes pulse-relationship {
+    0% { box-shadow: 0 0 0 0px rgba(236, 72, 153, 0.4); }
+    100% { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); }
+}
+
+/* ========================================
+   Summary Bracket (SVG overlay)
+   ======================================== */
+/* (rendered inline as SVG — no additional CSS needed) */
+
+/* ========================================
+   Toolbar (legacy - keep for compat)
+   ======================================== */
+.mindmap-toolbar {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.mindmap-toolbar-btn {
+    background: transparent;
+    border: none;
+    padding: 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #475569;
+    transition: all 0.18s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mindmap-toolbar-btn:hover {
+    background: #f1f5f9;
+    color: #0f172a;
 }

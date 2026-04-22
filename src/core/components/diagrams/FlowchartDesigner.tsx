@@ -748,7 +748,9 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
             if (nodeId) {
                 const node = nodesRef.current.find((n: Node) => n.id === nodeId);
                 if (node) {
-                    reactFlowInstance.setCenter(node.position.x + (node.measured?.width || 100) / 2, node.position.y + (node.measured?.height || 50) / 2, { duration: 800, zoom: 1.2 });
+                    const currentZoom = reactFlowInstance.getZoom();
+                    const targetZoom = e.detail.preserveZoom ? currentZoom : (e.detail.zoom || 1.2);
+                    reactFlowInstance.setCenter(node.position.x + (node.measured?.width || 100) / 2, node.position.y + (node.measured?.height || 50) / 2, { duration: 600, zoom: targetZoom });
                     setSelectedNodes(nodesRef.current.filter(n => n.id === nodeId));
                     setSelectedEdges([]);
                 }
@@ -760,7 +762,9 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                     if (sourceNode && targetNode) {
                         const midX = (sourceNode.position.x + targetNode.position.x) / 2;
                         const midY = (sourceNode.position.y + targetNode.position.y) / 2;
-                        reactFlowInstance.setCenter(midX, midY, { duration: 800, zoom: 1.2 });
+                        const currentZoom = reactFlowInstance.getZoom();
+                        const targetZoom = e.detail.preserveZoom ? currentZoom : (e.detail.zoom || 1.2);
+                        reactFlowInstance.setCenter(midX, midY, { duration: 600, zoom: targetZoom });
                         setSelectedEdges(edgesRef.current.filter(e => e.id === edgeId));
                         setSelectedNodes([]);
                     }

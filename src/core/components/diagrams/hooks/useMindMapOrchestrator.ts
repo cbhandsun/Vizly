@@ -5,7 +5,8 @@ import { useRef } from 'react';
 import { parseIndentedText } from '../../../utils/textTreeParser';
 import { appMessage } from '../../../utils/antdStaticBridge';
 
-export const PALETTE = ['#f43f5e', '#f97316', '#eab308', '#10b981', '#0ea5e9', '#6366f1', '#d946ef'];
+// XMind-inspired premium palette: vibrant yet harmonious branch colors
+export const PALETTE = ['#e85d4a', '#f0872a', '#c27af5', '#2dd4bf', '#3b82f6', '#f59e0b', '#10b981'];
 
 // ─── T-1: Module-level mindmap clipboard (subtree copy/paste) ───────────────
 // Stored at module scope so it persists across renders without triggering re-renders.
@@ -88,13 +89,20 @@ export function useMindMapOrchestrator(
         }
         const currentSignature = `${structHashParts.join('|')}#${edgeHashParts.join('|')}`;
 
-        // Check if any root properties changed
-        const rootNodes = nodes.filter(n => n.type === 'mindmap' && n.data?.depth === 0);
+        // Check if any root properties changed (including branchColor changes propagated from children)
+        const rootNodes = nodes.filter(n => n.type === 'mindmap' && (n.data?.depth === 0 || (n.data?.depth === undefined && n.data?.direction !== undefined)));
         const rootDataParts: string[] = [];
         for (const root of rootNodes) {
              rootDataParts.push(`${root.id}:${root.data?.direction || 'LR'}:${root.data?.pathStyle || 'bezier'}:${root.data?.shape || 'pill'}`);
         }
-        const rootSignature = rootDataParts.join('|');
+        // Also watch branchColor on ALL mindmap nodes (color picker changes must trigger re-render)
+        const colorSigParts: string[] = [];
+        for (const n of nodes) {
+            if (n.type === 'mindmap' && n.data?.branchColor) {
+                colorSigParts.push(`${n.id}:${n.data.branchColor}`);
+            }
+        }
+        const rootSignature = rootDataParts.join('|') + '#C#' + colorSigParts.join('|');
         const finalSignature = `${currentSignature}##${rootSignature}`;
 
         if (prevRootDataRef.current['__global_sig__'] === finalSignature) {
@@ -957,11 +965,56 @@ export function useMindMapOrchestrator(
 
     }, [nodes, edges, setNodes, takeSnapshot]);
 
-
     useEffect(() => {
         window.addEventListener('mindmap:toggle-collapse', handleToggleCollapse);
         return () => window.removeEventListener('mindmap:toggle-collapse', handleToggleCollapse);
     }, [handleToggleCollapse]);
+
+    // ── Collapse ALL non-root nodes ────────────────────────────────────────────
+    const handleCollapseAll = useCallback(() => {
+        takeSnapshot();
+        setNodes(currentNodes => {
+            const edgeChildMap = new Map<string, string[]>();
+            edges.forEach(e => {
+                if (e.type === 'relationshipEdge') return;
+                if (!edgeChildMap.has(e.source)) edgeChildMap.set(e.source, []);
+                edgeChildMap.get(e.source)!.push(e.target);
+            });
+
+            // Only collapse depth-1 nodes (direct children of root) — collapses whole subtrees
+            return currentNodes.map(n => {
+                if (n.type !== 'mindmap') return n;
+                const d = n.data?.depth as number | undefined;
+                const isRoot = d === 0 || (d === undefined && n.data?.direction !== undefined);
+                if (isRoot) return n;
+                const hasKids = (edgeChildMap.get(n.id) || []).length > 0;
+                if (!hasKids) return n;
+                return { ...n, data: { ...n.data, collapsed: true } };
+            });
+        });
+    }, [edges, setNodes, takeSnapshot]);
+
+    // ── Expand ALL nodes ───────────────────────────────────────────────────────
+    const handleExpandAll = useCallback(() => {
+        takeSnapshot();
+        setNodes(currentNodes =>
+            currentNodes.map(n => {
+                if (n.type !== 'mindmap') return n;
+                if (!n.data?.collapsed) return n;
+                return { ...n, data: { ...n.data, collapsed: false }, hidden: false };
+            })
+        );
+    }, [setNodes, takeSnapshot]);
+
+    useEffect(() => {
+        window.addEventListener('mindmap:collapseAll', handleCollapseAll);
+        window.addEventListener('mindmap:expandAll', handleExpandAll);
+        return () => {
+            window.removeEventListener('mindmap:collapseAll', handleCollapseAll);
+            window.removeEventListener('mindmap:expandAll', handleExpandAll);
+        };
+    }, [handleCollapseAll, handleExpandAll]);
+
 
 
     const handleReparent = useCallback((e: Event) => {
@@ -1169,7 +1222,7 @@ export function useMindMapOrchestrator(
             type: 'mindmap-boundary',
             position: { x: 0, y: 0 }, // Will be calculated by orchestrator
             data: {
-                targetSubtreeIds: nodeIds,
+                targetSubtreeId: nodeIds[0],
                 label: '逻辑外框',
                 width: 100,
                 height: 100,

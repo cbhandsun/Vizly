@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { Tree, Empty, Input } from 'antd';
 import { PluginContext } from '../../../types/plugin';
 import type { DataNode } from 'antd/es/tree';
+import { SearchOutlined } from '@ant-design/icons';
 
 // [T-6] Inline-editable tree node title
 // Double-click switches to an input; Enter/Blur commits the edit back to canvas.
@@ -69,6 +70,11 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
     const nodes = getNodes();
     const edges = getEdges();
 
+    // [Search] Filter state
+    const [searchText, setSearchText] = useState('');
+    const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
+    const [autoExpandParent, setAutoExpandParent] = useState(true);
+
     // [T-6] Inline edit state
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingValue, setEditingValue] = useState('');
@@ -103,6 +109,46 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
         setEditingValue('');
     }, []);
 
+    // [Search] Build flat list of all (nodeId, label) for search matching
+    const allNodeLabels = useMemo(() => {
+        return nodes
+            .filter((n: any) => n.type === 'mindmap')
+            .map((n: any) => ({
+                id: n.id,
+                label: ((n.data?.label as string) || '').replace(/<[^>]+>/g, '').trim()
+            }));
+    }, [nodes]);
+
+    // When search text changes, expand all ancestor paths of matching nodes
+    const handleSearch = useCallback((value: string) => {
+        setSearchText(value);
+        if (!value.trim()) {
+            setExpandedKeys([]);
+            setAutoExpandParent(false);
+            return;
+        }
+
+        // Build parent map
+        const parentMap = new Map<string, string>();
+        edges.forEach((e: any) => { if (e.type !== 'relationshipEdge') parentMap.set(e.target, e.source); });
+
+        const matched = allNodeLabels
+            .filter(n => n.label.toLowerCase().includes(value.toLowerCase()))
+            .map(n => n.id);
+
+        // Collect all ancestors of matched nodes
+        const keysToExpand = new Set<string>();
+        matched.forEach(id => {
+            let cur = parentMap.get(id);
+            while (cur) {
+                keysToExpand.add(cur);
+                cur = parentMap.get(cur);
+            }
+        });
+        setExpandedKeys(Array.from(keysToExpand));
+        setAutoExpandParent(true);
+    }, [allNodeLabels, edges]);
+
     const treeData = useMemo((): DataNode[] => {
         const roots = nodes.filter((n: any) => n.type === 'mindmap' && n.data?.depth === 0);
         if (roots.length === 0) return [];
@@ -123,34 +169,41 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
             const rawTitle = (node?.data?.label as string) || 'Untitled';
             const cleanLabel = rawTitle.replace(/<[^>]+>/g, '').trim() || 'Untitled';
 
-            const childrenIds = (childrenMap.get(nodeId) || []).sort((a: string, b: string) => {
+        const childrenIds = (childrenMap.get(nodeId) || []).sort((a: string, b: string) => {
                 const na = nodeMap.get(a) as any;
                 const nb = nodeMap.get(b) as any;
                 return (na?.position?.y ?? 0) - (nb?.position?.y ?? 0);
             });
 
+            // [Search] Highlight matching text
+            const isMatched = searchText.trim() && cleanLabel.toLowerCase().includes(searchText.toLowerCase());
+            const titleEl = (
+                <EditableTitle
+                    nodeId={nodeId}
+                    label={cleanLabel}
+                    editingId={editingId}
+                    editingValue={editingValue}
+                    onStartEdit={startEdit}
+                    onChangeValue={setEditingValue}
+                    onCommit={commitEdit}
+                    onCancel={cancelEdit}
+                />
+            );
+
             return {
-                // [T-6] Custom title renders an editable input on double-click
-                title: (
-                    <EditableTitle
-                        nodeId={nodeId}
-                        label={cleanLabel}
-                        editingId={editingId}
-                        editingValue={editingValue}
-                        onStartEdit={startEdit}
-                        onChangeValue={setEditingValue}
-                        onCommit={commitEdit}
-                        onCancel={cancelEdit}
-                    />
-                ),
+                title: isMatched ? (
+                    <span style={{ background: 'rgba(99,102,241,0.15)', borderRadius: 3, padding: '0 2px' }}>
+                        {titleEl}
+                    </span>
+                ) : titleEl,
                 key: nodeId,
                 children: childrenIds.map((childId: string) => buildNode(childId))
             };
         };
 
         return roots.map((root: any) => buildNode(root.id));
-    // editingId/editingValue are included so title renders update when edit mode changes
-    }, [nodes, edges, editingId, editingValue, startEdit, commitEdit, cancelEdit]);
+    // editingId/editingValue/searchText are included so title renders update when edit/search mode changes
+    }, [nodes, edges, editingId, editingValue, searchText, startEdit, commitEdit, cancelEdit]);
 
     if (treeData.length === 0) {
         return <Empty description="暂无导图节点" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
@@ -178,18 +231,36 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
     }, [nodes]);
 
     return (
-        <div style={{ padding: '12px 8px', height: '100%', overflowY: 'auto' }}>
+        <div style={{ padding: '12px 8px', height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {/* [Search] Search bar */}
+            <div style={{ marginBottom: 10, paddingLeft: 4, paddingRight: 4 }}>
+                <Input
+                    size="small"
+                    placeholder="搜索节点..."
+                    prefix={<SearchOutlined style={{ color: '#94a3b8', fontSize: 12 }} />}
+                    value={searchText}
+                    onChange={e => handleSearch(e.target.value)}
+                    allowClear
+                    onClear={() => handleSearch('')}
+                    style={{ borderRadius: 8 }}
+                />
+            </div>
             <div style={{ marginBottom: 8, fontSize: 11, color: '#94a3b8', paddingLeft: 4 }}>
                 💡 双击节点名称可直接编辑
             </div>
-            <Tree
-                showLine={{ showLeafIcon: false }}
-                defaultExpandAll
-                treeData={treeData}
-                onSelect={onSelect}
-                selectedKeys={selectedKeys}
-                blockNode
-            />
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+                <Tree
+                    showLine={{ showLeafIcon: false }}
+                    defaultExpandAll={!searchText}
+                    expandedKeys={searchText ? expandedKeys : undefined}
+                    autoExpandParent={autoExpandParent}
+                    onExpand={(keys) => { setExpandedKeys(keys as string[]); setAutoExpandParent(false); }}
+                    treeData={treeData}
+                    onSelect={onSelect}
+                    selectedKeys={selectedKeys}
+                    blockNode
+                />
+            </div>
         </div>
     );
 };

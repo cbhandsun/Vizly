@@ -108,8 +108,12 @@ export const MindMapEdge = ({
     }
 
     // We strictly DO NOT pass markerEnd to BaseEdge to ensure NO arrowheads.
-    const pathStyle = (sourceNode?.data?.pathStyle as string) || 'bezier';
-    const branchColor = (sourceNode?.data?.branchColor as string) || '#ccc';
+    const pathStyle = (sourceNode?.data?.pathStyle as string) || (targetNode?.data?.pathStyle as string) || 'bezier';
+    // Branch color: prefer TARGET node (the branch color belongs to the destination branch)
+    // Fallback to source node's color, then to a neutral gray
+    const branchColor = (targetNode?.data?.branchColor as string) 
+        || (sourceNode?.data?.branchColor as string) 
+        || '#94a3b8';
     const depth = (sourceNode?.data?.depth as number) || 0;
     const isMainBranch = depth === 0;
 
@@ -146,8 +150,11 @@ export const MindMapEdge = ({
         });
     }
 
-    // Weighted Strokes for hierarchy awareness
-    const strokeWidth = isMainBranch ? 3.5 : 2;
+    // XMind-style weighted strokes: root branches thicker, leaf branches thinner
+    // depth 0->1: 4px, depth 1->2: 2.5px, depth 2+: 1.8px
+    const strokeWidth = isMainBranch ? 4 : depth === 1 ? 2.5 : 1.8;
+    // Opacity also decreases slightly at deep levels for visual hierarchy
+    const opacity = isMainBranch ? 1 : depth <= 1 ? 0.92 : 0.82;
 
     return (
         <BaseEdge 
@@ -160,9 +167,11 @@ export const MindMapEdge = ({
                  strokeLinecap: 'round',
                  strokeLinejoin: 'round',
                  strokeDasharray: 'none',
-                 transition: 'stroke 0.3s ease, stroke-width 0.3s ease',
-                 filter: isMainBranch ? 'drop-shadow(0px 1px 2px rgba(0,0,0,0.1))' : 'none',
-                 opacity: 0.9,
+                 transition: 'stroke 0.3s ease, stroke-width 0.3s ease, opacity 0.3s ease',
+                 filter: isMainBranch
+                    ? `drop-shadow(0 2px 4px ${branchColor}60)`
+                    : depth === 1 ? `drop-shadow(0 1px 3px ${branchColor}40)` : 'none',
+                 opacity,
             }} 
         />
     );
