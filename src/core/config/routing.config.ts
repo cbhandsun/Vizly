@@ -77,16 +77,16 @@ export const FAST_PRESET: UnifiedRoutingConfig = {
         enableSimplification: true,
         enableNudge: false,
         enableOrthogonalization: true,
-        borderRadius: 10,
-        minFirstSegment: 20,
-        minLastSegment: 20,
+        borderRadius: 16,
+        minFirstSegment: 40,
+        minLastSegment: 40,
         redundantBendThreshold: 60,
         finalRedundantBendThreshold: 15,
         nudgeSpacing: 6,
         nudgeSearchLimit: 120
     },
     offsets: {
-        source: 20,
+        source: 30,
         target: 30
     },
     debug: true
@@ -151,16 +151,16 @@ export const QUALITY_PRESET: UnifiedRoutingConfig = {
         enableSimplification: true,
         enableNudge: true,
         enableOrthogonalization: true,
-        borderRadius: 25,
-        minFirstSegment: 30,
-        minLastSegment: 35,
+        borderRadius: 30,
+        minFirstSegment: 65,
+        minLastSegment: 70,
         redundantBendThreshold: 60,
         finalRedundantBendThreshold: 15,
         nudgeSpacing: 6,
         nudgeSearchLimit: 120
     },
     offsets: {
-        source: 30,
+        source: 40,
         target: 40
     },
     debug: true
@@ -200,12 +200,12 @@ export const COMPACT_PRESET: UnifiedRoutingConfig = mergeConfig(
         },
         bus: { spacing: 20 },
         postProcessing: {
-            borderRadius: 12,
+            borderRadius: 16,
             nudgeSpacing: 8,
-            minFirstSegment: 20,
-            minLastSegment: 20,
+            minFirstSegment: 38,
+            minLastSegment: 38,
         },
-        offsets: { source: 20, target: 20 },
+        offsets: { source: 25, target: 25 },
     }
 );
 
@@ -228,12 +228,12 @@ export const CLEAR_PRESET: UnifiedRoutingConfig = mergeConfig(
         },
         bus: { spacing: 40 },
         postProcessing: {
-            borderRadius: 24,
+            borderRadius: 28,
             nudgeSpacing: 18,
-            minFirstSegment: 40,
-            minLastSegment: 40,
+            minFirstSegment: 62,
+            minLastSegment: 62,
         },
-        offsets: { source: 40, target: 40 },
+        offsets: { source: 50, target: 50 },
     }
 );
 

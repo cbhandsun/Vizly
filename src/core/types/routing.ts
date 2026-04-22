@@ -225,22 +225,22 @@ export function createDefaultRoutingConfig(): UnifiedRoutingConfig {
         },
         postProcessing: {
             enableSimplification: true,
-            simplificationLevel: 'medium' as 'low' | 'medium' | 'high',     // [FIX] 中等简化强度
-            preserveObstacleAvoidance: true,   // [FIX] 保留避障路径
+            simplificationLevel: 'medium' as 'low' | 'medium' | 'high',
+            preserveObstacleAvoidance: true,
             enableNudge: true,
             enableOrthogonalization: true,
-            borderRadius: 16,  // [P2 优化] 调整倒角半径（原20）
-            minFirstSegment: 32, // [FIX] 独立首段最小长度，与 offsets.source 一致
-            minLastSegment: 35,  // [P2 优化] 增加最小末端线段长度（原30）
+            borderRadius: 20,  // [VISUAL] 提升圆角半径，让拐角更柔和
+            minFirstSegment: 45, // 必须 >= borderRadius * 2 + 5 才能完整渲染圆角
+            minLastSegment: 45,
             redundantBendThreshold: 60,
             finalRedundantBendThreshold: 15,
-            finalSimplificationThreshold: 30,  // [FIX] 最终简化阈值 (increased from 15)
-            nudgeSpacing: 12,  // [VISUAL] Increase vertical spacing between parallel edges (from 6)
+            finalSimplificationThreshold: 30,
+            nudgeSpacing: 12,
             nudgeSearchLimit: 120
         },
         offsets: {
-            source: 32,  // [P2 优化] 增大起点偏移（原25）
-            target: 32   // [P2 优化] 统一偏移量（原35）
+            source: 40,  // [VISUAL] 增大 stub 偏移，为圆角预留空间
+            target: 40
         },
         debug: true,
         experimental: {

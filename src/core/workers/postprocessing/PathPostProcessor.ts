@@ -19,7 +19,8 @@ import {
     createFilletedPath,
     ensureMinLastSegment,
     ensureMinFirstSegment,
-    removeTinyOrthogonalJogs
+    removeTinyOrthogonalJogs,
+    removeLargeBacktrack
 } from '../../algorithms/smartEdgeUtils';
 
 export interface PostProcessContext {
@@ -75,8 +76,10 @@ export class PathPostProcessor {
                 if (Math.abs(snapped[i].x - snapped[i + 1].x) < 1) snapped[i + 1].x = snapped[i].x;
                 if (Math.abs(snapped[i].y - snapped[i + 1].y) < 1) snapped[i + 1].y = snapped[i].y;
             }
-            const svgPath = createFilletedPath(snapped, this.config.postProcessing.borderRadius);
-            return { points: snapped, svgPath };
+            // [BACKTRACK-V2] Orthogonal-safe backtrack removal for trunk paths
+            const detracked = removeLargeBacktrack(snapped, obstacles, { sourcePos: startPos, targetPos: endPos });
+            const svgPath = createFilletedPath(detracked, this.config.postProcessing.borderRadius);
+            return { points: detracked, svgPath };
         }
 
         let finalPoints = [...points];
@@ -106,6 +109,11 @@ export class PathPostProcessor {
         // Phase 1: Simplification & Redundancy Removal
         const posOptions = { sourcePos: startPos, targetPos: endPos };
         finalPoints = simplifyPath(finalPoints, config.algorithm.gridSize * 2, obstacles, posOptions);
+        // [BACKTRACK-V2] Orthogonal-safe large backtrack removal.
+        // Only fires when: dominant direction is clear (≥2:1), backtrack ≥60px, AND
+        // corner is provably perpendicular to both incoming and outgoing segments.
+        // makePathOrthogonal (Phase 4) still runs after this as a safety net.
+        finalPoints = removeLargeBacktrack(finalPoints, obstacles, posOptions);
         finalPoints = collapseRedundantBends(finalPoints, obstacles, config.postProcessing.redundantBendThreshold, posOptions);
 
         // Phase 2: Cleanup (Jogs, Backtracks)
