@@ -33,6 +33,9 @@ import {
     BranchesOutlined,
     BarChartOutlined,
     SearchOutlined,
+    ZoomInOutlined,
+    ZoomOutOutlined,
+    PrinterOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import MindElixir from 'mind-elixir';
@@ -223,6 +226,54 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
         } catch (e) { console.error('JSON export failed:', e); }
     }, [mind]);
 
+    const handleExportPdf = useCallback(() => {
+        if (!mind) return;
+        // Use browser print API: hide everything except the mind-elixir container
+        const style = document.createElement('style');
+        style.id = 'me-print-style';
+        style.textContent = `
+            @media print {
+                body > * { display: none !important; }
+                #vizly-mind-elixir-root, #vizly-mind-elixir-root * { display: block !important; }
+                #vizly-mind-elixir-root {
+                    position: fixed !important;
+                    top: 0 !important; left: 0 !important;
+                    width: 100vw !important; height: 100vh !important;
+                    overflow: visible !important;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+        window.print();
+        setTimeout(() => style.remove(), 1000);
+    }, [mind]);
+
+    // ── Zoom controls ───────────────────────────────────────────────────────
+    const [zoomVal, setZoomVal] = useState(100);
+    useEffect(() => {
+        if (!mind) return;
+        const update = () => setZoomVal(Math.round((mind.scaleVal ?? 1) * 100));
+        update();
+        mind.bus.addListener('operation', update);
+        return () => { mind.bus.removeListener('operation', update); };
+    }, [mind]);
+
+    const handleZoomIn = useCallback(() => {
+        if (!mind) return;
+        mind.scale(Math.min((mind.scaleVal ?? 1) + 0.1, 3));
+    }, [mind]);
+
+    const handleZoomOut = useCallback(() => {
+        if (!mind) return;
+        mind.scale(Math.max((mind.scaleVal ?? 1) - 0.1, 0.2));
+    }, [mind]);
+
+    const handleZoomReset = useCallback(() => {
+        if (!mind) return;
+        mind.scale(1);
+        mind.toCenter();
+    }, [mind]);
+
     const handleFocusMode = useCallback(() => {
         if (!mind) return;
         try {
@@ -246,6 +297,8 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
         { key: 'markdown', label: '导出 Markdown', icon: <DownloadOutlined />, onClick: handleExportMarkdown },
         { key: 'opml',     label: '导出 OPML',     icon: <DownloadOutlined />, onClick: handleExportOpml },
         { key: 'json',     label: '导出 JSON',     icon: <DownloadOutlined />, onClick: handleExportJson },
+        { type: 'divider' as const },
+        { key: 'pdf',      label: '打印 / PDF',    icon: <PrinterOutlined />,  onClick: handleExportPdf },
     ];
 
     // ── Summary creation ─────────────────────────────────────────────────────────
@@ -456,6 +509,37 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
             <Tooltip title={t('plugins.mindmap.fitView', '居中')}>
                 <Button size="small" type="text" icon={<FullscreenOutlined />} onClick={handleFitView} disabled={!mind} />
             </Tooltip>
+
+            {/* Zoom controls */}
+            {mind && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: 1,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 8, overflow: 'hidden',
+                }}>
+                    <Button size="small" type="text" icon={<ZoomOutOutlined />}
+                        onClick={handleZoomOut}
+                        style={{ borderRadius: 0, width: 24, padding: 0, minWidth: 0 }}
+                        title="缩小" />
+                    <Tooltip title="点击重置为 100%">
+                        <span onClick={handleZoomReset}
+                            style={{
+                                fontSize: 11, fontWeight: 600, minWidth: 36,
+                                textAlign: 'center', cursor: 'pointer',
+                                color: zoomVal !== 100 ? '#6366f1' : 'inherit',
+                                padding: '0 2px', lineHeight: '22px',
+                                transition: 'color 0.15s',
+                            }}>
+                            {zoomVal}%
+                        </span>
+                    </Tooltip>
+                    <Button size="small" type="text" icon={<ZoomInOutlined />}
+                        onClick={handleZoomIn}
+                        style={{ borderRadius: 0, width: 24, padding: 0, minWidth: 0 }}
+                        title="放大" />
+                </div>
+            )}
 
             {/* Export dropdown */}
             <Dropdown

@@ -25,7 +25,7 @@ import 'mind-elixir/style.css';
 
 import { PluginContext } from '../../types/plugin';
 import { VIZLY_HYPER_THEME, VIZLY_HYPER_DARK_THEME, VIZLY_THEMES } from './theme';
-import { migrateV1ToV2, directionStringToInt } from './migrate';
+import { migrateV1ToV2, directionStringToInt, markdownToNodeObj, opmlToNodeObj } from './migrate';
 import { isMindMapV2 } from './types';
 import { registerMindElixirInstance, unregisterMindElixirInstance } from './mindElixirStore';
 
@@ -392,6 +392,59 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         const debouncedSave = debounce(() => saveRef.current(), 800);
         mind.bus.addListener('operation', debouncedSave);
 
+        // ── Collapsed count badges ───────────────────────────────────────────
+        // After each operation, refresh child count badges on collapsed nodes
+        const updateCollapsedBadges = () => {
+            const container = document.getElementById('vizly-mind-elixir-root');
+            if (!container) return;
+            // Remove all existing badges first
+            container.querySelectorAll('.me-collapsed-badge').forEach(el => el.remove());
+            // For each collapsed wrapper, find the parent tpc and inject badge
+            container.querySelectorAll('me-wrapper[data-nodeid]').forEach(wrapper => {
+                const isCollapsed = (wrapper as HTMLElement).classList.contains('me-collapsed')
+                    || (wrapper as HTMLElement).getAttribute('data-expanded') === 'false'
+                    || (wrapper as HTMLElement).hasAttribute('data-collapsed');
+                // Try to find hidden children count
+                const children = wrapper.querySelectorAll(':scope > me-children > me-wrapper');
+                if (!isCollapsed || children.length === 0) return;
+                const tpc = wrapper.querySelector(':scope > me-parent > me-tpc');
+                if (!tpc || tpc.querySelector('.me-collapsed-badge')) return;
+                const badge = document.createElement('span');
+                badge.className = 'me-collapsed-badge node-children-count';
+                badge.textContent = String(children.length);
+                tpc.appendChild(badge);
+            });
+        };
+
+        // Simpler approach: check expand state via node data
+        const updateBadgesFromData = () => {
+            try {
+                const data = mind.getData();
+                const container = document.getElementById('vizly-mind-elixir-root');
+                if (!container) return;
+                container.querySelectorAll('.me-collapsed-badge').forEach(el => el.remove());
+                function walkNodes(node: NodeObj) {
+                    if (node.expanded === false && node.children && node.children.length > 0) {
+                        try {
+                            const tpc = mind.findEle(node.id);
+                            if (tpc && !tpc.querySelector('.me-collapsed-badge')) {
+                                const badge = document.createElement('span');
+                                badge.className = 'me-collapsed-badge node-children-count';
+                                badge.textContent = String(node.children.length);
+                                tpc.appendChild(badge);
+                            }
+                        } catch {}
+                    }
+                    (node.children ?? []).forEach(walkNodes);
+                }
+                walkNodes(data.nodeData);
+            } catch {}
+        };
+
+        mind.bus.addListener('operation', updateBadgesFromData);
+        // Initial badge update after layout settles
+        setTimeout(updateBadgesFromData, 350);
+
         // Track selected node for property panel
         // EventMap has 'selectNodes' (array) and 'selectNewNode' (single), not 'selectNode'
         const handleSelectNodes = (nodes: NodeObj[]) => {
@@ -413,6 +466,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
 
         return () => {
             mind.bus.removeListener('operation', debouncedSave);
+            mind.bus.removeListener('operation', updateBadgesFromData);
             mind.bus.removeListener('selectNodes', handleSelectNodes);
             mind.bus.removeListener('selectNewNode', handleSelectNewNode);
             mind.bus.removeListener('unselectNodes', handleUnselectNodes);
@@ -431,15 +485,67 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         mindRef.current.changeTheme(isDark ? VIZLY_HYPER_DARK_THEME : VIZLY_HYPER_THEME);
     }, [isDark]);
 
+    // Drag-to-import handler: drop .md / .opml files onto canvas
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+        const files = Array.from(e.dataTransfer.items || []);
+        const hasCompatible = files.some(item =>
+            item.kind === 'file' && (
+                item.type === 'text/markdown' ||
+                item.type === 'text/plain' ||
+                item.type === 'application/xml' ||
+                item.type === 'text/xml' ||
+                (item.getAsFile()?.name.match(/\.(md|markdown|opml|xml|txt)$/i) ?? false)
+            )
+        );
+        if (hasCompatible || files.some(f => f.kind === 'file')) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        }
+    }, []);
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        const mind = mindRef.current;
+        if (!mind) return;
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const text = ev.target?.result as string;
+                let nodeData;
+                if (file.name.match(/\.(opml|xml)$/i)) {
+                    nodeData = opmlToNodeObj(text);
+                } else {
+                    nodeData = markdownToNodeObj(text);
+                }
+                mind.refresh({ nodeData });
+                mind.toCenter();
+                mind.clearHistory?.();
+            } catch (err) {
+                console.error('[Drag Import]', err);
+            }
+        };
+        reader.readAsText(file);
+    }, []);
+
+    const [isDragOver, setIsDragOver] = useState(false);
+
     return (
         <MindElixirContext.Provider value={{ instance, selectedNode }}>
             <div
+                onDragOver={(e) => { handleDragOver(e); setIsDragOver(true); }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={(e) => { handleDrop(e); setIsDragOver(false); }}
                 style={{
                     position: 'absolute',
                     inset: 0,
                     zIndex: 10,
                     background: isDark ? '#0f172a' : '#f8fafc',
                     overflow: 'hidden',
+                    outline: isDragOver ? '3px dashed rgba(99,102,241,0.6)' : 'none',
+                    outlineOffset: '-4px',
+                    transition: 'outline 0.15s ease',
                 }}
             >
                 <div
@@ -447,6 +553,27 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     id="vizly-mind-elixir-root"
                     style={{ width: '100%', height: '100%' }}
                 />
+                {isDragOver && (
+                    <div style={{
+                        position: 'absolute', inset: 0, zIndex: 100,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'rgba(99,102,241,0.08)',
+                        pointerEvents: 'none',
+                    }}>
+                        <div style={{
+                            padding: '16px 28px',
+                            background: 'rgba(99,102,241,0.15)',
+                            backdropFilter: 'blur(12px)',
+                            border: '2px dashed rgba(99,102,241,0.5)',
+                            borderRadius: 16,
+                            fontSize: 15,
+                            fontWeight: 600,
+                            color: '#6366f1',
+                        }}>
+                            📥 释放以导入 Markdown / OPML
+                        </div>
+                    </div>
+                )}
             </div>
         </MindElixirContext.Provider>
     );
