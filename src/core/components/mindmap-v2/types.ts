@@ -14,9 +14,11 @@ export interface VizlyMindMapV2Data {
     /** The tree data compatible with mind-elixir */
     nodeData: NodeObj;
     /** Direction constant: 0=TB, 1=R, 2=LR(SIDE), 3=L */
-    direction: number;
-    /** Theme snapshot */
+    direction: 0 | 1 | 2 | 3;
+    /** Theme snapshot (rarely needed, themeKey is preferred) */
     theme?: Theme;
+    /** Persisted theme key (e.g. 'indigo', 'ocean', 'dark') */
+    themeKey?: string;
 }
 
 /** Legacy React Flow based format (mindmap-v1) */

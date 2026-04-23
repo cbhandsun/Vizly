@@ -201,9 +201,36 @@ const DiagramViewer: React.FC = () => {
     const docType = useMemo(() => {
         if (!selectedDiagramId || selectedDiagram) return undefined;
         try {
+            // 1. In-memory DataService (valid within current session)
             const doc = dataService.getDiagram(selectedDiagramId);
-            return doc?.type;
-        } catch { return undefined; }
+            if (doc?.type) return doc.type;
+        } catch { /* ignore */ }
+        try {
+            // 2. vizly_diagrams localStorage (written by older versions / external tools)
+            const raw = localStorage.getItem('vizly_diagrams');
+            if (raw) {
+                const arr: any[] = JSON.parse(raw);
+                const found = Array.isArray(arr) ? arr.find((d: any) => d.id === selectedDiagramId) : null;
+                if (found?.type) return found.type;
+            }
+        } catch { /* ignore */ }
+        try {
+            // 3. vizly_diagram_configs — lightweight type-only index
+            const raw2 = localStorage.getItem('vizly_diagram_configs');
+            if (raw2) {
+                const configs: any = JSON.parse(raw2);
+                if (configs?.[selectedDiagramId]?.type) return configs[selectedDiagramId].type;
+            }
+        } catch { /* ignore */ }
+        try {
+            // 4. autosave key — metadata.type written on save by FlowchartDesigner
+            const autosaveRaw = localStorage.getItem(`flowchart-autosave-v2-${selectedDiagramId}`);
+            if (autosaveRaw) {
+                const autosave = JSON.parse(autosaveRaw);
+                if (autosave?.metadata?.type) return autosave.metadata.type;
+            }
+        } catch { /* ignore */ }
+        return undefined;
     }, [selectedDiagramId, selectedDiagram]);
 
     // Bridge: diagram.type → plugin registry ID
@@ -214,11 +241,22 @@ const DiagramViewer: React.FC = () => {
         if (selectedDiagram?.component) return selectedDiagram.component;
 
         if (resolvedPluginId) {
-            // Dynamically load UnifiedDesigner for recognized plugin types
-            return lazy(() => import('@/core').then(m => {
+            // Use FlowchartDesigner (full implementation) with the resolved pluginId.
+            // Plugins that override the canvas entirely (mindmap, timeline, network...)
+            // register themselves via PluginRegistry and contribute canvas + toolbar via hooks.
+            // The legacy UnifiedDesigner is just an architecture skeleton and must NOT be used here.
+            return lazy(() => import('@/core').then(async m => {
                 if (m.initializePlugins) m.initializePlugins();
+                // Ensure plugin-specific registration happens before render
+                if (resolvedPluginId === 'mindmap') {
+                    const { PluginRegistry } = m;
+                    if (!PluginRegistry.getInstance().getPlugin('mindmap')) {
+                        const { MindMapPlugin } = await import('../core/plugins/MindMapPlugin');
+                        PluginRegistry.getInstance().register(new MindMapPlugin());
+                    }
+                }
                 return {
-                    default: (props: any) => React.createElement(m.UnifiedDesigner, { ...props, pluginId: resolvedPluginId })
+                    default: (props: any) => React.createElement(m.FlowchartDesigner, { ...props, pluginId: resolvedPluginId })
                 };
             }));
         }

@@ -370,6 +370,14 @@ const WorkspaceDashboardPage: React.FC = () => {
                 cloned.type = TYPE_DEFAULTS[templateKey] || 'flowchart';
             }
             localService.registerDiagram(cloned);
+            // Persist diagram type index to localStorage so DiagramViewer
+            // can resolve the correct plugin even after a page refresh.
+            try {
+                const configsRaw = localStorage.getItem('vizly_diagram_configs');
+                const configs: Record<string, any> = configsRaw ? JSON.parse(configsRaw) : {};
+                configs[cloned.id] = { id: cloned.id, type: cloned.type, name: cloned.name, updatedAt: Date.now() };
+                localStorage.setItem('vizly_diagram_configs', JSON.stringify(configs));
+            } catch { /* ignore storage errors */ }
             navigate(`/?diagram=${cloned.id}`);
         }
     };

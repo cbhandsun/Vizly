@@ -9,6 +9,7 @@ import {
   FaCodeBranch,
   FaEdit,
   FaNetworkWired,
+  FaBrain,
 } from 'react-icons/fa';
 
 export const diagramDefinitions: DiagramDefinition[] = [
@@ -162,5 +163,25 @@ export const diagramDefinitions: DiagramDefinition[] = [
     category: 'other',
     tags: ['network', 'topology', 'aws', 'azure', 'gcp', 'unified', 'plugin'],
     icon: FaNetworkWired,
+  },
+  {
+    id: 'mindmap-unified',
+    name: '🌿 统一架构：思维导图',
+    component: lazy(() =>
+      import('@/core').then(async m => {
+        const { PluginRegistry } = m;
+        if (!PluginRegistry.getInstance().getPlugin('mindmap')) {
+          const { MindMapPlugin } = await import('../core/plugins/MindMapPlugin');
+          PluginRegistry.getInstance().register(new MindMapPlugin());
+        }
+        return {
+          default: (props: any) =>
+            createElement(m.FlowchartDesigner, { ...props, pluginId: 'mindmap' })
+        };
+      })
+    ),
+    category: 'other',
+    tags: ['mindmap', 'mind-map', 'brainstorm', 'unified', 'plugin'],
+    icon: FaBrain,
   },
 ];

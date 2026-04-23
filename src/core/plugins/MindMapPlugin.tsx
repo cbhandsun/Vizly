@@ -4,33 +4,65 @@
  * Architecture:
  *   - mind-elixir handles all rendering, layout, keyboard, undo/redo
  *   - Vizly's PluginContext only used for save/load/toolbar/sidebar
- *   - React Flow is retained as the outer canvas shell (pan/zoom/minimap)
+ *   - React Flow is retained as the outer canvas shell
  *     but no RF nodes/edges are used for mindmap content
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import {
     DiagramTypePlugin,
     PluginContext,
 } from '../types/plugin';
 import { SidebarPanel } from '../types/plugin';
-import { UnorderedListOutlined } from '@ant-design/icons';
+import { UnorderedListOutlined, SettingOutlined } from '@ant-design/icons';
 import { BaseDiagramPlugin } from '../sdk/BasePlugin';
 import i18n from '@/i18n';
 import MindElixirWrapper from '../components/mindmap-v2/MindElixirWrapper';
 import MindElixirToolbar from '../components/mindmap-v2/MindElixirToolbar';
+import MindMapPropertyPanel from '../components/mindmap-v2/MindMapPropertyPanel';
+import MindMapOutlinePanel from '../components/mindmap-v2/MindMapOutlinePanel';
 import { migrateV1ToV2 } from '../components/mindmap-v2/migrate';
 import { isMindMapV2 } from '../components/mindmap-v2/types';
+import { getMindElixirInstance } from '../components/mindmap-v2/mindElixirStore';
+import { VIZLY_THEMES } from '../components/mindmap-v2/theme';
 
-// ── Inline Outline Panel (lightweight placeholder for Phase 1) ────────────────
-const MindElixirOutlinePanelPlaceholder: React.FC<{ ctx: PluginContext }> = () => (
-    <div style={{ padding: 16, color: '#94a3b8', fontSize: 13, textAlign: 'center' }}>
-        <div style={{ fontSize: 24, marginBottom: 8 }}>🌿</div>
-        <div>大纲视图将在 Phase 2 提供</div>
-        <div style={{ marginTop: 8, fontSize: 11 }}>使用画布上的键盘导航即可</div>
-    </div>
-);
+// ── Theme-aware canvas wrapper ─────────────────────────────────────────────────
+// Keeps theme state at plugin level so toolbar & property panel share the same key
+const MindMapCanvas: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
+    const [themeKey, setThemeKey] = useState<string>(() => {
+        return localStorage.getItem('vizly_mindmap_theme') || 'indigo';
+    });
+    const isDark = themeKey === 'dark'
+        || document.documentElement.classList.contains('dark')
+        || localStorage.getItem('vizly-theme') === 'dark';
+
+    return <MindElixirWrapper ctx={ctx} isDark={isDark} />;
+};
+
+// ── Property Panel wrapper (stateful theme) ────────────────────────────────────
+const PropertyPanelWrapper: React.FC = () => {
+    const [themeKey, setThemeKey] = useState<string>(() => {
+        return localStorage.getItem('vizly_mindmap_theme') || 'indigo';
+    });
+
+    const handleThemeChange = (key: string) => {
+        const mind = getMindElixirInstance();
+        const theme = VIZLY_THEMES[key];
+        if (mind && theme) {
+            mind.changeTheme(theme);
+            localStorage.setItem('vizly_mindmap_theme', key);
+            setThemeKey(key);
+        }
+    };
+
+    return (
+        <MindMapPropertyPanel
+            activeTheme={themeKey}
+            onThemeChange={handleThemeChange}
+        />
+    );
+};
 
 // ── Plugin Class ───────────────────────────────────────────────────────────────
 export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugin {
@@ -40,33 +72,23 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
         return i18n.t('plugins.mindmap.title');
     }
 
-    version = '2.0';
+    version = '2.1';
 
-    /**
-     * Migrate old data formats to current format.
-     * v1 (RF nodes/edges) → v2 (mind-elixir tree) is handled in MindElixirWrapper.
-     * This method is a pass-through for any base plugin migration needed.
-     */
     async migrate(data: any, fromVersion: string | undefined): Promise<any> {
         const migratedData = await super.migrate(data, fromVersion);
 
-        // If data is in v1 RF format, convert to v2 now at the plugin level
-        // so it gets stored in the correct format on next save.
         if (!isMindMapV2(migratedData) && Array.isArray(migratedData?.nodes)) {
             const mindmapNodes = migratedData.nodes.filter((n: any) => n.type === 'mindmap');
             if (mindmapNodes.length > 0) {
                 const v2 = migrateV1ToV2({ nodes: mindmapNodes, edges: migratedData.edges ?? [] });
-                // Embed v2 payload in the meta node convention that MindElixirWrapper reads
                 return {
-                    nodes: [
-                        {
-                            id: '__mindmap_meta__',
-                            type: 'mindmap',
-                            position: { x: -9999, y: -9999 },
-                            hidden: true,
-                            data: { mindmapV2: v2, depth: -1, label: '' },
-                        },
-                    ],
+                    nodes: [{
+                        id: '__mindmap_meta__',
+                        type: 'mindmap',
+                        position: { x: -9999, y: -9999 },
+                        hidden: true,
+                        data: { mindmapV2: v2, depth: -1, label: '' },
+                    }],
                     edges: [],
                 };
             }
@@ -80,9 +102,11 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
     hideContextToolbar = true;
     hideGridControls = true;
     hideLayoutControls = true;
+    hideFlowFocusControls = true;
+    // Also hide the bottom toolbar's undo/redo and zoom (mind-elixir handles them)
+    hideZoomControls = false;  // Keep zoom for pan/zoom convenience
 
     // ── Initial State ─────────────────────────────────────────────────────────
-    // We only need a placeholder — mind-elixir will init with DEFAULT_DATA if meta is empty
     getEmptyState() {
         return { nodes: [], edges: [] };
     }
@@ -90,16 +114,12 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
     getSupportedLayouts() { return ['MindElixirLayout']; }
     getDefaultLayout() { return 'MindElixirLayout'; }
 
-    // mind-elixir doesn't use RF custom node types (all rendering is internal SVG)
     getNodeTypes(): Record<string, any> { return {}; }
     getEdgeTypes() { return {}; }
 
     // ── Canvas Component ── mind-elixir renders here ──────────────────────────
     contributeCanvasComponents(ctx: PluginContext) {
-        // isDark: detect from body class or localStorage (simple heuristic)
-        const isDark = document.documentElement.classList.contains('dark')
-            || localStorage.getItem('vizly-theme') === 'dark';
-        return <MindElixirWrapper ctx={ctx} isDark={isDark} />;
+        return <MindMapCanvas ctx={ctx} />;
     }
 
     // ── Toolbar ───────────────────────────────────────────────────────────────
@@ -109,17 +129,18 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
 
     // ── Property Panel ────────────────────────────────────────────────────────
     renderCustomPropertyPanel(_ctx: PluginContext, _selectedNodes: Node[], _selectedEdges: Edge[]) {
-        // Phase 1: no property panel, mind-elixir handles in-place editing
-        return null;
+        return <PropertyPanelWrapper />;
     }
 
     // ── Sidebar Panels ────────────────────────────────────────────────────────
-    contributeSidebarPanels(ctx: PluginContext): SidebarPanel[] {
-        return [{
-            id: 'mindmap-outline',
-            title: i18n.t('plugins.mindmap.outline.title') || '大纲视图',
-            icon: <UnorderedListOutlined />,
-            content: <MindElixirOutlinePanelPlaceholder ctx={ctx} />,
-        }];
+    contributeSidebarPanels(_ctx: PluginContext): SidebarPanel[] {
+        return [
+            {
+                id: 'mindmap-outline',
+                title: i18n.t('plugins.mindmap.outline.title') || '大纲视图',
+                icon: <UnorderedListOutlined />,
+                content: <MindMapOutlinePanel />,
+            },
+        ];
     }
 }

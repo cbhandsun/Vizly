@@ -103,8 +103,223 @@ export function nodeObjToMarkdown(node: NodeObj, depth = 0): string {
     const indent = '  '.repeat(depth);
     const prefix = depth === 0 ? '# ' : indent + '- ';
     const lines = [prefix + node.topic];
+    if (node.note) lines.push(indent + `  > ${node.note}`);
     for (const child of node.children ?? []) {
         lines.push(nodeObjToMarkdown(child, depth + 1));
     }
     return lines.join('\n');
 }
+
+/** Convert mind-elixir NodeObj to OPML XML string (compatible with Logseq / Obsidian / OmniOutliner) */
+export function nodeObjToOpml(root: NodeObj): string {
+    function convertNode(node: NodeObj, depth: number): string {
+        const indent = '  '.repeat(depth + 2);
+        const text = node.topic
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        const extras: string[] = [];
+        if (node.note) extras.push(`_note="${node.note.replace(/"/g, '&quot;')}"`);
+        if (node.hyperLink) extras.push(`url="${node.hyperLink}"`);
+        const extrasStr = extras.length ? ' ' + extras.join(' ') : '';
+        const children = node.children ?? [];
+        if (children.length === 0) {
+            return `${indent}<outline text="${text}"${extrasStr}/>`;
+        }
+        const childLines = children.map(c => convertNode(c, depth + 1)).join('\n');
+        return `${indent}<outline text="${text}"${extrasStr}>\n${childLines}\n${indent}</outline>`;
+    }
+    return [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<opml version="2.0">',
+        '  <head><title>' + root.topic.replace(/</g, '&lt;') + '</title></head>',
+        '  <body>',
+        convertNode(root, 0),
+        '  </body>',
+        '</opml>',
+    ].join('\n');
+}
+
+/** Trigger a browser download of text content */
+export function downloadText(filename: string, content: string, mimeType = 'text/plain') {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+/** Simple unique ID generator for imported nodes */
+function genId(): string {
+    return `imp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/**
+ * Parse a Markdown string into a mind-elixir NodeObj tree.
+ *
+ * Supports two formats:
+ *   1. Heading-based:  # Root  ## Branch  ### Sub-branch
+ *   2. Bullet-based:   - Root  \n  - Branch  \n    - Sub
+ *
+ * The deepest heading becomes the leaf; the shallowest becomes root.
+ * If both formats are mixed, headings take precedence.
+ */
+export function markdownToNodeObj(md: string): NodeObj {
+    const lines = md.split('\n').map(l => l.trimEnd()).filter(l => l.trim());
+
+    // ── Try heading-based ──────────────────────────────────────────────────────
+    const headingLines = lines.filter(l => /^#{1,6}\s/.test(l));
+    if (headingLines.length > 0) {
+        // Find min heading level used → becomes depth 0
+        const minLevel = Math.min(...headingLines.map(l => l.match(/^(#+)/)![1].length));
+
+        const stack: Array<{ node: NodeObj; depth: number }> = [];
+        let root: NodeObj | null = null;
+
+        for (const line of lines) {
+            const m = line.match(/^(#{1,6})\s+(.*)/);
+            if (!m) continue;
+            const depth = m[1].length - minLevel;
+            const topic = m[2].trim();
+            const node: NodeObj = { id: genId(), topic, children: [] };
+
+            if (depth === 0) {
+                root = node;
+                stack.length = 0;
+                stack.push({ node, depth: 0 });
+            } else {
+                // Pop stack until parent is found
+                while (stack.length > 1 && stack[stack.length - 1].depth >= depth) {
+                    stack.pop();
+                }
+                const parent = stack[stack.length - 1].node;
+                (parent.children ??= []).push(node);
+                stack.push({ node, depth });
+            }
+        }
+
+        if (root) {
+            root.id = 'root';
+            return root;
+        }
+    }
+
+    // ── Bullet-based fallback ──────────────────────────────────────────────────
+    const getIndent = (l: string) => l.match(/^(\s*)/)?.[1].length ?? 0;
+
+    const stack2: Array<{ node: NodeObj; indent: number }> = [];
+    let root2: NodeObj | null = null;
+
+    for (const line of lines) {
+        const m = line.match(/^\s*[-*+]\s+(.*)/);
+        if (!m) continue;
+        const indent = getIndent(line);
+        const topic = m[1].trim();
+        const node: NodeObj = { id: genId(), topic, children: [] };
+
+        if (stack2.length === 0 || indent === 0) {
+            root2 = node;
+            stack2.length = 0;
+            stack2.push({ node, indent: 0 });
+        } else {
+            while (stack2.length > 1 && stack2[stack2.length - 1].indent >= indent) {
+                stack2.pop();
+            }
+            const parent = stack2[stack2.length - 1].node;
+            (parent.children ??= []).push(node);
+            stack2.push({ node, indent });
+        }
+    }
+
+    if (root2) {
+        root2.id = 'root';
+        return root2;
+    }
+
+    // ── Fallback: single root with one child per non-empty line ───────────────
+    return {
+        id: 'root',
+        topic: '导入的思维导图',
+        children: lines.slice(0, 20).map(l => ({
+            id: genId(),
+            topic: l.replace(/^[-*#\s]+/, '').trim() || l,
+            children: [],
+        })),
+    };
+}
+
+/**
+ * Parse an OPML XML string into a mind-elixir NodeObj tree.
+ * Compatible with files exported by Logseq, OmniOutliner, and nodeObjToOpml().
+ */
+export function opmlToNodeObj(opmlStr: string): NodeObj {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(opmlStr, 'application/xml');
+
+    // Check for parse errors
+    const parseError = doc.querySelector('parsererror');
+    if (parseError) {
+        throw new Error('OPML 格式解析失败：' + parseError.textContent?.slice(0, 80));
+    }
+
+    const titleEl = doc.querySelector('head > title');
+    const rootTitle = titleEl?.textContent?.trim() || '导入的思维导图';
+
+    function convertOutline(el: Element, depth: number): NodeObj {
+        const topic = el.getAttribute('text') ?? el.getAttribute('_text') ?? '节点';
+        const note = el.getAttribute('_note') ?? undefined;
+        const hyperLink = el.getAttribute('url') ?? undefined;
+
+        const children: NodeObj[] = [];
+        for (const child of Array.from(el.children)) {
+            if (child.tagName.toLowerCase() === 'outline') {
+                children.push(convertOutline(child, depth + 1));
+            }
+        }
+
+        const node: NodeObj = { id: genId(), topic, children };
+        if (note) node.note = note;
+        if (hyperLink) node.hyperLink = hyperLink;
+        return node;
+    }
+
+    const body = doc.querySelector('body');
+    if (!body) {
+        return { id: 'root', topic: rootTitle, children: [] };
+    }
+
+    // If body has a single outline child that wraps everything (our export format)
+    const topOutlines = Array.from(body.children).filter(
+        c => c.tagName.toLowerCase() === 'outline'
+    );
+
+    if (topOutlines.length === 1) {
+        const root = convertOutline(topOutlines[0], 0);
+        root.id = 'root';
+        return root;
+    }
+
+    // Multiple top-level outlines → create synthetic root
+    return {
+        id: 'root',
+        topic: rootTitle,
+        children: topOutlines.map(o => convertOutline(o, 1)),
+    };
+}
+
+/** Count total nodes in a NodeObj tree */
+export function countNodes(node: NodeObj): number {
+    return 1 + (node.children ?? []).reduce((sum, c) => sum + countNodes(c), 0);
+}
+
+/** Get max depth of a NodeObj tree */
+export function getTreeDepth(node: NodeObj): number {
+    if (!node.children || node.children.length === 0) return 0;
+    return 1 + Math.max(...node.children.map(getTreeDepth));
+}
+

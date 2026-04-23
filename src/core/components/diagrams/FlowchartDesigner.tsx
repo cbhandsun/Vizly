@@ -1200,7 +1200,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                     leftSidebar={
                         (() => {
                             const pluginPanels = (activePlugin?.contributeSidebarPanels && pluginCtx) ? activePlugin.contributeSidebarPanels(pluginCtx) : [];
-                            if (isSidebarHidden) return null;
+                            // Hide the entire sidebar for plugins that manage their own UI
+                            if (isSidebarHidden || activePlugin?.hideDefaultSidebar) return null;
                             return (
                                 <IconRailSidebar
                                     nodes={nodes}
@@ -1241,7 +1242,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                         )}
 
                         <FlowchartOnboardingHint
-                            visible={!onboardingDismissed && nodes.length <= 1 && edges.length === 0 && !jsonEditorVisible && selectedNodes.length === 0 && selectedEdges.length === 0}
+                            visible={pluginId !== 'mindmap' && !onboardingDismissed && nodes.length <= 1 && edges.length === 0 && !jsonEditorVisible && selectedNodes.length === 0 && selectedEdges.length === 0}
                             mod={/Mac/i.test(navigator.platform) ? '⌘' : 'Ctrl'}
                             onOpenCommandPalette={() => setCommandPaletteVisible(true)}
                             onDismiss={() => {
@@ -1250,7 +1251,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                             }}
                         />
                         <FlowchartEmptyState 
-                            visible={nodes.length === 0 && !jsonEditorVisible && !isDragging && !isConnecting && !quickAddMenu?.visible}
+                            visible={pluginId !== 'mindmap' && nodes.length === 0 && !jsonEditorVisible && !isDragging && !isConnecting && !quickAddMenu?.visible}
                         />
                         <div ref={reactFlowWrapper} style={{ position: 'relative', height: '100%' }}>
                             <ContextMenuLayer onAction={handleContextMenuAction} activePlugin={activePlugin} pluginCtx={pluginCtx} />

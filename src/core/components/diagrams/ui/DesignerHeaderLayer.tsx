@@ -272,7 +272,13 @@ export const DesignerHeaderLayer = React.memo(
             prevProps.topActions.pluginManagerVisible === nextProps.topActions.pluginManagerVisible &&
             // 工具栏外观 — gridVariant 影响 gridInfo memo，showMinimap 影响 moreMenuItems
             prevProps.toolbar.gridVariant === nextProps.toolbar.gridVariant &&
-            prevProps.toolbar.showMinimap === nextProps.toolbar.showMinimap
+            prevProps.toolbar.showMinimap === nextProps.toolbar.showMinimap &&
+            // ⭐ Plugin hide flags — MindMapPlugin (hideLayoutControls=true) 激活后
+            // 需要重渲染 toolbar，否则流程图专属按钮无法被正确隐藏
+            prevProps.toolbar.hideLayoutControls === nextProps.toolbar.hideLayoutControls &&
+            prevProps.toolbar.hideGridControls === nextProps.toolbar.hideGridControls &&
+            prevProps.toolbar.hideFlowFocusControls === nextProps.toolbar.hideFlowFocusControls &&
+            prevProps.toolbar.hideZoomControls === nextProps.toolbar.hideZoomControls
         );
     }
 );
