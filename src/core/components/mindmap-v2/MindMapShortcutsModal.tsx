@@ -130,7 +130,7 @@ const MindMapShortcutsModal: React.FC<MindMapShortcutsModalProps> = ({ open, onC
                 },
                 body: { paddingTop: 16 },
                 mask: { backdropFilter: 'blur(4px)' },
-            }}
+            } as any}
         >
             <div style={{
                 display: 'grid',

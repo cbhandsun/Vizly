@@ -139,7 +139,7 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
             const tpc = mind.findEle(id);
             if (!tpc) return;
             const newTopic = obj.topic.replace(new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), replaceText);
-            mind.reshapeNode(tpc as HTMLElement, { ...obj, topic: newTopic });
+            mind.reshapeNode(tpc as any, { ...obj, topic: newTopic });
             setReplaceCount(1);
             // Move to next after replacing
             setTimeout(() => goNext(), 60);
@@ -158,7 +158,7 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
                 if (!tpc) continue;
                 const newTopic = obj.topic.replace(regex, replaceText);
                 if (newTopic !== obj.topic) {
-                    mind.reshapeNode(tpc as HTMLElement, { ...obj, topic: newTopic });
+                    mind.reshapeNode(tpc as any, { ...obj, topic: newTopic });
                     count++;
                 }
             } catch {}
