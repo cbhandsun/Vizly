@@ -106,8 +106,14 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
             <Item icon="➕" label="添加子节点" kbd="Tab"
                 onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.addChild(tpc); })} />
             {!isRoot && (
-                <Item icon="↕️" label="添加同级节点" kbd="Enter"
-                    onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.insertSibling('after', tpc); })} />
+                <>
+                    <Item icon="↕️" label="添加同级节点" kbd="Enter"
+                        onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.insertSibling('after', tpc); })} />
+                    <Item icon="📋" label="复制为同级" kbd="Ctrl+D"
+                        onClick={() => act(() => {
+                            try { const tpc = getTpc(); if (tpc) mind.copyNode(tpc, tpc); } catch {}
+                        })} />
+                </>
             )}
 
             {DIVIDER}

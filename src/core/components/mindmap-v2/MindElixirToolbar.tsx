@@ -50,6 +50,7 @@ import { VIZLY_THEME_OPTIONS, VIZLY_THEMES } from './theme';
 import { usePresentationMode } from './MindMapPresentationMode';
 import { emitOpenSearch } from './mindmapSearchStore';
 import MindMapShortcutsModal from './MindMapShortcutsModal';
+import MindMapTemplates from './MindMapTemplates';
 
 
 const DIRECTION_OPTIONS = [
@@ -661,6 +662,9 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
                 <Button size="small" type="text" icon={<SearchOutlined />}
                     onClick={emitOpenSearch} disabled={!mind} />
             </Tooltip>
+
+            {/* Templates */}
+            <MindMapTemplates />
 
             {/* Canvas background preset */}
             <Dropdown
