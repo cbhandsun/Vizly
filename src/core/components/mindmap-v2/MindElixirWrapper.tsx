@@ -35,6 +35,7 @@ import MindMapEmptyGuide from './MindMapEmptyGuide';
 import MindMapOutlinePanel from './MindMapOutlinePanel';
 import MindMapYjsIntegration from './MindMapYjsIntegration';
 import MindMapBoundaries from './MindMapBoundaries';
+import MindMapMultiplayerCursors from './MindMapMultiplayerCursors';
 import { emitToggleOutline } from './mindmapOutlineStore';
 import { findNodeById } from './migrate';
 import { marked } from 'marked';
@@ -837,6 +838,9 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
 
             {/* Boundary Geometry Engine (React Portal) */}
             <MindMapBoundaries />
+
+            {/* Multiplayer Cursor Overlay */}
+            <MindMapMultiplayerCursors />
 
             {/* Note hover preview tooltip */}
             {notePreview && (
