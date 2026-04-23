@@ -83,6 +83,23 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
     const mind = getMindElixirInstance();
     const { t } = useTranslation();
 
+    // ── Canvas background pattern ──────────────────────────────────────────────
+    const [bgPattern, setBgPattern] = useState<'none' | 'grid' | 'dots'>(() =>
+        (localStorage.getItem('vizly_mindmap_bg') as any) ?? 'none'
+    );
+    const applyBgPattern = useCallback((pattern: 'none' | 'grid' | 'dots') => {
+        setBgPattern(pattern);
+        localStorage.setItem('vizly_mindmap_bg', pattern);
+        const el = document.getElementById('vizly-mind-elixir-root');
+        if (!el) return;
+        el.setAttribute('data-bg', pattern);
+    }, []);
+    // Apply on mount and when mind loads
+    useEffect(() => {
+        const el = document.getElementById('vizly-mind-elixir-root');
+        if (el) el.setAttribute('data-bg', bgPattern);
+    }, [mind, bgPattern]);
+
     // Presentation mode — declare state first so callback closure is clean
     const [isPresenting, setIsPresenting] = useState(false);
     const presentation = usePresentationMode(mind, () => setIsPresenting(false));
@@ -294,25 +311,6 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
         };
     }, [mind]);
 
-    // ── JSON import ─────────────────────────────────────────────────────────────
-    const jsonInputRef = useRef<HTMLInputElement>(null);
-    const handleImportJson = useCallback(() => { jsonInputRef.current?.click(); }, []);
-    const handleJsonFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file || !mind) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            try {
-                const json = JSON.parse(ev.target?.result as string);
-                // Accept full MindElixirData or just nodeData
-                const nodeData = json.nodeData ?? json;
-                loadAndRefresh(nodeData);
-            } catch (err) { console.error('[Import JSON]', err); }
-        };
-        reader.readAsText(file);
-        e.target.value = '';
-    }, [mind, loadAndRefresh]);
-
     // ── Shortcuts panel ─────────────────────────────────────────────────────────
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
@@ -395,6 +393,24 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
         mind.toCenter();
         (mind as any).clearHistory?.();
     }, [mind]);
+
+    // ── JSON import ─────────────────────────────────────────────────────────────
+    const jsonInputRef = useRef<HTMLInputElement>(null);
+    const handleImportJson = useCallback(() => { jsonInputRef.current?.click(); }, []);
+    const handleJsonFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !mind) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const json = JSON.parse(ev.target?.result as string);
+                const nodeData = json.nodeData ?? json;
+                loadAndRefresh(nodeData);
+            } catch (err) { console.error('[Import JSON]', err); }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+    }, [mind, loadAndRefresh]);
 
     const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -645,6 +661,45 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
                 <Button size="small" type="text" icon={<SearchOutlined />}
                     onClick={emitOpenSearch} disabled={!mind} />
             </Tooltip>
+
+            {/* Canvas background preset */}
+            <Dropdown
+                menu={{
+                    items: [
+                        {
+                            key: 'none', label: '纯色背景',
+                            icon: <span style={{ display:'inline-block', width:12, height:12,
+                                borderRadius:2, background:'#1e293b', border:'1px solid #475569' }} />,
+                            onClick: () => applyBgPattern('none'),
+                        },
+                        {
+                            key: 'grid', label: '网格背景',
+                            icon: <span style={{ display:'inline-block', width:12, height:12,
+                                borderRadius:2, border:'1px solid #6366f1',
+                                backgroundImage:'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(99,102,241,.25) 3px,rgba(99,102,241,.25) 4px),repeating-linear-gradient(90deg,transparent,transparent 3px,rgba(99,102,241,.25) 3px,rgba(99,102,241,.25) 4px)' }} />,
+                            onClick: () => applyBgPattern('grid'),
+                        },
+                        {
+                            key: 'dots', label: '点阵背景',
+                            icon: <span style={{ display:'inline-block', width:12, height:12,
+                                borderRadius:2, border:'1px solid #6366f1',
+                                backgroundImage:'radial-gradient(circle, rgba(99,102,241,.5) 1px, transparent 1px)',
+                                backgroundSize:'5px 5px' }} />,
+                            onClick: () => applyBgPattern('dots'),
+                        },
+                    ],
+                    selectable: true,
+                    selectedKeys: [bgPattern],
+                }}
+                placement="bottomRight"
+                trigger={['click']}
+            >
+                <Tooltip title="画布背景">
+                    <Button size="small" type="text"
+                        icon={<span style={{ fontSize: 14 }}>⊞</span>}
+                        style={{ color: bgPattern !== 'none' ? '#6366f1' : 'rgba(255,255,255,0.4)' }} />
+                </Tooltip>
+            </Dropdown>
 
             {/* Shortcuts help */}
             <Tooltip title="键盘快捷键 (?)">

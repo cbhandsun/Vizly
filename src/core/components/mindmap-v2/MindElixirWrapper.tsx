@@ -230,6 +230,18 @@ function injectGradientFix() {
             margin: 2px 2px 0;
             line-height: 16px;
         }
+
+        /* ── Canvas background presets ───────────────────────────────────────────── */
+        #vizly-mind-elixir-root[data-bg="grid"] .map-container {
+            background-image:
+                repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(99,102,241,0.12) 23px, rgba(99,102,241,0.12) 24px),
+                repeating-linear-gradient(90deg, transparent, transparent 23px, rgba(99,102,241,0.12) 23px, rgba(99,102,241,0.12) 24px) !important;
+        }
+        #vizly-mind-elixir-root[data-bg="dots"] .map-container {
+            background-image:
+                radial-gradient(circle, rgba(99,102,241,0.35) 1px, transparent 1px) !important;
+            background-size: 24px 24px !important;
+        }
     `;
     document.head.appendChild(style);
 }

@@ -46,12 +46,32 @@ const MindMapCanvas: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
         return subscribeSearchOpen(() => setSearchOpen(prev => !prev));
     }, []);
 
-    // Ctrl+F / Cmd+F to open search
+    // Ctrl+F / Cmd+F to open search;  Ctrl+D to duplicate node
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
+        const isInput = ['INPUT','TEXTAREA','SELECT'].includes((e.target as HTMLElement)?.tagName);
+        if (isInput) return;
+
         if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             setSearchOpen(prev => !prev);
+            return;
+        }
+
+        // Ctrl+D — duplicate selected node as sibling (with all children)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+            e.preventDefault(); e.stopPropagation();
+            const mind = getMindElixirInstance();
+            if (!mind) return;
+            try {
+                const nodeId = (mind.currentNode as any)?.id
+                    ?? (mind.currentNodes?.[0] as any)?.id;
+                if (!nodeId) return;
+                const rootId = mind.getData()?.nodeData?.id;
+                if (nodeId === rootId) return; // can't duplicate root
+                const tpc = mind.findEle(nodeId);
+                if (tpc) mind.copyNode(tpc, tpc);  // copy to same parent as sibling
+            } catch {}
+            return;
         }
     }, []);
 
