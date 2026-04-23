@@ -28,6 +28,7 @@ import { VIZLY_HYPER_THEME, VIZLY_HYPER_DARK_THEME, VIZLY_THEMES } from './theme
 import { migrateV1ToV2, directionStringToInt, markdownToNodeObj, opmlToNodeObj } from './migrate';
 import { isMindMapV2 } from './types';
 import { registerMindElixirInstance, unregisterMindElixirInstance } from './mindElixirStore';
+import MindMapContextMenu, { type CtxPos } from './MindMapContextMenu';
 
 // ─── Default data shown for a fresh mindmap ──────────────────────────────────
 const DEFAULT_DATA: MindElixirData = {
@@ -357,6 +358,8 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         if (mindRef.current) saveData(ctx, mindRef.current);
     }, [ctx]);
 
+    const [ctxMenu, setCtxMenu] = useState<CtxPos>({ visible: false, x: 0, y: 0, nodeId: null });
+
     useEffect(() => {
         // Inject gradient CSS fix once globally
         injectGradientFix();
@@ -375,7 +378,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             el: containerRef.current,
             direction: (initialData.direction ?? MindElixir.SIDE) as 0 | 1 | 2,
             editable: true,
-            contextMenu: true,   // enable built-in context menu for node ops
+            contextMenu: false,   // disabled: using custom MindMapContextMenu
             toolBar: false,
             keypress: true,
             overflowHidden: false,
@@ -407,6 +410,22 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             } catch {}
         };
         mind.container.addEventListener('click', handleHyperLinkClick);
+
+        // ── Custom contextmenu ────────────────────────────────────────────────
+        const handleContextMenu = (e: MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const tpc = (e.target as HTMLElement)?.closest?.('me-tpc') as HTMLElement | null;
+            if (!tpc) return;
+            const wrapper = tpc.closest('me-wrapper') as HTMLElement | null;
+            const nodeId = tpc.getAttribute('data-nodeid')
+                || wrapper?.getAttribute('data-nodeid')
+                || (mind.currentNode as any)?.id
+                || null;
+            if (!nodeId) return;
+            setCtxMenu({ visible: true, x: e.clientX, y: e.clientY, nodeId });
+        };
+        mind.container.addEventListener('contextmenu', handleContextMenu);
 
         // Debounced auto-save on every operation
         const debouncedSave = debounce(() => saveRef.current(), 800);
@@ -491,6 +510,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             mind.bus.removeListener('selectNewNode', handleSelectNewNode);
             mind.bus.removeListener('unselectNodes', handleUnselectNodes);
             mind.container?.removeEventListener('click', handleHyperLinkClick);
+            mind.container?.removeEventListener('contextmenu', handleContextMenu);
             // mind-elixir doesn't have a formal destroy() — unmounting the div is enough
             unregisterMindElixirInstance();
             mindRef.current = null;
@@ -596,6 +616,12 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     </div>
                 )}
             </div>
+
+            {/* Custom context menu — rendered outside canvas div so fixed positioning works */}
+            <MindMapContextMenu
+                {...ctxMenu}
+                onClose={() => setCtxMenu(m => ({ ...m, visible: false }))}
+            />
         </MindElixirContext.Provider>
     );
 };
