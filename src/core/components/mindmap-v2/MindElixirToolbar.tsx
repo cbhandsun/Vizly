@@ -49,6 +49,7 @@ import {
 import { VIZLY_THEME_OPTIONS, VIZLY_THEMES } from './theme';
 import { usePresentationMode } from './MindMapPresentationMode';
 import { emitOpenSearch } from './mindmapSearchStore';
+import { emitToggleOutline } from './mindmapOutlineStore';
 import MindMapShortcutsModal from './MindMapShortcutsModal';
 import MindMapTemplates from './MindMapTemplates';
 import { exportXmind } from './exportXmind';
@@ -739,6 +740,16 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
                         style={{ color: bgPattern !== 'none' ? '#6366f1' : 'rgba(255,255,255,0.4)' }} />
                 </Tooltip>
             </Dropdown>
+
+            {/* Outline view toggle */}
+            <Tooltip title="大纲视图 (Alt+O)">
+                <Button size="small" type="text"
+                    onClick={emitToggleOutline}
+                    style={{ fontSize: 13 }}
+                >
+                    ☰
+                </Button>
+            </Tooltip>
 
             {/* Shortcuts help */}
             <Tooltip title="键盘快捷键 (?)">

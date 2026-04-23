@@ -1,472 +1,196 @@
 /**
- * MindMapOutlinePanel.tsx — Tree outline navigator (v2)
- *
- * Features:
- *  - Recursive tree rendering with expand/collapse
- *  - Real-time keyword search with highlight + auto-expand matching paths
- *  - Click to select + scroll-into-view on canvas
- *  - Selection sync from canvas → outline (auto-scrolls outline)
- *  - Expand All / Collapse All toolbar
- *  - Note & hyperLink badges on nodes
- *  - Correct EventMap usage (selectNodes / selectNewNode / unselectNodes)
+ * MindMapOutlinePanel.tsx — 大纲视图侧面板
+ * XMind / Notion 风格：所有节点按树形缩进列出，点击定位，内置搜索过滤
  */
-
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Typography, Input, Empty, Button, Tooltip } from 'antd';
-import {
-    SearchOutlined, BranchesOutlined,
-    MenuFoldOutlined, MenuUnfoldOutlined,
-    LinkOutlined, FileTextOutlined,
-} from '@ant-design/icons';
+import React, { useEffect, useState, useCallback } from 'react';
 import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
+import { subscribeOutline } from './mindmapOutlineStore';
 
-const { Text } = Typography;
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function checkDescendantsMatch(node: NodeObj, filter: string): boolean {
-    if (!node.children?.length) return false;
-    const lc = filter.toLowerCase();
-    return node.children.some(c =>
-        (c.topic || '').toLowerCase().includes(lc)
-        || checkDescendantsMatch(c, lc)
-    );
+// ─── Flatten tree → array ─────────────────────────────────────────────────────
+interface FlatNode {
+    id: string; topic: string; depth: number;
+    hasNote: boolean; hasLink: boolean;
+    icons: string[];
 }
 
-function highlightText(text: string, filter: string): React.ReactNode {
-    if (!filter) return text;
-    const idx = text.toLowerCase().indexOf(filter.toLowerCase());
-    if (idx === -1) return text;
-    return (
-        <>
-            {text.slice(0, idx)}
-            <mark style={{
-                background: 'rgba(99,102,241,0.22)',
-                borderRadius: 3, padding: '0 2px',
-                color: 'inherit',
-            }}>
-                {text.slice(idx, idx + filter.length)}
-            </mark>
-            {text.slice(idx + filter.length)}
-        </>
-    );
+function flattenTree(node: NodeObj, depth = 0, result: FlatNode[] = []): FlatNode[] {
+    result.push({
+        id: node.id,
+        topic: node.topic || '(无标题)',
+        depth,
+        hasNote: !!node.note,
+        hasLink: !!node.hyperLink,
+        icons: ((node.icons as string[]) ?? []).slice(0, 2),
+    });
+    (node.children ?? []).forEach(c => flattenTree(c, depth + 1, result));
+    return result;
 }
 
-function countNodes(node: NodeObj): number {
-    if (!node.children?.length) return 1;
-    return 1 + node.children.reduce((s, c) => s + countNodes(c), 0);
-}
-
-/** Returns true if this node or any descendant matches the filter */
-function nodeOrDescendantMatches(node: NodeObj, filter: string): boolean {
-    const lc = filter.toLowerCase();
-    if ((node.topic || '').toLowerCase().includes(lc)) return true;
-    return node.children?.some(c => nodeOrDescendantMatches(c, lc)) ?? false;
-}
-
-// ─── Recursive node row ───────────────────────────────────────────────────────
-interface OutlineNodeProps {
-    node: NodeObj;
-    depth: number;
-    selectedId: string | null;
-    filterText: string;
-    expandAll: boolean;    // when true, force-expand all
-    collapseAll: boolean;  // when true, force-collapse all (except root)
-    isRoot: boolean;
-    onSelect: (node: NodeObj) => void;
-    nodeRef?: (id: string, el: HTMLDivElement | null) => void;
-}
-
-const OutlineNode: React.FC<OutlineNodeProps> = ({
-    node, depth, selectedId, filterText, expandAll, collapseAll, isRoot, onSelect, nodeRef,
-}) => {
-    const hasChildren = (node.children?.length ?? 0) > 0;
-    const isSelected = node.id === selectedId;
-    const label = node.topic || '(空节点)';
-    const [localExpanded, setLocalExpanded] = useState(depth < 2);
-    const rowRef = useRef<HTMLDivElement>(null);
-    const [editing, setEditing] = useState(false);
-    const [editValue, setEditValue] = useState('');
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    // Force-expand when searching; force-expand/collapse from toolbar
-    const forceExpand = filterText
-        ? nodeOrDescendantMatches(node, filterText)
-        : expandAll;
-    const expanded = filterText
-        ? (nodeOrDescendantMatches(node, filterText) || localExpanded)
-        : (isRoot ? true : (expandAll ? true : collapseAll ? false : localExpanded));
-
-    // Register DOM ref for scroll-into-view
-    useEffect(() => {
-        nodeRef?.(node.id, rowRef.current);
-        return () => nodeRef?.(node.id, null);
-    }, [node.id, nodeRef]);
-
-    // Inline editing helpers
-    const startEdit = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setEditValue(node.topic || '');
-        setEditing(true);
-        setTimeout(() => inputRef.current?.select(), 30);
-    };
-
-    const commitEdit = async () => {
-        const mind = getMindElixirInstance();
-        if (!mind || !editing) return;
-        setEditing(false);
-        const trimmed = editValue.trim();
-        if (!trimmed || trimmed === node.topic) return;
-        try {
-            const tpc = mind.findEle(node.id);
-            if (tpc) await mind.setNodeTopic(tpc, trimmed);
-        } catch {}
-    };
-
-    const cancelEdit = () => {
-        setEditing(false);
-        setEditValue('');
-    };
-
-    // Filter: hide if no match in this subtree
-    if (filterText && !nodeOrDescendantMatches(node, filterText)) return null;
-
-    const paddingLeft = depth * 16 + 8;
-    const isHovered = false; // use CSS for hover
-
-    return (
-        <div>
-            <div
-                ref={rowRef}
-                data-nodeid={node.id}
-                onClick={() => onSelect(node)}
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 5,
-                    padding: `5px 10px 5px ${paddingLeft}px`,
-                    cursor: 'pointer',
-                    background: isSelected ? 'rgba(99,102,241,0.1)' : 'transparent',
-                    borderLeft: `2px solid ${isSelected ? '#6366f1' : 'transparent'}`,
-                    borderRadius: isSelected ? '0 6px 6px 0' : 0,
-                    transition: 'background 0.12s ease, border-color 0.12s ease',
-                    userSelect: 'none',
-                }}
-                onMouseEnter={e => {
-                    if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'rgba(0,0,0,0.03)';
-                }}
-                onMouseLeave={e => {
-                    if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'transparent';
-                }}
-            >
-                {/* Expand/collapse toggle */}
-                <span
-                    onClick={e => { e.stopPropagation(); setLocalExpanded(v => !v); }}
-                    style={{
-                        width: 14, height: 14, flexShrink: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 9, color: '#94a3b8',
-                        transform: expanded ? 'rotate(90deg)' : 'none',
-                        transition: 'transform 0.15s ease',
-                        opacity: hasChildren ? 1 : 0,
-                        pointerEvents: hasChildren ? 'auto' : 'none',
-                    }}
-                >
-                    ▶
-                </span>
-
-                {/* Depth-based icon */}
-                <span style={{ fontSize: 11, flexShrink: 0, lineHeight: 1 }}>
-                    {isRoot ? '⭐' : depth === 1 ? '◆' : '·'}
-                </span>
-
-                {/* Label with search highlight — double-click to edit */}
-                {editing ? (
-                    <input
-                        ref={inputRef}
-                        value={editValue}
-                        onChange={e => setEditValue(e.target.value)}
-                        onBlur={commitEdit}
-                        onKeyDown={e => {
-                            if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
-                            if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
-                            e.stopPropagation();
-                        }}
-                        onClick={e => e.stopPropagation()}
-                        style={{
-                            flex: 1,
-                            fontSize: 12.5,
-                            fontWeight: isRoot ? 600 : depth === 1 ? 500 : 400,
-                            background: 'rgba(99,102,241,0.08)',
-                            border: '1px solid rgba(99,102,241,0.4)',
-                            borderRadius: 4,
-                            padding: '1px 5px',
-                            color: '#1e293b',
-                            outline: 'none',
-                            minWidth: 0,
-                        }}
-                        autoFocus
-                    />
-                ) : (
-                    <span
-                        style={{
-                            fontSize: 12.5,
-                            color: isSelected ? '#6366f1' : '#1e293b',
-                            fontWeight: isRoot ? 600 : depth === 1 ? 500 : 400,
-                            flex: 1,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                        }}
-                        onDoubleClick={startEdit}
-                        title="双击编辑"
-                    >
-                        {highlightText(label, filterText)}
-                    </span>
-                )}
-
-                {/* Badges: note, hyperlink, child count */}
-                <span style={{ display: 'flex', gap: 3, flexShrink: 0, alignItems: 'center' }}>
-                    {node.note && (
-                        <Tooltip title={node.note.slice(0, 80) + (node.note.length > 80 ? '...' : '')}>
-                            <FileTextOutlined style={{ fontSize: 10, color: '#94a3b8' }} />
-                        </Tooltip>
-                    )}
-                    {node.hyperLink && (
-                        <Tooltip title={node.hyperLink}>
-                            <LinkOutlined style={{ fontSize: 10, color: '#94a3b8' }} />
-                        </Tooltip>
-                    )}
-                    {hasChildren && !expanded && (
-                        <span style={{
-                            fontSize: 9.5, color: '#94a3b8',
-                            background: 'rgba(0,0,0,0.06)',
-                            borderRadius: 8, padding: '1px 4px',
-                        }}>
-                            {node.children!.length}
-                        </span>
-                    )}
-                </span>
-            </div>
-
-            {/* Children */}
-            {hasChildren && expanded && (
-                <div>
-                    {node.children!.map(child => (
-                        <OutlineNode
-                            key={child.id}
-                            node={child}
-                            depth={depth + 1}
-                            selectedId={selectedId}
-                            filterText={filterText}
-                            expandAll={expandAll}
-                            collapseAll={collapseAll}
-                            isRoot={false}
-                            onSelect={onSelect}
-                            nodeRef={nodeRef}
-                        />
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-};
-
-// ─── Main Panel ───────────────────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────────────────────────
 const MindMapOutlinePanel: React.FC = () => {
-    const [, setTick] = useState(0);
-    const [filterText, setFilterText] = useState('');
-    const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [expandAll, setExpandAll] = useState(false);
-    const [collapseAll, setCollapseAll] = useState(false);
+    const [open, setOpen] = useState(false);
+    const [nodes, setNodes] = useState<FlatNode[]>([]);
+    const [query, setQuery] = useState('');
+    const [activeId, setActiveId] = useState<string | null>(null);
+    const [mind, setMind] = useState(getMindElixirInstance());
 
-    // Map from nodeId → DOM element for scroll-into-view
-    const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    useEffect(() => subscribeMindElixir(m => setMind(m)), []);
+    useEffect(() => subscribeOutline(v => setOpen(v)), []);
 
-    useEffect(() => subscribeMindElixir(() => setTick(t => t + 1)), []);
-
-    const mind = getMindElixirInstance();
-
-    // Also listen to operation events to redraw outline after node changes
-    useEffect(() => {
-        if (!mind) return;
-        const refresh = () => setTick(t => t + 1);
-        mind.bus.addListener('operation', refresh);
-        return () => { mind.bus.removeListener('operation', refresh); };
-    }, [mind]);
-
-    // Track canvas selection → sync outline highlight + scroll
-    useEffect(() => {
-        if (!mind) return;
-
-        const syncSelect = (id: string | null) => {
-            setSelectedId(id);
-            if (!id) return;
-            // Scroll outline panel to show the selected row
-            requestAnimationFrame(() => {
-                const el = nodeRefs.current.get(id);
-                const container = scrollContainerRef.current;
-                if (el && container) {
-                    const elRect = el.getBoundingClientRect();
-                    const cRect = container.getBoundingClientRect();
-                    if (elRect.top < cRect.top || elRect.bottom > cRect.bottom) {
-                        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                    }
-                }
-            });
-        };
-
-        const onSelectNodes = (nodes: NodeObj[]) => syncSelect(nodes[0]?.id ?? null);
-        const onSelectNewNode = (node: NodeObj) => syncSelect(node.id);
-        const onUnselectNodes = () => syncSelect(null);
-
-        mind.bus.addListener('selectNodes', onSelectNodes);
-        mind.bus.addListener('selectNewNode', onSelectNewNode);
-        mind.bus.addListener('unselectNodes', onUnselectNodes);
-
-        return () => {
-            mind.bus.removeListener('selectNodes', onSelectNodes);
-            mind.bus.removeListener('selectNewNode', onSelectNewNode);
-            mind.bus.removeListener('unselectNodes', onUnselectNodes);
-        };
-    }, [mind]);
-
-    const handleNodeSelect = useCallback((node: NodeObj) => {
-        if (!mind) return;
-        setSelectedId(node.id);
+    const refresh = useCallback(() => {
         try {
-            const tpcEl = mind.findEle(node.id);
-            if (tpcEl) {
-                mind.selectNode(tpcEl);
-                mind.scrollIntoView(tpcEl);
-            }
-        } catch (e) {
-            console.warn('[Outline] selectNode failed:', e);
-        }
+            const data = mind?.getData();
+            if (!data) return;
+            setNodes(flattenTree(data.nodeData));
+        } catch {}
     }, [mind]);
 
-    const registerNodeRef = useCallback((id: string, el: HTMLDivElement | null) => {
-        if (el) nodeRefs.current.set(id, el);
-        else nodeRefs.current.delete(id);
-    }, []);
+    useEffect(() => {
+        if (!mind || !open) return;
+        refresh();
+        const onOp = () => { setTimeout(refresh, 80); };
+        const onSelect = (nodeObj: NodeObj | null) => setActiveId((nodeObj as any)?.id ?? null);
+        const onDeselect = () => setActiveId(null);
+        mind.bus.addListener('operation', onOp);
+        mind.bus.addListener('selectNode', onSelect as any);
+        mind.bus.addListener('unselectNode', onDeselect);
+        return () => {
+            mind.bus.removeListener('operation', onOp);
+            mind.bus.removeListener('selectNode', onSelect as any);
+            mind.bus.removeListener('unselectNode', onDeselect);
+        };
+    }, [mind, open, refresh]);
 
-    const handleExpandAll = useCallback(() => {
-        setExpandAll(true);
-        setCollapseAll(false);
-        // Reset after one render cycle so individual toggles still work
-        setTimeout(() => setExpandAll(false), 100);
-    }, []);
+    const handleClick = useCallback((id: string) => {
+        if (!mind) return;
+        try {
+            const tpc = mind.findEle(id);
+            if (tpc) { mind.selectNode(tpc); mind.toCenter(); }
+        } catch {}
+        setActiveId(id);
+    }, [mind]);
 
-    const handleCollapseAll = useCallback(() => {
-        setCollapseAll(true);
-        setExpandAll(false);
-        setTimeout(() => setCollapseAll(false), 100);
-    }, []);
+    if (!open) return null;
 
-    if (!mind) {
-        return (
-            <div style={{ padding: 24 }}>
-                <Empty description="思维导图加载中..." image={Empty.PRESENTED_IMAGE_SIMPLE} />
-            </div>
-        );
-    }
+    const filtered = query.trim()
+        ? nodes.filter(n => n.topic.toLowerCase().includes(query.toLowerCase()))
+        : nodes;
 
-    const data = mind.getData();
-    const nodeCount = countNodes(data.nodeData);
+    const INDENT = 12;
+    const depthColor = (d: number) =>
+        d === 0 ? '#a5b4fc' : d === 1 ? '#c4b5fd' : d === 2 ? '#d8b4fe' : 'rgba(255,255,255,0.5)';
 
     return (
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* ── Header ───────────────────────────────────────────────── */}
+        <div style={{
+            position: 'absolute',
+            right: 0, top: 0, bottom: 0, width: 262,
+            background: 'rgba(9,9,15,0.93)',
+            backdropFilter: 'blur(24px)',
+            borderLeft: '1px solid rgba(255,255,255,0.07)',
+            zIndex: 800,
+            display: 'flex', flexDirection: 'column',
+            animation: 'outlineIn 0.16s ease',
+        }}>
+            <style>{`
+                @keyframes outlineIn {
+                    from { opacity:0; transform:translateX(16px); }
+                    to   { opacity:1; transform:translateX(0); }
+                }
+                .outline-item:hover { background: rgba(255,255,255,0.04) !important; }
+                .outline-scroll::-webkit-scrollbar { width: 3px; }
+                .outline-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+            `}</style>
+
+            {/* Header */}
             <div style={{
                 padding: '10px 12px 8px',
-                borderBottom: '1px solid rgba(0,0,0,0.06)',
-                flexShrink: 0,
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                display: 'flex', alignItems: 'center', gap: 8,
             }}>
-                <div style={{
-                    display: 'flex', alignItems: 'center',
-                    gap: 6, marginBottom: 8,
-                }}>
-                    <BranchesOutlined style={{ color: '#6366f1', fontSize: 13 }} />
-                    <Text strong style={{ fontSize: 13, flex: 1 }}>大纲视图</Text>
-                    <span style={{
-                        fontSize: 11, color: '#94a3b8',
-                        background: 'rgba(0,0,0,0.04)',
-                        borderRadius: 8, padding: '1px 6px',
-                    }}>
-                        {nodeCount} 节点
-                    </span>
-                    <Tooltip title="展开全部">
-                        <Button
-                            size="small" type="text"
-                            icon={<MenuUnfoldOutlined />}
-                            onClick={handleExpandAll}
-                            style={{ color: '#94a3b8', width: 24, padding: 0 }}
-                        />
-                    </Tooltip>
-                    <Tooltip title="折叠全部">
-                        <Button
-                            size="small" type="text"
-                            icon={<MenuFoldOutlined />}
-                            onClick={handleCollapseAll}
-                            style={{ color: '#94a3b8', width: 24, padding: 0 }}
-                        />
-                    </Tooltip>
-                </div>
+                <span style={{ fontSize: 13 }}>📋</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.7)', flex: 1 }}>大纲视图</span>
+                <button onClick={() => setOpen(false)} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'rgba(255,255,255,0.3)', fontSize: 16, lineHeight: 1,
+                }} title="关闭 (Alt+O)">×</button>
+            </div>
 
-                <Input
-                    prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
-                    placeholder="搜索节点..."
-                    size="small"
-                    value={filterText}
-                    onChange={e => setFilterText(e.target.value)}
-                    allowClear
-                    style={{ borderRadius: 8 }}
+            {/* Search */}
+            <div style={{ padding: '7px 10px 4px' }}>
+                <input
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    placeholder="🔍 搜索节点..."
+                    style={{
+                        width: '100%', boxSizing: 'border-box',
+                        padding: '4px 9px', borderRadius: 6,
+                        border: '1px solid rgba(255,255,255,0.09)',
+                        background: 'rgba(255,255,255,0.05)',
+                        color: 'rgba(255,255,255,0.75)',
+                        fontSize: 11, outline: 'none',
+                    }}
                 />
             </div>
 
-            {/* ── Search result count ───────────────────────────────────── */}
-            {filterText && (
-                <div style={{
-                    padding: '4px 12px',
-                    fontSize: 11, color: '#94a3b8',
-                    borderBottom: '1px solid rgba(0,0,0,0.04)',
-                    flexShrink: 0,
-                }}>
-                    搜索结果：<strong style={{ color: '#6366f1' }}>
-                        {countMatchingNodes(data.nodeData, filterText)}
-                    </strong> 个节点
-                </div>
-            )}
+            {/* Node list */}
+            <div className="outline-scroll" style={{ flex: 1, overflowY: 'auto', padding: '2px 5px 8px' }}>
+                {filtered.map(n => (
+                    <div
+                        key={n.id}
+                        className="outline-item"
+                        onClick={() => handleClick(n.id)}
+                        title={n.topic}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: 5,
+                            padding: `3px 8px 3px ${8 + n.depth * INDENT}px`,
+                            borderRadius: 5, cursor: 'pointer', marginBottom: 1,
+                            background: activeId === n.id ? 'rgba(99,102,241,0.14)' : 'transparent',
+                            borderLeft: `2px solid ${activeId === n.id ? '#6366f1' : 'transparent'}`,
+                            transition: 'background 0.1s',
+                        }}
+                    >
+                        {n.depth > 0 && (
+                            <div style={{
+                                width: 4, height: 4, borderRadius: '50%', flexShrink: 0,
+                                background: depthColor(n.depth), opacity: 0.7,
+                            }} />
+                        )}
+                        {n.depth === 0 && <span style={{ fontSize: 11, flexShrink: 0 }}>🧠</span>}
+                        <span style={{
+                            flex: 1, fontSize: 11,
+                            color: activeId === n.id ? '#c7d2fe' : depthColor(n.depth),
+                            fontWeight: n.depth <= 1 ? 600 : 400,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                            {n.topic}
+                        </span>
+                        <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                            {n.icons.map(ic => <span key={ic} style={{ fontSize: 9 }}>{ic}</span>)}
+                            {n.hasNote && <span title="有备注" style={{ fontSize: 9, opacity: 0.45 }}>📝</span>}
+                            {n.hasLink && <span title="有超链接" style={{ fontSize: 9, opacity: 0.45 }}>🔗</span>}
+                        </div>
+                    </div>
+                ))}
+                {filtered.length === 0 && (
+                    <div style={{ padding: '24px', textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 11 }}>
+                        {query ? '无匹配节点' : '暂无节点'}
+                    </div>
+                )}
+            </div>
 
-            {/* ── Node tree ─────────────────────────────────────────────── */}
-            <div
-                ref={scrollContainerRef}
-                style={{ flex: 1, overflowY: 'auto', paddingTop: 4, paddingBottom: 16 }}
-            >
-                <OutlineNode
-                    node={data.nodeData}
-                    depth={0}
-                    selectedId={selectedId}
-                    filterText={filterText}
-                    expandAll={expandAll}
-                    collapseAll={collapseAll}
-                    isRoot={true}
-                    onSelect={handleNodeSelect}
-                    nodeRef={registerNodeRef}
-                />
+            {/* Footer */}
+            <div style={{
+                padding: '5px 14px',
+                borderTop: '1px solid rgba(255,255,255,0.05)',
+                fontSize: 10, color: 'rgba(255,255,255,0.25)',
+                display: 'flex', justifyContent: 'space-between',
+            }}>
+                <span>共 {nodes.length} 个节点</span>
+                <span>Alt+O 切换</span>
             </div>
         </div>
     );
 };
-
-function countMatchingNodes(node: NodeObj, filter: string): number {
-    const lc = filter.toLowerCase();
-    let count = (node.topic || '').toLowerCase().includes(lc) ? 1 : 0;
-    for (const child of node.children ?? []) {
-        count += countMatchingNodes(child, filter);
-    }
-    return count;
-}
 
 export default MindMapOutlinePanel;

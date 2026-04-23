@@ -32,6 +32,9 @@ import MindMapContextMenu, { type CtxPos } from './MindMapContextMenu';
 import MindMapFloatingBar from './MindMapFloatingBar';
 import MindMapBatchBar from './MindMapBatchBar';
 import MindMapEmptyGuide from './MindMapEmptyGuide';
+import MindMapOutlinePanel from './MindMapOutlinePanel';
+import { emitToggleOutline } from './mindmapOutlineStore';
+import { findNodeById } from './migrate';
 import { marked } from 'marked';
 
 // ─── Default data shown for a fresh mindmap ──────────────────────────────────
@@ -326,6 +329,24 @@ function injectGradientFix() {
             font-family: 'Menlo', 'Consolas', monospace;
             color: inherit;
         }
+
+        /* ── 备注指示器：右上角 amber 点 ────────────────────────────────────── */
+        me-wrapper[data-note] me-tpc {
+            position: relative !important;
+        }
+        me-wrapper[data-note] me-tpc::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #f59e0b;
+            box-shadow: 0 0 5px rgba(245,158,11,0.55);
+            pointer-events: none;
+            z-index: 10;
+        }
     `;
     document.head.appendChild(style);
 }
@@ -576,7 +597,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         // Initial badge update after layout settles
         setTimeout(updateBadgesFromData, 350);
 
-        // ── Apply node shapes from shapeClass property to DOM ─────────────────
+        // ── Apply node shapes + note indicators to DOM ──────────────────────
         const applyShapes = () => {
             try {
                 const walk = (node: NodeObj) => {
@@ -587,6 +608,9 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                         if (wrapper) {
                             if (shape) wrapper.setAttribute('data-shape', shape);
                             else wrapper.removeAttribute('data-shape');
+                            // Note indicator
+                            if (node.note) wrapper.setAttribute('data-note', '1');
+                            else wrapper.removeAttribute('data-note');
                         }
                     } catch {}
                     (node.children ?? []).forEach(walk);
@@ -596,6 +620,30 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         };
         mind.bus.addListener('operation', applyShapes);
         setTimeout(applyShapes, 400);
+
+        // ── Keyboard shortcuts: Alt+O (outline), Ctrl+Shift+C (copy text) ────
+        const handleGlobalKeys = (e: KeyboardEvent) => {
+            // Alt+O — toggle outline panel
+            if (e.altKey && e.key.toLowerCase() === 'o') {
+                e.preventDefault();
+                emitToggleOutline();
+                return;
+            }
+            // Ctrl+Shift+C — copy selected node topic to clipboard
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
+                try {
+                    const currentNode = (mind as any).currentNode as HTMLElement | null;
+                    const nodeId = currentNode?.dataset?.nodeid ?? '';
+                    if (!nodeId) return;
+                    const obj = findNodeById(mind.getData().nodeData, nodeId);
+                    if (obj?.topic) {
+                        navigator.clipboard.writeText(obj.topic).catch(() => {});
+                    }
+                } catch {}
+                return;
+            }
+        };
+        document.addEventListener('keydown', handleGlobalKeys);
 
         // Track selected node for property panel
         // EventMap has 'selectNodes' (array) and 'selectNewNode' (single), not 'selectNode'
@@ -626,6 +674,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             mind.bus.removeListener('operation', applyShapes);
             mind.container?.removeEventListener('click', handleHyperLinkClick);
             mind.container?.removeEventListener('contextmenu', handleContextMenu);
+            document.removeEventListener('keydown', handleGlobalKeys);
             // mind-elixir doesn't have a formal destroy() — unmounting the div is enough
             unregisterMindElixirInstance();
             mindRef.current = null;
@@ -733,6 +782,9 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
 
                 {/* Empty state guide — shown only when map has just the root node */}
                 {instance && <MindMapEmptyGuide />}
+
+                {/* Outline view panel — slides in from the right */}
+                <MindMapOutlinePanel />
             </div>
 
             {/* Custom context menu */}
