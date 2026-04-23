@@ -6,10 +6,10 @@
  *  - 覆盖 90% 高频操作：添加子/兄弟、颜色、折叠/展开、删除
  *  - 无需打开侧边属性面板或右键菜单
  */
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Tooltip, Popover } from 'antd';
 import type { NodeObj } from 'mind-elixir';
-import { getMindElixirInstance } from './mindElixirStore';
+import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { findNodeById } from './migrate';
 
 // ─── Colour palette for quick branch color ─────────────────────────────────
@@ -23,6 +23,10 @@ const QUICK_COLORS = [
 interface BarPos { x: number; y: number; nodeId: string; }
 
 const MindMapFloatingBar: React.FC = () => {
+    // 订阅 store，确保 mind 实例异步注册后触发重渲染
+    const [mind, setMind] = useState(getMindElixirInstance);
+    useEffect(() => subscribeMindElixir(() => setMind(getMindElixirInstance())), []);
+
     const [pos, setPos] = useState<BarPos | null>(null);
     const [colorOpen, setColorOpen] = useState(false);
     const [shapeOpen, setShapeOpen] = useState(false);
@@ -30,7 +34,6 @@ const MindMapFloatingBar: React.FC = () => {
     const [noteText, setNoteText] = useState('');
     const barRef = useRef<HTMLDivElement>(null);
 
-    const mind = getMindElixirInstance();
 
     // ── Listen to selectNode / selectNodes events ────────────────────────────
     useEffect(() => {
@@ -51,7 +54,9 @@ const MindMapFloatingBar: React.FC = () => {
             } catch { setPos(null); }
         };
 
-        const onDeselect = () => { setPos(null); setColorOpen(false); };
+        const onDeselect = () => {
+            setPos(null); setColorOpen(false); setShapeOpen(false); setNoteOpen(false);
+        };
 
         // mind-elixir fires 'selectNode' with the NodeObj
         mind.bus.addListener('selectNode', onSelect);
@@ -125,8 +130,6 @@ const MindMapFloatingBar: React.FC = () => {
         transition: 'background 0.12s, transform 0.1s',
         flexShrink: 0,
     };
-
-    const BAR_W = isRoot ? 100 : (hasChildren ? 340 : 310);
 
     const Btn: React.FC<{ icon: string; tip: string; danger?: boolean; onClick: () => void }> = ({ icon, tip, danger, onClick }) => (
         <Tooltip title={tip} placement="top" mouseEnterDelay={0.4}>
