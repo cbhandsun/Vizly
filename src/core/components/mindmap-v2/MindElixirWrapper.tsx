@@ -33,6 +33,8 @@ import MindMapFloatingBar from './MindMapFloatingBar';
 import MindMapBatchBar from './MindMapBatchBar';
 import MindMapEmptyGuide from './MindMapEmptyGuide';
 import MindMapOutlinePanel from './MindMapOutlinePanel';
+import MindMapYjsIntegration from './MindMapYjsIntegration';
+import MindMapBoundaries from './MindMapBoundaries';
 import { emitToggleOutline } from './mindmapOutlineStore';
 import { findNodeById } from './migrate';
 import { marked } from 'marked';
@@ -829,6 +831,12 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
 
             {/* Multi-select batch operation bar — appears at bottom when 2+ nodes selected */}
             <MindMapBatchBar />
+
+            {/* Yjs CRDT Collaboration Engine */}
+            <MindMapYjsIntegration />
+
+            {/* Boundary Geometry Engine (React Portal) */}
+            <MindMapBoundaries />
 
             {/* Note hover preview tooltip */}
             {notePreview && (

@@ -154,6 +154,54 @@ export function downloadText(filename: string, content: string, mimeType = 'text
     URL.revokeObjectURL(url);
 }
 
+/** Convert mind-elixir NodeObj to Vizly Flowchart JSON */
+export function nodeObjToFlowchartJson(root: NodeObj): string {
+    const nodes: any[] = [];
+    const edges: any[] = [];
+    let yCounter = 0;
+
+    function traverse(node: NodeObj, depth: number, parentId: string | null) {
+        const id = node.id === 'root' ? 'me_root' : node.id;
+        
+        nodes.push({
+            id: id,
+            type: depth === 0 ? 'terminal' : 'task',
+            position: { x: depth * 280, y: yCounter * 110 },
+            data: { label: node.topic, ...(node.note ? { note: node.note } : {}) }
+        });
+        
+        if (parentId) {
+            edges.push({
+                id: `e_${parentId}_${id}`,
+                source: parentId,
+                target: id,
+                type: 'editableEdge'
+            });
+        }
+        
+        const children = node.children || [];
+        if (children.length === 0) {
+            yCounter++;
+        } else {
+            let first = true;
+            for (const child of children) {
+                if (!first) yCounter++;
+                traverse(child, depth + 1, id);
+                first = false;
+            }
+        }
+    }
+    
+    traverse(root, 0, null);
+    
+    return JSON.stringify({
+        version: "1.0",
+        pluginId: "flowchart",
+        nodes,
+        edges
+    }, null, 2);
+}
+
 /** Simple unique ID generator for imported nodes */
 function genId(): string {
     return `imp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;

@@ -44,7 +44,7 @@ import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import {
     directionStringToInt, nodeObjToMarkdown, nodeObjToOpml, downloadText,
-    markdownToNodeObj, opmlToNodeObj, countNodes, getTreeDepth,
+    markdownToNodeObj, opmlToNodeObj, countNodes, getTreeDepth, nodeObjToFlowchartJson
 } from './migrate';
 import { VIZLY_THEME_OPTIONS, VIZLY_THEMES } from './theme';
 import { usePresentationMode } from './MindMapPresentationMode';
@@ -248,6 +248,15 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
         } catch (e) { console.error('JSON export failed:', e); }
     }, [mind]);
 
+    const handleExportFlowchart = useCallback(() => {
+        if (!mind) return;
+        try {
+            const data = mind.getData();
+            const json = nodeObjToFlowchartJson(data.nodeData);
+            downloadText('mindmap_to_flowchart.vizly', json, 'application/json');
+        } catch (e) { console.error('Flowchart export failed:', e); }
+    }, [mind]);
+
     const handleExportXmind = useCallback(async () => {
         if (!mind) return;
         try {
@@ -364,6 +373,8 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
         { key: 'markdown', label: '导出 Markdown', icon: <DownloadOutlined />, onClick: handleExportMarkdown },
         { key: 'opml',     label: '导出 OPML',     icon: <DownloadOutlined />, onClick: handleExportOpml },
         { key: 'json',     label: '导出 JSON',     icon: <DownloadOutlined />, onClick: handleExportJson },
+        { type: 'divider' as const },
+        { key: 'flowchart',label: '转为流程图格式', icon: <ShareAltOutlined />, onClick: handleExportFlowchart },
         { type: 'divider' as const },
         { key: 'pdf',      label: '打印 / PDF',    icon: <PrinterOutlined />,  onClick: handleExportPdf },
     ];

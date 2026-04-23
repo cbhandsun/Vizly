@@ -11,6 +11,9 @@ import { Tooltip, Popover } from 'antd';
 import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { findNodeById } from './migrate';
+import { expandNodeWithAI, getAncestorPath } from './mindmapAIService';
+import { PlusOutlined, LoadingOutlined } from '@ant-design/icons';
+import styles from './FloatingBar.module.css';
 
 // ─── Colour palette for quick branch color ─────────────────────────────────
 const QUICK_COLORS = [
@@ -32,6 +35,10 @@ const MindMapFloatingBar: React.FC = () => {
     const [shapeOpen, setShapeOpen] = useState(false);
     const [noteOpen, setNoteOpen] = useState(false);
     const [noteText, setNoteText] = useState('');
+    const [aiOpen, setAiOpen] = useState(false);
+    const [aiExpanding, setAiExpanding] = useState(false);
+    const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+    const [aiError, setAiError] = useState('');
     const barRef = useRef<HTMLDivElement>(null);
 
 
@@ -41,7 +48,7 @@ const MindMapFloatingBar: React.FC = () => {
 
         const onSelect = (nodes: NodeObj[] | null) => {
             const node = nodes?.[0] ?? null;
-            if (!node) { setPos(null); setColorOpen(false); setShapeOpen(false); setNoteOpen(false); return; }
+            if (!node) { setPos(null); setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setAiOpen(false); return; }
             // Find the DOM element for the selected node to get its bounding rect
             try {
                 const tpcEl = mind.findEle(node.id);
@@ -56,7 +63,7 @@ const MindMapFloatingBar: React.FC = () => {
         };
 
         const onDeselect = () => {
-            setPos(null); setColorOpen(false); setShapeOpen(false); setNoteOpen(false);
+            setPos(null); setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setAiOpen(false);
         };
 
         // mind-elixir v5: fires 'selectNodes' (array) and 'selectNewNode'
@@ -64,7 +71,7 @@ const MindMapFloatingBar: React.FC = () => {
         mind.bus.addListener('selectNewNode', (node: NodeObj) => onSelect([node] as any));
         // Clicking canvas background fires 'unselectNodes'
         mind.bus.addListener('unselectNodes', onDeselect);
-        mind.bus.addListener('unselectNode', onDeselect);  // legacy fallback
+        mind.bus.addListener('unselectNode' as any, onDeselect);  // legacy fallback
         // When map refreshes, deselect
         mind.bus.addListener('operation', () => {
             // Delay to let DOM update, then refresh position
@@ -82,7 +89,7 @@ const MindMapFloatingBar: React.FC = () => {
             mind.bus.removeListener('selectNodes', onSelect as any);
             mind.bus.removeListener('selectNewNode', onSelect as any);
             mind.bus.removeListener('unselectNodes', onDeselect);
-            mind.bus.removeListener('unselectNode', onDeselect);
+            mind.bus.removeListener('unselectNode' as any, onDeselect);
         };
     }, [mind]);
 
@@ -92,6 +99,7 @@ const MindMapFloatingBar: React.FC = () => {
         const handler = (e: MouseEvent) => {
             if (barRef.current && !barRef.current.contains(e.target as Node)) {
                 setColorOpen(false);
+                // Also close other popovers if we want to mimic clicking outside
             }
         };
         document.addEventListener('mousedown', handler, true);
@@ -120,65 +128,113 @@ const MindMapFloatingBar: React.FC = () => {
         { key: 'diamond',   label: '菱形', preview: '◇' },
     ];
 
-    const act = (fn: () => void) => { fn(); setColorOpen(false); setShapeOpen(false); };
+    const act = (fn: () => void) => { fn(); setColorOpen(false); setShapeOpen(false); setAiOpen(false); };
 
-    // ── Button style ─────────────────────────────────────────────────────────
-    const btnStyle: React.CSSProperties = {
-        width: 28, height: 28,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        borderRadius: 7,
-        background: 'rgba(255,255,255,0.07)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        cursor: 'pointer',
-        fontSize: 13,
-        color: 'rgba(255,255,255,0.85)',
-        transition: 'background 0.12s, transform 0.1s',
-        flexShrink: 0,
+    // ── AI logic ─────────────────────────────────────────────────────────────
+    const handleAIExpand = async () => {
+        if (!mind || aiExpanding) return;
+        setAiExpanding(true);
+        setAiSuggestions([]);
+        setAiError('');
+        try {
+            const data = mind.getData();
+            const ancestorPath = getAncestorPath(data.nodeData, pos.nodeId);
+            const mapTitle = data.nodeData.topic;
+            const result = await expandNodeWithAI({ node: obj, ancestorPath, count: 4, mapTitle });
+            if (result.error) { setAiError(result.error); }
+            else { setAiSuggestions(result.topics); }
+        } catch (e: any) {
+            setAiError(e?.message ?? '未知错误');
+        } finally {
+            setAiExpanding(false);
+        }
     };
 
+    const handleAIApply = async (topic: string) => {
+        if (!mind) return;
+        try {
+            const tpcEl = getTpc();
+            if (!tpcEl) return;
+            mind.selectNode(tpcEl as any);
+            await mind.addChild(tpcEl as any, { topic, id: mind.generateNewObj?.().id ?? `n_${Date.now()}` } as NodeObj);
+        } catch (e) {}
+    };
+
+    // ── Button style ─────────────────────────────────────────────────────────
     const Btn: React.FC<{ icon: string; tip: string; danger?: boolean; onClick: () => void }> = ({ icon, tip, danger, onClick }) => (
         <Tooltip title={tip} placement="top" mouseEnterDelay={0.4}>
-            <div
-                style={{ ...btnStyle, color: danger ? '#f87171' : btnStyle.color }}
+            <button
+                className={`${styles.btn} ${danger ? styles.btnDanger : ''}`}
                 onClick={onClick}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = danger ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.15)'; (e.currentTarget as HTMLElement).style.transform = 'scale(1.1)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'; (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
             >
                 {icon}
-            </div>
+            </button>
         </Tooltip>
     );
 
     // Divider
-    const Div = () => <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />;
+    const Div = () => <div className={styles.divider} />;
 
     // ── Position: offset left so bar is truly centered ────────────────────────
-    const BAR_W = isRoot ? 100 : (hasChildren ? 370 : 340);
+    const BAR_W = isRoot ? 140 : (hasChildren ? 410 : 380); // Adjusted for new AI button
 
     return (
         <div
             ref={barRef}
+            className={styles.barContainer}
             style={{
-                position: 'fixed',
                 left: Math.min(Math.max(pos.x - BAR_W / 2, 8), window.innerWidth - BAR_W - 8),
-                top: pos.y - 38,
-                zIndex: 9000,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-                padding: '4px 6px',
-                background: 'rgba(12,12,20,0.9)',
-                backdropFilter: 'blur(16px)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 10,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3)',
-                animation: 'floatBarIn 0.12s ease',
-                pointerEvents: 'all',
+                top: Math.max(pos.y - 44, 8),
             }}
             // stop clicks from deselecting the node in canvas
             onMouseDown={e => e.stopPropagation()}
         >
-            <style>{`@keyframes floatBarIn { from { opacity:0; transform:translateY(4px) scale(0.96) } to { opacity:1; transform:translateY(0) scale(1) } }`}</style>
+
+            {/* AI Expand */}
+            <Popover
+                open={aiOpen}
+                onOpenChange={v => {
+                    setAiOpen(v);
+                    if (v) {
+                        setColorOpen(false); setShapeOpen(false); setNoteOpen(false);
+                        if (aiSuggestions.length === 0 && !aiExpanding) {
+                            handleAIExpand();
+                        }
+                    }
+                }}
+                trigger="click"
+                placement="top"
+                arrow={false}
+                content={
+                    <div className={styles.aiPopover}>
+                        <div className={styles.aiHeader}>
+                            <span>✨ AI 扩展建议</span>
+                            {aiExpanding && <span style={{ fontSize: 10, opacity: 0.6 }}>生成中...</span>}
+                        </div>
+                        {aiError && <div style={{ color: '#ef4444', fontSize: 12, padding: 4 }}>{aiError}</div>}
+                        {!aiExpanding && aiSuggestions.length === 0 && !aiError && (
+                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', padding: 4 }}>暂无建议</div>
+                        )}
+                        {aiSuggestions.map(s => (
+                            <div key={s} onClick={() => { handleAIApply(s); setAiOpen(false); }} className={styles.aiSuggestion}>
+                                <PlusOutlined style={{ marginRight: 6, color: '#a5b4fc', fontSize: 10 }} />
+                                {s}
+                            </div>
+                        ))}
+                    </div>
+                }
+            >
+                <Tooltip title="AI 扩展子主题">
+                    <button
+                        className={`${styles.btn} ${styles.btnAi}`}
+                        onClick={() => setAiOpen(v => !v)}
+                    >
+                        <div className={styles.btnAiInner}>✨</div>
+                    </button>
+                </Tooltip>
+            </Popover>
+
+            <Div />
 
             {/* Add child */}
             <Btn icon="➕" tip="添加子节点 (Tab)"
@@ -218,10 +274,11 @@ const MindMapFloatingBar: React.FC = () => {
                 placement="top"
                 arrow={false}
                 content={
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 5, padding: 4 }}>
+                    <div className={styles.colorGrid}>
                         {QUICK_COLORS.map(c => (
                             <div
                                 key={c}
+                                className={styles.colorItem}
                                 title={c === 'transparent' ? '透明（继承）' : c}
                                 onClick={() => {
                                     try {
@@ -234,31 +291,22 @@ const MindMapFloatingBar: React.FC = () => {
                                     setColorOpen(false);
                                 }}
                                 style={{
-                                    width: 22, height: 22, borderRadius: 5,
                                     background: c === 'transparent' ? 'repeating-conic-gradient(#ccc 0 90deg, #fff 0 180deg) 0 / 10px 10px' : c,
-                                    border: '1.5px solid rgba(0,0,0,0.15)',
-                                    cursor: 'pointer', transition: 'transform 0.1s',
                                 }}
-                                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.2)'; }}
-                                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
                             />
                         ))}
                     </div>
                 }
             >
                 <Tooltip title="连线颜色">
-                    <div style={{ ...btnStyle, gap: 2 }}
-                        onClick={() => { setColorOpen(v => !v); setShapeOpen(false); }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.15)'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'; }}
-                    >
+                    <button className={styles.btn} style={{ gap: 2 }} onClick={() => { setColorOpen(v => !v); setShapeOpen(false); }}>
                         <div style={{
                             width: 10, height: 10, borderRadius: '50%',
                             background: obj.branchColor ?? '#6366f1',
                             border: '1px solid rgba(255,255,255,0.3)',
                         }} />
                         <span style={{ fontSize: 9 }}>▾</span>
-                    </div>
+                    </button>
                 </Tooltip>
             </Popover>
 
@@ -270,12 +318,13 @@ const MindMapFloatingBar: React.FC = () => {
                 placement="top"
                 arrow={false}
                 content={
-                    <div style={{ display: 'flex', gap: 5, padding: 4 }}>
+                    <div className={styles.shapeGrid}>
                         {SHAPES.map(({ key, label, preview }) => {
                             const current = (obj as any).shapeClass ?? '';
                             return (
                                 <button key={key || 'default'}
                                     title={label}
+                                    className={`${styles.shapeBtn} ${current === key ? styles.shapeBtnActive : ''}`}
                                     onClick={() => {
                                         try {
                                             const tpc = getTpc();
@@ -283,17 +332,9 @@ const MindMapFloatingBar: React.FC = () => {
                                         } catch {}
                                         setShapeOpen(false);
                                     }}
-                                    style={{
-                                        width: 32, height: 32, borderRadius: 6, cursor: 'pointer',
-                                        fontSize: 14, textAlign: 'center', display: 'flex',
-                                        flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                                        border: current === key ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.12)',
-                                        background: current === key ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)',
-                                        color: current === key ? '#a5b4fc' : 'rgba(255,255,255,0.7)',
-                                    }}
                                 >
-                                    <div style={{ fontSize: 14 }}>{preview}</div>
-                                    <div style={{ fontSize: 8, opacity: 0.6 }}>{label}</div>
+                                    <div className={styles.shapePreview}>{preview}</div>
+                                    <div className={styles.shapeLabel}>{label}</div>
                                 </button>
                             );
                         })}
@@ -301,13 +342,9 @@ const MindMapFloatingBar: React.FC = () => {
                 }
             >
                 <Tooltip title="节点形状">
-                    <div style={{ ...btnStyle }}
-                        onClick={() => { setShapeOpen(v => !v); setColorOpen(false); }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.15)'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'; }}
-                    >
+                    <button className={styles.btn} onClick={() => { setShapeOpen(v => !v); setColorOpen(false); }}>
                         <span style={{ fontSize: 13 }}>◇</span>
-                    </div>
+                    </button>
                 </Tooltip>
             </Popover>
 
@@ -325,38 +362,27 @@ const MindMapFloatingBar: React.FC = () => {
                 placement="top"
                 arrow={false}
                 content={
-                    <div style={{ width: 240, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div className={styles.notePopover}>
                         <textarea
+                            className={styles.noteTextarea}
                             value={noteText}
                             onChange={e => setNoteText(e.target.value)}
                             placeholder="输入备注（支持 Markdown）..."
                             rows={4}
-                            style={{
-                                width: '100%', boxSizing: 'border-box', resize: 'vertical',
-                                padding: '6px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)',
-                                background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)',
-                                fontSize: 12, outline: 'none', fontFamily: 'inherit',
-                            }}
                         />
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <div className={styles.noteActions}>
                             <button
+                                className={styles.noteBtnClear}
                                 onClick={() => {
                                     try { const tpc = getTpc(); if (tpc) mind.reshapeNode(tpc as any, { ...obj, note: undefined }); }
                                     catch {} setNoteOpen(false);
                                 }}
-                                style={{
-                                    padding: '3px 10px', borderRadius: 5, border: 'none', cursor: 'pointer',
-                                    background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.45)', fontSize: 11,
-                                }}
                             >清除</button>
                             <button
+                                className={styles.noteBtnSave}
                                 onClick={() => {
                                     try { const tpc = getTpc(); if (tpc) mind.reshapeNode(tpc as any, { ...obj, note: noteText || undefined }); }
                                     catch {} setNoteOpen(false);
-                                }}
-                                style={{
-                                    padding: '3px 10px', borderRadius: 5, border: 'none', cursor: 'pointer',
-                                    background: 'rgba(99,102,241,0.3)', color: '#a5b4fc', fontSize: 11, fontWeight: 600,
                                 }}
                             >保存</button>
                         </div>
@@ -364,15 +390,26 @@ const MindMapFloatingBar: React.FC = () => {
                 }
             >
                 <Tooltip title={obj.note ? '编辑备注' : '添加备注'}>
-                    <div style={{ ...btnStyle, color: obj.note ? '#f59e0b' : 'rgba(255,255,255,0.7)' }}
+                    <button
+                        className={styles.btn}
+                        style={{ color: obj.note ? '#f59e0b' : 'rgba(255, 255, 255, 0.7)' }}
                         onClick={() => setNoteOpen(v => !v)}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.15)'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'; }}
                     >
                         <span style={{ fontSize: 13 }}>📝</span>
-                    </div>
+                    </button>
                 </Tooltip>
             </Popover>
+
+            {/* Boundary Toggle */}
+            <Btn icon="📌" tip={(obj as any).boundary ? '取消外框分组' : '添加外框分组'}
+                onClick={() => act(() => { 
+                    const tpc = getTpc(); 
+                    if (tpc) {
+                        const newBoundary = (obj as any).boundary ? undefined : { color: '#818cf8', title: '新建分组' };
+                        mind.reshapeNode(tpc as any, { ...obj, boundary: newBoundary } as any);
+                    }
+                })} 
+            />
 
             {/* Delete — not for root */}
             {!isRoot && (

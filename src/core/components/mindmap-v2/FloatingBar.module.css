@@ -1,0 +1,259 @@
+.barContainer {
+    position: fixed;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.2);
+    transition: left 0.15s ease-out, top 0.15s ease-out;
+}
+
+.divider {
+    width: 1px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 0 2px;
+}
+
+.btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.85);
+    transition: background 0.12s, transform 0.1s;
+    flex-shrink: 0;
+}
+
+.btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.1);
+}
+
+.btnDanger {
+    color: #f87171;
+}
+
+.btnDanger:hover {
+    background: rgba(239, 68, 68, 0.2);
+    transform: scale(1.1);
+}
+
+.btnAi {
+    position: relative;
+    overflow: hidden;
+}
+
+.btnAi::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: conic-gradient(transparent, rgba(168, 85, 247, 0.5), transparent 30%);
+    animation: rotate 3s linear infinite;
+}
+
+.btnAiInner {
+    position: absolute;
+    inset: 1px;
+    background: rgba(15, 23, 42, 0.8);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.colorGrid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 5px;
+    padding: 4px;
+}
+
+.colorItem {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    border: 1.5px solid rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.colorItem:hover {
+    transform: scale(1.2);
+}
+
+.shapeGrid {
+    display: flex;
+    gap: 5px;
+    padding: 4px;
+}
+
+.shapeBtn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.7);
+    transition: all 0.15s;
+}
+
+.shapeBtn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.shapeBtnActive {
+    border: 2px solid #6366f1;
+    background: rgba(99, 102, 241, 0.2);
+    color: #a5b4fc;
+}
+
+.shapePreview {
+    font-size: 14px;
+}
+
+.shapeLabel {
+    font-size: 8px;
+    opacity: 0.6;
+}
+
+.notePopover {
+    width: 240px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.noteTextarea {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 12px;
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+.noteTextarea:focus {
+    border-color: #6366f1;
+}
+
+.noteActions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.noteBtnClear {
+    padding: 3px 10px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 11px;
+    transition: all 0.15s;
+}
+
+.noteBtnClear:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.noteBtnSave {
+    padding: 3px 10px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    background: rgba(99, 102, 241, 0.3);
+    color: #a5b4fc;
+    font-size: 11px;
+    font-weight: 600;
+    transition: all 0.15s;
+}
+
+.noteBtnSave:hover {
+    background: rgba(99, 102, 241, 0.5);
+    color: #fff;
+}
+
+.aiPopover {
+    width: 260px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.aiHeader {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #a855f7;
+    margin-bottom: 4px;
+}
+
+.aiSuggestion {
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.15s;
+}
+
+.aiSuggestion:hover {
+    background: rgba(168, 85, 247, 0.15);
+    border-color: rgba(168, 85, 247, 0.4);
+    transform: translateX(2px);
+}
+
+.aiLoading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 0;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 12px;
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
