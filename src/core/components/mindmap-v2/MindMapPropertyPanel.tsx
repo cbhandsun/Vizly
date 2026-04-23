@@ -382,21 +382,47 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                     autoSize={{ minRows: 2, maxRows: 5 }} style={{ fontSize: 12 }} />
             </Row>
 
-            {/* Image URL */}
-            <Row label="节点图片 URL">
-                <Input prefix={<span style={{ fontSize: 11, color: '#94a3b8' }}>🖼️</span>}
-                    placeholder="https://..." value={imageUrl} size="small"
-                    onChange={e => setImageUrl(e.target.value)}
-                    onBlur={() => {
-                        const url = imageUrl.trim();
-                        reshape({ image: url ? { url, width: 160, height: 100, fit: 'contain' } : undefined });
-                    }}
-                    onPressEnter={() => {
-                        const url = imageUrl.trim();
-                        reshape({ image: url ? { url, width: 160, height: 100, fit: 'contain' } : undefined });
-                    }} />
+            {/* Image — URL input + local file upload */}
+            <Row label="节点图片">
+                <div style={{ display: 'flex', gap: 4, marginBottom: 5 }}>
+                    <Input prefix={<span style={{ fontSize: 11, color: '#94a3b8' }}>🖼️</span>}
+                        placeholder="https://... 或点击上传" value={imageUrl} size="small"
+                        style={{ flex: 1 }}
+                        onChange={e => setImageUrl(e.target.value)}
+                        onBlur={() => {
+                            const url = imageUrl.trim();
+                            reshape({ image: url ? { url, width: 160, height: 100, fit: 'contain' } : undefined });
+                        }}
+                        onPressEnter={() => {
+                            const url = imageUrl.trim();
+                            reshape({ image: url ? { url, width: 160, height: 100, fit: 'contain' } : undefined });
+                        }} />
+                    {/* Local file upload */}
+                    <label title="从本地上传图片" style={{
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        width: 28, height: 24, borderRadius: 5, cursor: 'pointer', flexShrink: 0,
+                        background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
+                        fontSize: 13,
+                    }}>
+                        📁
+                        <input type="file" accept="image/*" style={{ display: 'none' }}
+                            onChange={e => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onload = ev => {
+                                    const dataUrl = ev.target?.result as string;
+                                    if (!dataUrl) return;
+                                    setImageUrl(dataUrl);
+                                    reshape({ image: { url: dataUrl, width: 160, height: 100, fit: 'contain' } });
+                                };
+                                reader.readAsDataURL(file);
+                                e.target.value = '';
+                            }} />
+                    </label>
+                </div>
                 {imageUrl && (
-                    <div style={{ marginTop: 6, borderRadius: 6, overflow: 'hidden',
+                    <div style={{ marginTop: 2, borderRadius: 6, overflow: 'hidden',
                         border: '1px solid rgba(99,102,241,0.15)', position: 'relative' }}>
                         <img src={imageUrl} alt="预览"
                             style={{ width: '100%', maxHeight: 100, objectFit: 'contain',

@@ -51,6 +51,7 @@ import { usePresentationMode } from './MindMapPresentationMode';
 import { emitOpenSearch } from './mindmapSearchStore';
 import MindMapShortcutsModal from './MindMapShortcutsModal';
 import MindMapTemplates from './MindMapTemplates';
+import { exportXmind } from './exportXmind';
 
 
 const DIRECTION_OPTIONS = [
@@ -246,6 +247,15 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
         } catch (e) { console.error('JSON export failed:', e); }
     }, [mind]);
 
+    const handleExportXmind = useCallback(async () => {
+        if (!mind) return;
+        try {
+            const data = mind.getData();
+            const title = data.nodeData?.topic ?? 'mindmap';
+            await exportXmind(data.nodeData, title);
+        } catch (e) { console.error('XMind export failed:', e); }
+    }, [mind]);
+
     const handleExportPdf = useCallback(() => {
         if (!mind) return;
         // Use browser print API: hide everything except the mind-elixir container
@@ -335,6 +345,8 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
     const exportMenuItems = [
         { key: 'svg',      label: '导出 SVG',      icon: <ExportOutlined />,  onClick: handleExportSvg },
         { key: 'png',      label: '导出 PNG',      icon: <DownloadOutlined />, onClick: handleExportPng },
+        { key: 'xmind',   label: '导出 XMind',    icon: <DownloadOutlined />, onClick: handleExportXmind },
+        { type: 'divider' as const },
         { key: 'markdown', label: '导出 Markdown', icon: <DownloadOutlined />, onClick: handleExportMarkdown },
         { key: 'opml',     label: '导出 OPML',     icon: <DownloadOutlined />, onClick: handleExportOpml },
         { key: 'json',     label: '导出 JSON',     icon: <DownloadOutlined />, onClick: handleExportJson },

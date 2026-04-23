@@ -29,6 +29,7 @@ import { migrateV1ToV2, directionStringToInt, markdownToNodeObj, opmlToNodeObj }
 import { isMindMapV2 } from './types';
 import { registerMindElixirInstance, unregisterMindElixirInstance } from './mindElixirStore';
 import MindMapContextMenu, { type CtxPos } from './MindMapContextMenu';
+import MindMapFloatingBar from './MindMapFloatingBar';
 
 // ─── Default data shown for a fresh mindmap ──────────────────────────────────
 const DEFAULT_DATA: MindElixirData = {
@@ -396,6 +397,19 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             overflowHidden: false,
             mouseSelectionButton: 0,
             theme,
+            // ── Inline Markdown rendering (bold, italic, code, links) ────────
+            // marked is already in node_modules via monaco-editor dependency
+            markdown: (text: string) => {
+                try {
+                    // Use dynamic require to avoid top-level import issues
+                    // eslint-disable-next-line @typescript-eslint/no-var-requires
+                    const { marked } = require('marked');
+                    // inline-only parse: no wrapping <p> tags
+                    return (marked.parseInline(text) as string) ?? text;
+                } catch {
+                    return text;
+                }
+            },
         });
 
         mind.init(initialData);
@@ -606,11 +620,14 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                 )}
             </div>
 
-            {/* Custom context menu — rendered outside canvas div so fixed positioning works */}
+            {/* Custom context menu */}
             <MindMapContextMenu
                 {...ctxMenu}
                 onClose={() => setCtxMenu(m => ({ ...m, visible: false }))}
             />
+
+            {/* Floating quick action bar — appears above selected node (Whimsical-style) */}
+            <MindMapFloatingBar />
         </MindElixirContext.Provider>
     );
 };
