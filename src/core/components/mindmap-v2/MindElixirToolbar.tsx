@@ -342,6 +342,19 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
         } catch (e) { console.warn('[Toolbar] focusMode:', e); }
     }, [mind]);
 
+    // ── 自动节点编号 ─────────────────────────────────────────────────────────────
+    const [isNumbering, setIsNumbering] = useState(false);
+    const handleToggleNumbering = useCallback(() => {
+        const el = document.getElementById('vizly-mind-elixir-root');
+        if (!el) return;
+        setIsNumbering(v => {
+            const next = !v;
+            if (next) el.setAttribute('data-numbering', '');
+            else el.removeAttribute('data-numbering');
+            return next;
+        });
+    }, []);
+
     const exportMenuItems = [
         { key: 'svg',      label: '导出 SVG',      icon: <ExportOutlined />,  onClick: handleExportSvg },
         { key: 'png',      label: '导出 PNG',      icon: <DownloadOutlined />, onClick: handleExportPng },
@@ -572,6 +585,16 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
                 <Button size="small" type="text" icon={<ShareAltOutlined />}
                     onClick={handleArrowMode} disabled={!mind}
                     style={{ color: arrowMode ? '#6366f1' : undefined }} />
+            </Tooltip>
+
+            {/* Auto numbering */}
+            <Tooltip title={isNumbering ? '关闭自动编号' : '开启自动编号（每层节点自动加序号）'}>
+                <Button size="small" type="text"
+                    onClick={handleToggleNumbering} disabled={!mind}
+                    style={{ color: isNumbering ? '#6366f1' : undefined, fontSize: 12, fontWeight: 700 }}
+                >
+                    #
+                </Button>
             </Tooltip>
 
             <Divider orientation="vertical" style={{ height: 16, margin: '0 2px' }} />

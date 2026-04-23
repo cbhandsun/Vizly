@@ -323,3 +323,15 @@ export function getTreeDepth(node: NodeObj): number {
     return 1 + Math.max(...node.children.map(getTreeDepth));
 }
 
+/**
+ * DFS search for a node by ID in the tree.
+ * Replaces mind-elixir's `getObjById` which may not exist in v5.
+ */
+export function findNodeById(root: NodeObj, id: string): NodeObj | null {
+    if (root.id === id) return root;
+    for (const child of root.children ?? []) {
+        const found = findNodeById(child, id);
+        if (found) return found;
+    }
+    return null;
+}

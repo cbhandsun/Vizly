@@ -1,9 +1,12 @@
 /**
  * MindMapContextMenu.tsx — 自定义右键上下文菜单
  * 替换 mind-elixir 内置菜单，集成所有自定义操作
+ *
+ * v2: 修复 getObjById → findNodeById，新增形状快速选择
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getMindElixirInstance } from './mindElixirStore';
+import { findNodeById } from './migrate';
 
 interface CtxPos { visible: boolean; x: number; y: number; nodeId: string | null; }
 interface Props extends CtxPos { onClose: () => void; }
@@ -25,9 +28,19 @@ const KBD: React.FC<{ k: string }> = ({ k }) => (
     }}>{k}</kbd>
 );
 
+// ─── Shape options ────────────────────────────────────────────────────────────
+const SHAPES = [
+    { key: '',          label: '默认', preview: '▭' },
+    { key: 'oval',      label: '椭圆', preview: '◡' },
+    { key: 'rect',      label: '矩形', preview: '□' },
+    { key: 'underline', label: '下划线', preview: '▁' },
+    { key: 'diamond',   label: '菱形', preview: '◇' },
+];
+
 const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose }) => {
     const mind = getMindElixirInstance();
     const ref = useRef<HTMLDivElement>(null);
+    const [shapeOpen, setShapeOpen] = useState(false);
 
     // Close on outside click or Escape
     useEffect(() => {
@@ -47,14 +60,16 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
     if (!visible || !nodeId || !mind) return null;
 
     const getTpc = () => { try { return mind.findEle(nodeId); } catch { return null; } };
-    const getObj = () => { try { return mind.getObjById(nodeId, mind.getData().nodeData); } catch { return null; } };
+    // ✅ Using our own DFS instead of mind-elixir's getObjById (which doesn't exist in v5)
+    const getObj = () => { try { return findNodeById(mind.getData().nodeData, nodeId); } catch { return null; } };
     const obj = getObj();
     const isRoot = nodeId === mind.getData()?.nodeData?.id;
     const isExpanded = obj?.expanded !== false;
     const hasChildren = (obj?.children?.length ?? 0) > 0;
+    const currentShape = (obj as any)?.shapeClass ?? '';
 
     // Clamp to viewport
-    const MENU_W = 220, MENU_H = 360;
+    const MENU_W = 230, MENU_H = 420;
     const cx = Math.min(x, window.innerWidth - MENU_W - 8);
     const cy = Math.min(y, window.innerHeight - MENU_H - 8);
 
@@ -95,7 +110,7 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
                 <div style={{ padding: '6px 14px 8px', borderBottom: '1px solid rgba(255,255,255,0.07)', marginBottom: 4 }}>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>节点</div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)',
-                        maxWidth: 190, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {obj.topic}
                     </div>
                 </div>
@@ -134,6 +149,52 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
             )}
             <Item icon="⌥" label="创建汇总括号"
                 onClick={() => act(() => { try { mind.createSummary(); } catch {} })} />
+
+            {DIVIDER}
+
+            {/* ── Shape quick-pick ─────────────────────────────────────────── */}
+            <div
+                style={{ ...ITEM_STYLE, flexDirection: 'column', alignItems: 'flex-start', gap: 6, paddingBottom: 10 }}
+                onClick={() => setShapeOpen(v => !v)}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
+                    <span style={{ fontSize: 14, width: 18, textAlign: 'center' }}>🔷</span>
+                    <span style={{ flex: 1 }}>节点形状</span>
+                    <span style={{ fontSize: 10, opacity: 0.4 }}>{shapeOpen ? '▲' : '▼'}</span>
+                </div>
+                {shapeOpen && (
+                    <div style={{ display: 'flex', gap: 4, width: '100%', paddingLeft: 28 }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {SHAPES.map(({ key, label, preview }) => (
+                            <button
+                                key={key || 'default'}
+                                title={label}
+                                onClick={() => {
+                                    const tpc = getTpc();
+                                    if (!tpc || !obj) { onClose(); return; }
+                                    try {
+                                        mind.reshapeNode(tpc, { ...obj, ...({ shapeClass: key || undefined } as any) });
+                                    } catch {}
+                                    onClose();
+                                }}
+                                style={{
+                                    flex: 1, padding: '4px 2px', borderRadius: 5, cursor: 'pointer',
+                                    fontSize: 15, textAlign: 'center',
+                                    border: currentShape === key
+                                        ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.12)',
+                                    background: currentShape === key
+                                        ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)',
+                                    color: currentShape === key ? '#a5b4fc' : 'rgba(255,255,255,0.6)',
+                                }}
+                            >
+                                <div>{preview}</div>
+                                <div style={{ fontSize: 9, opacity: 0.6, marginTop: 1 }}>{label}</div>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
 
             {obj?.hyperLink && (
                 <>

@@ -308,6 +308,24 @@ function injectGradientFix() {
             clip-path: polygon(12px 50%, 50% 2px, calc(100% - 12px) 50%, 50% calc(100% - 2px)) !important;
             padding: 6px 24px !important;
         }
+
+        /* ── 自动节点编号 (data-numbering 驱动) ─────────────────────────────────── */
+        #vizly-mind-elixir-root[data-numbering] me-children {
+            counter-reset: me-seq;
+        }
+        #vizly-mind-elixir-root[data-numbering] me-children > me-wrapper {
+            counter-increment: me-seq;
+        }
+        #vizly-mind-elixir-root[data-numbering] me-children > me-wrapper > me-tpc::before {
+            content: counter(me-seq) ".";
+            font-size: 0.75em;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            opacity: 0.45;
+            margin-right: 5px;
+            font-family: 'Menlo', 'Consolas', monospace;
+            color: inherit;
+        }
     `;
     document.head.appendChild(style);
 }

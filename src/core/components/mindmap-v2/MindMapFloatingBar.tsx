@@ -10,6 +10,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Tooltip, Popover } from 'antd';
 import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance } from './mindElixirStore';
+import { findNodeById } from './migrate';
 
 // ─── Colour palette for quick branch color ─────────────────────────────────
 const QUICK_COLORS = [
@@ -88,7 +89,7 @@ const MindMapFloatingBar: React.FC = () => {
 
     const getTpc = () => { try { return mind.findEle(pos.nodeId); } catch { return null; } };
     const getObj = (): NodeObj | null => {
-        try { return mind.getObjById(pos.nodeId, mind.getData().nodeData); } catch { return null; }
+        try { return findNodeById(mind.getData().nodeData, pos.nodeId); } catch { return null; }
     };
 
     const obj = getObj();
