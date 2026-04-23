@@ -120,6 +120,9 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
         return (node.tags ?? []).map(t => typeof t === 'string' ? { text: t } : t as TagObj);
     });
     const [tagInput, setTagInput] = useState('');
+    // ─ Shape & Line width ──────────────────────────────────────────────────────────
+    const [shapeClass, setShapeClass] = useState<string>((node as any).shapeClass ?? '');
+    const [branchWidth, setBranchWidth] = useState<number>((node as any).branchWidth ?? 0);
 
     useEffect(() => {
         setTopic(node.topic || '');
@@ -132,6 +135,8 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
         setImageUrl(node.image?.url ?? '');
         setIcons((node.icons as string[]) ?? []);
         setTags((node.tags ?? []).map(t => typeof t === 'string' ? { text: t } : t as TagObj));
+        setShapeClass((node as any).shapeClass ?? '');
+        setBranchWidth((node as any).branchWidth ?? 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [node.id]);
 
@@ -361,6 +366,66 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
             {/* Branch color */}
             <Row label="连线颜色">
                 <ColorSwatch value={branchColor} onChange={c => { setBranchColor(c); reshape({ branchColor: c || undefined }); }} withTransparent />
+            </Row>
+
+            {/* Node shape */}
+            <Row label="节点形状">
+                <div style={{ display: 'flex', gap: 5 }}>
+                    {[
+                        { key: '',          label: '默认', preview: '▭' },
+                        { key: 'oval',      label: '椭圆', preview: '◡' },
+                        { key: 'rect',      label: '矩形', preview: '□' },
+                        { key: 'underline', label: '下划线', preview: '□̲' },
+                        { key: 'diamond',   label: '菱形', preview: '◇' },
+                    ].map(({ key, label, preview }) => (
+                        <button key={key || 'default'}
+                            title={label}
+                            onClick={() => {
+                                setShapeClass(key);
+                                reshape({ ...({ shapeClass: key || undefined } as any) });
+                            }}
+                            style={{
+                                flex: 1, padding: '4px 2px', borderRadius: 6, cursor: 'pointer',
+                                fontSize: 16, textAlign: 'center',
+                                border: shapeClass === key
+                                    ? '2px solid #6366f1'
+                                    : '1px solid rgba(255,255,255,0.1)',
+                                background: shapeClass === key
+                                    ? 'rgba(99,102,241,0.15)'
+                                    : 'rgba(255,255,255,0.04)',
+                                color: shapeClass === key ? '#a5b4fc' : 'rgba(255,255,255,0.6)',
+                                transition: 'all 0.12s',
+                            }}>
+                            <div style={{ fontSize: 16, lineHeight: 1 }}>{preview}</div>
+                            <div style={{ fontSize: 9, marginTop: 2, opacity: 0.7 }}>{label}</div>
+                        </button>
+                    ))}
+                </div>
+            </Row>
+
+            {/* Branch line width */}
+            <Row label="连线宽度">
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {[0, 1, 2, 4, 6].map(w => (
+                        <button key={w}
+                            title={w === 0 ? '默认' : `${w}px`}
+                            onClick={() => { setBranchWidth(w); reshape({ ...({ branchWidth: w || undefined } as any) }); }}
+                            style={{
+                                flex: 1, height: 28, borderRadius: 5, cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                border: branchWidth === w ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.1)',
+                                background: branchWidth === w ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.04)',
+                                transition: 'all 0.12s',
+                            }}>
+                            <div style={{
+                                height: w === 0 ? 1.5 : Math.min(w, 6),
+                                width: '80%',
+                                background: branchWidth === w ? '#6366f1' : 'rgba(255,255,255,0.4)',
+                                borderRadius: 3,
+                            }} />
+                        </button>
+                    ))}
+                </div>
             </Row>
 
             <Divider style={{ margin: '10px 0' }} />

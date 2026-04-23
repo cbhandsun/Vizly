@@ -31,6 +31,7 @@ import { registerMindElixirInstance, unregisterMindElixirInstance } from './mind
 import MindMapContextMenu, { type CtxPos } from './MindMapContextMenu';
 import MindMapFloatingBar from './MindMapFloatingBar';
 import MindMapBatchBar from './MindMapBatchBar';
+import MindMapEmptyGuide from './MindMapEmptyGuide';
 import { marked } from 'marked';
 
 // ─── Default data shown for a fresh mindmap ──────────────────────────────────
@@ -281,6 +282,32 @@ function injectGradientFix() {
             font-size: 0.88em;
         }
         me-tpc a { color: #93c5fd; text-decoration: underline; }
+
+        /* ── 节点形状 (data-shape 属性驱动) ─────────────────────────────────────── */
+        /* 椭圆 */
+        me-wrapper[data-shape="oval"] me-tpc {
+            border-radius: 999px !important;
+            padding-left: 20px !important;
+            padding-right: 20px !important;
+        }
+        /* 矩形（直角） */
+        me-wrapper[data-shape="rect"] me-tpc {
+            border-radius: 3px !important;
+        }
+        /* 下划线（无背景，仅底部线条） */
+        me-wrapper[data-shape="underline"] me-tpc {
+            background: transparent !important;
+            border: none !important;
+            border-bottom: 2px solid currentColor !important;
+            border-radius: 0 !important;
+            padding-left: 2px !important;
+            padding-right: 2px !important;
+        }
+        /* 菱形 (clip-path polygon) */
+        me-wrapper[data-shape="diamond"] me-tpc {
+            clip-path: polygon(12px 50%, 50% 2px, calc(100% - 12px) 50%, 50% calc(100% - 2px)) !important;
+            padding: 6px 24px !important;
+        }
     `;
     document.head.appendChild(style);
 }
@@ -531,6 +558,27 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         // Initial badge update after layout settles
         setTimeout(updateBadgesFromData, 350);
 
+        // ── Apply node shapes from shapeClass property to DOM ─────────────────
+        const applyShapes = () => {
+            try {
+                const walk = (node: NodeObj) => {
+                    const shape = (node as any).shapeClass as string | undefined;
+                    try {
+                        const tpc = mind.findEle(node.id) as HTMLElement | null;
+                        const wrapper = tpc?.closest('me-wrapper') as HTMLElement | null;
+                        if (wrapper) {
+                            if (shape) wrapper.setAttribute('data-shape', shape);
+                            else wrapper.removeAttribute('data-shape');
+                        }
+                    } catch {}
+                    (node.children ?? []).forEach(walk);
+                };
+                walk(mind.getData().nodeData);
+            } catch {}
+        };
+        mind.bus.addListener('operation', applyShapes);
+        setTimeout(applyShapes, 400);
+
         // Track selected node for property panel
         // EventMap has 'selectNodes' (array) and 'selectNewNode' (single), not 'selectNode'
         const handleSelectNodes = (nodes: NodeObj[]) => {
@@ -557,6 +605,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             mind.bus.removeListener('selectNodes', handleSelectNodes);
             mind.bus.removeListener('selectNewNode', handleSelectNewNode);
             mind.bus.removeListener('unselectNodes', handleUnselectNodes);
+            mind.bus.removeListener('operation', applyShapes);
             mind.container?.removeEventListener('click', handleHyperLinkClick);
             mind.container?.removeEventListener('contextmenu', handleContextMenu);
             // mind-elixir doesn't have a formal destroy() — unmounting the div is enough
@@ -663,6 +712,9 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                         </div>
                     </div>
                 )}
+
+                {/* Empty state guide — shown only when map has just the root node */}
+                {instance && <MindMapEmptyGuide />}
             </div>
 
             {/* Custom context menu */}
