@@ -26,6 +26,8 @@ const MindMapFloatingBar: React.FC = () => {
     const [pos, setPos] = useState<BarPos | null>(null);
     const [colorOpen, setColorOpen] = useState(false);
     const [shapeOpen, setShapeOpen] = useState(false);
+    const [noteOpen, setNoteOpen] = useState(false);
+    const [noteText, setNoteText] = useState('');
     const barRef = useRef<HTMLDivElement>(null);
 
     const mind = getMindElixirInstance();
@@ -293,6 +295,69 @@ const MindMapFloatingBar: React.FC = () => {
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'; }}
                     >
                         <span style={{ fontSize: 13 }}>◇</span>
+                    </div>
+                </Tooltip>
+            </Popover>
+
+            {/* Note quick edit */}
+            <Popover
+                open={noteOpen}
+                onOpenChange={v => {
+                    if (v) {
+                        setNoteText(obj.note ?? '');
+                        setColorOpen(false); setShapeOpen(false);
+                    }
+                    setNoteOpen(v);
+                }}
+                trigger="click"
+                placement="top"
+                arrow={false}
+                content={
+                    <div style={{ width: 240, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <textarea
+                            value={noteText}
+                            onChange={e => setNoteText(e.target.value)}
+                            placeholder="输入备注（支持 Markdown）..."
+                            rows={4}
+                            style={{
+                                width: '100%', boxSizing: 'border-box', resize: 'vertical',
+                                padding: '6px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)',
+                                background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)',
+                                fontSize: 12, outline: 'none', fontFamily: 'inherit',
+                            }}
+                        />
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => {
+                                    try { const tpc = getTpc(); if (tpc) mind.reshapeNode(tpc as any, { ...obj, note: undefined }); }
+                                    catch {} setNoteOpen(false);
+                                }}
+                                style={{
+                                    padding: '3px 10px', borderRadius: 5, border: 'none', cursor: 'pointer',
+                                    background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.45)', fontSize: 11,
+                                }}
+                            >清除</button>
+                            <button
+                                onClick={() => {
+                                    try { const tpc = getTpc(); if (tpc) mind.reshapeNode(tpc as any, { ...obj, note: noteText || undefined }); }
+                                    catch {} setNoteOpen(false);
+                                }}
+                                style={{
+                                    padding: '3px 10px', borderRadius: 5, border: 'none', cursor: 'pointer',
+                                    background: 'rgba(99,102,241,0.3)', color: '#a5b4fc', fontSize: 11, fontWeight: 600,
+                                }}
+                            >保存</button>
+                        </div>
+                    </div>
+                }
+            >
+                <Tooltip title={obj.note ? '编辑备注' : '添加备注'}>
+                    <div style={{ ...btnStyle, color: obj.note ? '#f59e0b' : 'rgba(255,255,255,0.7)' }}
+                        onClick={() => setNoteOpen(v => !v)}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.15)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'; }}
+                    >
+                        <span style={{ fontSize: 13 }}>📝</span>
                     </div>
                 </Tooltip>
             </Popover>

@@ -81,6 +81,11 @@ function injectGradientFix() {
     // We override with background shorthand to fix this. DO NOT also set background-color: transparent
     // for the root node — it would override the root's valid hex color (#312e81).
     style.textContent = `
+        @keyframes noteTooltipIn {
+            from { opacity: 0; transform: translateY(-96%) scale(0.97); }
+            to   { opacity: 1; transform: translateY(-100%) scale(1); }
+        }
+
         /* ── First-level branch nodes: gradient background fix ────────────────── */
         /* background-color can't hold gradients; use background shorthand instead */
         .map-container me-main > me-wrapper > me-parent > me-tpc {
@@ -476,6 +481,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
     }, [ctx]);
 
     const [ctxMenu, setCtxMenu] = useState<CtxPos>({ visible: false, x: 0, y: 0, nodeId: null });
+    const [notePreview, setNotePreview] = useState<{ html: string; x: number; y: number } | null>(null);
 
     useEffect(() => {
         // Inject gradient CSS fix once globally
@@ -664,6 +670,29 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         mind.bus.addListener('selectNewNode', handleSelectNewNode);
         mind.bus.addListener('unselectNodes', handleUnselectNodes);
 
+        // ── Note hover preview ────────────────────────────────────────────────────
+        const handleNoteOver = (e: MouseEvent) => {
+            const wrapper = (e.target as HTMLElement).closest('me-wrapper[data-note]') as HTMLElement | null;
+            if (!wrapper) { setNotePreview(null); return; }
+            const tpcEl = wrapper.querySelector('[nodeid]') as HTMLElement | null;
+            const nodeId = tpcEl?.getAttribute('nodeid') ?? '';
+            if (!nodeId) return;
+            try {
+                const node = findNodeById(mind.getData().nodeData, nodeId);
+                if (node?.note) {
+                    const html = marked.parse(node.note) as string;
+                    const rect = wrapper.getBoundingClientRect();
+                    setNotePreview({ html, x: rect.left, y: rect.top });
+                }
+            } catch {}
+        };
+        const handleNoteOut = (e: MouseEvent) => {
+            const related = e.relatedTarget as HTMLElement | null;
+            if (!related?.closest?.('me-wrapper[data-note]')) setNotePreview(null);
+        };
+        mind.container?.addEventListener('mouseover', handleNoteOver);
+        mind.container?.addEventListener('mouseout', handleNoteOut);
+
         return () => {
             mq.removeEventListener('change', handleColorScheme);
             mind.bus.removeListener('operation', debouncedSave);
@@ -674,6 +703,8 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             mind.bus.removeListener('operation', applyShapes);
             mind.container?.removeEventListener('click', handleHyperLinkClick);
             mind.container?.removeEventListener('contextmenu', handleContextMenu);
+            mind.container?.removeEventListener('mouseover', handleNoteOver);
+            mind.container?.removeEventListener('mouseout', handleNoteOut);
             document.removeEventListener('keydown', handleGlobalKeys);
             // mind-elixir doesn't have a formal destroy() — unmounting the div is enough
             unregisterMindElixirInstance();
@@ -798,6 +829,34 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
 
             {/* Multi-select batch operation bar — appears at bottom when 2+ nodes selected */}
             <MindMapBatchBar />
+
+            {/* Note hover preview tooltip */}
+            {notePreview && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        left: Math.min(notePreview.x, window.innerWidth - 310),
+                        top: notePreview.y - 12,
+                        transform: 'translateY(-100%)',
+                        zIndex: 8500,
+                        maxWidth: 300,
+                        maxHeight: 200,
+                        overflowY: 'auto',
+                        background: 'rgba(10,10,18,0.95)',
+                        backdropFilter: 'blur(20px)',
+                        border: '1px solid rgba(245,158,11,0.25)',
+                        borderRadius: 10,
+                        padding: '10px 14px',
+                        fontSize: 12,
+                        lineHeight: 1.55,
+                        color: 'rgba(255,255,255,0.78)',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
+                        pointerEvents: 'none',
+                        animation: 'noteTooltipIn 0.14s ease',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: notePreview.html }}
+                />
+            )}
         </MindElixirContext.Provider>
     );
 };
