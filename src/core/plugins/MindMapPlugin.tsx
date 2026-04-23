@@ -8,36 +8,64 @@
  *     but no RF nodes/edges are used for mindmap content
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import {
     DiagramTypePlugin,
     PluginContext,
 } from '../types/plugin';
 import { SidebarPanel } from '../types/plugin';
-import { UnorderedListOutlined, SettingOutlined } from '@ant-design/icons';
+import { UnorderedListOutlined } from '@ant-design/icons';
 import { BaseDiagramPlugin } from '../sdk/BasePlugin';
 import i18n from '@/i18n';
 import MindElixirWrapper from '../components/mindmap-v2/MindElixirWrapper';
 import MindElixirToolbar from '../components/mindmap-v2/MindElixirToolbar';
 import MindMapPropertyPanel from '../components/mindmap-v2/MindMapPropertyPanel';
 import MindMapOutlinePanel from '../components/mindmap-v2/MindMapOutlinePanel';
+import MindMapSearch from '../components/mindmap-v2/MindMapSearch';
 import { migrateV1ToV2 } from '../components/mindmap-v2/migrate';
 import { isMindMapV2 } from '../components/mindmap-v2/types';
 import { getMindElixirInstance } from '../components/mindmap-v2/mindElixirStore';
 import { VIZLY_THEMES } from '../components/mindmap-v2/theme';
+import { subscribeSearchOpen } from '../components/mindmap-v2/mindmapSearchStore';
 
 // ── Theme-aware canvas wrapper ─────────────────────────────────────────────────
 // Keeps theme state at plugin level so toolbar & property panel share the same key
 const MindMapCanvas: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
-    const [themeKey, setThemeKey] = useState<string>(() => {
+    const [themeKey] = useState<string>(() => {
         return localStorage.getItem('vizly_mindmap_theme') || 'indigo';
     });
     const isDark = themeKey === 'dark'
         || document.documentElement.classList.contains('dark')
         || localStorage.getItem('vizly-theme') === 'dark';
 
-    return <MindElixirWrapper ctx={ctx} isDark={isDark} />;
+    const [searchOpen, setSearchOpen] = useState(false);
+
+    // Subscribe to search event from Toolbar
+    useEffect(() => {
+        return subscribeSearchOpen(() => setSearchOpen(prev => !prev));
+    }, []);
+
+    // Ctrl+F / Cmd+F to open search
+    const handleKeyDown = useCallback((e: KeyboardEvent) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            e.stopPropagation();
+            setSearchOpen(prev => !prev);
+        }
+    }, []);
+
+    useEffect(() => {
+        document.addEventListener('keydown', handleKeyDown, true);
+        return () => document.removeEventListener('keydown', handleKeyDown, true);
+    }, [handleKeyDown]);
+
+    return (
+        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+            <MindElixirWrapper ctx={ctx} isDark={isDark} />
+            <MindMapSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+        </div>
+    );
 };
 
 // ── Property Panel wrapper (stateful theme) ────────────────────────────────────

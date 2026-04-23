@@ -129,11 +129,14 @@ export interface PresentationController {
 
 export function usePresentationMode(
     mind: MindElixirInstance | null,
+    onStop?: () => void,
     containerId = 'vizly-mind-elixir-root'
 ): PresentationController {
     const isActiveRef = useRef(false);
     const indexRef = useRef(0);
     const nodeIdsRef = useRef<string[]>([]);
+    const onStopRef = useRef(onStop);
+    useEffect(() => { onStopRef.current = onStop; }, [onStop]);
 
     const getContainer = () => document.getElementById(containerId);
 
@@ -168,6 +171,9 @@ export function usePresentationMode(
 
         removeHUD();
         mind?.clearSelection?.();
+
+        // Notify Toolbar so it can sync its isPresenting state
+        onStopRef.current?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mind]);
 

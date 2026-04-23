@@ -32,6 +32,7 @@ import {
     ShareAltOutlined,
     BranchesOutlined,
     BarChartOutlined,
+    SearchOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import MindElixir from 'mind-elixir';
@@ -43,6 +44,7 @@ import {
 } from './migrate';
 import { VIZLY_THEME_OPTIONS, VIZLY_THEMES } from './theme';
 import { usePresentationMode } from './MindMapPresentationMode';
+import { emitOpenSearch } from './mindmapSearchStore';
 
 
 const DIRECTION_OPTIONS = [
@@ -63,19 +65,22 @@ function setExpandedAll(node: NodeObj, expanded: boolean): NodeObj {
 
 const THEME_KEY_LS = 'vizly_mindmap_theme';
 
+// ─── Toolbar Props ────────────────────────────────────────────────────────────
+interface MindElixirToolbarProps {}
+
 // ─── Focus mode state (module-level, shared) ─────────────────────────────────
 let _isFocused = false;
 
-const MindElixirToolbar: React.FC = () => {
+const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
     // Subscribe to store so we re-render when instance becomes available
     const [, setTick] = useState(0);
     useEffect(() => subscribeMindElixir(() => setTick(t => t + 1)), []);
     const mind = getMindElixirInstance();
     const { t } = useTranslation();
 
-    // Presentation mode
-    const presentation = usePresentationMode(mind);
+    // Presentation mode — declare state first so callback closure is clean
     const [isPresenting, setIsPresenting] = useState(false);
+    const presentation = usePresentationMode(mind, () => setIsPresenting(false));
 
     const handlePresentation = useCallback(() => {
         if (isPresenting) {
@@ -505,6 +510,12 @@ const MindElixirToolbar: React.FC = () => {
                     </div>
                 </Tooltip>
             )}
+
+            {/* Search */}
+            <Tooltip title="搜索节点 (Ctrl+F)">
+                <Button size="small" type="text" icon={<SearchOutlined />}
+                    onClick={emitOpenSearch} disabled={!mind} />
+            </Tooltip>
         </div>
     );
 };
