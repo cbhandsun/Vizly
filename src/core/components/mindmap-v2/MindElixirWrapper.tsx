@@ -30,6 +30,8 @@ import { isMindMapV2 } from './types';
 import { registerMindElixirInstance, unregisterMindElixirInstance } from './mindElixirStore';
 import MindMapContextMenu, { type CtxPos } from './MindMapContextMenu';
 import MindMapFloatingBar from './MindMapFloatingBar';
+import MindMapBatchBar from './MindMapBatchBar';
+import { marked } from 'marked';
 
 // ─── Default data shown for a fresh mindmap ──────────────────────────────────
 const DEFAULT_DATA: MindElixirData = {
@@ -243,6 +245,42 @@ function injectGradientFix() {
                 radial-gradient(circle, rgba(99,102,241,0.35) 1px, transparent 1px) !important;
             background-size: 24px 24px !important;
         }
+
+        /* ── 折叠/展开 动画 ───────────────────────────────────────────────────── */
+        me-children {
+            transform-origin: left center;
+            transition: opacity 0.2s ease, transform 0.2s ease !important;
+        }
+        /* When node is collapsing (mind-elixir adds 'collapsed' attr to me-wrapper) */
+        me-wrapper[data-id] me-children {
+            animation: none;
+        }
+        /* Expand animation via :not(:hidden) — animate freshly visible children */
+        @keyframes meChildrenExpand {
+            from { opacity: 0; transform: scaleX(0.8) translateX(-8px); }
+            to   { opacity: 1; transform: scaleX(1) translateX(0); }
+        }
+
+        /* ── me-tpc (node bubble) hover micro-interaction ────────────────────── */
+        me-tpc {
+            transition: box-shadow 0.15s ease, filter 0.15s ease !important;
+        }
+        me-tpc:hover {
+            filter: brightness(1.08) !important;
+            box-shadow: 0 0 0 2px rgba(99,102,241,0.25) !important;
+        }
+
+        /* ── Markdown rendered content inside nodes ───────────────────────────── */
+        me-tpc strong { font-weight: 700; }
+        me-tpc em     { font-style: italic; opacity: 0.9; }
+        me-tpc code   {
+            font-family: 'Menlo', 'Consolas', monospace;
+            background: rgba(255,255,255,0.1);
+            padding: 0 3px;
+            border-radius: 3px;
+            font-size: 0.88em;
+        }
+        me-tpc a { color: #93c5fd; text-decoration: underline; }
     `;
     document.head.appendChild(style);
 }
@@ -398,13 +436,9 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             mouseSelectionButton: 0,
             theme,
             // ── Inline Markdown rendering (bold, italic, code, links) ────────
-            // marked is already in node_modules via monaco-editor dependency
             markdown: (text: string) => {
                 try {
-                    // Use dynamic require to avoid top-level import issues
-                    // eslint-disable-next-line @typescript-eslint/no-var-requires
-                    const { marked } = require('marked');
-                    // inline-only parse: no wrapping <p> tags
+                    // parseInline returns string, no wrapping <p> tags
                     return (marked.parseInline(text) as string) ?? text;
                 } catch {
                     return text;
@@ -416,6 +450,16 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         mindRef.current = mind;
         setInstance(mind);
         registerMindElixirInstance(mind);  // expose to toolbar and other out-of-tree consumers
+
+        // ── 系统深色/浅色主题自动跟随 ─────────────────────────────────────────
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleColorScheme = (e: MediaQueryListEvent) => {
+            // 只在用户没有手动选主题时自动切换
+            const hasManualTheme = localStorage.getItem('vizly_mindmap_theme');
+            if (hasManualTheme) return;
+            mind.changeTheme(e.matches ? VIZLY_HYPER_DARK_THEME : VIZLY_HYPER_THEME);
+        };
+        mq.addEventListener('change', handleColorScheme);
 
         // ── Ctrl+Click → open hyperLink ──────────────────────────────────────
         const handleHyperLinkClick = (e: MouseEvent) => {
@@ -507,6 +551,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         mind.bus.addListener('unselectNodes', handleUnselectNodes);
 
         return () => {
+            mq.removeEventListener('change', handleColorScheme);
             mind.bus.removeListener('operation', debouncedSave);
             mind.bus.removeListener('operation', updateBadgesFromData);
             mind.bus.removeListener('selectNodes', handleSelectNodes);
@@ -628,6 +673,9 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
 
             {/* Floating quick action bar — appears above selected node (Whimsical-style) */}
             <MindMapFloatingBar />
+
+            {/* Multi-select batch operation bar — appears at bottom when 2+ nodes selected */}
+            <MindMapBatchBar />
         </MindElixirContext.Provider>
     );
 };
