@@ -36,6 +36,7 @@ import {
     ZoomInOutlined,
     ZoomOutOutlined,
     PrinterOutlined,
+    QuestionCircleOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import MindElixir from 'mind-elixir';
@@ -48,6 +49,7 @@ import {
 import { VIZLY_THEME_OPTIONS, VIZLY_THEMES } from './theme';
 import { usePresentationMode } from './MindMapPresentationMode';
 import { emitOpenSearch } from './mindmapSearchStore';
+import MindMapShortcutsModal from './MindMapShortcutsModal';
 
 
 const DIRECTION_OPTIONS = [
@@ -273,6 +275,46 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
         mind.scale(1);
         mind.toCenter();
     }, [mind]);
+
+    // Also update zoom on wheel scroll (mind-elixir zoom doesn't emit 'operation')
+    useEffect(() => {
+        if (!mind) return;
+        let timer: ReturnType<typeof setTimeout>;
+        const onWheel = () => {
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                setZoomVal(Math.round((mind.scaleVal ?? 1) * 100));
+            }, 80);
+        };
+        const container = mind.container;
+        container?.addEventListener('wheel', onWheel, { passive: true });
+        return () => {
+            clearTimeout(timer);
+            container?.removeEventListener('wheel', onWheel);
+        };
+    }, [mind]);
+
+    // ── JSON import ─────────────────────────────────────────────────────────────
+    const jsonInputRef = useRef<HTMLInputElement>(null);
+    const handleImportJson = useCallback(() => { jsonInputRef.current?.click(); }, []);
+    const handleJsonFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !mind) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const json = JSON.parse(ev.target?.result as string);
+                // Accept full MindElixirData or just nodeData
+                const nodeData = json.nodeData ?? json;
+                loadAndRefresh(nodeData);
+            } catch (err) { console.error('[Import JSON]', err); }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+    }, [mind, loadAndRefresh]);
+
+    // ── Shortcuts panel ─────────────────────────────────────────────────────────
+    const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
     const handleFocusMode = useCallback(() => {
         if (!mind) return;
@@ -557,13 +599,16 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
                 style={{ display: 'none' }} onChange={handleFileChange} />
             <input ref={opmlInputRef} type="file" accept=".opml,.xml"
                 style={{ display: 'none' }} onChange={handleOpmlFileChange} />
+            <input ref={jsonInputRef} type="file" accept=".json"
+                style={{ display: 'none' }} onChange={handleJsonFileChange} />
 
-            {/* Import dropdown (MD + OPML) */}
+            {/* Import dropdown (MD + OPML + JSON) */}
             <Dropdown
                 menu={{
                     items: [
                         { key: 'md',   label: '从 Markdown 导入', icon: <UploadOutlined />, onClick: handleImportMarkdown },
                         { key: 'opml', label: '从 OPML 导入',     icon: <UploadOutlined />, onClick: handleImportOpml },
+                        { key: 'json', label: '从 JSON 导入',     icon: <UploadOutlined />, onClick: handleImportJson },
                     ]
                 }}
                 placement="bottomRight"
@@ -600,6 +645,19 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
                 <Button size="small" type="text" icon={<SearchOutlined />}
                     onClick={emitOpenSearch} disabled={!mind} />
             </Tooltip>
+
+            {/* Shortcuts help */}
+            <Tooltip title="键盘快捷键 (?)">
+                <Button size="small" type="text" icon={<QuestionCircleOutlined />}
+                    onClick={() => setShortcutsOpen(true)}
+                    style={{ color: 'rgba(255,255,255,0.4)' }} />
+            </Tooltip>
+
+            {/* Shortcuts Modal */}
+            <MindMapShortcutsModal
+                open={shortcutsOpen}
+                onClose={() => setShortcutsOpen(false)}
+            />
         </div>
     );
 };

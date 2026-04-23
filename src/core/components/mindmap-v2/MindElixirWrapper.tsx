@@ -388,6 +388,26 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         setInstance(mind);
         registerMindElixirInstance(mind);  // expose to toolbar and other out-of-tree consumers
 
+        // ── Ctrl+Click → open hyperLink ──────────────────────────────────────
+        const handleHyperLinkClick = (e: MouseEvent) => {
+            if (!e.ctrlKey && !e.metaKey) return;
+            const tpc = (e.target as HTMLElement)?.closest?.('me-tpc') as HTMLElement | null;
+            if (!tpc) return;
+            // me-tpc elements have a data-nodeid or we can find the id from mind.currentNode
+            const nodeId = tpc.getAttribute('data-nodeid')
+                || (mind.currentNode as any)?.id
+                || (mind.currentNodes?.[0] as any)?.id;
+            if (!nodeId) return;
+            try {
+                const obj = mind.getObjById(nodeId, mind.getData().nodeData);
+                if (obj?.hyperLink) {
+                    e.preventDefault();
+                    window.open(obj.hyperLink.startsWith('http') ? obj.hyperLink : `https://${obj.hyperLink}`, '_blank', 'noopener,noreferrer');
+                }
+            } catch {}
+        };
+        mind.container.addEventListener('click', handleHyperLinkClick);
+
         // Debounced auto-save on every operation
         const debouncedSave = debounce(() => saveRef.current(), 800);
         mind.bus.addListener('operation', debouncedSave);
@@ -470,6 +490,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             mind.bus.removeListener('selectNodes', handleSelectNodes);
             mind.bus.removeListener('selectNewNode', handleSelectNewNode);
             mind.bus.removeListener('unselectNodes', handleUnselectNodes);
+            mind.container?.removeEventListener('click', handleHyperLinkClick);
             // mind-elixir doesn't have a formal destroy() — unmounting the div is enough
             unregisterMindElixirInstance();
             mindRef.current = null;
