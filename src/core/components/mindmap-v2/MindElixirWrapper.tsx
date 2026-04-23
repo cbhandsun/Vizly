@@ -431,31 +431,8 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         const debouncedSave = debounce(() => saveRef.current(), 800);
         mind.bus.addListener('operation', debouncedSave);
 
-        // ── Collapsed count badges ───────────────────────────────────────────
-        // After each operation, refresh child count badges on collapsed nodes
-        const updateCollapsedBadges = () => {
-            const container = document.getElementById('vizly-mind-elixir-root');
-            if (!container) return;
-            // Remove all existing badges first
-            container.querySelectorAll('.me-collapsed-badge').forEach(el => el.remove());
-            // For each collapsed wrapper, find the parent tpc and inject badge
-            container.querySelectorAll('me-wrapper[data-nodeid]').forEach(wrapper => {
-                const isCollapsed = (wrapper as HTMLElement).classList.contains('me-collapsed')
-                    || (wrapper as HTMLElement).getAttribute('data-expanded') === 'false'
-                    || (wrapper as HTMLElement).hasAttribute('data-collapsed');
-                // Try to find hidden children count
-                const children = wrapper.querySelectorAll(':scope > me-children > me-wrapper');
-                if (!isCollapsed || children.length === 0) return;
-                const tpc = wrapper.querySelector(':scope > me-parent > me-tpc');
-                if (!tpc || tpc.querySelector('.me-collapsed-badge')) return;
-                const badge = document.createElement('span');
-                badge.className = 'me-collapsed-badge node-children-count';
-                badge.textContent = String(children.length);
-                tpc.appendChild(badge);
-            });
-        };
-
-        // Simpler approach: check expand state via node data
+        // ── Collapsed count badges (data-driven) ─────────────────────────────
+        // Walk the nodeData tree; for each collapsed node inject a child-count badge
         const updateBadgesFromData = () => {
             try {
                 const data = mind.getData();

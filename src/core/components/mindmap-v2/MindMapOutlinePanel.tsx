@@ -85,6 +85,9 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
     const label = node.topic || '(空节点)';
     const [localExpanded, setLocalExpanded] = useState(depth < 2);
     const rowRef = useRef<HTMLDivElement>(null);
+    const [editing, setEditing] = useState(false);
+    const [editValue, setEditValue] = useState('');
+    const inputRef = useRef<HTMLInputElement>(null);
 
     // Force-expand when searching; force-expand/collapse from toolbar
     const forceExpand = filterText
@@ -99,6 +102,31 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
         nodeRef?.(node.id, rowRef.current);
         return () => nodeRef?.(node.id, null);
     }, [node.id, nodeRef]);
+
+    // Inline editing helpers
+    const startEdit = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setEditValue(node.topic || '');
+        setEditing(true);
+        setTimeout(() => inputRef.current?.select(), 30);
+    };
+
+    const commitEdit = async () => {
+        const mind = getMindElixirInstance();
+        if (!mind || !editing) return;
+        setEditing(false);
+        const trimmed = editValue.trim();
+        if (!trimmed || trimmed === node.topic) return;
+        try {
+            const tpc = mind.findEle(node.id);
+            if (tpc) await mind.setNodeTopic(tpc, trimmed);
+        } catch {}
+    };
+
+    const cancelEdit = () => {
+        setEditing(false);
+        setEditValue('');
+    };
 
     // Filter: hide if no match in this subtree
     if (filterText && !nodeOrDescendantMatches(node, filterText)) return null;
@@ -152,18 +180,50 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
                     {isRoot ? '⭐' : depth === 1 ? '◆' : '·'}
                 </span>
 
-                {/* Label with search highlight */}
-                <span style={{
-                    fontSize: 12.5,
-                    color: isSelected ? '#6366f1' : '#1e293b',
-                    fontWeight: isRoot ? 600 : depth === 1 ? 500 : 400,
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                }}>
-                    {highlightText(label, filterText)}
-                </span>
+                {/* Label with search highlight — double-click to edit */}
+                {editing ? (
+                    <input
+                        ref={inputRef}
+                        value={editValue}
+                        onChange={e => setEditValue(e.target.value)}
+                        onBlur={commitEdit}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
+                            if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+                            e.stopPropagation();
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            flex: 1,
+                            fontSize: 12.5,
+                            fontWeight: isRoot ? 600 : depth === 1 ? 500 : 400,
+                            background: 'rgba(99,102,241,0.08)',
+                            border: '1px solid rgba(99,102,241,0.4)',
+                            borderRadius: 4,
+                            padding: '1px 5px',
+                            color: '#1e293b',
+                            outline: 'none',
+                            minWidth: 0,
+                        }}
+                        autoFocus
+                    />
+                ) : (
+                    <span
+                        style={{
+                            fontSize: 12.5,
+                            color: isSelected ? '#6366f1' : '#1e293b',
+                            fontWeight: isRoot ? 600 : depth === 1 ? 500 : 400,
+                            flex: 1,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                        }}
+                        onDoubleClick={startEdit}
+                        title="双击编辑"
+                    >
+                        {highlightText(label, filterText)}
+                    </span>
+                )}
 
                 {/* Badges: note, hyperlink, child count */}
                 <span style={{ display: 'flex', gap: 3, flexShrink: 0, alignItems: 'center' }}>
@@ -227,6 +287,14 @@ const MindMapOutlinePanel: React.FC = () => {
     useEffect(() => subscribeMindElixir(() => setTick(t => t + 1)), []);
 
     const mind = getMindElixirInstance();
+
+    // Also listen to operation events to redraw outline after node changes
+    useEffect(() => {
+        if (!mind) return;
+        const refresh = () => setTick(t => t + 1);
+        mind.bus.addListener('operation', refresh);
+        return () => { mind.bus.removeListener('operation', refresh); };
+    }, [mind]);
 
     // Track canvas selection → sync outline highlight + scroll
     useEffect(() => {
