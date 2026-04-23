@@ -141,7 +141,11 @@ const MindMapFloatingBar: React.FC = () => {
         </Tooltip>
     );
 
+    // Divider
+    const Div = () => <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />;
+
     // ── Position: offset left so bar is truly centered ────────────────────────
+    const BAR_W = isRoot ? 100 : (hasChildren ? 370 : 340);
 
     return (
         <div
