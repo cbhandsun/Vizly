@@ -39,8 +39,9 @@ const MindMapFloatingBar: React.FC = () => {
     useEffect(() => {
         if (!mind) return;
 
-        const onSelect = (node: NodeObj | null) => {
-            if (!node) { setPos(null); setColorOpen(false); return; }
+        const onSelect = (nodes: NodeObj[] | null) => {
+            const node = nodes?.[0] ?? null;
+            if (!node) { setPos(null); setColorOpen(false); setShapeOpen(false); setNoteOpen(false); return; }
             // Find the DOM element for the selected node to get its bounding rect
             try {
                 const tpcEl = mind.findEle(node.id);
@@ -58,10 +59,12 @@ const MindMapFloatingBar: React.FC = () => {
             setPos(null); setColorOpen(false); setShapeOpen(false); setNoteOpen(false);
         };
 
-        // mind-elixir fires 'selectNode' with the NodeObj
-        mind.bus.addListener('selectNode', onSelect);
-        // Clicking canvas background fires 'unselectNode'
-        mind.bus.addListener('unselectNode', onDeselect);
+        // mind-elixir v5: fires 'selectNodes' (array) and 'selectNewNode'
+        mind.bus.addListener('selectNodes', onSelect as any);
+        mind.bus.addListener('selectNewNode', (node: NodeObj) => onSelect([node] as any));
+        // Clicking canvas background fires 'unselectNodes'
+        mind.bus.addListener('unselectNodes', onDeselect);
+        mind.bus.addListener('unselectNode', onDeselect);  // legacy fallback
         // When map refreshes, deselect
         mind.bus.addListener('operation', () => {
             // Delay to let DOM update, then refresh position
@@ -76,7 +79,9 @@ const MindMapFloatingBar: React.FC = () => {
         });
 
         return () => {
-            mind.bus.removeListener('selectNode', onSelect);
+            mind.bus.removeListener('selectNodes', onSelect as any);
+            mind.bus.removeListener('selectNewNode', onSelect as any);
+            mind.bus.removeListener('unselectNodes', onDeselect);
             mind.bus.removeListener('unselectNode', onDeselect);
         };
     }, [mind]);
