@@ -1,39 +1,25 @@
 /**
- * MindMapSearch.tsx — 节点全文搜索组件
+ * MindMapSearch.tsx — 节点全文搜索 + 批量替换
  *
- * 用法：
- *   <MindMapSearch open={open} onClose={() => setOpen(false)} />
- *
- * 功能：
- *  - DFS 遍历所有节点，匹配 topic（大小写不敏感）
- *  - 高亮匹配的关键词（CSS class）
- *  - 上下键 / Enter 逐条导航（selectNode + scrollIntoView）
- *  - 显示 X/N 匹配数
- *  - Escape 关闭
+ * v2 新增：
+ *  - 展开/折叠 Replace 输入行
+ *  - Replace One (当前匹配项替换)
+ *  - Replace All (全部替换，记录历史)
+ *  - 替换后自动导航到下一匹配
  */
-
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from 'antd';
 import { SearchOutlined, CloseOutlined, UpOutlined, DownOutlined } from '@ant-design/icons';
 import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance } from './mindElixirStore';
+import { findNodeById } from './migrate';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Collect all nodes in DFS order */
 function collectAllNodes(root: NodeObj): NodeObj[] {
     const result: NodeObj[] = [];
-    function dfs(n: NodeObj) {
-        result.push(n);
-        for (const c of n.children ?? []) dfs(c);
-    }
+    function dfs(n: NodeObj) { result.push(n); for (const c of n.children ?? []) dfs(c); }
     dfs(root);
     return result;
-}
-
-/** Case-insensitive substring match */
-function matches(node: NodeObj, query: string): boolean {
-    return node.topic.toLowerCase().includes(query.toLowerCase());
 }
 
 // ─── CSS injection ────────────────────────────────────────────────────────────
@@ -63,45 +49,34 @@ function clearSearchHighlights() {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-
-interface MindMapSearchProps {
-    open: boolean;
-    onClose: () => void;
-}
+interface MindMapSearchProps { open: boolean; onClose: () => void; }
 
 const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
     const mind = getMindElixirInstance();
     const inputRef = useRef<any>(null);
 
     const [query, setQuery] = useState('');
+    const [replaceText, setReplaceText] = useState('');
+    const [showReplace, setShowReplace] = useState(false);
     const [matchIdx, setMatchIdx] = useState(0);
+    const [replaceCount, setReplaceCount] = useState<number | null>(null);
 
-    // Compute matches whenever query changes
     const matchIds = useMemo<string[]>(() => {
         if (!mind || !query.trim()) return [];
         try {
             const all = collectAllNodes(mind.getData().nodeData);
-            return all.filter(n => matches(n, query)).map(n => n.id);
-        } catch {
-            return [];
-        }
+            return all.filter(n => n.topic.toLowerCase().includes(query.toLowerCase())).map(n => n.id);
+        } catch { return []; }
     }, [mind, query]);
 
-    // Sync highlights on match list change
+    // Sync highlights
     useEffect(() => {
         injectSearchCSS();
         clearSearchHighlights();
         if (!mind || matchIds.length === 0) return;
-
-        // Highlight all matches
         matchIds.forEach(id => {
-            try {
-                const el = mind.findEle(id);
-                if (el) el.classList.add('search-match');
-            } catch {}
+            try { const el = mind.findEle(id); if (el) el.classList.add('search-match'); } catch {}
         });
-
-        // Scroll to and mark active
         const currentId = matchIds[Math.min(matchIdx, matchIds.length - 1)];
         if (currentId) {
             try {
@@ -116,30 +91,25 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
         }
     }, [mind, matchIds, matchIdx]);
 
-    // Reset matchIdx when matches change
-    useEffect(() => {
-        setMatchIdx(0);
-    }, [matchIds.length, query]);
+    useEffect(() => { setMatchIdx(0); setReplaceCount(null); }, [matchIds.length, query]);
 
-    // Focus input when opened
     useEffect(() => {
         if (open) {
             setTimeout(() => inputRef.current?.focus(), 80);
         } else {
-            // Clean up highlights when closed
             clearSearchHighlights();
             setQuery('');
+            setReplaceText('');
+            setShowReplace(false);
+            setReplaceCount(null);
         }
     }, [open]);
 
-    // Escape key handler
+    // Escape key
     useEffect(() => {
         if (!open) return;
         const handler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                e.stopPropagation();
-                onClose();
-            }
+            if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
         };
         document.addEventListener('keydown', handler, true);
         return () => document.removeEventListener('keydown', handler, true);
@@ -156,101 +126,154 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
     }, [matchIds.length]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            if (e.shiftKey) goPrev(); else goNext();
-        }
+        if (e.key === 'Enter') { e.preventDefault(); if (e.shiftKey) goPrev(); else goNext(); }
     }, [goNext, goPrev]);
+
+    // ── Replace helpers ──────────────────────────────────────────────────────
+    const doReplaceOne = useCallback(() => {
+        if (!mind || matchIds.length === 0 || !query.trim()) return;
+        const id = matchIds[Math.min(matchIdx, matchIds.length - 1)];
+        try {
+            const obj = findNodeById(mind.getData().nodeData, id);
+            if (!obj) return;
+            const tpc = mind.findEle(id);
+            if (!tpc) return;
+            const newTopic = obj.topic.replace(new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), replaceText);
+            mind.reshapeNode(tpc as HTMLElement, { ...obj, topic: newTopic });
+            setReplaceCount(1);
+            // Move to next after replacing
+            setTimeout(() => goNext(), 60);
+        } catch {}
+    }, [mind, matchIds, matchIdx, query, replaceText, goNext]);
+
+    const doReplaceAll = useCallback(() => {
+        if (!mind || matchIds.length === 0 || !query.trim()) return;
+        let count = 0;
+        const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        for (const id of matchIds) {
+            try {
+                const obj = findNodeById(mind.getData().nodeData, id);
+                if (!obj) continue;
+                const tpc = mind.findEle(id);
+                if (!tpc) continue;
+                const newTopic = obj.topic.replace(regex, replaceText);
+                if (newTopic !== obj.topic) {
+                    mind.reshapeNode(tpc as HTMLElement, { ...obj, topic: newTopic });
+                    count++;
+                }
+            } catch {}
+        }
+        setReplaceCount(count);
+        setMatchIdx(0);
+    }, [mind, matchIds, query, replaceText]);
 
     if (!open) return null;
 
     const total = matchIds.length;
     const current = total > 0 ? Math.min(matchIdx, total - 1) + 1 : 0;
 
+    // ── Shared button style ───────────────────────────────────────────────────
+    const iconBtn = (disabled: boolean): React.CSSProperties => ({
+        background: 'transparent', border: 'none',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        color: disabled ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.7)',
+        padding: '2px 4px', borderRadius: 4, lineHeight: 1, transition: 'color 0.15s',
+    });
+
+    const replaceBtn = (primary = false): React.CSSProperties => ({
+        padding: '2px 8px', borderRadius: 5, cursor: total === 0 ? 'not-allowed' : 'pointer',
+        fontSize: 11, fontWeight: 600, border: 'none', transition: 'background 0.12s',
+        background: total === 0 ? 'rgba(255,255,255,0.06)' : primary ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.08)',
+        color: total === 0 ? 'rgba(255,255,255,0.25)' : primary ? '#a5b4fc' : 'rgba(255,255,255,0.6)',
+    });
+
     return (
-        <div
-            id="me-search-panel"
-            style={{
-                position: 'absolute',
-                top: 12,
-                right: 16,
-                zIndex: 999,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '6px 10px',
-                background: 'rgba(15,15,20,0.88)',
-                backdropFilter: 'blur(16px)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 12,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
-                minWidth: 260,
-            }}
-        >
-            <SearchOutlined style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, flexShrink: 0 }} />
+        <div id="me-search-panel" style={{
+            position: 'absolute',
+            top: 12, right: 16, zIndex: 999,
+            display: 'flex', flexDirection: 'column', gap: 0,
+            background: 'rgba(12,12,20,0.92)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 12,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+            minWidth: 300,
+            overflow: 'hidden',
+        }}>
+            {/* ── Search row ─────────────────────────────────────────────── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px' }}>
+                <SearchOutlined style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, flexShrink: 0 }} />
+                <Input
+                    ref={inputRef}
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="搜索节点..."
+                    variant="borderless"
+                    style={{ flex: 1, color: '#fff', background: 'transparent', fontSize: 13, padding: '0 4px' }}
+                    styles={{ input: { color: '#fff' } }}
+                />
+                {query.trim() && (
+                    <span style={{
+                        fontSize: 11, whiteSpace: 'nowrap', minWidth: 40, textAlign: 'center',
+                        color: total > 0 ? 'rgba(255,255,255,0.6)' : '#ef4444',
+                    }}>
+                        {total > 0 ? `${current}/${total}` : '无匹配'}
+                    </span>
+                )}
+                <button onClick={goPrev} style={iconBtn(total === 0)} title="上一个 (Shift+Enter)">
+                    <UpOutlined style={{ fontSize: 11 }} />
+                </button>
+                <button onClick={goNext} style={iconBtn(total === 0)} title="下一个 (Enter)">
+                    <DownOutlined style={{ fontSize: 11 }} />
+                </button>
+                {/* Toggle replace row */}
+                <button
+                    onClick={() => setShowReplace(v => !v)}
+                    title={showReplace ? '关闭替换' : '展开替换 (Ctrl+H)'}
+                    style={{
+                        ...iconBtn(false),
+                        fontSize: 12, fontWeight: 700,
+                        color: showReplace ? '#6366f1' : 'rgba(255,255,255,0.4)',
+                    }}
+                >
+                    ⇌
+                </button>
+                <button onClick={onClose} title="关闭 (Esc)" style={iconBtn(false)}>
+                    <CloseOutlined style={{ fontSize: 11 }} />
+                </button>
+            </div>
 
-            <Input
-                ref={inputRef}
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="搜索节点..."
-                variant="borderless"
-                style={{
-                    flex: 1,
-                    color: '#fff',
-                    background: 'transparent',
-                    fontSize: 13,
-                    padding: '0 4px',
-                }}
-                styles={{ input: { color: '#fff', '::placeholder': { color: 'rgba(255,255,255,0.35)' } } }}
-            />
-
-            {/* Match count */}
-            {query.trim() && (
-                <span style={{
-                    fontSize: 11,
-                    color: total > 0 ? 'rgba(255,255,255,0.7)' : '#ef4444',
-                    whiteSpace: 'nowrap',
-                    minWidth: 40,
-                    textAlign: 'center',
+            {/* ── Replace row ────────────────────────────────────────────── */}
+            {showReplace && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '5px 10px 8px',
+                    borderTop: '1px solid rgba(255,255,255,0.06)',
                 }}>
-                    {total > 0 ? `${current}/${total}` : '无匹配'}
-                </span>
+                    <span style={{ fontSize: 12, width: 14, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>⇌</span>
+                    <Input
+                        value={replaceText}
+                        onChange={e => { setReplaceText(e.target.value); setReplaceCount(null); }}
+                        placeholder="替换为..."
+                        variant="borderless"
+                        style={{ flex: 1, color: '#fff', background: 'transparent', fontSize: 13, padding: '0 4px' }}
+                        styles={{ input: { color: '#fff' } }}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); doReplaceOne(); } }}
+                    />
+                    <button onClick={doReplaceOne} disabled={total === 0} style={replaceBtn(false)} title="替换当前 (Enter)">
+                        替换
+                    </button>
+                    <button onClick={doReplaceAll} disabled={total === 0} style={replaceBtn(true)} title="全部替换">
+                        全替
+                    </button>
+                    {replaceCount !== null && (
+                        <span style={{ fontSize: 10, color: '#6ee7b7', whiteSpace: 'nowrap' }}>
+                            ✓ {replaceCount} 处
+                        </span>
+                    )}
+                </div>
             )}
-
-            {/* Navigation */}
-            <button onClick={goPrev} disabled={total === 0}
-                title="上一个 (Shift+Enter)"
-                style={{
-                    background: 'transparent', border: 'none', cursor: total > 0 ? 'pointer' : 'not-allowed',
-                    color: total > 0 ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)',
-                    padding: '2px 4px', borderRadius: 4, lineHeight: 1,
-                    transition: 'color 0.15s',
-                }}>
-                <UpOutlined style={{ fontSize: 11 }} />
-            </button>
-            <button onClick={goNext} disabled={total === 0}
-                title="下一个 (Enter)"
-                style={{
-                    background: 'transparent', border: 'none', cursor: total > 0 ? 'pointer' : 'not-allowed',
-                    color: total > 0 ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)',
-                    padding: '2px 4px', borderRadius: 4, lineHeight: 1,
-                    transition: 'color 0.15s',
-                }}>
-                <DownOutlined style={{ fontSize: 11 }} />
-            </button>
-
-            {/* Close */}
-            <button onClick={onClose}
-                title="关闭搜索 (Esc)"
-                style={{
-                    background: 'transparent', border: 'none', cursor: 'pointer',
-                    color: 'rgba(255,255,255,0.5)', padding: '2px 4px',
-                    borderRadius: 4, lineHeight: 1, transition: 'color 0.15s',
-                }}>
-                <CloseOutlined style={{ fontSize: 11 }} />
-            </button>
         </div>
     );
 };

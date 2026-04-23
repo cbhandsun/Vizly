@@ -21,8 +21,7 @@ const GROUPS = [
             { keys: ['Del'],            desc: '删除选中节点' },
             { keys: ['↑ ↓ ← →'],       desc: '导航节点' },
             { keys: ['Ctrl', 'D'],      desc: '复制节点为同级' },
-            { keys: ['Ctrl', 'C'],      desc: '复制节点' },
-            { keys: ['Ctrl', 'V'],      desc: '粘贴节点' },
+            { keys: ['Ctrl', 'Shift', 'C'], desc: '复制节点文本到剪贴板' },
         ],
     },
     {
@@ -33,6 +32,8 @@ const GROUPS = [
             { keys: ['Ctrl', '-'],      desc: '缩小' },
             { keys: ['/'],              desc: '居中视图' },
             { keys: ['Ctrl', 'F'],      desc: '搜索节点' },
+            { keys: ['Alt', 'O'],       desc: '切换大纲视图面板' },
+            { keys: ['☰ 工具栏'],       desc: '切换大纲视图' },
             { keys: ['⊞ 工具栏'],       desc: '切换画布背景（网格/点阵）' },
         ],
     },
@@ -58,10 +59,11 @@ const GROUPS = [
         title: '高效功能',
         icon: '⚡',
         items: [
+            { keys: ['Ctrl', 'F'],      desc: '搜索 / 查找替换（⇌ 按钮展开替换栏）' },
+            { keys: ['# 工具栏'],        desc: '切换节点自动编号' },
             { keys: ['Ctrl', 'Click'],  desc: '打开节点超链接' },
             { keys: ['拖拽 .md/.opml'], desc: '快速导入文件' },
-            { keys: ['大纲 双击'],       desc: '内联编辑节点名' },
-            { keys: ['右键节点'],        desc: '上下文菜单' },
+            { keys: ['右键节点'],        desc: '上下文菜单（含形状选择）' },
         ],
     },
 ];

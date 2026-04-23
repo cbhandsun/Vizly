@@ -25,6 +25,7 @@ interface BarPos { x: number; y: number; nodeId: string; }
 const MindMapFloatingBar: React.FC = () => {
     const [pos, setPos] = useState<BarPos | null>(null);
     const [colorOpen, setColorOpen] = useState(false);
+    const [shapeOpen, setShapeOpen] = useState(false);
     const barRef = useRef<HTMLDivElement>(null);
 
     const mind = getMindElixirInstance();
@@ -99,7 +100,15 @@ const MindMapFloatingBar: React.FC = () => {
     const hasChildren = (obj.children?.length ?? 0) > 0;
     const isExpanded = obj.expanded !== false;
 
-    const act = (fn: () => void) => { fn(); setColorOpen(false); };
+    const SHAPES = [
+        { key: '',          label: '默认', preview: '▭' },
+        { key: 'oval',      label: '椭圆', preview: '◡' },
+        { key: 'rect',      label: '矩形', preview: '□' },
+        { key: 'underline', label: '下划线', preview: '□̲' },
+        { key: 'diamond',   label: '菱形', preview: '◇' },
+    ];
+
+    const act = (fn: () => void) => { fn(); setColorOpen(false); setShapeOpen(false); };
 
     // ── Button style ─────────────────────────────────────────────────────────
     const btnStyle: React.CSSProperties = {
@@ -115,6 +124,8 @@ const MindMapFloatingBar: React.FC = () => {
         flexShrink: 0,
     };
 
+    const BAR_W = isRoot ? 100 : (hasChildren ? 340 : 310);
+
     const Btn: React.FC<{ icon: string; tip: string; danger?: boolean; onClick: () => void }> = ({ icon, tip, danger, onClick }) => (
         <Tooltip title={tip} placement="top" mouseEnterDelay={0.4}>
             <div
@@ -128,11 +139,7 @@ const MindMapFloatingBar: React.FC = () => {
         </Tooltip>
     );
 
-    // Divider
-    const Div = () => <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />;
-
     // ── Position: offset left so bar is truly centered ────────────────────────
-    const BAR_W = isRoot ? 100 : (hasChildren ? 290 : 260);
 
     return (
         <div
@@ -192,7 +199,7 @@ const MindMapFloatingBar: React.FC = () => {
             {/* Branch color quick picker */}
             <Popover
                 open={colorOpen}
-                onOpenChange={setColorOpen}
+                onOpenChange={v => { setColorOpen(v); if (v) setShapeOpen(false); }}
                 trigger="click"
                 placement="top"
                 arrow={false}
@@ -216,8 +223,7 @@ const MindMapFloatingBar: React.FC = () => {
                                     width: 22, height: 22, borderRadius: 5,
                                     background: c === 'transparent' ? 'repeating-conic-gradient(#ccc 0 90deg, #fff 0 180deg) 0 / 10px 10px' : c,
                                     border: '1.5px solid rgba(0,0,0,0.15)',
-                                    cursor: 'pointer',
-                                    transition: 'transform 0.1s',
+                                    cursor: 'pointer', transition: 'transform 0.1s',
                                 }}
                                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.2)'; }}
                                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
@@ -226,9 +232,9 @@ const MindMapFloatingBar: React.FC = () => {
                     </div>
                 }
             >
-                <Tooltip title="节点连线颜色">
+                <Tooltip title="连线颜色">
                     <div style={{ ...btnStyle, gap: 2 }}
-                        onClick={() => setColorOpen(v => !v)}
+                        onClick={() => { setColorOpen(v => !v); setShapeOpen(false); }}
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.15)'; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'; }}
                     >
@@ -238,6 +244,55 @@ const MindMapFloatingBar: React.FC = () => {
                             border: '1px solid rgba(255,255,255,0.3)',
                         }} />
                         <span style={{ fontSize: 9 }}>▾</span>
+                    </div>
+                </Tooltip>
+            </Popover>
+
+            {/* Shape quick picker */}
+            <Popover
+                open={shapeOpen}
+                onOpenChange={v => { setShapeOpen(v); if (v) setColorOpen(false); }}
+                trigger="click"
+                placement="top"
+                arrow={false}
+                content={
+                    <div style={{ display: 'flex', gap: 5, padding: 4 }}>
+                        {SHAPES.map(({ key, label, preview }) => {
+                            const current = (obj as any).shapeClass ?? '';
+                            return (
+                                <button key={key || 'default'}
+                                    title={label}
+                                    onClick={() => {
+                                        try {
+                                            const tpc = getTpc();
+                                            if (tpc) mind.reshapeNode(tpc, { ...obj, ...({ shapeClass: key || undefined } as any) });
+                                        } catch {}
+                                        setShapeOpen(false);
+                                    }}
+                                    style={{
+                                        width: 32, height: 32, borderRadius: 6, cursor: 'pointer',
+                                        fontSize: 14, textAlign: 'center', display: 'flex',
+                                        flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                        border: current === key ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.12)',
+                                        background: current === key ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)',
+                                        color: current === key ? '#a5b4fc' : 'rgba(255,255,255,0.7)',
+                                    }}
+                                >
+                                    <div style={{ fontSize: 14 }}>{preview}</div>
+                                    <div style={{ fontSize: 8, opacity: 0.6 }}>{label}</div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                }
+            >
+                <Tooltip title="节点形状">
+                    <div style={{ ...btnStyle }}
+                        onClick={() => { setShapeOpen(v => !v); setColorOpen(false); }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.15)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'; }}
+                    >
+                        <span style={{ fontSize: 13 }}>◇</span>
                     </div>
                 </Tooltip>
             </Popover>
