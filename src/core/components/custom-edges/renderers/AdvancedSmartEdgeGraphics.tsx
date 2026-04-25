@@ -23,7 +23,8 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
     const { 
         safeFinalPath, opacity, crossfadeOpacity, finalLabelX, finalLabelY, 
         nodesDragging, isStale, isBusEdge, isLoading,
-        shouldRenderDebugVisuals, shouldRenderPortHeatmap, obstacles, centeredCoords, workerSmartLabelPos
+        shouldRenderDebugVisuals, shouldRenderPortHeatmap, obstacles, centeredCoords, workerSmartLabelPos,
+        workerSmartPoints
     } = router;
 
     const {
@@ -153,8 +154,12 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
             } as any)} />
             
             <g className="custom-edge-updater-group">
-                <circle className="custom-edge-updater custom-edge-updater-source" cx={sourceX} cy={sourceY} />
-                <circle className="custom-edge-updater custom-edge-updater-target" cx={targetX} cy={targetY} />
+                <circle className="custom-edge-updater custom-edge-updater-source"
+                    cx={workerSmartPoints && workerSmartPoints.length > 0 ? workerSmartPoints[0].x : sourceX}
+                    cy={workerSmartPoints && workerSmartPoints.length > 0 ? workerSmartPoints[0].y : sourceY} />
+                <circle className="custom-edge-updater custom-edge-updater-target"
+                    cx={workerSmartPoints && workerSmartPoints.length > 1 ? workerSmartPoints[workerSmartPoints.length - 1].x : targetX}
+                    cy={workerSmartPoints && workerSmartPoints.length > 1 ? workerSmartPoints[workerSmartPoints.length - 1].y : targetY} />
             </g>
 
             {resolvedLabelText && (

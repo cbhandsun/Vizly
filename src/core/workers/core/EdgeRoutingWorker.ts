@@ -673,6 +673,70 @@ export class EdgeRoutingWorker {
             }
         }
 
+        // 5.6 [FIX] Self-Collision Guard: Prevent port selections that force paths through own node body.
+        // When bus/trunk logic selects a port that faces AWAY from the target (e.g., Bottom port
+        // but target is to the upper-right), the A* path must loop back through the source node.
+        // This guard detects such cases and overrides to the direct geometric port.
+        // Only applies to non-reverse edges (reverse edges intentionally use same-side ports).
+        if (!isReverseBypassActive && !hasExplicitSource && !hasExplicitTarget) {
+            const sCx = sRect.x + sRect.width / 2;
+            const sCy = sRect.y + sRect.height / 2;
+            const tCx = tRect.x + tRect.width / 2;
+            const tCy = tRect.y + tRect.height / 2;
+            const dx = tCx - sCx;
+            const dy = tCy - sCy;
+            const absDx = Math.abs(dx);
+            const absDy = Math.abs(dy);
+
+            // Determine the direct geometric port (the side facing the target)
+            const getDirectPort = (ddx: number, ddy: number, adx: number, ady: number): Position => {
+                if (adx > ady) {
+                    return ddx > 0 ? Position.Right : Position.Left;
+                }
+                return ddy > 0 ? Position.Bottom : Position.Top;
+            };
+
+            // Check if current source port faces AWAY from target
+            // "Faces away" = port direction is OPPOSITE to approach direction on the dominant axis
+            const checkPortConflict = (
+                port: Position, ddx: number, ddy: number, adx: number, ady: number
+            ): boolean => {
+                if (adx > ady) {
+                    // Dominant horizontal: port should face left or right toward target
+                    if (ddx > 0 && port === Position.Left) return true;   // target right, exit left
+                    if (ddx < 0 && port === Position.Right) return true;  // target left, exit right
+                    // Also check if vertical port on dominant-horizontal edge
+                    // Only flag if the vertical distance is small (would cross through node)
+                    if ((port === Position.Top || port === Position.Bottom) && adx > ady * 2) {
+                        // Strong horizontal dominance but using vertical port
+                        if (port === Position.Bottom && ddy < 0) return true;  // exit down, target above
+                        if (port === Position.Top && ddy > 0) return true;     // exit up, target below
+                    }
+                } else {
+                    // Dominant vertical: port should face top or bottom toward target
+                    if (ddy > 0 && port === Position.Top) return true;    // target below, exit up
+                    if (ddy < 0 && port === Position.Bottom) return true; // target above, exit down
+                    // Also check if horizontal port on dominant-vertical edge
+                    if ((port === Position.Left || port === Position.Right) && ady > adx * 2) {
+                        if (port === Position.Right && ddx < 0) return true;
+                        if (port === Position.Left && ddx > 0) return true;
+                    }
+                }
+                return false;
+            };
+
+            // Guard source port
+            if (checkPortConflict(startPos, dx, dy, absDx, absDy)) {
+                const directPort = getDirectPort(dx, dy, absDx, absDy);
+                startPos = directPort;
+            }
+
+            // Guard target port (target sees the source as "incoming" — flip dx/dy perspective)
+            if (checkPortConflict(endPos, -dx, -dy, absDx, absDy)) {
+                const directPort = getDirectPort(-dx, -dy, absDx, absDy);
+                endPos = directPort;
+            }
+        }
 
         // 6. Coordinates with Distribution
         // [Bus Optimization] Force coalesced ports for Bus Hubs (Tree Root) to create a clean bundle
@@ -1116,8 +1180,10 @@ export class EdgeRoutingWorker {
                 
                 let activeConfig = config;
 
-                // [FIX] Use activeObstacles for grid building too
-                const grid = prebuiltGrid || gridBuilder.buildGrid(activeObstacles, bounds, job.source, job.target);
+                // [FIX] Use full graph.obstacles (including source/target) for grid building
+                // so GridBuilder can rasterize them as OBSTACLE (no buffer padding via sourceId/targetId).
+                // activeObstacles is filtered and excludes source/target, causing A* to tunnel through them.
+                const grid = prebuiltGrid || gridBuilder.buildGrid(spatialIndex || graph.obstacles, bounds, job.source, job.target);
 
                 // [FIX] 将已路由完成的其他边的路径线段传入 A*
                 // graph.pendingEdges 由 Coordinator 收集并注入，包含其他边的路径段
