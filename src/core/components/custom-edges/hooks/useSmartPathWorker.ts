@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import type { MutableRefObject, Dispatch, SetStateAction } from 'react';
 import { Edge, Position } from '@xyflow/react';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
@@ -53,7 +53,10 @@ const _getElkPoints = (edgeData: EdgeData): Point2D[] | null => {
 const getComputedPoints = (edgeData: EdgeData): Point2D[] | null => {
     if (!edgeData?.computedPath || !Array.isArray(edgeData.computedPath) || edgeData.computedPath.length <= 1) return null;
     const path = edgeData.computedPath as unknown[];
-    if (!path.every(p => typeof (p as Point2D).x === 'number' && typeof (p as Point2D).y === 'number')) return null;
+    if (!path.every(p => {
+        const pt = p as Point2D;
+        return typeof pt.x === 'number' && typeof pt.y === 'number' && !Number.isNaN(pt.x) && !Number.isNaN(pt.y);
+    })) return null;
     return edgeData.computedPath;
 };
 
@@ -402,6 +405,15 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
     // edgeData reference changes on every selection change (displayEdges .map()),
     // but routing only cares about _layoutEpoch and algorithm.
     const edgeDataSig = `${edgeData?._layoutEpoch ?? 0}|${edgeData?.algorithm ?? ''}`;
+
+    // [P0-2] 响应式订阅 graphVersion，替代把 getGraphVersion() 放进 deps 的错误做法。
+    // 之前写法：deps 里用函数调用，React 每次渲染都执行但无法检测返回值变化。
+    // 新写法：useSyncExternalStore 能精确在 graphVersion 递增时触发重渲染。
+    const graphVersion = useSyncExternalStore(
+        (cb) => EdgeRoutingCoordinator.getInstance().subscribeGraphVersion(cb),
+        () => EdgeRoutingCoordinator.getInstance().getGraphVersion(),
+        () => 0
+    );
 
     // [P3.3] Pre-compute obstacles via memoized hook (only recalculates when topology changes)
     const obstacleData = useObstacles(simpleNodeMap, obstacles as ObstacleItem[], source, target, edgeConfig, isBus);
@@ -803,7 +815,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
         edgeConfig, layoutDirection, zoomLevel,
         respectSourceHandle, respectTargetHandle, sourceHandleId, targetHandleId,
         id, edgeDataSig, multiEdgeInfo, isLayoutStable, nodesDragging, elkPoints,
-        isReverseEdge, isBus, EdgeRoutingCoordinator.getInstance().getGraphVersion()
+        isReverseEdge, isBus, graphVersion
     ]);
 
     return { path, smartLabelPos, setPath, setSmartLabelPos, smartPoints, isLoading, workerUsedPositions };

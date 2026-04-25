@@ -5,6 +5,7 @@ import { useAutoSave } from './useAutoSave';
 import { PluginRegistry } from '../../../services/PluginRegistry';
 import { LayoutOptimizer } from '../../layout/LayoutOptimizer';
 import { analyzeDiagram } from '@/utils/diagramAnalyzer';
+import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 
 
 export interface UseDesignerSystemSyncProps {
@@ -364,7 +365,7 @@ export function useDesignerSystemSync({
     // performanceMode = nodes.length > 300 || isDragging
     // 所以 nodes.length > 300 && !performanceMode 永远为 false（条件互斥），移除该死代码 Effect
 
-    const { saveState, loadSaved, clearSaved } = useAutoSave(nodes, edges, {
+    const { saveState, loadSaved, clearSaved, saveNow } = useAutoSave(nodes, edges, {
         interval: 60000,
         storageKey: `flowchart-autosave-v2-${id || 'default'}`,
         enabled: true,
@@ -372,6 +373,36 @@ export function useDesignerSystemSync({
         onSaveSuccess: undefined,
         onSaveError: (error) => console.error('Auto-save failed:', error)
     });
+
+    // [FIX-AUTOSAVE] 节点/边变化后 3 秒防抖保存（补充 beforeunload 之前的兜底）。
+    // 用 skipCountRef 跳过前 2 次 effect 触发：
+    //   第 1 次 = 初始 mount（nodes/edges 可能为空或来自 reactflow 初始化）
+    //   第 2 次 = autosave 恢复后 setNodes/setEdges 触发（此时数据刚从 localStorage 读回，保存毫无意义）
+    // 从第 3 次开始 = 用户真正的操作，才需要防抖保存。
+    const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const skipCountRef = useRef(0);
+    const isMountedRef = useRef(true);
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => { isMountedRef.current = false; };
+    }, []);
+    useEffect(() => {
+        if (skipCountRef.current < 2) {
+            skipCountRef.current++;
+            return;
+        }
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => {
+            // 只在组件仍挂载时执行（beforeunload 负责卸载后的最终保存）
+            if (isMountedRef.current) saveNow();
+        }, 3000);
+        // 注意：cleanup 只清除「因 deps 变化」导致的旧计时器，
+        // 不影响 beforeunload 的同步保存（它们是独立的机制）
+        return () => {
+            if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        };
+    }, [nodes, edges, saveNow]);
+
 
     const hasRestoredAutoSave = useRef(false);
     const needsInitialFitView = useRef(false);
@@ -407,9 +438,12 @@ export function useDesignerSystemSync({
                 const isFreshAndValid = saved.isFreshSeed && saved.timestamp &&
                     (Date.now() - saved.timestamp) < FRESH_SEED_TTL_MS;
 
-                const isCanvasData = isFreshAndValid || (saved.nodes && (
-                    saved.nodes.length === 0 || 
-                    saved.nodes.some((n: any) => n.data !== undefined && (n.type === 'flowchart' || n.type === 'titleGroup' || n.type === 'subGroup' || n.type === 'group' || n.type === 'swimlane' || n.type === 'architectureNode' || n.type === 'mindmap'))
+                // [FIX-AUTOSAVE] 放宽验证逻辑：只要节点有 data 字段就认定为有效 canvas 数据。
+                // 原来的白名单（flowchart/titleGroup/subGroup...）对用户在空白画布上新建的节点过于严格，
+                // 导致 autosave 数据存在但负载失败，画布被重置。
+                const isCanvasData = isFreshAndValid || (saved.nodes !== undefined && (
+                    saved.nodes.length === 0 ||
+                    saved.nodes.some((n: any) => n.data !== undefined)
                 ));
                 
                 // If the isFreshSeed flag is stale (crash remnant), strip it from storage
@@ -453,6 +487,13 @@ export function useDesignerSystemSync({
             setNodes(recalculatedNodes);
             setEdges(saved.edges);
             needsInitialFitView.current = true;
+
+            // [COLD-START FIX] 冻结路由器，阻止在节点尺寸未稳定前触发大量 A* 计算。
+            // 根据 CDP 调试，34节点图加载时出现 A* openSet exhausted (iterations=23892)，
+            // 原因是节点 measured 不稳定，Worker 被反复触发，导致 1-2 秒连线白屏。
+            // freeze() 后所有 route() 请求会被积压在 latestRequests 里，
+            // 等 unfreeze() 调用后一次性批量计算。
+            EdgeRoutingCoordinator.getInstance().freeze();
 
             // ★ After consuming the fresh seed, clear the isFreshSeed flag from localStorage
             // so that subsequent autosave cycles are no longer blocked by the guard.
@@ -506,31 +547,36 @@ export function useDesignerSystemSync({
     useEffect(() => {
         if (needsInitialFitView.current && reactFlowInstance) {
             needsInitialFitView.current = false;
-            
-            // Define a function to safely apply initial layout
-            const applyInitialViewport = () => {
+
+            // [COLD-START FIX] 等节点被 React Flow 测量后解冻路由器。
+            // freeze() 阻止了节点测量期间的所有 A* 计算（避免 23892次 openSet 迭代），
+            // 所有 route() 请求已积压在 latestRequests 中。
+            // unfreeze() 会将它们全部标脏，然后触发一次性批量计算。
+            const triggerRoutingAfterMeasure = () => {
                 const currentNodes = reactFlowInstance.getNodes();
-                const container = document.querySelector('.react-flow') as HTMLElement | null;
-                const cw = container ? container.clientWidth : window.innerWidth;
-                const ch = container ? container.clientHeight : window.innerHeight;
-                
-                // All diagrams, regardless of node count, should use the industry-standard true center 'fit'.
-                // Our customized 'fit' handles safe zones and absolute centering.
-                
-                const allMeasured = currentNodes.every((n: any) => n.measured?.width || n.width);
+                const allMeasured = currentNodes.length > 0 &&
+                    currentNodes.every((n: any) => (n.measured?.width && n.measured.width > 0) || n.width);
+
                 if (allMeasured) {
+                    // 节点已被 RF 测量，解冻路由器 → 积压请求立即批量计算
+                    EdgeRoutingCoordinator.getInstance().unfreeze();
                     window.dispatchEvent(new CustomEvent('diagramControl', { detail: { action: 'fit' } }));
                 } else {
-                    // Fallback to forcefully push it to a general center if unmeasured,
-                    // avoiding the top-left snag, then trigger actual fit after it measures.
+                    // 节点尚未测量完毕，先把视口大致定到中心，稍后重试
+                    const container = document.querySelector('.react-flow') as HTMLElement | null;
+                    const cw = container ? container.clientWidth : window.innerWidth;
+                    const ch = container ? container.clientHeight : window.innerHeight;
                     reactFlowInstance.setViewport({ x: cw / 2 - 100, y: ch / 2 - 100, zoom: 1 });
                     setTimeout(() => {
+                        // 350ms 后 RF 应已完成测量，解冻并 fit
+                        EdgeRoutingCoordinator.getInstance().unfreeze();
                         window.dispatchEvent(new CustomEvent('diagramControl', { detail: { action: 'fit' } }));
-                    }, 400);
+                    }, 350);
                 }
             };
 
-            setTimeout(applyInitialViewport, 100);
+            // 给 RF 一点时间完成初次布局测量（通常 <1 帧，60ms 是保守值）
+            setTimeout(triggerRoutingAfterMeasure, 60);
         }
     }, [reactFlowInstance]);
 

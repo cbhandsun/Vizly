@@ -16,6 +16,22 @@ import type { CenteredCoords } from './hooks/useSmartPathWorker';
 // 整个应用生命周期内 key 数量 << 20，不存在内存泄漏风险（每次签名变化 clear 一次）。
 const _directionVoteCache = new Map<string, 'LR' | 'RL' | 'TB' | 'BT'>();
 
+// [P1-2] 模块级 multiEdgeInfo 缓存：
+// 原问题：每条边各自对 storeEdges 做 O(E) forEach，31 条边 = 31 次扫描。
+// 修复：用 (topologySig, source, target) 作为 key，相同拓扑下仅计算一次。
+// 当拓扑签名变化时自动失效（map 的所有 key 都包含旧签名，自然淘汰）。
+// 每个签名对应的 map size ≤ E（每条边一个 entry），无内存泄漏风险。
+type MultiEdgeInfoResult = {
+    isManyToOne: boolean; isOneToMany: boolean;
+    incomingCount: number; outgoingCount: number;
+    incomingIndex: number; outgoingIndex: number;
+    enableBus: boolean;
+};
+// key = `${topologySig}:${source}:${target}` → per-edge outgoing/incoming lists (without id-specific index)
+type EdgeListCache = { outgoingList: string[]; incomingList: string[] };
+const _multiEdgeListCache = new Map<string, EdgeListCache>();
+let _multiEdgeListCacheTopoSig: number = -1;
+
 
 /**
  * Return type for useSmartEdgeContext hook
@@ -524,125 +540,109 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
     }, [source, target, simpleNodeMap, getAbsPos]);
 
     // ---------- 2️⃣ Edge grouping info ----------
+    // [P1-2] 使用模块级缓存，相同拓扑签名下 outgoing/incoming 列表只计算一次，
+    // 避免 E 条边各自对 storeEdges 做 O(E) forEach（总计 O(E²)）。
     const multiEdgeInfo = useMemo(() => {
-        const sourceNodeStatic = simpleNodeMap.get(source);
-        const targetNodeStatic = simpleNodeMap.get(target);
-
-        const classifyDirection = (from: any, to: any): string | null => {
-            if (!from || !to) return null;
-            const fw = from.width || 0;
-            const fh = from.height || 0;
-            const tw = to.width || 0;
-            const th = to.height || 0;
-            const fx = from.x ?? 0;
-            const fy = from.y ?? 0;
-            const tx = to.x ?? 0;
-            const ty = to.y ?? 0;
-            const cx1 = fx + fw / 2;
-            const cy1 = fy + fh / 2;
-            const cx2 = tx + tw / 2;
-            const cy2 = ty + th / 2;
-            const dx = cx2 - cx1;
-            const dy = cy2 - cy1;
-            if (!Number.isFinite(dx) || !Number.isFinite(dy)) return null;
-            const ax = Math.abs(dx);
-            const ay = Math.abs(dy);
-            if (ax < 1 && ay < 1) return null;
-
-            if (ay > ax * 1.5) {
-                return dy >= 0 ? 'down' : 'up';
-            }
-            if (ax > ay * 1.5) {
-                return dx >= 0 ? 'right' : 'left';
-            }
-
-            const isVerticalLayout = layoutDirection === 'TB' || layoutDirection === 'BT';
-            const isHorizontalLayout = layoutDirection === 'LR' || layoutDirection === 'RL';
-
-            if (isVerticalLayout && ay >= ax * 0.5) {
-                return dy >= 0 ? 'down' : 'up';
-            }
-            if (isHorizontalLayout && ax >= ay * 0.5) {
-                return dx >= 0 ? 'right' : 'left';
-            }
-            return null;
-        };
-
-        const outgoingBuckets: Record<string, string[]> = {};
-        const incomingBuckets: Record<string, string[]> = {};
-
-        if (sourceNodeStatic) {
-            storeEdges.forEach((e) => {
-                if (e.source !== source) return;
-                const tNode = simpleNodeMap.get(e.target);
-                const dir = tNode ? classifyDirection(sourceNodeStatic, tNode) : null;
-                if (!dir) return;
-                if (!outgoingBuckets[dir]) outgoingBuckets[dir] = [];
-                outgoingBuckets[dir].push(e.id);
-            });
+        // 当拓扑签名变化时，清空旧缓存，防止无限增长
+        if (_multiEdgeListCacheTopoSig !== edgeTopologySig) {
+            _multiEdgeListCache.clear();
+            _multiEdgeListCacheTopoSig = edgeTopologySig;
         }
 
-        if (targetNodeStatic) {
-            storeEdges.forEach((e) => {
-                if (e.target !== target) return;
-                const sNode = simpleNodeMap.get(e.source);
-                const dir = sNode ? classifyDirection(sNode, targetNodeStatic) : null;
-                if (!dir) return;
-                if (!incomingBuckets[dir]) incomingBuckets[dir] = [];
-                incomingBuckets[dir].push(e.id);
-            });
-        }
+        const cacheKey = `${source}:${target}`;
+        let cached = _multiEdgeListCache.get(cacheKey);
 
-        let outgoingList: string[] = [];
-        Object.values(outgoingBuckets).forEach((list) => {
-            if (list.length > 1 && list.includes(id)) {
+        if (!cached) {
+            const sourceNodeStatic = simpleNodeMap.get(source);
+            const targetNodeStatic = simpleNodeMap.get(target);
+
+            const classifyDirection = (from: any, to: any): string | null => {
+                if (!from || !to) return null;
+                const fw = from.width || 0; const fh = from.height || 0;
+                const tw = to.width || 0;   const th = to.height || 0;
+                const fx = from.x ?? 0;     const fy = from.y ?? 0;
+                const tx = to.x ?? 0;       const ty = to.y ?? 0;
+                const cx1 = fx + fw / 2;    const cy1 = fy + fh / 2;
+                const cx2 = tx + tw / 2;    const cy2 = ty + th / 2;
+                const dx = cx2 - cx1;       const dy = cy2 - cy1;
+                if (!Number.isFinite(dx) || !Number.isFinite(dy)) return null;
+                const ax = Math.abs(dx);    const ay = Math.abs(dy);
+                if (ax < 1 && ay < 1) return null;
+                if (ay > ax * 1.5) return dy >= 0 ? 'down' : 'up';
+                if (ax > ay * 1.5) return dx >= 0 ? 'right' : 'left';
+                const isVL = layoutDirection === 'TB' || layoutDirection === 'BT';
+                const isHL = layoutDirection === 'LR' || layoutDirection === 'RL';
+                if (isVL && ay >= ax * 0.5) return dy >= 0 ? 'down' : 'up';
+                if (isHL && ax >= ay * 0.5) return dx >= 0 ? 'right' : 'left';
+                return null;
+            };
+
+            const outgoingBuckets: Record<string, string[]> = {};
+            const incomingBuckets: Record<string, string[]> = {};
+
+            if (sourceNodeStatic) {
+                storeEdges.forEach((e) => {
+                    if (e.source !== source) return;
+                    const tNode = simpleNodeMap.get(e.target);
+                    const dir = tNode ? classifyDirection(sourceNodeStatic, tNode) : null;
+                    if (!dir) return;
+                    if (!outgoingBuckets[dir]) outgoingBuckets[dir] = [];
+                    outgoingBuckets[dir].push(e.id);
+                });
+            }
+
+            if (targetNodeStatic) {
+                storeEdges.forEach((e) => {
+                    if (e.target !== target) return;
+                    const sNode = simpleNodeMap.get(e.source);
+                    const dir = sNode ? classifyDirection(sNode, targetNodeStatic) : null;
+                    if (!dir) return;
+                    if (!incomingBuckets[dir]) incomingBuckets[dir] = [];
+                    incomingBuckets[dir].push(e.id);
+                });
+            }
+
+            let outgoingList: string[] = [];
+            Object.values(outgoingBuckets).forEach((list) => {
                 const sorted = [...list].sort();
-                if (sorted.length > outgoingList.length) {
+                if (sorted.length > 1 && sorted.length > outgoingList.length) {
                     outgoingList = sorted;
                 }
+            });
+            if (outgoingList.length === 0) {
+                const allOutgoing = storeEdges.filter(e => e.source === source).map(e => e.id).sort();
+                if (allOutgoing.length > 1) outgoingList = allOutgoing;
             }
-        });
-        if (outgoingList.length === 0) {
-            const allOutgoing = storeEdges
-                .filter(e => e.source === source)
-                .map(e => e.id)
-                .sort();
-            if (allOutgoing.length > 1 && allOutgoing.includes(id)) {
-                outgoingList = allOutgoing;
-            }
-        }
 
-        let incomingList: string[] = [];
-        Object.values(incomingBuckets).forEach((list) => {
-            if (list.length > 1 && list.includes(id)) {
+            let incomingList: string[] = [];
+            Object.values(incomingBuckets).forEach((list) => {
                 const sorted = [...list].sort();
-                if (sorted.length > incomingList.length) {
+                if (sorted.length > 1 && sorted.length > incomingList.length) {
                     incomingList = sorted;
                 }
+            });
+            if (incomingList.length === 0) {
+                const allIncoming = storeEdges.filter(e => e.target === target).map(e => e.id).sort();
+                if (allIncoming.length > 1) incomingList = allIncoming;
             }
-        });
-        if (incomingList.length === 0) {
-            const allIncoming = storeEdges
-                .filter(e => e.target === target)
-                .map(e => e.id)
-                .sort();
-            if (allIncoming.length > 1 && allIncoming.includes(id)) {
-                incomingList = allIncoming;
-            }
+
+            cached = { outgoingList, incomingList };
+            _multiEdgeListCache.set(cacheKey, cached);
         }
 
+        const { outgoingList, incomingList } = cached;
         const isManyToOne = incomingList.length > 1;
         const isOneToMany = outgoingList.length > 1;
-        const enableBus = isManyToOne || isOneToMany;
 
         return {
             isManyToOne,
             isOneToMany,
             incomingCount: incomingList.length,
             outgoingCount: outgoingList.length,
-            incomingIndex: incomingList.indexOf(id) >= 0 ? incomingList.indexOf(id) : 0,
-            outgoingIndex: outgoingList.indexOf(id) >= 0 ? outgoingList.indexOf(id) : 0,
-            enableBus,
+            // id-specific index computed here (not cached, O(1))
+            incomingIndex: Math.max(0, incomingList.indexOf(id)),
+            outgoingIndex: Math.max(0, outgoingList.indexOf(id)),
+            enableBus: isManyToOne || isOneToMany,
         };
     // [FIX] Removed storeEdges from deps — edgeTopologySig already captures topology changes.
     // storeEdges reference changes on every selection change (selected property),
@@ -651,9 +651,25 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
 
     // ---------- 3️⃣ Centered coordinates ----------
     const centeredCoords = useMemo(() => {
-        // [FIX] Removed livePositions dependency. 
-        // We now rely on 'sourceNode' and 'targetNode' derived from useNodes(), 
-        // which provides live positions during drag without needing ref hacks.
+        // [PERF] 拖动时直接用 RF props 坐标（handle 坐标）早返回，跳过 calcHandlePos 计算
+        // Worker 路由在拖动时被禁用，centeredCoords 的精确值此时不需要
+        // 这避免了每帧 O(N) 的 calcHandlePos + handle 推断计算，显著减少卡顿
+        if (nodesDragging) {
+            return {
+                sourceX,
+                sourceY,
+                targetX,
+                targetY,
+                forcedSourcePos: undefined,
+                forcedTargetPos: undefined,
+                busTrunkSource: undefined,
+                busTrunkTarget: undefined,
+                effectiveIsOneToMany: false,
+                effectiveIsManyToOne: false,
+                sourceNodeOrigin: { x: sourceX, y: sourceY },
+                targetNodeOrigin: { x: targetX, y: targetY },
+            };
+        }
 
         // [FIX] Helper to calculate handle position
         const calcHandlePos = (
@@ -860,6 +876,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
 
         return result;
     }, [
+        nodesDragging, // [PERF] 拖动时早返回，松手后重新精确计算
         sourceNode, targetNode,
         source, target,
         sourceX, sourceY, targetX, targetY,

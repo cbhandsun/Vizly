@@ -303,19 +303,29 @@
     background: transparent !important;
 }
 
-/* 正在拖拽的节点 — 悬浮阴影 + 半透明 */
+/* 正在拖拽的节点 — 明显悬浮感：半透明 + 强阴影 + 轻微放大 */
 .react-flow__node.dragging {
-    opacity: 0.85;
+    opacity: 0.88;
     cursor: grabbing !important;
-    transition: opacity 0.1s;
-    filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.15));
+    transition: opacity 0.1s, filter 0.1s;
+    /* 多层阴影：近处扩散 + 远处落地投影 = 真实浮起感 */
+    filter:
+        drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12))
+        drop-shadow(0 12px 28px rgba(0, 0, 0, 0.18))
+        drop-shadow(0 24px 48px rgba(0, 0, 0, 0.10));
     z-index: 1000 !important;
+    scale: 1.02;
 }
 
-/* Drop 反馈（移除导致跳动的缩放动画，保留内发光反馈） */
+/* 落地脉冲反馈 — 快速扩散光环消退 */
 .react-flow__node.just-dropped {
-    box-shadow: 0 0 0 3px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.25));
-    transition: box-shadow 0.2s ease-out;
+    animation: dropLand 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes dropLand {
+    0%   { box-shadow: 0 0 0 8px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.30)); scale: 1.03; }
+    60%  { box-shadow: 0 0 0 4px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.15)); scale: 1.00; }
+    100% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0); scale: 1.00; }
 }
 
 /* 3. 连接点（Handle）交互效果 */
@@ -437,52 +447,62 @@
 
 /* 边路径样式过渡（不过渡 d 属性 — 拖拽时太重） */
 .react-flow__edge-path {
-    transition: stroke-width 0.2s ease, stroke 0.2s ease, filter 0.2s ease;
+    transition: stroke-width 0.18s ease, stroke 0.18s ease, filter 0.18s ease;
+}
+
+/* 边悬停：扩大透明 hitbox + 主色高亮 + 精致光晕 */
+.react-flow__edge .react-flow__edge-interaction {
+    stroke-width: 20px !important; /* 大热区 */
+    stroke: transparent !important;
+    fill: none;
 }
 
 .performance-mode .react-flow__edge-path {
     transition: none !important;
 }
 
-/* 边悬停效果 — 蓝色高亮光晕 (对标 Figma/Lucidchart 顶级体验) */
+/* 边悬停效果 — 品牌色高亮光晕 */
 .react-flow__edge:hover .react-flow__edge-path {
-    stroke: var(--theme-primary-main, #3b82f6);
-    stroke-width: 3;
-    filter: drop-shadow(0 0 6px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.5)));
+    stroke: var(--designer-accent, #6366f1);
+    stroke-width: 2.5;
+    filter:
+        drop-shadow(0 0 4px rgba(99, 102, 241, 0.45))
+        drop-shadow(0 0 10px rgba(99, 102, 241, 0.20));
 }
 
-/* 选中的边 — 蓝色描边更明显 */
+/* 选中的边 */
 .react-flow__edge.selected .react-flow__edge-path {
-    stroke: var(--theme-primary-main, #3b82f6) !important;
-    stroke-width: 3;
-    filter: drop-shadow(0 0 4px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.4)));
+    stroke: var(--designer-accent, #6366f1) !important;
+    stroke-width: 2.5;
+    filter:
+        drop-shadow(0 0 3px rgba(99, 102, 241, 0.50))
+        drop-shadow(0 0 8px rgba(99, 102, 241, 0.25)) !important;
 }
 
-/* ⭐ 边端点重连手柄 — 悬停/选中时显示可拖拽圆形 */
-/* 连接成功动画 */
+/* 连接成功动画 — 绿色脉冲 */
 .react-flow__edge.just-connected .react-flow__edge-path {
     stroke: var(--theme-success-main, #10b981) !important;
-    animation: connect-success-pulse 1s ease-in-out;
+    animation: connect-success-pulse 0.8s ease-in-out;
 }
 
-/* AI 驱动的动态路径增强 — 呼吸发光效果 */
+/* 动画连线 — 呼吸流动 */
 @keyframes edge-glow-pulse {
-    0% { filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.4)); stroke-width: 2; }
-    50% { filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.8)); stroke-width: 3; }
-    100% { filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.4)); stroke-width: 2; }
+    0%   { filter: drop-shadow(0 0 2px rgba(99, 102, 241, 0.4)); stroke-width: 2; }
+    50%  { filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.7)); stroke-width: 3; }
+    100% { filter: drop-shadow(0 0 2px rgba(99, 102, 241, 0.4)); stroke-width: 2; }
 }
 
 .react-flow__edge-path.animated {
     stroke-dasharray: 8;
-    animation: react-flow__dash-animation 0.6s linear infinite, edge-glow-pulse 2s ease-in-out infinite !important;
+    animation: react-flow__dash-animation 0.5s linear infinite, edge-glow-pulse 2.5s ease-in-out infinite !important;
 }
 
-/* 原生边缘更新器：完全透明，但放大半径（r=12或更多）作为广阔的拖拽交互热区 */
+/* 原生边缘更新器：完全透明，放大半径作为广阔拖拽热区 */
 circle.react-flow__edgeupdater {
     cursor: grab;
     fill: transparent !important;
     stroke: transparent !important;
-    r: 14 !important;
+    r: 16 !important;
     opacity: 0 !important;
     pointer-events: all;
 }
@@ -491,31 +511,41 @@ circle.react-flow__edgeupdater:active {
     cursor: grabbing;
 }
 
-/* ⭐ 自绘高精度锚点 (Custom Visual Updater) — 悬停/选中时显示 */
+/* ⭐ 边端点锚点圆（自绘） — 悬停/选中时弹出 */
 circle.custom-edge-updater {
-    fill: var(--theme-background-main, #ffffff);
-    stroke: var(--theme-primary-dark, #2563eb);
-    stroke-width: 2.5;
-    r: 4.5;
+    fill: #ffffff;
+    stroke: var(--designer-accent, #6366f1);
+    stroke-width: 2;
+    r: 4;
     opacity: 0;
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-    pointer-events: none; /* 让事件穿透到下方的巨大原生热区 */
+    transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
 }
 
-/* 覆盖/悬停/选中均显示句柄 */
+/* 悬停/选中时显示 */
 .react-flow__edge:hover circle.custom-edge-updater,
 .react-flow__edge.selected circle.custom-edge-updater {
     opacity: 1;
-    filter: drop-shadow(0 2px 4px rgba(37, 99, 235, 0.2));
+    r: 5;
+    filter: drop-shadow(0 1px 3px rgba(99, 102, 241, 0.30));
 }
 
-/* 由于 native updater 渲染在组件树后方，使用 :has() 逆向查找到 parent 并影响 custom updater */
-.react-flow__edge:has(.react-flow__edgeupdater:hover) .custom-edge-updater {
-    fill: var(--theme-primary-light, #f8fafc);
-    stroke: var(--theme-primary-dark, #1d4ed8);
-    r: 6;
-    stroke-width: 3;
-    filter: drop-shadow(0 0 6px var(--theme-primary-main-alpha, rgba(37, 99, 235, 0.5))) drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+/* 原生热区 hover → 圆点放大高亮 + 弹跳 */
+.react-flow__edge:has(.react-flow__edgeupdater:hover) circle.custom-edge-updater {
+    r: 7;
+    fill: var(--designer-accent, #6366f1);
+    stroke: #fff;
+    stroke-width: 2.5;
+    filter:
+        drop-shadow(0 0 6px rgba(99, 102, 241, 0.6))
+        drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+    animation: edgeUpdaterBounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes edgeUpdaterBounce {
+    0%   { transform: scale(0.6); }
+    70%  { transform: scale(1.1); }
+    100% { transform: scale(1.0); }
 }
 
 /* 核心杀手锏：利用 :has() 伪类，当存在被选中、或悬挂被悬停的边时，直接将带有 SVG 的 Edges 容器层级凌驾于 Nodes 之上。
@@ -678,21 +708,29 @@ circle.custom-edge-updater {
 }
 
 .react-flow__node.selected {
-    box-shadow: 0 0 0 2px var(--designer-accent), 0 0 16px rgba(99, 102, 241, 0.3) !important;
-    transition: box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow:
+        0 0 0 2px var(--designer-accent),
+        0 0 0 4px rgba(99, 102, 241, 0.12),
+        0 4px 16px rgba(99, 102, 241, 0.15) !important;
+    transition: box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-/* 选中态的渐变微光效果 */
+/* 选中态：品牌色渐变边框光晕 */
 .react-flow__node.selected::after {
     content: '';
     position: absolute;
-    inset: -3px;
-    background: linear-gradient(135deg, var(--designer-accent), #818cf8);
+    inset: -2px;
+    background: linear-gradient(135deg, var(--designer-accent, #6366f1) 0%, #818cf8 50%, #a5b4fc 100%);
     border-radius: inherit;
     z-index: -1;
-    opacity: 0.2;
-    animation: pulseGlow 2s infinite alternate;
+    opacity: 0;
+    animation: selectionGlow 2.5s ease-in-out infinite alternate;
     pointer-events: none;
+}
+
+@keyframes selectionGlow {
+    0%   { opacity: 0.08; transform: scale(0.998); filter: blur(0px); }
+    100% { opacity: 0.22; transform: scale(1.004); filter: blur(1px); }
 }
 
 @keyframes pulseGlow {
@@ -1360,18 +1398,29 @@ circle.custom-edge-updater {
 }
 
 /* ============================================
-   Selection Marquee — Figma-style
+   Selection Marquee — 精细化 Figma 风格选框
    ============================================ */
 .react-flow__selection {
-    background: rgba(59, 130, 246, 0.08) !important;
-    border: 1.5px solid rgba(59, 130, 246, 0.5) !important;
-    border-radius: 4px !important;
+    background: rgba(99, 102, 241, 0.07) !important;
+    border: 1.5px solid rgba(99, 102, 241, 0.55) !important;
+    border-radius: 5px !important;
+    /* 流动虚线边框动画 */
+    animation: selectionMarch 0.8s linear infinite !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08), inset 0 0 20px rgba(99, 102, 241, 0.04) !important;
 }
 
+@keyframes selectionMarch {
+    0%   { border-color: rgba(99, 102, 241, 0.55); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08); }
+    50%  { border-color: rgba(99, 102, 241, 0.80); box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12); }
+    100% { border-color: rgba(99, 102, 241, 0.55); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08); }
+}
+
+/* 节点多选高亮框 — 虚线描边 + 内部淡蓝 */
 .react-flow__nodesselection-rect {
-    background: rgba(59, 130, 246, 0.04) !important;
-    border: 1.5px dashed rgba(59, 130, 246, 0.4) !important;
-    border-radius: 6px !important;
+    background: rgba(99, 102, 241, 0.05) !important;
+    border: 1.5px dashed rgba(99, 102, 241, 0.5) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 0 0 5px rgba(99, 102, 241, 0.06), 0 4px 20px rgba(99, 102, 241, 0.12) !important;
 }
 
 /* ============================================
@@ -1391,7 +1440,7 @@ circle.custom-edge-updater {
     height: 11px !important;
     background: var(--theme-primary-main, #3b82f6) !important;
     border-color: var(--theme-background-main, #fff) !important;
-    box-shadow: 0 0 0 3px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.25)), 0 0 8px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.3)) !important;
+    box-shadow: 0 0 0 3px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.25)), 0 0 10px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.35)) !important;
     z-index: 10;
 }
 
@@ -1401,40 +1450,57 @@ circle.custom-edge-updater {
 }
 
 .react-flow.connecting .react-flow__handle.connectionindicator {
-    width: 11px !important;
-    height: 11px !important;
+    width: 12px !important;
+    height: 12px !important;
     background: var(--theme-success-main, #10b981) !important;
-    animation: handlePulse 0.8s ease-in-out infinite !important;
+    animation: handleSnapCapture 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+    box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.25) !important;
 }
 
 @keyframes handlePulse {
     0%, 100% {
-        box-shadow: 0 0 0 0 var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.4));
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
         transform: scale(1);
     }
     50% {
-        box-shadow: 0 0 0 4px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.1)), 0 0 10px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.2));
-        transform: scale(1.2);
+        box-shadow: 0 0 0 5px rgba(99, 102, 241, 0.10), 0 0 12px rgba(99, 102, 241, 0.20);
+        transform: scale(1.25);
     }
 }
 
-/* 🚀 P6: 连线预览路径升级 — 能量流动感 */
+@keyframes handleSnapCapture {
+    0%   { transform: scale(0.7); opacity: 0.6; }
+    60%  { transform: scale(1.3); }
+    100% { transform: scale(1.0); opacity: 1; }
+}
+
+/* ============================================
+   🔌 Connection Line Preview — 渐变能量线
+   ============================================ */
+/* 连线路径本体 */
 .react-flow__connection-path {
-    stroke: var(--theme-primary-main, #3b82f6) !important;
-    stroke-width: 2px !important;
-    stroke-dasharray: 8, 4 !important;
-    animation: energyFlow 1s linear infinite !important;
-    filter: drop-shadow(0 0 4px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.3)));
+    stroke: var(--theme-primary-main, #6366f1) !important;
+    stroke-width: 2.5px !important;
+    stroke-dasharray: 7, 5 !important;
+    stroke-linecap: round !important;
+    animation: connLineFlow 0.7s linear infinite !important;
+    filter:
+        drop-shadow(0 0 3px rgba(99, 102, 241, 0.5))
+        drop-shadow(0 0 8px rgba(99, 102, 241, 0.20)) !important;
     pointer-events: none;
+    opacity: 0.9;
 }
 
-@keyframes energyFlow {
-    from {
-        stroke-dashoffset: 24;
-    }
-    to {
-        stroke-dashoffset: 0;
-    }
+@keyframes connLineFlow {
+    from { stroke-dashoffset: 24; }
+    to   { stroke-dashoffset: 0; }
+}
+
+/* 连线时隐藏所有 ⊕ 快捷按钮，减少干扰 */
+.react-flow.connecting .flowchart-quick-clone-btn {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: none !important;
 }
 
 /* 🚀 P6: 磁性吸附反馈 — 节点共鸣 */
@@ -1695,5 +1761,41 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
 @keyframes drop-pulse-fill {
     0%, 100% { transform: scale(0.98); opacity: 0.1; }
     50% { transform: scale(1.02); opacity: 0.25; }
+}
+
+/* ============================================
+   节点拖动时连线"预览态"降级样式
+   当节点拖动时 → fallback SmoothStep 路径 + 虚线预览（由 JS busStyle 注入）
+   松手后 Worker 重算 → 完整精确路径还原
+   ============================================ */
+
+/* 拖动中：保持高 opacity，stroke 颜色和虚线由 busStyle JS 控制 */
+.diagram-dragging .react-flow__edge:not(.selected) .react-flow__edge-path {
+    opacity: 0.95 !important;
+    transition: none !important; /* 跟随节点位置实时更新，无延迟 */
+}
+
+/* 拖动中：已选中边完全不透明 */
+.diagram-dragging .react-flow__edge.selected .react-flow__edge-path {
+    opacity: 1 !important;
+    transition: none !important;
+}
+
+/* 拖动中：停用昂贵的 filter 效果（drop-shadow 触发 GPU 层重绘） */
+.diagram-dragging .react-flow__edge-path {
+    filter: none !important;
+    animation-play-state: paused !important;
+}
+
+/* 拖动中：停用边标签（避免位置抖动） */
+.diagram-dragging .react-flow__edge-textbg,
+.diagram-dragging .react-flow__edge-text {
+    opacity: 0 !important;
+    transition: none !important;
+}
+
+/* 拖动结束后：平滑恢复 */
+.react-flow__edge-path {
+    transition: opacity 0.25s ease, stroke-width 0.15s ease;
 }
 

@@ -18,6 +18,7 @@ import {
 import { RoutingStrategySelector, RoutingAlgorithm } from './RoutingStrategySelector';
 import { VisibilityGraphCache } from './VisibilityGraphCache';
 import { SpatialIndex } from './SpatialIndex';
+import type { Position } from '@xyflow/react';
 
 /**
  * [P1-1] Pathfinding configuration
@@ -336,6 +337,8 @@ export function generateSimplePath(
         enableBuffer?: boolean;  // 是否考虑缓冲区(默认true)
         bufferDistance?: number; // 缓冲区距离(默认20px)
         maxSegments?: number;    // 允许的最大段数: 2=直线, 3=L型, 4=Z型(默认4)
+        sourcePos?: Position;
+        targetPos?: Position;
     }
 ): Point[] | null {
     // 合并默认选项
@@ -350,12 +353,44 @@ export function generateSimplePath(
     // enableBuffer=true 时使用指定的 bufferDistance
     const padding = opts.enableBuffer ? opts.bufferDistance : 1;
 
-    // 1. 直线检查 (水平或垂直对齐)
-    if (Math.abs(start.x - end.x) < 0.1 || Math.abs(start.y - end.y) < 0.1) {
-        if (!isPathBlocked([start, end], obstacles, padding, lineObstacles)) {
-            return [start, end];
+    // Helper to check if a path is valid and respects port directions
+    const checkPath = (path: Point[], allowLineCrossings: boolean = false) => {
+        if (opts.sourcePos) {
+            const dx = path[1].x - path[0].x;
+            const dy = path[1].y - path[0].y;
+            if (opts.sourcePos === 'left' && dx > 0) return false;
+            if (opts.sourcePos === 'right' && dx < 0) return false;
+            if (opts.sourcePos === 'top' && dy > 0) return false;
+            if (opts.sourcePos === 'bottom' && dy < 0) return false;
         }
-    }
+        if (opts.targetPos) {
+            const n = path.length;
+            const dx = path[n - 1].x - path[n - 2].x;
+            const dy = path[n - 1].y - path[n - 2].y;
+            if (opts.targetPos === 'left' && dx < 0) return false;
+            if (opts.targetPos === 'right' && dx > 0) return false;
+            if (opts.targetPos === 'top' && dy < 0) return false;
+            if (opts.targetPos === 'bottom' && dy > 0) return false;
+        }
+        
+        let localLineObs = lineObstacles;
+        if (allowLineCrossings) {
+            // Only check collinear overlaps, ignore crossings
+            return !isPathBlocked(path, obstacles, padding, []) && 
+                   !path.some((p, i) => i < path.length - 1 && lineObstacles.some(line => areSegmentsCollinearAndOverlapping(path[i], path[i+1], line.start, line.end)));
+        } else {
+            return !isPathBlocked(path, obstacles, padding, lineObstacles);
+        }
+    };
+
+    // Run passes: strict first, then relaxed (allowing crossings)
+    for (const allowCrossings of [false, true]) {
+        // 1. 直线检查 (水平或垂直对齐)
+        if (Math.abs(start.x - end.x) < 0.1 || Math.abs(start.y - end.y) < 0.1) {
+            if (checkPath([start, end], allowCrossings)) {
+                return [start, end];
+            }
+        }
 
     // 2. L型路径 (2个点 + 1个转角 = 3个点)
     if (opts.maxSegments >= 3) {
@@ -367,12 +402,8 @@ export function generateSimplePath(
         const pathB = [start, cornerB, end];
 
         // 检查两种L型路径，优先返回第一个不被阻挡的
-        if (!isPathBlocked(pathA, obstacles, padding, lineObstacles)) {
-            return pathA;
-        }
-        if (!isPathBlocked(pathB, obstacles, padding, lineObstacles)) {
-            return pathB;
-        }
+        if (checkPath(pathA, allowCrossings)) return pathA;
+        if (checkPath(pathB, allowCrossings)) return pathB;
     }
 
     // 3. Z型路径 (4个点)
@@ -390,6 +421,12 @@ export function generateSimplePath(
         // the critical narrow-corridor x-values. Uniform steps are a coarse backup,
         // so cap at 8 (was 20) to cut ~60% of isPathBlocked calls per Z-path probe.
         let candidates: number[] = [];
+        
+        // [FIX] Explicitly add the exact midpoint to guarantee perfectly symmetrical
+        // Z-paths when unobstructed. Odd STEPS would otherwise miss the exact midpoint.
+        let midP = start.x + dx / 2;
+        candidates.push(midP);
+        
         let STEPS = Math.min(8, Math.max(3, Math.floor(Math.abs(dx) / 20)));
         for (let i = 1; i < STEPS; i++) {
             candidates.push(start.x + (dx * i) / STEPS);
@@ -414,50 +451,61 @@ export function generateSimplePath(
         
         // [I-3] Deduplicate and cap candidates to avoid redundant isPathBlocked calls.
         // Snap to 1px grid to cluster near-identical values, then keep closest-to-midpoint first.
-        candidates = [...new Set(candidates.map(v => Math.round(v)))].slice(0, 10);
-        let midP = start.x + dx / 2;
+        candidates = [...new Set(candidates.map(v => Math.round(v)))];
         candidates.sort((a, b) => Math.abs(a - midP) - Math.abs(b - midP));
+        candidates = candidates.slice(0, 10);
+
+        // Add explicit U-shape bypass candidates
+        candidates.push(Math.max(start.x, end.x) + 30);
+        candidates.push(Math.min(start.x, end.x) - 30);
 
         for (const midX of candidates) {
             const path = [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
-            if (!isPathBlocked(path, obstacles, padding, lineObstacles)) {
+            if (checkPath(path, allowCrossings)) {
                 return path;
             }
         }
 
         // --- Try V-H-V 形状: 竖-横-竖 ---
-        candidates = [];
-        STEPS = Math.min(8, Math.max(3, Math.floor(Math.abs(dy) / 20)));
-        for (let i = 1; i < STEPS; i++) {
-            candidates.push(start.y + (dy * i) / STEPS);
+        let candidatesY: number[] = [];
+        let midPy = start.y + dy / 2;
+        candidatesY.push(midPy); // Explicitly add midpoint for perfect symmetry
+        
+        let STEPS_Y = Math.min(8, Math.max(3, Math.floor(Math.abs(dy) / 20)));
+        for (let i = 1; i < STEPS_Y; i++) {
+            candidatesY.push(start.y + (dy * i) / STEPS_Y);
         }
         
         for (const obs of localObstacles) {
             const topSweep = obs.y - padding - 1;
             const bottomSweep = obs.y + obs.height + padding + 1;
-            if (topSweep > Math.min(start.y, end.y) && topSweep < Math.max(start.y, end.y)) candidates.push(topSweep);
-            if (bottomSweep > Math.min(start.y, end.y) && bottomSweep < Math.max(start.y, end.y)) candidates.push(bottomSweep);
+            if (topSweep > Math.min(start.y, end.y) && topSweep < Math.max(start.y, end.y)) candidatesY.push(topSweep);
+            if (bottomSweep > Math.min(start.y, end.y) && bottomSweep < Math.max(start.y, end.y)) candidatesY.push(bottomSweep);
         }
         
-        // [I-3] Deduplicate V-H-V candidates
-        candidates = [...new Set(candidates.map(v => Math.round(v)))].slice(0, 10);
-        midP = start.y + dy / 2;
-        candidates.sort((a, b) => Math.abs(a - midP) - Math.abs(b - midP));
+        // Deduplicate and cap
+        candidatesY = [...new Set(candidatesY.map(v => Math.round(v)))];
+        candidatesY.sort((a, b) => Math.abs(a - midPy) - Math.abs(b - midPy));
+        candidatesY = candidatesY.slice(0, 10);
 
-        for (const midY of candidates) {
+        // Add explicit U-shape bypass candidates
+        candidatesY.push(Math.max(start.y, end.y) + 30);
+        candidatesY.push(Math.min(start.y, end.y) - 30);
+
+        for (const midY of candidatesY) {
             const path = [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
-            if (!isPathBlocked(path, obstacles, padding, lineObstacles)) {
+            if (checkPath(path, allowCrossings)) {
                 return path;
             }
         }
-    }
+    } // end if maxSegments >= 4
+    } // end for passes
 
     // 4. 无法生成简单路径，返回null让A*处理
-    // 这种情况通常是：
-    // - 障碍物阻挡了所有简单路径
-    // - 需要更复杂的绕行(>4个转角)
     return null;
 }
+
+
 
 function simplifyPath(path: Point[]): Point[] {
     if (path.length <= 2) return path;
@@ -466,11 +514,19 @@ function simplifyPath(path: Point[]): Point[] {
         const prev = path[i - 1];
         const curr = path[i];
         const next = path[i + 1];
+        
         const dx1 = curr.x - prev.x;
         const dy1 = curr.y - prev.y;
         const dx2 = next.x - curr.x;
         const dy2 = next.y - curr.y;
-        if (dx1 !== dx2 || dy1 !== dy2) {
+        
+        // [FIX] Cross product accurately detects collinearity regardless of segment length.
+        // dx1 !== dx2 failed when lengths differed.
+        const crossProduct = dx1 * dy2 - dy1 * dx2;
+        // Dot product < 0 means a U-turn (backtrack). We must keep backtrack turning points.
+        const dotProduct = dx1 * dx2 + dy1 * dy2;
+        
+        if (Math.abs(crossProduct) > 0.1 || dotProduct < 0) {
             simplified.push(curr);
         }
     }
@@ -683,7 +739,8 @@ export function findPath(
     dynamicObstacles: Rectangle[] = [], // [NEW] Dynamic obstacles (e.g., strict padding) to be added to grid
     containerBorders: Rectangle[] = [], // [NEW] Soft penalty for container borders
     congestionGrid?: Int32Array,   // [NEW] Congestion map
-    clearanceRects: Rectangle[] = []   // [NEW] Areas to force clear (source/target)
+    clearanceRects: Rectangle[] = [],   // [NEW] Areas to force clear (source/target)
+    generateOpts?: { sourcePos?: Position, targetPos?: Position } // [NEW] Port directions for simple path validation
 ): Point[] | null {
     // [DEBUG] Log findPath invocation for e10 debugging
 
@@ -691,7 +748,7 @@ export function findPath(
     const spatialIndex = isSpatialIndex(obstacles) ? obstacles : undefined;
     const obstacleList: Rectangle[] = spatialIndex ? spatialIndex.getAll() : (obstacles as Rectangle[]);
 
-    const simplePath = generateSimplePath(start, end, obstacles, lineObstacles);
+    const simplePath = generateSimplePath(start, end, obstacles, lineObstacles, generateOpts);
     if (simplePath) {
         const hasDynamicObstacles = dynamicObstacles.length > 0;
 
@@ -1536,10 +1593,10 @@ export function generateSmartCShapePath(
 
     // Determine direction based on Position
     let dirX = 0, dirY = 0;
-    if (startPos === Position.Top) dirY = -1;
-    else if (startPos === Position.Bottom) dirY = 1;
-    else if (startPos === Position.Left) dirX = -1;
-    else if (startPos === Position.Right) dirX = 1;
+    if (startPos === 'top') dirY = -1;
+    else if (startPos === 'bottom') dirY = 1;
+    else if (startPos === 'left') dirX = -1;
+    else if (startPos === 'right') dirX = 1;
 
     // Candidates for margin
     const margins = [60, 80, 120, 160];

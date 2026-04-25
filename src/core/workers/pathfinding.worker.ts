@@ -368,10 +368,10 @@ self.onmessage = (e: MessageEvent) => {
             } catch (err: any) {
                 console.error(`[Worker] Task execution failed for edge ${task.edgeId}:`, err);
                 // Provide a safe fallback result so the batch doesn't crash completely
-                const sx = task.sourceX ?? 0;
-                const sy = task.sourceY ?? 0;
-                const tx = task.targetX ?? 0;
-                const ty = task.targetY ?? 0;
+                const sx = Number.isFinite(task.sourceX) ? task.sourceX! : 0;
+                const sy = Number.isFinite(task.sourceY) ? task.sourceY! : 0;
+                const tx = Number.isFinite(task.targetX) ? task.targetX! : 0;
+                const ty = Number.isFinite(task.targetY) ? task.targetY! : 0;
                 result = {
                     edgeId: task.edgeId,
                     jobId: task.jobId,

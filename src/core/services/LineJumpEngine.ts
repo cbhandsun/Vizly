@@ -119,6 +119,11 @@ class LineJumpEngine {
     private version: number = 0;
     // [FIX N-6] 订阅者集合，供 useSyncExternalStore 使用
     private subscribers: Set<() => void> = new Set();
+    // [P2-3] globalChannelRouting 结果缓存：
+    // 原问题：31 条边各自调用 globalChannelRouting(allPaths) = 31 次 O(E²) 计算。
+    // 修复：将结果缓存在单例内，engineVersion 不变时直接复用。
+    private channelRoutingCache: Map<string, Point[]> | null = null;
+    private channelRoutingCacheVersion: number = -1;
 
     static getInstance(): LineJumpEngine {
         if (!LineJumpEngine.instance) {
@@ -182,6 +187,21 @@ class LineJumpEngine {
         return this.edgePoints;
     }
 
+    /**
+     * [P2-3] 获取全局通道分配结果（带缓存）。
+     * 所有边共享同一次 globalChannelRouting 计算结果，
+     * 引擎版本未变则直接复用，无需每条边各自重算。
+     */
+    getCachedChannelRouting(routingFn: (paths: Map<string, Point[]>, spacing: number) => Map<string, Point[]>, spacing: number): Map<string, Point[]> {
+        if (this.channelRoutingCache && this.channelRoutingCacheVersion === this.version) {
+            return this.channelRoutingCache;
+        }
+        const result = routingFn(this.edgePoints, spacing);
+        this.channelRoutingCache = result;
+        this.channelRoutingCacheVersion = this.version;
+        return result;
+    }
+
     /** 清理 */
     cleanup(): void {
         this.edgePoints.clear();
@@ -192,6 +212,7 @@ class LineJumpEngine {
     private invalidateCache(): void {
         this.segmentsCache = null;
         this.intersectionsCache = null;
+        this.channelRoutingCache = null; // [P2-3] 同步清空通道分配缓存
         this.version++;
         // [FIX N-6] 通知所有订阅者版本已变化
         this.subscribers.forEach(cb => cb());

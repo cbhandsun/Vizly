@@ -63,12 +63,8 @@
 
 .diagram-dragging .flowchart-node {
     transition: none !important;
-    /* filter: none !important; [FIX] 禁用，防止全局重绘 */
-    /* box-shadow: none !important; [FIX] 禁用，防止全局重绘 */
     will-change: transform;
 }
-
-/* .diagram-dragging .flowchart-node:hover { filter: none !important; } disabled */
 
 .diagram-dragging .flowchart-node:hover:not(.selected) {
     transform: none;
@@ -314,16 +310,19 @@
     transform: none !important;
 }
 
-/* 🎨 P1: Handle hover — 放大 + 蓝色品牌光环 */
+/* 🎨 P1: Handle hover — 弹性放大 + 品牌色光环 */
 .flowchart-handle:hover {
     opacity: 1 !important;
-    transform: scale(1.6);
-    border-color: #3b82f6 !important;
+    transform: scale(1.7) !important;
+    border-color: var(--designer-accent, #6366f1) !important;
     background: #ffffff !important;
     width: 8px !important;
     height: 8px !important;
-    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18), 0 0 8px rgba(59, 130, 246, 0.12);
-    cursor: pointer;
+    box-shadow:
+        0 0 0 4px rgba(99, 102, 241, 0.20),
+        0 0 10px rgba(99, 102, 241, 0.15) !important;
+    cursor: crosshair;
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.15s, box-shadow 0.18s !important;
 }
 
 /* Handle 隐形热区扩展（缩小以避免与 ⊕ 按钮的光标冲突） */
@@ -584,12 +583,21 @@
 }
 
 /* ⊕ 方向定位（相对 Handle 父元素）+ hover 放大 */
-.flowchart-quick-clone-btn[data-dir="top"]    { top: auto; bottom: 100%; left: 50%; transform: translate(-50%, -4px); }
-.flowchart-quick-clone-btn[data-dir="bottom"] { bottom: auto; top: 100%; left: 50%; transform: translate(-50%, 4px); }
-.flowchart-quick-clone-btn[data-dir="left"]   { left: auto; right: 100%; top: 50%; transform: translate(-4px, -50%); }
-.flowchart-quick-clone-btn[data-dir="right"]  { right: auto; left: 100%; top: 50%; transform: translate(4px, -50%); }
+.flowchart-quick-clone-btn[data-dir="top"]    { top: auto; bottom: 100%; left: 50%; transform: translate(-50%, -6px) scale(0.85); }
+.flowchart-quick-clone-btn[data-dir="bottom"] { bottom: auto; top: 100%; left: 50%; transform: translate(-50%, 6px) scale(0.85); }
+.flowchart-quick-clone-btn[data-dir="left"]   { left: auto; right: 100%; top: 50%; transform: translate(-6px, -50%) scale(0.85); }
+.flowchart-quick-clone-btn[data-dir="right"]  { right: auto; left: 100%; top: 50%; transform: translate(6px, -50%) scale(0.85); }
 
-.flowchart-quick-clone-btn[data-dir="top"]:hover    { transform: translate(-50%, -4px) scale(1.15); }
-.flowchart-quick-clone-btn[data-dir="bottom"]:hover { transform: translate(-50%, 4px) scale(1.15); }
-.flowchart-quick-clone-btn[data-dir="left"]:hover   { transform: translate(-4px, -50%) scale(1.15); }
-.flowchart-quick-clone-btn[data-dir="right"]:hover  { transform: translate(4px, -50%) scale(1.15); }
+/* hover 时弹性放大 */
+.flowchart-quick-clone-btn[data-dir="top"]:hover    { transform: translate(-50%, -6px) scale(1.2); }
+.flowchart-quick-clone-btn[data-dir="bottom"]:hover { transform: translate(-50%, 6px) scale(1.2); }
+.flowchart-quick-clone-btn[data-dir="left"]:hover   { transform: translate(-6px, -50%) scale(1.2); }
+.flowchart-quick-clone-btn[data-dir="right"]:hover  { transform: translate(6px, -50%) scale(1.2); }
+
+/* active 击下缩回反馈 */
+.flowchart-quick-clone-btn:active {
+    filter: brightness(0.9);
+    transition: filter 0.08s, transform 0.1s cubic-bezier(0.4, 0, 0.6, 1) !important;
+}
+
+/* 显示时：opacity 恢复（位置由 data-dir 规则管理） */

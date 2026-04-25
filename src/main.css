@@ -1169,14 +1169,17 @@ html {
   }
 }
 
-.edge-cyber-flow path.react-flow__edge-path {
+/* ── [FIX] 仅对显式 animated 边（标记了 data-animated）应用流动虚线动画 ── */
+/* 默认不给全部 edge-cyber-flow 加 dasharray，否则所有连线都变虚线 */
+.edge-cyber-flow[data-animated="true"] path.react-flow__edge-path,
+.react-flow__edge.animated .edge-cyber-flow path.react-flow__edge-path {
   stroke-dasharray: 6 6 !important;
   animation: cyber-flow-pulse 1.2s linear infinite !important;
-  /* Glowing line effect */
   filter: drop-shadow(0 0 3px rgba(99, 102, 241, 0.4));
 }
 
-[data-theme='dark'] .edge-cyber-flow path.react-flow__edge-path {
+[data-theme='dark'] .edge-cyber-flow[data-animated="true"] path.react-flow__edge-path,
+[data-theme='dark'] .react-flow__edge.animated .edge-cyber-flow path.react-flow__edge-path {
   filter: drop-shadow(0 0 5px rgba(129, 140, 248, 0.7));
 }
 

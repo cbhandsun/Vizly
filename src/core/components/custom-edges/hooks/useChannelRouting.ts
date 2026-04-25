@@ -38,22 +38,19 @@ export function useChannelRouting({ edgeId, points, enabled = true }: UseChannel
     );
 
     return useMemo(() => {
-        // [FIX N-5] 最小点数从 4 降低到 2：
-        // 3 点的 L 形边（最常见路径）原先会被直接跳过通道分配，
-        // 导致最普通的折线也会与其他边重叠，无法分离。
         if (!enabled || !points || points.length < 2) {
             return null;
         }
 
-
-        // 从 LineJumpEngine 获取所有已注册的路径
+        // [P2-3] 使用引擎缓存的通道分配结果，避免每条边各自重算 O(E²) Interval Coloring。
+        // getCachedChannelRouting 内部检查 engineVersion：版本未变则直接返回缓存 Map（O(1)）；
+        // 版本变化时（任意边路径更新后）才重新计算（O(E²)，但只计算一次）。
         const allPaths = engine.getAllEdgePaths();
         if (allPaths.size < 2) {
             return null; // 只有一条边，无需分配
         }
 
-        // 运行全局通道分配
-        const adjusted = globalChannelRouting(allPaths, 12);
+        const adjusted = engine.getCachedChannelRouting(globalChannelRouting, 12);
 
         // 获取当前边的调整结果
         const myAdjusted = adjusted.get(edgeId);

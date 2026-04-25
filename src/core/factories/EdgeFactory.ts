@@ -229,8 +229,8 @@ export class EdgeFactory {
         return t?.arrow;
       } catch { return undefined as any; }
     })();
-    const markerW = typeof presetArrow?.width === 'number' ? presetArrow!.width : (typeof markerCfg?.width === 'number' ? markerCfg.width : 20);
-    const markerH = typeof presetArrow?.height === 'number' ? presetArrow!.height : (typeof markerCfg?.height === 'number' ? markerCfg.height : 20);
+    const markerW = typeof presetArrow?.width === 'number' ? presetArrow!.width : (typeof markerCfg?.width === 'number' ? markerCfg.width : 14);
+    const markerH = typeof presetArrow?.height === 'number' ? presetArrow!.height : (typeof markerCfg?.height === 'number' ? markerCfg.height : 14);
 
     // 终点：闭合箭头，强调指向性
     if (config.markerEnd !== false) {
@@ -571,8 +571,8 @@ export class EdgeFactory {
     // - 某些页面可能直接覆写 markerEnd 仅设置 color；这里保证宽高统一
     const cfg = diagramConfigManager.getConfig();
     const markerCfg = (cfg?.edge as any)?.markerEnd;
-    const markerW = typeof markerCfg?.width === 'number' ? markerCfg.width : 20;
-    const markerH = typeof markerCfg?.height === 'number' ? markerCfg.height : 20;
+    const markerW = typeof markerCfg?.width === 'number' ? markerCfg.width : 14;
+    const markerH = typeof markerCfg?.height === 'number' ? markerCfg.height : 14;
     if ((updatedEdge as any).markerEnd) {
       const me: any = (updatedEdge as any).markerEnd;
       if (typeof me.width !== 'number') me.width = markerW;

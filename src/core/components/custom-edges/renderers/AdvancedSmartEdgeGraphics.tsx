@@ -6,7 +6,6 @@ import { getEdgeLabelStyleMenuItems } from '../../diagrams/EdgeLabelStyleMenu';
 import { useEdgeTheme } from '../../diagrams/EdgeUpdateContext';
 import { UseSmartEdgeRoutingReturn } from '../hooks/useSmartEdgeRouting';
 import { UseEdgeLabelInteractionsReturn } from '../hooks/useEdgeLabelInteractions';
-import { useSmartEdgeContext } from '../useSmartEdgeContext';
 
 export interface AdvancedSmartEdgeGraphicsProps {
     props: EdgeProps;
@@ -35,11 +34,14 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
 
     const edgeData = props.data as Record<string, any> | undefined;
     const currentTheme = useEdgeTheme();
-    const context = useSmartEdgeContext(props);
-    const { simpleNodeMap, multiEdgeInfo } = context;
+    // [PERF] 消除双订阅：移除第二次 useSmartEdgeContext 调用
+    // simpleNodeMap 仅在 debug heatmap 时使用，通过 router 传入
+    // 这避免了每条边对 nodeLookup 进行两次订阅，显著减少拖动时的重算量
+    const simpleNodeMap = (router as any).simpleNodeMap as Map<string, any> | undefined;
 
     // ---------- Bus styling ----------
     const bundleInfo = edgeData?.bundleInfo;
+    // busStyle: 纯净的持久化样式，不含任何 drag 状态覆盖（防止写入自动保存）
     const busStyle = useMemo(() => {
         if (!bundleInfo || bundleInfo.bundleSize < 2) {
             if (style && typeof style.strokeWidth === 'number') {
@@ -50,6 +52,21 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
         const bw = Math.min(6, Number(style?.strokeWidth || 1) + (bundleInfo.bundleSize - 1) * 0.8);
         return { ...style, strokeWidth: String(bw) };
     }, [style, bundleInfo]);
+
+    // dragOverlayStyle: 仅在渲染时临时叠加，绝不写入 edge.style 持久化数据
+    // 使连线在拖动中仍清晰可见（用虚线区分预览态 vs 定型态）
+    const dragOverlayStyle = useMemo(() => {
+        if (!nodesDragging) return null;
+        const baseStroke = style?.stroke;
+        const isDefaultGrey = !baseStroke || baseStroke === '#b1b1b7';
+        const baseWidth = Number(style?.strokeWidth || 1.5);
+        return {
+            stroke: isDefaultGrey ? '#6366f1' : baseStroke, // 默认用品牌色，更醒目
+            strokeDasharray: '8 5',                          // 更细腻的虚线节奏
+            strokeWidth: String(Math.max(2, baseWidth)),
+            opacity: 0.85,                                   // 轻微透明感区分预览态
+        };
+    }, [nodesDragging, style?.stroke, style?.strokeWidth]);
 
     // ---------- Theme-aware label styling ----------
     const resolvedLabel = (label ?? edgeData?.label);
@@ -130,7 +147,8 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
                 path: safeFinalPath,
                 markerStart: markerStart as any,
                 markerEnd: markerEnd as any,
-                style: busStyle,
+                // dragOverlayStyle 只在渲染时合并，不污染 edge.style 持久化数据
+                style: dragOverlayStyle ? { ...busStyle, ...dragOverlayStyle } : busStyle,
                 interactionWidth: 40
             } as any)} />
             

@@ -1,10 +1,15 @@
 // src/types/routing.ts
 
-import { Position } from '@xyflow/react';
+export enum Position {
+    Left = 'left',
+    Right = 'right',
+    Top = 'top',
+    Bottom = 'bottom'
+}
+
 import type { PathfindingGrid } from '../algorithms/pathfinding';
 import type { VisibilityGraph } from '../algorithms/visibilityGraph';
 import type { SpatialIndex } from '../algorithms/SpatialIndex';
-export { Position }; // Re-export
 
 // Common Geometry Types
 export interface Point {

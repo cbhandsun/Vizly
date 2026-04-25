@@ -23,6 +23,8 @@ export interface PathfinderOptions {
     // [FIX] 接收其他边的路径线段作为软避障目标（A* 会尝试绕开但不硬性拦截）
     lineObstacles?: import('../../algorithms/pathfinding').LineObstacle[];
     debugOut?: { visited?: Point[]; grid?: { minX: number, minY: number, cols: number, rows: number, size: number, data: Int32Array } };
+    sourcePos?: import('../../types/routing').Position;
+    targetPos?: import('../../types/routing').Position;
 }
 
 export class AStarPathfinder {
@@ -64,7 +66,8 @@ export class AStarPathfinder {
                 [],                  // dynamicObstacles
                 [],                  // containerBorders
                 options.congestionGrid, // [NEW]
-                options.clearanceRects  // [NEW]
+                options.clearanceRects,  // [NEW]
+                { sourcePos: options.sourcePos, targetPos: options.targetPos } // [NEW]
             );
 
             return result;

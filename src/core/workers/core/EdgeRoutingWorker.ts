@@ -338,6 +338,20 @@ export class EdgeRoutingWorker {
                 } else {
                     directPort = dy > 0 ? Position.Top : Position.Bottom;  // source is above → enter Top
                 }
+
+                // [FIX] Strong alignment override: when nodes are strongly aligned on one axis
+                // (e.g., vertically stacked with |dy| >> |dx|), the trunk axis port (e.g., Right)
+                // forces a U-turn detour. Use the direct geometric port instead.
+                const absDx = Math.abs(dx);
+                const absDy = Math.abs(dy);
+                const dominantRatio = Math.max(absDx, absDy) / (Math.min(absDx, absDy) + 1);
+                if (dominantRatio > 3 && (
+                    (absDy > absDx && (trunkPort === Position.Left || trunkPort === Position.Right)) ||
+                    (absDx > absDy && (trunkPort === Position.Top || trunkPort === Position.Bottom))
+                )) {
+                    return directPort;
+                }
+
                 if (isTargetSide) {
                     // For target entry: directPort is the side facing the source.
                     // Conflict: if trunkPort === directPort, both source and trunk approach from same side.

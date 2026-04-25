@@ -140,6 +140,35 @@ export const useAutoSave = (
         return () => clearInterval(timer);
     }, [enabled, interval, save]);
 
+    // [FIX-AUTOSAVE] 页面关闭/刷新前同步保存。
+    // 核心问题：React 在页面卸载时会运行 useEffect cleanup，取消所有防抖计时器。
+    // 用户刷新时 -> 组件卸载 -> cleanup 删除计时器 -> save 永远不发生。
+    // beforeunload 在页面卸载前触发，localStorage.setItem 是同步操作，完全可靠。
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            // 同步保存：直接操作 localStorage，不经过 async/await
+            const currentNodes = nodesRef.current;
+            const currentEdges = edgesRef.current;
+            if (!currentNodes || !enabled) return;
+            const contentKey = JSON.stringify({ nodes: currentNodes, edges: currentEdges });
+            if (contentKey === lastSavedContentRef.current) return; // 无变化无需写入
+            try {
+                const data = {
+                    diagramId,
+                    nodes: currentNodes,
+                    edges: currentEdges,
+                    timestamp: Date.now(),
+                    lastAccessedAt: Date.now(),
+                    version: '1.0'
+                };
+                localStorage.setItem(storageKey, JSON.stringify(data));
+                lastSavedContentRef.current = contentKey;
+            } catch { /* 存储满时静默失败 */ }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [enabled, storageKey, diagramId]);
+
     // Manual save trigger
     const saveNow = useCallback(() => {
         save();

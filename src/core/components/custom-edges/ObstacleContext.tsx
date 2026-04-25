@@ -31,8 +31,8 @@ interface ObstacleContextValue {
     businessNodes: NodeBBox[];
     /** 节点 ID -> 节点的快速查找 Map */
     nodeMap: Map<string, any>;
-    /** 原始签名，用于检测变化 */
-    signature: string;
+    /** 原始签名（djb2 哈希数字），用于检测变化 */
+    signature: number;
     /** 上下文是否就绪 */
     ready: boolean;
 }
@@ -40,7 +40,7 @@ interface ObstacleContextValue {
 const ObstacleContext = createContext<ObstacleContextValue>({
     businessNodes: [],
     nodeMap: new Map(),
-    signature: '',
+    signature: 0,
     ready: false,
 });
 
@@ -79,16 +79,19 @@ const getNodeBBox = (n: any, nodeMap: Map<string, any>): NodeBBox => {
 };
 
 /**
- * 生成业务节点签名（用于检测变化）
+ * [P1-1] 生成业务节点签名（检测位置/尺寸变化）
+ * 原写法：sort() + join() = O(N log N) + 大字符串分配，拖拽期间 GC 压力高。
+ * 新写法：djb2 滚动哈希 = O(N)，无中间字符串，与 edgeTopologySig 同一模式。
+ * 坐标量化到 4px 单元，过滤 sub-pixel 噪声，减少不必要的 debounce 触发。
  */
-const makeSignature = (nodes: any[]): string => {
+const makeSignature = (nodes: any[]): number => {
     try {
         const nodeMap = new Map<string, any>();
         for (const n of nodes || []) {
             if (!n) continue;
             if (n?.id != null) nodeMap.set(String(n.id), n);
         }
-        const items: string[] = [];
+        let h = 5381;
         for (const n of nodes || []) {
             if (!n) continue;
             const t = String(n?.type || '');
@@ -96,11 +99,23 @@ const makeSignature = (nodes: any[]): string => {
             const hidden = !!((n?.data || {}) as any)?.hidden;
             if (hidden) continue;
             const bb = getNodeBBox(n, nodeMap);
-            items.push(`${n.id}:${Math.round(bb.x)},${Math.round(bb.y)},${Math.round(bb.width)},${Math.round(bb.height)}`);
+            // 量化到 4px 单元，消除 sub-pixel 噪声
+            const x = Math.round(bb.x / 4);
+            const y = Math.round(bb.y / 4);
+            const w = Math.round(bb.width / 4);
+            const hh = Math.round(bb.height / 4);
+            // djb2 哈希：散列 id + 位置 + 尺寸
+            for (let i = 0; i < (n.id?.length ?? 0); i++) {
+                h = ((h * 33) ^ (n.id as string).charCodeAt(i)) >>> 0;
+            }
+            h = ((h * 33) ^ x) >>> 0;
+            h = ((h * 33) ^ y) >>> 0;
+            h = ((h * 33) ^ w) >>> 0;
+            h = ((h * 33) ^ hh) >>> 0;
         }
-        return items.sort().join('|');
+        return h;
     } catch {
-        return `sig-${(nodes || []).length}`;
+        return (nodes || []).length;
     }
 };
 

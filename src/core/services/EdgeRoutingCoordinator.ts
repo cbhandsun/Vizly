@@ -118,6 +118,8 @@ export class EdgeRoutingCoordinator {
     private edgeDependencies: Map<string, Set<string>> = new Map(); // edgeId -> Set<nodeId>
     private allEdges: Edge[] = [];
     private graphVersion: number = 0;
+    // [P0-2] graphVersion 订阅者集合，用于 useSyncExternalStore 响应式订阅
+    private graphVersionSubscribers: Set<() => void> = new Set();
 
     // [P2-3] Port Usage for Congestion Awareness
     // private portUsageStats: Record<string, PortUsageStats> = {};
@@ -150,6 +152,45 @@ export class EdgeRoutingCoordinator {
 
     private isDragging: boolean = false;
 
+    // [COLD-START] 冷启动保护：freeze 期间所有 scheduleBatchRouting 调用被挂起
+    // 直到 unfreeze() 被调用，再一次性批量触发，避免节点测量不稳定时 A* 大量无效迭代
+    private isFrozen: boolean = false;
+    private frozenDuringColdStart: boolean = false;
+
+    /**
+     * [COLD-START] 冻结路由调度。
+     * 在从缓存加载数据时调用，防止节点尺寸未稳定前触发大量 A* 计算。
+     */
+    public freeze(): void {
+        this.isFrozen = true;
+        this.frozenDuringColdStart = true;
+        if (this.pendingTimeout) {
+            clearTimeout(this.pendingTimeout);
+            this.pendingTimeout = null;
+        }
+    }
+
+    /**
+     * [COLD-START] 解冻路由调度，并立即触发一次批量计算。
+     * 在节点测量稳定后（RF measured.width > 0）调用。
+     */
+    public unfreeze(): void {
+        if (!this.isFrozen) return;
+        this.isFrozen = false;
+        this.frozenDuringColdStart = false;
+        // 立即触发一次批量路由（所有积压的请求都在 latestRequests 里）
+        if (this.latestRequests.size > 0) {
+            this.markAllDirty();
+            this.scheduleBatchRouting();
+        }
+    }
+
+    /** [COLD-START] 将所有已知边标记为脏 */
+    private markAllDirty(): void {
+        this.latestRequests.forEach((_, edgeId) => this.dirtyEdges.add(edgeId));
+        this.allEdges.forEach(e => this.dirtyEdges.add(e.id));
+    }
+
     /**
      * [H-10] Notify coordinator that a drag operation is in progress.
      * Increases debounce delay during drag to reduce CPU load (~75% fewer route calls).
@@ -167,6 +208,9 @@ export class EdgeRoutingCoordinator {
      * Call this after manually marking edges as dirty.
      */
     public scheduleBatchRouting(): void {
+        // [COLD-START] 冻结期间挂起所有调度，等 unfreeze() 统一触发
+        if (this.isFrozen) return;
+
         // [FIX C-1] 标准防抖：每次调用先清除旧计时器再重新设置。
         // [H-10] 拖拽中提升去抖到 60ms，减少 ~75% 的路由触发次数，
         //        释放 Worker pool 给交互响应使用。拖拽结束后恢复 16ms。
@@ -232,6 +276,22 @@ export class EdgeRoutingCoordinator {
     }
 
     /**
+     * [P0-2] 订阅 graphVersion 变化。
+     * 返回取消订阅函数，配合 useSyncExternalStore 使用。
+     * 这样 useSmartPathWorker 可以响应式地追踪版本变化，
+     * 而不需要把 getGraphVersion() 函数调用放进 deps array。
+     */
+    public subscribeGraphVersion(callback: () => void): () => void {
+        this.graphVersionSubscribers.add(callback);
+        return () => this.graphVersionSubscribers.delete(callback);
+    }
+
+    /** [P0-2] 通知所有 graphVersion 订阅者 */
+    private notifyGraphVersionSubscribers(): void {
+        this.graphVersionSubscribers.forEach(cb => cb());
+    }
+
+    /**
      * Mark the graph as dirty (topology changed).
      * This invalidates the cache because routing depends on obstacles/other edges.
      */
@@ -259,6 +319,7 @@ export class EdgeRoutingCoordinator {
         } else {
             // Fallback: full invalidation when no specific nodes provided
             this.graphVersion++;
+            this.notifyGraphVersionSubscribers();
             this.cache.clear();
             this.dirtyEdges.clear();
             this.allEdges.forEach(edge => this.dirtyEdges.add(edge.id));
@@ -296,6 +357,7 @@ export class EdgeRoutingCoordinator {
         this.edgeDependencies.clear();
         this.latestRequests.clear();
         this.graphVersion++;
+        this.notifyGraphVersionSubscribers();
         
         // Clear global SVG path cache to prevent "flying lines" UI fallback
         try {
@@ -662,10 +724,10 @@ export class EdgeRoutingCoordinator {
             // [FIX] Ensure pending resolvers are cleared to avoid deadlocks
             for (const [edgeId, pending] of this.pendingResolvers.entries()) {
                 const entry = this.latestRequests.get(edgeId);
-                const sx = entry?.request.job.sourceX ?? 0;
-                const sy = entry?.request.job.sourceY ?? 0;
-                const tx = entry?.request.job.targetX ?? 0;
-                const ty = entry?.request.job.targetY ?? 0;
+                const sx = Number.isFinite(entry?.request.job.sourceX) ? entry!.request.job.sourceX : 0;
+                const sy = Number.isFinite(entry?.request.job.sourceY) ? entry!.request.job.sourceY : 0;
+                const tx = Number.isFinite(entry?.request.job.targetX) ? entry!.request.job.targetX : 0;
+                const ty = Number.isFinite(entry?.request.job.targetY) ? entry!.request.job.targetY : 0;
                 pending.resolve({
                     jobId: entry?.request.job.jobId || edgeId,
                     edgeId,
@@ -1694,6 +1756,7 @@ export class EdgeRoutingCoordinator {
      */
     public clearAllCaches(): void {
         this.graphVersion++;
+        this.notifyGraphVersionSubscribers();
         this.cache.clear();
         this.dirtyEdges.clear();
         this.allEdges.forEach(edge => this.dirtyEdges.add(edge.id));
