@@ -21,6 +21,7 @@ import { VisibilityGraphCache } from '../algorithms/VisibilityGraphCache';
 import { setPathfindingConfig } from '../algorithms/pathfinding';
 import { LineObstacle, Rectangle } from '../algorithms/pathfinding';
 import { optimizePaths } from '../algorithms/LPNudge';
+import { globalChannelRouting, type BuddyGroup } from '../algorithms/globalChannelRouting';
 
 /**
  * [P0-2] Main coordination service for edge routing.
@@ -1651,102 +1652,118 @@ export class EdgeRoutingCoordinator {
         const validResults = results.filter((r): r is PathFindingResult => r !== null && !r.error && !!r.points && r.points.length > 0);
         if (validResults.length <= 1) return;
 
-        // We only nudge standard paths (non-bus) to avoid breaking trunk logic which has its own spacing
-        const nudgeableResults = validResults.filter((r) => {
-            const req = requests.find(rq => rq.edgeId === r.edgeId);
-            const isBus = req && (!!(req.job as any).isOneToMany || !!(req.job as any).isManyToOne);
-            return !isBus;
-        });
+        // [UPGRADE] Include ALL edges in overlap detection, but bus/trunk edges from the
+        // same group are treated as "buddies" — they intentionally share trunk segments
+        // and should NOT be separated. Only non-buddy overlaps get channel-routed.
 
-        if (nudgeableResults.length <= 1) return;
-
-        const paths = nudgeableResults.map(r => {
-            const raw = r.points;
+        // Step 1: Clean collinear points from all paths
+        const cleanPath = (raw: Point[]): Point[] => {
             if (raw.length < 3) return raw;
-            
-            // [FIX] Strictly remove ALL collinear points (both forward and backward).
-            // LPNudge treats each segment between points as a separate entity. 
-            // If a single straight line has intermediate points, it will be broken into 
-            // multiple segments that might be nudged differently, causing slanted jogs.
             const cleaned: Point[] = [{ x: raw[0].x, y: raw[0].y }];
             for (let i = 1; i < raw.length - 1; i++) {
                 const prev = cleaned[cleaned.length - 1];
                 const curr = raw[i];
                 const next = raw[i + 1];
-
                 const isHorizontal = Math.abs(prev.y - curr.y) < 1 && Math.abs(curr.y - next.y) < 1;
                 const isVertical = Math.abs(prev.x - curr.x) < 1 && Math.abs(curr.x - next.x) < 1;
-
-                if (isHorizontal || isVertical) {
-                    continue; // Skip this redundant intermediate point
-                }
+                if (isHorizontal || isVertical) continue;
                 cleaned.push({ x: curr.x, y: curr.y });
             }
             cleaned.push({ x: raw[raw.length - 1].x, y: raw[raw.length - 1].y });
             return cleaned;
-        });
+        };
+
+        // Step 2: Build edgePaths map for globalChannelRouting
+        const edgePaths = new Map<string, Point[]>();
+        for (const r of validResults) {
+            edgePaths.set(r.edgeId, cleanPath(r.points));
+        }
+
+        // Step 3: Build buddy groups — bus/trunk edges sharing same source (O2M) or target (M2O)
+        // O2M buddy group: protect first segment (shared source trunk)
+        // M2O buddy group: protect last segment (shared target trunk)
+        const buddyGroupMap = new Map<string, { edgeIds: Set<string>; type: 'o2m' | 'm2o' }>(); // groupKey → group info
+        for (const req of requests) {
+            const job = req.job as any;
+            if (job.isOneToMany) {
+                const key = `o2m:${job.source}`;
+                if (!buddyGroupMap.has(key)) buddyGroupMap.set(key, { edgeIds: new Set(), type: 'o2m' });
+                buddyGroupMap.get(key)!.edgeIds.add(req.edgeId);
+            }
+            if (job.isManyToOne) {
+                const key = `m2o:${job.target}`;
+                if (!buddyGroupMap.has(key)) buddyGroupMap.set(key, { edgeIds: new Set(), type: 'm2o' });
+                buddyGroupMap.get(key)!.edgeIds.add(req.edgeId);
+            }
+        }
+        // Only keep groups with 2+ members
+        const buddyGroups = [...buddyGroupMap.values()].filter(g => g.edgeIds.size >= 2);
+
+
 
         try {
-            const nudgedPaths = optimizePaths(paths, {
-                minSpacing: config?.postProcessing?.nudgeSpacing ?? 12,
-                maxOffset: 50,
-                debug: config?.debug
-            });
+            // Use globalChannelRouting with position-aware buddy groups.
+            // O2M buddies protect first segment only, M2O protect last segment only.
+            // Mid-segments of buddy edges still participate in normal channel routing.
+            const spacing = config?.postProcessing?.nudgeSpacing ?? 12;
+            const nudgedPaths = globalChannelRouting(edgePaths, spacing, buddyGroups);
 
-            // Apply back
-            nudgedPaths.forEach((newPoints, i) => {
-                const res = nudgeableResults[i];
-                res.points = newPoints;
-                // [FIX C-5] 路径重建：在正交折角处补圆角（Q 二次贝塞尔）
-                // 原来用纯 M L L L，Nudge 后圆角全丢失。
-                if (newPoints.length > 0) {
-                    const r = Math.min(6, (config as any)?.borderRadius ?? 6); // 圆角半径
-                    const buildRoundedPath = (pts: Point[], radius: number): string => {
-                        if (pts.length < 2) return '';
-                        if (pts.length === 2 || radius <= 0) {
-                            return `M ${pts[0].x} ${pts[0].y} ` + pts.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
-                        }
-                        let d = `M ${pts[0].x} ${pts[0].y}`;
-                        for (let j = 1; j < pts.length - 1; j++) {
-                            const prev = pts[j - 1];
-                            const curr = pts[j];
-                            const next = pts[j + 1];
-                            const len1 = Math.hypot(curr.x - prev.x, curr.y - prev.y);
-                            const len2 = Math.hypot(next.x - curr.x, next.y - curr.y);
-                            // 确保圆角不超过线段长度的一半
-                            const clipped = Math.min(radius, len1 / 2, len2 / 2);
-                            if (clipped < 1) {
-                                d += ` L ${curr.x} ${curr.y}`;
-                                continue;
-                            }
-                            // 从 prev 到 curr 方向上的进入点
-                            const t1x = curr.x - (curr.x - prev.x) / len1 * clipped;
-                            const t1y = curr.y - (curr.y - prev.y) / len1 * clipped;
-                            // 从 curr 到 next 方向上的离开点
-                            const t2x = curr.x + (next.x - curr.x) / len2 * clipped;
-                            const t2y = curr.y + (next.y - curr.y) / len2 * clipped;
-                            d += ` L ${t1x} ${t1y} Q ${curr.x} ${curr.y} ${t2x} ${t2y}`;
-                        }
-                        const last = pts[pts.length - 1];
-                        d += ` L ${last.x} ${last.y}`;
-                        return d;
-                    };
-                    res.path = buildRoundedPath(newPoints, r);
-                    // Also update label pos if it's the middle segment
-                    if (newPoints.length >= 2) {
-                        const midIndex = Math.floor(newPoints.length / 2);
-                        const p1 = newPoints[midIndex - 1];
-                        const p2 = newPoints[midIndex];
-                        res.labelX = (p1.x + p2.x) / 2;
-                        res.labelY = (p1.y + p2.y) / 2;
+            // Step 3: Apply back to results
+            for (const r of validResults) {
+                const newPoints = nudgedPaths.get(r.edgeId);
+                if (!newPoints || newPoints.length < 2) continue;
+
+                // Check if path actually changed
+                const changed = newPoints.some((p, i) => {
+                    const orig = r.points[i];
+                    return !orig || Math.abs(p.x - orig.x) > 0.5 || Math.abs(p.y - orig.y) > 0.5;
+                });
+                if (!changed) continue;
+
+                r.points = newPoints;
+
+                // [FIX C-5] Rebuild rounded path at orthogonal corners (Q quadratic Bézier)
+                const radius = Math.min(6, (config as any)?.borderRadius ?? 6);
+                const buildRoundedPath = (pts: Point[], r: number): string => {
+                    if (pts.length < 2) return '';
+                    if (pts.length === 2 || r <= 0) {
+                        return `M ${pts[0].x} ${pts[0].y} ` + pts.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
                     }
-                }
-            });
+                    let d = `M ${pts[0].x} ${pts[0].y}`;
+                    for (let j = 1; j < pts.length - 1; j++) {
+                        const prev = pts[j - 1];
+                        const curr = pts[j];
+                        const next = pts[j + 1];
+                        const len1 = Math.hypot(curr.x - prev.x, curr.y - prev.y);
+                        const len2 = Math.hypot(next.x - curr.x, next.y - curr.y);
+                        const clipped = Math.min(r, len1 / 2, len2 / 2);
+                        if (clipped < 1) {
+                            d += ` L ${curr.x} ${curr.y}`;
+                            continue;
+                        }
+                        const t1x = curr.x - (curr.x - prev.x) / len1 * clipped;
+                        const t1y = curr.y - (curr.y - prev.y) / len1 * clipped;
+                        const t2x = curr.x + (next.x - curr.x) / len2 * clipped;
+                        const t2y = curr.y + (next.y - curr.y) / len2 * clipped;
+                        d += ` L ${t1x} ${t1y} Q ${curr.x} ${curr.y} ${t2x} ${t2y}`;
+                    }
+                    const last = pts[pts.length - 1];
+                    d += ` L ${last.x} ${last.y}`;
+                    return d;
+                };
+                r.path = buildRoundedPath(newPoints, radius);
 
-            if (config?.debug) {
+                // Update label position
+                if (newPoints.length >= 2) {
+                    const midIndex = Math.floor(newPoints.length / 2);
+                    const p1 = newPoints[midIndex - 1];
+                    const p2 = newPoints[midIndex];
+                    r.labelX = (p1.x + p2.x) / 2;
+                    r.labelY = (p1.y + p2.y) / 2;
+                }
             }
         } catch (err) {
-            console.error('[LPNudge] Global Nudging failed, falling back to original paths:', err);
+            console.error('[GlobalNudge] Channel routing failed, falling back to original paths:', err);
         }
     }
 
