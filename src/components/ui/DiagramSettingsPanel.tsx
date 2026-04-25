@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Select, Switch } from 'antd';
@@ -145,6 +145,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                 onChange={async (val) => {
                                     const next = val as string;
                                     await onLayoutStrategyChange(next);
+                                    let refreshed = false;
                                     try {
                                         const manager = LayoutStrategyManager.getShared();
                                         const autoNode = manager.getPreferredNodeStrategyForHierarchy(next);
@@ -154,18 +155,17 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                         if (linkOrientationEnabled) {
                                             if (norm === 'domainhorizontallayout' || norm === 'domainhorizontal') {
                                                 await onNodeLayoutStrategyChange('DagreLayout');
-                                                onRefreshRequest();
                                             } else if (norm === 'domainverticallayout' || norm === 'domainvertical') {
                                                 await onNodeLayoutStrategyChange('DagreLayout');
-                                                onRefreshRequest();
                                             }
                                         }
 
                                         if (!selectable && autoNode) {
                                             await onNodeLayoutStrategyChange(autoNode);
-                                            onRefreshRequest();
                                         }
                                     } catch { }
+                                    // 始终触发重新布局，确保切换策略后节点位置重新计算
+                                    onRefreshRequest();
                                 }}
                                 popupMatchSelectWidth={false}
                                 optionLabelProp="label"
