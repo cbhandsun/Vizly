@@ -782,6 +782,24 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
             const { action } = e.detail;
             if (action === 'smart-layout') {
                 handleSmartLayout();
+            } else if (action === 'apply-layout') {
+                // 从设置面板切换布局策略时触发：将 UI 策略名映射到引擎策略名
+                const uiName = String(e.detail.strategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
+                const nodeLayout = e.detail.nodeLayout as string | undefined;
+                const map: Record<string, string> = {
+                    domainverticallayout: 'domain-vertical',
+                    domainvertical: 'domain-vertical',
+                    domainhorizontallayout: 'domain-horizontal',
+                    domainhorizontal: 'domain-horizontal',
+                    domainelklayout: 'domain-elk',
+                    domainelk: 'domain-elk',
+                    domaindagrelayout: 'dagre',
+                    domaindagre: 'dagre',
+                    dagre: 'dagre',
+                    elk: 'domain-elk',
+                };
+                const engineName = map[uiName] || 'domain-vertical';
+                handleStrategyLayout(engineName, nodeLayout);
             } else if (action === 'export-png') {
                 const downloadBtn = document.querySelector('[data-id="toolbar-export-btn"]') as HTMLButtonElement;
                 if(downloadBtn) downloadBtn.click();
@@ -826,7 +844,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         };
         window.addEventListener('editor:command', handleCommand as EventListener);
         return () => window.removeEventListener('editor:command', handleCommand as EventListener);
-    }, [handleSmartLayout, handleExport, setNodes, setEdges, takeSnapshot, reactFlowInstance, activePlugin]);
+    }, [handleSmartLayout, handleStrategyLayout, handleExport, setNodes, setEdges, takeSnapshot, reactFlowInstance, activePlugin]);
 
     const handleAddSummary = useCallback((e: CustomEvent) => {
         const { sourceIds } = e.detail;

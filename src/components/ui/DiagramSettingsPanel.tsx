@@ -145,7 +145,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                 onChange={async (val) => {
                                     const next = val as string;
                                     await onLayoutStrategyChange(next);
-                                    let refreshed = false;
+                                    let resolvedNodeLayout: string | undefined;
                                     try {
                                         const manager = LayoutStrategyManager.getShared();
                                         const autoNode = manager.getPreferredNodeStrategyForHierarchy(next);
@@ -155,8 +155,10 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                         if (linkOrientationEnabled) {
                                             if (norm === 'domainhorizontallayout' || norm === 'domainhorizontal') {
                                                 await onNodeLayoutStrategyChange('DagreLayout');
+                                                resolvedNodeLayout = 'dagre';
                                             } else if (norm === 'domainverticallayout' || norm === 'domainvertical') {
                                                 await onNodeLayoutStrategyChange('DagreLayout');
+                                                resolvedNodeLayout = 'dagre';
                                             }
                                         }
 
@@ -164,8 +166,10 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                             await onNodeLayoutStrategyChange(autoNode);
                                         }
                                     } catch { }
-                                    // 始终触发重新布局，确保切换策略后节点位置重新计算
-                                    onRefreshRequest();
+                                    // 触发 FlowchartDesigner 用新策略重新计算布局
+                                    window.dispatchEvent(new CustomEvent('editor:command', {
+                                        detail: { action: 'apply-layout', strategy: next, nodeLayout: resolvedNodeLayout }
+                                    }));
                                 }}
                                 popupMatchSelectWidth={false}
                                 optionLabelProp="label"

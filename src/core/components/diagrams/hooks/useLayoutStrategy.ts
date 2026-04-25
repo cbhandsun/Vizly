@@ -196,6 +196,12 @@ export function useLayoutStrategy({
                 } else if (strategyName === 'domain-horizontal' || (isDomainDagre && dir === 'LR')) {
                     const { DomainHorizontalLayoutStrategy } = await import('../../../strategies/DomainHorizontalLayoutStrategy');
                     strategy = new DomainHorizontalLayoutStrategy();
+                } else if (strategyName === 'domain-elk' || strategyName === 'elk') {
+                    const { DomainElkLayoutStrategy } = await import('../../../strategies/DomainElkLayoutStrategy');
+                    strategy = new DomainElkLayoutStrategy();
+                } else if (strategyName === 'dagre') {
+                    const { DomainDagreLayoutStrategy } = await import('../../../strategies/DomainDagreLayoutStrategy');
+                    strategy = new DomainDagreLayoutStrategy();
                 } else {
                     const { DomainVerticalLayoutStrategy } = await import('../../../strategies/DomainVerticalLayoutStrategy');
                     strategy = new DomainVerticalLayoutStrategy();
