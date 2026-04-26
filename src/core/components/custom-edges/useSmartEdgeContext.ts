@@ -252,7 +252,9 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
 
     // ---------- 0️⃣ Edge configuration ----------
     const edgeConfig = useMemo(() => {
-        const strictOverride = (props.data as any)?.edgeConfig?.strictOrthogonal !== false; // Default true based on user request
+        // [FIX] Default strictOrthogonal to FALSE: explicitly requiring `strictOrthogonal: true` to enable sharp corners.
+        // Previously defaulted to true (because `undefined !== false`), which silently set borderRadius=0 for all edges.
+        const strictOverride = (props.data as any)?.edgeConfig?.strictOrthogonal === true;
 
         const DEFAULT_EDGE_CONFIG = {
             bundleStrength: 0.6,

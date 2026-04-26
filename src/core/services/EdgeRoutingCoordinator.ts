@@ -1913,7 +1913,8 @@ export class EdgeRoutingCoordinator {
                 r.points = newPoints;
 
                 // [FIX C-5] Rebuild rounded path at orthogonal corners (Q quadratic Bézier)
-                const radius = Math.min(6, (config as any)?.borderRadius ?? 6);
+                // [FIX] Unified radius: match PathPostProcessor default (was min(6,...) causing inconsistent corners)
+                const radius = Math.min(20, (config as any)?.borderRadius ?? 20);
                 const buildRoundedPath = (pts: Point[], r: number): string => {
                     if (pts.length < 2) return '';
                     if (pts.length === 2 || r <= 0) {
