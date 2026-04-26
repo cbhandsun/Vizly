@@ -52,8 +52,8 @@ export interface OneBendConfig {
 }
 
 const DEFAULT_CONFIG: Required<OneBendConfig> = {
-    sourcePadding: 10,
-    targetPadding: 10,
+    sourcePadding: 15,
+    targetPadding: 15,
     minSegmentLength: 20,
     debug: false
 };

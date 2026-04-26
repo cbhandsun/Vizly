@@ -314,7 +314,9 @@
       "source": "calc-theory-ratio",
       "target": "sort-demand",
       "type": "main",
-      "label": "Max_Ratio"
+      "label": "Max_Ratio",
+      "sourceHandle": "right",
+      "targetHandle": "left"
     },
     {
       "id": "e4",

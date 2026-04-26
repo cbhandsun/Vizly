@@ -267,7 +267,7 @@ const IGNORED_OBSTACLE_TYPES = new Set([
 /** Container types that serve as soft boundaries */
 const CONTAINER_TYPES = new Set(['group', 'subGroup', 'swimlane', 'domain', 'subDomain']);
 
-interface ObstacleRect { id?: string; x: number; y: number; width: number; height: number }
+interface ObstacleRect { id?: string; x: number; y: number; width: number; height: number; padding?: number; isSoftZone?: boolean; }
 
 /**
  * [P3.3] Extracted obstacle building into independent useMemo.
@@ -299,7 +299,9 @@ const useObstacles = (
                     x: rect.x,
                     y: rect.y,
                     width: rect.width,
-                    height: rect.height
+                    height: rect.height,
+                    padding: rect.padding,
+                    isSoftZone: rect.isSoftZone
                 });
             }
         };
@@ -351,6 +353,51 @@ const useObstacles = (
 
                 const pos = getAbsolutePosition(n, simpleNodeMap);
                 addObstacle({ id: n.id, x: pos.x, y: pos.y, width: w, height: h });
+            });
+        }
+
+        // [FIX] Cross-group routing: Inject parent containers as Soft Zones to enforce clearance!
+        const sourceNode = simpleNodeMap.get(source);
+        const targetNode = simpleNodeMap.get(target);
+
+        let sParentId = sourceNode?.parentId || sourceNode?.parentNode;
+        let tParentId = targetNode?.parentId || targetNode?.parentNode;
+
+        // Detect parent relationships using React Flow's `data.children` array if `parentId` is missing
+        simpleNodeMap.forEach(n => {
+            if ((n.data as any)?.children?.includes(source)) sParentId = n.id;
+            if ((n.data as any)?.children?.includes(target)) tParentId = n.id;
+        });
+
+        const isCrossGroup = sParentId !== tParentId && (sParentId || tParentId);
+        
+        if (isCrossGroup) {
+            const crossGroupContainers = new Set<string>();
+            if (sParentId) crossGroupContainers.add(sParentId as string);
+            if (tParentId) crossGroupContainers.add(tParentId as string);
+
+            crossGroupContainers.forEach(containerId => {
+                const existing = obstacleRects.find(obs => obs.id === containerId);
+                if (existing) {
+                    existing.isSoftZone = true;
+                    existing.padding = 40;
+                } else {
+                    const n = simpleNodeMap.get(containerId);
+                    if (n) {
+                        const pos = getAbsolutePosition(n, simpleNodeMap);
+                        const w = n.measured?.width || n.width || 0;
+                        const h = n.measured?.height || n.height || 0;
+                        addObstacle({ 
+                            id: n.id, 
+                            x: pos.x, 
+                            y: pos.y, 
+                            width: w, 
+                            height: h, 
+                            isSoftZone: true, 
+                            padding: 40 
+                        }, false);
+                    }
+                }
             });
         }
 

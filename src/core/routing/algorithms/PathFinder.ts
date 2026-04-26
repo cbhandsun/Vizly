@@ -8,7 +8,7 @@
 import type { Point, Rectangle } from '../types/routing';
 
 // 扩展 Rect 类型以包含 padding，保持与原逻辑兼容
-type ObstacleRect = Rectangle & { padding?: number };
+type ObstacleRect = Rectangle & { padding?: number; isSoftZone?: boolean };
 
 export class PathFinder {
     /**
@@ -94,6 +94,9 @@ export class PathFinder {
     private isBlocked(p: Point, obstacles: ObstacleRect[], gs: number) {
         const r = { x: p.x, y: p.y, width: gs, height: gs };
         for (const o of obstacles) {
+            // [FIX] Soft zones are high-cost areas, not hard blocks — skip them in isBlocked.
+            // They only affect routing cost in getCellCost, making A* prefer to go around.
+            if (o.isSoftZone) continue;
             const pad = o.padding || 0;
             const ox = o.x - pad;
             const oy = o.y - pad;
@@ -115,6 +118,25 @@ export class PathFinder {
         // 1. 节点接近惩罚（梯度，非二元）
         const bufferZone = gs * 2.5;
         for (const o of obstacles) {
+            if (o.isSoftZone) {
+                // [FIX] Soft zone (e.g. target group container): apply a heavy penalty for
+                // cells INSIDE the zone, making A* strongly prefer routes that go AROUND it.
+                // The penalty drops to zero outside the zone, so external routing is free.
+                const pad = o.padding || 0;
+                const inside = p.x >= o.x - pad && p.x <= o.x + o.width + pad &&
+                               p.y >= o.y - pad && p.y <= o.y + o.height + pad;
+                if (inside) {
+                    cost += gs * 15; // Increased cost to strongly discourage entering the group
+                } else {
+                    // Add a gradient penalty OUTSIDE the soft zone to keep the path further away
+                    const d = this.pointToRectDistance(p, o);
+                    const softBufferZone = gs * 5; // 50px buffer zone outside the soft zone
+                    if (d < softBufferZone && d > 0) {
+                        cost += ((softBufferZone - d) / softBufferZone) * gs * 4;
+                    }
+                }
+                continue;
+            }
             const d = this.pointToRectDistance(p, o);
             if (d < bufferZone && d > 0) {
                 cost += ((bufferZone - d) / bufferZone) * gs * 0.8;

@@ -141,11 +141,6 @@ export class GridBuilder {
 
         // Rasterize each obstacle with graduated buffer zones
         for (const obs of relevantObstacles) {
-            // [FIX] Previously, source and target nodes were skipped completely to prevent
-            // them from blocking entry/exit. However, treating them as `COSTS.NORMAL`
-            // caused A* to shamelessly tunnel through the center of the nodes.
-            // SOLUTION: Rasterize their *exact* boundaries as `OBSTACLE`, but omit 
-            // the `bufferDistance` padding, ensuring a clear path to the port but no tunneling!
             const nodeObs = obs as any;
             if (nodeObs.id && (nodeObs.id === sourceId || nodeObs.id === targetId)) {
                 // Buffer = 0 (no padding), Cost = OBSTACLE
@@ -153,13 +148,20 @@ export class GridBuilder {
                 continue;
             }
 
-            this.rasterizeRect(obs, bufferDistanceFar, this.config.costs.bufferZoneFar, costs, minX, minY, cols, rows, gridSize);
-            this.rasterizeRect(obs, bufferDistanceClose, this.config.costs.bufferZoneClose, costs, minX, minY, cols, rows, gridSize);
-            
-            // [FIX] Removed 10px manual hard padding. Block-aliasing naturally expands the
-            // node bounds to the nearest 20px grid boundaries. Adding an EXTRA 10px caused
-            // tight 20px corridors between dense nodes to be mathematically sealed solid with 10,000,000 cost.
-            this.rasterizeRect(obs, 0, this.config.costs.obstacle, costs, minX, minY, cols, rows, gridSize);
+            const customPadding = nodeObs.padding ?? 0;
+            const isSoftZone = nodeObs.isSoftZone === true;
+
+            if (isSoftZone) {
+                // Soft zone applies a graduated high cost but does not block pathing.
+                // Cost must be > bufferZoneClose (2000) so paths prefer to exit the soft zone.
+                this.rasterizeRect(obs, bufferDistanceFar + customPadding, this.config.costs.bufferZoneFar, costs, minX, minY, cols, rows, gridSize);
+                this.rasterizeRect(obs, bufferDistanceClose + customPadding, this.config.costs.bufferZoneClose, costs, minX, minY, cols, rows, gridSize);
+                this.rasterizeRect(obs, customPadding, 3000 /* SOFT_ZONE_CORE */, costs, minX, minY, cols, rows, gridSize);
+            } else {
+                this.rasterizeRect(obs, bufferDistanceFar + customPadding, this.config.costs.bufferZoneFar, costs, minX, minY, cols, rows, gridSize);
+                this.rasterizeRect(obs, bufferDistanceClose + customPadding, this.config.costs.bufferZoneClose, costs, minX, minY, cols, rows, gridSize);
+                this.rasterizeRect(obs, customPadding, this.config.costs.obstacle, costs, minX, minY, cols, rows, gridSize);
+            }
         }
     }
 

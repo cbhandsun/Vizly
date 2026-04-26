@@ -224,34 +224,37 @@ export function isPathBlocked(path: Point[], obstacles: Rectangle[] | SpatialInd
 
         // 1. Check Rectangles
         if (isSpatialIndex(obstacles)) {
-            // [FIX] Use query() with padded range instead of queryLine() (which has 0 padding)
-            // This ensures Broad Phase matches Narrow Phase sensitivity.
-            const minX = Math.min(p1.x, p2.x) - padding;
-            const minY = Math.min(p1.y, p2.y) - padding;
-            const width = Math.abs(p1.x - p2.x) + padding * 2;
-            const height = Math.abs(p1.y - p2.y) + padding * 2;
+            // [FIX] Use query() with safely padded range to catch soft zones (up to 40px)
+            const maxPadding = Math.max(padding, 40);
+            const minX = Math.min(p1.x, p2.x) - maxPadding;
+            const minY = Math.min(p1.y, p2.y) - maxPadding;
+            const width = Math.abs(p1.x - p2.x) + maxPadding * 2;
+            const height = Math.abs(p1.y - p2.y) + maxPadding * 2;
 
             const candidates = obstacles.query({ x: minX, y: minY, width, height });
 
             if (Math.abs(p1.y - p2.y) < 0.1) { // Horizontal
                 for (const obs of candidates) {
-                    if (isHLineIntersectingRect(p1.y, p1.x, p2.x, obs, padding)) return true;
+                    const dynamicPadding = (obs as any).padding ?? padding;
+                    if (isHLineIntersectingRect(p1.y, p1.x, p2.x, obs, dynamicPadding)) return true;
                 }
             } else if (Math.abs(p1.x - p2.x) < 0.1) { // Vertical
                 for (const obs of candidates) {
-                    if (isVLineIntersectingRect(p1.x, p1.y, p2.y, obs, padding)) return true;
+                    const dynamicPadding = (obs as any).padding ?? padding;
+                    if (isVLineIntersectingRect(p1.x, p1.y, p2.y, obs, dynamicPadding)) return true;
                 }
             } else {
                 // [FIX] Diagonal Line Check
                 for (const obs of candidates) {
+                    const dynamicPadding = (obs as any).padding ?? padding;
                     // Check endpoints
-                    if (isPointInRectangle(p1.x, p1.y, obs, padding) || isPointInRectangle(p2.x, p2.y, obs, padding)) return true;
+                    if (isPointInRectangle(p1.x, p1.y, obs, dynamicPadding) || isPointInRectangle(p2.x, p2.y, obs, dynamicPadding)) return true;
 
                     // Check intersection with padded borders
-                    const x1 = obs.x - padding;
-                    const y1 = obs.y - padding;
-                    const x2 = obs.x + obs.width + padding;
-                    const y2 = obs.y + obs.height + padding;
+                    const x1 = obs.x - dynamicPadding;
+                    const y1 = obs.y - dynamicPadding;
+                    const x2 = obs.x + obs.width + dynamicPadding;
+                    const y2 = obs.y + obs.height + dynamicPadding;
 
                     const tl = { x: x1, y: y1 };
                     const tr = { x: x2, y: y1 };
@@ -268,25 +271,28 @@ export function isPathBlocked(path: Point[], obstacles: Rectangle[] | SpatialInd
             // Standard Linear Scan
             if (Math.abs(p1.y - p2.y) < 0.1) { // Horizontal
                 for (const obs of obstacles) {
-                    if (isHLineIntersectingRect(p1.y, p1.x, p2.x, obs, padding)) return true;
+                    const dynamicPadding = (obs as any).padding ?? padding;
+                    if (isHLineIntersectingRect(p1.y, p1.x, p2.x, obs, dynamicPadding)) return true;
                 }
             }
             else if (Math.abs(p1.x - p2.x) < 0.1) { // Vertical
                 for (const obs of obstacles) {
-                    if (isVLineIntersectingRect(p1.x, p1.y, p2.y, obs, padding)) return true;
+                    const dynamicPadding = (obs as any).padding ?? padding;
+                    if (isVLineIntersectingRect(p1.x, p1.y, p2.y, obs, dynamicPadding)) return true;
                 }
             }
             else {
                 // [FIX] Diagonal Line Check (Linear Scan)
                 for (const obs of obstacles) {
+                    const dynamicPadding = (obs as any).padding ?? padding;
                     // Check endpoints
-                    if (isPointInRectangle(p1.x, p1.y, obs, padding) || isPointInRectangle(p2.x, p2.y, obs, padding)) return true;
+                    if (isPointInRectangle(p1.x, p1.y, obs, dynamicPadding) || isPointInRectangle(p2.x, p2.y, obs, dynamicPadding)) return true;
 
                     // Check intersection with padded borders
-                    const x1 = obs.x - padding;
-                    const y1 = obs.y - padding;
-                    const x2 = obs.x + obs.width + padding;
-                    const y2 = obs.y + obs.height + padding;
+                    const x1 = obs.x - dynamicPadding;
+                    const y1 = obs.y - dynamicPadding;
+                    const x2 = obs.x + obs.width + dynamicPadding;
+                    const y2 = obs.y + obs.height + dynamicPadding;
 
                     const tl = { x: x1, y: y1 };
                     const tr = { x: x2, y: y1 };
@@ -707,13 +713,21 @@ export function buildPathfindingGrid(
     }
 
     for (const obs of relevantObstacles) {
-        rasterizeRect(obs, bufferDistanceFar, COSTS.BUFFER_ZONE_FAR);
-        rasterizeRect(obs, bufferDistanceClose, COSTS.BUFFER_ZONE_CLOSE);
-        // [I-2] Changed from 15px to 0px to match GridBuilder.rasterizeObstacles behavior.
-        // GridBuilder (used in batch mode) uses 0px hard padding + two graduated buffer zones.
-        // The old 15px was an undocumented inconsistency that made single-mode obstacles slightly
-        // larger than batch-mode obstacles, causing visual path differences.
-        rasterizeRect(obs, 0, COSTS.OBSTACLE);
+        // [FIX] Extract custom padding and soft zone flags from obstacle
+        const customPadding = (obs as any).padding ?? 0;
+        const isSoftZone = (obs as any).isSoftZone === true;
+
+        if (isSoftZone) {
+            // Soft zone applies a graduated high cost but does not block pathing
+            rasterizeRect(obs, bufferDistanceFar + customPadding, COSTS.BUFFER_ZONE_FAR);
+            rasterizeRect(obs, bufferDistanceClose + customPadding, COSTS.BUFFER_ZONE_CLOSE);
+            rasterizeRect(obs, customPadding, COSTS.CONTAINER_BORDER); // High but traversable cost
+        } else {
+            // Hard obstacle
+            rasterizeRect(obs, bufferDistanceFar + customPadding, COSTS.BUFFER_ZONE_FAR);
+            rasterizeRect(obs, bufferDistanceClose + customPadding, COSTS.BUFFER_ZONE_CLOSE);
+            rasterizeRect(obs, customPadding, COSTS.OBSTACLE);
+        }
     }
 
     return {

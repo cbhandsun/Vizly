@@ -273,7 +273,10 @@ export function decideEdgeRouting(
             x: getAbsolutePosition(n).x ?? 0,
             y: getAbsolutePosition(n).y ?? 0,
             width: n.width ?? n.measured?.width ?? n.style?.width ?? 100,
-            height: n.height ?? n.measured?.height ?? n.style?.height ?? 50
+            height: n.height ?? n.measured?.height ?? n.style?.height ?? 50,
+            // [FIX] Add padding so A* routes with 40px clearance from each node,
+            // preventing paths from hugging node boundaries (previous: no padding → paths stop at node edge)
+            padding: 40,
         }));
 
     const cfgEdge = diagramConfigManager?.getConfig?.()?.edge || {};
@@ -301,6 +304,50 @@ export function decideEdgeRouting(
             effectiveGlobalPath = 'smoothstep';
         } else {
             effectiveGlobalPath = smoothFallback;
+        }
+    }
+
+    // [FIX] Cross-subGroup edges: add the target's parent container as a soft cost zone.
+    // Without this, A* routes through the target group's interior (since containers are
+    // excluded from obstacles), producing paths that appear to hug the group boundary.
+    // We mark the container with isSoftZone so it raises cost but doesn't block access
+    // (otherwise A* would never reach the target node inside the container).
+    // Find parent container using data.children array since parentId might not be populated in all strategies
+    const getParentId = (nodeId: string) => {
+        const pNode = (allNodes || []).find(n => {
+            const type = String(n.type || '');
+            if (type === 'subGroup' || type === 'domain' || type === 'group') {
+                const children = (n.data as any)?.children;
+                if (Array.isArray(children) && children.includes(nodeId)) {
+                    return true;
+                }
+            }
+            return false;
+        });
+        return pNode ? pNode.id : undefined;
+    };
+
+    const sParentId = sNode.parentId || sNode.parentNode || getParentId(sNode.id);
+    const tParentId = tNode.parentId || tNode.parentNode || getParentId(tNode.id);
+    const isCrossGroup = !!(sParentId && tParentId && sParentId !== tParentId);
+
+    if (isCrossGroup) {
+        const tParentNode = (allNodes || []).find((n: any) => n.id === tParentId);
+        if (tParentNode) {
+            const tParentPos = getAbsolutePosition(tParentNode);
+            const tParentW = tParentNode.width ?? tParentNode.measured?.width ?? tParentNode.style?.width ?? 400;
+            const tParentH = tParentNode.height ?? tParentNode.measured?.height ?? tParentNode.style?.height ?? 300;
+            // Mark as soft zone: A* sees it as expensive but not impossible to traverse.
+            // This makes A* prefer going AROUND the container boundary first, then enter
+            // from the correct handle side near the target node.
+            obstacles.push({
+                x: tParentPos.x,
+                y: tParentPos.y,
+                width: tParentW,
+                height: tParentH,
+                padding: 40, // Increased padding to ensure visible distance from group border
+                isSoftZone: true, // signals PathFinder to treat as high-cost, not blocked
+            } as any);
         }
     }
 

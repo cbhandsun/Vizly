@@ -45,13 +45,13 @@ export function buildVisibilityGraph(
     options: {
         useCornerPoints?: boolean;     // 使用角点（默认true）
         useEdgeMidpoints?: boolean;    // 使用边中点（默认false,可提升精度但增加顶点）
-        obstacleOffset?: number;       // 障碍物偏移（避免贴边，默认5px）
+        obstacleOffset?: number;       // 障碍物偏移（避免贴边，默认15px）
     } = {}
 ): VisibilityGraph {
     const {
         useCornerPoints = true,
         useEdgeMidpoints = false,
-        obstacleOffset = 5
+        obstacleOffset = 15
     } = options;
 
     // 获取障碍物列表用于生成顶点
@@ -62,9 +62,17 @@ export function buildVisibilityGraph(
     const vertexToObstacle = new Map<number, number>();
 
     obstacleList.forEach((rect, obstacleIdx) => {
+        const dynamicPadding = (rect as any).padding ?? obstacleOffset;
+        const expandedRect = {
+            x: rect.x - dynamicPadding,
+            y: rect.y - dynamicPadding,
+            width: rect.width + dynamicPadding * 2,
+            height: rect.height + dynamicPadding * 2
+        };
+
         if (useCornerPoints) {
-            // 获取四个角点（带偏移）
-            const corners = getRectCorners(rect);
+            // 获取四个角点（带动态偏移）
+            const corners = getRectCorners(expandedRect);
             corners.forEach(corner => {
                 vertices.push(corner);
                 vertexToObstacle.set(vertices.length - 1, obstacleIdx);
@@ -72,12 +80,12 @@ export function buildVisibilityGraph(
         }
 
         if (useEdgeMidpoints) {
-            // 添加边中点（可选）
+            // 添加边中点（带动态偏移）
             vertices.push(
-                { x: rect.x + rect.width / 2, y: rect.y - obstacleOffset },             // 上中
-                { x: rect.x + rect.width + obstacleOffset, y: rect.y + rect.height / 2 }, // 右中
-                { x: rect.x + rect.width / 2, y: rect.y + rect.height + obstacleOffset }, // 下中
-                { x: rect.x - obstacleOffset, y: rect.y + rect.height / 2 }               // 左中
+                { x: rect.x + rect.width / 2, y: expandedRect.y },                               // 上中
+                { x: expandedRect.x + expandedRect.width, y: rect.y + rect.height / 2 },         // 右中
+                { x: rect.x + rect.width / 2, y: expandedRect.y + expandedRect.height },         // 下中
+                { x: expandedRect.x, y: rect.y + rect.height / 2 }                               // 左中
             );
             for (let i = 0; i < 4; i++) {
                 vertexToObstacle.set(vertices.length - 4 + i, obstacleIdx);
@@ -105,31 +113,16 @@ export function buildVisibilityGraph(
 
             // 1. 同一障碍物优化
             if (obsI !== undefined && obsI === obsJ) {
-                // 对于同一障碍物，只连接相邻的角点
-                // 这里假设vertices按顺时针或逆时针存储。
-                // 如果没有确定的顺序，这个优化很难做。
-                // 保守起见: 总是允许同一障碍物上的连接（构成凸包），或者相信isBitangent检查。
-                // 简单的Reduced VG逻辑通常忽略同一障碍物的非相邻边（对角线），除非它们构成了凸包边界。
-                // 但为了简单和正确性，我们先保留内部可见性检查。
-                // 更好的优化：如果是在障碍物"内部"穿过，则不可见。
+                // ...
             }
 
             // 2. Bitangent (切线) 检查 [NEW]
-            // 如果连线穿过了 p1 所属障碍物的"内部"，或者 p2 所属障碍物的"内部"，则不是切线边。
-            // 这极大地减少了无用边。
-            // 只有当不仅可见，而且是"切线"时才连接。
-
-            // 如何检查？
-            // 简单方法：将连线向障碍物内部微推一点，如果相交，则不是切线。
-            // 或者，检查连线角度是否在该顶点的"可行角扇区"内。
-
-            // 在这里，我们将使用一个简化的几何检查：
-            // 如果 p1 是某矩形的一个角，p1->p2 向量必须在该角的"外侧"。
-
+            // We pass obstacleOffset to isLocalTangent (which also should be updated to read padding)
             if (obsI !== undefined && !isLocalTangent(p1, p2, obstacleList[obsI], obstacleOffset)) continue;
             if (obsJ !== undefined && !isLocalTangent(p2, p1, obstacleList[obsJ], obstacleOffset)) continue;
 
             // 3. 全局可见性检查 (Raycast)
+            // We pass obstacleOffset. isVisible must be updated to expand obstacles!
             if (isVisible(p1, p2, obstacles, obstacleOffset)) {
                 const cost = distance(p1, p2);
 
@@ -176,14 +169,24 @@ export function isVisible(
     }
 
     for (const obstacle of potentialObstacles) {
+        // [FIX] Read padding from obstacle, defaulting to the passed tolerance/offset
+        const dynamicPadding = (obstacle as any).padding ?? tolerance;
+        
+        const expandedObstacle = {
+            x: obstacle.x - dynamicPadding,
+            y: obstacle.y - dynamicPadding,
+            width: obstacle.width + dynamicPadding * 2,
+            height: obstacle.height + dynamicPadding * 2
+        };
+
         // 检查端点是否在障碍物内部
         // 如果端点在边界上，不算穿越
-        const p1InObstacle = pointInRect(p1, obstacle, -tolerance);
-        const p2InObstacle = pointInRect(p2, obstacle, -tolerance);
+        const p1InObstacle = pointInRect(p1, expandedObstacle, -1);
+        const p2InObstacle = pointInRect(p2, expandedObstacle, -1);
 
         // 检查线段是否穿越障碍物
         // allowEdgeTouch=false 表示仅边界接触不算相交
-        if (lineIntersectsRect(segment, obstacle, false)) {
+        if (lineIntersectsRect(segment, expandedObstacle, false)) {
             // 进一步验证：如果两个端点都在同一个障碍物的边界上，允许通过
             if (p1InObstacle && p2InObstacle) {
                 // 端点都在同一障碍物边界，可能是沿着边移动，允许
@@ -436,10 +439,11 @@ function isLocalTangent(p1: Point, p2: Point, rect: Rectangle, padding: number):
         y: p1.y + (dy / len) * smallStep
     };
 
-    const rx = rect.x - padding;
-    const ry = rect.y - padding;
-    const rw = rect.width + padding * 2;
-    const rh = rect.height + padding * 2;
+    const dynamicPadding = (rect as any).padding ?? padding;
+    const rx = rect.x - dynamicPadding;
+    const ry = rect.y - dynamicPadding;
+    const rw = rect.width + dynamicPadding * 2;
+    const rh = rect.height + dynamicPadding * 2;
 
     // Strict interior check (excluding boundary)
     if (pTest.x > rx + 0.01 && pTest.x < rx + rw - 0.01 &&
