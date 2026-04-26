@@ -862,7 +862,7 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
             ...(edge.data || {}),
             intraContainerNoObstacle: true,
             obstacleScope: 'corridor',
-            obstaclePadding: 16,
+            obstaclePadding: 24,
             pathOptions: {
               ...(edge.data?.pathOptions || {}),
               gridRatio: 1.04,

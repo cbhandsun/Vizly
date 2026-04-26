@@ -270,7 +270,7 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
         ...(edge.data || {}),
         intraContainerNoObstacle: true,
         obstacleScope: 'corridor',
-        obstaclePadding: 16,
+        obstaclePadding: 24,
         pathOptions: { ...(edge.data?.pathOptions || {}), gridRatio: 1.04, borderRadius: 20 } // [FIX] Unified with PathPostProcessor default (was 4)
       }
 

@@ -102,7 +102,7 @@ function processEdge(
     ...(edge.data || {}),
     intraContainerNoObstacle: true,
     obstacleScope: 'corridor',
-    obstaclePadding: 16,
+    obstaclePadding: 24, // [FIX] Increased from 16 for better visual clearance from adjacent nodes/groups
     pathOptions: {
       ...(edge.data?.pathOptions || {}),
       gridRatio: 1.04,

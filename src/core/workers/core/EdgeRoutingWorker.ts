@@ -1374,17 +1374,32 @@ export class EdgeRoutingWorker {
             const maxY = Math.max(sRect.y + sRect.height, tRect.y + tRect.height);
 
             // Find obstacles in the corridor between source and target
+            // [FIX] For vertical flow: only consider obstacles in the X-band between/near source & target,
+            // not ALL obstacles in the Y-range. Previously, nodes far to the right (e.g. a group container)
+            // would inflate farthestRight, causing the bypass line to hug their right edge with only 40px clearance.
+            const CORRIDOR_X_SLACK = 80; // allow obstacles slightly outside the S/T bounding box
             const corridorObstacles = routingObstacles.filter(o => {
                 if (isVerticalFlow) {
-                    // Vertical flow: corridor is horizontally between nodes
-                    return o.y + o.height > minY && o.y < maxY;
+                    // Must overlap the Y-range between source and target
+                    const inY = o.y + o.height > minY && o.y < maxY;
+                    if (!inY) return false;
+                    // [FIX] Also must be within the relevant X-band (near source/target column)
+                    // Don't let distant groups on the right inflate farthestRight
+                    const inX = o.x < maxX + CORRIDOR_X_SLACK && o.x + o.width > minX - CORRIDOR_X_SLACK;
+                    return inX;
                 } else {
-                    return o.x + o.width > minX && o.x < maxX;
+                    // Must overlap the X-range between source and target
+                    const inX = o.x + o.width > minX && o.x < maxX;
+                    if (!inX) return false;
+                    // [FIX] Also constrain Y-band
+                    const inY = o.y < maxY + CORRIDOR_X_SLACK && o.y + o.height > minY - CORRIDOR_X_SLACK;
+                    return inY;
                 }
             });
 
             // Calculate bypass distance: furthest obstacle edge + padding
-            const BYPASS_PADDING = 40;
+            // [FIX] Increased from 40 to 60 for better visual clearance from adjacent nodes
+            const BYPASS_PADDING = 60;
             let bypassCoord: number;
 
             if (isVerticalFlow) {
