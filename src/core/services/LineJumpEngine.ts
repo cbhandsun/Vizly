@@ -251,53 +251,48 @@ export { LineJumpEngine, JUMP_RADIUS };
 export function injectLineJumps(
     points: Point[], 
     jumps: IntersectionInfo[], 
-    radius: number = JUMP_RADIUS
+    radius: number = JUMP_RADIUS,
+    cornerRadius: number = 16
 ): string {
     if (!points || points.length < 2 || jumps.length === 0) {
         return '';  // 调用方应使用原始路径
     }
 
     // [FIX] 去除连续重复点（容差 0.5px），防止零长段导致同一跳弧被处理两次
-    const deduped: Point[] = [points[0]];
+    const cleanPoints: Point[] = [points[0]];
     for (let i = 1; i < points.length; i++) {
-        const prev = deduped[deduped.length - 1];
+        const prev = cleanPoints[cleanPoints.length - 1];
         const curr = points[i];
         if (Math.abs(curr.x - prev.x) + Math.abs(curr.y - prev.y) > 0.5) {
-            deduped.push(curr);
+            cleanPoints.push(curr);
         }
     }
 
-    const parts: string[] = [];
-    parts.push(`M ${deduped[0].x} ${deduped[0].y}`);
+    if (cleanPoints.length < 2) return '';
 
-    for (let i = 0; i < deduped.length - 1; i++) {
-        const p1 = deduped[i];
-        const p2 = deduped[i + 1];
-        const isHorizontal = Math.abs(p1.y - p2.y) < 0.5;
+    // [FIX-FILLET] 同时注入跳线弧和圆角曲线
+    // 策略：与 createFilletedPath 完全对齐——
+    // 1. 遍历每个中间点 (i=1..N-2)，计算圆角的 filletStart / filletEnd
+    // 2. 在 filletStart 前面的线段中（从上一个 cursor 到 filletStart），检测跳线弧
+    // 3. 画圆角 Q 曲线
+    // 4. 最后一段也检测跳线弧
 
-        // [FIX] 跳过零长段（去重后仍可能出现）
-        if (Math.abs(p2.x - p1.x) + Math.abs(p2.y - p1.y) < 0.5) continue;
+    // Helper: 在水平线段 (fromX, y) -> (toX, y) 上注入跳线弧
+    const emitHorizontalWithJumps = (parts: string[], fromX: number, toX: number, y: number) => {
+        const segMinX = Math.min(fromX, toX);
+        const segMaxX = Math.max(fromX, toX);
+        const goingRight = toX > fromX;
 
-        if (!isHorizontal) {
-            // 非水平段直接画线
-            parts.push(`L ${p2.x} ${p2.y}`);
-            continue;
-        }
-
-        // 水平段：查找落在此段上的交叉点
-        const segMinX = Math.min(p1.x, p2.x);
-        const segMaxX = Math.max(p1.x, p2.x);
-        const goingRight = p2.x > p1.x;
-
+        // 查找落在此段上的交叉点
         const rawJumps = jumps
             .filter(j => {
                 const jx = j.point.x;
-                return Math.abs(j.point.y - p1.y) < 1 && 
+                return Math.abs(j.point.y - y) < 1 &&
                        jx > segMinX + radius && jx < segMaxX - radius;
             })
             .sort((a, b) => goingRight ? a.point.x - b.point.x : b.point.x - a.point.x);
 
-        // [FIX] 过滤掉间距 < 2×radius 的重叠跳弧，避免弧线相互干扰产生回折段
+        // 过滤掉间距 < 2×radius 的重叠跳弧
         const segJumps: IntersectionInfo[] = [];
         let lastJumpX = -Infinity;
         for (const j of rawJumps) {
@@ -308,35 +303,87 @@ export function injectLineJumps(
             }
         }
 
-        if (segJumps.length === 0) {
-            parts.push(`L ${p2.x} ${p2.y}`);
+        for (const jump of segJumps) {
+            const jx = jump.point.x;
+            const arcStartX = jx - (goingRight ? radius : -radius);
+            parts.push(`L ${arcStartX} ${y}`);
+            const arcEndX = jx + (goingRight ? radius : -radius);
+            const sweepFlag = goingRight ? 1 : 0;
+            parts.push(`A ${radius} ${radius} 0 0 ${sweepFlag} ${arcEndX} ${y}`);
+        }
+        // 画到终点
+        parts.push(`L ${toX} ${y}`);
+    };
+
+    // Helper: 在线段上（可能非水平）画线，如果水平则注入跳线弧
+    const emitSegmentWithJumps = (parts: string[], from: Point, to: Point) => {
+        const isHoriz = Math.abs(from.y - to.y) < 0.5;
+        if (isHoriz && Math.abs(from.x - to.x) > 1) {
+            // 水平段：可能有跳线弧
+            emitHorizontalWithJumps(parts, from.x, to.x, from.y);
+        } else {
+            parts.push(`L ${to.x} ${to.y}`);
+        }
+    };
+
+    const parts: string[] = [];
+    parts.push(`M ${cleanPoints[0].x} ${cleanPoints[0].y}`);
+
+    if (cleanPoints.length === 2) {
+        // 只有两点，直线
+        emitSegmentWithJumps(parts, cleanPoints[0], cleanPoints[1]);
+        return parts.join(' ');
+    }
+
+    // 与 createFilletedPath 完全一致的圆角遍历
+    // cursor 跟踪"当前已经画到的位置"
+    let cursor: Point = { x: cleanPoints[0].x, y: cleanPoints[0].y };
+
+    for (let i = 1; i < cleanPoints.length - 1; i++) {
+        const pPrev = cleanPoints[i - 1];
+        const pCurr = cleanPoints[i];
+        const pNext = cleanPoints[i + 1];
+
+        // 计算向量
+        const v1 = { x: pCurr.x - pPrev.x, y: pCurr.y - pPrev.y };
+        const v2 = { x: pNext.x - pCurr.x, y: pNext.y - pCurr.y };
+        const l1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+        const l2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+
+        // 安全圆角半径
+        const r = cornerRadius > 0 ? Math.min(cornerRadius, l1 / 2, l2 / 2) : 0;
+
+        if (r < 0.5 || l1 < 0.5 || l2 < 0.5) {
+            // 圆角太小，直接画到 pCurr
+            emitSegmentWithJumps(parts, cursor, pCurr);
+            cursor = { x: pCurr.x, y: pCurr.y };
             continue;
         }
 
-        // 沿行进方向依次画弧
-        let currentX = p1.x;
-        const y = p1.y;
+        const r1Ratio = r / l1;
+        const r2Ratio = r / l2;
 
-        for (const jump of segJumps) {
-            const jx = jump.point.x;
+        const filletStart = {
+            x: pCurr.x - v1.x * r1Ratio,
+            y: pCurr.y - v1.y * r1Ratio
+        };
+        const filletEnd = {
+            x: pCurr.x + v2.x * r2Ratio,
+            y: pCurr.y + v2.y * r2Ratio
+        };
 
-            // 画线到弧起点
-            const arcStartX = jx - (goingRight ? radius : -radius);
-            parts.push(`L ${arcStartX} ${y}`);
+        // 画从 cursor 到 filletStart（可能有跳线弧）
+        emitSegmentWithJumps(parts, cursor, filletStart);
 
-            // 画半圆弧（向上跨越）
-            // A rx ry x-axis-rotation large-arc-flag sweep-flag x y
-            const arcEndX = jx + (goingRight ? radius : -radius);
-            // sweep-flag: 1 = 顺时针（向上弧）
-            const sweepFlag = goingRight ? 1 : 0;
-            parts.push(`A ${radius} ${radius} 0 0 ${sweepFlag} ${arcEndX} ${y}`);
+        // 画圆角 Q 曲线
+        parts.push(`Q ${pCurr.x} ${pCurr.y} ${filletEnd.x} ${filletEnd.y}`);
 
-            currentX = arcEndX;
-        }
-
-        // 画线到段终点
-        parts.push(`L ${p2.x} ${p2.y}`);
+        cursor = { x: filletEnd.x, y: filletEnd.y };
     }
+
+    // 最后一段：cursor -> lastPoint（可能有跳线弧）
+    const last = cleanPoints[cleanPoints.length - 1];
+    emitSegmentWithJumps(parts, cursor, last);
 
     return parts.join(' ');
 }

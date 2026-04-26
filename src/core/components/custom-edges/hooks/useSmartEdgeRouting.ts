@@ -106,10 +106,12 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
   const isBusEdge = !!((multiEdgeInfo as any)?.isOneToMany || (multiEdgeInfo as any)?.isManyToOne);
 
   // 3. Channel Routing
+  // [UPGRADE] Channel routing is now handled at the Coordinator level (applyGlobalNudge),
+  // which writes results back to path data. Running it again here would cause double-shifting.
   const channelPoints = useChannelRouting({
       edgeId: id,
       points: workerSmartPoints,
-      enabled: !nodesDragging && !isLoading && !isBusEdge,
+      enabled: false,  // Disabled: Coordinator-level globalChannelRouting handles this
   });
 
   // 4. Stale Detection
@@ -139,7 +141,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       const cachedPath = cache.get(id);
 
       if (!nodesDragging && !isLoading && !isStale && channelPoints && channelPoints.length > 1) {
-          const p = createFilletedPath(channelPoints, edgeConfig.borderRadius ?? 16);
+          const p = createFilletedPath(channelPoints, edgeConfig.borderRadius || 16);
           cache.set(id, p);
           return p;
       }
@@ -154,10 +156,17 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
   }, [nodesDragging, channelPoints, edgeConfig.borderRadius, workerPath, _fallbackPath, isLoading, id, isStale, workerSmartPoints, props.sourceX, props.sourceY, props.targetX, props.targetY]);
 
   // 6. Line Jumps
+  // [FIX-FILLET] Pass cornerRadius so jumpPath retains rounded corners.
+  // Prefer channelPoints (post-channel-adjusted) over raw workerSmartPoints
+  // to ensure jump detection uses the same points as finalPath.
+  const jumpInputPoints = (!nodesDragging && !isLoading && !isStale && channelPoints && channelPoints.length > 1) 
+      ? channelPoints 
+      : workerSmartPoints;
   const { jumpPath } = useLineJumps({
       edgeId: id,
-      points: workerSmartPoints,
+      points: jumpInputPoints,
       enabled: !nodesDragging && !isLoading && !isStale,
+      cornerRadius: edgeConfig.borderRadius || 16,
   });
 
   const safeFinalPath = jumpPath || finalPath || `M ${props.sourceX} ${props.sourceY} L ${props.targetX} ${props.targetY}`;

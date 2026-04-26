@@ -139,18 +139,64 @@ export class LPNudge {
     }
 
     /**
-     * 按重叠分组
+     * 按空间重叠分组（Union-Find 算法）
+     * 
+     * 只有满足以下两个条件的线段才会被分到同一组：
+     * 1. 固定轴坐标差 < COORD_TOLERANCE（即"几乎在同一条线上"）
+     * 2. 可变轴范围有交集（即"在空间上实际重叠"）
+     * 
+     * 类比：两条公路只有"平行且有一段路程并排"时才需要分道行驶
      */
     private groupByOverlap(
         segments: EdgeSegment[],
         direction: 'horizontal' | 'vertical'
     ): SegmentGroup[] {
-        // 简化实现：将所有同方向的边段视为可能重叠
-        // 完整实现应该检查实际的空间重叠
-        return [{
-            direction,
-            segments: segments.slice()
-        }];
+        if (segments.length < 2) return [];
+
+        const COORD_TOLERANCE = 5; // px: 固定轴坐标容差
+
+        // 1. 按固定轴坐标排序，使后续 O(n²) 扫描可以提前终止
+        const sorted = segments.slice().sort((a, b) => a.coordinate - b.coordinate);
+
+        // 2. Union-Find 数据结构
+        const parent = sorted.map((_, i) => i);
+        const find = (i: number): number => {
+            while (parent[i] !== i) {
+                parent[i] = parent[parent[i]]; // 路径压缩
+                i = parent[i];
+            }
+            return i;
+        };
+        const union = (a: number, b: number) => {
+            const ra = find(a), rb = find(b);
+            if (ra !== rb) parent[ra] = rb;
+        };
+
+        // 3. 扫描配对：坐标接近 + 范围交叠 → 合并
+        for (let i = 0; i < sorted.length; i++) {
+            for (let j = i + 1; j < sorted.length; j++) {
+                // 固定轴坐标差超过容差 → 后续更不可能匹配，break
+                if (sorted[j].coordinate - sorted[i].coordinate > COORD_TOLERANCE) break;
+
+                // 检查可变轴范围是否有交集
+                if (sorted[i].end >= sorted[j].start && sorted[j].end >= sorted[i].start) {
+                    union(i, j);
+                }
+            }
+        }
+
+        // 4. 按根节点聚合分组
+        const groupMap = new Map<number, EdgeSegment[]>();
+        sorted.forEach((seg, i) => {
+            const root = find(i);
+            if (!groupMap.has(root)) groupMap.set(root, []);
+            groupMap.get(root)!.push(seg);
+        });
+
+        // 5. 只返回有 2+ 成员的组（单线段无需 nudge）
+        return [...groupMap.values()]
+            .filter(g => g.length > 1)
+            .map(g => ({ direction, segments: g }));
     }
 
     /**

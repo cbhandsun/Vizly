@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { LineJumpEngine, injectLineJumps } from '../../../services/LineJumpEngine';
 import type { Point, IntersectionInfo } from '../../../services/LineJumpEngine';
+// [FIX-FILLET] Updated to pass cornerRadius for unified jump+fillet path rendering
 
 interface UseLineJumpsOptions {
     edgeId: string;
@@ -8,6 +9,8 @@ interface UseLineJumpsOptions {
     points: Point[] | null | undefined;
     /** 是否启用跳线弧 */
     enabled?: boolean;
+    /** 圆角半径（默认16），用于在跳线路径中保持圆角效果 */
+    cornerRadius?: number;
 }
 
 interface UseLineJumpsResult {
@@ -17,7 +20,7 @@ interface UseLineJumpsResult {
     jumpPath: string | null;
 }
 
-export function useLineJumps({ edgeId, points, enabled = true }: UseLineJumpsOptions): UseLineJumpsResult {
+export function useLineJumps({ edgeId, points, enabled = true, cornerRadius = 16 }: UseLineJumpsOptions): UseLineJumpsResult {
     const engine = LineJumpEngine.getInstance();
 
     // [FIX N-6] 用 useSyncExternalStore 订阅 engine 的版本变化
@@ -54,10 +57,10 @@ export function useLineJumps({ edgeId, points, enabled = true }: UseLineJumpsOpt
             return { jumps: [], jumpPath: null };
         }
 
-        const jumpPath = injectLineJumps(points, jumps, engine.getJumpRadius());
+        const jumpPath = injectLineJumps(points, jumps, engine.getJumpRadius(), cornerRadius);
         return { jumps, jumpPath: jumpPath || null };
     // engineVersion 作为依赖，useSyncExternalStore 保证它在引擎变化时更新
-    }, [edgeId, points, enabled, engine, engineVersion]);
+    }, [edgeId, points, enabled, engine, engineVersion, cornerRadius]);
 
     return result;
 }

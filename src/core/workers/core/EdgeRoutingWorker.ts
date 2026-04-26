@@ -232,6 +232,7 @@ export class EdgeRoutingWorker {
         const clearanceRects = [sRect, tRect];
 
 
+
         // 4. Pre-processing: Bus Consensus & Direction
         // [H-6] Pass pre-built nodeMap to avoid O(N) Array.find() inside resolveBusOrientation
         const busOrientation = busDetector.resolveBusOrientation(
@@ -787,6 +788,7 @@ export class EdgeRoutingWorker {
         // [Imp-12] Lower threshold to 1 for explict bus scenarios to ensure uniform routing style
         const shouldUseTrunk = hasPrecomputedTrunk || (isBusScenario && trunkCalculator.shouldUseTrunkRouting(peerCount, 1));
 
+
         if (shouldUseTrunk) {
             let trunkStart: Point | null = null;
             let trunkEnd: Point | null = null;
@@ -807,8 +809,31 @@ export class EdgeRoutingWorker {
                     trunkEnd = { x: endWithOffset.x, y: trunkAxis };
                 }
 
-                // if (['e21', 'e22', 'e23'].includes(job.edgeId)) {
-                //                // }
+                // [FIX] Detour Guard: Skip trunk routing when the precomputed trunk
+                // forces an unreasonable detour for this specific edge.
+                // In 1-to-Many scenarios, the trunk axis is computed for the GROUP of
+                // edges (e.g., receipt→bi + receipt→putaway). If one edge's target is
+                // in a completely different direction (e.g., straight down vs far right),
+                // the trunk detour can be much longer than the direct path.
+                // Guard: compare trunk Manhattan distance vs direct Manhattan distance.
+                if (trunkStart && trunkEnd) {
+                    const directManhattan = Math.abs(endWithOffset.x - startWithOffset.x)
+                        + Math.abs(endWithOffset.y - startWithOffset.y);
+                    const trunkManhattan = Math.abs(trunkStart.x - startWithOffset.x)
+                        + Math.abs(trunkStart.y - startWithOffset.y)
+                        + Math.abs(trunkEnd.x - trunkStart.x)
+                        + Math.abs(trunkEnd.y - trunkStart.y)
+                        + Math.abs(endWithOffset.x - trunkEnd.x)
+                        + Math.abs(endWithOffset.y - trunkEnd.y);
+
+                    // If trunk path is >2x longer than direct, skip trunk.
+                    // This catches cases like receipt→putaway (direct=230px, trunk=580px).
+                    if (directManhattan > 0 && trunkManhattan > directManhattan * 2) {
+                        trunkStart = null;
+                        trunkEnd = null;
+                        trunkAxis = null;
+                    }
+                }
             }
             // Priority 2: Local Calculation (Fallback)
             else {
@@ -1296,6 +1321,7 @@ export class EdgeRoutingWorker {
         if (!pathPoints || pathPoints.length === 0) {
             return this.errorResult(job, 'Pathfinding failed to generate any path');
         }
+
 
         const { points: finalPoints, svgPath } = postProcessor.process(pathPoints, postContext);
 

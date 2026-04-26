@@ -2,13 +2,13 @@
  * 全局通道分配 (Global Channel Routing)
  * 
  * 使用 Interval Coloring 算法，将重合或极度接近的平行正交线段
- * 分离到不同的轨道（Track）上，彻底解决多线重叠问题。
+ * 分离到不同的轨道（Track）上，解决非 bus 线的重叠问题。
  * 
- * 移植自 DiagramView-SVG/routing/AdvancedRouting.ts → globalChannelRouting
- * 
- * 与 RF 版现有 Nudge 的差异：
- * - Nudge：逐边逐段搜索式推移，依赖搜索顺序
- * - Channel：全局所有边统一分配，Interval Coloring 确定性结果
+ * 核心原则（KISS）：
+ * - Bus/Trunk 边（buddyGroups 中的边）路径保持原样不动，
+ *   但其线段参与碰撞检测，作为"已占用轨道"。
+ * - 只有非 bus 的独立边才会被偏移。
+ * - 偏移保守：只分离真正重叠的段，避免引入新的交叉。
  */
 
 export interface Point {
@@ -20,55 +20,66 @@ interface Segment {
     edgeId: string;
     segIdx: number;
     isHoriz: boolean;
-    /** 固定轴的值（水平段→Y，垂直段→X） */
     fixedVal: number;
-    /** 可变轴的最小值 */
     minVal: number;
-    /** 可变轴的最大值 */
     maxVal: number;
+    isBuddy: boolean;
+}
+
+/**
+ * Buddy group — bus/trunk 边的分组。
+ * 组内的边路径不被修改，但其线段会参与碰撞检测。
+ */
+export interface BuddyGroup {
+    edgeIds: Set<string>;
+    type: 'o2m' | 'm2o';
 }
 
 /**
  * 对一组 edges 的路径进行全局通道分配。
- * 
- * @param edgePaths Map<edgeId, Point[]> — 每条边的原始路径点
- * @param spacing 轨道间距（像素），默认 12
- * @returns Map<edgeId, Point[]> — 调整后的路径点
+ * buddy 边作为固定占用参与碰撞检测，只偏移非 buddy 段。
  */
 export function globalChannelRouting(
     edgePaths: Map<string, Point[]>,
-    spacing: number = 12
+    spacing: number = 12,
+    buddyGroups?: BuddyGroup[]
 ): Map<string, Point[]> {
-    // 1. 提取所有内部正交线段（跳过首末端口段）
+    const buddyEdgeIds = new Set<string>();
+    if (buddyGroups) {
+        for (const group of buddyGroups) {
+            for (const edgeId of group.edgeIds) {
+                buddyEdgeIds.add(edgeId);
+            }
+        }
+    }
+
+    // 1. 提取所有正交线段
+    const GROUP_TOLERANCE = 6;  // 同通道聚类容差（px）
     const segments: Segment[] = [];
 
     for (const [edgeId, pts] of edgePaths) {
-        // [FIX T-5] 与 Sprint D N-5 保持一致，改为 < 2
-        // 原来 < 4 使得 3 点 L 形边全部被跳过，导致 useChannelRouting N-5 修复效果被内部抵消
         if (pts.length < 2) continue;
+        const isBuddy = buddyEdgeIds.has(edgeId);
 
-        for (let j = 1; j < pts.length - 2; j++) {
+        for (let j = 0; j < pts.length - 1; j++) {
             const p1 = pts[j];
             const p2 = pts[j + 1];
-
-            const isHoriz = Math.abs(p1.y - p2.y) < 1;
-            const isVert = Math.abs(p1.x - p2.x) < 1;
+            const isHoriz = Math.abs(p1.y - p2.y) < 1.5;
+            const isVert = Math.abs(p1.x - p2.x) < 1.5;
+            const len = isHoriz ? Math.abs(p1.x - p2.x) : Math.abs(p1.y - p2.y);
+            if (len < 8) continue; // 太短的段跳过
 
             if (isHoriz) {
                 segments.push({
-                    edgeId,
-                    segIdx: j,
-                    isHoriz: true,
-                    fixedVal: Math.round(p1.y),
+                    edgeId, segIdx: j, isHoriz: true, isBuddy,
+                    fixedVal: Math.round((p1.y + p2.y) / 2),
                     minVal: Math.min(p1.x, p2.x),
                     maxVal: Math.max(p1.x, p2.x),
                 });
             } else if (isVert) {
                 segments.push({
-                    edgeId,
-                    segIdx: j,
-                    isHoriz: false,
-                    fixedVal: Math.round(p1.x),
+                    edgeId, segIdx: j, isHoriz: false, isBuddy,
+                    fixedVal: Math.round((p1.x + p2.x) / 2),
                     minVal: Math.min(p1.y, p2.y),
                     maxVal: Math.max(p1.y, p2.y),
                 });
@@ -76,20 +87,21 @@ export function globalChannelRouting(
         }
     }
 
-    // 2. 按方向分组 + Interval Coloring 分配 track
-    const groupAndAssignTracks = (segs: Segment[]): Map<string, number> => {
-        // 按 fixedVal 聚类（容差 5px）
+    // 2. 按 fixedVal 聚类 → Interval Coloring
+    const assignTracks = (segs: Segment[]): Map<string, number> => {
+        // 聚类
         const groups = new Map<number, Segment[]>();
         for (const s of segs) {
-            let foundKey = s.fixedVal;
+            let foundKey: number | null = null;
             for (const key of groups.keys()) {
-                if (Math.abs(key - s.fixedVal) < 5) {
+                if (Math.abs(key - s.fixedVal) < GROUP_TOLERANCE) {
                     foundKey = key;
                     break;
                 }
             }
-            if (!groups.has(foundKey)) groups.set(foundKey, []);
-            groups.get(foundKey)!.push(s);
+            const gKey = foundKey ?? s.fixedVal;
+            if (!groups.has(gKey)) groups.set(gKey, []);
+            groups.get(gKey)!.push(s);
         }
 
         const shifts = new Map<string, number>();
@@ -97,32 +109,92 @@ export function globalChannelRouting(
         for (const [, group] of groups) {
             if (group.length < 2) continue;
 
-            // Interval Coloring：按起点排序，贪心分配到 track
+            // 检查是否有跨边的实际重叠
+            let hasOverlap = false;
+            outer: for (let i = 0; i < group.length; i++) {
+                for (let j = i + 1; j < group.length; j++) {
+                    if (group[i].edgeId === group[j].edgeId) continue;
+                    const overlapLen = Math.min(group[i].maxVal, group[j].maxVal) - Math.max(group[i].minVal, group[j].minVal);
+                    if (overlapLen > 2) {
+                        hasOverlap = true;
+                        break outer;
+                    }
+                }
+            }
+            if (!hasOverlap) continue;
+
             group.sort((a, b) => a.minVal - b.minVal);
 
-            const tracks: number[] = []; // tracks[i] = 该 track 当前的最大结束值
+            // Interval Coloring: buddy 段优先占用 track 0
+            const trackEnds: number[] = [];
             const assignments: { seg: Segment; trackIdx: number }[] = [];
 
+            // Phase 1: 放置所有 buddy 段（它们是固定的）
             for (const seg of group) {
+                if (!seg.isBuddy) continue;
                 let placed = false;
-                for (let t = 0; t < tracks.length; t++) {
-                    if (seg.minVal > tracks[t] + spacing) {
-                        tracks[t] = seg.maxVal;
+                for (let t = 0; t < trackEnds.length; t++) {
+                    if (seg.minVal > trackEnds[t] + 2) {
+                        trackEnds[t] = seg.maxVal;
                         assignments.push({ seg, trackIdx: t });
                         placed = true;
                         break;
                     }
                 }
                 if (!placed) {
-                    tracks.push(seg.maxVal);
-                    assignments.push({ seg, trackIdx: tracks.length - 1 });
+                    trackEnds.push(seg.maxVal);
+                    assignments.push({ seg, trackIdx: trackEnds.length - 1 });
                 }
             }
 
-            const numTracks = tracks.length;
-            if (numTracks > 1) {
-                for (const { seg, trackIdx } of assignments) {
-                    const offset = (trackIdx - (numTracks - 1) / 2) * spacing;
+            // 记住 buddy 段占用的轨道数
+            const buddyTrackCount = trackEnds.length;
+
+            // Phase 2: 放置非 buddy 段，避开 buddy 占用的轨道
+            for (const seg of group) {
+                if (seg.isBuddy) continue;
+                let placed = false;
+                
+                // 优先找 buddy 轨道外的空闲轨道
+                for (let t = buddyTrackCount; t < trackEnds.length; t++) {
+                    if (seg.minVal > trackEnds[t] + 2) {
+                        trackEnds[t] = seg.maxVal;
+                        assignments.push({ seg, trackIdx: t });
+                        placed = true;
+                        break;
+                    }
+                }
+                // 尝试 buddy 轨道中没冲突的
+                if (!placed) {
+                    for (let t = 0; t < buddyTrackCount; t++) {
+                        if (seg.minVal > trackEnds[t] + 2) {
+                            trackEnds[t] = seg.maxVal;
+                            assignments.push({ seg, trackIdx: t });
+                            placed = true;
+                            break;
+                        }
+                    }
+                }
+                // 开新轨道
+                if (!placed) {
+                    trackEnds.push(seg.maxVal);
+                    assignments.push({ seg, trackIdx: trackEnds.length - 1 });
+                }
+            }
+
+            const numTracks = trackEnds.length;
+            if (numTracks <= 1) continue;
+
+            // 计算偏移：以 buddy 轨道为中心参考
+            // 如果没有 buddy 轨道，以全部轨道的中点为中心
+            const center = buddyTrackCount > 0
+                ? (buddyTrackCount - 1) / 2
+                : (numTracks - 1) / 2;
+
+            for (const { seg, trackIdx } of assignments) {
+                if (seg.isBuddy) continue;
+                const offset = (trackIdx - center) * spacing;
+                if (Math.abs(offset) > 0.5) {
                     shifts.set(`${seg.edgeId}:${seg.segIdx}`, offset);
                 }
             }
@@ -131,22 +203,22 @@ export function globalChannelRouting(
         return shifts;
     };
 
-    const horizSegs = segments.filter(s => s.isHoriz);
-    const vertSegs = segments.filter(s => !s.isHoriz);
+    const hShifts = assignTracks(segments.filter(s => s.isHoriz));
+    const vShifts = assignTracks(segments.filter(s => !s.isHoriz));
 
-    const hShifts = groupAndAssignTracks(horizSegs);
-    const vShifts = groupAndAssignTracks(vertSegs);
-
-    // 3. 如果没有任何偏移，直接返回原始路径
     if (hShifts.size === 0 && vShifts.size === 0) {
         return edgePaths;
     }
 
-    // 4. 重建路径点：将 shift 应用到中间点（跳过首末点保持端口连接）
+    // 3. 重建路径
     const result = new Map<string, Point[]>();
 
     for (const [edgeId, pts] of edgePaths) {
-        // [FIX T-5] 同上。路径重建阶段也需要放宽到 2 点
+        if (buddyEdgeIds.has(edgeId)) {
+            result.set(edgeId, pts);
+            continue;
+        }
+
         if (pts.length < 2) {
             result.set(edgeId, pts);
             continue;
@@ -154,21 +226,19 @@ export function globalChannelRouting(
 
         const newPts = pts.map(p => ({ x: p.x, y: p.y }));
 
+        // 对每个中间点，根据其前后段的偏移移动
+        // 规则：取前段和后段中绝对值较大的偏移（不累加，避免过度偏移导致新交叉）
         for (let j = 1; j < pts.length - 1; j++) {
-            const prevSegIdx = j - 1;
-            const nextSegIdx = j;
+            const prevKey = `${edgeId}:${j - 1}`;
+            const nextKey = `${edgeId}:${j}`;
 
-            // 水平段偏移 → 移动 Y
-            const shiftYPrev = hShifts.get(`${edgeId}:${prevSegIdx}`) || 0;
-            const shiftYNext = hShifts.get(`${edgeId}:${nextSegIdx}`) || 0;
+            const hPrev = hShifts.get(prevKey) || 0;
+            const hNext = hShifts.get(nextKey) || 0;
+            newPts[j].y += Math.abs(hPrev) >= Math.abs(hNext) ? hPrev : hNext;
 
-            // 垂直段偏移 → 移动 X
-            const shiftXPrev = vShifts.get(`${edgeId}:${prevSegIdx}`) || 0;
-            const shiftXNext = vShifts.get(`${edgeId}:${nextSegIdx}`) || 0;
-
-            // 角点受相邻两段的偏移影响
-            newPts[j].x += shiftXPrev + shiftXNext;
-            newPts[j].y += shiftYPrev + shiftYNext;
+            const vPrev = vShifts.get(prevKey) || 0;
+            const vNext = vShifts.get(nextKey) || 0;
+            newPts[j].x += Math.abs(vPrev) >= Math.abs(vNext) ? vPrev : vNext;
         }
 
         result.set(edgeId, newPts);

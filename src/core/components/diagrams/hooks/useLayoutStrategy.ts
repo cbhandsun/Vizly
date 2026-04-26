@@ -122,7 +122,9 @@ export function useLayoutStrategy({
                 return { x, y };
             };
             const containerTypes = new Set(['titleGroup', 'subGroup', 'domain', 'group']);
-            const plainNodes = allNodes.filter(n => !containerTypes.has(n.type || ''));
+            const nonLayoutTypes = new Set(['mindmap', 'mindmap-boundary', 'sticky-note']);
+            const excludedTypes = new Set([...containerTypes, ...nonLayoutTypes]);
+            const plainNodes = allNodes.filter(n => !excludedTypes.has(n.type || ''));
             const layoutNodes = plainNodes.map(n => ({
                 ...n,
                 position: toAbsolutePosition(n),
@@ -137,11 +139,15 @@ export function useLayoutStrategy({
                 // ── 扁平树形布局（对齐 SVG 版：不检测域） ──
                 const positions = treeLayout(layoutNodes, layoutEdges, { direction: dir });
                 const newNodes = applyLayout(layoutNodes, positions);
+                // [FIX] 保留非流程图节点
+                const treeNodeIds = new Set(newNodes.map(n => n.id));
+                const treePreserved = allNodes.filter(n => nonLayoutTypes.has(n.type || '') && !treeNodeIds.has(n.id));
+                const treeResult = [...newNodes, ...treePreserved];
                 // [FIX] Clear handles + cached data BEFORE animation — let smart port selection decide
                 setEdges(prev => prev.map(e => ({ ...e, sourceHandle: null, targetHandle: null, data: { ...e.data, waypoints: [], computedPath: undefined, elkPath: undefined, algorithm: undefined, _layoutEpoch: undefined } })));
                 EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
                 // ⭐ 平滑过渡动画（edges already have clean data）
-                await animateLayoutTransition(setNodes, newNodes, { onComplete: twoStepFitView });
+                await animateLayoutTransition(setNodes, treeResult, { onComplete: twoStepFitView });
                 // [FIX] Post-animation safety clear
                 EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
                 // [FIX] Double RAF: let RF recompute positionAbsolute, then re-trigger edges
@@ -159,6 +165,10 @@ export function useLayoutStrategy({
                 // ── 扁平力导向布局（对齐 SVG 版：不检测域） ──
                 const positions = forceDirectedLayout(layoutNodes, layoutEdges);
                 const newNodes = applyLayout(layoutNodes, positions);
+                // [FIX] 保留非流程图节点
+                const forceNodeIds = new Set(newNodes.map(n => n.id));
+                const forcePreserved = allNodes.filter(n => nonLayoutTypes.has(n.type || '') && !forceNodeIds.has(n.id));
+                const forceResult = [...newNodes, ...forcePreserved];
                 // [FIX] Clear handles + cached data BEFORE animation — let smart port selection decide
                 setEdges(prev => prev.map(e => ({
                     ...e,
@@ -168,7 +178,7 @@ export function useLayoutStrategy({
                 })));
                 EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
                 // ⭐ 平滑过渡动画（edges already have clean data）
-                await animateLayoutTransition(setNodes, newNodes, { onComplete: twoStepFitView });
+                await animateLayoutTransition(setNodes, forceResult, { onComplete: twoStepFitView });
                 // [FIX] Post-animation safety clear
                 EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
                 // [FIX] Double RAF: let RF recompute positionAbsolute, then re-trigger edges
@@ -219,10 +229,14 @@ export function useLayoutStrategy({
                 });
 
                 if (result.nodes.length > 0) {
+                    // [FIX] 保留非流程图节点（mindmap、sticky-note 等）：布局算法不处理它们，但不能丢弃
+                    const resultNodeIds = new Set(result.nodes.map((n: any) => n.id));
+                    const preservedNodes = allNodes.filter(n => nonLayoutTypes.has(n.type || '') && !resultNodeIds.has(n.id));
+                    const finalNodes = [...result.nodes, ...preservedNodes];
                     // [FIX] Clear edges + cache BEFORE animation
-                    setEdges(sanitizeLayoutEdges(result.nodes, result.edges, dir));
+                    setEdges(sanitizeLayoutEdges(finalNodes, result.edges, dir));
                     EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-                    await animateLayoutTransition(setNodes, result.nodes, { onComplete: twoStepFitView });
+                    await animateLayoutTransition(setNodes, finalNodes, { onComplete: twoStepFitView });
                     // [FIX] Post-animation safety clear
                     EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
                     // [FIX] ROOT CAUSE FIX: After setNodes(targetNodes), React Flow needs one render cycle
