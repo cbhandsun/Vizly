@@ -6,7 +6,7 @@ import { createDefaultRoutingConfig } from '../types/routing';
 import {
     PathFindingJob,
     PathFindingResult,
-
+    SharedTrunkSegment,
     Point,
     SharedGraphContext,
 } from '../types/routing';
@@ -118,6 +118,9 @@ export class EdgeRoutingCoordinator {
     private dirtyEdges: Set<string> = new Set();
     private edgeDependencies: Map<string, Set<string>> = new Map(); // edgeId -> Set<nodeId>
     private allEdges: Edge[] = [];
+    /** [SharedTrunk] Accumulated shared trunk segments from latest batch, keyed by group ID */
+    private sharedTrunks: Map<string, SharedTrunkSegment> = new Map();
+
     private graphVersion: number = 0;
     // [P0-2] graphVersion 订阅者集合，用于 useSyncExternalStore 响应式订阅
     private graphVersionSubscribers: Set<() => void> = new Set();
@@ -830,6 +833,13 @@ export class EdgeRoutingCoordinator {
             
             if (isNudgeEnabled && results.length > 1) {
                 this.applyGlobalNudge(results, group.requests, group.graph);
+            }
+
+            // [SharedTrunk] Extract shared trunk segments for M2O/O2M groups
+            // and trim individual edge paths to branch-only segments.
+            const newTrunks = this.mergeTrunkSegments(results, group.requests);
+            for (const [key, seg] of newTrunks) {
+                this.sharedTrunks.set(key, seg);
             }
 
             // [FIX] Iterate over REQUESTS to ensure every request gets a response (Prevent Hanging Promises)
@@ -1645,9 +1655,189 @@ export class EdgeRoutingCoordinator {
     }
 
     /**
+     * [SharedTrunk] Public accessor — returns the latest shared trunk segments.
+     * Called by useSmartPathWorker to pass trunk data to the canvas rendering layer.
+     */
+    public getSharedTrunks(): SharedTrunkSegment[] {
+        return Array.from(this.sharedTrunks.values());
+    }
+
+    /**
+     * [SharedTrunk] Extract shared trunk segments from M2O/O2M buddy groups.
+     *
+     * For each group of N edges sharing a common trunk axis:
+     *  1. Identify the trunk junction points in each edge's path.
+     *  2. Build ONE shared trunk path covering the full span (min_branch_x → hub).
+     *  3. Trim each edge's path to the branch-only portion (source → junction).
+     *
+     * Visual result:
+     *  Before: N overlapping SVG paths each drawing source → trunk → hub
+     *  After : N branch-only paths (source → junction) + 1 shared trunk path (junction → hub)
+     */
+    private mergeTrunkSegments(
+        results: (PathFindingResult | null)[],
+        requests: RoutingRequest[]
+    ): Map<string, SharedTrunkSegment> {
+        const output = new Map<string, SharedTrunkSegment>();
+
+        // ── 1. Group edges by buddy type ────────────────────────────────────────
+        const groups = new Map<string, { type: 'm2o' | 'o2m'; hubId: string; edgeIds: string[] }>();
+        for (const req of requests) {
+            const job = req.job as any;
+            if (job.isManyToOne && job.busTrunkSource && job.busTrunkTarget) {
+                const key = `m2o:${job.target}`;
+                if (!groups.has(key)) groups.set(key, { type: 'm2o', hubId: job.target, edgeIds: [] });
+                groups.get(key)!.edgeIds.push(req.edgeId);
+            }
+            if (job.isOneToMany && job.busTrunkSource && job.busTrunkTarget) {
+                const key = `o2m:${job.source}`;
+                if (!groups.has(key)) groups.set(key, { type: 'o2m', hubId: job.source, edgeIds: [] });
+                groups.get(key)!.edgeIds.push(req.edgeId);
+            }
+        }
+
+        for (const [groupKey, groupInfo] of groups) {
+            if (groupInfo.edgeIds.length < 2) continue;
+
+            const edgeResults = groupInfo.edgeIds
+                .map(id => results.find(r => r && r.edgeId === id) ?? null)
+                .filter((r): r is PathFindingResult => r !== null && !r.error && r.points.length >= 2);
+
+            if (edgeResults.length < 2) continue;
+
+            // ── 2. Find the shared trunk segment in each edge's path ──────────
+            // For M2O with horizontal trunk: the trunk segment is the horizontal
+            // portion that ends closest to the hub (target). We look backwards
+            // from endPt to find the last horizontal run.
+            // Convention: "trunk junction" = the point where the vertical branch
+            // meets the horizontal trunk segment.
+
+            const junctions: { edgeId: string; junctionPt: Point; branchPts: Point[]; hubPts: Point[] }[] = [];
+
+            for (const r of edgeResults) {
+                const pts = r.points;
+                if (pts.length < 3) continue;
+
+                // Scan backwards to find the horizontal segment (same y for 2+ pts)
+                // closest to the end (hub side).
+                let trunkStartIdx = -1;
+                for (let i = pts.length - 2; i >= 1; i--) {
+                    const isHoriz = Math.abs(pts[i].y - pts[i + 1].y) < 2;
+                    if (isHoriz) {
+                        trunkStartIdx = i;
+                        // Keep scanning backwards along the same y to find the junction
+                        while (trunkStartIdx > 0 && Math.abs(pts[trunkStartIdx - 1].y - pts[trunkStartIdx].y) < 2) {
+                            trunkStartIdx--;
+                        }
+                        break;
+                    }
+                    // Also check for vertical trunk (same x for 2+ pts)
+                    const isVert = Math.abs(pts[i].x - pts[i + 1].x) < 2;
+                    if (isVert) {
+                        trunkStartIdx = i;
+                        while (trunkStartIdx > 0 && Math.abs(pts[trunkStartIdx - 1].x - pts[trunkStartIdx].x) < 2) {
+                            trunkStartIdx--;
+                        }
+                        break;
+                    }
+                }
+
+                if (trunkStartIdx < 0 || trunkStartIdx >= pts.length - 1) continue;
+
+                junctions.push({
+                    edgeId: r.edgeId,
+                    junctionPt: pts[trunkStartIdx],
+                    branchPts: pts.slice(0, trunkStartIdx + 1),  // source → junction (inclusive)
+                    hubPts: pts.slice(trunkStartIdx),            // junction → hub (inclusive)
+                });
+            }
+
+            if (junctions.length < 2) continue;
+
+            // ── 3. Determine shared trunk span ───────────────────────────────
+            // For horizontal trunk: find the junction with the most extreme x
+            // (furthest from the hub) to be the start of the shared trunk.
+            const isHorizTrunk = junctions.every(j =>
+                j.hubPts.length >= 2 && Math.abs(j.hubPts[0].y - j.hubPts[1].y) < 2
+            );
+
+            let sharedJunction: Point;
+            if (isHorizTrunk) {
+                // Hub is on the right side: pick junction with smallest x (leftmost)
+                // Hub is on the left side: pick junction with largest x (rightmost)
+                const hubEndPt = junctions[0].hubPts[junctions[0].hubPts.length - 1];
+                const sortedByX = [...junctions].sort((a, b) =>
+                    Math.abs(a.junctionPt.x - hubEndPt.x) - Math.abs(b.junctionPt.x - hubEndPt.x)
+                );
+                sharedJunction = sortedByX[sortedByX.length - 1].junctionPt; // furthest from hub
+            } else {
+                // Vertical trunk: pick junction furthest from hub in Y
+                const hubEndPt = junctions[0].hubPts[junctions[0].hubPts.length - 1];
+                const sortedByY = [...junctions].sort((a, b) =>
+                    Math.abs(a.junctionPt.y - hubEndPt.y) - Math.abs(b.junctionPt.y - hubEndPt.y)
+                );
+                sharedJunction = sortedByY[sortedByY.length - 1].junctionPt;
+            }
+
+            // The shared trunk path: from sharedJunction → hub (use first junction's hubPts as template,
+            // but start from sharedJunction so the trunk covers the full span).
+            // Pick the junction whose hubPts most naturally represents the shared portion.
+            const referenceJunction = junctions.find(j =>
+                Math.abs(j.junctionPt.x - sharedJunction.x) < 2 &&
+                Math.abs(j.junctionPt.y - sharedJunction.y) < 2
+            ) ?? junctions[0];
+
+            const trunkPoints: Point[] = [sharedJunction, ...referenceJunction.hubPts.slice(1)];
+
+            // Build rounded SVG path for the shared trunk
+            const radius = 6;
+            const buildPath = (pts: Point[]): string => {
+                if (pts.length < 2) return '';
+                if (pts.length === 2) return `M ${pts[0].x} ${pts[0].y} L ${pts[1].x} ${pts[1].y}`;
+                let d = `M ${pts[0].x} ${pts[0].y}`;
+                for (let j = 1; j < pts.length - 1; j++) {
+                    const prev = pts[j - 1], curr = pts[j], next = pts[j + 1];
+                    const len1 = Math.hypot(curr.x - prev.x, curr.y - prev.y);
+                    const len2 = Math.hypot(next.x - curr.x, next.y - curr.y);
+                    const r = Math.min(radius, len1 / 2, len2 / 2);
+                    if (r < 1) { d += ` L ${curr.x} ${curr.y}`; continue; }
+                    const t1x = curr.x - (curr.x - prev.x) / len1 * r;
+                    const t1y = curr.y - (curr.y - prev.y) / len1 * r;
+                    const t2x = curr.x + (next.x - curr.x) / len2 * r;
+                    const t2y = curr.y + (next.y - curr.y) / len2 * r;
+                    d += ` L ${t1x} ${t1y} Q ${curr.x} ${curr.y} ${t2x} ${t2y}`;
+                }
+                d += ` L ${pts[pts.length - 1].x} ${pts[pts.length - 1].y}`;
+                return d;
+            };
+
+            // ── 4. [ADDITIVE ONLY] SharedTrunkLayer is a visual overlay — do NOT trim
+            // individual edge paths. If we set result.path = branchOnly, ReactFlow renders
+            // the edge as a disconnected stub (flying line). Instead, keep each edge's full
+            // path intact. The SharedTrunkLayer renders the shared trunk on top as a
+            // separate decorative SVG path, making the trunk visually prominent.
+            // Individual edge paths still overlap on the trunk segment (same y, same color)
+            // and appear as one line — the overlay just makes it cleaner and more intentional.
+
+            output.set(groupKey, {
+                id: groupKey,
+                points: trunkPoints,
+                path: buildPath(trunkPoints),
+                edgeIds: groupInfo.edgeIds,
+                hubId: groupInfo.hubId,
+                type: groupInfo.type,
+            });
+        }
+
+
+        return output;
+    }
+
+    /**
      * [NEW] Helper to apply LPNudge separately for overlapping paths
      */
     private applyGlobalNudge(results: (PathFindingResult | null)[], requests: RoutingRequest[], graph: SharedGraphContext): void {
+
         const config = graph.config;
         const validResults = results.filter((r): r is PathFindingResult => r !== null && !r.error && !!r.points && r.points.length > 0);
         if (validResults.length <= 1) return;

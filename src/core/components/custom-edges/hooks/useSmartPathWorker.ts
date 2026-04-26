@@ -638,7 +638,10 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                     position: absolutePos,
                     measured: { width: n.width, height: n.height },
                     type: n.type,
-                    data: { collapsed: n.data?.collapsed, expanded: n.data?.expanded }
+                    data: { collapsed: n.data?.collapsed, expanded: n.data?.expanded },
+                    // [FIX-crossgroup] Pass parent refs so Worker can detect cross-group edges
+                    parentId: n.parentId,
+                    parentNode: n.parentNode,
                 };
             });
             const edgesArr = storeEdges.map(e => ({

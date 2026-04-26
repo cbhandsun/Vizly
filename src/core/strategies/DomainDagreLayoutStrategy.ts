@@ -832,13 +832,19 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
         // 克隆 edges 以确保 React 能检测到修改
         // Sort edges by source then target to ensure consistent processing order for "bus" optimization
+        // [FIX] Clear stale computedPath from previous layouts so EdgeRouter always recomputes fresh.
+        // Without this, the old C-shaped path would be preserved across layout runs.
         const clonedEdges = edges
-            .map(e => ({ ...e }))
+            .map(e => ({
+                ...e,
+                data: e.data ? { ...e.data as object, computedPath: undefined } : e.data
+            }))
             .sort((a, b) => {
                 const sComp = a.source.localeCompare(b.source);
                 if (sComp !== 0) return sComp;
                 return a.target.localeCompare(b.target);
             });
+
 
         const nodeUsage: Record<string, Record<string, number>> = {};
         // P1: Edge-Edge Avoidance - 收集已路由边的路径

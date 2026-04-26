@@ -127,7 +127,49 @@ export class EdgeRouter {
                 geometry
             );
 
+            // [FIX-C-shape] Post-port-selection guard: prevent C-shaped paths.
+            // When both ports are horizontal (right/left) but nodes are primarily vertically
+            // separated (|dy| > |dx| * 2), the orthogonal path must make 3 segments
+            // (right → down → left = C-shape). Switch to vertical ports for a 2-segment L-shape.
+            // Only applies when there is no forced layout direction (i.e., TB layout where we
+            // naturally want bottom→top connections).
+            {
+                const sCx = sourceNode.position.x + sourceNode.dimensions.width / 2;
+                const sCy = sourceNode.position.y + sourceNode.dimensions.height / 2;
+                const tCx = targetNode.position.x + targetNode.dimensions.width / 2;
+                const tCy = targetNode.position.y + targetNode.dimensions.height / 2;
+                const ddx = tCx - sCx;
+                const ddy = tCy - sCy;
+                const addx = Math.abs(ddx);
+                const addy = Math.abs(ddy);
+
+                const normH = (h: string) => {
+                    const s = h.toLowerCase();
+                    return s === 'r' || s === 'right' || s === 'l' || s === 'left';
+                };
+                const normV = (h: string) => {
+                    const s = h.toLowerCase();
+                    return s === 't' || s === 'top' || s === 'b' || s === 'bottom';
+                };
+
+                const srcIsHoriz = normH(portResult.sourceHandle);
+                const tgtIsHoriz = normH(portResult.targetHandle);
+                const srcIsVert = normV(portResult.sourceHandle);
+                const tgtIsVert = normV(portResult.targetHandle);
+
+                if (srcIsHoriz && tgtIsHoriz && addy > addx * 2) {
+                    // Both horizontal but strong vertical dominance → switch to vertical
+                    portResult.sourceHandle = ddy > 0 ? 'b' : 't';
+                    portResult.targetHandle = ddy > 0 ? 't' : 'b';
+                } else if (srcIsVert && tgtIsVert && addx > addy * 2) {
+                    // Both vertical but strong horizontal dominance → switch to horizontal
+                    portResult.sourceHandle = ddx > 0 ? 'r' : 'l';
+                    portResult.targetHandle = ddx > 0 ? 'l' : 'r';
+                }
+            }
+
             // 4. 确定路由类型
+
             const type = this.resolveEdgeType(config, geometry);
 
             // 5. 计算路径

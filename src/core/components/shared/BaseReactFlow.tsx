@@ -33,6 +33,8 @@ import { enhancedTextMeasurement } from '../../utils/EnhancedTextMeasurement';
 import CanvasEdgeLayer from '../layers/CanvasEdgeLayer';
 import { CanvasRefEdge } from '../edges/CanvasRefEdge';
 import EditableEdge from '../custom-edges/EditableEdge'; // ⭐ Waypoint编辑Edge
+import { useSharedTrunks } from '../custom-edges/hooks/useSharedTrunks';
+import { SharedTrunkLayer } from '../custom-edges/renderers/SharedTrunkLayer';
 
 
 interface BaseReactFlowProps {
@@ -206,6 +208,8 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [hasInitialized, setHasInitialized] = useState(false);
   const [initAttempts, setInitAttempts] = useState(0);
+  const sharedTrunks = useSharedTrunks();
+
   // 全局滚轮灵敏度（函数级注释）：从配置系统读取，用于主画布自定义缩放
   const globalSensitivity = useMemo(() => {
     try {
@@ -917,6 +921,9 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           <AlignGuide />
           <RightEdgeGuides />
           {children}
+          {enableSmartEdges && sharedTrunks.length > 0 && (
+            <SharedTrunkLayer trunks={sharedTrunks} />
+          )}
         </ReactFlow>
       </div>
       {!isContainerReady && (

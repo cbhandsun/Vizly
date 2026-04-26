@@ -320,9 +320,46 @@ export class EdgeRoutingWorker {
                 trunkPort = center.y > ts.y ? Position.Top : Position.Bottom;
             }
 
-            // [CONFLICT GUARD] Check if trunk port causes same-side entry/exit.
-            // e.g. trunk-facing port = Top, but source is ALSO above this node (direct approach = Top).
-            // In that case the path would enter from the same side it exits → visual loop/overlap.
+            // [FIX-C-shape] Strong alignment override — runs BEFORE the isGlobalTrunkMember
+            // shortcut so it can rescue trunk members from C-shaped paths.
+            // When nodes are strongly aligned on one axis (e.g., vertically stacked with
+            // |dy| >> |dx|, ratio > 3), the trunk axis port (e.g., Right) forces a U-turn
+            // detour. Use the direct geometric port instead even for trunk members.
+            if (otherRect) {
+                const otherCenter = { x: otherRect.x + otherRect.width / 2, y: otherRect.y + otherRect.height / 2 };
+                const dx = isTargetSide
+                    ? (otherCenter.x - center.x)
+                    : (center.x - otherCenter.x);
+                const dy = isTargetSide
+                    ? (otherCenter.y - center.y)
+                    : (center.y - otherCenter.y);
+
+                let directPort: Position;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    directPort = dx > 0 ? Position.Left : Position.Right;
+                } else {
+                    directPort = dy > 0 ? Position.Top : Position.Bottom;
+                }
+
+                const absDx = Math.abs(dx);
+                const absDy = Math.abs(dy);
+                const dominantRatio = Math.max(absDx, absDy) / (Math.min(absDx, absDy) + 1);
+                if (dominantRatio > 3 && (
+                    (absDy > absDx && (trunkPort === Position.Left || trunkPort === Position.Right)) ||
+                    (absDx > absDy && (trunkPort === Position.Top || trunkPort === Position.Bottom))
+                )) {
+                    // Strong geometric dominance overrides trunk port assignment
+                    return directPort;
+                }
+            }
+
+            // [CONFLICT GUARD] For NON-trunk-members, check same-side entry/exit.
+            // For trunk members we trust the Coordinator's port assignment (with the
+            // strong-alignment exception handled above).
+            if (isGlobalTrunkMember) {
+                return trunkPort;
+            }
+
             if (otherRect) {
                 const otherCenter = { x: otherRect.x + otherRect.width / 2, y: otherRect.y + otherRect.height / 2 };
                 const dx = isTargetSide
@@ -340,30 +377,11 @@ export class EdgeRoutingWorker {
                     directPort = dy > 0 ? Position.Top : Position.Bottom;  // source is above → enter Top
                 }
 
-                // [FIX] Strong alignment override: when nodes are strongly aligned on one axis
-                // (e.g., vertically stacked with |dy| >> |dx|), the trunk axis port (e.g., Right)
-                // forces a U-turn detour. Use the direct geometric port instead.
-                const absDx = Math.abs(dx);
-                const absDy = Math.abs(dy);
-                const dominantRatio = Math.max(absDx, absDy) / (Math.min(absDx, absDy) + 1);
-                if (dominantRatio > 3 && (
-                    (absDy > absDx && (trunkPort === Position.Left || trunkPort === Position.Right)) ||
-                    (absDx > absDy && (trunkPort === Position.Top || trunkPort === Position.Bottom))
-                )) {
-                    return directPort;
-                }
-
                 if (isTargetSide) {
-                    // For target entry: directPort is the side facing the source.
-                    // Conflict: if trunkPort === directPort, both source and trunk approach from same side.
-                    // Use directPort (geometry wins — it IS the correct entry).
                     if (trunkPort === directPort) {
                         return directPort;
                     }
                 } else {
-                    // For source exit: directPort is the side facing the target.
-                    // Same conflict: if trunkPort === directPort, exit toward target directly — OK.
-                    // Conflict only if trunkPort === OPPOSITE of directPort (exiting away from target).
                     const opposite = (p: Position) => (
                         p === Position.Top ? Position.Bottom :
                         p === Position.Bottom ? Position.Top :
@@ -617,7 +635,21 @@ export class EdgeRoutingWorker {
         // the edge is nearly pure-horizontal or pure-vertical (i.e. a true U-turn case).
         let isReverseBypassActive = false;
         let reverseBypassSide: Position | null = null;
-        if (job.isReverseEdge && !hasExplicitSource && !hasExplicitTarget) {
+
+        // [FIX-crossgroup] Cross-group edges (source & target in different containers) should NOT
+        // trigger U-turn bypass. They represent inter-module dependencies whose long arcs are
+        // expected. Let A* find the optimal path directly without forcing same-side ports.
+        const sParentId = (sNode as unknown as Record<string, unknown>)?.parentId
+            || (sNode as unknown as Record<string, unknown>)?.parentNode;
+        const tParentId = (tNode as unknown as Record<string, unknown>)?.parentId
+            || (tNode as unknown as Record<string, unknown>)?.parentNode;
+        const isCrossGroupEdge = !!(sParentId && tParentId && sParentId !== tParentId);
+
+        // [FIX-trunk] Global trunk members (M2O/O2M) must NEVER activate the reverse bypass.
+        // The Coordinator has already computed optimal trunk ports (e.g. Top/Bottom) via
+        // resolvePortFromTrunkAxis(). Allowing the bypass to overwrite them with same-side
+        // Right→Right ports is precisely what causes the large U-turn arcs seen in bus topologies.
+        if (job.isReverseEdge && !isGlobalTrunkMember && !isCrossGroupEdge && !hasExplicitSource && !hasExplicitTarget) {
             // [FIX] Use ACTUAL geometry (dx/dy) to decide bypass side, NOT just layoutDirection.
             // If we blindly use layoutDirection='LR' → Top/Bottom, but the target is significantly
             // BELOW the source (dy > 0), then Bottom→Bottom creates a huge U-turn downward.
@@ -639,11 +671,26 @@ export class EdgeRoutingWorker {
                 console.log(`[Worker] ${job.source}→${job.target}: diagonal reverse edge (ratio=${dominantRatio.toFixed(2)}<1.8), skipping U-Turn bypass.`);
             } else if (absDx > absDy) {
                 // Dominant horizontal → bypass via Top or Bottom (perpendicular)
+                // [FIX-pathlen] Score = obstacle_weight + estimated_detour_length.
+                // Pure obstacle count ignores that one side may require a far longer arc.
+                const BYPASS_GAP = 80;
                 const topCount = countObstaclesInDirection(sRect, Position.Top, routingObstacles, 120)
                                + countObstaclesInDirection(tRect, Position.Top, routingObstacles, 120);
                 const bottomCount = countObstaclesInDirection(sRect, Position.Bottom, routingObstacles, 120)
                                   + countObstaclesInDirection(tRect, Position.Bottom, routingObstacles, 120);
-                reverseBypassSide = topCount <= bottomCount ? Position.Top : Position.Bottom;
+
+                const topBypassY = Math.min(sRect.y, tRect.y) - BYPASS_GAP;
+                const bottomBypassY = Math.max(sRect.y + sRect.height, tRect.y + tRect.height) + BYPASS_GAP;
+                const topPathLen    = Math.abs(sRect.y - topBypassY)
+                                    + absDx
+                                    + Math.abs(tRect.y - topBypassY);
+                const bottomPathLen = Math.abs((sRect.y + sRect.height) - bottomBypassY)
+                                    + absDx
+                                    + Math.abs((tRect.y + tRect.height) - bottomBypassY);
+
+                const topScore    = topCount    * 200 + topPathLen;
+                const bottomScore = bottomCount * 200 + bottomPathLen;
+                reverseBypassSide = topScore <= bottomScore ? Position.Top : Position.Bottom;
 
                 startPos = reverseBypassSide;
                 endPos = reverseBypassSide;
@@ -652,18 +699,33 @@ export class EdgeRoutingWorker {
                 isReverseBypassActive = true;
             } else {
                 // Dominant vertical → bypass via Left or Right (perpendicular)
+                // [FIX-pathlen] Same scoring improvement: weight obstacle count + detour length.
+                const BYPASS_GAP = 80;
                 const leftCount = countObstaclesInDirection(sRect, Position.Left, routingObstacles, 120)
                                 + countObstaclesInDirection(tRect, Position.Left, routingObstacles, 120);
                 const rightCount = countObstaclesInDirection(sRect, Position.Right, routingObstacles, 120)
                                  + countObstaclesInDirection(tRect, Position.Right, routingObstacles, 120);
-                // [FIX] When obstacle counts are similar (diff ≤ 1), prefer the side where
+
+                const leftBypassX  = Math.min(sRect.x, tRect.x) - BYPASS_GAP;
+                const rightBypassX = Math.max(sRect.x + sRect.width, tRect.x + tRect.width) + BYPASS_GAP;
+                const leftPathLen  = Math.abs(sRect.x - leftBypassX)
+                                   + absDy
+                                   + Math.abs(tRect.x - leftBypassX);
+                const rightPathLen = Math.abs((sRect.x + sRect.width) - rightBypassX)
+                                   + absDy
+                                   + Math.abs((tRect.x + tRect.width) - rightBypassX);
+
+                const leftScore  = leftCount  * 200 + leftPathLen;
+                const rightScore = rightCount * 200 + rightPathLen;
+
+                // [FIX] When scores are very close (diff ≤ 5%), prefer the side where
                 // the target is located to produce a shorter bypass arc.
-                // e.g. target at dx=+531 (right) → prefer Right bypass over Left.
-                const countDiff = leftCount - rightCount;
-                if (Math.abs(countDiff) <= 1 && Math.abs(dx) > 50) {
+                const scoreDiff = Math.abs(leftScore - rightScore);
+                const scoreAvg  = (leftScore + rightScore) / 2;
+                if (scoreDiff / (scoreAvg + 1) <= 0.05 && Math.abs(dx) > 50) {
                     reverseBypassSide = dx > 0 ? Position.Right : Position.Left;
                 } else {
-                    reverseBypassSide = leftCount <= rightCount ? Position.Left : Position.Right;
+                    reverseBypassSide = leftScore <= rightScore ? Position.Left : Position.Right;
                 }
 
                 startPos = reverseBypassSide;
@@ -739,6 +801,55 @@ export class EdgeRoutingWorker {
             }
         }
 
+        // 5.7 [FIX-C-shape] C-shape anti-pattern guard — runs INDEPENDENTLY of the self-collision
+        // guard above so it works even when hasExplicitSource/hasExplicitTarget are set.
+        //
+        // Problem: When BOTH ports are horizontal (Left/Right) but the nodes are primarily
+        // vertically separated (|dy| >> |dx|), the orthogonal path must go:
+        //   → horizontal stub → vertical leg → horizontal stub  (C-shape or Z-shape, 3 segments)
+        // This is always worse than an L-shape path via Bottom→Top:
+        //   → vertical leg → horizontal stub  (2 segments, direct)
+        //
+        // Trigger: both ports horizontal + |dy| > |dx| * 2 (vertical dominance)
+        //          AND not a global trunk member (trunk ports are set by Coordinator)
+        //          AND not a reverse bypass (bypass intentionally uses same-side ports)
+        //          AND no edge-level explicit handle override (sourceHandle/targetHandle strings)
+        if (!isReverseBypassActive && !isGlobalTrunkMember) {
+            const sCx2 = sRect.x + sRect.width / 2;
+            const sCy2 = sRect.y + sRect.height / 2;
+            const tCx2 = tRect.x + tRect.width / 2;
+            const tCy2 = tRect.y + tRect.height / 2;
+            const dx2 = tCx2 - sCx2;
+            const dy2 = tCy2 - sCy2;
+            const absDx2 = Math.abs(dx2);
+            const absDy2 = Math.abs(dy2);
+
+            const bothHoriz = (
+                (startPos === Position.Left || startPos === Position.Right) &&
+                (endPos   === Position.Left || endPos   === Position.Right)
+            );
+            const bothVert = (
+                (startPos === Position.Top || startPos === Position.Bottom) &&
+                (endPos   === Position.Top || endPos   === Position.Bottom)
+            );
+
+            // [DEBUG] Log for edge-tms-yms
+            if (job.source?.includes('tms') && job.target?.includes('yms')) {
+                console.log(`[C-shape Debug v2] edge-tms-yms: startPos=${startPos} endPos=${endPos} dx2=${dx2.toFixed(0)} dy2=${dy2.toFixed(0)} bothHoriz=${bothHoriz} absDy2>${absDx2*2}=${absDy2 > absDx2*2} isReverseBypas=${isReverseBypassActive} isGlobalTrunk=${isGlobalTrunkMember} srcHandle=${job.sourceHandle}`);
+            }
+
+            if (bothHoriz && absDy2 > absDx2 * 2) {
+                // Strong vertical dominance with horizontal ports → C-shape → fix to L-shape
+                startPos = dy2 > 0 ? Position.Bottom : Position.Top;
+                endPos   = dy2 > 0 ? Position.Top    : Position.Bottom;
+            } else if (bothVert && absDx2 > absDy2 * 2) {
+                // Strong horizontal dominance with vertical ports → fix
+                startPos = dx2 > 0 ? Position.Right : Position.Left;
+                endPos   = dx2 > 0 ? Position.Left  : Position.Right;
+            }
+        }
+
+
         // 6. Coordinates with Distribution
         // [Bus Optimization] Force coalesced ports for Bus Hubs (Tree Root) to create a clean bundle
         const forceSourceCoalesce = job.isOneToMany;
@@ -803,11 +914,25 @@ export class EdgeRoutingWorker {
                     trunkStart = { x: trunkAxis, y: startWithOffset.y };
                     trunkEnd = { x: trunkAxis, y: endWithOffset.y };
                 } else {
+                    // Horizontal trunk: trunk axis is a Y value.
+                    // [FIX-shared-trunk] The horizontal segment must span the FULL group range
+                    // (busTrunkSource.x → busTrunkTarget.x), NOT just this edge's startWithOffset.x
+                    // → endWithOffset.x. Using per-edge x values caused each edge to walk only its
+                    // own slice of the trunk, producing N parallel short horizontal stubs instead
+                    // of one shared horizontal bus that all peers merge onto.
                     isVertical = false;
                     trunkAxis = job.busTrunkSource.y;
-                    trunkStart = { x: startWithOffset.x, y: trunkAxis };
-                    trunkEnd = { x: endWithOffset.x, y: trunkAxis };
-                }
+                    // The trunk segment spans the full group x-range from Coordinator.
+                    const trunkXMin = Math.min(job.busTrunkSource.x, job.busTrunkTarget.x);
+                    const trunkXMax = Math.max(job.busTrunkSource.x, job.busTrunkTarget.x);
+                    // Each edge's branch touches the trunk at its own x position (clamped to range).
+                    const branchSourceX = Math.max(trunkXMin, Math.min(trunkXMax, startWithOffset.x));
+                    const branchTargetX = Math.max(trunkXMin, Math.min(trunkXMax, endWithOffset.x));
+                    // trunkStart = point on trunk for this edge's SOURCE branch
+                    // trunkEnd   = point on trunk for this edge's TARGET branch
+                    trunkStart = { x: branchSourceX, y: trunkAxis };
+                    trunkEnd   = { x: branchTargetX, y: trunkAxis };
+                } // end horizontal trunk branch
 
                 // [FIX] Detour Guard: Skip trunk routing when the precomputed trunk
                 // forces an unreasonable detour for this specific edge.
@@ -828,13 +953,74 @@ export class EdgeRoutingWorker {
 
                     // If trunk path is >2x longer than direct, skip trunk.
                     // This catches cases like receipt→putaway (direct=230px, trunk=580px).
-                    if (directManhattan > 0 && trunkManhattan > directManhattan * 2) {
+                    let skipTrunk = directManhattan > 0 && trunkManhattan > directManhattan * 2;
+
+                    // [FIX-C-shape] Additional guard: detect C-shape routing from vertical trunk.
+                    // C-shape occurs when the path goes: source → (right) → trunkX → (down) → (left) → target.
+                    // i.e., the horizontal step from source→trunk and trunk→target are in OPPOSITE directions.
+                    // This is geometrically suboptimal and should fall back to direct A* routing.
+                    if (!skipTrunk && isVertical) {
+                        const step1H = trunkStart.x - startWithOffset.x;
+                        const step3H = endWithOffset.x - trunkEnd.x;
+                        const isCshape = Math.abs(step1H) > 5 && Math.abs(step3H) > 5
+                            && Math.sign(step1H) !== Math.sign(step3H);
+                        if (isCshape) {
+                            skipTrunk = true;
+                        }
+                    }
+                    // Similarly for horizontal trunk producing C-shape in vertical direction.
+                    if (!skipTrunk && !isVertical) {
+                        const step1V = trunkStart.y - startWithOffset.y;
+                        const step3V = endWithOffset.y - trunkEnd.y;
+                        const isCshape = Math.abs(step1V) > 5 && Math.abs(step3V) > 5
+                            && Math.sign(step1V) !== Math.sign(step3V);
+                        if (isCshape) {
+                            skipTrunk = true;
+                        }
+                    }
+
+                    if (skipTrunk) {
                         trunkStart = null;
                         trunkEnd = null;
                         trunkAxis = null;
+                        // [FIX-C-shape-precomputed] When we skip the precomputed trunk due to C-shape
+                        // or excessive detour, we must also reset the port assignments. The ports were
+                        // locked to trunk-facing positions (e.g. Right for a vertical trunk), but with
+                        // no trunk those ports create a misaligned A* start/end.
+                        // Recalculate using pure geometric heuristic: dominant direction of source→target.
+                        if (!hasExplicitSource && !hasExplicitTarget) {
+                            const sCx = sRect.x + sRect.width / 2;
+                            const sCy = sRect.y + sRect.height / 2;
+                            const tCx = tRect.x + tRect.width / 2;
+                            const tCy = tRect.y + tRect.height / 2;
+                            const gdx = tCx - sCx;
+                            const gdy = tCy - sCy;
+                            if (Math.abs(gdx) > Math.abs(gdy)) {
+                                startPos = gdx > 0 ? Position.Right : Position.Left;
+                                endPos = gdx > 0 ? Position.Left : Position.Right;
+                            } else {
+                                startPos = gdy > 0 ? Position.Bottom : Position.Top;
+                                endPos = gdy > 0 ? Position.Top : Position.Bottom;
+                            }
+                            hasFixedSourcePort = false;
+                            hasFixedTargetPort = false;
+                            // Recalculate port anchor points for the new geometric ports
+                            const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, 1);
+                            const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, 1);
+                            const portOffset = config.algorithm.portOffset ?? 40;
+                            (startPt as { x: number; y: number }).x = newStartPt.x;
+                            (startPt as { x: number; y: number }).y = newStartPt.y;
+                            (endPt as { x: number; y: number }).x = newEndPt.x;
+                            (endPt as { x: number; y: number }).y = newEndPt.y;
+                            (startWithOffset as { x: number; y: number }).x = startPos === Position.Left ? newStartPt.x - portOffset : startPos === Position.Right ? newStartPt.x + portOffset : newStartPt.x;
+                            (startWithOffset as { x: number; y: number }).y = startPos === Position.Top ? newStartPt.y - portOffset : startPos === Position.Bottom ? newStartPt.y + portOffset : newStartPt.y;
+                            (endWithOffset as { x: number; y: number }).x = endPos === Position.Left ? newEndPt.x - portOffset : endPos === Position.Right ? newEndPt.x + portOffset : newEndPt.x;
+                            (endWithOffset as { x: number; y: number }).y = endPos === Position.Top ? newEndPt.y - portOffset : endPos === Position.Bottom ? newEndPt.y + portOffset : newEndPt.y;
+    
+                        }
                     }
                 }
-            }
+            } // end hasPrecomputedTrunk
             // Priority 2: Local Calculation (Fallback)
             else {
                 const hubId = job.isOneToMany ? job.source : job.target;
@@ -902,7 +1088,88 @@ export class EdgeRoutingWorker {
                 }
             }
 
-            // Execute Trunk Routing if we have valid trunk points
+            // [FIX-C-shape UNIFIED] Unified C-shape guard for BOTH precomputed and locally-calculated trunks.
+            // After trunk points are resolved (from either priority 1 or 2), check if routing through
+            // the trunk produces a C-shape (source exits in one horizontal direction, but must re-enter
+            // from the opposite side to reach the target). If so, skip trunk and use direct A* routing.
+            // This is the single authoritative guard for C-shape prevention.
+
+            if (trunkStart && trunkEnd && trunkAxis !== null) {
+                let shouldSkipTrunk = false;
+                if (isVertical) {
+                    const step1H = trunkStart.x - startWithOffset.x;
+                    const step3H = endWithOffset.x - trunkEnd.x;
+                    if (Math.abs(step1H) > 5 && Math.abs(step3H) > 5 && Math.sign(step1H) !== Math.sign(step3H)) {
+                        shouldSkipTrunk = true;
+                        // Also reset ports to geometric optimal to avoid L/R port with no trunk
+                        if (!hasExplicitSource && !hasExplicitTarget) {
+                            const sCx = sRect.x + sRect.width / 2;
+                            const sCy = sRect.y + sRect.height / 2;
+                            const tCx = tRect.x + tRect.width / 2;
+                            const tCy = tRect.y + tRect.height / 2;
+                            const gdx = tCx - sCx;
+                            const gdy = tCy - sCy;
+                            if (Math.abs(gdx) > Math.abs(gdy)) {
+                                startPos = gdx > 0 ? Position.Right : Position.Left;
+                                endPos = gdx > 0 ? Position.Left : Position.Right;
+                            } else {
+                                startPos = gdy > 0 ? Position.Bottom : Position.Top;
+                                endPos = gdy > 0 ? Position.Top : Position.Bottom;
+                            }
+                        }
+                    }
+                } else {
+                    const step1V = trunkStart.y - startWithOffset.y;
+                    const step3V = endWithOffset.y - trunkEnd.y;
+                    if (Math.abs(step1V) > 5 && Math.abs(step3V) > 5 && Math.sign(step1V) !== Math.sign(step3V)) {
+                        shouldSkipTrunk = true;
+                        if (!hasExplicitSource && !hasExplicitTarget) {
+                            const sCx = sRect.x + sRect.width / 2;
+                            const sCy = sRect.y + sRect.height / 2;
+                            const tCx = tRect.x + tRect.width / 2;
+                            const tCy = tRect.y + tRect.height / 2;
+                            const gdx = tCx - sCx;
+                            const gdy = tCy - sCy;
+                            if (Math.abs(gdx) > Math.abs(gdy)) {
+                                startPos = gdx > 0 ? Position.Right : Position.Left;
+                                endPos = gdx > 0 ? Position.Left : Position.Right;
+                            } else {
+                                startPos = gdy > 0 ? Position.Bottom : Position.Top;
+                                endPos = gdy > 0 ? Position.Top : Position.Bottom;
+                            }
+                        }
+                    }
+                }
+                if (shouldSkipTrunk) {
+                    trunkStart = null;
+                    trunkEnd = null;
+                    trunkAxis = null;
+                    // [FIX-C-shape] Recalculate port points based on the newly-assigned geometric ports,
+                    // since startPt/endPt/startWithOffset/endWithOffset were computed with the old trunk-biased ports.
+                    if (!hasExplicitSource && !hasExplicitTarget) {
+                        const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, 1);
+                        const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, 1);
+
+                        // Reassign in the outer scope using the mutable binding trick: just use these below
+                        // (startPt, endPt, startWithOffset, endWithOffset are let-declared)
+                        // We can't reassign const, but we can use local vars for the path building below.
+                        // Override the outer vars by shadowing is not allowed; use a flag instead.
+                        // Since they're `let`, we can reassign directly:
+                        (startPt as { x: number; y: number }).x = newStartPt.x;
+                        (startPt as { x: number; y: number }).y = newStartPt.y;
+                        (endPt as { x: number; y: number }).x = newEndPt.x;
+                        (endPt as { x: number; y: number }).y = newEndPt.y;
+                        const newStartOffset = getPortOffsetPoint(newStartPt.x, newStartPt.y, startPos, config.offsets.source);
+                        const newEndOffset = getPortOffsetPoint(newEndPt.x, newEndPt.y, endPos, config.offsets.target);
+                        (startWithOffset as { x: number; y: number }).x = newStartOffset.x;
+                        (startWithOffset as { x: number; y: number }).y = newStartOffset.y;
+                        (endWithOffset as { x: number; y: number }).x = newEndOffset.x;
+                        (endWithOffset as { x: number; y: number }).y = newEndOffset.y;
+                    }
+                }
+            }
+
+            // Execute Trunk Routing if we have valid trunk points (after unified C-shape guard)
             if (trunkStart && trunkEnd && trunkAxis !== null) {
                 // [Validation] Ensure the trunk provides minimal clearance from the Hub to prevent overlap
                 const hubRect = job.isOneToMany ? sRect : tRect;
@@ -930,9 +1197,17 @@ export class EdgeRoutingWorker {
                         waypoints.push(trunkStart, trunkEnd);
                         if (endPos === Position.Top || endPos === Position.Bottom) waypoints.push(endWithOffset);
                     } else {
-                        if (startPos === Position.Left || startPos === Position.Right) waypoints.push(startWithOffset);
+                        // Horizontal trunk (isVertical=false): Top/Bottom ports connect vertically
+                        // to the trunk, then the trunk runs horizontally.
+                        // [FIX-orthogonal] Always add startWithOffset/endWithOffset regardless of
+                        // port direction. Without them, the path goes DIAGONALLY from startPt to
+                        // trunkStart when branchSourceX ≠ startPt.x (clamped edge case).
+                        // With them, the path is: startPt → startWithOffset (stub) →
+                        // {startWithOffset.x, trunkAxis} [=trunkStart] → {endWithOffset.x, trunkAxis}
+                        // [=trunkEnd] → endWithOffset (stub) → endPt — fully orthogonal.
+                        waypoints.push(startWithOffset);
                         waypoints.push(trunkStart, trunkEnd);
-                        if (endPos === Position.Left || endPos === Position.Right) waypoints.push(endWithOffset);
+                        waypoints.push(endWithOffset);
                     }
                     waypoints.push(endPt);
 

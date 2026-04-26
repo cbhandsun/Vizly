@@ -451,3 +451,25 @@ export interface RoutingRequest {
     job: Omit<PathFindingJob, 'edgeId'>;
     graph: SharedGraphContext;
 }
+
+/**
+ * [SharedTrunk] Represents the shared horizontal/vertical trunk segment
+ * extracted from a M2O or O2M buddy group.
+ * Rendered as a single SVG path in the canvas trunk layer instead of
+ * N overlapping individual edge paths.
+ */
+export interface SharedTrunkSegment {
+    /** Unique key: 'm2o:<targetId>' or 'o2m:<sourceId>' */
+    id: string;
+    /** The full trunk path points (branch junction → ... → hub port) */
+    points: Point[];
+    /** SVG path string with rounded corners */
+    path: string;
+    /** Which edge IDs contribute branches to this trunk */
+    edgeIds: string[];
+    /** The hub node ID (ASN for M2O, source node for O2M) */
+    hubId: string;
+    /** Trunk group type */
+    type: 'm2o' | 'o2m';
+}
+
