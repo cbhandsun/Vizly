@@ -1458,11 +1458,14 @@ export class EdgeRoutingWorker {
         // Fallback to standard routing if trunk routing failed or not applicable
         if (!pathPoints) {
             let activeObstacles = routingObstacles;
+            
+            // [FIX] Extract lineObstacles early so both VG and A* can use it to avoid crossings
+            const lineObstacles = (graph.pendingEdges ?? []) as import('../../algorithms/pathfinding').LineObstacle[];
 
             // Try Visibility Graph first if recommended
             if (config.algorithm.useVisibilityGraph) {
-                // [FIX] Use activeObstacles (clean & pruned list) to prevent VG from failing on source/target
-                let vgPathPoints = vgRouter.findPath(startWithOffset, endWithOffset, activeObstacles, undefined);
+                // [FIX] Pass lineObstacles to VG so it avoids unnecessary crossings with existing edges
+                let vgPathPoints = vgRouter.findPath(startWithOffset, endWithOffset, activeObstacles, undefined, lineObstacles);
                 if (vgPathPoints) {
                     // [FIX] Strict Orthogonalization Pre-verification
                     // VG produces diagonal lines that geometrically graze obstacles.
@@ -1499,11 +1502,6 @@ export class EdgeRoutingWorker {
                 // so GridBuilder can rasterize them as OBSTACLE (no buffer padding via sourceId/targetId).
                 // activeObstacles is filtered and excludes source/target, causing A* to tunnel through them.
                 const grid = prebuiltGrid || gridBuilder.buildGrid(spatialIndex || graph.obstacles, bounds, job.source, job.target);
-
-                // [FIX] 将已路由完成的其他边的路径线段传入 A*
-                // graph.pendingEdges 由 Coordinator 收集并注入，包含其他边的路径段
-                // A* 通过 lineCross 代价（300）主动避开并行，不是硬队
-                const lineObstacles = (graph.pendingEdges ?? []) as import('../../algorithms/pathfinding').LineObstacle[];
 
                 // Route from offset to offset, then we will stitch startPt/endPt
                 const offsetPath = astar.findPath(startWithOffset, endWithOffset, {

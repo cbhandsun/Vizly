@@ -248,6 +248,8 @@ export { LineJumpEngine, JUMP_RADIUS };
  * @param filletRadius 倒角半径（用于重新生成 filleted path）
  * @returns SVG d-path 字符串
  */
+import { collapseCollinearBacktracks } from '../algorithms/smartEdgeUtils';
+
 export function injectLineJumps(
     points: Point[], 
     jumps: IntersectionInfo[], 
@@ -269,6 +271,11 @@ export function injectLineJumps(
     }
 
     if (cleanPoints.length < 2) return '';
+
+    // [FIX] 消除共线折返点，与 createFilletedPath 保持完全一致的预处理
+    // 防止因折返段导致的 fillet 数学计算异常（产生重叠的垂直/水平线段）
+    const normalizedPoints = collapseCollinearBacktracks(cleanPoints);
+    if (normalizedPoints.length < 2) return '';
 
     // [FIX-FILLET] 同时注入跳线弧和圆角曲线
     // 策略：与 createFilletedPath 完全对齐——
@@ -327,22 +334,22 @@ export function injectLineJumps(
     };
 
     const parts: string[] = [];
-    parts.push(`M ${cleanPoints[0].x} ${cleanPoints[0].y}`);
+    parts.push(`M ${normalizedPoints[0].x} ${normalizedPoints[0].y}`);
 
-    if (cleanPoints.length === 2) {
+    if (normalizedPoints.length === 2) {
         // 只有两点，直线
-        emitSegmentWithJumps(parts, cleanPoints[0], cleanPoints[1]);
+        emitSegmentWithJumps(parts, normalizedPoints[0], normalizedPoints[1]);
         return parts.join(' ');
     }
 
     // 与 createFilletedPath 完全一致的圆角遍历
     // cursor 跟踪"当前已经画到的位置"
-    let cursor: Point = { x: cleanPoints[0].x, y: cleanPoints[0].y };
+    let cursor: Point = { x: normalizedPoints[0].x, y: normalizedPoints[0].y };
 
-    for (let i = 1; i < cleanPoints.length - 1; i++) {
-        const pPrev = cleanPoints[i - 1];
-        const pCurr = cleanPoints[i];
-        const pNext = cleanPoints[i + 1];
+    for (let i = 1; i < normalizedPoints.length - 1; i++) {
+        const pPrev = normalizedPoints[i - 1];
+        const pCurr = normalizedPoints[i];
+        const pNext = normalizedPoints[i + 1];
 
         // 计算向量
         const v1 = { x: pCurr.x - pPrev.x, y: pCurr.y - pPrev.y };
@@ -382,7 +389,7 @@ export function injectLineJumps(
     }
 
     // 最后一段：cursor -> lastPoint（可能有跳线弧）
-    const last = cleanPoints[cleanPoints.length - 1];
+    const last = normalizedPoints[normalizedPoints.length - 1];
     emitSegmentWithJumps(parts, cursor, last);
 
     return parts.join(' ');

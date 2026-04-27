@@ -15,7 +15,8 @@ import {
     manhattanDistance,
     lineIntersectsRect,
     getRectCorners,
-    pointInRect
+    pointInRect,
+    lineSegmentsIntersect
 } from './geometryUtils';
 import { SpatialIndex } from './SpatialIndex';
 
@@ -245,7 +246,8 @@ export function addPointToGraph(
 export function aStarOnGraph(
     graph: VisibilityGraph,
     startIdx: number,
-    endIdx: number
+    endIdx: number,
+    lineObstacles?: LineSegment[]
 ): number[] | null {
     const { vertices, edges, edgeCosts } = graph;
 
@@ -301,7 +303,21 @@ export function aStarOnGraph(
             if (closedSet.has(neighbor)) continue;
 
             const edgeKey = `${current}-${neighbor}`;
-            const tentativeG = (gScores.get(current) ?? 0) + (edgeCosts.get(edgeKey) ?? 0);
+            
+            // [FIX] Calculate penalty for crossing existing lines
+            let penalty = 0;
+            if (lineObstacles && lineObstacles.length > 0) {
+                const p1 = vertices[current];
+                const p2 = vertices[neighbor];
+                const edgeSegment = { start: p1, end: p2 };
+                for (const line of lineObstacles) {
+                    if (lineSegmentsIntersect(edgeSegment, line, false)) {
+                        penalty += 300; // LINE_CROSS penalty
+                    }
+                }
+            }
+
+            const tentativeG = (gScores.get(current) ?? 0) + (edgeCosts.get(edgeKey) ?? 0) + penalty;
 
             if (!inOpenSet.has(neighbor)) {
                 // [K-3] O(1) membership check instead of O(N) includes()
@@ -358,9 +374,11 @@ export function findPathOnVisibilityGraph(
     end: Point,
     obstacles: Rectangle[] | SpatialIndex,
     prebuiltGraph?: VisibilityGraph,
-    options: { obstacleOffset?: number } = {}
+    options: { obstacleOffset?: number, lineObstacles?: LineSegment[] } = {}
 ): Point[] | null {
     // 1. 快速检查：起终点直接可见
+    // FIXME: We don't check lineObstacles for direct visibility here to keep it fast.
+    // If it's a direct shot, we allow it.
     if (isVisible(start, end, obstacles)) {
         return [start, end];
     }
@@ -384,7 +402,7 @@ export function findPathOnVisibilityGraph(
     const endIdx = addPointToGraph(graph, end, obstacles);
 
     // 4. A*搜索
-    const pathIndices = aStarOnGraph(graph, startIdx, endIdx);
+    const pathIndices = aStarOnGraph(graph, startIdx, endIdx, options.lineObstacles);
 
     if (!pathIndices) {
         return null;

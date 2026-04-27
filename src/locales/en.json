@@ -34,6 +34,7 @@
         "login": "Sign in",
         "menu": {
             "myDiagrams": "My diagrams",
+            "switchUser": "Switch user",
             "logout": "Sign out"
         },
         "modal": {
@@ -670,6 +671,8 @@
         "loggedIn": "Logged in, synced: {{email}}",
         "notLoggedIn": "Not logged in, data saved locally",
         "previewCode": "Preview Code",
+        "previewJson": "View JSON Source",
+        "applyToCanvas": "Apply to Canvas",
         "saveLocal": "Save Local",
         "saveS3": "Save to S3",
         "saveCloud": "Save to Cloud",
@@ -1578,7 +1581,13 @@
         "modelAdded": "Model added: {{id}}",
         "testFillRequired": "Fill API Key and Base URL first",
         "testFailHtml": "Connection failed",
-        "testFail": "Connection failed: {{message}}"
+        "testFail": "Connection failed: {{message}}",
+        "fetchModels": "Fetch Models",
+        "fetchModelsSuccess": "Successfully fetched {{count}} new models",
+        "fetchModelsNoNew": "Models are up to date",
+        "fetchModelsInvalidData": "Failed to fetch models: Invalid response data format",
+        "discoveryTitle": "Select Models to Add",
+        "discoverySearchPlaceholder": "Search by Model ID or Name"
     },
     "storageConfig": {
         "title": "Storage Configuration",

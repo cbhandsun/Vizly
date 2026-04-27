@@ -14,10 +14,7 @@
     background: transparent;
 }
 
-/* 🔑 阻止 React Flow 提升大组 z-index，强制沉入底层（-1）防止背景遮挡前方的子节点 */
-.react-flow__node-titleGroup {
-    z-index: -1 !important;
-}
+
 
 .title-group-node.glass {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);

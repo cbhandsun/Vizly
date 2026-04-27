@@ -16,6 +16,8 @@ export const AuthStatus: React.FC<{ compact?: boolean }> = ({ compact = false })
     const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
         if (key === 'logout') {
             signOut();
+        } else if (key === 'switch_user') {
+            signOut().then(() => setIsModalOpen(true));
         } else if (key === 'cloud_files') {
             setIsCloudModalOpen(true);
         }
@@ -35,6 +37,11 @@ export const AuthStatus: React.FC<{ compact?: boolean }> = ({ compact = false })
             key: 'cloud_files',
             label: t('auth.menu.myDiagrams'),
             icon: <CloudOutlined />,
+        },
+        {
+            key: 'switch_user',
+            label: t('auth.menu.switchUser'),
+            icon: <UserOutlined />,
         },
         {
             key: 'logout',

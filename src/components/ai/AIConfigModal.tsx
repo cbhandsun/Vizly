@@ -12,7 +12,8 @@ import Space from 'antd/es/space';
 import Tag from 'antd/es/tag';
 import Divider from 'antd/es/divider';
 import Select from 'antd/es/select';
-import Collapse from 'antd/es/collapse'; // Add Collapse for grouping
+import Collapse from 'antd/es/collapse';
+import Checkbox from 'antd/es/checkbox';
 import {
     PlusOutlined,
     DeleteOutlined,
@@ -21,7 +22,8 @@ import {
     GlobalOutlined,
     SettingOutlined,
     CheckCircleFilled,
-    AppstoreOutlined
+    AppstoreOutlined,
+    SyncOutlined
 } from '@ant-design/icons';
 
 const { Text, Title, Paragraph } = Typography;
@@ -235,6 +237,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             message.success(t('aiConfig.saveSuccess'));
         }
 
+        window.dispatchEvent(new Event('aiConfigChanged'));
         onSave();
     };
 
@@ -393,8 +396,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 },
                 body: JSON.stringify({
                     model: provider.models[0]?.id || 'test-model',
-                    messages: [{ role: 'user', content: 'Hi' }],
-                    max_tokens: 1
+                    messages: [{ role: 'user', content: 'Hello, please reply with "OK".' }]
                 })
             });
 
@@ -413,6 +415,120 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             message.error(t('aiConfig.testError', { message: error.message }));
         } finally {
             setIsTesting(false);
+        }
+    };
+
+    const [isFetchingModels, setIsFetchingModels] = useState(false);
+
+    const [discoveryModalVisible, setDiscoveryModalVisible] = useState(false);
+    const [discoveredModels, setDiscoveredModels] = useState<AIModel[]>([]);
+    const [discoverySearchText, setDiscoverySearchText] = useState('');
+    const [discoverySelectedIds, setDiscoverySelectedIds] = useState<string[]>([]);
+
+    const handleAddDiscoveredModels = () => {
+        if (!selectedProvider) return;
+        const modelsToAdd = discoveredModels.filter(m => discoverySelectedIds.includes(m.id));
+        if (modelsToAdd.length > 0) {
+            setConfig(prev => ({
+                ...prev,
+                providers: prev.providers.map(p => {
+                    if (p.id !== selectedProvider.id) return p;
+                    return { ...p, models: [...p.models, ...modelsToAdd] };
+                })
+            }));
+            message.success(t('aiConfig.fetchModelsSuccess', { count: modelsToAdd.length }));
+        }
+        setDiscoveryModalVisible(false);
+    };
+
+    const toggleDiscoverySelection = (id: string, checked: boolean) => {
+        if (checked) {
+            setDiscoverySelectedIds(prev => [...prev, id]);
+        } else {
+            setDiscoverySelectedIds(prev => prev.filter(x => x !== id));
+        }
+    };
+
+    const toggleDiscoveryGroupSelection = (groupModels: AIModel[], checked: boolean) => {
+        const ids = groupModels.map(m => m.id);
+        if (checked) {
+            setDiscoverySelectedIds(prev => Array.from(new Set([...prev, ...ids])));
+        } else {
+            setDiscoverySelectedIds(prev => prev.filter(x => !ids.includes(x)));
+        }
+    };
+
+    const filteredDiscoveredModels = discoveredModels.filter(m => 
+        m.id.toLowerCase().includes(discoverySearchText.toLowerCase()) || 
+        m.name.toLowerCase().includes(discoverySearchText.toLowerCase())
+    );
+
+    const groupedDiscoveredModels = useMemo(() => {
+        const groups: Record<string, AIModel[]> = {};
+        filteredDiscoveredModels.forEach(m => {
+            const key = m.group || 'Other';
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(m);
+        });
+        return groups;
+    }, [filteredDiscoveredModels]);
+
+    const handleFetchModels = async (provider: AIProviderConfig) => {
+        if (!provider.apiKey || !provider.baseUrl) {
+            message.warning(t('aiConfig.testFillRequired'));
+            return;
+        }
+        setIsFetchingModels(true);
+        try {
+            const endpoint = `${provider.baseUrl.replace(/\/$/, '')}/models`;
+            const response = await fetch(endpoint, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${provider.apiKey}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data && data.data && Array.isArray(data.data)) {
+                    const existingModelIds = new Set(provider.models.map(m => m.id));
+                    const newModels = data.data
+                        .filter((m: any) => !existingModelIds.has(m.id))
+                        .map((m: any) => {
+                            let group = 'Fetched';
+                            if (m.id.includes('-') || m.id.includes('/')) {
+                                const parts = m.id.split(/[-/]/);
+                                group = parts[0].toUpperCase() === parts[0] ? parts[0] : parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+                            }
+                            if (m.id.toLowerCase().includes('vision')) group = 'Vision';
+                            return {
+                                id: m.id,
+                                name: m.id,
+                                group: group,
+                                enabled: false,
+                                isCustom: true
+                            };
+                        });
+                    
+                    if (newModels.length > 0) {
+                        setDiscoveredModels(newModels);
+                        setDiscoverySelectedIds([]);
+                        setDiscoverySearchText('');
+                        setDiscoveryModalVisible(true);
+                    } else {
+                        message.info(t('aiConfig.fetchModelsNoNew'));
+                    }
+                } else {
+                    message.error(t('aiConfig.fetchModelsInvalidData'));
+                }
+            } else {
+                const errText = await response.text();
+                message.error(t('aiConfig.testFail', { status: response.status, message: errText.substring(0, 100) }));
+            }
+        } catch (error: any) {
+            message.error(t('aiConfig.testError', { message: error.message }));
+        } finally {
+            setIsFetchingModels(false);
         }
     };
 
@@ -561,7 +677,10 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                 <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                                         <Text strong>{t('aiConfig.modelList', { count: selectedProvider.models.length })}</Text>
-                                        <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => setNewModelFormVisible(true)}>{t('aiConfig.addModel')}</Button>
+                                        <Space>
+                                            <Button size="small" icon={<SyncOutlined />} loading={isFetchingModels} onClick={() => handleFetchModels(selectedProvider)}>{t('aiConfig.fetchModels')}</Button>
+                                            <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => setNewModelFormVisible(true)}>{t('aiConfig.addModel')}</Button>
+                                        </Space>
                                     </div>
 
                                     {newModelFormVisible && (
@@ -651,6 +770,63 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                     </div>
                 </div>
             </div>
+
+            {/* Model Discovery Modal */}
+            <Modal
+                title={t('aiConfig.discoveryTitle', '选择要添加的模型')}
+                open={discoveryModalVisible}
+                onOk={handleAddDiscoveredModels}
+                onCancel={() => setDiscoveryModalVisible(false)}
+                okText={t('aiConfig.confirmAdd')}
+                width={700}
+                styles={{ body: { padding: '16px 0', height: 500, overflowY: 'auto' } }}
+            >
+                <div style={{ padding: '0 24px', marginBottom: 16 }}>
+                    <Input.Search
+                        placeholder={t('aiConfig.discoverySearchPlaceholder', '搜索模型 ID 或名称')}
+                        allowClear
+                        value={discoverySearchText}
+                        onChange={e => setDiscoverySearchText(e.target.value)}
+                    />
+                </div>
+                
+                <div style={{ padding: '0 24px' }}>
+                    {Object.keys(groupedDiscoveredModels).map(groupName => {
+                        const groupModels = groupedDiscoveredModels[groupName];
+                        const allSelected = groupModels.length > 0 && groupModels.every(m => discoverySelectedIds.includes(m.id));
+                        const indeterminate = groupModels.some(m => discoverySelectedIds.includes(m.id)) && !allSelected;
+                        
+                        return (
+                            <div key={groupName} style={{ marginBottom: 16, border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
+                                <div style={{ padding: '8px 12px', background: '#fafafa', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <Space>
+                                        <Checkbox
+                                            indeterminate={indeterminate}
+                                            checked={allSelected}
+                                            onChange={e => toggleDiscoveryGroupSelection(groupModels, e.target.checked)}
+                                        />
+                                        <Text strong>{groupName} <Tag color="blue" style={{ marginLeft: 8, border: 'none', background: '#e6f7ff' }}>{groupModels.length}</Tag></Text>
+                                    </Space>
+                                </div>
+                                <div style={{ padding: '0 12px' }}>
+                                    {groupModels.map(model => (
+                                        <div key={model.id} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center' }}>
+                                            <Checkbox
+                                                checked={discoverySelectedIds.includes(model.id)}
+                                                onChange={e => toggleDiscoverySelection(model.id, e.target.checked)}
+                                            />
+                                            <Space style={{ marginLeft: 12 }}>
+                                                <Text>{model.name}</Text>
+                                                <Text type="secondary" style={{ fontSize: 12 }}>({model.id})</Text>
+                                            </Space>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </Modal>
         </Modal>
     );
 };

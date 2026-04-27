@@ -34,7 +34,7 @@ import { TeamOutlined } from '@ant-design/icons';
 import { useCloudSave } from './diagrams/hooks/useCloudSave';
 const AIConfigModal = React.lazy(() => import('./ai/AIConfigModal'));
 const AIChatView = React.lazy(() => import('./ai/AIChatPanel').then(m => ({ default: m.AIChatView })));
-const ShareDialog = React.lazy(() => import('./diagrams/ShareDialog'));
+const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
 import { CloudOutlined, AppstoreOutlined, FolderOpenOutlined, LockOutlined, UnlockOutlined, HomeOutlined, CodeOutlined } from '@ant-design/icons';
 import { Dropdown, Tooltip, Switch, message, Modal, Input } from 'antd';
 const CloudStorageManagerModal = React.lazy(() => import('./storage/CloudStorageManagerModal').then(m => ({ default: m.CloudStorageManagerModal })));
@@ -149,13 +149,13 @@ const DiagramViewer: React.FC = () => {
 
     const aiNodesRef = useMemo(() => ({
         get current() {
-            return (window as any).__flowDataBridge?.[selectedDiagramId]?.getSnapshot()?.nodes || [];
+            return (window as any).__flowDataBridge?.[selectedDiagramId]?.nodes || [];
         }
     }), [selectedDiagramId]);
 
     const aiEdgesRef = useMemo(() => ({
         get current() {
-            return (window as any).__flowDataBridge?.[selectedDiagramId]?.getSnapshot()?.edges || [];
+            return (window as any).__flowDataBridge?.[selectedDiagramId]?.edges || [];
         }
     }), [selectedDiagramId]);
     // =======================================================

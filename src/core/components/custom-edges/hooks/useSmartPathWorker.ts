@@ -356,51 +356,6 @@ const useObstacles = (
             });
         }
 
-        // [FIX] Cross-group routing: Inject parent containers as Soft Zones to enforce clearance!
-        const sourceNode = simpleNodeMap.get(source);
-        const targetNode = simpleNodeMap.get(target);
-
-        let sParentId = sourceNode?.parentId || sourceNode?.parentNode;
-        let tParentId = targetNode?.parentId || targetNode?.parentNode;
-
-        // Detect parent relationships using React Flow's `data.children` array if `parentId` is missing
-        simpleNodeMap.forEach(n => {
-            if ((n.data as any)?.children?.includes(source)) sParentId = n.id;
-            if ((n.data as any)?.children?.includes(target)) tParentId = n.id;
-        });
-
-        const isCrossGroup = sParentId !== tParentId && (sParentId || tParentId);
-        
-        if (isCrossGroup) {
-            const crossGroupContainers = new Set<string>();
-            if (sParentId) crossGroupContainers.add(sParentId as string);
-            if (tParentId) crossGroupContainers.add(tParentId as string);
-
-            crossGroupContainers.forEach(containerId => {
-                const existing = obstacleRects.find(obs => obs.id === containerId);
-                if (existing) {
-                    existing.isSoftZone = true;
-                    existing.padding = 40;
-                } else {
-                    const n = simpleNodeMap.get(containerId);
-                    if (n) {
-                        const pos = getAbsolutePosition(n, simpleNodeMap);
-                        const w = n.measured?.width || n.width || 0;
-                        const h = n.measured?.height || n.height || 0;
-                        addObstacle({ 
-                            id: n.id, 
-                            x: pos.x, 
-                            y: pos.y, 
-                            width: w, 
-                            height: h, 
-                            isSoftZone: true, 
-                            padding: 40 
-                        }, false);
-                    }
-                }
-            });
-        }
-
         return { obstacleRects, containerBounds };
     }, [simpleNodeMap, obstacles, source, target, edgeConfig.obstaclePadding, isBus]);
 };

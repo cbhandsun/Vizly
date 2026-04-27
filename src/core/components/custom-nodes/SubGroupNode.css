@@ -16,7 +16,6 @@
 /* 🔑 React Flow 外层 wrapper 也需要穿透，并且强制放入底层（-1）防止背景遮挡普通节点 */
 .react-flow__node-subGroup {
     pointer-events: none !important;
-    z-index: -1 !important;
 }
 
 /* 使 subGroup 内的交互区域恢复事件 */

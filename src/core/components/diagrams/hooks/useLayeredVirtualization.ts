@@ -26,17 +26,48 @@ export function useLayeredVirtualization({
 }: UseLayeredVirtualizationProps) {
     // 图层同步 nodes
     const layerSyncedNodes = useMemo(() => {
+        // [Z-Index Fix] Pre-calculate depth to ensure children render above parents
+        const nodeMap = new Map(virtualizedNodes.map(n => [n.id, n]));
+        const getDepth = (nodeId: string, visited = new Set<string>()): number => {
+            if (visited.has(nodeId)) return 0; // Prevent circular reference
+            visited.add(nodeId);
+            const node = nodeMap.get(nodeId);
+            if (!node || !node.parentId) return 0;
+            return 1 + getDepth(node.parentId, visited);
+        };
+
+        const depthMap = new Map<string, number>();
+        virtualizedNodes.forEach(n => {
+            depthMap.set(n.id, getDepth(n.id));
+        });
+
+        // Detect if any ancestor is selected or dragging to elevate children above the selected parent (React Flow uses 1000 for selected)
+        const getSelectionElevation = (nodeId: string, visited = new Set<string>()): number => {
+            if (visited.has(nodeId)) return 0;
+            visited.add(nodeId);
+            const node = nodeMap.get(nodeId);
+            if (!node || !node.parentId) return 0;
+            const parent = nodeMap.get(node.parentId);
+            if (parent?.selected || parent?.dragging) return 2000;
+            return getSelectionElevation(node.parentId, visited);
+        };
+
         return virtualizedNodes.map(node => {
             const layerId = String(node.data?.layer || 'layer-0');
             const layer = getLayer(layerId);
             const layerVisible = layer ? layer.visible : true;
             const layerLocked = layer ? layer.locked : false;
             const zIndex = layer ? layer.zIndex : 0;
+            
+            const depth = depthMap.get(node.id) || 0;
+            const selectionElevation = getSelectionElevation(node.id);
 
             const nextHidden = !layerVisible || (node.hidden || false);
             const nextDraggable = !layerLocked && (node.draggable !== false);
             const nextSelectable = !layerLocked && (node.selectable !== false);
-            const nextZIndex = zIndex * 100 + (Number(node.style?.zIndex) || 0);
+            // Child nodes dynamically get higher zIndex (+10 per level) to prevent parent occlusion on select
+            // If parent is selected, elevate child by +2000 to defeat React Flow's internal 1000 elevation
+            const nextZIndex = zIndex * 100 + (Number(node.style?.zIndex) || 0) + depth * 10 + selectionElevation;
 
             // [PERFORMANCE] Short-circuit evaluation for pure reference stability
             // Only unpack into a new object if there is an actual data divergence.

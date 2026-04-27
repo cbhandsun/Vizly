@@ -34,6 +34,7 @@
         "login": "登录",
         "menu": {
             "myDiagrams": "我的图表",
+            "switchUser": "切换账号",
             "logout": "退出登录"
         },
         "modal": {
@@ -731,7 +732,13 @@
         "testSuccess": "连接成功！API 配置有效。",
         "testFailHtml": "连接失败: 返回了 HTML 错误页 ({{status}})。请检查 Base URL (通常应以 /v1 结尾)。",
         "testFail": "连接失败: {{status}} - {{message}}",
-        "testError": "请求异常: {{message}}"
+        "testError": "请求异常: {{message}}",
+        "fetchModels": "同步模型列表",
+        "fetchModelsSuccess": "成功获取 {{count}} 个新模型",
+        "fetchModelsNoNew": "模型已是最新",
+        "fetchModelsInvalidData": "获取模型列表失败: 返回数据格式无效",
+        "discoveryTitle": "选择要添加的模型",
+        "discoverySearchPlaceholder": "搜索模型 ID 或名称"
     },
     "aiChat": {
         "title": "AI 架构助手",
@@ -744,6 +751,8 @@
         "loggedIn": "已登录云同步: {{email}}",
         "notLoggedIn": "未登录，数据仅保存在本地",
         "previewCode": "预览代码",
+        "previewJson": "查看源代码",
+        "applyToCanvas": "应用到画布",
         "saveLocal": "保存到本地",
         "saveS3": "保存到 S3",
         "saveCloud": "保存到云端",

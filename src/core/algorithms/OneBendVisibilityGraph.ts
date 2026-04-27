@@ -79,16 +79,17 @@ export class OneBendVisibilityGraph {
     findPath(
         source: Point,
         target: Point,
-        obstacles: Rectangle[]
+        obstacles: Rectangle[],
+        lineObstacles?: any[]
     ): OneBendPathResult | null {
         // 策略1: 尝试直接路径（0-bend）
-        const directPath = this.tryDirectPath(source, target, obstacles);
+        const directPath = this.tryDirectPath(source, target, obstacles, lineObstacles);
         if (directPath) {
             return directPath;
         }
 
         // 策略2: 尝试L型路径（1-bend）
-        const oneBendPath = this.tryOneBendPath(source, target, obstacles);
+        const oneBendPath = this.tryOneBendPath(source, target, obstacles, lineObstacles);
         if (oneBendPath) {
             return oneBendPath;
         }
@@ -104,11 +105,12 @@ export class OneBendVisibilityGraph {
     private tryDirectPath(
         source: Point,
         target: Point,
-        obstacles: Rectangle[]
+        obstacles: Rectangle[],
+        lineObstacles?: any[]
     ): OneBendPathResult | null {
         const path = [source, target];
 
-        if (!isPathBlocked(path, obstacles, this.config.sourcePadding)) {
+        if (!isPathBlocked(path, obstacles, this.config.sourcePadding, lineObstacles)) {
             this.log('Direct path found (0-bend)');
             return {
                 path,
@@ -125,13 +127,14 @@ export class OneBendVisibilityGraph {
     private tryOneBendPath(
         source: Point,
         target: Point,
-        obstacles: Rectangle[]
+        obstacles: Rectangle[],
+        lineObstacles?: any[]
     ): OneBendPathResult | null {
         // 尝试两种弯折方向
-        const hFirst = this.tryHorizontalFirst(source, target, obstacles);
+        const hFirst = this.tryHorizontalFirst(source, target, obstacles, lineObstacles);
         if (hFirst) return hFirst;
 
-        const vFirst = this.tryVerticalFirst(source, target, obstacles);
+        const vFirst = this.tryVerticalFirst(source, target, obstacles, lineObstacles);
         if (vFirst) return vFirst;
 
         return null;
@@ -145,7 +148,8 @@ export class OneBendVisibilityGraph {
     private tryHorizontalFirst(
         source: Point,
         target: Point,
-        obstacles: Rectangle[]
+        obstacles: Rectangle[],
+        lineObstacles?: any[]
     ): OneBendPathResult | null {
         const bendPoint: Point = { x: target.x, y: source.y };
 
@@ -160,7 +164,7 @@ export class OneBendVisibilityGraph {
 
         // 检查路径是否无障碍
         const path = [source, bendPoint, target];
-        if (!isPathBlocked(path, obstacles, this.config.sourcePadding)) {
+        if (!isPathBlocked(path, obstacles, this.config.sourcePadding, lineObstacles)) {
             this.log('H→V path found (1-bend)');
             return {
                 path,
@@ -180,7 +184,8 @@ export class OneBendVisibilityGraph {
     private tryVerticalFirst(
         source: Point,
         target: Point,
-        obstacles: Rectangle[]
+        obstacles: Rectangle[],
+        lineObstacles?: any[]
     ): OneBendPathResult | null {
         const bendPoint: Point = { x: source.x, y: target.y };
 
@@ -195,7 +200,7 @@ export class OneBendVisibilityGraph {
 
         // 检查路径是否无障碍
         const path = [source, bendPoint, target];
-        if (!isPathBlocked(path, obstacles, this.config.sourcePadding)) {
+        if (!isPathBlocked(path, obstacles, this.config.sourcePadding, lineObstacles)) {
             this.log('V→H path found (1-bend)');
             return {
                 path,
@@ -237,9 +242,10 @@ export function tryOneBendPath(
     source: Point,
     target: Point,
     obstacles: Rectangle[],
-    config?: OneBendConfig
+    config?: OneBendConfig,
+    lineObstacles?: any[]
 ): Point[] | null {
     const optimizer = new OneBendVisibilityGraph(config);
-    const result = optimizer.findPath(source, target, obstacles);
+    const result = optimizer.findPath(source, target, obstacles, lineObstacles);
     return result ? result.path : null;
 }

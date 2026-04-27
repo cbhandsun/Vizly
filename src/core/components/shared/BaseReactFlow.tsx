@@ -897,6 +897,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           onReconnect={onReconnect}
           onReconnectStart={onReconnectStart}
           onReconnectEnd={onReconnectEnd}
+          elevateNodesOnSelect={false}
           elevateEdgesOnSelect={true}
           style={reactFlowStyle}
           className={flowClassName}

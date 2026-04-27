@@ -15,12 +15,16 @@ interface SubscriptionContextType {
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
-import { useAuth } from './AuthContext';
+import { useAuth } from '@/context/AuthContext';
+
+const FREE_FEATURES = ['ai-assistant'];
+const PRO_FEATURES = [...FREE_FEATURES, 'export-hd-svg', 'export-pdf', 'cloud-sync', 'cloud-history', 'premium-templates'];
+const ENTERPRISE_FEATURES = [...PRO_FEATURES, 'sso', 'whitelabel', 'rbac'];
 
 const TIER_FEATURES: Record<UserTier, string[]> = {
-  free: ['ai-assistant'],
-  pro: ['export-hd-svg', 'export-pdf', 'cloud-sync', 'cloud-history', 'premium-templates'],
-  enterprise: ['export-hd-svg', 'export-pdf', 'cloud-sync', 'cloud-history', 'premium-templates', 'sso', 'whitelabel', 'rbac']
+  free: FREE_FEATURES,
+  pro: PRO_FEATURES,
+  enterprise: ENTERPRISE_FEATURES
 };
 
 export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {

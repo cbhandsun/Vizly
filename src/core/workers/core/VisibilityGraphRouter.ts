@@ -54,7 +54,8 @@ export class VisibilityGraphRouter {
         start: Point,
         end: Point,
         obstacles: Rectangle[] | SpatialIndex,
-        spatialIndex?: SpatialIndex
+        spatialIndex?: SpatialIndex,
+        lineObstacles?: any[]
     ): Point[] | null {
         const isSpatialIndex = (obs: any): obs is SpatialIndex =>
             typeof (obs as SpatialIndex).query === 'function';
@@ -93,7 +94,8 @@ export class VisibilityGraphRouter {
             const quickResult = this.oneBendOptimizer.findPath(
                 start,
                 end,
-                obstacleList
+                obstacleList,
+                lineObstacles
             );
 
             if (quickResult) {
@@ -108,7 +110,7 @@ export class VisibilityGraphRouter {
 
         // Fall back to full VG
         const vg = this.vgCache.getOrBuild(obstacleList, spatialIndex);
-        const path = findPathOnVisibilityGraph(start, end, obstacles, vg);
+        const path = findPathOnVisibilityGraph(start, end, obstacles, vg, { lineObstacles });
 
         return path;
     }

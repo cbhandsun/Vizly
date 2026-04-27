@@ -7,6 +7,7 @@ import Avatar from 'antd/es/avatar';
 import Collapse from 'antd/es/collapse';
 
 import Dropdown from 'antd/es/dropdown';
+import Select from 'antd/es/select';
 import message from 'antd/es/message';
 import Space from 'antd/es/space';
 import Typography from 'antd/es/typography';
@@ -36,7 +37,7 @@ import {
 } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { getAIConfig } from './AIConfigModal';
+import { getAIConfig, AI_CONFIG_KEY } from './AIConfigModal';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { unifiedStorage } from '@/services/UnifiedStorageService';
@@ -235,6 +236,50 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Default to closed overlay
     const [filteredCommands, setFilteredCommands] = useState(SLASH_COMMANDS);
     const [isListening, setIsListening] = useState(false); // Voice UI Feedback state
+
+    const [aiConfig, setAiConfig] = useState(() => getAIConfig());
+
+    useEffect(() => {
+        const handleConfigChange = () => setAiConfig(getAIConfig());
+        window.addEventListener('storage', handleConfigChange);
+        window.addEventListener('aiConfigChanged', handleConfigChange);
+        return () => {
+            window.removeEventListener('storage', handleConfigChange);
+            window.removeEventListener('aiConfigChanged', handleConfigChange);
+        };
+    }, []);
+
+    const availableModels = useMemo(() => {
+        const models: { label: string, value: string, group: string }[] = [];
+        aiConfig.providers.filter(p => p.enabled).forEach(p => {
+            p.models.filter(m => m.enabled).forEach(m => {
+                models.push({
+                    label: m.name || m.id,
+                    value: `${p.id}:${m.id}`,
+                    group: p.name
+                });
+            });
+        });
+        return models;
+    }, [aiConfig]);
+
+    // Find the readable name for the currently active model (even if disabled)
+    const activeModelName = useMemo(() => {
+        const [pId, mId] = aiConfig.activeModelKey.split(':');
+        const p = aiConfig.providers.find(prov => prov.id === pId);
+        if (p) {
+            const m = p.models.find(mod => mod.id === mId);
+            if (m) return m.name || m.id;
+        }
+        return mId || aiConfig.activeModelKey;
+    }, [aiConfig]);
+
+    const handleModelChange = (val: string) => {
+        const newConfig = { ...aiConfig, activeModelKey: val };
+        setAiConfig(newConfig);
+        localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(newConfig));
+        message.success(t('aiChat.autoSwitched', { name: availableModels.find(m => m.value === val)?.label || val }));
+    };
 
     // UI Local state
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -1131,7 +1176,27 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
                         onClick={() => setIsSidebarOpen(true)}
                         title={t('aiChat.viewHistory')}
                     />
-                    <Typography.Text type="secondary" style={{ fontSize: 12, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', verticalAlign: 'middle' }}>
+                    <Select
+                        size="small"
+                        variant="borderless"
+                        value={aiConfig.activeModelKey}
+                        onChange={handleModelChange}
+                        dropdownMatchSelectWidth={false}
+                        options={availableModels.reduce((acc: any[], curr) => {
+                            const group = acc.find(g => g.label === curr.group);
+                            if (group) {
+                                group.options.push({ label: curr.label, value: curr.value });
+                            } else {
+                                acc.push({ label: curr.group, options: [{ label: curr.label, value: curr.value }] });
+                            }
+                            return acc;
+                        }, [])}
+                        labelRender={() => (
+                            <span style={{ color: '#1677ff' }}>{activeModelName}</span>
+                        )}
+                        style={{ maxWidth: 160, fontWeight: 500 }}
+                    />
+                    <Typography.Text type="secondary" style={{ fontSize: 12, maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', verticalAlign: 'middle', marginLeft: 4 }} title={activeConversation?.title}>
                         {activeConversation?.title || ''}
                     </Typography.Text>
                 </Space>
