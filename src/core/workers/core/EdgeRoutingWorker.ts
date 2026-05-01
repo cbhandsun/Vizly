@@ -1423,7 +1423,7 @@ export class EdgeRoutingWorker {
 
         // Fallback to standard routing if trunk routing failed or not applicable
         if (!pathPoints) {
-            let activeObstacles = routingObstacles;
+            const activeObstacles = routingObstacles;
             
             // [FIX] Extract lineObstacles early so both VG and A* can use it to avoid crossings
             const lineObstacles = (graph.pendingEdges ?? []) as import('../../algorithms/pathfinding').LineObstacle[];
@@ -1431,7 +1431,7 @@ export class EdgeRoutingWorker {
             // Try Visibility Graph first if recommended
             if (config.algorithm.useVisibilityGraph) {
                 // [FIX] Pass lineObstacles to VG so it avoids unnecessary crossings with existing edges
-                let vgPathPoints = vgRouter.findPath(startWithOffset, endWithOffset, activeObstacles, undefined, lineObstacles);
+                const vgPathPoints = vgRouter.findPath(startWithOffset, endWithOffset, activeObstacles, undefined, lineObstacles);
                 if (vgPathPoints) {
                     // [FIX] Strict Orthogonalization Pre-verification
                     // VG produces diagonal lines that geometrically graze obstacles.
@@ -1462,7 +1462,7 @@ export class EdgeRoutingWorker {
                     endX: endWithOffset.x, endY: endWithOffset.y
                 };
                 
-                let activeConfig = config;
+                const activeConfig = config;
 
                 // [FIX] Use full graph.obstacles (including source/target) for grid building
                 // so GridBuilder can rasterize them as OBSTACLE (no buffer padding via sourceId/targetId).

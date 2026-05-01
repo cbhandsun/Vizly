@@ -26,7 +26,7 @@ export function useDesignerSystemSync({
     reactFlowInstance, isDragging, pluginId, messageApi
 }: UseDesignerSystemSyncProps) {
 
-    // 用 ref 持有最新快照，避免 __flowDataBridge Effect 因 nodes/edges 变化频繁重建整个 API 对象
+    // 使用 ref 持有最新的 nodes/edges，避免 __flowDataBridge Effect 因每次编辑重建整个 API 对象
     const nodesRef = useRef(nodes);
     const edgesRef = useRef(edges);
     const reactFlowRef = useRef(reactFlowInstance);
@@ -90,7 +90,7 @@ export function useDesignerSystemSync({
             });
 
             // --- 扩展原子化操作 API (Phase 3: AI Design Pilot) ---
-            Object.defineProperty(standardData, 'addNode', {
+
                 enumerable: false,
                 value: async (args: { id?: string; label: string; type?: string; shape?: string; parentId?: string; position?: {x: number, y: number} }) => {
                     const { id: incomingId, label, type: incomingType, shape = 'rectangle', parentId, position } = args;
@@ -334,7 +334,7 @@ export function useDesignerSystemSync({
         return () => {
             delete (window as any).__flowDataBridge?.[diagramIdForExport];
         };
-    // nodes/edges 通过 ref 读取，不再作为 dep，防止每次编辑重建整个 API
+    // 仅在 diagramIdForExport/id/pluginId 变化时重建，nodes/edges 通过 ref 访问
     }, [diagramIdForExport, id, setNodes, setEdges, pluginId, messageApi]);
 
     useEffect(() => {
@@ -363,7 +363,7 @@ export function useDesignerSystemSync({
     }, [performanceMode]);
 
     // performanceMode = nodes.length > 300 || isDragging
-    // 所以 nodes.length > 300 && !performanceMode 永远为 false（条件互斥），移除该死代码 Effect
+    // nodes.length > 300 && !performanceMode 永远为 false，无需 Effect
 
     const { saveState, loadSaved, clearSaved, saveNow } = useAutoSave(nodes, edges, {
         interval: 60000,
