@@ -185,6 +185,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
             open={visible}
             title={t('designer.jsonEditor.title') || 'Diagram Data Viewer'}
             onCancel={onClose}
+            getContainer={() => document.getElementById('app-root-layout') || document.body}
             width={850}
             footer={
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

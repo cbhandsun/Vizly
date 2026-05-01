@@ -48,7 +48,7 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
                 <button
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); onClose(); }}
-                    className="flex items-center justify-center w-7 h-7 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border-none outline-none cursor-pointer"
+                    className="flex items-center justify-center w-7 h-7 rounded-full bg-transparent hover:bg-black/5 dark:bg-transparent dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border-none outline-none cursor-pointer"
                 >
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />

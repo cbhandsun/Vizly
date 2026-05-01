@@ -250,6 +250,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
             title={null}
             open={open}
             onCancel={handleClose}
+            getContainer={() => document.getElementById('app-root-layout') || document.body}
             footer={null}
             destroyOnHidden
             width={420}

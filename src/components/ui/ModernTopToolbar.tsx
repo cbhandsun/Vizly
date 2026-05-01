@@ -78,7 +78,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   return (
     <div className="flex items-start justify-between w-full px-4 mt-4 z-[100] relative box-border transition-all pointer-events-none">
       {/* ── Left Island: Brand + Breadcrumb + Title + Save Status + Search ── */}
-      <div className="flex items-center gap-2 flex-shrink-0 h-[48px] px-3 bg-white/90 dark:bg-[#0f172a]/95 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/80 rounded-[14px] shadow-[0_4px_24px_rgba(0,0,0,0.06)] pointer-events-auto">
+      <div className="flex items-center gap-2 flex-shrink-0 h-[48px] px-3 bg-white/90 dark:bg-[#0f172a]/95 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/80 rounded-[10px] shadow-[0_4px_24px_rgba(0,0,0,0.06)] pointer-events-auto">
         {/* Vizly Brand → Home */}
         <a
           className="flex items-center justify-center px-2 py-1 rounded-md no-underline cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5"
@@ -110,7 +110,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
 
       {/* ── Right Island: Styling + Controls + Actions ── */}
       <div className="flex flex-col items-end gap-2 flex-shrink-0">
-        <div className="flex items-center gap-1.5 h-[48px] px-2 bg-white/90 dark:bg-[#0f172a]/95 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/80 rounded-[14px] shadow-[0_4px_24px_rgba(0,0,0,0.06)] pointer-events-auto">
+        <div className="flex items-center gap-1.5 h-[48px] px-2 bg-white/90 dark:bg-[#0f172a]/95 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/80 rounded-[10px] shadow-[0_4px_24px_rgba(0,0,0,0.06)] pointer-events-auto">
           {/* Styling Group */}
           {showStyleSwitcher && (
             <EnhancedStyleSwitcher

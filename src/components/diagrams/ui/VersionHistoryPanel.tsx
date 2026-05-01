@@ -54,6 +54,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                 onClose();
             }}
             open={isOpen}
+            getContainer={() => document.getElementById('app-root-layout') || document.body}
             size="default"
             styles={{
                 header: { padding: '16px 20px', borderBottom: '1px solid #f0f0f0' },

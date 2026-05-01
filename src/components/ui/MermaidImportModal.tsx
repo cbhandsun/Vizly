@@ -49,6 +49,7 @@ export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible,
       title="从 Mermaid 导入"
       open={visible}
       onCancel={onClose}
+      getContainer={() => document.getElementById('app-root-layout') || document.body}
       width={800}
       footer={[
         <Button key="back" onClick={onClose}>

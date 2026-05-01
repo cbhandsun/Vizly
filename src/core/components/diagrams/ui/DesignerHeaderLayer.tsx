@@ -166,14 +166,14 @@ export const DesignerHeaderLayer = React.memo(
                 </TopActionButtons>
 
                 {topActions.topActionArea && (
-                    <div style={{ position: 'absolute', top: 16, left: 24, zIndex: 1020 }} className="designer-top-left-actions">
+                    <div style={{ position: 'absolute', top: 16, left: 24, zIndex: 110 }} className="designer-top-left-actions">
                         {topActions.topActionArea}
                     </div>
                 )}
 
                 {/* GAP-02: Premium Collaboration Presence */}
                 {topActions.activeUsers && topActions.activeUsers.length > 0 && (
-                    <div style={{ position: 'absolute', top: 16, right: topActions.rightOffset + 280, zIndex: 1020 }} className="designer-top-presence">
+                    <div style={{ position: 'absolute', top: 16, right: topActions.rightOffset + 280, zIndex: 110 }} className="designer-top-presence">
                         <PresenceHeader activeUsers={topActions.activeUsers} />
                     </div>
                 )}

@@ -151,6 +151,13 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
 
   return (
     <ConfigProvider
+      getPopupContainer={(node) => {
+        if (node) {
+          const layoutRoot = node.closest('#app-root-layout') as HTMLElement;
+          if (layoutRoot) return layoutRoot;
+        }
+        return document.getElementById('app-root-layout') || document.body;
+      }}
       theme={{
         token: {
           fontSize: Math.max(12, Math.floor(14 * uiScale)),

@@ -317,7 +317,12 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                                         size="small"
                                         onClick={batchMode && isOwner ? () => toggleSelect(item.id) : undefined}
                                         style={{
-                                            ...(batchMode && selectedIds.has(item.id) ? { borderColor: '#1677ff', boxShadow: '0 0 0 2px rgba(22,119,255,0.15)' } : {}),
+                                            borderRadius: 12,
+                                            overflow: 'hidden',
+                                            backgroundColor: 'rgba(255, 255, 255, 0.45)',
+                                            border: '1px solid rgba(0, 0, 0, 0.06)',
+                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                            ...(batchMode && selectedIds.has(item.id) ? { borderColor: 'var(--color-primary-500, #6366f1)', boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.15)' } : {}),
                                             ...(batchMode && !isOwner ? { opacity: 0.5 } : {})
                                         }}
                                         cover={<RemoteDiagramCover storageId={item.id} alt={item.title} height={110} cacheBuster={item.updatedAt?.getTime?.() ?? ''} />}
@@ -456,9 +461,10 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
             title={modalTitle}
             open={open}
             onCancel={onCancel}
+            getContainer={() => document.getElementById('app-root-layout') || document.body}
             footer={null}
-            width={700}
-            styles={{ body: { padding: '0 24px 24px' } }}
+            width={800}
+            styles={{ body: { padding: '0 var(--glass-padding-lg, 32px) var(--glass-padding-lg, 32px)' } }}
         >
             <div style={{ marginBottom: 12, marginTop: 16 }}>
                 <Search

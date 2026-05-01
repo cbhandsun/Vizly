@@ -41,6 +41,7 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({
             }
             open={open}
             onCancel={onClose}
+            getContainer={() => document.getElementById('app-root-layout') || document.body}
             footer={null}
             destroyOnHidden
             width={480}

@@ -42,6 +42,7 @@ export const SetPasswordModal: React.FC<SetPasswordModalProps> = ({ open, onCanc
             title={t('auth.menu.setPassword')}
             open={open}
             onCancel={handleClose}
+            getContainer={() => document.getElementById('app-root-layout') || document.body}
             footer={null}
             destroyOnHidden
             width={400}

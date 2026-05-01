@@ -78,7 +78,7 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
       ]}
       width={480}
     >
-      <div style={{ padding: '8px 0' }}>
+      <div style={{ padding: 'var(--glass-padding-md, 24px) 0' }}>
         <p style={{ fontWeight: 500, marginBottom: 8 }}>{t('advancedExport.formatLabel')}</p>
         <Radio.Group 
           value={format} 
@@ -126,7 +126,7 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
           </Checkbox>
         </div>
 
-        <div style={{ marginTop: 20, padding: '12px', background: '#f5f5f5', borderRadius: 8, fontSize: '12px', color: '#666' }}>
+        <div style={{ marginTop: 20, padding: '12px', background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: 8, fontSize: '12px', color: '#666' }}>
           <Space>
             <CameraOutlined /> 
             <span>{t('advancedExport.svgHint')}</span>

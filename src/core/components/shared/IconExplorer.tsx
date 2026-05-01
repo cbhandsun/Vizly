@@ -78,6 +78,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({
       title={t('iconExplorer.title', '图标浏览器')}
       open={visible}
       onCancel={onClose}
+      getContainer={() => document.getElementById('app-root-layout') || document.body}
       footer={null}
       width={800}
       styles={{ body: { height: '600px', display: 'flex', flexDirection: 'column', gap: '16px' } }}

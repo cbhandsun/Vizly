@@ -540,59 +540,69 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             open={open}
             onOk={handleSave}
             onCancel={onCancel}
+            getContainer={() => document.getElementById('app-root-layout') || document.body}
             okText={t('aiConfig.saveAll')}
             cancelText={t('aiConfig.cancel')}
-            width={900}
-            styles={{ body: { padding: 0, height: 550 } }}
+            width={760}
+            zIndex={1050}
+            className="ai-hyper-glass-modal"
+            styles={{ body: { padding: 0, height: 480 } }}
         >
             <div style={{ display: 'flex', height: '100%' }}>
                 {/* --- Left Sidebar: Providers --- */}
-                <div style={{ width: 280, borderRight: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column', backgroundColor: '#fafafa' }}>
-                    <div style={{ padding: 12 }}>
+                <div style={{ width: 240, borderRight: '1px solid var(--designer-border, rgba(0,0,0,0.06))', display: 'flex', flexDirection: 'column', backgroundColor: 'transparent' }}>
+                    <div style={{ padding: 'var(--glass-padding-sm, 16px)' }}>
                         <Input.Search
                             placeholder={t('aiConfig.searchPlaceholder')}
                             allowClear
                             value={searchText}
                             onChange={e => setSearchText(e.target.value)}
-                            style={{ marginBottom: 8 }}
+                            style={{ marginBottom: 12 }}
                         />
                         <div
                             onClick={() => setSelectedProviderId('global_settings')}
+                            className={`glass-pulse-glow-container ${selectedProviderId === 'global_settings' ? 'glass-pulse-glow' : ''}`}
                             style={{
-                                padding: '10px 12px',
+                                padding: '12px 16px',
                                 cursor: 'pointer',
-                                borderRadius: 6,
-                                backgroundColor: selectedProviderId === 'global_settings' ? '#e6f7ff' : (selectedProviderId === 'global' ? '#fff' : 'transparent'),
-                                color: selectedProviderId === 'global_settings' ? '#1890ff' : '#333',
-                                fontWeight: 500,
-                                display: 'flex', alignItems: 'center', gap: 10,
-                                border: selectedProviderId === 'global_settings' ? '1px solid #91caff' : '1px solid transparent'
+                                borderRadius: 10,
+                                backgroundColor: selectedProviderId === 'global_settings' ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                                color: selectedProviderId === 'global_settings' ? 'var(--color-primary-500, #6366f1)' : 'inherit',
+                                fontWeight: 600,
+                                display: 'flex', alignItems: 'center', gap: 12,
+                                transition: 'all 0.3s',
+                                border: selectedProviderId === 'global_settings' ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent',
+                                zIndex: 1
                             }}
                         >
-                            <SettingOutlined /> {t('aiConfig.globalSettings')}
+                            <SettingOutlined style={{ position: 'relative', zIndex: 2, fontSize: 16 }} /> 
+                            <span style={{ position: 'relative', zIndex: 2 }}>{t('aiConfig.globalSettings')}</span>
                         </div>
                     </div>
 
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px' }}>
-                        <Text type="secondary" style={{ fontSize: 12, marginBottom: 4, display: 'block' }}>{t('aiConfig.providerList')}</Text>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '0 var(--glass-padding-sm, 16px)' }}>
+                        <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block', paddingLeft: 4 }}>{t('aiConfig.providerList')}</Text>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                             {filteredProviders.map(item => (
                                 <div
                                     key={item.id}
                                     onClick={() => setSelectedProviderId(item.id)}
+                                    className={selectedProviderId === item.id ? 'glass-pulse-glow' : ''}
                                     style={{
-                                        padding: '10px 12px',
+                                        padding: '12px 16px',
                                         cursor: 'pointer',
-                                        borderRadius: 6,
-                                        backgroundColor: selectedProviderId === item.id ? '#fff' : 'transparent',
-                                        border: selectedProviderId === item.id ? '1px solid #d9d9d9' : '1px solid transparent',
-                                        boxShadow: selectedProviderId === item.id ? '0 2px 4px rgba(0,0,0,0.02)' : 'none',
-                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                                        borderRadius: 10,
+                                        backgroundColor: selectedProviderId === item.id ? 'rgba(255,255,255,0.45)' : 'transparent',
+                                        border: selectedProviderId === item.id ? '1px solid rgba(255,255,255,0.6)' : '1px solid transparent',
+                                        boxShadow: selectedProviderId === item.id ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                        transition: 'all 0.2s',
+                                        zIndex: 1
                                     }}
                                 >
-                                    <Space>
-                                        <AppstoreOutlined style={{ color: item.enabled ? '#1890ff' : '#ccc' }} />
-                                        <Text strong={selectedProviderId === item.id} style={{ color: item.enabled ? 'inherit' : '#999' }}>
+                                    <Space style={{ position: 'relative', zIndex: 2 }} size={12}>
+                                        <AppstoreOutlined style={{ color: item.enabled ? 'var(--color-primary-500, #6366f1)' : '#ccc', fontSize: 16 }} />
+                                        <Text strong={selectedProviderId === item.id} style={{ color: item.enabled ? 'inherit' : 'rgba(0,0,0,0.45)' }}>
                                             {item.name}
                                         </Text>
                                     </Space>
@@ -605,19 +615,19 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                             ))}
                         </div>
                     </div>
-                    <div style={{ padding: 12, borderTop: '1px solid #f0f0f0' }}>
-                        <Button type="dashed" block icon={<PlusOutlined />} onClick={addCustomProvider}>
+                    <div style={{ padding: 'var(--glass-padding-sm, 16px)', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                        <Button type="dashed" block icon={<PlusOutlined />} onClick={addCustomProvider} style={{ height: 40, borderRadius: 10 }}>
                             {t('aiConfig.addCustomProvider')}
                         </Button>
                     </div>
                 </div>
 
                 {/* --- Right Content: Settings --- */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: '#fff', overflow: 'hidden' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'transparent', overflow: 'hidden' }}>
 
                     {/* Header */}
-                    <div style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Title level={4} style={{ margin: 0 }}>
+                    <div style={{ padding: '24px var(--glass-padding-md, 24px)', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Title level={4} style={{ margin: 0, fontWeight: 700, letterSpacing: '-0.02em' }}>
                             {selectedProviderId === 'global_settings' ? 'Global Settings' : selectedProvider?.name}
                         </Title>
                         {selectedProvider && selectedProvider.id.startsWith('custom_') && (
@@ -625,23 +635,23 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                         )}
                     </div>
 
-                    <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+                    <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--glass-padding-md, 24px) var(--glass-padding-lg, 32px)' }}>
                         {selectedProviderId === 'global_settings' ? (
                             <Form layout="vertical">
                                 <Form.Item label={t('aiConfig.systemPromptLabel')}>
                                     <Paragraph type="secondary">{t('aiConfig.systemPromptDesc')}</Paragraph>
-                                    <Input.TextArea
+                                        <Input.TextArea
                                         rows={12}
                                         value={config.systemPrompt}
                                         onChange={e => setConfig({ ...config, systemPrompt: e.target.value })}
-                                        style={{ fontFamily: 'monospace', fontSize: 13, backgroundColor: '#f9f9f9' }}
+                                        style={{ fontFamily: 'monospace', fontSize: 13, backgroundColor: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.08)' }}
                                     />
                                 </Form.Item>
                             </Form>
                         ) : selectedProvider ? (
                             <Form layout="vertical">
                                 {/* Platform Config */}
-                                <div style={{ marginBottom: 24, padding: 16, border: '1px solid #f0f0f0', borderRadius: 8, background: '#fafafa' }}>
+                                <div style={{ marginBottom: 24, padding: 16, border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, background: 'rgba(255,255,255,0.3)' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <Text strong>{t('aiConfig.apiConfig')}</Text>
                                         <Button
@@ -779,6 +789,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 open={discoveryModalVisible}
                 onOk={handleAddDiscoveredModels}
                 onCancel={() => setDiscoveryModalVisible(false)}
+                getContainer={() => document.getElementById('app-root-layout') || document.body}
                 okText={t('aiConfig.confirmAdd')}
                 width={700}
                 styles={{ body: { padding: '16px 0', height: 500, overflowY: 'auto' } }}

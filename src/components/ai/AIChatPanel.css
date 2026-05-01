@@ -179,6 +179,7 @@
     display: flex;
     flex-direction: column;
     max-width: 92%;
+    min-width: 0;
     word-break: break-word;
     overflow-wrap: break-word;
 }
@@ -733,4 +734,27 @@
 
 [data-theme="dark"] .voice-btn.listening {
     background: rgba(239, 68, 68, 0.2) !important;
-}
+}
+
+/* AIConfigModal Hyper-Glass Style */
+.ai-hyper-glass-modal .ant-modal-content {
+    background-color: var(--designer-panel-bg, rgba(255, 255, 255, 0.72)) !important;
+    backdrop-filter: var(--designer-blur, blur(24px) saturate(180%)) !important;
+    -webkit-backdrop-filter: var(--designer-blur, blur(24px) saturate(180%)) !important;
+    box-shadow: var(--designer-shadow, 0 20px 40px -10px rgba(0, 0, 0, 0.1)) !important;
+    border: 1px solid rgba(255, 255, 255, 0.45) !important;
+    border-radius: 16px !important;
+}
+
+[data-theme='dark'] .ai-hyper-glass-modal .ant-modal-content {
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+.ai-hyper-glass-modal .ant-modal-header {
+    background: transparent !important;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+[data-theme='dark'] .ai-hyper-glass-modal .ant-modal-header {
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}

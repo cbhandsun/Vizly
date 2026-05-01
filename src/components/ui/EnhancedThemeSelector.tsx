@@ -25,6 +25,7 @@ export interface EnhancedThemeSelectorProps {
   showCustomThemes?: boolean;
   showPerformanceMetrics?: boolean;
   showImportExport?: boolean;
+  borderless?: boolean;
   onThemeChange?: (theme: Theme) => void;
 }
 
@@ -46,6 +47,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
   showCustomThemes = true,
   showPerformanceMetrics = false,
   showImportExport = true,
+  borderless = false,
   onThemeChange,
 }) => {
   const { t } = useTranslation();
@@ -550,7 +552,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
   return (
     <>
       <button
-        className={`flex items-center justify-between gap-1.5 h-8 px-2.5 text-[13px] transition-colors rounded-[6px] bg-white dark:bg-[#1C1C1E] border border-[#d9d9d9] dark:border-white/15 hover:border-blue-400 dark:hover:border-blue-500 text-gray-700 dark:text-gray-200 shadow-none pointer-events-auto overflow-hidden w-full ${className}`}
+        className={`flex items-center justify-between gap-1.5 h-8 px-2.5 text-[13px] transition-colors rounded-[6px] ${borderless ? 'bg-transparent border-none' : 'bg-white dark:bg-[#1C1C1E] border border-[#d9d9d9] dark:border-white/15 hover:border-blue-400 dark:hover:border-blue-500 shadow-sm'} text-gray-700 dark:text-gray-200 pointer-events-auto overflow-hidden w-full ${className}`}
         onClick={() => setIsOpen(!isOpen)}
         style={style}
       >
@@ -559,13 +561,13 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
             className="flex-shrink-0 w-2.5 h-2.5 rounded-full border border-black/10 dark:border-white/20"
             style={{ background: currentTheme?.palette?.primary?.main || token.colorPrimary }}
           />
-          <span className="truncate text-gray-700 dark:text-gray-200">
+          <span className="truncate text-gray-700 dark:text-gray-400 font-medium">
             {currentTheme
               ? t(`theme.selector.${currentTheme.id}`, { defaultValue: currentTheme.name })
               : t('theme.selector.choose')}
           </span>
         </span>
-        <svg className="flex-shrink-0 text-gray-400 w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        <svg className="flex-shrink-0 text-gray-400 w-3 h-3 ml-1" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
       </button>
 
       {isOpen && createPortal(

@@ -265,6 +265,26 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         return models;
     }, [aiConfig]);
 
+    // Ensure active model is valid and enabled
+    useEffect(() => {
+        const parts = (aiConfig.activeModelKey || '').split(':');
+        const pId = parts[0];
+        const mId = parts.slice(1).join(':');
+        const provider = aiConfig.providers.find(p => p.id === pId);
+        const model = provider?.models.find(m => m.id === mId);
+
+        if (!provider?.enabled || !model?.enabled) {
+            if (availableModels.length > 0) {
+                const fallback = availableModels[0];
+                if (aiConfig.activeModelKey !== fallback.value) {
+                    const newConfig = { ...aiConfig, activeModelKey: fallback.value };
+                    setAiConfig(newConfig);
+                    localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(newConfig));
+                }
+            }
+        }
+    }, [aiConfig, availableModels]);
+
     // Find the readable name for the currently active model (even if disabled)
     const activeModelName = useMemo(() => {
         const parts = (aiConfig.activeModelKey || '').split(':');

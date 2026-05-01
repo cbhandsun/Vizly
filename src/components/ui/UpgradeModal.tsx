@@ -73,6 +73,7 @@ export const UpgradeModal: React.FC = () => {
       <Modal
         open={isUpgradeModalVisible}
         onCancel={hideUpgradeModal}
+        getContainer={() => document.getElementById('app-root-layout') || document.body}
         footer={null}
         centered
         width={480}

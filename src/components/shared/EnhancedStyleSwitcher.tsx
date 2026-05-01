@@ -21,139 +21,123 @@ export interface EnhancedStyleSwitcherProps {
     size?: 'sm' | 'md';
     className?: string;
     style?: React.CSSProperties;
+    borderless?: boolean;
 }
 
 /**
  * 迷你预览渲染器
- * 渲染边线 + 节点示意图
  */
 const StylePreviewMini: React.FC<{ preset: FlowStylePreset; size?: 'sm' | 'md' }> = ({
     preset,
     size = 'sm',
 }) => {
-    const width = size === 'sm' ? 32 : 80;
-    const height = size === 'sm' ? 18 : 52;
-    const nodeWidth = size === 'sm' ? 10 : 24;
-    const nodeHeight = size === 'sm' ? 7 : 16;
-
+    const width = size === 'sm' ? 42 : 100;
+    const height = size === 'sm' ? 22 : 60;
+    
+    const nodeStyle = preset.node;
     const mainEdge = preset.edges.main;
     const statusEdge = preset.edges.status;
-    const nodeStyle = preset.node;
 
-    // 计算节点位置
-    const node1 = { x: size === 'sm' ? 4 : 8, y: height / 2 - nodeHeight / 2 };
-    const node2 = { x: width - nodeWidth - (size === 'sm' ? 4 : 8), y: height / 2 - nodeHeight / 2 };
-
-    // 获取阴影样式
-    const getShadow = (shadow: string) => {
-        switch (shadow) {
-            case 'soft':
-                return '0 1px 2px rgba(0,0,0,0.1)';
-            case 'medium':
-                return '0 2px 4px rgba(0,0,0,0.15)';
-            case 'strong':
-                return '0 3px 6px rgba(0,0,0,0.2)';
-            default:
-                return 'none';
-        }
-    };
+    const nodeWidth = size === 'sm' ? 10 : 28;
+    const nodeHeight = size === 'sm' ? 8 : 20;
+    const nodeRadius = Math.min(nodeStyle.radius / (size === 'sm' ? 4 : 2), nodeHeight / 2);
+    const strokeWidth = Math.max(nodeStyle.borderWidth / (size === 'sm' ? 2.5 : 1.5), 0.5);
 
     return (
         <svg
             width={width}
             height={height}
             viewBox={`0 0 ${width} ${height}`}
-            style={{ borderRadius: 4, background: '#f8f9fa' }}
+            className="overflow-visible"
         >
-            {/* 主连线 */}
-            <line
-                x1={node1.x + nodeWidth}
-                y1={height / 2}
-                x2={node2.x}
-                y2={height / 2}
-                stroke={mainEdge.color}
-                strokeWidth={Math.min(mainEdge.width, 2.5)}
-                markerEnd="url(#arrow-main)"
-            />
-            {/* 状态连线（虚线，偏移） */}
-            <line
-                x1={node1.x + nodeWidth}
-                y1={height / 2 - (size === 'sm' ? 3 : 6)}
-                x2={node2.x}
-                y2={height / 2 - (size === 'sm' ? 3 : 6)}
-                stroke={statusEdge.color}
-                strokeWidth={Math.min(statusEdge.width, size === 'sm' ? 1 : 1.5)}
-                strokeDasharray={statusEdge.dash || (size === 'sm' ? '2 1' : '4 2')}
-                opacity={0.7}
-            />
-            {/* 节点1 */}
-            <rect
-                x={node1.x}
-                y={node1.y}
-                width={nodeWidth}
-                height={nodeHeight}
-                rx={Math.min(nodeStyle.radius, 4)}
-                fill="#fff"
-                stroke={mainEdge.color}
-                strokeWidth={Math.min(nodeStyle.borderWidth, 2)}
-                style={{ filter: getShadow(nodeStyle.shadow) !== 'none' ? `drop-shadow(${getShadow(nodeStyle.shadow)})` : undefined }}
-            />
-            {/* 节点2 */}
-            <rect
-                x={node2.x}
-                y={node2.y}
-                width={nodeWidth}
-                height={nodeHeight}
-                rx={Math.min(nodeStyle.radius, 4)}
-                fill="#fff"
-                stroke={statusEdge.color}
-                strokeWidth={Math.min(nodeStyle.borderWidth, 2)}
-            />
-            {/* 箭头定义 */}
             <defs>
-                <marker
-                    id="arrow-main"
-                    markerWidth="6"
-                    markerHeight="6"
-                    refX="5"
-                    refY="3"
-                    orient="auto"
-                >
-                    <polygon points="0 0, 6 3, 0 6" fill={mainEdge.color} />
-                </marker>
+                <filter id={`shadow-${preset.name}`} x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation={nodeStyle.shadow === 'strong' ? 2 : 1} result="blur" />
+                    <feOffset dx="0" dy="1" result="offsetBlur" />
+                    <feComponentTransfer><feFuncA type="linear" slope={nodeStyle.shadow === 'none' ? 0 : 0.15} /></feComponentTransfer>
+                    <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+                </filter>
             </defs>
+            
+            <path
+                d={`M ${width * 0.2} ${height * 0.5} L ${width * 0.8} ${height * 0.5}`}
+                stroke={mainEdge.color}
+                strokeWidth={mainEdge.width / (size === 'sm' ? 2 : 1.5)}
+                strokeLinecap="round"
+            />
+            
+            <path
+                d={`M ${width * 0.2} ${height * 0.5 - (size === 'sm' ? 4 : 10)} L ${width * 0.8} ${height * 0.5 - (size === 'sm' ? 4 : 10)}`}
+                stroke={statusEdge.color}
+                strokeWidth={statusEdge.width / (size === 'sm' ? 2.5 : 2)}
+                strokeDasharray={statusEdge.dash ? (size === 'sm' ? "2 2" : "3 2") : "none"}
+                opacity="0.5"
+            />
+
+            {[0.2, 0.8].map((pos, idx) => {
+                const x = width * pos - nodeWidth / 2;
+                const y = height * 0.5 - nodeHeight / 2;
+                const color = idx === 0 ? mainEdge.color : statusEdge.color;
+                
+                return (
+                    <g key={idx} filter={`url(#shadow-${preset.name})`}>
+                        <rect
+                            x={x} y={y} width={nodeWidth} height={nodeHeight} rx={nodeRadius}
+                            fill="white" stroke={color} strokeWidth={strokeWidth}
+                        />
+                        {nodeStyle.accentBar && size === 'md' && (
+                            <rect
+                                x={x} y={y} 
+                                width={nodeStyle.accentBar.position === 'left' ? 3 : nodeWidth}
+                                height={nodeStyle.accentBar.position === 'left' ? nodeHeight : 3}
+                                rx={1} fill={color} opacity={nodeStyle.accentBar.alpha}
+                            />
+                        )}
+                    </g>
+                );
+            })}
         </svg>
     );
 };
 
 /**
- * 预设卡片组件
+ * 预设卡片组件 - 采用横向布局，解决视觉重心不稳问题
  */
 const PresetCard: React.FC<{
     preset: FlowStylePreset;
     isActive: boolean;
     onClick: () => void;
-    onHover?: () => void;
-    onLeave?: () => void;
-}> = ({ preset, isActive, onClick, onHover, onLeave }) => {
+}> = ({ preset, isActive, onClick }) => {
     const { t } = useTranslation();
     return (
         <div
-            className={`group relative flex flex-col gap-3 p-4 transition-all duration-300 rounded-2xl cursor-pointer hover:-translate-y-1 ${isActive ? 'bg-white/90 dark:bg-black/60 border border-blue-500/50 shadow-[0_8px_24px_-8px_rgba(59,130,246,0.4)] ring-1 ring-blue-500/20' : 'bg-white/40 dark:bg-black/20 border border-black/[0.03] dark:border-white/[0.03] hover:border-black/[0.08] dark:hover:border-white/[0.1] hover:shadow-[0_8px_20px_-8px_rgba(0,0,0,0.1)] hover:bg-white/80 dark:hover:bg-black/40'}`}
+            className={`group relative flex flex-row items-center gap-6 p-5 transition-all duration-400 rounded-2xl cursor-pointer border ${
+                isActive 
+                ? 'glass-pulse-glow bg-white/80 dark:bg-black/60 border-blue-500/50 shadow-lg' 
+                : 'bg-white/30 dark:bg-white/5 border-white/20 dark:border-white/10 hover:bg-white/50 dark:hover:bg-white/10 hover:border-blue-400/30 hover:translate-x-1 hover:shadow-xl'
+            }`}
             onClick={onClick}
-            onMouseEnter={onHover}
-            onMouseLeave={onLeave}
-            title={preset.description}
         >
-            <div className="flex items-center justify-center p-3 rounded-xl bg-gray-50/50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700/50 overflow-hidden relative shadow-[inset_0_2px_4px_rgba(255,255,255,0.3)] dark:shadow-[inset_0_1px_2px_rgba(255,255,255,0.05)] transform transition-transform group-hover:scale-[1.02]">
+            {/* 左侧图例区 */}
+            <div className="flex-none flex items-center justify-center w-24 h-20 rounded-xl bg-gray-50/80 dark:bg-black/30 border border-black/[0.03] dark:border-white/[0.05] overflow-hidden transition-all group-hover:scale-105">
                 <StylePreviewMini preset={preset} size="md" />
-                <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/30 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 transform -translate-x-[150%] group-hover:translate-x-[150%]" style={{ transitionProperty: 'opacity, transform' }} />
             </div>
-            <div className="flex flex-col pt-1">
-                <div className="text-[15px] font-semibold text-gray-800 dark:text-gray-100 tracking-tight">{t(`style.preset.${preset.name}`)}</div>
-                <div className="text-[13px] text-gray-500/80 dark:text-gray-400 truncate mt-1 font-medium">{preset.description}</div>
+            
+            {/* 右侧信息区 */}
+            <div className="flex-1 min-w-0 flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                    <span className="text-[16px] font-bold text-gray-900 dark:text-gray-100 tracking-tight truncate">
+                        {t(`style.preset.${preset.name}`)}
+                    </span>
+                    {isActive && <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center"><FaCheck className="text-white w-2 h-2" /></div>}
+                </div>
+                <div className="text-[13px] leading-snug text-gray-500 dark:text-gray-400 font-medium line-clamp-2 opacity-80">
+                    {preset.description}
+                </div>
             </div>
-            {isActive && <FaCheck className="absolute top-2 right-2 text-blue-500 p-1.5 w-6 h-6 bg-white/90 dark:bg-black/70 rounded-full shadow-sm backdrop-blur-md" />}
+            
+            {/* 激活时的背景微光 */}
+            {isActive && <div className="absolute inset-0 bg-blue-500/[0.03] rounded-2xl pointer-events-none" />}
         </div>
     );
 };
@@ -165,15 +149,13 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
     size = 'md',
     className = '',
     style,
+    borderless = false,
 }) => {
     const { t } = useTranslation();
-    const { token } = theme.useToken();
     const currentPreset = useDiagramStylePreset_v2();
     const [isOpen, setIsOpen] = useState(false);
-    const [hoveredPreset, setHoveredPreset] = useState<FlowStylePreset | null>(null);
     const panelRef = useRef<HTMLDivElement>(null);
 
-    // 获取所有分类及其预设
     const categories = useMemo(() => {
         return diagramStyleManager.getCategories().map((cat) => ({
             id: cat,
@@ -187,99 +169,92 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
         setIsOpen(false);
     }, []);
 
-    // 悬停预览时临时应用样式（可选，暂不实现，仅高亮）
-    const handlePresetHover = useCallback((preset: FlowStylePreset) => {
-        setHoveredPreset(preset);
-    }, []);
-
-    const handlePresetLeave = useCallback(() => {
-        setHoveredPreset(null);
-    }, []);
-
-    // 点击外部关闭面板
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
                 setIsOpen(false);
             }
         };
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
+        if (isOpen) document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isOpen]);
-
-    const fontSize = size === 'sm' ? 13 : 14;
-    const padding = size === 'sm' ? '6px 10px' : '8px 12px';
 
     return (
         <>
             {/* 触发按钮 */}
             <button
-                className={`flex items-center justify-between gap-1.5 h-8 px-2.5 text-[13px] transition-colors rounded-[6px] bg-white dark:bg-[#1C1C1E] border border-[#d9d9d9] dark:border-white/15 hover:border-blue-400 dark:hover:border-blue-500 text-gray-700 dark:text-gray-200 pointer-events-auto overflow-hidden w-full ${className}`}
+                className={`flex items-center justify-between gap-2.5 h-10 px-3.5 text-[13px] font-semibold transition-all rounded-xl ${
+                    borderless 
+                    ? 'bg-transparent border-none' 
+                    : 'bg-white/60 dark:bg-white/5 border border-white/40 dark:border-white/10 hover:border-blue-400/50 hover:bg-white/80 shadow-sm backdrop-blur-md'
+                } text-gray-700 dark:text-gray-200 pointer-events-auto w-full ${className}`}
                 onClick={() => setIsOpen(!isOpen)}
                 style={style}
             >
-                <span className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
-                    <StylePreviewMini preset={currentPreset} size="sm" />
+                <span className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className="flex-shrink-0 bg-gray-100/50 dark:bg-white/5 rounded-md p-0.5">
+                        <StylePreviewMini preset={currentPreset} size="sm" />
+                    </div>
                     <span className="truncate">{t(`style.preset.${currentPreset.name}`)}</span>
                 </span>
-                <svg className="flex-shrink-0 text-gray-400 w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <svg className="flex-shrink-0 text-gray-400 w-3.5 h-3.5 transition-transform duration-300" style={{ transform: isOpen ? 'rotate(180deg)' : 'none' }} viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </button>
 
-            {/* 弹出面板 */}
+            {/* 弹出面板 - Hyper-Glass V3 */}
             {isOpen &&
                 createPortal(
-                    <div className={`fixed inset-0 z-[3000] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsOpen(false)}>
+                    <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 sm:p-8 bg-black/40 backdrop-blur-md animate-in fade-in duration-500" onClick={() => setIsOpen(false)}>
                         <div
-                            className="relative flex flex-col w-full max-w-2xl max-h-[85vh] rounded-2xl bg-white/70 dark:bg-[#1C1C1E]/80 backdrop-blur-3xl backdrop-saturate-200 border border-white/40 dark:border-white/10 shadow-[0_16px_40px_0_rgba(0,0,0,0.16),inset_0_1px_1px_rgba(255,255,255,0.4)] overflow-hidden transition-all duration-300 pointer-events-auto"
+                            className="relative flex flex-col w-full max-w-6xl max-h-[85vh] rounded-[24px] bg-white/75 dark:bg-[#1C1C29]/70 backdrop-blur-3xl backdrop-saturate-150 border border-white/60 dark:border-white/10 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.35)] overflow-hidden animate-in zoom-in-98 duration-500 pointer-events-auto"
                             ref={panelRef}
                             onClick={(e) => e.stopPropagation()}
-                            style={{
-                                transform: isOpen ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(20px)',
-                                opacity: isOpen ? 1 : 0
-                            }}
                         >
                             {/* 面板头部 */}
-                            <div className="flex-none px-6 py-5 border-b border-gray-200/50 dark:border-gray-700/50 flex items-center justify-between">
-                                <div className="flex items-center gap-3 text-lg font-bold text-gray-800 dark:text-gray-100 tracking-tight">
-                                    <FaPalette className="text-blue-500" />
-                                    <h2>{t('style.switcher.title')}</h2>
+                            <div className="flex-none px-10 py-6 border-b border-black/5 dark:border-white/5 flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                                        <FaPalette className="text-white text-lg" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">{t('style.switcher.title')}</h2>
+                                        <p className="text-[12px] text-gray-400 font-bold opacity-60 uppercase tracking-widest">Visual Identity Schemes</p>
+                                    </div>
                                 </div>
                                 <button
-                                    className="p-2 text-gray-500 transition-colors rounded-full hover:bg-black/5 dark:hover:bg-white/10 hover:text-gray-800 dark:hover:text-gray-100 cursor-pointer"
+                                    className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-all cursor-pointer group"
                                     onClick={() => setIsOpen(false)}
-                                    title="Close"
                                 >
-                                    <FaTimes />
+                                    <FaTimes size={18} className="group-hover:rotate-90 transition-transform duration-300" />
                                 </button>
                             </div>
 
-                            {/* 内容区 */}
-                            <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 flex flex-col gap-6">
-                                {categories.map((category) => (
-                                    <div key={category.id} className="flex flex-col gap-3">
-                                        <h4 className="text-xs font-bold tracking-wider text-gray-500 uppercase dark:text-gray-400">{t(`style.category.${category.id}`)}</h4>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                            {category.presets.map((preset) => (
-                                                <PresetCard
-                                                    key={preset.name}
-                                                    preset={preset}
-                                                    isActive={currentPreset.name === preset.name}
-                                                    onClick={() => handlePresetChange(preset)}
-                                                    onHover={() => handlePresetHover(preset)}
-                                                    onLeave={handlePresetLeave}
-                                                />
-                                            ))}
+                            {/* 内容区 - 扎紧垂直间距 */}
+                            <div className="flex-1 overflow-y-auto scrollbar-none flex flex-col items-center">
+                                <div className="w-full max-w-5xl px-20 py-12 flex flex-col gap-14">
+                                    {categories.map((category) => (
+                                        <div key={category.id} className="flex flex-col gap-6">
+                                            <div className="flex items-center gap-6">
+                                                <h4 className="text-[11px] font-black tracking-[0.4em] text-blue-500 uppercase whitespace-nowrap">{t(`style.category.${category.id}`)}</h4>
+                                                <div className="h-[1px] w-full bg-gradient-to-r from-blue-500/20 via-blue-500/5 to-transparent" />
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+                                                {category.presets.map((preset) => (
+                                                    <PresetCard
+                                                        key={preset.name}
+                                                        preset={preset}
+                                                        isActive={currentPreset.name === preset.name}
+                                                        onClick={() => handlePresetChange(preset)}
+                                                    />
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     </div>,
-                    (document.fullscreenElement as HTMLElement | null) || document.body
+                    (document.getElementById('app-root-layout') || document.body)
                 )}
-
         </>
     );
 };

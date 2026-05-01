@@ -10,4 +10,89 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Hyper-Glass Standard Spacing Tokens */
+  --glass-padding-lg: 32px;
+  --glass-padding-md: 24px;
+  --glass-padding-sm: 16px;
+  --glass-gap: 16px;
+  --glass-radius: 10px;
+
+  /* Pulse Glow Tokens */
+  --pulse-glow-gradient: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2));
+}
+
+@keyframes pulse-glow {
+  0% { opacity: 0.1; }
+  50% { opacity: 0.3; }
+  100% { opacity: 0.1; }
+}
+
+.glass-pulse-glow {
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-pulse-glow::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--pulse-glow-gradient);
+  animation: pulse-glow 3s infinite ease-in-out;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* =========================================================
+   Global Hyper-Glass Ant Design Overrides
+   Ensures Popovers, Dropdowns, Selects, and Menus follow Vizly standards
+   ========================================================= */
+.ant-popover-inner,
+.ant-select-dropdown,
+.ant-dropdown-menu,
+.ant-tooltip-inner,
+.ant-modal-content,
+.ant-drawer-content {
+    background-color: var(--designer-panel-bg, rgba(255, 255, 255, 0.72)) !important;
+    backdrop-filter: var(--designer-blur, blur(24px) saturate(180%)) !important;
+    -webkit-backdrop-filter: var(--designer-blur, blur(24px) saturate(180%)) !important;
+    box-shadow: var(--designer-shadow, 0 20px 40px -10px rgba(0, 0, 0, 0.1)) !important;
+    border: 1px solid rgba(255, 255, 255, 0.45) !important;
+}
+
+/* Fix inner transparency issues */
+.ant-select-dropdown .ant-select-item,
+.ant-dropdown-menu-item {
+    background: transparent;
+}
+
+[data-theme='dark'] .ant-popover-inner,
+[data-theme='dark'] .ant-select-dropdown,
+[data-theme='dark'] .ant-dropdown-menu,
+[data-theme='dark'] .ant-tooltip-inner,
+[data-theme='dark'] .ant-modal-content,
+[data-theme='dark'] .ant-drawer-content {
+    background-color: rgba(28, 28, 41, 0.65) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Make arrow matching */
+.ant-popover-arrow::before,
+.ant-popover-arrow::after {
+    background: var(--designer-panel-bg, rgba(255, 255, 255, 0.72)) !important;
+    backdrop-filter: var(--designer-blur, blur(24px) saturate(180%)) !important;
+}
+
+.ant-modal-header,
+.ant-drawer-header {
+    background: transparent !important;
+    border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+}
+
+[data-theme='dark'] .ant-modal-header,
+[data-theme='dark'] .ant-drawer-header {
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
 }

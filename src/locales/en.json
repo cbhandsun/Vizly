@@ -313,6 +313,61 @@
                 }
             }
         },
+        "settings": {
+            "title": "Diagram Settings",
+            "theme": "Color Theme",
+            "themeDesc": "Define the global color palette for the diagram",
+            "style": "Line Style",
+            "styleDesc": "Adjust the artistic form of nodes and edges",
+            "edgeMode": "Edge Mode",
+            "edgeModeDesc": "Determines edge obstacle avoidance and pathfinding",
+            "smart": "Smart Routing",
+            "native": "Native Routing",
+            "layoutStrategy": "Layout Strategy",
+            "layoutStrategyDesc": "Core algorithm for global topological arrangement",
+            "nodeLayout": "Node Layout",
+            "nodeLayoutDesc": "Fine-tune node arrangement within sub-domains",
+            "elkAlgorithm": "ELK Algorithm",
+            "autoDisabled": "Auto (Disabled)",
+            "autoDisabledDesc": "Current strategy does not support manual node layout",
+            "showMainFlow": "Main Flow Only",
+            "showMainFlowDesc": "Filter out auxiliary branches, show only core business flow",
+            "advancedConfig": "Advanced Config",
+            "advancedConfigDesc": "Finer adjustment of geometric parameters and weights",
+            "group": {
+                "visual": "Appearance",
+                "engine": "Engine Strategy",
+                "view": "View Control"
+            },
+            "elk": {
+                "layered": {
+                    "title": "Layered",
+                    "desc": "Standard hierarchical layout, best for flowcharts"
+                },
+                "mrtree": {
+                    "title": "MR-Tree",
+                    "desc": "Multi-root tree layout for complex hierarchies"
+                },
+                "force": {
+                    "title": "Force",
+                    "desc": "Physics-based force-directed layout"
+                }
+            },
+            "preset": {
+                "elastic": {
+                    "label": "Elastic + ELK",
+                    "desc": "Standard style: Balanced layout"
+                },
+                "soft": {
+                    "label": "Soft + ELK",
+                    "desc": "Organic style: Loose clustering"
+                },
+                "strict": {
+                    "label": "Strict + ELK",
+                    "desc": "Engineering style: Strict alignment"
+                }
+            }
+        },
         "viewer": {
             "toggleFlowDirection": "Toggle flow direction",
             "more": "More",

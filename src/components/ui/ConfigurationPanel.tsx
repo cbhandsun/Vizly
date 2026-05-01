@@ -750,21 +750,21 @@ const renderConfigEditor = (item: ConfigItem) => {
           max={item.max}
           step={item.step}
           onChange={(e) => handleValueChange(item.key, Number(e.target.value))}
-          className="w-24 px-3 py-1.5 text-[13px] font-medium text-center transition-all bg-black/5 dark:bg-white/10 border border-transparent rounded-[8px] text-gray-800 dark:text-gray-100 hover:bg-black/10 dark:hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-black"
+          className="w-24 px-3 py-1.5 text-[13px] font-medium text-center transition-all bg-black/[0.04] dark:bg-white/10 border border-black/5 dark:border-white/5 rounded-[6px] text-gray-800 dark:text-gray-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.15] hover:border-black/10 dark:hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-black/50 focus:border-indigo-500"
           title={t(`config.${item.key}.label`)}
         />
       );
 
     case 'boolean':
       return (
-        <label className="relative inline-flex items-center cursor-pointer">
+        <label className="relative inline-flex items-center cursor-pointer group">
           <input
             type="checkbox"
             checked={Boolean(currentValue)}
             onChange={(e) => handleValueChange(item.key, e.target.checked)}
             className="sr-only peer"
           />
-          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+          <div className="w-[36px] h-[20px] bg-black/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500/50 rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-200/50 after:border after:rounded-full after:h-[16px] after:w-[16px] after:transition-all after:shadow-sm dark:border-gray-600 peer-checked:bg-indigo-500 group-hover:bg-black/15 dark:group-hover:bg-white/15 peer-checked:group-hover:bg-indigo-600 transition-colors"></div>
         </label>
       );
 
@@ -774,7 +774,8 @@ const renderConfigEditor = (item: ConfigItem) => {
           <select
             value={currentValue}
             onChange={(e) => handleValueChange(item.key, e.target.value)}
-            className="w-48 px-3 py-1.5 text-[13px] font-medium transition-all bg-black/5 dark:bg-white/10 border border-transparent rounded-[8px] text-gray-800 dark:text-gray-100 hover:bg-black/10 dark:hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-black cursor-pointer disabled:opacity-50"
+            className="w-48 px-3 py-1.5 text-[13px] font-medium transition-all bg-black/[0.04] dark:bg-white/10 border border-black/5 dark:border-white/5 rounded-[6px] text-gray-800 dark:text-gray-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.15] hover:border-black/10 dark:hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-black/50 focus:border-indigo-500 cursor-pointer disabled:opacity-50 appearance-none"
+            style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%236b7280\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1em' }}
             disabled={nodeLayoutDisabled}
             title={t(`config.${item.key}.label`)}
           >
@@ -802,7 +803,7 @@ const renderConfigEditor = (item: ConfigItem) => {
           type="text"
           value={currentValue}
           onChange={(e) => handleValueChange(item.key, e.target.value)}
-          className="w-64 px-3 py-1.5 text-[13px] font-medium transition-all bg-black/5 dark:bg-white/10 border border-transparent rounded-[8px] text-gray-800 dark:text-gray-100 hover:bg-black/10 dark:hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-black"
+          className="w-64 px-3 py-1.5 text-[13px] font-medium transition-all bg-black/[0.04] dark:bg-white/10 border border-black/5 dark:border-white/5 rounded-[6px] text-gray-800 dark:text-gray-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.15] hover:border-black/10 dark:hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-black/50 focus:border-indigo-500"
           title={t(`config.${item.key}.label`)}
         />
       );
@@ -827,14 +828,14 @@ const renderConfigItem = (item: ConfigItem) => {
   const primaryDesc = displayDesc ? displayDesc.split(' - ')[0] : '';
 
   return (
-  <div key={item.key} className="flex items-center justify-between px-5 py-3 transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
+  <div key={item.key} className="flex items-center justify-between transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.02]" style={{ padding: 'var(--glass-padding-sm) var(--glass-padding-md)' }}>
     <div className="flex flex-col pr-4 flex-1 min-w-0">
       <div className="text-[13px] font-medium text-gray-800 dark:text-gray-200 leading-tight">
         {displayLabel}
       </div>
       {primaryDesc && (
         <div
-          className="mt-0.5 text-[11.5px] text-gray-400 dark:text-gray-500 truncate max-w-[280px] cursor-help"
+          className="mt-0.5 text-[11.5px] text-gray-500 dark:text-gray-400 truncate max-w-[280px] cursor-help"
           title={displayDesc}
         >
           {primaryDesc}
@@ -878,11 +879,11 @@ const renderTabContent = () => {
   });
 
   return (
-    <div className="flex flex-col gap-8 pb-4">
+    <div className="flex flex-col pb-4" style={{ gap: 'var(--glass-padding-lg)' }}>
       {groups.map((group, index) => (
         <div key={index} className="flex flex-col">
-          <div className="mb-2 px-2">
-            <h3 className="text-[11px] font-semibold tracking-wider text-gray-500 dark:text-gray-400 uppercase">
+          <div className="mb-2" style={{ paddingLeft: 'var(--glass-padding-sm)' }}>
+            <h3 className="text-[11px] font-bold tracking-wider text-indigo-500/80 dark:text-indigo-400/80 uppercase">
               {(() => {
                 const map: Record<string, string> = {
                   '基础设置': 'basic', '避障与容器': 'obstacle', '几何微调': 'geometry', '偏好权重': 'preference',
@@ -894,7 +895,7 @@ const renderTabContent = () => {
               })()}
             </h3>
           </div>
-          <div className="flex flex-col bg-white dark:bg-[#1A1A1C] shadow-sm border border-gray-200/60 dark:border-white/10 rounded-[12px] overflow-hidden divide-y divide-gray-100 dark:divide-white/5">
+          <div className="shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),0_4px_16px_-4px_rgba(0,0,0,0.02)] border border-black/[0.06] dark:border-white/[0.08] overflow-hidden divide-y divide-black/[0.04] dark:divide-white/[0.06] bg-white/60 dark:bg-[#1A1A1C]/60 backdrop-blur-xl" style={{ borderRadius: 'calc(var(--glass-radius) * 1.2)' }}>
             {group.items.map(renderConfigItem)}
           </div>
         </div>
@@ -930,20 +931,27 @@ if (!state.isReady) {
 }
 
 // 等效于 iOS/macOS 风格的激活态与默认态
-const activeTabClass = "bg-black/5 dark:bg-white/10 text-gray-900 dark:text-gray-100 font-semibold";
-const inactiveTabClass = "text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 font-medium";
-const actionBtnPrimary = "text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm border-transparent rounded-[8px]";
-const actionBtnSecondary = "text-gray-700 dark:text-gray-200 bg-white dark:bg-black hover:bg-gray-50 dark:hover:bg-white/5 border border-black/10 dark:border-white/10 shadow-sm rounded-[8px]";
+const activeTabClass = "bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white font-semibold shadow-sm rounded-[6px] border border-black/[0.04] dark:border-white/[0.04]";
+const inactiveTabClass = "text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 font-medium rounded-[6px] border border-transparent";
+const actionBtnPrimary = "text-white bg-gradient-to-b from-gray-800 to-black hover:from-gray-700 hover:to-gray-900 dark:from-gray-200 dark:to-white dark:text-black dark:hover:from-white dark:hover:to-white shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] border-transparent";
+const actionBtnSecondary = "text-gray-700 dark:text-gray-200 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 border border-black/[0.08] dark:border-white/10 shadow-[0_1px_2px_rgba(0,0,0,0.05)]";
 
 // 修复（函数级注释）：确保配置面板在全屏下可见，portal 挂载到全屏元素
 return createPortal(
-  <div className={`fixed inset-0 z-[5000] flex items-center justify-center p-4 sm:p-6 bg-black/30 dark:bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={onClose}>
+  <div className={`fixed inset-0 z-[5000] flex items-center justify-center bg-black/30 dark:bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} style={{ padding: 'var(--glass-padding-lg)' }} onClick={onClose}>
     {/* Vercel/Linear 风格设置面板 (Sidebar Master-Detail) */}
-    <div className={`relative flex w-full max-w-[900px] h-full max-h-[640px] rounded-[16px] bg-white dark:bg-[#111113] border border-black/10 dark:border-white/10 shadow-2xl transition-all duration-300 transform ${isOpen ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'} overflow-hidden`} onClick={(e) => e.stopPropagation()}>
+    <div className={`relative flex w-full max-w-[900px] h-full max-h-[640px] border border-black/10 dark:border-white/10 shadow-2xl transition-all duration-300 transform ${isOpen ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'} overflow-hidden`} 
+         style={{ 
+           borderRadius: 'calc(var(--glass-radius) * 1.6)', 
+           backgroundColor: 'var(--designer-panel-bg, rgba(255, 255, 255, 0.85))', 
+           backdropFilter: 'var(--designer-blur, blur(24px) saturate(180%))',
+           WebkitBackdropFilter: 'var(--designer-blur, blur(24px) saturate(180%))'
+         }} 
+         onClick={(e) => e.stopPropagation()}>
       
       {/* 左侧导航栏 Sidebar */}
-      <div className="w-[240px] flex-none flex flex-col border-r border-black/10 dark:border-white/10 bg-gray-50/60 dark:bg-black/30">
-        <div className="px-5 py-5 border-b border-transparent">
+      <div className="w-[240px] flex-none flex flex-col border-r border-black/10 dark:border-white/10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.03)' }}>
+        <div className="border-b border-transparent" style={{ padding: 'var(--glass-padding-md)' }}>
           <h2 className="text-[15px] font-semibold tracking-tight text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <div className="p-1.5 bg-indigo-500/10 rounded-md">
               <FaCog className="text-indigo-600 dark:text-indigo-400 w-3.5 h-3.5" />
@@ -952,7 +960,7 @@ return createPortal(
           </h2>
         </div>
         
-        <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1">
+        <div className="flex-1 overflow-y-auto space-y-1 scrollbar-none" style={{ padding: 'var(--glass-padding-sm)' }}>
           {(isAdvancedMode ? [
             { id: 'nodes', label: t('config.tabs.nodes') },
             { id: 'containers', label: t('config.tabs.containers') },
@@ -966,7 +974,7 @@ return createPortal(
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`w-full flex items-center px-3 py-2 text-[13px] rounded-lg transition-colors ${activeTab === tab.id ? activeTabClass : inactiveTabClass}`}
+              className={`w-full flex items-center px-3.5 py-2.5 text-[13px] rounded-[6px] transition-colors ${activeTab === tab.id ? activeTabClass : inactiveTabClass}`}
             >
               {tab.label}
             </button>
@@ -974,12 +982,12 @@ return createPortal(
         </div>
 
         {/* 高级模式切换 */}
-        <div className="px-5 py-4 border-t border-black/5 dark:border-white/5 bg-gray-50/50 dark:bg-black/20">
+        <div className="border-t border-black/5 dark:border-white/5 bg-gray-50/50 dark:bg-black/20" style={{ padding: 'var(--glass-padding-md)' }}>
           <label className="flex items-center justify-between cursor-pointer group">
             <span className="text-[13px] font-medium text-gray-700 dark:text-gray-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
               {t('config.groups.expertMode', 'Expert Mode')}
             </span>
-            <div className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${isAdvancedMode ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-white/10'}`}>
+            <div className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600/50 focus:ring-offset-1 ${isAdvancedMode ? 'bg-[#111111] dark:bg-white' : 'bg-gray-300 dark:bg-gray-600'}`}>
               <span className="sr-only">Use advanced mode</span>
               <input
                 type="checkbox"
@@ -991,28 +999,28 @@ return createPortal(
                   setActiveTab(advanced ? 'nodes' : 'basic');
                 }}
               />
-              <span className={`pointer-events-none absolute left-[2px] top-[2px] inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isAdvancedMode ? 'translate-x-4' : 'translate-x-0'}`} />
+              <span className={`pointer-events-none absolute left-[2px] top-[2px] inline-block h-4 w-4 transform rounded-full shadow ring-0 transition duration-200 ease-in-out ${isAdvancedMode ? 'translate-x-4 bg-white dark:bg-black' : 'translate-x-0 bg-white dark:bg-gray-200'}`} />
             </div>
           </label>
         </div>
       </div>
 
-      {/* 右侧主区域 Main Content */}
-      <div className="flex-1 flex flex-col relative bg-transparent overflow-hidden">
-        {/* 顶部标题栏 & 关闭按钮 */}
-        <div className="flex-none flex items-center justify-between px-8 md:px-12 pt-7 pb-5">
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight leading-none">
-            {t(`config.tabs.${activeTab}`)}
-          </h1>
-          <button onClick={onClose} className="-mr-2 p-1.5 rounded-md text-gray-400 hover:text-gray-800 hover:bg-black/5 dark:hover:text-gray-100 dark:hover:bg-white/10 transition-colors" title={t('config.actions.close')}>
-            <FaTimes className="w-4 h-4" />
-          </button>
-        </div>
+        {/* 右侧主区域 Main Content */}
+        <div className="flex-1 flex flex-col relative bg-transparent overflow-hidden">
+          {/* 顶部标题栏 & 关闭按钮 */}
+          <div className="flex-none flex items-center justify-between" style={{ padding: 'var(--glass-padding-md) var(--glass-padding-lg) var(--glass-padding-sm)' }}>
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight leading-none">
+              {t(`config.tabs.${activeTab}`)}
+            </h1>
+            <button onClick={onClose} className="-mr-2 p-1.5 rounded-md text-gray-400 hover:text-gray-800 hover:bg-black/5 dark:hover:text-gray-100 dark:hover:bg-white/10 transition-colors" title={t('config.actions.close')}>
+              <FaTimes className="w-4 h-4" />
+            </button>
+          </div>
 
-        {/* 滚动内容区 */}
-        <div className="flex-1 overflow-y-auto px-8 md:px-12 pb-8 pt-1 scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10">
-          <div className="w-full max-w-2xl mx-auto pb-12">
-            {renderTabContent()}
+          {/* 滚动内容区 */}
+          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10" style={{ padding: '0 var(--glass-padding-lg) var(--glass-padding-lg)' }}>
+            <div className="w-full max-w-2xl mx-auto pb-8">
+              {renderTabContent()}
             {activeTab === 'layout' && (
               <div className="mt-8 flex flex-col sm:flex-row gap-3">
                 <button
@@ -1074,46 +1082,46 @@ return createPortal(
         </div>
       </div>
 
-      {/* 底部操作栏 */}
-      <div className="flex-none px-10 py-5 border-t border-black/5 dark:border-white/5 flex items-center justify-between bg-gray-50/30 dark:bg-[#161618]">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleResetChanges}
-            className={`flex items-center justify-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnSecondary}`}
-            disabled={!hasChanges}
-          >
-            <FaUndo />
-            {t('config.actions.reset')}
-          </button>
-          {hasChanges && (
-            <div className="flex items-center gap-2 text-[13px] font-medium text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-md border border-amber-200 dark:border-amber-800/30">
-              <FaExclamationTriangle className="w-3.5 h-3.5" />
-              {t('config.unsavedChanges')}
-            </div>
-          )}
+        {/* 底部操作栏 */}
+        <div className="flex-none border-t border-black/10 dark:border-white/10 flex items-center justify-between" style={{ padding: 'var(--glass-padding-md) var(--glass-padding-lg)', backgroundColor: 'rgba(0, 0, 0, 0.03)' }}>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleResetChanges}
+              className={`flex items-center justify-center gap-2 px-5 py-2 text-[13px] font-medium transition-colors rounded-[6px] disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnSecondary}`}
+              disabled={!hasChanges}
+            >
+              <FaUndo />
+              {t('config.actions.reset')}
+            </button>
+            {hasChanges && (
+              <div className="flex items-center gap-2 text-[13px] font-medium text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-[calc(var(--glass-radius)-2px)] border border-amber-200 dark:border-amber-800/30">
+                <FaExclamationTriangle className="w-3.5 h-3.5" />
+                {t('config.unsavedChanges')}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className={`px-6 py-2 text-[13px] font-medium transition-colors rounded-[6px] ${actionBtnSecondary}`}
+            >
+              {t('config.actions.cancel', 'Cancel')}
+            </button>
+            <button
+              onClick={handleSaveChanges}
+              disabled={!hasChanges || !state.isReady || !state.integration}
+              className={`flex items-center justify-center gap-2 px-6 py-2 text-[13px] font-medium transition-all rounded-[6px] disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnPrimary}`}
+            >
+              <FaCheck />
+              {t('config.actions.save')}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onClose}
-            className={`px-6 py-2 text-[13px] font-medium transition-colors ${actionBtnSecondary}`}
-          >
-            {t('config.actions.cancel', 'Cancel')}
-          </button>
-          <button
-            onClick={handleSaveChanges}
-            disabled={!hasChanges || !state.isReady || !state.integration}
-            className={`flex items-center justify-center gap-2 px-6 py-2 text-[13px] font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${actionBtnPrimary}`}
-          >
-            <FaCheck />
-            {t('config.actions.save')}
-          </button>
         </div>
       </div>
-      </div>
-    </div>
-  </div>,
-  (document.fullscreenElement as HTMLElement | null) || document.body
-);
+    </div>,
+    (document.fullscreenElement as HTMLElement | null) || document.body
+  );
 };
 
 export default ConfigurationPanel;

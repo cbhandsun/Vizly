@@ -378,6 +378,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         <Modal
             open={open}
             onCancel={onClose}
+            getContainer={() => document.getElementById('app-root-layout') || document.body}
             title={
                 <Space>
                     <SafetyOutlined style={{ color: token.colorPrimary }} />
@@ -389,7 +390,8 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                     🔒 分享的图表可随时撤销访问权限
                 </Text>
             }
-            width={560}
+            width={600}
+            styles={{ body: { padding: '0 var(--glass-padding-md, 24px) var(--glass-padding-md, 24px)' } }}
         >
             <Tabs defaultActiveKey="invite" activeKey={activeTab} onChange={setActiveTab} items={items} />
         </Modal>

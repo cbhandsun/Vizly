@@ -165,8 +165,8 @@ export const AntdThemeBridge: React.FC<{ children: React.ReactNode }> = ({ child
             colorBorder: 'rgba(0, 0, 0, 0.1)'
           },
           Modal: {
-            contentBg: 'rgba(255, 255, 255, 0.85)',
-            boxShadow: '0 24px 48px -12px rgba(0,0,0,0.15)'
+            contentBg: 'rgba(255, 255, 255, 0.72)',
+            boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)'
           }
         }
       }
