@@ -630,7 +630,7 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
             const trunkVertical: boolean | undefined = ps?.trunkVertical;
             const peerGroupMembers: any[] | undefined = Array.isArray(ps?.peerGroupMembers) ? ps.peerGroupMembers : undefined;
 
-            if (trunkAxis !== undefined && trunkVertical !== undefined) {
+            if (typeof trunkAxis === 'number' && trunkVertical != null) {
                 // 绘制主干轴线（全宽虚线）
                 const TRUNK_COLOR = '#ffd666';
                 ctx.save();
