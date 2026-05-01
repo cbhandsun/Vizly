@@ -33,6 +33,11 @@ interface WorkerEdge {
  * Determine the dominant orientation of a bus (spine).
  * Uses advanced geometry limits to prevent "Side Ports" on clearly vertical layouts.
  */
+/**
+ * @deprecated [T7] 请改用 BusDetector.resolveBusOrientation()
+ * 此函数与 BusDetector 中的同名方法功能重叠，后者支持 nodeMap O(1) 查找和加权投票。
+ * BusRouter.ts 中保留下来仅作实现参考，未来可能移除。
+ */
 export const resolveBusOrientation = (
     isTarget: boolean,
     commonNodeId: string,
@@ -86,6 +91,10 @@ export const resolveBusOrientation = (
  * Determine the local direction quadrant of an edge relative to an origin node.
  * 0: Right, 1: Bottom, 2: Left, 3: Top
  */
+/**
+ * @deprecated [T7] 请改用 BusDetector.getEdgeQuadrant()
+ * 此函数与 BusDetector 中的同名方法功能重叠。
+ */
 export const getEdgeQuadrant = (
     edgeId: string,
     originId: string,
@@ -113,6 +122,10 @@ export const getEdgeQuadrant = (
 /**
  * Filter peers to only include those in compatible directional quadrants.
  * This prevents "Backward" lines from being grouped with "Forward" lines.
+ */
+/**
+ * @deprecated [T7] 请改用 BusDetector.filterPeersByQuadrant()
+ * 此函数与 BusDetector 中的同名方法功能重叠，后者已支持 nodeMap O(1) 查找。
  */
 export const filterPeersByQuadrant = (
     peerList: WorkerEdge[],

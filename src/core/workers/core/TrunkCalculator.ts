@@ -115,7 +115,9 @@ export class TrunkCalculator {
         peerNodes: Rectangle[],
         isManyToOne: boolean,
         config: UnifiedRoutingConfig,
-        layoutDirection: string = 'LR'
+        layoutDirection: string = 'LR',
+        precomputedCentroid?: Point,    // [T3] 可选预计算质心
+        obstacles?: Rectangle[]         // [T1] 可选障碍物列表，用于轴线扫描避障
     ): { axis: number; direction: 'horizontal' | 'vertical'; range: { min: number; max: number }; suggestedPort: 'top' | 'bottom' | 'left' | 'right' } {
         const hubCenter = {
             x: hubNode.x + hubNode.width / 2,
@@ -150,7 +152,8 @@ export class TrunkCalculator {
         // [FIX] Geometry Override for Process Flows
         // If geometry is overwhelmingly Top-Down (Vertical Flow), we MUST use a Horizontal Trunk (isHorz=false)
         // regardless of the default 'LR' setting.
-        const peersCenter = this.calculateCentroid(peerNodes);
+        // [T3] 使用预传质心（若有），避免重复遍历 peerNodes
+        const peersCenter = precomputedCentroid ?? this.calculateCentroid(peerNodes);
         const dx = Math.abs(peersCenter.x - hubCenter.x);
         const dy = Math.abs(peersCenter.y - hubCenter.y);
 
@@ -224,10 +227,29 @@ export class TrunkCalculator {
             });
             range.min = Math.min(range.min, hubCenter.y);
             range.max = Math.max(range.max, hubCenter.y);
-            // [S4-P12] Guard: range must always be finite (peerNodes was verified non-empty above)
             if (!isFinite(range.min) || !isFinite(range.max)) {
                 range.min = hubCenter.y;
                 range.max = hubCenter.y;
+            }
+
+            // [T1] 垂直干线（x=axis）隘碍物扫描：将轴推离最近障碍物边缘 + spacing
+            if (obstacles && obstacles.length > 0) {
+                // 找到所有穿过 x=axis 且在范围内的障碍物
+                const blockers = obstacles.filter(o =>
+                    o.x < axis + 1 && o.x + o.width > axis - 1 &&
+                    o.y < range.max + spacing && o.y + o.height > range.min - spacing
+                );
+                if (blockers.length > 0) {
+                    if (isLeft) {
+                        // 干线在左侧：推到最小障碍物 x - spacing
+                        const clearAxis = Math.min(...blockers.map(o => o.x)) - spacing;
+                        axis = Math.min(axis, clearAxis);
+                    } else {
+                        // 干线在右侧：推到最大障碍物右边 + spacing
+                        const clearAxis = Math.max(...blockers.map(o => o.x + o.width)) + spacing;
+                        axis = Math.max(axis, clearAxis);
+                    }
+                }
             }
 
             return { axis, direction: 'vertical', range, suggestedPort };
@@ -264,15 +286,31 @@ export class TrunkCalculator {
             });
             range.min = Math.min(range.min, hubCenter.x);
             range.max = Math.max(range.max, hubCenter.x);
-            // [S4-P12] Guard: range must always be finite
             if (!isFinite(range.min) || !isFinite(range.max)) {
                 range.min = hubCenter.x;
                 range.max = hubCenter.x;
             }
 
-            // [ASSERT] suggestedPort must be assigned by both branches above.
-            // If not, it means a new branch was added without port logic — fail loudly.
-            if (!suggestedPort) {
+            // [T1] 水平干线（y=axis）隘碍物扫描：将轴推离最近障碍物边缘 + spacing
+            if (obstacles && obstacles.length > 0) {
+                const blockers = obstacles.filter(o =>
+                    o.y < axis + 1 && o.y + o.height > axis - 1 &&
+                    o.x < range.max + spacing && o.x + o.width > range.min - spacing
+                );
+                if (blockers.length > 0) {
+                    if (isTop) {
+                        // 干线在上方：推到最小障碍物 y - spacing
+                        const clearAxis = Math.min(...blockers.map(o => o.y)) - spacing;
+                        axis = Math.min(axis, clearAxis);
+                    } else {
+                        // 干线在下方：推到最大障碍物下边 + spacing
+                        const clearAxis = Math.max(...blockers.map(o => o.y + o.height)) + spacing;
+                        axis = Math.max(axis, clearAxis);
+                    }
+                }
+            }
+
+            if (config.debug && !suggestedPort!) {
                 console.error('[TrunkCalculator] suggestedPort was never assigned for horizontal trunk!', { isManyToOne, isTop });
             }
 
@@ -346,12 +384,16 @@ export class TrunkCalculator {
 
         // 1. Calculate independent trunks first to check for side/port availability
         // This ensures that if groups are naturally on opposite sides (Left vs Right), they get independent trunks without forced offsets.
+        // [T3] 预计算各组质心，供 calculateTreeTrunk 和碰撞检查复用
+        const forwardCentroid = forwardPeers.length > 0 ? this.calculateCentroid(forwardPeers) : undefined;
+        const backwardCentroid = backwardPeers.length > 0 ? this.calculateCentroid(backwardPeers) : undefined;
+
         const forwardTrunkRaw = forwardPeers.length > 0
-            ? this.calculateTreeTrunk(hubNode, forwardPeers, isManyToOne, config, layoutDirection)
+            ? this.calculateTreeTrunk(hubNode, forwardPeers, isManyToOne, config, layoutDirection, forwardCentroid)
             : undefined;
 
         const backwardTrunkRaw = backwardPeers.length > 0
-            ? this.calculateTreeTrunk(hubNode, backwardPeers, isManyToOne, config, layoutDirection)
+            ? this.calculateTreeTrunk(hubNode, backwardPeers, isManyToOne, config, layoutDirection, backwardCentroid)
             : undefined;
 
         // 2. Check for Independent Opposite Sides (No Collision)
@@ -380,12 +422,19 @@ export class TrunkCalculator {
         // 3. Collision Detected (Same Side/Port)
         // Apply Offset Strategy using Base Trunk (All Peers)
         const allPeers = [...forwardPeers, ...backwardPeers];
+        // [T3] 加权拼接质心，避免再次遍历 allPeers
+        let allCentroid: Point | undefined;
+        if (forwardCentroid && backwardCentroid) {
+            const fN = forwardPeers.length, bN = backwardPeers.length;
+            allCentroid = {
+                x: (forwardCentroid.x * fN + backwardCentroid.x * bN) / (fN + bN),
+                y: (forwardCentroid.y * fN + backwardCentroid.y * bN) / (fN + bN),
+            };
+        } else {
+            allCentroid = forwardCentroid ?? backwardCentroid;
+        }
         const baseTrunk = this.calculateTreeTrunk(
-            hubNode,
-            allPeers,
-            isManyToOne,
-            config,
-            layoutDirection
+            hubNode, allPeers, isManyToOne, config, layoutDirection, allCentroid
         );
 
         // [Phase 3.5] Intelligent trunk assignment based on strategy

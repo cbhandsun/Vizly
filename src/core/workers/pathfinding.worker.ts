@@ -695,8 +695,6 @@ function rasterizePathToGrid(
         const p1 = points[i];
         const p2 = points[i + 1];
 
-        // Rasterize segment p1-p2
-        // Simple Bresenham or axis-aligned filling
         const gStart = {
             x: Math.round(p1.x / size) * size,
             y: Math.round(p1.y / size) * size
@@ -706,29 +704,33 @@ function rasterizePathToGrid(
             y: Math.round(p2.y / size) * size
         };
 
-        const idxStart = getIdx(gStart.x, gStart.y);
-        const idxEnd = getIdx(gEnd.x, gEnd.y);
+        const cStart = Math.floor((gStart.x - minX) / size);
+        const rStart = Math.floor((gStart.y - minY) / size);
+        const cEnd   = Math.floor((gEnd.x   - minX) / size);
+        const rEnd   = Math.floor((gEnd.y   - minY) / size);
 
-        addCost(idxStart);
-        addCost(idxEnd);
-
-        if (Math.abs(gStart.y - gEnd.y) < 1) { // Horizontal
-            const sIdx = Math.min(idxStart, idxEnd);
-            const eIdx = Math.max(idxStart, idxEnd);
-            // Optimization: bulk fill if contiguous (only works if in same row, usually true for H-seg)
-            // Be careful about wrapping? getIdx handles simple C/R check. 
-            // If they are on same row:
-            for (let idx = sIdx; idx <= eIdx; idx++) {
-                addCost(idx);
+        if (Math.abs(gStart.y - gEnd.y) < 1) {
+            // [FIX-P2⑦] Horizontal segment: iterate by column index in the SAME row
+            // Previously used raw linear index which could cross row boundaries.
+            if (rStart < 0 || rStart >= rows) continue;
+            const colMin = Math.max(0, Math.min(cStart, cEnd));
+            const colMax = Math.min(cols - 1, Math.max(cStart, cEnd));
+            for (let c = colMin; c <= colMax; c++) {
+                addCost(rStart * cols + c);
             }
-        } else if (Math.abs(gStart.x - gEnd.x) < 1) { // Vertical
-            const sIdx = Math.min(idxStart, idxEnd);
-            const eIdx = Math.max(idxStart, idxEnd);
-            for (let idx = sIdx; idx <= eIdx; idx += cols) {
-                addCost(idx);
+        } else if (Math.abs(gStart.x - gEnd.x) < 1) {
+            // Vertical segment: step by cols (unchanged, already correct)
+            if (cStart < 0 || cStart >= cols) continue;
+            const rowMin = Math.max(0, Math.min(rStart, rEnd));
+            const rowMax = Math.min(rows - 1, Math.max(rStart, rEnd));
+            for (let r = rowMin; r <= rowMax; r++) {
+                addCost(r * cols + cStart);
             }
+        } else {
+            // Diagonal (rare from A*): mark endpoints only
+            addCost(getIdx(gStart.x, gStart.y));
+            addCost(getIdx(gEnd.x, gEnd.y));
         }
-        // Ignore diagonal segments rasterization here (handled by endpoints usually or A* won't produce them much)
     }
 }
 

@@ -72,7 +72,11 @@ export class AStarPathfinder {
 
             return result;
         } catch (error) {
-            console.error('[AStarPathfinder] Grid A* failed:', error);
+            // [P6] 仅在 debug 模式打印错误：A* 边界情况（start==end、网格为空）会抛出，
+            // 生产环境的 console.error 在 DevTools 开启时有显著开销。
+            if (this.config.debug) {
+                console.error('[AStarPathfinder] Grid A* failed:', error);
+            }
             return null;
         }
     }

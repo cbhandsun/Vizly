@@ -144,6 +144,13 @@ export class PathfindingWorkerPool {
         const results: PathFindingResult[] = new Array(jobs.length);
         let completedCount = 0;
 
+        // [OPT-P1⑤] Pre-build O(1) lookup index — avoids O(N²) findIndex inside forEach
+        const idToIdx = new Map<string, number>();
+        jobs.forEach((j, i) => {
+            if (j.edgeId) idToIdx.set(j.edgeId, i);
+            if (j.jobId && j.jobId !== j.edgeId) idToIdx.set(j.jobId, i);
+        });
+
         await Promise.all(
             groups.map(async (group) => {
                 const batchTasks = group.map(g => g.job);
@@ -156,7 +163,8 @@ export class PathfindingWorkerPool {
                     const res = (wrapper.result || wrapper) as PathFindingResult;
                     const jobId = wrapper.jobId || (res as any).jobId || (res as any).edgeId;
 
-                    const originalIdx = jobs.findIndex(j => j.edgeId === res.edgeId || j.jobId === jobId);
+                    // O(1) lookup instead of O(N) findIndex
+                    const originalIdx = idToIdx.get(res.edgeId) ?? idToIdx.get(jobId) ?? -1;
                     if (originalIdx !== -1) {
                         results[originalIdx] = res;
                     }
@@ -293,17 +301,44 @@ export class PathfindingWorkerPool {
     }
 
     /**
-     * Group jobs for optimal parallel execution
+     * Group jobs for optimal parallel execution.
+     * [P3] Bus 优化：将相同 hub（source/target）的边聚合到同一 batch，
+     * 最大化 Worker 内部 prebuiltGrid 的共享率。
      */
     private groupJobs(jobs: PathFindingJob[], graph: SharedGraphContext): WorkerTask[][] {
         const BATCH_SIZE = 50;
         const chunkSize = Math.min(Math.ceil(jobs.length / Math.max(1, this.poolSize)), BATCH_SIZE);
         const effectiveChunkSize = Math.max(chunkSize, 20);
 
-        const groups: WorkerTask[][] = [];
+        // [P3] 先按 hub 分组：相同 source（O2M）或 target（M2O）的 bus 边放入同一组
+        const hubGroups = new Map<string, PathFindingJob[]>();
+        const nonBusJobs: PathFindingJob[] = [];
 
-        for (let i = 0; i < jobs.length; i += effectiveChunkSize) {
-            const chunk = jobs.slice(i, i + effectiveChunkSize);
+        for (const job of jobs) {
+            if (job.isOneToMany && job.source) {
+                const list = hubGroups.get(job.source) ?? [];
+                list.push(job);
+                hubGroups.set(job.source, list);
+            } else if (job.isManyToOne && job.target) {
+                const list = hubGroups.get(job.target) ?? [];
+                list.push(job);
+                hubGroups.set(job.target, list);
+            } else {
+                nonBusJobs.push(job);
+            }
+        }
+
+        // 将 hub 分组按 effectiveChunkSize 切片后合并到 orderedJobs
+        const orderedJobs: PathFindingJob[] = [];
+        for (const busGroup of hubGroups.values()) {
+            orderedJobs.push(...busGroup);
+        }
+        orderedJobs.push(...nonBusJobs);
+
+        // 按 effectiveChunkSize 切片分组
+        const groups: WorkerTask[][] = [];
+        for (let i = 0; i < orderedJobs.length; i += effectiveChunkSize) {
+            const chunk = orderedJobs.slice(i, i + effectiveChunkSize);
             groups.push(
                 chunk.map((job, idx) => ({
                     job,

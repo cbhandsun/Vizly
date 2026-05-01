@@ -1,14 +1,77 @@
 /**
  * A* Path Finding Algorithm
- * 
+ *
  * 移植自原 HandlePicker.ts
  * 提供基于网格的 A* 寻路，支持障碍物回避、成本加权和已有路径回避。
+ *
+ * [OPT-P0②] Open List 由 array.sort()+shift（O(N log N) 每步）换为 MinHeap（O(log N) 每步）。
  */
 
 import type { Point, Rectangle } from '../types/routing';
 
 // 扩展 Rect 类型以包含 padding，保持与原逻辑兼容
 type ObstacleRect = Rectangle & { padding?: number; isSoftZone?: boolean };
+
+// ---------------------------------------------------------------------------
+// MinHeap — A* open list 最优数据结构
+// push O(log N) / pop O(log N) / size O(1)
+// ---------------------------------------------------------------------------
+interface AStarNode {
+    p: Point;
+    g: number;
+    f: number;
+    parent: AStarNode | null;
+}
+
+class MinHeap {
+    private data: AStarNode[] = [];
+
+    get size(): number { return this.data.length; }
+
+    push(node: AStarNode): void {
+        this.data.push(node);
+        this.bubbleUp(this.data.length - 1);
+    }
+
+    pop(): AStarNode | undefined {
+        if (this.data.length === 0) return undefined;
+        const top = this.data[0];
+        const last = this.data.pop()!;
+        if (this.data.length > 0) {
+            this.data[0] = last;
+            this.sinkDown(0);
+        }
+        return top;
+    }
+
+    private bubbleUp(i: number): void {
+        while (i > 0) {
+            const parent = (i - 1) >>> 1;
+            if (this.data[parent].f <= this.data[i].f) break;
+            const tmp = this.data[parent];
+            this.data[parent] = this.data[i];
+            this.data[i] = tmp;
+            i = parent;
+        }
+    }
+
+    private sinkDown(i: number): void {
+        const n = this.data.length;
+        while (true) {
+            let min = i;
+            const l = 2 * i + 1;
+            const r = 2 * i + 2;
+            if (l < n && this.data[l].f < this.data[min].f) min = l;
+            if (r < n && this.data[r].f < this.data[min].f) min = r;
+            if (min === i) break;
+            const tmp = this.data[min];
+            this.data[min] = this.data[i];
+            this.data[i] = tmp;
+            i = min;
+        }
+    }
+}
+// ---------------------------------------------------------------------------
 
 export class PathFinder {
     /**
@@ -31,21 +94,22 @@ export class PathFinder {
         // 直线距离，用于绕路限制
         const directDist = this.dist(start, goal);
 
-        const open: any[] = [{ p: s, g: 0, f: this.dist(s, g), parent: null }];
+        // [OPT-P0②] MinHeap open list — O(log N) push/pop vs O(N log N) sort+shift
+        const open = new MinHeap();
+        open.push({ p: s, g: 0, f: this.dist(s, g), parent: null });
         const closed = new Set<string>();
         const gScoreMap = new Map<string, number>();
         gScoreMap.set(`${s.x}:${s.y}`, 0);
         let expansions = 0;
 
-        while (open.length && expansions < maxExpansions) {
-            open.sort((a, b) => a.f - b.f);
-            const cur = open.shift();
-            expansions++;
+        while (open.size > 0 && expansions < maxExpansions) {
+            const cur = open.pop();
             if (!cur) break;
+            expansions++;
 
             if (this.dist(cur.p, g) < gs) { // Reached goal
                 const path: Point[] = [];
-                let node = cur;
+                let node: AStarNode | null = cur;
                 while (node) { path.push(node.p); node = node.parent; }
                 return [start, ...path.reverse(), goal];
             }

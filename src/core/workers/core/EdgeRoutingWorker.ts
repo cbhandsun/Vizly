@@ -59,14 +59,19 @@ function getOppositePort(pos: Position): Position {
 
 export class EdgeRoutingWorker {
     // [H-4] Module-level singleton cache for stateless routing modules.
-    // These are reconstructed only when config.algorithm.gridSize changes,
-    // reducing per-route object allocation and GC pressure by ~50%.
+    // These are reconstructed only when config.algorithm.gridSize or borderRadius changes,
+    // reducing per-route object allocation and GC pressure.
     private static _cachedConfig: UnifiedRoutingConfig | null = null;
     private static _gridBuilder: GridBuilder | null = null;
     private static _astar: AStarPathfinder | null = null;
     private static _analyzer: ObstacleAnalyzer | null = null;
     private static _postProcessor: PathPostProcessor | null = null;
     private static _trunkCalculator: TrunkCalculator | null = null;
+    // [B1] 加入单例缓存：vgRouter/busDetector/portSelector 是纯配置驱动的无状态类，可安全复用
+    // 原代论说“轻量级—每条边新建”，但 50 条边批处理创建 150 个对象，增加 GC 压力
+    private static _vgRouter: VisibilityGraphRouter | null = null;
+    private static _busDetector: BusDetector | null = null;
+    private static _portSelectorWorker: PortSelector | null = null;
 
     private static getModules(config: UnifiedRoutingConfig) {
         // Re-use if same config reference or same gridSize (the only field that changes module behavior)
@@ -82,6 +87,10 @@ export class EdgeRoutingWorker {
             EdgeRoutingWorker._analyzer = new ObstacleAnalyzer();
             EdgeRoutingWorker._postProcessor = new PathPostProcessor(config);
             EdgeRoutingWorker._trunkCalculator = new TrunkCalculator();
+            // [B1] 同步重建配置相关单例
+            EdgeRoutingWorker._vgRouter = new VisibilityGraphRouter(config);
+            EdgeRoutingWorker._busDetector = new BusDetector(config);
+            EdgeRoutingWorker._portSelectorWorker = new PortSelector(config);
         }
 
         return {
@@ -90,6 +99,9 @@ export class EdgeRoutingWorker {
             analyzer: EdgeRoutingWorker._analyzer!,
             postProcessor: EdgeRoutingWorker._postProcessor!,
             trunkCalculator: EdgeRoutingWorker._trunkCalculator!,
+            vgRouter: EdgeRoutingWorker._vgRouter!,
+            busDetector: EdgeRoutingWorker._busDetector!,
+            portSelector: EdgeRoutingWorker._portSelectorWorker!,
         };
     }
 
@@ -101,15 +113,14 @@ export class EdgeRoutingWorker {
         const { prebuiltGrid, spatialIndex: prebuiltSpatialIndex } = runtime;
 
         // 1. Initialize Modules — stateless ones are cached, stateful ones created fresh
-        const { gridBuilder, astar, analyzer, postProcessor, trunkCalculator } = EdgeRoutingWorker.getModules(config);
-        // BusDetector, PortSelector, VisibilityGraphRouter are config-aware and lightweight — create fresh
-        const vgRouter = new VisibilityGraphRouter(config);
-        const busDetector = new BusDetector(config);
-        const portSelector = new PortSelector(config);
+        const { gridBuilder, astar, analyzer, postProcessor, trunkCalculator, vgRouter, busDetector, portSelector } = EdgeRoutingWorker.getModules(config);
+        // [B1] vgRouter/busDetector/portSelector 已加入单例缓存，不再每条边新建
+
 
         // 2. Setup Spatial Index (if needed)
         let spatialIndex: SpatialIndex | undefined = prebuiltSpatialIndex;
-        if (!spatialIndex && graph.obstacles.length > 50) {
+        // [B3] 阈値 50 → 20：40 节点的图（常见规模）改走 QuadTree 而非线性扫描
+        if (!spatialIndex && graph.obstacles.length > 20) {
             const bounds = analyzer.getBounds(graph.obstacles);
             const padding = 2000;
             spatialIndex = new QuadTree({
@@ -249,19 +260,8 @@ export class EdgeRoutingWorker {
 
         const hasExplicitSource = !!job.sourceHandle;
         const hasExplicitTarget = !!job.targetHandle;
-        const parseHandleDir = (h?: string | null) => {
-            if (!h) return undefined;
-            const s = String(h).toLowerCase();
-            if (s.includes('left')) return Position.Left;
-            if (s.includes('right')) return Position.Right;
-            if (s.includes('top')) return Position.Top;
-            if (s.includes('bottom')) return Position.Bottom;
-            if (s.startsWith('l')) return Position.Left;
-            if (s.startsWith('r')) return Position.Right;
-            if (s.startsWith('t')) return Position.Top;
-            if (s.startsWith('b')) return Position.Bottom;
-            return undefined;
-        };
+        // [B4] 内联箭头函数提升为静态方法，避免每条边创建闭包对象
+        const parseHandleDir = EdgeRoutingWorker.parseHandleDir;
 
         let hasFixedSourcePort = false;
         let hasFixedTargetPort = false;
@@ -668,7 +668,8 @@ export class EdgeRoutingWorker {
             if (!isTrulyAxisAligned) {
                 // Diagonal edge — let geometry-classifier port rules handle port selection.
                 // The preferred ports (e.g. R→L for diagonal-ne) produce clean L-shapes.
-                console.log(`[Worker] ${job.source}→${job.target}: diagonal reverse edge (ratio=${dominantRatio.toFixed(2)}<1.8), skipping U-Turn bypass.`);
+                // [A1] debug log 已改为 config.debug 条件保护，删除生产环境每条边级的 console.log
+                if (config.debug) console.log(`[Worker] ${job.source}→${job.target}: diagonal reverse edge (ratio=${dominantRatio.toFixed(2)}<1.8), skipping U-Turn bypass.`);
             } else if (absDx > absDy) {
                 // Dominant horizontal → bypass via Top or Bottom (perpendicular)
                 // [FIX-pathlen] Score = obstacle_weight + estimated_detour_length.
@@ -833,16 +834,15 @@ export class EdgeRoutingWorker {
                 (endPos   === Position.Top || endPos   === Position.Bottom)
             );
 
-            // [DEBUG] Log for edge-tms-yms
-            if (job.source?.includes('tms') && job.target?.includes('yms')) {
-                console.log(`[C-shape Debug v2] edge-tms-yms: startPos=${startPos} endPos=${endPos} dx2=${dx2.toFixed(0)} dy2=${dy2.toFixed(0)} bothHoriz=${bothHoriz} absDy2>${absDx2*2}=${absDy2 > absDx2*2} isReverseBypas=${isReverseBypassActive} isGlobalTrunk=${isGlobalTrunkMember} srcHandle=${job.sourceHandle}`);
-            }
+                // [A1] C-shape debug log 已移除（生产环境每次路由均输出会阻塞 Worker 消息队列）
 
-            if (bothHoriz && absDy2 > absDx2 * 2) {
+            // [A2] 阈値 2× → 1.4×：更准确地捕获明显垂直主导但仍被渲染为 C-shape 的边
+            // Draw.io 等价阈値约 1.3×，取 1.4× 为稳妙平衡点
+            if (bothHoriz && absDy2 > absDx2 * 1.4) {
                 // Strong vertical dominance with horizontal ports → C-shape → fix to L-shape
                 startPos = dy2 > 0 ? Position.Bottom : Position.Top;
                 endPos   = dy2 > 0 ? Position.Top    : Position.Bottom;
-            } else if (bothVert && absDx2 > absDy2 * 2) {
+            } else if (bothVert && absDx2 > absDy2 * 1.4) {
                 // Strong horizontal dominance with vertical ports → fix
                 startPos = dx2 > 0 ? Position.Right : Position.Left;
                 endPos   = dx2 > 0 ? Position.Left  : Position.Right;
@@ -905,6 +905,24 @@ export class EdgeRoutingWorker {
             let trunkEnd: Point | null = null;
             let trunkAxis: number | null = null;
             let isVertical = false;
+
+            // [T6] 提取公共辅助函数：将端口重置为基于 source→target 主轴方向的几何最优端口。
+            // 原来此段代码在 3 处重复（precomputed trunk skip / unified guard vertical / horizontal）。
+            // 提取后维护只需改一处，后续扩展（45°对角线判断等）只需在此添加。
+            const resetPortsToGeometric = () => {
+                if (hasExplicitSource || hasExplicitTarget) return;
+                const gdx = (tRect.x + tRect.width / 2) - (sRect.x + sRect.width / 2);
+                const gdy = (tRect.y + tRect.height / 2) - (sRect.y + sRect.height / 2);
+                if (Math.abs(gdx) > Math.abs(gdy)) {
+                    startPos = gdx > 0 ? Position.Right : Position.Left;
+                    endPos   = gdx > 0 ? Position.Left  : Position.Right;
+                } else {
+                    startPos = gdy > 0 ? Position.Bottom : Position.Top;
+                    endPos   = gdy > 0 ? Position.Top    : Position.Bottom;
+                }
+                hasFixedSourcePort = false;
+                hasFixedTargetPort = false;
+            };
 
             // Priority 1: Use Precomputed Trunk from Coordinator (Global Context)
             if (hasPrecomputedTrunk && job.busTrunkSource && job.busTrunkTarget) {
@@ -983,28 +1001,10 @@ export class EdgeRoutingWorker {
                         trunkStart = null;
                         trunkEnd = null;
                         trunkAxis = null;
-                        // [FIX-C-shape-precomputed] When we skip the precomputed trunk due to C-shape
-                        // or excessive detour, we must also reset the port assignments. The ports were
-                        // locked to trunk-facing positions (e.g. Right for a vertical trunk), but with
-                        // no trunk those ports create a misaligned A* start/end.
-                        // Recalculate using pure geometric heuristic: dominant direction of source→target.
+                        // [T6] 使用提取的公共助手函数重置端口
+                        resetPortsToGeometric();
+                        // 重算端口锄点坐标以匹配新端口
                         if (!hasExplicitSource && !hasExplicitTarget) {
-                            const sCx = sRect.x + sRect.width / 2;
-                            const sCy = sRect.y + sRect.height / 2;
-                            const tCx = tRect.x + tRect.width / 2;
-                            const tCy = tRect.y + tRect.height / 2;
-                            const gdx = tCx - sCx;
-                            const gdy = tCy - sCy;
-                            if (Math.abs(gdx) > Math.abs(gdy)) {
-                                startPos = gdx > 0 ? Position.Right : Position.Left;
-                                endPos = gdx > 0 ? Position.Left : Position.Right;
-                            } else {
-                                startPos = gdy > 0 ? Position.Bottom : Position.Top;
-                                endPos = gdy > 0 ? Position.Top : Position.Bottom;
-                            }
-                            hasFixedSourcePort = false;
-                            hasFixedTargetPort = false;
-                            // Recalculate port anchor points for the new geometric ports
                             const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, 1);
                             const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, 1);
                             const portOffset = config.algorithm.portOffset ?? 40;
@@ -1016,7 +1016,6 @@ export class EdgeRoutingWorker {
                             (startWithOffset as { x: number; y: number }).y = startPos === Position.Top ? newStartPt.y - portOffset : startPos === Position.Bottom ? newStartPt.y + portOffset : newStartPt.y;
                             (endWithOffset as { x: number; y: number }).x = endPos === Position.Left ? newEndPt.x - portOffset : endPos === Position.Right ? newEndPt.x + portOffset : newEndPt.x;
                             (endWithOffset as { x: number; y: number }).y = endPos === Position.Top ? newEndPt.y - portOffset : endPos === Position.Bottom ? newEndPt.y + portOffset : newEndPt.y;
-    
                         }
                     }
                 }
@@ -1068,7 +1067,9 @@ export class EdgeRoutingWorker {
                     };
 
                     const treeTrunk = trunkCalculator.calculateTreeTrunk(
-                        hubRect, peerNodes, !!job.isManyToOne, config, job.layoutDirection
+                        hubRect, peerNodes, !!job.isManyToOne, config, job.layoutDirection,
+                        undefined,            // precomputedCentroid: 本地计算路径不预传
+                        routingObstacles      // [T1] 传入障碍物，启用轴线扫描避障
                     );
 
                     if (treeTrunk.direction === 'vertical') {
@@ -1094,6 +1095,7 @@ export class EdgeRoutingWorker {
             // from the opposite side to reach the target). If so, skip trunk and use direct A* routing.
             // This is the single authoritative guard for C-shape prevention.
 
+            // [T6] Unified C-shape guard — 使用提取的 resetPortsToGeometric() 替代 3 处重复代码块
             if (trunkStart && trunkEnd && trunkAxis !== null) {
                 let shouldSkipTrunk = false;
                 if (isVertical) {
@@ -1101,60 +1103,24 @@ export class EdgeRoutingWorker {
                     const step3H = endWithOffset.x - trunkEnd.x;
                     if (Math.abs(step1H) > 5 && Math.abs(step3H) > 5 && Math.sign(step1H) !== Math.sign(step3H)) {
                         shouldSkipTrunk = true;
-                        // Also reset ports to geometric optimal to avoid L/R port with no trunk
-                        if (!hasExplicitSource && !hasExplicitTarget) {
-                            const sCx = sRect.x + sRect.width / 2;
-                            const sCy = sRect.y + sRect.height / 2;
-                            const tCx = tRect.x + tRect.width / 2;
-                            const tCy = tRect.y + tRect.height / 2;
-                            const gdx = tCx - sCx;
-                            const gdy = tCy - sCy;
-                            if (Math.abs(gdx) > Math.abs(gdy)) {
-                                startPos = gdx > 0 ? Position.Right : Position.Left;
-                                endPos = gdx > 0 ? Position.Left : Position.Right;
-                            } else {
-                                startPos = gdy > 0 ? Position.Bottom : Position.Top;
-                                endPos = gdy > 0 ? Position.Top : Position.Bottom;
-                            }
-                        }
+                        resetPortsToGeometric(); // [T6]
                     }
                 } else {
                     const step1V = trunkStart.y - startWithOffset.y;
                     const step3V = endWithOffset.y - trunkEnd.y;
                     if (Math.abs(step1V) > 5 && Math.abs(step3V) > 5 && Math.sign(step1V) !== Math.sign(step3V)) {
                         shouldSkipTrunk = true;
-                        if (!hasExplicitSource && !hasExplicitTarget) {
-                            const sCx = sRect.x + sRect.width / 2;
-                            const sCy = sRect.y + sRect.height / 2;
-                            const tCx = tRect.x + tRect.width / 2;
-                            const tCy = tRect.y + tRect.height / 2;
-                            const gdx = tCx - sCx;
-                            const gdy = tCy - sCy;
-                            if (Math.abs(gdx) > Math.abs(gdy)) {
-                                startPos = gdx > 0 ? Position.Right : Position.Left;
-                                endPos = gdx > 0 ? Position.Left : Position.Right;
-                            } else {
-                                startPos = gdy > 0 ? Position.Bottom : Position.Top;
-                                endPos = gdy > 0 ? Position.Top : Position.Bottom;
-                            }
-                        }
+                        resetPortsToGeometric(); // [T6]
                     }
                 }
                 if (shouldSkipTrunk) {
                     trunkStart = null;
                     trunkEnd = null;
                     trunkAxis = null;
-                    // [FIX-C-shape] Recalculate port points based on the newly-assigned geometric ports,
-                    // since startPt/endPt/startWithOffset/endWithOffset were computed with the old trunk-biased ports.
+                    // 重算端口锄点坐标（启用 getPortOffsetPoint 精确计算 offset）
                     if (!hasExplicitSource && !hasExplicitTarget) {
                         const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, 1);
                         const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, 1);
-
-                        // Reassign in the outer scope using the mutable binding trick: just use these below
-                        // (startPt, endPt, startWithOffset, endWithOffset are let-declared)
-                        // We can't reassign const, but we can use local vars for the path building below.
-                        // Override the outer vars by shadowing is not allowed; use a flag instead.
-                        // Since they're `let`, we can reassign directly:
                         (startPt as { x: number; y: number }).x = newStartPt.x;
                         (startPt as { x: number; y: number }).y = newStartPt.y;
                         (endPt as { x: number; y: number }).x = newEndPt.x;
@@ -1710,5 +1676,24 @@ export class EdgeRoutingWorker {
             labelY: 0,
             error: message
         };
+    }
+
+    /**
+     * [B4] 静态方法：将 handle 字符串解析为 Position 枚举。
+     * 原为 execute() 内的内联箭头函数，每条边调用时创建新闭包对象。
+     * 提升为静态方法后，50 条边批处理中只有一个函数引用。
+     */
+    static parseHandleDir(h?: string | null): Position | undefined {
+        if (!h) return undefined;
+        const s = String(h).toLowerCase();
+        if (s.includes('left'))   return Position.Left;
+        if (s.includes('right'))  return Position.Right;
+        if (s.includes('top'))    return Position.Top;
+        if (s.includes('bottom')) return Position.Bottom;
+        if (s.startsWith('l'))    return Position.Left;
+        if (s.startsWith('r'))    return Position.Right;
+        if (s.startsWith('t'))    return Position.Top;
+        if (s.startsWith('b'))    return Position.Bottom;
+        return undefined;
     }
 }

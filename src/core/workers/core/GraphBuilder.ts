@@ -125,8 +125,9 @@ export const buildOrGetSpatialIndex = (
 
     if (prebuiltSpatialIndex) return prebuiltSpatialIndex;
 
-    // Only build if obstacle count justifies the overhead (> 50)
-    if (!obstacles || obstacles.length <= 50) return undefined;
+    // [P5] 与 Worker 内部阈值对齐：20 个节点以上即构建 SpatialIndex。
+    // 原阈值 50 导致主线程在中等图（21-50节点）退化为线性扫描。
+    if (!obstacles || obstacles.length <= 20) return undefined;
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 

@@ -140,7 +140,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
   {
     id: 'performance-demo',
     name: 'Smart Edge Performance',
-    component: lazy(() => import('@/core').then(m => ({ default: m.PerformanceDemo })).then(module => ({ default: module.PerformanceDemo }))),
+    component: lazy(() => import('@/core').then(m => ({ default: m.PerformanceDemo }))),
     category: 'debug',
     tags: ['performance', 'smart-edge', 'demo'],
     icon: FaCodeBranch,

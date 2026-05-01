@@ -198,7 +198,8 @@ export class PathPostProcessor {
             finalPoints = collapseCollinearBacktracks(preventEndpointCollinearBacktrack(finalPoints));
         }
 
-        finalPoints = snapAxis(finalPoints);
+        // [A3] 删除多余的无条件 snapAxis（L201），Phase 5 结尾已在上方条件分支内执行了 snapAxis
+        // Phase 6 之前的点已是轴对齐状态，无需重复
         // [BACKTRACK-BUS] Run collapseCollinearBacktracks on bus/trunk edges too,
         // to clean up any small directional backtracks introduced by nudging or
         // trunk junction alignment (e.g. 52px overshoot at merge point).

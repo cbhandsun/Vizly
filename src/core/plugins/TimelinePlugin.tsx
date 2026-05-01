@@ -18,7 +18,7 @@ export class TimelinePlugin implements DiagramTypePlugin {
   version = '1.1.0';
   description = 'Pro 级甘特图与时间线引擎，支持阶段推演、依赖联动与原子级随动演练，是项目管理与路线图规划的神兵利器。';
   author = 'Vizly Core';
-  category = 'Productivity';
+  category: 'Core' | 'Productivity' | 'Integration' | 'Beta' = 'Productivity';
   tags = ['Gantt', 'Project', 'Timeline'];
   brandColor = '#52c41a';
 

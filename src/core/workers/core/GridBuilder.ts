@@ -55,20 +55,26 @@ export class GridBuilder {
             relevantObstacles = obstacles;
         }
 
-        // Expand bounds to fully enclose any obstacle that touches our initial grid
-        for (const obs of relevantObstacles) {
-            // Skip source/target node to prevent over-expansion or weird behavior
-            const nodeObs = obs as any;
-            if (nodeObs.id && (nodeObs.id === sourceId || nodeObs.id === targetId)) continue;
-            
-            const intersects = !(obs.x > maxX_raw || obs.x + obs.width < minX_raw || obs.y > maxY_raw || obs.y + obs.height < minY_raw);
-            if (intersects) {
-                // Expand by the obstacle's bounds PLUS a safe routing margin (200px)
-                const routeMargin = 200;
-                minX_raw = Math.min(minX_raw, obs.x - routeMargin);
-                maxX_raw = Math.max(maxX_raw, obs.x + obs.width + routeMargin);
-                minY_raw = Math.min(minY_raw, obs.y - routeMargin);
-                maxY_raw = Math.max(maxY_raw, obs.y + obs.height + routeMargin);
+        // [P2] 短距离路径（<=400px）跳过障碍物边界扩展循环。
+        // 对于短路径，每个障碍物均会对边界扩展 ±200px，导致网格大小远超路径需求。
+        // GRID_PADDING=200 对于短路径的绕路空间已足够。
+        const routeDist = Math.hypot(bounds.endX - bounds.startX, bounds.endY - bounds.startY);
+        if (routeDist > 400) {
+            // Expand bounds to fully enclose any obstacle that touches our initial grid
+            for (const obs of relevantObstacles) {
+                // Skip source/target node to prevent over-expansion or weird behavior
+                const nodeObs = obs as any;
+                if (nodeObs.id && (nodeObs.id === sourceId || nodeObs.id === targetId)) continue;
+
+                const intersects = !(obs.x > maxX_raw || obs.x + obs.width < minX_raw || obs.y > maxY_raw || obs.y + obs.height < minY_raw);
+                if (intersects) {
+                    // Expand by the obstacle's bounds PLUS a safe routing margin (200px)
+                    const routeMargin = 200;
+                    minX_raw = Math.min(minX_raw, obs.x - routeMargin);
+                    maxX_raw = Math.max(maxX_raw, obs.x + obs.width + routeMargin);
+                    minY_raw = Math.min(minY_raw, obs.y - routeMargin);
+                    maxY_raw = Math.max(maxY_raw, obs.y + obs.height + routeMargin);
+                }
             }
         }
 

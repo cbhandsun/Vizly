@@ -20,7 +20,7 @@ export class StandardFlowPlugin implements DiagramTypePlugin {
   version = '2.1.0';
   description = '功能强大的通用流程图引擎，支持多种自动布局策略与智能连线，是业务逻辑编排的首选工具。';
   author = 'Vizly Core Team';
-  category = 'Core';
+  category: 'Core' | 'Productivity' | 'Integration' | 'Beta' = 'Core';
   tags = ['Flow', 'Logic', 'BPMN'];
   brandColor = '#1890ff';
 
@@ -85,7 +85,7 @@ export class StandardFlowPlugin implements DiagramTypePlugin {
           const recommendation = recommendLayout(ctx.getNodes(), ctx.getEdges());
           if (recommendation) {
             window.dispatchEvent(new CustomEvent('editor:command', { 
-              detail: { action: 'apply-layout', strategy: recommendation.strategy } 
+              detail: { action: 'apply-layout', strategy: recommendation.domainStrategy } 
             }));
           }
         });

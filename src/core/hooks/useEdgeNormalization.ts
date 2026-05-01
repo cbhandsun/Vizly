@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { Edge, Node } from '@xyflow/react';
 import { decideEdgeRouting } from '../utils/HandlePicker';
 import { diagramConfigManager } from '../components/config/DiagramConfig';
@@ -11,25 +11,20 @@ export interface EdgeNormalizationOptions {
 
 /**
  * P1 Single Source of Truth for Edge Properties
- * 
+ *
  * Unifies edge.mode / pathType / autoPathType / autoHandle into a single resolution step.
  * Ensures that what the view layer sees is exactly what should be rendered.
+ *
+ * [OPT-P2⑧] 精细化 useMemo 依赖粒度：
+ * - 节点拓扑签名：只包含 id + 尺寸（忽略位置）→ 拖动不触发重算
+ * - 边签名：只包含 source/target/handle/manual 关键字段
+ * - 路由决策结果缓存在 ref 中，签名未变时直接复用
  */
 export function useEdgeNormalization(
   nodes: Node[],
   edges: Edge[],
   options: EdgeNormalizationOptions = {}
 ) {
-  // Subscribe to config changes (in a real app, this might be a context or store, 
-  // but here we use the manager directly or assume parent passes trigger. 
-  // For now, we'll assume the parent component re-renders when config changes, 
-  // or we can add a listener if needed. Given existing code uses useEffect to sync config,
-  // we'll rely on props/context propagation or just read current config.)
-
-  // Note: To make this hook reactive to config changes without a React context,
-  // we might need a forceUpdate or similar if the config manager doesn't trigger React updates.
-  // Assuming the calling component manages the 'edgeMode' state or similar.
-
   const {
     enableSmartRouting = true,
     layoutDirection = 'TB',
@@ -39,9 +34,44 @@ export function useEdgeNormalization(
   const config = overrideConfig || diagramConfigManager.getConfig();
   const edgeConfig = config.edge || {};
 
+  // [OPT-P2⑧] 节点拓扑签名：id + 尺寸（不包含位置，拖动时不失效）
+  const nodeTopoKey = useMemo(() => {
+    return nodes.map(n => {
+      const w = n.measured?.width ?? (n as any).width ?? 0;
+      const h = n.measured?.height ?? (n as any).height ?? 0;
+      return `${n.id}:${w}:${h}`;
+    }).join('|');
+  }, [nodes]);
+
+  // [OPT-P2⑧] 边拓扑签名：source/target/handle/manualHandles 关键字段
+  const edgeTopoKey = useMemo(() => {
+    return edges.map(e => {
+      const d: any = e.data || {};
+      const mh = d.manualHandles ? '1' : '0';
+      const mhs = Array.isArray(d.manualHandleSides) ? d.manualHandleSides.join(',') : '';
+      return `${e.id}:${e.source}>${e.target}:${e.sourceHandle ?? ''}:${e.targetHandle ?? ''}:${mh}:${mhs}`;
+    }).join('|');
+  }, [edges]);
+
+  // [OPT-P2⑧] 只提取影响路由决策的 edgeConfig 字段
+  const edgeConfigKey = useMemo(() => {
+    return `${edgeConfig.mode}|${edgeConfig.pathType}|${edgeConfig.directionalHandlePolicy}`;
+  }, [edgeConfig]);
+
+  // 签名缓存 ref，签名命中时直接返回上次结果
+  const cacheRef = useRef<{ key: string; result: Edge[] } | null>(null);
+
   const normalizedEdges = useMemo(() => {
     if (!enableSmartRouting) {
       return edges;
+    }
+
+    // 组合签名：任意一项变化都触发重算
+    const cacheKey = `${nodeTopoKey}::${edgeTopoKey}::${edgeConfigKey}::${layoutDirection}`;
+
+    // 签名命中：节点拖动时最常触发，直接复用
+    if (cacheRef.current && cacheRef.current.key === cacheKey) {
+      return cacheRef.current.result;
     }
 
     // Prepare routing config once
@@ -51,14 +81,13 @@ export function useEdgeNormalization(
       autoPathSelection: true,
       layoutDirection,
       directionalHandlePolicy: (edgeConfig.directionalHandlePolicy || 'prefer') as 'prefer' | 'force' | 'off',
-      // Pass other config values if needed
       angleToleranceDeg: edgeConfig.angleToleranceDeg,
       bezierDistanceThreshold: edgeConfig.bezierDistanceThreshold,
       obstacleScopePadding: edgeConfig.obstacleScopePadding,
       corridorObstacleThreshold: edgeConfig.corridorObstacleThreshold,
       verticalBiasThreshold: edgeConfig.verticalBiasThreshold,
       obstaclePadding: edgeConfig.obstaclePadding,
-      smoothFallback: edgeConfig.smoothFallback, // Ensure fallback is passed
+      smoothFallback: edgeConfig.smoothFallback,
     };
 
     const nodeMap = new Map<string, any>();
@@ -111,41 +140,22 @@ export function useEdgeNormalization(
       return { source: false, target: false };
     };
 
-    return edges.map(edge => {
-      // P8: O(n²)→O(n) — 已有 nodeMap，直接 Map.get 替代 Array.find
+    const result = edges.map(edge => {
+      // O(n²)→O(n) — nodeMap 直接 get
       const sourceNode = nodeMap.get(String(edge.source));
       const targetNode = nodeMap.get(String(edge.target));
 
-      // If nodes are missing, we can't do smart routing. Return as is or with defaults.
       if (!sourceNode || !targetNode) {
         return edge;
       }
-
-      // Check for explicit handle overrides on the edge itself
-      // If the edge has explicit handles, we might want to respect them unless 'autoHandle' is true?
-      // P1 goal: "orchestration layer parses once".
-      // Current behavior in codebases:
-      // "sourceHandle: edge.sourceHandle ?? routingResult.sourceHandle"
-      // This implies if edge.sourceHandle is set, we use it.
 
       const autoFlags = readAutoFlags(edge);
       const manualFlags = readManualFlags(edge);
       const hasExplicitSource = !!edge.sourceHandle && manualFlags.source;
       const hasExplicitTarget = !!edge.targetHandle && manualFlags.target;
 
-      // However, decideEdgeRouting also takes 'preAssignedPorts' or we can just let it run 
-      // and then overwrite if we want to respect explicit handles.
-      // But decideEdgeRouting might choose a different 'type' based on handles.
-      // Ideally, if handles are fixed, we should tell decideEdgeRouting about them so it picks the best type for THOSE handles.
-
-      // Let's call decideEdgeRouting.
-      // Note: decideEdgeRouting doesn't currently accept "fixed handles" as a hard constraint for type selection 
-      // except via candidate filtering which isn't fully exposed in the simplified call.
-      // But we can just use the result and override handles if needed.
-
       const routingResult = decideEdgeRouting(sourceNode, targetNode, nodes, routingConfig);
 
-      // Resolve final properties
       const existingSH = normalizeHandle(edge.sourceHandle as any);
       const existingTH = normalizeHandle(edge.targetHandle as any);
 
@@ -178,11 +188,6 @@ export function useEdgeNormalization(
       if (nextAuto.source) autoList.push('source');
       if (nextAuto.target) autoList.push('target');
 
-      // If we forced handles, should we re-evaluate type? 
-      // decideEdgeRouting's type logic is coupled with its handle choice.
-      // For P1, let's stick to the pattern: "Calculate optimal, but respect explicit overrides".
-
-      // Construct the unified edge object
       return {
         ...edge,
         type: routingResult.type,
@@ -195,13 +200,20 @@ export function useEdgeNormalization(
           autoTarget: nextAuto.target,
           manualHandles: (edge.data as any)?.manualHandles,
           manualHandleSides: (edge.data as any)?.manualHandleSides,
-          // We can also inject debug info or other computed props here
           _routingMode: routingConfig.mode,
           _generatedType: routingResult.type
         } as any)
       };
     });
-  }, [nodes, edges, edgeConfig, enableSmartRouting, layoutDirection]);
+
+    // 写入签名缓存
+    cacheRef.current = { key: cacheKey, result };
+    return result;
+
+  // [OPT-P2⑧] 依赖改为签名字符串（而非原始数组引用）
+  // 节点位置变化（拖动）不触发重算，仅拓扑/尺寸/配置变化时触发
+  // nodes/edges 本身仍列入，以确保 getAbsolutePosition 内部逻辑使用最新引用
+  }, [nodeTopoKey, edgeTopoKey, edgeConfigKey, enableSmartRouting, layoutDirection, nodes, edges]);
 
   return normalizedEdges;
 }

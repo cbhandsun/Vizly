@@ -136,24 +136,25 @@ export class BusDetector {
         nodes: any[],
         edges: any[],
         layoutDirection: string,
-        edgeId: string
+        edgeId: string,
+        nodeMap?: Map<string, any>  // [T4] O(1) 查找
     ): any[] {
         if (targetQuad === -1) {
             const currentEdge = peerList.find(e => e.id === edgeId);
             return currentEdge ? [currentEdge] : [];
         }
 
-        const originNode = nodes.find((n: any) => n.id === originId);
+        // [T4] 构建或复用 nodeMap
+        const nMap = nodeMap ?? new Map<string, any>(nodes.map((n: any) => [n.id, n]));
+
+        const originNode = nMap.get(originId);
         const refEdge = edges.find((e: any) => e.id === edgeId);
         if (!originNode || !refEdge) return [peerList.find(e => e.id === edgeId)].filter(Boolean);
 
-        // [FIX] Use getNodePosition
         const originPos = getNodePosition(originNode);
-
-        // Determine orientation
         const otherId = isSource ? refEdge.target : refEdge.source;
-        const targetNode = nodes.find((n: any) => n.id === otherId);
-        
+        const targetNode = nMap.get(otherId);
+
         let isHorz = true;
         if (targetNode) {
             const targetPos = getNodePosition(targetNode);
@@ -164,20 +165,18 @@ export class BusDetector {
 
         return peerList.filter((e: any) => {
             if (e.id === edgeId) return true;
-
             const peerOtherId = isSource ? e.target : e.source;
-            const peerOtherNode = nodes.find((n: any) => n.id === peerOtherId);
+            const peerOtherNode = nMap.get(peerOtherId);  // [T4] O(1)
             if (!peerOtherNode) return false;
 
-            const oC = { 
-                x: originPos.x + (originNode.width || originNode.measured?.width || 0) / 2, 
-                y: originPos.y + (originNode.height || originNode.measured?.height || 0) / 2 
+            const oC = {
+                x: originPos.x + (originNode.width || originNode.measured?.width || 0) / 2,
+                y: originPos.y + (originNode.height || originNode.measured?.height || 0) / 2
             };
-            
             const pPos = getNodePosition(peerOtherNode);
-            const tC = { 
-                x: pPos.x + (peerOtherNode.width || peerOtherNode.measured?.width || 0) / 2, 
-                y: pPos.y + (peerOtherNode.height || peerOtherNode.measured?.height || 0) / 2 
+            const tC = {
+                x: pPos.x + (peerOtherNode.width || peerOtherNode.measured?.width || 0) / 2,
+                y: pPos.y + (peerOtherNode.height || peerOtherNode.measured?.height || 0) / 2
             };
             const dx = tC.x - oC.x;
             const dy = tC.y - oC.y;
@@ -206,20 +205,21 @@ export class BusDetector {
         edgeList: any[],
         isOutgoing: boolean,
         nodes: any[],
-        _edges: any[]
+        _edges: any[],
+        nodeMap?: Map<string, any>  // [T2] O(1) 查找
     ): any[] {
+        const nMap = nodeMap ?? new Map<string, any>(nodes.map((n: any) => [n.id, n]));
         const upstream: any[] = [];
         const downstream: any[] = [];
         const map = new Map<string, number>();
 
         edgeList.forEach(e => {
-            const dist = this.getSignedDist(e, isOutgoing, nodes);
+            const dist = this.getSignedDist(e, isOutgoing, nMap);
             map.set(e.id, dist);
             if (dist < 0) upstream.push(e);
             else downstream.push(e);
         });
 
-        // Standard Ascending Sort works for both
         upstream.sort((a, b) => (map.get(a.id) || 0) - (map.get(b.id) || 0));
         downstream.sort((a, b) => (map.get(a.id) || 0) - (map.get(b.id) || 0));
 
@@ -229,15 +229,16 @@ export class BusDetector {
     /**
      * Get signed distance for sorting (relative to hub node)
      */
+    // [T2] 将参数改为 Map，O(1) 查找替换原来的 nodes.find() O(N)
     private getSignedDist(
         e: any,
         isOutgoing: boolean,
-        nodes: any[]
+        nodeMap: Map<string, any>
     ): number {
         const hubId = isOutgoing ? e.source : e.target;
         const otherId = isOutgoing ? e.target : e.source;
-        const hub = nodes.find(n => n.id === hubId);
-        const other = nodes.find(n => n.id === otherId);
+        const hub = nodeMap.get(hubId);
+        const other = nodeMap.get(otherId);
 
         if (!hub || !other) return 0;
 
@@ -246,8 +247,6 @@ export class BusDetector {
         const dx = oC.x - hC.x;
         const dy = oC.y - hC.y;
 
-        // If predominantly horizontal, use dy as sort metric (and vice versa)
-        // This spreads edges along the spine
         return Math.abs(dx) > Math.abs(dy) ? dy : dx;
     }
 
@@ -374,10 +373,13 @@ export class BusDetector {
     /**
      * Adaptive Bus Separation
      */
+    // [T5] 分支间距考虑 peer 节点平均尺寸，而非仅依赖 hub 尺寸
+    // 场景：hub 是大节点但 peers 小时，原公式过大；hub 小但 peers 大时，原公式过小
     calculateBusSeparation(
         nodeRect: Rectangle | null,
         branchCount: number,
-        isHorizontalSpine: boolean
+        isHorizontalSpine: boolean,
+        peerRects?: Rectangle[]  // [T5] peer 节点矩形列表，用于平均尺寸计算
     ): number {
         const MIN_SEPARATION = 20;
         const MAX_SEPARATION = 80;
@@ -387,9 +389,20 @@ export class BusDetector {
             return DEFAULT_SEPARATION;
         }
 
-        const relevantDimension = isHorizontalSpine ? nodeRect.width : nodeRect.height;
-        const adaptiveSeparation = relevantDimension / (branchCount + 2);
+        // hub 节点垂直于干线方向的尺寸
+        const hubDim = isHorizontalSpine ? nodeRect.width : nodeRect.height;
 
+        // [T5] 如果提供了 peerRects，取 hub 与 peers 平均尺寸的较小值
+        let refDim = hubDim;
+        if (peerRects && peerRects.length > 0) {
+            const avgPeerDim = peerRects.reduce(
+                (sum, p) => sum + (isHorizontalSpine ? p.height : p.width), 0
+            ) / peerRects.length;
+            // 参考尺寸 = hub 尺寸与「peer 平均尺寸 × branchCount」取较小值—防止过大
+            refDim = Math.min(hubDim, avgPeerDim * branchCount);
+        }
+
+        const adaptiveSeparation = refDim / (branchCount + 2);
         return Math.max(MIN_SEPARATION, Math.min(MAX_SEPARATION, adaptiveSeparation));
     }
 

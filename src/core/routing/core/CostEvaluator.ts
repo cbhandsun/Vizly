@@ -89,18 +89,34 @@ export class CostEvaluator {
 
     /**
      * 评估转弯成本
+     *
+     * [OPT-P1③] 由"方向不同 = 一次固定惩罚"升级为基于端口对的精确转弯次数估算：
+     * - 0 次转弯：直通路径 (r→l, l→r, b→t, t→b，且沿正确轴方向)
+     * - 1 次转弯：L 形路径 (水平端口 → 垂直端口，或反之)
+     * - 2 次转弯：U 形/Z 形 (同侧端口 r→r，或反向端口 r→r 等)
      */
     private evaluateTurns(context: CostContext): number {
-        const { sDir, tDir, weights } = context;
+        const { sDir, tDir, dx, dy, weights } = context;
 
-        // 简化:如果源和目标方向不同(e.g., r -> b)，意味着至少 1 次转弯
-        // 如果方向相同 (e.g., r -> r)，通常意味着 0 或 2 次转弯(U-turn)
-        // 这里只给出一个基础估计
-        if (sDir !== tDir) {
-            return weights.turn;
+        const isHoriz = (d: string) => d === 'l' || d === 'r';
+        const isVert  = (d: string) => d === 't' || d === 'b';
+
+        // 同轴直通：源和目标端口轴一致，且方向互相面对
+        const straightThrough =
+            (sDir === 'r' && tDir === 'l' && dx >= 0) ||
+            (sDir === 'l' && tDir === 'r' && dx <= 0) ||
+            (sDir === 'b' && tDir === 't' && dy >= 0) ||
+            (sDir === 't' && tDir === 'b' && dy <= 0);
+
+        if (straightThrough) return 0;
+
+        // L 形：一个水平端口 + 一个垂直端口
+        if ((isHoriz(sDir) && isVert(tDir)) || (isVert(sDir) && isHoriz(tDir))) {
+            return weights.turn; // 1 次转弯
         }
 
-        return 0;
+        // 同侧端口 (U 形) 或反向同轴 (Z 形) = 2 次转弯
+        return weights.turn * 2;
     }
 
     /**
@@ -116,7 +132,20 @@ export class CostEvaluator {
         const sa = geometryAnalyzer.getHandleAnchor(sNode, sDir);
         const ta = geometryAnalyzer.getHandleAnchor(tNode, tDir);
 
-        // 简单检测:直线路径是否穿过障碍物
+        // [P4] AABB 快速剥除：计算 source→target 的路径包围盒
+        // 如果该区域内没有任何障碍物，直接返回 0，跳过逐矩形检测。
+        // 对于常见的无障碍场景，将 O(N) 降为 O(1)。
+        const bboxMinX = Math.min(sa.x, ta.x);
+        const bboxMaxX = Math.max(sa.x, ta.x);
+        const bboxMinY = Math.min(sa.y, ta.y);
+        const bboxMaxY = Math.max(sa.y, ta.y);
+        const hasAnyInBbox = (obstacles as any[]).some((obs: any) =>
+            obs.x < bboxMaxX && obs.x + obs.width > bboxMinX &&
+            obs.y < bboxMaxY && obs.y + obs.height > bboxMinY
+        );
+        if (!hasAnyInBbox) return 0;
+
+        // 简单检测：直线路径是否穿过障碍物
         let crossings = 0;
         for (const obs of obstacles) {
             if (this.lineIntersectsRect(sa, ta, obs)) {

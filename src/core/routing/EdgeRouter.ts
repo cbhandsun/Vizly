@@ -2,6 +2,8 @@ import { geometryAnalyzer } from './core/GeometryAnalyzer';
 import { portSelector } from './core/PortSelector';
 import { costEvaluator } from './core/CostEvaluator';
 import * as pathFinder from '../algorithms/pathfinding';
+import { calculateAdaptiveGridSize } from '../workers/core/GraphBuilder'; // [P1]
+import { expandHandle, normalizeHandle, isHorizontalHandle, isVerticalHandle } from './utils/handleUtils';
 
 import type {
     NodeGeometry,
@@ -85,29 +87,10 @@ export class EdgeRouter {
         customWeights?: Partial<EdgeRoutingWeights>
     ): RoutingDecision {
 
-        // 将路由系统内部简写 (r/l/t/b) 映射为 FlowchartNode Handle 全称 (right/left/top/bottom)
-        const expandHandle = (h: string): string => {
-            const s = String(h).toLowerCase();
-            if (s === 'r') return 'right';
-            if (s === 'l') return 'left';
-            if (s === 't') return 'top';
-            if (s === 'b') return 'bottom';
-            // 已经是全称或其他自定义 ID，原样返回
-            return h;
-        };
+
 
         try {
-            const normalizeHandle = (h?: string): 'l' | 'r' | 't' | 'b' | undefined => {
-                if (!h) return undefined;
-                const s = String(h).toLowerCase();
-                if (s === 'l' || s.startsWith('l') || s.includes('left')) return 'l';
-                if (s === 'r' || s.startsWith('r') || s.includes('right')) return 'r';
-                if (s === 't' || s.startsWith('t') || s.includes('top')) return 't';
-                if (s === 'b' || s.startsWith('b') || s.includes('bottom')) return 'b';
-                return undefined;
-            };
-
-            // 1. 获取权重配置
+            // [OPT-P2⑧] normalizeHandle/expandHandle 已统一到 handleUtils.ts
             const weights = this.getWeights(config, customWeights);
 
             // 2. 几何分析
@@ -143,19 +126,11 @@ export class EdgeRouter {
                 const addx = Math.abs(ddx);
                 const addy = Math.abs(ddy);
 
-                const normH = (h: string) => {
-                    const s = h.toLowerCase();
-                    return s === 'r' || s === 'right' || s === 'l' || s === 'left';
-                };
-                const normV = (h: string) => {
-                    const s = h.toLowerCase();
-                    return s === 't' || s === 'top' || s === 'b' || s === 'bottom';
-                };
-
-                const srcIsHoriz = normH(portResult.sourceHandle);
-                const tgtIsHoriz = normH(portResult.targetHandle);
-                const srcIsVert = normV(portResult.sourceHandle);
-                const tgtIsVert = normV(portResult.targetHandle);
+                // [OPT-P2⑧] 使用 handleUtils 中的 isHorizontalHandle / isVerticalHandle
+                const srcIsHoriz = isHorizontalHandle(portResult.sourceHandle);
+                const tgtIsHoriz = isHorizontalHandle(portResult.targetHandle);
+                const srcIsVert  = isVerticalHandle(portResult.sourceHandle);
+                const tgtIsVert  = isVerticalHandle(portResult.targetHandle);
 
                 if (srcIsHoriz && tgtIsHoriz && addy > addx * 2) {
                     // Both horizontal but strong vertical dominance → switch to vertical
@@ -235,11 +210,19 @@ export class EdgeRouter {
                     }
                 }
 
+                // [P1] 自适应 gridSize：短距离连线用 10px 精细网格，长距离自动升为粗网格
+                // 原来硬编码 orthogonalGridSize（默认 20），导致短距离节点间精度不足
+                const adaptiveGridSize = calculateAdaptiveGridSize(
+                    startPoint.x, startPoint.y,
+                    endPoint.x, endPoint.y,
+                    config.orthogonalGridSize || 20
+                );
+
                 const path = pathFinder.findPath(
                     startPoint,
                     endPoint,
                     (config as any).obstacles || [],
-                    config.orthogonalGridSize || 20,
+                    adaptiveGridSize,  // [P1]
                     lineObstacles
                 );
 
