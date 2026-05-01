@@ -886,13 +886,15 @@ export class EdgeRoutingCoordinator {
                     this.cache.set(key, result);
                 }
 
-                // [FIX] Track Performance — 不含策略名称
+                // [FIX] Track Performance — 含策略名称 + 路径质量指标
                 this.monitor.track({
                     edgeId: req.edgeId,
                     routingTime: performance.now() - startTime,
                     cacheHit: false,
                     workerTime: result.metadata?.executionTime,
-                    strategy: result.metadata?.strategy  // 传递策略名，供分布图使用
+                    strategy: result.metadata?.strategy,       // 传递策略名，供分布图使用
+                    bendCount: (result.metadata as any)?.bendCount,
+                    efficiencyRatio: (result.metadata as any)?.efficiencyRatio,
                 });
 
                 const shouldEmitDebug =

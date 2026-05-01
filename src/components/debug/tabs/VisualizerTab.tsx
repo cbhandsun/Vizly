@@ -807,7 +807,7 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
         coordinator.setDebugEdge(targetEdgeId || null);
     }, [targetEdgeId]);
 
-    // [UX] Extract strategy info for HUD display
+    // [UX] Extract strategy info + quality metrics for HUD display
     const hudInfo = (() => {
         if (!debugData) return null;
         const ad = debugData.algorithmDebug && typeof debugData.algorithmDebug === 'object'
@@ -819,7 +819,12 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
         const tt = dataAny.selectedTargetPos ?? ps?.selected?.target ?? '?';
         const geo = ps?.geometry ?? ps?.detectedGeometry ?? '?';
         const ms = debugData.metadata?.duration?.toFixed(1) ?? '?';
-        return { strategy, portStr: `${s} → ${tt}`, geo, ms };
+        // [路径质量] 从 metadata 提取弯折数/长度/效率比
+        const meta = debugData.metadata as any;
+        const bendCount: number | undefined = meta?.bendCount;
+        const pathLength: number | undefined = meta?.pathLength;
+        const efficiencyRatio: number | undefined = meta?.efficiencyRatio;
+        return { strategy, portStr: `${s} → ${tt}`, geo, ms, bendCount, pathLength, efficiencyRatio };
     })();
 
     const canvasContent = (
@@ -855,6 +860,29 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                     <div style={{ color: '#69b1ff' }}>Port: <span style={{ color: '#fff', fontWeight: 600 }}>{hudInfo.portStr}</span></div>
                     <div style={{ color: '#aaa' }}>Geo: <span style={{ color: geoColor(hudInfo.geo) }}>{hudInfo.geo}</span></div>
                     <div style={{ color: '#888' }}>{hudInfo.ms}ms · {(transform.k * 100).toFixed(0)}%</div>
+                    {/* [路径质量] 弯折数 + 效率比 */}
+                    {hudInfo.bendCount !== undefined && (
+                        <div style={{
+                            marginTop: 2, paddingTop: 2,
+                            borderTop: '1px solid rgba(255,255,255,0.08)',
+                            display: 'flex', gap: 8
+                        }}>
+                            <span style={{ color: hudInfo.bendCount <= 2 ? '#52c41a' : hudInfo.bendCount <= 4 ? '#faad14' : '#ff4d4f' }}>
+                                ↪ {hudInfo.bendCount} bends
+                            </span>
+                            {hudInfo.efficiencyRatio !== undefined && (
+                                <span style={{
+                                    color: hudInfo.efficiencyRatio >= 0.8 ? '#52c41a'
+                                        : hudInfo.efficiencyRatio >= 0.5 ? '#faad14' : '#ff4d4f'
+                                }}>
+                                    △ {(hudInfo.efficiencyRatio * 100).toFixed(0)}%
+                                </span>
+                            )}
+                            {hudInfo.pathLength !== undefined && (
+                                <span style={{ color: '#666' }}>{hudInfo.pathLength}px</span>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
             {/* [UX] Mouse world-coordinate crosshair display */}
@@ -1036,6 +1064,27 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                                         {debugData.metadata.length ? <div>{t('designer.debug.visualizer.stats.length', { value: debugData.metadata.length.toFixed(0) })}</div> : null}
                                     </div>
                                 )}
+                                {/* [路径质量] 弯折/效率/长度 指标行 */}
+                                {(() => {
+                                    const meta = debugData.metadata as any;
+                                    const bc = meta?.bendCount;
+                                    const er = meta?.efficiencyRatio;
+                                    const pl = meta?.pathLength;
+                                    if (bc === undefined && er === undefined) return null;
+                                    const bcColor = bc <= 2 ? '#52c41a' : bc <= 4 ? '#faad14' : '#ff4d4f';
+                                    const erColor = er >= 0.8 ? '#52c41a' : er >= 0.5 ? '#faad14' : '#ff4d4f';
+                                    return (
+                                        <div style={{
+                                            marginTop: 6, padding: '4px 6px',
+                                            background: 'rgba(255,255,255,0.04)',
+                                            borderRadius: 4, display: 'flex', gap: 10, flexWrap: 'wrap'
+                                        }}>
+                                            <span style={{ color: bcColor }}>↪ {bc} bends</span>
+                                            {er !== undefined && <span style={{ color: erColor }}>△ {(er * 100).toFixed(0)}% eff</span>}
+                                            {pl !== undefined && <span style={{ color: '#555' }}>{pl}px</span>}
+                                        </div>
+                                    );
+                                })()}
                             </>
                         );
                     })()}

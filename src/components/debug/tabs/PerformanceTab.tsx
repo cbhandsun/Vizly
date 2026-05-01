@@ -128,10 +128,26 @@ export const PerformanceTab: React.FC = () => {
                                 {log.strategy.slice(0, 10)}
                             </span>
                         )}
-                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 80, color: '#666' }}
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 60, color: '#666' }}
                             title={log.edgeId}>
-                            {log.edgeId.slice(0, 8)}…
+                            {log.edgeId.slice(0, 7)}…
                         </span>
+                        {(log as any).bendCount !== undefined && (
+                            <span style={{
+                                color: (log as any).bendCount <= 2 ? '#52c41a' : (log as any).bendCount <= 4 ? '#faad14' : '#ff4d4f',
+                                minWidth: 24, fontSize: 10
+                            }}>
+                                {(log as any).bendCount}↪
+                            </span>
+                        )}
+                        {(log as any).efficiencyRatio !== undefined && (
+                            <span style={{
+                                color: (log as any).efficiencyRatio >= 0.8 ? '#52c41a' : (log as any).efficiencyRatio >= 0.5 ? '#faad14' : '#ff4d4f',
+                                minWidth: 32, fontSize: 10
+                            }}>
+                                {((log as any).efficiencyRatio * 100).toFixed(0)}%
+                            </span>
+                        )}
                         <span style={{ color: log.routingTime > 30 ? '#ff9800' : '#aaa' }}>
                             {log.routingTime.toFixed(1)}ms
                         </span>

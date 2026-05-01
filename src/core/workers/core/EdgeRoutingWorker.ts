@@ -1610,6 +1610,36 @@ export class EdgeRoutingWorker {
             })();
 
 
+            // 10. 路径质量指标：弯折数、总长度、效率比
+            // 效率比 = 直线距离 / 实际路径长度（完美直线=1.0，绕道越多越小）
+            let bendCount = 0;
+            let pathTotalLength = 0;
+            if (finalPoints && finalPoints.length >= 2) {
+                for (let i = 1; i < finalPoints.length; i++) {
+                    const dx = finalPoints[i].x - finalPoints[i - 1].x;
+                    const dy = finalPoints[i].y - finalPoints[i - 1].y;
+                    pathTotalLength += Math.sqrt(dx * dx + dy * dy);
+                    if (i >= 2) {
+                        const pdx = finalPoints[i - 1].x - finalPoints[i - 2].x;
+                        const pdy = finalPoints[i - 1].y - finalPoints[i - 2].y;
+                        // 平行向量不算弯折（共线点）
+                        const cross = Math.abs(pdx * dy - pdy * dx);
+                        if (cross > 0.5) bendCount++;
+                    }
+                }
+            }
+            const straightDist = (() => {
+                const fp = finalPoints?.[0];
+                const lp = finalPoints?.[finalPoints.length - 1];
+                if (!fp || !lp) return 0;
+                const dx = lp.x - fp.x;
+                const dy = lp.y - fp.y;
+                return Math.sqrt(dx * dx + dy * dy);
+            })();
+            const efficiencyRatio = pathTotalLength > 0
+                ? Math.min(1, straightDist / pathTotalLength)
+                : 1;
+
             return {
                 jobId: job.jobId,
                 edgeId: job.edgeId,
@@ -1625,7 +1655,11 @@ export class EdgeRoutingWorker {
             busTrunkSource: job.busTrunkSource,
             busTrunkTarget: job.busTrunkTarget,
             metadata: {
-                strategy: strategyName
+                strategy: strategyName,
+                // [路径质量] 弯折数、总长度、效率比
+                bendCount,
+                pathLength: Math.round(pathTotalLength),
+                efficiencyRatio: Math.round(efficiencyRatio * 100) / 100,
             },
             debugInfo: {
                 algorithmDebug: {

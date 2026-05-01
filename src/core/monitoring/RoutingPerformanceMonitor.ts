@@ -6,6 +6,10 @@ interface PerformanceMetrics {
     edgeId: string;
     /** 路由策略名称，例如 'Trunk Direct', 'A* Grid', 'VG', '1-Bend' */
     strategy?: string;
+    /** 弯折数（后处理后） */
+    bendCount?: number;
+    /** 路径效率比 = 直线距离 / 实际路径长度 */
+    efficiencyRatio?: number;
     timestamp: number;
 }
 
