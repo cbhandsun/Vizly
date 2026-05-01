@@ -1671,7 +1671,11 @@ export class EdgeRoutingCoordinator {
 
             // [Trunk Vis] 注入 peerGroup 信息，供调试面板的 Canvas 可视化
             (job as any).peerGroupMembers = edges.map((e: any) => e.id);
-            (job as any).peerGroupKey = hubId;
+            // [FIX] hubId 在 assignTrunkGeometry 作用域内不可用，改用可推导的 hub 节点 ID
+            const peerGroupKey = isManyToOne
+                ? (edge.target as string)   // M2O: hub 是公共 target
+                : (edge.source as string);  // O2M: hub 是公共 source
+            (job as any).peerGroupKey = peerGroupKey;
             (job as any).peerGroupSize = edges.length;
 
             // [S4] Port 注入已移至 Worker 内部（几何推算）。

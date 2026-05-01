@@ -1007,7 +1007,7 @@ export class EdgeRoutingWorker {
                         if (!hasExplicitSource && !hasExplicitTarget) {
                             const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, 1);
                             const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, 1);
-                            const portOffset = config.algorithm.portOffset ?? 40;
+                            const portOffset: number = (config.algorithm as any).portOffset ?? 40;
                             (startPt as { x: number; y: number }).x = newStartPt.x;
                             (startPt as { x: number; y: number }).y = newStartPt.y;
                             (endPt as { x: number; y: number }).x = newEndPt.x;
