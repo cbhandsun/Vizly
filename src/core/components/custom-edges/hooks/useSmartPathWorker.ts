@@ -552,11 +552,12 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
             // for the first frame. Aborting here and clearing isLoading permanent-locks the edge into a fallback 
             // since the next frame's fingerprint might perfectly match. Let the worker handle zero-width as default 150x80.
             if (!sourceNode || !targetNode) {
-                const fallbackPath = `M ${centeredCoords.sourceX} ${centeredCoords.sourceY} L ${centeredCoords.targetX} ${centeredCoords.targetY}`;
-                if (isMountedRef.current) {
-                    setPath(fallbackPath);
-                    setIsLoading(false);
-                }
+                // [FIX] 节点在 simpleNodeMap 中找不到（常见于 HMR 热重载或首帧渲染）
+                // 不能设 isLoading=false！那会导致 fingerprint 匹配后永远停在直线。
+                // 正确做法：清除 fingerprint 强制下一帧重试，保持 loading 状态显示 fallback。
+                console.warn(`[SmartWorker:${id}] Node not found in simpleNodeMap — retrying next frame. source=${source} target=${target} mapSize=${simpleNodeMap.size}`);
+                lastFingerprintRef.current = ''; // 清除指纹，强制下帧重算
+                // 保持 isLoading=true，下帧自然重试（不 setIsLoading(false)）
                 return;
             }
 
