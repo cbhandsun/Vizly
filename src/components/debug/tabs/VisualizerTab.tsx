@@ -164,6 +164,7 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
     const [showObstacles, setShowObstacles] = useState(true);
     const [showVG, setShowVG] = useState(true);
     const [showQuadTree, setShowQuadTree] = useState(false);
+    const [showTrunk, setShowTrunk] = useState(true); // [主干可视化] Trunk Axis + Peer Group overlay
     const [isMaximized, setIsMaximized] = useState(false);
     // [UX] Mouse world-coordinate tracking for HUD crosshair display
     const [mouseWorldPos, setMouseWorldPos] = useState<{ x: number; y: number } | null>(null);
@@ -619,15 +620,92 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
             });
         }
 
+        // 7. Trunk Axis + Peer Group Visualization
+        // 从 algorithmDebug.portSelection 中提取 trunkAxis / peerGroup 数据
+        if (showTrunk) {
+            const ad = data.algorithmDebug && typeof data.algorithmDebug === 'object'
+                ? (data.algorithmDebug as Record<string, any>) : null;
+            const ps = ad?.portSelection;
+            const trunkAxis: number | undefined = ps?.trunkAxis;
+            const trunkVertical: boolean | undefined = ps?.trunkVertical;
+            const peerGroupMembers: any[] | undefined = Array.isArray(ps?.peerGroupMembers) ? ps.peerGroupMembers : undefined;
+
+            if (trunkAxis !== undefined && trunkVertical !== undefined) {
+                // 绘制主干轴线（全宽虚线）
+                const TRUNK_COLOR = '#ffd666';
+                ctx.save();
+                ctx.strokeStyle = TRUNK_COLOR;
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([6, 4]);
+                ctx.globalAlpha = 0.7;
+                ctx.beginPath();
+                if (trunkVertical) {
+                    // 垂直主干：x = trunkAxis
+                    const sx = toScreen(trunkAxis, 0).x;
+                    ctx.moveTo(sx, 0);
+                    ctx.lineTo(sx, canvasSize.height);
+                } else {
+                    // 水平主干：y = trunkAxis
+                    const sy = toScreen(0, trunkAxis).y;
+                    ctx.moveTo(0, sy);
+                    ctx.lineTo(canvasSize.width, sy);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.globalAlpha = 1;
+
+                // 标注主干坐标
+                ctx.fillStyle = TRUNK_COLOR;
+                ctx.font = `${Math.max(10, 11 * transform.k)}px monospace`;
+                ctx.textBaseline = 'top';
+                if (trunkVertical) {
+                    const sx = toScreen(trunkAxis, 0).x;
+                    ctx.fillText(`trunk x=${trunkAxis.toFixed(0)}`, sx + 4, 22);
+                } else {
+                    const sy = toScreen(0, trunkAxis).y;
+                    ctx.fillText(`trunk y=${trunkAxis.toFixed(0)}`, 4, sy + 4);
+                }
+                ctx.restore();
+            }
+
+            // 绘制 Peer Group 包围框（如果有 peerGroupMembers）
+            if (peerGroupMembers && peerGroupMembers.length > 0) {
+                // 尝试从 obstacles 中匹配 peer 节点矩形
+                const obsArr = (data.obstacles ?? (data.algorithmDebug as any)?.obstacles) as DebugObstacle[] | undefined;
+                if (obsArr && obsArr.length > 0) {
+                    ctx.save();
+                    ctx.strokeStyle = '#b37feb';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([3, 3]);
+                    ctx.globalAlpha = 0.6;
+
+                    // 将 peerGroupMembers id/index 匹配到 obstacles
+                    // obstacles 可能没有 id，用顶点匹配即可
+                    peerGroupMembers.forEach((peer: any, idx: number) => {
+                        const o = obsArr[idx] ?? obsArr.find(o => (o as any).id === String(peer));
+                        if (!o) return;
+                        const s = toScreen(o.x, o.y);
+                        const w = (o.w ?? o.width ?? 0) * transform.k;
+                        const h = (o.h ?? o.height ?? 0) * transform.k;
+                        ctx.strokeRect(s.x - 2, s.y - 2, w + 4, h + 4);
+                    });
+
+                    ctx.setLineDash([]);
+                    ctx.globalAlpha = 1;
+                    ctx.restore();
+                }
+            }
+        }
+
         ctx.restore();
-    }, [canvasRef, showGrid, showObstacles, showVG, showQuadTree, transform, toScreen]);
+    }, [canvasRef, showGrid, showObstacles, showVG, showQuadTree, showTrunk, transform, toScreen, canvasSize]);
 
     // Redraw when data or flags change
     useEffect(() => {
         if (debugData) {
             drawVisualization(debugData);
         }
-    }, [debugData, showGrid, showObstacles, showVG, showQuadTree, transform, drawVisualization, canvasSize]);
+    }, [debugData, showGrid, showObstacles, showVG, showQuadTree, showTrunk, transform, drawVisualization, canvasSize]);
 
     // Handlers for Zoom/Pan
     const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
@@ -824,6 +902,10 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                 <Switch size="small" checked={showQuadTree} onChange={setShowQuadTree} />
                 <span>{t('designer.debug.visualizer.quadTree')}</span>
             </Space>
+            <Space size={6}>
+                <Switch size="small" checked={showTrunk} onChange={setShowTrunk} />
+                <span style={{ color: '#ffd666' }}>主干轴</span>
+            </Space>
             {/* [UX] Reset view button + zoom indicator */}
             <Tooltip title="重置视图 (fit to content)">
                 <Button
@@ -831,7 +913,7 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                     onClick={() => { if (debugDataRef.current) fitToContent(debugDataRef.current); }}
                     style={{ fontSize: 11, padding: '0 6px', height: 20, lineHeight: '18px' }}
                 >
-                    ⊡ 重置
+                    ⊞ 重置
                 </Button>
             </Tooltip>
             <span style={{ color: token.colorTextQuaternary, fontFamily: 'monospace' }}>
@@ -866,6 +948,18 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                     <span style={{ display: 'inline-block', width: 8, height: 8, background: '#ff00ff', marginRight: 4 }}></span> {t('designer.debug.visualizer.legend.rawPath')}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span style={{
+                        display: 'inline-block', width: 16, height: 2, marginRight: 4,
+                        background: 'repeating-linear-gradient(90deg,#ffd666 0,#ffd666 4px,transparent 4px,transparent 8px)'
+                    }}></span> 主干轴
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span style={{
+                        display: 'inline-block', width: 8, height: 8, marginRight: 4,
+                        border: '1px dashed #b37feb', borderRadius: 1
+                    }}></span> Peer Group
                 </div>
             </div>
 
@@ -967,12 +1061,11 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
         }
     };
 
-    // [SCAN] Scan all edges in the current diagram and collect routing metadata
+    // [SCAN] Scan all edges - 优化版：优先读路由缓存，避免强制重路由
     const scanAllEdges = useCallback(async () => {
         const coordinator = EdgeRoutingCoordinator.getInstance() as unknown as DebuggableCoordinator;
         if (!('setDebugEdge' in coordinator) || !('forceDebugReRoute' in coordinator)) return;
 
-        // Collect all edge IDs from the DOM
         const edgeEls = document.querySelectorAll('.react-flow__edge');
         const edgeIds = [...edgeEls].map(e => e.getAttribute('data-id')).filter(Boolean) as string[];
         if (edgeIds.length === 0) return;
@@ -983,49 +1076,72 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
 
         const rows: ScanRow[] = [];
 
+        // [提速] 尝试从缓存读取每个边的路由结果，避免强制重路由
+        // 如果缓存命中则直接提取元数据；不命中再 fallback 到强制重路由
+        const cacheCoord = coordinator as any;
+        const hasGetCached = typeof cacheCoord.getCachedResult === 'function';
+
         for (const eid of edgeIds) {
-            await new Promise<void>((resolve) => {
-                const onDebug = (data: DebugPayload) => {
-                    // Field paths match what renderLegend uses (line ~737):
-                    //   data.algorithmDebug.portSelection → ps
-                    //   ps.selected.source / ps.selected.target → ports
-                    //   data.selectedSourcePos / data.selectedTargetPos → port fallback
-                    const ad = data.algorithmDebug && typeof data.algorithmDebug === 'object'
-                        ? (data.algorithmDebug as Record<string, any>)
-                        : null;
-                    const ps = ad?.portSelection;
-                    const dataAny = data as unknown as Record<string, any>;
-                    const strategy = data.metadata?.strategy ?? ad?.strategy ?? 'Unknown';
-                    const s = dataAny.selectedSourcePos ?? ps?.selected?.source ?? '?';
-                    const tt = dataAny.selectedTargetPos ?? ps?.selected?.target ?? '?';
-                    const geo = ps?.geometry ?? ps?.detectedGeometry ?? '?';
-                    const isM2O = ps?.isManyToOne === true;
-                    const layoutDir = ps?.layoutDirection ?? '';
-                    // Anomaly detection
-                    const backward = typeof geo === 'string' && geo.includes('backward');
-                    const tbMismatch = layoutDir === 'TB' && (s === 'left' || s === 'right' || tt === 'left' || tt === 'right');
-                    const lrMismatch = (layoutDir === 'LR' || layoutDir === 'RL') && (s === 'top' || s === 'bottom' || tt === 'top' || tt === 'bottom');
-                    const anomaly = backward || tbMismatch || lrMismatch;
-                    rows.push({ edgeId: eid, port: `${s}→${tt}`, strategy, geo, isM2O, anomaly });
-                    // [FIX] Restore React component listener before resolving
-                    coordinator.registerDebugListener(debugListenerRef.current);
-                    resolve();
-                };
-                coordinator.registerDebugListener(onDebug);
-                coordinator.setDebugEdge(eid);
-                coordinator.forceDebugReRoute(eid);
-                // Timeout fallback
-                setTimeout(() => { coordinator.registerDebugListener(debugListenerRef.current); resolve(); }, 1500);
-            });
+            // 尝试从 latestRequests 构建请求对象然后读缓存
+            let cachedMeta: any = null;
+            if (hasGetCached) {
+                const entry = cacheCoord.latestRequests?.get(eid);
+                if (entry) {
+                    const cached = cacheCoord.getCachedResult(entry.request);
+                    if (cached) cachedMeta = cached;
+                }
+            }
+
+            if (cachedMeta && cachedMeta.algorithmDebug) {
+                // 缓存命中 — 直接提取元数据
+                const data = cachedMeta as any;
+                const ad = data.algorithmDebug && typeof data.algorithmDebug === 'object'
+                    ? data.algorithmDebug as Record<string, any> : null;
+                const ps = ad?.portSelection;
+                const dataAny = data as Record<string, any>;
+                const strategy = data.metadata?.strategy ?? ad?.strategy ?? 'Unknown';
+                const s = dataAny.selectedSourcePos ?? ps?.selected?.source ?? '?';
+                const tt = dataAny.selectedTargetPos ?? ps?.selected?.target ?? '?';
+                const geo = ps?.geometry ?? ps?.detectedGeometry ?? '?';
+                const isM2O = ps?.isManyToOne === true;
+                const layoutDir = ps?.layoutDirection ?? '';
+                const backward = typeof geo === 'string' && geo.includes('backward');
+                const tbMismatch = layoutDir === 'TB' && (s === 'left' || s === 'right' || tt === 'left' || tt === 'right');
+                const lrMismatch = (layoutDir === 'LR' || layoutDir === 'RL') && (s === 'top' || s === 'bottom' || tt === 'top' || tt === 'bottom');
+                rows.push({ edgeId: eid, port: `${s}→${tt}`, strategy, geo, isM2O, anomaly: backward || tbMismatch || lrMismatch });
+            } else {
+                // 缓存未命中 — fallback 到强制重路由
+                await new Promise<void>((resolve) => {
+                    const onDebug = (data: DebugPayload) => {
+                        const ad = data.algorithmDebug && typeof data.algorithmDebug === 'object'
+                            ? (data.algorithmDebug as Record<string, any>) : null;
+                        const ps = ad?.portSelection;
+                        const dataAny = data as unknown as Record<string, any>;
+                        const strategy = data.metadata?.strategy ?? ad?.strategy ?? 'Unknown';
+                        const s = dataAny.selectedSourcePos ?? ps?.selected?.source ?? '?';
+                        const tt = dataAny.selectedTargetPos ?? ps?.selected?.target ?? '?';
+                        const geo = ps?.geometry ?? ps?.detectedGeometry ?? '?';
+                        const isM2O = ps?.isManyToOne === true;
+                        const layoutDir = ps?.layoutDirection ?? '';
+                        const backward = typeof geo === 'string' && geo.includes('backward');
+                        const tbMismatch = layoutDir === 'TB' && (s === 'left' || s === 'right' || tt === 'left' || tt === 'right');
+                        const lrMismatch = (layoutDir === 'LR' || layoutDir === 'RL') && (s === 'top' || s === 'bottom' || tt === 'top' || tt === 'bottom');
+                        rows.push({ edgeId: eid, port: `${s}→${tt}`, strategy, geo, isM2O, anomaly: backward || tbMismatch || lrMismatch });
+                        coordinator.registerDebugListener(debugListenerRef.current);
+                        resolve();
+                    };
+                    coordinator.registerDebugListener(onDebug);
+                    coordinator.setDebugEdge(eid);
+                    coordinator.forceDebugReRoute(eid);
+                    setTimeout(() => { coordinator.registerDebugListener(debugListenerRef.current); resolve(); }, 1500);
+                });
+            }
         }
 
-        // Restore previous debug edge
         coordinator.setDebugEdge(targetEdgeIdRef.current || null);
         setScanResults(rows);
         setIsScanning(false);
 
-        // [VISUAL] Highlight anomalous edges in the diagram with a CSS class
-        // Clear any previous highlights first
         document.querySelectorAll('.react-flow__edge').forEach(el => {
             el.classList.remove('vizly-debug-anomaly', 'vizly-debug-ok');
         });

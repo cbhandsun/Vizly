@@ -886,12 +886,13 @@ export class EdgeRoutingCoordinator {
                     this.cache.set(key, result);
                 }
 
-                // [FIX] Track Performance
+                // [FIX] Track Performance — 不含策略名称
                 this.monitor.track({
                     edgeId: req.edgeId,
                     routingTime: performance.now() - startTime,
                     cacheHit: false,
-                    workerTime: result.metadata?.executionTime
+                    workerTime: result.metadata?.executionTime,
+                    strategy: result.metadata?.strategy  // 传递策略名，供分布图使用
                 });
 
                 const shouldEmitDebug =
@@ -899,13 +900,24 @@ export class EdgeRoutingCoordinator {
                     jobs[index]?.debug ||
                     group.graph.config?.debug;
                 if (shouldEmitDebug) {
-                    // [FIX] Explicitly log to console to ensure Alt+Click works even if UI callback is detached
                     console.dir(result, { depth: null });
                     if (this.onDebugData) {
-                        // [BUG FIX] trunkData was gating onDebugData — non-bus edges never had trunkData,
-                        // so the debug callback was never called for regular edges.
-                        // Now trunkData is always optional, not a gate.
                         const trunkData = this.trunkDebugData.get(req.edgeId);
+                        // [Trunk Vis] 注入 trunkAxis/trunkVertical/peerGroupMembers
+                        // 让 VisualizerTab 可以在 Canvas 上绘制主干轴虚线和 Peer Group 包围框
+                        const trunkVisualization = trunkData?.trunk ? {
+                            trunkAxis: trunkData.trunk.axis,
+                            trunkVertical: trunkData.trunk.direction === 'vertical',
+                            trunkRange: trunkData.trunk.range,
+                        } : {};
+                        // 从 jobs 中尝试提取 peerGroup 信息
+                        const jobAny = jobs[index] as any;
+                        const peerGroupInfo = jobAny?.peerGroupMembers ? {
+                            peerGroupMembers: jobAny.peerGroupMembers,
+                            peerGroupSize: jobAny.peerGroupSize ?? jobAny.peerGroupMembers?.length,
+                            peerGroupKey: jobAny.peerGroupKey,
+                        } : {};
+
                         this.onDebugData({
                             edgeId: req.edgeId,
                             pathPoints: result.points,
@@ -918,7 +930,16 @@ export class EdgeRoutingCoordinator {
                                 delta: trunkData.delta,
                                 typeInfluenced: trunkData.typeInfluenced,
                                 trunk: trunkData.trunk
-                            } : null
+                            } : null,
+                            // [Trunk Vis] 将 trunk/peer 数据注入 portSelection，让 VisualizerTab 可读取
+                            algorithmDebug: {
+                                ...((result.debugInfo as any)?.algorithmDebug ?? {}),
+                                portSelection: {
+                                    ...((result.debugInfo as any)?.algorithmDebug?.portSelection ?? {}),
+                                    ...trunkVisualization,
+                                    ...peerGroupInfo,
+                                }
+                            }
                         });
                     }
                 }
@@ -1645,6 +1666,11 @@ export class EdgeRoutingCoordinator {
                 job.busTrunkSource = { x: trunk.range.min, y: trunk.axis };
                 job.busTrunkTarget = { x: trunk.range.max, y: trunk.axis };
             }
+
+            // [Trunk Vis] 注入 peerGroup 信息，供调试面板的 Canvas 可视化
+            (job as any).peerGroupMembers = edges.map((e: any) => e.id);
+            (job as any).peerGroupKey = hubId;
+            (job as any).peerGroupSize = edges.length;
 
             // [S4] Port 注入已移至 Worker 内部（几何推算）。
             // Coordinator 仅传递 busTrunkSource/busTrunkTarget 几何元数据，
