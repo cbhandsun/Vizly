@@ -13,6 +13,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { tryAttachDiagramSnapshot } from '@/core';
 import { invalidateRemoteDiagramPreview } from '@/core';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
 const CloudStorageManagerModal = React.lazy(() => import('@/components/storage/CloudStorageManagerModal').then(async (m) => {
   return { default: m.CloudStorageManagerModal };
@@ -157,7 +159,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
     }
 
     if (!diagram) {
-       message.error('未找到图表数据，无法导出 Markdown');
+       appMessage.error('未找到图表数据，无法导出 Markdown');
        return;
     }
 
@@ -195,7 +197,7 @@ ${mermaid}
     link.download = `${diagramName || 'blueprint'}.md`;
     link.click();
     URL.revokeObjectURL(url);
-    message.success('📄 文档已导出为 Markdown');
+    appMessage.success('📄 文档已导出为 Markdown');
   };
 
   // 保存到云端，返回云端 UUID
@@ -206,11 +208,11 @@ ${mermaid}
     }
 
     if (!unifiedStorage.isConfigured()) {
-      message.error(`${unifiedStorage.activeProvider.name} 未配置，无法保存`);
+      appMessage.error(`${unifiedStorage.activeProvider.name} 未配置，无法保存`);
       return undefined;
     }
 
-    const hide = message.loading(t('export.savingToCloud'), 0);
+    const hide = appMessage.loading(t('export.savingToCloud'), 0);
     try {
       const dataService = dataRegistry.getDataService();
       let diagram = dataService.getDiagram(diagramId);
@@ -245,13 +247,13 @@ ${mermaid}
       }
 
       if (!diagram) {
-        message.error('未找到图表数据');
+        appMessage.error('未找到图表数据');
         return undefined;
       }
 
       const snap = await tryAttachDiagramSnapshot(diagram, diagramId);
       if (snap.warning) {
-        message.warning(t('export.snapshotFailed', { reason: snap.warning }));
+        appMessage.warning(t('export.snapshotFailed', { reason: snap.warning }));
       }
 
       const cloudProvider = snap.diagram.metadata?.cloud?.provider;
@@ -284,11 +286,11 @@ ${mermaid}
         (currentDiagram as any).metadata = { ...((currentDiagram as any).metadata || {}), cloud: cloudInfo };
       }
 
-      message.success(t('export.cloudSaveSuccess'));
+      appMessage.success(t('export.cloudSaveSuccess'));
       return finalId;
     } catch (error) {
       console.error('Cloud save failed', error);
-      message.error(t('export.cloudSaveFailed'));
+      appMessage.error(t('export.cloudSaveFailed'));
       return undefined;
     } finally {
       hide();

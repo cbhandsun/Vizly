@@ -3,6 +3,8 @@ import { Input, Spin, Empty, Tooltip, Typography, message } from 'antd';
 import { SearchOutlined, CloudDownloadOutlined, FireOutlined } from '@ant-design/icons';
 import { Icon } from '@iconify/react';
 import { PluginContext } from '../../types/plugin';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 const { Text } = Typography;
 
@@ -51,7 +53,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
                 }
             } catch (error) {
                 console.error('Failed to fetch icons:', error);
-                message.error('搜索图标失败，请检查网络连接');
+                appMessage.error('搜索图标失败，请检查网络连接');
             } finally {
                 setLoading(false);
             }

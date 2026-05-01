@@ -11,6 +11,8 @@ import {
 import { useTranslation } from 'react-i18next';
 import { downloadImage, copyImageToClipboard, ExportOptions } from '../../../utils/imageExporter';
 import { useDiagramStore } from '../../../store/useDiagramStore';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 interface AdvancedExportModalProps {
   visible: boolean;
@@ -39,10 +41,10 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
         includeBackground,
         embedMetadata
       });
-      message.success(t('advancedExport.successMsg', { format: format.toUpperCase() }));
+      appMessage.success(t('advancedExport.successMsg', { format: format.toUpperCase() }));
       onClose();
     } catch (e) {
-      message.error(t('advancedExport.errorMsg'));
+      appMessage.error(t('advancedExport.errorMsg'));
     } finally {
       setExporting(false);
     }
@@ -51,10 +53,10 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
   const handleCopyClipboard = async () => {
     const success = await copyImageToClipboard(nodes);
     if (success) {
-      message.success(t('advancedExport.copySuccess'));
+      appMessage.success(t('advancedExport.copySuccess'));
       onClose();
     } else {
-      message.error(t('advancedExport.copyFailed'));
+      appMessage.error(t('advancedExport.copyFailed'));
     }
   };
 

@@ -4,6 +4,8 @@ import { Modal, Form, Input, Button, message, Tabs, Typography } from 'antd';
 import { UserOutlined, MailOutlined, LockOutlined, KeyOutlined } from '@ant-design/icons';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 const { Text } = Typography;
 
@@ -38,12 +40,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
 
         if (error) {
             if (error.message === 'Invalid login credentials') {
-                message.error(t('auth.modal.invalidCredentials'));
+                appMessage.error(t('auth.modal.invalidCredentials'));
             } else {
-                message.error(error.message);
+                appMessage.error(error.message);
             }
         } else {
-            message.success(t('auth.modal.loginSuccess'));
+            appMessage.success(t('auth.modal.loginSuccess'));
             handleClose();
         }
     };
@@ -55,17 +57,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
         setLoading(false);
 
         if (error) {
-            message.error(error.message);
+            appMessage.error(error.message);
         } else {
             setMagicLinkSent(true);
-            message.success(t('auth.modal.magicLinkSent'));
+            appMessage.success(t('auth.modal.magicLinkSent'));
         }
     };
 
     // ===== Register =====
     const onRegister = async (values: { email: string; password: string; confirmPassword: string }) => {
         if (values.password !== values.confirmPassword) {
-            message.error(t('auth.modal.register.passwordMismatch'));
+            appMessage.error(t('auth.modal.register.passwordMismatch'));
             return;
         }
         setLoading(true);
@@ -73,9 +75,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onCancel }) => {
         setLoading(false);
 
         if (error) {
-            message.error(error.message);
+            appMessage.error(error.message);
         } else {
-            message.success(t('auth.modal.register.success'));
+            appMessage.success(t('auth.modal.register.success'));
             handleClose();
         }
     };

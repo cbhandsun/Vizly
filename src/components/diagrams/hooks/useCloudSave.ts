@@ -4,6 +4,8 @@ import { unifiedStorage } from '@/services/UnifiedStorageService';
 import { tryAttachDiagramSnapshot } from '@/core';
 import { invalidateRemoteDiagramPreview } from '@/core';
 import type { StandardDiagramData } from '@/core';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 /**
  * 轻量云保存 Hook — 读取 __flowDataBridge 数据并上传到活动云提供商
@@ -13,16 +15,16 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
 
     const saveToCloud = useCallback(async () => {
         if (!unifiedStorage.isConfigured()) {
-            message.error('云存储未配置，请先在设置中配置');
+            appMessage.error('云存储未配置，请先在设置中配置');
             return;
         }
 
-        const hide = message.loading('正在保存到云端...', 0);
+        const hide = appMessage.loading('正在保存到云端...', 0);
         try {
             // 从桥接数据中读取（FlowchartDesigner 的 useEffect 会持续更新此数据）
             const bridge = (window as any).__flowDataBridge?.[diagramId];
             if (!bridge || !bridge.nodes || bridge.nodes.length === 0) {
-                message.error('未找到图表数据');
+                appMessage.error('未找到图表数据');
                 return;
             }
 
@@ -62,10 +64,10 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
                 };
             }
 
-            message.success('已保存到云端');
+            appMessage.success('已保存到云端');
         } catch (error) {
             console.error('Cloud save failed:', error);
-            message.error('保存到云端失败');
+            appMessage.error('保存到云端失败');
         } finally {
             hide();
         }

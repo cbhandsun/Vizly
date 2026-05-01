@@ -51,12 +51,12 @@ export const useLayerManagement = () => {
         };
         setLayers(prev => [...prev, newLayer]);
         setActiveLayerId(newLayer.id);
-        message.success(`已创建图层 "${name}"`);
+        appMessage.success(`已创建图层 "${name}"`);
     }, [layers.length]);
 
     const deleteLayer = useCallback((layerId: string) => {
         if (layerId === 'layer-0') {
-            message.warning('无法删除默认图层');
+            appMessage.warning('无法删除默认图层');
             return;
         }
         const layer = layers.find(l => l.id === layerId);
@@ -64,7 +64,7 @@ export const useLayerManagement = () => {
         if (activeLayerId === layerId) {
             setActiveLayerId('layer-0');
         }
-        message.success(`已删除图层 "${layer?.name}"`);
+        appMessage.success(`已删除图层 "${layer?.name}"`);
     }, [activeLayerId, layers]);
 
     const toggleVisibility = useCallback((layerId: string) => {

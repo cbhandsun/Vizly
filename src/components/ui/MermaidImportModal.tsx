@@ -3,6 +3,8 @@ import { Modal, Button, Space, message, Alert } from 'antd';
 import Editor from '@monaco-editor/react';
 import { MermaidParser } from '@/services/import/MermaidParser';
 import { useTranslation } from 'react-i18next';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 interface MermaidImportModalProps {
   visible: boolean;
@@ -35,7 +37,7 @@ export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible,
       }
 
       onImport(nodes, edges);
-      message.success(`成功解析 ${nodes.length} 个节点和 ${edges.length} 条连线！`);
+      appMessage.success(`成功解析 ${nodes.length} 个节点和 ${edges.length} 条连线！`);
       onClose();
     } catch (err: any) {
       setError(err.message || '解析失败，请检查 Mermaid 语法。');

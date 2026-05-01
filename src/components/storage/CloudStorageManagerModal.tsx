@@ -20,6 +20,8 @@ import { AuthModal } from '@/components/auth/AuthModal';
 import { coerceToStandardDiagramDataWithReport } from '@/core';
 import RemoteDiagramCover from '@/components/shared/RemoteDiagramCover';
 import { shareService } from '@/services/ShareService';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 const { Text } = Typography;
 const { Search } = Input;
@@ -92,7 +94,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
             setCloudDiagrams(items);
         } catch (error) {
             console.error("Failed to list diagrams", error);
-            message.error(t('storage.manager.loadFailed'));
+            appMessage.error(t('storage.manager.loadFailed'));
             setCloudDiagrams([]);
         } finally {
             setLoading(false);
@@ -102,7 +104,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
     const handleProviderChange = (value: 'supabase' | 's3') => {
         unifiedStorage.setProvider(value);
         setCurrentProvider(value);
-        message.info(t('storage.manager.providerSwitched', { provider: value === 's3' ? 'S3' : 'Supabase' }));
+        appMessage.info(t('storage.manager.providerSwitched', { provider: value === 's3' ? 'S3' : 'Supabase' }));
     };
 
     const handleOpenCloud = async (item: DiagramMetadata) => {
@@ -110,7 +112,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
             setIsAuthModalOpen(true);
             return;
         }
-        const hide = message.loading(t('storage.manager.downloading'), 0);
+        const hide = appMessage.loading(t('storage.manager.downloading'), 0);
         try {
             const savedDiagram = await unifiedStorage.loadDiagram(item.id);
             if (savedDiagram && savedDiagram.content) {
@@ -119,11 +121,11 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                 const errors = report.issues.filter(x => x.level === 'error');
                 const warns = report.issues.filter(x => x.level === 'warn');
                 if (errors.length > 0) {
-                    message.error(t('common.remoteDataInvalid', { reason: errors.map(x => x.message).join('; ') }));
+                    appMessage.error(t('common.remoteDataInvalid', { reason: errors.map(x => x.message).join('; ') }));
                     return;
                 }
                 if (warns.length > 0 && report.diagram.nodes.length > 0) {
-                    message.warning(t('common.remoteDataRepaired', { reason: warns.map(x => x.message).join('; ') }));
+                    appMessage.warning(t('common.remoteDataRepaired', { reason: warns.map(x => x.message).join('; ') }));
                 }
                 const normalized: StandardDiagramData = {
                     ...report.diagram,
@@ -160,13 +162,13 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                     }
                     navigate(`/?diagram=${savedDiagram.id}`);
                 }
-                message.success(t('storage.manager.downloadedAndOpened'));
+                appMessage.success(t('storage.manager.downloadedAndOpened'));
             } else {
-                message.error(t('storage.manager.noContent'));
+                appMessage.error(t('storage.manager.noContent'));
             }
         } catch (error) {
             console.error(error);
-            message.error(error instanceof Error ? error.message : t('common.error'));
+            appMessage.error(error instanceof Error ? error.message : t('common.error'));
         } finally {
             hide();
         }
@@ -175,10 +177,10 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
     const handleDeleteCloud = async (id: string) => {
         try {
             await unifiedStorage.deleteDiagram(id);
-            message.success(t('storage.manager.deleted'));
+            appMessage.success(t('storage.manager.deleted'));
             loadCloudDiagrams();
         } catch (e) {
-            message.error(t('storage.manager.deleteFailed'));
+            appMessage.error(t('storage.manager.deleteFailed'));
         }
     };
 
@@ -220,7 +222,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
         }
         setBatchDeleting(false);
         setSelectedIds(new Set());
-        message.success(`已删除 ${success} 个${failed > 0 ? `，${failed} 个失败` : ''}`);
+        appMessage.success(`已删除 ${success} 个${failed > 0 ? `，${failed} 个失败` : ''}`);
         loadCloudDiagrams();
     };
 

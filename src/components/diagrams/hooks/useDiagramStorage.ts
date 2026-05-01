@@ -4,6 +4,8 @@ import { unifiedStorage } from '@/services/UnifiedStorageService';
 import { DiagramMetadata } from '@/services/storage/types';
 import { StandardDiagramData } from '@/core';
 import { dataService } from '@/services/DataService';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 export function useDiagramStorage() {
   const [s3Diagrams, setS3Diagrams] = useState<DiagramMetadata[]>([]);
@@ -35,7 +37,7 @@ export function useDiagramStorage() {
 
   const loadFromCloud = async (key: string, sourceGroup: string): Promise<StandardDiagramData | null> => {
     if (sourceGroup !== 's3' && sourceGroup !== 'supabase') return null;
-    const hide = message.loading(`正在从 ${sourceGroup === 's3' ? 'S3' : 'Supabase'} 加载...`, 0);
+    const hide = appMessage.loading(`正在从 ${sourceGroup === 's3' ? 'S3' : 'Supabase'} 加载...`, 0);
     try {
       const provider = unifiedStorage.getProvider(sourceGroup as any);
       const saved = await provider.loadDiagram(key);
@@ -48,7 +50,7 @@ export function useDiagramStorage() {
       if (registered) {
         return registered as StandardDiagramData;
       }
-      message.error(`${sourceGroup.toUpperCase()} 加载失败`);
+      appMessage.error(`${sourceGroup.toUpperCase()} 加载失败`);
       throw e;
     } finally {
       hide();

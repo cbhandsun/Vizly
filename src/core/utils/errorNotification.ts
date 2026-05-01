@@ -18,7 +18,7 @@ class ErrorNotification {
      * 简短的Toast提示
      */
     toast(msg: string, duration: number = 3) {
-        message.error({
+        appMessage.error({
             content: msg,
             duration,
         });
@@ -28,7 +28,7 @@ class ErrorNotification {
      * 成功提示
      */
     success(msg: string, duration: number = 3) {
-        message.success({
+        appMessage.success({
             content: msg,
             duration,
         });
@@ -38,7 +38,7 @@ class ErrorNotification {
      * 警告提示
      */
     warning(msg: string, duration: number = 3) {
-        message.warning({
+        appMessage.warning({
             content: msg,
             duration,
         });
@@ -48,7 +48,7 @@ class ErrorNotification {
      * 详细的错误通知
      */
     notify(options: ErrorNotificationOptions) {
-        notification.error({
+        appNotification.error({
             message: options.title || '错误',
             description: options.description,
             duration: options.duration || 5,

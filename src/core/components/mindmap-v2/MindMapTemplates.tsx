@@ -10,6 +10,8 @@ import { AppstoreAddOutlined } from '@ant-design/icons';
 import type { NodeObj } from 'mind-elixir';
 import MindElixir from 'mind-elixir';
 import { getMindElixirInstance } from './mindElixirStore';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 // ─── Template definitions ─────────────────────────────────────────────────────
 
@@ -155,7 +157,7 @@ const MindMapTemplates: React.FC = () => {
     const mind = getMindElixirInstance();
 
     const applyTemplate = useCallback((tpl: Template) => {
-        if (!mind) { message.warning('思维导图未加载'); return; }
+        if (!mind) { appMessage.warning('思维导图未加载'); return; }
 
         if (tpl.mode === 'replace') {
             // Replace entire map with template structure
@@ -165,11 +167,11 @@ const MindMapTemplates: React.FC = () => {
             mind.refresh({ nodeData, direction: MindElixir.SIDE as 0 | 1 | 2 });
             mind.toCenter();
             (mind as any).clearHistory?.();
-            message.success(`已载入模板：${tpl.label}`);
+            appMessage.success(`已载入模板：${tpl.label}`);
         } else {
             // Insert template subtree under currently selected node
             const selId = (mind.currentNode as any)?.id ?? (mind.currentNodes?.[0] as any)?.id;
-            if (!selId) { message.info('请先选中一个节点再插入模板'); return; }
+            if (!selId) { appMessage.info('请先选中一个节点再插入模板'); return; }
             try {
                 const parentTpc = mind.findEle(selId);
                 const children = tpl.tree.children ?? [];
@@ -177,9 +179,9 @@ const MindMapTemplates: React.FC = () => {
                     const nodeData = templateToNodeObj(child);
                     mind.addChild(parentTpc, nodeData);
                 }
-                message.success(`已插入 ${children.length} 个子节点`);
+                appMessage.success(`已插入 ${children.length} 个子节点`);
             } catch (e) {
-                message.error('插入失败');
+                appMessage.error('插入失败');
                 console.error('[Template insert]', e);
             }
         }

@@ -35,6 +35,7 @@
         "menu": {
             "myDiagrams": "我的图表",
             "switchUser": "切换账号",
+            "setPassword": "设置密码",
             "logout": "退出登录"
         },
         "modal": {
@@ -72,6 +73,7 @@
             "registerNow": "立即注册",
             "hasAccount": "已有账号？",
             "backToLogin": "返回登录",
+            "setPasswordSuccess": "密码设置成功！下次可直接用密码登录。",
             "magicLinkHint": "💡 如果您之前通过 Magic Link 登录过，可以继续使用此方式。登录后可在个人菜单中设置密码。"
         }
     },

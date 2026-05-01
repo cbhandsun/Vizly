@@ -10,6 +10,8 @@ import { InteractionOutlined, PlusOutlined } from '@ant-design/icons';
 import { Button, Tooltip, Divider, message } from 'antd';
 import i18n from '@/i18n';
 import { useTranslation } from 'react-i18next';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 export class SequencePlugin implements DiagramTypePlugin {
   id = 'sequence-diagram';
@@ -109,7 +111,7 @@ const SequenceSmartToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
             }));
         });
         
-        message.info(t('plugins.sequence.layoutSuccess'));
+        appMessage.info(t('plugins.sequence.layoutSuccess'));
     };
 
     const handleAddActor = () => {

@@ -55,6 +55,8 @@ import { appMessage } from '@/core/utils/antdStaticBridge';
 import { resolvePluginId } from '@/core/plugins/registry';
 
 import { ErrorBoundary } from './ui/ErrorBoundary';
+import { appModal } from '@/core/utils/antdStaticBridge';
+
 
 const DiagramViewer: React.FC = () => {
     const { t } = useTranslation();
@@ -109,7 +111,7 @@ const DiagramViewer: React.FC = () => {
     const handleImportMermaidNodes = useCallback(async (nodes: any[], edges: any[]) => {
         const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
         if (!bridge) {
-            message.error(t('diagramViewer.canvasNotFound'));
+            appMessage.error(t('diagramViewer.canvasNotFound'));
             return;
         }
 
@@ -139,7 +141,7 @@ const DiagramViewer: React.FC = () => {
             }, 500);
         } catch (err) {
             console.error('[Mermaid Import] Error:', err);
-            message.error('导入过程中发生错误');
+            appMessage.error('导入过程中发生错误');
         }
     }, [selectedDiagramId]);
     const [aiConfigVisible, setAiConfigVisible] = useState(false);
@@ -290,7 +292,7 @@ const DiagramViewer: React.FC = () => {
     const handleSaveTo = useCallback(async (target: 's3' | 'supabase' | 'local') => {
         const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
         if (!bridge || !bridge.nodes) {
-            message.error('未找到图表数据，无法保存');
+            appMessage.error('未找到图表数据，无法保存');
             return;
         }
 
@@ -298,7 +300,7 @@ const DiagramViewer: React.FC = () => {
 
         let newName = defaultName;
         // 使用简易模态交互提供命名的机会
-        Modal.confirm({
+        appModal.confirm({
             title: t('diagramViewer.saveAs.title', { target: target.toUpperCase() }),
             content: (
                 <div style={{ marginTop: 16 }}>
@@ -310,11 +312,11 @@ const DiagramViewer: React.FC = () => {
             ),
             onOk: async () => {
                 if (!newName || !newName.trim()) {
-                    message.error(t('diagramViewer.saveAs.nameRequired'));
+                    appMessage.error(t('diagramViewer.saveAs.nameRequired'));
                     return;
                 }
                 const nameStr = newName.trim();
-                const hide = message.loading(t('diagramViewer.saveAs.saving', { target }), 0);
+                const hide = appMessage.loading(t('diagramViewer.saveAs.saving', { target }), 0);
                 try {
                     const dataToSave = {
                         ...bridge,
@@ -334,7 +336,7 @@ const DiagramViewer: React.FC = () => {
                         const map: Record<string, unknown> = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
                         map[nameStr] = dataToSave;
                         localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(map));
-                        message.success(t('diagramViewer.saveAs.localSuccess'));
+                        appMessage.success(t('diagramViewer.saveAs.localSuccess'));
 
                         // Sync current
                         // selectedDiagramId && dispatchDiagramControl('loadLocalJson', { json: JSON.stringify(dataToSave) });
@@ -360,10 +362,10 @@ const DiagramViewer: React.FC = () => {
 
                         // URL 刷新指引
                         setSearchParams(prev => { prev.set('diagram', dataToSave.id); return prev; });
-                        message.success(t('diagramViewer.saveAs.cloudSuccess'));
+                        appMessage.success(t('diagramViewer.saveAs.cloudSuccess'));
                     }
                 } catch (e: any) {
-                    message.error(t('diagramViewer.saveAs.error', { message: e.message || String(e) }));
+                    appMessage.error(t('diagramViewer.saveAs.error', { message: e.message || String(e) }));
                 } finally {
                     hide();
                 }
@@ -377,7 +379,7 @@ const DiagramViewer: React.FC = () => {
         const cloudMeta = bridge?.metadata?.cloud;
         if (cloudMeta && cloudMeta.provider && cloudMeta.title) {
             // 已存在云记录，静默同名同 id 覆盖更新
-            const hide = message.loading(t('diagramViewer.directSave.saving', { provider: cloudMeta.provider }), 0);
+            const hide = appMessage.loading(t('diagramViewer.directSave.saving', { provider: cloudMeta.provider }), 0);
             try {
                 const snap = await tryAttachDiagramSnapshot(bridge, selectedDiagramId);
                 const provider = unifiedStorage.getProvider(cloudMeta.provider);
@@ -389,9 +391,9 @@ const DiagramViewer: React.FC = () => {
                     user_id: 'anonymous',
                 });
                 invalidateRemoteDiagramPreview(cloudMeta.id || bridge.id);
-                message.success(t('diagramViewer.directSave.success'));
+                appMessage.success(t('diagramViewer.directSave.success'));
             } catch (e: any) {
-                message.error(t('diagramViewer.directSave.error', { message: e.message }));
+                appMessage.error(t('diagramViewer.directSave.error', { message: e.message }));
             } finally { hide(); }
         } else {
             // 首次未知归属文件强制另存为至 supabase 后端
@@ -420,7 +422,7 @@ const DiagramViewer: React.FC = () => {
             const currentNodes = useDiagramStore.getState().nodes;
             if (currentNodes && currentNodes.length > 0) {
                 const confirmed = await new Promise<boolean>(resolve => {
-                    Modal.confirm({
+                    appModal.confirm({
                         title: '切换图表模板',
                         content: `当前图表包含 ${currentNodes.length} 个节点。切换后当前的本地修改将被新模板覆盖，确定要继续吗？`,
                         okText: '确定切换',
@@ -935,7 +937,7 @@ const DiagramViewer: React.FC = () => {
 
                                         if (rootGroup === 's3' || rootGroup === 'cloud' || rootGroup === 'supabase') {
                                             const providerName = rootGroup === 's3' ? 's3' : 'supabase';
-                                            const messageKey = message.loading(t('storage.manager.downloading'), 0);
+                                            const messageKey = appMessage.loading(t('storage.manager.downloading'), 0);
                                             try {
                                                 const provider = unifiedStorage.getProvider(providerName);
                                                 const savedDiagram = await provider.loadDiagram(leafKey);
@@ -952,10 +954,10 @@ const DiagramViewer: React.FC = () => {
                                                     };
                                                     seedAutoSaveAndNavigate(normalized, savedDiagram.id);
                                                 } else {
-                                                    message.error(t('storage.manager.noContent'));
+                                                    appMessage.error(t('storage.manager.noContent'));
                                                 }
                                             } catch (e: any) {
-                                                message.error(t('diagramViewer.cloudLoad.error', { message: e.message }));
+                                                appMessage.error(t('diagramViewer.cloudLoad.error', { message: e.message }));
                                             } finally {
                                                 messageKey();
                                             }
@@ -1246,7 +1248,7 @@ const DiagramViewer: React.FC = () => {
                                                                         .map(([key, value]) => `  --${key}: ${value} !important;`)
                                                                         .join('\n');
                                                                     styleTag.innerHTML = `:root {\n${cssVars}\n}`;
-                                                                    message.success(t('diagramViewer.aiThemeApplied'));
+                                                                    appMessage.success(t('diagramViewer.aiThemeApplied'));
                                                                 },
                                                                 onTogglePresentation: (active) => {
                                                                     setIsPresentationMode(active);
@@ -1306,7 +1308,7 @@ const DiagramViewer: React.FC = () => {
                                         className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[3000] px-6 py-2.5 bg-black/70 hover:bg-black/90 backdrop-blur-md text-white text-xs font-semibold rounded-full cursor-pointer transition-all border border-white/20 shadow-2xl animate-bounce-subtle"
                                         onClick={() => {
                                             setIsPresentationMode(false);
-                                            message.info('演示模式已退出');
+                                            appMessage.info('演示模式已退出');
                                         }}
                                     >
                                         🎬 点击或按 ESC 退出演示模式

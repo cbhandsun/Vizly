@@ -43,6 +43,8 @@ import RemoteDiagramCover from '@/components/shared/RemoteDiagramCover';
 import { PRESET_MAP } from '@/data/standardized';
 
 import './WorkspaceDashboard.css';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 // --- Unified Data Types ---
 type DataSourceType = 'local' | 'supabase' | 's3';
@@ -207,7 +209,7 @@ const WorkspaceDashboardPage: React.FC = () => {
             setUnifiedItems(newItems);
         } catch (error) {
             console.error("Failed to load dashboard data", error);
-            message.error("Failed to load workspace data");
+            appMessage.error("Failed to load workspace data");
         } finally {
             setLoading(false);
         }
@@ -230,7 +232,7 @@ const WorkspaceDashboardPage: React.FC = () => {
             return;
         }
 
-        const hide = message.loading("Loading diagram from cloud...", 0);
+        const hide = appMessage.loading("Loading diagram from cloud...", 0);
         try {
             const rawObj = item.raw as DiagramMetadata;
             const savedDiagram = await unifiedStorage.loadDiagram(rawObj.id);
@@ -239,7 +241,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                 const report = coerceToStandardDiagramDataWithReport(savedDiagram.content, { id: savedDiagram.id, title: savedDiagram.title });
                 
                 if (report.issues.some(x => x.level === 'error')) {
-                    message.error("Diagram format error. Cannot load.");
+                    appMessage.error("Diagram format error. Cannot load.");
                     return;
                 }
                 
@@ -263,10 +265,10 @@ const WorkspaceDashboardPage: React.FC = () => {
                 localService.registerDiagram(normalized);
                 navigate(`/?diagram=${savedDiagram.id}`);
             } else {
-                message.error("Diagram not found in cloud storage.");
+                appMessage.error("Diagram not found in cloud storage.");
             }
         } catch (error: any) {
-            message.error("Failed to open diagram: " + error.message);
+            appMessage.error("Failed to open diagram: " + error.message);
         } finally {
             hide();
         }
@@ -290,10 +292,10 @@ const WorkspaceDashboardPage: React.FC = () => {
                         const rawObj = item.raw as DiagramMetadata;
                         await unifiedStorage.deleteDiagram(rawObj.id);
                     }
-                    message.success('Deleted successfully');
+                    appMessage.success('Deleted successfully');
                     loadAllData();
                 } catch (error) {
-                    message.error("Failed to delete diagram.");
+                    appMessage.error("Failed to delete diagram.");
                 }
             }
         });
@@ -431,7 +433,7 @@ const WorkspaceDashboardPage: React.FC = () => {
             onClick: () => {
                 unifiedStorage.setProvider('s3');
                 setCloudProvider('s3');
-                message.info('Switched purely to S3 Backend');
+                appMessage.info('Switched purely to S3 Backend');
             }
         },
         {
@@ -441,7 +443,7 @@ const WorkspaceDashboardPage: React.FC = () => {
             onClick: () => {
                 unifiedStorage.setProvider('supabase');
                 setCloudProvider('supabase');
-                message.info('Switched purely to Supabase');
+                appMessage.info('Switched purely to Supabase');
             }
         },
         { type: 'divider' },

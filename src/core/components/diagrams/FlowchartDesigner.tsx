@@ -120,6 +120,8 @@ import ERDatabaseNode from '../custom-nodes/ERDatabaseNode';
 import { VersionHistoryPanel } from '../../../components/diagrams/ui/VersionHistoryPanel';
 // useLayerManagement already imported above
 import { MobileBottomDock } from '../layout/MobileBottomDock';
+import { appMessage, appModal } from '@/core/utils/antdStaticBridge';
+
 // useMindMapOrchestrator decoupled
 
 const FallbackNode = ({ type, data }: any) => {
@@ -232,7 +234,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         if (onOpenSettings) {
             onOpenSettings();
         } else {
-            message.info(t('designer.flowchart.settingsNotAvailable'));
+            appMessage.info(t('designer.flowchart.settingsNotAvailable'));
         }
     }, [onOpenSettings]);
 
@@ -429,7 +431,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                     };
                     
                     setNodes(nds => [...nds, newNode]);
-                    message.success(t('designer.flowchart.nodeAdded', { type }));
+                    appMessage.success(t('designer.flowchart.nodeAdded', { type }));
                     
                     // 移动端添加后自动关闭抽屉
                     if (isMobile) {
@@ -665,7 +667,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
 
     const handleSmartLayout = useCallback(() => {
         const rec = recommendLayout(nodesRef.current, edgesRef.current);
-        message.info(t('designer.flowchart.smartLayout', { reason: rec.reason, confidence: Math.round(rec.confidence * 100) }));
+        appMessage.info(t('designer.flowchart.smartLayout', { reason: rec.reason, confidence: Math.round(rec.confidence * 100) }));
         handleStrategyLayout(rec.domainStrategy, rec.nodeLayout, rec.direction);
     }, [handleStrategyLayout]);
 
@@ -677,7 +679,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         setNodes(result.nodes);
         setEdges(result.edges);
         
-        message.success(t('designer.flowchart.optimize', { overlaps: result.stats.rectifiedOverlaps, nodes: result.stats.alignedNodes }));
+        appMessage.success(t('designer.flowchart.optimize', { overlaps: result.stats.rectifiedOverlaps, nodes: result.stats.alignedNodes }));
     }, [setNodes, setEdges, takeSnapshot]);
 
     // Gap 6: 双击连线，在中点插入新节点，将边一分为二
@@ -727,7 +729,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
 
         setNodes(ns => [...ns, newNode]);
         setEdges(es => [...es.filter(e => e.id !== edge.id), edgeA, edgeB]);
-        message.success(t('designer.flowchart.edgeNodeInserted'));
+        appMessage.success(t('designer.flowchart.edgeNodeInserted'));
     }, [isReadonly, setNodes, setEdges, takeSnapshot]);
 
 
@@ -829,7 +831,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                     selected: true
                 } as Node]);
             } else if (action === 'clear-canvas') {
-                Modal.confirm({
+                appModal.confirm({
                     title: t('designer.flowchart.clearCanvas.title'),
                     content: t('designer.flowchart.clearCanvas.content'),
                     okText: t('designer.flowchart.clearCanvas.ok'),
@@ -976,7 +978,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
             a.download = `flowchart-${Date.now()}.mmd`;
             a.click();
             URL.revokeObjectURL(url);
-        } catch(e:any) { message.error(e.message); }
+        } catch(e:any) { appMessage.error(e.message); }
     }, []);
 
     const handleCopyAsMermaid = useCallback(async () => {
@@ -984,9 +986,9 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
              const m = await toMermaid(nodesRef.current, edgesRef.current);
              if (navigator.clipboard) {
                  await navigator.clipboard.writeText(m);
-                 message.success(t('designer.flowchart.mermaidCopied'));
+                 appMessage.success(t('designer.flowchart.mermaidCopied'));
              }
-         } catch(e:any) { message.error(e.message); }
+         } catch(e:any) { appMessage.error(e.message); }
     }, []);
 
     const handleUseTemplate = useCallback((tpl: any) => {
@@ -995,7 +997,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         const { nodes: newN, edges: newE } = createFromTemplate(tpl, viewport.x, viewport.y, viewport.zoom);
         setNodes(nds => [...nds, ...newN]);
         setEdges(eds => [...eds, ...newE]);
-        message.success(t('designer.flowchart.templateApplied'));
+        appMessage.success(t('designer.flowchart.templateApplied'));
     }, [reactFlowInstance, takeSnapshot, createFromTemplate, viewport, setNodes, setEdges]);
     
     const handleOpacity = useCallback((opacity: number) => {
@@ -1299,7 +1301,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                             );
                                             setDiffResult(result);
                                         } else {
-                                            message.info(t('designer.flowchart.noHistory'));
+                                            appMessage.info(t('designer.flowchart.noHistory'));
                                         }
                                     },
                                     onShowHistory: () => setHistoryPanelVisible(prev => !prev),

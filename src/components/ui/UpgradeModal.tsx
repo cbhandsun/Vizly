@@ -4,6 +4,8 @@ import { CrownOutlined, CheckCircleFilled } from '@ant-design/icons';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { useTranslation } from 'react-i18next';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -16,7 +18,7 @@ export const UpgradeModal: React.FC = () => {
 
   const handleUpgradeClick = async () => {
     if (!jwtToken || jwtToken === 'guest') {
-      message.warning(t('upgrade.loginFirst'));
+      appMessage.warning(t('upgrade.loginFirst'));
       setIsAuthModalVisible(true);
       return;
     }
@@ -57,10 +59,10 @@ export const UpgradeModal: React.FC = () => {
       if (data.url) {
         window.location.href = data.url; // 重定向至 Stripe 网关
       } else {
-        message.error(t('upgrade.checkoutFail', { error: data.error || t('upgrade.unknownError') }));
+        appMessage.error(t('upgrade.checkoutFail', { error: data.error || t('upgrade.unknownError') }));
       }
     } catch (e: any) {
-       message.error(t('upgrade.gatewayFail', { error: e.message }));
+       appMessage.error(t('upgrade.gatewayFail', { error: e.message }));
     } finally {
        setLoading(false);
     }

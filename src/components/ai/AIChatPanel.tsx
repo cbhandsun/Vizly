@@ -60,6 +60,8 @@ import {
 } from './types';
 import ShortcutsGuide from './ShortcutsGuide';
 import './AIChatPanel.css';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 
 
@@ -265,7 +267,9 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
 
     // Find the readable name for the currently active model (even if disabled)
     const activeModelName = useMemo(() => {
-        const [pId, mId] = aiConfig.activeModelKey.split(':');
+        const parts = (aiConfig.activeModelKey || '').split(':');
+        const pId = parts[0];
+        const mId = parts.slice(1).join(':');
         const p = aiConfig.providers.find(prov => prov.id === pId);
         if (p) {
             const m = p.models.find(mod => mod.id === mId);
@@ -278,7 +282,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         const newConfig = { ...aiConfig, activeModelKey: val };
         setAiConfig(newConfig);
         localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(newConfig));
-        message.success(t('aiChat.autoSwitched', { name: availableModels.find(m => m.value === val)?.label || val }));
+        appMessage.success(t('aiChat.autoSwitched', { name: availableModels.find(m => m.value === val)?.label || val }));
     };
 
     // UI Local state
@@ -460,32 +464,32 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                     case 'addNode':
                         if (canvasOps.onAddNode) {
                             const newId = canvasOps.onAddNode(cmd.label, cmd.shape || cmd.type);
-                            if (newId) message.success(t('aiChat.status.nodeAdded', { label: cmd.label }));
+                            if (newId) appMessage.success(t('aiChat.status.nodeAdded', { label: cmd.label }));
                         }
                         break;
                     case 'deleteNodes':
                         if (canvasOps.onDeleteNodes && cmd.ids) {
                             canvasOps.onDeleteNodes(cmd.ids);
-                            message.success(t('aiChat.status.nodesDeleted', { count: cmd.ids.length }));
+                            appMessage.success(t('aiChat.status.nodesDeleted', { count: cmd.ids.length }));
                         }
                         break;
                     case 'connectNodes':
                         if (canvasOps.onConnectNodes && cmd.source && cmd.target) {
                             canvasOps.onConnectNodes(cmd.source, cmd.target, cmd.label);
-                            message.success(t('aiChat.status.connected', { label: cmd.label || '' }));
+                            appMessage.success(t('aiChat.status.connected', { label: cmd.label || '' }));
                         }
                         break;
                     case 'triggerLayout':
                     case 'layout':
                         if (canvasOps.onAutoLayout) {
                             canvasOps.onAutoLayout(cmd.strategy);
-                            message.success(t('aiChat.status.layoutApplied', { strategy: cmd.strategy || t('aiChat.status.smartLayout') }));
+                            appMessage.success(t('aiChat.status.layoutApplied', { strategy: cmd.strategy || t('aiChat.status.smartLayout') }));
                         }
                         break;
                     case 'groupNodes':
                         if (canvasOps.onGroupNodes && cmd.ids) {
                             canvasOps.onGroupNodes(cmd.ids, cmd.name || cmd.label);
-                            message.success(t('aiChat.status.groupCreated', { name: cmd.name || cmd.label || t('aiChat.status.smartGroup') }));
+                            appMessage.success(t('aiChat.status.groupCreated', { name: cmd.name || cmd.label || t('aiChat.status.smartGroup') }));
                         }
                         break;
                     case 'export':
@@ -686,7 +690,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
             if (activeId) {
                 aiConversationService.updateConversation(activeId, { messages: [] });
                 setConversations(aiConversationService.getConversations());
-                message.success(t('aiChat.status.resetSuccess'));
+                appMessage.success(t('aiChat.status.resetSuccess'));
                 return true;
             }
         }
@@ -784,7 +788,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
     const handleVoiceToggle = () => {
         if (!isListening) {
             setIsListening(true);
-            message.info({
+            appMessage.info({
                 content: t('aiChat.status.voiceBeta'),
                 key: 'voice-beta',
                 duration: 3
@@ -817,12 +821,12 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
 
         // 调试日志
 
-        // 如果当前选择的模型不可用，尝试自动回退到第一个可用的模型
-        if (!activeProvider || !activeProvider.apiKey || !activeModel) {
+        // 如果当前选择的模型不可用（如被删除或禁用），尝试自动回退到第一个可用的模型
+        if (!activeProvider || !activeModel) {
 
             // 查找第一个可用的 provider 和 model
             for (const provider of config.providers) {
-                if (provider.enabled && provider.apiKey) {
+                if (provider.enabled) {
                     const enabledModel = provider.models.find(m => m.enabled);
                     if (enabledModel) {
                         activeProvider = provider;
@@ -835,7 +839,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
                         config.activeModelKey = newActiveModelKey;
                         localStorage.setItem('DiagramView.AIConfig_V2_Advanced', JSON.stringify(config));
 
-                        message.info(t('aiChat.autoSwitched', { name: `${provider.name} - ${enabledModel.name}` }));
+                        appMessage.info(t('aiChat.autoSwitched', { name: `${provider.name} - ${enabledModel.name}` }));
                         break;
                     }
                 }
@@ -843,8 +847,8 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         }
 
         // 再次检查
-        if (!activeProvider || !activeProvider.apiKey || !activeModel) {
-            message.warning('没有找到可用的模型，请先在设置中配置 API Key 并启用模型');
+        if (!activeProvider || !activeModel) {
+            appMessage.warning('没有找到可用的模型，请先在设置中启用模型');
             onOpenConfig();
             return;
         }
@@ -876,7 +880,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${activeProvider.apiKey}`
+                    ...(activeProvider.apiKey ? { 'Authorization': `Bearer ${activeProvider.apiKey}` } : {})
                 },
                 body: JSON.stringify({
                     model: activeModel.id,
@@ -997,7 +1001,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
             }
 
         } catch (error: any) {
-            message.error(t('aiChat.requestFailed', { error: error.message }));
+            appMessage.error(t('aiChat.requestFailed', { error: error.message }));
             if (activeId) {
                 const convs = [...aiConversationService.getConversations()];
                 const cIdx = convs.findIndex(c => c.id === activeId);
@@ -1029,7 +1033,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
             setSaveTarget(target);
             setSaveModalVisible(true);
         } catch (e: any) {
-            message.error(t('aiChat.invalidDiagram'));
+            appMessage.error(t('aiChat.invalidDiagram'));
         }
     };
 
@@ -1042,7 +1046,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
             const obj = JSON.parse(saveJson);
             const target = saveTarget;
             const targetLabel = target === 'local' ? t('storage.manager.local') : (target === 's3' ? 'S3' : 'Supabase');
-            const hide = message.loading(t('aiChat.status.savingTo', { target: targetLabel }), 0);
+            const hide = appMessage.loading(t('aiChat.status.savingTo', { target: targetLabel }), 0);
 
             try {
                 // [FIX] Update Title
@@ -1059,7 +1063,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
                     if (typeof localStorage !== 'undefined') {
                         localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(map));
                     }
-                    message.success(t('aiChat.status.saveSuccess', { target: targetLabel, title: title }));
+                    appMessage.success(t('aiChat.status.saveSuccess', { target: targetLabel, title: title }));
                 } else {
                     const provider = unifiedStorage.getProvider(target);
                     if (!provider.isConfigured()) {
@@ -1092,14 +1096,14 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
                         user_id: user?.id || 'anonymous',
                         updated_at: new Date().toISOString()
                     });
-                    message.success(t('aiChat.status.saveSuccess', { target: targetLabel, title: title }));
+                    appMessage.success(t('aiChat.status.saveSuccess', { target: targetLabel, title: title }));
                 }
             } finally {
                 hide();
             }
         } catch (error: any) {
             const errMsg = error.message || String(error);
-            message.error(t('aiChat.status.saveFailed', { error: errMsg }));
+            appMessage.error(t('aiChat.status.saveFailed', { error: errMsg }));
         }
     };
 

@@ -35,6 +35,7 @@
         "menu": {
             "myDiagrams": "My diagrams",
             "switchUser": "Switch user",
+            "setPassword": "Set password",
             "logout": "Sign out"
         },
         "modal": {
@@ -72,6 +73,7 @@
             "registerNow": "Register now",
             "hasAccount": "Already have an account?",
             "backToLogin": "Back to login",
+            "setPasswordSuccess": "Password set successfully! You can now use it to sign in.",
             "magicLinkHint": "💡 If you previously used Magic Link, you can continue using it. You can set a password later in your profile."
         }
     },

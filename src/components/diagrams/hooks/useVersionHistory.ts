@@ -3,6 +3,8 @@ import { message } from 'antd';
 import { unifiedStorage } from '@/services/UnifiedStorageService';
 import { DiagramVersion } from '@/services/storage/types';
 import { tryAttachDiagramSnapshot } from '@/core';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 export function useVersionHistory(diagramId: string) {
     const [versions, setVersions] = useState<DiagramVersion[]>([]);
@@ -17,7 +19,7 @@ export function useVersionHistory(diagramId: string) {
             setVersions(data);
         } catch (error) {
             console.error("Failed to load versions:", error);
-            message.error("加载历史版本失败");
+            appMessage.error("加载历史版本失败");
         } finally {
             setLoading(false);
         }
@@ -29,7 +31,7 @@ export function useVersionHistory(diagramId: string) {
         try {
             const bridge = (window as any).__flowDataBridge?.[diagramId];
             if (!bridge) {
-                message.error('无法提取当前图表数据');
+                appMessage.error('无法提取当前图表数据');
                 return;
             }
 
@@ -40,11 +42,11 @@ export function useVersionHistory(diagramId: string) {
             
             // Add new version to list without refetching all
             setVersions(prev => [newVersion, ...prev]);
-            message.success("已保存快照");
+            appMessage.success("已保存快照");
             
         } catch (error) {
             console.error("Failed to save version:", error);
-            message.error("保存版本失败");
+            appMessage.error("保存版本失败");
         }
     }, [diagramId]);
 
@@ -53,7 +55,7 @@ export function useVersionHistory(diagramId: string) {
             return await unifiedStorage.loadVersion(diagramId, versionId);
         } catch (e) {
             console.error("Failed to load version payload:", e);
-            message.error("加载快照详细数据失败");
+            appMessage.error("加载快照详细数据失败");
             return null;
         }
     }, [diagramId]);
@@ -75,7 +77,7 @@ export function useVersionHistory(diagramId: string) {
             : await loadVersionData(versionId);
 
         if (!fullVersion || !fullVersion.snapshotData) {
-            message.error("无法恢复：快照数据缺失");
+            appMessage.error("无法恢复：快照数据缺失");
             return false;
         }
 
@@ -88,13 +90,13 @@ export function useVersionHistory(diagramId: string) {
                 setEdges(fullVersion.snapshotData.edges || []);
                 
                 // Keep the bridge intact, overwrite internal values if necessary!
-                message.success(`已恢复至快照: ${fullVersion.message || fullVersion.id.substring(0, 8)}`);
+                appMessage.success(`已恢复至快照: ${fullVersion.message || fullVersion.id.substring(0, 8)}`);
                 setPreviewVersion(null);
                 return true;
             }
         } catch (e) {
             console.error(e);
-            message.error("恢复出错");
+            appMessage.error("恢复出错");
         }
         return false;
     }, [diagramId, previewVersion, loadVersionData]);

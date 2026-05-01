@@ -165,6 +165,8 @@ export const getAIConfig = (): AIConfigState => {
 import { useAuth } from '@/context/AuthContext';
 import { storageService } from '@/services/SupabaseStorage';
 import { CryptoService } from '@/core';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave }) => {
     const { t } = useTranslation();
@@ -228,13 +230,13 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 const cloudConfig = { ...config, providers: encryptedProviders };
 
                 await storageService.saveConfig('ai_config', cloudConfig, user.id);
-                message.success(t('aiConfig.saveSuccessCloud'));
+                appMessage.success(t('aiConfig.saveSuccessCloud'));
             } catch (err) {
                 console.error('Cloud save failed', err);
-                message.warning(t('aiConfig.cloudSyncFail'));
+                appMessage.warning(t('aiConfig.cloudSyncFail'));
             }
         } else {
-            message.success(t('aiConfig.saveSuccess'));
+            appMessage.success(t('aiConfig.saveSuccess'));
         }
 
         window.dispatchEvent(new Event('aiConfigChanged'));
@@ -296,7 +298,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     // --- Model Actions ---
     const addModel = (providerId: string) => {
         if (!newModelData.id) {
-            message.error(t('aiConfig.noModelId'));
+            appMessage.error(t('aiConfig.noModelId'));
             return;
         }
         setConfig(prev => ({
@@ -317,7 +319,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
         }));
         setNewModelFormVisible(false);
         setNewModelData({ id: '', name: '', group: '' });
-        message.success(t('aiConfig.modelAdded'));
+        appMessage.success(t('aiConfig.modelAdded'));
     };
 
     const deleteModel = (providerId: string, modelId: string) => {
@@ -355,7 +357,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(newConfig));
             return newConfig;
         });
-        message.success(t('aiConfig.switchedTo', { model: modelId }));
+        appMessage.success(t('aiConfig.switchedTo', { model: modelId }));
     };
 
     const selectedProvider = config.providers.find(p => p.id === selectedProviderId);
@@ -381,8 +383,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     const [isTesting, setIsTesting] = useState(false);
 
     const handleTestConnection = async (provider: AIProviderConfig) => {
-        if (!provider.apiKey || !provider.baseUrl) {
-            message.warning(t('aiConfig.testFillRequired'));
+        if (!provider.baseUrl) {
+            appMessage.warning(t('aiConfig.testFillRequired'));
             return;
         }
         setIsTesting(true);
@@ -392,7 +394,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${provider.apiKey}`
+                    ...(provider.apiKey ? { 'Authorization': `Bearer ${provider.apiKey}` } : {})
                 },
                 body: JSON.stringify({
                     model: provider.models[0]?.id || 'test-model',
@@ -401,18 +403,18 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             });
 
             if (response.ok) {
-                message.success(t('aiConfig.testSuccess'));
+                appMessage.success(t('aiConfig.testSuccess'));
             } else {
                 const errText = await response.text();
                 // Check if HTML
                 if (errText.trim().startsWith('<')) {
-                    message.error(t('aiConfig.testFailHtml', { status: response.status }));
+                    appMessage.error(t('aiConfig.testFailHtml', { status: response.status }));
                 } else {
-                    message.error(t('aiConfig.testFail', { status: response.status, message: errText.substring(0, 100) }));
+                    appMessage.error(t('aiConfig.testFail', { status: response.status, message: errText.substring(0, 100) }));
                 }
             }
         } catch (error: any) {
-            message.error(t('aiConfig.testError', { message: error.message }));
+            appMessage.error(t('aiConfig.testError', { message: error.message }));
         } finally {
             setIsTesting(false);
         }
@@ -436,7 +438,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                     return { ...p, models: [...p.models, ...modelsToAdd] };
                 })
             }));
-            message.success(t('aiConfig.fetchModelsSuccess', { count: modelsToAdd.length }));
+            appMessage.success(t('aiConfig.fetchModelsSuccess', { count: modelsToAdd.length }));
         }
         setDiscoveryModalVisible(false);
     };
@@ -474,8 +476,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     }, [filteredDiscoveredModels]);
 
     const handleFetchModels = async (provider: AIProviderConfig) => {
-        if (!provider.apiKey || !provider.baseUrl) {
-            message.warning(t('aiConfig.testFillRequired'));
+        if (!provider.baseUrl) {
+            appMessage.warning(t('aiConfig.testFillRequired'));
             return;
         }
         setIsFetchingModels(true);
@@ -484,7 +486,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             const response = await fetch(endpoint, {
                 method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${provider.apiKey}`
+                    ...(provider.apiKey ? { 'Authorization': `Bearer ${provider.apiKey}` } : {})
                 }
             });
 
@@ -516,17 +518,17 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                         setDiscoverySearchText('');
                         setDiscoveryModalVisible(true);
                     } else {
-                        message.info(t('aiConfig.fetchModelsNoNew'));
+                        appMessage.info(t('aiConfig.fetchModelsNoNew'));
                     }
                 } else {
-                    message.error(t('aiConfig.fetchModelsInvalidData'));
+                    appMessage.error(t('aiConfig.fetchModelsInvalidData'));
                 }
             } else {
                 const errText = await response.text();
-                message.error(t('aiConfig.testFail', { status: response.status, message: errText.substring(0, 100) }));
+                appMessage.error(t('aiConfig.testFail', { status: response.status, message: errText.substring(0, 100) }));
             }
         } catch (error: any) {
-            message.error(t('aiConfig.testError', { message: error.message }));
+            appMessage.error(t('aiConfig.testError', { message: error.message }));
         } finally {
             setIsFetchingModels(false);
         }

@@ -1,9 +1,10 @@
 
 import React, { useState } from 'react';
 import { Button, Avatar, Dropdown, MenuProps, Tooltip } from 'antd';
-import { UserOutlined, LoginOutlined, LogoutOutlined, CloudOutlined } from '@ant-design/icons';
+import { UserOutlined, LoginOutlined, LogoutOutlined, CloudOutlined, LockOutlined } from '@ant-design/icons';
 import { useAuth } from '@/context/AuthContext';
 import { AuthModal } from './AuthModal';
+import { SetPasswordModal } from './SetPasswordModal';
 const CloudStorageManagerModal = React.lazy(() => import('../storage/CloudStorageManagerModal').then(m => ({ default: m.CloudStorageManagerModal })));
 import { useTranslation } from 'react-i18next';
 
@@ -12,12 +13,15 @@ export const AuthStatus: React.FC<{ compact?: boolean }> = ({ compact = false })
     const { user, signOut } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
+    const [isSetPasswordModalOpen, setIsSetPasswordModalOpen] = useState(false);
 
     const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
         if (key === 'logout') {
             signOut();
         } else if (key === 'switch_user') {
             signOut().then(() => setIsModalOpen(true));
+        } else if (key === 'set_password') {
+            setIsSetPasswordModalOpen(true);
         } else if (key === 'cloud_files') {
             setIsCloudModalOpen(true);
         }
@@ -42,6 +46,11 @@ export const AuthStatus: React.FC<{ compact?: boolean }> = ({ compact = false })
             key: 'switch_user',
             label: t('auth.menu.switchUser'),
             icon: <UserOutlined />,
+        },
+        {
+            key: 'set_password',
+            label: t('auth.menu.setPassword'),
+            icon: <LockOutlined />,
         },
         {
             key: 'logout',
@@ -92,6 +101,10 @@ export const AuthStatus: React.FC<{ compact?: boolean }> = ({ compact = false })
             <AuthModal
                 open={isModalOpen}
                 onCancel={() => setIsModalOpen(false)}
+            />
+            <SetPasswordModal
+                open={isSetPasswordModalOpen}
+                onCancel={() => setIsSetPasswordModalOpen(false)}
             />
             <React.Suspense fallback={null}>
                 <CloudStorageManagerModal

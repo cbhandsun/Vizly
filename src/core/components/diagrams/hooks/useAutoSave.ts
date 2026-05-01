@@ -124,7 +124,7 @@ export const useAutoSave = (
                 setTimeout(() => save(), retryDelay);
             } else {
                 onSaveError?.(error as Error);
-                message.error(`Auto-save failed: ${errorMsg}`);
+                appMessage.error(`Auto-save failed: ${errorMsg}`);
             }
         }
     }, [storageKey, diagramId, onSaveSuccess, onSaveError]);

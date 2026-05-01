@@ -7,6 +7,8 @@ import { diagramStyleManager } from '../../shared/DiagramStyleManager';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { useFlowchartState } from './useFlowchartState';
 import { subscribeViewport } from '../../shared/viewportStore';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 export interface UseDesignerCanvasStateProps {
     id?: string;
@@ -74,7 +76,7 @@ export function useDesignerCanvasState({
         if (onOpenSettings) {
             onOpenSettings();
         } else {
-            message.info('当前独立设计器模式未挂载高级首选项面板，请在主视图中或按快捷键 Ctrl+Shift+, 打开。');
+            appMessage.info('当前独立设计器模式未挂载高级首选项面板，请在主视图中或按快捷键 Ctrl+Shift+, 打开。');
         }
     }, [onOpenSettings]);
 

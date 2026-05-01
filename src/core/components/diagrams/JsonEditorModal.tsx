@@ -3,6 +3,8 @@ import { Button, Modal, Segmented, message } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 const LazyMonacoEditor = React.lazy(() => import('../lazy/LazyMonacoEditor'));
 
@@ -89,7 +91,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                 const { dataRegistry } = await import('@/data/DataRegistry');
                 const localSvc = dataRegistry.getDataService();
                 localSvc.registerDiagram(data);
-                message.success('配置已保存！重载视图以应用全部全量布局...');
+                appMessage.success('配置已保存！重载视图以应用全部全量布局...');
                 setTimeout(() => window.location.reload(), 500);
                 return true;
             }
@@ -102,12 +104,12 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                 setNodes(newNodes);
                 setEdges(newEdges);
                 setTimeout(() => reactFlowInstance.fitView({ duration: 800, padding: 0.35, minZoom: 0.55 }), 50);
-                message.success(t('designer.flowchart.jsonApplied') || '应用成功');
+                appMessage.success(t('designer.flowchart.jsonApplied') || '应用成功');
                 return true;
             }
             return false;
         } catch (e) {
-            message.error(t('designer.flowchart.invalidJson', { reason: (e as Error).message }));
+            appMessage.error(t('designer.flowchart.invalidJson', { reason: (e as Error).message }));
             return false;
         }
     };
@@ -127,9 +129,9 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
             const content = getActiveContent();
             const obj = JSON.parse(content || '{}');
             setActiveContent(JSON.stringify(obj, null, 2));
-            message.success(t('designer.flowchart.jsonFormatted') || 'JSON 格式化成功');
+            appMessage.success(t('designer.flowchart.jsonFormatted') || 'JSON 格式化成功');
         } catch (e: unknown) {
-            message.error(t('designer.flowchart.invalidJson', { reason: (e as Error).message }));
+            appMessage.error(t('designer.flowchart.invalidJson', { reason: (e as Error).message }));
         }
     }, [getActiveContent, setActiveContent, t]);
 
@@ -148,7 +150,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
             a.click();
             URL.revokeObjectURL(url);
         } catch (e: unknown) {
-            message.error(t('designer.flowchart.invalidJson', { reason: (e as Error).message }));
+            appMessage.error(t('designer.flowchart.invalidJson', { reason: (e as Error).message }));
         }
     }, [getActiveContent, jsonFormatMode, t]);
 

@@ -5,6 +5,8 @@ import { Form, Input, Button, Card, Switch, Typography, Space, Select } from 'an
 import { appMessage as message, appModal } from '@/core';
 import { SaveOutlined, ApiOutlined, CloudServerOutlined } from '@ant-design/icons';
 import { s3Storage as storageService, StorageConfig } from '../services/StorageService';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -27,9 +29,9 @@ const StorageConfigPage: React.FC = () => {
         setLoading(true);
         try {
             storageService.saveConfig(values);
-            message.success(t('storageConfig.saveSuccess'));
+            appMessage.success(t('storageConfig.saveSuccess'));
         } catch (error) {
-            message.error(t('storageConfig.saveFail'));
+            appMessage.error(t('storageConfig.saveFail'));
         } finally {
             setLoading(false);
         }
@@ -43,7 +45,7 @@ const StorageConfigPage: React.FC = () => {
             storageService.saveConfig(values);
 
             await storageService.testConnection();
-            message.success(t('storageConfig.testSuccess'));
+            appMessage.success(t('storageConfig.testSuccess'));
         } catch (error: any) {
             console.error(error);
             const errorDetails = JSON.stringify({

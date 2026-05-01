@@ -5,6 +5,8 @@ import { LinkOutlined, TeamOutlined, UserOutlined, CheckCircleFilled, SafetyOutl
 import { useTranslation } from 'react-i18next';
 import { shareService, ShareRecord, CollaboratorRecord } from '@/services/ShareService';
 import { useAuth } from '@/context/AuthContext';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+
 
 const { Text } = Typography;
 
@@ -100,11 +102,11 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
 
     // ===== Link Tab Actions =====
     const handleCreateLink = useCallback(async () => {
-        if (!user) { message.warning(t('share.loginRequired')); return; }
+        if (!user) { appMessage.warning(t('share.loginRequired')); return; }
         setCreatingLink(true);
         try {
             const savedId = await onEnsureSaved();
-            if (!savedId) { message.error(t('export.cloudSaveFailed')); return; }
+            if (!savedId) { appMessage.error(t('export.cloudSaveFailed')); return; }
             setCloudDiagramId(savedId);
             const record = await shareService.createShareLink({ diagramId: savedId, userId: user.id, expiresAt: getExpiresAt(expiration) });
             const url = shareService.buildShareUrl(record.share_token);
@@ -113,7 +115,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             setTimeout(() => setJustCopiedUrl(null), 5000);
             setShares(prev => [record, ...prev]);
         } catch (err) {
-            message.error(String(err));
+            appMessage.error(String(err));
         } finally {
             setCreatingLink(false);
         }
@@ -122,30 +124,30 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const handleCopy = useCallback(async (shareToken: string) => {
         const url = shareService.buildShareUrl(shareToken);
         await navigator.clipboard.writeText(url);
-        message.success(t('share.copied'));
+        appMessage.success(t('share.copied'));
     }, [t]);
 
     const handleRevokeShare = useCallback(async (shareId: string) => {
         try {
             await shareService.revokeShare(shareId);
-            message.success(t('share.revoked'));
+            appMessage.success(t('share.revoked'));
             setShares(prev => prev.filter(s => s.id !== shareId));
-        } catch { message.error('Failed to revoke'); }
+        } catch { appMessage.error('Failed to revoke'); }
     }, [t]);
 
     // ===== Invite Tab Actions =====
     const handleInvite = useCallback(async () => {
-        if (!user) { message.warning(t('share.loginRequired')); return; }
+        if (!user) { appMessage.warning(t('share.loginRequired')); return; }
         if (!inviteEmail.trim()) return;
         setInviting(true);
         setInviteStatus('idle');
         try {
             const savedId = await onEnsureSaved();
-            if (!savedId) { message.error(t('export.cloudSaveFailed')); return; }
+            if (!savedId) { appMessage.error(t('export.cloudSaveFailed')); return; }
             setCloudDiagramId(savedId);
             const res = await shareService.addCollaborator(savedId, inviteEmail.trim(), inviteRole);
             if (res.success) {
-                message.success(t('share.inviteSuccess'));
+                appMessage.success(t('share.inviteSuccess'));
                 setInviteEmail('');
                 setInviteStatus('success');
                 setTimeout(() => setInviteStatus('idle'), 1500);
@@ -153,12 +155,12 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             } else {
                 setInviteStatus('error');
                 setTimeout(() => setInviteStatus('idle'), 2000);
-                message.error(t('share.inviteFailed', { error: res.error || 'Unknown' }));
+                appMessage.error(t('share.inviteFailed', { error: res.error || 'Unknown' }));
             }
         } catch (err: any) {
             setInviteStatus('error');
             setTimeout(() => setInviteStatus('idle'), 2000);
-            message.error(t('share.inviteFailed', { error: err.message || String(err) }));
+            appMessage.error(t('share.inviteFailed', { error: err.message || String(err) }));
         } finally {
             setInviting(false);
         }
@@ -167,9 +169,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const handleRemoveCollab = useCallback(async (targetUserId: string) => {
         try {
             await shareService.removeCollaborator(effectiveId, targetUserId);
-            message.success(t('share.removeSuccess'));
+            appMessage.success(t('share.removeSuccess'));
             setCollaborators(prev => prev.filter(c => c.user_id !== targetUserId));
-        } catch { message.error('Failed to remove collaborator'); }
+        } catch { appMessage.error('Failed to remove collaborator'); }
     }, [effectiveId, t]);
 
     // 输入框动态边框色
