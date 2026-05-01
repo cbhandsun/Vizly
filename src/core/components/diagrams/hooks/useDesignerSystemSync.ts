@@ -90,7 +90,7 @@ export function useDesignerSystemSync({
             });
 
             // --- 扩展原子化操作 API (Phase 3: AI Design Pilot) ---
-
+            Object.defineProperty(standardData, 'addNode', {
                 enumerable: false,
                 value: async (args: { id?: string; label: string; type?: string; shape?: string; parentId?: string; position?: {x: number, y: number} }) => {
                     const { id: incomingId, label, type: incomingType, shape = 'rectangle', parentId, position } = args;
