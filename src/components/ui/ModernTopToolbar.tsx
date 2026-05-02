@@ -7,6 +7,7 @@ import ExportTools from '../ExportTools';
 import { EnhancedThemeSelector } from './EnhancedThemeSelector';
 import EnhancedStyleSwitcher from '../shared/EnhancedStyleSwitcher';
 import { LanguageSwitcher } from '../shared/LanguageSwitcher';
+import { AuthStatusCompact } from '../auth/AuthStatus';
 import { TopToolbarProps } from './TopToolbar';
 
 export type { TopToolbarProps };
@@ -111,30 +112,24 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       {/* ── Right Island: Styling + Controls + Actions ── */}
       <div className="flex flex-col items-end gap-2 flex-shrink-0">
         <div className="flex items-center gap-1.5 h-[48px] px-2 bg-white/90 dark:bg-[#0f172a]/95 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/80 rounded-[10px] shadow-[0_4px_24px_rgba(0,0,0,0.06)] pointer-events-auto">
-          {/* Styling Group */}
-          {showStyleSwitcher && (
-            <EnhancedStyleSwitcher
-              style={{
-                height: 32,
-                borderRadius: 8,
-                border: 'none',
-                background: 'transparent',
-                padding: '0 8px',
-              }}
-              className="hover:bg-indigo-500/10 hover:text-indigo-500 transition-colors"
+          {/* 3 Clear Buttons: Theme, Language, Auth */}
+          <div className="flex items-center gap-1.5 ml-2">
+            {showThemeSelector && (
+              <EnhancedThemeSelector
+                variant="icon"
+                className="inline-flex items-center justify-center w-[30px] h-[30px] rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-indigo-500 hover:border-indigo-500/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10 transition-all cursor-pointer shadow-sm"
+              />
+            )}
+            
+            <LanguageSwitcher 
+                variant="icon" 
+                className="inline-flex items-center justify-center w-[30px] h-[30px] rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-indigo-500 hover:border-indigo-500/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10 transition-all cursor-pointer shadow-sm"
             />
-          )}
-          {showThemeSelector && (
-            <EnhancedThemeSelector
-              style={{
-                height: 32,
-                borderRadius: 8,
-                border: 'none',
-                background: 'transparent',
-                padding: '0 8px',
-              }}
-            />
-          )}
+
+            <div className="flex items-center justify-center w-[30px] h-[30px] rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-indigo-500/30 transition-all shadow-sm overflow-hidden cursor-pointer [&_.ant-btn]:border-none [&_.ant-btn]:w-full [&_.ant-btn]:h-full [&_.ant-btn]:p-0 [&_.ant-btn:hover]:bg-indigo-50/50 dark:[&_.ant-btn:hover]:bg-indigo-500/10 [&_.ant-btn:hover]:text-indigo-500 [&_.ant-avatar]:w-full [&_.ant-avatar]:h-full [&_.ant-avatar]:rounded-none">
+              <AuthStatusCompact />
+            </div>
+          </div>
 
           <div className="w-[1px] h-4 bg-black/10 dark:bg-white/20 mx-1" />
 
@@ -155,9 +150,29 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
             </div>
           )}
 
-          {/* More menu — Edge Mode + Language */}
+          {/* More menu — Edge Mode */}
           <Popover
-            content={moreContent}
+            content={
+                <div className="min-w-[220px] py-2 flex flex-col font-sans">
+                  <div className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
+                      {t('header.edgeMode')}
+                    </div>
+                    <Select
+                      variant="filled"
+                      value={edgeMode}
+                      onChange={(value) => { onEdgeModeChange(value as 'advanced-smart' | 'native'); }}
+                      style={{ width: '100%', fontSize: '13px' }}
+                      popupMatchSelectWidth={false}
+                      options={[
+                        { value: 'advanced-smart', label: t('header.smart') },
+                        { value: 'native', label: t('header.native') },
+                      ]}
+                      styles={{ popup: { root: { borderRadius: '8px', padding: '4px' } } }}
+                    />
+                  </div>
+                </div>
+            }
             trigger="click"
             placement="bottomRight"
             open={moreOpen}

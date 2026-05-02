@@ -26,6 +26,7 @@ export interface EnhancedThemeSelectorProps {
   showPerformanceMetrics?: boolean;
   showImportExport?: boolean;
   borderless?: boolean;
+  variant?: 'default' | 'icon';
   onThemeChange?: (theme: Theme) => void;
 }
 
@@ -48,6 +49,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
   showPerformanceMetrics = false,
   showImportExport = true,
   borderless = false,
+  variant = 'default',
   onThemeChange,
 }) => {
   const { t } = useTranslation();
@@ -290,7 +292,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
 
   // 渲染主题列表
   const renderThemeList = () => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
       {availableThemes.map((themeId: string) => {
         const themeManager = state.integration?.getThemeManager();
         // 优先从预设加载颜色数据，确保预览卡片能显示出五彩渐变色
@@ -306,13 +308,13 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         return (
           <div
             key={themeId}
-            className={`group relative flex flex-col gap-3 p-4 transition-all duration-300 rounded-2xl cursor-pointer hover:-translate-y-1 ${isActive ? 'bg-white/90 dark:bg-black/60 border border-blue-500/50 shadow-[0_8px_24px_-8px_rgba(59,130,246,0.4)] ring-1 ring-blue-500/20' : 'bg-white/40 dark:bg-black/20 border border-black/[0.03] dark:border-white/[0.03] hover:border-black/[0.08] dark:hover:border-white/[0.1] hover:shadow-[0_8px_20px_-8px_rgba(0,0,0,0.1)] hover:bg-white/80 dark:hover:bg-black/40'}`}
+            className={`group relative flex flex-col gap-3 p-4 transition-all duration-300 rounded-[var(--glass-radius)] cursor-pointer ${isActive ? 'bg-white dark:bg-[#1A1A1C]/60 border-indigo-500 dark:border-indigo-400 shadow-[0_2px_12px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500/20' : 'bg-white dark:bg-white/5 border border-black/[0.06] dark:border-white/[0.08] hover:border-black/[0.1] dark:hover:border-white/[0.15] hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]'}`}
             onClick={() => handleThemeChange(themeId)}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleThemeChange(themeId); } }}
           >
-            <div className="w-full h-20 rounded-xl shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),0_4px_12px_rgba(0,0,0,0.08)] relative overflow-hidden transform transition-transform group-hover:scale-[1.02]" style={{
+            <div className="w-full h-[72px] rounded-[6px] shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(0,0,0,0.05)] relative overflow-hidden transform transition-transform" style={{
               background: getGradientBackground(preset || themeData || { id: themeId }),
             }}>
                <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/30 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 transform -translate-x-[150%] group-hover:translate-x-[150%]" style={{ transitionProperty: 'opacity, transform' }} />
@@ -348,17 +350,17 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
           return (
             <div key={category.id} className="flex flex-col gap-3">
               <h4 className="text-xs font-bold tracking-wider text-gray-500 uppercase dark:text-gray-400">{category.name}</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                 {categoryPresets.map(preset => (
                   <div
                     key={preset.id}
-                    className="group relative flex flex-col gap-3 p-4 transition-all duration-300 rounded-2xl cursor-pointer bg-white/40 dark:bg-black/20 border border-black/[0.03] dark:border-white/[0.03] hover:-translate-y-1 hover:shadow-[0_8px_20px_-8px_rgba(0,0,0,0.1)] hover:bg-white/80 dark:hover:bg-black/40"
+                    className="group relative flex flex-col gap-3 p-4 transition-all duration-300 rounded-[var(--glass-radius)] cursor-pointer bg-white dark:bg-white/5 border border-black/[0.06] dark:border-white/[0.08] hover:border-black/[0.1] dark:hover:border-white/[0.15] hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]"
                     onClick={() => handleApplyPreset(preset)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleApplyPreset(preset); } }}
                   >
-                    <div className="w-full h-20 rounded-xl shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),0_4px_12px_rgba(0,0,0,0.08)] relative overflow-hidden transform transition-transform group-hover:scale-[1.02]" style={{
+                    <div className="w-full h-[72px] rounded-[6px] shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(0,0,0,0.05)] relative overflow-hidden transform transition-transform" style={{
                       background: getGradientBackground(preset),
                     }}>
                        <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/30 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 transform -translate-x-[150%] group-hover:translate-x-[150%]" style={{ transitionProperty: 'opacity, transform' }} />
@@ -452,7 +454,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
         {customThemes.map(theme => (
           <div key={theme.id} className="relative flex flex-col gap-3 p-4 transition-all duration-200 rounded-xl bg-white/30 dark:bg-black/20 border border-black/5 dark:border-white/5 hover:bg-white/50 dark:hover:bg-black/30 group">
             <div className="w-full h-16 rounded-lg opacity-90 shadow-inner" style={{
@@ -546,34 +548,45 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
     );
   }
 
-  const activeTabClass = "bg-white dark:bg-[#3A3A3C] text-gray-900 dark:text-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)] rounded-[10px] font-semibold transform transition-all duration-300 scale-100 ring-1 ring-black/5 dark:ring-white/10";
-  const inactiveTabClass = "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/5 rounded-[10px] font-medium transition-all duration-300 scale-[0.98] opacity-80 hover:opacity-100 hover:scale-100";
+  const activeTabClass = "bg-white dark:bg-white/10 text-gray-900 dark:text-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] rounded-[6px] font-semibold transform transition-all duration-300 ring-1 ring-black/[0.04] dark:ring-white/[0.05]";
+  const inactiveTabClass = "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] rounded-[6px] font-medium transition-all duration-300 opacity-80 hover:opacity-100";
 
   return (
     <>
-      <button
-        className={`flex items-center justify-between gap-1.5 h-8 px-2.5 text-[13px] transition-colors rounded-[6px] ${borderless ? 'bg-transparent border-none' : 'bg-white dark:bg-[#1C1C1E] border border-[#d9d9d9] dark:border-white/15 hover:border-blue-400 dark:hover:border-blue-500 shadow-sm'} text-gray-700 dark:text-gray-200 pointer-events-auto overflow-hidden w-full ${className}`}
-        onClick={() => setIsOpen(!isOpen)}
-        style={style}
-      >
-        <span className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
-          <span
-            className="flex-shrink-0 w-2.5 h-2.5 rounded-full border border-black/10 dark:border-white/20"
-            style={{ background: currentTheme?.palette?.primary?.main || token.colorPrimary }}
-          />
-          <span className="truncate text-gray-700 dark:text-gray-400 font-medium">
-            {currentTheme
-              ? t(`theme.selector.${currentTheme.id}`, { defaultValue: currentTheme.name })
-              : t('theme.selector.choose')}
-          </span>
-        </span>
-        <svg className="flex-shrink-0 text-gray-400 w-3 h-3 ml-1" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-      </button>
+      {variant === 'icon' ? (
+        <button
+            className={className || "inline-flex items-center justify-center w-[30px] h-[30px] rounded-[10px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-indigo-500 hover:border-indigo-500/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10 transition-all cursor-pointer shadow-sm"}
+            onClick={() => setIsOpen(!isOpen)}
+            style={style}
+            title={t('theme.selector.title')}
+        >
+            <FaPalette />
+        </button>
+      ) : (
+        <button
+            className={`flex items-center justify-between gap-1.5 h-8 px-2.5 text-[13px] transition-colors rounded-[6px] ${borderless ? 'bg-transparent border-none' : 'bg-white dark:bg-[#1C1C1E] border border-[#d9d9d9] dark:border-white/15 hover:border-blue-400 dark:hover:border-blue-500 shadow-sm'} text-gray-700 dark:text-gray-200 pointer-events-auto overflow-hidden w-full ${className}`}
+            onClick={() => setIsOpen(!isOpen)}
+            style={style}
+        >
+            <span className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+            <span
+                className="flex-shrink-0 w-2.5 h-2.5 rounded-full border border-black/10 dark:border-white/20"
+                style={{ background: currentTheme?.palette?.primary?.main || token.colorPrimary }}
+            />
+            <span className="truncate text-gray-700 dark:text-gray-400 font-medium">
+                {currentTheme
+                ? t(`theme.selector.${currentTheme.id}`, { defaultValue: currentTheme.name })
+                : t('theme.selector.choose')}
+            </span>
+            </span>
+            <svg className="flex-shrink-0 text-gray-400 w-3 h-3 ml-1" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </button>
+      )}
 
       {isOpen && createPortal(
         <div className={`fixed inset-0 z-[3000] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsOpen(false)}>
           <div
-            className="relative flex flex-col w-full max-w-2xl max-h-[85vh] rounded-2xl bg-white/70 dark:bg-[#1C1C1E]/80 backdrop-blur-3xl backdrop-saturate-200 border border-white/40 dark:border-white/10 shadow-[0_16px_40px_0_rgba(0,0,0,0.16),inset_0_1px_1px_rgba(255,255,255,0.4)] overflow-hidden transition-all duration-300 pointer-events-auto"
+            className="relative flex flex-col w-full max-w-3xl max-h-[85vh] rounded-[var(--glass-radius)] bg-slate-50/90 dark:bg-[#111113]/95 backdrop-blur-2xl backdrop-saturate-[180%] border border-white/40 dark:border-white/10 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.15)] overflow-hidden transition-all duration-300 pointer-events-auto"
             onClick={(e) => e.stopPropagation()}
             style={{
               cursor: isDragging ? 'grabbing' : 'default',
@@ -583,27 +596,27 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
             ref={panelRef}
           >
             {/* Header */}
-            <div className="flex-none px-6 py-5 border-b border-gray-200/50 dark:border-gray-700/50 flex items-center justify-between"
+            <div className="flex-none px-8 py-5 bg-white/40 dark:bg-black/20 border-b border-black/5 dark:border-white/5 flex items-center justify-between shrink-0"
               onPointerDown={handlePointerDown}
               style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
             >
-              <div className="flex items-center gap-3 text-lg font-bold text-gray-800 dark:text-gray-100 tracking-tight">
-                <FaPalette className="text-purple-500" />
+              <div className="flex items-center gap-3 text-[16px] font-semibold text-gray-800 dark:text-gray-100 tracking-tight">
+                <FaPalette className="text-indigo-500" />
                 <h2>{t('theme.selector.title')}</h2>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="p-2 text-gray-500 transition-colors rounded-full hover:bg-black/5 dark:hover:bg-white/10 hover:text-gray-800 dark:hover:text-gray-100 cursor-pointer"
+                className="flex items-center justify-center w-7 h-7 rounded-[6px] bg-transparent hover:bg-black/5 dark:bg-transparent dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border-none outline-none cursor-pointer"
                 title={t('config.actions.close')}
               >
-                <FaTimes />
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
               </button>
             </div>
 
             {/* Tabs */}
-            <div className="flex-none px-6 pt-4 pb-2 border-b border-gray-200/50 dark:border-gray-700/50">
-              <div className="flex items-center gap-1 p-1 bg-black/[0.04] dark:bg-white/[0.06] rounded-[12px] w-fit shadow-[inset_0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.2)]">
+            <div className="flex-none px-8 py-5">
+              <div className="flex items-center gap-1 p-1 bg-black/[0.04] dark:bg-white/[0.06] rounded-[8px] w-fit border border-black/[0.02] dark:border-white/[0.02]">
                 <button
                   className={`flex-none px-4 py-2 text-[14px] rounded-[10px] whitespace-nowrap cursor-pointer ${activeTab === 'themes' ? activeTabClass : inactiveTabClass}`}
                   onClick={() => setActiveTab('themes')}
@@ -638,7 +651,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+            <div className="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar">
               {activeTab === 'themes' && renderThemeList()}
               {activeTab === 'presets' && showPresets && renderPresetList()}
               {activeTab === 'custom' && showCustomThemes && renderCustomThemes()}

@@ -273,51 +273,66 @@
             "manage": "打开图表管理",
             "clearFavorites": "清空收藏图表"
         },
+        "settings": {
+            "title": "图表设置",
+            "theme": "颜色主题",
+            "themeDesc": "定义图表的全局配色方案",
+            "style": "线条风格",
+            "styleDesc": "调整节点与连线的艺术形式",
+            "edgeMode": "连线模式",
+            "edgeModeDesc": "决定连线的避障与寻路逻辑",
+            "smart": "智能连线",
+            "native": "原生连线",
+            "layoutStrategy": "布局策略",
+            "layoutStrategyDesc": "全局拓扑排列的核心算法",
+            "nodeLayout": "节点布局",
+            "nodeLayoutDesc": "子域内节点的排布微调",
+            "elkAlgorithm": "ELK 算法",
+            "autoDisabled": "自动 (不可选)",
+            "autoDisabledDesc": "当前策略不支持手动调整节点布局",
+            "showMainFlow": "仅显示主流程",
+            "showMainFlowDesc": "过滤辅助分支，仅展示核心业务动线",
+            "advancedConfig": "高级配置",
+            "advancedConfigDesc": "精细化几何参数与避障权重调节",
+            "group": {
+                "visual": "外观视觉",
+                "engine": "引擎策略",
+                "view": "视图控制"
+            },
+            "elk": {
+                "layered": {
+                    "title": "分层布局 (Layered)",
+                    "desc": "标准分层布局，最适合流程图"
+                },
+                "mrtree": {
+                    "title": "多根树 (MR-Tree)",
+                    "desc": "适用于复杂层级关系的多根树布局"
+                },
+                "force": {
+                    "title": "力导向 (Force)",
+                    "desc": "基于物理模拟的力导向布局"
+                }
+            },
+            "preset": {
+                "elastic": {
+                    "label": "弹性 + ELK (标准)",
+                    "desc": "标准风格：布局均衡，空间利用合理"
+                },
+                "soft": {
+                    "label": "柔性 + ELK (有机)",
+                    "desc": "有机风格：松散聚类，适合脑图"
+                },
+                "strict": {
+                    "label": "严格 + ELK (工程)",
+                    "desc": "工程风格：严格对齐，适合架构图"
+                }
+            }
+        },
         "intelligence": {
             "optimize": "智能优化",
             "optimizeDesc": "智能全图优化 (解决重叠与对齐)",
             "optimizing": "正在智能优化图表布局...",
             "optimizeSuccess": "优化完成：解决了 {{rectified}} 处重叠，对齐了 {{aligned}} 个节点。"
-        },
-        "settings": {
-            "edgeMode": "连线模式",
-            "smart": "智能连线",
-            "native": "原生连线",
-            "layoutStrategy": "布局策略",
-            "nodeLayout": "节点布局",
-            "elkAlgorithm": "ELK算法",
-            "showMainFlow": "仅显示主流程（动线）",
-            "advancedConfig": "高级配置",
-            "autoDisabled": "自动（已禁用）",
-            "autoDisabledDesc": "域整体布局下节点布局不再单独生效",
-            "elk": {
-                "layered": {
-                    "title": "ELK Layered",
-                    "desc": "分层布局，主次分明"
-                },
-                "mrtree": {
-                    "title": "ELK Mr. Tree",
-                    "desc": "树布局，父子层次"
-                },
-                "force": {
-                    "title": "ELK Force",
-                    "desc": "力导布局，关系分布"
-                }
-            },
-            "preset": {
-                "elastic": {
-                    "label": "Elastic + ELK",
-                    "desc": "标准风格：均衡布局"
-                },
-                "soft": {
-                    "label": "Soft + ELK",
-                    "desc": "有机风格：疏松聚类"
-                },
-                "strict": {
-                    "label": "Strict + ELK",
-                    "desc": "工程风格：严格对齐"
-                }
-            }
         },
         "viewer": {
             "toggleFlowDirection": "切换流程方向",
@@ -603,61 +618,6 @@
                 "pan": "Space + 拖拽"
             }
         },
-        "settings": {
-            "title": "图表设置",
-            "theme": "颜色主题",
-            "themeDesc": "定义图表的全局配色方案",
-            "style": "线条风格",
-            "styleDesc": "调整节点与连线的艺术形式",
-            "edgeMode": "连线模式",
-            "edgeModeDesc": "决定连线的避障与寻路逻辑",
-            "smart": "智能连线",
-            "native": "原生连线",
-            "layoutStrategy": "布局策略",
-            "layoutStrategyDesc": "全局拓扑排列的核心算法",
-            "nodeLayout": "节点布局",
-            "nodeLayoutDesc": "子域内节点的排布微调",
-            "elkAlgorithm": "ELK 算法",
-            "autoDisabled": "自动 (禁用)",
-            "autoDisabledDesc": "当前策略不支持手动调整节点布局",
-            "showMainFlow": "仅显示主分支",
-            "showMainFlowDesc": "过滤掉辅助分支，仅展示业务核心动线",
-            "advancedConfig": "高级配置",
-            "advancedConfigDesc": "更精细的几何参数与避障权重调节",
-            "group": {
-                "visual": "外观视觉",
-                "engine": "引擎策略",
-                "view": "视图控制"
-            },
-            "elk": {
-                "layered": {
-                    "title": "分层布局 (Layered)",
-                    "desc": "经典的分层拓扑，适合流程图"
-                },
-                "mrtree": {
-                    "title": "多根树 (MR-Tree)",
-                    "desc": "适合复杂层级结构的多根树布局"
-                },
-                "force": {
-                    "title": "力导向 (Force)",
-                    "desc": "基于物理模拟的力导向布局"
-                }
-            },
-            "preset": {
-                "elastic": {
-                    "label": "弹性 + ELK",
-                    "desc": "标准风格：均衡的布局分布"
-                },
-                "soft": {
-                    "label": "柔和 + ELK",
-                    "desc": "有机风格：较松散的集群感"
-                },
-                "strict": {
-                    "label": "严格 + ELK",
-                    "desc": "工程风格：严格的对齐准则"
-                }
-            }
-        },
         "sidebar": {
             "basic": "基础形状",
             "components": "组件",
@@ -750,11 +710,7 @@
             "analyzeError": "无法执行分析: Bridge 未就绪"
         }
     },
-    "header": {
-        "edgeMode": "连线模式",
-        "smart": "智能连线",
-        "native": "原生连线"
-    },
+
     "aiConfig": {
         "title": "AI 平台与模型配置",
         "saveAll": "保存全部",
@@ -796,6 +752,11 @@
         "fetchModelsInvalidData": "获取模型列表失败: 返回数据格式无效",
         "discoveryTitle": "选择要添加的模型",
         "discoverySearchPlaceholder": "搜索模型 ID 或名称"
+    },
+    "header": {
+        "edgeMode": "连线模式",
+        "smart": "智能",
+        "native": "原生"
     },
     "aiChat": {
         "title": "AI 架构助手",

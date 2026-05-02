@@ -103,13 +103,13 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
     };
 
     const SettingRow = ({ icon: Icon, label, children, description, disabled = false }: any) => (
-        <div className={`group flex items-start justify-between gap-[var(--spacing-md)] px-[var(--spacing-md)] sm:px-[var(--spacing-lg)] py-[var(--spacing-md)] transition-all duration-[var(--transition-normal)] ${disabled ? 'opacity-40 pointer-events-none' : 'hover:bg-white/60 dark:hover:bg-white/10'}`}>
-            <div className="flex items-start gap-[var(--spacing-md)] min-w-0 flex-1">
-                <div className="flex-shrink-0 mt-0.5 w-10 h-10 rounded-[var(--radius-lg)] bg-gray-100/80 dark:bg-white/5 border border-black/[0.03] dark:border-white/[0.05] flex items-center justify-center group-hover:scale-110 group-hover:shadow-md group-hover:bg-indigo-50 dark:group-hover:bg-indigo-500/10 transition-all duration-[var(--transition-normal)]">
-                    <Icon size={20} className="text-gray-600 dark:text-gray-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400" />
+        <div className={`group flex items-start justify-between gap-4 px-5 py-3.5 transition-all duration-300 ${disabled ? 'opacity-40 pointer-events-none' : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'}`}>
+            <div className="flex items-start gap-4 min-w-0 flex-1">
+                <div className="flex-shrink-0 mt-0 w-9 h-9 rounded-[6px] bg-black/[0.03] dark:bg-white/5 border border-black/[0.04] dark:border-white/[0.04] flex items-center justify-center group-hover:scale-105 group-hover:shadow-sm group-hover:bg-white dark:group-hover:bg-white/10 transition-all duration-300">
+                    <Icon size={18} className="text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
                 </div>
-                <div className="flex flex-col min-w-0 flex-1">
-                    <span className="text-[15px] font-bold text-gray-800 dark:text-gray-100 leading-tight mb-1">{label}</span>
+                <div className="flex flex-col min-w-0 flex-1 justify-center min-h-[36px]">
+                    <span className="text-[14px] font-semibold text-gray-800 dark:text-gray-100 leading-tight">{label}</span>
                     {description && (
                         <span className="text-[12px] text-gray-500 dark:text-gray-400 leading-relaxed pr-4">
                             {description}
@@ -123,24 +123,24 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
         </div>
     );
 
-    const SectionHeader = ({ title }: { title: string }) => (
-        <div className="px-6 pt-10 pb-4">
-            <span className="text-[12px] font-black uppercase tracking-[0.15em] text-gray-400/80 dark:text-gray-500/60">{title}</span>
+    const SectionHeader = ({ title, first }: { title: string, first?: boolean }) => (
+        <div className={`px-2 pb-2 ${first ? 'pt-0' : 'pt-4'}`}>
+            <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-gray-500 dark:text-gray-400/80">{title}</span>
         </div>
     );
 
     return (
-        <div className="flex flex-col w-full h-full bg-transparent overflow-hidden">
+        <div className="flex flex-col w-full h-full bg-slate-100/80 dark:bg-black/30 overflow-hidden">
             {/* 遵循全局令牌系统的响应式滚动容器 */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-[var(--spacing-md)] sm:p-[var(--spacing-lg)] lg:p-[var(--glass-padding-lg)]">
-                <div className="w-full max-w-full sm:max-w-2xl lg:max-w-5xl mx-auto flex flex-col gap-[var(--glass-gap)] pb-[var(--spacing-xl)]">
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-7 py-5">
+                <div className="w-full max-w-full sm:max-w-2xl lg:max-w-5xl mx-auto flex flex-col gap-1.5">
                 
                 {/* 视觉风格组 */}
-                <SectionHeader title={t('designer.settings.group.visual', '外观视觉')} />
+                <SectionHeader title={t('designer.settings.group.visual', '外观视觉')} first={true} />
                 <motion.div 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-white/50 dark:bg-white/[0.03] backdrop-blur-xl border border-black/[0.05] dark:border-white/[0.05] rounded-[var(--radius-xl)] overflow-hidden shadow-[0_4px_12px_-4px_rgba(0,0,0,0.05)]">
+                    className="bg-white dark:bg-[#1A1A1C]/60 backdrop-blur-md border border-black/[0.06] dark:border-white/[0.08] rounded-[var(--glass-radius)] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
                     <SettingRow 
                         icon={Palette} 
                         label={t('designer.settings.theme', '颜色主题')}
@@ -157,7 +157,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                         </div>
                     </SettingRow>
                     
-                    <div className="h-[1px] mx-[var(--spacing-lg)] bg-black/[0.04] dark:bg-white/[0.04]" />
+                    <div className="h-[1px] ml-[68px] bg-black/[0.04] dark:bg-white/[0.06]" />
                     
                     <SettingRow 
                         icon={Sparkles} 
@@ -176,7 +176,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
-                    className="bg-white/50 dark:bg-white/[0.03] backdrop-blur-xl border border-black/[0.05] dark:border-white/[0.05] rounded-[var(--radius-xl)] overflow-hidden shadow-[0_4px_12px_-4px_rgba(0,0,0,0.05)]">
+                    className="bg-white dark:bg-[#1A1A1C]/60 backdrop-blur-md border border-black/[0.06] dark:border-white/[0.08] rounded-[var(--glass-radius)] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
                     <SettingRow 
                         icon={Zap} 
                         label={t('designer.settings.edgeMode')}
@@ -194,7 +194,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                         </Select>
                     </SettingRow>
 
-                    <div className="h-[1px] mx-[var(--spacing-lg)] bg-black/[0.04] dark:bg-white/[0.04]" />
+                    <div className="h-[1px] ml-[68px] bg-black/[0.04] dark:bg-white/[0.06]" />
 
                     <SettingRow 
                         icon={Layers} 
@@ -246,7 +246,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                         </Select>
                     </SettingRow>
 
-                    <div className="h-[1px] mx-[var(--spacing-lg)] bg-black/[0.04] dark:bg-white/[0.04]" />
+                    <div className="h-[1px] ml-[68px] bg-black/[0.04] dark:bg-white/[0.06]" />
 
                     <SettingRow 
                         icon={Cpu} 
@@ -375,7 +375,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
-                    className="bg-white/50 dark:bg-white/[0.03] backdrop-blur-xl border border-black/[0.05] dark:border-white/[0.05] rounded-[var(--radius-xl)] overflow-hidden shadow-[0_4px_12px_-4px_rgba(0,0,0,0.05)]">
+                    className="bg-white dark:bg-[#1A1A1C]/60 backdrop-blur-md border border-black/[0.06] dark:border-white/[0.08] rounded-[var(--glass-radius)] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
                     <SettingRow 
                         icon={Filter} 
                         label={t('designer.settings.showMainFlow')}
@@ -395,22 +395,22 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.3 }}
-                    className="mt-10 mb-2">
+                    className="mt-6 mb-2">
                     <button
-                        className="w-full group relative flex items-center justify-between p-5 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 hover:from-indigo-500/15 hover:to-purple-500/15 dark:from-indigo-400/5 dark:to-purple-400/5 dark:hover:from-indigo-400/10 dark:hover:to-purple-400/10 border border-indigo-500/20 dark:border-indigo-400/10 rounded-[22px] cursor-pointer shadow-sm transition-all duration-300"
+                        className="w-full group relative flex items-center justify-between p-4 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 border border-black/[0.08] dark:border-white/10 rounded-[var(--glass-radius)] cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-all duration-300 active:scale-[0.99]"
                         onClick={() => setIsPanelOpen(true)}
                     >
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 group-hover:rotate-12 transition-transform duration-500">
-                                <Settings2 size={22} />
+                            <div className="w-10 h-10 rounded-[6px] bg-gradient-to-b from-gray-800 to-black hover:from-gray-700 hover:to-gray-900 dark:from-gray-200 dark:to-white flex items-center justify-center text-white dark:text-black shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] transition-transform duration-300">
+                                <Settings2 size={18} />
                             </div>
                             <div className="flex flex-col text-left">
-                                <span className="text-[15px] font-extrabold text-gray-800 dark:text-gray-100">{t('designer.settings.advancedConfig')}</span>
-                                <span className="text-[12px] text-gray-500 dark:text-gray-400 mt-0.5">{t('designer.settings.advancedConfigDesc', '精细化几何参数与避障权重调节')}</span>
+                                <span className="text-[14px] font-semibold text-gray-800 dark:text-gray-100">{t('designer.settings.advancedConfig')}</span>
+                                <span className="text-[12px] text-gray-500 dark:text-gray-400 mt-0.5 leading-tight pr-2">{t('designer.settings.advancedConfigDesc', '精细化几何参数与避障权重调节')}</span>
                             </div>
                         </div>
-                        <div className="w-8 h-8 rounded-full bg-black/[0.03] dark:bg-white/5 flex items-center justify-center group-hover:bg-indigo-500 group-hover:text-white transition-all">
-                            <ChevronRight size={18} />
+                        <div className="w-7 h-7 rounded-[6px] bg-black/[0.03] dark:bg-white/5 flex items-center justify-center group-hover:bg-black/[0.08] dark:group-hover:bg-white/10 text-gray-500 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white transition-all">
+                            <ChevronRight size={16} />
                         </div>
                     </button>
                 </motion.div>

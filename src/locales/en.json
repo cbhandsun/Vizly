@@ -274,46 +274,6 @@
             "clearFavorites": "Clear favorites"
         },
         "settings": {
-            "edgeMode": "Edge Mode",
-            "smart": "Smart Routing",
-            "native": "Native Routing",
-            "layoutStrategy": "Layout Strategy",
-            "nodeLayout": "Node Layout",
-            "elkAlgorithm": "ELK Algorithm",
-            "showMainFlow": "Show Main Flow Only",
-            "advancedConfig": "Advanced Config",
-            "autoDisabled": "Auto (Disabled)",
-            "autoDisabledDesc": "Node layout is handled by domain layout",
-            "elk": {
-                "layered": {
-                    "title": "ELK Layered",
-                    "desc": "Layered layout with clear hierarchy"
-                },
-                "mrtree": {
-                    "title": "ELK Mr. Tree",
-                    "desc": "Tree layout with parent-child hierarchy"
-                },
-                "force": {
-                    "title": "ELK Force",
-                    "desc": "Force-directed layout for relationships"
-                }
-            },
-            "preset": {
-                "elastic": {
-                    "label": "Elastic + ELK",
-                    "desc": "Standard style: Balanced layout"
-                },
-                "soft": {
-                    "label": "Soft + ELK",
-                    "desc": "Organic style: Loose clustering"
-                },
-                "strict": {
-                    "label": "Strict + ELK",
-                    "desc": "Engineering style: Strict alignment"
-                }
-            }
-        },
-        "settings": {
             "title": "Diagram Settings",
             "theme": "Color Theme",
             "themeDesc": "Define the global color palette for the diagram",
