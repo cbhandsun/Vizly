@@ -516,9 +516,9 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
 
                     </div>
 
-                {/* ── 历史 ── */}
+                {/* ── Pill 2: 历史与视图 (History & Viewport) ── */}
                 <div className={`flex items-center gap-1 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[16px] px-3 py-1.5 ${isDragging ? 'shadow-[0_20px_60px_rgba(0,0,0,0.25)]' : 'shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]'} pointer-events-auto`} style={{ pointerEvents: 'auto' }}>
-                    {/* ── 历史 ── */}
+                    {/* 历史 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
                         <Tooltip title={t('designer.toolbar.undo')}>
                             <Button type="text" icon={<FaUndo />} onClick={onUndo} disabled={!canUndo} aria-label={t('designer.toolbar.undo')} style={{ borderRadius: '6px 0 0 6px' }} />
@@ -531,17 +531,10 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                                     onClick={onShowHistory}
                                     aria-label={t('designer.toolbar.historyPanel')}
                                     style={{
-                                        width: 14,
-                                        height: 32,
-                                        padding: 0,
-                                        borderRadius: '0 6px 6px 0',
-                                        fontSize: 8,
+                                        width: 14, height: 32, padding: 0, borderRadius: '0 6px 6px 0', fontSize: 8,
                                         color: historyCount ? '#6366f1' : 'rgba(0,0,0,0.3)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        borderLeft: '1px solid rgba(0,0,0,0.08)',
-                                        marginLeft: 0,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        borderLeft: '1px solid rgba(0,0,0,0.08)', marginLeft: 0,
                                     }}
                                 >
                                     ▾
@@ -553,9 +546,9 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         <Button type="text" icon={<FaRedo />} onClick={onRedo} disabled={!canRedo} aria-label={t('designer.toolbar.redo')} />
                     </Tooltip>
 
+                    {/* 视图控制 & 缩放比例 */}
                     {!hideZoomControls && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2,   /* borderLeft: removed */ }}>
-                            {/* ── 视图 ── */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Tooltip title={t('designer.toolbar.zoomIn')}>
                                 <Button type="text" icon={<FaSearchPlus />} onClick={onZoomIn} aria-label={t('designer.toolbar.zoomIn')} />
                             </Tooltip>
@@ -570,12 +563,18 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                                     <Button type="text" icon={<FaArrowsAltH />} onClick={onFitWidth} aria-label={t('designer.toolbar.fitWidth', '适应宽度')} />
                                 </Tooltip>
                             )}
+                            {zoomPercent !== undefined && (
+                                <span style={{ fontFamily: 'monospace', minWidth: 36, textAlign: 'right', fontSize: 12, color: 'rgba(0,0,0,0.45)', marginLeft: 4 }}>{zoomPercent}%</span>
+                            )}
                         </div>
                     )}
+                </div>
 
+                {/* ── Pill 3: 智能排版与 AI (Smart Actions) ── */}
+                <div className={`flex items-center gap-1 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[16px] px-3 py-1.5 ${isDragging ? 'shadow-[0_20px_60px_rgba(0,0,0,0.25)]' : 'shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]'} pointer-events-auto`} style={{ pointerEvents: 'auto' }}>
+                    {/* 布局 + 路由 */}
                     {!hideLayoutControls && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2,   /* borderLeft: removed */ }}>
-                            {/* ── 布局 + 路由 ── */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Dropdown menu={{ items: layoutMenu, selectedKeys: selectedLayoutKeys, selectable: true }} placement="top">
                                 <Tooltip title={t('designer.flowchart.layout.tooltip')}>
                                     <Button type="text" icon={<FaSitemap />} aria-label={t('designer.flowchart.layout.tooltip')} />
@@ -594,28 +593,9 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         </div>
                     )}
 
-
-                    </div>
-
-                {/* ── AI 助手 ── */}
-                <div className={`flex items-center gap-1 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[16px] px-3 py-1.5 ${isDragging ? 'shadow-[0_20px_60px_rgba(0,0,0,0.25)]' : 'shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]'} pointer-events-auto`} style={{ pointerEvents: 'auto' }}>
-                    {/* ── AI 助手 ── */}
-                    {onToggleAI && (
-                        <Tooltip title={<>{t('aiChat.title')} {showAiCrown && <span style={{  fontSize: '13px' }} title={t('common.proFeature')}>👑</span>}</>}>
-                            <Button
-                                type={aiChatActive ? 'primary' : 'text'}
-                                ghost={aiChatActive}
-                                icon={<RobotOutlined />}
-                                onClick={onToggleAI}
-                                aria-label={t('aiChat.title')}
-                                aria-pressed={aiChatActive}
-                            />
-                        </Tooltip>
-                    )}
-
-                    {/* ── 主链路相关 (Flow Focus) ── */}
+                    {/* 主链路 */}
                     {!hideFlowFocusControls && onToggleHighlightMainFlow && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2,   /* borderLeft: removed */ }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Tooltip title={highlightMainFlow ? t('designer.toolbar.unhighlightMainFlow') : t('designer.toolbar.highlightMainFlow')}>
                                 <Button
                                     type={highlightMainFlow ? 'primary' : 'text'}
@@ -638,62 +618,64 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                             )}
                         </div>
                     )}
+
+                    {/* AI 助手 */}
+                    {onToggleAI && (
+                        <Tooltip title={<>{t('aiChat.title')} {showAiCrown && <span style={{  fontSize: '13px' }} title={t('common.proFeature')}>👑</span>}</>}>
+                            <Button
+                                type={aiChatActive ? 'primary' : 'text'}
+                                ghost={aiChatActive}
+                                icon={<RobotOutlined />}
+                                onClick={onToggleAI}
+                                aria-label={t('aiChat.title')}
+                                aria-pressed={aiChatActive}
+                            />
+                        </Tooltip>
+                    )}
                 </div>
 
+                {/* ── Pill 4: 选项与状态 (Settings & Options) ── */}
+                <div className={`flex items-center gap-1 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[16px] px-3 py-1.5 ${isDragging ? 'shadow-[0_20px_60px_rgba(0,0,0,0.25)]' : 'shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]'} pointer-events-auto`} style={{ pointerEvents: 'auto' }}>
+                    {/* 网格吸附 & 选中节点数 */}
+                    {!hideGridControls && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'rgba(0,0,0,0.45)', whiteSpace: 'nowrap' }}>
+                            {onToggleSnap && (
+                                <Tooltip title={snapToGrid ? t('designer.toolbar.snapOn') : t('designer.toolbar.snapOff')}>
+                                    <Button
+                                        type="text"
+                                        size="small"
+                                        className={`toolbar-status-btn ${snapToGrid ? 'active' : ''}`}
+                                        onClick={onToggleSnap}
+                                        icon={<FaMagnet size={10} />}
+                                        style={{
+                                            color: snapToGrid ? '#1890ff' : 'rgba(0,0,0,0.3)',
+                                            fontSize: 10, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                                        }}
+                                    />
+                                </Tooltip>
+                            )}
+                            {(selectedNodesCount || 0) > 0 && (
+                                <span style={{ color: '#1890ff', fontWeight: 500, minWidth: 24, textAlign: 'center' }}>
+                                    {selectedNodesCount}↗
+                                </span>
+                            )}
+                        </div>
+                    )}
 
-                    
-
-                    <div className={`flex items-center gap-1 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[16px] px-3 py-1.5 ${isDragging ? 'shadow-[0_20px_60px_rgba(0,0,0,0.25)]' : 'shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]'} pointer-events-auto`} style={{ pointerEvents: 'auto' }}>
-                    {/* ── 更多菜单（低频功能） ── */}
+                    {/* 更多菜单 */}
                     <Dropdown menu={{ items: moreMenuItems }} placement="top" trigger={['click']} styles={{ root: { minWidth: 220, whiteSpace: 'nowrap' } }}>
                         <Tooltip title={t('designer.toolbar.moreActions')}>
                             <Button type="text" icon={<FaEllipsisH />} aria-label={t('designer.toolbar.moreActions')} />
                         </Tooltip>
                     </Dropdown>
 
-                    {(!hideGridControls || !hideLayoutControls) && (
-                        <>
-                            {/* ── 状态信息区域（合并自 DiagramStatusBar） ── */}
-                            {(selectedNodesCount !== undefined || zoomPercent !== undefined) && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(0,0,0,0.45)', whiteSpace: 'nowrap' }}>
-                                        {!hideGridControls && (selectedNodesCount || 0) > 0 && (
-                                            <span style={{ color: '#1890ff', fontWeight: 500 }}>
-                                                {selectedNodesCount}↗
-                                            </span>
-                                        )}
-                                        {!hideGridControls && onToggleSnap && (
-                                            <Tooltip title={snapToGrid ? t('designer.toolbar.snapOn') : t('designer.toolbar.snapOff')}>
-                                                <Button
-                                                    type="text"
-                                                    size="small"
-                                                    className={`toolbar-status-btn ${snapToGrid ? 'active' : ''}`}
-                                                    onClick={onToggleSnap}
-                                                    icon={<FaMagnet size={10} />}
-                                                    style={{
-                                                        color: snapToGrid ? '#1890ff' : 'rgba(0,0,0,0.3)',
-                                                        fontSize: 10,
-                                                        width: 24, height: 24,
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                        borderRadius: '6px',
-                                                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                                                    }}
-                                                />
-                                            </Tooltip>
-                                        )}
-                                        {!hideZoomControls && zoomPercent !== undefined && (
-                                            <span style={{ fontFamily: 'monospace', minWidth: 36, textAlign: 'right' }}>{zoomPercent}%</span>
-                                        )}
-                                    </div>
-                            )}
-                        </>
+                    {/* 自定义扩展 (通常是主题切换器) */}
+                    {children && (
+                        <div style={{ marginLeft: 4, display: 'flex', alignItems: 'center' }}>
+                            {children}
+                        </div>
                     )}
                 </div>
-
-                {children && (
-                    <div className={`flex items-center gap-1 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[16px] px-3 py-1.5 ${isDragging ? 'shadow-[0_20px_60px_rgba(0,0,0,0.25)]' : 'shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]'} pointer-events-auto`} style={{ pointerEvents: 'auto' }}>
-                        {children}
-                    </div>
-                )}
         </div>
     );
 });
