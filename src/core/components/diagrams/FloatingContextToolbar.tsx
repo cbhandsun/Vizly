@@ -141,19 +141,6 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
         transform: `translate(-50%, ${placeBelow ? '0%' : '-100%'})`,
         transformOrigin: placeBelow ? 'top center' : 'bottom center',
         zIndex: 1005,
-        borderRadius: overrideDefaultToolbar ? 12 : 99,
-        background: 'rgba(255, 255, 255, 0.70)',
-        boxShadow: overrideDefaultToolbar 
-            ? '0 8px 32px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.2) inset, 0 0 0 1px rgba(0, 0, 0, 0.04)'
-            : '0 6px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.4) inset, 0 0 0 1px rgba(0, 0, 0, 0.05)',
-        padding: overrideDefaultToolbar ? '8px' : '4px 12px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 2,
-        pointerEvents: 'auto',
-        border: 'none',
-        backdropFilter: 'blur(24px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(24px) saturate(180%)',
         // 平滑追踪位置变化
         transition: 'left 0.25s cubic-bezier(0.2, 0.9, 0.3, 1), top 0.25s cubic-bezier(0.2, 0.9, 0.3, 1), background-color 0.2s',
         animation: 'toolbarFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -288,7 +275,7 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
     );
 
     return (
-        <div style={style} className="floating-toolbar">
+        <div style={style} className={`floating-toolbar flex items-center gap-0.5 pointer-events-auto border-none backdrop-blur-[24px] backdrop-saturate-[180%] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.45)] dark:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.12)] ${overrideDefaultToolbar ? 'rounded-[12px] p-2' : 'rounded-full px-3 py-1'}`}>
             {overrideDefaultToolbar ? (
                 <>{extraToolbarContent}</>
             ) : (

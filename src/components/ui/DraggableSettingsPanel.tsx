@@ -24,13 +24,13 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
     return createPortal(
         <div
             ref={panelRef}
-            className="bg-white/80 dark:bg-[#111113]/85 backdrop-blur-2xl backdrop-saturate-[180%] border border-white/40 dark:border-white/10 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.15)] rounded-xl overflow-hidden"
+            className="bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] shadow-[0_24px_48px_-12px_rgba(0,0,0,0.15)] rounded-[20px] overflow-hidden"
             style={{
                 position: 'fixed',
                 top: 0,
                 left: 0,
-                width: '460px',
-                maxHeight: 'calc(100vh - 80px)',
+                width: '480px',
+                maxHeight: 'calc(100vh - 100px)',
                 display: 'flex',
                 flexDirection: 'column',
                 zIndex: 2000,
@@ -39,11 +39,11 @@ export const DraggableSettingsPanel: React.FC<DraggableSettingsPanelProps> = ({ 
         >
             <div
                 onPointerDown={handlePointerDown}
-                className="flex items-center justify-between px-5 py-3.5 bg-white/40 dark:bg-black/20 hover:bg-white/50 dark:hover:bg-black/30 backdrop-blur-md border-b border-black/5 dark:border-white/5 cursor-move select-none shrink-0 transition-colors"
+                className="flex items-center justify-between px-6 py-4 bg-white/40 dark:bg-black/20 hover:bg-white/50 dark:hover:bg-black/30 backdrop-blur-md border-b border-black/5 dark:border-white/5 cursor-move select-none shrink-0 transition-colors"
             >
-                <div className="flex items-center gap-2">
-                    <MdDragIndicator className="text-gray-400 dark:text-gray-500 text-lg" />
-                    <span className="font-semibold text-[14px] text-gray-800 dark:text-gray-200">{title}</span>
+                <div className="flex items-center gap-3">
+                    <MdDragIndicator className="text-gray-400 dark:text-gray-500 text-[20px]" />
+                    <span className="font-semibold text-[15px] tracking-wide text-gray-800 dark:text-gray-200">{title}</span>
                 </div>
                 <button
                     onPointerDown={(e) => e.stopPropagation()}

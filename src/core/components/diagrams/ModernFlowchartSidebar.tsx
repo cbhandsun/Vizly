@@ -250,7 +250,14 @@ export const ModernFlowchartSidebar: React.FC<FlowchartSidebarProps> = ({
             collapsedWidth={collapsedWidth}
             trigger={null}
             style={{
-                borderRight: `1px solid ${token.colorBorderSecondary}`,
+                margin: '16px 0 16px 16px',
+                height: 'calc(100% - 32px)',
+                borderRadius: '16px',
+                border: `1px solid var(--designer-border, ${token.colorBorderSecondary})`,
+                boxShadow: 'var(--designer-shadow, 0 8px 32px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.04))',
+                backgroundColor: 'var(--designer-panel-bg, rgba(255, 255, 255, 0.85))',
+                backdropFilter: 'var(--designer-blur, blur(20px) saturate(180%))',
+                WebkitBackdropFilter: 'var(--designer-blur, blur(20px) saturate(180%))',
                 minHeight: 0,
                 overflow: 'hidden',
                 position: 'relative',
@@ -258,7 +265,7 @@ export const ModernFlowchartSidebar: React.FC<FlowchartSidebarProps> = ({
             }}
         >
             {isCollapsed ? (
-                <Flex vertical align="center" style={{ height: '100%', paddingTop: 12, gap: 12 }}>
+                <Flex vertical align="center" justify="center" style={{ height: '100%', gap: 12 }}>
                     <Tooltip title={t('designer.sidebar.components')} placement="right">
                         <div
                             onClick={onToggleCollapse}

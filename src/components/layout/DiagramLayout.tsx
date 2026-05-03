@@ -217,7 +217,14 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
                 collapsedWidth={64}
                 theme="light"
                 style={{
-                  borderRight: `1px solid ${token.colorBorderSecondary}`,
+                  margin: '16px 0 16px 16px',
+                  height: 'calc(100% - 32px)',
+                  borderRadius: '16px',
+                  border: `1px solid var(--designer-border, ${token.colorBorderSecondary})`,
+                  boxShadow: 'var(--designer-shadow, 0 8px 32px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.04))',
+                  backgroundColor: 'var(--designer-panel-bg, rgba(255, 255, 255, 0.85))',
+                  backdropFilter: 'var(--designer-blur, blur(20px) saturate(180%))',
+                  WebkitBackdropFilter: 'var(--designer-blur, blur(20px) saturate(180%))',
                   zIndex: 9,
                   overflow: 'hidden'
                 }}
@@ -247,17 +254,17 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
                   menuProps.onToggleCollapse();
                 }}
                 style={{
-                  width: 6,
+                  width: 16,
                   cursor: menuProps.isCollapsed ? 'pointer' : 'col-resize',
                   background: 'transparent',
                   display: 'flex',
-                  alignItems: 'stretch',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   position: 'relative',
                   zIndex: 20,
                   overflow: 'visible'
                 }}
               >
-                <div style={{ width: 1, background: token.colorBorderSecondary, marginLeft: 2 }} />
                 <div
                   style={{
                     position: 'absolute',
@@ -266,11 +273,13 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
                     transform: 'translate(-50%, -50%)',
                     padding: 2,
                     borderRadius: 999,
-                    background: token.colorBgContainer,
-                    border: `1px solid ${token.colorBorderSecondary}`,
-                    boxShadow: token.boxShadowSecondary,
+                    background: 'var(--designer-panel-bg, rgba(255, 255, 255, 0.85))',
+                    backdropFilter: 'var(--designer-blur, blur(20px) saturate(180%))',
+                    border: `1px solid var(--designer-border, ${token.colorBorderSecondary})`,
+                    boxShadow: 'var(--designer-shadow, 0 8px 32px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.04))',
                     zIndex: 21,
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    display: 'flex',
                   }}
                   onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 >
@@ -315,17 +324,18 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
                   flowchartSidebarProps.onToggleCollapse();
                 }}
                 style={{
-                  width: 6,
+                  width: 16,
                   cursor: flowchartSidebarProps.isCollapsed ? 'pointer' : 'col-resize',
                   background: 'transparent',
                   display: 'flex',
-                  alignItems: 'stretch',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   position: 'relative',
                   zIndex: 20,
                   overflow: 'visible'
                 }}
               >
-                <div style={{ width: 1, background: token.colorBorderSecondary, marginLeft: 2 }} />
+                {/* No solid vertical line anymore, just the floating handle */}
                 <div
                   style={{
                     position: 'absolute',
@@ -334,11 +344,13 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
                     transform: 'translate(-50%, -50%)',
                     padding: 2,
                     borderRadius: 999,
-                    background: token.colorBgContainer,
-                    border: `1px solid ${token.colorBorderSecondary}`,
-                    boxShadow: token.boxShadowSecondary,
+                    background: 'var(--designer-panel-bg, rgba(255, 255, 255, 0.85))',
+                    backdropFilter: 'var(--designer-blur, blur(20px) saturate(180%))',
+                    border: `1px solid var(--designer-border, ${token.colorBorderSecondary})`,
+                    boxShadow: 'var(--designer-shadow, 0 8px 32px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.04))',
                     zIndex: 21,
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    display: 'flex',
                   }}
                   onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   title={flowchartSidebarProps.isCollapsed ? '展开右侧工具栏' : '收起右侧工具栏'}

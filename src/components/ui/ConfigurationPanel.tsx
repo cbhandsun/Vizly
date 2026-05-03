@@ -940,12 +940,9 @@ const actionBtnSecondary = "text-gray-700 dark:text-gray-200 bg-white dark:bg-wh
 return createPortal(
   <div className={`fixed inset-0 z-[5000] flex items-center justify-center bg-black/30 dark:bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} style={{ padding: 'var(--glass-padding-lg)' }} onClick={onClose}>
     {/* Vercel/Linear 风格设置面板 (Sidebar Master-Detail) */}
-    <div className={`relative flex w-full max-w-[900px] h-full max-h-[640px] border border-black/10 dark:border-white/10 shadow-2xl transition-all duration-300 transform ${isOpen ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'} overflow-hidden`} 
+    <div className={`relative flex w-full max-w-[900px] h-full max-h-[640px] border-none shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.45)] dark:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] transition-all duration-300 transform ${isOpen ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'} overflow-hidden`} 
          style={{ 
-           borderRadius: 'calc(var(--glass-radius) * 1.6)', 
-           backgroundColor: 'var(--designer-panel-bg, rgba(255, 255, 255, 0.85))', 
-           backdropFilter: 'var(--designer-blur, blur(24px) saturate(180%))',
-           WebkitBackdropFilter: 'var(--designer-blur, blur(24px) saturate(180%))'
+           borderRadius: 'calc(var(--glass-radius) * 1.6)'
          }} 
          onClick={(e) => e.stopPropagation()}>
       

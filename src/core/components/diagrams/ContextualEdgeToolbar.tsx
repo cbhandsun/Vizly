@@ -136,17 +136,12 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
 
     return (
         <div 
-            className="contextual-edge-toolbar"
+            className="contextual-edge-toolbar border-none backdrop-blur-[24px] backdrop-saturate-[180%] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.45)] dark:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.12)] rounded-full"
             style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '2px', // Reduce gap slightly
                 padding: '4px 12px',
-                background: 'rgba(255, 255, 255, 0.70)',
-                backdropFilter: 'blur(24px) saturate(180%)',
-                WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-                borderRadius: '99px',
-                boxShadow: '0 6px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.4) inset, 0 0 0 1px rgba(0, 0, 0, 0.05)',
                 pointerEvents: 'all',
                 transition: 'left 0.25s cubic-bezier(0.2, 0.9, 0.3, 1), top 0.25s cubic-bezier(0.2, 0.9, 0.3, 1)',
                 animation: 'toolbarFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',

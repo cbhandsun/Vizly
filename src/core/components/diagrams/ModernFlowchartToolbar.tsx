@@ -410,12 +410,6 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             top: position.y,
             transform: 'none',
             zIndex: 1010,
-            boxShadow: isDragging ? '0 20px 60px rgba(0, 0, 0, 0.25)' : '0 12px 48px rgba(0, 0, 0, 0.15)',
-            border: '1px solid rgba(255, 255, 255, 0.4)',
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.65))',
-            backdropFilter: 'blur(24px) saturate(200%)',
-            borderRadius: '10px',
-            padding: '4px 14px',
             transition: isDragging ? 'none' : 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
             cursor: isDragging ? 'grabbing' : 'default',
         }
@@ -425,20 +419,14 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 1010,
-            boxShadow: 'var(--designer-shadow, 0 12px 48px rgba(0, 0, 0, 0.15))',
-            border: '1px solid rgba(255, 255, 255, 0.35)',
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.62))',
-            backdropFilter: 'blur(20px) saturate(190%)',
-            borderRadius: '10px',
-            padding: '4px 14px',
             transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
             animation: 'toolbarEnter 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
         };
 
     return (
-        <div ref={toolbarRef} style={toolbarStyle} className="modern-toolbar" role="toolbar" aria-label={t('designer.toolbar.toolbarAriaLabel')}>
-            {/* 内部 Flex 容器 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div ref={toolbarRef} style={toolbarStyle} className="modern-toolbar flex items-center justify-center gap-4 pointer-events-none" role="toolbar" aria-label={t('designer.toolbar.toolbarAriaLabel')}>
+            
+                <div className={`flex items-center gap-1 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[16px] px-3 py-1.5 ${isDragging ? 'shadow-[0_20px_60px_rgba(0,0,0,0.25)]' : 'shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]'} pointer-events-auto`} style={{ pointerEvents: 'auto' }}>
                 {/* 拖动手柄 */}
                 <div
                     onMouseDown={handleMouseDown}
@@ -460,10 +448,9 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     <FaGripVertical size={16} />
                 </div>
                 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    {/* ── 创作工具栏 (Creation Tools) ── */}
+                {/* ── 创作工具栏 (Creation Tools) ── */}
                     {onActivatePointer && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginRight: 4, paddingRight: 6, borderRight: '1px solid var(--designer-border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 2,   /* borderRight: removed */ }}>
                             <Tooltip title={t('designer.toolbar.pointer')}>
                                 <Button 
                                     type={!isDrawingMode && !isMarqueeActive ? 'primary' : 'text'} 
@@ -527,6 +514,10 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         </div>
                     )}
 
+                    </div>
+
+                {/* ── 历史 ── */}
+                <div className={`flex items-center gap-1 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[16px] px-3 py-1.5 ${isDragging ? 'shadow-[0_20px_60px_rgba(0,0,0,0.25)]' : 'shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]'} pointer-events-auto`} style={{ pointerEvents: 'auto' }}>
                     {/* ── 历史 ── */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
                         <Tooltip title={t('designer.toolbar.undo')}>
@@ -563,7 +554,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     </Tooltip>
 
                     {!hideZoomControls && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 4, paddingLeft: 6, borderLeft: '1px solid var(--designer-border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 2,   /* borderLeft: removed */ }}>
                             {/* ── 视图 ── */}
                             <Tooltip title={t('designer.toolbar.zoomIn')}>
                                 <Button type="text" icon={<FaSearchPlus />} onClick={onZoomIn} aria-label={t('designer.toolbar.zoomIn')} />
@@ -583,7 +574,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     )}
 
                     {!hideLayoutControls && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 4, paddingLeft: 6, borderLeft: '1px solid var(--designer-border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 2,   /* borderLeft: removed */ }}>
                             {/* ── 布局 + 路由 ── */}
                             <Dropdown menu={{ items: layoutMenu, selectedKeys: selectedLayoutKeys, selectable: true }} placement="top">
                                 <Tooltip title={t('designer.flowchart.layout.tooltip')}>
@@ -604,9 +595,13 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     )}
 
 
+                    </div>
+
+                {/* ── AI 助手 ── */}
+                <div className={`flex items-center gap-1 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[16px] px-3 py-1.5 ${isDragging ? 'shadow-[0_20px_60px_rgba(0,0,0,0.25)]' : 'shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]'} pointer-events-auto`} style={{ pointerEvents: 'auto' }}>
                     {/* ── AI 助手 ── */}
                     {onToggleAI && (
-                        <Tooltip title={<>{t('aiChat.title')} {showAiCrown && <span style={{ marginLeft: 4, fontSize: '13px' }} title={t('common.proFeature')}>👑</span>}</>}>
+                        <Tooltip title={<>{t('aiChat.title')} {showAiCrown && <span style={{  fontSize: '13px' }} title={t('common.proFeature')}>👑</span>}</>}>
                             <Button
                                 type={aiChatActive ? 'primary' : 'text'}
                                 ghost={aiChatActive}
@@ -620,7 +615,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
 
                     {/* ── 主链路相关 (Flow Focus) ── */}
                     {!hideFlowFocusControls && onToggleHighlightMainFlow && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 4, paddingLeft: 6, borderLeft: '1px solid var(--designer-border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 2,   /* borderLeft: removed */ }}>
                             <Tooltip title={highlightMainFlow ? t('designer.toolbar.unhighlightMainFlow') : t('designer.toolbar.highlightMainFlow')}>
                                 <Button
                                     type={highlightMainFlow ? 'primary' : 'text'}
@@ -643,9 +638,12 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                             )}
                         </div>
                     )}
+                </div>
 
-                    {children}
 
+                    
+
+                    <div className={`flex items-center gap-1 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[16px] px-3 py-1.5 ${isDragging ? 'shadow-[0_20px_60px_rgba(0,0,0,0.25)]' : 'shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]'} pointer-events-auto`} style={{ pointerEvents: 'auto' }}>
                     {/* ── 更多菜单（低频功能） ── */}
                     <Dropdown menu={{ items: moreMenuItems }} placement="top" trigger={['click']} styles={{ root: { minWidth: 220, whiteSpace: 'nowrap' } }}>
                         <Tooltip title={t('designer.toolbar.moreActions')}>
@@ -657,7 +655,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         <>
                             {/* ── 状态信息区域（合并自 DiagramStatusBar） ── */}
                             {(selectedNodesCount !== undefined || zoomPercent !== undefined) && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(0,0,0,0.45)', whiteSpace: 'nowrap', marginLeft: 4, paddingLeft: 6, borderLeft: '1px solid var(--designer-border)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(0,0,0,0.45)', whiteSpace: 'nowrap' }}>
                                         {!hideGridControls && (selectedNodesCount || 0) > 0 && (
                                             <span style={{ color: '#1890ff', fontWeight: 500 }}>
                                                 {selectedNodesCount}↗
@@ -690,7 +688,12 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         </>
                     )}
                 </div>
-            </div>
+
+                {children && (
+                    <div className={`flex items-center gap-1 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[16px] px-3 py-1.5 ${isDragging ? 'shadow-[0_20px_60px_rgba(0,0,0,0.25)]' : 'shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]'} pointer-events-auto`} style={{ pointerEvents: 'auto' }}>
+                        {children}
+                    </div>
+                )}
         </div>
     );
 });

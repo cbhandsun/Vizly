@@ -153,7 +153,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                 flexDirection: 'row-reverse',
                 boxShadow: 'var(--designer-shadow, 0 8px 32px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.04))',
                 border: `1px solid var(--designer-border, ${token.colorBorderSecondary})`,
-                borderRadius: isMobile ? '24px 24px 0 0' : 'var(--designer-radius, 10px)',
+                borderRadius: isMobile ? '24px 24px 0 0' : '16px',
                 zIndex: 110,
                 // 只在收起/展开时加动画，拖拽时关闭动画避免卡顿
                 transition: isMobile ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
