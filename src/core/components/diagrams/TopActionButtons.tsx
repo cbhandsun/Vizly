@@ -125,7 +125,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
     useEffect(() => {
-        const target = document.getElementById('vizly-plugin-right-island-portal');
+        const target = document.getElementById('vizly-plugin-center-island-portal');
         if (target) {
             setPortalTarget(target);
         }

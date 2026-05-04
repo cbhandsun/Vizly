@@ -120,6 +120,13 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
         )}
       </div>
 
+      {/* ── Center Island Group: Action Tools ── */}
+      <div 
+        id="vizly-plugin-center-island-portal" 
+        className="absolute left-1/2 top-0 -translate-x-1/2 flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto px-[8px] transition-all empty:hidden" 
+        style={{ zIndex: 100 }} 
+      />
+
       {/* ── Right Island Group: Unified single pill ── */}
       <div className="flex items-center flex-shrink-0">
           
@@ -127,10 +134,8 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
         <div className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
           <div className="flex items-center gap-2">
 
-            {/* Group 1: Plugin Portal + Export + More */}
+            {/* Group 1: Export + More */}
             <div className="flex items-center gap-1.5">
-              {/* Plugin Portal Target */}
-              <div id="vizly-plugin-right-island-portal" className="flex items-center gap-1 empty:hidden" />
 
               {/* Export */}
               {showExport && (
