@@ -52,6 +52,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     pluginCtx,
     isMobile = false,
 }) => {
+    const visible = true; // Always true so theme switcher is accessible
     const { t } = useTranslation();
     const { token } = theme.useToken();
     const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
@@ -122,8 +123,6 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     }, [hasSelection]);
 
     const toggle = useCallback(() => setIsCollapsed(prev => !prev), []);
-
-    const visible = true; // Always true so theme switcher is accessible
 
     // 通知父组件当前面板实际宽度（用 ref 避免依赖变化）
     const onWidthChangeRef = React.useRef(onWidthChange);
