@@ -77,12 +77,15 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   );
 
   return (
-    <div className="relative w-full h-[48px] mt-4 z-[100] pointer-events-none box-border">
+    <div 
+        className="grid grid-cols-3 w-full mt-4 z-[100] relative box-border transition-all pointer-events-none"
+        style={{ 
+            paddingLeft: 'var(--left-sidebar-offset, 0px)',
+            paddingRight: 'var(--right-sidebar-offset, 0px)' 
+        }}
+    >
       {/* ── Left Island Group ── */}
-      <div 
-        className="absolute top-0 h-full flex items-center gap-2 max-w-[32%] overflow-hidden"
-        style={{ left: 'calc(16px + var(--left-sidebar-offset, 0px))' }}
-      >
+      <div className="flex items-center justify-start gap-2 min-w-0 overflow-hidden px-4">
         
         {/* Pill 1: Brand + Breadcrumb + Title + Save Status */}
         <div className="flex items-center gap-2 h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
@@ -121,7 +124,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       </div>
 
       {/* ── Center Island Group ── */}
-      <div className="absolute left-1/2 top-0 -translate-x-1/2 h-fit flex flex-col items-center gap-2 z-10 max-w-[32%]">
+      <div className="flex flex-col items-center gap-2 z-10 min-w-0 px-4">
         <div 
           id="vizly-plugin-center-island-portal" 
           className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto px-[8px] transition-all empty:hidden" 
@@ -135,10 +138,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       </div>
 
       {/* ── Right Island Group ── */}
-      <div 
-        className="absolute top-0 h-full flex items-center justify-end gap-2 max-w-[32%] overflow-hidden"
-        style={{ right: 'calc(16px + var(--right-sidebar-offset, 0px))' }}
-      >
+      <div className="flex items-center justify-end gap-2 min-w-0 overflow-hidden px-4">
           
         {/* Unified Pill: Tools, Settings, Theme, Language, Auth */}
         <div className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
