@@ -479,8 +479,8 @@ export const defaultConfig: DiagramConfig = {
     },
     markerEnd: {
       type: 'arrowclosed',
-      width: 14,
-      height: 14
+      width: 10,
+      height: 10
     }
     ,
     // 箭头与节点边界的偏移距离（0 = 箭头贴合节点边界）
@@ -769,10 +769,10 @@ export class DiagramConfigManager {
       const savedConfig = localStorage.getItem('architecture-diagram-config');
       if (savedConfig) {
         const parsedConfig = JSON.parse(savedConfig);
-        // [FIX] Force markerEnd to 14x14 to override any stale values in localStorage
+        // [FIX] Force markerEnd to 10x10 to override any stale values in localStorage
         if (parsedConfig.edge && parsedConfig.edge.markerEnd) {
-          parsedConfig.edge.markerEnd.width = 14;
-          parsedConfig.edge.markerEnd.height = 14;
+          parsedConfig.edge.markerEnd.width = 10;
+          parsedConfig.edge.markerEnd.height = 10;
         }
         this.updateConfig(parsedConfig);
         // 载入后已通过 updateConfig 规范化并保存
