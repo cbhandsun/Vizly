@@ -931,10 +931,6 @@ circle.custom-edge-updater {
     background-color: rgba(137, 180, 250, 0.05) !important;
     border-color: rgba(137, 180, 250, 0.6) !important;
 }
-
-[data-theme='dark'] .modern-toolbar:hover {
-}
-
 [data-theme='dark'] .floating-toolbar {
     background-color: rgba(30, 30, 46, 0.88) !important;
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(205, 214, 244, 0.06) !important;
@@ -1191,8 +1187,6 @@ circle.custom-edge-updater {
 }
 
 /* 浮动工具栏 — glassmorphism 暗色 (背景移至单独的胶囊元素) */
-[data-theme="dark"] .modern-toolbar {
-}
 [data-theme="dark"] .modern-toolbar .ant-btn-text {
     color: #cbd5e1 !important;
 }

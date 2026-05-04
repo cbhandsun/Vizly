@@ -76,7 +76,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     });
 
     useEffect(() => {
-        if (!visible || isMobile) {
+        if (isMobile) {
             document.documentElement.style.setProperty('--right-sidebar-offset', '0px');
             return;
         }
