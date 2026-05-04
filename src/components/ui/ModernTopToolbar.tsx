@@ -120,33 +120,14 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
         )}
       </div>
 
-      {/* ── Right Island Group: Split into smaller glass pills for breathing room ── */}
-      <div className="flex flex-col items-end gap-2 flex-shrink-0">
-        <div className="flex items-center gap-4">
+      {/* ── Right Island Group: Unified single pill ── */}
+      <div className="flex items-center flex-shrink-0">
           
-          {/* Pill 3: Theme, Language, Auth */}
-          <div className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
-            <div className="flex items-center gap-3">
-              {showThemeSelector && (
-                <EnhancedThemeSelector
-                  variant="icon"
-                  className="inline-flex items-center justify-center w-[30px] h-[30px] rounded-[8px] bg-white/80 dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-slate-600 dark:text-slate-300 hover:text-indigo-500 hover:border-indigo-500/30 hover:bg-indigo-50/80 dark:hover:bg-indigo-500/20 transition-all cursor-pointer shadow-sm"
-                />
-              )}
-              
-              <LanguageSwitcher 
-                  variant="icon" 
-                  className="inline-flex items-center justify-center w-[30px] h-[30px] rounded-[8px] bg-white/80 dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-slate-600 dark:text-slate-300 hover:text-indigo-500 hover:border-indigo-500/30 hover:bg-indigo-50/80 dark:hover:bg-indigo-500/20 transition-all cursor-pointer shadow-sm"
-              />
+        {/* Unified Pill: Tools, Settings, Theme, Language, Auth */}
+        <div className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
+          <div className="flex items-center gap-2">
 
-              <div className="flex items-center justify-center w-[30px] h-[30px] rounded-[8px] bg-white/80 dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-slate-600 dark:text-slate-300 hover:border-indigo-500/30 transition-all shadow-sm overflow-hidden cursor-pointer [&_.ant-btn]:border-none [&_.ant-btn]:w-full [&_.ant-btn]:h-full [&_.ant-btn]:p-0 [&_.ant-btn:hover]:bg-indigo-50/80 dark:[&_.ant-btn:hover]:bg-indigo-500/20 [&_.ant-btn:hover]:text-indigo-500 [&_.ant-avatar]:w-full [&_.ant-avatar]:h-full [&_.ant-avatar]:rounded-none">
-                <AuthStatusCompact />
-              </div>
-            </div>
-          </div>
-
-          {/* Pill 4: Plugin Portal + Export + More + Settings */}
-          <div className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
+            {/* Group 1: Plugin Portal + Export + More */}
             <div className="flex items-center gap-1.5">
               {/* Plugin Portal Target */}
               <div id="vizly-plugin-right-island-portal" className="flex items-center gap-1 empty:hidden" />
@@ -198,10 +179,42 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
                   <MoreOutlined />
                 </button>
               </Popover>
-
-              {/* Right slot (Settings gear, etc) */}
-              {rightChildren}
             </div>
+
+            {/* Divider */}
+            {((showExport || moreOpen !== undefined) || (rightChildren)) && (
+                <div className="w-[1px] h-[20px] bg-slate-200 dark:bg-slate-700 mx-1" />
+            )}
+
+            {/* Group 2: Settings */}
+            {rightChildren && (
+              <div className="flex items-center">
+                {rightChildren}
+              </div>
+            )}
+
+            {/* Divider for System Utilities */}
+            <div className="w-[1px] h-[20px] bg-slate-200 dark:bg-slate-700 mx-1" />
+
+            {/* Group 3: Theme, Language, Auth */}
+            <div className="flex items-center gap-2 pl-1">
+              {showThemeSelector && (
+                <EnhancedThemeSelector
+                  variant="icon"
+                  className="inline-flex items-center justify-center w-[30px] h-[30px] rounded-[8px] bg-transparent border-none text-slate-600 dark:text-slate-300 hover:text-indigo-500 hover:bg-indigo-500/10 active:bg-indigo-500/20 transition-all cursor-pointer shadow-none"
+                />
+              )}
+              
+              <LanguageSwitcher 
+                  variant="icon" 
+                  className="inline-flex items-center justify-center w-[30px] h-[30px] rounded-[8px] bg-transparent border-none text-slate-600 dark:text-slate-300 hover:text-indigo-500 hover:bg-indigo-500/10 active:bg-indigo-500/20 transition-all cursor-pointer shadow-none"
+              />
+
+              <div className="ml-1 flex items-center justify-center w-[32px] h-[32px] rounded-[8px] bg-white/80 dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-slate-600 dark:text-slate-300 hover:border-indigo-500/30 transition-all shadow-sm overflow-hidden cursor-pointer [&_.ant-btn]:border-none [&_.ant-btn]:w-full [&_.ant-btn]:h-full [&_.ant-btn]:p-0 [&_.ant-btn:hover]:bg-indigo-50/80 dark:[&_.ant-btn:hover]:bg-indigo-500/20 [&_.ant-btn:hover]:text-indigo-500 [&_.ant-avatar]:w-full [&_.ant-avatar]:h-full [&_.ant-avatar]:rounded-none">
+                <AuthStatusCompact />
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
