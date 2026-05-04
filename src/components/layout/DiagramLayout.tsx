@@ -149,6 +149,15 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
     }
   }, [flowchartSidebarProps, flowSidebarWidth, onDragMove, showFlowchartSidebar, stopDrag]);
 
+  useEffect(() => {
+    if (isPresentationMode || !showMenu || !menuProps) {
+      document.documentElement.style.setProperty('--left-sidebar-offset', '0px');
+      return;
+    }
+    const width = menuProps.isCollapsed ? 64 : menuWidth;
+    document.documentElement.style.setProperty('--left-sidebar-offset', `${width}px`);
+  }, [menuProps?.isCollapsed, menuWidth, showMenu, isPresentationMode]);
+
   return (
     <ConfigProvider
       getPopupContainer={(node) => {
