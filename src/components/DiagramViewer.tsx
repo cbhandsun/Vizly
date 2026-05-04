@@ -1000,99 +1000,15 @@ const DiagramViewer: React.FC = () => {
                                     }}
                                 />
                             </div>
-                            <div className="w-[1px] h-4 bg-black/10 dark:bg-white/20 mx-1" />
-
-                            {selectedDiagramId === 'architecture-diagram' && (
-                                <button
-                                    className="flex items-center justify-center gap-1 px-2 py-1.5 bg-white/50 hover:bg-black/5 dark:bg-[#1e293b]/50 dark:hover:bg-white/10 text-xs font-medium text-gray-700 dark:text-gray-300 rounded-md transition-colors border-none outline-none cursor-pointer"
-                                    onClick={() => dispatchDiagramControl('toggleFlowDirection', 'architecture-diagram')}
-                                >
-                                    {t('designer.viewer.toggleFlowDirection')}
-                                </button>
-                            )}
-                            <button
-                                className="flex items-center justify-center gap-1 px-2 py-1.5 bg-white/50 hover:bg-black/5 dark:bg-[#1e293b]/50 dark:hover:bg-white/10 text-xs font-medium text-gray-700 dark:text-gray-300 rounded-md transition-colors border-none outline-none cursor-pointer"
-                                onClick={() => setVersionHistoryOpen(true)}
-                            >
-                                <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 512 512" height="12px" width="12px" xmlns="http://www.w3.org/2000/svg"><path d="M256 8C119 8 8 119 8 256s111 248 248 248 248-111 248-248S393 8 256 8zm0 448c-110.5 0-200-89.5-200-200S145.5 56 256 56s200 89.5 200 200-89.5 200-200 200zm61.8-104.4l-84.9-61.7c-3.1-2.3-4.9-5.9-4.9-9.7V116c0-6.6 5.4-12 12-12h32c6.6 0 12 5.4 12 12v141.7l66.8 48.6c5.4 3.9 6.5 11.4 2.6 16.8L334.6 349c-3.9 5.3-11.4 6.5-16.8 2.6z"></path></svg> 
-                                {t('diagramViewer.versionHistory')}
-                            </button>
-                            <button
-                                className="flex items-center justify-center gap-1 px-2 py-1.5 bg-white/50 hover:bg-black/5 dark:bg-[#1e293b]/50 dark:hover:bg-white/10 text-xs font-medium text-gray-700 dark:text-gray-300 rounded-md transition-colors border-none outline-none cursor-pointer"
-                                onClick={() => setCloudManagerVisible(true)}
-                            >
-                                <CloudOutlined /> {t('diagramViewer.cloudDrive')} <span style={{ fontSize: '11px', opacity: 0.5 }}>👑</span>
-                            </button>
-                            <div className="flex items-center gap-2">
-                                {activeUsers && activeUsers.length > 0 && (
-                                    <Avatar.Group
-                                        maxCount={3}
-                                        size="small"
-                                        maxStyle={{ color: '#f56a00', backgroundColor: '#fde3cf', fontSize: '10px' }}
-                                    >
-                                        {activeUsers.map(u => (
-                                            <Tooltip key={u.clientId} title={u.user?.name || 'Anonymous'}>
-                                                <Avatar 
-                                                    style={{ backgroundColor: u.user?.color || '#1677ff', border: '2px solid #fff' }}
-                                                >
-                                                    {u.user?.name ? u.user.name.charAt(0).toUpperCase() : '?'}
-                                                </Avatar>
-                                            </Tooltip>
-                                        ))}
-                                    </Avatar.Group>
-                                )}
-                                <Tooltip title={isCollabEnabled ? t('diagramViewer.collab.active') : t('diagramViewer.collab.start')}>
-                                    <button
-                                        className="flex items-center justify-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-xs font-semibold text-blue-600 dark:text-blue-400 rounded-lg transition-all border-none outline-none cursor-pointer shadow-sm"
-                                        onClick={() => setCollabModalVisible(true)}
-                                    >
-                                        <TeamOutlined style={{ fontSize: '14px' }} />
-                                        {t('diagramViewer.collab.share')}
-                                        {isCollabEnabled && (
-                                            <div className="relative flex h-2 w-2 ml-0.5">
-                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                                            </div>
-                                        )}
-                                    </button>
-                                </Tooltip>
-                            </div>
-                            <Tooltip title={t('diagramViewer.readonlyTooltip')}>
-                                <Switch
-                                    size="small"
-                                    checked={isReadonly}
-                                    onChange={setIsReadonly}
-                                    checkedChildren={<LockOutlined />}
-                                    unCheckedChildren={<UnlockOutlined />}
-                                    style={{ marginLeft: 4 }}
-                                />
-                            </Tooltip>
                         </>
                     ),
-                    rightChildren: (
-                        <>
-                            <button
-                                className={`flex items-center justify-center w-[30px] h-[30px] rounded-md transition-colors border-none outline-none cursor-pointer text-slate-600 dark:text-slate-400 ${isSettingsOpen ? 'bg-indigo-500/10 text-indigo-500' : 'bg-transparent hover:bg-indigo-500/10 hover:text-indigo-500'}`}
-                                onClick={() => setIsSettingsOpen(prev => !prev)}
-                                title={t('designer.viewer.moreSettings')}
-                            >
-                                <FaCog />
-                            </button>
-                            {isSettingsOpen && (
-                                <Suspense fallback={<div />}>
-                                    <DraggableSettingsPanel
-                                        onClose={() => setIsSettingsOpen(false)}
-                                        title={t('designer.viewer.moreSettings')}
-                                    >
-                                        {settingsPanel}
-                                    </DraggableSettingsPanel>
-                                </Suspense>
-                            )}
-                        </>
-                    )
+                    centerChildren: null,
+                    rightChildren: null
                 }}
                 showMenu={false}
             >
+                {/* Host actions are now unified in the designer's internal toolbar islands */}
+
                 <CommandPalette
                     open={isCommandOpen}
                     onClose={() => setIsCommandOpen(false)}

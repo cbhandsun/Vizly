@@ -1404,6 +1404,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                     onImportClick: () => fileInputRef.current?.click(),
                                     renderThemeSelector,
                                     historyCount: pastEntries?.length ?? 0,
+                                    onAlign: handleAlign,
+                                    onDistribute: handleDistribute,
                                 }}
                             />
 

@@ -1,21 +1,34 @@
-import React, { useMemo, useState } from 'react';
-import { Node, useViewport, useStore } from '@xyflow/react';
-import { theme, Button, Tooltip, Divider, Popover, Slider, Input, Space, ColorPicker, Dropdown, type MenuProps } from 'antd';
+import React, { useMemo } from 'react';
+import { Node } from '@xyflow/react';
+import { Popover, Slider, Divider, Dropdown, ColorPicker, type MenuProps } from 'antd';
 import type { LayerConfig } from './hooks/useLayerManagement';
+import type { AggregationColor } from 'antd/es/color-picker/color';
 import {
     FaTrash, FaCopy, FaLock, FaLockOpen, FaLayerGroup,
-    FaPalette, FaArrowsAlt, FaPercentage, FaArrowUp, FaArrowDown, FaShapes,
-    FaStar, FaPaintBrush
+    FaArrowsAlt, FaShapes, FaStar, FaPaintBrush
 } from 'react-icons/fa';
 import {
     MdAlignHorizontalLeft, MdAlignHorizontalCenter, MdAlignHorizontalRight,
     MdAlignVerticalTop, MdAlignVerticalCenter, MdAlignVerticalBottom,
     MdVerticalDistribute, MdHorizontalDistribute, MdLineWeight
 } from 'react-icons/md';
-import { FaBorderNone } from 'react-icons/fa';
-import { AggregationColor } from 'antd/es/color-picker/color';
+import { FaArrowUp, FaArrowDown, FaPercentage } from 'react-icons/fa';
 import { useAlignment } from './hooks/useAlignment';
 import { ShapePreview } from './ShapePreview';
+import {
+    ToolbarContainer,
+    ToolbarButton,
+    ToolbarColorSwatch,
+    ToolbarDivider,
+    ToolbarPopover,
+    ToolbarOverflow,
+    useFloatingPosition,
+    useSelectedNodeBounds,
+    useNodesDragging,
+    type OverflowItem,
+} from '../shared/FloatingToolbar';
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const POPULAR_SHAPES = [
     { shape: 'rectangle', label: 'Process' },
@@ -38,6 +51,8 @@ const DOMAIN_OPTIONS = [
     { value: 'data', label: '数据计算域 (Data)', color: '#607D8B' },
     { value: 'infra', label: '基础设施域 (Infra)', color: '#424242' },
 ];
+
+// ─── Types (preserved for backward compatibility) ────────────────────────────
 
 export type ToolbarFeature = 'color' | 'opacity' | 'shape' | 'domain' | 'align' | 'layer' | 'border' | 'copyStyle';
 
@@ -68,6 +83,124 @@ export interface FloatingContextToolbarProps {
     overrideDefaultToolbar?: boolean; // If true, replaces ALL default buttons and uses square borders
 }
 
+// ─── Popover Content Components ──────────────────────────────────────────────
+
+const OpacityPanel: React.FC<{ value: number; onChange: (v: number) => void }> = ({ value, onChange }) => (
+    <div style={{ padding: 8, width: 150 }}>
+        <div style={{ marginBottom: 4 }}>Opacity: {Math.round(value * 100)}%</div>
+        <Slider min={0.1} max={1} step={0.1} value={value} onChange={onChange} />
+    </div>
+);
+
+const AlignPanel: React.FC<{
+    onAlign: (dir: string) => void;
+    onDistribute: (dir: string) => void;
+    canAlign: boolean;
+    canDistribute: boolean;
+}> = ({ onAlign, onDistribute, canAlign, canDistribute }) => (
+    <div style={{ padding: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 2 }}>
+            <ToolbarButton icon={<MdAlignHorizontalLeft />} label="Align Left" onClick={() => onAlign('left')} disabled={!canAlign} />
+            <ToolbarButton icon={<MdAlignHorizontalCenter />} label="Align Center" onClick={() => onAlign('center')} disabled={!canAlign} />
+            <ToolbarButton icon={<MdAlignHorizontalRight />} label="Align Right" onClick={() => onAlign('right')} disabled={!canAlign} />
+        </div>
+        <div style={{ display: 'flex', gap: 2 }}>
+            <ToolbarButton icon={<MdAlignVerticalTop />} label="Align Top" onClick={() => onAlign('top')} disabled={!canAlign} />
+            <ToolbarButton icon={<MdAlignVerticalCenter />} label="Align Middle" onClick={() => onAlign('middle')} disabled={!canAlign} />
+            <ToolbarButton icon={<MdAlignVerticalBottom />} label="Align Bottom" onClick={() => onAlign('bottom')} disabled={!canAlign} />
+        </div>
+        <Divider style={{ margin: '4px 0' }} />
+        <div style={{ display: 'flex', gap: 2 }}>
+            <ToolbarButton icon={<MdHorizontalDistribute />} label="Distribute Horizontally" onClick={() => onDistribute('horizontal')} disabled={!canDistribute} />
+            <ToolbarButton icon={<MdVerticalDistribute />} label="Distribute Vertically" onClick={() => onDistribute('vertical')} disabled={!canDistribute} />
+        </div>
+    </div>
+);
+
+const LayerPanel: React.FC<{ onBringToFront: () => void; onSendToBack: () => void }> = ({ onBringToFront, onSendToBack }) => (
+    <div style={{ padding: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <ToolbarButton icon={<FaArrowUp />} label="Bring to Front" onClick={onBringToFront} />
+        <ToolbarButton icon={<FaArrowDown />} label="Send to Back" onClick={onSendToBack} />
+    </div>
+);
+
+const BorderPanel: React.FC<{
+    strokeWidth: number;
+    isDashed: boolean;
+    onUpdateStyle: (style: React.CSSProperties) => void;
+}> = ({ strokeWidth, isDashed, onUpdateStyle }) => (
+    <div style={{ padding: 8, width: 160 }}>
+        <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: '12px', marginBottom: 4 }}>Thickness: {strokeWidth}px</div>
+            <Slider min={0} max={10} step={1} value={strokeWidth} onChange={(val) => onUpdateStyle({ strokeWidth: val })} />
+        </div>
+        <Divider style={{ margin: '8px 0' }} />
+        <div style={{ display: 'flex', gap: 4 }}>
+            <button
+                onClick={() => onUpdateStyle({ strokeDasharray: 'none' })}
+                style={{
+                    flex: 1, padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
+                    border: 'none', fontSize: 12,
+                    background: !isDashed ? 'var(--toolbar-btn-hover-bg)' : 'transparent',
+                    color: !isDashed ? 'var(--toolbar-btn-hover-color)' : 'var(--toolbar-btn-color)',
+                }}
+            >Solid</button>
+            <button
+                onClick={() => onUpdateStyle({ strokeDasharray: '4,4' })}
+                style={{
+                    flex: 1, padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
+                    border: 'none', fontSize: 12,
+                    background: isDashed ? 'var(--toolbar-btn-hover-bg)' : 'transparent',
+                    color: isDashed ? 'var(--toolbar-btn-hover-color)' : 'var(--toolbar-btn-color)',
+                }}
+            >Dashed</button>
+        </div>
+    </div>
+);
+
+const ShapePanel: React.FC<{ onChangeShape: (shape: string) => void }> = ({ onChangeShape }) => (
+    <div style={{ padding: 8, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, width: 180 }}>
+        {POPULAR_SHAPES.map(s => (
+            <div
+                key={s.shape}
+                onClick={() => onChangeShape(s.shape)}
+                style={{
+                    padding: '6px 4px', cursor: 'pointer', display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', gap: 4, borderRadius: 4, transition: 'background 0.2s',
+                }}
+                title={s.label}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--toolbar-btn-hover-bg)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+                <div style={{ lineHeight: 0 }}><ShapePreview shape={s.shape as any} size={24} color="#64748b" /></div>
+            </div>
+        ))}
+    </div>
+);
+
+const DomainClassPanel: React.FC<{ onChangeDomainClass: (domainClass: string) => void }> = ({ onChangeDomainClass }) => (
+    <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 4, width: 180 }}>
+        <div style={{ fontSize: '12px', marginBottom: 4, color: '#666' }}>业务域色带配置</div>
+        {DOMAIN_OPTIONS.map(opt => (
+            <div
+                key={opt.value}
+                onClick={() => onChangeDomainClass(opt.value)}
+                style={{
+                    padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+                    borderRadius: 4, transition: 'background 0.2s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--toolbar-btn-hover-bg)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+                <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: opt.color, border: '1px solid rgba(0,0,0,0.1)' }} />
+                <span style={{ fontSize: '13px' }}>{opt.label}</span>
+            </div>
+        ))}
+    </div>
+);
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+
 export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = React.memo(({
     selectedNodes, onDelete, onDuplicate, onChangeColor,
     onLock, onOpacity, onBringToFront, onSendToBack, onUpdateStyle, onUpdateNodes,
@@ -75,211 +208,65 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
     onCopyStyle, onPasteStyle, hasCopiedStyle, extraToolbarContent, excludeToolbarFeatures,
     overrideDefaultToolbar
 }) => {
-    const { token } = theme.useToken();
-    const { x: vX, y: vY, zoom } = useViewport();
-    // [FIX] 拖拽时隐藏工具栏：节点位置通过 CSS transform 变化，不触发 re-render，
-    // 工具栏 bounds 不更新导致留在原地。拖拽结束后自动重现在新位置。
-    const nodesDragging = useStore((s: any) => !!s.nodesDragging);
+    // ─── Hooks (must be called unconditionally) ──────────────────────────────
+    const selectedIds = useMemo(() => selectedNodes.map(n => n.id), [selectedNodes]);
+    const worldBounds = useSelectedNodeBounds(selectedIds);
+    const nodesDragging = useNodesDragging();
 
-    // Alignment Hook
     const { handleAlign, handleDistribute, canAlign, canDistribute } = useAlignment({
-        selectedNodes,
-        onUpdateNodes
+        selectedNodes, onUpdateNodes,
     });
 
-    // 图层菜单项 - 修复Hooks顺序问题:永远调用useMemo,避免条件性Hooks
+    // 图层菜单项
     const layerMenuItems: MenuProps['items'] = useMemo(() => {
-        // 条件逻辑移到useMemo内部
         if (!layers || !onMoveToLayer) return [];
         return layers.map(layer => ({
             key: layer.id,
             label: layer.name,
-            onClick: () => onMoveToLayer(layer.id)
+            onClick: () => onMoveToLayer(layer.id),
         }));
     }, [layers, onMoveToLayer]);
 
-    // Compute bounds from store's latest positions (not from stale selectedNodes prop)
-    // This ensures bounds update immediately after drag stop
-    const selectedIds = useMemo(() => selectedNodes.map(n => n.id), [selectedNodes]);
-    const bounds = useStore((s: any) => {
-        if (selectedIds.length === 0) return null;
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        for (const id of selectedIds) {
-            const n = s.nodeLookup?.get(id) || s.nodeInternals?.get(id);
-            if (!n) continue;
-            const abs = n.internals?.positionAbsolute || n.positionAbsolute || n.position;
-            const x = abs?.x ?? 0;
-            const y = abs?.y ?? 0;
-            const w = n.measured?.width ?? n.width ?? 0;
-            const h = n.measured?.height ?? n.height ?? 0;
-            minX = Math.min(minX, x);
-            minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x + (typeof w === 'number' ? w : 0));
-            maxY = Math.max(maxY, y + (typeof h === 'number' ? h : 0));
-        }
-        if (minX === Infinity) return null;
-        return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+    // (overflow items are now inline in the JSX ToolbarOverflow component)
+
+    // 定位计算
+    const { style: positionStyle, visible } = useFloatingPosition({
+        worldBounds,
+        placement: 'auto',
+        offset: 20,
+        hidden: nodesDragging || selectedNodes.length === 0,
     });
 
     // Early return AFTER all Hooks
-    if (!bounds || nodesDragging) return null;
+    if (!visible) return null;
 
-    // Smart Positioning — 世界坐标 → 屏幕坐标（ReactFlow children 在容器坐标系）
-    // 公式: screenPos = worldPos * zoom + viewportOffset
-    const screenCenterX = (bounds.x + bounds.w / 2) * zoom + vX;
-    const screenTopY = bounds.y * zoom + vY;
-    const screenBottomY = (bounds.y + bounds.h) * zoom + vY;
-
-    const placeBelow = screenTopY < 140; // buffer for top UI (toolbar / hints)
-
-    const style: React.CSSProperties = {
-        position: 'absolute',
-        left: screenCenterX,
-        top: placeBelow
-            ? screenBottomY + 20 // Below node, 20px gap
-            : screenTopY - 20,   // Above node, 20px gap
-        transform: `translate(-50%, ${placeBelow ? '0%' : '-100%'})`,
-        transformOrigin: placeBelow ? 'top center' : 'bottom center',
-        zIndex: 1005,
-        // 平滑追踪位置变化
-        transition: 'left 0.25s cubic-bezier(0.2, 0.9, 0.3, 1), top 0.25s cubic-bezier(0.2, 0.9, 0.3, 1), background-color 0.2s',
-        animation: 'toolbarFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-    };
-
-    // Determine Lock State (if all selected are locked)
-    const allLocked = selectedNodes.every(n => n.draggable === false);
+    // ─── Derived state ───────────────────────────────────────────────────────
     const isHide = (feature: ToolbarFeature) => excludeToolbarFeatures?.includes(feature);
+    const allLocked = selectedNodes.every(n => n.draggable === false);
 
-    // Determine Opacity (avg of selected)
     const currentOpacity = selectedNodes.reduce((acc, n) => {
         const op = n.style?.opacity !== undefined ? Number(n.style.opacity) : 1;
         return acc + op;
     }, 0) / selectedNodes.length;
 
-    // --- Popover Contents ---
-
-    // Determine Color (first node)
     const currentColor = (selectedNodes[0]?.data?.style as any)?.backgroundColor ||
         (selectedNodes[0]?.data?.theme as any)?.main || '#ffffff';
-
-    const OpacityContent = (
-        <div style={{ padding: 8, width: 150 }}>
-            <div style={{ marginBottom: 4 }}>Opacity: {Math.round(currentOpacity * 100)}%</div>
-            <Slider
-                min={0.1} max={1} step={0.1}
-                value={currentOpacity}
-                onChange={onOpacity}
-            />
-        </div>
-    );
-
-    const AlignContent = (
-        <div style={{ padding: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <Space>
-                <Tooltip title="Align Left"><Button size="small" type="text" onClick={() => handleAlign('left')} disabled={!canAlign} icon={<MdAlignHorizontalLeft />} /></Tooltip>
-                <Tooltip title="Align Center"><Button size="small" type="text" onClick={() => handleAlign('center')} disabled={!canAlign} icon={<MdAlignHorizontalCenter />} /></Tooltip>
-                <Tooltip title="Align Right"><Button size="small" type="text" onClick={() => handleAlign('right')} disabled={!canAlign} icon={<MdAlignHorizontalRight />} /></Tooltip>
-            </Space>
-            <Space>
-                <Tooltip title="Align Top"><Button size="small" type="text" onClick={() => handleAlign('top')} disabled={!canAlign} icon={<MdAlignVerticalTop />} /></Tooltip>
-                <Tooltip title="Align Middle"><Button size="small" type="text" onClick={() => handleAlign('middle')} disabled={!canAlign} icon={<MdAlignVerticalCenter />} /></Tooltip>
-                <Tooltip title="Align Bottom"><Button size="small" type="text" onClick={() => handleAlign('bottom')} disabled={!canAlign} icon={<MdAlignVerticalBottom />} /></Tooltip>
-            </Space>
-            <Divider style={{ margin: '4px 0' }} />
-            <Space>
-                <Tooltip title="Distribute Horizontally"><Button size="small" type="text" onClick={() => handleDistribute('horizontal')} disabled={!canDistribute} icon={<MdHorizontalDistribute />} /></Tooltip>
-                <Tooltip title="Distribute Vertically"><Button size="small" type="text" onClick={() => handleDistribute('vertical')} disabled={!canDistribute} icon={<MdVerticalDistribute />} /></Tooltip>
-            </Space>
-        </div>
-    );
-
-
-    const LayerContent = (
-        <div style={{ padding: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <Button size="small" type="text" icon={<FaArrowUp />} onClick={onBringToFront} style={{ justifyContent: 'flex-start' }}>Bring to Front</Button>
-            <Button size="small" type="text" icon={<FaArrowDown />} onClick={onSendToBack} style={{ justifyContent: 'flex-start' }}>Send to Back</Button>
-        </div>
-    );
 
     const currentStrokeWidth = Number(selectedNodes[0]?.style?.strokeWidth || 1);
     const isDashed = selectedNodes[0]?.style?.strokeDasharray === '4,4';
 
-    const BorderContent = (
-        <div style={{ padding: 8, width: 160 }}>
-            <div style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: '12px', marginBottom: 4 }}>Thickness: {currentStrokeWidth}px</div>
-                <Slider
-                    min={0} max={10} step={1}
-                    value={currentStrokeWidth}
-                    onChange={(val) => onUpdateStyle({ strokeWidth: val })}
-                />
-            </div>
-            <Divider style={{ margin: '8px 0' }} />
-            <div style={{ display: 'flex', gap: 4 }}>
-                <Button
-                    size="small"
-                    type={!isDashed ? 'primary' : 'default'}
-                    onClick={() => onUpdateStyle({ strokeDasharray: 'none' })}
-                    style={{ flex: 1 }}
-                >Solid</Button>
-                <Button
-                    size="small"
-                    type={isDashed ? 'primary' : 'default'}
-                    onClick={() => onUpdateStyle({ strokeDasharray: '4,4' })}
-                    style={{ flex: 1 }}
-                >Dashed</Button>
-            </div>
-        </div>
-    );
-
-    const ShapeContent = (
-        <div style={{ padding: 8, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, width: 180 }}>
-            {POPULAR_SHAPES.map(s => (
-                <div
-                    key={s.shape}
-                    onClick={() => { onChangeShape?.(s.shape); }}
-                    style={{
-                        padding: '6px 4px', cursor: 'pointer', display: 'flex', flexDirection: 'column',
-                        alignItems: 'center', gap: 4, borderRadius: 4,
-                        transition: 'background 0.2s'
-                    }}
-                    title={s.label}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.04)'}
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                    <div style={{ lineHeight: 0 }}><ShapePreview shape={s.shape as any} size={24} color="#64748b" /></div>
-                </div>
-            ))}
-        </div>
-    );
-
-    const DomainClassContent = (
-        <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 4, width: 180 }}>
-            <div style={{ fontSize: '12px', marginBottom: 4, color: '#666' }}>业务域色带配置</div>
-            {DOMAIN_OPTIONS.map(opt => (
-                <div
-                    key={opt.value}
-                    onClick={() => { onChangeDomainClass?.(opt.value); }}
-                    style={{
-                        padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, borderRadius: 4,
-                        transition: 'background 0.2s'
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.04)'}
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                    <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: opt.color, border: '1px solid rgba(0,0,0,0.1)' }} />
-                    <span style={{ fontSize: '13px', color: '#333' }}>{opt.label}</span>
-                </div>
-            ))}
-        </div>
-    );
-
+    // ─── Render ──────────────────────────────────────────────────────────────
     return (
-        <div style={style} className={`floating-toolbar flex items-center gap-0.5 pointer-events-auto border-none backdrop-blur-[24px] backdrop-saturate-[180%] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.45)] dark:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.12)] ${overrideDefaultToolbar ? 'rounded-[12px] p-2' : 'rounded-full px-3 py-1'}`}>
+        <ToolbarContainer
+            positioning="positioned"
+            square={overrideDefaultToolbar}
+            style={positionStyle}
+        >
             {overrideDefaultToolbar ? (
                 <>{extraToolbarContent}</>
             ) : (
                 <>
+                    {/* ── 外观区 ── */}
                     {!isHide('color') && (
                         <ColorPicker
                             value={currentColor}
@@ -288,111 +275,94 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                                 onChangeColor(hex);
                             }}
                             disabledAlpha
-                            presets={[
-                                {
-                                    label: 'Recommended',
-                                    colors: ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#64748b'],
-                                },
-                            ]}
+                            presets={[{
+                                label: 'Brand',
+                                colors: ['#6366f1', '#3b82f6', '#06b6d4', '#10b981', '#84cc16', '#f59e0b', '#f97316', '#ef4444', '#d946ef', '#8b5cf6'],
+                            }, {
+                                label: 'Neutral',
+                                colors: ['#1e293b', '#334155', '#475569', '#64748b', '#94a3b8', '#cbd5e1', '#e2e8f0', '#f1f5f9', '#ffffff', '#000000'],
+                            }]}
                             trigger="click"
                         >
-                            <Tooltip title="Color">
-                                <Button type="text" size="small" icon={<FaPalette />} />
-                            </Tooltip>
+                            <span><ToolbarColorSwatch color={currentColor} label="颜色" /></span>
                         </ColorPicker>
                     )}
 
-                    {!isHide('opacity') && <Popover content={OpacityContent} trigger="click">
-                        <Tooltip title="Opacity">
-                            <Button type="text" size="small" icon={<FaPercentage />} />
-                        </Tooltip>
-                    </Popover>}
-
-                    {!isHide('shape') && <Popover content={ShapeContent} trigger="click" placement="bottom">
-                        <Tooltip title="Change Shape">
-                            <Button type="text" size="small" icon={<FaShapes />} />
-                        </Tooltip>
-                    </Popover>}
-
-                    {!isHide('domain') && onChangeDomainClass && (
-                        <Popover content={DomainClassContent} trigger="click" placement="bottom">
-                            <Tooltip title="业务域 (Domain)">
-                                <Button type="text" size="small" icon={<div style={{ width: 14, height: 14, borderRadius: 2, background: 'linear-gradient(135deg, #3498db, #e74c3c)' }} />} />
-                            </Tooltip>
-                        </Popover>
+                    {!isHide('shape') && (
+                        <ToolbarPopover icon={<FaShapes />} label="形状" content={<ShapePanel onChangeShape={onChangeShape || (() => {})} />} />
                     )}
 
-                    {!isHide('align') && <Popover content={AlignContent} trigger="click" placement="bottom">
-                        <Tooltip title="Alignments">
-                            <Button type="text" size="small" icon={<FaArrowsAlt />} disabled={!canAlign} />
-                        </Tooltip>
-                    </Popover>}
-
-                    {!isHide('layer') && <Popover content={LayerContent} trigger="click" placement="bottom">
-                        <Tooltip title="Layers">
-                            <Button type="text" size="small" icon={<FaLayerGroup />} />
-                        </Tooltip>
-                    </Popover>}
-
-                    {!isHide('border') && <Popover content={BorderContent} trigger="click" placement="bottom">
-                        <Tooltip title="Border & Stroke">
-                            <Button type="text" size="small" icon={<MdLineWeight />} />
-                        </Tooltip>
-                    </Popover>}
-
-                    <Divider orientation="vertical" style={{ height: 16, margin: '0 4px' }} />
-
-                    {/* 图层移动功能也属于 layer 控制 */}
-                    {!isHide('layer') && layers && layers.length > 0 && onMoveToLayer && (
-                        <>
-                            <Dropdown menu={{ items: layerMenuItems }} trigger={['click']}>
-                                <Tooltip title="移动到图层">
-                                    <Button type="text" size="small" icon={<FaLayerGroup />} />
-                                </Tooltip>
-                            </Dropdown>
-                            <Divider orientation="vertical" style={{ height: 16, margin: '0 4px' }} />
-                        </>
-                    )}
-
-                    <Tooltip title={allLocked ? "Unlock" : "Lock"}>
-                        <Button
-                            type="text"
-                            size="small"
-                            icon={allLocked ? <FaLock /> : <FaLockOpen />}
-                            onClick={() => onLock(!allLocked)}
-                            style={{ color: allLocked ? token.colorError : undefined }}
+                    {!isHide('align') && (
+                        <ToolbarPopover icon={<FaArrowsAlt />} label="对齐" disabled={!canAlign}
+                            content={<AlignPanel onAlign={handleAlign} onDistribute={handleDistribute} canAlign={canAlign} canDistribute={canDistribute} />}
                         />
-                    </Tooltip>
-
-                    <Tooltip title="Duplicate (Ctrl+D)">
-                        <Button type="text" size="small" icon={<FaCopy />} onClick={onDuplicate} />
-                    </Tooltip>
-
-                    {onSaveAsComponent && (
-                        <Tooltip title="保存为组件">
-                            <Button type="text" size="small" icon={<FaStar />} onClick={onSaveAsComponent} style={{ color: '#f59e0b' }} />
-                        </Tooltip>
                     )}
 
-                    {onCopyStyle && onPasteStyle && (
-                        <Tooltip title={hasCopiedStyle ? "粘贴样式 (再次点击可连续)" : "复制样式 (进入格式刷状态)"}>
-                            <Button 
-                                type="text" 
-                                size="small" 
-                                icon={<FaPaintBrush />} 
-                                onClick={hasCopiedStyle ? onPasteStyle : onCopyStyle} 
-                                style={{ color: hasCopiedStyle ? '#3b82f6' : undefined, background: hasCopiedStyle ? 'rgba(59, 130, 246, 0.1)' : undefined }}
-                            />
-                        </Tooltip>
+                    <ToolbarDivider />
+
+                    {/* ── 操作区 ── */}
+                    <ToolbarButton
+                        icon={allLocked ? <FaLock /> : <FaLockOpen />}
+                        label={allLocked ? "解锁" : "锁定"}
+                        onClick={() => onLock(!allLocked)}
+                        active={allLocked}
+                    />
+                    <ToolbarButton icon={<FaCopy />} label="复制 (Ctrl+D)" onClick={onDuplicate} />
+                    <ToolbarButton icon={<FaTrash />} label="删除 (Del)" onClick={onDelete} danger />
+
+                    {/* ── 更多 ── */}
+                    <ToolbarDivider />
+                    <ToolbarOverflow items={[
+                        ...(!isHide('opacity') ? [{
+                            key: 'opacity', icon: <FaPercentage />,
+                            label: `透明度 ${Math.round(currentOpacity * 100)}%`,
+                            onClick: () => {
+                                const steps = [1, 0.8, 0.6, 0.4, 0.2];
+                                const idx = steps.findIndex(s => Math.abs(s - currentOpacity) < 0.05);
+                                onOpacity(steps[(idx + 1) % steps.length]);
+                            },
+                        }] : []),
+                        ...(!isHide('layer') ? [
+                            { key: 'bringFront', icon: <FaArrowUp />, label: '置顶', onClick: onBringToFront },
+                            { key: 'sendBack', icon: <FaArrowDown />, label: '置底', onClick: onSendToBack },
+                        ] : []),
+                        ...(!isHide('border') ? [{
+                            key: 'border', icon: <MdLineWeight />,
+                            label: `边框 ${currentStrokeWidth}px${isDashed ? ' 虚线' : ''}`,
+                            onClick: () => {
+                                const widths = [0, 1, 2, 4];
+                                const idx = widths.indexOf(currentStrokeWidth);
+                                onUpdateStyle({ strokeWidth: widths[(idx + 1) % widths.length] });
+                            },
+                        }] : []),
+                        ...(onSaveAsComponent ? [{ key: 'save', icon: <FaStar />, label: '保存为组件', onClick: onSaveAsComponent }] : []),
+                        ...(onCopyStyle && onPasteStyle ? [{
+                            key: 'format', icon: <FaPaintBrush />,
+                            label: hasCopiedStyle ? '粘贴样式' : '复制样式',
+                            onClick: hasCopiedStyle ? onPasteStyle : onCopyStyle,
+                        }] : []),
+                    ]} />
+
+                    {/* 域 Popover — 仅在插件启用时显示 */}
+                    {!isHide('domain') && onChangeDomainClass && (
+                        <ToolbarPopover
+                            icon={<div style={{ width: 12, height: 12, borderRadius: 3, background: 'linear-gradient(135deg, #3b82f6, #ef4444)' }} />}
+                            label="业务域"
+                            content={<DomainClassPanel onChangeDomainClass={onChangeDomainClass} />}
+                        />
                     )}
 
-                    {extraToolbarContent}
+                    {/* 图层 dropdown */}
+                    {!isHide('layer') && layers && layers.length > 0 && onMoveToLayer && (
+                        <Dropdown menu={{ items: layerMenuItems }} trigger={['click']}>
+                            <span><ToolbarButton icon={<FaLayerGroup />} label="移动到图层" /></span>
+                        </Dropdown>
+                    )}
 
-                    <Tooltip title="Delete (Del)">
-                        <Button type="text" size="small" danger icon={<FaTrash />} onClick={onDelete} />
-                    </Tooltip>
+                    {/* 插件注入 */}
+                    {extraToolbarContent && (<><ToolbarDivider />{extraToolbarContent}</>)}
                 </>
             )}
-        </div>
+        </ToolbarContainer>
     );
 });

@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState, memo } from 'react';
 import { createPortal } from 'react-dom';
-import { Space, Button, Dropdown, Tooltip, MenuProps } from 'antd';
+import { Space, Button, Dropdown, Tooltip, MenuProps, Grid } from 'antd';
 import { useTranslation } from 'react-i18next';
 import {
     FaFileExport, FaFolderOpen, FaShareAlt, FaCloudUploadAlt, FaSave,
     FaPlay, FaImage, FaFileCode, FaFilePdf, FaFilm, FaProjectDiagram,
     FaCode, FaHistory, FaExchangeAlt, FaBars, FaCog, FaLock, FaUnlock,
-    FaMagic, FaRegComment
+    FaMagic, FaRegComment, FaEllipsisH, FaRobot
 } from 'react-icons/fa';
 import { CollaborationAvatars } from './ui/CollaborationAvatars';
 import { AdvancedExportModal } from './ui/AdvancedExportModal';
@@ -47,6 +47,10 @@ interface TopActionButtonsProps {
     setPluginManagerVisible?: (val: boolean) => void;
     isCommentMode?: boolean; // ⭐ Phase 11
     setIsCommentMode?: (val: boolean) => void;
+    /** 是否禁用 Portal 渲染（避免与 ModernFlowchartToolbar 冲突） */
+    disablePortal?: boolean;
+    onToggleAI?: () => void;
+    aiChatActive?: boolean;
 }
 
 export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
@@ -70,8 +74,14 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     setPluginManagerVisible = () => {},
     isCommentMode = false,
     setIsCommentMode = () => {},
+    disablePortal = false,
+    onToggleAI,
+    aiChatActive = false,
 }) => {
     const { t } = useTranslation();
+    const screens = Grid.useBreakpoint();
+    const isMobile = !screens.lg;
+    const isSmallMobile = !screens.md;
 
     // [Fix] Modals must render regardless of portal vs fallback path.
     // Extract them here so both branches can render the portal content + these modals.
@@ -126,7 +136,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     const [contextPortalTarget, setContextPortalTarget] = useState<HTMLElement | null>(null);
 
     useEffect(() => {
-        const target = document.getElementById('vizly-plugin-center-island-portal');
+        const target = document.getElementById('vizly-plugin-right-island-portal');
         if (target) {
             setPortalTarget(target);
         }
@@ -136,89 +146,118 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         }
     }, []);
 
+    // Generate more menu items dynamically for mobile
+    const mobileMoreItems: MenuProps['items'] = useMemo(() => {
+        if (!isMobile) return [];
+        const items = [];
+        
+        if (onStartPresentation) {
+            items.push({ key: 'presentation', label: t('designer.toolbar.presentationMode'), icon: <FaPlay />, onClick: onStartPresentation });
+        }
+        if (onShowDiff) {
+            items.push({ key: 'diff-view', label: t('designer.toolbar.diffView'), icon: <FaExchangeAlt />, onClick: onShowDiff });
+        }
+        if (onSmartOptimize) {
+            items.push({ key: 'smart-optimize', label: t('designer.toolbar.smartOptimize'), icon: <FaMagic className="text-purple-500" />, onClick: onSmartOptimize });
+        }
+        
+        if (items.length > 0) items.push({ type: 'divider' as const });
+        return items;
+    }, [isMobile, onStartPresentation, onShowDiff, onSmartOptimize, t]);
+
+    const combinedMoreMenu: MenuProps['items'] = useMemo(() => [
+        ...mobileMoreItems,
+        ...moreMenu
+    ], [mobileMoreItems, moreMenu]);
+
+    // 统一按钮样式 (与 ModernFlowchartToolbar 保持一致)
+    const tbtn = "w-8 h-8 p-0 flex items-center justify-center border-none rounded-[6px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors";
+    const tbtnActive = "w-8 h-8 p-0 flex items-center justify-center border-none rounded-[6px] bg-[#e8f0fe] dark:bg-[rgba(138,180,248,0.15)] text-[#1a73e8] dark:text-[#8ab4f8] transition-colors hover:bg-[#d2e3fc] dark:hover:bg-[rgba(138,180,248,0.22)]";
+    const divider = <div className="w-[1px] h-4 bg-slate-200/80 dark:bg-white/10 mx-0.5 flex-shrink-0" />;
+
     const content = (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {onStartPresentation && (
+        <div className="flex items-center gap-0.5">
+            {onStartPresentation && !isMobile && (
                 <Tooltip title={t('designer.toolbar.presentationMode')}>
-                    <Button 
-                        type="text" 
-                        icon={<FaPlay className="text-[12px]" />} 
-                        onClick={onStartPresentation}
-                        style={{ width: 32, height: 32, borderRadius: '6px', border: 'none', background: 'transparent' }}
-                        className="flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-indigo-500 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                    />
+                    <Button type="text" icon={<FaPlay className="text-[13px]" />} onClick={onStartPresentation} className={tbtn} />
                 </Tooltip>
             )}
 
-            {onShowDiff && (
+            {onShowDiff && !isMobile && (
                 <Tooltip title={t('designer.toolbar.diffView')}>
-                    <Button 
-                        type="text" 
-                        icon={<FaExchangeAlt className="text-[12px]" />} 
-                        onClick={onShowDiff}
-                        style={{ width: 32, height: 32, borderRadius: '6px', border: 'none', background: 'transparent' }}
-                        className="flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-indigo-500 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                    />
+                    <Button type="text" icon={<FaExchangeAlt className="text-[13px]" />} onClick={onShowDiff} className={tbtn} />
                 </Tooltip>
             )}
 
             {onShowHistory && (
                 <Tooltip title={t('designer.toolbar.historyPanel')}>
-                    <Button 
-                        type="text" 
-                        icon={<FaHistory className="text-[12px]" />} 
-                        onClick={onShowHistory}
-                        style={{ width: 32, height: 32, borderRadius: '6px', border: 'none', background: 'transparent' }}
-                        className="flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-indigo-500 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                    />
+                    <Button type="text" icon={<FaHistory className="text-[13px]" />} onClick={onShowHistory} className={tbtn} />
                 </Tooltip>
             )}
 
-            {onSmartOptimize && (
+            {divider}
+
+            {onSaveToCloud && (
+                <Tooltip title={t('designer.toolbar.saveToCloud', '保存到云端')}>
+                    <Button type="text" icon={<FaCloudUploadAlt className="text-[13px]" />} onClick={onSaveToCloud} className={tbtn} />
+                </Tooltip>
+            )}
+
+            {onDirectSave && (
+                <Tooltip title={isDirectSaveDisabled ? t('designer.toolbar.saveDisabled') : t('designer.toolbar.directSave', '覆盖保存')}>
+                    <Button type="text" icon={<FaSave className="text-[13px]" />} onClick={onDirectSave} disabled={isDirectSaveDisabled} className={isDirectSaveDisabled ? "w-8 h-8 p-0 flex items-center justify-center border-none rounded-[6px] text-slate-300 dark:text-slate-600 cursor-not-allowed" : tbtn} />
+                </Tooltip>
+            )}
+
+            {onSmartOptimize && !isMobile && (
                 <Tooltip title={t('designer.toolbar.smartOptimize')}>
-                    <Button 
-                        type="text" 
-                        icon={<FaMagic className="text-[12px] text-purple-500" />} 
-                        onClick={onSmartOptimize}
-                        style={{ width: 32, height: 32, borderRadius: '6px', border: 'none', background: 'transparent' }}
-                        className="flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                    />
+                    <Button type="text" icon={<FaMagic className="text-[13px]" />} onClick={onSmartOptimize} className={tbtn} />
                 </Tooltip>
             )}
 
-            <Tooltip title={t('designer.toolbar.pluginManager')}>
-                <Button 
-                    type="text" 
-                    icon={<ApiOutlined style={{ fontSize: 13 }} />} 
-                    onClick={() => setPluginManagerVisible(true)}
-                    style={{ width: 32, height: 32, borderRadius: '6px', border: 'none', background: 'transparent' }}
-                    className="flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-blue-500 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                />
-            </Tooltip>
+            {onOpenSettings && (
+                <Tooltip title={t('designer.toolbar.settings', '设置')}>
+                    <Button type="text" icon={<FaCog className="text-[13px]" />} onClick={onOpenSettings} className={tbtn} />
+                </Tooltip>
+            )}
+
+            {divider}
+
+            {onToggleAI && (
+                <Tooltip title={t('aiChat.title', 'AI 助手')}>
+                    <Button type="text" icon={<FaRobot className="text-[13px]" />} onClick={onToggleAI} className={aiChatActive ? tbtnActive : tbtn} />
+                </Tooltip>
+            )}
+
+            {!isSmallMobile && (
+                <Tooltip title={t('designer.toolbar.pluginManager')}>
+                    <Button type="text" icon={<ApiOutlined style={{ fontSize: 13 }} />} onClick={() => setPluginManagerVisible(true)} className={tbtn} />
+                </Tooltip>
+            )}
 
             {setIsCommentMode && (
                 <Tooltip title={isCommentMode ? t('designer.toolbar.commentModeExit') : t('designer.toolbar.commentMode')}>
-                    <Button 
-                        type="text" 
-                        icon={<FaRegComment className={`text-[12px] ${isCommentMode ? 'text-green-500' : ''}`} />} 
-                        onClick={() => setIsCommentMode(!isCommentMode)}
-                        style={{ width: 32, height: 32, borderRadius: '6px', border: 'none', background: isCommentMode ? 'rgba(16, 185, 129, 0.1)' : 'transparent' }}
-                        className={`flex items-center justify-center transition-colors ${isCommentMode ? 'text-green-600' : 'text-slate-600 dark:text-slate-300 hover:text-green-500 hover:bg-black/5 dark:hover:bg-white/10'}`}
-                    />
+                    <Button type="text" icon={<FaRegComment className="text-[13px]" />} onClick={() => setIsCommentMode(!isCommentMode)} className={isCommentMode ? tbtnActive : tbtn} />
                 </Tooltip>
             )}
 
-            <div style={{ marginLeft: 8, marginRight: 8, height: 20, width: 1, backgroundColor: '#f0f0f0' }} />
-            
+            {isMobile && combinedMoreMenu.length > 0 && (
+                <Dropdown menu={{ items: combinedMoreMenu }} placement="bottomRight" trigger={['click']}>
+                    <Button type="text" icon={<FaEllipsisH className="text-[13px]" />} className={tbtn} />
+                </Dropdown>
+            )}
+
+            {divider}
+
             <CollaborationAvatars />
 
             {onShare && (
-                <Button 
-                    type="primary" 
-                    icon={<FaShareAlt className="text-[12px]" />} 
+                <Button
+                    type="primary"
+                    icon={<FaShareAlt className="text-[11px]" />}
                     onClick={onShare}
-                    style={{ height: 32, borderRadius: 9999, border: 'none', padding: '0 12px', fontSize: 13, background: 'var(--designer-primary, #6366f1)', boxShadow: '0 2px 8px rgba(99, 102, 241, 0.25)' }}
-                    className="flex items-center gap-1.5 transition-transform active:scale-95 ml-1"
+                    className="flex items-center gap-1 transition-transform active:scale-95 ml-0.5"
+                    style={{ height: 28, borderRadius: 9999, border: 'none', padding: isSmallMobile ? '0 8px' : '0 12px', fontSize: 12, background: 'var(--designer-primary, #1a73e8)', boxShadow: '0 1px 4px rgba(26,115,232,0.3)' }}
                 >
                     <span className="hidden xl:inline">{t('designer.toolbar.share')}</span>
                 </Button>
@@ -233,6 +272,15 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             {children}
         </div>
     ) : null;
+
+    if (disablePortal) {
+        return (
+            <div className="flex items-center gap-1">
+                {content}
+                {modals}
+            </div>
+        );
+    }
 
     if (portalTarget) {
         return (
@@ -282,8 +330,14 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                 />
             </Tooltip>
 
-            <Dropdown menu={{ items: exportMenu }} placement="bottomRight">
-                <Button type="text" icon={<FaFileExport />} onClick={() => setExportModalVisible(true)}>导出</Button>
+            <Dropdown 
+                menu={{ items: exportMenu }} 
+                placement="bottomRight"
+                getPopupContainer={(trigger) => trigger.parentElement!}
+            >
+                <Button type="text" icon={<FaFileExport />} onClick={() => setExportModalVisible(true)}>
+                    {t('common.export', '导出')}
+                </Button>
             </Dropdown>
 
             {onDirectSave && (
@@ -335,9 +389,13 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             )}
 
             {moreMenu.length > 0 && (
-                <Dropdown menu={{ items: moreMenu }} placement="bottomRight">
-                    <Button type="text" icon={<FaBars />} />
-                </Dropdown>
+            <Dropdown 
+                menu={{ items: moreMenu }} 
+                placement="bottomRight"
+                getPopupContainer={(trigger) => trigger.parentElement!}
+            >
+                <Button type="text" icon={<FaEllipsisH />} />
+            </Dropdown>
             )}
             
             {isYjsSynced && (

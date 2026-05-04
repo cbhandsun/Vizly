@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaProjectDiagram, FaExchangeAlt } from 'react-icons/fa';
-import { Divider } from 'antd';
+
 import { PresenceHeader } from '../../../../components/diagrams/collaboration/PresenceHeader';
 
 import { TopActionButtons } from '../TopActionButtons';
@@ -100,6 +100,8 @@ export interface DesignerHeaderLayerProps {
         /** 历史面板入口 */
         onShowHistory?: () => void;
         historyCount?: number;
+        onAlign?: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
+        onDistribute?: (type: 'horizontal' | 'vertical') => void;
     };
 }
 
@@ -143,6 +145,9 @@ export const DesignerHeaderLayer = React.memo(
                     setPluginManagerVisible={topActions.setPluginManagerVisible}
                     isCommentMode={topActions.isCommentMode}
                     setIsCommentMode={topActions.setIsCommentMode}
+                    onToggleAI={toolbar.onToggleAI}
+                    aiChatActive={toolbar.aiChatActive}
+                    disablePortal={false}
                     extraMoreItems={[
                         {
                             key: 'toggle-highlight-main',
@@ -232,14 +237,9 @@ export const DesignerHeaderLayer = React.memo(
                     setIsCommentMode={topActions.setIsCommentMode}
                     onShowHistory={topActions.onShowHistory}
                     historyCount={toolbar.historyCount}
-                >
-                    {toolbar.renderThemeSelector && (
-                        <>
-                            <Divider orientation="vertical" style={{ margin: '0 2px', height: '1.2em' }} />
-                            {toolbar.renderThemeSelector}
-                        </>
-                    )}
-                </ModernFlowchartToolbar>
+                    onAlign={toolbar.onAlign}
+                    onDistribute={toolbar.onDistribute}
+                />
             </>
         );
     },

@@ -3,7 +3,6 @@ import { Node, useViewport } from '@xyflow/react';
 import { useDiagramStore } from '../../store/useDiagramStore';
 import { FloatingContextToolbar } from './FloatingContextToolbar';
 import { ContextualEdgeToolbar } from './ContextualEdgeToolbar';
-import { useAlignment } from './hooks/useAlignment';
 import { NodeDataUpdate, EdgeDataUpdate } from '../../types/diagram-updates';
 import { readDomViewport } from '../../utils/domViewport';
 
@@ -61,8 +60,6 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
     // Hide global toolbar if a mindmap node is selected because they have their own integrated tool island
     const isMindMapSelected = selectedNodes.some((n: any) => n.type === 'mindmap');
 
-    const { handleAlign, handleDistribute } = useAlignment({ selectedNodes, onUpdateNodes: onUpdateNodes || (() => {}) });
-
     return (
         <>
             {!contextMenu && !quickAddMenuVisible && !isDragging && !isConnecting && !isContextToolbarHidden && !isMindMapSelected && (
@@ -84,8 +81,7 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
                             domainClass: domainClass === 'none' ? undefined : domainClass
                         });
                     }}
-                    onAlign={handleAlign}
-                    onDistribute={handleDistribute}
+
                     onLock={handleLock}
                     onOpacity={handleOpacity}
                     onBringToFront={() => handleBringToFront(selectedNodes[0]?.id)}

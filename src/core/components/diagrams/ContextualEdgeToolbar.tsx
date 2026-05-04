@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Button, Tooltip, Divider, InputNumber } from 'antd';
 import { Edge } from '@xyflow/react';
 import {
     LineOutlined,
@@ -13,6 +12,11 @@ import {
     CheckOutlined,
     CloseOutlined
 } from '@ant-design/icons';
+import {
+    ToolbarContainer,
+    ToolbarButton,
+    ToolbarDivider,
+} from '../shared/FloatingToolbar';
 
 interface ContextualEdgeToolbarProps {
     edge: Edge;
@@ -134,99 +138,76 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
         setIsEditingLabel(false);
     };
 
-    return (
-        <div 
-            className="contextual-edge-toolbar border-none backdrop-blur-[24px] backdrop-saturate-[180%] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.45)] dark:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.12)] rounded-full"
-            style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '2px', // Reduce gap slightly
-                padding: '4px 12px',
-                pointerEvents: 'all',
-                transition: 'left 0.25s cubic-bezier(0.2, 0.9, 0.3, 1), top 0.25s cubic-bezier(0.2, 0.9, 0.3, 1)',
-                animation: 'toolbarFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-            onPointerDownCapture={(e) => e.stopPropagation()}
-            onPointerMoveCapture={(e) => e.stopPropagation()}
-            onWheelCapture={(e) => e.stopPropagation()}
-        >
-            {/* 路由模式 */}
-            <Tooltip title={isOrthogonal ? "切换至曲线" : "切换至正交"}>
-                <Button 
-                    type="text" 
-                    size="small"
-                    icon={<PartitionOutlined />}
-                    onClick={toggleRouting}
-                    style={{ color: isOrthogonal ? '#3b82f6' : '#64748b' }}
-                />
-            </Tooltip>
+    const DASH_LABELS: Record<string, string> = {
+        'solid': '实线', 'dashed': '虚线', 'dotted': '点线',
+        'long-dash': '长虚线', 'dash-dot': '点划线',
+    };
 
-            <Divider orientation="vertical" style={{ margin: '0 2px' }} />
+    return (
+        <ToolbarContainer>
+            {/* 路由模式 */}
+            <ToolbarButton
+                icon={<PartitionOutlined />}
+                label={isOrthogonal ? "切换至曲线" : "切换至正交"}
+                onClick={toggleRouting}
+                active={isOrthogonal}
+
+            />
+
+            <ToolbarDivider />
 
             {/* 线型循环 */}
-            <Tooltip title={`线型：${{'solid':'实线','dashed':'虚线','dotted':'点线','long-dash':'长虚线','dash-dot':'点划线'}[currentDash] || '实线'}（点击切换）`}>
-                <Button 
-                    type="text" 
-                    size="small"
-                    icon={isDashed ? <DashOutlined /> : <LineOutlined />}
-                    onClick={toggleDashed}
-                    style={{ color: isDashed ? '#6366f1' : '#64748b' }}
-                />
-            </Tooltip>
+            <ToolbarButton
+                icon={isDashed ? <DashOutlined /> : <LineOutlined />}
+                label={`线型：${DASH_LABELS[currentDash] || '实线'}（点击切换）`}
+                onClick={toggleDashed}
+                active={isDashed}
+
+            />
 
             {/* 线宽 */}
-            <Tooltip title={`线宽: ${currentWidth}px`}>
-                <Button
-                    type="text"
-                    size="small"
-                    icon={<ColumnWidthOutlined />}
-                    onClick={cycleWidth}
-                    style={{ color: '#64748b', position: 'relative' }}
-                >
-                    <span style={{
-                        position: 'absolute', bottom: 0, right: 2,
-                        fontSize: 8, lineHeight: 1, fontWeight: 700,
-                        color: '#3b82f6',
-                    }}>{currentWidth}</span>
-                </Button>
-            </Tooltip>
+            <ToolbarButton
+                icon={
+                    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <ColumnWidthOutlined />
+                        <span style={{
+                            position: 'absolute', bottom: -4, right: -4,
+                            fontSize: 8, lineHeight: 1, fontWeight: 700,
+                            color: '#3b82f6',
+                        }}>{currentWidth}</span>
+                    </span>
+                }
+                label={`线宽: ${currentWidth}px`}
+                onClick={cycleWidth}
+            />
 
             {/* 流动动画 */}
-            <Tooltip title={isAnimated ? "停止流动" : "开启流动动画"}>
-                <Button 
-                    type="text" 
-                    size="small"
-                    icon={<PlayCircleOutlined />}
-                    onClick={toggleAnimation}
-                    style={{ color: isAnimated ? '#10b981' : '#64748b' }}
-                />
-            </Tooltip>
+            <ToolbarButton
+                icon={<PlayCircleOutlined />}
+                label={isAnimated ? "停止流动" : "开启流动动画"}
+                onClick={toggleAnimation}
+                active={isAnimated}
 
-            <Divider orientation="vertical" style={{ margin: '0 2px' }} />
+            />
+
+            <ToolbarDivider />
 
             {/* 箭头样式 */}
-            <Tooltip title="切换箭头样式">
-                <Button
-                    type="text"
-                    size="small"
-                    icon={<SwapOutlined />}
-                    onClick={cycleArrow}
-                    style={{ color: '#64748b' }}
-                />
-            </Tooltip>
+            <ToolbarButton
+                icon={<SwapOutlined />}
+                label="切换箭头样式"
+                onClick={cycleArrow}
+            />
 
             {/* 颜色 */}
-            <Tooltip title="切换颜色">
-                <Button 
-                    type="text" 
-                    size="small"
-                    icon={<FormatPainterOutlined />}
-                    onClick={toggleColor}
-                    style={{ color: edge.style?.stroke as string || '#64748b' }}
-                />
-            </Tooltip>
+            <ToolbarButton
+                icon={<FormatPainterOutlined />}
+                label="切换颜色"
+                onClick={toggleColor}
 
-            <Divider orientation="vertical" style={{ margin: '0 2px' }} />
+            />
+
+            <ToolbarDivider />
 
             {/* 标签编辑 */}
             {isEditingLabel ? (
@@ -241,31 +222,28 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
                         }}
                         placeholder="标签文本..."
                         style={{
-                            border: '1px solid #d1d5db',
+                            border: '1px solid var(--ftb-divider-color, rgba(0,0,0,0.09))',
                             borderRadius: 4,
                             padding: '2px 6px',
                             fontSize: 12,
                             width: 100,
                             outline: 'none',
                             background: 'transparent',
+                            color: 'inherit',
                         }}
                     />
-                    <Button type="text" size="small" icon={<CheckOutlined />}
-                        onClick={confirmLabel} style={{ color: '#10b981' }} />
-                    <Button type="text" size="small" icon={<CloseOutlined />}
-                        onClick={cancelLabel} style={{ color: '#ef4444' }} />
+                    <ToolbarButton icon={<CheckOutlined />} label="确认" onClick={confirmLabel} />
+                    <ToolbarButton icon={<CloseOutlined />} label="取消" onClick={cancelLabel} danger />
                 </div>
             ) : (
-                <Tooltip title={edge.label ? `标签: ${edge.label}` : '添加标签'}>
-                    <Button 
-                        type="text" 
-                        size="small"
-                        icon={<EditOutlined />}
-                        onClick={() => setIsEditingLabel(true)}
-                        style={{ color: edge.label ? '#3b82f6' : '#64748b' }}
-                    />
-                </Tooltip>
+                <ToolbarButton
+                    icon={<EditOutlined />}
+                    label={edge.label ? `标签: ${edge.label}` : '添加标签'}
+                    onClick={() => setIsEditingLabel(true)}
+                    active={!!edge.label}
+
+                />
             )}
-        </div>
+        </ToolbarContainer>
     );
 };

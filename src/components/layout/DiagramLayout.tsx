@@ -152,10 +152,21 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
   useEffect(() => {
     if (isPresentationMode || !showMenu || !menuProps) {
       document.documentElement.style.setProperty('--left-sidebar-offset', '0px');
+      document.documentElement.style.setProperty('--max-sidebar-offset', '0px');
       return;
     }
-    const width = menuProps.isCollapsed ? 64 : menuWidth;
-    document.documentElement.style.setProperty('--left-sidebar-offset', `${width}px`);
+    
+    const isCollapsed = menuProps.isCollapsed;
+    const leftOffset = isCollapsed ? 64 + 16 : menuWidth + 16;
+    
+    const rightSidebarVisible = localStorage.getItem('designer.rightSidebar.visible') !== 'false';
+    const rightSidebarWidth = parseInt(localStorage.getItem('designer.rightSidebar.width') || '360', 10);
+    const rightOffset = rightSidebarVisible ? rightSidebarWidth + 16 : 0;
+    
+    const maxOffset = Math.max(leftOffset, rightOffset);
+    
+    document.documentElement.style.setProperty('--left-sidebar-offset', `${leftOffset}px`);
+    document.documentElement.style.setProperty('--max-sidebar-offset', `${maxOffset}px`);
   }, [menuProps?.isCollapsed, menuWidth, showMenu, isPresentationMode]);
 
   return (

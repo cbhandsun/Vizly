@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useReactFlow, Node, Edge, useStore } from '@xyflow/react';
-import { Popover, Divider, Tooltip } from 'antd';
+import { Popover } from 'antd';
 import { 
   SisternodeOutlined, 
   SubnodeOutlined, 
@@ -14,65 +14,11 @@ import {
 } from '@ant-design/icons';
 import { MindMapBeautifyPanel } from './MindMapBeautifyPanel';
 import { exportMindMapToMarkdown } from '../hooks/useMindMapOrchestrator';
-
-interface ActionBtnProps {
-  icon: React.ReactNode;
-  label: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  danger?: boolean;
-}
-
-const ActionBtn: React.FC<ActionBtnProps> = ({ icon, label, onClick, disabled, danger }) => {
-  return (
-    <Tooltip title={label} placement="top" mouseEnterDelay={0.3}>
-      <div 
-        onPointerDown={(e) => {
-          e.stopPropagation();
-          if (disabled) return;
-          onClick?.();
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-        }}
-        style={{
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          width: 32,
-          height: 32,
-          margin: '0 1px',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          opacity: disabled ? 0.35 : 1,
-          color: disabled ? '#aaa' : (danger ? '#ef4444' : '#475569'), 
-          borderRadius: 8,
-          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-          flexShrink: 0,
-        }}
-        onMouseEnter={(e) => { 
-          if (!disabled) { 
-            e.currentTarget.style.backgroundColor = danger
-              ? 'rgba(239, 68, 68, 0.08)'
-              : 'rgba(99, 102, 241, 0.08)';
-            e.currentTarget.style.color = danger ? '#dc2626' : '#6366f1'; 
-            e.currentTarget.style.transform = 'translateY(-1px) scale(1.08)';
-          } 
-        }}
-        onMouseLeave={(e) => { 
-          if (!disabled) { 
-            e.currentTarget.style.backgroundColor = 'transparent'; 
-            e.currentTarget.style.color = disabled ? '#aaa' : (danger ? '#ef4444' : '#475569');
-            e.currentTarget.style.transform = 'translateY(0) scale(1)';
-          } 
-        }}
-      >
-        <div style={{ fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {icon}
-        </div>
-      </div>
-    </Tooltip>
-  );
-};
+import {
+  ToolbarContainer,
+  ToolbarButton,
+  ToolbarDivider,
+} from '../../shared/FloatingToolbar';
 
 export const MindMapActionBar: React.FC = () => {
   const { t } = useTranslation();
@@ -218,81 +164,69 @@ export const MindMapActionBar: React.FC = () => {
   const nodeDepth = selectedNode?.data?.depth as number | undefined;
   const isRoot = nodeDepth === 0 || (nodeDepth === undefined && selectedNode?.data?.direction !== undefined);
 
+  const BoundaryIcon = () => (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+      <rect x="1" y="1" width="12" height="12" rx="2" strokeDasharray="3 2" />
+    </svg>
+  );
+
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      padding: '3px 8px',
-      background: 'rgba(255, 255, 255, 0.85)',
-      backdropFilter: 'blur(28px) saturate(200%)',
-      WebkitBackdropFilter: 'blur(28px) saturate(200%)',
-      borderRadius: 28,
-      boxShadow:
-        '0 8px 32px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.06), inset 0 0 0 1px rgba(255, 255, 255, 0.6), inset 0 -1px 0 rgba(0,0,0,0.04)',
-      pointerEvents: 'all',
-      border: 'none',
-      animation: 'toolbarFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-      gap: 2,
-    }}>
+    <ToolbarContainer>
       {/* 结构操作区 */}
-      <ActionBtn
+      <ToolbarButton
         icon={<SisternodeOutlined />}
         label={t('plugins.mindmap.actionBar.addSibling')}
         disabled={!selectedNode}
         onClick={handleAddSibling}
       />
-      <ActionBtn
+      <ToolbarButton
         icon={<SubnodeOutlined />}
         label={t('plugins.mindmap.actionBar.addChild')}
         disabled={!selectedNode}
         onClick={handleAddChild}
       />
 
-      <div style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.08)', margin: '0 4px', borderRadius: 1, flexShrink: 0 }} />
+      <ToolbarDivider />
 
-      <ActionBtn
+      <ToolbarButton
         icon={<LinkOutlined />}
         label={t('plugins.mindmap.actionBar.addRelationship')}
         onClick={handleAddRelationship}
       />
-      <ActionBtn
+      <ToolbarButton
         icon={<BlockOutlined />}
         label={t('plugins.mindmap.actionBar.addSummary')}
         disabled={selectedNodes.length === 0}
         onClick={handleAddSummary}
       />
-      <ActionBtn 
-        icon={
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-            <rect x="1" y="1" width="12" height="12" rx="2" strokeDasharray="3 2" />
-          </svg>
-        } 
-        label={t('plugins.mindmap.actionBar.addBoundary')} 
-        disabled={!selectedNode} 
+      <ToolbarButton
+        icon={<BoundaryIcon />}
+        label={t('plugins.mindmap.actionBar.addBoundary')}
+        disabled={!selectedNode}
         onClick={() => {
           const event = new CustomEvent('editor:add-boundary-node', {
             detail: { nodeId: selectedNode?.id }
           });
           window.dispatchEvent(event);
-        }} 
+        }}
       />
 
-      <div style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.08)', margin: '0 4px', borderRadius: 1, flexShrink: 0 }} />
+      <ToolbarDivider />
 
       {/* 编辑操作区 */}
-      <ActionBtn
+      <ToolbarButton
         icon={<CopyOutlined />}
         label={t('plugins.mindmap.actionBar.copyBranch')}
         disabled={!selectedNode}
         onClick={handleCopyBranch}
       />
-      <ActionBtn
+      <ToolbarButton
         icon={<FileMarkdownOutlined />}
         label={t('plugins.mindmap.actionBar.exportMd')}
         onClick={handleExportMd}
       />
 
-      <div style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.08)', margin: '0 4px', borderRadius: 1, flexShrink: 0 }} />
+      <ToolbarDivider />
 
       {/* 美化 */}
       <Popover 
@@ -301,24 +235,23 @@ export const MindMapActionBar: React.FC = () => {
           placement="bottom"
           styles={{ root: {}, container: { padding: 0 } }}
       >
-          <div>
-            <ActionBtn icon={<FormatPainterOutlined />} label={t('plugins.mindmap.actionBar.beautify')} />
-          </div>
+          <span>
+            <ToolbarButton icon={<FormatPainterOutlined />} label={t('plugins.mindmap.actionBar.beautify')} />
+          </span>
       </Popover>
 
       {/* 危险操作区 — 删除（根节点不可删）*/}
       {!isRoot && (
         <>
-          <div style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.08)', margin: '0 4px', borderRadius: 1, flexShrink: 0 }} />
-          <ActionBtn
+          <ToolbarDivider />
+          <ToolbarButton
             icon={<DeleteOutlined />}
             label={t('plugins.mindmap.actions.deleteNode')}
-            disabled={false}
             danger
             onClick={handleDeleteNode}
           />
         </>
       )}
-    </div>
+    </ToolbarContainer>
   );
 };

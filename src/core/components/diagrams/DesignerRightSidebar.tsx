@@ -79,10 +79,19 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     useEffect(() => {
         if (isMobile || !visible) {
             document.documentElement.style.setProperty('--right-sidebar-offset', '0px');
+            // Re-sync max offset when closed
+            const leftOffset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left-sidebar-offset')) || 0;
+            document.documentElement.style.setProperty('--max-sidebar-offset', `${leftOffset}px`);
             return;
         }
         const effectiveWidth = (isCollapsed ? RAIL_WIDTH : panelWidth) + 16;
         document.documentElement.style.setProperty('--right-sidebar-offset', `${effectiveWidth}px`);
+        
+        // Sync Max Offset
+        const leftOffset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left-sidebar-offset')) || 0;
+        const maxOffset = Math.max(leftOffset, effectiveWidth);
+        document.documentElement.style.setProperty('--max-sidebar-offset', `${maxOffset}px`);
+
         return () => {
             document.documentElement.style.setProperty('--right-sidebar-offset', '0px');
         };

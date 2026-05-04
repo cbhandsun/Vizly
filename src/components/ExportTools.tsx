@@ -7,7 +7,7 @@ import { useDiagramControls } from '@/core';
 import { useTranslation } from 'react-i18next';
 import { unifiedStorage } from '../services/UnifiedStorageService';
 import { dataRegistry } from '../data/DataRegistry';
-import { App, Button, Dropdown, Tooltip, Space, theme, Progress } from 'antd';
+import { App, Button, Dropdown, Tooltip, theme, Progress } from 'antd';
 import type { MenuProps } from 'antd';
 import { useAuth } from '@/context/AuthContext';
 import { useSubscription } from '@/context/SubscriptionContext';
@@ -26,7 +26,7 @@ interface ExportToolsProps {
   onToggleFullscreen?: () => void;
   isFullscreen?: boolean;
   showControls?: boolean;
-  variant?: 'overlay' | 'inline';
+  variant?: 'overlay' | 'inline' | 'compact';
   enableMainFlowAnimation?: boolean; // 主流程动线控制参数
   /** 如果提供，云端图表将在设计器中打开 */
   onOpenInDesigner?: (data: any) => void;
@@ -419,24 +419,25 @@ ${mermaid}
         (document.fullscreenElement as HTMLElement | null) || document.body
       )}
 
-      <Space size={4}>
+      <div className="flex items-center gap-0.5">
         {showControls && (
           <>
             <Tooltip title={t('export.backToTop')} getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}>
-              <Button type="text" icon={<FaHome />} onClick={handleBackToTop} disabled={isExporting} />
+              <Button type="text" icon={<FaHome className="text-[13px]" />} onClick={handleBackToTop} disabled={isExporting} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
             </Tooltip>
             <Tooltip title={t('export.fitScreen')} getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}>
-              <Button type="text" icon={<FaRuler />} onClick={handleFitDiagram} disabled={isExporting} />
+              <Button type="text" icon={<FaRuler className="text-[13px]" />} onClick={handleFitDiagram} disabled={isExporting} className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
             </Tooltip>
             <Tooltip title={isFullscreen ? t('export.exitFullScreen') : t('export.fullScreen')} getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}>
               <Button
                 type="text"
-                icon={isFullscreen ? <FaCompress /> : <FaExpand />}
+                icon={isFullscreen ? <FaCompress className="text-[13px]" /> : <FaExpand className="text-[13px]" />}
                 onClick={() => { onToggleFullscreen?.(); handleFs(); }}
                 disabled={isExporting}
+                className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors"
               />
             </Tooltip>
-            <div style={{ width: 1, height: 16, background: token.colorBorderSecondary, margin: '0 4px' }} />
+            <div className="w-[1px] h-4 bg-slate-200/80 dark:bg-white/10 mx-0.5 flex-shrink-0" />
           </>
         )}
 
@@ -446,26 +447,35 @@ ${mermaid}
           placement="bottomRight"
           getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}
         >
-          <Button
-            icon={<FaDownload size={14} />}
-            style={variant === 'inline' ? {
-              height: 32,
-              display: 'flex',
-              alignItems: 'center',
-              background: token.colorBgContainer,
-              border: `1px solid ${token.colorBorder}`,
-              borderRadius: 6,
-              padding: '0 12px',
-              fontSize: 13,
-              cursor: 'pointer',
-              color: token.colorText,
-              boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-            } : undefined}
-          >
-            {t('export.export')}
-          </Button>
+          {variant === 'compact' ? (
+            <Button
+              type="text"
+              icon={<FaDownload className="text-[13px]" />}
+              className="w-8 h-8 p-0 border-none flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors"
+              disabled={isExporting}
+            />
+          ) : (
+            <Button
+              icon={<FaDownload size={14} />}
+              style={variant === 'inline' ? {
+                height: 32,
+                display: 'flex',
+                alignItems: 'center',
+                background: token.colorBgContainer,
+                border: `1px solid ${token.colorBorder}`,
+                borderRadius: 6,
+                padding: '0 12px',
+                fontSize: 13,
+                cursor: 'pointer',
+                color: token.colorText,
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+              } : undefined}
+            >
+              {t('export.export')}
+            </Button>
+          )}
         </Dropdown>
-      </Space>
+      </div>
 
       <React.Suspense fallback={null}>
         <ShareDialog

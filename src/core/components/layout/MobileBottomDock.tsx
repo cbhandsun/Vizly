@@ -74,13 +74,22 @@ export const MobileBottomDock: React.FC<MobileBottomDockProps> = ({
 
                     {/* History / More */}
                     <div className="mobile-dock-group">
-                        <button 
-                            className="mobile-dock-btn mini" 
-                            disabled={!canUndo} 
-                            onClick={onUndo}
-                        >
-                            <FaUndo />
-                        </button>
+                        <div className="flex flex-col gap-1 items-center">
+                            <button 
+                                className="mobile-dock-btn mini" 
+                                disabled={!canUndo} 
+                                onClick={onUndo}
+                            >
+                                <FaUndo />
+                            </button>
+                            <button 
+                                className="mobile-dock-btn mini" 
+                                disabled={!canRedo} 
+                                onClick={onRedo}
+                            >
+                                <FaRedo />
+                            </button>
+                        </div>
                         <button className="mobile-dock-btn" onClick={onSettingsClick}>
                             <FaCogs />
                         </button>

@@ -1,15 +1,22 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
+import { createPortal } from 'react-dom';
 import {
     FaUndo, FaRedo, FaSearchPlus, FaSearchMinus, FaCompressArrowsAlt, FaArrowsAltH,
     FaMagic, FaTh, FaKeyboard, FaBorderAll, FaBorderNone,
-    FaSitemap, FaObjectGroup, FaRegObjectGroup, FaRuler, FaGripVertical,
+    FaSitemap, FaObjectGroup, FaRegObjectGroup, FaRuler,
     FaEllipsisH, FaTrashAlt, FaProjectDiagram,
     FaMagnet, FaPen, FaStickyNote, FaMousePointer,
-    FaFolderOpen, FaFileExport, FaMap, FaRegComment
+    FaFolderOpen, FaFileExport, FaMap, FaRegComment,
+    FaArrowsAlt
 } from 'react-icons/fa';
+import { 
+    MdAlignHorizontalLeft, MdAlignHorizontalCenter, MdAlignHorizontalRight,
+    MdAlignVerticalTop, MdAlignVerticalCenter, MdAlignVerticalBottom,
+    MdHorizontalDistribute, MdVerticalDistribute
+} from 'react-icons/md';
 import { BackgroundVariant } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
-import { Tooltip, Button, Dropdown, MenuProps, Popover } from 'antd';
+import { Tooltip, Button, Dropdown, MenuProps, Popover, Grid } from 'antd';
 import { RobotOutlined } from '@ant-design/icons';
 import { appModal } from '../../utils/antdStaticBridge';
 
@@ -81,6 +88,10 @@ interface FlowchartToolbarProps {
     // --- Phase 1.4: History Panel ---
     onShowHistory?: () => void;
     historyCount?: number;
+
+    // --- Alignment & Distribution ---
+    onAlign?: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
+    onDistribute?: (type: 'horizontal' | 'vertical') => void;
 }
 
 export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
@@ -129,67 +140,26 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     setIsCommentMode,
     onShowHistory,
     historyCount,
+    onAlign,
+    onDistribute,
 }) => {
     const { t } = useTranslation();
+    const screens = Grid.useBreakpoint();
+    const isMobile = !screens.md;
     const onLabel = t('common.on');
     const offLabel = t('common.off');
 
-    // 拖动功能状态
-    const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
-    const [isDragging, setIsDragging] = useState(false);
-    const dragStartRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
-    const toolbarRef = useRef<HTMLDivElement>(null);
-
-    const handleMouseDown = useCallback((e: React.MouseEvent) => {
-        e.preventDefault();
-        const toolbar = toolbarRef.current;
-        if (!toolbar) return;
-
-        const rect = toolbar.getBoundingClientRect();
-        const currentX = position?.x ?? rect.left;
-        const currentY = position?.y ?? rect.top;
-
-        dragStartRef.current = {
-            x: currentX,
-            y: currentY,
-            startX: e.clientX,
-            startY: e.clientY
-        };
-        setIsDragging(true);
-    }, [position]);
+    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+    const [contextPortalTarget, setContextPortalTarget] = useState<HTMLElement | null>(null);
+    const [bottomPortalTarget, setBottomPortalTarget] = useState<HTMLElement | null>(null);
 
     useEffect(() => {
-        if (!isDragging) return;
-
-        const handleMouseMove = (e: MouseEvent) => {
-            if (!dragStartRef.current) return;
-
-            const deltaX = e.clientX - dragStartRef.current.startX;
-            const deltaY = e.clientY - dragStartRef.current.startY;
-
-            setPosition({
-                x: dragStartRef.current.x + deltaX,
-                y: dragStartRef.current.y + deltaY
-            });
-        };
-
-        const handleMouseUp = () => {
-            setIsDragging(false);
-            dragStartRef.current = null;
-        };
-
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-
-        return () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [isDragging]);
-
-    // 重置位置（双击拖动手柄）
-    const handleDoubleClick = useCallback(() => {
-        setPosition(null);
+        const target = document.getElementById('vizly-plugin-center-island-portal');
+        if (target) setPortalTarget(target);
+        const contextTarget = document.getElementById('vizly-plugin-context-toolbar-portal');
+        if (contextTarget) setContextPortalTarget(contextTarget);
+        const bottomTarget = document.getElementById('vizly-plugin-bottom-island-portal');
+        if (bottomTarget) setBottomPortalTarget(bottomTarget);
     }, []);
 
     const activeLayoutKey = useMemo(() => {
@@ -402,281 +372,264 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
         },
     ], [t, gridInfo, showRuler, toggleRuler, toggleMinimap, showMinimap, onShowShortcuts, onImportClick, onExport]);
 
-    // 计算工具栏样式
-    const toolbarStyle: React.CSSProperties = position
-        ? {
-            position: 'absolute',
-            left: position.x,
-            top: position.y,
-            transform: 'none',
-            zIndex: 1010,
-            transition: isDragging ? 'none' : 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-            cursor: isDragging ? 'grabbing' : 'default',
-        }
-        : {
-            position: 'absolute',
-            bottom: 32,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 1010,
-            transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-            animation: 'toolbarEnter 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-        };
-
-    return (
-        <div ref={toolbarRef} style={toolbarStyle} className="modern-toolbar flex items-center justify-center gap-4 pointer-events-none" role="toolbar" aria-label={t('designer.toolbar.toolbarAriaLabel')}>
-            
-                <div className={`flex items-center gap-1 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[16px] px-3 py-1.5 ${isDragging ? 'shadow-[0_20px_60px_rgba(0,0,0,0.25)]' : 'shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]'} pointer-events-auto`} style={{ pointerEvents: 'auto' }}>
-                {/* 拖动手柄 */}
-                <div
-                    onMouseDown={handleMouseDown}
-                    onDoubleClick={handleDoubleClick}
-                    title={t('designer.toolbar.dragToMove')}
-                    role="separator"
-                    aria-roledescription={t('designer.toolbar.dragHandle')}
-                    className="toolbar-drag-handle"
-                    style={{
-                        cursor: isDragging ? 'grabbing' : 'grab',
-                        padding: '4px 8px',
-                        marginRight: 6,
-                        display: 'flex',
-                        alignItems: 'center',
-                        color: 'rgba(0, 0, 0, 0.25)',
-                        transition: 'all 0.3s ease',
-                    }}
+    const CanvasSettingsContent = (
+        <div className="p-1 min-w-[180px]">
+            <div className="px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                {t('toolbar.canvasSettings', 'Canvas Settings')}
+            </div>
+            <div className="flex flex-col gap-0.5">
+                <Button 
+                    type="text" 
+                    block 
+                    className="flex items-center justify-between h-9 px-2 hover:bg-slate-100 dark:hover:bg-white/5"
+                    onClick={toggleMinimap}
                 >
-                    <FaGripVertical size={16} />
-                </div>
-                
-                {/* ── 创作工具栏 (Creation Tools) ── */}
-                    {onActivatePointer && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2,   /* borderRight: removed */ }}>
-                            <Tooltip title={t('designer.toolbar.pointer')}>
-                                <Button 
-                                    type={!isDrawingMode && !isMarqueeActive ? 'primary' : 'text'} 
-                                    icon={<FaMousePointer />} 
-                                    onClick={onActivatePointer}
-                                />
-                            </Tooltip>
-                            
-                            {toggleSelectionMode && (
-                            <Tooltip title={isMarqueeActive ? t('designer.toolbar.marqueeExit') : t('designer.toolbar.marqueeEnter')}>
-                                <Button 
-                                    type={isMarqueeActive ? 'primary' : 'text'} 
-                                    icon={<FaRegObjectGroup />} 
-                                    onClick={toggleSelectionMode}
-                                />
-                            </Tooltip>
-                            )}
+                    <span className="flex items-center gap-2 text-[13px] text-slate-600 dark:text-slate-300">
+                        <FaMap className="text-[14px]" /> {t('toolbar.minimap', 'Minimap')}
+                    </span>
+                    <div className={`w-2 h-2 rounded-full ${showMinimap ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300 dark:bg-slate-700'}`} />
+                </Button>
+                <Button 
+                    type="text" 
+                    block 
+                    className="flex items-center justify-between h-9 px-2 hover:bg-slate-100 dark:hover:bg-white/5"
+                    onClick={toggleRuler}
+                >
+                    <span className="flex items-center gap-2 text-[13px] text-slate-600 dark:text-slate-300">
+                        <FaRuler className="text-[14px]" /> {t('toolbar.ruler', 'Ruler')}
+                    </span>
+                    <div className={`w-2 h-2 rounded-full ${showRuler ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300 dark:bg-slate-700'}`} />
+                </Button>
+                <Button 
+                    type="text" 
+                    block 
+                    className="flex items-center justify-between h-9 px-2 hover:bg-slate-100 dark:hover:bg-white/5"
+                    onClick={toggleGrid}
+                >
+                    <span className="flex items-center gap-2 text-[13px] text-slate-600 dark:text-slate-300">
+                        <FaTh className="text-[14px]" /> {t('toolbar.grid', 'Grid')}
+                    </span>
+                    <div className={`w-2 h-2 rounded-full ${showGrid ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300 dark:bg-slate-700'}`} />
+                </Button>
+                <div className="h-[1px] bg-slate-100 dark:bg-white/5 my-1" />
+                <Button 
+                    type="text" 
+                    block 
+                    className="flex items-center gap-2 h-9 px-2 text-[13px] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                    onClick={onShowShortcuts}
+                >
+                    <FaKeyboard className="text-[14px]" /> {t('toolbar.shortcuts', 'Shortcuts')}
+                </Button>
+            </div>
+        </div>
+    );
 
-                            {onToggleDrawingMode && (
-                                <Tooltip title={t('designer.toolbar.drawingMode')}>
-                                    <Button 
-                                        type={isDrawingMode ? 'primary' : 'text'} 
-                                        icon={<FaPen />} 
-                                        onClick={onToggleDrawingMode}
-                                    />
-                                </Tooltip>
-                            )}
+    const CreationTools = (
+        <div className="flex items-center gap-1.5 p-1">
+            <div className="flex items-center gap-1">
+                <Tooltip title={t('toolbar.pointer', '普通选择器 (V)')}>
+                    <Button 
+                        type="text" 
+                        onClick={onActivatePointer} 
+                        icon={<FaMousePointer className={`text-[12px] ${(!isDrawingMode && !isMarqueeActive) ? 'text-indigo-500' : 'text-slate-500'}`} />} 
+                        className={`w-9 h-9 p-0 border-none transition-all ${(!isDrawingMode && !isMarqueeActive) ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-500' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`} 
+                    />
+                </Tooltip>
+                <Tooltip title={isMarqueeActive ? t('toolbar.marqueeExit', '退出框选 (Esc)') : t('toolbar.marqueeEnter', '框选模式 (M)')}>
+                    <Button 
+                        type="text" 
+                        onClick={toggleSelectionMode} 
+                        icon={<FaObjectGroup className={`text-[14px] ${isMarqueeActive ? 'text-indigo-500' : 'text-slate-500'}`} />} 
+                        className={`w-9 h-9 p-0 border-none transition-all ${isMarqueeActive ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-500' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`} 
+                    />
+                </Tooltip>
+                <Tooltip title={t('toolbar.drawingMode', '自由画笔 (P)')}>
+                    <Button 
+                        type="text" 
+                        onClick={onToggleDrawingMode} 
+                        icon={<FaPen className={`text-[13px] ${isDrawingMode ? 'text-indigo-500' : 'text-slate-500'}`} />} 
+                        className={`w-9 h-9 p-0 border-none transition-all ${isDrawingMode ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-500' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`} 
+                    />
+                </Tooltip>
+            </div>
+            
+            <div className="w-[1px] h-4 bg-slate-200 dark:bg-white/10 mx-1" />
+            
+            <div className="flex items-center gap-1">
+                <Tooltip title={t('toolbar.stickyNote', '便签 (S)')}>
+                    <Button type="text" onClick={onAddStickyNote} icon={<FaStickyNote className="text-[14px] text-amber-500" />} className="w-9 h-9 p-0 border-none hover:bg-slate-200 dark:hover:bg-white/5" />
+                </Tooltip>
+                <Tooltip title={t('toolbar.mindMap', '思维导图 (M)')}>
+                    <Button type="text" onClick={onAddMindMap} icon={<FaSitemap className="text-[14px] text-sky-500" />} className="w-9 h-9 p-0 border-none hover:bg-slate-200 dark:hover:bg-white/5" />
+                </Tooltip>
+            </div>
+        </div>
+    );
 
-                            {onAddStickyNote && (
-                                <Tooltip title={t('designer.toolbar.stickyNote')}>
-                                    <Button 
-                                        type="text" 
-                                        icon={<FaStickyNote />} 
-                                        onClick={onAddStickyNote}
-                                        style={{ color: '#F59E0B' }}
-                                    />
-                                </Tooltip>
-                            )}
+    // 统一按钮样式
+    const tbtn = "w-8 h-8 p-0 border-none text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors";
+    const tbtnActive = "w-8 h-8 p-0 border-none bg-[#e8f0fe] dark:bg-[rgba(138,180,248,0.15)] text-[#1a73e8] dark:text-[#8ab4f8] rounded-[6px] transition-colors hover:bg-[#d2e3fc] dark:hover:bg-[rgba(138,180,248,0.22)]";
+    const tbtnDisabled = "w-8 h-8 p-0 border-none text-slate-300 dark:text-slate-600 rounded-[6px] cursor-not-allowed";
+    const dividerCls = "w-[1px] h-4 bg-slate-200/80 dark:bg-white/10 mx-0.5 flex-shrink-0";
 
-                            {onAddMindMap && (
-                                <Tooltip title={t('designer.toolbar.mindMap')}>
-                                    <Button 
-                                        type="text" 
-                                        icon={<FaProjectDiagram />} 
-                                        onClick={onAddMindMap}
-                                        style={{ color: '#8B5CF6' }}
-                                    />
-                                </Tooltip>
-                            )}
-
-                            {setIsCommentMode && (
-                                <Tooltip title={isCommentMode ? t('designer.toolbar.commentModeExit') : t('designer.toolbar.commentMode')}>
-                                    <Button 
-                                        type={isCommentMode ? 'primary' : 'text'} 
-                                        icon={<FaRegComment />} 
-                                        onClick={() => setIsCommentMode(!isCommentMode)}
-                                        style={{ color: isCommentMode ? undefined : '#10B981' }}
-                                    />
-                                </Tooltip>
-                            )}
-                        </div>
-                    )}
-
-                    </div>
-
-                {/* ── Pill 2: 历史与视图 (History & Viewport) ── */}
-                <div className={`flex items-center gap-1 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[16px] px-3 py-1.5 ${isDragging ? 'shadow-[0_20px_60px_rgba(0,0,0,0.25)]' : 'shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]'} pointer-events-auto`} style={{ pointerEvents: 'auto' }}>
-                    {/* 历史 */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-                        <Tooltip title={t('designer.toolbar.undo')}>
-                            <Button type="text" icon={<FaUndo />} onClick={onUndo} disabled={!canUndo} aria-label={t('designer.toolbar.undo')} style={{ borderRadius: '6px 0 0 6px' }} />
-                        </Tooltip>
-                        {onShowHistory && (
-                            <Tooltip title={historyCount ? t('designer.toolbar.historyWithCount', { count: historyCount }) : t('designer.toolbar.historyPanel')}>
-                                <Button
-                                    type="text"
-                                    size="small"
-                                    onClick={onShowHistory}
-                                    aria-label={t('designer.toolbar.historyPanel')}
-                                    style={{
-                                        width: 14, height: 32, padding: 0, borderRadius: '0 6px 6px 0', fontSize: 8,
-                                        color: historyCount ? '#6366f1' : 'rgba(0,0,0,0.3)',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        borderLeft: '1px solid rgba(0,0,0,0.08)', marginLeft: 0,
-                                    }}
-                                >
-                                    ▾
-                                </Button>
-                            </Tooltip>
-                        )}
-                    </div>
-                    <Tooltip title={t('designer.toolbar.redo')}>
-                        <Button type="text" icon={<FaRedo />} onClick={onRedo} disabled={!canRedo} aria-label={t('designer.toolbar.redo')} />
+    const MainWorkflowTools = (
+        <div className="flex items-center gap-0.5">
+            {/* ── Undo / Redo ── */}
+            {!isMobile && (
+                <>
+                    <Tooltip title={t('designer.toolbar.undo')}>
+                        <Button type="text" icon={<FaUndo size={13} />} onClick={onUndo} disabled={!canUndo} className={canUndo ? tbtn : tbtnDisabled} />
                     </Tooltip>
-
-                    {/* 视图控制 & 缩放比例 */}
-                    {!hideZoomControls && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Tooltip title={t('designer.toolbar.zoomIn')}>
-                                <Button type="text" icon={<FaSearchPlus />} onClick={onZoomIn} aria-label={t('designer.toolbar.zoomIn')} />
-                            </Tooltip>
-                            <Tooltip title={t('designer.toolbar.zoomOut')}>
-                                <Button type="text" icon={<FaSearchMinus />} onClick={onZoomOut} aria-label={t('designer.toolbar.zoomOut')} />
-                            </Tooltip>
-                            <Tooltip title={t('designer.toolbar.fitView')}>
-                                <Button type="text" icon={<FaCompressArrowsAlt />} onClick={onFitView} aria-label={t('designer.toolbar.fitView')} />
-                            </Tooltip>
-                            {onFitWidth && (
-                                <Tooltip title={t('designer.toolbar.fitWidth', '适应宽度')}>
-                                    <Button type="text" icon={<FaArrowsAltH />} onClick={onFitWidth} aria-label={t('designer.toolbar.fitWidth', '适应宽度')} />
-                                </Tooltip>
-                            )}
-                            {zoomPercent !== undefined && (
-                                <span style={{ fontFamily: 'monospace', minWidth: 36, textAlign: 'right', fontSize: 12, color: 'rgba(0,0,0,0.45)', marginLeft: 4 }}>{zoomPercent}%</span>
-                            )}
-                        </div>
+                    {onShowHistory && screens.md && (
+                        <Tooltip title={historyCount ? t('designer.toolbar.historyWithCount', { count: historyCount }) : t('designer.toolbar.historyPanel')}>
+                            <Button type="text" size="small" onClick={onShowHistory} className="w-4 h-8 p-0 border-none text-[8px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 bg-transparent flex items-center justify-center">▾</Button>
+                        </Tooltip>
                     )}
-                </div>
+                    <Tooltip title={t('designer.toolbar.redo')}>
+                        <Button type="text" icon={<FaRedo size={13} />} onClick={onRedo} disabled={!canRedo} className={canRedo ? tbtn : tbtnDisabled} />
+                    </Tooltip>
+                    <div className={dividerCls} />
+                </>
+            )}
 
-                {/* ── Pill 3: 智能排版与 AI (Smart Actions) ── */}
-                <div className={`flex items-center gap-1 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[16px] px-3 py-1.5 ${isDragging ? 'shadow-[0_20px_60px_rgba(0,0,0,0.25)]' : 'shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]'} pointer-events-auto`} style={{ pointerEvents: 'auto' }}>
-                    {/* 布局 + 路由 */}
-                    {!hideLayoutControls && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Dropdown menu={{ items: layoutMenu, selectedKeys: selectedLayoutKeys, selectable: true }} placement="top">
-                                <Tooltip title={t('designer.flowchart.layout.tooltip')}>
-                                    <Button type="text" icon={<FaSitemap />} aria-label={t('designer.flowchart.layout.tooltip')} />
-                                </Tooltip>
-                            </Dropdown>
-                            <Tooltip title={`${t('designer.toolbar.autoRouting')} (${autoRouting ? onLabel : offLabel})`}>
-                                <Button
-                                    type={autoRouting ? 'primary' : 'text'}
-                                    ghost={autoRouting}
-                                    icon={<FaMagic />}
-                                    onClick={toggleAutoRouting}
-                                    aria-label={`${t('designer.toolbar.autoRouting')} (${autoRouting ? onLabel : offLabel})`}
-                                    aria-pressed={autoRouting}
-                                />
-                            </Tooltip>
-                        </div>
+            {/* ── Zoom ── */}
+            {!hideZoomControls && (
+                <>
+                    <Tooltip title={t('designer.toolbar.zoomIn')}>
+                        <Button type="text" icon={<FaSearchPlus size={13} />} onClick={onZoomIn} className={tbtn} />
+                    </Tooltip>
+                    <Tooltip title={t('designer.toolbar.zoomOut')}>
+                        <Button type="text" icon={<FaSearchMinus size={13} />} onClick={onZoomOut} className={tbtn} />
+                    </Tooltip>
+                    <Tooltip title={t('designer.toolbar.fitView')}>
+                        <Button type="text" icon={<FaCompressArrowsAlt size={13} />} onClick={onFitView} className={tbtn} />
+                    </Tooltip>
+                    {zoomPercent !== undefined && screens.lg && (
+                        <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400 min-w-[32px] text-center tabular-nums">{zoomPercent}%</span>
                     )}
+                    <div className={dividerCls} />
+                </>
+            )}
 
-                    {/* 主链路 */}
-                    {!hideFlowFocusControls && onToggleHighlightMainFlow && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Tooltip title={highlightMainFlow ? t('designer.toolbar.unhighlightMainFlow') : t('designer.toolbar.highlightMainFlow')}>
-                                <Button
-                                    type={highlightMainFlow ? 'primary' : 'text'}
-                                    ghost={highlightMainFlow}
-                                    icon={<FaProjectDiagram />}
-                                    onClick={onToggleHighlightMainFlow}
-                                    aria-label={highlightMainFlow ? t('designer.toolbar.unhighlightMainFlow') : t('designer.toolbar.highlightMainFlow')}
-                                    aria-pressed={highlightMainFlow}
-                                />
-                            </Tooltip>
-                            {onToggleShowOnlyMainFlow && (
-                                <Tooltip title={showOnlyMainFlow ? t('designer.toolbar.restoreFullFlow') : t('designer.toolbar.showOnlyMainFlow')}>
-                                    <Button
-                                        type={showOnlyMainFlow ? 'primary' : 'text'}
-                                        ghost={showOnlyMainFlow}
-                                        icon={<FaSitemap />}
-                                        onClick={onToggleShowOnlyMainFlow}
-                                    />
-                                </Tooltip>
-                            )}
-                        </div>
-                    )}
+            {/* ── Layout + Routing ── */}
+            {!hideLayoutControls && (
+                <>
+                    <Dropdown menu={{ items: layoutMenu, selectedKeys: selectedLayoutKeys, selectable: true }} placement="bottom">
+                        <Tooltip title={t('designer.flowchart.layout.tooltip')}>
+                            <Button type="text" icon={<FaSitemap size={13} />} className={tbtn} />
+                        </Tooltip>
+                    </Dropdown>
+                    <Tooltip title={autoRouting ? t('designer.toolbar.autoRouting') + ' ' + onLabel : t('designer.toolbar.autoRouting') + ' ' + offLabel}>
+                        <Button
+                            type="text"
+                            icon={<FaMagic size={13} />}
+                            onClick={toggleAutoRouting}
+                            className={autoRouting ? tbtnActive : tbtn}
+                        />
+                    </Tooltip>
+                    <div className={dividerCls} />
+                </>
+            )}
 
-                    {/* AI 助手 */}
-                    {onToggleAI && (
-                        <Tooltip title={<>{t('aiChat.title')} {showAiCrown && <span style={{  fontSize: '13px' }} title={t('common.proFeature')}>👑</span>}</>}>
+            {/* ── Canvas Helpers: Snap · Settings · More ── */}
+            {screens.md && (
+                <>
+                    {!hideGridControls && onToggleSnap && (
+                        <Tooltip title={snapToGrid ? t('designer.toolbar.snapOn') : t('designer.toolbar.snapOff')}>
                             <Button
-                                type={aiChatActive ? 'primary' : 'text'}
-                                ghost={aiChatActive}
-                                icon={<RobotOutlined />}
-                                onClick={onToggleAI}
-                                aria-label={t('aiChat.title')}
-                                aria-pressed={aiChatActive}
+                                type="text"
+                                onClick={onToggleSnap}
+                                icon={<FaMagnet className="text-[13px]" />}
+                                className={snapToGrid ? tbtnActive : tbtn}
                             />
                         </Tooltip>
                     )}
-                </div>
 
-                {/* ── Pill 4: 选项与状态 (Settings & Options) ── */}
-                <div className={`flex items-center gap-1 bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[16px] px-3 py-1.5 ${isDragging ? 'shadow-[0_20px_60px_rgba(0,0,0,0.25)]' : 'shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)]'} pointer-events-auto`} style={{ pointerEvents: 'auto' }}>
-                    {/* 网格吸附 & 选中节点数 */}
-                    {!hideGridControls && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'rgba(0,0,0,0.45)', whiteSpace: 'nowrap' }}>
-                            {onToggleSnap && (
-                                <Tooltip title={snapToGrid ? t('designer.toolbar.snapOn') : t('designer.toolbar.snapOff')}>
-                                    <Button
-                                        type="text"
-                                        size="small"
-                                        className={`toolbar-status-btn ${snapToGrid ? 'active' : ''}`}
-                                        onClick={onToggleSnap}
-                                        icon={<FaMagnet size={10} />}
-                                        style={{
-                                            color: snapToGrid ? '#1890ff' : 'rgba(0,0,0,0.3)',
-                                            fontSize: 10, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                                        }}
-                                    />
-                                </Tooltip>
-                            )}
-                            {(selectedNodesCount || 0) > 0 && (
-                                <span style={{ color: '#1890ff', fontWeight: 500, minWidth: 24, textAlign: 'center' }}>
-                                    {selectedNodesCount}↗
-                                </span>
-                            )}
-                        </div>
-                    )}
+                    <Popover content={CanvasSettingsContent} trigger="click" placement="bottomRight">
+                        <Tooltip title={t('toolbar.canvasSettings', '画布设置')}>
+                            <Button
+                                type="text"
+                                icon={
+                                    <div className="relative">
+                                        <FaBorderAll className="text-[13px]" />
+                                        {(showRuler || showMinimap) && (
+                                            <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-[#1a73e8] rounded-full" />
+                                        )}
+                                    </div>
+                                }
+                                className={tbtn}
+                            />
+                        </Tooltip>
+                    </Popover>
 
-                    {/* 更多菜单 */}
-                    <Dropdown menu={{ items: moreMenuItems }} placement="top" trigger={['click']} styles={{ root: { minWidth: 220, whiteSpace: 'nowrap' } }}>
+                    <Dropdown menu={{ items: moreMenuItems }} placement="bottomRight" trigger={['click']}>
                         <Tooltip title={t('designer.toolbar.moreActions')}>
-                            <Button type="text" icon={<FaEllipsisH />} aria-label={t('designer.toolbar.moreActions')} />
+                            <Button type="text" icon={<FaEllipsisH className="text-[13px]" />} className={tbtn} />
                         </Tooltip>
                     </Dropdown>
+                </>
+            )}
 
-                    {/* 自定义扩展 (通常是主题切换器) */}
-                    {children && (
-                        <div style={{ marginLeft: 4, display: 'flex', alignItems: 'center' }}>
-                            {children}
-                        </div>
-                    )}
+            {children && (
+                <div className="flex items-center ml-1 pl-2 border-l border-slate-200/60 dark:border-white/10">
+                    {children}
                 </div>
+            )}
         </div>
+    );
+
+    const AlignmentTools = (
+        <div className="flex items-center gap-1.5 h-full">
+            <div className="flex items-center gap-1 px-1">
+                <Tooltip title={t('toolbar.alignL', '左对齐')}>
+                    <Button type="text" size="small" icon={<MdAlignHorizontalLeft className="text-[16px]" />} onClick={() => onAlign?.('left')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
+                </Tooltip>
+                <Tooltip title={t('toolbar.alignC', '水平居中')}>
+                    <Button type="text" size="small" icon={<MdAlignHorizontalCenter className="text-[16px]" />} onClick={() => onAlign?.('center')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
+                </Tooltip>
+                <Tooltip title={t('toolbar.alignR', '右对齐')}>
+                    <Button type="text" size="small" icon={<MdAlignHorizontalRight className="text-[16px]" />} onClick={() => onAlign?.('right')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
+                </Tooltip>
+            </div>
+            
+            <div className="w-[1px] h-4 bg-slate-200 dark:bg-white/10 mx-1" />
+            
+            <div className="flex items-center gap-1 px-1">
+                <Tooltip title={t('toolbar.alignT', '顶对齐')}>
+                    <Button type="text" size="small" icon={<MdAlignVerticalTop className="text-[16px]" />} onClick={() => onAlign?.('top')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
+                </Tooltip>
+                <Tooltip title={t('toolbar.alignM', '垂直居中')}>
+                    <Button type="text" size="small" icon={<MdAlignVerticalCenter className="text-[16px]" />} onClick={() => onAlign?.('middle')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
+                </Tooltip>
+                <Tooltip title={t('toolbar.alignB', '底对齐')}>
+                    <Button type="text" size="small" icon={<MdAlignVerticalBottom className="text-[16px]" />} onClick={() => onAlign?.('bottom')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
+                </Tooltip>
+            </div>
+            
+            {(selectedNodesCount || 0) > 2 && (
+                <>
+                    <div className="w-[1px] h-4 bg-slate-200 dark:bg-white/10 mx-1" />
+                    <div className="flex items-center gap-1 px-1">
+                        <Tooltip title={t('toolbar.distributeH', '水平均分')}>
+                            <Button type="text" size="small" icon={<MdHorizontalDistribute className="text-[16px]" />} onClick={() => onDistribute?.('horizontal')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
+                        </Tooltip>
+                        <Tooltip title={t('toolbar.distributeV', '垂直均分')}>
+                            <Button type="text" size="small" icon={<MdVerticalDistribute className="text-[16px]" />} onClick={() => onDistribute?.('vertical')} className="w-8 h-8 p-0 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] transition-colors" />
+                        </Tooltip>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+
+    if (!portalTarget) return null;
+
+    return (
+        <>
+            {createPortal(MainWorkflowTools, portalTarget)}
+            {contextPortalTarget && (selectedNodesCount || 0) > 1 && createPortal(AlignmentTools, contextPortalTarget)}
+            {bottomPortalTarget && createPortal(CreationTools, bottomPortalTarget)}
+        </>
     );
 });
 

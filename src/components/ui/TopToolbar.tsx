@@ -50,6 +50,10 @@ export interface TopToolbarProps {
    */
   leftChildren?: React.ReactNode;
   /**
+   * 中间插槽：用于放置主要设计工具
+   */
+  centerChildren?: React.ReactNode;
+  /**
    * 右侧插槽：用于放置额外状态文本或统计信息
    */
   rightChildren?: React.ReactNode;

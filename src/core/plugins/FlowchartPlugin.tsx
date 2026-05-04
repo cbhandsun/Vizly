@@ -383,13 +383,22 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
         return (
             <div style={{ padding: '8px 10px' }}>
                 <Input
-                    prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+                    prefix={<SearchOutlined style={{ color: '#8c8c8c' }} />}
                     placeholder="搜索组件..."
                     size="small"
                     allowClear
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    style={{ marginBottom: 10, borderRadius: 6, border: '1px solid #e0e0e0', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.02)' }}
+                    style={{ 
+                        marginBottom: 10, 
+                        borderRadius: 10, 
+                        border: '1px solid rgba(0, 0, 0, 0.08)', 
+                        background: 'rgba(255, 255, 255, 0.5)',
+                        backdropFilter: 'blur(10px)',
+                        padding: '6px 12px',
+                        fontSize: '13px',
+                        boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.03)' 
+                    }}
                 />
                 {filteredItems.length === 0 ? (
                     <div style={{ color: '#bfbfbf', textAlign: 'center', padding: 16, fontSize: 12 }}>无匹配组件</div>
@@ -443,16 +452,20 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                 paddingBottom: 12 
             }}>
                 <Input
-                    prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+                    prefix={<SearchOutlined style={{ color: '#8c8c8c' }} />}
                     placeholder="搜索组件..."
                     size="small"
                     allowClear
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     style={{ 
-                        borderRadius: 6, 
-                        border: '1px solid #e0e0e0', 
-                        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.02)' 
+                        borderRadius: 10, 
+                        border: '1px solid rgba(0, 0, 0, 0.08)', 
+                        background: 'rgba(255, 255, 255, 0.5)',
+                        backdropFilter: 'blur(10px)',
+                        padding: '6px 12px',
+                        fontSize: '13px',
+                        boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.03)' 
                     }}
                 />
             </div>

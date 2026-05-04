@@ -555,12 +555,12 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
     <>
       {variant === 'icon' ? (
         <button
-            className={className || "inline-flex items-center justify-center w-[30px] h-[30px] rounded-[10px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-indigo-500 hover:border-indigo-500/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10 transition-all cursor-pointer shadow-sm"}
+            className={className || "inline-flex items-center justify-center w-7 h-7 rounded-[6px] border-none text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"}
             onClick={() => setIsOpen(!isOpen)}
             style={style}
             title={t('theme.selector.title')}
         >
-            <FaPalette />
+            <FaPalette className="text-[13px]" />
         </button>
       ) : (
         <button

@@ -1,24 +1,26 @@
 // @ts-nocheck
-import React, { useState } from 'react';
-import { Button, Flex, Grid, Select, Typography, Space, Tooltip, Popover, theme } from 'antd';
-import { SearchOutlined, HomeOutlined, RightOutlined, MoreOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import React, { useState, useMemo } from 'react';
+import { Button, Grid, Select, Typography, Space, Tooltip, Popover, theme, Dropdown } from 'antd';
+import { SearchOutlined, HomeOutlined, RightOutlined, MoreOutlined, CheckCircleOutlined, EllipsisOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import ExportTools from '../ExportTools';
 import { EnhancedThemeSelector } from './EnhancedThemeSelector';
 import EnhancedStyleSwitcher from '../shared/EnhancedStyleSwitcher';
 import { LanguageSwitcher } from '../shared/LanguageSwitcher';
 import { AuthStatusCompact } from '../auth/AuthStatus';
+import { FaChevronDown, FaEllipsisV } from 'react-icons/fa';
 import { TopToolbarProps } from './TopToolbar';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export type { TopToolbarProps };
 
 const { Text } = Typography;
 
 /**
- * ModernTopToolbar
+ * ModernTopToolbar (Hyper-Glass V3.1 - Indestructible Layout)
  * 
- * A Figma-style unified toolbar with glassmorphism, brand identity,
- * and clean grouping. Designed to match the Vizly Dashboard aesthetic.
+ * A Figma-style unified toolbar with glassmorphism and robust space management.
+ * Solves the overlap/occlusion issue by enforcing island boundaries and responsive scaling.
  */
 export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   diagramId,
@@ -31,37 +33,39 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   showStyleSwitcher = true,
   showExport = true,
   leftChildren,
+  centerChildren,
   rightChildren,
   title,
   setIsCommandOpen,
 }) => {
   const { t } = useTranslation();
-  const { token } = theme.useToken();
   const screens = Grid.useBreakpoint();
-  const compact = !screens.xl;
+  
+  // Responsive flags
+  const isCompact = !screens.xl; // < 1200px
+  const isMobile = !screens.md;  // < 768px
+  
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '');
   const commandShortcutLabel = isMac ? '⌘K' : 'Ctrl+K';
 
-  const [moreOpen, setMoreOpen] = useState(false);
+  const islandBaseClass = "flex items-center h-[40px] bg-white dark:bg-[#2d2d2d] border border-[rgba(0,0,0,0.12)] dark:border-[rgba(255,255,255,0.12)] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.08)] px-2 transition-all duration-200 pointer-events-auto";
 
-  /* ── More menu — Edge Mode + Language ── */
-  const moreContent = (
+  /* ── Menu Content ── */
+  const moreContent = useMemo(() => (
     <div className="min-w-[220px] py-2 flex flex-col font-sans">
       <div className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
         <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
-          {t('header.edgeMode')}
+          {t('header.edgeMode', '连线模式')}
         </div>
         <Select
           variant="filled"
           value={edgeMode}
           onChange={(value) => { onEdgeModeChange(value as 'advanced-smart' | 'native'); }}
           style={{ width: '100%', fontSize: '13px' }}
-          popupMatchSelectWidth={false}
           options={[
             { value: 'advanced-smart', label: t('header.smart') },
             { value: 'native', label: t('header.native') },
           ]}
-          styles={{ popup: { root: { borderRadius: '8px', padding: '4px' } } }}
         />
       </div>
       
@@ -69,172 +73,134 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       
       <div className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
         <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
-          {t('common.language', 'Language')}
+          {t('common.language', '语言 / Language')}
         </div>
         <LanguageSwitcher />
       </div>
     </div>
-  );
+  ), [edgeMode, onEdgeModeChange, t]);
 
   return (
-    <div 
-        className="flex w-full mt-4 z-[100] relative box-border transition-all pointer-events-none"
-    >
-      {/* ── Left Spacer (Sidebar area) ── */}
-      <div style={{ width: 'var(--left-sidebar-offset, 0px)', flexShrink: 0 }} />
-
-      {/* ── Left Island Group ── */}
-      <div className="flex-1 flex items-center justify-start gap-2 min-w-0 overflow-hidden px-4">
-        
-        {/* Pill 1: Brand + Breadcrumb + Title + Save Status */}
-        <div className="flex items-center gap-2 h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto max-w-[180px]" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
-          {/* Vizly Brand → Home */}
-          <a
-            className="flex items-center justify-center py-1 rounded-md no-underline cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-            onClick={(e) => { e.preventDefault(); window.location.href = '#/manage'; }}
-            href="#/manage"
-            title="Back to Home"
+    <div className="fixed top-3 left-3 right-3 z-[1000] flex items-center justify-between pointer-events-none h-[40px] gap-3">
+      
+      {/* ── LEFT SECTION: Brand + Project + Search (unified pill) ── */}
+      <div className="flex-[0_1_auto] flex items-center min-w-0">
+        <div className={`${islandBaseClass} px-2 shrink-0`}>
+          <a 
+            href="#/manage" 
+            className="flex items-center gap-1.5 px-1 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-all no-underline active:scale-95"
+            onClick={(e) => { e.preventDefault(); window.location.hash = '#/manage'; }}
           >
-            <span className="font-extrabold text-[16px] tracking-tight whitespace-nowrap bg-clip-text text-transparent bg-gradient-to-r from-[#6366f1] to-[#a855f7]">
-              {compact ? 'V' : 'Vizly'}
-            </span>
+            <div className="w-5 h-5 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-md flex items-center justify-center shadow-sm">
+              <span className="text-[10px] font-black text-white italic">V</span>
+            </div>
+            {!isMobile && (
+              <span className="text-[14px] font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-500">
+                Vizly
+              </span>
+            )}
           </a>
 
-          {/* Breadcrumb chevron */}
-          <RightOutlined className="text-[10px] text-slate-600 dark:text-slate-400 opacity-40 mx-1 flex-shrink-0" />
-
-          {/* Current file title */}
           {title && (
-            <div className="group flex items-center gap-2 mr-1 px-2.5 py-1 rounded-md cursor-default transition-colors hover:bg-black/5 dark:hover:bg-white/5">
-              <span className="font-semibold text-sm text-slate-700 dark:text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] lg:max-w-[160px] xl:max-w-[240px]">{title}</span>
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-500 dark:text-emerald-400 opacity-70 ml-1 transition-opacity group-hover:opacity-100">
-                <CheckCircleOutlined /> Saved
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Pill 2: Left slot (Home, flow direction, search etc) */}
-        {leftChildren && (
-          <div className="flex items-center gap-3 h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto px-[12px] min-w-0 max-w-[240px] overflow-hidden">
-            {leftChildren}
-          </div>
-        )}
-      </div>
-
-      {/* ── Center Island Group ── */}
-      <div className="flex flex-col items-center gap-2 z-10 px-4">
-        <div 
-          id="vizly-plugin-center-island-portal" 
-          className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto px-[8px] transition-all empty:hidden" 
-          style={{ zIndex: 100 }} 
-        />
-        <div 
-          id="vizly-plugin-context-toolbar-portal" 
-          className="flex items-center h-[42px] bg-[rgba(255,255,255,0.85)] dark:bg-[rgba(40,40,55,0.85)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.6)] dark:border-[rgba(255,255,255,0.15)] rounded-[12px] shadow-[0_10px_30px_-5px_rgba(0,0,0,0.12)] pointer-events-auto px-[6px] transition-all empty:hidden" 
-          style={{ zIndex: 99 }} 
-        />
-      </div>
-
-      {/* ── Right Island Group ── */}
-      <div className="flex-1 flex items-center justify-end gap-2 min-w-0 overflow-hidden px-4">
-          
-        {/* Unified Pill: Tools, Settings, Theme, Language, Auth */}
-        <div className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
-          <div className="flex items-center gap-2">
-
-            {/* Group 1: Export + More */}
-            <div className="flex items-center gap-1.5">
-
-              {/* Export */}
-              {showExport && (
-                <div className="flex items-center gap-1.5 [&_.ant-btn]:border-none [&_.ant-btn]:shadow-none [&_.ant-btn]:bg-transparent [&_.ant-btn]:text-slate-600 dark:[&_.ant-btn]:text-slate-400 [&_.ant-btn:hover]:bg-indigo-500/10 [&_.ant-btn:hover]:text-indigo-500 [&_.ant-btn]:h-[30px] [&_.ant-btn]:rounded-[8px] [&_.ant-btn]:text-[13px] [&_.ant-btn]:font-medium [&_.ant-btn-icon-only]:w-[30px] [&_.ant-btn-icon-only]:px-0">
-                  <ExportTools
-                    diagramId={diagramId}
-                    diagramName={diagramName || 'diagram'}
-                    variant="inline"
-                    showControls={false}
-                    isFullscreen={isFullscreen}
-                    onToggleFullscreen={onToggleFullscreen}
-                  />
-                </div>
-              )}
-
-              {/* More menu — Edge Mode */}
+            <div className="flex items-center min-w-0">
+              <RightOutlined className="text-[9px] text-slate-300 dark:text-slate-600 mx-1 flex-shrink-0" />
               <Popover
                 content={
-                    <div className="min-w-[220px] py-2 flex flex-col font-sans">
-                      <div className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
-                          {t('header.edgeMode')}
-                        </div>
-                        <Select
-                          variant="filled"
-                          value={edgeMode}
-                          onChange={(value) => { onEdgeModeChange(value as 'advanced-smart' | 'native'); }}
-                          style={{ width: '100%', fontSize: '13px' }}
-                          popupMatchSelectWidth={false}
-                          options={[
-                            { value: 'advanced-smart', label: t('header.smart') },
-                            { value: 'native', label: t('header.native') },
-                          ]}
-                          styles={{ popup: { root: { borderRadius: '8px', padding: '4px' } } }}
-                        />
-                      </div>
+                  <div className="w-[360px] p-1">
+                    <div className="px-3 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-white/5 mb-2 flex items-center justify-between">
+                      <span>{t('diagramViewer.switchDiagram', '切换图表')}</span>
                     </div>
+                    <div className="max-h-[50vh] overflow-y-auto">{leftChildren}</div>
+                  </div>
                 }
                 trigger="click"
-                placement="bottomRight"
-                open={moreOpen}
-                onOpenChange={setMoreOpen}
-                styles={{ root: {}, container: { padding: 0, borderRadius: '12px' } }}
+                placement="bottomLeft"
               >
-                <button className="inline-flex items-center justify-center w-[30px] h-[30px] border-none rounded-[8px] bg-transparent text-slate-600 dark:text-slate-400 hover:bg-indigo-500/10 hover:text-indigo-500 active:bg-indigo-500/20 active:scale-95 transition-all outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 cursor-pointer" title="More options">
-                  <MoreOutlined />
-                </button>
+                <Tooltip title={t('diagramViewer.switchDiagram', '切换图表')} mouseEnterDelay={0.6}>
+                  <div className="flex items-center gap-1 px-2 h-[32px] rounded-[6px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer transition-colors active:scale-[0.97] min-w-0 group">
+                    <span className="font-semibold text-[13.5px] text-slate-700 dark:text-slate-200 truncate max-w-[80px] sm:max-w-[160px] lg:max-w-[240px]">
+                      {title}
+                    </span>
+                    <FaChevronDown className="text-[8px] text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors flex-shrink-0" />
+                  </div>
+                </Tooltip>
               </Popover>
             </div>
+          )}
 
-            {/* Divider */}
-            {((showExport || moreOpen !== undefined) || (rightChildren)) && (
-                <div className="w-[1px] h-[20px] bg-slate-200 dark:bg-slate-700 mx-1" />
-            )}
-
-            {/* Group 2: Settings */}
-            {rightChildren && (
-              <div className="flex items-center">
-                {rightChildren}
+          {/* Search — integrated into the same pill */}
+          {!isMobile && setIsCommandOpen && (
+            <>
+              <div className="w-[1px] h-4 bg-slate-200/80 dark:bg-white/10 mx-1 flex-shrink-0" />
+              <div 
+                className="flex items-center gap-1.5 px-1.5 h-[32px] rounded-[6px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer transition-colors group"
+                onClick={() => setIsCommandOpen(true)}
+              >
+                <SearchOutlined className="text-[14px] text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300" />
+                <div className="flex items-center px-1 py-0.5 bg-black/[0.04] dark:bg-white/[0.06] rounded-[4px]">
+                  <span className="text-[9px] font-semibold text-slate-400 dark:text-slate-500">{commandShortcutLabel}</span>
+                </div>
               </div>
-            )}
-
-            {/* Divider for System Utilities */}
-            <div className="w-[1px] h-[20px] bg-slate-200 dark:bg-slate-700 mx-1" />
-
-            {/* Group 3: Theme, Language, Auth */}
-            <div className="flex items-center gap-2 pl-1">
-              {showThemeSelector && (
-                <EnhancedThemeSelector
-                  variant="icon"
-                  className="inline-flex items-center justify-center w-[30px] h-[30px] rounded-[8px] bg-transparent border-none text-slate-600 dark:text-slate-300 hover:text-indigo-500 hover:bg-indigo-500/10 active:bg-indigo-500/20 transition-all cursor-pointer shadow-none"
-                />
-              )}
-              
-              <LanguageSwitcher 
-                  variant="icon" 
-                  className="inline-flex items-center justify-center w-[30px] h-[30px] rounded-[8px] bg-transparent border-none text-slate-600 dark:text-slate-300 hover:text-indigo-500 hover:bg-indigo-500/10 active:bg-indigo-500/20 transition-all cursor-pointer shadow-none"
-              />
-
-              <div className="ml-1 flex items-center justify-center w-[32px] h-[32px] rounded-[8px] bg-white/80 dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] text-slate-600 dark:text-slate-300 hover:border-indigo-500/30 transition-all shadow-sm overflow-hidden cursor-pointer [&_.ant-btn]:border-none [&_.ant-btn]:w-full [&_.ant-btn]:h-full [&_.ant-btn]:p-0 [&_.ant-btn:hover]:bg-indigo-50/80 dark:[&_.ant-btn:hover]:bg-indigo-500/20 [&_.ant-btn:hover]:text-indigo-500 [&_.ant-avatar]:w-full [&_.ant-avatar]:h-full [&_.ant-avatar]:rounded-none">
-                <AuthStatusCompact />
-              </div>
-            </div>
-
-          </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* ── Right Spacer (Sidebar area) ── */}
-      <div style={{ width: 'var(--right-sidebar-offset, 0px)', flexShrink: 0 }} />
+      {/* ── CENTER SECTION: Tools ── */}
+      <div className="flex-1 flex items-center justify-center min-w-0 overflow-hidden">
+        <div className="flex items-center gap-2 max-w-full overflow-hidden">
+          {/* Core Tools Pill */}
+          <div className={`${islandBaseClass} overflow-hidden shrink-0`}>
+            {centerChildren}
+            <div id="vizly-plugin-center-island-portal" className="flex items-center gap-0.5 empty:hidden" />
+          </div>
+
+          {/* Contextual Toolbar Pill (Dynamic Actions) */}
+          <div 
+            id="vizly-plugin-context-toolbar-portal" 
+            className={`${islandBaseClass} empty:hidden overflow-hidden`}
+          />
+        </div>
+      </div>
+
+      {/* ── RIGHT SECTION: System ── */}
+      <div className="flex-[0_1_auto] flex items-center justify-end gap-2 min-w-0">
+        <div id="vizly-plugin-right-island-portal" className={`${islandBaseClass} empty:hidden overflow-hidden`} />
+        
+        <div className={`${islandBaseClass} shrink-0`}>
+          {rightChildren}
+          
+          <div className="flex items-center gap-0.5">
+            {showExport && (
+              <ExportTools
+                diagramId={diagramId}
+                diagramName={diagramName}
+                onToggleFullscreen={onToggleFullscreen}
+                isFullscreen={isFullscreen}
+                variant="compact"
+              />
+            )}
+            
+            <Popover content={moreContent} trigger="click" placement="bottomRight">
+              <div className="w-8 h-8 flex items-center justify-center hover:bg-black/[0.06] dark:hover:bg-white/[0.08] rounded-[6px] cursor-pointer text-slate-500 dark:text-slate-400 transition-colors">
+                <FaEllipsisV className="text-[13px]" />
+              </div>
+            </Popover>
+          </div>
+
+          <div className="w-[1px] h-4 bg-slate-200/80 dark:bg-white/10 mx-0.5 flex-shrink-0" />
+          <div className="flex items-center gap-1">
+            {showThemeSelector && (
+              <EnhancedThemeSelector variant="icon" />
+            )}
+            <div className="w-7 h-7 rounded-full overflow-hidden border border-slate-200/50 dark:border-slate-700 flex-shrink-0 cursor-pointer active:scale-95">
+              <AuthStatusCompact />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
+
+export default ModernTopToolbar;
