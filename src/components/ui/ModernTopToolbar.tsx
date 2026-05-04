@@ -78,15 +78,13 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
 
   return (
     <div 
-        className="grid w-full mt-4 z-[100] relative box-border transition-all pointer-events-none"
-        style={{ 
-            gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
-            paddingLeft: 'var(--left-sidebar-offset, 0px)',
-            paddingRight: 'var(--right-sidebar-offset, 0px)' 
-        }}
+        className="flex w-full mt-4 z-[100] relative box-border transition-all pointer-events-none"
     >
+      {/* ── Left Spacer (Sidebar area) ── */}
+      <div style={{ width: 'var(--left-sidebar-offset, 0px)', flexShrink: 0 }} />
+
       {/* ── Left Island Group ── */}
-      <div className="flex items-center justify-start gap-2 min-w-0 overflow-hidden px-4">
+      <div className="flex-1 flex items-center justify-start gap-2 min-w-0 overflow-hidden px-4">
         
         {/* Pill 1: Brand + Breadcrumb + Title + Save Status */}
         <div className="flex items-center gap-2 h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto max-w-[180px]" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
@@ -139,7 +137,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       </div>
 
       {/* ── Right Island Group ── */}
-      <div className="flex items-center justify-end gap-2 min-w-0 overflow-hidden px-4">
+      <div className="flex-1 flex items-center justify-end gap-2 min-w-0 overflow-hidden px-4">
           
         {/* Unified Pill: Tools, Settings, Theme, Language, Auth */}
         <div className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
@@ -234,6 +232,9 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ── Right Spacer (Sidebar area) ── */}
+      <div style={{ width: 'var(--right-sidebar-offset, 0px)', flexShrink: 0 }} />
     </div>
   );
 };

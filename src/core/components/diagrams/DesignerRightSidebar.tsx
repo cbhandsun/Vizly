@@ -81,7 +81,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
             document.documentElement.style.setProperty('--right-sidebar-offset', '0px');
             return;
         }
-        const effectiveWidth = isCollapsed ? RAIL_WIDTH : panelWidth;
+        const effectiveWidth = (isCollapsed ? RAIL_WIDTH : panelWidth) + 16;
         document.documentElement.style.setProperty('--right-sidebar-offset', `${effectiveWidth}px`);
         return () => {
             document.documentElement.style.setProperty('--right-sidebar-offset', '0px');
