@@ -78,11 +78,11 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
 
   return (
     <div 
-        className="flex flex-wrap items-start justify-between w-full px-4 mt-4 z-[100] relative box-border transition-all pointer-events-none gap-4"
+        className="flex items-start justify-between w-full px-4 mt-4 z-[100] relative box-border transition-all pointer-events-none gap-4 flex-nowrap overflow-hidden"
         style={{ paddingRight: 'calc(16px + var(--right-sidebar-offset, 0px))' }}
     >
       {/* ── Left Island Group ── */}
-      <div className="flex items-center justify-start gap-2 flex-wrap max-w-full">
+      <div className="flex items-center justify-start gap-2 flex-shrink min-w-0 overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] h-[48px] pb-4">
         
         {/* Pill 1: Brand + Breadcrumb + Title + Save Status */}
         <div className="flex items-center gap-2 h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
@@ -135,7 +135,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       </div>
 
       {/* ── Right Island Group ── */}
-      <div className="flex items-center justify-end gap-2 flex-wrap">
+      <div className="flex items-center justify-end gap-2 flex-shrink min-w-0 overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] h-[48px] pb-4">
           
         {/* Unified Pill: Tools, Settings, Theme, Language, Auth */}
         <div className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
