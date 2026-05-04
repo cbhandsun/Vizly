@@ -82,7 +82,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
         style={{ paddingRight: 'calc(16px + var(--right-sidebar-offset, 0px))' }}
     >
       {/* ── Left Island Group: Split into smaller glass pills for breathing room ── */}
-      <div className="flex items-center justify-start gap-4 flex-shrink-0 max-w-[50%] overflow-x-auto no-scrollbar">
+      <div className="flex items-center justify-start gap-4 flex-shrink-0">
         
         {/* Pill 1: Brand + Breadcrumb + Title + Save Status */}
         <div className="flex items-center gap-2 h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
@@ -120,12 +120,17 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
         )}
       </div>
 
-      {/* ── Center Island Group: Action Tools ── */}
-      <div className="flex flex-1 justify-center min-w-0 mx-2 pointer-events-none">
+      {/* ── Center Island Group: Action Tools & Context Tools ── */}
+      <div className="flex flex-col items-center flex-1 min-w-0 mx-2 pointer-events-none gap-2">
         <div 
           id="vizly-plugin-center-island-portal" 
-          className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto px-[8px] transition-all empty:hidden max-w-full overflow-x-auto no-scrollbar" 
+          className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto px-[8px] transition-all empty:hidden" 
           style={{ zIndex: 100 }} 
+        />
+        <div 
+          id="vizly-plugin-context-toolbar-portal" 
+          className="flex items-center h-[42px] bg-[rgba(255,255,255,0.85)] dark:bg-[rgba(40,40,55,0.85)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.6)] dark:border-[rgba(255,255,255,0.15)] rounded-[12px] shadow-[0_10px_30px_-5px_rgba(0,0,0,0.12)] pointer-events-auto px-[6px] transition-all empty:hidden" 
+          style={{ zIndex: 99 }} 
         />
       </div>
 

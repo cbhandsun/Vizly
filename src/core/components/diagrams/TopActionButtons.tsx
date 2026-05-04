@@ -123,11 +123,16 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     ], [onEditJson, onShowDiff, onShowHistory, extraMoreItems, t]);
 
     const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+    const [contextPortalTarget, setContextPortalTarget] = useState<HTMLElement | null>(null);
 
     useEffect(() => {
         const target = document.getElementById('vizly-plugin-center-island-portal');
         if (target) {
             setPortalTarget(target);
+        }
+        const contextTarget = document.getElementById('vizly-plugin-context-toolbar-portal');
+        if (contextTarget) {
+            setContextPortalTarget(contextTarget);
         }
     }, []);
 
@@ -220,14 +225,20 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             )}
 
             {extraActionItems}
-            {children}
         </div>
     );
+
+    const contextContent = children ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+            {children}
+        </div>
+    ) : null;
 
     if (portalTarget) {
         return (
             <>
                 {createPortal(content, portalTarget)}
+                {contextPortalTarget && contextContent ? createPortal(contextContent, contextPortalTarget) : null}
                 {modals}
             </>
         );
