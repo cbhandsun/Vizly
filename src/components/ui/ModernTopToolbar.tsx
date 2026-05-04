@@ -78,8 +78,9 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
 
   return (
     <div 
-        className="grid grid-cols-3 w-full mt-4 z-[100] relative box-border transition-all pointer-events-none"
+        className="grid w-full mt-4 z-[100] relative box-border transition-all pointer-events-none"
         style={{ 
+            gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
             paddingLeft: 'var(--left-sidebar-offset, 0px)',
             paddingRight: 'var(--right-sidebar-offset, 0px)' 
         }}
@@ -88,7 +89,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       <div className="flex items-center justify-start gap-2 min-w-0 overflow-hidden px-4">
         
         {/* Pill 1: Brand + Breadcrumb + Title + Save Status */}
-        <div className="flex items-center gap-2 h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
+        <div className="flex items-center gap-2 h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto max-w-[180px]" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
           {/* Vizly Brand → Home */}
           <a
             className="flex items-center justify-center py-1 rounded-md no-underline cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5"
@@ -117,14 +118,14 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
 
         {/* Pill 2: Left slot (Home, flow direction, search etc) */}
         {leftChildren && (
-          <div className="flex items-center gap-3 h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
+          <div className="flex items-center gap-3 h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto px-[12px] min-w-0 max-w-[240px] overflow-hidden">
             {leftChildren}
           </div>
         )}
       </div>
 
       {/* ── Center Island Group ── */}
-      <div className="flex flex-col items-center gap-2 z-10 min-w-0 px-4">
+      <div className="flex flex-col items-center gap-2 z-10 px-4">
         <div 
           id="vizly-plugin-center-island-portal" 
           className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto px-[8px] transition-all empty:hidden" 
