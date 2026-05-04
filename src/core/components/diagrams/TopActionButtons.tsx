@@ -215,7 +215,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
                     style={{ height: 32, borderRadius: 9999, border: 'none', padding: '0 12px', fontSize: 13, background: 'var(--designer-primary, #6366f1)', boxShadow: '0 2px 8px rgba(99, 102, 241, 0.25)' }}
                     className="flex items-center gap-1.5 transition-transform active:scale-95 ml-1"
                 >
-                {t('designer.toolbar.share')}
+                    <span className="hidden xl:inline">{t('designer.toolbar.share')}</span>
                 </Button>
             )}
 

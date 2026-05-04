@@ -77,7 +77,10 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   );
 
   return (
-    <div className="flex items-start justify-between w-full px-4 mt-4 z-[100] relative box-border transition-all pointer-events-none">
+    <div 
+        className="flex items-start justify-between w-full px-4 mt-4 z-[100] relative box-border transition-all pointer-events-none"
+        style={{ paddingRight: 'calc(16px + var(--right-sidebar-offset, 0px))' }}
+    >
       {/* ── Left Island Group: Split into smaller glass pills for breathing room ── */}
       <div className="flex items-center gap-4 flex-shrink-0">
         

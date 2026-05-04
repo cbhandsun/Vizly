@@ -75,6 +75,19 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
         } catch { return 360; }
     });
 
+    useEffect(() => {
+        if (!visible || isMobile) {
+            document.documentElement.style.setProperty('--right-sidebar-offset', '0px');
+            return;
+        }
+        const effectiveWidth = isCollapsed ? RAIL_WIDTH : panelWidth;
+        const offset = effectiveWidth + 16; // 16 is right margin
+        document.documentElement.style.setProperty('--right-sidebar-offset', `${offset}px`);
+        return () => {
+            document.documentElement.style.setProperty('--right-sidebar-offset', '0px');
+        };
+    }, [visible, isCollapsed, panelWidth, isMobile]);
+
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
         e.preventDefault();
         const startX = e.clientX;
@@ -139,7 +152,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
             style={{
                 position: isMobile ? 'fixed' : 'absolute',
                 pointerEvents: 'auto',
-                right: isMobile ? 0 : 24,
+                right: isMobile ? 0 : 16,
                 left: isMobile ? 0 : 'auto',
                 top: isMobile ? 'auto' : 72,
                 bottom: isMobile ? 0 : 'auto',
@@ -153,7 +166,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                 flexDirection: 'row-reverse',
                 boxShadow: 'var(--designer-shadow, 0 24px 48px -12px rgba(0,0,0,0.15))',
                 border: `1px solid var(--designer-border, rgba(255,255,255,0.45))`,
-                borderRadius: isMobile ? '24px 24px 0 0' : '16px',
+                borderRadius: '16px',
                 zIndex: 110,
                 // 只在收起/展开时加动画，拖拽时关闭动画避免卡顿
                 transition: isMobile ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',

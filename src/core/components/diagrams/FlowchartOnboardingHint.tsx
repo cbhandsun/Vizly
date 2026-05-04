@@ -42,10 +42,11 @@ export const FlowchartOnboardingHint: React.FC<{
       <Card
         size="small"
         style={{
-          borderRadius: 12,
-          boxShadow: '0 12px 36px rgba(15, 23, 42, 0.12)',
-          background: 'rgba(255, 255, 255, 0.92)',
-          backdropFilter: 'blur(10px) saturate(140%)'
+          borderRadius: 16,
+          boxShadow: '0 24px 48px -12px rgba(0,0,0,0.15)',
+          background: 'rgba(255, 255, 255, 0.72)',
+          backdropFilter: 'blur(24px) saturate(180%)',
+          border: '1px solid rgba(255,255,255,0.45)'
         }}
         styles={{ body: { padding: 14 } }}
       >

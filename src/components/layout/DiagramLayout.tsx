@@ -217,7 +217,7 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
                 collapsedWidth={64}
                 theme="light"
                 style={{
-                  margin: '16px 0 16px 24px',
+                  margin: '16px 0 16px 16px',
                   height: 'calc(100% - 32px)',
                   borderRadius: '16px',
                   border: `1px solid var(--designer-border, rgba(255,255,255,0.45))`,
