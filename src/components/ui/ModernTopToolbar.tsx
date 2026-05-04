@@ -78,11 +78,11 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
 
   return (
     <div 
-        className="grid grid-cols-[1fr_auto_1fr] items-start w-full px-4 mt-4 z-[100] relative box-border transition-all pointer-events-none gap-4"
+        className="flex items-start justify-between w-full px-4 mt-4 z-[100] relative box-border transition-all pointer-events-none"
         style={{ paddingRight: 'calc(16px + var(--right-sidebar-offset, 0px))' }}
     >
       {/* ── Left Island Group: Split into smaller glass pills for breathing room ── */}
-      <div className="flex items-start justify-start gap-4 min-w-0">
+      <div className="flex items-center justify-start gap-4 flex-shrink-0 max-w-[50%] overflow-x-auto no-scrollbar">
         
         {/* Pill 1: Brand + Breadcrumb + Title + Save Status */}
         <div className="flex items-center gap-2 h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
@@ -121,16 +121,16 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       </div>
 
       {/* ── Center Island Group: Action Tools ── */}
-      <div className="flex justify-center min-w-0">
+      <div className="flex flex-1 justify-center min-w-0 mx-2 pointer-events-none">
         <div 
           id="vizly-plugin-center-island-portal" 
-          className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto px-[8px] transition-all empty:hidden" 
+          className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto px-[8px] transition-all empty:hidden max-w-full overflow-x-auto no-scrollbar" 
           style={{ zIndex: 100 }} 
         />
       </div>
 
       {/* ── Right Island Group: Unified single pill ── */}
-      <div className="flex items-start justify-end min-w-0">
+      <div className="flex items-center justify-end flex-shrink-0">
           
         {/* Unified Pill: Tools, Settings, Theme, Language, Auth */}
         <div className="flex items-center h-[48px] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] border border-[rgba(255,255,255,0.45)] dark:border-[rgba(255,255,255,0.12)] rounded-[14px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] pointer-events-auto" style={{ paddingLeft: '14px', paddingRight: '14px', flexShrink: 0 }}>
