@@ -681,9 +681,12 @@ const WorkspaceDashboardPage: React.FC = () => {
                             <TemplateCascaderMenu 
                                 templatesOnly={true} 
                                 onChange={handleTemplateMenuChange} 
-                                placeholder="选择模板..." 
-                                style={{ width: 160 }} 
-                            />
+                            >
+                                <button className="create-btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '36px', padding: '0 16px', background: 'var(--vz-bg-elevated)', border: '1px solid var(--vz-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--vz-text-primary)' }}>
+                                    <AppstoreOutlined />
+                                    行业模板库
+                                </button>
+                            </TemplateCascaderMenu>
                             <Dropdown
                                 menu={{
                                     items: [

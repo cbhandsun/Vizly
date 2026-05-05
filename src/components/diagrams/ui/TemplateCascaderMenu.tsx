@@ -14,6 +14,7 @@ export interface TemplateCascaderMenuProps {
   placeholder?: string;
   allowClear?: boolean;
   templatesOnly?: boolean;
+  children?: React.ReactNode;
 }
 
 export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
@@ -22,7 +23,8 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
   style,
   placeholder = "搜索或选择图表...",
   allowClear = true,
-  templatesOnly = false
+  templatesOnly = false,
+  children
 }) => {
   const { s3Diagrams, supabaseDiagrams, systemTemplates, fetchCloudList } = useDiagramStorage();
 
@@ -188,6 +190,8 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       style={{ width: 320, ...style }}
       suffixIcon={<SearchOutlined style={{ color: 'rgba(0,0,0,0.45)' }} />}
       getPopupContainer={() => document.body}
-    />
+    >
+      {children}
+    </Cascader>
   );
 };
