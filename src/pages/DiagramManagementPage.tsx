@@ -41,6 +41,7 @@ import { AuthModal } from '@/components/auth/AuthModal';
 import { coerceToStandardDiagramDataWithReport } from '@/core';
 import RemoteDiagramCover from '@/components/shared/RemoteDiagramCover';
 import { PRESET_MAP } from '@/data/standardized';
+import { TemplateCascaderMenu } from '@/components/diagrams/ui/TemplateCascaderMenu';
 
 import './WorkspaceDashboard.css';
 import { appMessage } from '@/core/utils/antdStaticBridge';
@@ -384,6 +385,81 @@ const WorkspaceDashboardPage: React.FC = () => {
         }
     };
 
+    const handleTemplateMenuChange = async (val: string[], leafKey: string, rootGroup: string) => {
+        if (!leafKey) return;
+
+        const seedAutoSaveAndNavigate = (normalized: any, id: string) => {
+            const localService = dataRegistry.getDataService();
+            const cloned = JSON.parse(JSON.stringify(normalized));
+            cloned.id = crypto.randomUUID(); // ensure fresh ID for new creations from template
+            localService.registerDiagram(cloned);
+            
+            try {
+                const configsRaw = localStorage.getItem('vizly_diagram_configs');
+                const configs: Record<string, any> = configsRaw ? JSON.parse(configsRaw) : {};
+                configs[cloned.id] = { id: cloned.id, type: cloned.type || 'flowchart', name: cloned.name, updatedAt: Date.now() };
+                localStorage.setItem('vizly_diagram_configs', JSON.stringify(configs));
+            } catch { /* ignore storage errors */ }
+            
+            try {
+                localStorage.removeItem(`flowchart-autosave-v2-${cloned.id}`);
+            } catch (e) {}
+
+            navigate(`/?diagram=${cloned.id}`);
+        };
+
+        if (rootGroup === 'system-templates') {
+            const messageKey = appMessage.loading('正在加载云端模板...', 0);
+            try {
+                const { supabase } = await import('@/services/supabase');
+                if (supabase) {
+                    const { data, error } = await supabase.from('system_templates').select('content, title, id').eq('id', leafKey).single();
+                    if (!error && data && data.content) {
+                        const baseData = {
+                            ...data.content,
+                            id: data.id,
+                            name: data.title || data.content.name,
+                            metadata: {
+                                ...(data.content.metadata || {}),
+                                title: data.title
+                            }
+                        };
+                        const { coerceToStandardDiagramData } = await import('@/core/utils/coerceDiagram');
+                        const normalized = coerceToStandardDiagramData(baseData, { id: data.id, title: data.title });
+                        seedAutoSaveAndNavigate(normalized, data.id);
+                    } else {
+                        appMessage.error('模板内容为空');
+                    }
+                }
+            } catch (e: any) {
+                appMessage.error(`加载失败: ${e.message}`);
+            } finally {
+                messageKey();
+            }
+        } else if (rootGroup === 'gallery' || rootGroup === 'by-tags' || rootGroup === 'all-demos') {
+            const preset = PRESET_MAP[leafKey];
+            if (preset) {
+                const trueId = preset.id || leafKey;
+                seedAutoSaveAndNavigate({
+                    ...preset,
+                    id: trueId,
+                    metadata: { ...preset.metadata, title: preset.name }
+                }, trueId);
+            }
+        } else if (rootGroup === 'local-workspace') {
+            const d = localStorage.getItem('diagram-custom-presets');
+            if (d) {
+                try {
+                    const maps = JSON.parse(d);
+                    const found = maps[leafKey];
+                    if (found) {
+                        seedAutoSaveAndNavigate(found, found.id || leafKey);
+                    }
+                } catch (e) { }
+            }
+        }
+    };
+
     // --- Computed Views ---
     const filteredItems = useMemo(() => {
         let viewFiltered = unifiedItems;
@@ -601,7 +677,13 @@ const WorkspaceDashboardPage: React.FC = () => {
                             <span className="workspace-count">{unifiedItems.length} documents</span>
                         </div>
 
-                        <div className="workspace-actions-compact">
+                        <div className="workspace-actions-compact" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                            <TemplateCascaderMenu 
+                                templatesOnly={true} 
+                                onChange={handleTemplateMenuChange} 
+                                placeholder="选择模板..." 
+                                style={{ width: 160 }} 
+                            />
                             <Dropdown
                                 menu={{
                                     items: [

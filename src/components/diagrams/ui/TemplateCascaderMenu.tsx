@@ -13,6 +13,7 @@ export interface TemplateCascaderMenuProps {
   style?: React.CSSProperties;
   placeholder?: string;
   allowClear?: boolean;
+  templatesOnly?: boolean;
 }
 
 export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
@@ -20,9 +21,10 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
   onChange,
   style,
   placeholder = "搜索或选择图表...",
-  allowClear = true
+  allowClear = true,
+  templatesOnly = false
 }) => {
-  const { s3Diagrams, supabaseDiagrams, fetchCloudList } = useDiagramStorage();
+  const { s3Diagrams, supabaseDiagrams, systemTemplates, fetchCloudList } = useDiagramStorage();
 
   useEffect(() => {
     fetchCloudList();
@@ -65,8 +67,30 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       children: galleryChildren
     });
 
-    // --- 2. S3 Storage ---
-    if (s3Diagrams.length > 0) {
+    // --- 2. System Templates (Cloud Generic Templates) ---
+    if (systemTemplates && systemTemplates.length > 0) {
+      const byCategory: Record<string, any[]> = {};
+      systemTemplates.forEach(t => {
+         const cat = t.category || '未分类';
+         if (!byCategory[cat]) byCategory[cat] = [];
+         byCategory[cat].push(t);
+      });
+      
+      const stChildren: CascaderOption[] = Object.entries(byCategory).map(([cat, items]) => ({
+         value: `st-cat-${cat}`,
+         label: cat,
+         children: items.map(d => ({ value: d.id, label: d.title }))
+      }));
+
+      options.push({
+        value: 'system-templates',
+        label: <span><ApartmentOutlined style={{ marginRight: 8, color: '#eb2f96' }} />行业模板库</span>,
+        children: stChildren
+      });
+    }
+
+    // --- 3. S3 Storage ---
+    if (!templatesOnly && s3Diagrams.length > 0) {
       options.push({
         value: 's3',
         label: <span><CloudOutlined style={{ marginRight: 8, color: '#fa8c16' }} />S3 存储</span>,
@@ -74,16 +98,16 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       });
     }
 
-    // --- 3. Supabase Cloud ---
-    if (supabaseDiagrams.length > 0) {
+    // --- 4. Supabase Cloud ---
+    if (!templatesOnly && supabaseDiagrams.length > 0) {
       options.push({
         value: 'supabase',
-        label: <span><DatabaseOutlined style={{ marginRight: 8, color: '#3eaf7c' }} />Supabase 云端</span>,
+        label: <span><DatabaseOutlined style={{ marginRight: 8, color: '#3eaf7c' }} />个人云端图表</span>,
         children: supabaseDiagrams.map(d => ({ value: d.id, label: d.title || d.id }))
       });
     }
 
-    // --- 4. Local Workspace (Custom Saves) ---
+    // --- 5. Local Workspace (Custom Saves) ---
     const customPresets = Object.keys(PRESET_MAP).filter(k => k.startsWith('custom:'));
     if (customPresets.length > 0) {
       options.push({
@@ -94,7 +118,7 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
     }
 
     return options;
-  }, [s3Diagrams, supabaseDiagrams]);
+  }, [s3Diagrams, supabaseDiagrams, systemTemplates]);
 
   return (
     <Cascader
