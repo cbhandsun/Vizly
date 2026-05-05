@@ -68,6 +68,7 @@ export const SequenceMessageEdge = ({
       {label && (
         <EdgeLabelRenderer>
           <div
+            key={`${id}-label`}
             style={{
               position: 'absolute',
               transform: `translate(-50%, -100%) translate(${labelX}px,${labelY}px)`,

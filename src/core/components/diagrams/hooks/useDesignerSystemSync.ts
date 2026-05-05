@@ -80,6 +80,8 @@ export function useDesignerSystemSync({
                         // 强制延迟执行一次路由与 Layout
                         if (reactFlowInstance) {
                             setTimeout(() => {
+                                // 触发全局重新布局，确保无位置的节点能正确展开，解决零维度问题
+                                window.dispatchEvent(new CustomEvent('diagramControl', { detail: { action: 'layout' } }));
                                 reactFlowInstance.fitView({ padding: 0.2, duration: 400, minZoom: 0.55 });
                             }, 50);
                         }
@@ -529,15 +531,30 @@ export function useDesignerSystemSync({
                         }).catch(e => console.error('[DesignerSystemSync] standardDataToCanvas error:', e));
                     }).catch(e => console.error('[DesignerSystemSync] Import designerUtils failed:', e));
                 } else {
-                    // Normal plugin fallback empty state
-                    const plugin = PluginRegistry.getInstance().getPlugin(pluginId);
-                    if (plugin) {
-                        const emptyState = plugin.getEmptyState();
-                        setNodes(emptyState.nodes);
-                        setEdges(emptyState.edges);
-                        // ALWAYS trigger initial viewport adjustment, even for empty canvases
-                        needsInitialFitView.current = true;
-                    }
+                    // Try DataRegistry for imported/general templates before falling back to empty state
+                    import('@/data/DataRegistry').then(({ dataRegistry }) => {
+                        const localSvc = dataRegistry.getDataService();
+                        const existing = localSvc.getDiagram(id || '');
+                        if (existing) {
+                            import('../designerUtils').then(({ standardDataToCanvas }) => {
+                                standardDataToCanvas(existing).then(({ nodes: newNodes, edges: newEdges }) => {
+                                    setNodes(newNodes);
+                                    setEdges(newEdges);
+                                    needsInitialFitView.current = true;
+                                }).catch(e => console.error('[DesignerSystemSync] standardDataToCanvas error (registry):', e));
+                            });
+                        } else {
+                            // Normal plugin fallback empty state
+                            const plugin = PluginRegistry.getInstance().getPlugin(pluginId);
+                            if (plugin) {
+                                const emptyState = plugin.getEmptyState();
+                                setNodes(emptyState.nodes);
+                                setEdges(emptyState.edges);
+                                // ALWAYS trigger initial viewport adjustment, even for empty canvases
+                                needsInitialFitView.current = true;
+                            }
+                        }
+                    }).catch(e => console.error('[DesignerSystemSync] import DataRegistry failed:', e));
                 }
             }).catch(e => console.error('[DesignerSystemSync] load PRESET_MAP failed:', e));
         }
@@ -578,7 +595,7 @@ export function useDesignerSystemSync({
             // 给 RF 一点时间完成初次布局测量（通常 <1 帧，60ms 是保守值）
             setTimeout(triggerRoutingAfterMeasure, 60);
         }
-    }, [reactFlowInstance]);
+    }, [reactFlowInstance, nodes]);
 
     return {
         performanceMode

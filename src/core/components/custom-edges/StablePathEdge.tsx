@@ -153,6 +153,7 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
             {label && (
                 <EdgeLabelRenderer>
                     <div
+                        key={`${id}-label`}
                         style={{
                             position: 'absolute',
                             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,

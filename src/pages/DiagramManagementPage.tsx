@@ -232,6 +232,26 @@ const WorkspaceDashboardPage: React.FC = () => {
                 }
             }
 
+            // 5. Load General Templates (PRESET_MAP)
+            try {
+                const { PRESET_MAP } = await import('@/data/standardized');
+                Object.values(PRESET_MAP).forEach(preset => {
+                    const presetId = preset.id || preset.metadata?.title || preset.name || crypto.randomUUID();
+                    if (!newItems.find(item => item.id === `general_template_${presetId}`)) {
+                        newItems.push({
+                            id: `general_template_${presetId}`,
+                            title: preset.metadata?.title || preset.name || 'Untitled Template',
+                            updatedAt: 0,
+                            source: 'general_template',
+                            role: 'template',
+                            raw: preset
+                        });
+                    }
+                });
+            } catch(e) {
+                console.error("General templates fetch failed", e);
+            }
+
             // Sort by most recent
             newItems.sort((a, b) => b.updatedAt - a.updatedAt);
             setUnifiedItems(newItems);
@@ -267,12 +287,20 @@ const WorkspaceDashboardPage: React.FC = () => {
                 if (supabase) {
                     const { data, error } = await supabase.from('system_templates').select('content, title, id').eq('id', rawObj.id).single();
                     if (!error && data && data.content) {
+                        let parsedContent = data.content;
+                        if (typeof parsedContent === 'string') {
+                            try {
+                                parsedContent = JSON.parse(parsedContent);
+                            } catch (e) {
+                                console.error('Failed to parse template content', e);
+                            }
+                        }
                         const baseData = {
-                            ...data.content,
+                            ...parsedContent,
                             id: data.id,
-                            name: data.title || data.content.name,
+                            name: data.title || parsedContent.name,
                             metadata: {
-                                ...(data.content.metadata || {}),
+                                ...(parsedContent.metadata || {}),
                                 title: data.title
                             }
                         };
@@ -305,6 +333,37 @@ const WorkspaceDashboardPage: React.FC = () => {
             } finally {
                 messageKey();
             }
+            return;
+        }
+
+        if (item.source === 'general_template') {
+            const rawObj = item.raw as any;
+            const trueId = rawObj.id || crypto.randomUUID();
+            const baseData = {
+                ...rawObj,
+                id: trueId,
+                metadata: { ...rawObj.metadata, title: rawObj.name || rawObj.metadata?.title }
+            };
+            const { coerceToStandardDiagramData } = await import('@/core/utils/coerceDiagram');
+            const normalized = coerceToStandardDiagramData(baseData, { id: trueId, title: baseData.metadata.title });
+            
+            const localService = dataRegistry.getDataService();
+            const cloned = JSON.parse(JSON.stringify(normalized));
+            cloned.id = crypto.randomUUID(); // ensure fresh ID
+            localService.registerDiagram(cloned);
+            
+            try {
+                const configsRaw = localStorage.getItem('vizly_diagram_configs');
+                const configs: Record<string, any> = configsRaw ? JSON.parse(configsRaw) : {};
+                configs[cloned.id] = { id: cloned.id, type: cloned.type || 'flowchart', name: cloned.name, updatedAt: Date.now() };
+                localStorage.setItem('vizly_diagram_configs', JSON.stringify(configs));
+            } catch { /* ignore storage errors */ }
+            
+            try {
+                localStorage.removeItem(`flowchart-autosave-v2-${cloned.id}`);
+            } catch (e) {}
+
+            navigate(`/?diagram=${cloned.id}`);
             return;
         }
 
@@ -490,12 +549,20 @@ const WorkspaceDashboardPage: React.FC = () => {
                 if (supabase) {
                     const { data, error } = await supabase.from('system_templates').select('content, title, id').eq('id', leafKey).single();
                     if (!error && data && data.content) {
+                        let parsedContent = data.content;
+                        if (typeof parsedContent === 'string') {
+                            try {
+                                parsedContent = JSON.parse(parsedContent);
+                            } catch (e) {
+                                console.error('Failed to parse template content', e);
+                            }
+                        }
                         const baseData = {
-                            ...data.content,
+                            ...parsedContent,
                             id: data.id,
-                            name: data.title || data.content.name,
+                            name: data.title || parsedContent.name,
                             metadata: {
-                                ...(data.content.metadata || {}),
+                                ...(parsedContent.metadata || {}),
                                 title: data.title
                             }
                         };
@@ -515,11 +582,14 @@ const WorkspaceDashboardPage: React.FC = () => {
             const preset = PRESET_MAP[leafKey];
             if (preset) {
                 const trueId = preset.id || leafKey;
-                seedAutoSaveAndNavigate({
+                const baseData = {
                     ...preset,
                     id: trueId,
-                    metadata: { ...preset.metadata, title: preset.name }
-                }, trueId);
+                    metadata: { ...preset.metadata, title: preset.name || preset.metadata?.title }
+                };
+                const { coerceToStandardDiagramData } = await import('@/core/utils/coerceDiagram');
+                const normalized = coerceToStandardDiagramData(baseData, { id: trueId, title: baseData.metadata.title });
+                seedAutoSaveAndNavigate(normalized, trueId);
             }
         } else if (rootGroup === 'local-workspace') {
             const d = localStorage.getItem('diagram-custom-presets');
@@ -553,6 +623,9 @@ const WorkspaceDashboardPage: React.FC = () => {
                 break;
             case 'templates':
                 viewFiltered = unifiedItems.filter(i => i.source === 'template');
+                break;
+            case 'general_templates':
+                viewFiltered = unifiedItems.filter(i => i.source === 'general_template');
                 break;
         }
 
@@ -801,7 +874,11 @@ const WorkspaceDashboardPage: React.FC = () => {
                             </div>
                             <div className={`filter-tab ${activeView === 'templates' ? 'active' : ''}`} onClick={() => setActiveView('templates')}>
                                 <AppstoreOutlined /> 行业模板库
-                                <span className="filter-tab-count">{templatesCount}</span>
+                                <span className="filter-tab-count">{unifiedItems.filter(i => i.source === 'template').length}</span>
+                            </div>
+                            <div className={`filter-tab ${activeView === 'general_templates' ? 'active' : ''}`} onClick={() => setActiveView('general_templates')}>
+                                <BlockOutlined /> 通用模版
+                                <span className="filter-tab-count">{unifiedItems.filter(i => i.source === 'general_template').length}</span>
                             </div>
                         </div>
 

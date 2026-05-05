@@ -209,6 +209,7 @@ const EditableEdgeGraphicsComponent: React.FC<EditableEdgeGraphicsProps> = ({
                 <EdgeLabelRenderer>
                     {isEditingLabel ? (
                         <div
+                            key={`${id}-label-editing`}
                             style={{
                                 position: 'absolute',
                                 transform: `translate(-50%, -50%) translate(${labelPos.x}px, ${labelPos.y}px)`,
@@ -250,6 +251,7 @@ const EditableEdgeGraphicsComponent: React.FC<EditableEdgeGraphicsProps> = ({
                         </div>
                     ) : (
                         <div
+                            key={`${id}-label-display`}
                             className="edge-label-premium nodrag nopan"
                             style={{
                                 position: 'absolute',

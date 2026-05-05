@@ -32,7 +32,9 @@ export const SmartGuideRenderer: React.FC<SmartGuideRendererProps> = React.memo(
 
     return (
         <EdgeLabelRenderer>
-            <div style={{
+            <div
+                key="smart-guide-renderer-container"
+                style={{
                 position: 'absolute',
                 width: '100%',
                 height: '100%',
