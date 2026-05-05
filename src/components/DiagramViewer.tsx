@@ -961,6 +961,34 @@ const DiagramViewer: React.FC = () => {
                                             } finally {
                                                 messageKey();
                                             }
+                                        } else if (rootGroup === 'system-templates') {
+                                            const messageKey = appMessage.loading('正在加载云端模板...', 0);
+                                            try {
+                                                const { supabase } = await import('@/services/supabase');
+                                                if (supabase) {
+                                                    const { data, error } = await supabase.from('system_templates').select('content, title, id').eq('id', leafKey).single();
+                                                    if (!error && data && data.content) {
+                                                        const baseData = {
+                                                            ...data.content,
+                                                            id: data.id,
+                                                            name: data.title || data.content.name,
+                                                            metadata: {
+                                                                ...(data.content.metadata || {}),
+                                                                title: data.title
+                                                            }
+                                                        };
+                                                        const { coerceToStandardDiagramData } = await import('@/core/utils/coerceDiagram');
+                                                        const normalized = coerceToStandardDiagramData(baseData, { id: data.id, title: data.title });
+                                                        seedAutoSaveAndNavigate(normalized, data.id);
+                                                    } else {
+                                                        appMessage.error('模板内容为空');
+                                                    }
+                                                }
+                                            } catch (e: any) {
+                                                appMessage.error(`加载失败: ${e.message}`);
+                                            } finally {
+                                                messageKey();
+                                            }
                                         } else {
                                             if (rootGroup === 'local-workspace') {
                                                 const d = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY);

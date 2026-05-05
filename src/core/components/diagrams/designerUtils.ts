@@ -311,7 +311,7 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
 
         nodes.push({
             id: n.id,
-            type: 'flowchart',
+            type: n.type || 'flowchart',
             // 坐标：有保存坐标就用，没有就先设 (0,0) 让布局后算
             position: hasCanvasPositions
                 ? (metadata.canvasPosition || { x: 100 + (idx % 5) * 150, y: 100 + Math.floor(idx / 5) * 100 })
@@ -358,6 +358,7 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
 
     // 3. Process Edges
     data.edges.forEach(e => {
+        const edgeId = e.id || `e-${e.source}-${e.target}-${Math.random().toString(36).substring(2,9)}`;
         if (hasCanvasPositions) {
             // 有保存坐标：使用保存的边数据
             const edgeType = e.type === 'main' ? 'advanced-smart-step' : (e.type || 'advanced-smart-step');
@@ -365,7 +366,7 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
                 ? e.metadata?.autoHandles
                 : ((e.metadata?.manualHandles === true) ? undefined : ((e.metadata?.sourceHandle || e.metadata?.targetHandle) ? ['source', 'target'] : undefined));
             edges.push({
-                id: e.id,
+                id: edgeId,
                 source: e.source,
                 target: e.target,
                 type: edgeType,
@@ -381,11 +382,12 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
             const direction = (data.layout?.direction === 'LR' || data.layout?.direction === 'RL') ? 'LR' : 'TB';
             const srcH = direction === 'LR' ? 'right' : 'bottom';
             const tgtH = direction === 'LR' ? 'left' : 'top';
+            const edgeType = e.type === 'main' ? 'advanced-smart-step' : (e.type || 'advanced-smart-step');
             edges.push({
-                id: e.id,
+                id: edgeId,
                 source: e.source,
                 target: e.target,
-                type: 'advanced-smart-step',
+                type: edgeType,
                 label: e.label,
                 sourceHandle: srcH,
                 targetHandle: tgtH,

@@ -33,7 +33,7 @@ const coerceNode = (node: any, index: number): StandardNodeData | null => {
   );
   const domain = typeof node.domain === 'string' && node.domain ? node.domain
     : (typeof node.data?.domain === 'string' && node.data.domain ? node.data.domain : 'default');
-  const type = typeof node.type === 'string' && node.type ? node.type : 'custom';
+  const type = typeof node.type === 'string' && node.type ? node.type : 'flowchart';
   return { ...node, id, description: desc, domain, type } as StandardNodeData;
 };
 
