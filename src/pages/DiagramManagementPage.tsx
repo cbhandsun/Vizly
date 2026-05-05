@@ -41,15 +41,15 @@ import { AuthModal } from '@/components/auth/AuthModal';
 import { coerceToStandardDiagramDataWithReport } from '@/core';
 import RemoteDiagramCover from '@/components/shared/RemoteDiagramCover';
 import { PRESET_MAP } from '@/data/standardized';
-import { TemplateCascaderMenu } from '@/components/diagrams/ui/TemplateCascaderMenu';
+import { supabase } from '@/services/supabase';
 
 import './WorkspaceDashboard.css';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 
 
 // --- Unified Data Types ---
-type DataSourceType = 'local' | 'supabase' | 's3';
-type FilterViewType = 'recent' | 'local' | 'cloud' | 'shared';
+type DataSourceType = 'local' | 'supabase' | 's3' | 'template';
+type FilterViewType = 'recent' | 'local' | 'cloud' | 'shared' | 'templates';
 type ViewMode = 'grid' | 'list';
 type SortKey = 'updated' | 'name' | 'type';
 
@@ -205,6 +205,33 @@ const WorkspaceDashboardPage: React.FC = () => {
                 }
             }
 
+            // 4. Load System Templates
+            if (supabase) {
+                try {
+                    const { data } = await supabase
+                        .from('system_templates')
+                        .select('id, title, category, tags, sort_order')
+                        .eq('is_active', true)
+                        .order('sort_order', { ascending: true })
+                        .order('created_at', { ascending: false });
+                    
+                    if (data) {
+                        data.forEach(t => {
+                            newItems.push({
+                                id: `template_${t.id}`,
+                                title: t.title,
+                                updatedAt: 0,
+                                source: 'template',
+                                role: 'template',
+                                raw: { id: t.id, title: t.title } as any
+                            });
+                        });
+                    }
+                } catch(e) {
+                    console.error("System templates fetch failed", e);
+                }
+            }
+
             // Sort by most recent
             newItems.sort((a, b) => b.updatedAt - a.updatedAt);
             setUnifiedItems(newItems);
@@ -230,6 +257,54 @@ const WorkspaceDashboardPage: React.FC = () => {
 
         if (item.source === 'supabase' && !user) {
             setIsAuthModalOpen(true);
+            return;
+        }
+
+        if (item.source === 'template') {
+            const rawObj = item.raw as any;
+            const messageKey = appMessage.loading('Loading template...', 0);
+            try {
+                if (supabase) {
+                    const { data, error } = await supabase.from('system_templates').select('content, title, id').eq('id', rawObj.id).single();
+                    if (!error && data && data.content) {
+                        const baseData = {
+                            ...data.content,
+                            id: data.id,
+                            name: data.title || data.content.name,
+                            metadata: {
+                                ...(data.content.metadata || {}),
+                                title: data.title
+                            }
+                        };
+                        const { coerceToStandardDiagramData } = await import('@/core/utils/coerceDiagram');
+                        const normalized = coerceToStandardDiagramData(baseData, { id: data.id, title: data.title });
+                        
+                        const localService = dataRegistry.getDataService();
+                        const cloned = JSON.parse(JSON.stringify(normalized));
+                        cloned.id = crypto.randomUUID(); // ensure fresh ID
+                        localService.registerDiagram(cloned);
+                        
+                        try {
+                            const configsRaw = localStorage.getItem('vizly_diagram_configs');
+                            const configs: Record<string, any> = configsRaw ? JSON.parse(configsRaw) : {};
+                            configs[cloned.id] = { id: cloned.id, type: cloned.type || 'flowchart', name: cloned.name, updatedAt: Date.now() };
+                            localStorage.setItem('vizly_diagram_configs', JSON.stringify(configs));
+                        } catch { /* ignore storage errors */ }
+                        
+                        try {
+                            localStorage.removeItem(`flowchart-autosave-v2-${cloned.id}`);
+                        } catch (e) {}
+
+                        navigate(`/?diagram=${cloned.id}`);
+                    } else {
+                        appMessage.error('Template content empty.');
+                    }
+                }
+            } catch (e: any) {
+                appMessage.error(`Failed to load template: ${e.message}`);
+            } finally {
+                messageKey();
+            }
             return;
         }
 
@@ -465,7 +540,7 @@ const WorkspaceDashboardPage: React.FC = () => {
         let viewFiltered = unifiedItems;
         switch (activeView) {
             case 'recent':
-                viewFiltered = unifiedItems.slice(0, 30);
+                viewFiltered = unifiedItems.filter(i => i.source !== 'template').slice(0, 30);
                 break;
             case 'local':
                 viewFiltered = unifiedItems.filter(i => i.source === 'local');
@@ -475,6 +550,9 @@ const WorkspaceDashboardPage: React.FC = () => {
                 break;
             case 'shared':
                 viewFiltered = unifiedItems.filter(i => i.role === 'viewer');
+                break;
+            case 'templates':
+                viewFiltered = unifiedItems.filter(i => i.source === 'template');
                 break;
         }
 
@@ -594,8 +672,9 @@ const WorkspaceDashboardPage: React.FC = () => {
 
     // --- Computed Counts ---
     const localCount = useMemo(() => unifiedItems.filter(i => i.source === 'local').length, [unifiedItems]);
-    const cloudCount = useMemo(() => unifiedItems.filter(i => i.source !== 'local' && i.role !== 'viewer').length, [unifiedItems]);
+    const cloudCount = useMemo(() => unifiedItems.filter(i => i.source === 's3' || i.source === 'supabase').length, [unifiedItems]);
     const sharedCount = useMemo(() => unifiedItems.filter(i => i.role === 'viewer').length, [unifiedItems]);
+    const templatesCount = useMemo(() => unifiedItems.filter(i => i.source === 'template').length, [unifiedItems]);
 
     return (
         <div className="workspace-dashboard">
@@ -678,15 +757,6 @@ const WorkspaceDashboardPage: React.FC = () => {
                         </div>
 
                         <div className="workspace-actions-compact" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                            <TemplateCascaderMenu 
-                                templatesOnly={true} 
-                                onChange={handleTemplateMenuChange} 
-                            >
-                                <button className="create-btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '36px', padding: '0 16px', background: 'var(--vz-bg-elevated)', border: '1px solid var(--vz-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--vz-text-primary)' }}>
-                                    <AppstoreOutlined />
-                                    行业模板库
-                                </button>
-                            </TemplateCascaderMenu>
                             <Dropdown
                                 menu={{
                                     items: [
@@ -715,7 +785,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                         <div className="workspace-filter-tabs">
                             <div className={`filter-tab ${activeView === 'recent' ? 'active' : ''}`} onClick={() => setActiveView('recent')}>
                                 <ClockCircleOutlined /> Recent
-                                <span className="filter-tab-count">{unifiedItems.length}</span>
+                                <span className="filter-tab-count">{unifiedItems.filter(i => i.source !== 'template').length}</span>
                             </div>
                             <div className={`filter-tab ${activeView === 'local' ? 'active' : ''}`} onClick={() => setActiveView('local')}>
                                 <LaptopOutlined /> Local
@@ -728,6 +798,10 @@ const WorkspaceDashboardPage: React.FC = () => {
                             <div className={`filter-tab ${activeView === 'shared' ? 'active' : ''}`} onClick={() => setActiveView('shared')}>
                                 <ShareAltOutlined /> Shared
                                 <span className="filter-tab-count">{sharedCount}</span>
+                            </div>
+                            <div className={`filter-tab ${activeView === 'templates' ? 'active' : ''}`} onClick={() => setActiveView('templates')}>
+                                <AppstoreOutlined /> 行业模板库
+                                <span className="filter-tab-count">{templatesCount}</span>
                             </div>
                         </div>
 
