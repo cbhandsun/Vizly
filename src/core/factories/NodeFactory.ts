@@ -128,18 +128,19 @@ export class NodeFactory {
     const normalizedType = (() => {
       const raw = (config.type as any);
       if (typeof raw === 'string') {
-        const s = raw.trim().toLowerCase();
-        if (s === 'titlegroup') return 'titleGroup';
-        if (s === 'subgroup') return 'subGroup';
-        if (s === 'networknode') return 'networkNode';
-        if (s === 'networkcontainer') return 'networkContainer';
-        if (s === 'domain' || s === 'input' || s === 'output' || s === 'default' || s === 'custom') {
-          return s;
-        }
-        // 其他未注册类型（如 system/module/feature）统一回退为 custom
-        return 'custom';
+        const s = raw.trim();
+        const lowerS = s.toLowerCase();
+        if (lowerS === 'titlegroup') return 'titleGroup';
+        if (lowerS === 'subgroup') return 'subGroup';
+        if (lowerS === 'networknode') return 'networkNode';
+        if (lowerS === 'networkcontainer') return 'networkContainer';
+        if (lowerS === 'architecturenode') return 'architectureNode';
+        if (lowerS === 'flowchart') return 'flowchart';
+        if (lowerS === 'swimlane') return 'swimlane';
+        if (lowerS === 'mindmap') return 'mindmap';
+        if (lowerS === 'sticky-note') return 'sticky-note';
+        return s; // 保留原始类型，不要强制转为 custom
       }
-      // 若为枚举或其他类型，直接使用；枚举值本身为字符串（如 'subGroup'）
       return raw ?? 'custom';
     })();
 

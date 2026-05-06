@@ -56,7 +56,7 @@
 .ant-tooltip-inner,
 .ant-modal-content,
 .ant-drawer-content {
-    background-color: var(--designer-panel-bg, rgba(255, 255, 255, 0.72)) !important;
+    background-color: var(--designer-panel-bg, rgba(255, 255, 255, 0.92)) !important;
     backdrop-filter: var(--designer-blur, blur(24px) saturate(180%)) !important;
     -webkit-backdrop-filter: var(--designer-blur, blur(24px) saturate(180%)) !important;
     box-shadow: var(--designer-shadow, 0 20px 40px -10px rgba(0, 0, 0, 0.1)) !important;
@@ -75,7 +75,7 @@
 [data-theme='dark'] .ant-tooltip-inner,
 [data-theme='dark'] .ant-modal-content,
 [data-theme='dark'] .ant-drawer-content {
-    background-color: rgba(28, 28, 41, 0.65) !important;
+    background-color: rgba(28, 28, 41, 0.90) !important;
     border: 1px solid rgba(255, 255, 255, 0.12) !important;
 }
 

@@ -57,10 +57,9 @@ export class ReactFlowAdapter {
       const domainClass = (nodeData as any).domainClass;
       const subDomain = (nodeData as any).subDomain; // 顶层 subDomain 需要透传到 data 供分组使用
       const extraData = (nodeData.metadata || {}) as Record<string, any>;
-      // 规范节点类型：仅当为已注册类型时保留，否则统一为 custom
-      const rawType = String((nodeData as any).type || '').trim().toLowerCase();
-      const allowed = new Set(['custom','titlegroup','subgroup','domain','input','output','default']);
-      const normalizedType = allowed.has(rawType) ? (rawType === 'titlegroup' ? 'titleGroup' : rawType === 'subgroup' ? 'subGroup' : rawType) : 'custom';
+      // 规范节点类型：保留原始类型，若为空则回退为 custom
+      const rawType = String((nodeData as any).type || '').trim();
+      const normalizedType = rawType ? rawType : 'custom';
       /**
        * 函数级注释：节点数据透传与规范
        * - 直传 `domainClass` 到 `node.data`，以便渲染层按域类解析主题颜色。
@@ -72,9 +71,12 @@ export class ReactFlowAdapter {
         id: nodeData.id,
         description: nodeData.description || '',
         type: normalizedType as any,
-        position: { x: 0, y: 0 },
+        position: (nodeData as any).position || { x: 0, y: 0 },
+        width: (nodeData as any).width,
+        height: (nodeData as any).height,
         // 将域与元数据（如 stage）写入节点数据，供布局策略使用
         data: {
+          ...(nodeData as any).data,
           ...extraData,
           domain,
           domainClass,
@@ -121,6 +123,7 @@ export class ReactFlowAdapter {
           : defaultEdgeType;
 
   const data = {
+    ...(edgeData as any).data,
     ...metadata,
     sourceDomain: idToDomain.get(edgeData.source),
     targetDomain: idToDomain.get(edgeData.target),
@@ -136,7 +139,7 @@ export class ReactFlowAdapter {
       }
 
       return EdgeFactory.getInstance().createEdge({
-        id: edgeData.id ?? `e-${edgeData.source}-${edgeData.target}`,
+        id: edgeData.id ?? `e-${edgeData.source}-${edgeData.target}-${Math.random().toString(36).substring(2,9)}`,
         source: edgeData.source,
         target: edgeData.target,
         type: edgeType as EdgeType, // 显式类型断言

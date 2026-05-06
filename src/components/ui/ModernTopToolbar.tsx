@@ -48,7 +48,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '');
   const commandShortcutLabel = isMac ? '⌘K' : 'Ctrl+K';
 
-  const islandBaseClass = "flex items-center h-[40px] bg-white dark:bg-[#2d2d2d] border border-[rgba(0,0,0,0.12)] dark:border-[rgba(255,255,255,0.12)] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.08)] px-2 transition-all duration-200 pointer-events-auto";
+  const islandBaseClass = "flex items-center h-[40px] bg-white dark:bg-[#2d2d2d] border border-[rgba(0,0,0,0.12)] dark:border-[rgba(255,255,255,0.12)] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all duration-200 pointer-events-auto";
 
   /* ── Menu Content ── */
   const moreContent = useMemo(() => (
@@ -85,17 +85,17 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       
       {/* ── LEFT SECTION: Brand + Project + Search (unified pill) ── */}
       <div className="flex-[0_1_auto] flex items-center min-w-0">
-        <div className={`${islandBaseClass} px-2 shrink-0`}>
+        <div className={`${islandBaseClass} gap-1 shrink-0`} style={{ paddingLeft: '14px', paddingRight: '14px' }}>
           <a 
             href="#/manage" 
-            className="flex items-center gap-1.5 px-1 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-all no-underline active:scale-95"
+            className="flex items-center gap-2 px-1.5 py-1 rounded-[6px] hover:bg-black/5 dark:hover:bg-white/5 transition-all no-underline active:scale-95"
             onClick={(e) => { e.preventDefault(); window.location.hash = '#/manage'; }}
           >
-            <div className="w-5 h-5 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-md flex items-center justify-center shadow-sm">
-              <span className="text-[10px] font-black text-white italic">V</span>
+            <div className="w-[22px] h-[22px] bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-md flex items-center justify-center shadow-sm">
+              <span className="text-[11px] font-black text-white italic">V</span>
             </div>
             {!isMobile && (
-              <span className="text-[14px] font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-500">
+              <span className="text-[14.5px] font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-500">
                 Vizly
               </span>
             )}
@@ -103,7 +103,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
 
           {title && (
             <div className="flex items-center min-w-0">
-              <RightOutlined className="text-[9px] text-slate-300 dark:text-slate-600 mx-1 flex-shrink-0" />
+              <RightOutlined className="text-[10px] text-slate-300 dark:text-slate-600 mx-1.5 flex-shrink-0" />
               <Popover
                 content={
                   <div className="w-[360px] p-1">
@@ -117,11 +117,11 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
                 placement="bottomLeft"
               >
                 <Tooltip title={t('diagramViewer.switchDiagram', '切换图表')} mouseEnterDelay={0.6}>
-                  <div className="flex items-center gap-1 px-2 h-[32px] rounded-[6px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer transition-colors active:scale-[0.97] min-w-0 group">
-                    <span className="font-semibold text-[13.5px] text-slate-700 dark:text-slate-200 truncate max-w-[80px] sm:max-w-[160px] lg:max-w-[240px]">
+                  <div className="flex items-center gap-1.5 px-2.5 h-[32px] rounded-[6px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer transition-colors active:scale-[0.97] min-w-0 group">
+                    <span className="font-semibold text-[14px] text-slate-700 dark:text-slate-200 truncate max-w-[80px] sm:max-w-[160px] lg:max-w-[240px]">
                       {title}
                     </span>
-                    <FaChevronDown className="text-[8px] text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors flex-shrink-0" />
+                    <FaChevronDown className="text-[9px] text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors flex-shrink-0" />
                   </div>
                 </Tooltip>
               </Popover>
@@ -131,14 +131,14 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
           {/* Search — integrated into the same pill */}
           {!isMobile && setIsCommandOpen && (
             <>
-              <div className="w-[1px] h-4 bg-slate-200/80 dark:bg-white/10 mx-1 flex-shrink-0" />
+              <div className="w-[1px] h-[18px] bg-slate-200 dark:bg-white/10 mx-1.5 flex-shrink-0" />
               <div 
-                className="flex items-center gap-1.5 px-1.5 h-[32px] rounded-[6px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer transition-colors group"
+                className="flex items-center gap-2 px-2 h-[32px] rounded-[6px] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer transition-colors group"
                 onClick={() => setIsCommandOpen(true)}
               >
-                <SearchOutlined className="text-[14px] text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300" />
-                <div className="flex items-center px-1 py-0.5 bg-black/[0.04] dark:bg-white/[0.06] rounded-[4px]">
-                  <span className="text-[9px] font-semibold text-slate-400 dark:text-slate-500">{commandShortcutLabel}</span>
+                <SearchOutlined className="text-[15px] text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300" />
+                <div className="flex items-center px-1.5 py-[3px] bg-black/[0.04] dark:bg-white/[0.06] rounded-[4px] border border-black/[0.02] dark:border-white/[0.04]">
+                  <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider leading-none">{commandShortcutLabel}</span>
                 </div>
               </div>
             </>
@@ -147,10 +147,10 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       </div>
 
       {/* ── CENTER SECTION: Tools ── */}
-      <div className="flex-1 flex items-center justify-center min-w-0 overflow-hidden">
-        <div className="flex items-center gap-2 max-w-full overflow-hidden">
+      <div className="flex-1 flex items-center justify-center min-w-0">
+        <div className="flex items-center gap-2 max-w-full">
           {/* Core Tools Pill */}
-          <div className={`${islandBaseClass} overflow-hidden shrink-0`}>
+          <div className={`${islandBaseClass} px-2 shrink-0`}>
             {centerChildren}
             <div id="vizly-plugin-center-island-portal" className="flex items-center gap-0.5 empty:hidden" />
           </div>
@@ -158,16 +158,16 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
           {/* Contextual Toolbar Pill (Dynamic Actions) */}
           <div 
             id="vizly-plugin-context-toolbar-portal" 
-            className={`${islandBaseClass} empty:hidden overflow-hidden`}
+            className={`${islandBaseClass} px-2 empty:hidden`}
           />
         </div>
       </div>
 
       {/* ── RIGHT SECTION: System ── */}
       <div className="flex-[0_1_auto] flex items-center justify-end gap-2 min-w-0">
-        <div id="vizly-plugin-right-island-portal" className={`${islandBaseClass} empty:hidden overflow-hidden`} />
+        <div id="vizly-plugin-right-island-portal" className={`${islandBaseClass} px-2 empty:hidden`} />
         
-        <div className={`${islandBaseClass} shrink-0`}>
+        <div className={`${islandBaseClass} px-2 shrink-0`}>
           {rightChildren}
           
           <div className="flex items-center gap-0.5">

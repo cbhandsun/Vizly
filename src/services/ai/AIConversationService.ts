@@ -81,9 +81,17 @@ class AIConversationService {
         }
     }
 
+    private getStorageKey(): string {
+        return this.currentUserId ? `AIChatPanel.conversations_${this.currentUserId}` : 'AIChatPanel.conversations_anonymous';
+    }
+
+    private getActiveIdKey(): string {
+        return this.currentUserId ? `AIChatPanel.activeId_${this.currentUserId}` : 'AIChatPanel.activeId_anonymous';
+    }
+
     getConversations(): Conversation[] {
         try {
-            const saved = localStorage.getItem(CONVERSATIONS_STORAGE_KEY);
+            const saved = localStorage.getItem(this.getStorageKey());
             if (saved) {
                 const parsed = JSON.parse(saved);
                 // Guard against corrupted or migrated data (e.g., a non-array was serialised)
@@ -98,7 +106,7 @@ class AIConversationService {
 
     saveConversations(conversations: Conversation[], syncCloud: boolean = true) {
         try {
-            localStorage.setItem(CONVERSATIONS_STORAGE_KEY, JSON.stringify(conversations));
+            localStorage.setItem(this.getStorageKey(), JSON.stringify(conversations));
             // 如果需要，这里可以限制并发或进行全量同步，但通常 upsert 单条更好
         } catch (e) {
             console.error('Failed to save conversations', e);
@@ -106,14 +114,14 @@ class AIConversationService {
     }
 
     getActiveConversationId(): string | null {
-        return localStorage.getItem(ACTIVE_CONVERSATION_ID_KEY);
+        return localStorage.getItem(this.getActiveIdKey());
     }
 
     setActiveConversationId(id: string | null) {
         if (id) {
-            localStorage.setItem(ACTIVE_CONVERSATION_ID_KEY, id);
+            localStorage.setItem(this.getActiveIdKey(), id);
         } else {
-            localStorage.removeItem(ACTIVE_CONVERSATION_ID_KEY);
+            localStorage.removeItem(this.getActiveIdKey());
         }
     }
 

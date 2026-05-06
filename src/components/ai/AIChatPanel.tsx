@@ -37,12 +37,13 @@ import {
 } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { getAIConfig, AI_CONFIG_KEY } from './AIConfigModal';
+import { getAIConfig, AI_CONFIG_KEY, getAIConfigKey } from './AIConfigModal';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { unifiedStorage } from '@/services/UnifiedStorageService';
 import { PluginRegistry } from '@/core/services/PluginRegistry';
 import { aiConversationService, Conversation, Message } from '@/services/ai/AIConversationService';
+import { dataRegistry } from '@/data/DataRegistry';
 import { 
     DIAGRAM_SYSTEM_PROMPT, 
     MINDMAP_SYSTEM_PROMPT,
@@ -54,6 +55,7 @@ import List from 'antd/es/list';
 import Tooltip from 'antd/es/tooltip';
 import Popconfirm from 'antd/es/popconfirm';
 import { Node, Edge } from '@xyflow/react';
+import { extractJson } from './useAIChatStreaming';
 import { 
     CanvasOperations, 
     AIChatPanelProps
@@ -110,13 +112,6 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
     return (
         <div className={`ai-chat-message ${item.role}`}>
-            <div className="ai-chat-avatar">
-                {isAi ? (
-                    <Avatar icon={<RobotOutlined />} className="avatar-ai" />
-                ) : (
-                    <Avatar icon={<UserOutlined />} className="avatar-user" />
-                )}
-            </div>
             <div className="ai-chat-bubble">
                 <div className="ai-chat-bubble-content">
                     {item.reasoningContent && (
@@ -124,9 +119,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
                             <Collapse
                                 ghost
                                 size="small"
+                                expandIcon={({ isActive }) => <RobotOutlined style={{ color: isActive ? 'var(--color-primary-500, #1677ff)' : '#999', transition: 'all 0.3s' }} />}
                                 items={[{
                                     key: 'reasoning',
-                                    label: <Typography.Text type="secondary" italic>{t('aiChat.reasoning') || 'Thinking Process...'}</Typography.Text>,
+                                    label: <Typography.Text type="secondary" style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>{item.isStreaming ? (<span className="reasoning-pulse-dot" />) : null}{t('aiChat.reasoning') || 'Thinking Process...'}</Typography.Text>,
                                     children: (
                                         <div className="reasoning-content-inner">
                                             {item.reasoningContent}
@@ -150,28 +146,19 @@ const MessageItem: React.FC<MessageItemProps> = ({
                     {item.isStreaming && <span className="ai-chat-cursor" />}
                 </div>
 
-                {/* JSON Action Buttons */}
+                {/* JSON Action Buttons - Capsule Toolbar */}
                 {isAi && item.hasJson && item.jsonContent && (
-                    <div className="ai-chat-actions">
-                        <Space direction="vertical" style={{ width: '100%' }} size={4}>
-                            <Space size={8} style={{ width: '100%', justifyContent: 'space-between' }}>
+                    <div className="ai-chat-actions-capsule">
+                        <Space size={4} split={<div style={{ width: 1, height: 14, background: 'rgba(0,0,0,0.06)' }} />}>
+                            <Tooltip title={t('aiChat.previewJson')}>
                                 <Button 
+                                    type="text"
                                     size="small" 
+                                    className="action-icon-btn"
                                     icon={<CodeOutlined />} 
                                     onClick={() => onPreviewJson?.(item.jsonContent!)}
-                                >
-                                    {t('aiChat.previewJson')}
-                                </Button>
-                                <Button 
-                                    size="small" 
-                                    type="primary" 
-                                    className="action-btn-apply"
-                                    icon={<CheckCircleOutlined />} 
-                                    onClick={() => onApplyJson?.(item.jsonContent!)}
-                                >
-                                    {t('aiChat.applyToCanvas')}
-                                </Button>
-                            </Space>
+                                />
+                            </Tooltip>
                             
                             <Dropdown
                                 menu={{
@@ -183,10 +170,22 @@ const MessageItem: React.FC<MessageItemProps> = ({
                                     onClick: ({ key }) => handleSaveDiagramTo?.(item.jsonContent!, key as any)
                                 }}
                             >
-                                <Button size="small" icon={<DownOutlined />} style={{ width: '100%' }}>
-                                    {t('aiChat.saveDiagram')}
-                                </Button>
+                                <Tooltip title={t('aiChat.saveDiagram')}>
+                                    <Button type="text" size="small" className="action-icon-btn" icon={<DownOutlined />} />
+                                </Tooltip>
                             </Dropdown>
+
+                            <Tooltip title={t('aiChat.applyToCanvas')}>
+                                <Button 
+                                    size="small" 
+                                    type="primary" 
+                                    className="action-btn-apply-capsule"
+                                    icon={<CheckCircleOutlined />} 
+                                    onClick={() => onApplyJson?.(item.jsonContent!)}
+                                >
+                                    应用图表
+                                </Button>
+                            </Tooltip>
                         </Space>
                     </div>
                 )}
@@ -230,7 +229,10 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         { key: '/help', label: t('aiChat.commands.help.label'), description: t('aiChat.commands.help.desc') },
     ], [t]);
 
-    const [conversations, setConversations] = useState<Conversation[]>(() => aiConversationService.getConversations());
+    const [conversations, setConversations] = useState<Conversation[]>(() => {
+        aiConversationService.setUserId(user?.id || null);
+        return aiConversationService.getConversations();
+    });
     const [activeId, setActiveId] = useState<string | null>(() => aiConversationService.getActiveConversationId());
     const [inputValue, setInputValue] = useState('');
     const [loading, setLoading] = useState(false);
@@ -239,17 +241,18 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     const [filteredCommands, setFilteredCommands] = useState(SLASH_COMMANDS);
     const [isListening, setIsListening] = useState(false); // Voice UI Feedback state
 
-    const [aiConfig, setAiConfig] = useState(() => getAIConfig());
+    const [aiConfig, setAiConfig] = useState(() => getAIConfig(user?.id));
 
     useEffect(() => {
-        const handleConfigChange = () => setAiConfig(getAIConfig());
+        setAiConfig(getAIConfig(user?.id));
+        const handleConfigChange = () => setAiConfig(getAIConfig(user?.id));
         window.addEventListener('storage', handleConfigChange);
         window.addEventListener('aiConfigChanged', handleConfigChange);
         return () => {
             window.removeEventListener('storage', handleConfigChange);
             window.removeEventListener('aiConfigChanged', handleConfigChange);
         };
-    }, []);
+    }, [user?.id]);
 
     const availableModels = useMemo(() => {
         const models: { label: string, value: string, group: string }[] = [];
@@ -279,11 +282,11 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                 if (aiConfig.activeModelKey !== fallback.value) {
                     const newConfig = { ...aiConfig, activeModelKey: fallback.value };
                     setAiConfig(newConfig);
-                    localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(newConfig));
+                    localStorage.setItem(getAIConfigKey(user?.id), JSON.stringify(newConfig));
                 }
             }
         }
-    }, [aiConfig, availableModels]);
+    }, [aiConfig, availableModels, user?.id]);
 
     // Find the readable name for the currently active model (even if disabled)
     const activeModelName = useMemo(() => {
@@ -301,7 +304,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     const handleModelChange = (val: string) => {
         const newConfig = { ...aiConfig, activeModelKey: val };
         setAiConfig(newConfig);
-        localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(newConfig));
+        localStorage.setItem(getAIConfigKey(user?.id), JSON.stringify(newConfig));
         appMessage.success(t('aiChat.autoSwitched', { name: availableModels.find(m => m.value === val)?.label || val }));
     };
 
@@ -330,10 +333,27 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         if (user?.id) {
             aiConversationService.syncFromCloud().then(convs => {
                 setConversations(convs);
-                if (!activeId && convs.length > 0) {
+                const active = aiConversationService.getActiveConversationId();
+                if (active && convs.some(c => c.id === active)) {
+                    setActiveId(active);
+                } else if (convs.length > 0) {
                     setActiveId(convs[0].id);
+                } else {
+                    setActiveId(null);
                 }
             });
+        } else {
+            // Load anonymous local conversations
+            const localConvs = aiConversationService.getConversations();
+            setConversations(localConvs);
+            const active = aiConversationService.getActiveConversationId();
+            if (active && localConvs.some(c => c.id === active)) {
+                setActiveId(active);
+            } else if (localConvs.length > 0) {
+                setActiveId(localConvs[0].id);
+            } else {
+                setActiveId(null);
+            }
         }
     }, [user?.id]);
 
@@ -400,47 +420,6 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [onClose]);
-
-    // 增强版 JSON 提取与残缺容错
-    const extractJson = (content: string, isStreaming: boolean = false): string | null => {
-        // 尝试匹配完整包裹的 ```json 块
-        const jsonMatch = content.match(/```json\n([\s\S]*?)(?:\n```|$)/);
-        let rawStr = jsonMatch ? jsonMatch[1] : content;
-
-        // 如果不是在流传输中或者本来就能 parse，直接过
-        try {
-            const potentialJson = JSON.parse(rawStr);
-            if (potentialJson && (potentialJson.nodes || potentialJson.edges)) {
-                return rawStr;
-            }
-        } catch { }
-
-        // 如果正在 streaming，尝试主动修补尾部的缺失括号
-        if (isStreaming) {
-            try {
-                // 1. 掐去最后一个不完整的节点或边（寻找最后一个完整的 '}'）
-                const lastBraceIdx = rawStr.lastIndexOf('}');
-                if (lastBraceIdx === -1) return null;
-                
-                let trimStr = rawStr.substring(0, lastBraceIdx + 1);
-
-                // 2. 检查数组闭合，并强行打补丁
-                const openNodes = (trimStr.match(/"nodes"\s*:\s*\[/g) || []).length;
-                const closeNodes = (trimStr.match(/]/g) || []).length; // 粗略估算
-
-                // 用一个简单暴力的修补策略：看看能不能闭合出 nodes 数组和根对象
-                const patched = trimStr + ']}';
-                const parsed = JSON.parse(patched);
-                if (parsed && Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
-                    return patched;
-                }
-            } catch {
-                // 如果进一步尝试修补还是失败，也无妨，下一个 chunk 再说
-            }
-        }
-
-        return null;
-    };
 
     /**
      * 解析并执行 AI 输出中的原子化命令
@@ -833,7 +812,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
             return;
         }
 
-        const config = getAIConfig();
+        const config = getAIConfig(user?.id);
         let [pId, ...mIdParts] = (config.activeModelKey || '').split(':');
         let mId = mIdParts.join(':'); // 支持模型ID中包含冒号的情况
         let activeProvider = config.providers.find(p => p.id === pId);
@@ -857,7 +836,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
                         // 自动保存这个选择
                         const newActiveModelKey = `${pId}:${mId}`;
                         config.activeModelKey = newActiveModelKey;
-                        localStorage.setItem('DiagramView.AIConfig_V2_Advanced', JSON.stringify(config));
+                        localStorage.setItem(getAIConfigKey(user?.id), JSON.stringify(config));
 
                         appMessage.info(t('aiChat.autoSwitched', { name: `${provider.name} - ${enabledModel.name}` }));
                         break;
@@ -1075,14 +1054,19 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
                 obj.metadata.title = title;
 
                 if (target === 'local') {
-                    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY) : null;
-                    const parsedPresets = raw ? JSON.parse(raw) : {};
-                    // Guard: 存储损坏时回退到空对象，防止非对象类型赋值崩溃
-                    const map: Record<string, unknown> = (parsedPresets && typeof parsedPresets === 'object' && !Array.isArray(parsedPresets)) ? parsedPresets : {};
-                    map[title] = obj;
-                    if (typeof localStorage !== 'undefined') {
-                        localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(map));
-                    }
+                    const localService = dataRegistry.getDataService();
+                    // Ensure the object has a valid ID for standard diagram data
+                    if (!obj.id) obj.id = crypto.randomUUID();
+                    localService.registerDiagram(obj);
+                    
+                    // Persist to vizly_diagram_configs to make it appear in the dashboard immediately
+                    try {
+                        const configsRaw = localStorage.getItem('vizly_diagram_configs');
+                        const configs: Record<string, any> = configsRaw ? JSON.parse(configsRaw) : {};
+                        configs[obj.id] = { id: obj.id, type: obj.type || 'flowchart', name: obj.metadata.title, updatedAt: Date.now() };
+                        localStorage.setItem('vizly_diagram_configs', JSON.stringify(configs));
+                    } catch { /* ignore storage errors */ }
+                    
                     appMessage.success(t('aiChat.status.saveSuccess', { target: targetLabel, title: title }));
                 } else {
                     const provider = unifiedStorage.getProvider(target);

@@ -127,16 +127,20 @@ const DEFAULT_PROVIDERS: AIProviderConfig[] = [
 ];
 
 // --- Helpers ---
-export const getAIConfig = (): AIConfigState => {
+export const getAIConfigKey = (userId?: string | null): string => {
+    return userId ? `${AI_CONFIG_KEY}_${userId}` : `${AI_CONFIG_KEY}_anonymous`;
+};
+
+export const getAIConfig = (userId?: string | null): AIConfigState => {
     try {
-        const raw = localStorage.getItem(AI_CONFIG_KEY);
+        const raw = localStorage.getItem(getAIConfigKey(userId));
         if (raw) {
             const parsed = JSON.parse(raw);
             // Basic validation or migration could go here
             if (Array.isArray(parsed.providers)) return parsed;
         }
 
-        // Attempt legacy migration
+        // Attempt legacy migration only if it's the old key or anonymous fallback
         const v1Raw = localStorage.getItem('DiagramView.AIConfig');
         if (v1Raw) {
             const v1 = JSON.parse(v1Raw);
@@ -171,7 +175,7 @@ import { appMessage } from '@/core/utils/antdStaticBridge';
 const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave }) => {
     const { t } = useTranslation();
     const { user } = useAuth();
-    const [config, setConfig] = useState<AIConfigState>(getAIConfig());
+    const [config, setConfig] = useState<AIConfigState>(() => getAIConfig(user?.id));
     const [selectedProviderId, setSelectedProviderId] = useState<string>('global_settings');
     const [searchText, setSearchText] = useState('');
 
@@ -181,7 +185,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
 
     useEffect(() => {
         if (open) {
-            const loaded = getAIConfig();
+            const loaded = getAIConfig(user?.id);
             setConfig(loaded); // Load local first (fast)
 
             // Try to load from cloud if logged in
@@ -202,7 +206,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                         setConfig(mergedConfig);
 
                         // Update local storage with decrypted values (so we can use them locally)
-                        localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(mergedConfig));
+                        localStorage.setItem(getAIConfigKey(user.id), JSON.stringify(mergedConfig));
+                        window.dispatchEvent(new Event('aiConfigChanged'));
                     }
                 }).catch(err => {
                     console.error('AIConfigModal: Failed to load cloud config', err);
@@ -213,7 +218,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
 
     const handleSave = async () => {
         // 1. Save Local (Plain text, safe on user's device)
-        localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(config));
+        localStorage.setItem(getAIConfigKey(user?.id), JSON.stringify(config));
 
         // 2. Save Cloud (Encrypted)
         if (user) {
@@ -739,21 +744,26 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                                         {groupedModels[groupName].map(model => {
                                                             const isGlobalActive = config.activeModelKey === `${selectedProvider.id}:${model.id}`;
                                                             return (
-                                                                <div key={model.id} style={{ padding: '8px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                                <div key={model.id} className={isGlobalActive ? "glass-pulse-glow" : ""} style={{ padding: '12px var(--glass-padding-sm, 16px)', borderBottom: '1px solid var(--designer-border, rgba(0,0,0,0.06))', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 8, backgroundColor: isGlobalActive ? 'rgba(99, 102, 241, 0.04)' : 'transparent', marginBottom: 4 }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', zIndex: 1 }}>
                                                                         <Space>
-                                                                            <Text delete={!model.enabled}>{model.name}</Text>
+                                                                            <Text delete={!model.enabled} strong={isGlobalActive}>{model.name}</Text>
                                                                             <Text type="secondary" style={{ fontSize: 12 }}>({model.id})</Text>
+                                                                            {isGlobalActive && (
+                                                                                <Tag color="processing" style={{ margin: '0 0 0 8px', borderRadius: 12, border: '1px solid rgba(99, 102, 241, 0.3)', background: 'var(--pulse-glow-gradient)', color: 'var(--color-primary-600, #4f46e5)', padding: '0 8px', fontWeight: 600 }}>
+                                                                                    <CheckCircleFilled style={{ marginRight: 4 }} /> {t('aiConfig.currentActive', 'Active')}
+                                                                                </Tag>
+                                                                            )}
                                                                         </Space>
                                                                     </div>
-                                                                    <Space>
+                                                                    <Space style={{ zIndex: 1 }}>
                                                                         <Button
-                                                                            type={isGlobalActive ? 'link' : 'text'}
-                                                                            icon={isGlobalActive ? <CheckCircleFilled /> : null}
-                                                                            disabled={!model.enabled || !selectedProvider.enabled}
+                                                                            size="small"
+                                                                            type={isGlobalActive ? "primary" : "default"}
+                                                                            disabled={!model.enabled || !selectedProvider.enabled || isGlobalActive}
                                                                             onClick={() => setActiveModel(selectedProvider.id, model.id)}
                                                                         >
-                                                                            {isGlobalActive ? t('aiConfig.currentActive') : t('aiConfig.setActive')}
+                                                                            {t('aiConfig.setActive', 'Use')}
                                                                         </Button>
                                                                         <Switch
                                                                             size="small"

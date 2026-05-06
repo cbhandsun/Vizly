@@ -63,9 +63,8 @@ export abstract class BaseDiagramPlugin implements DiagramTypePlugin {
 
     // 2. 尝试从 StandardDiagramData 标准化格式转换
     try {
-      // 检查是否具备标准化数据的特征字段
-      const hasStandardTraits = Array.isArray(raw.nodes) && 
-                               (raw.type || raw.layout || (raw.nodes.length > 0 && 'description' in raw.nodes[0]));
+      // 检查是否具备标准化数据的特征字段，或者只包含基础的节点与连线数组
+      const hasStandardTraits = Array.isArray(raw.nodes) && Array.isArray(raw.edges);
       
       if (hasStandardTraits) {
         const standardData = coerceToStandardDiagramData(raw, { 

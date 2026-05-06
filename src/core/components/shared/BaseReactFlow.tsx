@@ -987,7 +987,7 @@ const AlignGuide: React.FC = () => {
   return (
     <EdgeLabelRenderer>
       <div
-        key={`group-boundary-${groupId}`}
+        key="align-guide-boundary"
         style={{
           position: 'absolute',
           transform: `translate(${Math.round(minX)}px, ${Math.round(minY)}px)`,

@@ -13,14 +13,14 @@
     --ftb-shadow:
         0 2px 8px rgba(0, 0, 0, 0.12),
         0 8px 24px rgba(0, 0, 0, 0.08);
-    --ftb-radius: 10px;
+    --ftb-radius: 8px;
     --ftb-padding: 3px;
     --ftb-gap: 1px;
 
     /* 按钮 */
-    --ftb-btn-size: 32px;
-    --ftb-btn-radius: 6px;
-    --ftb-icon-size: 14px;
+    --ftb-btn-size: 28px;
+    --ftb-btn-radius: 5px;
+    --ftb-icon-size: 13px;
     --ftb-icon-color: #555555;
     --ftb-icon-hover-color: #111111;
     --ftb-btn-hover-bg: #f0f0f0;
@@ -55,6 +55,9 @@
 .floating-toolbar-container {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: calc(100vw - 32px);
     gap: var(--ftb-gap);
     padding: var(--ftb-padding);
     background: var(--ftb-bg);

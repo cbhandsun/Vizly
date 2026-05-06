@@ -17,8 +17,8 @@ import type {
   DomainTheme
 } from '@/core';
 import { EdgeFactory } from '@/core';
-import { NodeFactory } from '@/core';
 import { unifiedStorage as storageService } from './UnifiedStorageService';
+import { localDB } from './IndexedDBStorage';
 
 // === 缓存管理器实现 ===
 
@@ -166,7 +166,7 @@ export class DataService {
 
   // === 数据注册与获取 ===
 
-  registerDiagram(diagram: StandardDiagramData): void {
+  registerDiagram(diagram: StandardDiagramData, persistToIndexedDB: boolean = true): void {
     if (!diagram || !diagram.id) {
       throw new Error(`Invalid diagram data: ${diagram?.id || 'null/undefined'}`);
     }
@@ -177,6 +177,13 @@ export class DataService {
 
     this.dataRegistry.set(diagram.id, diagram);
     this.cache.set(`diagram:${diagram.id}`, diagram);
+    
+    if (persistToIndexedDB) {
+      // Fire and forget, don't block the UI
+      localDB.saveDiagram(diagram).catch(err => {
+          console.error('[DataService] Failed to persist diagram to IndexedDB', err);
+      });
+    }
   }
 
   getDiagram(id: string): StandardDiagramData | null {
@@ -194,9 +201,15 @@ export class DataService {
     return null;
   }
 
-  deleteDiagram(id: string): void {
+  deleteDiagram(id: string, removeFromIndexedDB: boolean = true): void {
     this.dataRegistry.delete(id);
     this.cache.delete(`diagram:${id}`);
+    
+    if (removeFromIndexedDB) {
+        localDB.deleteDiagram(id).catch(err => {
+            console.error('[DataService] Failed to delete diagram from IndexedDB', err);
+        });
+    }
   }
 
   // === 数据查询 ===

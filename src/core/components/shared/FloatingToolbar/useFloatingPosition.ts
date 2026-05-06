@@ -108,12 +108,14 @@ export function useFloatingPosition({
 
         const placeBelow = actualPlacement === 'bottom';
 
-        // 水平限位：避免工具栏溢出到 PropertyPanel 区域
-        // 工具栏宽度约 300px，使用 translate(-50%) 居中
-        // 当中心点过右时限制 left 值
-        const maxRight = window.innerWidth - 340; // 340px = PropertyPanel宽度 + margin
-        const clampedX = Math.min(screenCenterX, maxRight);
-        const safeX = Math.max(clampedX, 180); // 左侧也留出最小间距
+        // 响应式水平限位：避免工具栏溢出屏幕或被右侧面板遮挡
+        const isMobile = window.innerWidth <= 768;
+        const rightPanelSafeZone = isMobile ? 20 : 340; // 移动端不考虑右侧面板
+        const toolbarHalfWidth = 160; // 预估工具栏宽度的一半，保证 translateX(-50%) 不越界
+        
+        const maxRight = window.innerWidth - rightPanelSafeZone;
+        const clampedX = Math.min(screenCenterX, Math.max(maxRight, toolbarHalfWidth + 16));
+        const safeX = Math.max(clampedX, toolbarHalfWidth + 16);
 
         const style: React.CSSProperties = {
             left: safeX,

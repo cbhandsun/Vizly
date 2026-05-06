@@ -48,8 +48,8 @@ import { appMessage } from '@/core/utils/antdStaticBridge';
 
 
 // --- Unified Data Types ---
-type DataSourceType = 'local' | 'supabase' | 's3' | 'template';
-type FilterViewType = 'recent' | 'local' | 'cloud' | 'shared' | 'templates';
+type DataSourceType = 'local' | 'supabase' | 's3' | 'template' | 'general_template';
+type FilterViewType = 'recent' | 'local' | 'cloud' | 'shared' | 'templates' | 'general_templates';
 type ViewMode = 'grid' | 'list';
 type SortKey = 'updated' | 'name' | 'type';
 

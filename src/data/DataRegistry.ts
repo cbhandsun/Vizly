@@ -5,6 +5,8 @@
 
 import type { StandardDiagramData } from '@/core';
 import { DataService } from '../services/DataService';
+import { localDB } from '../services/IndexedDBStorage';
+import { supabase } from '../services/supabase';
 
 // 导入标准化数据
 import enterpriseArchitectureData from './standardized/ArchitectureStandardData.json';
@@ -54,10 +56,18 @@ export class DataRegistry {
       // 1. 注册数据适配器
       this.registerAdapters();
 
-      // 2. 注册标准化数据
+      // 2. 注册内置标准化数据 (Static Fallback / Built-in)
       await this.registerStandardData();
 
-      // 3. 验证数据完整性
+      // 3. 尝试从云端加载通用模板库 (Remote Templates)
+      // 如果云端下发了同名的模板，会以云端的最后写入为准覆盖本地硬编码数据
+      const remoteLoaded = await this.loadRemoteTemplates();
+
+      // 4. 注册本地持久化数据 (User's IndexedDB Data)
+      // 用户本地修改的图表拥有最高优先级
+      await this.loadLocalDiagrams();
+
+      // 5. 验证数据完整性
       await this.validateData();
 
       this.initialized = true;
@@ -95,11 +105,61 @@ export class DataRegistry {
       blankCanvasStandardData,
     ];
 
-    // 批量注册图表数据
+    // 批量注册内置图表数据，并禁止重复写入 IndexedDB
     for (const diagram of diagrams) {
-      await this.dataService.registerDiagram(diagram as StandardDiagramData);
+      this.dataService.registerDiagram(diagram as StandardDiagramData, false);
     }
+  }
 
+  /**
+   * 从云端 (Supabase) 加载通用模板库 API
+   * 支持通过云端配置下发新的行业模板，而无需修改本地代码
+   */
+  private async loadRemoteTemplates(): Promise<boolean> {
+      if (!supabase) return false;
+      
+      try {
+          // 请求系统模板表
+          // 表结构预期: id, title, content (JSON), is_active
+          const { data, error } = await supabase
+              .from('system_templates')
+              .select('content')
+              .eq('is_active', true);
+              
+          if (error) {
+              // 表可能不存在或权限不足，静默降级到本地 JSON
+              return false;
+          }
+          
+          if (data && data.length > 0) {
+              for (const row of data) {
+                  if (row.content && typeof row.content === 'object') {
+                      this.dataService.registerDiagram(row.content as StandardDiagramData, false);
+                  }
+              }
+              console.log(`[DataRegistry] Loaded ${data.length} remote templates from cloud.`);
+              return true;
+          }
+          return false;
+      } catch (err) {
+          console.warn('[DataRegistry] Failed to fetch remote templates, falling back to local static JSONs.');
+          return false;
+      }
+  }
+
+  /**
+   * 从本地 IndexedDB 加载用户图表
+   */
+  private async loadLocalDiagrams(): Promise<void> {
+      try {
+          const localDiagrams = await localDB.listDiagrams();
+          for (const diagram of localDiagrams) {
+              // 注册到内存，但不重复写入 IndexedDB
+              this.dataService.registerDiagram(diagram as StandardDiagramData, false);
+          }
+      } catch (err) {
+          console.error('Failed to load local diagrams from IndexedDB', err);
+      }
   }
 
   /**

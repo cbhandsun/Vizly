@@ -90,18 +90,22 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
                         updateNodesBatch(selectedNodes.map((n: any) => n.id), { style });
                     }}
                     extraToolbarContent={
-                        <>
-                            {pluginCtx && activePlugin?.contributeHoverActions && activePlugin.contributeHoverActions(selectedNodes, selectedEdges, pluginCtx)}
-                            {selectedNodes.length === 1 && selectedNodes[0].type && nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes] && (nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes] as any).ToolbarExtension && (
-                                React.createElement((nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes] as any).ToolbarExtension, {
-                                    node: selectedNodes[0],
-                                    updateNodesBatch,
-                                    onDelete: handleDeleteWithToast,
-                                    onDuplicate: handleDuplicateWithToast,
-                                    onLock: handleLock
-                                })
-                            )}
-                        </>
+                        (pluginCtx && activePlugin?.contributeHoverActions) ||
+                        (selectedNodes.length === 1 && selectedNodes[0].type && nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes] && (nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes] as any).ToolbarExtension)
+                        ? (
+                            <>
+                                {pluginCtx && activePlugin?.contributeHoverActions && activePlugin.contributeHoverActions(selectedNodes, selectedEdges, pluginCtx)}
+                                {selectedNodes.length === 1 && selectedNodes[0].type && nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes] && (nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes] as any).ToolbarExtension && (
+                                    React.createElement((nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes] as any).ToolbarExtension, {
+                                        node: selectedNodes[0],
+                                        updateNodesBatch,
+                                        onDelete: handleDeleteWithToast,
+                                        onDuplicate: handleDuplicateWithToast,
+                                        onLock: handleLock
+                                    })
+                                )}
+                            </>
+                        ) : undefined
                     }
                     excludeToolbarFeatures={
                         selectedNodes.length === 1 && selectedNodes[0].type && nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes]

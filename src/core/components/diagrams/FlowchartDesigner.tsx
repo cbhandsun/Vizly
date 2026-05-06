@@ -698,7 +698,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
 
         takeSnapshot(nodesRef.current, edgesRef.current);
 
-        const newNodeId = `inserted-${Date.now()}`;
+        const newNodeId = `inserted-${Date.now()}_${Math.random().toString(36).substring(2,9)}`;
         const newNode: Node = {
             id: newNodeId,
             type: 'custom',
@@ -716,13 +716,13 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         };
         const edgeA: Edge = {
             ...baseEdgeProps,
-            id: `${edge.source}-${newNodeId}-${Date.now()}`,
+            id: `${edge.source}-${newNodeId}-${Date.now()}_${Math.random().toString(36).substring(2,9)}`,
             source: edge.source,
             target: newNodeId,
         };
         const edgeB: Edge = {
             ...baseEdgeProps,
-            id: `${newNodeId}-${edge.target}-${Date.now()}`,
+            id: `${newNodeId}-${edge.target}-${Date.now()}_${Math.random().toString(36).substring(2,9)}`,
             source: newNodeId,
             target: edge.target,
         };
@@ -822,7 +822,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                 // Let's use the first available node type in the active plugin, or fallback to 'custom'
                 const nodeType = activePlugin?.getNodeTypes ? Object.keys(activePlugin.getNodeTypes())[0] : 'custom';
                 
-                const newId = `node_${Date.now()}`;
+                const newId = `node_${Date.now()}_${Math.random().toString(36).substring(2,9)}`;
                 setNodes(nds => [...nds, {
                     id: newId,
                     type: nodeType || 'custom',
@@ -926,7 +926,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                         // 如果插件解析失败，回退到全局重载模式
                         const { dataRegistry } = await import('@/data/DataRegistry');
                         const localSvc = dataRegistry.getDataService();
-                        const currentId = businessData?.id || id || `imported_${Date.now()}`;
+                        const currentId = businessData?.id || id || `imported_${Date.now()}_${Math.random().toString(36).substring(2,9)}`;
                         const normalized = {
                             ...data,
                             id: currentId,
@@ -1120,7 +1120,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         const centerY = (ch / 2 - vp.y) / vp.zoom + offset;
         
         const newNode: Node = {
-            id: `sticky-${Date.now()}`,
+            id: `sticky-${Date.now()}_${Math.random().toString(36).substring(2,9)}`,
             type: 'sticky-note',
             position: { x: centerX - 100, y: centerY - 100 },
             data: { label: '', noteColor: 'yellow', layer: activeLayerId, isEditing: true },
@@ -1143,7 +1143,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         const centerY = (ch / 2 - vp.y) / vp.zoom;
         
         const newNode: Node = {
-            id: `mindmap-${Date.now()}`,
+            id: `mindmap-${Date.now()}_${Math.random().toString(36).substring(2,9)}`,
             type: 'mindmap',
             position: { x: centerX - 60, y: centerY - 20 },
             data: { label: t('designer.flowchart.mindMapCenter'), layer: activeLayerId, isEditing: true },

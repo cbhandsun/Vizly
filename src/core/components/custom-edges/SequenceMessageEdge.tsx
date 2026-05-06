@@ -4,15 +4,16 @@ import { BaseEdge, EdgeLabelRenderer, EdgeProps, getSimpleBezierPath } from '@xy
 export const SequenceMessageEdge = ({
   id,
   sourceX,
-  sourceY: _sourceY,
+  sourceY,
   targetX,
-  targetY: _targetY,
+  targetY,
   label,
   data,
   style = {},
   markerEnd,
 }: EdgeProps) => {
   const { type = 'sync', y: dataY } = data || {};
+  const y = dataY !== undefined ? (dataY as number) : sourceY;
   
   const isSelf = Math.abs(sourceX - targetX) < 5;
   

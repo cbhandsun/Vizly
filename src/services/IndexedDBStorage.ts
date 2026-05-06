@@ -1,10 +1,11 @@
 import type { DiagramVersion } from './storage/types';
 
 const DB_NAME = 'VizlyLocalDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'diagram_versions';
+const DIAGRAMS_STORE = 'local_diagrams';
 
-export class LocalVersionDB {
+export class LocalDB {
     private db: IDBDatabase | null = null;
     private initPromise: Promise<void> | null = null;
 
@@ -21,6 +22,9 @@ export class LocalVersionDB {
                     const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
                     store.createIndex('diagramId', 'diagramId', { unique: false });
                     store.createIndex('createdAt', 'createdAt', { unique: false });
+                }
+                if (!db.objectStoreNames.contains(DIAGRAMS_STORE)) {
+                    db.createObjectStore(DIAGRAMS_STORE, { keyPath: 'id' });
                 }
             };
 
@@ -97,6 +101,52 @@ export class LocalVersionDB {
             request.onerror = (event) => reject((event.target as IDBRequest).error);
         });
     }
+
+    // --- Diagram Storage Methods ---
+    async saveDiagram(diagram: any): Promise<void> {
+        await this.init();
+        return new Promise((resolve, reject) => {
+            const transaction = this.db!.transaction([DIAGRAMS_STORE], 'readwrite');
+            const store = transaction.objectStore(DIAGRAMS_STORE);
+            const request = store.put(diagram);
+            request.onsuccess = () => resolve();
+            request.onerror = (event) => reject((event.target as IDBRequest).error);
+        });
+    }
+
+    async loadDiagram(id: string): Promise<any | null> {
+        await this.init();
+        return new Promise((resolve, reject) => {
+            const transaction = this.db!.transaction([DIAGRAMS_STORE], 'readonly');
+            const store = transaction.objectStore(DIAGRAMS_STORE);
+            const request = store.get(id);
+            request.onsuccess = (event) => resolve((event.target as IDBRequest).result || null);
+            request.onerror = (event) => reject((event.target as IDBRequest).error);
+        });
+    }
+
+    async listDiagrams(): Promise<any[]> {
+        await this.init();
+        return new Promise((resolve, reject) => {
+            const transaction = this.db!.transaction([DIAGRAMS_STORE], 'readonly');
+            const store = transaction.objectStore(DIAGRAMS_STORE);
+            const request = store.getAll();
+            request.onsuccess = (event) => resolve((event.target as IDBRequest).result || []);
+            request.onerror = (event) => reject((event.target as IDBRequest).error);
+        });
+    }
+
+    async deleteDiagram(id: string): Promise<void> {
+        await this.init();
+        return new Promise((resolve, reject) => {
+            const transaction = this.db!.transaction([DIAGRAMS_STORE], 'readwrite');
+            const store = transaction.objectStore(DIAGRAMS_STORE);
+            const request = store.delete(id);
+            request.onsuccess = () => resolve();
+            request.onerror = (event) => reject((event.target as IDBRequest).error);
+        });
+    }
 }
 
-export const localVersionDB = new LocalVersionDB();
+export const localDB = new LocalDB();
+export const localVersionDB = localDB;

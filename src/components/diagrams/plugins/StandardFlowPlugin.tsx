@@ -120,9 +120,30 @@ const StandardTemplateToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
     // TODO: 这里应接入真正的加载逻辑（如调用 loadFromCloud 或解析 PRESET_MAP）
     // 为了简化 Plugin 的状态，可以触发一个全局事件或暴露给父级，也可以直接通过 import('@/core') 解析
     let data;
-    if (rootGroup === 's3' || rootGroup === 'supabase') {
+    if (rootGroup === 's3' || rootGroup === 'supabase' || rootGroup === 'system-templates') {
        // 需要通过 dataService 获取（如果有缓存）或后续再处理云加载
        data = dataService.getDiagram(key);
+       
+       if (!data && rootGroup === 'system-templates') {
+           // Fallback for cloud system templates
+           import('@/services/supabase').then(async ({ supabase }) => {
+              if (supabase) {
+                 const { data: remoteData } = await supabase.from('system_templates').select('content').eq('id', key).single();
+                 if (remoteData && remoteData.content) {
+                     import('@/core').then(({ standardDataToCanvas }) => {
+                         standardDataToCanvas(remoteData.content as any).then(({ nodes, edges }) => {
+                             ctx.setNodes(nodes);
+                             ctx.setEdges(edges);
+                             setTimeout(() => {
+                               ctx.reactFlowInstance?.fitView({ duration: 800, padding: 0.35, minZoom: 0.55 });
+                             }, 50);
+                         });
+                     });
+                 }
+              }
+           });
+           return;
+       }
     } else {
        data = PRESET_MAP[key] || defaultStandardData;
     }

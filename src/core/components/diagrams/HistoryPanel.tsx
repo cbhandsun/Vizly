@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { theme } from 'antd';
 import { FaHistory, FaUndoAlt, FaRedoAlt, FaClock } from 'react-icons/fa';
 import type { HistoryEntry } from '../../hooks/useDiagramHistory';
@@ -44,15 +45,15 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
 
     if (!visible) return null;
 
-    return (
+    return createPortal(
         <div
             style={{
-                position: 'absolute',
-                right: 12,
+                position: 'fixed',
+                left: 320,
                 top: 60,
                 width: 260,
                 maxHeight: 400,
-                zIndex: 1500,
+                zIndex: 3000,
                 background: token.colorBgContainer,
                 border: `1px solid ${token.colorBorderSecondary}`,
                 borderRadius: token.borderRadiusLG + 2,
@@ -211,6 +212,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                     </div>
                 ))}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

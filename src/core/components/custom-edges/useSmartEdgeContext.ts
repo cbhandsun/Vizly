@@ -99,9 +99,9 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
     const edgeTopologySig = useMemo(() => {
         let h = 5381;
         for (const e of storeEdges as Edge[]) {
-            for (let i = 0; i < e.id.length; i++)     h = (h * 33) ^ e.id.charCodeAt(i);
-            for (let i = 0; i < e.source.length; i++) h = (h * 33) ^ e.source.charCodeAt(i);
-            for (let i = 0; i < e.target.length; i++) h = (h * 33) ^ e.target.charCodeAt(i);
+            if (e.id) for (let i = 0; i < e.id.length; i++)     h = (h * 33) ^ e.id.charCodeAt(i);
+            if (e.source) for (let i = 0; i < e.source.length; i++) h = (h * 33) ^ e.source.charCodeAt(i);
+            if (e.target) for (let i = 0; i < e.target.length; i++) h = (h * 33) ^ e.target.charCodeAt(i);
         }
         return h >>> 0; // unsigned 32-bit integer
     }, [storeEdges]);
