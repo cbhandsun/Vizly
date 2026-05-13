@@ -40,7 +40,7 @@ import { useAuth } from '@/context/AuthContext';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { coerceToStandardDiagramDataWithReport } from '@/core';
 import RemoteDiagramCover from '@/components/shared/RemoteDiagramCover';
-import { PRESET_MAP } from '@/data/standardized';
+// PRESET_MAP 已迁移到 Supabase system_templates，仅在 handleCreateTemplate 中保留最小依赖
 import { supabase } from '@/services/supabase';
 
 import './WorkspaceDashboard.css';
@@ -205,7 +205,8 @@ const WorkspaceDashboardPage: React.FC = () => {
                 }
             }
 
-            // 4. Load System Templates
+            // 4. 从 Supabase system_templates 加载所有模版
+            // category='general' → 通用模版 tab；其他 category（行业类）→ 行业模版 tab
             if (supabase) {
                 try {
                     const { data } = await supabase
@@ -214,42 +215,23 @@ const WorkspaceDashboardPage: React.FC = () => {
                         .eq('is_active', true)
                         .order('sort_order', { ascending: true })
                         .order('created_at', { ascending: false });
-                    
+
                     if (data) {
                         data.forEach(t => {
+                            const isGeneral = t.category === 'general';
                             newItems.push({
                                 id: `template_${t.id}`,
                                 title: t.title,
                                 updatedAt: 0,
-                                source: 'template',
+                                source: isGeneral ? 'general_template' : 'template',
                                 role: 'template',
-                                raw: { id: t.id, title: t.title } as any
+                                raw: { id: t.id, title: t.title, category: t.category, tags: t.tags } as any
                             });
                         });
                     }
                 } catch(e) {
-                    console.error("System templates fetch failed", e);
+                    console.error("Templates fetch failed", e);
                 }
-            }
-
-            // 5. Load General Templates (PRESET_MAP)
-            try {
-                const { PRESET_MAP } = await import('@/data/standardized');
-                Object.values(PRESET_MAP).forEach(preset => {
-                    const presetId = preset.id || preset.metadata?.title || preset.name || crypto.randomUUID();
-                    if (!newItems.find(item => item.id === `general_template_${presetId}`)) {
-                        newItems.push({
-                            id: `general_template_${presetId}`,
-                            title: preset.metadata?.title || preset.name || 'Untitled Template',
-                            updatedAt: 0,
-                            source: 'general_template',
-                            role: 'template',
-                            raw: preset
-                        });
-                    }
-                });
-            } catch(e) {
-                console.error("General templates fetch failed", e);
             }
 
             // Sort by most recent
@@ -280,18 +262,21 @@ const WorkspaceDashboardPage: React.FC = () => {
             return;
         }
 
-        if (item.source === 'template') {
+        // template 和 general_template 都来自 Supabase system_templates，统一处理
+        if (item.source === 'template' || item.source === 'general_template') {
             const rawObj = item.raw as any;
-            const messageKey = appMessage.loading('Loading template...', 0);
+            const messageKey = appMessage.loading('正在加载模版...', 0);
             try {
                 if (supabase) {
-                    const { data, error } = await supabase.from('system_templates').select('content, title, id').eq('id', rawObj.id).single();
+                    const { data, error } = await supabase
+                        .from('system_templates')
+                        .select('content, title, id')
+                        .eq('id', rawObj.id)
+                        .single();
                     if (!error && data && data.content) {
                         let parsedContent = data.content;
                         if (typeof parsedContent === 'string') {
-                            try {
-                                parsedContent = JSON.parse(parsedContent);
-                            } catch (e) {
+                            try { parsedContent = JSON.parse(parsedContent); } catch (e) {
                                 console.error('Failed to parse template content', e);
                             }
                         }
@@ -299,73 +284,34 @@ const WorkspaceDashboardPage: React.FC = () => {
                             ...parsedContent,
                             id: data.id,
                             name: data.title || parsedContent.name,
-                            metadata: {
-                                ...(parsedContent.metadata || {}),
-                                title: data.title
-                            }
+                            metadata: { ...(parsedContent.metadata || {}), title: data.title }
                         };
                         const { coerceToStandardDiagramData } = await import('@/core/utils/coerceDiagram');
                         const normalized = coerceToStandardDiagramData(baseData, { id: data.id, title: data.title });
-                        
                         const localService = dataRegistry.getDataService();
                         const cloned = JSON.parse(JSON.stringify(normalized));
-                        cloned.id = crypto.randomUUID(); // ensure fresh ID
+                        cloned.id = crypto.randomUUID();
                         localService.registerDiagram(cloned);
-                        
                         try {
                             const configsRaw = localStorage.getItem('vizly_diagram_configs');
                             const configs: Record<string, any> = configsRaw ? JSON.parse(configsRaw) : {};
                             configs[cloned.id] = { id: cloned.id, type: cloned.type || 'flowchart', name: cloned.name, updatedAt: Date.now() };
                             localStorage.setItem('vizly_diagram_configs', JSON.stringify(configs));
-                        } catch { /* ignore storage errors */ }
-                        
-                        try {
-                            localStorage.removeItem(`flowchart-autosave-v2-${cloned.id}`);
-                        } catch (e) {}
-
+                        } catch { /* ignore */ }
+                        try { localStorage.removeItem(`flowchart-autosave-v2-${cloned.id}`); } catch (e) {}
                         navigate(`/?diagram=${cloned.id}`);
                     } else {
-                        appMessage.error('Template content empty.');
+                        appMessage.error('模版内容为空，请确认 Supabase 数据已迁移。');
                     }
                 }
             } catch (e: any) {
-                appMessage.error(`Failed to load template: ${e.message}`);
+                appMessage.error(`加载模版失败: ${e.message}`);
             } finally {
                 messageKey();
             }
             return;
         }
 
-        if (item.source === 'general_template') {
-            const rawObj = item.raw as any;
-            const trueId = rawObj.id || crypto.randomUUID();
-            const baseData = {
-                ...rawObj,
-                id: trueId,
-                metadata: { ...rawObj.metadata, title: rawObj.name || rawObj.metadata?.title }
-            };
-            const { coerceToStandardDiagramData } = await import('@/core/utils/coerceDiagram');
-            const normalized = coerceToStandardDiagramData(baseData, { id: trueId, title: baseData.metadata.title });
-            
-            const localService = dataRegistry.getDataService();
-            const cloned = JSON.parse(JSON.stringify(normalized));
-            cloned.id = crypto.randomUUID(); // ensure fresh ID
-            localService.registerDiagram(cloned);
-            
-            try {
-                const configsRaw = localStorage.getItem('vizly_diagram_configs');
-                const configs: Record<string, any> = configsRaw ? JSON.parse(configsRaw) : {};
-                configs[cloned.id] = { id: cloned.id, type: cloned.type || 'flowchart', name: cloned.name, updatedAt: Date.now() };
-                localStorage.setItem('vizly_diagram_configs', JSON.stringify(configs));
-            } catch { /* ignore storage errors */ }
-            
-            try {
-                localStorage.removeItem(`flowchart-autosave-v2-${cloned.id}`);
-            } catch (e) {}
-
-            navigate(`/?diagram=${cloned.id}`);
-            return;
-        }
 
         const hide = appMessage.loading("Loading diagram from cloud...", 0);
         try {
@@ -440,11 +386,21 @@ const WorkspaceDashboardPage: React.FC = () => {
     const handleCreateTemplate = (templateKey: 'flowchart' | 'architecture' | 'mindmap' | 'timeline' | 'blank') => {
         let templateData: StandardDiagramData | null = null;
         
-        // Strict domain separation
+        // 使用内联骨架数据，不依赖本地 JSON 文件打包
         if (templateKey === 'flowchart') {
-            templateData = PRESET_MAP['SupplyChainReceivingFlow'];
+            templateData = {
+                id: crypto.randomUUID(), name: 'New Flowchart', type: 'flowchart', version: '2.0',
+                nodes: [], edges: [],
+                layout: { type: 'custom', direction: 'TB', spacing: { horizontal: 80, vertical: 60 }, padding: { horizontal: 24, vertical: 16 } },
+                theme: { name: 'light', displayName: 'Light Theme', domains: {} }
+            };
         } else if (templateKey === 'architecture') {
-            templateData = PRESET_MAP['ArchitectureStandardData'];
+            templateData = {
+                id: crypto.randomUUID(), name: 'New Architecture Diagram', type: 'architecture', version: '2.0',
+                nodes: [], edges: [],
+                layout: { type: 'custom', direction: 'LR', spacing: { horizontal: 120, vertical: 80 }, padding: { horizontal: 24, vertical: 16 } },
+                theme: { name: 'light', displayName: 'Light Theme', domains: {} }
+            };
         } else if (templateKey === 'mindmap') {
             templateData = {
                 id: crypto.randomUUID(),
@@ -542,8 +498,8 @@ const WorkspaceDashboardPage: React.FC = () => {
             navigate(`/?diagram=${cloned.id}`);
         };
 
-        if (rootGroup === 'system-templates') {
-            const messageKey = appMessage.loading('正在加载云端模板...', 0);
+        if (rootGroup === 'system-templates' || rootGroup === 'industry-templates' || rootGroup === 'general-templates') {
+            const messageKey = appMessage.loading('正在加载模版...', 0);
             try {
                 const { supabase } = await import('@/services/supabase');
                 if (supabase) {
@@ -561,35 +517,19 @@ const WorkspaceDashboardPage: React.FC = () => {
                             ...parsedContent,
                             id: data.id,
                             name: data.title || parsedContent.name,
-                            metadata: {
-                                ...(parsedContent.metadata || {}),
-                                title: data.title
-                            }
+                            metadata: { ...(parsedContent.metadata || {}), title: data.title }
                         };
                         const { coerceToStandardDiagramData } = await import('@/core/utils/coerceDiagram');
                         const normalized = coerceToStandardDiagramData(baseData, { id: data.id, title: data.title });
                         seedAutoSaveAndNavigate(normalized, data.id);
                     } else {
-                        appMessage.error('模板内容为空');
+                        appMessage.error('模版内容为空');
                     }
                 }
             } catch (e: any) {
                 appMessage.error(`加载失败: ${e.message}`);
             } finally {
                 messageKey();
-            }
-        } else if (rootGroup === 'gallery' || rootGroup === 'by-tags' || rootGroup === 'all-demos') {
-            const preset = PRESET_MAP[leafKey];
-            if (preset) {
-                const trueId = preset.id || leafKey;
-                const baseData = {
-                    ...preset,
-                    id: trueId,
-                    metadata: { ...preset.metadata, title: preset.name || preset.metadata?.title }
-                };
-                const { coerceToStandardDiagramData } = await import('@/core/utils/coerceDiagram');
-                const normalized = coerceToStandardDiagramData(baseData, { id: trueId, title: baseData.metadata.title });
-                seedAutoSaveAndNavigate(normalized, trueId);
             }
         } else if (rootGroup === 'local-workspace') {
             const d = localStorage.getItem('diagram-custom-presets');
@@ -610,7 +550,7 @@ const WorkspaceDashboardPage: React.FC = () => {
         let viewFiltered = unifiedItems;
         switch (activeView) {
             case 'recent':
-                viewFiltered = unifiedItems.filter(i => i.source !== 'template').slice(0, 30);
+                viewFiltered = unifiedItems.filter(i => i.source !== 'template' && i.source !== 'general_template').slice(0, 30);
                 break;
             case 'local':
                 viewFiltered = unifiedItems.filter(i => i.source === 'local');
@@ -858,7 +798,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                         <div className="workspace-filter-tabs">
                             <div className={`filter-tab ${activeView === 'recent' ? 'active' : ''}`} onClick={() => setActiveView('recent')}>
                                 <ClockCircleOutlined /> Recent
-                                <span className="filter-tab-count">{unifiedItems.filter(i => i.source !== 'template').length}</span>
+                                <span className="filter-tab-count">{unifiedItems.filter(i => i.source !== 'template' && i.source !== 'general_template').length}</span>
                             </div>
                             <div className={`filter-tab ${activeView === 'local' ? 'active' : ''}`} onClick={() => setActiveView('local')}>
                                 <LaptopOutlined /> Local

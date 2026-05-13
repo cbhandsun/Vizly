@@ -2,7 +2,6 @@
 import React, { useMemo, useEffect } from 'react';
 import Cascader from 'antd/es/cascader';
 import { SearchOutlined, ApartmentOutlined, CloudOutlined, DatabaseOutlined, FolderOpenOutlined } from '@ant-design/icons';
-import { PRESET_MAP, PRESET_OPTIONS, ALL_TAGS } from '../../../data/standardized';
 import { useDiagramStorage } from '../hooks/useDiagramStorage';
 
 export const CUSTOM_PRESETS_STORAGE_KEY = 'diagram-custom-presets';
@@ -16,6 +15,9 @@ export interface TemplateCascaderMenuProps {
   templatesOnly?: boolean;
   children?: React.ReactNode;
 }
+
+// 被视为「通用」的 category 值
+const GENERAL_CATEGORIES = new Set(['general', '通用', 'general_template']);
 
 export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
   value,
@@ -42,56 +44,45 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
     }
     const options: CascaderOption[] = [];
 
-    // --- 1. Gallery (Example Center) ---
-    const galleryChildren: CascaderOption[] = [
-      {
-        value: 'by-tags',
-        label: '按领域分类',
-        children: Array.from(ALL_TAGS).map(tag => {
-          const items = PRESET_OPTIONS.filter(p => PRESET_MAP[p.value]?.metadata?.tags?.includes(tag));
-          return {
-            value: tag,
-            label: tag,
-            children: items.map(p => ({ value: p.value, label: p.label }))
-          };
-        }).filter(node => node.children && node.children.length > 0)
-      },
-      {
-        value: 'all-demos',
-        label: '全部演示列表',
-        children: PRESET_OPTIONS.map(p => ({ value: p.value, label: p.label }))
-      }
-    ];
-
-    options.push({
-      value: 'gallery',
-      label: <span><ApartmentOutlined style={{ marginRight: 8, color: '#1677ff' }} />示例中心</span>,
-      children: galleryChildren
-    });
-
-    // --- 2. System Templates (Cloud Generic Templates) ---
+    // --- 1. 行业模板库 (System Templates from Supabase，按 category 分组) ---
     if (systemTemplates && systemTemplates.length > 0) {
-      const byCategory: Record<string, any[]> = {};
-      systemTemplates.forEach(t => {
-         const cat = t.category || '未分类';
-         if (!byCategory[cat]) byCategory[cat] = [];
-         byCategory[cat].push(t);
-      });
-      
-      const stChildren: CascaderOption[] = Object.entries(byCategory).map(([cat, items]) => ({
-         value: `st-cat-${cat}`,
-         label: cat,
-         children: items.map(d => ({ value: d.id, label: d.title }))
-      }));
+      // 行业模版：category 不是 general 的
+      const industryTemplates = systemTemplates.filter(t => !GENERAL_CATEGORIES.has(t.category));
+      // 通用模版：category 是 general 的
+      const generalTemplates = systemTemplates.filter(t => GENERAL_CATEGORIES.has(t.category));
 
-      options.push({
-        value: 'system-templates',
-        label: <span><ApartmentOutlined style={{ marginRight: 8, color: '#eb2f96' }} />行业模板库</span>,
-        children: stChildren
-      });
+      if (industryTemplates.length > 0) {
+        // 按 category 分组
+        const byCategory: Record<string, any[]> = {};
+        industryTemplates.forEach(t => {
+          const cat = t.category || '其他行业';
+          if (!byCategory[cat]) byCategory[cat] = [];
+          byCategory[cat].push(t);
+        });
+
+        const industryChildren: CascaderOption[] = Object.entries(byCategory).map(([cat, items]) => ({
+          value: `industry-cat-${cat}`,
+          label: cat,
+          children: items.map(d => ({ value: d.id, label: d.title }))
+        }));
+
+        options.push({
+          value: 'industry-templates',
+          label: <span><ApartmentOutlined style={{ marginRight: 8, color: '#eb2f96' }} />行业模板库</span>,
+          children: industryChildren
+        });
+      }
+
+      if (generalTemplates.length > 0) {
+        options.push({
+          value: 'general-templates',
+          label: <span><ApartmentOutlined style={{ marginRight: 8, color: '#1677ff' }} />通用模版</span>,
+          children: generalTemplates.map(d => ({ value: d.id, label: d.title }))
+        });
+      }
     }
 
-    // --- 3. S3 Storage ---
+    // --- 2. S3 存储 ---
     if (!templatesOnly && s3Diagrams.length > 0) {
       options.push({
         value: 's3',
@@ -100,7 +91,7 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       });
     }
 
-    // --- 4. Supabase Cloud ---
+    // --- 3. 个人云端图表 ---
     if (!templatesOnly && supabaseDiagrams.length > 0) {
       options.push({
         value: 'supabase',
@@ -109,25 +100,30 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       });
     }
 
-    // --- 5. Local Workspace (Custom Saves) ---
-    const customPresets = Object.keys(PRESET_MAP).filter(k => k.startsWith('custom:'));
-    if (customPresets.length > 0) {
-      options.push({
-        value: 'local-workspace',
-        label: <span><FolderOpenOutlined style={{ marginRight: 8, color: '#8c8c8c' }} />本地工作区</span>,
-        children: customPresets.map(k => ({ value: k, label: k.replace('custom:', '') }))
-      });
-    }
+    // --- 4. 本地自定义 (Custom saved presets in localStorage) ---
+    try {
+      const raw = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY);
+      if (raw) {
+        const customMap = JSON.parse(raw);
+        const customKeys = Object.keys(customMap);
+        if (customKeys.length > 0) {
+          options.push({
+            value: 'local-workspace',
+            label: <span><FolderOpenOutlined style={{ marginRight: 8, color: '#8c8c8c' }} />本地工作区</span>,
+            children: customKeys.map(k => ({ value: `custom:${k}`, label: k }))
+          });
+        }
+      }
+    } catch { /* ignore */ }
 
     return options;
-  }, [s3Diagrams, supabaseDiagrams, systemTemplates]);
+  }, [s3Diagrams, supabaseDiagrams, systemTemplates, templatesOnly]);
 
   return (
     <Cascader
       key={cascaderKey}
       onOpenChange={(visible) => {
         if (!visible) {
-          // Reset cascader fully after popup close animation completes
           setTimeout(() => setCascaderKey(k => k + 1), 300);
         }
       }}
@@ -148,18 +144,8 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       }}
       displayRender={(labels, selectedOptions) => {
         if (!labels || labels.length === 0) return '';
-        
-        const lastOption = selectedOptions?.[selectedOptions.length - 1];
-        let lastLabel: React.ReactNode = labels[labels.length - 1];
-
-        // Retrieve real title instead of ID if it's from PRESET_MAP
-        if (lastOption && lastOption.value && PRESET_MAP[String(lastOption.value)]) {
-           const data = PRESET_MAP[String(lastOption.value)];
-           lastLabel = data.metadata?.title || data.name || lastLabel;
-        }
-
+        const lastLabel = labels[labels.length - 1];
         if (labels.length === 1) return lastLabel;
-
         return (
           <span>
             {labels.slice(0, -1).map((label, idx) => (
@@ -175,7 +161,7 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       placeholder={placeholder}
       allowClear={allowClear}
       showSearch={{
-      filter: (inputValue, path) => {
+        filter: (inputValue, path) => {
           const input = inputValue.toLowerCase();
           return path.some(option => {
             const lbl = option.label;
@@ -184,7 +170,6 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
             return text.toLowerCase().indexOf(input) > -1 || val.toLowerCase().indexOf(input) > -1;
           });
         },
-
       }}
       expandTrigger="hover"
       style={{ width: 320, ...style }}
