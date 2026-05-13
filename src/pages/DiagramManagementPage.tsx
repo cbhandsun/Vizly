@@ -345,6 +345,18 @@ const WorkspaceDashboardPage: React.FC = () => {
                     isReadonly: item.role === 'viewer'
                 };
                 localService.registerDiagram(normalized);
+                // 回写 type 索引，防止刷新后设计器无法识别图表类型
+                try {
+                    const configsRaw = localStorage.getItem('vizly_diagram_configs');
+                    const configs: Record<string, any> = configsRaw ? JSON.parse(configsRaw) : {};
+                    configs[savedDiagram.id] = {
+                        id: savedDiagram.id,
+                        type: normalized.type || 'flowchart',
+                        name: normalized.name,
+                        updatedAt: Date.now()
+                    };
+                    localStorage.setItem('vizly_diagram_configs', JSON.stringify(configs));
+                } catch { /* ignore */ }
                 navigate(`/?diagram=${savedDiagram.id}`);
             } else {
                 appMessage.error("Diagram not found in cloud storage.");
