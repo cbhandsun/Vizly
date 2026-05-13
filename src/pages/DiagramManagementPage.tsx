@@ -995,16 +995,6 @@ const WorkspaceDashboardPage: React.FC = () => {
                                                         height={150}
                                                     />
                                                 )}
-                                                            </div>
-                                                        </div>
-                                                    )}\r\n                                                ) : (
-                                                    <RemoteDiagramCover 
-                                                        storageId={(item.raw as DiagramMetadata).id} 
-                                                        alt={item.title} 
-                                                        cacheBuster={item.updatedAt} 
-                                                        height={150}
-                                                    />
-                                                )}
                                                 {/* 模版封面 hover 遮罩：显示「应用」按钮 */}
                                                 {isTemplate(item) && (
                                                     <div className="template-apply-overlay" onClick={() => handleOpenDiagram(item)}>
