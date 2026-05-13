@@ -211,7 +211,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                 try {
                     const { data } = await supabase
                         .from('system_templates')
-                        .select('id, title, category, tags, sort_order')
+                        .select('id, title, category, tags, sort_order, thumbnail_url')
                         .eq('is_active', true)
                         .order('sort_order', { ascending: true })
                         .order('created_at', { ascending: false });
@@ -225,7 +225,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                                 updatedAt: 0,
                                 source: isGeneral ? 'general_template' : 'template',
                                 role: 'template',
-                                raw: { id: t.id, title: t.title, category: t.category, tags: t.tags } as any
+                                raw: { id: t.id, title: t.title, category: t.category, tags: t.tags, thumbnail_url: t.thumbnail_url } as any
                             });
                         });
                     }
@@ -926,6 +926,45 @@ const WorkspaceDashboardPage: React.FC = () => {
                                                             {TYPE_ICON_MAP[diagramType] || TYPE_ICON_MAP.default}
                                                         </span>
                                                     </div>
+                                                ) : (item.source === 'template' || item.source === 'general_template') ? (
+                                                    (() => {
+                                                        const thumbnailUrl = (item.raw as any)?.thumbnail_url;
+                                                        if (thumbnailUrl) {
+                                                            return (
+                                                                <img
+                                                                    src={thumbnailUrl}
+                                                                    alt={item.title}
+                                                                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                                                    onError={(e) => {
+                                                                        (e.target as HTMLImageElement).style.display = 'none';
+                                                                        (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('style');
+                                                                    }}
+                                                                />
+                                                            );
+                                                        }
+                                                        // 无预览图时显示彩色图标占位
+                                                        const cat = (item.raw as any)?.category || 'default';
+                                                        const catColorMap: Record<string, string> = {
+                                                            '仓储': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                                            '运输': 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                                                            '计划': 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                                                            '架构': 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+                                                            '系统': 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                                                            'general': 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+                                                            'default': 'linear-gradient(135deg, #d299c2 0%, #fef9d7 100%)',
+                                                        };
+                                                        const gradient = catColorMap[cat] || catColorMap.default;
+                                                        return (
+                                                            <div style={{
+                                                                width: '100%', height: '100%',
+                                                                background: gradient,
+                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                fontSize: 36, opacity: 0.85
+                                                            }}>
+                                                                <span>{TYPE_ICON_MAP[diagramType] || TYPE_ICON_MAP.default}</span>
+                                                            </div>
+                                                        );
+                                                    })()
                                                 ) : (
                                                     <RemoteDiagramCover 
                                                         storageId={(item.raw as DiagramMetadata).id} 
