@@ -26,7 +26,8 @@ import {
     AppstoreOutlined,
     UnorderedListOutlined,
     SortAscendingOutlined,
-    DownOutlined
+    DownOutlined,
+    CopyOutlined
 } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { dataRegistry } from '../data/DataRegistry';
@@ -622,7 +623,17 @@ const WorkspaceDashboardPage: React.FC = () => {
         }
     ];
 
+    const isTemplate = (item: UnifiedDiagramItem) =>
+        item.source === 'template' || item.source === 'general_template';
+
     const getCardMenu = (item: UnifiedDiagramItem): MenuProps['items'] => {
+        // 模版专用菜单
+        if (isTemplate(item)) {
+            return [
+                { key: 'apply_template', label: '🚀 应用此模版', icon: <CopyOutlined /> },
+            ];
+        }
+        // 普通图表菜单
         const items: MenuProps['items'] = [
             { key: 'open_new', label: 'Open in new tab', icon: <ShareAltOutlined /> }
         ];
@@ -635,7 +646,9 @@ const WorkspaceDashboardPage: React.FC = () => {
 
     const handleMenuClick = (e: any, item: UnifiedDiagramItem) => {
         e.domEvent.stopPropagation();
-        if (e.key === 'delete') {
+        if (e.key === 'apply_template') {
+            handleOpenDiagram(item); // 应用模版 = 基于模版新建图表
+        } else if (e.key === 'delete') {
             handleDeleteDiagram(e.domEvent, item);
         } else if (e.key === 'open_new') {
             const rawId = (item.raw as any).id;
@@ -898,17 +911,26 @@ const WorkspaceDashboardPage: React.FC = () => {
                                 }
 
                                 return (
-                                    <div className="diagram-card" key={item.id} onClick={() => handleOpenDiagram(item)} onContextMenu={(e) => handleContextMenu(e, item)}>
+                                    <div className="diagram-card" key={item.id}
+                                        onClick={() => !isTemplate(item) && handleOpenDiagram(item)}
+                                        style={{ cursor: isTemplate(item) ? 'default' : 'pointer' }}
+                                        onContextMenu={(e) => handleContextMenu(e, item)}
+                                    >
+                                        {/* Source badge */}
                                         {item.source !== 'local' && (
                                             <div className={`source-badge ${item.source}`}>
-                                                {item.source === 's3' ? <CloudOutlined /> : <ApiOutlined />}
-                                                {item.source}
+                                                {isTemplate(item)
+                                                    ? <><AppstoreOutlined /> TEMPLATE</>
+                                                    : item.source === 's3'
+                                                        ? <><CloudOutlined /> S3</>
+                                                        : <><ApiOutlined /> CLOUD</>
+                                                }
                                             </div>
                                         )}
-                                        
+
                                         <div className="diagram-card-actions">
-                                            <Dropdown 
-                                                menu={{ items: getCardMenu(item), onClick: (e) => handleMenuClick(e, item) }} 
+                                            <Dropdown
+                                                menu={{ items: getCardMenu(item), onClick: (e) => handleMenuClick(e, item) }}
                                                 trigger={['click']}
                                                 placement="bottomRight"
                                             >
@@ -972,6 +994,24 @@ const WorkspaceDashboardPage: React.FC = () => {
                                                         cacheBuster={item.updatedAt} 
                                                         height={150}
                                                     />
+                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}\r\n                                                ) : (
+                                                    <RemoteDiagramCover 
+                                                        storageId={(item.raw as DiagramMetadata).id} 
+                                                        alt={item.title} 
+                                                        cacheBuster={item.updatedAt} 
+                                                        height={150}
+                                                    />
+                                                )}
+                                                {/* 模版封面 hover 遮罩：显示「应用」按钮 */}
+                                                {isTemplate(item) && (
+                                                    <div className="template-apply-overlay" onClick={() => handleOpenDiagram(item)}>
+                                                        <button className="template-apply-btn">
+                                                            <CopyOutlined /> 应用模版
+                                                        </button>
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>

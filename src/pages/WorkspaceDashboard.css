@@ -770,6 +770,60 @@ html[data-theme='dark'] .source-badge {
 
 .source-badge.s3 { color: #f59e0b; }
 .source-badge.supabase { color: #10b981; }
+.source-badge.template { color: #6366f1; }
+.source-badge.general_template { color: #8b5cf6; }
+
+/* ===== Template Apply Overlay ===== */
+.template-apply-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+  z-index: 3;
+  cursor: pointer;
+}
+
+.diagram-card:hover .template-apply-overlay {
+  opacity: 1;
+}
+
+.template-apply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 22px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.45);
+  transform: translateY(6px);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.22s ease;
+}
+
+.diagram-card:hover .template-apply-btn {
+  transform: translateY(0);
+}
+
+.template-apply-btn:hover {
+  box-shadow: 0 6px 28px rgba(99, 102, 241, 0.65);
+  transform: translateY(-2px) scale(1.04);
+}
+
+html[data-theme='dark'] .template-apply-overlay {
+  background: rgba(5, 8, 22, 0.65);
+}
 
 /* ==========================================================================
    Skeleton & Empty States
