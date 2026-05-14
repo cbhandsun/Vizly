@@ -438,9 +438,14 @@ const DiagramViewer: React.FC = () => {
 
         let processedData = data;
         
-        // Check if it's a standardized data payload that requires conversion to canvas format
+        // Check if it's a standardized data payload that requires conversion to canvas format.
+        // 判断条件：节点没有 data 字段（StandardNodeData），或者 edges 没有 markerEnd（Standard Edge 格式）
+        const firstNode = data?.nodes?.[0];
+        const firstEdge = data?.edges?.[0];
+        const nodeIsStandard = firstNode && (!('data' in firstNode) || ('domain' in firstNode));
+        const edgeIsStandard = firstEdge && !('markerEnd' in firstEdge) && !('sourceHandle' in firstEdge);
         const needsConversion = data && data.nodes && data.nodes.length > 0 && 
-            (!('data' in data.nodes[0]) || ('domain' in data.nodes[0]));
+            (nodeIsStandard || edgeIsStandard);
         
         if (needsConversion) {
             try {
@@ -456,6 +461,21 @@ const DiagramViewer: React.FC = () => {
             } catch (err) {
                 console.warn('[DiagramViewer] Standard data layout fallback execution failed:', err);
             }
+        } else if (data?.edges?.length > 0) {
+            // [FIX] 即使节点是画布格式，edges 也可能来自 StandardEdgeData（type:"main" 等，无 markerEnd）
+            // 做最小化格式兜底：确保 ReactFlow 能识别和渲染这些边
+            const STANDARD_EDGE_TYPES = new Set(['main', 'dependency', 'support', 'data', 'feedback', 'custom']);
+            const normalizedEdges = data.edges.map((e: any) => {
+                const needsFix = STANDARD_EDGE_TYPES.has(e.type) || !e.markerEnd;
+                if (!needsFix) return e;
+                return {
+                    ...e,
+                    type: 'advanced-smart-step',
+                    markerEnd: e.markerEnd || { type: 'arrowclosed' },
+                    data: e.data || { auto: ['source', 'target'] },
+                };
+            });
+            processedData = { ...data, edges: normalizedEdges };
         }
 
 
