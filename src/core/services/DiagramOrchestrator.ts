@@ -296,7 +296,11 @@ export class DiagramOrchestrator {
 
       const result = await strategy.calculateLayout(layoutNodes, layoutEdges, layoutOptions)
       layoutNodes = result.nodes || layoutNodes
-      layoutEdges = result.edges || layoutEdges
+      // [FIX] 空数组是 truthy，`result.edges || layoutEdges` 会把有效连线覆盖为 []。
+      // 只有当布局策略真正返回了非空 edges 时才替换，否则保留原始连线。
+      if (result.edges && result.edges.length > 0) {
+        layoutEdges = result.edges
+      }
     } // end if (layoutType)
 
     const processedNodes: Node[] = layoutNodes

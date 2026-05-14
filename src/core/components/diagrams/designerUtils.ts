@@ -424,7 +424,12 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
                     generateSubDomainGroups: true,
                     fitDomainContent: true,
                 } as any);
-                return { nodes: result.nodes, edges: result.edges };
+                return {
+                    nodes: result.nodes,
+                    // [FIX] 若布局策略返回空 edges（例如所有 source/target 均不在 idMap 中），
+                    // 回退到原始 edges，避免模版连线被意外丢失。
+                    edges: (result.edges && result.edges.length > 0) ? result.edges : edges
+                };
             } catch (err) {
                 console.error('[standardDataToCanvas] 域布局失败，回退到扁平 dagre:', err);
                 // 回退到下面的扁平 dagre
