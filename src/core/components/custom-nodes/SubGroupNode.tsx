@@ -210,10 +210,11 @@ const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<G
 
       {isConnectable && (
         <>
-          <Handle type="target" position={Position.Top} id="t" isConnectable={isConnectable} className="sub-group-handle" />
-          <Handle type="source" position={Position.Bottom} id="b" isConnectable={isConnectable} className="sub-group-handle" />
-          <Handle type="source" position={Position.Left} id="l" isConnectable={isConnectable} className="sub-group-handle" />
-          <Handle type="source" position={Position.Right} id="r" isConnectable={isConnectable} className="sub-group-handle" />
+          {/* [FIX] Handle id 统一长格式，与 FlowchartNode 和路由策略对齐 */}
+          <Handle type="target" position={Position.Top} id="top" isConnectable={isConnectable} className="sub-group-handle" />
+          <Handle type="source" position={Position.Bottom} id="bottom" isConnectable={isConnectable} className="sub-group-handle" />
+          <Handle type="source" position={Position.Left} id="left" isConnectable={isConnectable} className="sub-group-handle" />
+          <Handle type="source" position={Position.Right} id="right" isConnectable={isConnectable} className="sub-group-handle" />
         </>
       )}
     </div>

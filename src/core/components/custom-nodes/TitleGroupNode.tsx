@@ -206,10 +206,11 @@ const TitleGroupNode = React.memo(({ id, data, width = 200, height = 120, select
         {/* Children rendered by React Flow via nested nodes, this div just provides background/border */}
       </div>
 
-      <Handle type="target" position={Position.Top} id="t" className="title-group-handle" />
-      <Handle type="source" position={Position.Bottom} id="b" className="title-group-handle" />
-      <Handle type="source" position={Position.Left} id="l" className="title-group-handle" />
-      <Handle type="source" position={Position.Right} id="r" className="title-group-handle" />
+      {/* [FIX] Handle id 统一使用长格式，与 FlowchartNode 和 DomainDagreLayoutStrategy 的 sourceHandle 对齐 */}
+      <Handle type="target" position={Position.Top} id="top" className="title-group-handle" />
+      <Handle type="source" position={Position.Bottom} id="bottom" className="title-group-handle" />
+      <Handle type="source" position={Position.Left} id="left" className="title-group-handle" />
+      <Handle type="source" position={Position.Right} id="right" className="title-group-handle" />
     </div>
   );
 });

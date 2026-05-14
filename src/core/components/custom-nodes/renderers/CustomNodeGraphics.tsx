@@ -194,14 +194,15 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
 
                 {!d.isLegend && (
                     <>
-                        <Handle type="target" position={Position.Top} id="t" style={edgeHandleStyle} />
-                        <Handle type="source" position={Position.Top} id="t" style={edgeHandleStyle} />
-                        <Handle type="target" position={Position.Bottom} id="b" style={edgeHandleStyle} />
-                        <Handle type="source" position={Position.Bottom} id="b" style={edgeHandleStyle} />
-                        <Handle type="target" position={Position.Right} id="r" style={edgeHandleStyle} />
-                        <Handle type="source" position={Position.Right} id="r" style={edgeHandleStyle} />
-                        <Handle type="target" position={Position.Left} id="l" style={edgeHandleStyle} />
-                        <Handle type="source" position={Position.Left} id="l" style={edgeHandleStyle} />
+                        {/* [FIX] Handle id 统一长格式，与 FlowchartNode 和 DomainDagreLayoutStrategy 的 sourceHandle 对齐 */}
+                        <Handle type="target" position={Position.Top} id="top" style={edgeHandleStyle} />
+                        <Handle type="source" position={Position.Top} id="top" style={edgeHandleStyle} />
+                        <Handle type="target" position={Position.Bottom} id="bottom" style={edgeHandleStyle} />
+                        <Handle type="source" position={Position.Bottom} id="bottom" style={edgeHandleStyle} />
+                        <Handle type="target" position={Position.Right} id="right" style={edgeHandleStyle} />
+                        <Handle type="source" position={Position.Right} id="right" style={edgeHandleStyle} />
+                        <Handle type="target" position={Position.Left} id="left" style={edgeHandleStyle} />
+                        <Handle type="source" position={Position.Left} id="left" style={edgeHandleStyle} />
                     </>
                 )}
             </div>
