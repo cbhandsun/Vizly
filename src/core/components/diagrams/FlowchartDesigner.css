@@ -356,11 +356,13 @@
     z-index: 1000;
 }
 
-/* 可连接状态的连接点 */
-.react-flow__handle.connectable {
+/* 可连接状态的连接点 — 仅在用户正在拖拽连线时才显示绿色高亮 */
+/* 平时 .connectable 类不改变外观，避免绿点常驻导致视觉突兀 */
+.react-flow.connecting .react-flow__handle.connectable {
     background: var(--theme-success-main, #10b981) !important;
     border-color: var(--theme-success-dark, #059669) !important;
     box-shadow: 0 0 0 2px var(--theme-success-main-alpha, rgba(16, 185, 129, 0.2));
+    opacity: 1 !important;
 }
 
 /* 4. 连接创建微交互 */
@@ -1419,6 +1421,9 @@ circle.custom-edge-updater {
     border: 1.5px solid #fff !important;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
     box-shadow: 0 0 0 0 transparent;
+    /* [FIX] 默认不可见，与 FlowchartNode.css .flowchart-handle 的 opacity:0 设计对齐
+       避免节点上常驻灰/绿色连接点，视觉突兀。hover 时由下方规则显示。 */
+    opacity: 0;
 }
 
 .react-flow__handle:hover {
@@ -1428,10 +1433,12 @@ circle.custom-edge-updater {
     border-color: var(--theme-background-main, #fff) !important;
     box-shadow: 0 0 0 3px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.25)), 0 0 10px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.35)) !important;
     z-index: 10;
+    opacity: 1 !important;
 }
 
 /* 连线拖拽中：候选 handle 呼吸脉冲 */
 .react-flow.connecting .react-flow__handle:not(.connectingto):not(.connectingfrom) {
+    opacity: 1 !important;
     animation: handlePulse 1.2s ease-in-out infinite !important;
 }
 
