@@ -104,14 +104,18 @@ export const useCustomNodeStyleResolution = ({
     const bgPolicy = preset?.node?.backgroundPolicy ?? 'theme';
     const radiusToken = preset?.node?.radius ?? 16;
 
-    const tintBackground = hexToRgba(themeMain, 0.08);
-    const tintGradient = `linear-gradient(135deg, ${hexToRgba(themeMain, 0.06)} 0%, ${hexToRgba(themeMain, 0.12)} 100%)`;
+    const tintBackground = hexToRgba(themeMain, 0.07);
+    const tintGradient = `linear-gradient(160deg, ${hexToRgba(themeMain, 0.05)} 0%, ${hexToRgba(themeMain, 0.10)} 100%)`;
 
     const getBackgroundColor = () => {
-        if (selected) return hexToRgba(themeMain, 0.06);
+        if (selected) return hexToRgba(themeMain, 0.07);
         if (bgPolicy === 'white' && !hasExplicitDomainColor) return '#FFFFFF';
         if (bgPolicy === 'tint') return tintBackground;
-        return themeBackground || 'transparent';
+        // 兜底：主题色微染白，而非 transparent（transparent 在画布网格上不可见）
+        if (themeBackground && themeBackground !== 'transparent') return themeBackground;
+        return isDarkTheme
+            ? `color-mix(in srgb, ${themeMain} 8%, #1e2233 92%)`
+            : `color-mix(in srgb, ${themeMain} 6%, #ffffff 94%)`;
     };
 
     const safeCustomStyle = { ...(d.customStyle || {}) } as React.CSSProperties;
@@ -157,26 +161,26 @@ export const useCustomNodeStyleResolution = ({
         width: '100%', 
         height: '100%',
         maxWidth: nodeWidth ? `${nodeWidth}px` : undefined,
-        /* 边框：选中时主题色实边，平时半透明主题色 */
+        /* 边框：选中时主题色实边，平时主题色 55% 透明度（从 30% 提高，在网格背景上清晰可见）*/
         border: selected
             ? `1.5px solid ${themeMain}`
-            : `1px solid ${hexToRgba(themeBorder, 0.3)}`,
+            : `1px solid ${hexToRgba(themeBorder, 0.55)}`,
         borderRadius: `${finalRadius}px`,
         overflow: 'hidden',
         backgroundColor: getBackgroundColor(),
-        /* 多层阴影：精细层次 */
+        /* 多层精细阴影 */
         boxShadow: selected
-            ? `0 0 0 3px ${hexToRgba(themeMain, 0.15)}, 0 0 0 1px ${themeMain}, 0 6px 16px -3px rgba(0, 0, 0, 0.12)`
+            ? `0 0 0 3px ${hexToRgba(themeMain, 0.18)}, 0 0 0 1px ${themeMain}, 0 6px 16px -3px rgba(0, 0, 0, 0.14)`
             : hovered
-                ? `0 2px 6px -1px rgba(0,0,0,0.1), 0 6px 16px -4px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.18)`
-                : `0 1px 2px rgba(0,0,0,0.04), 0 3px 8px -2px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.14)`,
+                ? `0 2px 8px -2px rgba(0,0,0,0.12), 0 8px 20px -5px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.22)`
+                : `0 1px 3px rgba(0,0,0,0.06), 0 4px 10px -3px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.18)`,
         display: 'flex', 
         justifyContent: 'center', 
         alignItems: 'center',
-        /* 顶部多留 3px 给色带 */
+        /* 顶部多留 3px 给主题色带 */
         padding: `${finalPadV + 3}px ${finalPadH}px ${finalPadV}px`,
         boxSizing: 'border-box',
-        transition: 'border-color 0.15s ease, box-shadow 0.18s ease, background-color 0.15s ease',
+        transition: 'border-color 0.15s ease, box-shadow 0.2s ease, background-color 0.15s ease',
         position: 'relative', 
         zIndex,
         cursor: 'move',

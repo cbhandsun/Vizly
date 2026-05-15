@@ -42,6 +42,22 @@ export interface CustomNodeGraphicsProps {
     statusStripeProps: React.CSSProperties | null;
 }
 
+// 解析节点文本：第一行是标题，其余是描述
+const parseNodeContent = (raw: string): { title: string; body: string } => {
+    if (!raw) return { title: '', body: '' };
+    // 处理 <br> 分隔
+    const parts = raw.split(/<br\s*\/?>/i);
+    if (parts.length > 1) {
+        return { title: parts[0].replace(/<[^>]+>/g, '').trim(), body: parts.slice(1).join('\n').replace(/<[^>]+>/g, '').trim() };
+    }
+    // 处理 \n 分隔
+    const lines = raw.split('\n');
+    if (lines.length > 1) {
+        return { title: lines[0].trim(), body: lines.slice(1).join('\n').trim() };
+    }
+    return { title: raw.trim(), body: '' };
+};
+
 const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
     id,
     data: d,
@@ -127,10 +143,22 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
 
         if (!content) return null;
 
-        const contentBody = () => {
-            if (content.includes('<br>') || content.includes('<b>') || content.includes('<strong>')) {
-                const lines = content.split(/<br\s*\/?>/i);
-                return (
+        // 使用结构化排版（标题 + 描述体）
+        const { title, body } = parseNodeContent(content);
+
+        // 是否有 HTML 内容（旧格式兼容）
+        const hasHtml = content.includes('<br>') || content.includes('<b>') || content.includes('<strong>');
+
+        if (hasHtml) {
+            // 旧格式：HTML 直接渲染，保持兼容
+            const lines = content.split(/<br\s*\/?>/i);
+            return (
+                <div style={contentStyle} onDoubleClick={handleDoubleClick}>
+                    {d.icon && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', fontSize: '14px', flexShrink: 0 }}>
+                            {d.icon}
+                        </div>
+                    )}
                     <div style={textContainerStyle}>
                         {lines.map((line, index) => (
                             <div key={index} style={getLineStyle(line)}>
@@ -138,31 +166,64 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
                             </div>
                         ))}
                     </div>
-                );
-            }
-
-            const lines = content.split('\n');
-            return (
-                <div style={textContainerStyle}>
-                    {lines.map((line, index) => (
-                        <div key={index} style={getLineStyle(line)}>
-                            {line}
-                        </div>
-                    ))}
                 </div>
             );
+        }
+
+        // 新结构化排版：标题行 + 描述正文
+        const titleStyle: React.CSSProperties = {
+            fontWeight: 600,
+            fontSize: contentStyle.fontSize,
+            lineHeight: 1.3,
+            color: contentStyle.color,
+            display: 'block',
+            width: '100%',
+            letterSpacing: '0.01em',
+        };
+
+        const bodyStyle: React.CSSProperties = {
+            fontWeight: 400,
+            fontSize: `calc(${contentStyle.fontSize} * 0.88)`,
+            lineHeight: 1.5,
+            color: hexToRgba(String(contentStyle.color || '#374151'), 0.72),
+            display: 'block',
+            width: '100%',
+            marginTop: '4px',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
         };
 
         return (
             <div style={contentStyle} onDoubleClick={handleDoubleClick}>
                 {d.icon && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', fontSize: '14px', flexShrink: 0 }}>
+                    <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: '20px', height: '20px', fontSize: '15px', flexShrink: 0,
+                        opacity: 0.85,
+                    }}>
                         {d.icon}
                     </div>
                 )}
-                {contentBody()}
+                <div style={textContainerStyle}>
+                    {/* 标题 */}
+                    <span style={titleStyle}>{title}</span>
+                    {/* 描述正文（多行子弹列表支持） */}
+                    {body && (
+                        <div style={bodyStyle}>
+                            {body.split('\n').map((line, i) => (
+                                <div key={i} style={{ display: 'flex', gap: '4px', alignItems: 'flex-start' }}>
+                                    {line.startsWith('•') || line.startsWith('-') || line.startsWith('·') ? (
+                                        <>{line}</>
+                                    ) : (
+                                        <>{line}</>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
-        )
+        );
     };
 
     const rawContent = String(d?.description ?? '');
@@ -178,16 +239,10 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
             <div
                 style={containerStyle}
                 className={`diagram-node-glass diagram-node-hover-glow ${selected ? 'diagram-node-selected' : ''}`.trim()}
-                onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = `0 2px 8px -1px rgba(0, 0, 0, 0.1), 0 1px 4px rgba(0, 0, 0, 0.06)`;
-                    setHovered(true);
-                }}
-                onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = '';
-                    setHovered(false);
-                }}
+                onMouseEnter={() => setHovered(true)}
+                onMouseLeave={() => setHovered(false)}
             >
-                {/* 顶部主题色带：始终渲染，使用 accentBarProps 或默认 themeMain */}
+                {/* 顶部主题色带：始终渲染 */}
                 <div style={accentBarProps ?? {
                     position: 'absolute',
                     left: 0, right: 0, top: 0,
@@ -202,9 +257,9 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
                 {renderDebugOverlay()}
                 {renderContent(rawContent)}
 
+                {/* [FIX] Handle id 统一长格式，与 FlowchartNode 和 DomainDagreLayoutStrategy 的 sourceHandle 对齐 */}
                 {!d.isLegend && (
                     <>
-                        {/* [FIX] Handle id 统一长格式，与 FlowchartNode 和 DomainDagreLayoutStrategy 的 sourceHandle 对齐 */}
                         <Handle type="target" position={Position.Top} id="top" style={edgeHandleStyle} />
                         <Handle type="source" position={Position.Top} id="top" style={edgeHandleStyle} />
                         <Handle type="target" position={Position.Bottom} id="bottom" style={edgeHandleStyle} />
