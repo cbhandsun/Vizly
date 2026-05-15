@@ -1791,4 +1791,62 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
 .react-flow__edge-path {
     transition: opacity 0.25s ease, stroke-width 0.15s ease;
 }
+
+/* ============================================
+   Hyper-Glass V3: 连线标签胶囊化
+   对标 Lucidchart / draw.io edge label 样式
+   ============================================ */
+
+/* SVG 原生 label 背景（textbg 元素） */
+.react-flow__edge-textbg {
+    fill: white !important;
+    rx: 5;
+    ry: 5;
+    stroke: rgba(99, 102, 241, 0.35);
+    stroke-width: 1px;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.08));
+}
+
+/* SVG 原生 label 文字 */
+.react-flow__edge-text {
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    font-family: 'Inter', 'SF Pro Text', system-ui, sans-serif !important;
+    fill: #374151 !important;
+    letter-spacing: 0.01em;
+}
+
+/* HTML 自定义 EdgeLabel 容器（EdgeLabelRenderer 模式） */
+.edge-label-container {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1.5px solid rgba(99, 102, 241, 0.3);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Inter', 'SF Pro Text', system-ui, sans-serif;
+    color: #374151;
+    letter-spacing: 0.02em;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255,255,255,0.6) inset;
+    backdrop-filter: blur(4px);
+    white-space: nowrap;
+    pointer-events: none;
+    line-height: 1.6;
+    transition: opacity 0.15s ease;
+}
+
+/* 暗色模式 edge label */
+[data-theme='dark'] .react-flow__edge-textbg {
+    fill: #1e2233 !important;
+    stroke: rgba(139, 92, 246, 0.4);
+}
+[data-theme='dark'] .react-flow__edge-text {
+    fill: #e2e8f0 !important;
+}
+[data-theme='dark'] .edge-label-container {
+    background: rgba(30, 34, 51, 0.92);
+    border-color: rgba(139, 92, 246, 0.35);
+    color: #e2e8f0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255,255,255,0.04) inset;
+}
 

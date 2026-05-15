@@ -40,6 +40,8 @@ export interface CustomNodeGraphicsProps {
     getLineStyle: (line: string) => React.CSSProperties;
     accentBarProps: React.CSSProperties | null;
     statusStripeProps: React.CSSProperties | null;
+    /** 如果用户未设置图标，由 hook 追传过来的自动推断图标 */
+    resolvedIcon?: string | null;
 }
 
 // 解析节点文本：第一行是标题，其余是描述
@@ -78,8 +80,11 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
     textContainerStyle,
     getLineStyle,
     accentBarProps,
-    statusStripeProps
+    statusStripeProps,
+    resolvedIcon,
 }) => {
+    // 实际使用的图标：用户手动 > hook 推断 > null
+    const effectiveIcon = d?.icon || resolvedIcon || null;
 
     const renderDebugOverlay = () => {
         if (!debugEnabled) return null;
@@ -113,9 +118,9 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
         if (isEditing) {
             return (
                 <div style={contentStyle}>
-                    {d.icon && (
+                    {effectiveIcon && (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', fontSize: '14px', flexShrink: 0 }}>
-                            {d.icon}
+                            {effectiveIcon}
                         </div>
                     )}
                     <textarea
@@ -154,9 +159,9 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
             const lines = content.split(/<br\s*\/?>/i);
             return (
                 <div style={contentStyle} onDoubleClick={handleDoubleClick}>
-                    {d.icon && (
+                    {effectiveIcon && (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', fontSize: '14px', flexShrink: 0 }}>
-                            {d.icon}
+                            {effectiveIcon}
                         </div>
                     )}
                     <div style={textContainerStyle}>
@@ -195,13 +200,13 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
 
         return (
             <div style={contentStyle} onDoubleClick={handleDoubleClick}>
-                {d.icon && (
+                {effectiveIcon && (
                     <div style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         width: '20px', height: '20px', fontSize: '15px', flexShrink: 0,
                         opacity: 0.85,
                     }}>
-                        {d.icon}
+                        {effectiveIcon}
                     </div>
                 )}
                 <div style={textContainerStyle}>

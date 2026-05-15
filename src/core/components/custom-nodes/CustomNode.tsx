@@ -51,6 +51,7 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, id, width: prop
             getLineStyle={styleResolution.getLineStyle}
             accentBarProps={styleResolution.accentBarProps}
             statusStripeProps={styleResolution.statusStripeProps}
+            resolvedIcon={styleResolution.resolvedIcon}
         />
     );
 };

@@ -7,6 +7,90 @@ import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v
 
 const DEFAULT_FONT_STACK = '"Microsoft YaHei", "PingFang SC", "Helvetica Neue", Helvetica, Arial, sans-serif';
 
+/**
+ * 基于 domainClass 的语义图标映射（轻量 emoji 方案，零依赖）
+ * 支持通用架构词汇 + WMS/物流行业词汇
+ */
+const DOMAIN_CLASS_ICON_MAP: Record<string, string> = {
+    // 通用语义类
+    'core':         '⚙️',
+    'system':       '🖥️',
+    'external':     '🌐',
+    'decision':     '🔀',
+    'support':      '🔧',
+    'data':         '🗄️',
+    'api':          '🔗',
+    'service':      '⚡',
+    'gateway':      '🚪',
+    'queue':        '📬',
+    'cache':        '⚡',
+    'auth':         '🔐',
+    'ui':           '🖼️',
+    'fe':           '🖼️',
+    'frontend':     '🖼️',
+    'backend':      '⚙️',
+    'be':           '⚙️',
+    'database':     '🗄️',
+    'db':           '🗄️',
+    'storage':      '💾',
+    'cloud':        '☁️',
+    'monitor':      '📊',
+    'log':          '📋',
+    'user':         '👤',
+    'client':       '💻',
+    'mobile':       '📱',
+    // WMS/物流行业词汇
+    'wms':          '📦',
+    'tms':          '🚛',
+    'oms':          '🛒',
+    'wcs':          '🏭',
+    'erp':          '🏢',
+    'scm':          '🔄',
+    'be-scm':       '🔄',
+    'be-logistics': '🚛',
+    'ch':           '📡',
+    'channel':      '📡',
+    'logistics':    '🚛',
+    'warehouse':    '🏭',
+    'inbound':      '📥',
+    'outbound':     '📤',
+    'inventory':    '📦',
+    'order':        '🛒',
+    'shipping':     '🚢',
+    'delivery':     '🚚',
+    'supplier':     '🏗️',
+    'customer':     '👥',
+};
+
+/** 基于节点描述文本中的关键词推断图标（兜底机制） */
+const inferIconFromLabel = (label: string): string | null => {
+    const lower = label.toLowerCase();
+    const KEYWORD_ICONS: Array<[string[], string]> = [
+        [['api', 'gateway', '网关'],       '🚪'],
+        [['queue', 'kafka', 'mq', '消息'],  '📬'],
+        [['cache', 'redis', '缓存'],         '⚡'],
+        [['database', 'mysql', 'db', '数据库'], '🗄️'],
+        [['order', '订单'],                  '🛒'],
+        [['warehouse', '仓库', '仓储'],      '🏭'],
+        [['logistics', '物流'],              '🚛'],
+        [['user', '用户', 'customer'],       '👤'],
+        [['monitor', '监控', '运维'],        '📊'],
+        [['auth', '认证', '权限'],           '🔐'],
+        [['cloud', '云'],                    '☁️'],
+        [['mobile', '移动', '小程序', '微信'], '📱'],
+        [['report', '报表', '统计'],         '📋'],
+        [['ai', 'ml', '智能'],              '🤖'],
+        [['payment', '支付', '结算'],        '💳'],
+        [['inventory', '库存'],              '📦'],
+        [['schedule', '调度', '定时'],       '⏱️'],
+        [['service', '服务'],                '⚙️'],
+    ];
+    for (const [keywords, icon] of KEYWORD_ICONS) {
+        if (keywords.some(kw => lower.includes(kw))) return icon;
+    }
+    return null;
+};
+
 const hexToRgba = (hex: string, alpha: number): string => {
     if (!/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)) {
         return `rgba(200, 200, 200, ${alpha})`;
@@ -301,6 +385,19 @@ export const useCustomNodeStyleResolution = ({
         } as React.CSSProperties;
     };
 
+    // 智能图标推断：优先用户手动设置，其次 domainClass 映射，最后 label 关键词推断
+    const resolvedIcon = useMemo(() => {
+        // 用户已手动设置图标则不覆盖
+        if (d?.icon) return null;
+        // domainClass 直接命中
+        const cls = String(d?.domainClass || '').toLowerCase();
+        if (cls && DOMAIN_CLASS_ICON_MAP[cls]) return DOMAIN_CLASS_ICON_MAP[cls];
+        // label 关键词推断（兜底）
+        const label = String(d?.description || d?.label || '');
+        return inferIconFromLabel(label);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [d?.icon, d?.domainClass, d?.description, d?.label]);
+
     return {
         // Flags
         debugEnabled,
@@ -308,6 +405,8 @@ export const useCustomNodeStyleResolution = ({
         domainKey,
         themeMain,
         themeBorder,
+        // Auto icon (null if user has set d.icon manually)
+        resolvedIcon,
         // Styles
         containerStyle,
         contentStyle,
