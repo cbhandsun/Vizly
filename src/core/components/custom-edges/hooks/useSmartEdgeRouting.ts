@@ -92,7 +92,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
           targetX: props.targetX,
           targetY: props.targetY,
           targetPosition: renderPositions.targetPos,
-          borderRadius: edgeConfig.borderRadius ?? 16,
+          borderRadius: edgeConfig.borderRadius ?? 4,
       });
   }, [props.sourceX, props.sourceY, props.targetX, props.targetY, renderPositions.sourcePos, renderPositions.targetPos, edgeConfig.borderRadius]);
 
@@ -141,7 +141,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       const cachedPath = cache.get(id);
 
       if (!nodesDragging && !isLoading && !isStale && channelPoints && channelPoints.length > 1) {
-          const p = createFilletedPath(channelPoints, edgeConfig.borderRadius || 16);
+          const p = createFilletedPath(channelPoints, edgeConfig.borderRadius || 4);
           cache.set(id, p);
           return p;
       }
@@ -166,7 +166,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       edgeId: id,
       points: jumpInputPoints,
       enabled: !nodesDragging && !isLoading && !isStale,
-      cornerRadius: edgeConfig.borderRadius || 16,
+      cornerRadius: edgeConfig.borderRadius || 4,
   });
 
   const safeFinalPath = jumpPath || finalPath || `M ${props.sourceX} ${props.sourceY} L ${props.targetX} ${props.targetY}`;

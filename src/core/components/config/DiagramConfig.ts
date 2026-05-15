@@ -475,7 +475,7 @@ export const defaultConfig: DiagramConfig = {
     detourLimitRatio: 3.2,
     pathOptions: {
       gridRatio: 1.0,
-      borderRadius: 8
+      borderRadius: 4
     },
     markerEnd: {
       type: 'arrowclosed',
