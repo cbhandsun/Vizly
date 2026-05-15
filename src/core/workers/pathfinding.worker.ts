@@ -522,7 +522,7 @@ self.onmessage = (e: MessageEvent) => {
                 const updatedPoints = optimizedMap.get(result.edgeId || result.jobId);
                 if (!updatedPoints) continue;
                 result.points = updatedPoints;
-                result.path = createFilletedPath(updatedPoints, unifiedConfig.postProcessing.borderRadius ?? 12);
+                result.path = createFilletedPath(updatedPoints, unifiedConfig.postProcessing.borderRadius ?? 4);
                 const labelPos = getSmartLabelPosition(updatedPoints);
                 result.labelX = labelPos.x;
                 result.labelY = labelPos.y;

@@ -128,7 +128,7 @@ const useHydratedPath = (
             const s = sig(elkPoints);
             if (s && s === lastElkSigRef.current) return;
             lastElkSigRef.current = s;
-            const svgPath = createFilletedPath(elkPoints, edgeConfig.borderRadius ?? 12);
+            const svgPath = createFilletedPath(elkPoints, edgeConfig.borderRadius ?? 4);
             setTimeout(() => {
                 if (!isMountedRef.current) return;
                 if (path !== svgPath) {
@@ -144,7 +144,7 @@ const useHydratedPath = (
             const s = sig(computedPoints);
             if (s && s === lastComputedSigRef.current) return;
             lastComputedSigRef.current = s;
-            const svgPath = createFilletedPath(computedPoints, edgeConfig.borderRadius ?? 12);
+            const svgPath = createFilletedPath(computedPoints, edgeConfig.borderRadius ?? 4);
             setTimeout(() => {
                 if (!isMountedRef.current) return;
                 if (path !== svgPath) {
@@ -698,7 +698,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                     sourceOffset: edgeConfig.sourceOffset ?? 20,
                     targetOffset: edgeConfig.targetOffset ?? 32,
                     minLastSegment: edgeConfig.minLastSegment ?? 30,
-                    borderRadius: (edgeData?.borderRadius as number) ?? edgeConfig.borderRadius ?? 16,
+                    borderRadius: (edgeData?.borderRadius as number) ?? edgeConfig.borderRadius ?? 4,
                     gridSize: edgeConfig.gridSize ?? 20,
                     jumpRadius: edgeConfig.jumpRadius ?? 10,
                     shouldSimplify
