@@ -46,6 +46,8 @@ export class EdgeDecisionService {
         // 1. Determine fallback type based on global settings
         const fallbackType = (() => {
             if (preferSmart) {
+                // 'auto' 和未识别值都应该走 step（直角折线），不走 bezier
+                if (globalPath === 'auto') return EdgeType.ADVANCED_SMART_STEP;
                 if (globalPath.includes('step')) return EdgeType.ADVANCED_SMART_STEP;
                 if (globalPath.includes('straight')) return EdgeType.ADVANCED_SMART_STRAIGHT;
                 if (globalPath.includes('smooth')) {
@@ -55,8 +57,9 @@ export class EdgeDecisionService {
                     return EdgeType.ADVANCED_SMART_BEZIER;
                 }
                 if (globalPath.includes('bezier')) return EdgeType.ADVANCED_SMART_BEZIER;
-                return EdgeType.ADVANCED_SMART_BEZIER;
+                return EdgeType.ADVANCED_SMART_STEP; // 兜底改为 step
             }
+            if (globalPath === 'auto') return EdgeType.STEP;
             if (globalPath.includes('step')) return EdgeType.STEP;
             if (globalPath.includes('straight')) return EdgeType.STRAIGHT;
             if (globalPath.includes('smooth')) return EdgeType.SMOOTHSTEP;

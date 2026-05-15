@@ -308,11 +308,14 @@ export class EdgeRouter {
 
         const globalPath = config.globalPath || 'step';
 
+        // 'auto' 明确映射为 step（直角折线），不落入 bezier 兆底
+        if (globalPath === 'auto') return 'advanced-smart-step' as unknown as EdgeType;
         if (globalPath.includes('straight')) return 'advanced-smart-straight' as unknown as EdgeType;
         if (globalPath.includes('step')) return 'advanced-smart-step' as unknown as EdgeType;
         if (globalPath.includes('bezier')) return 'advanced-smart-bezier' as unknown as EdgeType;
 
-        return 'advanced-smart-bezier' as unknown as EdgeType;
+        // 其他未识别的值也回退到 step，而不是 bezier
+        return 'advanced-smart-step' as unknown as EdgeType;
     }
 }
 
