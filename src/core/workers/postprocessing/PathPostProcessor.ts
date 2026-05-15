@@ -20,7 +20,8 @@ import {
     ensureMinLastSegment,
     ensureMinFirstSegment,
     removeTinyOrthogonalJogs,
-    removeLargeBacktrack
+    removeLargeBacktrack,
+    trySimplify4PointCShape
 } from '../../algorithms/smartEdgeUtils';
 
 export interface PostProcessContext {
@@ -110,6 +111,8 @@ export class PathPostProcessor {
         // Phase 1: Simplification & Redundancy Removal
         const posOptions = { sourcePos: startPos, targetPos: endPos };
         finalPoints = simplifyPath(finalPoints, config.algorithm.gridSize * 2, obstacles, posOptions);
+        // [NEW] Handle 4-point C-shape paths before removeLargeBacktrack (which requires ≥5 pts)
+        finalPoints = trySimplify4PointCShape(finalPoints, obstacles, posOptions);
         // [BACKTRACK-V2] Orthogonal-safe large backtrack removal.
         // Threshold: 20px minimum (catches trunk junction micro-backtracks like 52px)
         // Only fires when: dominant direction is clear (≥2:1), AND

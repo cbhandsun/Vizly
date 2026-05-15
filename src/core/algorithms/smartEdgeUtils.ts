@@ -595,6 +595,85 @@ export function preventEndpointCollinearBacktrack(points: Point[]) {
  *
  * @param threshold  Minimum backward distance to trigger (default 60px)
  */
+
+/**
+ * [NEW] trySimplify4PointCShape
+ *
+ * removeLargeBacktrack 要求 ≥5 个点才触发，无法处理 4 点 C 形路径。
+ * 本函数专门检测 4 点路径是否形成 C 形绕路（side-trip），
+ * 并尝试用 3 点 L 形路径替代，条件：直线区间不被障碍物阻挡。
+ *
+ * 典型 C 形场景（bottom→top，vertical-forward）：
+ *   P0(src.bottom) → P1(left of src) → P2(left of tgt) → P3(tgt.top)
+ * 期望简化为：
+ *   P0 → corner{P0.x, P3.y} → P3   (L 形，两段)
+ */
+export function trySimplify4PointCShape(
+    points: Point[],
+    obstacles: Rectangle[] | SpatialIndex = [],
+    options?: { sourcePos?: Position; targetPos?: Position }
+): Point[] {
+    if (points.length !== 4) return points;
+
+    const [P0, P1, P2, P3] = points;
+
+    // 判断是否为 C 形：中间两点相对 src→dst 方向存在侧向偏移
+    const totalDx = P3.x - P0.x;
+    const totalDy = P3.y - P0.y;
+    const isMainVertical = Math.abs(totalDy) >= Math.abs(totalDx);
+
+    // 只处理有明确主方向的情况（≥1.5:1 比例）
+    if (isMainVertical && Math.abs(totalDy) < Math.abs(totalDx) * 1.5) return points;
+    if (!isMainVertical && Math.abs(totalDx) < Math.abs(totalDy) * 1.5) return points;
+
+    const isBlocked = (a: Point, b: Point): boolean => {
+        const rects = Array.isArray(obstacles) ? (obstacles as Rectangle[]) : [];
+        const CLEAR = 6;
+        const minX = Math.min(a.x, b.x) - CLEAR;
+        const maxX = Math.max(a.x, b.x) + CLEAR;
+        const minY = Math.min(a.y, b.y) - CLEAR;
+        const maxY = Math.max(a.y, b.y) + CLEAR;
+        return rects.some(obs =>
+            obs.x < maxX && obs.x + obs.width > minX &&
+            obs.y < maxY && obs.y + obs.height > minY
+        );
+    };
+
+    // 尝试 L 形路径：P0 → corner → P3（两种转角方向）
+    // corner1: 先水平后垂直 {P3.x, P0.y}
+    // corner2: 先垂直后水平 {P0.x, P3.y}
+    const corner1 = { x: P3.x, y: P0.y };
+    const corner2 = { x: P0.x, y: P3.y };
+
+    // 计算原始路径长度
+    const origLen =
+        Math.abs(P1.x - P0.x) + Math.abs(P1.y - P0.y) +
+        Math.abs(P2.x - P1.x) + Math.abs(P2.y - P1.y) +
+        Math.abs(P3.x - P2.x) + Math.abs(P3.y - P2.y);
+
+    // 尝试 corner2 (先垂直) —— 对 bottom→top 的 vertical-forward 更自然
+    const len2 = Math.abs(corner2.x - P0.x) + Math.abs(corner2.y - P0.y) +
+                 Math.abs(P3.x - corner2.x) + Math.abs(P3.y - corner2.y);
+    if (len2 < origLen - 5 && !isBlocked(P0, corner2) && !isBlocked(corner2, P3)) {
+        return [P0, corner2, P3];
+    }
+
+    // 尝试 corner1 (先水平)
+    const len1 = Math.abs(corner1.x - P0.x) + Math.abs(corner1.y - P0.y) +
+                 Math.abs(P3.x - corner1.x) + Math.abs(P3.y - corner1.y);
+    if (len1 < origLen - 5 && !isBlocked(P0, corner1) && !isBlocked(corner1, P3)) {
+        return [P0, corner1, P3];
+    }
+
+    // 尝试直线（两点完全对齐时）
+    const directLen = Math.abs(P3.x - P0.x) + Math.abs(P3.y - P0.y);
+    if (directLen < origLen - 5 && !isBlocked(P0, P3)) {
+        return [P0, P3];
+    }
+
+    return points;
+}
+
 export function removeLargeBacktrack(
     points: Point[],
     obstacles: Rectangle[] | SpatialIndex = [],
