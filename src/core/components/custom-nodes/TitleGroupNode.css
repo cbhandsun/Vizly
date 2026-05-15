@@ -1,106 +1,128 @@
-/* src/components/custom-nodes/TitleGroupNode.css */
+/* ============================================================
+   TitleGroupNode.css — Hyper-Glass V3 · 域容器精细化
+   层级：L1 Domain Container（最外层）
+   ============================================================ */
 
-/* Premium enhancements */
+/* ── 基础结构 ───────────────────────────────────────────────── */
 .title-group-node {
     box-sizing: border-box;
     width: 100%;
     height: 100%;
     position: relative;
     overflow: hidden;
-    transition: all var(--transition-normal), height 0.3s ease, width 0.3s ease, box-shadow 0.25s ease;
-    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
-    border-radius: var(--group-radius);
-    border: 1.5px solid var(--group-border-color);
+    transition: box-shadow 0.25s ease, border-color 0.2s ease;
+
+    /* 精细边框：1px 主题色 + 内侧 0.5px 高光线 */
+    border: 1px solid var(--group-border-color);
+    border-radius: var(--group-radius, 10px);
+
+    /* 多层阴影：环境光 + 扩散光 + 锐利阴影 */
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.04),
+        0 4px 12px -2px rgba(0, 0, 0, 0.08),
+        0 12px 32px -6px rgba(0, 0, 0, 0.06),
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+
     background: transparent;
 }
 
-
-
-.title-group-node.glass {
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+/* hover：轻微上浮 + 更强投影 */
+.title-group-node:hover {
+    box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.06),
+        0 8px 24px -4px rgba(0, 0, 0, 0.12),
+        0 20px 48px -8px rgba(0, 0, 0, 0.08),
+        0 0 0 1.5px var(--group-border-color),
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+    transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.15s ease;
 }
 
+/* 隐藏态 */
 .title-group-node.hidden {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
 }
 
-/* Drop Target Highlight */
+/* 拖拽投放目标 */
 .title-group-node.drop-target {
-    border-color: var(--color-primary-500) !important;
-    border-width: 3px !important;
-    box-shadow: 0 0 0 4px rgba(var(--color-primary-rgb), 0.2) !important;
-    background-color: rgba(var(--color-primary-rgb), 0.05) !important;
-    transform: scale(1.01);
-    animation: drop-target-pulse 1.5s ease-in-out infinite;
+    border-color: var(--color-primary-500, #6366f1) !important;
+    border-width: 2px !important;
+    box-shadow:
+        0 0 0 4px rgba(99, 102, 241, 0.15),
+        0 8px 32px -4px rgba(99, 102, 241, 0.2) !important;
+    animation: domain-drop-pulse 1.2s ease-in-out infinite;
 }
 
-@keyframes drop-target-pulse {
-    0%, 100% { box-shadow: 0 0 0 4px rgba(var(--color-primary-rgb), 0.15); }
-    50% { box-shadow: 0 0 0 8px rgba(var(--color-primary-rgb), 0.08); }
+@keyframes domain-drop-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12); }
+    50% { box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.06); }
 }
 
-.title-group-node:hover {
-    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.1), 0 4px 8px -2px rgba(0, 0, 0, 0.06), 0 0 0 1px var(--group-border-color);
-}
 
-/* Debug Overlay */
-.title-group-debug {
-    position: absolute;
-    top: 4px;
-    left: 4px;
-    padding: 2px 6px;
-    border-radius: 6px;
-    font-size: 11px;
-    line-height: 14px;
-    color: #111;
-    background: rgba(255, 255, 255, 0.75);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    pointer-events: none;
-    z-index: 999;
-}
-
-.debug-color-swatch {
-    width: 10px;
-    height: 10px;
-    border-radius: 2px;
-    border-width: 1px;
-    border-style: solid;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
-    display: inline-block;
-}
-
-/* Title Bar */
+/* ── 标题栏 ─────────────────────────────────────────────────── */
 .title-group-bar {
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    letter-spacing: 0.8px;
     position: relative;
-    transition: background-color var(--transition-fast);
+    overflow: hidden;
 
-    /* Variable Usage */
-    height: var(--group-title-height);
-    /* 微渐变：从主色到略深色，增强立体感 */
-    background: linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--group-theme-color) 100%, white 8%) 0%,
-        var(--group-theme-color) 50%,
-        color-mix(in srgb, var(--group-theme-color) 100%, black 10%) 100%
-    );
-    background-color: var(--group-theme-color);
-    /* Fallback */
+    height: var(--group-title-height, 40px);
+    padding: 0 14px 0 16px;
+
+    /* 精细渐变：主色 → 稍深，模拟顶部光源 */
+    background:
+        linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--group-theme-color) 90%, white 10%) 0%,
+            var(--group-theme-color) 60%,
+            color-mix(in srgb, var(--group-theme-color) 92%, black 8%) 100%
+        );
+
     color: var(--group-text-color);
-    font-size: var(--group-title-size);
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    font-size: var(--group-title-size, 13px);
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+
+    /* 噪声纹理叠加（极细腻）*/
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E"),
+        linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--group-theme-color) 90%, white 10%) 0%,
+            var(--group-theme-color) 60%,
+            color-mix(in srgb, var(--group-theme-color) 92%, black 8%) 100%
+        );
+
     z-index: 2;
+    gap: 8px;
+    cursor: default;
+    user-select: none;
 }
 
-/* 高光线：模拟玻璃高光 */
+/* 顶部高光线：玻璃感 */
+.title-group-bar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.35) 25%,
+        rgba(255, 255, 255, 0.5) 50%,
+        rgba(255, 255, 255, 0.35) 75%,
+        transparent 100%
+    );
+    pointer-events: none;
+}
+
+/* 底部分割线 */
 .title-group-bar::after {
     content: '';
     position: absolute;
@@ -111,139 +133,215 @@
     background: linear-gradient(
         90deg,
         transparent 0%,
-        rgba(255, 255, 255, 0.25) 20%,
-        rgba(255, 255, 255, 0.35) 50%,
-        rgba(255, 255, 255, 0.25) 80%,
+        rgba(0, 0, 0, 0.15) 20%,
+        rgba(0, 0, 0, 0.2) 50%,
+        rgba(0, 0, 0, 0.15) 80%,
         transparent 100%
     );
     pointer-events: none;
 }
 
+/* 域标识色点（左侧装饰） */
+.title-group-bar .domain-accent-dot {
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+    margin-right: 2px;
+}
+
+/* 图标容器 */
 .title-group-icon {
-    margin-right: 8px;
+    flex-shrink: 0;
     width: 20px;
     height: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
+    opacity: 0.9;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
 }
 
+/* 标题文字区 */
 .title-group-content-wrapper {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
+    flex: 1;
+    min-width: 0;
+    gap: 1px;
 }
 
-.title-group-subtitle {
-    font-size: 12px;
-    opacity: 0.9;
-    font-weight: 400;
-    margin-top: 2px;
-}
-
-/* 🆕 双击编辑标题 */
 .title-text {
-    cursor: default;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
 }
 
 .title-text span {
     cursor: text;
 }
 
+.title-group-subtitle {
+    font-size: 10px;
+    font-weight: 400;
+    opacity: 0.75;
+    letter-spacing: 0.3px;
+    margin-top: 0;
+    text-transform: none;
+}
+
+/* 行内编辑 */
 .title-group-inline-input {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.4);
     border-radius: 4px;
     color: inherit;
     font: inherit;
-    font-weight: 600;
-    padding: 2px 6px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
     outline: none;
     width: 100%;
     min-width: 80px;
-    max-width: 300px;
-    text-align: center;
+    text-align: left;
 }
 
 .title-group-inline-input:focus {
-    background: rgba(255, 255, 255, 0.3);
-    border-color: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.28);
+    border-color: rgba(255, 255, 255, 0.65);
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
 }
 
-/* Content Area */
-.title-group-content {
-    position: relative;
-    height: calc(100% - var(--group-title-height));
-    padding: var(--group-padding);
-    color: var(--group-content-text);
-    background-color: var(--group-bg-color);
-    transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
-    /* 顶部内阴影：增强标题栏与内容区的层次分离 */
-    box-shadow: inset 0 2px 6px -2px rgba(0, 0, 0, 0.08);
-}
-
-.title-group-content.glass {
-    -webkit-backdrop-filter: blur(12px) saturate(160%);
-    backdrop-filter: blur(12px) saturate(160%);
-    background: var(--group-glass-bg);
-}
-
-.title-group-content.blueprint {
-    background-image: repeating-linear-gradient(0deg, rgba(74, 144, 226, 0.1) 0px, rgba(74, 144, 226, 0.1) 1px, transparent 1px, transparent 12px), repeating-linear-gradient(90deg, rgba(74, 144, 226, 0.1) 0px, rgba(74, 144, 226, 0.1) 1px, transparent 1px, transparent 12px);
-    background-color: #f8fbff;
-}
-
-/* Handles */
-.title-group-handle {
-    border: 2px solid white;
-    background-color: var(--group-border-color);
-    width: 12px;
-    height: 12px;
-    transition: background-color var(--transition-fast);
-    z-index: 10;
-}
-
-/* 🆕 折叠控件 */
+/* ── 折叠控件 ───────────────────────────────────────────────── */
 .title-group-collapse-controls {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     margin-left: auto;
-    padding-right: 12px;
+    flex-shrink: 0;
 }
 
 .title-group-child-count {
-    font-size: 11px;
-    font-weight: 500;
-    padding: 2px 6px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.2);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.18);
     color: var(--group-text-color);
-    opacity: 0.9;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    letter-spacing: 0.3px;
+    min-width: 18px;
+    text-align: center;
 }
 
 .title-group-collapse-btn {
-    background: rgba(255, 255, 255, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.22);
     color: var(--group-text-color);
     cursor: pointer;
-    font-size: 16px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    transition: all 0.2s;
-    line-height: 1;
+    font-size: 13px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 5px;
+    transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
     display: flex;
     align-items: center;
     justify-content: center;
+    line-height: 1;
 }
 
 .title-group-collapse-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: scale(1.1);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.24);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    transform: scale(1.08);
 }
 
 .title-group-collapse-btn:active {
-    transform: scale(0.95);
+    transform: scale(0.94);
+}
+
+
+/* ── 内容区 ─────────────────────────────────────────────────── */
+.title-group-content {
+    position: relative;
+    height: calc(100% - var(--group-title-height, 40px));
+    padding: var(--group-padding, 14px);
+    color: var(--group-content-text);
+    background-color: var(--group-bg-color);
+    transition: background-color 0.2s ease;
+
+    /* 顶部内阴影：加强层次感 */
+    box-shadow: inset 0 3px 8px -3px rgba(0, 0, 0, 0.07);
+}
+
+/* 玻璃主题 */
+.title-group-node.glass .title-group-content {
+    backdrop-filter: blur(14px) saturate(170%);
+    -webkit-backdrop-filter: blur(14px) saturate(170%);
+    background: var(--group-glass-bg);
+}
+
+/* 蓝图主题 */
+.title-group-node.blueprint .title-group-content {
+    background-image:
+        repeating-linear-gradient(0deg, rgba(74, 144, 226, 0.08) 0px, rgba(74, 144, 226, 0.08) 1px, transparent 1px, transparent 20px),
+        repeating-linear-gradient(90deg, rgba(74, 144, 226, 0.08) 0px, rgba(74, 144, 226, 0.08) 1px, transparent 1px, transparent 20px);
+    background-color: rgba(248, 251, 255, 0.96);
+}
+
+
+/* ── Handle（连线锚点）─────────────────────────────────────── */
+.title-group-handle {
+    width: 10px;
+    height: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    background-color: var(--group-border-color);
+    border-radius: 50%;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    opacity: 0;
+}
+
+.title-group-node:hover .title-group-handle,
+.react-flow.connecting .title-group-handle {
+    opacity: 1;
+}
+
+.title-group-handle:hover {
+    transform: scale(1.4);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25);
+}
+
+
+/* ── 调试覆盖层 ──────────────────────────────────────────────── */
+.title-group-debug {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 10px;
+    line-height: 14px;
+    color: #111;
+    background: rgba(255, 255, 255, 0.82);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    pointer-events: none;
+    z-index: 999;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+
+.debug-color-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    border-width: 1px;
+    border-style: solid;
+    display: inline-block;
 }

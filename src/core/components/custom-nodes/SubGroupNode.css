@@ -1,24 +1,37 @@
-/* src/components/custom-nodes/SubGroupNode.css */
+/* ============================================================
+   SubGroupNode.css — Hyper-Glass V3 · 子域精细化
+   层级：L2 Sub-Domain Container（中间层）
+   ============================================================ */
 
+/* ── 基础结构 ───────────────────────────────────────────────── */
 .sub-group-node {
     box-sizing: border-box;
     width: 100%;
     height: 100%;
     position: relative;
-    transition: all var(--transition-normal), height 0.3s ease, width 0.3s ease, box-shadow 0.25s ease;
-    border-radius: 12px;
-    /* 极微弱内阴影：增加容器凹陷感 */
-    box-shadow: inset 0 1px 4px -1px rgba(0, 0, 0, 0.06);
-    /* 🔑 让点击穿透到子节点，标题/按钮通过 pointer-events: auto 保留交互 */
+
+    /* 默认无边框（由 TSX inline style 控制），CSS 补内阴影层次 */
+    border-radius: 8px;
+
+    /* 内阴影：轻微凹陷感 */
+    box-shadow:
+        inset 0 1px 3px -1px rgba(0, 0, 0, 0.08),
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+
+    transition:
+        box-shadow 0.2s ease,
+        background-color 0.2s ease;
+
+    /* 点击穿透：让子节点可交互 */
     pointer-events: none;
 }
 
-/* 🔑 React Flow 外层 wrapper 也需要穿透，并且强制放入底层（-1）防止背景遮挡普通节点 */
+/* React Flow 外层也穿透 */
 .react-flow__node-subGroup {
     pointer-events: none !important;
 }
 
-/* 使 subGroup 内的交互区域恢复事件 */
+/* 恢复交互的子区域 */
 .react-flow__node-subGroup .sub-group-title,
 .react-flow__node-subGroup .sub-group-collapse-controls,
 .react-flow__node-subGroup .sub-group-handle,
@@ -27,174 +40,210 @@
     pointer-events: auto;
 }
 
-/* Drop Target Highlight */
+/* hover：轻提示光晕 */
+.sub-group-node:hover {
+    box-shadow:
+        inset 0 1px 3px -1px rgba(0, 0, 0, 0.08),
+        0 4px 16px -6px rgba(0, 0, 0, 0.1),
+        0 0 0 1px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* 拖拽投放 */
 .sub-group-node.drop-target {
-    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.3) !important;
-    border-color: var(--color-primary-500) !important;
-    transform: scale(1.01);
-    animation: sub-drop-pulse 1.5s ease-in-out infinite;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.35) !important;
+    animation: sub-drop-pulse 1s ease-in-out infinite;
 }
 
 @keyframes sub-drop-pulse {
-    0%, 100% { box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.2); }
-    50% { box-shadow: 0 0 0 6px rgba(var(--color-primary-rgb), 0.1); }
+    0%, 100% { box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25); }
+    50% { box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12); }
 }
 
-.sub-group-node:hover {
-    box-shadow: inset 0 1px 4px -1px rgba(0, 0, 0, 0.06), 0 4px 16px -4px rgba(0, 0, 0, 0.1) !important;
+/* 选中态 */
+.sub-group-node.selected {
+    box-shadow:
+        inset 0 1px 3px -1px rgba(0, 0, 0, 0.06),
+        0 0 0 1.5px rgba(99, 102, 241, 0.5),
+        0 4px 16px -4px rgba(99, 102, 241, 0.2);
 }
 
-/* Glass Effect */
-.sub-group-node.glass {
-    -webkit-backdrop-filter: saturate(1.8) blur(10px);
-    backdrop-filter: saturate(1.8) blur(10px);
-    background: rgba(255, 255, 255, 0.5);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
-}
-
-/* Debug Overlay */
-.sub-group-debug {
-    position: absolute;
-    top: 4px;
-    left: 4px;
-    padding: 2px 6px;
-    border-radius: 6px;
-    font-size: 11px;
-    line-height: 14px;
-    color: #111;
-    background: rgba(255, 255, 255, 0.75);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    pointer-events: none;
-    z-index: 200;
-}
-
-.sub-group-title {
-    padding: 10px 14px;
-    border-top-left-radius: 10px;
-    /* Default, overridden by style logic */
-    border-top-right-radius: 10px;
-    background-color: transparent;
-    padding-left: 14px;
-    pointer-events: auto;
-    position: relative;
-}
-
-/* 标题区底部渐变分割线 */
-.sub-group-title::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 14px;
-    right: 14px;
-    height: 1px;
-    background: linear-gradient(
-        90deg,
-        transparent 0%,
-        currentColor 50%,
-        transparent 100%
-    );
-    opacity: 0.12;
-    pointer-events: none;
-}
-
-.sub-group-handle {
-    width: 8px;
-    /* React Flow defaults, can be overridden */
-    height: 8px;
-    background: #555;
-    border-radius: 50%;
-}
-
-/* Blueprint Pattern */
-.sub-group-node.blueprint {
-    background-image: repeating-linear-gradient(0deg, rgba(25, 118, 210, 0.12) 0px, rgba(25, 118, 210, 0.12) 1px, transparent 1px, transparent 12px),
-        repeating-linear-gradient(90deg, rgba(25, 118, 210, 0.12) 0px, rgba(25, 118, 210, 0.12) 1px, transparent 1px, transparent 12px);
-}
-
-/* Glass Effect */
-.sub-group-node.glass {
-    -webkit-backdrop-filter: saturate(1.2) blur(6px);
-    backdrop-filter: saturate(1.2) blur(6px);
-}
-
-/* Hidden State */
+/* 隐藏态 */
 .sub-group-node.hidden {
     opacity: 0;
     pointer-events: none;
     visibility: hidden;
 }
 
-/* Selected State */
-.sub-group-node.selected {
-    box-shadow: 0 0 0 2px rgba(0, 120, 255, 0.5);
-}
 
-/* 🆕 折叠控件样式 */
-.sub-group-collapse-controls {
+/* ── 标题区 ─────────────────────────────────────────────────── */
+.sub-group-title {
     display: flex;
     align-items: center;
     gap: 6px;
+    padding: 7px 12px 6px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    background-color: transparent;
+    pointer-events: auto;
+    position: relative;
+    min-height: 30px;
+}
+
+/* 底部分割线 */
+.sub-group-title::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 10px;
+    right: 10px;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        currentColor 40%,
+        currentColor 60%,
+        transparent 100%
+    );
+    opacity: 0.1;
+    pointer-events: none;
+}
+
+/* 左侧类型色块 */
+.sub-group-title-badge {
+    flex-shrink: 0;
+    width: 3px;
+    height: 14px;
+    border-radius: 2px;
+    background: currentColor;
+    opacity: 0.6;
+}
+
+
+/* ── 折叠控件 ───────────────────────────────────────────────── */
+.sub-group-collapse-controls {
+    display: flex;
+    align-items: center;
+    gap: 5px;
     margin-left: auto;
     pointer-events: auto;
 }
 
 .sub-group-child-count {
-    font-size: 11px;
-    font-weight: 500;
-    padding: 2px 6px;
-    border-radius: 10px;
-    background: rgba(74, 144, 226, 0.1);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 8px;
+    background: rgba(74, 144, 226, 0.08);
     color: currentColor;
-    opacity: 0.8;
-    border: 1px solid rgba(74, 144, 226, 0.3);
+    opacity: 0.75;
+    border: 1px solid rgba(74, 144, 226, 0.2);
+    min-width: 16px;
+    text-align: center;
+    letter-spacing: 0.2px;
 }
 
 .sub-group-collapse-btn {
-    background: rgba(74, 144, 226, 0.1);
-    border: 1px solid rgba(74, 144, 226, 0.3);
+    background: rgba(74, 144, 226, 0.06);
+    border: 1px solid rgba(74, 144, 226, 0.18);
     color: currentColor;
     cursor: pointer;
-    font-size: 14px;
-    padding: 2px 6px;
+    font-size: 12px;
+    width: 20px;
+    height: 20px;
+    padding: 0;
     border-radius: 4px;
-    transition: all 0.2s;
-    line-height: 1;
+    transition: background 0.15s, transform 0.15s;
     display: flex;
     align-items: center;
     justify-content: center;
+    line-height: 1;
+    opacity: 0.75;
 }
 
 .sub-group-collapse-btn:hover {
-    background: rgba(74, 144, 226, 0.2);
+    background: rgba(74, 144, 226, 0.14);
     transform: scale(1.1);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    opacity: 1;
 }
 
 .sub-group-collapse-btn:active {
-    transform: scale(0.95);
+    transform: scale(0.92);
 }
 
-/* 🆕 双击编辑标题 */
+
+/* ── 行内编辑 ───────────────────────────────────────────────── */
 .sub-group-inline-input {
-    background: rgba(255, 255, 255, 0.7);
-    border: 1px solid rgba(74, 144, 226, 0.4);
+    background: rgba(255, 255, 255, 0.65);
+    border: 1px solid rgba(74, 144, 226, 0.35);
     border-radius: 4px;
     color: inherit;
     font: inherit;
     font-weight: 600;
-    padding: 2px 6px;
+    padding: 2px 7px;
     outline: none;
     width: 100%;
-    min-width: 80px;
-    max-width: 300px;
-    text-align: center;
+    min-width: 60px;
+    max-width: 260px;
     pointer-events: auto;
 }
 
 .sub-group-inline-input:focus {
     background: rgba(255, 255, 255, 0.9);
-    border-color: rgba(74, 144, 226, 0.7);
-    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.15);
+    border-color: rgba(74, 144, 226, 0.6);
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.12);
+}
+
+
+/* ── Handle（连线锚点）─────────────────────────────────────── */
+.sub-group-handle {
+    width: 8px;
+    height: 8px;
+    background: currentColor;
+    border-radius: 50%;
+    opacity: 0;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+    border: 1.5px solid rgba(255, 255, 255, 0.8);
+}
+
+.sub-group-node:hover .sub-group-handle,
+.react-flow.connecting .sub-group-handle {
+    opacity: 0.7;
+}
+
+.sub-group-handle:hover {
+    transform: scale(1.5);
+    opacity: 1 !important;
+}
+
+
+/* ── 主题变体 ───────────────────────────────────────────────── */
+.sub-group-node.glass {
+    backdrop-filter: saturate(1.6) blur(10px);
+    -webkit-backdrop-filter: saturate(1.6) blur(10px);
+}
+
+.sub-group-node.blueprint {
+    background-image:
+        repeating-linear-gradient(0deg, rgba(25, 118, 210, 0.08) 0px, rgba(25, 118, 210, 0.08) 1px, transparent 1px, transparent 20px),
+        repeating-linear-gradient(90deg, rgba(25, 118, 210, 0.08) 0px, rgba(25, 118, 210, 0.08) 1px, transparent 1px, transparent 20px);
+}
+
+
+/* ── 调试覆盖层 ──────────────────────────────────────────────── */
+.sub-group-debug {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-size: 10px;
+    line-height: 14px;
+    color: #111;
+    background: rgba(255, 255, 255, 0.82);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    pointer-events: none;
+    z-index: 200;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
 }

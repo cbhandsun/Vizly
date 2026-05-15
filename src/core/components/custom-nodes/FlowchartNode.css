@@ -51,11 +51,13 @@
 
 .flowchart-node:hover {
     z-index: 10;
-    transform: translateY(-1px);
+    transform: translateY(-1.5px);
     box-shadow:
-        0 4px 12px rgba(0, 0, 0, 0.10),
-        0 8px 28px rgba(0, 0, 0, 0.08),
-        0 0 0 1px rgba(0, 0, 0, 0.04);
+        0 2px 4px rgba(0, 0, 0, 0.07),
+        0 6px 18px -2px rgba(0, 0, 0, 0.10),
+        0 14px 32px -6px rgba(0, 0, 0, 0.06),
+        0 0 0 1px rgba(0, 0, 0, 0.04),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 /* 选中态：无 bounce，使用 outline 过渡 */
@@ -91,22 +93,23 @@
     overflow: visible; /* 行业准则：内容为王，宁可溢出也绝不隐藏截断导致用户丢失关键信息 */
 }
 
-/* 🆕 标题行：粗体 + 主题色 */
+/* 🆕 标题行：粗体 + 精致分割线 */
 .flowchart-node-title {
     color: var(--node-text);
-    font-size: 14px;
-    font-weight: 600;
-    line-height: 1.5;
-    letter-spacing: 0.01em;
+    font-size: 13.5px;
+    font-weight: 650; /* 比 600 稍重，更清晰 */
+    line-height: 1.45;
+    letter-spacing: 0.015em;
     display: flex;
     align-items: center;
-    justify-content: center; /* 确保标题本身居中 */
+    justify-content: center;
     gap: 6px;
-    padding-bottom: 5px; /* 减小标题占据的空间 */
-    margin-bottom: 5px; /* 减小标题占据的空间 */
-    border-bottom: 1px solid color-mix(in srgb, var(--node-text) 8%, transparent); /* 更优雅的分割线 */
-    flex-shrink: 0; /* 禁止因容器过小而挤压标题高度 */
-    white-space: pre-wrap; /* 允许标题在框较窄时自然换行 */
+    padding-bottom: 5px;
+    margin-bottom: 5px;
+    /* 分割线：主题色调渐变，比黑色柔和 */
+    border-bottom: 1px solid color-mix(in srgb, var(--node-main, currentColor) 15%, transparent);
+    flex-shrink: 0;
+    white-space: pre-wrap;
     word-break: break-word;
     text-align: center;
 }

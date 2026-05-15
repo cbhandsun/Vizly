@@ -152,23 +152,31 @@ export const useCustomNodeStyleResolution = ({
     const textColor = resolveContentTextColor(d?.customStyle?.color, effectiveContrastBg);
 
     // --- Computed Styles Objects ---
+    const finalRadius = Math.min(radiusToken, 8); // 叶节点最多 8px，避免过于圆润
     const containerStyle: React.CSSProperties = {
         width: '100%', 
         height: '100%',
         maxWidth: nodeWidth ? `${nodeWidth}px` : undefined,
-        border: selected ? `1px solid ${themeMain}` : `1px solid ${hexToRgba(themeBorder, 0.35)}`,
-        borderRadius: `${radiusToken}px`,
+        /* 边框：选中时主题色实边，平时半透明主题色 */
+        border: selected
+            ? `1.5px solid ${themeMain}`
+            : `1px solid ${hexToRgba(themeBorder, 0.3)}`,
+        borderRadius: `${finalRadius}px`,
         overflow: 'hidden',
         backgroundColor: getBackgroundColor(),
+        /* 多层阴影：精细层次 */
         boxShadow: selected
-            ? `0 0 0 3px ${hexToRgba(themeMain, 0.12)}, 0 4px 12px -2px rgba(0, 0, 0, 0.1)`
-            : (hovered ? `0 2px 8px -1px rgba(0, 0, 0, 0.1), 0 1px 4px rgba(0, 0, 0, 0.06)` : `0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04)`),
+            ? `0 0 0 3px ${hexToRgba(themeMain, 0.15)}, 0 0 0 1px ${themeMain}, 0 6px 16px -3px rgba(0, 0, 0, 0.12)`
+            : hovered
+                ? `0 2px 6px -1px rgba(0,0,0,0.1), 0 6px 16px -4px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.18)`
+                : `0 1px 2px rgba(0,0,0,0.04), 0 3px 8px -2px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.14)`,
         display: 'flex', 
         justifyContent: 'center', 
         alignItems: 'center',
-        padding: `${finalPadV}px ${finalPadH}px`, 
+        /* 顶部多留 3px 给色带 */
+        padding: `${finalPadV + 3}px ${finalPadH}px ${finalPadV}px`,
         boxSizing: 'border-box',
-        transition: 'border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, transform 0.15s ease',
+        transition: 'border-color 0.15s ease, box-shadow 0.18s ease, background-color 0.15s ease',
         position: 'relative', 
         zIndex,
         cursor: 'move',
@@ -180,6 +188,7 @@ export const useCustomNodeStyleResolution = ({
         backgroundPosition: 'center',
         ...safeCustomStyle
     };
+
 
     const contentStyle: React.CSSProperties = {
         color: textColor,

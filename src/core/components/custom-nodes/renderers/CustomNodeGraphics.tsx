@@ -187,7 +187,17 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
                     setHovered(false);
                 }}
             >
-                {accentBarProps && <div style={accentBarProps} />}
+                {/* 顶部主题色带：始终渲染，使用 accentBarProps 或默认 themeMain */}
+                <div style={accentBarProps ?? {
+                    position: 'absolute',
+                    left: 0, right: 0, top: 0,
+                    height: '3px',
+                    background: `linear-gradient(90deg, ${themeMain}cc 0%, ${themeMain} 50%, ${themeMain}cc 100%)`,
+                    borderTopLeftRadius: 'inherit',
+                    borderTopRightRadius: 'inherit',
+                    pointerEvents: 'none',
+                    zIndex: 5,
+                }} />
                 {statusStripeProps && <div style={statusStripeProps} />}
                 {renderDebugOverlay()}
                 {renderContent(rawContent)}
