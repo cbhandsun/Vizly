@@ -106,7 +106,7 @@ function processEdge(
     pathOptions: {
       ...(edge.data?.pathOptions || {}),
       gridRatio: 1.04,
-      borderRadius: 20, // [FIX] Unified with PathPostProcessor default (was 4, caused sharp corners)
+      borderRadius: 4, // [FIX] Hyper-Glass V3: unified to 4px sharp orthogonal corners
     },
   };
 

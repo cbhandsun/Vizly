@@ -9,6 +9,11 @@
  *   但其线段参与碰撞检测，作为"已占用轨道"。
  * - 只有非 bus 的独立边才会被偏移。
  * - 偏移保守：只分离真正重叠的段，避免引入新的交叉。
+ * 
+ * [Edge Bundling] 吸附模式：
+ * - 当非 buddy 段与 buddy 段极度接近（SNAP_TOLERANCE 内）且重叠长度充分时，
+ *   将非 buddy 段**吸附**到 buddy 轨道上，而非推开。
+ * - 视觉效果：多条近距离平行线合并成共享主干，减少视觉密度。
  */
 
 export interface Point {
@@ -55,6 +60,8 @@ export function globalChannelRouting(
 
     // 1. 提取所有正交线段
     const GROUP_TOLERANCE = 6;  // 同通道聚类容差（px）
+    const SNAP_TOLERANCE = 16;  // 吸附容差：非 buddy 段与 buddy 段距离 < 此值时吸附合并
+    const SNAP_OVERLAP_RATIO = 0.3; // 吸附要求：重叠长度占短段比例 > 30%
     const segments: Segment[] = [];
 
     for (const [edgeId, pts] of edgePaths) {
@@ -87,11 +94,48 @@ export function globalChannelRouting(
         }
     }
 
-    // 2. 按 fixedVal 聚类 → Interval Coloring
+    // [Edge Bundling] Phase 0: 吸附检测
+    // 找出与 buddy 段极度接近且有足够重叠的非 buddy 段，将它们标记为"吸附目标"
+    // snapShifts: 记录需要吸附的段及其偏移量（偏移到 buddy 的 fixedVal）
+    const snapShifts = new Map<string, number>();
+    
+    const buddySegs = segments.filter(s => s.isBuddy);
+    const nonBuddySegs = segments.filter(s => !s.isBuddy);
+    
+    for (const nb of nonBuddySegs) {
+        for (const bs of buddySegs) {
+            if (nb.isHoriz !== bs.isHoriz) continue; // 方向不同跳过
+            
+            const dist = Math.abs(nb.fixedVal - bs.fixedVal);
+            if (dist < 0.5 || dist > SNAP_TOLERANCE) continue; // 完全重合或太远都跳过
+            
+            // 计算重叠长度
+            const overlapLen = Math.min(nb.maxVal, bs.maxVal) - Math.max(nb.minVal, bs.minVal);
+            const shortLen = Math.min(nb.maxVal - nb.minVal, bs.maxVal - bs.minVal);
+            
+            if (overlapLen > 0 && shortLen > 0 && overlapLen / shortLen > SNAP_OVERLAP_RATIO) {
+                // 吸附！将非 buddy 段偏移到 buddy 段的 fixedVal
+                const snapOffset = bs.fixedVal - nb.fixedVal;
+                const key = `${nb.edgeId}:${nb.segIdx}`;
+                
+                // 如果已有吸附记录，选距离最近的
+                const existing = snapShifts.get(key);
+                if (existing === undefined || Math.abs(snapOffset) < Math.abs(existing)) {
+                    snapShifts.set(key, snapOffset);
+                }
+            }
+        }
+    }
+
+    // 2. 按 fixedVal 聚类 → Interval Coloring（只处理需要分离的段，不处理已吸附的段）
     const assignTracks = (segs: Segment[]): Map<string, number> => {
         // 聚类
         const groups = new Map<number, Segment[]>();
         for (const s of segs) {
+            // 跳过已被吸附的段（它们不需要分离，而是要对齐）
+            const snapKey = `${s.edgeId}:${s.segIdx}`;
+            if (snapShifts.has(snapKey)) continue;
+            
             let foundKey: number | null = null;
             for (const key of groups.keys()) {
                 if (Math.abs(key - s.fixedVal) < GROUP_TOLERANCE) {
@@ -205,6 +249,21 @@ export function globalChannelRouting(
 
     const hShifts = assignTracks(segments.filter(s => s.isHoriz));
     const vShifts = assignTracks(segments.filter(s => !s.isHoriz));
+
+    // 将吸附偏移量按方向分入对应的 shift map
+    for (const [key, offset] of snapShifts) {
+        // 找到该段是水平还是垂直
+        const [edgeId, segIdxStr] = key.split(':');
+        const segIdx = parseInt(segIdxStr, 10);
+        const seg = segments.find(s => s.edgeId === edgeId && s.segIdx === segIdx);
+        if (!seg) continue;
+        
+        if (seg.isHoriz) {
+            hShifts.set(key, offset);
+        } else {
+            vShifts.set(key, offset);
+        }
+    }
 
     if (hShifts.size === 0 && vShifts.size === 0) {
         return edgePaths;

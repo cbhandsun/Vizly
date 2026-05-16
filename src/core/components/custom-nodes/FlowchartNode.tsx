@@ -148,7 +148,6 @@ const FlowchartNode = ({ data, selected, id, dragging }: FlowchartNodeProps) => 
                         >
                             {titleLine && (
                                 <div className="flowchart-node-title">
-                                    {resolvedIcon && <span className="flowchart-node-icon" style={{ color: mainColor }}>{resolvedIcon}</span>}
                                     <span dangerouslySetInnerHTML={{ __html: titleLine }} style={{ pointerEvents: 'none' }} />
                                 </div>
                             )}

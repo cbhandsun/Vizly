@@ -106,7 +106,7 @@ const CanvasEdgeLayer = memo(() => {
 
             // Draw Path
             if (pathString) {
-                const strokeColor = (edge.style?.stroke as string) || '#b1b1b7';
+                const strokeColor = (edge.style?.stroke as string) || '#94a3b8';
                 const strokeWidth = Number(edge.style?.strokeWidth) || 1.5;
 
                 ctx.strokeStyle = strokeColor;

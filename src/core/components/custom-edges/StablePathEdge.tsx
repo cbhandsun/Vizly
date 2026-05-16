@@ -41,13 +41,33 @@ function pointsToRoundedPath(points: Point[], radius: number = 8): string {
         return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
     }
 
-    const pathParts: string[] = [];
-    pathParts.push(`M ${points[0].x} ${points[0].y}`);
+    // [FIX] Snap near-orthogonal segments to perfect orthogonal BEFORE generating curves.
+    // This prevents diagonal L/Q commands caused by fractional handle coordinate offsets (e.g. dx=12, dy=419).
+    const snapped = points.map(p => ({ ...p }));
+    for (let i = 0; i < snapped.length - 1; i++) {
+        const a = snapped[i];
+        const b = snapped[i + 1];
+        const dx = Math.abs(a.x - b.x);
+        const dy = Math.abs(a.y - b.y);
+        // If one axis delta is much smaller than the other, snap it to zero
+        if (dx > 0.5 && dy > 0.5) {
+            if (dx < 15 && dy >= 15) {
+                // Almost vertical — snap x
+                b.x = a.x;
+            } else if (dy < 15 && dx >= 15) {
+                // Almost horizontal — snap y
+                b.y = a.y;
+            }
+        }
+    }
 
-    for (let i = 1; i < points.length - 1; i++) {
-        const prev = points[i - 1];
-        const curr = points[i];
-        const next = points[i + 1];
+    const pathParts: string[] = [];
+    pathParts.push(`M ${snapped[0].x} ${snapped[0].y}`);
+
+    for (let i = 1; i < snapped.length - 1; i++) {
+        const prev = snapped[i - 1];
+        const curr = snapped[i];
+        const next = snapped[i + 1];
 
         // 计算进入角和离开角的方向
         const dx1 = curr.x - prev.x;
@@ -77,7 +97,7 @@ function pointsToRoundedPath(points: Point[], radius: number = 8): string {
     }
 
     // 最后一个点
-    const last = points[points.length - 1];
+    const last = snapped[snapped.length - 1];
     pathParts.push(`L ${last.x} ${last.y}`);
 
     return pathParts.join(' ');
@@ -134,7 +154,7 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
             targetX,
             targetY,
             targetPosition,
-            borderRadius: 6,
+            borderRadius: 8,
         });
         edgePath = path;
         labelX = lx;

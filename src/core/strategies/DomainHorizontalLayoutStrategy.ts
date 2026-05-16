@@ -866,7 +866,7 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
             pathOptions: {
               ...(edge.data?.pathOptions || {}),
               gridRatio: 1.04,
-              borderRadius: 20 // [FIX] Unified with PathPostProcessor default (was 4)
+              borderRadius: 4 // [FIX] Hyper-Glass V3: 4px sharp corners
             }
           }
         };
@@ -919,7 +919,7 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
         pathOptions: {
           ...(edge.data?.pathOptions || {}),
           gridRatio: 1.04,
-          borderRadius: 20 // [FIX] Unified with PathPostProcessor default (was 4)
+          borderRadius: 4 // [FIX] Hyper-Glass V3: 4px sharp corners
         }
       };
 

@@ -83,7 +83,9 @@ self.onmessage = (e: MessageEvent) => {
             ...createDefaultRoutingConfig(),
             ...(context.config || {})
         };
-
+        // [FIX] Force borderRadius to 8px (Hyper-Glass V3 standard)
+        // Shallow merge above cannot propagate flat config.borderRadius into postProcessing.
+        unifiedConfig.postProcessing.borderRadius = (context.config as any)?.borderRadius ?? 8;
 
 
         // [Imp-8] Caching Logic
@@ -522,7 +524,7 @@ self.onmessage = (e: MessageEvent) => {
                 const updatedPoints = optimizedMap.get(result.edgeId || result.jobId);
                 if (!updatedPoints) continue;
                 result.points = updatedPoints;
-                result.path = createFilletedPath(updatedPoints, unifiedConfig.postProcessing.borderRadius ?? 4);
+                result.path = createFilletedPath(updatedPoints, unifiedConfig.postProcessing.borderRadius ?? 8);
                 const labelPos = getSmartLabelPosition(updatedPoints);
                 result.labelX = labelPos.x;
                 result.labelY = labelPos.y;
@@ -600,6 +602,8 @@ self.onmessage = (e: MessageEvent) => {
             ...createDefaultRoutingConfig(),
             ...(config || {})
         };
+        // [FIX] Force borderRadius to 8px (Hyper-Glass V3 standard)
+        unifiedConfig.postProcessing.borderRadius = (config as any)?.borderRadius ?? 8;
         const visibilityGraphEnabled = unifiedConfig.algorithm.useVisibilityGraph &&
             allObstacles.length >= (unifiedConfig.algorithm.visibilityGraphThreshold ?? 6);
         const shouldBuildSpatialIndex = allObstacles.length > 0 && (visibilityGraphEnabled || allObstacles.length > 50);

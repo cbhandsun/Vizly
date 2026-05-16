@@ -262,7 +262,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             obstaclePadding: 2,
             labelCollisionOffset: 8,
             jitterThresholdMultiplier: 2,
-            borderRadius: strictOverride ? 0 : 20, // 0 for strict orthogonal
+            borderRadius: strictOverride ? 0 : 8, // [FIX] Hyper-Glass V3: 8px smooth orthogonal corners (industry standard)
             sourceOffset: 12, // Reduced from 25 for tighter handle connection
             targetOffset: 15, // Reduced from 35 for tighter handle connection
             minLastSegment: 15, // Reduced from 30 for tighter handle connection

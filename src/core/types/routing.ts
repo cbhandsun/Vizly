@@ -146,7 +146,7 @@ export interface UnifiedRoutingConfig {
         preserveObstacleAvoidance?: boolean; // [FIX] Preserve pathfinding obstacle avoidance (default: true)
         enableNudge: boolean;              // default: true
         enableOrthogonalization: boolean;  // default: true
-        borderRadius: number;              // default: 20
+        borderRadius: number;              // default: 4
         minFirstSegment: number;           // default: 30 (source port stub min length)
         minLastSegment: number;            // default: 30 (target port stub min length)
         redundantBendThreshold: number;    // default: 40
@@ -234,9 +234,9 @@ export function createDefaultRoutingConfig(): UnifiedRoutingConfig {
             preserveObstacleAvoidance: true,
             enableNudge: true,
             enableOrthogonalization: true,
-            borderRadius: 20,  // [VISUAL] 提升圆角半径，让拐角更柔和
-            minFirstSegment: 45, // 必须 >= borderRadius * 2 + 5 才能完整渲染圆角
-            minLastSegment: 45,
+            borderRadius: 4,  // [FIX] 从20降至4: 直角折线风格，消除"弯曲"视觉
+            minFirstSegment: 20, // [FIX] 降低：borderRadius=4 只需 4*2+5=13，取 20 留余
+            minLastSegment: 20,
             redundantBendThreshold: 60,
             finalRedundantBendThreshold: 15,
             finalSimplificationThreshold: 30,
@@ -244,8 +244,8 @@ export function createDefaultRoutingConfig(): UnifiedRoutingConfig {
             nudgeSearchLimit: 120
         },
         offsets: {
-            source: 40,  // [VISUAL] 增大 stub 偏移，为圆角预留空间
-            target: 40
+            source: 25,  // [FIX] 降低：borderRadius=4 不再需要 40px 偏移
+            target: 25
         },
         debug: true,
         experimental: {

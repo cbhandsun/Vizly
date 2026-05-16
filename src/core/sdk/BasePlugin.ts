@@ -1,4 +1,5 @@
 import React from 'react';
+import { MarkerType } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 import { 
   DiagramTypePlugin, 
@@ -11,6 +12,7 @@ import {
 
 import { reactFlowAdapter } from '../services/ReactFlowAdapter';
 import { coerceToStandardDiagramData } from '../utils/coerceDiagram';
+import { diagramStyleManager } from '../components/shared/DiagramStyleManager';
 
 /**
  * BaseDiagramPlugin - Vizly 插件基类
@@ -58,7 +60,34 @@ export abstract class BaseDiagramPlugin implements DiagramTypePlugin {
                       (raw.nodes[0] as any).position !== undefined;
 
     if (isRfFormat) {
-      return { nodes: raw.nodes || [], edges: raw.edges || [] };
+      // [FIX] RF 格式数据跳过了 EdgeFactory，手动为缺失 style 的边注入 preset 默认值
+      const preset = (() => { try { return diagramStyleManager.getPreset(); } catch { return null; } })();
+      const defaultStroke = preset?.edges?.main?.color || '#3E8EDE';
+      const defaultWidth = preset?.edges?.main?.width || 1.8;
+      const defaultDash = (preset?.edges?.main as any)?.dash || undefined;
+      const defaultArrowW = preset?.edges?.main?.arrow?.width ?? 10;
+      const defaultArrowH = preset?.edges?.main?.arrow?.height ?? 10;
+
+      const patchedEdges = (raw.edges || []).map((e: any) => {
+        const hasStyle = e.style && (e.style.stroke || e.style.strokeWidth);
+        if (hasStyle) return e;
+        return {
+          ...e,
+          style: {
+            ...e.style,
+            stroke: defaultStroke,
+            strokeWidth: defaultWidth,
+            ...(defaultDash ? { strokeDasharray: defaultDash } : {}),
+          },
+          markerEnd: e.markerEnd || {
+            type: MarkerType.ArrowClosed,
+            color: defaultStroke,
+            width: defaultArrowW,
+            height: defaultArrowH,
+          },
+        };
+      });
+      return { nodes: raw.nodes || [], edges: patchedEdges };
     }
 
     // 2. 尝试从 StandardDiagramData 标准化格式转换

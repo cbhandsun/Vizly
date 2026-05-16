@@ -183,30 +183,51 @@
    ================================================ */
 
 .edge-label-premium {
-    background: rgba(255, 255, 255, 0.96);
-    padding: 2px 8px;
-    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.97);
+    padding: 3px 10px;
+    border-radius: 10px;
     font-size: 11px;
     font-weight: 600;
-    letter-spacing: 0.25px;
+    letter-spacing: 0.3px;
     color: #374151;
+    border: 1px solid rgba(99, 102, 241, 0.12);
     box-shadow:
-        0 1px 3px -1px rgba(0, 0, 0, 0.12),
-        0 0 0 1px rgba(0, 0, 0, 0.05);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+        0 1px 4px -1px rgba(0, 0, 0, 0.10),
+        0 0 0 1px rgba(0, 0, 0, 0.04);
+    backdrop-filter: blur(8px) saturate(180%);
+    -webkit-backdrop-filter: blur(8px) saturate(180%);
     pointer-events: auto;
     cursor: text;
     user-select: none;
-    transition: box-shadow 0.15s ease, transform 0.15s ease;
+    transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
     white-space: nowrap;
 }
 
 .edge-label-premium:hover {
     box-shadow:
-        0 3px 8px -2px rgba(0, 0, 0, 0.15),
-        0 0 0 1px rgba(0, 0, 0, 0.08);
-    transform: scale(1.04) translateY(-0.5px);
+        0 3px 10px -2px rgba(0, 0, 0, 0.14),
+        0 0 0 1px rgba(99, 102, 241, 0.18);
+    border-color: rgba(99, 102, 241, 0.3);
+    transform: scale(1.05) translateY(-1px);
+}
+
+/* 暗色模式边标签 */
+.dark .edge-label-premium,
+[data-theme="dark"] .edge-label-premium {
+    background: rgba(30, 34, 51, 0.94);
+    color: #e2e8f0;
+    border-color: rgba(139, 92, 246, 0.25);
+    box-shadow:
+        0 1px 4px -1px rgba(0, 0, 0, 0.25),
+        0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.dark .edge-label-premium:hover,
+[data-theme="dark"] .edge-label-premium:hover {
+    border-color: rgba(139, 92, 246, 0.5);
+    box-shadow:
+        0 3px 10px -2px rgba(0, 0, 0, 0.35),
+        0 0 0 1px rgba(139, 92, 246, 0.25);
 }
 
 

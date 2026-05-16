@@ -103,7 +103,7 @@ export function EnhancedAnimatedEdge({
                 id={id}
                 d={animatedProps.d}
                 fill="none"
-                stroke={style?.stroke || '#b1b1b7'}
+                stroke={style?.stroke || '#94a3b8'}
                 strokeWidth={style?.strokeWidth || 2}
                 strokeDasharray={animatedProps.strokeDasharray}
                 opacity={animatedProps.opacity}
@@ -149,7 +149,7 @@ export function SimpleAnimatedEdge(props: EdgeProps) {
             id={props.id}
             d={path}
             fill="none"
-            stroke={props.style?.stroke || '#b1b1b7'}
+            stroke={props.style?.stroke || '#94a3b8'}
             strokeWidth={props.style?.strokeWidth || 2}
             markerEnd={props.markerEnd}
             className="diagram-edge-smooth"

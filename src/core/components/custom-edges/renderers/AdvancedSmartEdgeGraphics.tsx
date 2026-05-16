@@ -44,15 +44,24 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
     const bundleInfo = edgeData?.bundleInfo;
     // busStyle: 纯净的持久化样式，不含任何 drag 状态覆盖（防止写入自动保存）
     const busStyle = useMemo(() => {
+        // [FIX] style 可能为空（RF 格式数据跳过了 EdgeFactory），需从 edgeData 回退
+        const resolvedStyle = (style && (style as any).stroke) ? style : {
+            stroke: (edgeData as any)?.stroke || (style as any)?.stroke || '#64748b',
+            strokeWidth: (edgeData as any)?.strokeWidth || (style as any)?.strokeWidth || 1.8,
+            strokeDasharray: (edgeData as any)?.strokeDasharray || (style as any)?.strokeDasharray,
+            strokeLinecap: 'round' as const,
+            strokeLinejoin: 'round' as const,
+            ...style,
+        };
         if (!bundleInfo || bundleInfo.bundleSize < 2) {
-            if (style && typeof style.strokeWidth === 'number') {
-                return { ...style, strokeWidth: String(style.strokeWidth) };
+            if (resolvedStyle && typeof (resolvedStyle as any).strokeWidth === 'number') {
+                return { ...resolvedStyle, strokeWidth: String((resolvedStyle as any).strokeWidth), strokeLinecap: 'round', strokeLinejoin: 'round' };
             }
-            return style;
+            return { ...resolvedStyle, strokeLinecap: 'round', strokeLinejoin: 'round' };
         }
-        const bw = Math.min(6, Number(style?.strokeWidth || 1) + (bundleInfo.bundleSize - 1) * 0.8);
-        return { ...style, strokeWidth: String(bw) };
-    }, [style, bundleInfo]);
+        const bw = Math.min(6, Number((resolvedStyle as any)?.strokeWidth || 1) + (bundleInfo.bundleSize - 1) * 0.8);
+        return { ...resolvedStyle, strokeWidth: String(bw), strokeLinecap: 'round', strokeLinejoin: 'round' };
+    }, [style, bundleInfo, edgeData]);
 
     // dragOverlayStyle: 仅在渲染时临时叠加，绝不写入 edge.style 持久化数据
     // 使连线在拖动中仍清晰可见（用虚线区分预览态 vs 定型态）
@@ -75,7 +84,7 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
     const labelColor = (labelStyle as any)?.fill ?? (labelStyle as any)?.color ?? (busStyle as any)?.stroke ?? '#374151';
     const themeFontSize = currentTheme?.typography?.fontSize?.sm;
     const themeFontFamily = currentTheme?.typography?.fontFamily;
-    const labelFontSize = (labelStyle as any)?.fontSize ?? themeFontSize ?? 12;
+    const labelFontSize = (labelStyle as any)?.fontSize ?? themeFontSize ?? 13;
     const labelFontFamily = (labelStyle as any)?.fontFamily ?? themeFontFamily;
     const labelFontWeight = (labelStyle as any)?.fontWeight;
     
@@ -174,11 +183,18 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
                             fontSize: labelFontSize,
                             fontFamily: labelFontFamily,
                             fontWeight: labelFontWeight,
-                            background: labelShowBg ? ((labelBgStyle as any)?.fill ?? (labelBgStyle as any)?.background ?? (currentTheme?.diagram?.canvas?.background ? String(currentTheme.diagram.canvas.background) : 'rgba(255,255,255,0.85)')) : 'transparent',
-                            padding: labelPadding,
-                            borderRadius: labelShowBg ? (labelBgBorderRadius ?? 2) : 0,
+                            // [FIX] Label 始终显示半透明胶囊背景以提升可读性（对齐专业图表标准）
+                            background: labelShowBg
+                                ? ((labelBgStyle as any)?.fill ?? (labelBgStyle as any)?.background ?? (currentTheme?.diagram?.canvas?.background ? String(currentTheme.diagram.canvas.background) : 'rgba(255,255,255,0.95)'))
+                                : (currentTheme?.mode === 'dark' ? 'rgba(30,30,46,0.92)' : 'rgba(255,255,255,0.95)'),
+                            padding: labelPadding || '2px 8px',
+                            borderRadius: labelShowBg ? (labelBgBorderRadius ?? 6) : 6,
+                            backdropFilter: 'blur(6px)',
+                            border: `1px solid ${currentTheme?.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+                            boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.03)',
                             opacity: opacity * crossfadeOpacity,
                             transition: nodesDragging ? 'none' : 'opacity 0.25s ease-in-out',
+                            zIndex: 1,
                             ...(labelStyle as any),
                         }}
                         className="nodrag nopan"

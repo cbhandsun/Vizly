@@ -189,8 +189,9 @@ export class PathPostProcessor {
         }
         
         // [FIX] Aggressively eliminate tiny orthogonal stair-steps created by A* grid snapping 
-        // to continuous anchor coordinates before final simplification. 
-        finalPoints = removeTinyOrthogonalJogs(finalPoints, 20, obstacles, posOptions);
+        // to continuous anchor coordinates before final simplification. Use a dynamic threshold
+        // that is strictly greater than the grid size to catch 1-grid-step jogs (e.g., 20px).
+        finalPoints = removeTinyOrthogonalJogs(finalPoints, Math.max(config.algorithm.gridSize * 1.5, 40), obstacles, posOptions);
         // [FIX] Skip second collapseRedundantBends to preserve pathfinding obstacle avoidance
         // Only apply if preserveObstacleAvoidance is explicitly disabled
         if (config.postProcessing.preserveObstacleAvoidance === false) {

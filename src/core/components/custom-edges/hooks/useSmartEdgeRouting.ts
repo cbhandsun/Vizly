@@ -141,7 +141,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       const cachedPath = cache.get(id);
 
       if (!nodesDragging && !isLoading && !isStale && channelPoints && channelPoints.length > 1) {
-          const p = createFilletedPath(channelPoints, edgeConfig.borderRadius || 4);
+          const p = createFilletedPath(channelPoints, edgeConfig.borderRadius || 8);
           cache.set(id, p);
           return p;
       }

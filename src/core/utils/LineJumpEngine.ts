@@ -27,7 +27,7 @@ export type IntersectionInfo = {
 };
 
 /** 跳线弧半径（像素） */
-const JUMP_RADIUS = 6;
+const JUMP_RADIUS = 4;
 
 /**
  * 提取一组点构成的所有正交线段

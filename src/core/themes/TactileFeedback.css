@@ -7,27 +7,16 @@
   will-change: transform, box-shadow;
 }
 
-.react-flow__node:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
-}
+/* hover 效果由 FlowchartNode.css 精细控制（5层阴影 + translateY），此处不叠加 */
 
-.react-flow__node.selected {
-  transform: scale(1.02);
-  box-shadow: 0 0 0 3px var(--theme-primary-light, #3b82f6),
-              0 12px 24px rgba(0, 0, 0, 0.15);
-  z-index: 1000 !important;
-}
+/* ⚠️ .selected 规则已统一至 FlowchartDesigner.css，避免 outline / box-shadow / scale 三重冲突 */
 
 /* 连线交互反馈 */
 .react-flow__edge-path {
   transition: stroke-width 0.2s ease, stroke 0.2s ease;
 }
 
-.react-flow__edge.selected .react-flow__edge-path {
-  stroke-width: 3.5px;
-  stroke: var(--theme-primary-main, #3b82f6);
-}
+/* ⚠️ .selected 边的样式已统一至 FlowchartDesigner.css */
 
 /* 容器微动效 */
 .property-panel-container,

@@ -3,9 +3,9 @@ import { THEMES } from './flowStyles';
 
 export const EDGE_STYLES = {
   default: {
-    style: { strokeWidth: 2, stroke: '#b1b1b7' },
+    style: { strokeWidth: 2, stroke: '#94a3b8' },
     type: 'smoothstep',
-    markerEnd: { type: MarkerType.ArrowClosed, color: '#b1b1b7' },
+    markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
   },
   core: {
     style: { strokeWidth: 3, stroke: THEMES.core.color },

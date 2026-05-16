@@ -74,8 +74,8 @@ const EditableEdgeGraphicsComponent: React.FC<EditableEdgeGraphicsProps> = ({
             <path
                 d={edgePath}
                 fill="none"
-                stroke={style?.stroke || '#b1b1b7'}
-                strokeWidth={((style?.strokeWidth as number) || 2) + 4}
+                stroke={style?.stroke || '#94a3b8'}
+                strokeWidth={((style?.strokeWidth as number) || 2) + 3}
                 className="edge-glow-path"
             />
 
@@ -93,7 +93,7 @@ const EditableEdgeGraphicsComponent: React.FC<EditableEdgeGraphicsProps> = ({
                 <path
                     d={edgePath}
                     fill="none"
-                    stroke={style?.stroke || '#1677ff'}
+                    stroke={style?.stroke || '#6366f1'}
                     strokeWidth={(style?.strokeWidth as number) || 2}
                     className="edge-selected-flow"
                     markerEnd={markerEnd}

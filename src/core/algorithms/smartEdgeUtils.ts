@@ -799,13 +799,10 @@ export function collapseCollinearBacktracks(points: Point[]) {
         const isVertical = Math.abs(prev.x - curr.x) < 1 && Math.abs(curr.x - next.x) < 1;
 
         if (isHorizontal || isVertical) {
-            const dx1 = curr.x - prev.x;
-            const dy1 = curr.y - prev.y;
-            const dx2 = next.x - curr.x;
-            const dy2 = next.y - curr.y;
-            if (dx1 * dx2 + dy1 * dy2 < -0.1) {
-                continue;
-            }
+            // [FIX] Skip ALL collinear points (both forward and backward).
+            // Retaining forward collinear points causes createFilletedPath to generate 
+            // impossible semicircular arcs (bulges) on straight lines.
+            continue;
         }
 
         res.push({ x: curr.x, y: curr.y });
@@ -1962,7 +1959,10 @@ export function makePathOrthogonal(
         const dy = Math.abs(curr.y - next.y);
 
         if (dx > 1 && dy > 1) {
-            const smallDiagonal = Math.min(dx, dy) < 2.5;
+            // [FIX] Increased from 2.5 to 15. Values like dx=12, dy=419 are "almost vertical"
+            // and must be snapped to orthogonal. The old 2.5 threshold only caught sub-pixel jitter;
+            // 15px catches real layout coordinate misalignment (handle offset vs node center).
+            const smallDiagonal = Math.min(dx, dy) < 15;
             if (smallDiagonal) {
                 let corner: Point | null = null;
                 if (options?.sourcePos && i === 0 && !newStartStub) {
@@ -2349,9 +2349,17 @@ export function removeTinyOrthogonalJogs(
 
     // Helper to check obstacles
     const isBlocked = (pts: Point[]) => {
-        // [FIX] Use local implementation or import if available. 
-        // Assuming isPathBlocked is imported from ./pathfinding
-        return isPathBlocked(pts, obstacles, 10);
+        // [FIX] Use -1 padding. Since pts start/end EXACTLY on the bounding boxes of source/target nodes,
+        // any positive padding or 0 padding will cause isHLineIntersectingRect/isVLineIntersectingRect to
+        // falsely report an intersection. A padding of -1 ensures that lines touching the exterior boundary 
+        // but routing outwards are considered safe, allowing stair-steps near nodes to be correctly flattened.
+        
+        // We must also strip any dynamic padding on obstacles for this strict check
+        const strictObstacles = Array.isArray(obstacles) 
+            ? obstacles.map(obs => ({ x: obs.x, y: obs.y, width: obs.width, height: obs.height }))
+            : typeof obstacles.getAll === 'function' ? obstacles.getAll().map(obs => ({ x: obs.x, y: obs.y, width: obs.width, height: obs.height })) : [];
+            
+        return isPathBlocked(pts, strictObstacles, -1);
     };
 
     while (changed && maxIter > 0) {
@@ -2381,23 +2389,26 @@ export function removeTinyOrthogonalJogs(
                     // Strategy 1: Flatten to p0.y (Forward Align)
                     const newP1 = { x: p1.x, y: p0.y };
                     const newP2 = { x: p2.x, y: p0.y };
+                    const newP3 = { x: p3.x, y: p0.y };
 
                     // If p3 is End Point, aligning to p0 might break p2->p3 orthogonality or shorten stub.
                     let canAlign1 = !isEnd;
                     if (isEnd && options.targetPos) {
                         const isTargetHoriz = options.targetPos === Position.Left || options.targetPos === Position.Right;
-                        const lastLen = Math.abs(p3.x - newP2.x);
+                        const lastLen = Math.abs(newP3.x - newP2.x);
                         if (isTargetHoriz && lastLen < 30) canAlign1 = false;
                     }
 
-                    if (canAlign1 && !isBlocked([p0, newP1, newP2, p3])) {
+                    if (canAlign1 && !isBlocked([p0, newP1, newP2, newP3])) {
                         p1.y = p0.y;
                         p2.y = p0.y;
+                        p3.y = p0.y;
                         changed = true;
                         continue;
                     }
 
                     // Strategy 2: Flatten to p3.y (Backward Align)
+                    const newP0b = { x: p0.x, y: p3.y };
                     const newP1b = { x: p1.x, y: p3.y };
                     const newP2b = { x: p2.x, y: p3.y };
 
@@ -2405,11 +2416,12 @@ export function removeTinyOrthogonalJogs(
                     let canAlign2 = !isStart;
                     if (isStart && options.sourcePos) {
                         const isSourceHoriz = options.sourcePos === Position.Left || options.sourcePos === Position.Right;
-                        const firstLen = Math.abs(newP1b.x - p0.x);
+                        const firstLen = Math.abs(newP1b.x - newP0b.x);
                         if (isSourceHoriz && firstLen < 30) canAlign2 = false;
                     }
 
-                    if (canAlign2 && !isBlocked([p0, newP1b, newP2b, p3])) {
+                    if (canAlign2 && !isBlocked([newP0b, newP1b, newP2b, p3])) {
+                        p0.y = p3.y;
                         p1.y = p3.y;
                         p2.y = p3.y;
                         changed = true;
@@ -2432,33 +2444,37 @@ export function removeTinyOrthogonalJogs(
                     // Strategy 1: Flatten to p0.x
                     const newP1 = { x: p0.x, y: p1.y };
                     const newP2 = { x: p0.x, y: p2.y };
+                    const newP3 = { x: p0.x, y: p3.y };
 
                     let canAlign1 = !isEnd;
                     if (isEnd && options.targetPos) {
                         const isTargetVert = options.targetPos === Position.Top || options.targetPos === Position.Bottom;
-                        const lastLen = Math.abs(p3.y - newP2.y);
+                        const lastLen = Math.abs(newP3.y - newP2.y);
                         if (isTargetVert && lastLen < 30) canAlign1 = false;
                     }
 
-                    if (canAlign1 && !isBlocked([p0, newP1, newP2, p3])) {
+                    if (canAlign1 && !isBlocked([p0, newP1, newP2, newP3])) {
                         p1.x = p0.x;
                         p2.x = p0.x;
+                        p3.x = p0.x;
                         changed = true;
                         continue;
                     }
 
                     // Strategy 2: Flatten to p3.x
+                    const newP0b = { x: p3.x, y: p0.y };
                     const newP1b = { x: p3.x, y: p1.y };
                     const newP2b = { x: p3.x, y: p2.y };
 
                     let canAlign2 = !isStart;
                     if (isStart && options.sourcePos) {
                         const isSourceVert = options.sourcePos === Position.Top || options.sourcePos === Position.Bottom;
-                        const firstLen = Math.abs(newP1b.y - p0.y);
+                        const firstLen = Math.abs(newP1b.y - newP0b.y);
                         if (isSourceVert && firstLen < 30) canAlign2 = false;
                     }
 
-                    if (canAlign2 && !isBlocked([p0, newP1b, newP2b, p3])) {
+                    if (canAlign2 && !isBlocked([newP0b, newP1b, newP2b, p3])) {
+                        p0.x = p3.x;
                         p1.x = p3.x;
                         p2.x = p3.x;
                         changed = true;
@@ -2594,16 +2610,86 @@ export function createFilletedPath(
     const normalizedPoints = collapseCollinearBacktracks(cleanPoints);
     if (normalizedPoints.length < 2) return '';
 
-    if (cornerRadius <= 0) {
-        return "M " + normalizedPoints.map(p => `${p.x} ${p.y}`).join(" L ");
+    // [FIX] Snap near-orthogonal segments to perfect orthogonal BEFORE generating arcs.
+    // Eliminates diagonal artifacts caused by fractional handle/port coordinate misalignment (e.g. dx=9, dy=36).
+    // This is the final defense layer — all SVG rendering paths (Worker, hydration, channel) converge here.
+    for (let i = 0; i < normalizedPoints.length - 1; i++) {
+        const a = normalizedPoints[i];
+        const b = normalizedPoints[i + 1];
+        const dx = Math.abs(a.x - b.x);
+        const dy = Math.abs(a.y - b.y);
+        if (dx > 0.5 && dy > 0.5) {
+            // Use proportional threshold: if the minor-axis is <15% of major-axis
+            // AND the minor-axis is <25px (safety cap), snap to orthogonal.
+            // This handles A* grid quantization artifacts (~20px) on long segments
+            // while preserving intentional diagonal routing on short ones.
+            const ratio = Math.min(dx, dy) / Math.max(dx, dy);
+            const minorAxis = Math.min(dx, dy);
+            if (ratio < 0.16 && minorAxis < 25) {
+                if (dx < dy) {
+                    // Almost vertical — snap x
+                    b.x = a.x;
+                } else {
+                    // Almost horizontal — snap y
+                    b.y = a.y;
+                }
+            }
+        }
     }
 
-    let path = `M ${normalizedPoints[0].x} ${normalizedPoints[0].y}`;
+    // [FIX] Micro-jog elimination: remove S-shaped deviations ≤ 3px offset.
+    // Pattern: two consecutive turns with tiny lateral offset (e.g., x shifts from 2531 to 2533).
+    // These create visually meaningless bends and sub-pixel arc artifacts.
+    // Strategy: scan for 3-point windows A→B→C where one axis drifts ≤3px total,
+    // then snap B to align with A on that axis, effectively straightening the path.
+    for (let pass = 0; pass < 2; pass++) {
+        for (let i = 0; i < normalizedPoints.length - 2; i++) {
+            const a = normalizedPoints[i];
+            const b = normalizedPoints[i + 1];
+            const c = normalizedPoints[i + 2];
 
-    for (let i = 1; i < normalizedPoints.length - 1; i++) {
-        const pPrev = normalizedPoints[i - 1];
-        const pCurr = normalizedPoints[i];
-        const pNext = normalizedPoints[i + 1];
+            // Check for vertical micro-jog: A.x ≈ C.x but B.x is slightly off
+            const xDriftAC = Math.abs(a.x - c.x);
+            const xDriftAB = Math.abs(a.x - b.x);
+            const xDriftBC = Math.abs(b.x - c.x);
+            if (xDriftAC <= 3 && (xDriftAB > 0.3 || xDriftBC > 0.3) && xDriftAB <= 3 && xDriftBC <= 3) {
+                // All three points are within 3px on X — snap to a single X
+                const avgX = a.x; // anchor to first point
+                b.x = avgX;
+                c.x = avgX;
+            }
+
+            // Check for horizontal micro-jog: A.y ≈ C.y but B.y is slightly off
+            const yDriftAC = Math.abs(a.y - c.y);
+            const yDriftAB = Math.abs(a.y - b.y);
+            const yDriftBC = Math.abs(b.y - c.y);
+            if (yDriftAC <= 3 && (yDriftAB > 0.3 || yDriftBC > 0.3) && yDriftAB <= 3 && yDriftBC <= 3) {
+                const avgY = a.y;
+                b.y = avgY;
+                c.y = avgY;
+            }
+        }
+    }
+
+    // [FIX] Second collinear cleanup: the micro-jog pass above may have created
+    // new collinear sequences (e.g., three points now on the same vertical line).
+    // Re-run collapse to eliminate them before arc generation.
+    const finalPoints = collapseCollinearBacktracks(normalizedPoints);
+    if (finalPoints.length < 2) return '';
+
+    // Replace normalizedPoints reference for the rest of the function
+    const renderPoints = finalPoints;
+
+    if (cornerRadius <= 0) {
+        return "M " + renderPoints.map(p => `${p.x} ${p.y}`).join(" L ");
+    }
+
+    let path = `M ${renderPoints[0].x} ${renderPoints[0].y}`;
+
+    for (let i = 1; i < renderPoints.length - 1; i++) {
+        const pPrev = renderPoints[i - 1];
+        const pCurr = renderPoints[i];
+        const pNext = renderPoints[i + 1];
 
         // 1. Calculate vectors
         const v1 = { x: pCurr.x - pPrev.x, y: pCurr.y - pPrev.y };
@@ -2637,13 +2723,33 @@ export function createFilletedPath(
         // 4. Draw Line to Start of Curve
         path += ` L ${startCurve.x} ${startCurve.y}`;
 
-        // 5. Draw Curve (Quadratic Bezier with Control Point at Corner)
-        // Q controlPoint endPoint
-        path += ` Q ${pCurr.x} ${pCurr.y} ${endCurve.x} ${endCurve.y}`;
+        // 5. Draw Curve (Circular Arc instead of Quadratic Bezier)
+        // Cross product to determine turn direction (clockwise vs counter-clockwise)
+        const cross = v1.x * v2.y - v1.y * v2.x;
+        // sweep-flag: 1 if positive cross product (clockwise turn), 0 otherwise
+        const sweepFlag = cross > 0 ? 1 : 0;
+        
+        // For 90 degree corners (orthogonal routing), distance to corner `r` equals the circular radius.
+        // For non-90, we compute the actual radius required for a tangent arc, though most are 90.
+        // Using `r` as the distance to corner is standard. The actual circle radius R = r * tan(theta/2).
+        // For orthogonal lines, R = r. To handle non-orthogonal gracefully without complex math,
+        // we can still use Q for non-orthogonal, or just compute R.
+        // Let's use the actual angle:
+        const dot = v1.x * v2.x + v1.y * v2.y;
+        const angle = Math.acos(Math.max(-1, Math.min(1, dot / (l1 * l2))));
+        // If angle is close to 0 or 180, it's straight, handled by skipping or small r.
+        const actualRadius = r * Math.abs(Math.tan(angle / 2));
+        
+        // Ensure we don't have NaN or Infinite radius.
+        // Minimum 2px to avoid visually imperceptible micro-arcs that add SVG complexity.
+        const safeRadius = Math.max(2, Number.isFinite(actualRadius) ? actualRadius : r);
+
+        // A rx ry x-axis-rotation large-arc-flag sweep-flag x y
+        path += ` A ${safeRadius} ${safeRadius} 0 0 ${sweepFlag} ${endCurve.x} ${endCurve.y}`;
     }
 
     // Final segment to last point
-    const last = normalizedPoints[normalizedPoints.length - 1];
+    const last = renderPoints[renderPoints.length - 1];
     path += ` L ${last.x} ${last.y}`;
 
     return path;

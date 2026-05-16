@@ -128,7 +128,7 @@ const useHydratedPath = (
             const s = sig(elkPoints);
             if (s && s === lastElkSigRef.current) return;
             lastElkSigRef.current = s;
-            const svgPath = createFilletedPath(elkPoints, edgeConfig.borderRadius ?? 4);
+            const svgPath = createFilletedPath(elkPoints, edgeConfig.borderRadius ?? 8);
             setTimeout(() => {
                 if (!isMountedRef.current) return;
                 if (path !== svgPath) {
@@ -144,7 +144,7 @@ const useHydratedPath = (
             const s = sig(computedPoints);
             if (s && s === lastComputedSigRef.current) return;
             lastComputedSigRef.current = s;
-            const svgPath = createFilletedPath(computedPoints, edgeConfig.borderRadius ?? 4);
+            const svgPath = createFilletedPath(computedPoints, edgeConfig.borderRadius ?? 8);
             setTimeout(() => {
                 if (!isMountedRef.current) return;
                 if (path !== svgPath) {

@@ -118,11 +118,7 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
         if (isEditing) {
             return (
                 <div style={contentStyle}>
-                    {effectiveIcon && (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', fontSize: '14px', flexShrink: 0 }}>
-                            {effectiveIcon}
-                        </div>
-                    )}
+
                     <textarea
                         aria-label="Edit Node Text"
                         className="nodrag"
@@ -159,11 +155,7 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
             const lines = content.split(/<br\s*\/?>/i);
             return (
                 <div style={contentStyle} onDoubleClick={handleDoubleClick}>
-                    {effectiveIcon && (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', fontSize: '14px', flexShrink: 0 }}>
-                            {effectiveIcon}
-                        </div>
-                    )}
+
                     <div style={textContainerStyle}>
                         {lines.map((line, index) => (
                             <div key={index} style={getLineStyle(line)}>
@@ -200,15 +192,7 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
 
         return (
             <div style={contentStyle} onDoubleClick={handleDoubleClick}>
-                {effectiveIcon && (
-                    <div style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        width: '20px', height: '20px', fontSize: '15px', flexShrink: 0,
-                        opacity: 0.85,
-                    }}>
-                        {effectiveIcon}
-                    </div>
-                )}
+
                 <div style={textContainerStyle}>
                     {/* 标题 */}
                     <span style={titleStyle}>{title}</span>

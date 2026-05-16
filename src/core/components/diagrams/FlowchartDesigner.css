@@ -264,13 +264,7 @@
     z-index: 100;
 }
 
-/* 选中节点 - 统一 outline 方案 (不与内联 boxShadow 冲突) */
-.react-flow__node.selected {
-    outline: 2px solid var(--theme-primary-main, #3b82f6);
-    outline-offset: 1px;
-    z-index: 10;
-    border-radius: var(--node-radius, 10px);
-}
+/* 选中节点 — 视觉效果统一至 L712 的 box-shadow 环方案（不再使用 outline，避免与 box-shadow 双重指示） */
 
 /* 非矩形形状节点：移除矩形效果 */
 .react-flow__node:has(.shape-non-rect) {
@@ -450,6 +444,8 @@
 /* 边路径样式过渡（不过渡 d 属性 — 拖拽时太重） */
 .react-flow__edge-path {
     transition: stroke-width 0.18s ease, stroke 0.18s ease, filter 0.18s ease;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 /* 边悬停：扩大透明 hitbox + 主色高亮 + 精致光晕 */
@@ -472,13 +468,10 @@
         drop-shadow(0 0 10px rgba(99, 102, 241, 0.20));
 }
 
-/* 选中的边 */
+/* 选中的边 — 基础品牌色（Hyper-Glass 覆盖层 L741 提供最终 stroke-width + filter） */
 .react-flow__edge.selected .react-flow__edge-path {
     stroke: var(--designer-accent, #6366f1) !important;
     stroke-width: 2.5;
-    filter:
-        drop-shadow(0 0 3px rgba(99, 102, 241, 0.50))
-        drop-shadow(0 0 8px rgba(99, 102, 241, 0.25)) !important;
 }
 
 /* 连接成功动画 — 绿色脉冲 */
@@ -715,24 +708,25 @@ circle.custom-edge-updater {
         0 0 0 4px rgba(99, 102, 241, 0.12),
         0 4px 16px rgba(99, 102, 241, 0.15) !important;
     transition: box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    z-index: 10;
 }
 
-/* 选中态：品牌色渐变边框光晕 */
+/* 选中态：品牌色渐变边框光晕（呼吸动画） */
 .react-flow__node.selected::after {
     content: '';
     position: absolute;
-    inset: -2px;
+    inset: -3px;
     background: linear-gradient(135deg, var(--designer-accent, #6366f1) 0%, #818cf8 50%, #a5b4fc 100%);
     border-radius: inherit;
     z-index: -1;
     opacity: 0;
-    animation: selectionGlow 2.5s ease-in-out infinite alternate;
+    animation: selectionGlow 2.8s ease-in-out infinite alternate;
     pointer-events: none;
 }
 
 @keyframes selectionGlow {
-    0%   { opacity: 0.08; transform: scale(0.998); filter: blur(0px); }
-    100% { opacity: 0.22; transform: scale(1.004); filter: blur(1px); }
+    0%   { opacity: 0.12; transform: scale(0.998); filter: blur(0.5px); }
+    100% { opacity: 0.35; transform: scale(1.006); filter: blur(1.5px); }
 }
 
 @keyframes pulseGlow {
@@ -740,10 +734,14 @@ circle.custom-edge-updater {
     to { opacity: 0.3; transform: scale(1.01); }
 }
 
+/* 选中边 — 品牌色发光强调（与 L470 的选中规则统一，此处用于 Hyper-Glass 覆盖层） */
 .react-flow__edge.selected .react-flow__edge-path {
     stroke: var(--designer-accent) !important;
     stroke-width: 3px !important;
-    filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.4));
+    filter:
+        drop-shadow(0 0 4px rgba(99, 102, 241, 0.50))
+        drop-shadow(0 0 10px rgba(99, 102, 241, 0.20));
+    transition: stroke-width 0.2s ease, filter 0.2s ease;
 }
 
 /* 🚀 performance-mode 补充覆盖：smart-edge 和 SVG shapes */
@@ -906,7 +904,15 @@ circle.custom-edge-updater {
 }
 
 [data-theme='dark'] .react-flow__node.selected {
-    outline-color: var(--diagram-dark-accent);
+    box-shadow:
+        0 0 0 2px var(--diagram-dark-accent),
+        0 0 0 4px rgba(137, 180, 250, 0.15),
+        0 4px 16px rgba(137, 180, 250, 0.12) !important;
+}
+
+/* 暗色模式默认边颜色加亮 */
+[data-theme='dark'] .react-flow__edge-path {
+    stroke: #cbd5e1;
 }
 
 [data-theme='dark'] .react-flow__edge:hover .react-flow__edge-path {
@@ -1029,7 +1035,10 @@ circle.custom-edge-updater {
     }
 
     :root:not([data-theme='light']) .react-flow__node.selected {
-        outline-color: var(--diagram-dark-accent);
+        box-shadow:
+            0 0 0 2px var(--diagram-dark-accent),
+            0 0 0 4px rgba(137, 180, 250, 0.15),
+            0 4px 16px rgba(137, 180, 250, 0.12) !important;
     }
 
     :root:not([data-theme='light']) .react-flow__edge:hover .react-flow__edge-path {
@@ -1144,7 +1153,10 @@ circle.custom-edge-updater {
     color: #e2e8f0;
 }
 [data-theme="dark"] .react-flow__node.selected {
-    outline-color: #60a5fa !important;
+    box-shadow:
+        0 0 0 2px #60a5fa,
+        0 0 0 4px rgba(96, 165, 250, 0.15),
+        0 4px 16px rgba(96, 165, 250, 0.12) !important;
 }
 
 /* 自定义节点 */
@@ -1818,17 +1830,18 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
 
 /* HTML 自定义 EdgeLabel 容器（EdgeLabelRenderer 模式） */
 .edge-label-container {
-    background: rgba(255, 255, 255, 0.95);
-    border: 1.5px solid rgba(99, 102, 241, 0.3);
-    border-radius: 6px;
-    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.97);
+    border: 1px solid rgba(99, 102, 241, 0.12);
+    border-radius: 10px;
+    padding: 3px 10px;
     font-size: 11px;
     font-weight: 600;
     font-family: 'Inter', 'SF Pro Text', system-ui, sans-serif;
     color: #374151;
     letter-spacing: 0.02em;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255,255,255,0.6) inset;
-    backdrop-filter: blur(4px);
+    box-shadow: 0 1px 4px -1px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    backdrop-filter: blur(8px) saturate(180%);
+    -webkit-backdrop-filter: blur(8px) saturate(180%);
     white-space: nowrap;
     pointer-events: none;
     line-height: 1.6;

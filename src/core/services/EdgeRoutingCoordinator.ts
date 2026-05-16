@@ -22,6 +22,7 @@ import { setPathfindingConfig } from '../algorithms/pathfinding';
 import { LineObstacle, Rectangle } from '../algorithms/pathfinding';
 import { optimizePaths } from '../algorithms/LPNudge';
 import { globalChannelRouting, type BuddyGroup } from '../algorithms/globalChannelRouting';
+import { createFilletedPath } from '../algorithms/smartEdgeUtils';
 
 /**
  * [P0-2] Main coordination service for edge routing.
@@ -1568,32 +1569,111 @@ export class EdgeRoutingCoordinator {
             sideGroups.get(key)?.push(peerEdge);
         });
 
+        // [FIX-quadrant] Cross-Axis Coherence Check
+        // When peers in the same side group are spread across both sides of the hub's
+        // cross-axis (e.g. one peer far-left and another far-right of hub), sharing a
+        // single trunk produces unnatural detours. Split into quadrant-coherent sub-groups.
+        const splitByCrossAxis = (edges: any[]): any[][] => {
+            if (edges.length <= 1) return [edges];
+
+            // Determine cross-axis offset of each peer relative to hub
+            const crossOffsets = edges.map(e => {
+                const peerId = isManyToOne ? e.source : e.target;
+                const peerRect = getNodeRect(peerId);
+                if (!peerRect) return { edge: e, offset: 0 };
+                const pc = { x: peerRect.x + peerRect.width / 2, y: peerRect.y + peerRect.height / 2 };
+                // Cross-axis = perpendicular to the primary flow direction
+                const offset = isHorz ? (pc.y - hubCenter.y) : (pc.x - hubCenter.x);
+                return { edge: e, offset };
+            });
+
+            const positiveGroup = crossOffsets.filter(c => c.offset >= 0).map(c => c.edge);
+            const negativeGroup = crossOffsets.filter(c => c.offset < 0).map(c => c.edge);
+
+            // Check if the cross-axis spread is significant enough to warrant splitting.
+            // Only split when both sub-groups have at least 1 member AND the angular spread
+            // between the extreme peers is wide (cross-range > 50% of main-axis range).
+            if (positiveGroup.length === 0 || negativeGroup.length === 0) {
+                return [edges]; // All on same side — no split needed
+            }
+
+            const allOffsets = crossOffsets.map(c => Math.abs(c.offset));
+            const maxCrossOffset = Math.max(...allOffsets);
+            // Main-axis range: how far peers are along the primary flow direction
+            const mainOffsets = crossOffsets.map(c => {
+                const peerId = isManyToOne ? c.edge.source : c.edge.target;
+                const peerRect = getNodeRect(peerId);
+                if (!peerRect) return 0;
+                const pc = { x: peerRect.x + peerRect.width / 2, y: peerRect.y + peerRect.height / 2 };
+                return Math.abs(isHorz ? (pc.x - hubCenter.x) : (pc.y - hubCenter.y));
+            });
+            const maxMainOffset = Math.max(...mainOffsets);
+
+            // Threshold: if cross-axis spread > 60% of main-axis distance, peers are coming
+            // from too-different angles to share a trunk. (Industry standard: ~45-60°)
+            if (maxCrossOffset > maxMainOffset * 0.6 && maxCrossOffset > 80) {
+                // Return each sub-group independently
+                const result: any[][] = [];
+                if (positiveGroup.length >= 1) result.push(positiveGroup);
+                if (negativeGroup.length >= 1) result.push(negativeGroup);
+                return result;
+            }
+
+            return [edges]; // Cross-spread within tolerance
+        };
+
         // Calculate Trunks (Dual-Trunk Architecture)
         const forwardEdges = sideGroups.get('forward') || [];
         const backwardEdges = sideGroups.get('backward') || [];
 
         if (forwardEdges.length > 0 || backwardEdges.length > 0) {
-            const forwardPeers = forwardEdges.map(e => getNodeRect(isManyToOne ? e.source : e.target)).filter((r): r is Rectangle => !!r);
-            const backwardPeers = backwardEdges.map(e => getNodeRect(isManyToOne ? e.source : e.target)).filter((r): r is Rectangle => !!r);
+            // [FIX-quadrant] Split each side by cross-axis coherence
+            const forwardSubGroups = splitByCrossAxis(forwardEdges);
+            const backwardSubGroups = splitByCrossAxis(backwardEdges);
 
-            const trunks = trunkCalculator.calculateParallelTrunks(
-                hubRect,
-                forwardPeers,
-                backwardPeers,
-                isManyToOne,
-                defaultConfig,
-                layoutDir
-            );
+            // Process each sub-group independently
+            const processSubGroup = (subGroup: any[], allSubGroups: any[][], isForward: boolean) => {
+                if (subGroup.length === 0) return;
 
-            // Assign Forward Trunk
-            if (trunks.forward && forwardEdges.length > 0) {
-                this.assignTrunkGeometry(forwardEdges, busGroupJobs, trunks.forward, layoutDir, getNodeRect, isManyToOne);
-            }
+                // Singleton sub-groups: skip trunk, let edge route via direct A*
+                if (subGroup.length === 1 && allSubGroups.length > 1) {
+                    // Mark as non-bus to disable trunk routing for this edge
+                    const job = busGroupJobs.find(j => j.edgeId === subGroup[0].id);
+                    if (job) {
+                        if (isManyToOne) {
+                            job.isManyToOne = false;
+                            job.incomingCount = 1;
+                            job.incomingIndex = 0;
+                        } else {
+                            job.isOneToMany = false;
+                            job.outgoingCount = 1;
+                            job.outgoingIndex = 0;
+                        }
+                    }
+                    return;
+                }
 
-            // Assign Backward Trunk
-            if (trunks.backward && backwardEdges.length > 0) {
-                this.assignTrunkGeometry(backwardEdges, busGroupJobs, trunks.backward, layoutDir, getNodeRect, isManyToOne);
-            }
+                // Multi-member sub-groups: compute trunk as usual
+                const subPeers = subGroup.map(e => getNodeRect(isManyToOne ? e.source : e.target)).filter((r): r is Rectangle => !!r);
+                const emptyPeers: Rectangle[] = [];
+
+                const trunks = trunkCalculator.calculateParallelTrunks(
+                    hubRect,
+                    isForward ? subPeers : emptyPeers,
+                    isForward ? emptyPeers : subPeers,
+                    isManyToOne,
+                    defaultConfig,
+                    layoutDir
+                );
+
+                const trunk = isForward ? trunks.forward : trunks.backward;
+                if (trunk) {
+                    this.assignTrunkGeometry(subGroup, busGroupJobs, trunk, layoutDir, getNodeRect, isManyToOne);
+                }
+            };
+
+            forwardSubGroups.forEach(sg => processSubGroup(sg, forwardSubGroups, true));
+            backwardSubGroups.forEach(sg => processSubGroup(sg, backwardSubGroups, false));
         }
     }
 
@@ -1797,37 +1877,11 @@ export class EdgeRoutingCoordinator {
 
                 r.points = newPoints;
 
-                // [FIX C-5] Rebuild rounded path at orthogonal corners (Q quadratic Bézier)
-                // [FIX] Unified radius: match PathPostProcessor default (was min(6,...) causing inconsistent corners)
-                const radius = Math.min(20, (config as any)?.borderRadius ?? 20);
-                const buildRoundedPath = (pts: Point[], r: number): string => {
-                    if (pts.length < 2) return '';
-                    if (pts.length === 2 || r <= 0) {
-                        return `M ${pts[0].x} ${pts[0].y} ` + pts.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
-                    }
-                    let d = `M ${pts[0].x} ${pts[0].y}`;
-                    for (let j = 1; j < pts.length - 1; j++) {
-                        const prev = pts[j - 1];
-                        const curr = pts[j];
-                        const next = pts[j + 1];
-                        const len1 = Math.hypot(curr.x - prev.x, curr.y - prev.y);
-                        const len2 = Math.hypot(next.x - curr.x, next.y - curr.y);
-                        const clipped = Math.min(r, len1 / 2, len2 / 2);
-                        if (clipped < 1) {
-                            d += ` L ${curr.x} ${curr.y}`;
-                            continue;
-                        }
-                        const t1x = curr.x - (curr.x - prev.x) / len1 * clipped;
-                        const t1y = curr.y - (curr.y - prev.y) / len1 * clipped;
-                        const t2x = curr.x + (next.x - curr.x) / len2 * clipped;
-                        const t2y = curr.y + (next.y - curr.y) / len2 * clipped;
-                        d += ` L ${t1x} ${t1y} Q ${curr.x} ${curr.y} ${t2x} ${t2y}`;
-                    }
-                    const last = pts[pts.length - 1];
-                    d += ` L ${last.x} ${last.y}`;
-                    return d;
-                };
-                r.path = buildRoundedPath(newPoints, radius);
+                // [FIX C-5] Use canonical createFilletedPath instead of hand-rolled Q-bezier.
+                // This ensures nudged paths go through micro-jog elimination, collinear collapse,
+                // and consistent A-arc rendering — matching all other edge rendering paths.
+                const radius = (config as any)?.borderRadius ?? 8;
+                r.path = createFilletedPath(newPoints, radius);
 
                 // Update label position
                 if (newPoints.length >= 2) {
