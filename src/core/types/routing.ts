@@ -202,7 +202,7 @@ export function createDefaultRoutingConfig(): UnifiedRoutingConfig {
             trunkMultiplier: 10,  // [总线优化] 增大干道倍数(原8)
             enableAdaptiveSeparation: true,
             parallelTrunkSpacing: 80,  // [FIX] 双主干间距 (increased from 60 to 80)
-            bidirectionalSpacing: 25   // [FIX] 双向连线间距
+            bidirectionalSpacing: 8    // [FIX] 双向连线间距（硬偏移，无需很大）
         },
         portSelection: {
             bonusCostThreshold: -100,

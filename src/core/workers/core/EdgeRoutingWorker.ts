@@ -1568,6 +1568,10 @@ export class EdgeRoutingWorker {
                 globalChannelIndex: job.globalChannelIndex,
                 globalChannelCount: job.globalChannelCount,
                 globalChannelType: job.globalChannelType,
+                // [FIX] Bidirectional Direct Offset — 之前遗漏导致 Phase 3b 从未生效
+                bidirectionalChannel: job.bidirectionalChannel,
+                bidirectionalSpacing: job.bidirectionalSpacing,
+                bidirectionalCount: (job as any).bidirectionalCount,
                 strategy: strategyName // [FIX] Pass strategy to prevent overwriting 'Trunk Direct'
             }
         };

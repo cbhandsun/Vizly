@@ -1438,8 +1438,8 @@ export class EdgeRoutingCoordinator {
             });
 
             const n = group.length;
-            // 间距随条数适度收窄（避免 N=5 时间距过大）
-            const spacing = Math.max(16, baseSpacing * Math.min(1, 3 / n));
+            // 硬偏移模式：baseSpacing 已是最终偏移量，按边数收窄
+            const spacing = baseSpacing * Math.min(1, 3 / n);
 
             group.forEach((job, index) => {
                 job.bidirectionalChannel = index;

@@ -136,22 +136,14 @@ export class PathPostProcessor {
                 nudgeOffset = 0;
             } else if (metadata.isManyToOne && metadata.incomingCount > 1) {
                 // [VISUAL UPGRADE] Shared Trunk Merge
-                // Force nudgeOffset to 0 to ensure all branches share the same main trunk line.
-                // The separation happens only at the branching points (Source -> Spine).
                 nudgeOffset = 0;
             } else if (metadata.globalChannelCount && metadata.globalChannelCount > 1 && metadata.globalChannelIndex !== undefined) {
                 // [NEW] Global Channel Ordering
-                // Use global index to separate independent parallel edges
                 nudgeOffset = (metadata.globalChannelIndex - (metadata.globalChannelCount - 1) / 2) * spacing;
             }
 
-            // [H-2] N-way bidirectional separation: evenly distribute N channels around center.
-            // Old formula only handled N=2 (0 → -1, else → +1), causing channels 1..N-1 to collapse.
-            if (metadata.bidirectionalChannel !== undefined && metadata.bidirectionalSpacing) {
-                const biCount = (metadata as any).bidirectionalCount ?? 2;
-                const biOffset = (metadata.bidirectionalChannel - (biCount - 1) / 2) * metadata.bidirectionalSpacing;
-                nudgeOffset += biOffset;
-            }
+            // [REMOVED] Bidirectional offset from nudgeSegments — it gets clipped by safeOffset.
+            // Moved to Phase 3b below for direct application.
 
             // Always run nudgeSegments to ensure gap centering, even if offset is 0
             const nudgeOptions = {
@@ -160,6 +152,50 @@ export class PathPostProcessor {
                 trunkShift: metadata.trunkShift // [NEW] Pass trunk separation
             };
             finalPoints = nudgeSegments(finalPoints, obstacles, config.postProcessing.nudgeSearchLimit, nudgeOffset, extraObstacles, nudgeOptions);
+        }
+
+        // Phase 3b: Bidirectional Direct Offset
+        // 对双向边的中间路径点直接做硬偏移，绕过 nudgeSegments 的安全裁剪。
+        if (metadata.bidirectionalChannel !== undefined && metadata.bidirectionalSpacing) {
+            const biCount = (metadata as any).bidirectionalCount ?? 2;
+            const biOffset = (metadata.bidirectionalChannel - (biCount - 1) / 2) * metadata.bidirectionalSpacing;
+
+            if (Math.abs(biOffset) > 0.5) {
+                const dx = finalPoints[finalPoints.length - 1].x - finalPoints[0].x;
+                const dy = finalPoints[finalPoints.length - 1].y - finalPoints[0].y;
+                const isMainlyVertical = Math.abs(dy) > Math.abs(dx);
+
+                if (finalPoints.length >= 3) {
+                    // 有中间点：直接偏移
+                    for (let k = 1; k < finalPoints.length - 1; k++) {
+                        if (isMainlyVertical) {
+                            finalPoints[k].x += biOffset;
+                        } else {
+                            finalPoints[k].y += biOffset;
+                        }
+                    }
+                } else if (finalPoints.length === 2) {
+                    // 只有起点+终点（直线路径）：
+                    // 在起点/终点附近各插入一个偏移后的中间点，形成正交折线
+                    const p0 = finalPoints[0];
+                    const p1 = finalPoints[1];
+                    const stubLen = 20; // 从 handle 出发的短直线段长度
+
+                    if (isMainlyVertical) {
+                        // 垂直主流向 → 水平偏移中间段
+                        const yDir = Math.sign(p1.y - p0.y);
+                        const mid1 = { x: p0.x + biOffset, y: p0.y + yDir * stubLen };
+                        const mid2 = { x: p0.x + biOffset, y: p1.y - yDir * stubLen };
+                        finalPoints.splice(1, 0, { x: p0.x, y: mid1.y }, mid1, mid2, { x: p1.x, y: mid2.y });
+                    } else {
+                        // 水平主流向 → 垂直偏移中间段
+                        const xDir = Math.sign(p1.x - p0.x);
+                        const mid1 = { x: p0.x + xDir * stubLen, y: p0.y + biOffset };
+                        const mid2 = { x: p1.x - xDir * stubLen, y: p0.y + biOffset };
+                        finalPoints.splice(1, 0, { x: mid1.x, y: p0.y }, mid1, mid2, { x: mid2.x, y: p1.y });
+                    }
+                }
+            }
         }
 
         // Phase 4: Orthogonalization
