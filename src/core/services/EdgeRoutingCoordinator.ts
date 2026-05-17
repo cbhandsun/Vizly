@@ -1646,6 +1646,29 @@ export class EdgeRoutingCoordinator {
             // O2M slot=0 (偏左/偏上), M2O slot=1 (偏右/偏下)。
             const hasPortConflict = isManyToOne && hubUsedPorts && hubUsedPorts.has(trunk.suggestedPort);
 
+            // [FIX-dual-lane] 双车道干线偏移
+            // Port spreading 只分开了 hub 端的连接点，但 trunk 主干线仍在同一 axis 上，
+            // 导致 O2M 和 M2O 的分支路径交织。
+            // 解决：给 M2O 的 trunk axis 偏移 20px（远离 hub），形成平行双车道。
+            //
+            //   Hub ──┬──┬── Hub port (slot 0 / slot 1, 已分开 ✓)
+            //         │  │
+            //   O2M ──┤  │   ← trunk axis A
+            //         │  ├── ← trunk axis A + 20px (M2O)
+            //         ↓  ↑
+            //        Peer Peer
+            if (hasPortConflict) {
+                const LANE_OFFSET = 20;
+                const hubCenterX = hubRect.x + hubRect.width / 2;
+                const hubCenterY = hubRect.y + hubRect.height / 2;
+
+                if (trunk.direction === 'vertical') {
+                    trunk.axis += (trunk.axis >= hubCenterX) ? LANE_OFFSET : -LANE_OFFSET;
+                } else {
+                    trunk.axis += (trunk.axis >= hubCenterY) ? LANE_OFFSET : -LANE_OFFSET;
+                }
+            }
+
             this.assignTrunkGeometry(groupEdges, busGroupJobs, trunk, layoutDir, getNodeRect, isManyToOne, hasPortConflict);
         });
     }
