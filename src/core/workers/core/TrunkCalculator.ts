@@ -124,6 +124,21 @@ export class TrunkCalculator {
             y: hubNode.y + hubNode.height / 2
         };
 
+        // [FIX] Filter obstacles: exclude the hub and peer nodes themselves.
+        // The trunk axis sits between hub and peers — those nodes should NOT trigger collision.
+        // Only third-party sibling nodes (the ones the trunk might cross through) matter.
+        const isRectsEqual = (a: Rectangle, b: Rectangle) =>
+            Math.abs(a.x - b.x) < 2 && Math.abs(a.y - b.y) < 2 &&
+            Math.abs(a.width - b.width) < 2 && Math.abs(a.height - b.height) < 2;
+
+        const filteredObstacles = obstacles?.filter(o => {
+            if (isRectsEqual(o, hubNode)) return false;
+            for (const peer of peerNodes) {
+                if (isRectsEqual(o, peer)) return false;
+            }
+            return true;
+        });
+
         // [S4-P12] Guard: empty peerNodes would produce NaN/Infinity in all calculations.
         // Return a safe fallback trunk directly below/to-the-right of the hub.
         if (peerNodes.length === 0) {
@@ -203,19 +218,27 @@ export class TrunkCalculator {
                 isLeft = peersCenter.x < hubCenter.x;
             }
 
+            const grid = 20;
+            const standardOffset = spacing + 20; // Default elbow distance
+
             if (isLeft) {
                 // Trunk on Left: Between PeersMaxX and HubMinX
                 const minSafe = hubNode.x - spacing;
-                const ideal = (pBounds.maxX + hubNode.x) / 2;
-                // If peers are overlapping or too close, respect minSafe
-                // If peers are far, center the trunk
-                axis = Math.min(ideal, minSafe);
+                // [FIX-elbow-consistency] Instead of pure midpoint, use a snapped offset from hub
+                // as the preferred axis, clamped by pBounds.maxX.
+                const preferred = Math.floor((hubNode.x - standardOffset) / grid) * grid;
+                // Ensure it doesn't cross the peers if they are very close
+                const peerSafe = pBounds.maxX + 10;
+                axis = Math.max(peerSafe, Math.min(preferred, minSafe));
                 suggestedPort = 'left';
             } else {
                 // Trunk on Right: Between HubMaxX and PeersMinX
                 const minSafe = hubNode.x + hubNode.width + spacing;
-                const ideal = (pBounds.minX + hubNode.x + hubNode.width) / 2;
-                axis = Math.max(ideal, minSafe);
+                // [FIX-elbow-consistency] Use a snapped offset from the hub to align different buses
+                const preferred = Math.ceil((hubNode.x + hubNode.width + standardOffset) / grid) * grid;
+                // Ensure it doesn't cross the peers if they are very close
+                const peerSafe = pBounds.minX - 10;
+                axis = Math.min(peerSafe, Math.max(preferred, minSafe));
                 suggestedPort = 'right';
             }
 
@@ -232,24 +255,42 @@ export class TrunkCalculator {
                 range.max = hubCenter.y;
             }
 
-            // [T1] 垂直干线（x=axis）隘碍物扫描：将轴推离最近障碍物边缘 + spacing
-            if (obstacles && obstacles.length > 0) {
-                // 找到所有穿过 x=axis 且在范围内的障碍物
-                const blockers = obstacles.filter(o =>
-                    o.x < axis + 1 && o.x + o.width > axis - 1 &&
-                    o.y < range.max + spacing && o.y + o.height > range.min - spacing
-                );
-                if (blockers.length > 0) {
-                    if (isLeft) {
-                        // 干线在左侧：推到最小障碍物 x - spacing
-                        const clearAxis = Math.min(...blockers.map(o => o.x)) - spacing;
-                        axis = Math.min(axis, clearAxis);
-                    } else {
-                        // 干线在右侧：推到最大障碍物右边 + spacing
-                        const clearAxis = Math.max(...blockers.map(o => o.x + o.width)) + spacing;
-                        axis = Math.max(axis, clearAxis);
+            // [T1] 垂直干线（x=axis）障碍物扫描：确保主干通道（axis +/- 10px）不穿透任何节点
+            if (filteredObstacles && filteredObstacles.length > 0) {
+                // [FIX-robust-collision] 多轮扫描以应对重叠障碍物
+                let collisionFound = true;
+                let safetyAttempt = 0;
+                while (collisionFound && safetyAttempt < 3) {
+                    collisionFound = false;
+                    // 使用 10px 的通道宽度进行检测，防止贴边导致的视觉穿透
+                    const blockers = filteredObstacles.filter(o =>
+                        o.x < axis + 10 && o.x + o.width > axis - 10 &&
+                        o.y < range.max + spacing && o.y + o.height > range.min - spacing
+                    );
+
+                    if (blockers.length > 0) {
+                        collisionFound = true;
+                        if (isLeft) {
+                            // 主干在左侧：推向更左侧。推开后重新吸附到网格（向下取整，确保远离 Hub 和障碍物）
+                            const minX = Math.min(...blockers.map(o => o.x));
+                            const clearAxis = minX - spacing;
+                            axis = Math.floor(clearAxis / grid) * grid;
+                        } else {
+                            // 主干在右侧：推向更右侧。向上取整吸附网格
+                            const maxX = Math.max(...blockers.map(o => o.x + o.width));
+                            const clearAxis = maxX + spacing;
+                            axis = Math.ceil(clearAxis / grid) * grid;
+                        }
                     }
+                    safetyAttempt++;
                 }
+            }
+
+            // [T1-Final-Guard] 最终边界兜底，确保主干至少在 Hub 边缘之外
+            if (isLeft) {
+                axis = Math.min(axis, hubNode.x - spacing);
+            } else {
+                axis = Math.max(axis, hubNode.x + hubNode.width + spacing);
             }
 
             return { axis, direction: 'vertical', range, suggestedPort };
@@ -264,17 +305,24 @@ export class TrunkCalculator {
             //   - peers below hub (peersCenter.y > hubCenter.y) → trunk sits below hub → !isTop
             const isTop: boolean = peersCenter.y < hubCenter.y;
 
+            const grid = 20;
+            const standardOffset = spacing + 20;
+
             if (isTop) {
                 // Trunk on Top: midpoint between peers' bottom and hub's top
                 const minSafe = hubNode.y - spacing;
-                const ideal = (pBounds.maxY + hubNode.y) / 2;
-                axis = Math.min(ideal, minSafe);
+                // [FIX-elbow-consistency] Use snapped offset
+                const preferred = Math.floor((hubNode.y - standardOffset) / grid) * grid;
+                const peerSafe = pBounds.maxY + 10;
+                axis = Math.max(peerSafe, Math.min(preferred, minSafe));
                 suggestedPort = 'top';
             } else {
                 // Trunk on Bottom: midpoint between hub's bottom and peers' top
                 const minSafe = hubNode.y + hubNode.height + spacing;
-                const ideal = (pBounds.minY + hubNode.y + hubNode.height) / 2;
-                axis = Math.max(ideal, minSafe);
+                // [FIX-elbow-consistency] Use snapped offset
+                const preferred = Math.ceil((hubNode.y + hubNode.height + standardOffset) / grid) * grid;
+                const peerSafe = pBounds.minY - 10;
+                axis = Math.min(peerSafe, Math.max(preferred, minSafe));
                 suggestedPort = 'bottom';
             }
 
@@ -291,23 +339,37 @@ export class TrunkCalculator {
                 range.max = hubCenter.x;
             }
 
-            // [T1] 水平干线（y=axis）隘碍物扫描：将轴推离最近障碍物边缘 + spacing
-            if (obstacles && obstacles.length > 0) {
-                const blockers = obstacles.filter(o =>
-                    o.y < axis + 1 && o.y + o.height > axis - 1 &&
-                    o.x < range.max + spacing && o.x + o.width > range.min - spacing
-                );
-                if (blockers.length > 0) {
-                    if (isTop) {
-                        // 干线在上方：推到最小障碍物 y - spacing
-                        const clearAxis = Math.min(...blockers.map(o => o.y)) - spacing;
-                        axis = Math.min(axis, clearAxis);
-                    } else {
-                        // 干线在下方：推到最大障碍物下边 + spacing
-                        const clearAxis = Math.max(...blockers.map(o => o.y + o.height)) + spacing;
-                        axis = Math.max(axis, clearAxis);
+            // [T1] 水平干线（y=axis）障碍物扫描
+            if (filteredObstacles && filteredObstacles.length > 0) {
+                let collisionFound = true;
+                let safetyAttempt = 0;
+                while (collisionFound && safetyAttempt < 3) {
+                    collisionFound = false;
+                    const blockers = filteredObstacles.filter(o =>
+                        o.y < axis + 10 && o.y + o.height > axis - 10 &&
+                        o.x < range.max + spacing && o.x + o.width > range.min - spacing
+                    );
+                    if (blockers.length > 0) {
+                        collisionFound = true;
+                        if (isTop) {
+                            const minY = Math.min(...blockers.map(o => o.y));
+                            const clearAxis = minY - spacing;
+                            axis = Math.floor(clearAxis / grid) * grid;
+                        } else {
+                            const maxY = Math.max(...blockers.map(o => o.y + o.height));
+                            const clearAxis = maxY + spacing;
+                            axis = Math.ceil(clearAxis / grid) * grid;
+                        }
                     }
+                    safetyAttempt++;
                 }
+            }
+
+            // [T1-Final-Guard]
+            if (isTop) {
+                axis = Math.min(axis, hubNode.y - spacing);
+            } else {
+                axis = Math.max(axis, hubNode.y + hubNode.height + spacing);
             }
 
             if (config.debug && !suggestedPort!) {
@@ -369,7 +431,8 @@ export class TrunkCalculator {
         backwardPeers: Rectangle[],
         isManyToOne: boolean,
         config: UnifiedRoutingConfig,
-        layoutDirection: string = 'LR'
+        layoutDirection: string = 'LR',
+        obstacles?: Rectangle[]       // [FIX] Obstacle list for trunk axis collision avoidance
     ): {
         forward?: { axis: number; direction: 'horizontal' | 'vertical'; range: { min: number; max: number }; suggestedPort: 'top' | 'bottom' | 'left' | 'right' };
         backward?: { axis: number; direction: 'horizontal' | 'vertical'; range: { min: number; max: number }; suggestedPort: 'top' | 'bottom' | 'left' | 'right' };
@@ -389,11 +452,11 @@ export class TrunkCalculator {
         const backwardCentroid = backwardPeers.length > 0 ? this.calculateCentroid(backwardPeers) : undefined;
 
         const forwardTrunkRaw = forwardPeers.length > 0
-            ? this.calculateTreeTrunk(hubNode, forwardPeers, isManyToOne, config, layoutDirection, forwardCentroid)
+            ? this.calculateTreeTrunk(hubNode, forwardPeers, isManyToOne, config, layoutDirection, forwardCentroid, obstacles)
             : undefined;
 
         const backwardTrunkRaw = backwardPeers.length > 0
-            ? this.calculateTreeTrunk(hubNode, backwardPeers, isManyToOne, config, layoutDirection, backwardCentroid)
+            ? this.calculateTreeTrunk(hubNode, backwardPeers, isManyToOne, config, layoutDirection, backwardCentroid, obstacles)
             : undefined;
 
         // 2. Check for Independent Opposite Sides (No Collision)
@@ -434,7 +497,7 @@ export class TrunkCalculator {
             allCentroid = forwardCentroid ?? backwardCentroid;
         }
         const baseTrunk = this.calculateTreeTrunk(
-            hubNode, allPeers, isManyToOne, config, layoutDirection, allCentroid
+            hubNode, allPeers, isManyToOne, config, layoutDirection, allCentroid, obstacles
         );
 
         // [Phase 3.5] Intelligent trunk assignment based on strategy

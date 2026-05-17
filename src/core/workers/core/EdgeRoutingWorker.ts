@@ -402,8 +402,12 @@ export class EdgeRoutingWorker {
         // [S5-P2] O2M hub 源端口 + M2O hub 目标端口 统一使用 resolvePortFromTrunkAxis()
 
         // O2M: hub（源）面向 trunk axis
+        // [FIX-shared-port] Hub port must NOT depend on individual peer geometry.
+        // Passing sRect/tRect as otherRect caused per-edge "strong alignment override",
+        // making some edges exit the hub from different ports. Pass undefined to ensure
+        // all edges in the same trunk group share the same hub port.
         if (job.isOneToMany && job.busTrunkSource && job.busTrunkTarget && !hasFixedSourcePort) {
-            startPos = resolvePortFromTrunkAxis(sRect, tRect, false);
+            startPos = resolvePortFromTrunkAxis(sRect, undefined, false);
             hasFixedSourcePort = true;
         }
 
@@ -412,8 +416,9 @@ export class EdgeRoutingWorker {
         // Trunk axis sits between the sources and the target.
         // → If trunk is ABOVE target: target faces UP → Position.Top
         // → If trunk is BELOW target: target faces DOWN → Position.Bottom
+        // [FIX-shared-port] Same fix: don't pass per-edge source rect to hub port calculation.
         if (job.isManyToOne && job.busTrunkSource && job.busTrunkTarget && !hasFixedTargetPort) {
-            endPos = resolvePortFromTrunkAxis(tRect, sRect, true);
+            endPos = resolvePortFromTrunkAxis(tRect, undefined, true);
             hasFixedTargetPort = true;
         }
 
@@ -852,9 +857,11 @@ export class EdgeRoutingWorker {
 
         // 6. Coordinates with Distribution
         // [Bus Optimization] Force coalesced ports for Bus Hubs (Tree Root) to create a clean bundle
-        const forceSourceCoalesce = job.isOneToMany;
-        const forceTargetCoalesce = job.isManyToOne;
-        const isBus = forceSourceCoalesce || forceTargetCoalesce;
+        // [FIX-port-spread] 但如果 Coordinator 明确设置了 count > 1（端口冲突扩展），
+        // 尊重它——表示 O2M 和 M2O 需要在同侧用不同连接点，不能强制合并到中心。
+        const forceSourceCoalesce = job.isOneToMany && (job.outgoingCount || 1) <= 1;
+        const forceTargetCoalesce = job.isManyToOne && (job.incomingCount || 1) <= 1;
+        const isBus = !!job.isOneToMany || !!job.isManyToOne;
 
         const outgoingCount = forceSourceCoalesce ? 1 : (job.outgoingCount || 1);
         const incomingCount = forceTargetCoalesce ? 1 : (job.incomingCount || 1);
@@ -924,8 +931,37 @@ export class EdgeRoutingWorker {
                 hasFixedTargetPort = false;
             };
 
-            // Priority 1: Use Precomputed Trunk from Coordinator (Global Context)
+            // [Imp-cross-domain] Priority 1: Use Precomputed Trunk from Coordinator (Global Context)
             if (hasPrecomputedTrunk && job.busTrunkSource && job.busTrunkTarget) {
+                // [FIX-cross-domain] Force port alignment with trunkPort if provided
+                if ((job as any).trunkPort) {
+                    const trunkPortPos = (job as any).trunkPort as Position;
+                    if (job.isOneToMany && !hasExplicitSource) {
+                        startPos = trunkPortPos;
+                        hasFixedSourcePort = true;
+                    } else if (job.isManyToOne && !hasExplicitTarget) {
+                        endPos = trunkPortPos;
+                        hasFixedTargetPort = true;
+                    }
+
+                    // Recalculate anchor points to match the forced trunk port direction
+                    // Using job.outgoingIndex (which is now 0 for hubs) ensures all edges in the group merge to one point
+                    const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, job.outgoingCount || 1);
+                    const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, job.incomingCount || 1);
+                    
+                    (startPt as any).x = newStartPt.x;
+                    (startPt as any).y = newStartPt.y;
+                    (endPt as any).x = newEndPt.x;
+                    (endPt as any).y = newEndPt.y;
+
+                    const sOffset = getPortOffsetPoint(newStartPt.x, newStartPt.y, startPos, config.offsets.source);
+                    const tOffset = getPortOffsetPoint(newEndPt.x, newEndPt.y, endPos, config.offsets.target);
+                    (startWithOffset as any).x = sOffset.x;
+                    (startWithOffset as any).y = sOffset.y;
+                    (endWithOffset as any).x = tOffset.x;
+                    (endWithOffset as any).y = tOffset.y;
+                }
+
                 if (Math.abs(job.busTrunkSource.x - job.busTrunkTarget.x) < 1.0) {
                     isVertical = true;
                     trunkAxis = job.busTrunkSource.x;

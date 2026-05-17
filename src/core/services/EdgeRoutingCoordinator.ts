@@ -379,6 +379,7 @@ export class EdgeRoutingCoordinator {
         console.info('[EdgeRoutingCoordinator] All caches cleared. Edges will re-route.');
     }
 
+    private nodeParentMap: Map<string, string | undefined> = new Map();
     private onSelectionChange: ((edgeId: string | null) => void) | null = null;
 
     public setDebugEdge(edgeId: string | null) {
@@ -1205,7 +1206,10 @@ export class EdgeRoutingCoordinator {
 
         // [FIX] Create Node Map for O(1) lookup and Parent Traversal
         const nodeMap = new Map<string, typeof allNodes[number]>();
-        allNodes.forEach(n => nodeMap.set(n.id, n));
+        allNodes.forEach(n => {
+            nodeMap.set(n.id, n);
+            this.nodeParentMap.set(n.id, n.parentId || (n as any).parentNode);
+        });
 
         // [FIX] Helper to get Absolute Position with Parent Traversal
         const getAbsolutePosition = (node: any): { x: number, y: number } => {
@@ -1249,6 +1253,19 @@ export class EdgeRoutingCoordinator {
         const trunkCalculator = new TrunkCalculator();
         const layoutDir = (graph as any).layoutDirection || 'LR';
 
+        // [FIX] Build obstacle list for trunk axis collision avoidance
+        // Without this, TrunkCalculator places axes blindly through node bodies.
+        const CONTAINER_TYPES = new Set(['group', 'subGroup', 'titleGroup', 'domain', 'subDomain', 'swimlane', 'annotation', 'background', 'sticky', 'comment']);
+        const trunkObstacles: Rectangle[] = [];
+        allNodes.forEach(n => {
+            const type = (n as any).type || '';
+            if (CONTAINER_TYPES.has(type)) return; // Skip containers
+            const rect = getNodeRect(n.id);
+            if (rect && rect.width > 0 && rect.height > 0) {
+                trunkObstacles.push(rect);
+            }
+        });
+
         // 1. One-to-Many Processing (Source Groups)
         const sourceGroups = new Map<string, PathFindingJob[]>();
         jobs.forEach(job => {
@@ -1260,6 +1277,10 @@ export class EdgeRoutingCoordinator {
             if (!sourceGroups.has(job.source)) sourceGroups.set(job.source, []);
             sourceGroups.get(job.source)?.push(job);
         });
+
+        // [FIX-port-conflict] 收集每个 hub 在 O2M 阶段已使用的端口，
+        // 供 M2O 阶段做冲突检测——确保入边和出边不共享同一端口。
+        const hubOutPorts = new Map<string, Set<string>>();
 
         sourceGroups.forEach((groupJobs, sourceId) => {
             const busJobs = groupJobs.filter(j => j.isOneToMany);
@@ -1273,8 +1294,17 @@ export class EdgeRoutingCoordinator {
                     trunkCalculator,
                     defaultConfig,
                     layoutDir,
-                    false // isManyToOne = false
+                    false, // isManyToOne = false
+                    trunkObstacles
                 );
+
+                // 收集 O2M 已占用的端口
+                const usedPorts = new Set<string>();
+                busJobs.forEach(j => {
+                    const port = (j as any).trunkPort;
+                    if (port) usedPorts.add(port);
+                });
+                if (usedPorts.size > 0) hubOutPorts.set(sourceId, usedPorts);
             }
         });
 
@@ -1301,7 +1331,9 @@ export class EdgeRoutingCoordinator {
                     trunkCalculator,
                     defaultConfig,
                     layoutDir,
-                    true // isManyToOne = true
+                    true, // isManyToOne = true
+                    trunkObstacles,
+                    hubOutPorts.get(targetId) // 传入该 hub 的 O2M 已占端口
                 );
             } else {
                 // Fallback for non-bus incoming groups
@@ -1483,63 +1515,49 @@ export class EdgeRoutingCoordinator {
         trunkCalculator: TrunkCalculator,
         defaultConfig: any,
         layoutDir: string,
-        isManyToOne: boolean
+        isManyToOne: boolean,
+        obstacles?: Rectangle[],  // [FIX] Node obstacles for trunk axis collision avoidance
+        hubUsedPorts?: Set<string> // [FIX-port-conflict] Ports already occupied by O2M on this hub
     ): void {
         const hubRect = getNodeRect(hubId);
         if (!hubRect) return;
 
         const hubCenter = { x: hubRect.x + hubRect.width / 2, y: hubRect.y + hubRect.height / 2 };
 
-        // [CRITICAL FIX] Directional Homogeneity Projection (Geometric Predominance Override v2)
-        // Replaces simple distance sum which fails on highly spread-out tree layouts.
-        // We tally the polarity of offsets. If all nodes are strictly "above" or "below", 
-        // it's an undeniable vertical flow. If they are spread left/right simultaneously, 
-        // horizontal flow is chaotic.
-        let isHorz = layoutDir === 'LR' || layoutDir === 'RL';
+        // ==================== [FIX-hemisphere] Flow-Direction Hemisphere Grouping ====================
+        // 行业标准（ELK/draw.io）：先算质心确定主流方向，再沿主流方向分成 2 个 180° 半球。
+        // 这样自然合并相邻象限（如"左上"和"左下"都归入同一半球）。
+        // 对于强烈偏离主流的边（交叉轴 > 2× 主轴），单独分到垂直端口（"逃逸"）。
+        //
+        // 示例（主流=下方）：
+        //   正下方的 peer → bottom 半球 ✓
+        //   左下方的 peer → bottom 半球 ✓（邻近象限自然合并）
+        //   纯右方的 peer → right 逃逸端口（交叉轴远大于主轴）
 
-        let aboveCount = 0, belowCount = 0;
-        let leftCount = 0, rightCount = 0;
-        let validPeers = 0;
-
+        // Step 1: 计算 peer 质心，确定主流方向
+        let centroidX = 0, centroidY = 0, validCount = 0;
         globalPeers.forEach(peerEdge => {
             const peerId = isManyToOne ? peerEdge.source : peerEdge.target;
             const peerRect = getNodeRect(peerId);
             if (peerRect) {
-                const pc = { x: peerRect.x + peerRect.width / 2, y: peerRect.y + peerRect.height / 2 };
-                // Use a deadzone of 10px to ignore slight misalignments
-                if (pc.y < hubCenter.y - 10) aboveCount++;
-                else if (pc.y > hubCenter.y + 10) belowCount++;
-
-                if (pc.x < hubCenter.x - 10) leftCount++;
-                else if (pc.x > hubCenter.x + 10) rightCount++;
-
-                validPeers++;
+                centroidX += peerRect.x + peerRect.width / 2;
+                centroidY += peerRect.y + peerRect.height / 2;
+                validCount++;
             }
         });
 
-        if (validPeers > 1) {
-            const yPurity = Math.max(aboveCount, belowCount) / validPeers;
-            const xPurity = Math.max(leftCount, rightCount) / validPeers;
+        // Fallback: 如果没有有效 peer，直接返回
+        if (validCount === 0) return;
+        centroidX /= validCount;
+        centroidY /= validCount;
 
-            // If layout is overwhelmingly uniform in Y (e.g. all above) but scattered in X
-            if (yPurity >= 0.8 && xPurity < 0.8) {
-                isHorz = false; // Strictly Vertical Flow (TB / BT)
-            }
-            // If layout is overwhelmingly uniform in X (e.g. all left) but scattered in Y
-            else if (xPurity >= 0.8 && yPurity < 0.8) {
-                isHorz = true; // Strictly Horizontal Flow (LR / RL)
-            }
-            // If both are pure (e.g. diagonal clump), fallback to the stronger purity or layoutDir
-            else if (yPurity >= 0.8 && xPurity >= 0.8) {
-                if (yPurity > xPurity) isHorz = false;
-                else if (xPurity > yPurity) isHorz = true;
-            }
-            // If both are chaotic, rely on user layoutDir string
-        }
+        const flowDx = centroidX - hubCenter.x;
+        const flowDy = centroidY - hubCenter.y;
+        // 主流方向：质心偏移更大的轴
+        const isVerticalFlow = Math.abs(flowDy) >= Math.abs(flowDx);
 
-        const dirSign = (layoutDir === 'RL' || layoutDir === 'BT') ? -1 : 1;
-        // Group peers by geometric side
-        const sideGroups = new Map<string, any[]>(); // 'forward' | 'backward'
+        // Step 2: 按半球 + 垂直逃逸分组
+        const sideGroups = new Map<string, any[]>();
 
         globalPeers.forEach(peerEdge => {
             const peerId = isManyToOne ? peerEdge.source : peerEdge.target;
@@ -1547,134 +1565,89 @@ export class EdgeRoutingCoordinator {
             if (!peerRect) return;
 
             const peerCenter = { x: peerRect.x + peerRect.width / 2, y: peerRect.y + peerRect.height / 2 };
-            // Correctly evaluate delta with Geometric Predominance
-            const delta = isHorz ? (peerCenter.x - hubCenter.x) : (peerCenter.y - hubCenter.y);
+            const dx = peerCenter.x - hubCenter.x;
+            const dy = peerCenter.y - hubCenter.y;
 
-            const edgeType = peerEdge.type as string | undefined;
-            // Use unified classification
-            const sideVal = classifyEdgeSide(delta, dirSign, edgeType);
-            const key = sideVal > 0 ? 'forward' : 'backward';
+            let side: string;
+            if (isVerticalFlow) {
+                // 主流=上下 → 默认按 y 分半球
+                // 逃逸：如果 |dx| > 2*|dy| 且 |dx| > 50px，说明 peer 强烈偏向左右
+                if (Math.abs(dx) > Math.abs(dy) * 2 && Math.abs(dx) > 50) {
+                    side = dx < 0 ? 'left' : 'right';
+                } else {
+                    side = dy < 0 ? 'top' : 'bottom';
+                }
+            } else {
+                // 主流=左右 → 默认按 x 分半球
+                // 逃逸：如果 |dy| > 2*|dx| 且 |dy| > 50px
+                if (Math.abs(dy) > Math.abs(dx) * 2 && Math.abs(dy) > 50) {
+                    side = dy < 0 ? 'top' : 'bottom';
+                } else {
+                    side = dx < 0 ? 'left' : 'right';
+                }
+            }
 
             // [Debug] Classification
+            const edgeType = peerEdge.type as string | undefined;
             this.trunkDebugData.set(peerEdge.id, {
                 edgeId: peerEdge.id,
                 edgeType,
-                delta,
-                dirSign,
-                side: sideVal,
-                typeInfluenced: classifyEdgeSide(delta, dirSign, undefined) !== sideVal
+                delta: isVerticalFlow ? dy : dx,
+                dirSign: 0,
+                side: 0,
+                typeInfluenced: false
             });
 
-            if (!sideGroups.has(key)) sideGroups.set(key, []);
-            sideGroups.get(key)?.push(peerEdge);
+            if (!sideGroups.has(side)) sideGroups.set(side, []);
+            sideGroups.get(side)!.push(peerEdge);
         });
 
-        // [FIX-quadrant] Cross-Axis Coherence Check
-        // When peers in the same side group are spread across both sides of the hub's
-        // cross-axis (e.g. one peer far-left and another far-right of hub), sharing a
-        // single trunk produces unnatural detours. Split into quadrant-coherent sub-groups.
-        const splitByCrossAxis = (edges: any[]): any[][] => {
-            if (edges.length <= 1) return [edges];
+        // 逐半球组计算主干线
+        sideGroups.forEach((groupEdges, _side) => {
+            if (groupEdges.length === 0) return;
 
-            // Determine cross-axis offset of each peer relative to hub
-            const crossOffsets = edges.map(e => {
-                const peerId = isManyToOne ? e.source : e.target;
-                const peerRect = getNodeRect(peerId);
-                if (!peerRect) return { edge: e, offset: 0 };
-                const pc = { x: peerRect.x + peerRect.width / 2, y: peerRect.y + peerRect.height / 2 };
-                // Cross-axis = perpendicular to the primary flow direction
-                const offset = isHorz ? (pc.y - hubCenter.y) : (pc.x - hubCenter.x);
-                return { edge: e, offset };
-            });
-
-            const positiveGroup = crossOffsets.filter(c => c.offset >= 0).map(c => c.edge);
-            const negativeGroup = crossOffsets.filter(c => c.offset < 0).map(c => c.edge);
-
-            // Check if the cross-axis spread is significant enough to warrant splitting.
-            // Only split when both sub-groups have at least 1 member AND the angular spread
-            // between the extreme peers is wide (cross-range > 50% of main-axis range).
-            if (positiveGroup.length === 0 || negativeGroup.length === 0) {
-                return [edges]; // All on same side — no split needed
-            }
-
-            const allOffsets = crossOffsets.map(c => Math.abs(c.offset));
-            const maxCrossOffset = Math.max(...allOffsets);
-            // Main-axis range: how far peers are along the primary flow direction
-            const mainOffsets = crossOffsets.map(c => {
-                const peerId = isManyToOne ? c.edge.source : c.edge.target;
-                const peerRect = getNodeRect(peerId);
-                if (!peerRect) return 0;
-                const pc = { x: peerRect.x + peerRect.width / 2, y: peerRect.y + peerRect.height / 2 };
-                return Math.abs(isHorz ? (pc.x - hubCenter.x) : (pc.y - hubCenter.y));
-            });
-            const maxMainOffset = Math.max(...mainOffsets);
-
-            // Threshold: if cross-axis spread > 60% of main-axis distance, peers are coming
-            // from too-different angles to share a trunk. (Industry standard: ~45-60°)
-            if (maxCrossOffset > maxMainOffset * 0.6 && maxCrossOffset > 80) {
-                // Return each sub-group independently
-                const result: any[][] = [];
-                if (positiveGroup.length >= 1) result.push(positiveGroup);
-                if (negativeGroup.length >= 1) result.push(negativeGroup);
-                return result;
-            }
-
-            return [edges]; // Cross-spread within tolerance
-        };
-
-        // Calculate Trunks (Dual-Trunk Architecture)
-        const forwardEdges = sideGroups.get('forward') || [];
-        const backwardEdges = sideGroups.get('backward') || [];
-
-        if (forwardEdges.length > 0 || backwardEdges.length > 0) {
-            // [FIX-quadrant] Split each side by cross-axis coherence
-            const forwardSubGroups = splitByCrossAxis(forwardEdges);
-            const backwardSubGroups = splitByCrossAxis(backwardEdges);
-
-            // Process each sub-group independently
-            const processSubGroup = (subGroup: any[], allSubGroups: any[][], isForward: boolean) => {
-                if (subGroup.length === 0) return;
-
-                // Singleton sub-groups: skip trunk, let edge route via direct A*
-                if (subGroup.length === 1 && allSubGroups.length > 1) {
-                    // Mark as non-bus to disable trunk routing for this edge
-                    const job = busGroupJobs.find(j => j.edgeId === subGroup[0].id);
-                    if (job) {
-                        if (isManyToOne) {
-                            job.isManyToOne = false;
-                            job.incomingCount = 1;
-                            job.incomingIndex = 0;
-                        } else {
-                            job.isOneToMany = false;
-                            job.outgoingCount = 1;
-                            job.outgoingIndex = 0;
-                        }
+            // 单条边的组：降级为普通 A* 路由（只在有多个组时）
+            if (groupEdges.length === 1 && sideGroups.size > 1) {
+                const job = busGroupJobs.find(j => j.edgeId === groupEdges[0].id);
+                if (job) {
+                    if (isManyToOne) {
+                        job.isManyToOne = false;
+                        job.incomingCount = 1;
+                        job.incomingIndex = 0;
+                    } else {
+                        job.isOneToMany = false;
+                        job.outgoingCount = 1;
+                        job.outgoingIndex = 0;
                     }
-                    return;
                 }
+                return;
+            }
 
-                // Multi-member sub-groups: compute trunk as usual
-                const subPeers = subGroup.map(e => getNodeRect(isManyToOne ? e.source : e.target)).filter((r): r is Rectangle => !!r);
-                const emptyPeers: Rectangle[] = [];
+            // 计算该象限的 peer 节点矩形列表
+            const subPeers = groupEdges.map(e =>
+                getNodeRect(isManyToOne ? e.source : e.target)
+            ).filter((r): r is Rectangle => !!r);
 
-                const trunks = trunkCalculator.calculateParallelTrunks(
-                    hubRect,
-                    isForward ? subPeers : emptyPeers,
-                    isForward ? emptyPeers : subPeers,
-                    isManyToOne,
-                    defaultConfig,
-                    layoutDir
-                );
+            // 直接调用 calculateTreeTrunk — 每个象限的 peer 天然在同侧，
+            // 不需要双干线并行间距（calculateParallelTrunks 的 forward/backward 拆分）
+            const trunk = trunkCalculator.calculateTreeTrunk(
+                hubRect,
+                subPeers,
+                isManyToOne,
+                defaultConfig,
+                layoutDir,
+                undefined, // 让 calculateTreeTrunk 自行计算质心
+                obstacles
+            );
 
-                const trunk = isForward ? trunks.forward : trunks.backward;
-                if (trunk) {
-                    this.assignTrunkGeometry(subGroup, busGroupJobs, trunk, layoutDir, getNodeRect, isManyToOne);
-                }
-            };
+            // [FIX-port-spread] 同侧端口扩展（Port Spreading）
+            // 当 M2O 和 O2M 共享同一端口侧时，不翻转也不偏移 trunk axis，
+            // 而是通过 hubPortSlot 告诉 Worker 在该侧使用不同的连接点位置。
+            // O2M slot=0 (偏左/偏上), M2O slot=1 (偏右/偏下)。
+            const hasPortConflict = isManyToOne && hubUsedPorts && hubUsedPorts.has(trunk.suggestedPort);
 
-            forwardSubGroups.forEach(sg => processSubGroup(sg, forwardSubGroups, true));
-            backwardSubGroups.forEach(sg => processSubGroup(sg, backwardSubGroups, false));
-        }
+            this.assignTrunkGeometry(groupEdges, busGroupJobs, trunk, layoutDir, getNodeRect, isManyToOne, hasPortConflict);
+        });
     }
 
     private assignTrunkGeometry(
@@ -1683,7 +1656,8 @@ export class EdgeRoutingCoordinator {
         trunk: { axis: number; direction: 'horizontal' | 'vertical'; range: { min: number; max: number }; suggestedPort: 'top' | 'bottom' | 'left' | 'right' },
         layoutDir: string,
         getNodeRect: (id: string) => Rectangle | undefined,
-        isManyToOne: boolean
+        isManyToOne: boolean,
+        hubPortConflict: boolean = false  // [FIX-port-spread] 是否与另一方向共享端口
     ): void {
         // [FIX] Removed dirtyEdges.add + scheduleBatchRouting that caused infinite recursion:
         // assignTrunkGeometry is called FROM batchRouteDirtyEdges, so marking edges dirty here
@@ -1724,20 +1698,26 @@ export class EdgeRoutingCoordinator {
             const job = busGroupJobs.find(j => j.edgeId === edge.id);
             if (!job) return;
 
-            if (isManyToOne) {
-                job.isManyToOne = true;
-                job.incomingCount = edges.length;
-            } else {
-                job.isOneToMany = true;
-                job.outgoingCount = edges.length;
-            }
-
             const index = sortedGlobal.findIndex((e: any) => e.id === job.edgeId);
+            (job as any).busIndex = index; // Store branching order for trunk calculation
 
             if (isManyToOne) {
-                job.incomingIndex = index;
+                // Hub is Target. Multiple sources merge into one target port.
+                // [FIX-port-spread] 如果与 O2M 共享端口，用 slot=1 (偏右/偏下)
+                // O2M 已占 slot=0，M2O 用 slot=1，两者在同一侧但位置错开
+                job.incomingCount = hubPortConflict ? 2 : 1;
+                job.incomingIndex = hubPortConflict ? 1 : 0;
+                // Peer side (Source)
+                job.outgoingCount = 1;
+                job.outgoingIndex = 0;
             } else {
-                job.outgoingIndex = index;
+                // Hub is Source. One source splits into multiple target ports.
+                // [FIX-port-spread] O2M 始终占 slot=0（偏左/偏上），保持不变
+                job.outgoingCount = 1;
+                job.outgoingIndex = 0;
+                // Peer side (Target)
+                job.incomingCount = 1; 
+                job.incomingIndex = 0;
             }
 
             // Assign Trunk Coordinates
@@ -1757,6 +1737,7 @@ export class EdgeRoutingCoordinator {
                 : (edge.source as string);  // O2M: hub 是公共 source
             (job as any).peerGroupKey = peerGroupKey;
             (job as any).peerGroupSize = edges.length;
+            (job as any).trunkPort = trunk.suggestedPort; // Pass suggested port direction
 
             // [S4] Port 注入已移至 Worker 内部（几何推算）。
             // Coordinator 仅传递 busTrunkSource/busTrunkTarget 几何元数据，
