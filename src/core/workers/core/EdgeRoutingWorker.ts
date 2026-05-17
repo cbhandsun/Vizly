@@ -934,33 +934,90 @@ export class EdgeRoutingWorker {
             // [Imp-cross-domain] Priority 1: Use Precomputed Trunk from Coordinator (Global Context)
             if (hasPrecomputedTrunk && job.busTrunkSource && job.busTrunkTarget) {
                 // [FIX-cross-domain] Force port alignment with trunkPort if provided
+                let skipTrunkDueToSelfCross = false;
                 if ((job as any).trunkPort) {
                     const trunkPortPos = (job as any).trunkPort as Position;
-                    if (job.isOneToMany && !hasExplicitSource) {
-                        startPos = trunkPortPos;
-                        hasFixedSourcePort = true;
-                    } else if (job.isManyToOne && !hasExplicitTarget) {
-                        endPos = trunkPortPos;
-                        hasFixedTargetPort = true;
+
+                    // [FIX-self-cross] Self-crossing guard:
+                    // If trunkPort points AWAY from the target, the path must cross through
+                    // the source/target node's own body. Detect and skip trunkPort for this edge.
+                    const sCx = sRect.x + sRect.width / 2;
+                    const sCy = sRect.y + sRect.height / 2;
+                    const tCx = tRect.x + tRect.width / 2;
+                    const tCy = tRect.y + tRect.height / 2;
+                    const dx = tCx - sCx;
+                    const dy = tCy - sCy;
+
+                    let wouldSelfCross = false;
+                    if (job.isOneToMany) {
+                        // For O2M: trunkPort is the source (hub) port direction
+                        // If port=Left but target is to the RIGHT → self-cross
+                        // If port=Right but target is to the LEFT → self-cross
+                        // If port=Top but target is BELOW → self-cross
+                        // If port=Bottom but target is ABOVE → self-cross
+                        if (trunkPortPos === Position.Left && dx > sRect.width / 2) wouldSelfCross = true;
+                        else if (trunkPortPos === Position.Right && dx < -sRect.width / 2) wouldSelfCross = true;
+                        else if (trunkPortPos === Position.Top && dy > sRect.height / 2) wouldSelfCross = true;
+                        else if (trunkPortPos === Position.Bottom && dy < -sRect.height / 2) wouldSelfCross = true;
+                    } else if (job.isManyToOne) {
+                        // For M2O: trunkPort is the target (hub) port direction
+                        // Check from target's perspective: port points away from source
+                        const rdx = sCx - tCx;
+                        const rdy = sCy - tCy;
+                        if (trunkPortPos === Position.Left && rdx > tRect.width / 2) wouldSelfCross = true;
+                        else if (trunkPortPos === Position.Right && rdx < -tRect.width / 2) wouldSelfCross = true;
+                        else if (trunkPortPos === Position.Top && rdy > tRect.height / 2) wouldSelfCross = true;
+                        else if (trunkPortPos === Position.Bottom && rdy < -tRect.height / 2) wouldSelfCross = true;
                     }
 
-                    // Recalculate anchor points to match the forced trunk port direction
-                    // Using job.outgoingIndex (which is now 0 for hubs) ensures all edges in the group merge to one point
-                    const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, job.outgoingCount || 1);
-                    const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, job.incomingCount || 1);
-                    
-                    (startPt as any).x = newStartPt.x;
-                    (startPt as any).y = newStartPt.y;
-                    (endPt as any).x = newEndPt.x;
-                    (endPt as any).y = newEndPt.y;
+                    if (wouldSelfCross) {
+                        // Skip trunkPort: use geometric port selection instead, and skip trunk entirely
+                        skipTrunkDueToSelfCross = true;
+                    } else {
+                        if (job.isOneToMany && !hasExplicitSource) {
+                            startPos = trunkPortPos;
+                            hasFixedSourcePort = true;
+                        } else if (job.isManyToOne && !hasExplicitTarget) {
+                            endPos = trunkPortPos;
+                            hasFixedTargetPort = true;
+                        }
 
-                    const sOffset = getPortOffsetPoint(newStartPt.x, newStartPt.y, startPos, config.offsets.source);
-                    const tOffset = getPortOffsetPoint(newEndPt.x, newEndPt.y, endPos, config.offsets.target);
-                    (startWithOffset as any).x = sOffset.x;
-                    (startWithOffset as any).y = sOffset.y;
-                    (endWithOffset as any).x = tOffset.x;
-                    (endWithOffset as any).y = tOffset.y;
+                        // Recalculate anchor points to match the forced trunk port direction
+                        const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, job.outgoingCount || 1);
+                        const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, job.incomingCount || 1);
+                        
+                        (startPt as any).x = newStartPt.x;
+                        (startPt as any).y = newStartPt.y;
+                        (endPt as any).x = newEndPt.x;
+                        (endPt as any).y = newEndPt.y;
+
+                        const sOffset = getPortOffsetPoint(newStartPt.x, newStartPt.y, startPos, config.offsets.source);
+                        const tOffset = getPortOffsetPoint(newEndPt.x, newEndPt.y, endPos, config.offsets.target);
+                        (startWithOffset as any).x = sOffset.x;
+                        (startWithOffset as any).y = sOffset.y;
+                        (endWithOffset as any).x = tOffset.x;
+                        (endWithOffset as any).y = tOffset.y;
+                    }
                 }
+
+                if (skipTrunkDueToSelfCross) {
+                    // Fall through to A* pathfinding with geometric ports
+                    resetPortsToGeometric();
+                    if (!hasExplicitSource && !hasExplicitTarget) {
+                        const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, job.outgoingCount || 1);
+                        const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, job.incomingCount || 1);
+                        (startPt as { x: number; y: number }).x = newStartPt.x;
+                        (startPt as { x: number; y: number }).y = newStartPt.y;
+                        (endPt as { x: number; y: number }).x = newEndPt.x;
+                        (endPt as { x: number; y: number }).y = newEndPt.y;
+                        const newStartOffset = getPortOffsetPoint(newStartPt.x, newStartPt.y, startPos, config.offsets.source);
+                        const newEndOffset = getPortOffsetPoint(newEndPt.x, newEndPt.y, endPos, config.offsets.target);
+                        (startWithOffset as { x: number; y: number }).x = newStartOffset.x;
+                        (startWithOffset as { x: number; y: number }).y = newStartOffset.y;
+                        (endWithOffset as { x: number; y: number }).x = newEndOffset.x;
+                        (endWithOffset as { x: number; y: number }).y = newEndOffset.y;
+                    }
+                } else {
 
                 if (Math.abs(job.busTrunkSource.x - job.busTrunkTarget.x) < 1.0) {
                     isVertical = true;
@@ -1055,6 +1112,7 @@ export class EdgeRoutingWorker {
                         }
                     }
                 }
+                } // end else (normal trunk path)
             } // end hasPrecomputedTrunk
             // Priority 2: Local Calculation (Fallback)
             else {

@@ -265,7 +265,7 @@ const IGNORED_OBSTACLE_TYPES = new Set([
 ]);
 
 /** Container types that serve as soft boundaries */
-const CONTAINER_TYPES = new Set(['group', 'subGroup', 'swimlane', 'domain', 'subDomain']);
+const CONTAINER_TYPES = new Set(['group', 'subGroup', 'titleGroup', 'swimlane', 'domain', 'subDomain']);
 
 interface ObstacleRect { id?: string; x: number; y: number; width: number; height: number; padding?: number; isSoftZone?: boolean; }
 
