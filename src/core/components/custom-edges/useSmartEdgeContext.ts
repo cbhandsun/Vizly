@@ -10,6 +10,7 @@ import { getConvergencePositions } from './convergencePositions';
 import { selectBestPortCombination } from '../../algorithms/smartEdgeUtils';
 import { diagramConfigManager } from '../config/DiagramConfig';
 import { LayeredConfigManager } from '../../config/LayeredConfigManager';
+import { parseHandlePosition } from '../../routing/utils/handleUtils';
 import type { CenteredCoords } from './hooks/useSmartPathWorker';
 
 // [FIX C-6] 模块级方向投票缓存：相同拓扑签名 → 复用计算结果，避免每条边重复 O(E) 计算。
@@ -77,24 +78,9 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         targetHandleId,
     } = props;
 
-    // Helper to parse handle direction from ID
-    // [FIX] Reordered: exact match → includes → single-char prefix
-    // Prevents compound IDs like 't-right' from being misidentified as 'top' via startsWith('t')
-    const parseHandleDirection = (handleId?: string | null): Position | undefined => {
-        if (!handleId) return undefined;
-        const h = handleId.toLowerCase();
-        // Priority 1: exact match
-        if (h === 'top' || h === 't') return Position.Top;
-        if (h === 'bottom' || h === 'b') return Position.Bottom;
-        if (h === 'left' || h === 'l') return Position.Left;
-        if (h === 'right' || h === 'r') return Position.Right;
-        // Priority 2: substring includes (catches 'source-right', 't-right', 'col-0-left', etc.)
-        if (h.includes('top')) return Position.Top;
-        if (h.includes('bottom')) return Position.Bottom;
-        if (h.includes('left')) return Position.Left;
-        if (h.includes('right')) return Position.Right;
-        return undefined;
-    };
+    // [CLEANUP] Handle direction parsing now uses the canonical parseHandlePosition
+    // from handleUtils.ts — single source of truth for the entire codebase.
+    const parseHandleDirection = parseHandlePosition;
 
     // ---------- Hooks (Top Level) ----------
     const simpleNodeMap = useSimpleNodeMap();
@@ -715,16 +701,9 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             // For minimal change, we will use the logic directly here or rely on the outer scope if provided.
             // However, the best fix is to use the robust matching logic.
 
-            // [FIX] Improved handle position calculation checking all formats
+            // [CLEANUP] Uses canonical parseHandlePosition from handleUtils.ts
             if (handleId) {
-                // Use the same logic as parseHandleDirection but avoid shadowing 'h' (height)
-                const lowerId = handleId.toLowerCase();
-                let dir: Position | undefined;
-
-                if (lowerId.startsWith('t') || lowerId.includes('-top') || lowerId.includes('top-')) dir = Position.Top;
-                else if (lowerId.startsWith('b') || lowerId.includes('-bottom') || lowerId.includes('bottom-')) dir = Position.Bottom;
-                else if (lowerId.startsWith('l') || lowerId.includes('-left') || lowerId.includes('left-')) dir = Position.Left;
-                else if (lowerId.startsWith('r') || lowerId.includes('-right') || lowerId.includes('right-')) dir = Position.Right;
+                const dir = parseHandlePosition(handleId);
 
                 if (dir === Position.Left) {
                     offsetX = 0;

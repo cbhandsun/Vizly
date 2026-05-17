@@ -1818,14 +1818,16 @@ export class EdgeRoutingWorker {
     static parseHandleDir(h?: string | null): Position | undefined {
         if (!h) return undefined;
         const s = String(h).toLowerCase();
+        // Priority 1: exact match
+        if (s === 'left' || s === 'l')   return Position.Left;
+        if (s === 'right' || s === 'r')  return Position.Right;
+        if (s === 'top' || s === 't')    return Position.Top;
+        if (s === 'bottom' || s === 'b') return Position.Bottom;
+        // Priority 2: substring match (catches compound IDs like 'source-right', 't-right')
         if (s.includes('left'))   return Position.Left;
         if (s.includes('right'))  return Position.Right;
         if (s.includes('top'))    return Position.Top;
         if (s.includes('bottom')) return Position.Bottom;
-        if (s.startsWith('l'))    return Position.Left;
-        if (s.startsWith('r'))    return Position.Right;
-        if (s.startsWith('t'))    return Position.Top;
-        if (s.startsWith('b'))    return Position.Bottom;
         return undefined;
     }
 }

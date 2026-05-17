@@ -135,10 +135,17 @@ export function parseHandleDirection(handleId?: string | null): Direction {
 
     const id = String(handleId).toLowerCase().trim();
 
-    if (id.startsWith('t')) return 'top';
-    if (id.startsWith('b')) return 'bottom';
-    if (id.startsWith('l')) return 'left';
-    if (id.startsWith('r')) return 'right';
+    // Priority 1: exact match
+    if (id === 'top' || id === 't') return 'top';
+    if (id === 'bottom' || id === 'b') return 'bottom';
+    if (id === 'left' || id === 'l') return 'left';
+    if (id === 'right' || id === 'r') return 'right';
+
+    // Priority 2: substring match (catches compound IDs like 'source-right', 't-right')
+    if (id.includes('top')) return 'top';
+    if (id.includes('bottom')) return 'bottom';
+    if (id.includes('left')) return 'left';
+    if (id.includes('right')) return 'right';
 
     // 默认右侧
     return 'right';

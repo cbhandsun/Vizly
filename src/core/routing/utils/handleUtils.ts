@@ -7,7 +7,37 @@
  *   - normH / normV (C 形修复块内联)
  *
  * 所有路由模块统一从此处导入，避免逻辑漂移。
+ *
+ * [CLEANUP] parseHandlePosition: canonical handle ID → Position 解析器。
+ *   替代 useSmartEdgeContext 和 calcHandlePos 中的内联重复实现。
  */
+
+import { Position } from '@xyflow/react';
+
+/**
+ * Canonical Handle ID → Position parser.
+ *
+ * 解析优先级：exact match → substring includes。
+ * 解决了 compound ID（如 't-right'）被 startsWith('t') 误判为 Top 的问题。
+ *
+ * 这是整个代码库中唯一的 handleId→Position 解析函数，
+ * 其他文件应全部导入此函数，不要内联实现。
+ */
+export function parseHandlePosition(handleId?: string | null): Position | undefined {
+    if (!handleId) return undefined;
+    const s = handleId.toLowerCase();
+    // Priority 1: exact match
+    if (s === 'top' || s === 't') return Position.Top;
+    if (s === 'bottom' || s === 'b') return Position.Bottom;
+    if (s === 'left' || s === 'l') return Position.Left;
+    if (s === 'right' || s === 'r') return Position.Right;
+    // Priority 2: substring includes (catches 'source-right', 't-right', 'col-0-left', etc.)
+    if (s.includes('right')) return Position.Right;
+    if (s.includes('left')) return Position.Left;
+    if (s.includes('bottom')) return Position.Bottom;
+    if (s.includes('top')) return Position.Top;
+    return undefined;
+}
 
 /** 将简写 (r/l/t/b) 展开为 React Flow Handle 全称 */
 export function expandHandle(h: string): string {
