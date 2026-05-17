@@ -1323,6 +1323,7 @@ export class EdgeRoutingCoordinator {
             const busJobs = groupJobs.filter(j => j.isManyToOne);
             if (busJobs.length > 0) {
                 const globalIncoming = allEdges.filter(e => e.target === targetId);
+                const usedPorts = hubOutPorts.get(targetId);
                 this.processBusGroups(
                     targetId,
                     busJobs,
@@ -1333,7 +1334,7 @@ export class EdgeRoutingCoordinator {
                     layoutDir,
                     true, // isManyToOne = true
                     trunkObstacles,
-                    hubOutPorts.get(targetId) // 传入该 hub 的 O2M 已占端口
+                    usedPorts // 传入该 hub 的 O2M 已占端口
                 );
             } else {
                 // Fallback for non-bus incoming groups

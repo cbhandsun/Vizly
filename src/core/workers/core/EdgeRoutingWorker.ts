@@ -1041,8 +1041,8 @@ export class EdgeRoutingWorker {
                         resetPortsToGeometric();
                         // 重算端口锄点坐标以匹配新端口
                         if (!hasExplicitSource && !hasExplicitTarget) {
-                            const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, 1);
-                            const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, 1);
+                            const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, job.outgoingCount || 1);
+                            const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, job.incomingCount || 1);
                             const portOffset: number = (config.algorithm as any).portOffset ?? 40;
                             (startPt as { x: number; y: number }).x = newStartPt.x;
                             (startPt as { x: number; y: number }).y = newStartPt.y;
@@ -1155,8 +1155,8 @@ export class EdgeRoutingWorker {
                     trunkAxis = null;
                     // 重算端口锄点坐标（启用 getPortOffsetPoint 精确计算 offset）
                     if (!hasExplicitSource && !hasExplicitTarget) {
-                        const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, 1);
-                        const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, 1);
+                        const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, job.outgoingCount || 1);
+                        const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, job.incomingCount || 1);
                         (startPt as { x: number; y: number }).x = newStartPt.x;
                         (startPt as { x: number; y: number }).y = newStartPt.y;
                         (endPt as { x: number; y: number }).x = newEndPt.x;
