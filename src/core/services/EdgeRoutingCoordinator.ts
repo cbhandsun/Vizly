@@ -1732,23 +1732,18 @@ export class EdgeRoutingCoordinator {
             (job as any).busIndex = index; // Store branching order for trunk calculation
 
             if (isManyToOne) {
-                // Hub is Target. Multiple sources merge into target ports.
-                // [Barycenter Port Ordering] Distribute incoming ports by peer (source) position
-                // to minimize edge crossings near the hub.
-                const totalSlots = hubPortConflict ? sortedGlobal.length + sortedGlobal.length : sortedGlobal.length;
-                const slotOffset = hubPortConflict ? sortedGlobal.length : 0; // O2M占前半，M2O占后半
-                job.incomingCount = Math.max(totalSlots, 1);
-                job.incomingIndex = index + slotOffset;
-                // Peer side (Source): each source has only one outgoing edge to hub
+                // Hub is Target. All M2O edges coalesce to ONE shared trunk port.
+                // When O2M also uses this side (hubPortConflict), M2O takes slot 1 to avoid overlap.
+                job.incomingCount = hubPortConflict ? 2 : 1;
+                job.incomingIndex = hubPortConflict ? 1 : 0;
+                // Peer side (Source)
                 job.outgoingCount = 1;
                 job.outgoingIndex = 0;
             } else {
-                // Hub is Source. One source splits into multiple target ports.
-                // [Barycenter Port Ordering] Distribute outgoing ports by peer (target) position
-                const totalSlots = hubPortConflict ? sortedGlobal.length + sortedGlobal.length : sortedGlobal.length;
-                job.outgoingCount = Math.max(totalSlots, 1);
-                job.outgoingIndex = index; // O2M占前半 (0..N-1)
-                // Peer side (Target): each target has only one incoming edge from hub
+                // Hub is Source. All O2M edges coalesce to ONE shared trunk port (slot 0).
+                job.outgoingCount = hubPortConflict ? 2 : 1;
+                job.outgoingIndex = 0;
+                // Peer side (Target)
                 job.incomingCount = 1; 
                 job.incomingIndex = 0;
             }
