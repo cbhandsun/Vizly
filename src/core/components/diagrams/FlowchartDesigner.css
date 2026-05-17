@@ -506,6 +506,14 @@ circle.react-flow__edgeupdater:active {
     cursor: grabbing;
 }
 
+/* 核心杀手锏：利用 :has() 伪类，当存在被选中、或悬挂被悬停的边时，直接将带有 SVG 的 Edges 容器层级凌驾于 Nodes 之上。
+   这就防止了下面原本层级绝缘的 HTML Handle 元素“吃掉”原本想点在圈圈上的鼠标事件（例如用户抱怨的：“移动连线还是会生崽”）。
+   [FIX] Node hover 本身带 z-index: 100/1000，必须加满到 2000 以彻底压制！ */
+.react-flow:has(.react-flow__edge.selected, .react-flow__edge:hover) .react-flow__edges {
+    z-index: 2000 !important;
+}
+
+
 /* ⭐ 边端点锚点圆（自绘） — 悬停/选中时弹出 */
 circle.custom-edge-updater {
     fill: #ffffff;
