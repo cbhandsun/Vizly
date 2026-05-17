@@ -376,6 +376,7 @@ interface LastArgs {
     ld: string;
     isRev: boolean;
     le?: number;
+    rls?: string;
     wasDragging?: boolean;
 }
 
@@ -407,6 +408,21 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
     // edgeData reference changes on every selection change (displayEdges .map()),
     // but routing only cares about _layoutEpoch and algorithm.
     const edgeDataSig = `${edgeData?._layoutEpoch ?? 0}|${edgeData?.algorithm ?? ''}`;
+    const routingLabelSig = useMemo(() => {
+        return storeEdges.map((edge) => {
+            const data = (edge.data ?? {}) as Record<string, unknown>;
+            const label = String(data.label ?? (edge as unknown as Record<string, unknown>).label ?? '');
+            const pos = data.labelPosition as { x?: number; y?: number } | undefined;
+            const absX = data.absoluteLabelX;
+            const absY = data.absoluteLabelY;
+            return [
+                edge.id,
+                label,
+                Math.round(Number(pos?.x ?? absX ?? 0)),
+                Math.round(Number(pos?.y ?? absY ?? 0)),
+            ].join(':');
+        }).join('|');
+    }, [storeEdges]);
 
     // [P0-2] 响应式订阅 graphVersion，替代把 getGraphVersion() 放进 deps 的错误做法。
     // 之前写法：deps 里用函数调用，React 每次渲染都执行但无法检测返回值变化。
@@ -459,7 +475,8 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
             rT: respectTargetHandle,
             ld: layoutDirection,
             isRev: isReverseEdge,
-            le: layoutEpoch
+            le: layoutEpoch,
+            rls: routingLabelSig
         };
 
         if (!isLayoutStable && !nodesDragging) {
@@ -479,6 +496,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
             currentArgs.rS ? 1 : 0, currentArgs.rT ? 1 : 0,
             currentArgs.ld, currentArgs.isRev ? 1 : 0, currentArgs.le,
             sourceHandleId || '', targetHandleId || '',
+            currentArgs.rls,
             multiEdgeInfo?.index ?? 0, multiEdgeInfo?.count ?? 1,
             multiEdgeInfo?.outgoingIndex ?? 0, multiEdgeInfo?.outgoingCount ?? 1,
             multiEdgeInfo?.incomingIndex ?? 0, multiEdgeInfo?.incomingCount ?? 1,
@@ -639,9 +657,20 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                 return {
                     id: n.id,
                     position: absolutePos,
-                    measured: { width: n.width, height: n.height },
+                    measured: {
+                        width: n.measured?.width ?? n.width,
+                        height: n.measured?.height ?? n.height,
+                    },
+                    width: n.measured?.width ?? n.width,
+                    height: n.measured?.height ?? n.height,
                     type: n.type,
-                    data: { collapsed: n.data?.collapsed, expanded: n.data?.expanded },
+                    data: {
+                        collapsed: n.data?.collapsed,
+                        expanded: n.data?.expanded,
+                        label: n.data?.label,
+                        title: n.data?.title,
+                        name: n.data?.name,
+                    },
                     // [FIX-crossgroup] Pass parent refs so Worker can detect cross-group edges
                     parentId: n.parentId,
                     parentNode: n.parentNode,
@@ -653,7 +682,32 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                 target: e.target,
                 sourceHandle: e.sourceHandle,
                 targetHandle: e.targetHandle,
+                label: (e.data as Record<string, unknown> | undefined)?.label ?? (e as unknown as Record<string, unknown>).label,
             }));
+            const estimateLabelRect = (label: string, center: { x: number; y: number }) => {
+                const text = label.replace(/<[^>]+>/g, '').trim();
+                if (!text) return null;
+                const width = Math.max(36, Math.min(220, text.length * 8 + 22));
+                const height = 26;
+                return {
+                    x: center.x - width / 2,
+                    y: center.y - height / 2,
+                    width,
+                    height,
+                };
+            };
+            const routingLabels = storeEdges
+                .map(edge => {
+                    const data = (edge.data ?? {}) as Record<string, unknown>;
+                    const label = String(data.label ?? (edge as unknown as Record<string, unknown>).label ?? '');
+                    const labelPos = data.labelPosition as { x?: number; y?: number } | undefined;
+                    const x = Number(labelPos?.x ?? data.absoluteLabelX);
+                const y = Number(labelPos?.y ?? data.absoluteLabelY);
+                if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+                    const rect = estimateLabelRect(label, { x, y });
+                    return rect ? { ...rect, edgeId: edge.id, ownerId: edge.id } : null;
+                })
+                .filter((rect): rect is { x: number; y: number; width: number; height: number; edgeId: string; ownerId: string } => !!rect);
 
             // EXECUTE WORKER via Coordinator
 
@@ -691,6 +745,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                 nodes: nodesArr,
                 edges: edgesArr,
                 obstacles: obstacleRects,
+                routingLabels,
                 containerBounds: containerBounds,
                 layoutDirection,
                 graphVersion,
@@ -821,7 +876,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
         edgeConfig, layoutDirection, zoomLevel,
         respectSourceHandle, respectTargetHandle, sourceHandleId, targetHandleId,
         id, edgeDataSig, multiEdgeInfo, isLayoutStable, nodesDragging, elkPoints,
-        isReverseEdge, isBus, graphVersion
+        isReverseEdge, isBus, graphVersion, routingLabelSig
     ]);
 
     return { path, smartLabelPos, setPath, setSmartLabelPos, smartPoints, isLoading, workerUsedPositions };

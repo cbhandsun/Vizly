@@ -235,6 +235,55 @@ export class ConfigValidator {
         } else if (postProcessing.nudgeSearchLimit > 500) {
             warnings.push('postProcessing.nudgeSearchLimit > 500 may cause large nudges');
         }
+
+        if (postProcessing.waypointRefinementPasses !== undefined) {
+            if (postProcessing.waypointRefinementPasses < 0) {
+                errors.push('postProcessing.waypointRefinementPasses must be >= 0');
+            } else if (postProcessing.waypointRefinementPasses > 6) {
+                warnings.push('postProcessing.waypointRefinementPasses > 6 may make dense diagrams feel sluggish');
+            }
+        }
+
+        if (postProcessing.maxWaypointRefineEdgesPerPass !== undefined) {
+            if (postProcessing.maxWaypointRefineEdgesPerPass < 0) {
+                errors.push('postProcessing.maxWaypointRefineEdgesPerPass must be >= 0');
+            } else if (postProcessing.maxWaypointRefineEdgesPerPass > 300) {
+                warnings.push('postProcessing.maxWaypointRefineEdgesPerPass > 300 may overwork large batches');
+            }
+        }
+
+        if (postProcessing.maxWaypointRerouteEdges !== undefined) {
+            if (postProcessing.maxWaypointRerouteEdges < 0) {
+                errors.push('postProcessing.maxWaypointRerouteEdges must be >= 0');
+            } else if (postProcessing.maxWaypointRerouteEdges > 50) {
+                warnings.push('postProcessing.maxWaypointRerouteEdges > 50 may cause expensive reroute passes');
+            }
+        }
+
+        const weightFields: Array<[keyof typeof postProcessing, string, number]> = [
+            ['waypointHardCrossingWeight', 'postProcessing.waypointHardCrossingWeight', 10000],
+            ['waypointSoftObstacleWeight', 'postProcessing.waypointSoftObstacleWeight', 2000],
+            ['waypointSoftNearMissWeight', 'postProcessing.waypointSoftNearMissWeight', 1000],
+            ['waypointTurnbackWeight', 'postProcessing.waypointTurnbackWeight', 500],
+            ['waypointBendWeight', 'postProcessing.waypointBendWeight', 100],
+        ];
+        for (const [field, name, warnAt] of weightFields) {
+            const value = postProcessing[field];
+            if (value === undefined) continue;
+            if (typeof value !== 'number' || value < 0) {
+                errors.push(`${name} must be a non-negative number`);
+            } else if (value > warnAt) {
+                warnings.push(`${name} is very high and may make refinement overreact`);
+            }
+        }
+
+        if (postProcessing.waypointSoftNearMissPadding !== undefined) {
+            if (postProcessing.waypointSoftNearMissPadding < 0) {
+                errors.push('postProcessing.waypointSoftNearMissPadding must be >= 0');
+            } else if (postProcessing.waypointSoftNearMissPadding > 40) {
+                warnings.push('postProcessing.waypointSoftNearMissPadding > 40 may push routes too far from labels');
+            }
+        }
     }
 
     private static validateOffsets(

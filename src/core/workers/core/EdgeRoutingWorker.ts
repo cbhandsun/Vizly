@@ -901,6 +901,7 @@ export class EdgeRoutingWorker {
         const isBusScenario = (job.isOneToMany || job.isManyToOne);
         const peerCount = job.isOneToMany ? (job.outgoingCount || 1) : (job.incomingCount || 1);
         const hasPrecomputedTrunk = !!(job.busTrunkSource && job.busTrunkTarget);
+        const isSharedGlobalTrunk = hasPrecomputedTrunk && (((job as any).peerGroupSize || 0) > 1);
 
         // Use trunk if precomputed by Coordinator OR if local calculation deems it necessary
         // [Imp-12] Lower threshold to 1 for explict bus scenarios to ensure uniform routing style
@@ -1064,13 +1065,13 @@ export class EdgeRoutingWorker {
 
                     // If trunk path is >2x longer than direct, skip trunk.
                     // This catches cases like receipt→putaway (direct=230px, trunk=580px).
-                    let skipTrunk = directManhattan > 0 && trunkManhattan > directManhattan * 2;
+                    let skipTrunk = !isSharedGlobalTrunk && directManhattan > 0 && trunkManhattan > directManhattan * 2;
 
                     // [FIX-C-shape] Additional guard: detect C-shape routing from vertical trunk.
                     // C-shape occurs when the path goes: source → (right) → trunkX → (down) → (left) → target.
                     // i.e., the horizontal step from source→trunk and trunk→target are in OPPOSITE directions.
                     // This is geometrically suboptimal and should fall back to direct A* routing.
-                    if (!skipTrunk && isVertical) {
+                    if (!skipTrunk && !isSharedGlobalTrunk && isVertical) {
                         const step1H = trunkStart.x - startWithOffset.x;
                         const step3H = endWithOffset.x - trunkEnd.x;
                         const isCshape = Math.abs(step1H) > 5 && Math.abs(step3H) > 5
@@ -1080,7 +1081,7 @@ export class EdgeRoutingWorker {
                         }
                     }
                     // Similarly for horizontal trunk producing C-shape in vertical direction.
-                    if (!skipTrunk && !isVertical) {
+                    if (!skipTrunk && !isSharedGlobalTrunk && !isVertical) {
                         const step1V = trunkStart.y - startWithOffset.y;
                         const step3V = endWithOffset.y - trunkEnd.y;
                         const isCshape = Math.abs(step1V) > 5 && Math.abs(step3V) > 5

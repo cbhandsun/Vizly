@@ -24,6 +24,7 @@ interface Segment {
     minVal: number;
     maxVal: number;
     isBuddy: boolean;
+    buddyGroupKey?: string;
 }
 
 /**
@@ -45,12 +46,15 @@ export function globalChannelRouting(
     buddyGroups?: BuddyGroup[]
 ): Map<string, Point[]> {
     const buddyEdgeIds = new Set<string>();
+    const buddyGroupByEdgeId = new Map<string, string>();
     if (buddyGroups) {
-        for (const group of buddyGroups) {
+        buddyGroups.forEach((group, index) => {
+            const groupKey = `${group.type}:${index}`;
             for (const edgeId of group.edgeIds) {
                 buddyEdgeIds.add(edgeId);
+                buddyGroupByEdgeId.set(edgeId, groupKey);
             }
-        }
+        });
     }
 
     // 1. 提取所有正交线段
@@ -72,6 +76,7 @@ export function globalChannelRouting(
             if (isHoriz) {
                 segments.push({
                     edgeId, segIdx: j, isHoriz: true, isBuddy,
+                    buddyGroupKey: buddyGroupByEdgeId.get(edgeId),
                     fixedVal: Math.round((p1.y + p2.y) / 2),
                     minVal: Math.min(p1.x, p2.x),
                     maxVal: Math.max(p1.x, p2.x),
@@ -79,6 +84,7 @@ export function globalChannelRouting(
             } else if (isVert) {
                 segments.push({
                     edgeId, segIdx: j, isHoriz: false, isBuddy,
+                    buddyGroupKey: buddyGroupByEdgeId.get(edgeId),
                     fixedVal: Math.round((p1.x + p2.x) / 2),
                     minVal: Math.min(p1.y, p2.y),
                     maxVal: Math.max(p1.y, p2.y),
@@ -132,6 +138,25 @@ export function globalChannelRouting(
             // Phase 1: 放置所有 buddy 段（它们是固定的）
             for (const seg of group) {
                 if (!seg.isBuddy) continue;
+
+                // Same buddy group + same axis + overlapping interval represents one
+                // shared trunk. Keep it on the same fixed track instead of counting
+                // every contributing edge as a separate occupied lane.
+                const sharedTrack = assignments.find(a => {
+                    const other = a.seg;
+                    if (!other.isBuddy) return false;
+                    if (!seg.buddyGroupKey || other.buddyGroupKey !== seg.buddyGroupKey) return false;
+                    if (other.isHoriz !== seg.isHoriz) return false;
+                    if (Math.abs(other.fixedVal - seg.fixedVal) >= GROUP_TOLERANCE) return false;
+                    const overlapLen = Math.min(other.maxVal, seg.maxVal) - Math.max(other.minVal, seg.minVal);
+                    return overlapLen > 2;
+                });
+                if (sharedTrack) {
+                    trackEnds[sharedTrack.trackIdx] = Math.max(trackEnds[sharedTrack.trackIdx], seg.maxVal);
+                    assignments.push({ seg, trackIdx: sharedTrack.trackIdx });
+                    continue;
+                }
+
                 let placed = false;
                 for (let t = 0; t < trackEnds.length; t++) {
                     if (seg.minVal > trackEnds[t] + 2) {

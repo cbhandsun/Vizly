@@ -23,6 +23,8 @@ import { LineObstacle, Rectangle } from '../algorithms/pathfinding';
 import { optimizePaths } from '../algorithms/LPNudge';
 import { globalChannelRouting, type BuddyGroup } from '../algorithms/globalChannelRouting';
 import { createFilletedPath } from '../algorithms/smartEdgeUtils';
+import { refineOrthogonalWaypointsDetailed, type WaypointRefinementSummary } from '../algorithms/orthogonalWaypointRefiner';
+import { optimizeHubPortOrder } from '../algorithms/hubPortOrderOptimizer';
 
 /**
  * [P0-2] Main coordination service for edge routing.
@@ -81,6 +83,11 @@ interface TrunkDebugData {
     };
 }
 
+interface HubPortGroupInfo {
+    tangent: number;
+    jobs: PathFindingJob[];
+}
+
 /**
  * [Phase 2] Classify edge side with Edge Type semantic support
  * 
@@ -121,6 +128,7 @@ export class EdgeRoutingCoordinator {
     private allEdges: Edge[] = [];
     /** [SharedTrunk] Accumulated shared trunk segments from latest batch, keyed by group ID */
     private sharedTrunks: Map<string, SharedTrunkSegment> = new Map();
+    private routedLabelObstacles: Map<string, Rectangle & { edgeId: string; ownerId: string }> = new Map();
 
     private graphVersion: number = 0;
     // [P0-2] graphVersion 订阅者集合，用于 useSyncExternalStore 响应式订阅
@@ -361,6 +369,7 @@ export class EdgeRoutingCoordinator {
         this.dirtyEdges.clear();
         this.edgeDependencies.clear();
         this.latestRequests.clear();
+        this.routedLabelObstacles.clear();
         this.graphVersion++;
         this.notifyGraphVersionSubscribers();
         
@@ -834,7 +843,7 @@ export class EdgeRoutingCoordinator {
             const isNudgeEnabled = config?.postProcessing?.enableNudge !== false;
             
             if (isNudgeEnabled && results.length > 1) {
-                this.applyGlobalNudge(results, group.requests, group.graph);
+                this.applyGlobalNudge(results, group.requests, group.graph, jobs);
             }
 
             // [SharedTrunk] Extract shared trunk segments for M2O/O2M groups
@@ -949,6 +958,7 @@ export class EdgeRoutingCoordinator {
                 }
 
                 resultsMap.set(req.edgeId, result);
+                this.updateRoutedLabelObstacle(req.edgeId, result, group.graph);
                 // Only clear dirty flag if this is the latest request
                 if (!isSuperseded) {
                     this.dirtyEdges.delete(req.edgeId);
@@ -972,6 +982,7 @@ export class EdgeRoutingCoordinator {
 
     private collectPendingEdges(graphKey: string, relatedNodeIds: Set<string>, maxSegments: number): LineObstacle[] {
         const pendingEdges: LineObstacle[] = [];
+        const rawSegmentLimit = Math.max(maxSegments, maxSegments * 4);
 
         // [FIX P3] Compute spatial bounding box of current batch so we can collect
         // nearby cached edges even if they share no nodes with the current batch.
@@ -1023,12 +1034,210 @@ export class EdgeRoutingCoordinator {
                     start: cached.points[i],
                     end: cached.points[i + 1]
                 });
-                if (pendingEdges.length >= maxSegments) {
-                    return pendingEdges;
+                if (pendingEdges.length >= rawSegmentLimit) {
+                    return this.compactLineObstacles(pendingEdges, maxSegments);
                 }
             }
         }
-        return pendingEdges;
+        return this.compactLineObstacles(pendingEdges, maxSegments);
+    }
+
+    private compactLineObstacles(lines: LineObstacle[], maxSegments: number): LineObstacle[] {
+        if (lines.length <= 1) return lines;
+
+        const AXIS_TOLERANCE = 1.5;
+        const MERGE_GAP = 2;
+        const axisGroups = new Map<string, {
+            isHorizontal: boolean;
+            fixed: number;
+            ranges: Array<{ min: number; max: number }>;
+        }>();
+        const diagonalMap = new Map<string, LineObstacle>();
+
+        const rounded = (value: number, quantum = 2) => Math.round(value / quantum) * quantum;
+
+        for (const line of lines) {
+            const isHorizontal = Math.abs(line.start.y - line.end.y) < AXIS_TOLERANCE;
+            const isVertical = Math.abs(line.start.x - line.end.x) < AXIS_TOLERANCE;
+
+            if (isHorizontal || isVertical) {
+                const fixed = rounded(isHorizontal
+                    ? (line.start.y + line.end.y) / 2
+                    : (line.start.x + line.end.x) / 2);
+                const min = isHorizontal
+                    ? Math.min(line.start.x, line.end.x)
+                    : Math.min(line.start.y, line.end.y);
+                const max = isHorizontal
+                    ? Math.max(line.start.x, line.end.x)
+                    : Math.max(line.start.y, line.end.y);
+                if (max - min < 1) continue;
+
+                const key = `${isHorizontal ? 'h' : 'v'}:${fixed}`;
+                const group = axisGroups.get(key);
+                if (group) {
+                    group.ranges.push({ min, max });
+                } else {
+                    axisGroups.set(key, { isHorizontal, fixed, ranges: [{ min, max }] });
+                }
+                continue;
+            }
+
+            const a = `${rounded(line.start.x)},${rounded(line.start.y)}`;
+            const b = `${rounded(line.end.x)},${rounded(line.end.y)}`;
+            const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+            diagonalMap.set(key, line);
+        }
+
+        const compacted: LineObstacle[] = [];
+        for (const group of axisGroups.values()) {
+            group.ranges.sort((a, b) => a.min - b.min || a.max - b.max);
+            let current: { min: number; max: number } | null = null;
+
+            const flush = () => {
+                if (!current) return;
+                compacted.push(group.isHorizontal
+                    ? { start: { x: current.min, y: group.fixed }, end: { x: current.max, y: group.fixed } }
+                    : { start: { x: group.fixed, y: current.min }, end: { x: group.fixed, y: current.max } });
+            };
+
+            for (const range of group.ranges) {
+                if (!current) {
+                    current = { ...range };
+                } else if (range.min <= current.max + MERGE_GAP) {
+                    current.max = Math.max(current.max, range.max);
+                } else {
+                    flush();
+                    current = { ...range };
+                }
+            }
+            flush();
+        }
+
+        for (const line of diagonalMap.values()) {
+            compacted.push(line);
+        }
+
+        return compacted.slice(0, maxSegments);
+    }
+
+    private collectSoftRoutingObstacles(graph: SharedGraphContext, excludedEdgeIds: Set<string> = new Set()): Rectangle[] {
+        const soft: Rectangle[] = [];
+        const pushRect = (rect: (Partial<Rectangle> & { edgeId?: string; ownerId?: string }) | undefined) => {
+            if (!rect) return;
+            const ownerId = rect.edgeId ?? rect.ownerId;
+            if (ownerId && excludedEdgeIds.has(ownerId)) return;
+            const x = Number(rect.x);
+            const y = Number(rect.y);
+            const width = Number(rect.width);
+            const height = Number(rect.height);
+            if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) return;
+            if (width <= 1 || height <= 1) return;
+            soft.push({ x, y, width, height });
+        };
+
+        (graph.softObstacles ?? []).forEach(pushRect);
+        (graph.routingLabels ?? []).forEach(pushRect);
+        this.routedLabelObstacles.forEach(pushRect);
+
+        const nodes = (graph.nodes ?? []) as Array<{
+            id?: string;
+            type?: string;
+            data?: Record<string, unknown>;
+            position?: { x?: number; y?: number };
+            positionAbsolute?: { x?: number; y?: number };
+            computed?: { positionAbsolute?: { x?: number; y?: number } };
+            measured?: { width?: number; height?: number };
+            width?: number;
+            height?: number;
+        }>;
+        const titleLikeTypes = new Set(['group', 'subGroup', 'titleGroup', 'domain', 'subDomain', 'swimlane']);
+
+        nodes.forEach(node => {
+            const type = node.type ?? '';
+            const hasVisibleTitle = titleLikeTypes.has(type)
+                || typeof node.data?.label === 'string'
+                || typeof node.data?.title === 'string'
+                || typeof node.data?.name === 'string';
+            if (!hasVisibleTitle) return;
+
+            const pos = node.computed?.positionAbsolute ?? node.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
+            const width = node.measured?.width ?? node.width ?? 0;
+            const height = node.measured?.height ?? node.height ?? 0;
+            if (!width || !height) return;
+
+            const titleHeight = Math.min(44, Math.max(24, height * 0.18));
+            pushRect({
+                x: (pos.x ?? 0) + 8,
+                y: (pos.y ?? 0) + 6,
+                width: Math.max(0, width - 16),
+                height: titleHeight,
+            });
+        });
+
+        return soft;
+    }
+
+    private updateRoutedLabelObstacle(edgeId: string, result: PathFindingResult, graph: SharedGraphContext): void {
+        const labelText = this.getGraphEdgeLabel(edgeId, graph);
+        if (!labelText) {
+            this.routedLabelObstacles.delete(edgeId);
+            return;
+        }
+
+        const x = Number(result.labelX);
+        const y = Number(result.labelY);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+            this.routedLabelObstacles.delete(edgeId);
+            return;
+        }
+
+        const width = Math.max(36, Math.min(220, labelText.length * 8 + 22));
+        const height = 26;
+        this.routedLabelObstacles.set(edgeId, {
+            edgeId,
+            ownerId: edgeId,
+            x: x - width / 2,
+            y: y - height / 2,
+            width,
+            height,
+        });
+    }
+
+    private getGraphEdgeLabel(edgeId: string, graph: SharedGraphContext): string {
+        const edge = (graph.edges ?? []).find((e: any) => e?.id === edgeId) as any;
+        const raw = edge?.label ?? edge?.data?.label;
+        return typeof raw === 'string' ? raw.replace(/<[^>]+>/g, '').trim() : '';
+    }
+
+    private buildWaypointCandidateAxes(
+        graph: SharedGraphContext,
+        assignedJobs?: PathFindingJob[]
+    ): { horizontal: number[]; vertical: number[] } {
+        const horizontal = new Set<number>();
+        const vertical = new Set<number>();
+        const addRectAxes = (rect: Rectangle, margin: number) => {
+            horizontal.add(Math.round(rect.y - margin));
+            horizontal.add(Math.round(rect.y + rect.height + margin));
+            vertical.add(Math.round(rect.x - margin));
+            vertical.add(Math.round(rect.x + rect.width + margin));
+        };
+
+        (graph.obstacles ?? []).forEach(rect => addRectAxes(rect, 8));
+        this.collectSoftRoutingObstacles(graph).forEach(rect => addRectAxes(rect, 6));
+
+        (assignedJobs ?? []).forEach(job => {
+            if (!job.busTrunkSource || !job.busTrunkTarget) return;
+            if (Math.abs(job.busTrunkSource.x - job.busTrunkTarget.x) < 1.0) {
+                vertical.add(Math.round(job.busTrunkSource.x));
+            } else if (Math.abs(job.busTrunkSource.y - job.busTrunkTarget.y) < 1.0) {
+                horizontal.add(Math.round(job.busTrunkSource.y));
+            }
+        });
+
+        return {
+            horizontal: [...horizontal].slice(0, 240),
+            vertical: [...vertical].slice(0, 240),
+        };
     }
 
     /**
@@ -1278,9 +1487,10 @@ export class EdgeRoutingCoordinator {
             sourceGroups.get(job.source)?.push(job);
         });
 
-        // [FIX-port-conflict] 收集每个 hub 在 O2M 阶段已使用的端口，
-        // 供 M2O 阶段做冲突检测——确保入边和出边不共享同一端口。
-        const hubOutPorts = new Map<string, Set<string>>();
+        // [FIX-port-conflict] 收集每个 hub 在 O2M 阶段已使用的端口组，
+        // 供 M2O 阶段做同侧端口排序。行业里通常把整条 bus/trunk 当成
+        // 一个端口占用对象，而不是按单条边逐个排序。
+        const hubOutPortGroups = new Map<string, Map<string, HubPortGroupInfo>>();
 
         sourceGroups.forEach((groupJobs, sourceId) => {
             const busJobs = groupJobs.filter(j => j.isOneToMany);
@@ -1298,13 +1508,24 @@ export class EdgeRoutingCoordinator {
                     trunkObstacles
                 );
 
-                // 收集 O2M 已占用的端口
-                const usedPorts = new Set<string>();
+                // 收集 O2M 已占用的端口组及其切线方向质心。
+                const usedPorts = new Map<string, HubPortGroupInfo>();
                 busJobs.forEach(j => {
                     const port = (j as any).trunkPort;
-                    if (port) usedPorts.add(port);
+                    if (!port) return;
+                    const tangent = typeof (j as any).trunkPortTangent === 'number'
+                        ? (j as any).trunkPortTangent
+                        : (typeof (j as any).trunkBranchCoord === 'number' ? (j as any).trunkBranchCoord : 0);
+                    const prev = usedPorts.get(port);
+                    if (!prev) {
+                        usedPorts.set(port, { tangent, jobs: [j] });
+                    } else {
+                        const nextCount = prev.jobs.length + 1;
+                        prev.tangent = (prev.tangent * prev.jobs.length + tangent) / nextCount;
+                        prev.jobs.push(j);
+                    }
                 });
-                if (usedPorts.size > 0) hubOutPorts.set(sourceId, usedPorts);
+                if (usedPorts.size > 0) hubOutPortGroups.set(sourceId, usedPorts);
             }
         });
 
@@ -1323,7 +1544,7 @@ export class EdgeRoutingCoordinator {
             const busJobs = groupJobs.filter(j => j.isManyToOne);
             if (busJobs.length > 0) {
                 const globalIncoming = allEdges.filter(e => e.target === targetId);
-                const usedPorts = hubOutPorts.get(targetId);
+                const usedPorts = hubOutPortGroups.get(targetId);
                 this.processBusGroups(
                     targetId,
                     busJobs,
@@ -1518,7 +1739,7 @@ export class EdgeRoutingCoordinator {
         layoutDir: string,
         isManyToOne: boolean,
         obstacles?: Rectangle[],  // [FIX] Node obstacles for trunk axis collision avoidance
-        hubUsedPorts?: Set<string> // [FIX-port-conflict] Ports already occupied by O2M on this hub
+        hubUsedPorts?: Map<string, HubPortGroupInfo> // [FIX-port-conflict] Ports already occupied by O2M on this hub
     ): void {
         const hubRect = getNodeRect(hubId);
         if (!hubRect) return;
@@ -1644,8 +1865,36 @@ export class EdgeRoutingCoordinator {
             // [FIX-port-spread] 同侧端口扩展（Port Spreading）
             // 当 M2O 和 O2M 共享同一端口侧时，不翻转也不偏移 trunk axis，
             // 而是通过 hubPortSlot 告诉 Worker 在该侧使用不同的连接点位置。
-            // O2M slot=0 (偏左/偏上), M2O slot=1 (偏右/偏下)。
-            const hasPortConflict = isManyToOne && hubUsedPorts && hubUsedPorts.has(trunk.suggestedPort);
+            // slot 按端口切线方向质心排序：slot 0 偏左/偏上，slot 1 偏右/偏下。
+            const currentGroupTangent = (() => {
+                let sum = 0;
+                let count = 0;
+                for (const edge of groupEdges) {
+                    const peerRect = getNodeRect(isManyToOne ? edge.source : edge.target);
+                    if (!peerRect) continue;
+                    const cx = peerRect.x + peerRect.width / 2;
+                    const cy = peerRect.y + peerRect.height / 2;
+                    sum += (trunk.suggestedPort === 'top' || trunk.suggestedPort === 'bottom') ? cx : cy;
+                    count++;
+                }
+                return count > 0 ? sum / count : 0;
+            })();
+
+            const conflictingOutGroup = isManyToOne ? hubUsedPorts?.get(trunk.suggestedPort) : undefined;
+            const hasPortConflict = !!conflictingOutGroup;
+            let hubPortSlot = hasPortConflict ? 1 : 0;
+
+            if (hasPortConflict && conflictingOutGroup) {
+                // Slot 0 is visually upper/left; slot 1 is lower/right. Order the
+                // two trunk bundles by their tangent barycenter so the bundles do
+                // not cross immediately at the shared hub port.
+                hubPortSlot = currentGroupTangent < conflictingOutGroup.tangent ? 0 : 1;
+                const outSlot = 1 - hubPortSlot;
+                conflictingOutGroup.jobs.forEach(j => {
+                    j.outgoingCount = 2;
+                    j.outgoingIndex = outSlot;
+                });
+            }
 
             // [FIX-dual-lane] 对侧走廊分离（Opposite-Side Corridor Separation）
             //
@@ -1676,7 +1925,8 @@ export class EdgeRoutingCoordinator {
                 }
             }
 
-            this.assignTrunkGeometry(groupEdges, busGroupJobs, trunk, layoutDir, getNodeRect, isManyToOne, hasPortConflict);
+            const groupKey = `${isManyToOne ? 'm2o' : 'o2m'}:${hubId}:${_side}`;
+            this.assignTrunkGeometry(groupEdges, busGroupJobs, trunk, layoutDir, getNodeRect, isManyToOne, hasPortConflict, groupKey, hubPortSlot, currentGroupTangent);
         });
     }
 
@@ -1687,7 +1937,10 @@ export class EdgeRoutingCoordinator {
         layoutDir: string,
         getNodeRect: (id: string) => Rectangle | undefined,
         isManyToOne: boolean,
-        hubPortConflict: boolean = false  // [FIX-port-spread] 是否与另一方向共享端口
+        hubPortConflict: boolean = false,  // [FIX-port-spread] 是否与另一方向共享端口
+        peerGroupKeyOverride?: string,
+        hubPortSlot: number = 0,
+        trunkPortTangent?: number
     ): void {
         // [FIX] Removed dirtyEdges.add + scheduleBatchRouting that caused infinite recursion:
         // assignTrunkGeometry is called FROM batchRouteDirtyEdges, so marking edges dirty here
@@ -1706,23 +1959,40 @@ export class EdgeRoutingCoordinator {
             }
         });
 
-        // Pre-sort peers ONCE outside the loop (O(NlogN) instead of O(N²logN))
-        const sortedGlobal = [...edges].sort((a: any, b: any) => {
-            const rectA = getNodeRect(isManyToOne ? a.source : a.target);
-            const rectB = getNodeRect(isManyToOne ? b.source : b.target);
+        const trunkProjection = (rect?: Rectangle) => {
+            if (!rect) return 0;
+            return trunk.direction === 'horizontal'
+                ? rect.x + rect.width / 2
+                : rect.y + rect.height / 2;
+        };
 
-            const valA = trunk.direction === 'horizontal' ? (rectA?.x || 0) : (rectA?.y || 0);
-            const valB = trunk.direction === 'horizontal' ? (rectB?.x || 0) : (rectB?.y || 0);
-            const diff = valA - valB;
-            if (Math.abs(diff) > 1.0) return diff;
+        const peerSecondaryProjection = (rect?: Rectangle) => {
+            if (!rect) return 0;
+            return trunk.direction === 'horizontal'
+                ? rect.y + rect.height / 2
+                : rect.x + rect.width / 2;
+        };
 
-            const secA = trunk.direction === 'horizontal' ? (rectA?.y || 0) : (rectA?.x || 0);
-            const secB = trunk.direction === 'horizontal' ? (rectB?.y || 0) : (rectB?.x || 0);
-            const diffSec = secA - secB;
-            if (Math.abs(diffSec) > 1.0) return diffSec;
-
-            return (a.id || '').localeCompare(b.id || '');
-        });
+        // Pre-sort peers once. The baseline is the peer projection onto the trunk,
+        // then a greedy adjacent-swap pass reduces mismatches between trunk order
+        // and peer spatial order. This is the local equivalent of layered graph
+        // crossing minimization's barycenter + greedy-switch stage.
+        const sortedGlobal = optimizeHubPortOrder(
+            edges.map((edge: any) => {
+                const rect = getNodeRect(isManyToOne ? edge.source : edge.target);
+                const branchCoord = trunkProjection(rect);
+                const secondaryCoord = peerSecondaryProjection(rect);
+                return {
+                    item: edge,
+                    id: edge.id || '',
+                    branchCoord,
+                    peerCoord: secondaryCoord,
+                    secondaryCoord: branchCoord,
+                };
+            }),
+            { primaryWeight: 10, branchOrderWeight: 7, secondaryWeight: 2 }
+        );
+        const sortedEdgeIds = sortedGlobal.map((e: any) => e.id);
 
         edges.forEach((edge: any) => {
             const job = busGroupJobs.find(j => j.edgeId === edge.id);
@@ -1730,12 +2000,16 @@ export class EdgeRoutingCoordinator {
 
             const index = sortedGlobal.findIndex((e: any) => e.id === job.edgeId);
             (job as any).busIndex = index; // Store branching order for trunk calculation
+            (job as any).trunkOrderIndex = index;
+            (job as any).trunkOrderCount = sortedGlobal.length;
+            const peerRect = getNodeRect(isManyToOne ? edge.source : edge.target);
+            (job as any).trunkBranchCoord = trunkProjection(peerRect);
 
             if (isManyToOne) {
                 // Hub is Target. All M2O edges coalesce to ONE shared trunk port.
-                // When O2M also uses this side (hubPortConflict), M2O takes slot 1 to avoid overlap.
+                // When O2M also uses this side, the two trunk bundles are ordered by tangent barycenter.
                 job.incomingCount = hubPortConflict ? 2 : 1;
-                job.incomingIndex = hubPortConflict ? 1 : 0;
+                job.incomingIndex = hubPortConflict ? hubPortSlot : 0;
                 // Peer side (Source)
                 job.outgoingCount = 1;
                 job.outgoingIndex = 0;
@@ -1758,14 +2032,15 @@ export class EdgeRoutingCoordinator {
             }
 
             // [Trunk Vis] 注入 peerGroup 信息，供调试面板的 Canvas 可视化
-            (job as any).peerGroupMembers = edges.map((e: any) => e.id);
+            (job as any).peerGroupMembers = sortedEdgeIds;
             // [FIX] hubId 在 assignTrunkGeometry 作用域内不可用，改用可推导的 hub 节点 ID
-            const peerGroupKey = isManyToOne
+            const peerGroupKey = peerGroupKeyOverride ?? (isManyToOne
                 ? (edge.target as string)   // M2O: hub 是公共 target
-                : (edge.source as string);  // O2M: hub 是公共 source
+                : (edge.source as string));  // O2M: hub 是公共 source
             (job as any).peerGroupKey = peerGroupKey;
             (job as any).peerGroupSize = edges.length;
             (job as any).trunkPort = trunk.suggestedPort; // Pass suggested port direction
+            (job as any).trunkPortTangent = trunkPortTangent;
 
             // [S4] Port 注入已移至 Worker 内部（几何推算）。
             // Coordinator 仅传递 busTrunkSource/busTrunkTarget 几何元数据，
@@ -1810,7 +2085,12 @@ export class EdgeRoutingCoordinator {
     /**
      * [NEW] Helper to apply LPNudge separately for overlapping paths
      */
-    private applyGlobalNudge(results: (PathFindingResult | null)[], requests: RoutingRequest[], graph: SharedGraphContext): void {
+    private applyGlobalNudge(
+        results: (PathFindingResult | null)[],
+        requests: RoutingRequest[],
+        graph: SharedGraphContext,
+        assignedJobs?: PathFindingJob[]
+    ): void {
 
         const config = graph.config;
         const validResults = results.filter((r): r is PathFindingResult => r !== null && !r.error && !!r.points && r.points.length > 0);
@@ -1843,25 +2123,28 @@ export class EdgeRoutingCoordinator {
             edgePaths.set(r.edgeId, cleanPath(r.points));
         }
 
-        // Step 3: Build buddy groups — bus/trunk edges sharing same source (O2M) or target (M2O)
+        // Step 3: Build buddy groups — bus/trunk edges sharing the same normalized
+        // direction + hemisphere trunk group.
         // O2M buddy group: protect first segment (shared source trunk)
         // M2O buddy group: protect last segment (shared target trunk)
         const buddyGroupMap = new Map<string, { edgeIds: Set<string>; type: 'o2m' | 'm2o' }>(); // groupKey → group info
-        for (const req of requests) {
-            const job = req.job as any;
+        requests.forEach((req, index) => {
+            const job = (assignedJobs?.[index] ?? req.job) as any;
             if (job.isOneToMany) {
-                const key = `o2m:${job.source}`;
+                const key = job.peerGroupKey ?? `o2m:${job.source}`;
                 if (!buddyGroupMap.has(key)) buddyGroupMap.set(key, { edgeIds: new Set(), type: 'o2m' });
                 buddyGroupMap.get(key)!.edgeIds.add(req.edgeId);
             }
             if (job.isManyToOne) {
-                const key = `m2o:${job.target}`;
+                const key = job.peerGroupKey ?? `m2o:${job.target}`;
                 if (!buddyGroupMap.has(key)) buddyGroupMap.set(key, { edgeIds: new Set(), type: 'm2o' });
                 buddyGroupMap.get(key)!.edgeIds.add(req.edgeId);
             }
-        }
-        // Only keep groups with 2+ members
-        const buddyGroups = [...buddyGroupMap.values()].filter(g => g.edgeIds.size >= 2);
+        });
+        // Keep even a single dirty member of a larger bus fixed. Its siblings may be
+        // satisfied from cache and absent from this batch, but the trunk segment still
+        // must not be nudged away from the shared axis.
+        const buddyGroups = [...buddyGroupMap.values()].filter(g => g.edgeIds.size >= 1);
 
 
 
@@ -1871,10 +2154,38 @@ export class EdgeRoutingCoordinator {
             // Mid-segments of buddy edges still participate in normal channel routing.
             const spacing = config?.postProcessing?.nudgeSpacing ?? 12;
             const nudgedPaths = globalChannelRouting(edgePaths, spacing, buddyGroups);
+            const currentBatchEdgeIds = new Set(requests.map(req => req.edgeId));
+            const postProcessing = config?.postProcessing;
+            const refinementEnabled = postProcessing?.enableWaypointRefinement !== false;
+            const refinementResult = refinementEnabled
+                ? refineOrthogonalWaypointsDetailed(nudgedPaths, {
+                    buddyGroups,
+                    hardObstacles: (graph.obstacles ?? []) as Rectangle[],
+                    softObstacles: this.collectSoftRoutingObstacles(graph, currentBatchEdgeIds),
+                    spacing,
+                    maxPasses: postProcessing?.waypointRefinementPasses,
+                    maxEdgesPerPass: postProcessing?.maxWaypointRefineEdgesPerPass,
+                    enableReroute: postProcessing?.enableWaypointReroute,
+                    maxRerouteEdges: postProcessing?.maxWaypointRerouteEdges,
+                    scoring: {
+                        hardCrossingWeight: postProcessing?.waypointHardCrossingWeight,
+                        softObstacleWeight: postProcessing?.waypointSoftObstacleWeight,
+                        softNearMissWeight: postProcessing?.waypointSoftNearMissWeight,
+                        softNearMissPadding: postProcessing?.waypointSoftNearMissPadding,
+                        turnbackWeight: postProcessing?.waypointTurnbackWeight,
+                        bendWeight: postProcessing?.waypointBendWeight,
+                    },
+                    candidateAxes: this.buildWaypointCandidateAxes(graph, assignedJobs),
+                })
+                : null;
+            const refinedPaths = refinementResult?.paths ?? nudgedPaths;
+            if (refinementResult) {
+                this.attachWaypointRefinementDebug(validResults, refinementResult.summary);
+            }
 
             // Step 3: Apply back to results
             for (const r of validResults) {
-                const newPoints = nudgedPaths.get(r.edgeId);
+                const newPoints = refinedPaths.get(r.edgeId);
                 if (!newPoints || newPoints.length < 2) continue;
 
                 // Check if path actually changed
@@ -1906,6 +2217,25 @@ export class EdgeRoutingCoordinator {
         }
     }
 
+    private attachWaypointRefinementDebug(
+        results: PathFindingResult[],
+        summary: WaypointRefinementSummary
+    ): void {
+        const changedEdgeSet = new Set(summary.changedEdgeIds);
+        for (const result of results) {
+            result.debugInfo = {
+                ...(result.debugInfo ?? {}),
+                algorithmDebug: {
+                    ...((result.debugInfo as any)?.algorithmDebug ?? {}),
+                    waypointRefinement: {
+                        ...summary,
+                        changed: changedEdgeSet.has(result.edgeId),
+                    },
+                },
+            };
+        }
+    }
+
     /**
      * [DEV] 强制清空所有路由缓存并递增 graphVersion，让所有边重新计算路径。
      * 用于修改了路由算法后无需重启即可验证效果。
@@ -1914,6 +2244,7 @@ export class EdgeRoutingCoordinator {
         this.graphVersion++;
         this.notifyGraphVersionSubscribers();
         this.cache.clear();
+        this.routedLabelObstacles.clear();
         this.dirtyEdges.clear();
         this.allEdges.forEach(edge => this.dirtyEdges.add(edge.id));
         this.workerPool.markDirty();
@@ -1927,6 +2258,7 @@ export class EdgeRoutingCoordinator {
         this.workerPool.terminate();
         this.parallelPool?.terminate();
         this.cache.clear();
+        this.routedLabelObstacles.clear();
         EdgeRoutingCoordinator.instance = null;
     }
 }

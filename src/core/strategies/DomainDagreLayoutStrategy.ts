@@ -131,6 +131,43 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         const showSub = ((options as any)?.generateSubDomainGroups !== undefined)
             ? !!((options as any)?.generateSubDomainGroups) : true;
 
+        // ===== [FIX] 域/子域显式排序支持 =====
+        // 从 options 读取标准数据文件中定义的 domainOrder 和 subDomainOrder
+        const domainOrderArr: string[] | undefined = (options as any)?.domainOrder as any;
+        const subDomainOrderOpt: any = (options as any)?.subDomainOrder;
+
+        // 子域排序辅助：支持全局数组 string[] 或按域对象 Record<string, string[]>
+        const getSubDomainOrderIndex = (domainKey: string, subKey: string): number => {
+            try {
+                const norm = (s: string) => String(s || '').toLowerCase().replace(/\u3000|\u00A0/g, '').replace(/\s+/g, '').replace(/[+_-]/g, '');
+                const dTrim = String(domainKey || '').trim();
+                const sTrim = String(subKey || '').trim();
+                const findIdx = (arr: string[], key: string) => {
+                    let idx = arr.indexOf(key);
+                    if (idx >= 0) return idx;
+                    idx = arr.findIndex(k => norm(k) === norm(key));
+                    return idx;
+                };
+                if (Array.isArray(subDomainOrderOpt)) {
+                    const idx = findIdx(subDomainOrderOpt, sTrim);
+                    return idx >= 0 ? idx : Infinity;
+                }
+                if (subDomainOrderOpt && typeof subDomainOrderOpt === 'object') {
+                    let arr = subDomainOrderOpt[dTrim];
+                    if (!Array.isArray(arr)) {
+                        const dNorm = norm(dTrim);
+                        const foundKey = Object.keys(subDomainOrderOpt).find(k => norm(k) === dNorm);
+                        if (foundKey) arr = subDomainOrderOpt[foundKey];
+                    }
+                    if (Array.isArray(arr)) {
+                        const idx = findIdx(arr, sTrim);
+                        return idx >= 0 ? idx : Infinity;
+                    }
+                }
+            } catch { /* ignore */ }
+            return Infinity;
+        };
+
         // 应用域/子域分组和白名单过滤 (使用归一化后的节点以确保尺寸一致)
         let processedNodes: ReactFlowNode[] = normalizedNodes as ReactFlowNode[];
         processedNodes = applyDomainGrouping(processedNodes as any, domainWhitelist) as any;
@@ -256,6 +293,22 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         const domains = updatedNodes.filter(n => String(n.type || '') === 'titleGroup' && !isHidden(n));
         const subGroups = updatedNodes.filter(n => String(n.type || '') === 'subGroup' && !isHidden(n));
         const leafNodes = updatedNodes.filter(n => !isGroupType(n.type) && !isHidden(n));
+
+        // [FIX] 构建域排序索引并按 domainOrder 排序域容器
+        const domainsByScan: string[] = [];
+        domains.forEach(d => {
+            const dk = domainOf(d);
+            if (dk && !domainsByScan.includes(dk)) domainsByScan.push(dk);
+        });
+        const domainOrderIndex = new Map<string, number>(
+            (Array.isArray(domainOrderArr) && domainOrderArr.length ? domainOrderArr : domainsByScan)
+                .map((d, i) => [String(d).trim(), i] as const)
+        );
+        domains.sort((a, b) => {
+            const ai = domainOrderIndex.get(domainOf(a)) ?? Infinity;
+            const bi = domainOrderIndex.get(domainOf(b)) ?? Infinity;
+            return ai - bi;
+        });
 
         // [DEBUG] 详细调试：输出布局模式选择原因
         if (domains.length === 0 && subGroups.length === 0) {
@@ -480,8 +533,13 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         domains.forEach(domain => {
             const dk = domainOf(domain);
 
-            // 获取该域下的所有子域
+            // 获取该域下的所有子域（按 subDomainOrder 排序）
             const domainSubGroups = subGroups.filter(sg => domainOf(sg) === dk);
+            domainSubGroups.sort((a, b) => {
+                const aKey = String(((a as any)?.data?.subDomain || (a as any)?.data?.description || '')).trim();
+                const bKey = String(((b as any)?.data?.subDomain || (b as any)?.data?.description || '')).trim();
+                return getSubDomainOrderIndex(dk, aKey) - getSubDomainOrderIndex(dk, bKey);
+            });
 
             // 获取该域下的自由节点（不属于任何子域）
             const domainFreeNodes = leafNodes.filter(n =>
@@ -712,6 +770,57 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 // 更新域/孤立节点位置
                 node.position = { x: newX, y: newY };
             });
+        }
+
+        // ===== [FIX] 强制按 domainOrder 重排域堆叠顺序 =====
+        // Dagre 基于拓扑边决定域位置，可能与标准数据文件中的 domainOrder 不一致
+        // 此步骤在 Dagre 布局完成后，按 domainOrder 重新堆叠域容器
+        if (Array.isArray(domainOrderArr) && domainOrderArr.length && domains.length > 1) {
+            const orderedDomains = domains.slice().sort((a, b) => {
+                const ai = domainOrderIndex.get(domainOf(a)) ?? Infinity;
+                const bi = domainOrderIndex.get(domainOf(b)) ?? Infinity;
+                return ai - bi;
+            });
+
+            if (isHorizontal) {
+                // LR 方向：按 domainOrder 水平重排
+                const startX = Math.min(...domains.map(d => d.position.x));
+                let cursorX = startX;
+                for (const d of orderedDomains) {
+                    const oldX = d.position.x;
+                    const deltaX = cursorX - oldX;
+                    if (Math.abs(deltaX) > 0.5) {
+                        const dk = domainOf(d);
+                        updatedNodes.forEach(child => {
+                            if (child.id === d.id) return;
+                            if (domainOf(child) !== dk) return;
+                            child.position = { x: child.position.x + deltaX, y: child.position.y };
+                        });
+                        d.position = { x: cursorX, y: d.position.y };
+                    }
+                    const w = num((d as any).style?.width ?? (d as any).measured?.width, 200);
+                    cursorX += w + domainGap;
+                }
+            } else {
+                // TB 方向：按 domainOrder 垂直重排
+                const startY = Math.min(...domains.map(d => d.position.y));
+                let cursorY = startY;
+                for (const d of orderedDomains) {
+                    const oldY = d.position.y;
+                    const deltaY = cursorY - oldY;
+                    if (Math.abs(deltaY) > 0.5) {
+                        const dk = domainOf(d);
+                        updatedNodes.forEach(child => {
+                            if (child.id === d.id) return;
+                            if (domainOf(child) !== dk) return;
+                            child.position = { x: child.position.x, y: child.position.y + deltaY };
+                        });
+                        d.position = { x: d.position.x, y: cursorY };
+                    }
+                    const h = num((d as any).style?.height ?? (d as any).measured?.height, 100);
+                    cursorY += h + domainGap;
+                }
+            }
         }
 
         // ============================================

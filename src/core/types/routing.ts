@@ -154,6 +154,17 @@ export interface UnifiedRoutingConfig {
         finalSimplificationThreshold?: number; // [FIX] Threshold for final simplification (default: 30, increased from 15)
         nudgeSpacing: number;              // default: 12
         nudgeSearchLimit: number;          // default: 200
+        enableWaypointRefinement?: boolean; // default: true; post-nudge crossing/label refinement
+        waypointRefinementPasses?: number; // default: 2
+        maxWaypointRefineEdgesPerPass?: number; // default: 80
+        enableWaypointReroute?: boolean; // default: true
+        maxWaypointRerouteEdges?: number; // default: 8
+        waypointHardCrossingWeight?: number; // default: 1000
+        waypointSoftObstacleWeight?: number; // default: 120
+        waypointSoftNearMissWeight?: number; // default: 35
+        waypointSoftNearMissPadding?: number; // default: 10
+        waypointTurnbackWeight?: number; // default: 18
+        waypointBendWeight?: number; // default: 2
     };
 
     // Offsets
@@ -241,7 +252,18 @@ export function createDefaultRoutingConfig(): UnifiedRoutingConfig {
             finalRedundantBendThreshold: 15,
             finalSimplificationThreshold: 30,
             nudgeSpacing: 12,
-            nudgeSearchLimit: 120
+            nudgeSearchLimit: 120,
+            enableWaypointRefinement: true,
+            waypointRefinementPasses: 2,
+            maxWaypointRefineEdgesPerPass: 80,
+            enableWaypointReroute: true,
+            maxWaypointRerouteEdges: 8,
+            waypointHardCrossingWeight: 1000,
+            waypointSoftObstacleWeight: 120,
+            waypointSoftNearMissWeight: 35,
+            waypointSoftNearMissPadding: 10,
+            waypointTurnbackWeight: 18,
+            waypointBendWeight: 2
         },
         offsets: {
             source: 25,  // [FIX] 降低：borderRadius=4 不再需要 40px 偏移
@@ -331,6 +353,11 @@ export interface PathFindingJob {
     outgoingCount?: number;
     incomingIndex?: number;
     incomingCount?: number;
+    /** Order of this branch along a precomputed shared trunk. */
+    trunkOrderIndex?: number;
+    trunkOrderCount?: number;
+    /** Peer center projected onto the shared trunk axis. */
+    trunkBranchCoord?: number;
 
     // Global Channel Metadata
     globalChannelIndex?: number;
@@ -357,6 +384,8 @@ export interface SharedGraphContext {
     nodes: unknown[];
     edges: unknown[];
     obstacles: Rectangle[];
+    softObstacles?: Array<Rectangle & { edgeId?: string; ownerId?: string }>;
+    routingLabels?: Array<Rectangle & { edgeId?: string; ownerId?: string }>;
     pendingEdges?: LineObstacle[];  // [P2-3] Moved from PathFindingJob
     config: Partial<UnifiedRoutingConfig>;
     graphVersion?: number; // [Imp-8] For Worker Caching

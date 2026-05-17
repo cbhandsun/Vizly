@@ -83,7 +83,18 @@ export const FAST_PRESET: UnifiedRoutingConfig = {
         redundantBendThreshold: 60,
         finalRedundantBendThreshold: 15,
         nudgeSpacing: 6,
-        nudgeSearchLimit: 120
+        nudgeSearchLimit: 120,
+        enableWaypointRefinement: false,
+        waypointRefinementPasses: 1,
+        maxWaypointRefineEdgesPerPass: 24,
+        enableWaypointReroute: false,
+        maxWaypointRerouteEdges: 0,
+        waypointHardCrossingWeight: 800,
+        waypointSoftObstacleWeight: 80,
+        waypointSoftNearMissWeight: 20,
+        waypointSoftNearMissPadding: 8,
+        waypointTurnbackWeight: 12,
+        waypointBendWeight: 1
     },
     offsets: {
         source: 30,
@@ -157,7 +168,18 @@ export const QUALITY_PRESET: UnifiedRoutingConfig = {
         redundantBendThreshold: 60,
         finalRedundantBendThreshold: 15,
         nudgeSpacing: 6,
-        nudgeSearchLimit: 120
+        nudgeSearchLimit: 120,
+        enableWaypointRefinement: true,
+        waypointRefinementPasses: 3,
+        maxWaypointRefineEdgesPerPass: 120,
+        enableWaypointReroute: true,
+        maxWaypointRerouteEdges: 16,
+        waypointHardCrossingWeight: 1600,
+        waypointSoftObstacleWeight: 180,
+        waypointSoftNearMissWeight: 45,
+        waypointSoftNearMissPadding: 12,
+        waypointTurnbackWeight: 20,
+        waypointBendWeight: 2
     },
     offsets: {
         source: 40,
@@ -232,6 +254,13 @@ export const CLEAR_PRESET: UnifiedRoutingConfig = mergeConfig(
             nudgeSpacing: 18,
             minFirstSegment: 62,
             minLastSegment: 62,
+            waypointRefinementPasses: 3,
+            maxWaypointRefineEdgesPerPass: 120,
+            maxWaypointRerouteEdges: 16,
+            waypointHardCrossingWeight: 1800,
+            waypointSoftObstacleWeight: 220,
+            waypointSoftNearMissWeight: 60,
+            waypointSoftNearMissPadding: 14,
         },
         offsets: { source: 50, target: 50 },
     }
@@ -268,6 +297,12 @@ export const DENSE_PRESET: UnifiedRoutingConfig = mergeConfig(
             nudgeSpacing: 10,
             nudgeSearchLimit: 200,
             simplificationLevel: 'high',
+            waypointRefinementPasses: 2,
+            maxWaypointRefineEdgesPerPass: 140,
+            maxWaypointRerouteEdges: 10,
+            waypointHardCrossingWeight: 1200,
+            waypointSoftObstacleWeight: 130,
+            waypointSoftNearMissWeight: 30,
         },
     }
 );

@@ -9,6 +9,8 @@ interface UseLineJumpsOptions {
     points: Point[] | null | undefined;
     /** 是否启用跳线弧 */
     enabled?: boolean;
+    /** 是否为当前边渲染跳线弧。关闭时仍注册路径，供其他边避让/跳线。 */
+    renderJumps?: boolean;
     /** 圆角半径（默认16），用于在跳线路径中保持圆角效果 */
     cornerRadius?: number;
 }
@@ -20,7 +22,7 @@ interface UseLineJumpsResult {
     jumpPath: string | null;
 }
 
-export function useLineJumps({ edgeId, points, enabled = true, cornerRadius = 16 }: UseLineJumpsOptions): UseLineJumpsResult {
+export function useLineJumps({ edgeId, points, enabled = true, renderJumps = enabled, cornerRadius = 16 }: UseLineJumpsOptions): UseLineJumpsResult {
     const engine = LineJumpEngine.getInstance();
 
     // [FIX N-6] 用 useSyncExternalStore 订阅 engine 的版本变化
@@ -48,7 +50,7 @@ export function useLineJumps({ edgeId, points, enabled = true, cornerRadius = 16
 
     // 查询交叉点
     const result = useMemo(() => {
-        if (!enabled || !points || points.length < 2) {
+        if (!enabled || !renderJumps || !points || points.length < 2) {
             return { jumps: [], jumpPath: null };
         }
 
@@ -60,7 +62,7 @@ export function useLineJumps({ edgeId, points, enabled = true, cornerRadius = 16
         const jumpPath = injectLineJumps(points, jumps, engine.getJumpRadius(), cornerRadius);
         return { jumps, jumpPath: jumpPath || null };
     // engineVersion 作为依赖，useSyncExternalStore 保证它在引擎变化时更新
-    }, [edgeId, points, enabled, engine, engineVersion, cornerRadius]);
+    }, [edgeId, points, enabled, renderJumps, engine, engineVersion, cornerRadius]);
 
     return result;
 }

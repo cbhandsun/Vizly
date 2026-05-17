@@ -5,6 +5,7 @@
  * 每个 slide 聚焦一个域，包含该域下的所有子节点
  */
 import { useMemo } from 'react';
+import { getDescendantIds, buildChildrenMap } from '../components/diagrams/hooks/useCollapsibleGroups';
 
 export interface PresentationSlide {
   /** 幻灯片标题（域名称） */
@@ -34,9 +35,12 @@ export function generateSlides(
   nodes: SlideNode[],
   direction: 'vertical' | 'horizontal' = 'vertical'
 ): PresentationSlide[] {
-  // 第一步：找到所有域容器（titleGroup / group / domain）
+  // 构建子节点关系查找表（支持 explicit parentId 和 semantic domain/subDomain 映射）
+  const childrenMap = buildChildrenMap(nodes as any);
+
+  // 第一步：找到所有主容器（titleGroup / group / subGroup / swimlane）
   const containers = nodes.filter(
-    n => n.type === 'titleGroup' || n.type === 'titleGroupNode' || n.type === 'group'
+    n => n.type === 'titleGroup' || n.type === 'titleGroupNode' || n.type === 'group' || n.type === 'subGroup' || n.type === 'subGroupNode' || n.type === 'swimlane'
   );
 
   if (containers.length === 0) {
@@ -56,6 +60,7 @@ export function generateSlides(
     {
       title: '全局概览',
       nodeIds: nodes.map(n => n.id),
+      containerIds: containers.map(n => n.id),
       notes: `共 ${nodes.length} 个节点，${containers.length} 个域`,
     },
   ];
@@ -64,14 +69,22 @@ export function generateSlides(
   for (const container of sorted) {
     const title = container.data?.label || container.data?.description || container.id;
 
-    // 找到该容器下的所有子节点
-    const childIds = nodes
-      .filter(n => n.parentId === container.id)
+    // 找到该容器下的所有子代节点（深度递归）
+    const descendantIds = getDescendantIds(nodes as any, container.id, childrenMap);
+
+    // 过滤出子代中也是容器的节点，作为 containerIds
+    const nestedContainerIds = nodes
+      .filter(n => descendantIds.includes(n.id) && (
+        n.type === 'titleGroup' || n.type === 'titleGroupNode' ||
+        n.type === 'group' || n.type === 'subGroup' || n.type === 'subGroupNode' ||
+        n.type === 'swimlane'
+      ))
       .map(n => n.id);
 
     slides.push({
       title,
-      nodeIds: [container.id, ...childIds],
+      nodeIds: [container.id, ...descendantIds],
+      containerIds: [container.id, ...nestedContainerIds],
       notes: container.data?.description,
     });
   }
@@ -93,7 +106,7 @@ function generateFlatSlides(
   );
 
   const slides: PresentationSlide[] = [
-    { title: '全局概览', nodeIds: nodes.map(n => n.id) },
+    { title: '全局概览', nodeIds: nodes.map(n => n.id), containerIds: [] },
   ];
 
   // 每 1 个节点一张，以产生良好的单步聚焦体验
@@ -104,6 +117,7 @@ function generateFlatSlides(
     slides.push({
       title: `节点介绍: ${nodeNameArr.join(', ')}`,
       nodeIds: chunk.map(n => n.id),
+      containerIds: [],
     });
   }
 

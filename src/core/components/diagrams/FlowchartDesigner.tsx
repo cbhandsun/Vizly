@@ -480,6 +480,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         }
         return DEFAULT_EDGE_TYPES;
     }, [activePlugin]);
+    const { nodesWithCollapseState, edgesWithCollapseState, toggleGroupCollapse } = useCollapsibleGroups({ nodes, edges, setNodes, takeSnapshot });
 
     // 2. Interactions Domain Controller
     const interactionsParams = useDesignerInteractions({
@@ -489,7 +490,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         isDragging, setIsDragging,
         activePlugin, pluginCtx,
         onNodesChange, onEdgesChange,
-        virtualizedNodes: nodes, edgesWithCollapseState: edges,
+        virtualizedNodes: nodesWithCollapseState, edgesWithCollapseState: edgesWithCollapseState,
         onConnect: (params) => {
              takeSnapshot(nodesRef.current, edgesRef.current);
              
@@ -509,7 +510,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
              }
              
              setEdges(eds => addEdge(params, eds));
-        },
+         },
         preset, showOnlyMainFlow, highlightMainFlow,
         layers,
         activeLayerId,
@@ -545,9 +546,12 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     
     // 2.5 Linter Layer (Phase 8 integration)
     const { lintedNodes, lintedEdges } = useTopologyLinter(nodesWithGhost, finalEdgesWithGhost, { enabled: !isReadonly });
+    
 
-    // 2.6 节点折叠层 — toggleGroupCollapse 供命令面板和右键菜单使用
-    const { toggleGroupCollapse } = useCollapsibleGroups({ nodes, edges, setNodes, takeSnapshot });
+
+
+
+
 
     // 协作层 diagramId：优先使用 id prop，回退到导出 ID，避免多画布协作时 ID 冲突
     const diagramId = id || diagramIdForExport || 'default';
@@ -655,6 +659,21 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     );
 
     const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout } = useAutoRouting({ setNodes, setEdges, nodesRef, edgesRef, takeSnapshot, reactFlowInstance });
+    
+    // 监听折叠状态变化，自动触发排版微调，让周围节点紧凑排列
+    const collapsedHash = useMemo(() => {
+        return nodes.map(n => `${n.id}:${n.data?.collapsed ? '1' : '0'}`).join(';');
+    }, [nodes]);
+
+    const initialCollapsedRef = useRef(collapsedHash);
+
+    useEffect(() => {
+        if (initialCollapsedRef.current !== collapsedHash) {
+            initialCollapsedRef.current = collapsedHash;
+            // 触发自动布局
+            handleStrategyLayout(lastDomainStrategy, lastNodeLayout, lastDomainDirection);
+        }
+    }, [collapsedHash, handleStrategyLayout, lastDomainStrategy, lastNodeLayout, lastDomainDirection]);
     
     // Auto-Routing: Sync internal `autoRoutingEnabled` with the exposed edgeMode from config/topbar
     useEffect(() => {

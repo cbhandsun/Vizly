@@ -3,7 +3,7 @@
  * 用户友好的错误提示
  */
 
-import { appMessage as message, appNotification as notification } from './antdStaticBridge';
+import { appMessage, appNotification } from './antdStaticBridge';
 import type { ArgsProps as NotificationArgsProps } from 'antd/es/notification';
 
 export interface ErrorNotificationOptions {

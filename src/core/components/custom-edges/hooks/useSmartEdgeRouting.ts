@@ -166,6 +166,9 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       edgeId: id,
       points: jumpInputPoints,
       enabled: !nodesDragging && !isLoading && !isStale,
+      // Bus/trunk edges should be treated as one integrated trunk visual:
+      // keep them registered for other edges, but do not draw jump arcs on them.
+      renderJumps: !isBusEdge,
       cornerRadius: edgeConfig.borderRadius || 4,
   });
 

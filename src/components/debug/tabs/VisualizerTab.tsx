@@ -1028,6 +1028,15 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                         const pgm = Array.isArray(ps?.peerGroupMembers) ? (ps.peerGroupMembers as unknown[]).map(String).slice(0, 8).join(',') : '';
                         const trunkAxis = typeof ps?.trunkAxis === 'number' ? ps.trunkAxis.toFixed(0) : '?';
                         const trunkV = typeof ps?.trunkVertical === 'boolean' ? (ps.trunkVertical ? 'V' : 'H') : '?';
+                        const wr = algorithmDebugAny?.waypointRefinement;
+                        const wrInitial = typeof wr?.initial?.totalScore === 'number' ? wr.initial.totalScore : null;
+                        const wrFinal = typeof wr?.final?.totalScore === 'number' ? wr.final.totalScore : null;
+                        const wrChanged = typeof wr?.changed === 'boolean' ? (wr.changed ? 'moved' : 'kept') : '?';
+                        const wrShift = typeof wr?.segmentShiftChanges === 'number' ? wr.segmentShiftChanges : 0;
+                        const wrReroute = typeof wr?.rerouteChanges === 'number' ? wr.rerouteChanges : 0;
+                        const wrHard = typeof wr?.final?.hardCrossings === 'number' ? wr.final.hardCrossings : '?';
+                        const wrSoft = typeof wr?.final?.softCrossings === 'number' ? wr.final.softCrossings : '?';
+                        const wrNear = typeof wr?.final?.softNearMisses === 'number' ? wr.final.softNearMisses : '?';
 
                         return (
                             <>
@@ -1057,6 +1066,11 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                                     {`TrunkAxis: ${trunkV} ${trunkAxis}`}
                                 </div>
                                 {pgm ? <div>{`Peers: ${pgm}${Array.isArray(ps?.peerGroupMembers) && (ps.peerGroupMembers as unknown[]).length > 8 ? '…' : ''}`}</div> : null}
+                                {wrInitial !== null && wrFinal !== null ? (
+                                    <div style={{ color: wrFinal < wrInitial ? token.colorSuccess : token.colorTextTertiary }}>
+                                        {`WR: ${wrInitial} -> ${wrFinal} (${wrChanged}) | hard=${wrHard} soft=${wrSoft} near=${wrNear} | shift=${wrShift} reroute=${wrReroute}`}
+                                    </div>
+                                ) : null}
                                 {debugData.metadata && (
                                     <div style={{ marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                                         <div>{t('designer.debug.visualizer.stats.time', { ms: debugData.metadata.duration?.toFixed(2) ?? '?' })}</div>

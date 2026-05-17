@@ -28,8 +28,10 @@ type MultiEdgeInfoResult = {
     incomingIndex: number; outgoingIndex: number;
     enableBus: boolean;
 };
-// key = `${topologySig}:${source}:${target}` → per-edge outgoing/incoming lists (without id-specific index)
-type EdgeListCache = { outgoingList: string[]; incomingList: string[] };
+// key = `${source}:${target}` → per-edge outgoing/incoming hemisphere buckets.
+// The final list is selected per edge id so opposite hemispheres do not leak into
+// the same bus/trunk group.
+type EdgeListCache = { outgoingBuckets: Record<string, string[]>; incomingBuckets: Record<string, string[]> };
 const _multiEdgeListCache = new Map<string, EdgeListCache>();
 let _multiEdgeListCacheTopoSig: number = -1;
 
@@ -556,8 +558,10 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
                 if (!from || !to) return null;
                 const fw = from.width || 0; const fh = from.height || 0;
                 const tw = to.width || 0;   const th = to.height || 0;
-                const fx = from.x ?? 0;     const fy = from.y ?? 0;
-                const tx = to.x ?? 0;       const ty = to.y ?? 0;
+                const fromAbs = from.id ? getAbsPos(from.id) : undefined;
+                const toAbs = to.id ? getAbsPos(to.id) : undefined;
+                const fx = fromAbs?.x ?? from.x ?? 0; const fy = fromAbs?.y ?? from.y ?? 0;
+                const tx = toAbs?.x ?? to.x ?? 0;     const ty = toAbs?.y ?? to.y ?? 0;
                 const cx1 = fx + fw / 2;    const cy1 = fy + fh / 2;
                 const cx2 = tx + tw / 2;    const cy2 = ty + th / 2;
                 const dx = cx2 - cx1;       const dy = cy2 - cy1;
@@ -598,35 +602,36 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
                 });
             }
 
-            let outgoingList: string[] = [];
-            Object.values(outgoingBuckets).forEach((list) => {
-                const sorted = [...list].sort();
-                if (sorted.length > 1 && sorted.length > outgoingList.length) {
-                    outgoingList = sorted;
-                }
-            });
-            if (outgoingList.length === 0) {
+            if (Object.keys(outgoingBuckets).length === 0) {
                 const allOutgoing = storeEdges.filter(e => e.source === source).map(e => e.id).sort();
-                if (allOutgoing.length > 1) outgoingList = allOutgoing;
+                if (allOutgoing.length > 1) outgoingBuckets.all = allOutgoing;
+            } else {
+                Object.keys(outgoingBuckets).forEach((key) => {
+                    outgoingBuckets[key] = [...outgoingBuckets[key]].sort();
+                });
             }
 
-            let incomingList: string[] = [];
-            Object.values(incomingBuckets).forEach((list) => {
-                const sorted = [...list].sort();
-                if (sorted.length > 1 && sorted.length > incomingList.length) {
-                    incomingList = sorted;
-                }
-            });
-            if (incomingList.length === 0) {
+            if (Object.keys(incomingBuckets).length === 0) {
                 const allIncoming = storeEdges.filter(e => e.target === target).map(e => e.id).sort();
-                if (allIncoming.length > 1) incomingList = allIncoming;
+                if (allIncoming.length > 1) incomingBuckets.all = allIncoming;
+            } else {
+                Object.keys(incomingBuckets).forEach((key) => {
+                    incomingBuckets[key] = [...incomingBuckets[key]].sort();
+                });
             }
 
-            cached = { outgoingList, incomingList };
+            cached = { outgoingBuckets, incomingBuckets };
             _multiEdgeListCache.set(cacheKey, cached);
         }
 
-        const { outgoingList, incomingList } = cached;
+        const pickCurrentHemisphere = (buckets: Record<string, string[]>, currentId: string) => {
+            const containing = Object.values(buckets).find(list => list.includes(currentId));
+            if (containing) return containing.length > 1 ? containing : [];
+            return [];
+        };
+
+        const outgoingList = pickCurrentHemisphere(cached.outgoingBuckets, id);
+        const incomingList = pickCurrentHemisphere(cached.incomingBuckets, id);
         const isManyToOne = incomingList.length > 1;
         const isOneToMany = outgoingList.length > 1;
 
@@ -643,7 +648,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
     // [FIX] Removed storeEdges from deps — edgeTopologySig already captures topology changes.
     // storeEdges reference changes on every selection change (selected property),
     // causing unnecessary multiEdgeInfo recalculation and cascading re-renders.
-    }, [edgeTopologySig, source, target, id, simpleNodeMap, layoutDirection]);
+    }, [edgeTopologySig, source, target, id, simpleNodeMap, layoutDirection, getAbsPos]);
 
     // ---------- 3️⃣ Centered coordinates ----------
     const centeredCoords = useMemo(() => {

@@ -73,21 +73,6 @@ export class PathPostProcessor {
         const { obstacles, startPos, endPos, metadata, extraObstacles } = context;
         const isBus = metadata.isOneToMany || metadata.isManyToOne;
 
-        if (context.metadata.strategy && context.metadata.strategy.includes('Trunk Direct')) {
-            // [H-1] Apply snapAxis before return to eliminate sub-pixel diagonal artifacts
-            // that arise from fractional coordinate math in trunk geometry construction.
-            const snapped = points.map(p => ({ ...p }));
-            for (let i = 0; i < snapped.length - 1; i++) {
-                if (Math.abs(snapped[i].x - snapped[i + 1].x) < 1) snapped[i + 1].x = snapped[i].x;
-                if (Math.abs(snapped[i].y - snapped[i + 1].y) < 1) snapped[i + 1].y = snapped[i].y;
-            }
-            // [BACKTRACK-V2] Orthogonal-safe backtrack removal for trunk paths
-            const detracked = removeLargeBacktrack(snapped, obstacles, { sourcePos: startPos, targetPos: endPos });
-            const svgPath = createFilletedPath(detracked, this.config.postProcessing.borderRadius);
-            return { points: detracked, svgPath };
-        }
-
-        let finalPoints = [...points];
         const snapAxis = (pts: Point[]): Point[] => {
             if (pts.length < 2) return pts;
             const res = pts.map(p => ({ ...p }));
@@ -99,6 +84,43 @@ export class PathPostProcessor {
             }
             return res;
         };
+
+        const cleanupConstructedPath = (pts: Point[]): Point[] => {
+            const cleaned: Point[] = [];
+            for (const p of pts) {
+                const prev = cleaned[cleaned.length - 1];
+                if (!prev || Math.abs(prev.x - p.x) > 1 || Math.abs(prev.y - p.y) > 1) {
+                    cleaned.push({ ...p });
+                }
+            }
+            return collapseCollinearBacktracks(cleaned);
+        };
+
+        if (context.metadata.strategy && context.metadata.strategy.includes('Trunk Direct')) {
+            // [H-1] Apply snapAxis before return to eliminate sub-pixel diagonal artifacts
+            // that arise from fractional coordinate math in trunk geometry construction.
+            const snapped = snapAxis(points);
+            // [BACKTRACK-V2] Orthogonal-safe backtrack removal for trunk paths
+            const detracked = removeLargeBacktrack(snapped, obstacles, { sourcePos: startPos, targetPos: endPos });
+            const svgPath = createFilletedPath(detracked, this.config.postProcessing.borderRadius);
+            return { points: detracked, svgPath };
+        }
+
+        if (context.metadata.strategy === 'Reverse U-Turn') {
+            const safeMinFirst = Math.max(config.postProcessing.minFirstSegment, config.postProcessing.borderRadius + 5);
+            const safeMinLast = Math.max(config.postProcessing.minLastSegment, config.postProcessing.borderRadius + 5);
+            const orthogonal = makePathOrthogonal(snapAxis(points), {
+                sourcePos: startPos,
+                targetPos: endPos,
+                sourceMinLength: safeMinFirst,
+                targetMinLength: safeMinLast,
+            }, obstacles) || points;
+            const finalPoints = cleanupConstructedPath(snapAxis(orthogonal));
+            const svgPath = createFilletedPath(finalPoints, this.config.postProcessing.borderRadius);
+            return { points: finalPoints, svgPath };
+        }
+
+        let finalPoints = [...points];
 
         // Phase 0: Ensure minimum segments
         // [FIX] Use independent minFirstSegment and minLastSegment parameters

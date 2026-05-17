@@ -4,6 +4,8 @@ import { treeLayout, forceDirectedLayout, applyLayout } from '../../../utils/Lay
 import { animateLayoutTransition } from '../../../utils/animateLayoutTransition';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { flushObstacles } from '../../custom-edges/ObstacleContext';
+import { buildChildrenMap, getDescendantIds } from './useCollapsibleGroups';
+
 
 interface UseLayoutStrategyParams {
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
@@ -11,7 +13,7 @@ interface UseLayoutStrategyParams {
     nodesRef: MutableRefObject<Node[]>;
     edgesRef: MutableRefObject<Edge[]>;
     takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
-    reactFlowInstance: ReactFlowInstance<any, any>;
+    reactFlowInstance: ReactFlowInstance<any, any> | null;
 }
 
 /**
@@ -80,8 +82,15 @@ export function useLayoutStrategy({
     // [FIX] 两步 fitView：先无动画（解决虚拟化 onlyRenderVisibleElements），再平滑动画
     const twoStepFitView = useCallback(() => {
         requestAnimationFrame(() => {
-            reactFlowInstance.fitView({ duration: 0, padding: 0.2, minZoom: 0.55 });
-            setTimeout(() => reactFlowInstance.fitView({ duration: 600, padding: 0.2, minZoom: 0.55 }), 100);
+            const rf = reactFlowInstance;
+            if (!rf?.fitView) return;
+
+            rf.fitView({ duration: 0, padding: 0.2, minZoom: 0.55 });
+            setTimeout(() => {
+                if (rf.fitView) {
+                    rf.fitView({ duration: 600, padding: 0.2, minZoom: 0.55 });
+                }
+            }, 100);
         });
     }, [reactFlowInstance]);
 
@@ -103,8 +112,28 @@ export function useLayoutStrategy({
         takeSnapshot(nodesRef.current, edgesRef.current);
 
         try {
-            const allNodes = nodesRef.current;
+            const rawNodes = nodesRef.current;
             const allEdges = edgesRef.current;
+
+            // 1. 自动传播折叠容器的折叠状态到子节点
+            // 确保布局策略和后处理管线能够通过 data.hidden 正确过滤隐藏节点
+            const collapsedGroups = rawNodes.filter(n => n.data?.collapsed);
+            const childrenMap = buildChildrenMap(rawNodes);
+            const hiddenNodeIds = new Set<string>();
+            collapsedGroups.forEach(group => {
+                getDescendantIds(rawNodes, group.id, childrenMap).forEach(id => hiddenNodeIds.add(id));
+            });
+
+            const allNodes = rawNodes.map(n => {
+                if (hiddenNodeIds.has(n.id)) {
+                    return { ...n, hidden: true, data: { ...n.data, hidden: true } };
+                }
+                // 如果节点不在隐藏列表中，但包含遗留的折叠隐藏状态，将其还原
+                if (n.data?.hidden) {
+                    return { ...n, hidden: false, data: { ...n.data, hidden: false } };
+                }
+                return { ...n, hidden: false };
+            });
 
             // ═══ 前处理：过滤容器、转绝对坐标、清除 parentId ═══
             const nodeById = new Map(allNodes.map(n => [n.id, n]));
