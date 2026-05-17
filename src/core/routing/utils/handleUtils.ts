@@ -24,10 +24,24 @@ export function expandHandle(h: string): string {
 export function normalizeHandle(h?: string | null): 'l' | 'r' | 't' | 'b' | undefined {
     if (!h) return undefined;
     const s = String(h).toLowerCase();
-    if (s === 'l' || s.startsWith('l') || s.includes('left'))   return 'l';
-    if (s === 'r' || s.startsWith('r') || s.includes('right'))  return 'r';
-    if (s === 't' || s.startsWith('t') || s.includes('top'))    return 't';
-    if (s === 'b' || s.startsWith('b') || s.includes('bottom')) return 'b';
+    // Priority 1: exact single-char match
+    if (s === 'l' || s === 'left')   return 'l';
+    if (s === 'r' || s === 'right')  return 'r';
+    if (s === 't' || s === 'top')    return 't';
+    if (s === 'b' || s === 'bottom') return 'b';
+    // Priority 2: substring match (handles compound IDs like 'source-right', 'col-0-left')
+    if (s.includes('left'))   return 'l';
+    if (s.includes('right'))  return 'r';
+    if (s.includes('top'))    return 't';
+    if (s.includes('bottom')) return 'b';
+    // Priority 3: single-char prefix (only for shorthand like 'l', 'r', 't', 'b')
+    // NOTE: This is now safe because compound IDs like 't-right' are caught above by includes('right')
+    if (s.length === 1) {
+        if (s === 'l') return 'l';
+        if (s === 'r') return 'r';
+        if (s === 't') return 't';
+        if (s === 'b') return 'b';
+    }
     return undefined;
 }
 

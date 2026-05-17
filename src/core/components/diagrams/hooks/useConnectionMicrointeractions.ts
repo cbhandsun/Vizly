@@ -152,7 +152,7 @@ export const useConnectionMicrointeractions = ({
                 else if (angle >= 45 && angle < 135) bestSide = 'bottom';
                 else if (angle >= -135 && angle < -45) bestSide = 'top';
                 else bestSide = 'left';
-                bestHandleId = `t-${bestSide}`;
+                bestHandleId = bestSide;
                 bestX = ptr.clientX;
                 bestY = ptr.clientY;
             }

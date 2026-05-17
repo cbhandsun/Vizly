@@ -112,10 +112,16 @@ export function useEdgeNormalization(
     const normalizeHandle = (h?: string | null): 't' | 'b' | 'l' | 'r' | undefined => {
       if (!h) return undefined;
       const s = String(h).toLowerCase();
-      if (s === 't' || s.startsWith('t') || s.includes('top')) return 't';
-      if (s === 'b' || s.startsWith('b') || s.includes('bottom')) return 'b';
-      if (s === 'l' || s.startsWith('l') || s.includes('left')) return 'l';
-      if (s === 'r' || s.startsWith('r') || s.includes('right')) return 'r';
+      // Priority 1: exact match
+      if (s === 't' || s === 'top') return 't';
+      if (s === 'b' || s === 'bottom') return 'b';
+      if (s === 'l' || s === 'left') return 'l';
+      if (s === 'r' || s === 'right') return 'r';
+      // Priority 2: substring match (handles compound IDs like 'source-right', 't-right')
+      if (s.includes('top')) return 't';
+      if (s.includes('bottom')) return 'b';
+      if (s.includes('left')) return 'l';
+      if (s.includes('right')) return 'r';
       return undefined;
     };
 

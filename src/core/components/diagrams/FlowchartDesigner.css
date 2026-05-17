@@ -1,7 +1,7 @@
-/* src/components/diagrams/FlowchartDesigner.css */
+﻿/* src/components/diagrams/FlowchartDesigner.css */
 
 /* ============================================
-   统一设计器 UI / Glassmorphism Design Tokens (Hyper-Glass)
+   缁熶竴璁捐鍣?UI / Glassmorphism Design Tokens (Hyper-Glass)
    ============================================ */
 :root {
     --designer-panel-bg: rgba(255, 255, 255, 0.72);
@@ -27,8 +27,8 @@
 }
 
 /* ============================================
-   设计器根容器 — 扁平化 Flexbox 布局
-   替代 antd Layout 的隐式 flex 样式
+   璁捐鍣ㄦ牴瀹瑰櫒 鈥?鎵佸钩鍖?Flexbox 甯冨眬
+   鏇夸唬 antd Layout 鐨勯殣寮?flex 鏍峰紡
    ============================================ */
 .diagram-root {
     display: flex;
@@ -37,10 +37,10 @@
     height: 100%;
     overflow: hidden;
     position: relative;
-    background-color: var(--designer-panel-bg); /* 背景通透感起点 */
+    background-color: var(--designer-panel-bg); /* 鑳屾櫙閫氶€忔劅璧风偣 */
 }
 
-/* 侧边栏空气感与间距优化 */
+/* 渚ц竟鏍忕┖姘旀劅涓庨棿璺濅紭鍖?*/
 .modern-sidebar-container {
     padding: 16px 12px !important;
     display: flex;
@@ -48,18 +48,18 @@
     gap: 16px;
 }
 
-/* 画布主区域 — 占满剩余空间 */
+/* 鐢诲竷涓诲尯鍩?鈥?鍗犳弧鍓╀綑绌洪棿 */
 .diagram-canvas-area {
     position: relative;
     flex: 1;
     min-width: 0;
-    /* Flexbox 溢出防护 (W3C 标准) */
+    /* Flexbox 婧㈠嚭闃叉姢 (W3C 鏍囧噯) */
     height: 100%;
     overflow: hidden;
     background-color: transparent;
 }
 
-/* 🎨 [GAP-63] 顶栏与画布的丝滑过渡 */
+/* 馃帹 [GAP-63] 椤舵爮涓庣敾甯冪殑涓濇粦杩囨浮 */
 .diagram-canvas-area::before {
     content: '';
     position: absolute;
@@ -73,7 +73,7 @@
     opacity: 0.8;
 }
 
-/* 🎨 P1-4: 浮动工具栏入场动画 */
+/* 馃帹 P1-4: 娴姩宸ュ叿鏍忓叆鍦哄姩鐢?*/
 @keyframes toolbarEnter {
     0% {
         opacity: 0;
@@ -202,29 +202,29 @@
 }
 
 /* ============================================
-   节点性能优化
+   鑺傜偣鎬ц兘浼樺寲
    ============================================ */
 
-/* 限制每个节点的重排范围 — 子节点变化不影响其他节点 */
+/* 闄愬埗姣忎釜鑺傜偣鐨勯噸鎺掕寖鍥?鈥?瀛愯妭鐐瑰彉鍖栦笉褰卞搷鍏朵粬鑺傜偣 */
 .react-flow__node {
     contain: layout style;
     /* Phase 3: Fluid Physics & Animation for Tree Structure Changes */
     transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s ease, opacity 0.3s ease;
 }
 
-/* 拖拽中的节点 — GPU 层提升 + 最高 z-index */
+/* 鎷栨嫿涓殑鑺傜偣 鈥?GPU 灞傛彁鍗?+ 鏈€楂?z-index */
 .react-flow__node.dragging {
     will-change: transform;
     z-index: 1000 !important;
 }
 
 /* ============================================
-   微交互动画
+   寰氦浜掑姩鐢?
    ============================================ */
 
-/* 1. 全局动画定义 */
+/* 1. 鍏ㄥ眬鍔ㄧ敾瀹氫箟 */
 
-/* 对齐线闪现动画 */
+/* 瀵归綈绾块棯鐜板姩鐢?*/
 @keyframes flash-guide {
 
     0%,
@@ -239,7 +239,7 @@
     }
 }
 
-/* 连接成功脉冲动画 */
+/* 杩炴帴鎴愬姛鑴夊啿鍔ㄧ敾 */
 @keyframes connect-success-pulse {
     0% {
         stroke-width: 2;
@@ -257,16 +257,16 @@
     }
 }
 
-/* 2. 节点交互效果 */
+/* 2. 鑺傜偣浜や簰鏁堟灉 */
 
-/* 节点悬停效果 — 由 FlowchartNode.css 处理，此处仅补充 z-index */
+/* 鑺傜偣鎮仠鏁堟灉 鈥?鐢?FlowchartNode.css 澶勭悊锛屾澶勪粎琛ュ厖 z-index */
 .react-flow__node:hover {
     z-index: 100;
 }
 
-/* 选中节点 — 视觉效果统一至 L712 的 box-shadow 环方案（不再使用 outline，避免与 box-shadow 双重指示） */
+/* 閫変腑鑺傜偣 鈥?瑙嗚鏁堟灉缁熶竴鑷?L712 鐨?box-shadow 鐜柟妗堬紙涓嶅啀浣跨敤 outline锛岄伩鍏嶄笌 box-shadow 鍙岄噸鎸囩ず锛?*/
 
-/* 非矩形形状节点：移除矩形效果 */
+/* 闈炵煩褰㈠舰鐘惰妭鐐癸細绉婚櫎鐭╁舰鏁堟灉 */
 .react-flow__node:has(.shape-non-rect) {
     box-shadow: none !important;
     background: transparent !important;
@@ -297,12 +297,12 @@
     background: transparent !important;
 }
 
-/* 正在拖拽的节点 — 明显悬浮感：半透明 + 强阴影 + 轻微放大 */
+/* 姝ｅ湪鎷栨嫿鐨勮妭鐐?鈥?鏄庢樉鎮诞鎰燂細鍗婇€忔槑 + 寮洪槾褰?+ 杞诲井鏀惧ぇ */
 .react-flow__node.dragging {
     opacity: 0.88;
     cursor: grabbing !important;
     transition: opacity 0.1s, filter 0.1s;
-    /* 多层阴影：近处扩散 + 远处落地投影 = 真实浮起感 */
+    /* 澶氬眰闃村奖锛氳繎澶勬墿鏁?+ 杩滃钀藉湴鎶曞奖 = 鐪熷疄娴捣鎰?*/
     filter:
         drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12))
         drop-shadow(0 12px 28px rgba(0, 0, 0, 0.18))
@@ -311,7 +311,7 @@
     scale: 1.02;
 }
 
-/* 落地脉冲反馈 — 快速扩散光环消退 */
+/* 钀藉湴鑴夊啿鍙嶉 鈥?蹇€熸墿鏁ｅ厜鐜秷閫€ */
 .react-flow__node.just-dropped {
     animation: dropLand 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
@@ -322,14 +322,14 @@
     100% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0); scale: 1.00; }
 }
 
-/* 3. 连接点（Handle）交互效果 */
+/* 3. 杩炴帴鐐癸紙Handle锛変氦浜掓晥鏋?*/
 
-/* 连接点基础样式 */
+/* 杩炴帴鐐瑰熀纭€鏍峰紡 */
 .react-flow__handle {
     transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-width 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 🎯 扩充连接点热区 (Hit-box Expansion) */
+/* 馃幆 鎵╁厖杩炴帴鐐圭儹鍖?(Hit-box Expansion) */
 .react-flow__handle::after {
     content: '';
     position: absolute;
@@ -343,15 +343,15 @@
     z-index: 10;
 }
 
-/* 连接点悬停效果 */
+/* 杩炴帴鐐规偓鍋滄晥鏋?*/
 .react-flow__handle:hover {
     transform: scale(1.3);
     border-width: 3px !important;
     z-index: 1000;
 }
 
-/* 可连接状态的连接点 — 仅在用户正在拖拽连线时才显示绿色高亮 */
-/* 平时 .connectable 类不改变外观，避免绿点常驻导致视觉突兀 */
+/* 鍙繛鎺ョ姸鎬佺殑杩炴帴鐐?鈥?浠呭湪鐢ㄦ埛姝ｅ湪鎷栨嫿杩炵嚎鏃舵墠鏄剧ず缁胯壊楂樹寒 */
+/* 骞虫椂 .connectable 绫讳笉鏀瑰彉澶栬锛岄伩鍏嶇豢鐐瑰父椹诲鑷磋瑙夌獊鍏€ */
 .react-flow.connecting .react-flow__handle.connectable {
     background: var(--theme-success-main, #10b981) !important;
     border-color: var(--theme-success-dark, #059669) !important;
@@ -359,23 +359,23 @@
     opacity: 1 !important;
 }
 
-/* 4. 连接创建微交互 */
+/* 4. 杩炴帴鍒涘缓寰氦浜?*/
 
-/* 正在连接的源节点 */
+/* 姝ｅ湪杩炴帴鐨勬簮鑺傜偣 */
 .react-flow__node.rf-connecting {
     border: 2px solid var(--theme-primary-main, #3b82f6) !important;
     box-shadow: 0 0 0 4px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.2));
     transition: border 0.2s, box-shadow 0.2s;
 }
 
-/* 可连接的目标节点 — 虚线提示 */
+/* 鍙繛鎺ョ殑鐩爣鑺傜偣 鈥?铏氱嚎鎻愮ず */
 .react-flow__node.rf-connectable {
     border: 2px dashed var(--theme-success-main, #10b981) !important;
     background: var(--theme-success-main-alpha-light, rgba(16, 185, 129, 0.05));
     transition: border 0.2s, background 0.2s;
 }
 
-/* 可连接的目标节点 — 所有 Handle 显示并高亮 */
+/* 鍙繛鎺ョ殑鐩爣鑺傜偣 鈥?鎵€鏈?Handle 鏄剧ず骞堕珮浜?*/
 .react-flow__node.rf-connectable .flowchart-handle {
     opacity: 1 !important;
     background: var(--theme-success-main, #10b981) !important;
@@ -387,7 +387,7 @@
     transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-/* 连线预览态 — 节点级：实线边框 + 绿色光晕 + 微放大 */
+/* 杩炵嚎棰勮鎬?鈥?鑺傜偣绾э細瀹炵嚎杈规 + 缁胯壊鍏夋檿 + 寰斁澶?*/
 .react-flow__node.rf-connectable.rf-connect-preview {
     border-style: solid !important;
     border-color: var(--theme-success-main, rgba(16, 185, 129, 1)) !important;
@@ -397,14 +397,14 @@
     transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-/* 连线预览态 — 非吸附方向的 Handle 淡化 */
+/* 杩炵嚎棰勮鎬?鈥?闈炲惛闄勬柟鍚戠殑 Handle 娣″寲 */
 .react-flow__node.rf-connectable.rf-connect-preview .flowchart-handle {
     opacity: 0.3 !important;
     transform: scale(1);
     box-shadow: none;
 }
 
-/* 🎯 磁吸反馈脉动动画 — 吸附方向 Handle 高亮 + 脉冲 */
+/* 馃幆 纾佸惛鍙嶉鑴夊姩鍔ㄧ敾 鈥?鍚搁檮鏂瑰悜 Handle 楂樹寒 + 鑴夊啿 */
 @keyframes magnetic-pulse {
     0%, 100% {
         transform: scale(2.0);
@@ -417,7 +417,7 @@
     }
 }
 
-/* 🔑 吸附方向 Handle — 脉冲动画 (修复: .flowchart-handle 替代原来匹配不到的 .flowchart-handle-target) */
+/* 馃攽 鍚搁檮鏂瑰悜 Handle 鈥?鑴夊啿鍔ㄧ敾 (淇: .flowchart-handle 鏇夸唬鍘熸潵鍖归厤涓嶅埌鐨?.flowchart-handle-target) */
 .react-flow__node.rf-connectable.rf-connect-preview.rf-connect-side-top .react-flow__handle-top.flowchart-handle,
 .react-flow__node.rf-connectable.rf-connect-preview.rf-connect-side-right .react-flow__handle-right.flowchart-handle,
 .react-flow__node.rf-connectable.rf-connect-preview.rf-connect-side-bottom .react-flow__handle-bottom.flowchart-handle,
@@ -431,7 +431,7 @@
     height: 10px !important;
 }
 
-/* 🎯 连接成功弹跳动画 */
+/* 馃幆 杩炴帴鎴愬姛寮硅烦鍔ㄧ敾 */
 @keyframes connection-snap {
     0%   { transform: scale(2.5); box-shadow: 0 0 0 10px var(--theme-success-main-alpha, rgba(16, 185, 129, 0.5)); }
     40%  { transform: scale(1.0); box-shadow: 0 0 0 0px rgba(16, 185, 129, 0); }
@@ -439,18 +439,18 @@
     100% { transform: scale(1.0); }
 }
 
-/* 5. 边（Edge）交互效果 */
+/* 5. 杈癸紙Edge锛変氦浜掓晥鏋?*/
 
-/* 边路径样式过渡（不过渡 d 属性 — 拖拽时太重） */
+/* 杈硅矾寰勬牱寮忚繃娓★紙涓嶈繃娓?d 灞炴€?鈥?鎷栨嫿鏃跺お閲嶏級 */
 .react-flow__edge-path {
     transition: stroke-width 0.18s ease, stroke 0.18s ease, filter 0.18s ease;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
 
-/* 边悬停：扩大透明 hitbox + 主色高亮 + 精致光晕 */
+/* 杈规偓鍋滐細鎵╁ぇ閫忔槑 hitbox + 涓昏壊楂樹寒 + 绮捐嚧鍏夋檿 */
 .react-flow__edge .react-flow__edge-interaction {
-    stroke-width: 20px !important; /* 大热区 */
+    stroke-width: 20px !important; /* 澶х儹鍖?*/
     stroke: transparent !important;
     fill: none;
 }
@@ -459,28 +459,30 @@
     transition: none !important;
 }
 
-/* 边悬停效果 — 品牌色高亮光晕 */
+/* 杈规偓鍋滄晥鏋?鈥?鍝佺墝鑹查珮浜厜鏅?
+   [FIX] 蹇呴』鐢?!important 绐佺牬鍐呰仈 style="stroke:..." 浼樺厛绾?*/
 .react-flow__edge:hover .react-flow__edge-path {
-    stroke: var(--designer-accent, #6366f1);
-    stroke-width: 2.5;
+    stroke: var(--designer-accent, #6366f1) !important;
+    stroke-width: 3 !important;
     filter:
         drop-shadow(0 0 4px rgba(99, 102, 241, 0.45))
-        drop-shadow(0 0 10px rgba(99, 102, 241, 0.20));
+        drop-shadow(0 0 10px rgba(99, 102, 241, 0.20)) !important;
 }
 
-/* 选中的边 — 基础品牌色（Hyper-Glass 覆盖层 L741 提供最终 stroke-width + filter） */
+/* 閫変腑鐨勮竟 鈥?鍩虹鍝佺墝鑹诧紙Hyper-Glass 瑕嗙洊灞?L741 鎻愪緵鏈€缁?stroke-width + filter锛?*/
 .react-flow__edge.selected .react-flow__edge-path {
     stroke: var(--designer-accent, #6366f1) !important;
-    stroke-width: 2.5;
+    stroke-width: 3 !important;
+    filter: drop-shadow(0 0 4px var(--designer-accent-alpha, rgba(99, 102, 241, 0.45))) !important;
 }
 
-/* 连接成功动画 — 绿色脉冲 */
+/* 杩炴帴鎴愬姛鍔ㄧ敾 鈥?缁胯壊鑴夊啿 */
 .react-flow__edge.just-connected .react-flow__edge-path {
     stroke: var(--theme-success-main, #10b981) !important;
     animation: connect-success-pulse 0.8s ease-in-out;
 }
 
-/* 动画连线 — 呼吸流动 */
+/* 鍔ㄧ敾杩炵嚎 鈥?鍛煎惛娴佸姩 */
 @keyframes edge-glow-pulse {
     0%   { filter: drop-shadow(0 0 2px rgba(99, 102, 241, 0.4)); stroke-width: 2; }
     50%  { filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.7)); stroke-width: 3; }
@@ -492,7 +494,7 @@
     animation: react-flow__dash-animation 0.5s linear infinite, edge-glow-pulse 2.5s ease-in-out infinite !important;
 }
 
-/* 原生边缘更新器：完全透明，放大半径作为广阔拖拽热区 */
+/* 鍘熺敓杈圭紭鏇存柊鍣細瀹屽叏閫忔槑锛屾斁澶у崐寰勪綔涓哄箍闃旀嫋鎷界儹鍖?*/
 circle.react-flow__edgeupdater {
     cursor: grab;
     fill: transparent !important;
@@ -506,15 +508,15 @@ circle.react-flow__edgeupdater:active {
     cursor: grabbing;
 }
 
-/* 核心杀手锏：利用 :has() 伪类，当存在被选中、或悬挂被悬停的边时，直接将带有 SVG 的 Edges 容器层级凌驾于 Nodes 之上。
-   这就防止了下面原本层级绝缘的 HTML Handle 元素“吃掉”原本想点在圈圈上的鼠标事件（例如用户抱怨的：“移动连线还是会生崽”）。
-   [FIX] Node hover 本身带 z-index: 100/1000，必须加满到 2000 以彻底压制！ */
+/* 鏍稿績鏉€鎵嬮攺锛氬埄鐢?:has() 浼被锛屽綋瀛樺湪琚€変腑銆佹垨鎮寕琚偓鍋滅殑杈规椂锛岀洿鎺ュ皢甯︽湁 SVG 鐨?Edges 瀹瑰櫒灞傜骇鍑岄┚浜?Nodes 涔嬩笂銆?
+   杩欏氨闃叉浜嗕笅闈㈠師鏈眰绾х粷缂樼殑 HTML Handle 鍏冪礌鈥滃悆鎺夆€濆師鏈兂鐐瑰湪鍦堝湀涓婄殑榧犳爣浜嬩欢锛堜緥濡傜敤鎴锋姳鎬ㄧ殑锛氣€滅Щ鍔ㄨ繛绾胯繕鏄細鐢熷唇鈥濓級銆?
+   [FIX] Node hover 鏈韩甯?z-index: 100/1000锛屽繀椤诲姞婊″埌 2000 浠ュ交搴曞帇鍒讹紒 */
 .react-flow:has(.react-flow__edge.selected, .react-flow__edge:hover) .react-flow__edges {
     z-index: 2000 !important;
 }
 
 
-/* ⭐ 边端点锚点圆（自绘） — 悬停/选中时弹出 */
+/* 猸?杈圭鐐归敋鐐瑰渾锛堣嚜缁橈級 鈥?鎮仠/閫変腑鏃跺脊鍑?*/
 circle.custom-edge-updater {
     fill: #ffffff;
     stroke: var(--designer-accent, #6366f1);
@@ -525,7 +527,7 @@ circle.custom-edge-updater {
     pointer-events: none;
 }
 
-/* 悬停/选中时显示 */
+/* 鎮仠/閫変腑鏃舵樉绀?*/
 .react-flow__edge:hover circle.custom-edge-updater,
 .react-flow__edge.selected circle.custom-edge-updater {
     opacity: 1;
@@ -533,7 +535,7 @@ circle.custom-edge-updater {
     filter: drop-shadow(0 1px 3px rgba(99, 102, 241, 0.30));
 }
 
-/* 原生热区 hover → 圆点放大高亮 + 弹跳 */
+/* 鍘熺敓鐑尯 hover 鈫?鍦嗙偣鏀惧ぇ楂樹寒 + 寮硅烦 */
 .react-flow__edge:has(.react-flow__edgeupdater:hover) circle.custom-edge-updater {
     r: 7;
     fill: var(--designer-accent, #6366f1);
@@ -551,22 +553,15 @@ circle.custom-edge-updater {
     100% { transform: scale(1.0); }
 }
 
-/* 核心杀手锏：利用 :has() 伪类，当存在被选中、或悬挂被悬停的边时，直接将带有 SVG 的 Edges 容器层级凌驾于 Nodes 之上。
-   这就防止了下面原本层级绝缘的 HTML Handle 元素“吃掉”原本想点在圈圈上的鼠标事件（例如用户抱怨的：“移动连线还是会生崽”）。
-   [FIX] Node hover 本身带 z-index: 100/1000，必须加满到 2000 以彻底压制！ */
-.react-flow:has(.react-flow__edge.selected, .react-flow__edge:hover) .react-flow__edges {
-    z-index: 2000 !important;
-}
-
-/* 6. 对齐线效果 */
+/* 6. 瀵归綈绾挎晥鏋?*/
 
 .smart-guide-line {
     animation: flash-guide 0.3s ease-in-out;
 }
 
-/* 7. 响应式和无障碍 */
+/* 7. 鍝嶅簲寮忓拰鏃犻殰纰?*/
 
-/* 禁用动画（用户偏好） */
+/* 绂佺敤鍔ㄧ敾锛堢敤鎴峰亸濂斤級 */
 @media (prefers-reduced-motion: reduce) {
 
     .react-flow__node,
@@ -586,8 +581,8 @@ circle.custom-edge-updater {
     }
 }
 
-/* 7b. 键盘焦点指示器 (focus-visible) */
-/* 键盘 Tab 导航时显示清晰的蓝色 outline，鼠标点击不影响 */
+/* 7b. 閿洏鐒︾偣鎸囩ず鍣?(focus-visible) */
+/* 閿洏 Tab 瀵艰埅鏃舵樉绀烘竻鏅扮殑钃濊壊 outline锛岄紶鏍囩偣鍑讳笉褰卞搷 */
 .modern-toolbar .ant-btn:focus-visible,
 .floating-toolbar .ant-btn:focus-visible,
 .diagram-status-bar .ant-btn:focus-visible {
@@ -604,22 +599,22 @@ circle.custom-edge-updater {
     box-shadow: 0 0 0 3px rgba(137, 180, 250, 0.25);
 }
 
-/* 低性能设备优化 - 拖动时启用高性能模式 */
-/* ===== 高性能拖动模式（核心优化） ===== */
+/* 浣庢€ц兘璁惧浼樺寲 - 鎷栧姩鏃跺惎鐢ㄩ珮鎬ц兘妯″紡 */
+/* ===== 楂樻€ц兘鎷栧姩妯″紡锛堟牳蹇冧紭鍖栵級 ===== */
 .react-flow.performance-mode .react-flow__node,
 .react-flow.performance-mode .react-flow__edge-path,
 .react-flow.performance-mode .react-flow__handle {
     transition: none !important;
-    /* animation: none !important; [FIX] 禁用：会导致节点松开时入场动画(fadeIn)被重置并重播，引发全屏狂闪 */
+    /* animation: none !important; [FIX] 绂佺敤锛氫細瀵艰嚧鑺傜偣鏉惧紑鏃跺叆鍦哄姩鐢?fadeIn)琚噸缃苟閲嶆挱锛屽紩鍙戝叏灞忕媯闂?*/
 }
 
-/* 拖动中的节点提升到GPU层 */
+/* 鎷栧姩涓殑鑺傜偣鎻愬崌鍒癎PU灞?*/
 .react-flow.performance-mode .react-flow__node.dragging {
     will-change: transform;
     contain: strict;
 }
 
-/* 禁用悬停效果减少重排 */
+/* 绂佺敤鎮仠鏁堟灉鍑忓皯閲嶆帓 */
 .react-flow.performance-mode .react-flow__node:hover {
     transform: none;
     /* filter: none; */
@@ -629,7 +624,7 @@ circle.custom-edge-updater {
     animation: none;
 }
 
-/* 🌈 [GAP-01] MiniMap 视觉重塑 */
+/* 馃寛 [GAP-01] MiniMap 瑙嗚閲嶅 */
 .react-flow__minimap {
     background: var(--designer-panel-bg) !important;
     backdrop-filter: blur(12px) saturate(180%) !important;
@@ -641,12 +636,12 @@ circle.custom-edge-updater {
     margin: 16px !important;
 }
 
-/* 增强 SVG 缩略图饱和度 */
+/* 澧炲己 SVG 缂╃暐鍥鹃ケ鍜屽害 */
 .react-flow__minimap svg {
     filter: saturate(1.8) contrast(1.1);
 }
 
-/* 高亮当前视口蒙层 */
+/* 楂樹寒褰撳墠瑙嗗彛钂欏眰 */
 .react-flow__minimap-mask {
     fill: rgba(0, 0, 0, 0.15) !important;
 }
@@ -661,32 +656,32 @@ circle.custom-edge-updater {
     stroke-width: 2px !important;
 }
 
-/* 拖动时隐藏 MiniMap 减少实时渲染开销 */
+/* 鎷栧姩鏃堕殣钘?MiniMap 鍑忓皯瀹炴椂娓叉煋寮€閿€ */
 .react-flow.performance-mode .react-flow__minimap {
     opacity: 0.2;
     pointer-events: none;
     transition: opacity 0.2s ease;
 }
 
-/* 拖动时简化节点样式（移除 box-shadow）- Disabled to prevent full canvas repaint flash
+/* 鎷栧姩鏃剁畝鍖栬妭鐐规牱寮忥紙绉婚櫎 box-shadow锛? Disabled to prevent full canvas repaint flash
 .react-flow.performance-mode .react-flow__node:not(.dragging) {
     box-shadow: none !important;
     filter: none !important;
 } */
 
-/* 8. 自定义节点类型特殊效果 */
+/* 8. 鑷畾涔夎妭鐐圭被鍨嬬壒娈婃晥鏋?*/
 
-/* 分组节点悬停效果（较弱） */
+/* 鍒嗙粍鑺傜偣鎮仠鏁堟灉锛堣緝寮憋級 */
 .react-flow__node[data-type="titleGroup"]:hover,
 .react-flow__node[data-type="subGroup"]:hover {
     transform: scale(1.005);
     filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
 }
 
-/* 9. 性能优化 */
+/* 9. 鎬ц兘浼樺寲 */
 
-/* GPU 加速 - 仅对拖动中的节点启用 */
-/* 移除了全局 translateZ(0)：100个节点 = 100个合成层 = 内存压力 */
+/* GPU 鍔犻€?- 浠呭鎷栧姩涓殑鑺傜偣鍚敤 */
+/* 绉婚櫎浜嗗叏灞€ translateZ(0)锛?00涓妭鐐?= 100涓悎鎴愬眰 = 鍐呭瓨鍘嬪姏 */
 .react-flow__node.dragging {
     will-change: transform;
 }
@@ -700,14 +695,14 @@ circle.custom-edge-updater {
     animation: none;
 }
 
-/* 🚀 性能优化：拖动时禁用 flowchart-node 内部所有 transition */
+/* 馃殌 鎬ц兘浼樺寲锛氭嫋鍔ㄦ椂绂佺敤 flowchart-node 鍐呴儴鎵€鏈?transition */
 .diagram-dragging .flowchart-node,
 .diagram-dragging .flowchart-node *,
 .diagram-dragging .flowchart-shape,
 .diagram-dragging .flowchart-shape-stroke,
 .diagram-dragging .smart-edge {
     transition: none !important;
-    /* animation: none !important; [FIX] 禁用：防止动画重播闪屏 */
+    /* animation: none !important; [FIX] 绂佺敤锛氶槻姝㈠姩鐢婚噸鎾棯灞?*/
 }
 
 .react-flow__node.selected {
@@ -719,7 +714,7 @@ circle.custom-edge-updater {
     z-index: 10;
 }
 
-/* 选中态：品牌色渐变边框光晕（呼吸动画） */
+/* 閫変腑鎬侊細鍝佺墝鑹叉笎鍙樿竟妗嗗厜鏅曪紙鍛煎惛鍔ㄧ敾锛?*/
 .react-flow__node.selected::after {
     content: '';
     position: absolute;
@@ -742,7 +737,7 @@ circle.custom-edge-updater {
     to { opacity: 0.3; transform: scale(1.01); }
 }
 
-/* 选中边 — 品牌色发光强调（与 L470 的选中规则统一，此处用于 Hyper-Glass 覆盖层） */
+/* 閫変腑杈?鈥?鍝佺墝鑹插彂鍏夊己璋冿紙涓?L470 鐨勯€変腑瑙勫垯缁熶竴锛屾澶勭敤浜?Hyper-Glass 瑕嗙洊灞傦級 */
 .react-flow__edge.selected .react-flow__edge-path {
     stroke: var(--designer-accent) !important;
     stroke-width: 3px !important;
@@ -752,7 +747,7 @@ circle.custom-edge-updater {
     transition: stroke-width 0.2s ease, filter 0.2s ease;
 }
 
-/* 🚀 performance-mode 补充覆盖：smart-edge 和 SVG shapes */
+/* 馃殌 performance-mode 琛ュ厖瑕嗙洊锛歴mart-edge 鍜?SVG shapes */
 .react-flow.performance-mode .smart-edge,
 .react-flow.performance-mode .flowchart-shape,
 .react-flow.performance-mode .flowchart-shape-stroke {
@@ -760,7 +755,7 @@ circle.custom-edge-updater {
     /* filter: none !important; */
 }
 
-/* 🚀 P5: 连线期间禁用 handle 和连接预览元素的 transition/animation */
+/* 馃殌 P5: 杩炵嚎鏈熼棿绂佺敤 handle 鍜岃繛鎺ラ瑙堝厓绱犵殑 transition/animation */
 .react-flow.performance-mode .react-flow__node.rf-connecting,
 .react-flow.performance-mode .react-flow__node.rf-connectable,
 .react-flow.performance-mode .react-flow__node.rf-connectable.rf-connect-preview,
@@ -768,7 +763,7 @@ circle.custom-edge-updater {
     transition: none !important;
 }
 
-/* 导航条目悬停效果 */
+/* 瀵艰埅鏉＄洰鎮仠鏁堟灉 */
 .navigator-item {
     transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -802,7 +797,7 @@ circle.custom-edge-updater {
     transform: translateX(-50%) translateY(-2px) !important;
 }
 
-/* 拖动手柄打磨 */
+/* 鎷栧姩鎵嬫焺鎵撶（ */
 .toolbar-drag-handle:hover {
     color: var(--designer-accent, #6366f1) !important;
     transform: scale(1.1);
@@ -812,7 +807,7 @@ circle.custom-edge-updater {
     transform: scale(0.9);
 }
 
-/* 按钮微交互 */
+/* 鎸夐挳寰氦浜?*/
 .modern-toolbar .ant-btn {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
@@ -846,9 +841,9 @@ circle.custom-edge-updater {
 
 
 
-/* 10. 拖拽父节点高亮效果 */
+/* 10. 鎷栨嫿鐖惰妭鐐归珮浜晥鏋?*/
 
-/* 节点拖动到父容器（titleGroup/subGroup）时的高亮效果 */
+/* 鑺傜偣鎷栧姩鍒扮埗瀹瑰櫒锛坱itleGroup/subGroup锛夋椂鐨勯珮浜晥鏋?*/
 .react-flow__node.drop-target-highlight {
     box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.5) !important;
     background-color: rgba(24, 144, 255, 0.05) !important;
@@ -856,7 +851,7 @@ circle.custom-edge-updater {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 11. QuickConnect 菜单入场动画 */
+/* 11. QuickConnect 鑿滃崟鍏ュ満鍔ㄧ敾 */
 @keyframes quickMenuFadeIn {
     from {
         opacity: 0;
@@ -870,13 +865,13 @@ circle.custom-edge-updater {
 }
 
 /* ============================================
-   12. 深色模式自适应
-   支持两种触发方式：
-   - [data-theme='dark'] — 手动切换
-   - @media (prefers-color-scheme: dark) — 系统跟随
+   12. 娣辫壊妯″紡鑷€傚簲
+   鏀寔涓ょ瑙﹀彂鏂瑰紡锛?
+   - [data-theme='dark'] 鈥?鎵嬪姩鍒囨崲
+   - @media (prefers-color-scheme: dark) 鈥?绯荤粺璺熼殢
    ============================================ */
 
-/* --- 共用暗色变量 --- */
+/* --- 鍏辩敤鏆楄壊鍙橀噺 --- */
 :root {
     --diagram-dark-bg: #1e1e2e;
     --diagram-dark-surface: rgba(30, 30, 46, 0.85);
@@ -888,7 +883,7 @@ circle.custom-edge-updater {
     --diagram-dark-success: #a6e3a1;
 }
 
-/* --- data-theme 方式 --- */
+/* --- data-theme 鏂瑰紡 --- */
 [data-theme='dark'] .diagram-status-bar {
     background: var(--diagram-dark-surface);
     -webkit-backdrop-filter: blur(16px) saturate(160%);
@@ -918,13 +913,13 @@ circle.custom-edge-updater {
         0 4px 16px rgba(137, 180, 250, 0.12) !important;
 }
 
-/* 暗色模式默认边颜色加亮 */
+/* 鏆楄壊妯″紡榛樿杈归鑹插姞浜?*/
 [data-theme='dark'] .react-flow__edge-path {
     stroke: #cbd5e1;
 }
 
 [data-theme='dark'] .react-flow__edge:hover .react-flow__edge-path {
-    stroke: var(--diagram-dark-accent);
+    stroke: var(--diagram-dark-accent) !important;
 }
 
 [data-theme='dark'] .react-flow__edge.selected .react-flow__edge-path {
@@ -957,7 +952,7 @@ circle.custom-edge-updater {
     box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35) !important;
 }
 
-/* 🆕 深色模式：工具栏按钮统一 hover / active 样式 */
+/* 馃啎 娣辫壊妯″紡锛氬伐鍏锋爮鎸夐挳缁熶竴 hover / active 鏍峰紡 */
 [data-theme='dark'] .modern-toolbar .ant-btn-text,
 [data-theme='dark'] .floating-toolbar .ant-btn-text {
     color: rgba(205, 214, 244, 0.85) !important;
@@ -979,7 +974,7 @@ circle.custom-edge-updater {
     color: rgba(205, 214, 244, 0.25) !important;
 }
 
-/* 🆕 深色模式：primary ghost 按钮（网格/路由/标尺等激活态） */
+/* 馃啎 娣辫壊妯″紡锛歱rimary ghost 鎸夐挳锛堢綉鏍?璺敱/鏍囧昂绛夋縺娲绘€侊級 */
 [data-theme='dark'] .modern-toolbar .ant-btn-primary.ant-btn-background-ghost {
     color: #89b4fa !important;
     border-color: rgba(137, 180, 250, 0.5) !important;
@@ -991,7 +986,7 @@ circle.custom-edge-updater {
     border-color: rgba(137, 180, 250, 0.7) !important;
 }
 
-/* 🆕 深色模式：拖拽手柄 */
+/* 馃啎 娣辫壊妯″紡锛氭嫋鎷芥墜鏌?*/
 [data-theme='dark'] .modern-toolbar .ant-card-body>div:first-child {
     color: rgba(205, 214, 244, 0.35) !important;
 }
@@ -1000,7 +995,7 @@ circle.custom-edge-updater {
     color: rgba(205, 214, 244, 0.75) !important;
 }
 
-/* 🆕 深色模式：分隔线 */
+/* 馃啎 娣辫壊妯″紡锛氬垎闅旂嚎 */
 [data-theme='dark'] .modern-toolbar .ant-divider,
 [data-theme='dark'] .floating-toolbar .ant-divider {
     border-color: rgba(205, 214, 244, 0.12) !important;
@@ -1018,7 +1013,7 @@ circle.custom-edge-updater {
 
 
 
-/* --- 系统跟随方式（无 data-theme 标记时生效） --- */
+/* --- 绯荤粺璺熼殢鏂瑰紡锛堟棤 data-theme 鏍囪鏃剁敓鏁堬級 --- */
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme='light']) .diagram-status-bar {
         background: var(--diagram-dark-surface);
@@ -1103,9 +1098,9 @@ circle.custom-edge-updater {
 }
 
 /* ============================================
-   13. 右侧边栏 Tabs 高度链修复
-   Ant Design Tabs 内部容器默认无 height，
-   导致 AI 面板 flex 布局无法撑满，输入框悬空。
+   13. 鍙充晶杈规爮 Tabs 楂樺害閾句慨澶?
+   Ant Design Tabs 鍐呴儴瀹瑰櫒榛樿鏃?height锛?
+   瀵艰嚧 AI 闈㈡澘 flex 甯冨眬鏃犳硶鎾戞弧锛岃緭鍏ユ鎮┖銆?
    ============================================ */
 .designer-right-sidebar .ant-tabs {
     display: flex;
@@ -1127,26 +1122,26 @@ circle.custom-edge-updater {
     height: 100%;
 }
 
-/* Tabs 内直接子 div（容器 wrapper）也要撑满 */
+/* Tabs 鍐呯洿鎺ュ瓙 div锛堝鍣?wrapper锛変篃瑕佹拺婊?*/
 .designer-right-sidebar .ant-tabs-tabpane>div {
     height: 100%;
 }
 
 /* ============================================
-   🌙 暗色模式（Dark Mode）
-   由 useThemeMode Hook 在 <html> 上设置 data-theme="dark"
+   馃寵 鏆楄壊妯″紡锛圖ark Mode锛?
+   鐢?useThemeMode Hook 鍦?<html> 涓婅缃?data-theme="dark"
    ============================================ */
 
 [data-theme="dark"] .diagram-root {
     background-color: #1a1a2e;
 }
 
-/* 画布背景 */
+/* 鐢诲竷鑳屾櫙 */
 [data-theme="dark"] .react-flow {
     background-color: #16213e !important;
 }
 
-/* React Flow 网格 */
+/* React Flow 缃戞牸 */
 [data-theme="dark"] .react-flow__background pattern circle {
     fill: rgba(255, 255, 255, 0.06) !important;
 }
@@ -1154,7 +1149,7 @@ circle.custom-edge-updater {
     stroke: rgba(255, 255, 255, 0.05) !important;
 }
 
-/* 节点卡片 */
+/* 鑺傜偣鍗＄墖 */
 [data-theme="dark"] .react-flow__node {
     background: #1e293b;
     border-color: #334155;
@@ -1167,7 +1162,7 @@ circle.custom-edge-updater {
         0 4px 16px rgba(96, 165, 250, 0.12) !important;
 }
 
-/* 自定义节点 */
+/* 鑷畾涔夎妭鐐?*/
 [data-theme="dark"] .flowchart-node,
 [data-theme="dark"] .custom-node-wrapper {
     background: #1e293b !important;
@@ -1182,7 +1177,7 @@ circle.custom-edge-updater {
     color: #94a3b8 !important;
 }
 
-/* 分组节点 */
+/* 鍒嗙粍鑺傜偣 */
 [data-theme="dark"] .title-group-node {
     background: rgba(30, 41, 59, 0.85) !important;
     border-color: #475569 !important;
@@ -1191,7 +1186,7 @@ circle.custom-edge-updater {
     color: #e2e8f0 !important;
 }
 
-/* 连线与边 */
+/* 杩炵嚎涓庤竟 */
 [data-theme="dark"] .react-flow__edge path {
     stroke: #64748b;
 }
@@ -1202,13 +1197,13 @@ circle.custom-edge-updater {
     stroke: #818cf8 !important;
 }
 
-/* 连接点 (Handles) */
+/* 杩炴帴鐐?(Handles) */
 [data-theme="dark"] .react-flow__handle {
     background: #475569;
     border-color: #60a5fa;
 }
 
-/* 浮动工具栏 — glassmorphism 暗色 (背景移至单独的胶囊元素) */
+/* 娴姩宸ュ叿鏍?鈥?glassmorphism 鏆楄壊 (鑳屾櫙绉昏嚦鍗曠嫭鐨勮兌鍥婂厓绱? */
 [data-theme="dark"] .modern-toolbar .ant-btn-text {
     color: #cbd5e1 !important;
 }
@@ -1220,14 +1215,14 @@ circle.custom-edge-updater {
     border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
-/* 状态栏 */
+/* 鐘舵€佹爮 */
 [data-theme="dark"] .diagram-status-bar {
     background: rgba(30, 41, 59, 0.9) !important;
     border-color: rgba(255, 255, 255, 0.06) !important;
     color: #94a3b8 !important;
 }
 
-/* 右侧面板 */
+/* 鍙充晶闈㈡澘 */
 [data-theme="dark"] .designer-right-sidebar {
     background: #1e293b !important;
     border-color: #334155 !important;
@@ -1239,45 +1234,45 @@ circle.custom-edge-updater {
     color: #60a5fa !important;
 }
 
-/* 属性面板 */
+/* 灞炴€ч潰鏉?*/
 [data-theme="dark"] .property-panel {
     background: #1e293b !important;
     color: #e2e8f0 !important;
 }
 
-/* 左侧边栏 */
+/* 宸︿晶杈规爮 */
 [data-theme="dark"] .icon-rail-sidebar {
     background: #1e293b !important;
     border-color: #334155 !important;
 }
 
-/* 搜索栏 */
+/* 鎼滅储鏍?*/
 [data-theme="dark"] .canvas-search-bar,
 [data-theme="dark"] div[style*="backdrop-filter"] {
     background: rgba(30, 41, 59, 0.95) !important;
     border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-/* 浮动上下文工具栏 */
+/* 娴姩涓婁笅鏂囧伐鍏锋爮 */
 [data-theme="dark"] .floating-context-toolbar,
 [data-theme="dark"] .contextual-edge-toolbar {
     background: rgba(30, 41, 59, 0.95) !important;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
 }
 
-/* 小地图 */
+/* 灏忓湴鍥?*/
 [data-theme="dark"] .react-flow__minimap {
     background: #1e293b !important;
     border-color: #334155 !important;
 }
 
-/* 标尺 */
+/* 鏍囧昂 */
 [data-theme="dark"] .canvas-ruler {
     background: #1e293b !important;
     color: #64748b !important;
 }
 
-/* 滚动条暗色 */
+/* 婊氬姩鏉℃殫鑹?*/
 [data-theme="dark"] ::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.15);
 }
@@ -1285,7 +1280,7 @@ circle.custom-edge-updater {
     background: rgba(255, 255, 255, 0.25);
 }
 
-/* Ant Design 下拉菜单暗色适配 */
+/* Ant Design 涓嬫媺鑿滃崟鏆楄壊閫傞厤 */
 [data-theme="dark"] .ant-dropdown {
     --antd-wave-shadow-color: #60a5fa;
 }
@@ -1300,21 +1295,21 @@ circle.custom-edge-updater {
     background: rgba(96, 165, 250, 0.08) !important;
 }
 
-/* DesignerRightSidebar — glassmorphism 暗色 */
+/* DesignerRightSidebar 鈥?glassmorphism 鏆楄壊 */
 [data-theme="dark"] .designer-right-sidebar {
     background-color: rgba(30, 41, 59, 0.95) !important;
     backdrop-filter: blur(20px) saturate(180%);
     box-shadow: -8px 0 32px rgba(0, 0, 0, 0.3) !important;
 }
 
-/* GenericStandardDiagram — AI 侧栏暗色 */
+/* GenericStandardDiagram 鈥?AI 渚ф爮鏆楄壊 */
 [data-theme="dark"] .gsd-ai-sidebar {
     background-color: #1e293b !important;
     border-left-color: #334155 !important;
     box-shadow: -2px 0 8px rgba(0, 0, 0, 0.2) !important;
 }
 
-/* PropertyPanel 暗色 */
+/* PropertyPanel 鏆楄壊 */
 [data-theme="dark"] .ant-collapse {
     background: transparent;
     border-color: #334155;
@@ -1356,7 +1351,7 @@ circle.custom-edge-updater {
     background: rgba(96, 165, 250, 0.15) !important;
 }
 
-/* Tabs 暗色 */
+/* Tabs 鏆楄壊 */
 [data-theme="dark"] .ant-tabs-nav {
     border-bottom-color: #334155 !important;
 }
@@ -1370,7 +1365,7 @@ circle.custom-edge-updater {
     background: #60a5fa !important;
 }
 
-/* Modal 暗色 */
+/* Modal 鏆楄壊 */
 [data-theme="dark"] .ant-modal-content {
     background: #1e293b !important;
     border: 1px solid #334155;
@@ -1389,13 +1384,13 @@ circle.custom-edge-updater {
     border-top-color: #334155 !important;
 }
 
-/* Tooltip 暗色 */
+/* Tooltip 鏆楄壊 */
 [data-theme="dark"] .ant-tooltip-inner {
     background: #0f172a !important;
     color: #e2e8f0 !important;
 }
 
-/* IconRailSidebar — 浮动抽屉暗色 */
+/* IconRailSidebar 鈥?娴姩鎶藉眽鏆楄壊 */
 [data-theme="dark"] .side-drawer {
     background: #1e293b !important;
     border-color: #334155 !important;
@@ -1406,13 +1401,13 @@ circle.custom-edge-updater {
 }
 
 /* ============================================
-   Selection Marquee — 精细化 Figma 风格选框
+   Selection Marquee 鈥?绮剧粏鍖?Figma 椋庢牸閫夋
    ============================================ */
 .react-flow__selection {
     background: rgba(99, 102, 241, 0.07) !important;
     border: 1.5px solid rgba(99, 102, 241, 0.55) !important;
     border-radius: 5px !important;
-    /* 流动虚线边框动画 */
+    /* 娴佸姩铏氱嚎杈规鍔ㄧ敾 */
     animation: selectionMarch 0.8s linear infinite !important;
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08), inset 0 0 20px rgba(99, 102, 241, 0.04) !important;
 }
@@ -1423,7 +1418,7 @@ circle.custom-edge-updater {
     100% { border-color: rgba(99, 102, 241, 0.55); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08); }
 }
 
-/* 节点多选高亮框 — 虚线描边 + 内部淡蓝 */
+/* 鑺傜偣澶氶€夐珮浜 鈥?铏氱嚎鎻忚竟 + 鍐呴儴娣¤摑 */
 .react-flow__nodesselection-rect {
     background: rgba(99, 102, 241, 0.05) !important;
     border: 1.5px dashed rgba(99, 102, 241, 0.5) !important;
@@ -1432,7 +1427,7 @@ circle.custom-edge-updater {
 }
 
 /* ============================================
-   Connection Handles — 精致悬浮效果
+   Connection Handles 鈥?绮捐嚧鎮诞鏁堟灉
    ============================================ */
 .react-flow__handle {
     width: 7px !important;
@@ -1441,8 +1436,8 @@ circle.custom-edge-updater {
     border: 1.5px solid #fff !important;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
     box-shadow: 0 0 0 0 transparent;
-    /* [FIX] 默认不可见，与 FlowchartNode.css .flowchart-handle 的 opacity:0 设计对齐
-       避免节点上常驻灰/绿色连接点，视觉突兀。hover 时由下方规则显示。 */
+    /* [FIX] 榛樿涓嶅彲瑙侊紝涓?FlowchartNode.css .flowchart-handle 鐨?opacity:0 璁捐瀵归綈
+       閬垮厤鑺傜偣涓婂父椹荤伆/缁胯壊杩炴帴鐐癸紝瑙嗚绐佸厐銆俬over 鏃剁敱涓嬫柟瑙勫垯鏄剧ず銆?*/
     opacity: 0;
 }
 
@@ -1456,7 +1451,7 @@ circle.custom-edge-updater {
     opacity: 1 !important;
 }
 
-/* 连线拖拽中：候选 handle 呼吸脉冲 */
+/* 杩炵嚎鎷栨嫿涓細鍊欓€?handle 鍛煎惛鑴夊啿 */
 .react-flow.connecting .react-flow__handle:not(.connectingto):not(.connectingfrom) {
     opacity: 1 !important;
     animation: handlePulse 1.2s ease-in-out infinite !important;
@@ -1488,9 +1483,9 @@ circle.custom-edge-updater {
 }
 
 /* ============================================
-   🔌 Connection Line Preview — 渐变能量线
+   馃攲 Connection Line Preview 鈥?娓愬彉鑳介噺绾?
    ============================================ */
-/* 连线路径本体 */
+/* 杩炵嚎璺緞鏈綋 */
 .react-flow__connection-path {
     stroke: var(--theme-primary-main, #6366f1) !important;
     stroke-width: 2.5px !important;
@@ -1509,14 +1504,14 @@ circle.custom-edge-updater {
     to   { stroke-dashoffset: 0; }
 }
 
-/* 连线时隐藏所有 ⊕ 快捷按钮，减少干扰 */
+/* 杩炵嚎鏃堕殣钘忔墍鏈?鈯?蹇嵎鎸夐挳锛屽噺灏戝共鎵?*/
 .react-flow.connecting .flowchart-quick-clone-btn {
     opacity: 0 !important;
     pointer-events: none !important;
     transition: none !important;
 }
 
-/* 🚀 P6: 磁性吸附反馈 — 节点共鸣 */
+/* 馃殌 P6: 纾佹€у惛闄勫弽棣?鈥?鑺傜偣鍏遍福 */
 .react-flow__node.rf-connect-preview {
     border-color: var(--theme-primary-main, #3b82f6) !important;
     box-shadow: 
@@ -1527,7 +1522,7 @@ circle.custom-edge-updater {
     z-index: 1000 !important;
 }
 
-/* 🚀 P6: 句柄点亮闪烁 — 捕捉状态 */
+/* 馃殌 P6: 鍙ユ焺鐐逛寒闂儊 鈥?鎹曟崏鐘舵€?*/
 .react-flow__handle.connectionindicator {
     background: var(--theme-success-main, #10b981) !important;
     border-color: #fff !important;
@@ -1550,7 +1545,7 @@ circle.custom-edge-updater {
     }
 }
 
-/* 暗色模式 handle */
+/* 鏆楄壊妯″紡 handle */
 [data-theme="dark"] .react-flow__handle {
     background: var(--theme-text-muted, #64748b) !important;
     border-color: var(--theme-background-main, #1e293b) !important;
@@ -1562,7 +1557,7 @@ circle.custom-edge-updater {
     box-shadow: 0 0 0 3px var(--theme-primary-main-alpha, rgba(96, 165, 250, 0.25)), 0 0 8px var(--theme-primary-main-alpha, rgba(96, 165, 250, 0.3)) !important;
 }
 
-/* 选框 */
+/* 閫夋 */
 .react-flow__selection {
     background: var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.08)) !important;
     border-color: var(--theme-primary-main, rgba(59, 130, 246, 0.5)) !important;
@@ -1575,14 +1570,14 @@ circle.custom-edge-updater {
 
 /* ============================================
    Semantic Zoom & Canvas Virtualization
-   当 zoom < 0.4 时，触发容器级降级渲染
+   褰?zoom < 0.4 鏃讹紝瑙﹀彂瀹瑰櫒绾ч檷绾ф覆鏌?
    ============================================ */
 .diagram-zoomed-out .react-flow__node {
     box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
     transition: none !important;
 }
 
-/* 隐藏无关交互组件 */
+/* 闅愯棌鏃犲叧浜や簰缁勪欢 */
 .diagram-zoomed-out .react-flow__handle,
 .diagram-zoomed-out .react-flow__resize-control,
 .diagram-zoomed-out .react-flow__connection-indicator,
@@ -1591,7 +1586,7 @@ circle.custom-edge-updater {
     display: none !important;
 }
 
-/* 隐藏节点内的复杂表单组件 */
+/* 闅愯棌鑺傜偣鍐呯殑澶嶆潅琛ㄥ崟缁勪欢 */
 .diagram-zoomed-out .react-flow__node input,
 .diagram-zoomed-out .react-flow__node textarea,
 .diagram-zoomed-out .react-flow__node select,
@@ -1604,7 +1599,7 @@ circle.custom-edge-updater {
     pointer-events: none !important;
 }
 
-/* 富文本与编辑框降级 */
+/* 瀵屾枃鏈笌缂栬緫妗嗛檷绾?*/
 .diagram-zoomed-out .react-flow__node [contenteditable="true"] {
     pointer-events: none !important;
     caret-color: transparent !important;
@@ -1612,13 +1607,13 @@ circle.custom-edge-updater {
     overflow: hidden !important;
 }
 
-/* 边线降级：取消所有复杂虚线与动画连线 */
+/* 杈圭嚎闄嶇骇锛氬彇娑堟墍鏈夊鏉傝櫄绾夸笌鍔ㄧ敾杩炵嚎 */
 .diagram-zoomed-out .react-flow__edge-path {
     stroke-dasharray: none !important;
     animation: none !important;
 }
 
-/* 连线文字降级 */
+/* 杩炵嚎鏂囧瓧闄嶇骇 */
 .diagram-zoomed-out .react-flow__edge-textbg,
 .diagram-zoomed-out .react-flow__edge-text,
 .diagram-zoomed-out .edge-label-container {
@@ -1671,7 +1666,7 @@ circle.custom-edge-updater {
     }
 }
 
-/* 🎯 扩充连接点热区 (Hit-box Expansion) */
+/* 馃幆 鎵╁厖杩炴帴鐐圭儹鍖?(Hit-box Expansion) */
 .react-flow__handle::after {
     content: '';
     position: absolute;
@@ -1686,8 +1681,8 @@ circle.custom-edge-updater {
 }
 
 /* ============================================
-   性能激进模式 (Performance Aggressive Mode)
-   当连线、拖拽时，挂载在 Body 上的 .performance-mode 会生效
+   鎬ц兘婵€杩涙ā寮?(Performance Aggressive Mode)
+   褰撹繛绾裤€佹嫋鎷芥椂锛屾寕杞藉湪 Body 涓婄殑 .performance-mode 浼氱敓鏁?
    ============================================ */
 body.performance-mode .react-flow__edge-path,
 body.performance-mode .react-flow__node,
@@ -1699,7 +1694,7 @@ body.performance-mode .react-flow__viewport {
 body.performance-mode .modern-toolbar,
 body.performance-mode .modern-sidebar-container,
 body.performance-mode .modern-controls-panel {
-    /* 拖动时禁用高开销滤镜，显著提升帧率 */
+    /* 鎷栧姩鏃剁鐢ㄩ珮寮€閿€婊ら暅锛屾樉钁楁彁鍗囧抚鐜?*/
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     background: rgba(255, 255, 255, 0.95) !important;
@@ -1715,7 +1710,7 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
    Magnetic Reparenting Drop Highlights
    ============================================ */
 
-/* 基础目标高亮 (内发光 + 脉冲) */
+/* 鍩虹鐩爣楂樹寒 (鍐呭彂鍏?+ 鑴夊啿) */
 .drop-target-highlight {
     outline: 2px solid var(--theme-primary-main, #3b82f6) !important;
     outline-offset: 4px !important;
@@ -1726,7 +1721,7 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
     z-index: 100 !important;
 }
 
-/* 伪元素用于指示具体的插入位置 (above, below, inside) */
+/* 浼厓绱犵敤浜庢寚绀哄叿浣撶殑鎻掑叆浣嶇疆 (above, below, inside) */
 .drop-target-highlight::before {
     content: '';
     position: absolute;
@@ -1738,7 +1733,7 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
     box-shadow: 0 0 8px var(--theme-primary-main-alpha, rgba(59, 130, 246, 0.6));
 }
 
-/* 插入上方 (上方发光条) */
+/* 鎻掑叆涓婃柟 (涓婃柟鍙戝厜鏉? */
 .drop-target-highlight.drop-above::before {
     top: -12px;
     left: 10%;
@@ -1747,7 +1742,7 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
     animation: drop-pulse-horizontal 1.5s infinite;
 }
 
-/* 插入下方 (下方发光条) */
+/* 鎻掑叆涓嬫柟 (涓嬫柟鍙戝厜鏉? */
 .drop-target-highlight.drop-below::before {
     bottom: -12px;
     left: 10%;
@@ -1756,7 +1751,7 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
     animation: drop-pulse-horizontal 1.5s infinite;
 }
 
-/* 作为子节点插入 (内部填充发光) */
+/* 浣滀负瀛愯妭鐐规彃鍏?(鍐呴儴濉厖鍙戝厜) */
 .drop-target-highlight.drop-inside::before {
     top: 0;
     bottom: 0;
@@ -1777,47 +1772,47 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
 }
 
 /* ============================================
-   节点拖动时连线"预览态"降级样式
-   当节点拖动时 → fallback SmoothStep 路径 + 虚线预览（由 JS busStyle 注入）
-   松手后 Worker 重算 → 完整精确路径还原
+   鑺傜偣鎷栧姩鏃惰繛绾?棰勮鎬?闄嶇骇鏍峰紡
+   褰撹妭鐐规嫋鍔ㄦ椂 鈫?fallback SmoothStep 璺緞 + 铏氱嚎棰勮锛堢敱 JS busStyle 娉ㄥ叆锛?
+   鏉炬墜鍚?Worker 閲嶇畻 鈫?瀹屾暣绮剧‘璺緞杩樺師
    ============================================ */
 
-/* 拖动中：保持高 opacity，stroke 颜色和虚线由 busStyle JS 控制 */
+/* 鎷栧姩涓細淇濇寔楂?opacity锛宻troke 棰滆壊鍜岃櫄绾跨敱 busStyle JS 鎺у埗 */
 .diagram-dragging .react-flow__edge:not(.selected) .react-flow__edge-path {
     opacity: 0.95 !important;
-    transition: none !important; /* 跟随节点位置实时更新，无延迟 */
+    transition: none !important; /* 璺熼殢鑺傜偣浣嶇疆瀹炴椂鏇存柊锛屾棤寤惰繜 */
 }
 
-/* 拖动中：已选中边完全不透明 */
+/* 鎷栧姩涓細宸查€変腑杈瑰畬鍏ㄤ笉閫忔槑 */
 .diagram-dragging .react-flow__edge.selected .react-flow__edge-path {
     opacity: 1 !important;
     transition: none !important;
 }
 
-/* 拖动中：停用昂贵的 filter 效果（drop-shadow 触发 GPU 层重绘） */
+/* 鎷栧姩涓細鍋滅敤鏄傝吹鐨?filter 鏁堟灉锛坉rop-shadow 瑙﹀彂 GPU 灞傞噸缁橈級 */
 .diagram-dragging .react-flow__edge-path {
     filter: none !important;
     animation-play-state: paused !important;
 }
 
-/* 拖动中：停用边标签（避免位置抖动） */
+/* 鎷栧姩涓細鍋滅敤杈规爣绛撅紙閬垮厤浣嶇疆鎶栧姩锛?*/
 .diagram-dragging .react-flow__edge-textbg,
 .diagram-dragging .react-flow__edge-text {
     opacity: 0 !important;
     transition: none !important;
 }
 
-/* 拖动结束后：平滑恢复 */
+/* 鎷栧姩缁撴潫鍚庯細骞虫粦鎭㈠ */
 .react-flow__edge-path {
     transition: opacity 0.25s ease, stroke-width 0.15s ease;
 }
 
 /* ============================================
-   Hyper-Glass V3: 连线标签胶囊化
-   对标 Lucidchart / draw.io edge label 样式
+   Hyper-Glass V3: 杩炵嚎鏍囩鑳跺泭鍖?
+   瀵规爣 Lucidchart / draw.io edge label 鏍峰紡
    ============================================ */
 
-/* SVG 原生 label 背景（textbg 元素） */
+/* SVG 鍘熺敓 label 鑳屾櫙锛坱extbg 鍏冪礌锛?*/
 .react-flow__edge-textbg {
     fill: white !important;
     rx: 5;
@@ -1827,7 +1822,7 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
     filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.08));
 }
 
-/* SVG 原生 label 文字 */
+/* SVG 鍘熺敓 label 鏂囧瓧 */
 .react-flow__edge-text {
     font-size: 11px !important;
     font-weight: 600 !important;
@@ -1836,7 +1831,7 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
     letter-spacing: 0.01em;
 }
 
-/* HTML 自定义 EdgeLabel 容器（EdgeLabelRenderer 模式） */
+/* HTML 鑷畾涔?EdgeLabel 瀹瑰櫒锛圗dgeLabelRenderer 妯″紡锛?*/
 .edge-label-container {
     background: rgba(255, 255, 255, 0.97);
     border: 1px solid rgba(99, 102, 241, 0.12);
@@ -1856,7 +1851,7 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
     transition: opacity 0.15s ease;
 }
 
-/* 暗色模式 edge label */
+/* 鏆楄壊妯″紡 edge label */
 [data-theme='dark'] .react-flow__edge-textbg {
     fill: #1e2233 !important;
     stroke: rgba(139, 92, 246, 0.4);
@@ -1870,4 +1865,4 @@ html[data-theme='dark'] body.performance-mode .modern-sidebar-container {
     color: #e2e8f0;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255,255,255,0.04) inset;
 }
-
+

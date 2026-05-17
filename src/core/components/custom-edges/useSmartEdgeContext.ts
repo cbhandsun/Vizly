@@ -78,13 +78,21 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
     } = props;
 
     // Helper to parse handle direction from ID
+    // [FIX] Reordered: exact match → includes → single-char prefix
+    // Prevents compound IDs like 't-right' from being misidentified as 'top' via startsWith('t')
     const parseHandleDirection = (handleId?: string | null): Position | undefined => {
         if (!handleId) return undefined;
         const h = handleId.toLowerCase();
-        if (h.startsWith('t') || h.includes('-top') || h.includes('top-')) return Position.Top;
-        if (h.startsWith('b') || h.includes('-bottom') || h.includes('bottom-')) return Position.Bottom;
-        if (h.startsWith('l') || h.includes('-left') || h.includes('left-')) return Position.Left;
-        if (h.startsWith('r') || h.includes('-right') || h.includes('right-')) return Position.Right;
+        // Priority 1: exact match
+        if (h === 'top' || h === 't') return Position.Top;
+        if (h === 'bottom' || h === 'b') return Position.Bottom;
+        if (h === 'left' || h === 'l') return Position.Left;
+        if (h === 'right' || h === 'r') return Position.Right;
+        // Priority 2: substring includes (catches 'source-right', 't-right', 'col-0-left', etc.)
+        if (h.includes('top')) return Position.Top;
+        if (h.includes('bottom')) return Position.Bottom;
+        if (h.includes('left')) return Position.Left;
+        if (h.includes('right')) return Position.Right;
         return undefined;
     };
 
