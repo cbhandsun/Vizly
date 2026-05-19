@@ -9,132 +9,77 @@
       "description": "<b>上游系统</b><br/>(ERP / OMS / SCM)",
       "domain": "external",
       "domainClass": "ch",
-      "type": "custom",
-      "zIndex": 1,
-      "position": {
-        "x": 550,
-        "y": 100
-      }
+      "type": "custom"
     },
     {
       "id": "l-oms",
       "description": "<b>物流订单中心 (L-OMS)</b><br/>• 接收上游订单/拆分物流单<br/>• 仓/运/关/配协同与编排<br/>• 全链路状态追踪与预警",
       "domain": "logistics",
       "domainClass": "be-logistics",
-      "type": "custom",
-      "zIndex": 1,
-      "position": {
-        "x": 550,
-        "y": 320
-      }
+      "type": "custom"
     },
     {
       "id": "wms",
       "description": "<b>仓储管理 (WMS)</b><br/>• 入库/上架/拣选/波次/盘点<br/>• 库内移动/路径优化/库存管理<br/>• RF/PDA/电子标签支持",
       "domain": "logistics",
       "domainClass": "be-logistics",
-      "type": "custom",
-      "zIndex": 1,
-      "position": {
-        "x": 100,
-        "y": 620
-      }
+      "type": "custom"
     },
     {
       "id": "wcs",
       "description": "<b>仓储控制 (WCS)</b><br/>• AGV/ASRS/输送线/分拣机调度<br/>• 自动化设备状态监控<br/>• 与WMS接口/执行具体任务",
       "domain": "logistics",
       "domainClass": "be-logistics",
-      "type": "custom",
-      "zIndex": 1,
-      "position": {
-        "x": 100,
-        "y": 710
-      }
+      "type": "custom"
     },
     {
       "id": "tms",
       "description": "<b>运输管理 (TMS)</b><br/>• 运力资源/线路规划/智能配载<br/>• 承运商协同/在途跟踪<br/>• 回单管理/异常处理",
       "domain": "logistics",
       "domainClass": "be-logistics",
-      "type": "custom",
-      "zIndex": 1,
-      "position": {
-        "x": 550,
-        "y": 620
-      }
+      "type": "custom"
     },
     {
       "id": "customs",
       "description": "<b>关务管理 (GTS)</b><br/>• 进出口报关/单一窗口对接<br/>• 贸易合规/关务文件/税费计算",
       "domain": "logistics",
       "domainClass": "be-logistics",
-      "type": "custom",
-      "zIndex": 1,
-      "position": {
-        "x": 1000,
-        "y": 620
-      }
+      "type": "custom"
     },
     {
       "id": "bms",
       "description": "<b>计费结算 (BMS)</b><br/>• 物流费用模型/合同管理<br/>• 自动计费/账单生成<br/>• 应收应付/对账与结算",
       "domain": "logistics",
       "domainClass": "be-logistics",
-      "type": "custom",
-      "zIndex": 1,
-      "position": {
-        "x": 100,
-        "y": 1300
-      }
+      "type": "custom"
     },
     {
       "id": "yms",
       "description": "<b>堆场管理 (YMS)</b><br/>• 预约/排队/月台调度<br/>• 车辆入场/停泊/离场管理<br/>• 封条/铅封管理",
       "domain": "logistics",
       "domainClass": "be-logistics",
-      "type": "custom",
-      "zIndex": 1,
-      "position": {
-        "x": 550,
-        "y": 1300
-      }
+      "type": "custom"
     },
     {
       "id": "carrier-portal",
       "description": "<b>承运商门户/EDI</b><br/>• 招投标/运力发布<br/>• 订单接收/状态反馈<br/>• 账单确认/KPI考核",
       "domain": "external",
       "domainClass": "ch",
-      "type": "custom",
-      "zIndex": 1,
-      "position": {
-        "x": 1000,
-        "y": 1300
-      }
+      "type": "custom"
     },
     {
       "id": "visibility",
       "description": "<b>物流追踪平台</b><br/>• 聚合多源(WMS/TMS/IoT)数据<br/>• 端到端可视化(ETD/ETA)<br/>• AI异常预警/智能客服",
       "domain": "data",
       "domainClass": "data",
-      "type": "custom",
-      "zIndex": 1,
-      "position": {
-        "x": 1150,
-        "y": 320
-      }
+      "type": "custom"
     },
     {
       "id": "downstream",
       "description": "<b>下游系统</b><br/>(客户端 / 第三方平台)",
       "domain": "external",
       "domainClass": "ch",
-      "type": "custom",
-      "zIndex": 1,
-      "position": {
-        "x": 550,
-        "y": 1500
-      }
+      "type": "custom"
     }
   ],
   "edges": [

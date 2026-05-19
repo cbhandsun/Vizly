@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import { useAutoSave } from './useAutoSave';
@@ -6,6 +6,9 @@ import { PluginRegistry } from '../../../services/PluginRegistry';
 import { LayoutOptimizer } from '../../layout/LayoutOptimizer';
 import { analyzeDiagram } from '@/utils/diagramAnalyzer';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
+import { PRESET_MAP } from '@/data/standardized';
+import { cancelLayoutTransition, suspendLayoutTransitions } from '../../../utils/animateLayoutTransition';
+import { expandHandle } from '../../../routing/utils/handleUtils';
 
 
 export interface UseDesignerSystemSyncProps {
@@ -20,6 +23,57 @@ export interface UseDesignerSystemSyncProps {
     pluginId: string;
     messageApi?: MessageInstance;
 }
+
+const mergePresetExplicitEdgeHandles = (saved: any, preset: any) => {
+    if (!saved || !Array.isArray(saved.edges)) return saved;
+    const presetById = new Map<string, any>();
+    if (preset && Array.isArray(preset.edges)) {
+        for (const edge of preset.edges) {
+            if (edge?.id && (edge.sourceHandle || edge.targetHandle)) presetById.set(String(edge.id), edge);
+        }
+    }
+    const nodeById = new Map<string, any>((saved.nodes || []).map((node: any) => [String(node.id), node]));
+
+    const edges = saved.edges.map((edge: Edge) => {
+        const presetEdge = presetById.get(String(edge.id));
+        const sourceNode = nodeById.get(String(edge.source));
+        const targetNode = nodeById.get(String(edge.target));
+        const sourceDomain = sourceNode?.domain ?? sourceNode?.data?.domain;
+        const targetDomain = targetNode?.domain ?? targetNode?.data?.domain;
+        const sourceSubDomain = sourceNode?.subDomain ?? sourceNode?.data?.subDomain;
+        const targetSubDomain = targetNode?.subDomain ?? targetNode?.data?.subDomain;
+        const isCrossSubDomainEdge = Boolean(
+            sourceDomain &&
+            targetDomain &&
+            sourceDomain === targetDomain &&
+            sourceSubDomain &&
+            targetSubDomain &&
+            sourceSubDomain !== targetSubDomain
+        );
+        if (!presetEdge && !isCrossSubDomainEdge) return edge;
+        const sourceHandle = presetEdge?.sourceHandle ? expandHandle(String(presetEdge.sourceHandle)) : (isCrossSubDomainEdge ? 'right' : edge.sourceHandle);
+        const targetHandle = presetEdge?.targetHandle ? expandHandle(String(presetEdge.targetHandle)) : (isCrossSubDomainEdge ? 'left' : edge.targetHandle);
+        const manualHandleSides = [
+            ...(sourceHandle ? ['source'] : []),
+            ...(targetHandle ? ['target'] : []),
+        ];
+        const prevAuto = Array.isArray((edge.data as any)?.auto) ? (edge.data as any).auto : [];
+        const auto = prevAuto.filter((side: string) => !manualHandleSides.includes(side));
+        return {
+            ...edge,
+            sourceHandle,
+            targetHandle,
+            data: {
+                ...(edge.data as any),
+                auto,
+                autoSource: manualHandleSides.includes('source') ? false : (edge.data as any)?.autoSource,
+                autoTarget: manualHandleSides.includes('target') ? false : (edge.data as any)?.autoTarget,
+                manualHandleSides: manualHandleSides.length > 0 ? manualHandleSides : (edge.data as any)?.manualHandleSides,
+            }
+        };
+    });
+    return { ...saved, edges };
+};
 
 export function useDesignerSystemSync({
     id, diagramIdForExport, nodes, edges, setNodes, setEdges,
@@ -367,10 +421,12 @@ export function useDesignerSystemSync({
     // performanceMode = nodes.length > 300 || isDragging
     // nodes.length > 300 && !performanceMode 永远为 false，无需 Effect
 
+    const [autosaveEnabled, setAutosaveEnabled] = useState(false);
+
     const { saveState, loadSaved, clearSaved, saveNow } = useAutoSave(nodes, edges, {
         interval: 60000,
         storageKey: `flowchart-autosave-v2-${id || 'default'}`,
-        enabled: true,
+        enabled: autosaveEnabled,
         diagramId: id,
         onSaveSuccess: undefined,
         onSaveError: (error) => console.error('Auto-save failed:', error)
@@ -389,6 +445,7 @@ export function useDesignerSystemSync({
         return () => { isMountedRef.current = false; };
     }, []);
     useEffect(() => {
+        if (!autosaveEnabled) return;
         if (skipCountRef.current < 2) {
             skipCountRef.current++;
             return;
@@ -403,7 +460,7 @@ export function useDesignerSystemSync({
         return () => {
             if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
         };
-    }, [nodes, edges, saveNow]);
+    }, [nodes, edges, saveNow, autosaveEnabled]);
 
 
     const hasRestoredAutoSave = useRef(false);
@@ -420,10 +477,24 @@ export function useDesignerSystemSync({
     useEffect(() => {
         if (hasRestoredAutoSave.current) return;
 
+        const preset = id ? PRESET_MAP[id] : null;
+        const isStandardPreset = !!preset && !String(id || '').startsWith('custom:');
+        setAutosaveEnabled(!isStandardPreset);
+
         // Seed switching now uses localStorage + reload exclusively.
         // useDiagramSeedStore is no longer used for handoff.
         let saved = loadSaved();
+        saved = mergePresetExplicitEdgeHandles(saved, preset);
         let shouldLoadAutosave = false;
+
+        if (isStandardPreset && saved) {
+            // Standard presets are source templates, not editable documents.
+            // Ordinary autosave state for their ids is stale user/session state and must not mask PRESET_MAP.
+            // Fresh seed was previously allowed here, but it can preserve old template layout output after
+            // strategy iterations. The preset map is now the single source of truth for standard templates.
+            clearSaved();
+            saved = null;
+        }
         
         if (saved) {
             if (saved.diagramId && saved.diagramId !== id) {
@@ -470,6 +541,10 @@ export function useDesignerSystemSync({
             hasRestoredAutoSave.current = true;
             const layoutOptimizer = LayoutOptimizer.getInstance();
             const containerTypes = new Set(['titleGroup', 'subGroup', 'swimlane', 'group']);
+            const toFiniteNumber = (value: unknown) => {
+                const parsed = typeof value === 'string' ? parseFloat(value) : Number(value);
+                return Number.isFinite(parsed) ? parsed : 0;
+            };
 
             const recalculatedNodes = saved.nodes.map((node: Node) => {
                 if (containerTypes.has(node.type || '')) return node;
@@ -477,15 +552,26 @@ export function useDesignerSystemSync({
                 const desc = String(node.data?.description || node.data?.label || '');
                 if (!desc) return node;
 
-                const contentWidth = node.width || (node as any).measured?.width || layoutOptimizer.calculateNodeWidth(desc);
+                const calculatedWidth = layoutOptimizer.calculateNodeWidth(desc);
+                const calculatedHeight = layoutOptimizer.calculateNodeHeight(desc);
+                const contentWidth = Math.max(
+                    calculatedWidth,
+                    toFiniteNumber(node.width || (node as any).measured?.width || (node.style as any)?.width)
+                );
+                const contentHeight = Math.max(
+                    calculatedHeight,
+                    toFiniteNumber(node.height || (node as any).measured?.height || (node.style as any)?.height)
+                );
                 return {
                     ...node,
                     width: contentWidth,
-                    style: { ...node.style, width: contentWidth },
-                    measured: { ...(node as any).measured, width: contentWidth },
+                    height: contentHeight,
+                    style: { ...node.style, width: contentWidth, height: contentHeight },
+                    measured: { ...(node as any).measured, width: contentWidth, height: contentHeight },
                 };
             });
 
+            cancelLayoutTransition(setNodes);
             setNodes(recalculatedNodes);
             setEdges(saved.edges);
             needsInitialFitView.current = true;
@@ -517,48 +603,46 @@ export function useDesignerSystemSync({
             hasRestoredAutoSave.current = true;
             
             // Core Fallback & Preset Injection Logic
-            import('@/data/standardized').then(({ PRESET_MAP }) => {
-                const preset = id ? PRESET_MAP[id] : null;
-
-                if (preset) {
-                    // IF the requested diagram matches a known standard preset map
-                    // WE securely run standardDataToCanvas to apply ELK.js layout mapping!
-                    import('../designerUtils').then(({ standardDataToCanvas }) => {
-                        standardDataToCanvas(preset).then(({ nodes: newNodes, edges: newEdges }) => {
-                            setNodes(newNodes);
-                            setEdges(newEdges);
-                            needsInitialFitView.current = true;
-                        }).catch(e => console.error('[DesignerSystemSync] standardDataToCanvas error:', e));
-                    }).catch(e => console.error('[DesignerSystemSync] Import designerUtils failed:', e));
-                } else {
-                    // Try DataRegistry for imported/general templates before falling back to empty state
-                    import('@/data/DataRegistry').then(({ dataRegistry }) => {
-                        const localSvc = dataRegistry.getDataService();
-                        const existing = localSvc.getDiagram(id || '');
-                        if (existing) {
-                            import('../designerUtils').then(({ standardDataToCanvas }) => {
-                                standardDataToCanvas(existing).then(({ nodes: newNodes, edges: newEdges }) => {
-                                    setNodes(newNodes);
-                                    setEdges(newEdges);
-                                    needsInitialFitView.current = true;
-                                }).catch(e => console.error('[DesignerSystemSync] standardDataToCanvas error (registry):', e));
-                            });
-                        } else {
-                            // Normal plugin fallback empty state
-                            const plugin = PluginRegistry.getInstance().getPlugin(pluginId);
-                            if (plugin) {
-                                const emptyState = plugin.getEmptyState();
-                                setNodes(emptyState.nodes);
-                                setEdges(emptyState.edges);
-                                // ALWAYS trigger initial viewport adjustment, even for empty canvases
+            if (preset) {
+                // IF the requested diagram matches a known standard preset map
+                // WE securely run standardDataToCanvas to apply ELK.js layout mapping!
+                import('../designerUtils').then(({ standardDataToCanvas }) => {
+                    standardDataToCanvas(preset).then(({ nodes: newNodes, edges: newEdges }) => {
+                        suspendLayoutTransitions(setNodes);
+                        setNodes(newNodes);
+                        setEdges(newEdges);
+                        needsInitialFitView.current = true;
+                    }).catch(e => console.error('[DesignerSystemSync] standardDataToCanvas error:', e));
+                }).catch(e => console.error('[DesignerSystemSync] Import designerUtils failed:', e));
+            } else {
+                // Try DataRegistry for imported/general templates before falling back to empty state
+                import('@/data/DataRegistry').then(({ dataRegistry }) => {
+                    const localSvc = dataRegistry.getDataService();
+                    const existing = localSvc.getDiagram(id || '');
+                    if (existing) {
+                        import('../designerUtils').then(({ standardDataToCanvas }) => {
+                            standardDataToCanvas(existing).then(({ nodes: newNodes, edges: newEdges }) => {
+                                cancelLayoutTransition(setNodes);
+                                setNodes(newNodes);
+                                setEdges(newEdges);
                                 needsInitialFitView.current = true;
-                            }
+                            }).catch(e => console.error('[DesignerSystemSync] standardDataToCanvas error (registry):', e));
+                        });
+                    } else {
+                        // Normal plugin fallback empty state
+                        const plugin = PluginRegistry.getInstance().getPlugin(pluginId);
+                        if (plugin) {
+                            const emptyState = plugin.getEmptyState();
+                            setNodes(emptyState.nodes);
+                            setEdges(emptyState.edges);
+                            // ALWAYS trigger initial viewport adjustment, even for empty canvases
+                            needsInitialFitView.current = true;
                         }
-                    }).catch(e => console.error('[DesignerSystemSync] import DataRegistry failed:', e));
-                }
-            }).catch(e => console.error('[DesignerSystemSync] load PRESET_MAP failed:', e));
+                    }
+                }).catch(e => console.error('[DesignerSystemSync] import DataRegistry failed:', e));
+            }
         }
-    }, [loadSaved, setNodes, setEdges, pluginId, id]);
+    }, [loadSaved, clearSaved, setNodes, setEdges, pluginId, id]);
 
     // Deferred view adjustment: waits for reactFlowInstance to become available
     useEffect(() => {

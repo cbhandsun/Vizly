@@ -37,6 +37,13 @@ interface CachedMeasurement {
   timestamp: number;
 }
 
+const FLOWCHART_RENDER_PADDING_H = 18;
+const FLOWCHART_TITLE_FONT_SIZE = 13.5;
+const FLOWCHART_TITLE_FONT_WEIGHT = '650';
+const FLOWCHART_BODY_FONT_SIZE = 13;
+const FLOWCHART_BODY_FONT_WEIGHT = '400';
+const FLOWCHART_WIDTH_SAFETY = 28;
+
 interface DomainData {
   title: string;
   nodes: string[];
@@ -116,6 +123,35 @@ export class LayoutOptimizer {
    */
   private getCacheKey(content: string, fontSize: number, fontFamily: string, fontWeight: string): string {
     return `${content}|${fontSize}|${fontFamily}|${fontWeight}`;
+  }
+
+  private calculateRenderedContentWidth(
+    lines: string[],
+    options: {
+      fontSize: number;
+      fontFamily: string;
+      fontWeight: string;
+      paddingH: number;
+    }
+  ): number {
+    if (!Array.isArray(lines) || lines.length === 0) return 0;
+
+    const renderedPaddingH = Math.max(options.paddingH, FLOWCHART_RENDER_PADDING_H);
+    const maxLineWidth = lines.reduce((maxWidth, line, index) => {
+      const isTitle = index === 0;
+      const fontSize = isTitle ? Math.max(options.fontSize, FLOWCHART_TITLE_FONT_SIZE) : Math.max(options.fontSize, FLOWCHART_BODY_FONT_SIZE);
+      const fontWeight = isTitle ? FLOWCHART_TITLE_FONT_WEIGHT : (options.fontWeight || FLOWCHART_BODY_FONT_WEIGHT);
+      const measurement = enhancedTextMeasurement.measureNodeContent(line, {
+        fontSize,
+        fontFamily: options.fontFamily,
+        fontWeight,
+        padding: { horizontal: 0, vertical: 0 },
+      });
+      const letterSpacingAllowance = isTitle ? Math.ceil(String(line || '').length * FLOWCHART_TITLE_FONT_SIZE * 0.015) : 0;
+      return Math.max(maxWidth, (measurement.maxLineWidth || 0) + letterSpacingAllowance);
+    }, 0);
+
+    return maxLineWidth + renderedPaddingH * 2 + FLOWCHART_WIDTH_SAFETY;
   }
 
   /**
@@ -214,7 +250,10 @@ export class LayoutOptimizer {
       });
       lines = Array.isArray(measurement.lines) ? measurement.lines : [];
       maxLineWidth = (typeof measurement.maxLineWidth === 'number' && isFinite(measurement.maxLineWidth)) ? measurement.maxLineWidth : 0;
-      const rawWidth = maxLineWidth + paddingH * 2 + 12; // 安全边距（收紧以减少空白）
+      const rawWidth = Math.max(
+        maxLineWidth + paddingH * 2 + 12,
+        this.calculateRenderedContentWidth(lines, { fontSize, fontFamily, fontWeight, paddingH })
+      );
       const isSingleBullet = (lines.length === 1) && /^\s*(•|-|·|\u2022)/.test(lines[0] || '');
       totalWidth = isSingleBullet
         ? Math.max(minWidth, rawWidth)
@@ -222,7 +261,7 @@ export class LayoutOptimizer {
     } catch (error) {
       console.warn('Node width calculation failed, fallback:', error);
       const cleanText = description.replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, ' ');
-      const estimated = cleanText.length * fontSize * 0.6 + paddingH * 2 + 12;
+      const estimated = cleanText.length * fontSize * 0.6 + Math.max(paddingH, FLOWCHART_RENDER_PADDING_H) * 2 + FLOWCHART_WIDTH_SAFETY;
       totalWidth = Math.max(minWidth, Math.min(estimated, hardMaxWidth));
     }
 
@@ -319,7 +358,10 @@ export class LayoutOptimizer {
       });
       lines = Array.isArray(measurement.lines) ? measurement.lines : [];
       const maxLineWidth = (typeof measurement.maxLineWidth === 'number' && isFinite(measurement.maxLineWidth)) ? measurement.maxLineWidth : 0;
-      const rawWidth = maxLineWidth + paddingH * 2 + 12;
+      const rawWidth = Math.max(
+        maxLineWidth + paddingH * 2 + 12,
+        this.calculateRenderedContentWidth(lines, { fontSize, fontFamily, fontWeight, paddingH })
+      );
       const isSingleBullet = (lines.length === 1) && /^\s*(•|-|·|\u2022)/.test(lines[0] || '');
       const baseClamped = isSingleBullet
         ? Math.max(minWidth, rawWidth)
@@ -329,7 +371,7 @@ export class LayoutOptimizer {
       validTotalWidth = (typeof baseClamped === 'number' && isFinite(baseClamped)) ? baseClamped : minWidth;
     } catch {
       const cleanText = description.replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, ' ');
-      const estimated = cleanText.length * fontSize * 0.6 + paddingH * 2 + 12;
+      const estimated = cleanText.length * fontSize * 0.6 + Math.max(paddingH, FLOWCHART_RENDER_PADDING_H) * 2 + FLOWCHART_WIDTH_SAFETY;
       scaledWidth = Math.max(minWidth, Math.min(estimated, hardMaxWidth));
       validTotalWidth = scaledWidth;
     }
@@ -403,10 +445,13 @@ export class LayoutOptimizer {
       padding: { horizontal: paddingH, vertical: paddingV }
     });
 
-    return measurements.map(measurement => {
+    return measurements.map((measurement) => {
       // 确保测量结果是有效数字
       const raw = (typeof measurement.width === 'number' && !isNaN(measurement.width) && isFinite(measurement.width)) ? measurement.width : minWidth;
-      let withSafety = raw + 12; // 安全边距（收紧以减少空白）
+      let withSafety = Math.max(
+        raw + 12,
+        this.calculateRenderedContentWidth(measurement.lines, { fontSize, fontFamily, fontWeight, paddingH })
+      );
 
       // 应用紧凑域宽度缩放
       if (options?.domainKey && this.COMPACT_DOMAINS[options.domainKey]) {
@@ -437,6 +482,15 @@ export class LayoutOptimizer {
     const fontWeight = (typeof config.NODE_FONT_WEIGHT === 'string' && config.NODE_FONT_WEIGHT.length > 0) ? config.NODE_FONT_WEIGHT : 'normal';
     const paddingH = (typeof config.NODE_PADDING?.horizontal === 'number' && !isNaN(config.NODE_PADDING.horizontal)) ? config.NODE_PADDING.horizontal : 16;
     const paddingV = (typeof config.NODE_PADDING?.vertical === 'number' && !isNaN(config.NODE_PADDING.vertical)) ? config.NODE_PADDING.vertical : 12;
+    const hardMaxWidth = (() => {
+      try {
+        const full = diagramConfigManager.getConfig();
+        const mw = (full?.node?.maxWidth as number) ?? 0;
+        return (typeof mw === 'number' && !isNaN(mw) && mw > 0) ? mw : 420;
+      } catch {
+        return 420;
+      }
+    })();
 
     try {
       // 使用增强版文本测量系统
@@ -448,7 +502,16 @@ export class LayoutOptimizer {
       });
 
       // 确保测量结果是有效数字
-      const height = (typeof measurement.height === 'number' && !isNaN(measurement.height) && isFinite(measurement.height)) ? measurement.height : 60;
+      const height = this.calculateWrappedContentHeight(measurement.lines, {
+        fontSize,
+        fontFamily,
+        fontWeight,
+        lineHeight: 1.4,
+        paddingH,
+        paddingV,
+        maxWidth: hardMaxWidth,
+        fallbackHeight: measurement.height,
+      });
       return Math.max(60, height); // 最小高度60px
 
     } catch (error) {
@@ -469,6 +532,7 @@ export class LayoutOptimizer {
       fontWeight?: string;
       padding?: { horizontal: number; vertical: number };
       minHeight?: number;
+      maxWidth?: number;
     }
   ): number {
     if (!description || typeof description !== 'string') {
@@ -487,6 +551,18 @@ export class LayoutOptimizer {
     const paddingV = (typeof overrides?.padding?.vertical === 'number')
       ? overrides!.padding!.vertical
       : base.NODE_PADDING.vertical;
+    const hardMaxWidth = (() => {
+      if (typeof overrides?.maxWidth === 'number' && overrides.maxWidth > 0) {
+        return overrides.maxWidth;
+      }
+      try {
+        const full = diagramConfigManager.getConfig();
+        const mw = (full?.node?.maxWidth as number) ?? 0;
+        return (typeof mw === 'number' && !isNaN(mw) && mw > 0) ? mw : 420;
+      } catch {
+        return 420;
+      }
+    })();
 
     try {
       const measurement = enhancedTextMeasurement.measureNodeContent(description, {
@@ -495,13 +571,53 @@ export class LayoutOptimizer {
         fontWeight,
         padding: { horizontal: paddingH, vertical: paddingV },
       });
-      const height = (typeof measurement.height === 'number' && isFinite(measurement.height))
-        ? measurement.height
-        : (overrides?.minHeight || 60);
+      const height = this.calculateWrappedContentHeight(measurement.lines, {
+        fontSize,
+        fontFamily,
+        fontWeight,
+        lineHeight: 1.4,
+        paddingH,
+        paddingV,
+        maxWidth: hardMaxWidth,
+        fallbackHeight: measurement.height,
+      });
       return Math.max(overrides?.minHeight || 60, height);
     } catch {
       return Math.max(overrides?.minHeight || 60, 60);
     }
+  }
+
+  private calculateWrappedContentHeight(
+    lines: string[],
+    options: {
+      fontSize: number;
+      fontFamily: string;
+      fontWeight: string;
+      lineHeight: number;
+      paddingH: number;
+      paddingV: number;
+      maxWidth: number;
+      fallbackHeight?: number;
+    }
+  ): number {
+    if (!Array.isArray(lines) || lines.length === 0) {
+      return Math.max(options.paddingV * 2, options.fallbackHeight || 0);
+    }
+
+    const contentMaxWidth = Math.max(24, options.maxWidth - options.paddingH * 2 - 12);
+    const visualLineCount = lines.reduce((sum, line) => {
+      const lineMeasurement = enhancedTextMeasurement.measureNodeContent(line, {
+        fontSize: options.fontSize,
+        fontFamily: options.fontFamily,
+        fontWeight: options.fontWeight,
+        padding: { horizontal: 0, vertical: 0 },
+      });
+      const lineWidth = Math.max(0, lineMeasurement.maxLineWidth || 0);
+      return sum + Math.max(1, Math.ceil(lineWidth / contentMaxWidth));
+    }, 0);
+    const titleGap = lines.length > 1 ? 12 : 0;
+    const contentHeight = visualLineCount * options.fontSize * options.lineHeight + options.paddingV * 2 + titleGap;
+    return Math.ceil(Math.max(contentHeight, options.fallbackHeight || 0));
   }
 
   /**

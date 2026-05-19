@@ -3,9 +3,12 @@ import { Node, Edge, MarkerType, Position } from '@xyflow/react';
 import { StandardDiagramData, StandardNodeData, StandardEdgeData, GroupNodeData, DiagramType } from '../../models/DiagramModels';
 import dagre from 'dagre';
 import { DomainDagreLayoutStrategy } from '../../strategies/DomainDagreLayoutStrategy';
+import { DomainVerticalLayoutStrategy } from '../../strategies/DomainVerticalLayoutStrategy';
+import { DomainHorizontalLayoutStrategy } from '../../strategies/DomainHorizontalLayoutStrategy';
 import { getThemeManager } from '../../themes';
 import { LayoutOptimizer } from '../layout/LayoutOptimizer';
 import { validateAndFixNodes } from '../../utils/nodeValidation';
+import { expandHandle } from '../../routing/utils/handleUtils';
 
 /**
  * Converts React Flow canvas data into the application's StandardDiagramData format.
@@ -275,7 +278,21 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
         const titleMatch = description.match(/<b>(.*?)<\/b>/);
         const label = titleMatch ? titleMatch[1] : description.replace(/<[^>]*>?/gm, '').substring(0, 20);
 
-        const contentWidth = metadata.width || LayoutOptimizer.getInstance().calculateNodeWidth(description);
+        const optimizer = LayoutOptimizer.getInstance();
+        const toFiniteNumber = (value: unknown) => {
+            const parsed = typeof value === 'string' ? parseFloat(value) : Number(value);
+            return Number.isFinite(parsed) ? parsed : 0;
+        };
+        const contentWidth = Math.max(
+            optimizer.calculateNodeWidth(description),
+            toFiniteNumber(metadata.width),
+            toFiniteNumber((metadata.style as any)?.width)
+        );
+        const contentHeight = Math.max(
+            optimizer.calculateNodeHeight(description),
+            toFiniteNumber(metadata.height),
+            toFiniteNumber((metadata.style as any)?.height)
+        );
 
         // 如果明确是 group 类型，转化为 titleGroup 并直接放入
         if (n.type === 'group' || (n as any).type === 'group') {
@@ -329,9 +346,10 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
                 sequence: metadata.sequence,
                 theme: metadata.theme
             },
-            style: { ...metadata.style, width: contentWidth },
+            style: { ...metadata.style, width: contentWidth, height: contentHeight },
             width: contentWidth,
-            height: metadata.height || 50
+            height: contentHeight,
+            measured: { width: contentWidth, height: contentHeight }
         });
     });
 
@@ -356,32 +374,61 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
     // 2.8 Validate and fix node dimensions/positions before layout
     nodes = validateAndFixNodes(nodes);
 
+    const rawNodeById = new Map(data.nodes.map(n => [n.id, n]));
+
     // 3. Process Edges
     data.edges.forEach(e => {
         const edgeId = e.id || `e-${e.source}-${e.target}-${Math.random().toString(36).substring(2,9)}`;
+        const edgeAny = e as any;
+        const rawSource = rawNodeById.get(e.source) as any;
+        const rawTarget = rawNodeById.get(e.target) as any;
+        const sourceDomain = rawSource?.domain ?? rawSource?.data?.domain;
+        const targetDomain = rawTarget?.domain ?? rawTarget?.data?.domain;
+        const sourceSubDomain = rawSource?.subDomain ?? rawSource?.data?.subDomain;
+        const targetSubDomain = rawTarget?.subDomain ?? rawTarget?.data?.subDomain;
+        const isCrossSubDomainEdge = Boolean(
+            sourceDomain &&
+            targetDomain &&
+            sourceDomain === targetDomain &&
+            sourceSubDomain &&
+            targetSubDomain &&
+            sourceSubDomain !== targetSubDomain
+        );
+        const explicitSourceHandle = edgeAny.sourceHandle ?? edgeAny.metadata?.sourceHandle;
+        const explicitTargetHandle = edgeAny.targetHandle ?? edgeAny.metadata?.targetHandle;
+        const sourceHandle = explicitSourceHandle ? expandHandle(String(explicitSourceHandle)) : (isCrossSubDomainEdge ? 'right' : undefined);
+        const targetHandle = explicitTargetHandle ? expandHandle(String(explicitTargetHandle)) : (isCrossSubDomainEdge ? 'left' : undefined);
+        const manualHandleSides = [
+            ...(sourceHandle ? ['source'] : []),
+            ...(targetHandle ? ['target'] : []),
+        ];
         if (hasCanvasPositions) {
             // 有保存坐标：使用保存的边数据
             const edgeType = e.type === 'main' ? 'advanced-smart-step' : (e.type || 'advanced-smart-step');
-            const inferredAuto = Array.isArray(e.metadata?.autoHandles)
-                ? e.metadata?.autoHandles
-                : ((e.metadata?.manualHandles === true) ? undefined : ((e.metadata?.sourceHandle || e.metadata?.targetHandle) ? ['source', 'target'] : undefined));
+            const inferredAuto = Array.isArray(edgeAny.metadata?.autoHandles)
+                ? edgeAny.metadata?.autoHandles
+                : ((edgeAny.metadata?.manualHandles === true || manualHandleSides.length > 0) ? undefined : ((edgeAny.metadata?.sourceHandle || edgeAny.metadata?.targetHandle) ? ['source', 'target'] : undefined));
             edges.push({
                 id: edgeId,
                 source: e.source,
                 target: e.target,
                 type: edgeType,
                 label: e.label,
-                sourceHandle: e.metadata?.sourceHandle,
-                targetHandle: e.metadata?.targetHandle,
-                data: { auto: inferredAuto, manualHandles: Boolean(e.metadata?.manualHandles), manualHandleSides: e.metadata?.manualHandleSides },
+                sourceHandle,
+                targetHandle,
+                data: {
+                    auto: inferredAuto,
+                    manualHandles: Boolean(edgeAny.metadata?.manualHandles),
+                    manualHandleSides: edgeAny.metadata?.manualHandleSides ?? (manualHandleSides.length > 0 ? manualHandleSides : undefined)
+                },
                 markerEnd: e.markerEnd || { type: MarkerType.ArrowClosed },
                 style: e.style
             });
         } else {
             // 无保存坐标：也使用智能连线类型
             const direction = (data.layout?.direction === 'LR' || data.layout?.direction === 'RL') ? 'LR' : 'TB';
-            const srcH = direction === 'LR' ? 'right' : 'bottom';
-            const tgtH = direction === 'LR' ? 'left' : 'top';
+            const srcH = sourceHandle ?? (direction === 'LR' ? 'right' : 'bottom');
+            const tgtH = targetHandle ?? (direction === 'LR' ? 'left' : 'top');
             const edgeType = e.type === 'main' ? 'advanced-smart-step' : (e.type || 'advanced-smart-step');
             edges.push({
                 id: edgeId,
@@ -391,6 +438,7 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
                 label: e.label,
                 sourceHandle: srcH,
                 targetHandle: tgtH,
+                data: manualHandleSides.length > 0 ? { manualHandleSides, auto: [] } : undefined,
                 markerEnd: { type: MarkerType.ArrowClosed },
             });
         }
@@ -402,27 +450,39 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
         const isHorizontal = direction === 'LR';
 
         // ═══ 域检测（对齐新项目 hasMeaningfulDomains） ═══
-        const domainSet = new Set<string>();
-        for (const node of nodes) {
-            const domain = (node.data as any)?.domain;
-            if (domain && domain !== '默认域' && domain !== 'default') {
-                domainSet.add(domain);
-            }
+        // 节点出现顺序仅用于判断是否存在多域；不要隐式生成 domainOrder。
+        // domainOrder 是强布局约束，只应来自标准数据中的显式 layout.domainOrder。
+        const implicitDomainOrder: string[] = [];
+        for (const node of data.nodes) {
+            const domain = String(node.domain || '').trim();
+            if (!domain || domain === '默认域' || domain === 'default') continue;
+            if (!implicitDomainOrder.includes(domain)) implicitDomainOrder.push(domain);
         }
+        const domainSet = new Set(implicitDomainOrder);
         const hasDomains = domainSet.size >= 2;
 
         if (hasDomains) {
-            // ═══ 有多域 → DomainDagreLayoutStrategy（对等新项目 domainGroupLayout） ═══
+            // ═══ 有多域 → 按标准数据 layout.type 选择域策略；未声明时保持 DomainDagre 兼容默认 ═══
             try {
-                const strategy = new DomainDagreLayoutStrategy();
+                const layoutType = String((data.layout as any)?.type || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
+                const strategy = layoutType === 'domainvertical' || layoutType === 'domainverticallayout'
+                    ? new DomainVerticalLayoutStrategy()
+                    : layoutType === 'domainhorizontal' || layoutType === 'domainhorizontallayout'
+                        ? new DomainHorizontalLayoutStrategy()
+                        : new DomainDagreLayoutStrategy();
+                const nodeLayout = (data.layout as any)?.nodeLayout
+                    ?? ((strategy instanceof DomainVerticalLayoutStrategy || strategy instanceof DomainHorizontalLayoutStrategy) ? 'vertical' : undefined);
                 const result = await strategy.calculateLayout(nodes, edges, {
-                    type: 'DomainDagreLayout' as any,
+                    type: strategy.getName() as any,
                     direction: direction as 'TB' | 'LR',
-                    spacing: { horizontal: 50, vertical: 50 },
+                    ...(nodeLayout ? { nodeLayout } : {}),
+                    spacing: data.layout?.spacing || { horizontal: 50, vertical: 50 },
                     padding: { top: 40, right: 20, bottom: 20, left: 20 },
                     generateDomainGroups: true,
                     generateSubDomainGroups: true,
                     fitDomainContent: true,
+                    domainOrder: (data.layout as any)?.domainOrder,
+                    subDomainOrder: (data.layout as any)?.subDomainOrder,
                 } as any);
                 return {
                     nodes: result.nodes,

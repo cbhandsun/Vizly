@@ -1043,6 +1043,7 @@
             "DomainVerticalLayout": "Global: Domain Vertical",
             "DomainHorizontalLayout": "Global: Domain Horizontal",
             "DomainElkLayout": "Global: Domain ELK",
+            "DomainDagreLayout": "Global: Domain Dagre",
             "DomainElkCompoundLayout": "Global: ELK Compound",
             "DomainElkRadialLayout": "Global: ELK Radial (Manual)",
             "DomainElkForceLayout": "Global: ELK Force",
@@ -1053,6 +1054,7 @@
             "CenteredLayout": "Nodes: Centered",
             "ElkNodeLayout": "Nodes: ELK-first",
             "DagreLayout": "Nodes: Dagre Layered",
+            "autoPathType": "Auto Path",
             "auto": "Industry Preset: Auto",
             "strict_industry": "Industry Preset: Strict",
             "balanced_industry": "Industry Preset: Balanced",
@@ -1075,7 +1077,8 @@
             "expertMode": "Expert Mode"
         },
         "layout": {
-            "domainElkActive": "Domain ELK Layout Active"
+            "domainElkActive": "Domain ELK Layout Active",
+            "nodeLayoutManaged": "Managed by the global layout"
         },
         "diagram": {
             "node": {
@@ -1311,7 +1314,7 @@
                 },
                 "linkOrientation": {
                     "label": "Link Orientation",
-                    "desc": "Link domain and node orientation."
+                    "desc": "When enabled, domain horizontal/vertical layouts automatically use vertical node flow inside subdomains."
                 },
                 "CONTAINMENT_POLICY": {
                     "label": "Containment Policy",

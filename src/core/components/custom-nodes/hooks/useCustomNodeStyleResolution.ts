@@ -103,6 +103,24 @@ const hexToRgba = (hex: string, alpha: number): string => {
     return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
 };
 
+const mixHexOverBase = (hex: string, amount: number, base: [number, number, number]): string => {
+    if (!/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)) {
+        return `color-mix(in srgb, ${hex} ${Math.round(amount * 100)}%, rgb(${base.join(', ')}) ${Math.round((1 - amount) * 100)}%)`;
+    }
+    let c: string[] = hex.substring(1).split('');
+    if (c.length === 3) {
+        c = [c[0], c[0], c[1], c[1], c[2], c[2]];
+    }
+    const num = parseInt(c.join(''), 16);
+    const fg: [number, number, number] = [
+        (num >> 16) & 255,
+        (num >> 8) & 255,
+        num & 255,
+    ];
+    const mixed = fg.map((channel, index) => Math.round(channel * amount + base[index] * (1 - amount)));
+    return `rgb(${mixed.join(', ')})`;
+};
+
 export interface UseCustomNodeStyleResolutionProps {
     id: string;
     data: any;
@@ -188,11 +206,13 @@ export const useCustomNodeStyleResolution = ({
     const bgPolicy = preset?.node?.backgroundPolicy ?? 'theme';
     const radiusToken = preset?.node?.radius ?? 16;
 
-    const tintBackground = hexToRgba(themeMain, 0.07);
-    const tintGradient = `linear-gradient(160deg, ${hexToRgba(themeMain, 0.05)} 0%, ${hexToRgba(themeMain, 0.10)} 100%)`;
+    const opaqueBase: [number, number, number] = isDarkTheme ? [30, 34, 51] : [255, 255, 255];
+    const tintBackground = mixHexOverBase(themeMain, isDarkTheme ? 0.12 : 0.09, opaqueBase);
+    const selectedTintBackground = mixHexOverBase(themeMain, isDarkTheme ? 0.16 : 0.11, opaqueBase);
+    const tintGradient = `linear-gradient(160deg, ${mixHexOverBase(themeMain, isDarkTheme ? 0.10 : 0.06, opaqueBase)} 0%, ${mixHexOverBase(themeMain, isDarkTheme ? 0.18 : 0.13, opaqueBase)} 100%)`;
 
     const getBackgroundColor = () => {
-        if (selected) return hexToRgba(themeMain, 0.07);
+        if (selected) return selectedTintBackground;
         if (bgPolicy === 'white' && !hasExplicitDomainColor) return '#FFFFFF';
         if (bgPolicy === 'tint') return tintBackground;
         // 兜底：主题色微染白，而非 transparent（transparent 在画布网格上不可见）

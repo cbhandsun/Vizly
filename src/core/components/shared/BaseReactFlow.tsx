@@ -640,6 +640,42 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   }, [edgeTypes]);
 
   const displayEdges = useMemo((): Edge[] => {
+    const nodeById = new Map(nodes.map(n => [n.id, n]));
+    const isVerticalHandle = (handle?: string | null) => {
+      const s = String(handle || '').toLowerCase();
+      return s === 'top' || s === 'bottom' || s === 't' || s === 'b';
+    };
+    const getNodeX = (node: Node | undefined) => {
+      const pos = (node as any)?.positionAbsolute ?? node?.position ?? { x: 0 };
+      return Number(pos.x || 0);
+    };
+    const normalizeCrossContainerManualHandles = (edge: Edge): Edge => {
+      const data = ((edge.data || {}) as Record<string, any>);
+      const manualSides = Array.isArray(data.manualHandleSides)
+        ? data.manualHandleSides.map((side: any) => String(side).toLowerCase())
+        : [];
+      if (!manualSides.includes('source') || !manualSides.includes('target')) return edge;
+      if (!isVerticalHandle(edge.sourceHandle) || !isVerticalHandle(edge.targetHandle)) return edge;
+      const sourceNode = nodeById.get(edge.source);
+      const targetNode = nodeById.get(edge.target);
+      const dx = getNodeX(targetNode) - getNodeX(sourceNode);
+      if (Math.abs(dx) < 80) return edge;
+      const nextHandles = dx >= 0
+        ? { sourceHandle: 'right', targetHandle: 'left' }
+        : { sourceHandle: 'left', targetHandle: 'right' };
+      return {
+        ...edge,
+        ...nextHandles,
+        data: {
+          ...data,
+          computedPath: undefined,
+          elkPath: undefined,
+          algorithm: undefined,
+          _layoutEpoch: Date.now(),
+        },
+      };
+    };
+
     // P2: Canvas Hybrid Rendering Mode for Large Graphs
     if (isLargeGraph) {
       return edges.map(e => ({
@@ -655,7 +691,8 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     if (enableSmartEdges) {
       if (typeof smartEdgePadding !== 'number' || !isFinite(smartEdgePadding)) return edges;
 
-      return edges.map((e) => {
+      return edges.map((rawEdge) => {
+        const e = normalizeCrossContainerManualHandles(rawEdge);
         const type = String(e.type || '');
         const lower = type.toLowerCase();
 
@@ -687,13 +724,14 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 
         const needsLabelPatch = typeof nextLabel !== 'undefined' && ((e as any).label !== nextLabel || (dataWithPad as any).label !== nextLabel);
         const needsTypePatch = targetType !== e.type;
-        if (!needsPadPatch && !needsLabelPatch && !needsTypePatch) return e;
+        if (!needsPadPatch && !needsLabelPatch && !needsTypePatch && e === rawEdge) return e;
 
         const finalData = needsLabelPatch ? { ...dataWithPad, label: nextLabel } : dataWithPad;
         return { ...e, type: targetType, data: finalData, label: nextLabel } as Edge;
       });
     }
-    return edges.map((e) => {
+    return edges.map((rawEdge) => {
+      const e = normalizeCrossContainerManualHandles(rawEdge);
       const type = String(e.type || '');
       const lower = type.toLowerCase();
       const nextType = (() => {
@@ -703,10 +741,10 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         return e.type;
       })();
       const nextLabel = (e as any).label ?? ((e.data && typeof e.data === 'object') ? (e.data as any).label : undefined);
-      if (nextType === e.type && nextLabel === (e as any).label) return e;
+      if (nextType === e.type && nextLabel === (e as any).label && e === rawEdge) return e;
       return { ...e, type: nextType as any, label: nextLabel } as Edge;
     });
-  }, [edges, enableSmartEdges, smartEdgePadding, isLargeGraph]);
+  }, [edges, nodes, enableSmartEdges, smartEdgePadding, isLargeGraph]);
 
   /**
    * 函数级注释：导出期间隐藏背景网格

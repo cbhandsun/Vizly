@@ -38,9 +38,9 @@ export interface UseSmartEdgeRoutingReturn {
 }
 
 export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn {
-  const { id, source, target, sourceHandleId, targetHandleId } = props;
+  const { id, source, target } = props;
   const context = useSmartEdgeContext(props);
-  const { simpleNodeMap, storeEdges, layoutDirection, multiEdgeInfo, centeredCoords, fallbackPositions, edgeConfig, respectSourceHandle, respectTargetHandle, isReverseEdge, nodesDragging } = context;
+  const { simpleNodeMap, storeEdges, layoutDirection, multiEdgeInfo, centeredCoords, fallbackPositions, edgeConfig, respectSourceHandle, respectTargetHandle, isReverseEdge, nodesDragging, sourceHandleId, targetHandleId } = context;
 
   useSharedObstacles();
   const obstacles = useObstaclesForEdge(source, target);
@@ -129,11 +129,19 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
 
       const firstPt = workerSmartPoints[0];
       const lastPt = workerSmartPoints[workerSmartPoints.length - 1];
+      if (respectSourceHandle || respectTargetHandle) {
+          const endpointTolerance = 45;
+          const sourceStale = respectSourceHandle
+              && (Math.abs(firstPt.x - centeredCoords.sourceX) > endpointTolerance || Math.abs(firstPt.y - centeredCoords.sourceY) > endpointTolerance);
+          const targetStale = respectTargetHandle
+              && (Math.abs(lastPt.x - centeredCoords.targetX) > endpointTolerance || Math.abs(lastPt.y - centeredCoords.targetY) > endpointTolerance);
+          if (sourceStale || targetStale) return true;
+      }
       return Math.abs(firstPt.x - props.sourceX) > 150 || 
              Math.abs(firstPt.y - props.sourceY) > 150 || 
              Math.abs(lastPt.x - props.targetX) > 150 || 
              Math.abs(lastPt.y - props.targetY) > 150;
-  }, [workerSmartPoints, workerPath, props.sourceX, props.sourceY, props.targetX, props.targetY, isLoading, nodesDragging, workerUsedPositions, centeredCoords]);
+  }, [workerSmartPoints, workerPath, props.sourceX, props.sourceY, props.targetX, props.targetY, isLoading, nodesDragging, workerUsedPositions, centeredCoords, respectSourceHandle, respectTargetHandle]);
 
   // 5. Final Path Resolution
   const finalPath = useMemo(() => {

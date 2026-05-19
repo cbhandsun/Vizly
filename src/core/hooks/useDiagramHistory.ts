@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import jsonpatch from 'fast-json-patch';
 
@@ -155,7 +155,7 @@ export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) 
         redo,
         canUndo,
         canRedo,
-        pastEntries: pastRef.current,
+        pastEntries: useMemo(() => [...pastRef.current], [historyInfo]),
         jumpTo,
         historyDeep: historyInfo.pastCount,
         getPreviousState: () => lastStateRef.current,

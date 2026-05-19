@@ -225,6 +225,12 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         icon: <FaRegObjectGroup />,
                         onClick: () => onStrategyLayout('domain-dagre', lastNodeLayout, 'TB')
                     },
+                    {
+                        key: 'domain-dagre-sub-horizontal-tb',
+                        label: t('designer.flowchart.layout.domainDagreSubHorizontalTB', '◈ DomainDagre (子域水平)'),
+                        icon: <FaRegObjectGroup />,
+                        onClick: () => onStrategyLayout('domain-dagre-sub-horizontal', 'dagre', 'TB')
+                    },
                     { type: 'divider' as const },
                     {
                         key: 'domain-vertical',
@@ -347,7 +353,9 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     okButtonProps: { danger: true },
                     onOk: () => {
                         // 1. 先读取当前选中的图表 ID（localStorage 清空前）
-                        const urlParams = new URLSearchParams(window.location.search);
+                        // [FIX] Hash 路由下参数在 hash 里，不在 search 里
+                        const hashQuery = window.location.hash.split('?')[1] || '';
+                        const urlParams = new URLSearchParams(hashQuery || window.location.search);
                         const diagramIdFromUrl = urlParams.get('diagram');
                         const diagramId = diagramIdFromUrl
                             || localStorage.getItem('diagramMenu.selectedDiagramId');

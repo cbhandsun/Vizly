@@ -820,7 +820,7 @@ export class EdgeRoutingWorker {
         //          AND not a global trunk member (trunk ports are set by Coordinator)
         //          AND not a reverse bypass (bypass intentionally uses same-side ports)
         //          AND no edge-level explicit handle override (sourceHandle/targetHandle strings)
-        if (!isReverseBypassActive && !isGlobalTrunkMember) {
+        if (!isReverseBypassActive && !isGlobalTrunkMember && !hasExplicitSource && !hasExplicitTarget) {
             const sCx2 = sRect.x + sRect.width / 2;
             const sCy2 = sRect.y + sRect.height / 2;
             const tCx2 = tRect.x + tRect.width / 2;
@@ -851,6 +851,39 @@ export class EdgeRoutingWorker {
                 // Strong horizontal dominance with vertical ports → fix
                 startPos = dx2 > 0 ? Position.Right : Position.Left;
                 endPos   = dx2 > 0 ? Position.Left  : Position.Right;
+            }
+        }
+
+        // 5.8 [FIX-crossgroup-lateral] Cross-subGroup lateral links should use facing side ports.
+        // In domain layouts with horizontal subgroups, a left-lower node often connects to a
+        // right-upper node. Pure geometry can pick Top/Bottom ports and A* then routes outside
+        // the target container, creating the tall blue detour seen in WMS diagrams. If the two
+        // node boxes are already separated by a clear horizontal gap, use the facing side ports
+        // and still let A* handle obstacles between them.
+        if (
+            isCrossGroupEdge &&
+            !isReverseBypassActive &&
+            !isGlobalTrunkMember &&
+            !job.isOneToMany &&
+            !job.isManyToOne &&
+            !hasExplicitSource &&
+            !hasExplicitTarget
+        ) {
+            const rightwardGap = tRect.x - (sRect.x + sRect.width);
+            const leftwardGap = sRect.x - (tRect.x + tRect.width);
+            const lateralGap = Math.max(rightwardGap, leftwardGap);
+            const minLateralGap = Math.max(80, Math.min(sRect.width, tRect.width) * 0.35);
+
+            if (lateralGap > minLateralGap) {
+                if (rightwardGap >= leftwardGap) {
+                    startPos = Position.Right;
+                    endPos = Position.Left;
+                } else {
+                    startPos = Position.Left;
+                    endPos = Position.Right;
+                }
+                hasFixedSourcePort = true;
+                hasFixedTargetPort = true;
             }
         }
 

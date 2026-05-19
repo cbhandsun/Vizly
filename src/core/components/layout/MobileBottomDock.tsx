@@ -10,7 +10,7 @@ interface MobileBottomDockProps {
     onAddClick: () => void;
     onPropertyClick: () => void;
     onLayerClick: () => void;
-    onSettingsClick: () => void;
+    onSettingsClick?: () => void;
     onAiClick: () => void;
     onUndo?: () => void;
     onRedo?: () => void;
@@ -90,9 +90,11 @@ export const MobileBottomDock: React.FC<MobileBottomDockProps> = ({
                                 <FaRedo />
                             </button>
                         </div>
-                        <button className="mobile-dock-btn" onClick={onSettingsClick}>
-                            <FaCogs />
-                        </button>
+                        {onSettingsClick && (
+                            <button className="mobile-dock-btn" onClick={onSettingsClick}>
+                                <FaCogs />
+                            </button>
+                        )}
                     </div>
                 </Flex>
             </div>

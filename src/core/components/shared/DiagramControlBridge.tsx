@@ -144,7 +144,7 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           const rawZoomW = safeAvailW / bboxWidth;
           const rawZoomH = safeAvailH / bboxHeight;
           const rawZoom = Math.min(rawZoomW, rawZoomH);
-          const MIN_FIT_ZOOM = 0.55; // 保证可读性的最小缩放防线
+          const MIN_FIT_ZOOM = 0.35; // 大图优先完整进入首屏，用户可再放大查看细节
           const zoom = Math.max(MIN_FIT_ZOOM, Math.min(1.0, rawZoom * 0.98)); // 使用 1.0 作为上限，避免图形放大后显得比系统 UI 字体突兀
 
           // 设计行业尖端实践 (Figma/Miro)：真实的绝对居中（水平居中 + 垂直居中）
@@ -167,7 +167,7 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
               const rzW = aw / bboxWidth;
               const rzH = ah / bboxHeight;
               const rz = Math.min(rzW, rzH);
-              const MIN_FIT_ZOOM = 0.55;
+              const MIN_FIT_ZOOM = 0.35;
               const z = Math.max(MIN_FIT_ZOOM, Math.min(1.0, rz * 0.98));
               const xc = OVERALL_SAFE_LEFT + pad + Math.max(0, (aw - bboxWidth * z) / 2) - (minX * z);
               const yc = OVERALL_SAFE_TOP + pad + Math.max(0, (ah - bboxHeight * z) / 2) - (minY * z);

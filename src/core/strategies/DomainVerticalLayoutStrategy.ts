@@ -327,6 +327,24 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
       }
       return { endY: cursorY + rowMaxH };
     };
+
+    const placeRowNoWrap = (list: ReactFlowNode[], left: number, startY: number) => {
+      let cursorX = left; let rowMaxH = 0;
+      const getW = (n: ReactFlowNode) => {
+        const mw = num(((n as any)?.measured?.width), 240);
+        const sw = num(((n as any)?.style?.width), 240);
+        return Math.max(mw, sw);
+      };
+      const getH = (n: ReactFlowNode) => num(((n as any)?.measured?.height ?? (n as any)?.style?.height), 80);
+      for (const n of list) {
+        const w = getW(n);
+        const h = getH(n);
+        (n as any).position = { x: Math.round(cursorX), y: startY } as any;
+        cursorX += w + Math.max(12, nodeH);
+        rowMaxH = Math.max(rowMaxH, h);
+      }
+      return { endY: startY + rowMaxH };
+    };
     /**
      * 函数级注释：按最大列数进行横排并换行
      * - 目的：当域内存在多个子域时，控制每行最多元素数并进行换行
@@ -1165,7 +1183,9 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
             const py = num(((sg as any)?.position?.y), 0);
             sgOldPositions.set(sg.id, { x: px, y: py });
           }
-          const rowRes = placeRowWrap(subGroupsOrdered as any, laneLeft, laneRightLayout, innerTop);
+          const rowRes = nodeLayoutName === 'vertical'
+            ? placeRowNoWrap(subGroupsOrdered as any, laneLeft, innerTop)
+            : placeRowWrap(subGroupsOrdered as any, laneLeft, laneRightLayout, innerTop);
 
           // dagre 布局逻辑已移除，因为此块对 dagre 模式不可达
           // 原有逻辑的剩余部分保持
@@ -1570,8 +1590,9 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
           const safeEdgeW = Math.max(4, Math.floor(padH * 0.25));
           const subGroupsForD = updatedNodes.filter(n => String(n.type || '') === 'subGroup' && String(((n.data as any)?.domain || '')) === d);
           const sumSubW = subGroupsForD.reduce((s, sg) => s + num((((sg as any)?.measured?.width ?? (sg as any)?.style?.width)), 0), 0);
+          const subGroupRowGapW = Math.max(0, subGroupsForD.length - 1) * Math.max(12, nodeH);
           const contentW = proj ? Math.max(0, proj.right - leftAnchor) + padH * 2 + safeEdgeW : 0;
-          const deterministicW = (sumSubW > 0 ? sumSubW + padH * 2 + safeEdgeW : 0);
+          const deterministicW = (sumSubW > 0 ? sumSubW + subGroupRowGapW + padH * 2 + safeEdgeW : 0);
           // 自由节点的确定性宽度（保守）：所有业务节点总宽 + 间隙 + 两侧内边距
           const freeNodesForD = updatedNodes.filter(n => {
             const tp = String(n.type || '');

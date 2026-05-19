@@ -241,7 +241,7 @@ export class LayoutStrategyManager {
    * 函数级注释：根据整体布局策略返回推荐的节点布局策略名称
    * - 输入：整体布局策略名称（支持别名）；可选节点与边集合用于密度启发
    * - 规则：
-   *   DomainVerticalLayout → HorizontalLayout
+   *   DomainVerticalLayout → VerticalLayout
    *   DomainHorizontalLayout → VerticalLayout
    *   DomainElkLayout → 密度高选 CytoscapeFcoseLayout，否则选 ElkNodeLayout
    *   DomainCytoscapeLayout → CytoscapeFcoseLayout
@@ -252,8 +252,8 @@ export class LayoutStrategyManager {
     const nodeCount = Array.isArray(nodes) ? nodes.length : 0;
     const edgeCount = Array.isArray(edges) ? edges.length : 0;
     const dense = (nodeCount >= 24) || (edgeCount >= nodeCount && nodeCount > 0) || (edgeCount >= 24);
-    if (norm === 'domainverticallayout' || norm === 'domainvertical') return 'DagreLayout';
-    if (norm === 'domainhorizontallayout' || norm === 'domainhorizontal') return 'DagreLayout';
+    if (norm === 'domainverticallayout' || norm === 'domainvertical') return 'VerticalLayout';
+    if (norm === 'domainhorizontallayout' || norm === 'domainhorizontal') return 'VerticalLayout';
     if (norm === 'domainelklayout' || norm === 'domainelk') return 'HorizontalLayout';
     if (norm === 'domaincytoscapelayout' || norm === 'domaincytoscape' || norm === 'domainfcose' || norm === 'domaincytoscapefcose') return 'HorizontalLayout';
     return 'HorizontalLayout';

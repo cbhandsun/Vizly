@@ -18,6 +18,7 @@ import transportDrivenData from './standardized/TransportDrivenStandardData.json
 import wmsArchitectureData from './standardized/WmsStandardData.json';
 import wmsOrderToTaskFlowData from './standardized/WmsOrderToTaskFlowData.json';
 import wmsProcessFlowData from './standardized/WmsProcessFlowStandardData.json';
+import demandAllocationData from './standardized/DeamndAllocation.json';
 import blankCanvasStandardData from './standardized/BlankCanvasStandardData.json';
 
 /**
@@ -28,6 +29,7 @@ export class DataRegistry {
   private static instance: DataRegistry;
   private dataService: DataService;
   private initialized = false;
+  private builtInDiagrams = new Map<string, StandardDiagramData>();
 
   private constructor() {
     this.dataService = DataService.getInstance();
@@ -102,11 +104,13 @@ export class DataRegistry {
       wmsArchitectureData,
       wmsOrderToTaskFlowData,
       wmsProcessFlowData,
+      demandAllocationData,
       blankCanvasStandardData,
     ];
 
     // 批量注册内置图表数据，并禁止重复写入 IndexedDB
     for (const diagram of diagrams) {
+      this.builtInDiagrams.set(diagram.id, diagram as StandardDiagramData);
       this.dataService.registerDiagram(diagram as StandardDiagramData, false);
     }
   }
@@ -154,12 +158,30 @@ export class DataRegistry {
       try {
           const localDiagrams = await localDB.listDiagrams();
           for (const diagram of localDiagrams) {
+              const builtIn = this.builtInDiagrams.get(diagram.id);
+              const normalizedDiagram = builtIn ? this.mergeBuiltInLayoutDefaults(diagram, builtIn) : diagram;
               // 注册到内存，但不重复写入 IndexedDB
-              this.dataService.registerDiagram(diagram as StandardDiagramData, false);
+              this.dataService.registerDiagram(normalizedDiagram as StandardDiagramData, false);
           }
       } catch (err) {
           console.error('Failed to load local diagrams from IndexedDB', err);
       }
+  }
+
+  /**
+   * 对同 ID 的内置模板本地副本补齐新增 layout 默认值。
+   * 仅填补缺失字段，保留用户本地节点、边和已有布局选择。
+   */
+  private mergeBuiltInLayoutDefaults(localDiagram: any, builtInDiagram: StandardDiagramData): StandardDiagramData {
+      const builtInLayout = (builtInDiagram as any).layout || {};
+      const localLayout = localDiagram.layout || {};
+      return {
+          ...localDiagram,
+          layout: {
+              ...builtInLayout,
+              ...localLayout,
+          }
+      } as StandardDiagramData;
   }
 
   /**

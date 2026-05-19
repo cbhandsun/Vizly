@@ -59,6 +59,8 @@ export interface SmartEdgeContextResult {
     respectTargetHandle: boolean;
     isReverseEdge: boolean;
     nodesDragging: boolean;
+    sourceHandleId?: string | null;
+    targetHandleId?: string | null;
     // 🚀 [PERF] 暴露内部数据，避免边组件重复订阅
     storeEdges: Edge[];
     simpleNodeMap: Map<string, any>;
@@ -76,8 +78,8 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         sourceY,
         targetX,
         targetY,
-        sourceHandleId,
-        targetHandleId,
+        sourceHandleId: rawSourceHandleId,
+        targetHandleId: rawTargetHandleId,
     } = props;
 
     // [CLEANUP] Handle direction parsing now uses the canonical parseHandlePosition
@@ -190,6 +192,51 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
     // Combine with store state for robustness
     const nodesDragging = !!(isSourceDragging || isTargetDragging || sourceNode?.dragging || targetNode?.dragging);
 
+    const { sourceHandleId, targetHandleId } = useMemo(() => {
+        const rawSource = rawSourceHandleId;
+        const rawTarget = rawTargetHandleId;
+        const lowerSource = String(rawSource || '').toLowerCase();
+        const lowerTarget = String(rawTarget || '').toLowerCase();
+        const isHorizontal = (handle: string) =>
+            handle === 'left' || handle === 'right' || handle === 'l' || handle === 'r' || handle.includes('left') || handle.includes('right');
+        const manualSides = Array.isArray((props.data as any)?.manualHandleSides)
+            ? (props.data as any).manualHandleSides.map((side: any) => String(side).toLowerCase())
+            : [];
+        if (!manualSides.includes('source') || !manualSides.includes('target')) {
+            return { sourceHandleId: rawSource, targetHandleId: rawTarget };
+        }
+        if (!isHorizontal(lowerSource) || !isHorizontal(lowerTarget)) {
+            return { sourceHandleId: rawSource, targetHandleId: rawTarget };
+        }
+
+        const sourceAbs = sourceNode?.positionAbsolute || { x: sourceX, y: sourceY };
+        const targetAbs = targetNode?.positionAbsolute || { x: targetX, y: targetY };
+        const sourceW = sourceNode?.measured?.width || sourceNode?.width || 0;
+        const sourceH = sourceNode?.measured?.height || sourceNode?.height || 0;
+        const targetW = targetNode?.measured?.width || targetNode?.width || 0;
+        const targetH = targetNode?.measured?.height || targetNode?.height || 0;
+        const dx = (targetAbs.x + targetW / 2) - (sourceAbs.x + sourceW / 2);
+        const dy = (targetAbs.y + targetH / 2) - (sourceAbs.y + sourceH / 2);
+        if (Math.abs(dx) < 80 || Math.abs(dy) <= Math.abs(dx) * 1.4) {
+            return { sourceHandleId: rawSource, targetHandleId: rawTarget };
+        }
+
+        const sourceParent = sourceNode?.parentId || sourceNode?.parentNode;
+        const targetParent = targetNode?.parentId || targetNode?.parentNode;
+        const sourceDomain = String(sourceNode?.data?.domain || '').trim();
+        const targetDomain = String(targetNode?.data?.domain || '').trim();
+        const sourceSubDomain = String(sourceNode?.data?.subDomain || '').trim();
+        const targetSubDomain = String(targetNode?.data?.subDomain || '').trim();
+        const isCrossContainerEdge = Boolean(sourceParent && targetParent && sourceParent !== targetParent)
+            || Boolean(sourceDomain && targetDomain && sourceDomain === targetDomain && sourceSubDomain && targetSubDomain && sourceSubDomain !== targetSubDomain);
+        if (!isCrossContainerEdge && Math.abs(dy) <= 480) {
+            return { sourceHandleId: rawSource, targetHandleId: rawTarget };
+        }
+
+        const outerSide = dx >= 0 ? 'right' : 'left';
+        return { sourceHandleId: outerSide, targetHandleId: outerSide };
+    }, [props.data, rawSourceHandleId, rawTargetHandleId, sourceNode, sourceX, sourceY, targetNode, targetX, targetY]);
+
     const handleSelectionPolicy = useMemo(() => {
         const layered = (() => {
             try {
@@ -208,10 +255,6 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         const fromEdge = (props.data as any)?.handleSelectionPolicy;
         return String(fromEdge ?? layered ?? fromCfg ?? 'respect').toLowerCase();
     }, [props.data]);
-
-    const forceCostHandles = useMemo(() => {
-        return handleSelectionPolicy.includes('force') && handleSelectionPolicy.includes('cost');
-    }, [handleSelectionPolicy]);
 
     // Handle Auto Flags
     const autoFlags = useMemo(() => {
@@ -238,12 +281,10 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
 
     const respectSourceHandle = Boolean(sourceHandleId)
         && manualFlags.manualSource
-        && !forceCostHandles
         && !autoFlags.autoSource;
 
     const respectTargetHandle = Boolean(targetHandleId)
         && manualFlags.manualTarget
-        && !forceCostHandles
         && !autoFlags.autoTarget;
 
     // ---------- 0️⃣ Edge configuration ----------
@@ -923,6 +964,8 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         respectTargetHandle,
         isReverseEdge,
         nodesDragging, // [NEW] Exported for Jitter control
+        sourceHandleId,
+        targetHandleId,
         // 🚀 [PERF] 暴露内部数据，避免 AdvancedSmartEdge 重复订阅
         storeEdges,
         simpleNodeMap: simpleNodeMap as Map<string, any>,

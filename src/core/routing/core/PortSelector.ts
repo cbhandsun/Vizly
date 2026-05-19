@@ -40,6 +40,18 @@ export class PortSelector {
         // 0. 几何分析
         const geo = geometryInfo || geometryAnalyzer.analyze(sourceNode, targetNode, config.layoutDirection);
 
+        const sPre = config.preAssignedPorts?.[sourceNode.id]?.source;
+        const tPre = config.preAssignedPorts?.[targetNode.id]?.target;
+        if (sPre && tPre) {
+            return {
+                sourceHandle: sPre,
+                targetHandle: tPre,
+                cost: 0,
+                autoSource: false,
+                autoTarget: false
+            };
+        }
+
         // 1. 生成候选端口
         const candidates = this.generateCandidates(
             sourceNode,

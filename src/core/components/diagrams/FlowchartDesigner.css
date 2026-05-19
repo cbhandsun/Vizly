@@ -508,11 +508,13 @@ circle.react-flow__edgeupdater:active {
     cursor: grabbing;
 }
 
-/* 鏍稿績鏉€鎵嬮攺锛氬埄鐢?:has() 浼被锛屽綋瀛樺湪琚€変腑銆佹垨鎮寕琚偓鍋滅殑杈规椂锛岀洿鎺ュ皢甯︽湁 SVG 鐨?Edges 瀹瑰櫒灞傜骇鍑岄┚浜?Nodes 涔嬩笂銆?
-   杩欏氨闃叉浜嗕笅闈㈠師鏈眰绾х粷缂樼殑 HTML Handle 鍏冪礌鈥滃悆鎺夆€濆師鏈兂鐐瑰湪鍦堝湀涓婄殑榧犳爣浜嬩欢锛堜緥濡傜敤鎴锋姳鎬ㄧ殑锛氣€滅Щ鍔ㄨ繛绾胯繕鏄細鐢熷唇鈥濓級銆?
-   [FIX] Node hover 鏈韩甯?z-index: 100/1000锛屽繀椤诲姞婊″埌 2000 浠ュ交搴曞帇鍒讹紒 */
-.react-flow:has(.react-flow__edge.selected, .react-flow__edge:hover) .react-flow__edges {
-    z-index: 2000 !important;
+/* Keep edges below nodes even when an edge is hovered/selected, so routes never paint over node cards. */
+.react-flow__edges {
+    z-index: 0 !important;
+}
+
+.react-flow__nodes {
+    z-index: auto !important;
 }
 
 

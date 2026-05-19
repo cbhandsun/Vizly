@@ -15,3 +15,11 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: vi.fn(),
   })),
 });
+
+Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+  writable: true,
+  value: vi.fn().mockImplementation(() => ({
+    font: '',
+    measureText: (text: string) => ({ width: String(text || '').length * 8 }),
+  })),
+});

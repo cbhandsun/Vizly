@@ -1122,6 +1122,7 @@ const DiagramViewer: React.FC = () => {
                                                 onDirectSave={handleDirectSave}
                                                 isDirectSaveDisabled={false}
                                                 onSaveAsTo={handleSaveTo}
+                                                onOpenSettings={() => setIsSettingsOpen(true)}
                                                 renderAIChatPanel={
                                                     <Suspense fallback={<div className="p-4 text-center text-gray-500">Loading AI...</div>}>
                                                         <AIChatView
@@ -1265,6 +1266,17 @@ const DiagramViewer: React.FC = () => {
                                         );
                                     })()}
                                 </Suspense>
+
+                                {isSettingsOpen && (
+                                    <Suspense fallback={null}>
+                                        <DraggableSettingsPanel 
+                                            title={t('designer.commandItems.settings', '配置面板 / Settings')}
+                                            onClose={() => setIsSettingsOpen(false)}
+                                        >
+                                            {settingsPanel}
+                                        </DraggableSettingsPanel>
+                                    </Suspense>
+                                )}
 
                                 {/* 演示模式退出提示层 */}
                                 {isPresentationMode && (

@@ -202,11 +202,11 @@ export class EdgeFactory {
 
     // 设置连接点
     if (config.sourceHandle !== undefined) {
-      // 规范化把手ID，统一映射到 't' | 'b' | 'l' | 'r'
+      // 规范化把手ID，统一映射到节点实际注册的全称 handle。
       edge.sourceHandle = this.normalizeHandleId(config.sourceHandle);
     }
     if (config.targetHandle !== undefined) {
-      // 规范化把手ID，统一映射到 't' | 'b' | 'l' | 'r'
+      // 规范化把手ID，统一映射到节点实际注册的全称 handle。
       edge.targetHandle = this.normalizeHandleId(config.targetHandle);
     }
 
@@ -502,12 +502,12 @@ export class EdgeFactory {
     }
 
     if (updates.sourceHandle) {
-      // 规范化把手ID，统一映射到 't' | 'b' | 'l' | 'r'
+      // 规范化把手ID，统一映射到节点实际注册的全称 handle。
       (updatedEdge as any).sourceHandle = this.normalizeHandleId(updates.sourceHandle);
     }
 
     if (updates.targetHandle) {
-      // 规范化把手ID，统一映射到 't' | 'b' | 'l' | 'r'
+      // 规范化把手ID，统一映射到节点实际注册的全称 handle。
       (updatedEdge as any).targetHandle = this.normalizeHandleId(updates.targetHandle);
     }
 
@@ -771,7 +771,7 @@ export class EdgeFactory {
    * 规范化把手ID
    * 函数级注释：
    * - 输入可为 'top'/'bottom'/'left'/'right'、't'/'b'/'l'/'r'、以及复合形式如 'right-top'/'rt'；
-   * - 输出统一为自定义节点实际注册的把手ID：'t' | 'b' | 'l' | 'r'；
+   * - 输出统一为自定义节点实际注册的把手ID：'top' | 'bottom' | 'left' | 'right'；
    * - 若无法解析，返回 null，让渲染组件按默认策略处理（通常居中或节点默认把手）。
    */
   private normalizeHandleId(handle: string | null | undefined): string | null {
@@ -781,13 +781,13 @@ export class EdgeFactory {
     // 明确定义映射表，覆盖常见同义词
     const map: Record<string, string> = {
       // 上
-      t: 't', top: 't', up: 't', north: 't', upper: 't',
+      t: 'top', top: 'top', up: 'top', north: 'top', upper: 'top',
       // 下
-      b: 'b', bottom: 'b', down: 'b', south: 'b', lower: 'b',
+      b: 'bottom', bottom: 'bottom', down: 'bottom', south: 'bottom', lower: 'bottom',
       // 左
-      l: 'l', left: 'l', west: 'l',
+      l: 'left', left: 'left', west: 'left',
       // 右
-      r: 'r', right: 'r', east: 'r'
+      r: 'right', right: 'right', east: 'right'
     };
 
     if (map[raw]) return map[raw];

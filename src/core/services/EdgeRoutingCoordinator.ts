@@ -25,6 +25,7 @@ import { globalChannelRouting, type BuddyGroup } from '../algorithms/globalChann
 import { createFilletedPath } from '../algorithms/smartEdgeUtils';
 import { refineOrthogonalWaypointsDetailed, type WaypointRefinementSummary } from '../algorithms/orthogonalWaypointRefiner';
 import { optimizeHubPortOrder } from '../algorithms/hubPortOrderOptimizer';
+import { refineManyToOneFanIn, type ManyToOneFanInGroup } from '../algorithms/manyToOneFanIn';
 
 /**
  * [P0-2] Main coordination service for edge routing.
@@ -568,6 +569,7 @@ export class EdgeRoutingCoordinator {
             }
         }
         return {
+            rv: 11,
             s: job.source,
             t: job.target,
             sx: Math.round(job.sourceX ?? 0),
@@ -581,6 +583,10 @@ export class EdgeRoutingCoordinator {
             // But if we want local caching, we might need a spatial hash of relevant obstacles.
             // @ts-expect-error - Job type is loose string in legacy code
             type: job.type || 's', // Smart
+            sourceHandle: (job as any).sourceHandle || '',
+            targetHandle: (job as any).targetHandle || '',
+            sourcePosition: (job as any).sourcePosition || '',
+            targetPosition: (job as any).targetPosition || '',
             // [FIX] Include Bus Routing params in cache key
             bus: `${!!(job as any).isOneToMany}|${!!(job as any).isManyToOne}|${(job as any).busTrunkSource?.x ?? 0},${(job as any).busTrunkSource?.y ?? 0}|${(job as any).busTrunkTarget?.x ?? 0},${(job as any).busTrunkTarget?.y ?? 0}`,
             pe: peHash,  // [H-9] pendingEdges fingerprint
@@ -842,8 +848,8 @@ export class EdgeRoutingCoordinator {
             const config = group.graph.config;
             const isNudgeEnabled = config?.postProcessing?.enableNudge !== false;
             
-            if (isNudgeEnabled && results.length > 1) {
-                this.applyGlobalNudge(results, group.requests, group.graph, jobs);
+            if (isNudgeEnabled && results.length > 0) {
+                this.applyGlobalNudge(results, group.requests, group.graph, jobs, group.graphKey);
             }
 
             // [SharedTrunk] Extract shared trunk segments for M2O/O2M groups
@@ -1040,6 +1046,63 @@ export class EdgeRoutingCoordinator {
             }
         }
         return this.compactLineObstacles(pendingEdges, maxSegments);
+    }
+
+    private collectFixedPathContext(
+        graphKey: string,
+        activeResults: PathFindingResult[],
+        activeEdgeIds: Set<string>,
+        maxEdges: number = 80
+    ): Map<string, Point[]> {
+        const fixedPaths = new Map<string, Point[]>();
+        if (activeResults.length === 0) return fixedPaths;
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const result of activeResults) {
+            for (const point of result.points ?? []) {
+                minX = Math.min(minX, point.x);
+                minY = Math.min(minY, point.y);
+                maxX = Math.max(maxX, point.x);
+                maxY = Math.max(maxY, point.y);
+            }
+        }
+        if (minX === Infinity) return fixedPaths;
+
+        const SPATIAL_MARGIN = 360;
+        const bbox = {
+            minX: minX - SPATIAL_MARGIN,
+            minY: minY - SPATIAL_MARGIN,
+            maxX: maxX + SPATIAL_MARGIN,
+            maxY: maxY + SPATIAL_MARGIN,
+        };
+
+        const overlapsBBox = (points: Point[]): boolean => {
+            for (let i = 0; i < points.length - 1; i++) {
+                const a = points[i];
+                const b = points[i + 1];
+                const segMinX = Math.min(a.x, b.x);
+                const segMaxX = Math.max(a.x, b.x);
+                const segMinY = Math.min(a.y, b.y);
+                const segMaxY = Math.max(a.y, b.y);
+                if (segMaxX >= bbox.minX && segMinX <= bbox.maxX && segMaxY >= bbox.minY && segMinY <= bbox.maxY) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        for (const [edgeId, entry] of this.latestRequests.entries()) {
+            if (fixedPaths.size >= maxEdges) break;
+            if (activeEdgeIds.has(edgeId) || this.dirtyEdges.has(edgeId)) continue;
+            if (entry.graphKey !== graphKey) continue;
+
+            const cached = this.getCachedResult(entry.request);
+            if (!cached?.points || cached.points.length < 2) continue;
+            if (!overlapsBBox(cached.points)) continue;
+            fixedPaths.set(edgeId, cached.points.map(p => ({ x: p.x, y: p.y })));
+        }
+
+        return fixedPaths;
     }
 
     private compactLineObstacles(lines: LineObstacle[], maxSegments: number): LineObstacle[] {
@@ -2089,12 +2152,13 @@ export class EdgeRoutingCoordinator {
         results: (PathFindingResult | null)[],
         requests: RoutingRequest[],
         graph: SharedGraphContext,
-        assignedJobs?: PathFindingJob[]
+        assignedJobs?: PathFindingJob[],
+        graphKey?: string
     ): void {
 
         const config = graph.config;
         const validResults = results.filter((r): r is PathFindingResult => r !== null && !r.error && !!r.points && r.points.length > 0);
-        if (validResults.length <= 1) return;
+        if (validResults.length === 0) return;
 
         // [UPGRADE] Include ALL edges in overlap detection, but bus/trunk edges from the
         // same group are treated as "buddies" — they intentionally share trunk segments
@@ -2119,9 +2183,17 @@ export class EdgeRoutingCoordinator {
 
         // Step 2: Build edgePaths map for globalChannelRouting
         const edgePaths = new Map<string, Point[]>();
+        const activeEdgeIds = new Set(validResults.map(r => r.edgeId));
+        const fixedContextPaths = graphKey
+            ? this.collectFixedPathContext(graphKey, validResults, activeEdgeIds)
+            : new Map<string, Point[]>();
+        fixedContextPaths.forEach((points, edgeId) => {
+            edgePaths.set(edgeId, cleanPath(points));
+        });
         for (const r of validResults) {
             edgePaths.set(r.edgeId, cleanPath(r.points));
         }
+        const fixedEdgeIds = new Set(fixedContextPaths.keys());
 
         // Step 3: Build buddy groups — bus/trunk edges sharing the same normalized
         // direction + hemisphere trunk group.
@@ -2153,13 +2225,14 @@ export class EdgeRoutingCoordinator {
             // O2M buddies protect first segment only, M2O protect last segment only.
             // Mid-segments of buddy edges still participate in normal channel routing.
             const spacing = config?.postProcessing?.nudgeSpacing ?? 12;
-            const nudgedPaths = globalChannelRouting(edgePaths, spacing, buddyGroups);
+            const nudgedPaths = globalChannelRouting(edgePaths, spacing, buddyGroups, fixedEdgeIds);
             const currentBatchEdgeIds = new Set(requests.map(req => req.edgeId));
             const postProcessing = config?.postProcessing;
             const refinementEnabled = postProcessing?.enableWaypointRefinement !== false;
             const refinementResult = refinementEnabled
                 ? refineOrthogonalWaypointsDetailed(nudgedPaths, {
                     buddyGroups,
+                    fixedEdgeIds,
                     hardObstacles: (graph.obstacles ?? []) as Rectangle[],
                     softObstacles: this.collectSoftRoutingObstacles(graph, currentBatchEdgeIds),
                     spacing,
@@ -2178,10 +2251,15 @@ export class EdgeRoutingCoordinator {
                     candidateAxes: this.buildWaypointCandidateAxes(graph, assignedJobs),
                 })
                 : null;
-            const refinedPaths = refinementResult?.paths ?? nudgedPaths;
+            let refinedPaths = refinementResult?.paths ?? nudgedPaths;
             if (refinementResult) {
                 this.attachWaypointRefinementDebug(validResults, refinementResult.summary);
             }
+            refinedPaths = refineManyToOneFanIn(refinedPaths, this.buildManyToOneFanInGroups(requests, graph, assignedJobs), {
+                spacing,
+                obstacles: (graph.obstacles ?? []) as Rectangle[],
+                ignoredRectsByEdge: this.buildFanInIgnoredRects(requests, assignedJobs),
+            });
 
             // Step 3: Apply back to results
             for (const r of validResults) {
@@ -2189,10 +2267,11 @@ export class EdgeRoutingCoordinator {
                 if (!newPoints || newPoints.length < 2) continue;
 
                 // Check if path actually changed
-                const changed = newPoints.some((p, i) => {
-                    const orig = r.points[i];
-                    return !orig || Math.abs(p.x - orig.x) > 0.5 || Math.abs(p.y - orig.y) > 0.5;
-                });
+                const changed = newPoints.length !== r.points.length
+                    || newPoints.some((p, i) => {
+                        const orig = r.points[i];
+                        return !orig || Math.abs(p.x - orig.x) > 0.5 || Math.abs(p.y - orig.y) > 0.5;
+                    });
                 if (!changed) continue;
 
                 r.points = newPoints;
@@ -2215,6 +2294,60 @@ export class EdgeRoutingCoordinator {
         } catch (err) {
             console.error('[GlobalNudge] Channel routing failed, falling back to original paths:', err);
         }
+    }
+
+    private buildManyToOneFanInGroups(
+        requests: RoutingRequest[],
+        graph: SharedGraphContext,
+        assignedJobs?: PathFindingJob[]
+    ): ManyToOneFanInGroup[] {
+        const requestCountByTarget = new Map<string, number>();
+        requests.forEach(req => {
+            requestCountByTarget.set(req.job.target, (requestCountByTarget.get(req.job.target) ?? 0) + 1);
+        });
+
+        const graphIncomingCountByTarget = new Map<string, number>();
+        ((graph.edges ?? []) as Array<{ target?: string }>).forEach(edge => {
+            if (!edge.target) return;
+            graphIncomingCountByTarget.set(edge.target, (graphIncomingCountByTarget.get(edge.target) ?? 0) + 1);
+        });
+
+        const groups = new Map<string, Set<string>>();
+
+        requests.forEach((req, index) => {
+            const job = (assignedJobs?.[index] ?? req.job) as any;
+            const targetId = job.target ?? req.job.target;
+            if (!targetId) return;
+            const isManyToOne = !!job.isManyToOne
+                || (requestCountByTarget.get(targetId) ?? 0) > 1
+                || (graphIncomingCountByTarget.get(targetId) ?? 0) > 1;
+            if (!isManyToOne) return;
+            const key = `m2o:${targetId}`;
+            if (!groups.has(key)) groups.set(key, new Set());
+            groups.get(key)!.add(req.edgeId);
+        });
+
+        return [...groups.entries()]
+            .map(([key, edgeIds]) => ({
+                targetId: key.slice('m2o:'.length),
+                edgeIds: [...edgeIds],
+            }))
+            .filter(group => group.edgeIds.length >= 2);
+    }
+
+    private buildFanInIgnoredRects(
+        requests: RoutingRequest[],
+        assignedJobs?: PathFindingJob[]
+    ): Map<string, Rectangle[]> {
+        const ignored = new Map<string, Rectangle[]>();
+
+        requests.forEach((req, index) => {
+            const job = assignedJobs?.[index] ?? req.job;
+            const rects = [job.sourceRect, job.targetRect].filter((rect): rect is Rectangle => !!rect);
+            if (rects.length > 0) ignored.set(req.edgeId, rects);
+        });
+
+        return ignored;
     }
 
     private attachWaypointRefinementDebug(

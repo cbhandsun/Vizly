@@ -1134,6 +1134,7 @@
             "DomainVerticalLayout": "整体：域垂直",
             "DomainHorizontalLayout": "整体：域水平",
             "DomainElkLayout": "整体：域ELK",
+            "DomainDagreLayout": "整体：域Dagre",
             "DomainElkCompoundLayout": "整体：ELK复合",
             "DomainElkRadialLayout": "整体：ELK径向(手动)",
             "DomainElkForceLayout": "整体：ELK力导向",
@@ -1144,6 +1145,7 @@
             "CenteredLayout": "节点：居中",
             "ElkNodeLayout": "节点：ELK-first",
             "DagreLayout": "节点：Dagre分层",
+            "autoPathType": "自动路径",
             "auto": "行业预设：自动",
             "strict_industry": "行业预设：严格",
             "balanced_industry": "行业预设：均衡",
@@ -1166,7 +1168,8 @@
             "expertMode": "专家模式"
         },
         "layout": {
-            "domainElkActive": "域ELK生效中"
+            "domainElkActive": "域ELK生效中",
+            "nodeLayoutManaged": "由整体布局策略管理"
         },
         "diagram": {
             "node": {
@@ -1402,7 +1405,7 @@
                 },
                 "linkOrientation": {
                     "label": "联动域/节点方向",
-                    "desc": "启用后选择域水平则默认节点垂直；选择域垂直则默认节点水平。"
+                    "desc": "启用后，域水平/域垂直布局会自动让子域内部按纵向流程排列。"
                 },
                 "CONTAINMENT_POLICY": {
                     "label": "容器包含策略",

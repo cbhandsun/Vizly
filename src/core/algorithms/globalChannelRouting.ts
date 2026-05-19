@@ -43,7 +43,8 @@ export interface BuddyGroup {
 export function globalChannelRouting(
     edgePaths: Map<string, Point[]>,
     spacing: number = 12,
-    buddyGroups?: BuddyGroup[]
+    buddyGroups?: BuddyGroup[],
+    fixedEdgeIds: Set<string> = new Set()
 ): Map<string, Point[]> {
     const buddyEdgeIds = new Set<string>();
     const buddyGroupByEdgeId = new Map<string, string>();
@@ -58,12 +59,12 @@ export function globalChannelRouting(
     }
 
     // 1. 提取所有正交线段
-    const GROUP_TOLERANCE = 6;  // 同通道聚类容差（px）
+    const GROUP_TOLERANCE = Math.max(6, Math.min(18, spacing * 1.5));  // 同通道聚类容差（px）
     const segments: Segment[] = [];
 
     for (const [edgeId, pts] of edgePaths) {
         if (pts.length < 2) continue;
-        const isBuddy = buddyEdgeIds.has(edgeId);
+        const isBuddy = buddyEdgeIds.has(edgeId) || fixedEdgeIds.has(edgeId);
 
         for (let j = 0; j < pts.length - 1; j++) {
             const p1 = pts[j];
@@ -216,9 +217,10 @@ export function globalChannelRouting(
                 ? (buddyTrackCount - 1) / 2
                 : (numTracks - 1) / 2;
 
+            const trackSpacing = getTrackSpacing(group, spacing, numTracks);
             for (const { seg, trackIdx } of assignments) {
                 if (seg.isBuddy) continue;
-                const offset = (trackIdx - center) * spacing;
+                const offset = (trackIdx - center) * trackSpacing;
                 if (Math.abs(offset) > 0.5) {
                     shifts.set(`${seg.edgeId}:${seg.segIdx}`, offset);
                 }
@@ -239,7 +241,7 @@ export function globalChannelRouting(
     const result = new Map<string, Point[]>();
 
     for (const [edgeId, pts] of edgePaths) {
-        if (buddyEdgeIds.has(edgeId)) {
+        if (buddyEdgeIds.has(edgeId) || fixedEdgeIds.has(edgeId)) {
             result.set(edgeId, pts);
             continue;
         }
@@ -270,4 +272,23 @@ export function globalChannelRouting(
     }
 
     return result;
+}
+
+function getTrackSpacing(group: Segment[], baseSpacing: number, trackCount: number): number {
+    if (trackCount <= 1 || group.length < 2) return baseSpacing;
+
+    let maxOverlap = 0;
+    for (let i = 0; i < group.length; i++) {
+        for (let j = i + 1; j < group.length; j++) {
+            if (group[i].edgeId === group[j].edgeId) continue;
+            const overlapLen = Math.min(group[i].maxVal, group[j].maxVal) - Math.max(group[i].minVal, group[j].minVal);
+            maxOverlap = Math.max(maxOverlap, overlapLen);
+        }
+    }
+
+    const isVerticalBundle = !group[0]?.isHoriz;
+    const isLongSharedRun = maxOverlap > baseSpacing * 12;
+    if (!isVerticalBundle || !isLongSharedRun) return baseSpacing;
+
+    return Math.max(baseSpacing, Math.min(baseSpacing * 1.6, baseSpacing + 8));
 }

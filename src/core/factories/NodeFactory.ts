@@ -276,6 +276,7 @@ export class NodeFactory {
           vertical: paddingOverride.vertical + shapePaddingV
         },
         minHeight: diagramConfig.node.height || 60,
+        maxWidth: maxWidthCap,
       });
     }
 

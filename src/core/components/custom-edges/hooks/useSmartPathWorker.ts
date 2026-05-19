@@ -60,6 +60,40 @@ const getComputedPoints = (edgeData: EdgeData): Point2D[] | null => {
     return edgeData.computedPath;
 };
 
+const isPointNear = (a: Point2D, b: Point2D, tolerance = 40): boolean => {
+    return Math.abs(a.x - b.x) <= tolerance && Math.abs(a.y - b.y) <= tolerance;
+};
+
+const isComputedPathCompatibleWithHandles = (
+    points: Point2D[] | null,
+    centeredCoords: CenteredCoords,
+    respectSourceHandle: boolean,
+    respectTargetHandle: boolean
+): boolean => {
+    if (!points || points.length < 2) return false;
+    const first = points[0];
+    const last = points[points.length - 1];
+
+    if (respectSourceHandle && !isPointNear(first, { x: centeredCoords.sourceX, y: centeredCoords.sourceY })) {
+        return false;
+    }
+    if (respectTargetHandle && !isPointNear(last, { x: centeredCoords.targetX, y: centeredCoords.targetY })) {
+        return false;
+    }
+    return true;
+};
+
+const isRoutingResultCompatibleWithHandles = (
+    result: { points?: Point2D[]; path?: string } | null | undefined,
+    centeredCoords: CenteredCoords,
+    respectSourceHandle: boolean,
+    respectTargetHandle: boolean
+): boolean => {
+    if (!respectSourceHandle && !respectTargetHandle) return true;
+    if (!result?.points || result.points.length < 2) return false;
+    return isComputedPathCompatibleWithHandles(result.points, centeredCoords, respectSourceHandle, respectTargetHandle);
+};
+
 const useLayoutStabilityReset = (
     isLayoutStable: boolean,
     lastFingerprintRef: MutableRefObject<string>
@@ -441,8 +475,11 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
     }, []);
     const computedPoints = useMemo(() => {
         if (isBus) return null;
-        return getComputedPoints(edgeData);
-    }, [edgeData, isBus]);
+        const points = getComputedPoints(edgeData);
+        return isComputedPathCompatibleWithHandles(points, centeredCoords, respectSourceHandle, respectTargetHandle)
+            ? points
+            : null;
+    }, [centeredCoords, edgeData, isBus, respectSourceHandle, respectTargetHandle]);
 
     // [REMOVED] Internal useStore for dragging. Passed via props now.
     // const nodesDragging = useStore((state: any) => state.nodesDragging);
@@ -776,7 +813,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
             // [FIX] Removed !isBus exclusion: bus edges should use cache when topology unchanged.
             // Without this, every click triggers full re-route for bus edges, causing trunk axis drift.
             const cached = (!nodesDragging && isLayoutStable) ? coordinator.getCachedResult(routingRequest) : null;
-            if (cached) {
+            if (cached && isRoutingResultCompatibleWithHandles(cached, centeredCoords, respectSourceHandle, respectTargetHandle)) {
                 if (isMountedRef.current) {
                     if (path !== cached.path) {
                         setPath(cached.path);
@@ -796,6 +833,22 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
             }
 
             coordinator.route(routingRequest).then((res: import('../../../types/routing').PathFindingResult) => {
+                if (res && !isRoutingResultCompatibleWithHandles(res, centeredCoords, respectSourceHandle, respectTargetHandle)) {
+                    if (isMountedRef.current) {
+                        setPath(`M ${centeredCoords.sourceX} ${centeredCoords.sourceY} L ${centeredCoords.targetX} ${centeredCoords.targetY}`);
+                        setSmartPoints([
+                            { x: centeredCoords.sourceX, y: centeredCoords.sourceY },
+                            { x: centeredCoords.targetX, y: centeredCoords.targetY }
+                        ]);
+                        setSmartLabelPos({
+                            x: (centeredCoords.sourceX + centeredCoords.targetX) / 2,
+                            y: (centeredCoords.sourceY + centeredCoords.targetY) / 2
+                        });
+                        setIsLoading(false);
+                    }
+                    return;
+                }
+
                 // [FIX] Store result in window-level cache BEFORE isMountedRef check.
                 // When toggle causes edge type change, React Flow unmounts the old component
                 // and mounts a new one. The old Promise resolves after unmount, so isMountedRef=false.

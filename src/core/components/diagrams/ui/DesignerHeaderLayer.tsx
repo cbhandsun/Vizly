@@ -31,7 +31,7 @@ export interface DesignerHeaderLayerProps {
         isYjsSynced?: boolean;
         isReadonly: boolean;
         onReadonlyChange: (v: boolean) => void;
-        onOpenSettings: () => void;
+        onOpenSettings?: () => void;
         onSmartOptimize?: () => void;
         highlightMainFlow: boolean;
         handleToggleHighlightMainFlow: () => void;

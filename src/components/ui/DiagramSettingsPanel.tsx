@@ -102,6 +102,23 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
         );
     };
 
+    const getEngineNodeLayout = (nodeStrategy?: string) => {
+        const normalized = String(nodeStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_\-]/g, '');
+        const map: Record<string, string> = {
+            dagrelayout: 'dagre',
+            dagre: 'dagre',
+            horizontallayout: 'horizontal',
+            horizontal: 'horizontal',
+            verticallayout: 'vertical',
+            vertical: 'vertical',
+            gridlayout: 'grid',
+            grid: 'grid',
+            centeredlayout: 'flow',
+            centered: 'flow'
+        };
+        return map[normalized];
+    };
+
     const SettingRow = ({ icon: Icon, label, children, description, disabled = false }: any) => (
         <div className={`group flex items-start justify-between gap-4 px-5 py-3.5 transition-all duration-300 ${disabled ? 'opacity-40 pointer-events-none' : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'}`}>
             <div className="flex items-start gap-4 min-w-0 flex-1">
@@ -219,16 +236,17 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
 
                                     if (linkOrientationEnabled) {
                                         if (norm === 'domainhorizontallayout' || norm === 'domainhorizontal') {
-                                            await onNodeLayoutStrategyChange('DagreLayout');
-                                            resolvedNodeLayout = 'dagre';
+                                            await onNodeLayoutStrategyChange('VerticalLayout');
+                                            resolvedNodeLayout = 'vertical';
                                         } else if (norm === 'domainverticallayout' || norm === 'domainvertical') {
-                                            await onNodeLayoutStrategyChange('DagreLayout');
-                                            resolvedNodeLayout = 'dagre';
+                                            await onNodeLayoutStrategyChange('VerticalLayout');
+                                            resolvedNodeLayout = 'vertical';
                                         }
                                     }
 
                                     if (!selectable && autoNode) {
                                         await onNodeLayoutStrategyChange(autoNode);
+                                        resolvedNodeLayout = getEngineNodeLayout(autoNode);
                                     }
                                 } catch { }
                                 window.dispatchEvent(new CustomEvent('editor:command', {
@@ -324,7 +342,15 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                     className="text-right font-bold text-gray-700 dark:text-gray-300 min-w-[140px]"
                                     value={nodeLayoutStrategy}
                                     onChange={async (val) => {
-                                        await onNodeLayoutStrategyChange(val as string);
+                                        const nextNodeLayout = val as string;
+                                        await onNodeLayoutStrategyChange(nextNodeLayout);
+                                        window.dispatchEvent(new CustomEvent('editor:command', {
+                                            detail: {
+                                                action: 'apply-layout',
+                                                strategy: layoutStrategy,
+                                                nodeLayout: getEngineNodeLayout(nextNodeLayout)
+                                            }
+                                        }));
                                         onRefreshRequest();
                                     }}
                                     disabled={!selectable}

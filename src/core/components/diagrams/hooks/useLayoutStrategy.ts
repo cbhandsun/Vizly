@@ -96,7 +96,7 @@ export function useLayoutStrategy({
 
     /** ═══════════════════════════════════════════════════════════════
      * 统一布局入口（对齐 SVG 版 handleAutoLayout）
-     * strategyName: 'tree' | 'force' | 'domain-vertical' | 'domain-horizontal' | 'domain-dagre'
+     * strategyName: 'tree' | 'force' | 'domain-vertical' | 'domain-horizontal' | 'domain-dagre' | 'domain-dagre-sub-horizontal'
      * nodeLayout: 'flow' | 'grid' | 'horizontal' | 'vertical' | 'dagre'
      * direction: 'TB' | 'LR'
      * ═══════════════════════════════════════════════════════════════ */
@@ -223,16 +223,56 @@ export function useLayoutStrategy({
                 });
             } else {
                 // ── 域感知策略布局 ──
-                const isDomainDagre = strategyName === 'domain-dagre';
+                const isDomainDagre = strategyName === 'domain-dagre' || strategyName === 'domain-dagre-sub-horizontal';
+                const isDomainDagreSubHorizontal = strategyName === 'domain-dagre-sub-horizontal';
                 const finalNodeLayout = isDomainDagre
                     ? 'dagre'
                     : (nodeLayout || 'flow');
+                // [FIX] 获取域排序：显式配置 > 标准数据节点出现顺序 > 策略内部扫描兜底
+                let domainOrder: string[] | undefined;
+                let subDomainOrder: Record<string, string[]> | undefined;
+                try {
+                    const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+                    const diagramId = hashParams.get('diagram') || '';
+                    if (diagramId) {
+                        const { PRESET_MAP } = await import('@/data/standardized');
+                        const preset = PRESET_MAP[diagramId];
+                        if (preset) {
+                            // 优先显式配置
+                            domainOrder = (preset as any).layout?.domainOrder;
+                            subDomainOrder = (preset as any).layout?.subDomainOrder;
+                            // 回退：从节点出现顺序推导
+                            if (!domainOrder && Array.isArray((preset as any).nodes)) {
+                                const implicitOrder: string[] = [];
+                                const implicitSubOrder: Record<string, string[]> = {};
+                                for (const n of (preset as any).nodes) {
+                                    const d = String(n.domain || '').trim();
+                                    if (!d || d === '默认域' || d === 'default') continue;
+                                    if (!implicitOrder.includes(d)) implicitOrder.push(d);
+                                    const s = String(n.subDomain || '').trim();
+                                    if (s) {
+                                        if (!implicitSubOrder[d]) implicitSubOrder[d] = [];
+                                        if (!implicitSubOrder[d].includes(s)) implicitSubOrder[d].push(s);
+                                    }
+                                }
+                                if (implicitOrder.length > 0) {
+                                    domainOrder = implicitOrder;
+                                    if (!subDomainOrder) subDomainOrder = implicitSubOrder;
+                                }
+                            }
+                        }
+                    }
+                } catch { /* ignore */ }
 
                 let strategy: any;
-                if (strategyName === 'domain-vertical' || (isDomainDagre && dir === 'TB')) {
+                // [FIX] domain-dagre 始终走 DomainDagreLayoutStrategy（唯一支持 domainOrder 的策略）
+                if (isDomainDagre) {
+                    const { DomainDagreLayoutStrategy } = await import('../../../strategies/DomainDagreLayoutStrategy');
+                    strategy = new DomainDagreLayoutStrategy();
+                } else if (strategyName === 'domain-vertical') {
                     const { DomainVerticalLayoutStrategy } = await import('../../../strategies/DomainVerticalLayoutStrategy');
                     strategy = new DomainVerticalLayoutStrategy();
-                } else if (strategyName === 'domain-horizontal' || (isDomainDagre && dir === 'LR')) {
+                } else if (strategyName === 'domain-horizontal') {
                     const { DomainHorizontalLayoutStrategy } = await import('../../../strategies/DomainHorizontalLayoutStrategy');
                     strategy = new DomainHorizontalLayoutStrategy();
                 } else if (strategyName === 'domain-elk' || strategyName === 'elk') {
@@ -255,7 +295,11 @@ export function useLayoutStrategy({
                     generateDomainGroups: true,
                     generateSubDomainGroups: true,
                     fitDomainContent: true,
-                });
+                    domainOrder,
+                    subDomainOrder,
+                    domainSubGroupDirection: isDomainDagreSubHorizontal ? 'LR' : dir,
+                    subDomainNodeDirection: dir,
+                } as any);
 
                 if (result.nodes.length > 0) {
                     // [FIX] 保留非流程图节点（mindmap、sticky-note 等）：布局算法不处理它们，但不能丢弃

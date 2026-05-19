@@ -500,6 +500,7 @@ export class DiagramOrchestrator {
       /**
        * 函数级注释：把手尊重优先级（显式优先）
        */
+      const existingData = (edge?.data || {}) as any
       const explicitSrc = typeof presetSourceHandle !== 'undefined' && String(presetSourceHandle || '').toLowerCase() !== 'auto'
       const explicitTgt = typeof presetTargetHandle !== 'undefined' && String(presetTargetHandle || '').toLowerCase() !== 'auto'
       const finalSourceHandle = explicitSrc
@@ -530,13 +531,20 @@ export class DiagramOrchestrator {
       /**
        * P1改动：单一事实源锁定
        */
-      const existingData = (edge?.data || {}) as any
-      const lockedAutoSource = autoSource && !finalSourceHandle
-      const lockedAutoTarget = autoTarget && !finalTargetHandle
+      const autoSides: string[] = []
+      if (autoSource) autoSides.push('source')
+      if (autoTarget) autoSides.push('target')
+      const manualSides: string[] = []
+      if (explicitSrc) manualSides.push('source')
+      if (explicitTgt) manualSides.push('target')
 
       const policyExtras: Record<string, any> = {
-        autoSource: lockedAutoSource,
-        autoTarget: lockedAutoTarget
+        autoSource,
+        autoTarget,
+        auto: autoSides
+      }
+      if (manualSides.length > 0 && typeof existingData.manualHandleSides === 'undefined') {
+        policyExtras.manualHandleSides = manualSides
       }
       if (typeof existingData.handleSelectionPolicy === 'undefined') policyExtras.handleSelectionPolicy = handlePolicy
       if (typeof existingData.autoHandle === 'undefined') policyExtras.autoHandle = enableAutoHandle

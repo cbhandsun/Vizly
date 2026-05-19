@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { LayeredConfigManager } from '@/core';
+import { LayeredConfigManager, LayoutStrategyManager } from '@/core';
 import { FaTimes, FaUndo, FaCheck, FaExclamationTriangle, FaCog, FaQuestionCircle } from 'react-icons/fa';
 import Tooltip from './Tooltip';
 import { useConfigIntegration } from '@/core';
@@ -46,11 +46,15 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
   const [state, actions] = useConfigIntegration();
   const [editingValues, setEditingValues] = useState<Record<string, any>>({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set());
   const [isAdvancedMode, setIsAdvancedMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'basic' | 'nodes' | 'containers' | 'spacing' | 'edges' | 'layout' | 'performance'>('basic');
 
   // 定义可编辑的配置项，按类别分组
   const configItemsByCategory: Record<string, ConfigItem[]> = useMemo(() => {
+    const layoutManager = LayoutStrategyManager.getShared();
+    const hierarchyOptions = layoutManager.getAvailableHierarchyStrategies().map(({ type }) => type);
+    const nodeOptions = layoutManager.getAvailableNodeStrategies().map(({ type }) => type);
     const raw = {
     nodes: [
       {
@@ -219,15 +223,15 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
       {
         key: 'diagram.edge.mode',
         type: 'select' as const,
-        value: 'smart',
-        options: ['smart', 'advanced-smart', 'native'],
+        value: 'advanced-smart',
+        options: ['advanced-smart', 'native'],
         group: '基础设置'
       },
       {
         key: 'diagram.edge.pathType',
         type: 'select' as const,
-        value: 'step',
-        options: ['bezier', 'straight', 'step'],
+        value: 'auto',
+        options: ['auto', 'bezier', 'straight', 'step'],
         group: '基础设置'
       },
       {
@@ -446,7 +450,7 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
         key: 'diagram.layout.strategy',
         type: 'select' as const,
         value: 'DomainVerticalLayout',
-        options: ['DomainVerticalLayout', 'DomainHorizontalLayout', 'DomainElkLayout', 'DomainElkCompoundLayout', 'DomainElkRadialLayout', 'DomainElkForceLayout', 'DomainElkTrueRadialLayout'],
+        options: hierarchyOptions,
         group: '核心策略'
       },
       {
@@ -459,8 +463,8 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
       {
         key: 'diagram.layout.nodeStrategy',
         type: 'select' as const,
-        value: 'HorizontalLayout',
-        options: ['HorizontalLayout', 'VerticalLayout', 'GridLayout', 'CenteredLayout', 'ElkNodeLayout', 'DagreLayout'],
+        value: 'VerticalLayout',
+        options: nodeOptions,
         group: '核心策略'
       },
       {
@@ -671,20 +675,55 @@ useEffect(() => {
 
 // 处理配置值变更
 // 处理配置值变更
+const getEngineNodeLayout = useCallback((nodeStrategy?: string) => {
+  const normalized = String(nodeStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_\-]/g, '');
+  const map: Record<string, string> = {
+    dagrelayout: 'dagre',
+    dagre: 'dagre',
+    horizontallayout: 'horizontal',
+    horizontal: 'horizontal',
+    verticallayout: 'vertical',
+    vertical: 'vertical',
+    gridlayout: 'grid',
+    grid: 'grid',
+    centeredlayout: 'flow',
+    centered: 'flow'
+  };
+  return map[normalized];
+}, []);
+
+const requestLayoutApply = useCallback((values: Record<string, any>) => {
+  const strategy = values['diagram.layout.strategy'];
+  if (!strategy || typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('editor:command', {
+    detail: {
+      action: 'apply-layout',
+      strategy,
+      nodeLayout: getEngineNodeLayout(values['diagram.layout.nodeStrategy']),
+      direction: values['diagram.layout.direction']
+    }
+  }));
+}, [getEngineNodeLayout]);
+
 const handleValueChange = useCallback(async (key: string, value: any) => {
   safeLog.debug('[Config] handleValueChange:', key, value);
 
-  // 联动逻辑：当选择域水平/垂直布局时，默认将节点布局设置为 Dagre
+  // 联动逻辑：当选择域水平/垂直布局时，默认将子域内部节点按纵向流程排列
   if (key === 'diagram.layout.strategy' && (value === 'DomainHorizontalLayout' || value === 'DomainVerticalLayout')) {
-    safeLog.info('[Config] Auto-switching nodeStrategy to DagreLayout');
+    safeLog.info('[Config] Auto-switching nodeStrategy to VerticalLayout');
     setEditingValues(prev => ({
       ...prev,
       [key]: value,
-      'diagram.layout.nodeStrategy': 'DagreLayout'
+      'diagram.layout.nodeStrategy': 'VerticalLayout'
     }));
     // Auto-save for immediate feedback
     await actions.setConfig(key, value);
-    await actions.setConfig('diagram.layout.nodeStrategy', 'DagreLayout');
+    await actions.setConfig('diagram.layout.nodeStrategy', 'VerticalLayout');
+    requestLayoutApply({
+      ...editingValues,
+      [key]: value,
+      'diagram.layout.nodeStrategy': 'VerticalLayout'
+    });
     return;
   }
 
@@ -703,10 +742,21 @@ const handleValueChange = useCallback(async (key: string, value: any) => {
 
   if (instantKeys.includes(key)) {
     await actions.setConfig(key, value);
+    if (key.startsWith('diagram.layout.')) {
+      requestLayoutApply({
+        ...editingValues,
+        [key]: value
+      });
+    }
   } else {
     setHasChanges(true);
+    setChangedKeys(prev => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
   }
-}, [actions]);
+}, [actions, editingValues, requestLayoutApply]);
 
 // 保存所有更改
 const handleSaveChanges = useCallback(async () => {
@@ -716,11 +766,19 @@ const handleSaveChanges = useCallback(async () => {
     for (const [key, value] of Object.entries(editingValues)) {
       await actions.setConfig(key, value);
     }
+    if (
+      changedKeys.has('diagram.layout.strategy') ||
+      changedKeys.has('diagram.layout.nodeStrategy') ||
+      changedKeys.has('diagram.layout.direction')
+    ) {
+      requestLayoutApply(editingValues);
+    }
     setHasChanges(false);
+    setChangedKeys(new Set());
   } catch (error) {
     console.error('保存配置失败:', error);
   }
-}, [editingValues, actions, state.integration]);
+}, [editingValues, actions, state.integration, changedKeys, requestLayoutApply]);
 
 // 重置所有更改
 const handleResetChanges = useCallback(() => {
@@ -730,15 +788,23 @@ const handleResetChanges = useCallback(() => {
   });
   setEditingValues(resetValues);
   setHasChanges(false);
+  setChangedKeys(new Set());
 }, [configItems]);
 
 // 渲染配置项编辑器
 const renderConfigEditor = (item: ConfigItem) => {
   const currentValue = editingValues[item.key] ?? item.value;
   const layeredStrategy = String(LayeredConfigManager.getInstance().get<string>('diagram.layout.strategy', '') || '');
-  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, '').replace(/[+_\-]/g, '');
-  const isElk = (v: string) => { const n = norm(v); return n === 'domainelk' || n === 'domainelklayout'; };
-  const nodeLayoutDisabled = item.key === 'diagram.layout.nodeStrategy' && (isElk(String(editingValues['diagram.layout.strategy'] || '')) || isElk(layeredStrategy));
+  const currentLayoutStrategy = String(editingValues['diagram.layout.strategy'] || layeredStrategy || '');
+  const nodeLayoutDisabled = item.key === 'diagram.layout.nodeStrategy' &&
+    !LayoutStrategyManager.getShared().isNodeLayoutExternallySelectable(currentLayoutStrategy);
+  const getOptionLabel = (option: string) => {
+    if (item.key === 'diagram.edge.pathType' && option === 'auto') {
+      return t('config.options.autoPathType', 'Auto Path');
+    }
+    const trOpt = t(`config.options.${option}`);
+    return trOpt.startsWith('config.') ? option : trOpt;
+  };
 
   switch (item.type) {
     case 'number':
@@ -779,18 +845,15 @@ const renderConfigEditor = (item: ConfigItem) => {
             disabled={nodeLayoutDisabled}
             title={t(`config.${item.key}.label`)}
           >
-            {item.options?.map(option => {
-              const trOpt = t(`config.options.${option}`);
-              return (
-                <option key={option} value={option}>
-                  {trOpt.startsWith('config.') ? option : trOpt}
-                </option>
-              );
-            })}
+            {item.options?.map(option => (
+              <option key={option} value={option}>
+                {getOptionLabel(option)}
+              </option>
+            ))}
           </select>
           {nodeLayoutDisabled && (
             <div className="text-[10px] text-amber-500 font-medium">
-              {t('config.layout.domainElkActive')}
+              {t('config.layout.nodeLayoutManaged')}
             </div>
           )}
         </div>

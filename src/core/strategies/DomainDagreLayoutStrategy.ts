@@ -12,10 +12,10 @@ import {
     applySubGrouping,
     assignChildrenToSubGroupsBySemantic,
     normalizeSubGroupDomainByChildren,
-    normalizeMissingNodeSubDomainByDomain,
     ensureMeasuredForNodes,
     centerSubGroupsInDomain
 } from '../utils/layoutUtils';
+import { normalizeHandle } from '../routing/utils/handleUtils';
 
 /**
  * 域级 Dagre 布局策略
@@ -73,6 +73,10 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         const nodeGapV = Math.max(30, num(cfg?.node?.gap?.vertical, 60));
         const direction = String((options as any)?.direction || cfg?.diagram?.layout?.direction || 'TB').toUpperCase();
         const isHorizontal = direction === 'LR' || direction === 'RL';
+        const subDomainNodeDirection = String((options as any)?.subDomainNodeDirection || direction).toUpperCase();
+        const subDomainNodeIsHorizontal = subDomainNodeDirection === 'LR' || subDomainNodeDirection === 'RL';
+        const domainSubGroupDirection = String((options as any)?.domainSubGroupDirection || direction).toUpperCase();
+        const domainSubGroupIsHorizontal = domainSubGroupDirection === 'LR' || domainSubGroupDirection === 'RL';
 
         const layoutCfg = diagramConfigManager.getLayoutConfig() as any;
         const titleSafe = num(layoutCfg?.GROUP_TITLE_SAFE_GAP, 8);
@@ -135,7 +139,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // 从 options 读取标准数据文件中定义的 domainOrder 和 subDomainOrder
         const domainOrderArr: string[] | undefined = (options as any)?.domainOrder as any;
         const subDomainOrderOpt: any = (options as any)?.subDomainOrder;
-
         // 子域排序辅助：支持全局数组 string[] 或按域对象 Record<string, string[]>
         const getSubDomainOrderIndex = (domainKey: string, subKey: string): number => {
             try {
@@ -171,7 +174,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // 应用域/子域分组和白名单过滤 (使用归一化后的节点以确保尺寸一致)
         let processedNodes: ReactFlowNode[] = normalizedNodes as ReactFlowNode[];
         processedNodes = applyDomainGrouping(processedNodes as any, domainWhitelist) as any;
-        processedNodes = normalizeMissingNodeSubDomainByDomain(processedNodes) as any;
         processedNodes = applySubGrouping(processedNodes as unknown as ReactFlowNode<StandardNodeData>[], subWhitelist) as any;
         processedNodes = assignChildrenToSubGroupsBySemantic(processedNodes as any) as ReactFlowNode[];
         processedNodes = ensureMeasuredForNodes(processedNodes);
@@ -410,9 +412,9 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     const result = this.layoutWithDagre(
                         sgChildren,
                         sgEdges,
-                        isHorizontal ? 'LR' : 'TB',
-                        isHorizontal ? nodeGapV : nodeGapH,
-                        isHorizontal ? nodeGapH : nodeGapV,
+                        subDomainNodeIsHorizontal ? 'LR' : 'TB',
+                        subDomainNodeIsHorizontal ? nodeGapV : nodeGapH,
+                        subDomainNodeIsHorizontal ? nodeGapH : nodeGapV,
                         getNodeDimensions
                     );
 
@@ -452,9 +454,9 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             const topResult = this.layoutWithDagre(
                 topLevelItems,
                 topLevelEdges,
-                isHorizontal ? 'LR' : 'TB',
-                isHorizontal ? nodeGapV : nodeGapH,
-                isHorizontal ? nodeGapH : nodeGapV,
+                domainSubGroupIsHorizontal ? 'LR' : 'TB',
+                domainSubGroupIsHorizontal ? nodeGapV : nodeGapH,
+                domainSubGroupIsHorizontal ? nodeGapH : nodeGapV,
                 getNodeDimensions
             );
 
@@ -521,6 +523,153 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             children.forEach(childId => nodeToSubGroup.set(childId, sgId));
         });
 
+        const sortSubGroupsByConfiguredOrder = (items: ReactFlowNode[], domainKey: string): ReactFlowNode[] => {
+            return items.slice().sort((a, b) => {
+                const aKey = String(((a as any)?.data?.subDomain || (a as any)?.data?.description || '')).trim();
+                const bKey = String(((b as any)?.data?.subDomain || (b as any)?.data?.description || '')).trim();
+                return getSubDomainOrderIndex(domainKey, aKey) - getSubDomainOrderIndex(domainKey, bKey);
+            });
+        };
+
+        const moveSubGroupWithChildren = (sg: ReactFlowNode, deltaX: number, deltaY: number) => {
+            if (Math.abs(deltaX) <= 0.5 && Math.abs(deltaY) <= 0.5) return;
+            (childrenBySub.get(sg.id) || []).forEach(childId => {
+                const child = idMap.get(childId);
+                if (!child) return;
+                child.position = {
+                    x: child.position.x + deltaX,
+                    y: child.position.y + deltaY
+                };
+            });
+            sg.position = {
+                x: sg.position.x + deltaX,
+                y: sg.position.y + deltaY
+            };
+        };
+
+        const expandDomainToContainFinalChildren = (domain: ReactFlowNode) => {
+            const dk = domainOf(domain);
+            if (!dk) return;
+
+            let maxRight = -Infinity;
+            let maxBottom = -Infinity;
+
+            updatedNodes.forEach(n => {
+                if (n.id === domain.id) return;
+                if (domainOf(n) !== dk) return;
+                if (isHidden(n)) return;
+                if (String(n.type || '') === 'titleGroup') return;
+                if (nodeToSubGroup.has(n.id)) return;
+
+                const dims = getNodeDimensions(n);
+                maxRight = Math.max(maxRight, n.position.x + dims.width);
+                maxBottom = Math.max(maxBottom, n.position.y + dims.height);
+            });
+
+            if (!isFinite(maxRight) || !isFinite(maxBottom)) return;
+
+            const curW = num((domain as any).style?.width ?? (domain as any).measured?.width, 0);
+            const curH = num((domain as any).style?.height ?? (domain as any).measured?.height, 0);
+            const needW = maxRight - domain.position.x + dPadHEffective;
+            const needH = maxBottom - domain.position.y + dPadV + bottomSafe + bottomSafeGap;
+            const finalW = Math.max(curW, needW);
+            const finalH = Math.max(curH, needH);
+
+            if (finalW > curW || finalH > curH) {
+                (domain as any).measured = { width: finalW, height: finalH };
+                (domain as any).style = { ...(domain as any).style, width: finalW, height: finalH };
+            }
+        };
+
+        const packDomainSubGroupsHorizontally = () => {
+            if (!domainSubGroupIsHorizontal) return;
+
+            const currentDomains = updatedNodes.filter(n => String(n.type || '') === 'titleGroup' && !isHidden(n));
+            currentDomains.forEach(domain => {
+                const dk = domainOf(domain);
+                if (!dk) return;
+
+                const domainSubGroups = sortSubGroupsByConfiguredOrder(
+                    updatedNodes.filter(n =>
+                        String(n.type || '') === 'subGroup' &&
+                        !isHidden(n) &&
+                        domainOf(n) === dk
+                    ),
+                    dk
+                );
+
+                if (domainSubGroups.length <= 1) {
+                    expandDomainToContainFinalChildren(domain);
+                    return;
+                }
+
+                const targetY = Math.min(
+                    ...domainSubGroups.map(sg => num((sg as any)?.position?.y, domain.position.y + dTitleH + titleSafe + dPadV))
+                );
+                let cursorX = domain.position.x + dPadHEffective;
+
+                for (const sg of domainSubGroups) {
+                    const deltaX = cursorX - num((sg as any)?.position?.x, cursorX);
+                    const deltaY = targetY - num((sg as any)?.position?.y, targetY);
+                    moveSubGroupWithChildren(sg, deltaX, deltaY);
+
+                    const sgWidth = num((sg as any)?.style?.width ?? (sg as any)?.measured?.width, 0);
+                    cursorX += sgWidth + nodeGapH;
+                }
+
+                expandDomainToContainFinalChildren(domain);
+            });
+        };
+
+        const reflowSubGroupChildrenAtCurrentPositions = () => {
+            childrenBySub.forEach((_children, sgId) => {
+                const sg = idMap.get(sgId);
+                if (!sg) return;
+                if (isHidden(sg)) return;
+
+                const sgChildren = (childrenBySub.get(sg.id) || [])
+                    .map(id => idMap.get(id))
+                    .filter(Boolean) as ReactFlowNode[];
+
+                if (sgChildren.length === 0) return;
+
+                const sgEdges = edges.filter(e =>
+                    sgChildren.some(n => n.id === e.source) &&
+                    sgChildren.some(n => n.id === e.target)
+                );
+
+                const result = this.layoutWithDagre(
+                    sgChildren,
+                    sgEdges,
+                    subDomainNodeIsHorizontal ? 'LR' : 'TB',
+                    subDomainNodeIsHorizontal ? nodeGapV : nodeGapH,
+                    subDomainNodeIsHorizontal ? nodeGapH : nodeGapV,
+                    getNodeDimensions
+                );
+
+                const baseX = sg.position.x;
+                const baseY = sg.position.y;
+                result.forEach(pos => {
+                    const node = idMap.get(pos.id);
+                    if (!node) return;
+                    node.position = {
+                        x: baseX + sdPadHEffective + pos.x,
+                        y: baseY + sdTitleH + titleSafe + sdPadV + pos.y,
+                    };
+                });
+
+                const bounds = this.calculateBounds(sgChildren, getNodeDimensions, widthCompensation);
+                const nextWidth = bounds.width + sdPadHEffective * 2;
+                const nextHeight = bounds.height + sdTitleH + titleSafe + sdPadV * 2 + bottomSafe;
+                const curWidth = num((sg as any).style?.width ?? (sg as any).measured?.width, 0);
+                const curHeight = num((sg as any).style?.height ?? (sg as any).measured?.height, 0);
+                const finalWidth = Math.max(curWidth, nextWidth);
+                const finalHeight = Math.max(curHeight, nextHeight);
+                (sg as any).measured = { width: finalWidth, height: finalHeight };
+                (sg as any).style = { ...(sg as any).style, width: finalWidth, height: finalHeight };
+            });
+        };
+
         // ============================================
         // 第一阶段：域内部布局（每个域单独使用 Dagre）
         // ============================================
@@ -563,9 +712,9 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     const result = this.layoutWithDagre(
                         sgChildren,
                         sgEdges,
-                        isHorizontal ? 'LR' : 'TB',
-                        isHorizontal ? nodeGapV : nodeGapH,
-                        isHorizontal ? nodeGapH : nodeGapV,
+                        subDomainNodeIsHorizontal ? 'LR' : 'TB',
+                        subDomainNodeIsHorizontal ? nodeGapV : nodeGapH,
+                        subDomainNodeIsHorizontal ? nodeGapH : nodeGapV,
                         getNodeDimensions
                     );
 
@@ -598,22 +747,29 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
             if (domainChildren.length > 0) {
                 // 获取域内跨子域边
+                const domainChildIds = new Set(domainChildren.map(c => c.id));
                 const domainEdges = edges.filter(e => {
                     const src = idMap.get(e.source);
                     const tgt = idMap.get(e.target);
                     if (!src || !tgt) return false;
-                    return domainOf(src) === dk && domainOf(tgt) === dk &&
-                        (domainChildren.some(c => c.id === e.source) ||
-                            domainChildren.some(c => c.id === e.target));
+                    if (domainOf(src) !== dk || domainOf(tgt) !== dk) return false;
+
+                    // Leaf-to-leaf edges inside subdomains must still participate in
+                    // domain-level layout after being lifted to their subGroup containers.
+                    // Without this, subdomains appear disconnected and Dagre spreads them
+                    // horizontally in one rank, stretching the domain container.
+                    const srcItem = nodeToSubGroup.get(e.source) || e.source;
+                    const tgtItem = nodeToSubGroup.get(e.target) || e.target;
+                    return domainChildIds.has(srcItem) && domainChildIds.has(tgtItem);
                 });
 
                 // 使用 Dagre 布局域内元素
                 const result = this.layoutWithDagre(
                     domainChildren,
                     this.mapEdgesToContainers(domainEdges, nodeToSubGroup),
-                    isHorizontal ? 'LR' : 'TB',
-                    isHorizontal ? nodeGapV : nodeGapH,
-                    isHorizontal ? nodeGapH : nodeGapV,
+                    domainSubGroupIsHorizontal ? 'LR' : 'TB',
+                    domainSubGroupIsHorizontal ? nodeGapV : nodeGapH,
+                    domainSubGroupIsHorizontal ? nodeGapH : nodeGapV,
                     getNodeDimensions
                 );
 
@@ -646,6 +802,32 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                         node.position = { x: newX, y: newY };
                     }
                 });
+
+                if (domainSubGroupIsHorizontal && domainSubGroups.length > 1) {
+                    const rowY = Math.min(...domainSubGroups.map(sg => num((sg as any)?.position?.y, dTitleH + titleSafe + dPadV)));
+                    let cursorX = dPadHEffective;
+                    for (const sg of domainSubGroups) {
+                        const oldX = num((sg as any)?.position?.x, 0);
+                        const oldY = num((sg as any)?.position?.y, 0);
+                        const deltaX = cursorX - oldX;
+                        const deltaY = rowY - oldY;
+
+                        if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
+                            (childrenBySub.get(sg.id) || []).forEach(childId => {
+                                const child = idMap.get(childId);
+                                if (!child) return;
+                                child.position = {
+                                    x: child.position.x + deltaX,
+                                    y: child.position.y + deltaY
+                                };
+                            });
+                            sg.position = { x: cursorX, y: rowY };
+                        }
+
+                        const sgWidth = num((sg as any)?.style?.width ?? (sg as any)?.measured?.width, 0);
+                        cursorX += sgWidth + nodeGapH;
+                    }
+                }
 
                 // 计算域尺寸（使用有效内边距确保左右对称）
                 // 注意：只使用 domainChildren（子域 + 自由节点）来计算边界
@@ -773,37 +955,21 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         }
 
         // ===== [FIX] 强制按 domainOrder 重排域堆叠顺序 =====
-        // Dagre 基于拓扑边决定域位置，可能与标准数据文件中的 domainOrder 不一致
-        // 此步骤在 Dagre 布局完成后，按 domainOrder 重新堆叠域容器
-        if (Array.isArray(domainOrderArr) && domainOrderArr.length && domains.length > 1) {
-            const orderedDomains = domains.slice().sort((a, b) => {
+        // Dagre 基于拓扑边决定域位置，可能与标准数据文件中的 domainOrder 不一致。
+        // 使用布局方向决定重排轴：TB/BT 沿 Y 轴，LR/RL 沿 X 轴。
+        // 不能根据中间态 x/y spread 猜测方向；TB 图在 Dagre 中间态横向散开时会被误判成横排。
+        // [FIX] 从 idMap 重新获取 domains：centerSubGroupsInDomain 可能替换了节点引用，
+        // 导致旧 domains 数组指向过时对象，position 不反映域级 Dagre 的结果
+        const freshDomains = updatedNodes.filter(n => String(n.type || '') === 'titleGroup' && !isHidden(n));
+        if (Array.isArray(domainOrderArr) && domainOrderArr.length && freshDomains.length > 1) {
+            const orderedDomains = freshDomains.slice().sort((a, b) => {
                 const ai = domainOrderIndex.get(domainOf(a)) ?? Infinity;
                 const bi = domainOrderIndex.get(domainOf(b)) ?? Infinity;
                 return ai - bi;
             });
 
-            if (isHorizontal) {
-                // LR 方向：按 domainOrder 水平重排
-                const startX = Math.min(...domains.map(d => d.position.x));
-                let cursorX = startX;
-                for (const d of orderedDomains) {
-                    const oldX = d.position.x;
-                    const deltaX = cursorX - oldX;
-                    if (Math.abs(deltaX) > 0.5) {
-                        const dk = domainOf(d);
-                        updatedNodes.forEach(child => {
-                            if (child.id === d.id) return;
-                            if (domainOf(child) !== dk) return;
-                            child.position = { x: child.position.x + deltaX, y: child.position.y };
-                        });
-                        d.position = { x: cursorX, y: d.position.y };
-                    }
-                    const w = num((d as any).style?.width ?? (d as any).measured?.width, 200);
-                    cursorX += w + domainGap;
-                }
-            } else {
-                // TB 方向：按 domainOrder 垂直重排
-                const startY = Math.min(...domains.map(d => d.position.y));
+            if (!isHorizontal) {
+                const startY = Math.min(...freshDomains.map(d => d.position.y));
                 let cursorY = startY;
                 for (const d of orderedDomains) {
                     const oldY = d.position.y;
@@ -820,6 +986,24 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     const h = num((d as any).style?.height ?? (d as any).measured?.height, 100);
                     cursorY += h + domainGap;
                 }
+            } else {
+                const startX = Math.min(...freshDomains.map(d => d.position.x));
+                let cursorX = startX;
+                for (const d of orderedDomains) {
+                    const oldX = d.position.x;
+                    const deltaX = cursorX - oldX;
+                    if (Math.abs(deltaX) > 0.5) {
+                        const dk = domainOf(d);
+                        updatedNodes.forEach(child => {
+                            if (child.id === d.id) return;
+                            if (domainOf(child) !== dk) return;
+                            child.position = { x: child.position.x + deltaX, y: child.position.y };
+                        });
+                        d.position = { x: cursorX, y: d.position.y };
+                    }
+                    const w = num((d as any).style?.width ?? (d as any).measured?.width, 200);
+                    cursorX += w + domainGap;
+                }
             }
         }
 
@@ -832,6 +1016,8 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // 更新节点映射以保持引用同步
         idMap.clear();
         updatedNodes.forEach(n => idMap.set(n.id, n));
+        reflowSubGroupChildrenAtCurrentPositions();
+        packDomainSubGroupsHorizontally();
 
         // [FIX] 居中后域尺寸回收：确保域容器严格包含所有成员
         // 居中可能导致子域的右缘超出域容器，此步骤检测并扩展域尺寸
@@ -958,6 +1144,11 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         const nodeUsage: Record<string, Record<string, number>> = {};
         // P1: Edge-Edge Avoidance - 收集已路由边的路径
         const routedPaths: Array<{ points: Array<{ x: number; y: number }> }> = [];
+        const isAutoHandle = (edge: Edge, side: 'source' | 'target') => {
+            const data = (edge.data ?? {}) as Record<string, any>;
+            const auto = Array.isArray(data.auto) ? data.auto : [];
+            return Boolean(data[side === 'source' ? 'autoSource' : 'autoTarget']) || auto.includes(side);
+        };
 
         // [FIX] 强制同步点：让出到微任务队列，确保所有待处理的状态更新完成
         // 这模拟了 DevTools 打开时 console.log 造成的微小延迟，解决 F12 打开/关闭的差异问题
@@ -982,12 +1173,34 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
             const sUsage = nodeUsage[source.id] || {};
             const tUsage = nodeUsage[target.id] || {};
+            const explicitSourceHandle = edge.sourceHandle && !isAutoHandle(edge, 'source')
+                ? normalizeHandle(edge.sourceHandle)
+                : undefined;
+            const explicitTargetHandle = edge.targetHandle && !isAutoHandle(edge, 'target')
+                ? normalizeHandle(edge.targetHandle)
+                : undefined;
+            const routingConfigForEdge = explicitSourceHandle && explicitTargetHandle
+                ? {
+                    ...routingConfig,
+                    preAssignedPorts: {
+                        ...(routingConfig as any).preAssignedPorts,
+                        [source.id]: {
+                            ...((routingConfig as any).preAssignedPorts?.[source.id] ?? {}),
+                            source: explicitSourceHandle
+                        },
+                        [target.id]: {
+                            ...((routingConfig as any).preAssignedPorts?.[target.id] ?? {}),
+                            target: explicitTargetHandle
+                        }
+                    }
+                }
+                : routingConfig;
 
             const routingResult = decideEdgeRouting(
                 source,
                 target,
                 sortedNodesForRouting,  // [FIX] 使用排序后的节点数组确保确定性
-                { ...routingConfig, routedPaths },  // P1: 传入已路由路径
+                { ...routingConfigForEdge, routedPaths },  // P1: 传入已路由路径
                 { source: sUsage, target: tUsage },
                 true
             );
@@ -1058,11 +1271,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // 直接使用即可。
         // ═══════════════════════════════════════════════════════════════
         let finalRoutedEdges = clonedEdges;
-
-        // ============================================
-        // 🎯 子域整体居中处理
-        // ============================================
-        updatedNodes = centerSubGroupsInDomain(updatedNodes);
 
         // Path 3 hierarchy conversion
         convertToHierarchicalFormat(updatedNodes, nodeToSubGroup);
@@ -1393,10 +1601,55 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             // 检查是否需要使用预定的统一端口
             const unifiedSourceHandle = oneToManySourceHandle[source.id];
             const unifiedTargetHandle = manyToOneTargetHandle[target.id];
+            const edgeData = (edge.data ?? {}) as Record<string, any>;
+            const manualSides = Array.isArray(edgeData.manualHandleSides)
+                ? edgeData.manualHandleSides.map((side: any) => String(side).toLowerCase())
+                : [];
+            const sourceDomain = String((source.data as any)?.domain || '').trim();
+            const targetDomain = String((target.data as any)?.domain || '').trim();
+            const sourceSubDomain = String((source.data as any)?.subDomain || '').trim();
+            const targetSubDomain = String((target.data as any)?.subDomain || '').trim();
+            const isHorizontalSubDomainEdge = sourceDomain
+                && targetDomain
+                && sourceDomain === targetDomain
+                && sourceSubDomain
+                && targetSubDomain
+                && sourceSubDomain !== targetSubDomain;
+            const sourceParentId = String((source as any).parentId || '');
+            const targetParentId = String((target as any).parentId || '');
+            const isCrossContainerEdge = Boolean(sourceParentId && targetParentId && sourceParentId !== targetParentId);
+            if (
+                (isHorizontalSubDomainEdge || isCrossContainerEdge) &&
+                manualSides.includes('source') &&
+                manualSides.includes('target') &&
+                ['top', 'bottom', 't', 'b'].includes(String(edge.sourceHandle || '').toLowerCase()) &&
+                ['top', 'bottom', 't', 'b'].includes(String(edge.targetHandle || '').toLowerCase())
+            ) {
+                const sPos = (source as any).positionAbsolute ?? source.position ?? { x: 0 };
+                const tPos = (target as any).positionAbsolute ?? target.position ?? { x: 0 };
+                if ((tPos.x ?? 0) >= (sPos.x ?? 0)) {
+                    edge.sourceHandle = 'right';
+                    edge.targetHandle = 'left';
+                } else {
+                    edge.sourceHandle = 'left';
+                    edge.targetHandle = 'right';
+                }
+            }
+            const preserveManualHandles = Boolean(edge.sourceHandle && edge.targetHandle)
+                && manualSides.includes('source')
+                && manualSides.includes('target');
 
 
             let routingResult;
-            if (unifiedSourceHandle || unifiedTargetHandle) {
+            if (preserveManualHandles) {
+                routingResult = {
+                    type: 'advanced-smart-step' as const,
+                    sourceHandle: edge.sourceHandle,
+                    targetHandle: edge.targetHandle,
+                    autoSource: false,
+                    autoTarget: false,
+                };
+            } else if (unifiedSourceHandle || unifiedTargetHandle) {
                 let sourceHandle: string;
                 let targetHandle: string;
 

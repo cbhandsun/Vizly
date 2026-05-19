@@ -17,10 +17,29 @@ const ANIMATION_NODE_THRESHOLD = 200;
  * 默认动画时长 (ms)
  */
 const DEFAULT_DURATION = 300;
+const activeAnimations = new WeakMap<React.Dispatch<React.SetStateAction<Node[]>>, () => void>();
+const suspendedUntil = new WeakMap<React.Dispatch<React.SetStateAction<Node[]>>, number>();
 
 interface AnimationTarget {
     from: { x: number; y: number };
     to: { x: number; y: number };
+}
+
+export function cancelLayoutTransition(setNodes: React.Dispatch<React.SetStateAction<Node[]>>) {
+    const cancel = activeAnimations.get(setNodes);
+    if (cancel) {
+        cancel();
+        activeAnimations.delete(setNodes);
+    }
+}
+
+export function suspendLayoutTransitions(
+    setNodes: React.Dispatch<React.SetStateAction<Node[]>>,
+    duration = 1200
+) {
+    cancelLayoutTransition(setNodes);
+    const until = Date.now() + duration;
+    suspendedUntil.set(setNodes, Math.max(suspendedUntil.get(setNodes) ?? 0, until));
 }
 
 /**
@@ -53,6 +72,12 @@ export function animateLayoutTransition(
 ): Promise<void> {
     const duration = options?.duration ?? DEFAULT_DURATION;
     const easing = options?.easing ?? easeOutCubic;
+    cancelLayoutTransition(setNodes);
+
+    if ((suspendedUntil.get(setNodes) ?? 0) > Date.now()) {
+        options?.onComplete?.();
+        return Promise.resolve();
+    }
 
     // 大图保护：超过阈值直接跳变
     if (targetNodes.length > ANIMATION_NODE_THRESHOLD) {
@@ -77,9 +102,18 @@ export function animateLayoutTransition(
         let animationMap: Map<string, AnimationTarget> | null = null;
         let startTime: number | null = null;
         let rafId: number | null = null;
+        let cancelled = false;
+
+        activeAnimations.set(setNodes, () => {
+            cancelled = true;
+            if (rafId !== null) cancelAnimationFrame(rafId);
+            options?.onComplete?.();
+            resolve();
+        });
 
         // 第一步：捕获当前位置（通过 setNodes updater 读取最新 state）
         setNodes(currentNodes => {
+            if (cancelled) return currentNodes;
             animationMap = new Map<string, AnimationTarget>();
 
             for (const node of currentNodes) {
@@ -100,6 +134,8 @@ export function animateLayoutTransition(
             // 如果没有节点需要动画，直接返回目标状态
             if (animationMap.size === 0) {
                 setTimeout(() => {
+                    if (cancelled) return;
+                    activeAnimations.delete(setNodes);
                     setNodes(targetNodes);
                     options?.onComplete?.();
                     resolve();
@@ -115,7 +151,7 @@ export function animateLayoutTransition(
         });
 
         function tick(now: number) {
-            if (!animationMap || !startTime) return;
+            if (cancelled || !animationMap || !startTime) return;
 
             const elapsed = now - startTime;
             const progress = Math.min(elapsed / duration, 1);
@@ -123,6 +159,7 @@ export function animateLayoutTransition(
 
             if (progress >= 1) {
                 // 动画结束：精确设置最终位置（使用完整的 targetNodes 替换）
+                activeAnimations.delete(setNodes);
                 setNodes(targetNodes);
                 options?.onComplete?.();
                 resolve();
@@ -131,6 +168,7 @@ export function animateLayoutTransition(
 
             // 插值更新
             setNodes(currentNodes => {
+                if (cancelled) return currentNodes;
                 return currentNodes.map(node => {
                     const anim = animationMap!.get(node.id);
                     if (!anim) {
