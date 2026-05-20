@@ -421,8 +421,12 @@ function evaluatePortCombination(
     //
     const sourceCenter = { x: sourceNode.x + sourceNode.width / 2, y: sourceNode.y + sourceNode.height / 2 };
     const targetCenter = { x: targetNode.x + targetNode.width / 2, y: targetNode.y + targetNode.height / 2 };
-    const sourcePort = getPortPoint(sourceNode, sourcePos, targetCenter, config);
-    const targetPort = getPortPoint(targetNode, targetPos, sourceCenter, config);
+    const sharedCenter = {
+        x: (sourceCenter.x + targetCenter.x) / 2,
+        y: (sourceCenter.y + targetCenter.y) / 2
+    };
+    const sourcePort = getPortPoint(sourceNode, sourcePos, sharedCenter, config);
+    const targetPort = getPortPoint(targetNode, targetPos, sharedCenter, config);
 
     // Check basic validity
     const isValid = isPortDirectionValid(sourcePort, targetPort, sourcePos, targetPos);

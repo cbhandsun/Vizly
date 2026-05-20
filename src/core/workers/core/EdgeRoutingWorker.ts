@@ -900,20 +900,27 @@ export class EdgeRoutingWorker {
 
         const outgoingCount = forceSourceCoalesce ? 1 : (job.outgoingCount || 1);
         const incomingCount = forceTargetCoalesce ? 1 : (job.incomingCount || 1);
-        const allowSourceSlide = !isBus && outgoingCount > 1;
-        const allowTargetSlide = !isBus && incomingCount > 1;
+        const allowSourceSlide = !isBus && config.portSelection.enableDynamicPorts;
+        const allowTargetSlide = !isBus && config.portSelection.enableDynamicPorts;
+
+        const srcCenter = { x: sRect.x + sRect.width / 2, y: sRect.y + sRect.height / 2 };
+        const tgtCenter = { x: tRect.x + tRect.width / 2, y: tRect.y + tRect.height / 2 };
+        const sharedCenter = {
+            x: (srcCenter.x + tgtCenter.x) / 2,
+            y: (srcCenter.y + tgtCenter.y) / 2
+        };
 
         const startPt = portSelector.getDistributedPortPoint(
             sRect, startPos,
             forceSourceCoalesce ? 0 : (job.outgoingIndex || 0),
             outgoingCount,
-            allowSourceSlide ? { x: tRect.x + tRect.width / 2, y: tRect.y + tRect.height / 2 } : undefined
+            allowSourceSlide ? sharedCenter : undefined
         );
         const endPt = portSelector.getDistributedPortPoint(
             tRect, endPos,
             forceTargetCoalesce ? 0 : (job.incomingIndex || 0),
             incomingCount,
-            allowTargetSlide ? { x: sRect.x + sRect.width / 2, y: sRect.y + sRect.height / 2 } : undefined
+            allowTargetSlide ? sharedCenter : undefined
         );
 
         // Apply Offsets (Stubs) to avoid being trapped in obstacle padding
