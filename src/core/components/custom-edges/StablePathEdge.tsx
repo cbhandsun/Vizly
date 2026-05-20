@@ -103,6 +103,18 @@ function pointsToRoundedPath(points: Point[], radius: number = 8): string {
     return pathParts.join(' ');
 }
 
+function isShortOrthogonalPath(points: Point[]): boolean {
+    if (points.length > 4) return false;
+    for (let i = 0; i < points.length - 1; i++) {
+        const a = points[i];
+        const b = points[i + 1];
+        if (Math.abs(a.x - b.x) > 1 && Math.abs(a.y - b.y) > 1) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /**
  * 稳定路径边组件
  */
@@ -139,7 +151,9 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
 
     if (computedPath && computedPath.length >= 2) {
         // 使用预计算的路径点
-        edgePath = pointsToRoundedPath(computedPath, 6);
+        edgePath = isShortOrthogonalPath(computedPath)
+            ? pointsToPath(computedPath)
+            : pointsToRoundedPath(computedPath, 6);
 
         // 计算标签位置（路径中点）
         const pos = getSmartLabelPosition(computedPath);

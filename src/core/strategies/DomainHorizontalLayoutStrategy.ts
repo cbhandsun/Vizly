@@ -7,6 +7,7 @@ import { diagramConfigManager } from '../components/config/DiagramConfig';
 import { LayeredConfigManager } from '../config/LayeredConfigManager';
 import { ILayoutStrategy } from './LayoutStrategyManager';
 import { decideEdgeRouting, separateParallelEdges, globalOptimizeEdgeRouting, distributePortConnections, bundleEdges, layerBasedEdgeRouting, optimizeEdgeLabelPositions, beautifyOrthogonalEdges, optimizeTreeBusRouting } from '../utils/HandlePicker';
+import { expandHandle } from '../routing/utils/handleUtils';
 import {
   applyDomainGrouping,
   applySubGrouping,
@@ -979,8 +980,8 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
       return {
         ...edge,
         type: finalType,
-        sourceHandle: finalSourceHandle, // 应用智能选择的 Handle
-        targetHandle: finalTargetHandle,
+        sourceHandle: finalSourceHandle ? expandHandle(String(finalSourceHandle)) : finalSourceHandle, // 应用智能选择的 Handle
+        targetHandle: finalTargetHandle ? expandHandle(String(finalTargetHandle)) : finalTargetHandle,
         data: newData
       };
     });

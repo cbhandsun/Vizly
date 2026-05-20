@@ -57,13 +57,23 @@ function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], dir: 'TB'
             if (srcH) expanded++; else defaulted++;
             if (tgtH) expanded++; else defaulted++;
 
-            // ⭐ [FIX] 切换布局时清除连线的自定义控制点缓冲，让重新计算的布局能够生效起步
-            edge.data = { ...edge.data, waypoints: [], computedPath: undefined, elkPath: undefined, algorithm: undefined, _layoutEpoch: undefined };
+            // ⭐ [FIX] 切换布局时清除连线的自定义控制点缓冲，让重新计算的布局能够生效起步；但保留布局策略计算好的路径/总线/ELK信息
+            edge.data = {
+                ...edge.data,
+                waypoints: [],
+                computedPath: e.data?.computedPath,
+                elkPath: e.data?.elkPath,
+                treeRouting: e.data?.treeRouting,
+                isTreeBus: e.data?.isTreeBus,
+                useElkRouting: e.data?.useElkRouting,
+                algorithm: e.data?.algorithm,
+                _layoutEpoch: e.data?._layoutEpoch
+            };
 
             return edge;
         });
 
-    if (orphan || expanded || defaulted)    return sanitized;
+    return sanitized;
 }
 
 export function useLayoutStrategy({

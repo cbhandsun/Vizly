@@ -399,9 +399,10 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
         const sourceHandle = explicitSourceHandle ? expandHandle(String(explicitSourceHandle)) : (isCrossSubDomainEdge ? 'right' : undefined);
         const targetHandle = explicitTargetHandle ? expandHandle(String(explicitTargetHandle)) : (isCrossSubDomainEdge ? 'left' : undefined);
         const manualHandleSides = [
-            ...(sourceHandle ? ['source'] : []),
-            ...(targetHandle ? ['target'] : []),
+            ...(explicitSourceHandle ? ['source'] : []),
+            ...(explicitTargetHandle ? ['target'] : []),
         ];
+        const inferredSubDomainHandles = isCrossSubDomainEdge && !explicitSourceHandle && !explicitTargetHandle;
         if (hasCanvasPositions) {
             // 有保存坐标：使用保存的边数据
             const edgeType = e.type === 'main' ? 'advanced-smart-step' : (e.type || 'advanced-smart-step');
@@ -419,7 +420,8 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
                 data: {
                     auto: inferredAuto,
                     manualHandles: Boolean(edgeAny.metadata?.manualHandles),
-                    manualHandleSides: edgeAny.metadata?.manualHandleSides ?? (manualHandleSides.length > 0 ? manualHandleSides : undefined)
+                    manualHandleSides: edgeAny.metadata?.manualHandleSides ?? (manualHandleSides.length > 0 ? manualHandleSides : undefined),
+                    inferredSubDomainHandles
                 },
                 markerEnd: e.markerEnd || { type: MarkerType.ArrowClosed },
                 style: e.style
@@ -438,7 +440,7 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
                 label: e.label,
                 sourceHandle: srcH,
                 targetHandle: tgtH,
-                data: manualHandleSides.length > 0 ? { manualHandleSides, auto: [] } : undefined,
+                data: manualHandleSides.length > 0 ? { manualHandleSides, auto: [], inferredSubDomainHandles } : undefined,
                 markerEnd: { type: MarkerType.ArrowClosed },
             });
         }

@@ -183,6 +183,10 @@ export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record
         }
 
         result[edge.id] = { source: sHandle, target: tHandle };
+        if (!result[edge.source]) result[edge.source] = {};
+        result[edge.source].source = sHandle;
+        if (!result[edge.target]) result[edge.target] = {};
+        result[edge.target].target = tHandle;
     }
 
     return result;
@@ -202,16 +206,29 @@ export function decideEdgeRouting(
 ): { type: EdgeType; sourceHandle: string; targetHandle: string; autoSource: boolean; autoTarget: boolean; computedPath: Array<{ x: number; y: number }> } {
 
     const nodeMap = new Map<string, any>();
+    const parentMap = new Map<string, string>();
     if (Array.isArray(allNodes)) {
         for (const n of allNodes) {
             if (n?.id != null) nodeMap.set(String(n.id), n);
+            const type = String(n?.type || '');
+            if (type === 'subGroup' || type === 'domain' || type === 'group' || type === 'titleGroup') {
+                const children = n?.data?.children;
+                if (Array.isArray(children)) {
+                    for (const cid of children) {
+                        if (cid) parentMap.set(String(cid), String(n.id));
+                    }
+                }
+            }
+            if (n?.parentId) {
+                parentMap.set(String(n.id), String(n.parentId));
+            }
         }
     }
     const getAbsolutePosition = (node: any, visited?: Set<string>): { x: number; y: number } => {
         const abs = node?.computed?.positionAbsolute || node?.positionAbsolute;
         if (abs) return abs;
         const base = node?.position || { x: node?.x ?? 0, y: node?.y ?? 0 };
-        const parentId = node?.parentId || node?.parentNode;
+        const parentId = node?.parentId || node?.parentNode || parentMap.get(String(node?.id));
         if (!parentId) return base;
         const v = visited || new Set<string>();
         const id = String(node?.id ?? '');
@@ -312,20 +329,8 @@ export function decideEdgeRouting(
     // excluded from obstacles), producing paths that appear to hug the group boundary.
     // We mark the container with isSoftZone so it raises cost but doesn't block access
     // (otherwise A* would never reach the target node inside the container).
-    // Find parent container using data.children array since parentId might not be populated in all strategies
-    const getParentId = (nodeId: string) => {
-        const pNode = (allNodes || []).find(n => {
-            const type = String(n.type || '');
-            if (type === 'subGroup' || type === 'domain' || type === 'group') {
-                const children = (n.data as any)?.children;
-                if (Array.isArray(children) && children.includes(nodeId)) {
-                    return true;
-                }
-            }
-            return false;
-        });
-        return pNode ? pNode.id : undefined;
-    };
+    // Find parent container using pre-built parentMap
+    const getParentId = (nodeId: string) => parentMap.get(nodeId);
 
     const sParentId = sNode.parentId || sNode.parentNode || getParentId(sNode.id);
     const tParentId = tNode.parentId || tNode.parentNode || getParentId(tNode.id);

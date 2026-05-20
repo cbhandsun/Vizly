@@ -15,7 +15,7 @@ import {
     ensureMeasuredForNodes,
     centerSubGroupsInDomain
 } from '../utils/layoutUtils';
-import { normalizeHandle } from '../routing/utils/handleUtils';
+import { expandHandle, normalizeHandle } from '../routing/utils/handleUtils';
 
 /**
  * 域级 Dagre 布局策略
@@ -1206,8 +1206,8 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             );
 
             edge.type = routingResult.type;
-            edge.sourceHandle = routingResult.sourceHandle;
-            edge.targetHandle = routingResult.targetHandle;
+            edge.sourceHandle = expandHandle(routingResult.sourceHandle);
+            edge.targetHandle = expandHandle(routingResult.targetHandle);
             if (!edge.data) edge.data = {} as any;
             (edge.data as any).autoSource = Boolean(routingResult.autoSource);
             (edge.data as any).autoTarget = Boolean(routingResult.autoTarget);
@@ -1252,12 +1252,12 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             }
 
             if (!nodeUsage[source.id]) nodeUsage[source.id] = {};
-            nodeUsage[source.id][routingResult.sourceHandle] =
-                (nodeUsage[source.id][routingResult.sourceHandle] || 0) + 1;
+            nodeUsage[source.id][edge.sourceHandle] =
+                (nodeUsage[source.id][edge.sourceHandle] || 0) + 1;
 
             if (!nodeUsage[target.id]) nodeUsage[target.id] = {};
-            nodeUsage[target.id][routingResult.targetHandle] =
-                (nodeUsage[target.id][routingResult.targetHandle] || 0) + 1;
+            nodeUsage[target.id][edge.targetHandle] =
+                (nodeUsage[target.id][edge.targetHandle] || 0) + 1;
         });
 
 
@@ -1685,8 +1685,8 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             if (edge.type !== routingResult.type) {
             }
             edge.type = routingResult.type;
-            edge.sourceHandle = routingResult.sourceHandle;
-            edge.targetHandle = routingResult.targetHandle;
+            edge.sourceHandle = expandHandle(routingResult.sourceHandle);
+            edge.targetHandle = expandHandle(routingResult.targetHandle);
             if (!edge.data) edge.data = {} as any;
             (edge.data as any).autoSource = Boolean(routingResult.autoSource);
             (edge.data as any).autoTarget = Boolean(routingResult.autoTarget);
@@ -1696,12 +1696,12 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             (edge.data as any).auto = autoList;
 
             if (!nodeUsage[source.id]) nodeUsage[source.id] = {};
-            nodeUsage[source.id][routingResult.sourceHandle] =
-                (nodeUsage[source.id][routingResult.sourceHandle] || 0) + 1;
+            nodeUsage[source.id][edge.sourceHandle] =
+                (nodeUsage[source.id][edge.sourceHandle] || 0) + 1;
 
             if (!nodeUsage[target.id]) nodeUsage[target.id] = {};
-            nodeUsage[target.id][routingResult.targetHandle] =
-                (nodeUsage[target.id][routingResult.targetHandle] || 0) + 1;
+            nodeUsage[target.id][edge.targetHandle] =
+                (nodeUsage[target.id][edge.targetHandle] || 0) + 1;
         });
     }
 }

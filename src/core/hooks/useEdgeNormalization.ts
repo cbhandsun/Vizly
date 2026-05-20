@@ -155,6 +155,14 @@ export function useEdgeNormalization(
         return edge;
       }
 
+      // ⭐ [FIX] 如果是布局引擎已经计算好树状总线（tree-bus）或 ELK 路径的边，直接透传，防止被单边寻路覆盖
+      if (edge.data?.isTreeBus && edge.data?.treeRouting) {
+        return edge;
+      }
+      if (edge.data?.useElkRouting && edge.data?.elkPath) {
+        return edge;
+      }
+
       const autoFlags = readAutoFlags(edge);
       const manualFlags = readManualFlags(edge);
       const hasExplicitSource = !!edge.sourceHandle && manualFlags.source;

@@ -4,6 +4,7 @@
  * 包含从 HandlePicker 迁移过来的实用工具函数，用于边路由的后处理和优化。
  */
 import { decideEdgeRouting } from '../../utils/HandlePicker';
+import { expandHandle } from './handleUtils';
 
 // Types
 interface EdgeRoutingCacheEntry {
@@ -150,8 +151,8 @@ export function incrementalEdgeRouting<T extends {
             if (cached) {
                 return {
                     ...edge,
-                    sourceHandle: cached.sourceHandle,
-                    targetHandle: cached.targetHandle,
+                    sourceHandle: cached.sourceHandle ? expandHandle(String(cached.sourceHandle)) : cached.sourceHandle,
+                    targetHandle: cached.targetHandle ? expandHandle(String(cached.targetHandle)) : cached.targetHandle,
                     type: cached.type,
                     data: {
                         ...(edge.data || {}),
@@ -177,8 +178,8 @@ export function incrementalEdgeRouting<T extends {
 
         return {
             ...edge,
-            sourceHandle: routingResult.sourceHandle,
-            targetHandle: routingResult.targetHandle,
+            sourceHandle: routingResult.sourceHandle ? expandHandle(String(routingResult.sourceHandle)) : routingResult.sourceHandle,
+            targetHandle: routingResult.targetHandle ? expandHandle(String(routingResult.targetHandle)) : routingResult.targetHandle,
             type: routingResult.type as string,
             data: {
                 ...(edge.data || {}),

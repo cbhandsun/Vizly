@@ -45,6 +45,7 @@ export class CostEvaluator {
         breakdown.length = this.evaluateLength(context);
         breakdown.turns = this.evaluateTurns(context);
         breakdown.crossings = this.evaluateCrossings(context);
+        breakdown.crossings += this.evaluateEdgeCrossings(context);
         breakdown.direction = this.evaluateDirection(context);
         breakdown.usage = this.evaluateUsage(context);
 
@@ -154,6 +155,120 @@ export class CostEvaluator {
         }
 
         return crossings * weights.crossing;
+    }
+
+    /**
+     * 评估与已路由边的交叉成本。
+     *
+     * DomainDagre 会把前面已经确定的路径放进 config.routedPaths。这里仅用
+     * 候选端口生成一条轻量的正交估算路径，作为端口选择阶段的软惩罚：
+     * 不强制改道，但在成本接近时优先选择少交叉的端口。
+     */
+    private evaluateEdgeCrossings(context: CostContext): number {
+        const routedPaths = context.config.routedPaths;
+        if (!routedPaths || routedPaths.length === 0) return 0;
+
+        const candidate = this.buildOrthogonalEstimate(context);
+        if (candidate.length < 2) return 0;
+
+        let crossings = 0;
+        for (const routed of routedPaths) {
+            const points = routed.points;
+            if (!points || points.length < 2) continue;
+            for (let i = 0; i < candidate.length - 1; i++) {
+                for (let j = 0; j < points.length - 1; j++) {
+                    if (this.segmentsIntersect(candidate[i], candidate[i + 1], points[j], points[j + 1])) {
+                        crossings++;
+                    }
+                }
+            }
+        }
+
+        return crossings * (context.weights.edgeCrossing || 80);
+    }
+
+    private buildOrthogonalEstimate(context: CostContext): Point[] {
+        const { sNode, tNode, sDir, tDir } = context;
+        const start = geometryAnalyzer.getHandleAnchor(sNode, sDir);
+        const end = geometryAnalyzer.getHandleAnchor(tNode, tDir);
+        const isSourceHorizontal = sDir === 'l' || sDir === 'r';
+        const isTargetHorizontal = tDir === 'l' || tDir === 'r';
+
+        if (Math.abs(start.x - end.x) < 1 || Math.abs(start.y - end.y) < 1) {
+            return [start, end];
+        }
+
+        if (isSourceHorizontal && isTargetHorizontal) {
+            if (sDir === tDir) {
+                const laneX = sDir === 'r'
+                    ? Math.max(start.x, end.x) + 48
+                    : Math.min(start.x, end.x) - 48;
+                return [start, { x: laneX, y: start.y }, { x: laneX, y: end.y }, end];
+            }
+            const midX = (start.x + end.x) / 2;
+            return [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
+        }
+        if (!isSourceHorizontal && !isTargetHorizontal) {
+            if (sDir === tDir) {
+                const laneY = sDir === 'b'
+                    ? Math.max(start.y, end.y) + 48
+                    : Math.min(start.y, end.y) - 48;
+                return [start, { x: start.x, y: laneY }, { x: end.x, y: laneY }, end];
+            }
+            const midY = (start.y + end.y) / 2;
+            return [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
+        }
+
+        return isSourceHorizontal
+            ? [start, { x: end.x, y: start.y }, end]
+            : [start, { x: start.x, y: end.y }, end];
+    }
+
+    private segmentsIntersect(a: Point, b: Point, c: Point, d: Point): boolean {
+        if (this.pointsNear(a, c) || this.pointsNear(a, d) || this.pointsNear(b, c) || this.pointsNear(b, d)) {
+            return false;
+        }
+
+        const minAx = Math.min(a.x, b.x);
+        const maxAx = Math.max(a.x, b.x);
+        const minAy = Math.min(a.y, b.y);
+        const maxAy = Math.max(a.y, b.y);
+        const minCx = Math.min(c.x, d.x);
+        const maxCx = Math.max(c.x, d.x);
+        const minCy = Math.min(c.y, d.y);
+        const maxCy = Math.max(c.y, d.y);
+        if (maxAx < minCx || maxCx < minAx || maxAy < minCy || maxCy < minAy) {
+            return false;
+        }
+
+        const o1 = this.orientation(a, b, c);
+        const o2 = this.orientation(a, b, d);
+        const o3 = this.orientation(c, d, a);
+        const o4 = this.orientation(c, d, b);
+
+        if (o1 === 0 && this.onSegment(a, c, b)) return true;
+        if (o2 === 0 && this.onSegment(a, d, b)) return true;
+        if (o3 === 0 && this.onSegment(c, a, d)) return true;
+        if (o4 === 0 && this.onSegment(c, b, d)) return true;
+
+        return o1 !== o2 && o3 !== o4;
+    }
+
+    private orientation(a: Point, b: Point, c: Point): number {
+        const value = (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y);
+        if (Math.abs(value) < 1e-6) return 0;
+        return value > 0 ? 1 : 2;
+    }
+
+    private onSegment(a: Point, b: Point, c: Point): boolean {
+        return b.x <= Math.max(a.x, c.x) + 1e-6
+            && b.x + 1e-6 >= Math.min(a.x, c.x)
+            && b.y <= Math.max(a.y, c.y) + 1e-6
+            && b.y + 1e-6 >= Math.min(a.y, c.y);
+    }
+
+    private pointsNear(a: Point, b: Point): boolean {
+        return Math.abs(a.x - b.x) < 2 && Math.abs(a.y - b.y) < 2;
     }
 
     /**

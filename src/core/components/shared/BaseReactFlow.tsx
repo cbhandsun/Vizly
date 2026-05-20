@@ -35,6 +35,7 @@ import { CanvasRefEdge } from '../edges/CanvasRefEdge';
 import EditableEdge from '../custom-edges/EditableEdge'; // ⭐ Waypoint编辑Edge
 import { useSharedTrunks } from '../custom-edges/hooks/useSharedTrunks';
 import { SharedTrunkLayer } from '../custom-edges/renderers/SharedTrunkLayer';
+import { expandHandle } from '../../routing/utils/handleUtils';
 
 
 interface BaseReactFlowProps {
@@ -641,6 +642,12 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 
   const displayEdges = useMemo((): Edge[] => {
     const nodeById = new Map(nodes.map(n => [n.id, n]));
+    const normalizeRuntimeHandles = (edge: Edge): Edge => {
+      const sourceHandle = edge.sourceHandle ? expandHandle(String(edge.sourceHandle)) : edge.sourceHandle;
+      const targetHandle = edge.targetHandle ? expandHandle(String(edge.targetHandle)) : edge.targetHandle;
+      if (sourceHandle === edge.sourceHandle && targetHandle === edge.targetHandle) return edge;
+      return { ...edge, sourceHandle, targetHandle };
+    };
     const isVerticalHandle = (handle?: string | null) => {
       const s = String(handle || '').toLowerCase();
       return s === 'top' || s === 'bottom' || s === 't' || s === 'b';
@@ -679,7 +686,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     // P2: Canvas Hybrid Rendering Mode for Large Graphs
     if (isLargeGraph) {
       return edges.map(e => ({
-        ...e,
+        ...normalizeRuntimeHandles(e),
         type: 'canvas-ref',
         data: {
           ...((e.data || {}) as Record<string, unknown>),
@@ -692,7 +699,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       if (typeof smartEdgePadding !== 'number' || !isFinite(smartEdgePadding)) return edges;
 
       return edges.map((rawEdge) => {
-        const e = normalizeCrossContainerManualHandles(rawEdge);
+        const e = normalizeRuntimeHandles(normalizeCrossContainerManualHandles(rawEdge));
         const type = String(e.type || '');
         const lower = type.toLowerCase();
 
@@ -731,7 +738,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       });
     }
     return edges.map((rawEdge) => {
-      const e = normalizeCrossContainerManualHandles(rawEdge);
+      const e = normalizeRuntimeHandles(normalizeCrossContainerManualHandles(rawEdge));
       const type = String(e.type || '');
       const lower = type.toLowerCase();
       const nextType = (() => {

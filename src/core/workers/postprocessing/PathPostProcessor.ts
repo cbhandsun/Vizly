@@ -269,7 +269,13 @@ export class PathPostProcessor {
         finalPoints = collapseCollinearBacktracks(finalPoints);
 
         // Phase 6: SVG Path Generation
-        const svgPath = createFilletedPath(finalPoints, config.postProcessing.borderRadius);
+        // Visibility Graph often produces an already-clean single-bend orthogonal route.
+        // Filleting that one corner creates a visible curve that reads like a diagonal segment.
+        const isSingleBendVisibilityGraph =
+            finalPoints.length <= 4 &&
+            (metadata.strategy === 'Visibility Graph' || metadata.strategy === 'Hybrid VG');
+        const renderRadius = isSingleBendVisibilityGraph ? 0 : config.postProcessing.borderRadius;
+        const svgPath = createFilletedPath(finalPoints, renderRadius);
 
         return { points: finalPoints, svgPath };
     }

@@ -16,6 +16,7 @@ import { parseColorToRgb, adjustSaturationAndLightness, toRgba } from '../utils/
 import { deriveDomainClassFromDomain } from '../utils/domainKey'
 import { EdgeDecisionService } from './EdgeDecisionService'
 import type { ResolvedEdgeConfig } from '../types/diagram-components'
+import { expandHandle } from '../routing/utils/handleUtils'
 
 export interface OrchestratedData {
   nodes: Node[];
@@ -513,6 +514,8 @@ export class DiagramOrchestrator {
         : enableAutoHandle
           ? autoDecision.targetHandle
           : presetTargetHandle;
+      const expandedFinalSourceHandle = finalSourceHandle ? expandHandle(String(finalSourceHandle)) : finalSourceHandle;
+      const expandedFinalTargetHandle = finalTargetHandle ? expandHandle(String(finalTargetHandle)) : finalTargetHandle;
       const autoSource = !explicitSrc && Boolean(enableAutoHandle)
       const autoTarget = !explicitTgt && Boolean(enableAutoHandle)
 
@@ -558,7 +561,7 @@ export class DiagramOrchestrator {
       const edgeId = baseEdge?.id ?? edge?.id ?? `${edge.source}-${edge.target}`;
 
 
-      const created = edgeFactory.createEdge({ id: edgeId, source: edge.source, target: edge.target, type: finalType as any, styleType, label: baseEdge?.label ?? edge?.label, animated: (baseEdge?.style as any)?.animated ?? (edge as any)?.animated, strokeWidth: (baseEdge?.style as any)?.strokeWidth ?? (edge as any)?.style?.strokeWidth, strokeColor: (baseEdge?.style as any)?.stroke ?? (edge as any)?.style?.stroke, strokeDasharray: (baseEdge?.style as any)?.strokeDasharray ?? (edge as any)?.style?.strokeDasharray, sourceHandle: (baseEdge?.sourceHandle ?? finalSourceHandle), targetHandle: (baseEdge?.targetHandle ?? finalTargetHandle), markerEnd: (baseEdge as any)?.markerEnd ?? (edge as any)?.markerEnd, markerStart: (baseEdge as any)?.markerStart ?? (edge as any)?.markerStart, data: { ...(baseEdge?.metadata || {}), ...dataExtras, ...policyExtras, ...existingData, sourceDomain: sDomain, targetDomain: tDomain, sourceDomainClass: sDomainClass, targetDomainClass: tDomainClass, layoutDirection: dirPref, edgeType: (edge?.data?.edgeType ?? semanticTypeRaw ?? baseEdge?.type) as any } as any })
+      const created = edgeFactory.createEdge({ id: edgeId, source: edge.source, target: edge.target, type: finalType as any, styleType, label: baseEdge?.label ?? edge?.label, animated: (baseEdge?.style as any)?.animated ?? (edge as any)?.animated, strokeWidth: (baseEdge?.style as any)?.strokeWidth ?? (edge as any)?.style?.strokeWidth, strokeColor: (baseEdge?.style as any)?.stroke ?? (edge as any)?.style?.stroke, strokeDasharray: (baseEdge?.style as any)?.strokeDasharray ?? (edge as any)?.style?.strokeDasharray, sourceHandle: (baseEdge?.sourceHandle ? expandHandle(String(baseEdge.sourceHandle)) : expandedFinalSourceHandle), targetHandle: (baseEdge?.targetHandle ? expandHandle(String(baseEdge.targetHandle)) : expandedFinalTargetHandle), markerEnd: (baseEdge as any)?.markerEnd ?? (edge as any)?.markerEnd, markerStart: (baseEdge as any)?.markerStart ?? (edge as any)?.markerStart, data: { ...(baseEdge?.metadata || {}), ...dataExtras, ...policyExtras, ...existingData, sourceDomain: sDomain, targetDomain: tDomain, sourceDomainClass: sDomainClass, targetDomainClass: tDomainClass, layoutDirection: dirPref, edgeType: (edge?.data?.edgeType ?? semanticTypeRaw ?? baseEdge?.type) as any } as any })
 
       processedEdges.push(created)
     }

@@ -30,7 +30,8 @@ export function refineManyToOneFanIn(
             .filter((entry): entry is { edgeId: string; points: Point[] } => !!entry.points && entry.points.length >= 2);
         if (members.length < 2) continue;
 
-        const refined = buildVerticalFanIn(members, spacing, options);
+        const refined = buildVerticalFanIn(members, spacing, options)
+            ?? buildHorizontalFanIn(members, spacing, options);
         if (!refined) continue;
 
         refined.forEach((points, edgeId) => result.set(edgeId, points));
@@ -78,6 +79,45 @@ function buildVerticalFanIn(
     return candidates;
 }
 
+function buildHorizontalFanIn(
+    members: Array<{ edgeId: string; points: Point[] }>,
+    spacing: number,
+    options: ManyToOneFanInOptions
+): Map<string, Point[]> | null {
+    const horizontalTailMembers = members.filter(({ points }) => {
+        const prev = points[points.length - 2];
+        const end = points[points.length - 1];
+        return Math.abs(prev.y - end.y) < EPS;
+    });
+    if (horizontalTailMembers.length < Math.ceil(members.length * 0.6)) return null;
+
+    const tailEnds = members.map(({ points }) => points[points.length - 1]);
+    const axisSpread = max(tailEnds.map(p => p.y)) - min(tailEnds.map(p => p.y));
+    if (axisSpread > Math.max(48, spacing * 5)) return null;
+
+    const trunkY = median(tailEnds.map(p => p.y));
+    const targetX = median(tailEnds.map(p => p.x));
+    const entryDirection = inferHorizontalEntryDirection(members, targetX);
+    if (entryDirection === 0) return null;
+
+    const targetClearance = Math.max(52, spacing * 4.5);
+    const collectorX = targetX - entryDirection * targetClearance;
+    const candidates = new Map<string, Point[]>();
+
+    for (const { edgeId, points } of members) {
+        const junction = { x: collectorX, y: trunkY };
+        const candidate = buildPathToHorizontalTrunk(points, junction, { x: targetX, y: trunkY }, spacing);
+        if (!isCandidateAcceptable(edgeId, points, candidate, spacing, options)) return null;
+        candidates.set(edgeId, candidate);
+    }
+
+    if (internalCrossings(candidates) > internalCrossings(new Map(members.map(m => [m.edgeId, m.points])))) {
+        return null;
+    }
+
+    return candidates;
+}
+
 function buildPathToVerticalTrunk(points: Point[], junction: Point, target: Point, spacing: number): Point[] {
     const prefix = sourcePrefix(points);
     const anchor = prefix[prefix.length - 1];
@@ -100,6 +140,34 @@ function buildPathToVerticalTrunk(points: Point[], junction: Point, target: Poin
     }
 
     if (Math.abs(junction.y - target.y) > EPS) {
+        candidate.push(target);
+    }
+
+    return simplifyOrthogonal(candidate);
+}
+
+function buildPathToHorizontalTrunk(points: Point[], junction: Point, target: Point, spacing: number): Point[] {
+    const prefix = sourcePrefix(points);
+    const anchor = prefix[prefix.length - 1];
+    const candidate = [...prefix];
+    const lateralGap = Math.abs(anchor.y - junction.y);
+    const shortCollectorJog = lateralGap > EPS && lateralGap < Math.max(24, spacing * 2);
+
+    if (shortCollectorJog && Math.abs(anchor.x - junction.x) > EPS) {
+        candidate.push({ x: anchor.x, y: junction.y });
+        candidate.push(junction);
+    } else {
+        if (Math.abs(anchor.x - junction.x) > EPS) {
+            candidate.push({ x: junction.x, y: anchor.y });
+        }
+        if (Math.abs(anchor.y - junction.y) > EPS) {
+            candidate.push(junction);
+        } else {
+            candidate[candidate.length - 1] = junction;
+        }
+    }
+
+    if (Math.abs(junction.x - target.x) > EPS) {
         candidate.push(target);
     }
 
@@ -135,6 +203,21 @@ function inferVerticalEntryDirection(members: Array<{ points: Point[] }>, target
     const sourceMedianY = median(members.map(({ points }) => sourceAnchor(points).y));
     const dy = targetY - sourceMedianY;
     return Math.abs(dy) > EPS ? Math.sign(dy) : 0;
+}
+
+function inferHorizontalEntryDirection(members: Array<{ points: Point[] }>, targetX: number): number {
+    let sum = 0;
+    for (const { points } of members) {
+        const prev = points[points.length - 2];
+        const end = points[points.length - 1];
+        const dx = end.x - prev.x;
+        if (Math.abs(dx) > EPS) sum += Math.sign(dx);
+    }
+    if (sum !== 0) return Math.sign(sum);
+
+    const sourceMedianX = median(members.map(({ points }) => sourceAnchor(points).x));
+    const dx = targetX - sourceMedianX;
+    return Math.abs(dx) > EPS ? Math.sign(dx) : 0;
 }
 
 function isCandidateAcceptable(

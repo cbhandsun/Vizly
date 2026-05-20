@@ -162,6 +162,15 @@ export function refineOrthogonalWaypointsDetailed(
                 spacing,
                 currentScore,
                 getProtectedTrunkLocks(buddyTypeByEdgeId.get(edgeId))
+            ) ?? findOuterLaneReroute(
+                edgeId,
+                points,
+                result,
+                scorer,
+                hardObstacles,
+                spacing,
+                currentScore,
+                getProtectedTrunkLocks(buddyTypeByEdgeId.get(edgeId))
             );
 
             if (!compactedCandidate) continue;
@@ -590,6 +599,76 @@ function findWrongSideDoglegCompaction(
     }
 
     return best ? { points: best.points, score: best.score } : null;
+}
+
+function findOuterLaneReroute(
+    edgeId: string,
+    points: Point[],
+    allPaths: Map<string, Point[]>,
+    scorer: RoutingCrossingScorer,
+    hardObstacles: Rectangle[],
+    spacing: number,
+    currentScore: ReturnType<RoutingCrossingScorer['score']>,
+    protectedTrunkLocks: ProtectedTrunkLocks = {}
+): { points: Point[]; score: ReturnType<RoutingCrossingScorer['score']> } | null {
+    if (points.length < 5) return null;
+    if ((currentScore.byEdge.get(edgeId) ?? 0) <= 0) return null;
+
+    const start = points[0];
+    const end = points[points.length - 1];
+    const originalStartDir = getFirstDirection(points);
+    const originalEndDir = getLastDirection(points);
+    if (!originalStartDir || !originalEndDir) return null;
+
+    const horizontalReturn =
+        (originalStartDir === 'R' && originalEndDir === 'L')
+        || (originalStartDir === 'L' && originalEndDir === 'R');
+    if (!horizontalReturn) return null;
+
+    const minAnchorX = Math.min(start.x, end.x);
+    const maxAnchorX = Math.max(start.x, end.x);
+    const side = originalStartDir === 'R' ? 1 : -1;
+    const axis = side > 0
+        ? Math.max(...points.map(point => point.x))
+        : Math.min(...points.map(point => point.x));
+    if (side > 0 && axis < maxAnchorX + spacing * 2) return null;
+    if (side < 0 && axis > minAnchorX - spacing * 2) return null;
+
+    const candidate = RoutingCrossingScorer.simplifyOrthogonalPoints([
+        start,
+        { x: axis, y: start.y },
+        { x: axis, y: end.y },
+        end,
+    ]);
+
+    if (candidate.length < 2) return null;
+    if (!isStrictlyOrthogonalPath(candidate)) return null;
+    if (!preservesEndpointDirections(candidate, originalStartDir, originalEndDir)) return null;
+
+    if (protectedTrunkLocks.lockFirstJunction && candidate.length > 2) {
+        const preserved = Math.abs(candidate[1].x - points[1].x) < 1.5
+            && Math.abs(candidate[1].y - points[1].y) < 1.5;
+        if (!preserved) return null;
+    }
+    if (protectedTrunkLocks.lockLastJunction && candidate.length > 3) {
+        const candidateJunction = candidate[candidate.length - 2];
+        const originalJunction = points[points.length - 2];
+        const preserved = Math.abs(candidateJunction.x - originalJunction.x) < 1.5
+            && Math.abs(candidateJunction.y - originalJunction.y) < 1.5;
+        if (!preserved) return null;
+    }
+
+    const originalLength = RoutingCrossingScorer.pathLength(points);
+    const candidateLength = RoutingCrossingScorer.pathLength(candidate);
+    if (candidateLength > originalLength + spacing * 12) return null;
+    if (pathIntroducesObstacleHit(candidate, points, hardObstacles)) return null;
+
+    const trial = new Map(allPaths);
+    trial.set(edgeId, candidate);
+    const score = scorer.score(trial);
+    if (!scorer.isBetter(score, currentScore)) return null;
+
+    return { points: candidate, score };
 }
 
 function getDominantVerticalAxis(points: Point[]): number {

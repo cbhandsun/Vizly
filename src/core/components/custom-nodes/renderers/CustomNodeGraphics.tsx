@@ -14,6 +14,12 @@ const hexToRgba = (hex: string, alpha: number): string => {
 };
 
 const edgeHandleStyle = { background: 'transparent', width: '1px', height: '1px', zIndex: 10 };
+const HANDLE_SIDES = [
+    { full: 'top', short: 't', position: Position.Top },
+    { full: 'bottom', short: 'b', position: Position.Bottom },
+    { full: 'right', short: 'r', position: Position.Right },
+    { full: 'left', short: 'l', position: Position.Left },
+] as const;
 
 export interface CustomNodeGraphicsProps {
     id: string;
@@ -249,14 +255,14 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
                 {/* [FIX] Handle id 统一长格式，与 FlowchartNode 和 DomainDagreLayoutStrategy 的 sourceHandle 对齐 */}
                 {!d.isLegend && (
                     <>
-                        <Handle type="target" position={Position.Top} id="top" style={edgeHandleStyle} />
-                        <Handle type="source" position={Position.Top} id="top" style={edgeHandleStyle} />
-                        <Handle type="target" position={Position.Bottom} id="bottom" style={edgeHandleStyle} />
-                        <Handle type="source" position={Position.Bottom} id="bottom" style={edgeHandleStyle} />
-                        <Handle type="target" position={Position.Right} id="right" style={edgeHandleStyle} />
-                        <Handle type="source" position={Position.Right} id="right" style={edgeHandleStyle} />
-                        <Handle type="target" position={Position.Left} id="left" style={edgeHandleStyle} />
-                        <Handle type="source" position={Position.Left} id="left" style={edgeHandleStyle} />
+                        {HANDLE_SIDES.map(({ full, short, position }) => (
+                            <React.Fragment key={full}>
+                                <Handle type="target" position={position} id={full} style={edgeHandleStyle} />
+                                <Handle type="source" position={position} id={full} style={edgeHandleStyle} />
+                                <Handle type="target" position={position} id={short} style={edgeHandleStyle} />
+                                <Handle type="source" position={position} id={short} style={edgeHandleStyle} />
+                            </React.Fragment>
+                        ))}
                     </>
                 )}
             </div>

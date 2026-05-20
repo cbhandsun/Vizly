@@ -166,42 +166,52 @@ const FlowchartNode = ({ data, selected, id, dragging }: FlowchartNodeProps) => 
             {(['top', 'right', 'bottom', 'left'] as const).map((dir) => {
                 const posMap = { top: Position.Top, right: Position.Right, bottom: Position.Bottom, left: Position.Left };
                 const IconMap = { top: FaChevronUp, right: FaChevronRight, bottom: FaChevronDown, left: FaChevronLeft };
+                const shortIdMap = { top: 't', right: 'r', bottom: 'b', left: 'l' } as const;
                 const Icon = IconMap[dir];
                 const showQuickBtn = (isHovered || selected) && !data.locked;
                 return (
-                    <Handle
-                        key={dir}
-                        type="source"
-                        position={posMap[dir]}
-                        id={dir}
-                        className={`flowchart-handle flowchart-handle-bidirectional${showQuickBtn ? ' has-quick-btn' : ''}`}
-                        isConnectableStart={true}
-                        isConnectableEnd={true}
-                    >
-                        {showQuickBtn && (
-                            <div
-                                className="flowchart-quick-clone-btn"
-                                data-dir={dir}
-                                title="单击: 快速添加 | 拖拽: 连线"
-                                onPointerDown={(ev) => {
-                                    const startX = ev.clientX;
-                                    const startY = ev.clientY;
-                                    const dirCapture = dir;
-                                    const onUp = (ue: PointerEvent) => {
-                                        document.removeEventListener('pointerup', onUp);
-                                        const dx = Math.abs(ue.clientX - startX);
-                                        const dy = Math.abs(ue.clientY - startY);
-                                        if (dx < 5 && dy < 5) {
-                                            handleQuickClone(dirCapture, ev as any);
-                                        }
-                                    };
-                                    document.addEventListener('pointerup', onUp, { once: true });
-                                }}
-                            >
-                                <Icon size={8} />
-                            </div>
-                        )}
-                    </Handle>
+                    <React.Fragment key={dir}>
+                        <Handle
+                            type="source"
+                            position={posMap[dir]}
+                            id={dir}
+                            className={`flowchart-handle flowchart-handle-bidirectional${showQuickBtn ? ' has-quick-btn' : ''}`}
+                            isConnectableStart={true}
+                            isConnectableEnd={true}
+                        >
+                            {showQuickBtn && (
+                                <div
+                                    className="flowchart-quick-clone-btn"
+                                    data-dir={dir}
+                                    title="单击: 快速添加 | 拖拽: 连线"
+                                    onPointerDown={(ev) => {
+                                        const startX = ev.clientX;
+                                        const startY = ev.clientY;
+                                        const dirCapture = dir;
+                                        const onUp = (ue: PointerEvent) => {
+                                            document.removeEventListener('pointerup', onUp);
+                                            const dx = Math.abs(ue.clientX - startX);
+                                            const dy = Math.abs(ue.clientY - startY);
+                                            if (dx < 5 && dy < 5) {
+                                                handleQuickClone(dirCapture, ev as any);
+                                            }
+                                        };
+                                        document.addEventListener('pointerup', onUp, { once: true });
+                                    }}
+                                >
+                                    <Icon size={8} />
+                                </div>
+                            )}
+                        </Handle>
+                        <Handle
+                            type="source"
+                            position={posMap[dir]}
+                            id={shortIdMap[dir]}
+                            className="flowchart-handle flowchart-handle-bidirectional flowchart-handle-alias"
+                            isConnectableStart={true}
+                            isConnectableEnd={true}
+                        />
+                    </React.Fragment>
                 );
             })}
         </div>

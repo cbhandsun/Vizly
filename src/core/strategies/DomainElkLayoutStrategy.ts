@@ -28,6 +28,7 @@ import {
   resolveAllNodeOverlapsGlobal,
 } from '../utils/layoutUtils'
 import { decideEdgeRouting, separateParallelEdges, globalOptimizeEdgeRouting, distributePortConnections, bundleEdges, layerBasedEdgeRouting, optimizeEdgeLabelPositions, beautifyOrthogonalEdges, optimizeTreeBusRouting } from '../utils/HandlePicker'
+import { expandHandle } from '../routing/utils/handleUtils'
 
 /**
  * 域级 ELK 整体布局策略
@@ -327,8 +328,8 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
       return {
         ...edge,
         type: finalType,
-        sourceHandle: finalSourceHandle,
-        targetHandle: finalTargetHandle,
+        sourceHandle: finalSourceHandle ? expandHandle(String(finalSourceHandle)) : finalSourceHandle,
+        targetHandle: finalTargetHandle ? expandHandle(String(finalTargetHandle)) : finalTargetHandle,
         data: newData
       }
     })

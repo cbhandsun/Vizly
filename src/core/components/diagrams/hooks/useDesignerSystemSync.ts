@@ -36,6 +36,8 @@ const mergePresetExplicitEdgeHandles = (saved: any, preset: any) => {
 
     const edges = saved.edges.map((edge: Edge) => {
         const presetEdge = presetById.get(String(edge.id));
+        const expandedExistingSourceHandle = edge.sourceHandle ? expandHandle(String(edge.sourceHandle)) : edge.sourceHandle;
+        const expandedExistingTargetHandle = edge.targetHandle ? expandHandle(String(edge.targetHandle)) : edge.targetHandle;
         const sourceNode = nodeById.get(String(edge.source));
         const targetNode = nodeById.get(String(edge.target));
         const sourceDomain = sourceNode?.domain ?? sourceNode?.data?.domain;
@@ -50,9 +52,16 @@ const mergePresetExplicitEdgeHandles = (saved: any, preset: any) => {
             targetSubDomain &&
             sourceSubDomain !== targetSubDomain
         );
-        if (!presetEdge && !isCrossSubDomainEdge) return edge;
-        const sourceHandle = presetEdge?.sourceHandle ? expandHandle(String(presetEdge.sourceHandle)) : (isCrossSubDomainEdge ? 'right' : edge.sourceHandle);
-        const targetHandle = presetEdge?.targetHandle ? expandHandle(String(presetEdge.targetHandle)) : (isCrossSubDomainEdge ? 'left' : edge.targetHandle);
+        if (!presetEdge && !isCrossSubDomainEdge) {
+            if (expandedExistingSourceHandle === edge.sourceHandle && expandedExistingTargetHandle === edge.targetHandle) return edge;
+            return {
+                ...edge,
+                sourceHandle: expandedExistingSourceHandle,
+                targetHandle: expandedExistingTargetHandle,
+            };
+        }
+        const sourceHandle = presetEdge?.sourceHandle ? expandHandle(String(presetEdge.sourceHandle)) : (isCrossSubDomainEdge ? 'right' : expandedExistingSourceHandle);
+        const targetHandle = presetEdge?.targetHandle ? expandHandle(String(presetEdge.targetHandle)) : (isCrossSubDomainEdge ? 'left' : expandedExistingTargetHandle);
         const manualHandleSides = [
             ...(sourceHandle ? ['source'] : []),
             ...(targetHandle ? ['target'] : []),

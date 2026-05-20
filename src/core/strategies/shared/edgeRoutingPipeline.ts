@@ -20,6 +20,7 @@ import {
   distributePortConnections,
 } from '../../utils/HandlePicker';
 import { routeEdgesWithELK } from '../../utils/elkEdgeRouter';
+import { expandHandle } from '../../routing/utils/handleUtils';
 
 const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
 type Point = { x: number; y: number };
@@ -473,12 +474,12 @@ function processEdge(
     }
   }
 
-  return {
+    return {
     edge: {
       ...edge,
       type: finalType,
-      sourceHandle: finalSourceHandle,
-      targetHandle: finalTargetHandle,
+      sourceHandle: finalSourceHandle ? expandHandle(String(finalSourceHandle)) : finalSourceHandle,
+      targetHandle: finalTargetHandle ? expandHandle(String(finalTargetHandle)) : finalTargetHandle,
       data: { ...newData, computedPath },
     },
     computedPath,
@@ -614,7 +615,7 @@ export async function runEdgeRoutingPipeline(
   // P8: 树状总线路由
   finalEdges = optimizeTreeBusRouting(finalEdges, nodes, {
     enabled: true,
-    minBusSize: 1,
+    minBusSize: 2,
     layoutDirection,
   });
 

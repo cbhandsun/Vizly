@@ -328,6 +328,45 @@ describe('refineOrthogonalWaypointsDetailed', () => {
         expect(RoutingCrossingScorer.pathLength(refined)).toBeLessThan(RoutingCrossingScorer.pathLength(paths.get('e7')!));
     });
 
+    it('keeps an outer return lane when a shorter inner segment would cross a routed spine', () => {
+        const paths = new Map([
+            ['e9', [
+                { x: 1228, y: 134 },
+                { x: 1228, y: 294 },
+            ]],
+            ['e8', [
+                { x: 849, y: 854 },
+                { x: 937, y: 854 },
+                { x: 937, y: 207 },
+                { x: 1364, y: 207 },
+                { x: 1364, y: 86 },
+                { x: 1324, y: 86 },
+            ]],
+        ]);
+
+        const result = refineOrthogonalWaypointsDetailed(paths, {
+            spacing: 12,
+            maxPasses: 1,
+            enableReroute: false,
+            fixedEdgeIds: new Set(['e9']),
+            hardObstacles: [
+                { x: 1132, y: 38, width: 192, height: 96 },
+                { x: 1102, y: 294, width: 252, height: 96 },
+                { x: 633, y: 806, width: 216, height: 96 },
+            ],
+        });
+
+        const refined = result.paths.get('e8') ?? [];
+        expect(result.summary.initial.hardCrossings).toBe(1);
+        expect(result.summary.final.hardCrossings).toBe(0);
+        expect(refined).toEqual([
+            { x: 849, y: 854 },
+            { x: 1364, y: 854 },
+            { x: 1364, y: 86 },
+            { x: 1324, y: 86 },
+        ]);
+    });
+
 });
 
 describe('globalChannelRouting', () => {
@@ -508,5 +547,56 @@ describe('refineManyToOneFanIn', () => {
             expect(Math.abs(a.x - b.x) < 1 || Math.abs(a.y - b.y) < 1).toBe(true);
         }
         expect(rebuilt).not.toContainEqual({ x: 188, y: 138 });
+    });
+
+    it('collects horizontal fan-in branches on one shared trunk junction', () => {
+        const paths = new Map([
+            ['top', [
+                { x: 0, y: 100 },
+                { x: 40, y: 100 },
+                { x: 40, y: 70 },
+                { x: 180, y: 70 },
+                { x: 180, y: 200 },
+                { x: 240, y: 200 },
+            ]],
+            ['center', [
+                { x: 0, y: 200 },
+                { x: 240, y: 200 },
+            ]],
+            ['bottom', [
+                { x: 0, y: 300 },
+                { x: 80, y: 300 },
+                { x: 80, y: 330 },
+                { x: 160, y: 330 },
+                { x: 160, y: 200 },
+                { x: 240, y: 200 },
+            ]],
+        ]);
+
+        const result = refineManyToOneFanIn(paths, [
+            { targetId: 'target', edgeIds: ['top', 'center', 'bottom'] },
+        ], { spacing: 12 });
+
+        const branchXs = ['top', 'bottom'].map(edgeId => {
+            const points = result.get(edgeId)!;
+            const trunkJoin = points.find((point, index) =>
+                index > 0
+                && index < points.length - 1
+                && Math.abs(point.y - 200) < 1
+                && Math.abs(points[index + 1].y - 200) < 1
+            );
+            return trunkJoin?.x ?? 0;
+        });
+
+        expect(new Set(branchXs.map(x => Math.round(x))).size).toBe(1);
+        expect(branchXs[0]).toBeGreaterThan(180);
+        expect(branchXs[0]).toBeLessThan(210);
+        for (const edgeId of ['top', 'center', 'bottom']) {
+            const points = result.get(edgeId)!;
+            expect(points[points.length - 1]).toEqual({ x: 240, y: 200 });
+            for (let i = 0; i < points.length - 1; i++) {
+                expect(Math.abs(points[i].x - points[i + 1].x) < 1 || Math.abs(points[i].y - points[i + 1].y) < 1).toBe(true);
+            }
+        }
     });
 });

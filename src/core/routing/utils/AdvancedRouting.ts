@@ -56,10 +56,10 @@ function getAnchor(node: any, handle: string | null | undefined): Point {
     if (!handle) return { x: pos.x + w / 2, y: pos.y + h / 2 };
 
     switch (handle) {
-        case 'l': return { x: pos.x, y: pos.y + h / 2 };
-        case 'r': return { x: pos.x + w, y: pos.y + h / 2 };
-        case 't': return { x: pos.x + w / 2, y: pos.y };
-        case 'b': return { x: pos.x + w / 2, y: pos.y + h };
+        case 'l': case 'left': return { x: pos.x, y: pos.y + h / 2 };
+        case 'r': case 'right': return { x: pos.x + w, y: pos.y + h / 2 };
+        case 't': case 'top': return { x: pos.x + w / 2, y: pos.y };
+        case 'b': case 'bottom': return { x: pos.x + w / 2, y: pos.y + h };
         default: return { x: pos.x + w / 2, y: pos.y + h / 2 };
     }
 }
@@ -720,6 +720,22 @@ export function optimizeTreeBusRouting<T extends {
     const layoutDir = String(layoutDirection).toUpperCase();
     const isHorizontal = layoutDir.includes('LR') || layoutDir.includes('RL');
 
+    const parentMap = new Map<string, string>();
+    nodes.forEach(n => {
+        const type = String(n.type || '');
+        if (type === 'subGroup' || type === 'domain' || type === 'titleGroup') {
+            const children = n.data?.children;
+            if (Array.isArray(children)) {
+                children.forEach(cid => {
+                    if (cid) parentMap.set(String(cid), n.id);
+                });
+            }
+        }
+        if (n.parentId) {
+            parentMap.set(n.id, n.parentId);
+        }
+    });
+
     const getAnchorLocal = (nodeId: string, handle: string | null | undefined): { x: number; y: number } | null => {
         const node = idMap.get(nodeId);
         if (!node) return null;
@@ -728,10 +744,10 @@ export function optimizeTreeBusRouting<T extends {
         const h = node?.measured?.height ?? 50;
         if (!handle) return { x: pos.x + w / 2, y: pos.y + h / 2 };
         switch (handle) {
-            case 'l': return { x: pos.x, y: pos.y + h / 2 };
-            case 'r': return { x: pos.x + w, y: pos.y + h / 2 };
-            case 't': return { x: pos.x + w / 2, y: pos.y };
-            case 'b': return { x: pos.x + w / 2, y: pos.y + h };
+            case 'l': case 'left': return { x: pos.x, y: pos.y + h / 2 };
+            case 'r': case 'right': return { x: pos.x + w, y: pos.y + h / 2 };
+            case 't': case 'top': return { x: pos.x + w / 2, y: pos.y };
+            case 'b': case 'bottom': return { x: pos.x + w / 2, y: pos.y + h };
             default: return { x: pos.x + w / 2, y: pos.y + h / 2 };
         }
     };
@@ -764,10 +780,17 @@ export function optimizeTreeBusRouting<T extends {
             const deltaX = targetCenter.x - sourceCenter.x;
             const deltaY = targetCenter.y - sourceCenter.y;
             let isAligned = false;
-            if (layoutDir.includes('TB')) isAligned = deltaY > 1;
-            else if (layoutDir.includes('BT')) isAligned = deltaY < -1;
-            else if (layoutDir.includes('LR')) isAligned = deltaX > 1;
-            else if (layoutDir.includes('RL')) isAligned = deltaX < -1;
+            const effSrcHandle = edge.sourceHandle;
+            if (effSrcHandle === 'r' || effSrcHandle === 'right') isAligned = deltaX > 1;
+            else if (effSrcHandle === 'l' || effSrcHandle === 'left') isAligned = deltaX < -1;
+            else if (effSrcHandle === 'b' || effSrcHandle === 'bottom') isAligned = deltaY > 1;
+            else if (effSrcHandle === 't' || effSrcHandle === 'top') isAligned = deltaY < -1;
+            else {
+                if (layoutDir.includes('TB')) isAligned = deltaY > 1;
+                else if (layoutDir.includes('BT')) isAligned = deltaY < -1;
+                else if (layoutDir.includes('LR')) isAligned = deltaX > 1;
+                else if (layoutDir.includes('RL')) isAligned = deltaX < -1;
+            }
             if (isAligned) alignedEdges.push(edge);
         });
 
@@ -775,7 +798,7 @@ export function optimizeTreeBusRouting<T extends {
 
         const domainGroups = new Map<string, typeof alignedEdges>();
         alignedEdges.forEach(edge => {
-            const domainKey = idMap.get(edge.target)?.parentId ?? '__root__';
+            const domainKey = parentMap.get(edge.target) ?? '__root__';
             if (!domainGroups.has(domainKey)) domainGroups.set(domainKey, []);
             domainGroups.get(domainKey)?.push(edge);
         });
@@ -793,9 +816,13 @@ export function optimizeTreeBusRouting<T extends {
                 else effectiveSourceHandle = 'b';
             } else {
                 if (layoutDir.includes('TB') || layoutDir.includes('BT')) {
-                    if (effectiveSourceHandle === 'l' || effectiveSourceHandle === 'r') effectiveSourceHandle = layoutDir.includes('TB') ? 'b' : 't';
+                    if (effectiveSourceHandle === 'l' || effectiveSourceHandle === 'r' || effectiveSourceHandle === 'left' || effectiveSourceHandle === 'right') {
+                        effectiveSourceHandle = layoutDir.includes('TB') ? 'b' : 't';
+                    }
                 } else {
-                    if (effectiveSourceHandle === 't' || effectiveSourceHandle === 'b') effectiveSourceHandle = layoutDir.includes('LR') ? 'r' : 'l';
+                    if (effectiveSourceHandle === 't' || effectiveSourceHandle === 'b' || effectiveSourceHandle === 'top' || effectiveSourceHandle === 'bottom') {
+                        effectiveSourceHandle = layoutDir.includes('LR') ? 'r' : 'l';
+                    }
                 }
             }
 
@@ -803,8 +830,10 @@ export function optimizeTreeBusRouting<T extends {
             if (!srcAnchor) return;
 
             let dirX = 0, dirY = 0;
-            if (effectiveSourceHandle === 'r') dirX = 1; else if (effectiveSourceHandle === 'l') dirX = -1;
-            else if (effectiveSourceHandle === 'b') dirY = 1; else if (effectiveSourceHandle === 't') dirY = -1;
+            if (effectiveSourceHandle === 'r' || effectiveSourceHandle === 'right') dirX = 1;
+            else if (effectiveSourceHandle === 'l' || effectiveSourceHandle === 'left') dirX = -1;
+            else if (effectiveSourceHandle === 'b' || effectiveSourceHandle === 'bottom') dirY = 1;
+            else if (effectiveSourceHandle === 't' || effectiveSourceHandle === 'top') dirY = -1;
 
             const branchPoint = { x: srcAnchor.x + dirX * trunkLength, y: srcAnchor.y + dirY * trunkLength };
 
@@ -818,9 +847,13 @@ export function optimizeTreeBusRouting<T extends {
                     else effectiveTargetHandle = 't';
                 } else {
                     if (layoutDir.includes('TB') || layoutDir.includes('BT')) {
-                        if (effectiveTargetHandle === 'l' || effectiveTargetHandle === 'r') effectiveTargetHandle = layoutDir.includes('TB') ? 't' : 'b';
+                        if (effectiveTargetHandle === 'l' || effectiveTargetHandle === 'r' || effectiveTargetHandle === 'left' || effectiveTargetHandle === 'right') {
+                            effectiveTargetHandle = layoutDir.includes('TB') ? 't' : 'b';
+                        }
                     } else {
-                        if (effectiveTargetHandle === 't' || effectiveTargetHandle === 'b') effectiveTargetHandle = layoutDir.includes('LR') ? 'l' : 'r';
+                        if (effectiveTargetHandle === 't' || effectiveTargetHandle === 'b' || effectiveTargetHandle === 'top' || effectiveTargetHandle === 'bottom') {
+                            effectiveTargetHandle = layoutDir.includes('LR') ? 'l' : 'r';
+                        }
                     }
                 }
 
@@ -863,11 +896,17 @@ export function optimizeTreeBusRouting<T extends {
             const deltaX = sourceCenter.x - targetCenter.x;
             const deltaY = sourceCenter.y - targetCenter.y;
             let isAligned = false;
-            // Source should be in the "flow from" direction
-            if (layoutDir.includes('TB')) isAligned = deltaY < -30;
-            else if (layoutDir.includes('BT')) isAligned = deltaY > 30;
-            else if (layoutDir.includes('LR')) isAligned = deltaX < -30;
-            else if (layoutDir.includes('RL')) isAligned = deltaX > 30;
+            const effTgtHandle = edge.targetHandle;
+            if (effTgtHandle === 'l' || effTgtHandle === 'left') isAligned = deltaX < -30;
+            else if (effTgtHandle === 'r' || effTgtHandle === 'right') isAligned = deltaX > 30;
+            else if (effTgtHandle === 't' || effTgtHandle === 'top') isAligned = deltaY < -30;
+            else if (effTgtHandle === 'b' || effTgtHandle === 'bottom') isAligned = deltaY > 30;
+            else {
+                if (layoutDir.includes('TB')) isAligned = deltaY < -30;
+                else if (layoutDir.includes('BT')) isAligned = deltaY > 30;
+                else if (layoutDir.includes('LR')) isAligned = deltaX < -30;
+                else if (layoutDir.includes('RL')) isAligned = deltaX > 30;
+            }
             if (isAligned) alignedEdges.push(edge);
         });
 
@@ -875,7 +914,7 @@ export function optimizeTreeBusRouting<T extends {
 
         const domainGroups = new Map<string, typeof alignedEdges>();
         alignedEdges.forEach(edge => {
-            const domainKey = idMap.get(edge.source)?.parentId ?? '__root__';
+            const domainKey = parentMap.get(edge.source) ?? '__root__';
             if (!domainGroups.has(domainKey)) domainGroups.set(domainKey, []);
             domainGroups.get(domainKey)?.push(edge);
         });
@@ -893,9 +932,13 @@ export function optimizeTreeBusRouting<T extends {
                 else effectiveTargetHandle = 't';
             } else {
                 if (layoutDir.includes('TB') || layoutDir.includes('BT')) {
-                    if (effectiveTargetHandle === 'l' || effectiveTargetHandle === 'r') effectiveTargetHandle = layoutDir.includes('TB') ? 't' : 'b';
+                    if (effectiveTargetHandle === 'l' || effectiveTargetHandle === 'r' || effectiveTargetHandle === 'left' || effectiveTargetHandle === 'right') {
+                        effectiveTargetHandle = layoutDir.includes('TB') ? 't' : 'b';
+                    }
                 } else {
-                    if (effectiveTargetHandle === 't' || effectiveTargetHandle === 'b') effectiveTargetHandle = layoutDir.includes('LR') ? 'l' : 'r';
+                    if (effectiveTargetHandle === 't' || effectiveTargetHandle === 'b' || effectiveTargetHandle === 'top' || effectiveTargetHandle === 'bottom') {
+                        effectiveTargetHandle = layoutDir.includes('LR') ? 'l' : 'r';
+                    }
                 }
             }
 
@@ -903,8 +946,10 @@ export function optimizeTreeBusRouting<T extends {
             if (!tgtAnchor) return;
 
             let dirX = 0, dirY = 0;
-            if (effectiveTargetHandle === 'l') dirX = -1; else if (effectiveTargetHandle === 'r') dirX = 1;
-            else if (effectiveTargetHandle === 't') dirY = -1; else if (effectiveTargetHandle === 'b') dirY = 1;
+            if (effectiveTargetHandle === 'l' || effectiveTargetHandle === 'left') dirX = -1;
+            else if (effectiveTargetHandle === 'r' || effectiveTargetHandle === 'right') dirX = 1;
+            else if (effectiveTargetHandle === 't' || effectiveTargetHandle === 'top') dirY = -1;
+            else if (effectiveTargetHandle === 'b' || effectiveTargetHandle === 'bottom') dirY = 1;
 
             const mergePoint = { x: tgtAnchor.x + dirX * trunkLength, y: tgtAnchor.y + dirY * trunkLength };
 
@@ -918,9 +963,13 @@ export function optimizeTreeBusRouting<T extends {
                     else effectiveSourceHandle = 'b';
                 } else {
                     if (layoutDir.includes('TB') || layoutDir.includes('BT')) {
-                        if (effectiveSourceHandle === 'l' || effectiveSourceHandle === 'r') effectiveSourceHandle = layoutDir.includes('TB') ? 'b' : 't';
+                        if (effectiveSourceHandle === 'l' || effectiveSourceHandle === 'r' || effectiveSourceHandle === 'left' || effectiveSourceHandle === 'right') {
+                            effectiveSourceHandle = layoutDir.includes('TB') ? 'b' : 't';
+                        }
                     } else {
-                        if (effectiveSourceHandle === 't' || effectiveSourceHandle === 'b') effectiveSourceHandle = layoutDir.includes('LR') ? 'r' : 'l';
+                        if (effectiveSourceHandle === 't' || effectiveSourceHandle === 'b' || effectiveSourceHandle === 'top' || effectiveSourceHandle === 'bottom') {
+                            effectiveSourceHandle = layoutDir.includes('LR') ? 'r' : 'l';
+                        }
                     }
                 }
 
@@ -951,7 +1000,7 @@ export function optimizeTreeBusRouting<T extends {
             ...edge,
             sourceHandle: info.effectiveSourceHandle || edge.sourceHandle,
             targetHandle: info.effectiveTargetHandle || edge.targetHandle,
-            data: { ...(edge.data || {}), treeRouting: info, isTreeBus: true }
+            data: { ...(edge.data || {}), treeRouting: info, isTreeBus: true, computedPath: info.points }
         };
     });
 }

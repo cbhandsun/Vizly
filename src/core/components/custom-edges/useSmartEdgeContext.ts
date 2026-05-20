@@ -104,6 +104,16 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         return h >>> 0; // unsigned 32-bit integer
     }, [storeEdges]);
 
+    const endpointFanCounts = useMemo(() => {
+        let outgoingFromSource = 0;
+        let incomingToTarget = 0;
+        for (const e of storeEdges as Edge[]) {
+            if (e.source === source) outgoingFromSource += 1;
+            if (e.target === target) incomingToTarget += 1;
+        }
+        return { outgoingFromSource, incomingToTarget };
+    }, [edgeTopologySig, source, target]);
+
 
     // 🚀 [PERF] 使用 nodeLookup 精准订阅替代 useNodes() 全量订阅
     // useNodes() 每条边都订阅全量节点数组 → O(N×E) 重算
@@ -233,9 +243,15 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             return { sourceHandleId: rawSource, targetHandleId: rawTarget };
         }
 
+        const isAutoSubDomainSideHandle = (props.data as any)?.inferredSubDomainHandles === true;
+        const participatesInFan = endpointFanCounts.incomingToTarget > 1 || endpointFanCounts.outgoingFromSource > 1;
+        if (isAutoSubDomainSideHandle && participatesInFan) {
+            return { sourceHandleId: rawSource, targetHandleId: rawTarget };
+        }
+
         const outerSide = dx >= 0 ? 'right' : 'left';
         return { sourceHandleId: outerSide, targetHandleId: outerSide };
-    }, [props.data, rawSourceHandleId, rawTargetHandleId, sourceNode, sourceX, sourceY, targetNode, targetX, targetY]);
+    }, [props.data, rawSourceHandleId, rawTargetHandleId, sourceNode, sourceX, sourceY, targetNode, targetX, targetY, endpointFanCounts]);
 
     const handleSelectionPolicy = useMemo(() => {
         const layered = (() => {
