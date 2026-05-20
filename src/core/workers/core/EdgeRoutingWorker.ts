@@ -153,15 +153,17 @@ export class EdgeRoutingWorker {
             return this.errorResult(job, 'Source or Target node not found');
         }
 
+        const sNodePos = getNodePosition(sNode);
+        const tNodePos = getNodePosition(tNode);
         const sRect: Rectangle = {
-            x: getNodePosition(sNode).x,
-            y: getNodePosition(sNode).y,
+            x: sNodePos.x,
+            y: sNodePos.y,
             width: sNode.measured?.width || 150,
             height: sNode.measured?.height || 80
         };
         const tRect: Rectangle = {
-            x: getNodePosition(tNode).x,
-            y: getNodePosition(tNode).y,
+            x: tNodePos.x,
+            y: tNodePos.y,
             width: tNode.measured?.width || 150,
             height: tNode.measured?.height || 80
         };

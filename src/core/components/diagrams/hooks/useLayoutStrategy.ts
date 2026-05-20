@@ -233,7 +233,7 @@ export function useLayoutStrategy({
                 });
             } else {
                 // ── 域感知策略布局 ──
-                const isDomainDagre = strategyName === 'domain-dagre' || strategyName === 'domain-dagre-sub-horizontal';
+                const isDomainDagre = strategyName === 'domain-dagre' || strategyName === 'domain-dagre-sub-horizontal' || strategyName === 'dagre';
                 const isDomainDagreSubHorizontal = strategyName === 'domain-dagre-sub-horizontal';
                 const finalNodeLayout = isDomainDagre
                     ? 'dagre'

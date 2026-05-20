@@ -29,6 +29,10 @@ const nodeTypes = {
   titleGroup: TitleGroupNode,
   subGroup: SubGroupNode,
   'sticky-note': StickyNoteNode,
+  system: CustomNode,
+  actor: CustomNode,
+  process: CustomNode,
+  notification: CustomNode,
 } as const;
 
 export interface BaseDiagramConfig {

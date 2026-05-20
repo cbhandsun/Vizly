@@ -72,6 +72,10 @@ const nodeTypes: any = {
   custom: CustomNode,
   titleGroup: TitleGroupNode,
   subGroup: SubGroupNode,
+  system: CustomNode,
+  actor: CustomNode,
+  process: CustomNode,
+  notification: CustomNode,
 };
 
 /**

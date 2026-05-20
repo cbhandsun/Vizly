@@ -436,8 +436,28 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
             : (typeof n.style?.height === 'number' && !isNaN(n.style.height) && isFinite(n.style.height))
               ? n.style.height
               : 120;
-        const x1 = (typeof n.position?.x === 'number' && !isNaN(n.position.x) && isFinite(n.position.x)) ? n.position.x : 0;
-        const y1 = (typeof n.position?.y === 'number' && !isNaN(n.position.y) && isFinite(n.position.y)) ? n.position.y : 0;
+        
+        // 考虑嵌套节点的绝对坐标
+        const abs = (n as any).positionAbsolute ?? (n as any).computed?.positionAbsolute;
+        let xVal = abs?.x;
+        let yVal = abs?.y;
+        if (typeof xVal !== 'number' || isNaN(xVal) || !isFinite(xVal) || typeof yVal !== 'number' || isNaN(yVal) || !isFinite(yVal)) {
+          let x = n.position?.x ?? 0;
+          let y = n.position?.y ?? 0;
+          let curr = n;
+          while (curr.parentId) {
+            const parent = currentNodes.find(pn => pn.id === curr.parentId);
+            if (!parent) break;
+            x += parent.position?.x ?? 0;
+            y += parent.position?.y ?? 0;
+            curr = parent;
+          }
+          xVal = x;
+          yVal = y;
+        }
+        
+        const x1 = xVal;
+        const y1 = yVal;
         const x2 = x1 + w;
         const y2 = y1 + h;
         if (x1 < minX) minX = x1;

@@ -147,6 +147,10 @@ const DEFAULT_NODE_TYPES: NodeTypes = {
     iconNode: IconNode as any,
     erNode: ERDatabaseNode as any,
     'vizly:comment': CommentNode as any,
+    system: CustomNode as any,
+    actor: CustomNode as any,
+    process: CustomNode as any,
+    notification: CustomNode as any,
 };
 
 // [NEW] Declare static edge types to inject specialized rendering

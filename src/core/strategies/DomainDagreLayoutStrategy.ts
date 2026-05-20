@@ -970,36 +970,42 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
             if (!isHorizontal) {
                 const startY = Math.min(...freshDomains.map(d => d.position.y));
+                const startX = Math.min(...freshDomains.map(d => d.position.x));
                 let cursorY = startY;
                 for (const d of orderedDomains) {
                     const oldY = d.position.y;
                     const deltaY = cursorY - oldY;
-                    if (Math.abs(deltaY) > 0.5) {
+                    const oldX = d.position.x;
+                    const deltaX = startX - oldX;
+                    if (Math.abs(deltaY) > 0.5 || Math.abs(deltaX) > 0.5) {
                         const dk = domainOf(d);
                         updatedNodes.forEach(child => {
                             if (child.id === d.id) return;
                             if (domainOf(child) !== dk) return;
-                            child.position = { x: child.position.x, y: child.position.y + deltaY };
+                            child.position = { x: child.position.x + deltaX, y: child.position.y + deltaY };
                         });
-                        d.position = { x: d.position.x, y: cursorY };
+                        d.position = { x: startX, y: cursorY };
                     }
                     const h = num((d as any).style?.height ?? (d as any).measured?.height, 100);
                     cursorY += h + domainGap;
                 }
             } else {
                 const startX = Math.min(...freshDomains.map(d => d.position.x));
+                const startY = Math.min(...freshDomains.map(d => d.position.y));
                 let cursorX = startX;
                 for (const d of orderedDomains) {
                     const oldX = d.position.x;
                     const deltaX = cursorX - oldX;
-                    if (Math.abs(deltaX) > 0.5) {
+                    const oldY = d.position.y;
+                    const deltaY = startY - oldY;
+                    if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
                         const dk = domainOf(d);
                         updatedNodes.forEach(child => {
                             if (child.id === d.id) return;
                             if (domainOf(child) !== dk) return;
-                            child.position = { x: child.position.x + deltaX, y: child.position.y };
+                            child.position = { x: child.position.x + deltaX, y: child.position.y + deltaY };
                         });
-                        d.position = { x: cursorX, y: d.position.y };
+                        d.position = { x: cursorX, y: startY };
                     }
                     const w = num((d as any).style?.width ?? (d as any).measured?.width, 200);
                     cursorX += w + domainGap;

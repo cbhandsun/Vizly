@@ -309,8 +309,8 @@ export const resolveDomainContainerOverlaps = (
           (updated[i] as any).data = nd;
         }
       }
-      return updated;
     }
+    return updated;
   };
 
   // 1) 垂直方向重叠消解：按 y 升序设置

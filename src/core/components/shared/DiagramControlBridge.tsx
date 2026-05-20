@@ -95,7 +95,7 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           // 视口参考改为图表内容区，确保与用户可视空间一致
           const viewportEl = (container.querySelector('.react-flow') as HTMLElement | null) ?? container;
 
-          // 计算内容包围盒（基于节点位置与尺寸）
+          // 计算内容包围盒（基于节点绝对位置与尺寸）
           let minX = Number.POSITIVE_INFINITY;
           let minY = Number.POSITIVE_INFINITY;
           let maxX = Number.NEGATIVE_INFINITY;
@@ -104,8 +104,25 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           nodes.forEach((n) => {
             const w = (n.width as number) ?? (n.style?.width as number) ?? 220;
             const h = (n.height as number) ?? (n.style?.height as number) ?? 120;
-            const x1 = n.position.x;
-            const y1 = n.position.y;
+            const abs = (n as any).positionAbsolute ?? (n as any).computed?.positionAbsolute;
+            let xVal = abs?.x;
+            let yVal = abs?.y;
+            if (typeof xVal !== 'number' || isNaN(xVal) || !isFinite(xVal) || typeof yVal !== 'number' || isNaN(yVal) || !isFinite(yVal)) {
+              let x = n.position?.x ?? 0;
+              let y = n.position?.y ?? 0;
+              let curr = n;
+              while (curr.parentId) {
+                const parent = nodes.find(pn => pn.id === curr.parentId);
+                if (!parent) break;
+                x += parent.position?.x ?? 0;
+                y += parent.position?.y ?? 0;
+                curr = parent;
+              }
+              xVal = x;
+              yVal = y;
+            }
+            const x1 = xVal;
+            const y1 = yVal;
             const x2 = x1 + w;
             const y2 = y1 + h;
             if (x1 < minX) minX = x1;
@@ -213,7 +230,7 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           const reactFlowRenderer = container.querySelector('.react-flow__renderer') as HTMLElement;
           const viewportEl = reactFlowRenderer || container;
 
-          // 计算内容包围盒（基于节点位置与尺寸）
+          // 计算内容包围盒（基于节点绝对位置与尺寸）
           let minX = Number.POSITIVE_INFINITY;
           let minY = Number.POSITIVE_INFINITY;
           let maxX = Number.NEGATIVE_INFINITY;
@@ -222,8 +239,25 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           nodes.forEach((n) => {
             const w = (n.width as number) ?? (n.style?.width as number) ?? 220;
             const h = (n.height as number) ?? (n.style?.height as number) ?? 120;
-            const x1 = n.position.x;
-            const y1 = n.position.y;
+            const abs = (n as any).positionAbsolute ?? (n as any).computed?.positionAbsolute;
+            let xVal = abs?.x;
+            let yVal = abs?.y;
+            if (typeof xVal !== 'number' || isNaN(xVal) || !isFinite(xVal) || typeof yVal !== 'number' || isNaN(yVal) || !isFinite(yVal)) {
+              let x = n.position?.x ?? 0;
+              let y = n.position?.y ?? 0;
+              let curr = n;
+              while (curr.parentId) {
+                const parent = nodes.find(pn => pn.id === curr.parentId);
+                if (!parent) break;
+                x += parent.position?.x ?? 0;
+                y += parent.position?.y ?? 0;
+                curr = parent;
+              }
+              xVal = x;
+              yVal = y;
+            }
+            const x1 = xVal;
+            const y1 = yVal;
             const x2 = x1 + w;
             const y2 = y1 + h;
             if (x1 < minX) minX = x1;

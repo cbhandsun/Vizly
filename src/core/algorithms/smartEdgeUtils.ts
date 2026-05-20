@@ -18,8 +18,13 @@ export type NodeLike = {
     computed?: { positionAbsolute?: { x: number; y: number } };
 };
 
-export function getNodePosition(node: NodeLike): { x: number, y: number } {
-    return node.computed?.positionAbsolute || node.positionAbsolute || node.position || { x: 0, y: 0 };
+export function getNodePosition(node: NodeLike | null | undefined): { x: number, y: number } {
+    if (!node) return { x: 0, y: 0 };
+    const pos = node.computed?.positionAbsolute || node.positionAbsolute || node.position;
+    return {
+        x: (pos && typeof pos.x === 'number' && Number.isFinite(pos.x)) ? pos.x : 0,
+        y: (pos && typeof pos.y === 'number' && Number.isFinite(pos.y)) ? pos.y : 0
+    };
 }
 
 export function getCenterFromHandle(x: number, y: number, pos: Position, w: number, h: number): Point {
