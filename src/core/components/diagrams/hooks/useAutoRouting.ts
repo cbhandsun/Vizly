@@ -12,6 +12,7 @@ interface UseAutoRoutingOptions {
     edgesRef: React.MutableRefObject<Edge[]>;
     takeSnapshot: (nodes: any[], edges: Edge[]) => void;
     reactFlowInstance: ReactFlowInstance<any, any>;
+    diagramId?: string;
 }
 
 /**
@@ -25,6 +26,7 @@ export function useAutoRouting({
     edgesRef,
     takeSnapshot,
     reactFlowInstance,
+    diagramId,
 }: UseAutoRoutingOptions) {
     // [FIX] Read initial value from DiagramConfig instead of hardcoding false.
     // When autoRoutingEnabled starts as false, BaseReactFlow converts 'advanced-smart-step'
@@ -48,6 +50,7 @@ export function useAutoRouting({
         edgesRef,
         takeSnapshot,
         reactFlowInstance,
+        diagramId,
     });
 
     // 布局时自动启用 autoRouting + 管理稳定性标记

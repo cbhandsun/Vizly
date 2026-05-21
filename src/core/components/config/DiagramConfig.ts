@@ -566,7 +566,7 @@ export const defaultConfig: DiagramConfig = {
       max: 8,
       step: 0.1,
       sensitivity: 1,
-      fitRatio: 0.9, // 默认 90% 填充
+      fitRatio: 0.85, // 默认 85% 填充
     },
     pan: {
       enabled: true

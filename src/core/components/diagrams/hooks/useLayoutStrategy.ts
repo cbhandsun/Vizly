@@ -5,6 +5,7 @@ import { animateLayoutTransition } from '../../../utils/animateLayoutTransition'
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { flushObstacles } from '../../custom-edges/ObstacleContext';
 import { buildChildrenMap, getDescendantIds } from './useCollapsibleGroups';
+import { dispatchDiagramControl } from '../../shared/diagramControl';
 
 
 interface UseLayoutStrategyParams {
@@ -14,6 +15,7 @@ interface UseLayoutStrategyParams {
     edgesRef: MutableRefObject<Edge[]>;
     takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
     reactFlowInstance: ReactFlowInstance<any, any> | null;
+    diagramId?: string;
 }
 
 /**
@@ -83,26 +85,19 @@ export function useLayoutStrategy({
     edgesRef,
     takeSnapshot,
     reactFlowInstance,
+    diagramId,
 }: UseLayoutStrategyParams) {
     // [对齐 SVG 版] 跟踪当前域布局策略和方向
     const [lastDomainStrategy, setLastDomainStrategy] = useState<string>('domain-dagre');
     const [lastDomainDirection, setLastDomainDirection] = useState<'TB' | 'LR'>('TB');
     const [lastNodeLayout, setLastNodeLayout] = useState<string>('dagre');
 
-    // [FIX] 两步 fitView：先无动画（解决虚拟化 onlyRenderVisibleElements），再平滑动画
+    // [FIX] 精准两步 fitView：调用统一的 diagramControl 'fit' 逻辑，自适应侧边栏和最小缩放比例
     const twoStepFitView = useCallback(() => {
         requestAnimationFrame(() => {
-            const rf = reactFlowInstance;
-            if (!rf?.fitView) return;
-
-            rf.fitView({ duration: 0, padding: 0.2, minZoom: 0.55 });
-            setTimeout(() => {
-                if (rf.fitView) {
-                    rf.fitView({ duration: 600, padding: 0.2, minZoom: 0.55 });
-                }
-            }, 100);
+            dispatchDiagramControl('fit', diagramId);
         });
-    }, [reactFlowInstance]);
+    }, [diagramId]);
 
     /** ═══════════════════════════════════════════════════════════════
      * 统一布局入口（对齐 SVG 版 handleAutoLayout）

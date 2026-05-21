@@ -82,13 +82,13 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           const container = resolveContainer();
           // 若无法解析到容器，退化为内置fitView
           if (!container) {
-            rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: 0.55, maxZoom: 1.15 });
+            rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: 0.15, maxZoom: 1.15 });
             return;
           }
 
           const nodes = rf.getNodes();
           if (!nodes || nodes.length === 0) {
-            rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: 0.55, maxZoom: 1.15 });
+            rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: 0.15, maxZoom: 1.15 });
             return;
           }
 
@@ -161,7 +161,7 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           const rawZoomW = safeAvailW / bboxWidth;
           const rawZoomH = safeAvailH / bboxHeight;
           const rawZoom = Math.min(rawZoomW, rawZoomH);
-          const MIN_FIT_ZOOM = 0.35; // 大图优先完整进入首屏，用户可再放大查看细节
+          const MIN_FIT_ZOOM = 0.1;
           const zoom = Math.max(MIN_FIT_ZOOM, Math.min(1.0, rawZoom * 0.98)); // 使用 1.0 作为上限，避免图形放大后显得比系统 UI 字体突兀
 
           // 设计行业尖端实践 (Figma/Miro)：真实的绝对居中（水平居中 + 垂直居中）
@@ -184,7 +184,7 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
               const rzW = aw / bboxWidth;
               const rzH = ah / bboxHeight;
               const rz = Math.min(rzW, rzH);
-              const MIN_FIT_ZOOM = 0.35;
+              const MIN_FIT_ZOOM = 0.1;
               const z = Math.max(MIN_FIT_ZOOM, Math.min(1.0, rz * 0.98));
               const xc = OVERALL_SAFE_LEFT + pad + Math.max(0, (aw - bboxWidth * z) / 2) - (minX * z);
               const yc = OVERALL_SAFE_TOP + pad + Math.max(0, (ah - bboxHeight * z) / 2) - (minY * z);
@@ -193,7 +193,7 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           }, 250);
         } catch {
           try {
-            rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: 0.55, maxZoom: 1.0 });
+            rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: 0.15, maxZoom: 1.0 });
           } catch { }
         }
         return;
@@ -216,13 +216,13 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
         try {
           const container = resolveContainer();
           if (!container) {
-            rf.fitView({ padding: 0.1, includeHiddenNodes: false, duration: 400, minZoom: 0.55, maxZoom: 1.15 });
+            rf.fitView({ padding: 0.1, includeHiddenNodes: false, duration: 400, minZoom: 0.15, maxZoom: 1.15 });
             return;
           }
 
           const nodes = rf.getNodes();
           if (!nodes || nodes.length === 0) {
-            rf.fitView({ padding: 0.1, includeHiddenNodes: false, duration: 400, minZoom: 0.55, maxZoom: 1.15 });
+            rf.fitView({ padding: 0.1, includeHiddenNodes: false, duration: 400, minZoom: 0.15, maxZoom: 1.15 });
             return;
           }
 
@@ -284,17 +284,17 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           const OVERALL_SAFE_TOP = SAFE_TOP + RULER_THICKNESS;
           const OVERALL_SAFE_LEFT = SAFE_LEFT + RULER_THICKNESS;
 
-          // 计算按宽度适配的缩放比，并顶端对齐，限制上限为 1.15，下限0.55防线
+          // 计算按宽度适配的缩放比，并顶端对齐，限制上限为 1.0，并根据节点数动态限制最小缩放防线
           const safeAvailW = Math.max(1, containerWidth - OVERALL_SAFE_LEFT);
-          const MIN_FIT_ZOOM = 0.55;
-          const zoom = Math.max(MIN_FIT_ZOOM, Math.min(1.15, safeAvailW / bboxWidth));
+          const MIN_FIT_ZOOM = 0.1;
+          const zoom = Math.max(MIN_FIT_ZOOM, Math.min(1.0, safeAvailW / bboxWidth));
           const extraCenterX = Math.max(0, (safeAvailW - bboxWidth * zoom) / 2);
           const x = OVERALL_SAFE_LEFT + padding + extraCenterX - (minX * zoom);
           const y = OVERALL_SAFE_TOP + padding - (minY * zoom);
 
           rf.setViewport({ x, y, zoom });
         } catch {
-          rf.fitView({ padding: 0.1, includeHiddenNodes: false, duration: 400, minZoom: 0.55, maxZoom: 1.15 });
+          rf.fitView({ padding: 0.1, includeHiddenNodes: false, duration: 400, minZoom: 0.15, maxZoom: 1.15 });
         }
         return;
       }

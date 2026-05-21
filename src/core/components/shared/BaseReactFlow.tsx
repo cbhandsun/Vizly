@@ -508,21 +508,21 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           const urlRatio = parseFloat(qs.get('fitRatio') || '');
           if (!isNaN(urlRatio) && urlRatio > 0 && urlRatio <= 2) return urlRatio;
 
-          return diagramConfigManager.getConfig().canvas.zoom.fitRatio ?? 0.75;
+          return diagramConfigManager.getConfig().canvas.zoom.fitRatio ?? 0.85;
         }
-        catch { return 0.75; }
+        catch { return 0.85; }
       })();
 
       // 获取自适应专用的最大放大系数（防止初始化或全景缩放时，小数量节点被放大成了“巨无霸”）
-      // 允许图纸可手动放大至 4.0，但对于自动 fit 行为，行业标准通常卡在 1.0 ~ 1.25
+      // 限制最大自适应缩放为 1.0，以保证小图表字号与UI体系协调
       const maxFitZoom = (() => {
         try {
-          return diagramConfigManager.getConfig().canvas.zoom.maxFitZoom ?? 1.15;
-        } catch { return 1.15; }
+          return diagramConfigManager.getConfig().canvas.zoom.maxFitZoom ?? 1.0;
+        } catch { return 1.0; }
       })();
 
-      // 保证可读性的自适应最小缩放防线（解决长/宽图自适应后太小看不清的问题）
-      const MIN_FIT_ZOOM = 0.55;
+      // 允许向下收缩以确保完整放入首屏，避免宽图/横向布局在初始化或切换时被截断
+      const MIN_FIT_ZOOM = 0.18;
 
       // 计算按宽度适配的缩放比，并顶端对齐
       // 应用 fitRatio 调整目标宽度，实现"留白"效果（解决 100% 撑满过于拥挤的问题）
@@ -540,7 +540,9 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       }
 
       // X/Y 计算必须结合 Safe Zone，确保内容完美地避让玻璃 UI 浮岛
-      const x = SAFE_LEFT + padding - (minXBound * zoom);
+      // 修正：如果图表实际宽度小于容器可用宽度，则水平居中；若超出，则靠左对齐（自适应从左侧起步）
+      const extraCenterX = Math.max(0, (containerWidth - bboxWidth * zoom) / 2);
+      const x = SAFE_LEFT + padding + extraCenterX - (minXBound * zoom);
       const y = SAFE_TOP + padding - (minYBound * zoom);
 
       // 应用视口变换

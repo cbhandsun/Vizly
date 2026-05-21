@@ -662,7 +662,15 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         setEdges
     );
 
-    const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout } = useAutoRouting({ setNodes, setEdges, nodesRef, edgesRef, takeSnapshot, reactFlowInstance });
+    const { autoRoutingEnabled, setAutoRoutingEnabled, isLayoutStable, handleStrategyLayout, lastDomainStrategy, lastDomainDirection, lastNodeLayout } = useAutoRouting({
+        setNodes,
+        setEdges,
+        nodesRef,
+        edgesRef,
+        takeSnapshot,
+        reactFlowInstance,
+        diagramId: diagramIdForExport,
+    });
     
     // 监听折叠状态变化，自动触发排版微调，让周围节点紧凑排列
     const collapsedHash = useMemo(() => {
