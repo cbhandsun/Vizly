@@ -388,7 +388,13 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
       labelPadding: 8
     })
 
-    return { nodes: updatedNodes, edges: labeledEdges }
+    const finalEdgesExpanded = labeledEdges.map(edge => ({
+      ...edge,
+      sourceHandle: edge.sourceHandle ? expandHandle(String(edge.sourceHandle)) : edge.sourceHandle,
+      targetHandle: edge.targetHandle ? expandHandle(String(edge.targetHandle)) : edge.targetHandle,
+    }))
+
+    return { nodes: updatedNodes, edges: finalEdgesExpanded }
   }
 }
 

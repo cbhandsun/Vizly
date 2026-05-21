@@ -71,18 +71,22 @@ export class MermaidParser {
       }
 
       // Extract explicit node definitions e.g. A[Label] or B((Circle))
-      const nodeDefRegex = /([^\s\-\>\(\[\{\|\}]+)\s*(?:(\[|\[\(|\(\[|\(\(|\(|\{\{|\[\/|\[\\|\{)(.+?)(?:\]|\)\]|\]\)|\)\)|\)|\}\}|\\\/]|\/\]|\}))/g;
+      const nodeDefRegex = /([^\s\-\>\(\[\{\|\}]+)\s*(?:(\[\(|\[\/|\[\\|\[|\(\[|\(\(|\(|\{\{|\{)(.+?)(?:\)\]|\]\)|\)\)|\\\/]|\/\]|\]|\}\text|\}|\)))/g;
       let m;
       while ((m = nodeDefRegex.exec(trimmedLine)) !== null) {
         this.ensureNodeExists(nodes, m[1], currentParentId, ARCH_KEYWORDS, m[3], 'architectureNode', m[2]);
       }
 
+      // Strip node definitions so transitionRegex can match IDs correctly
+      const cleanedLine = trimmedLine.replace(nodeDefRegex, '$1');
+
       // Normalize labeled edges: --text--> becomes -->|text|
-      const normalizedLine = trimmedLine
-        .replace(/--\s*(.+?)\s*-->/g, '-->|$1|')
-        .replace(/==\s*(.+?)\s*==>/g, '==>|$1|')
-        .replace(/--\s*(.+?)\s*---/g, '---|$1|')
-        .replace(/-\.\s*(.+?)\s*\.->/g, '-.-|$1|');
+      const normalizedLine = cleanedLine
+        .replace(/--\s*([^\-\>]+?)\s*-->/g, '-->|$1|')
+        .replace(/==\s*([^=\>]+?)\s*==>/g, '==>|$1|')
+        .replace(/--\s*([^\-]+?)\s*---/g, '---|$1|')
+        .replace(/-\.->/g, '-.-')
+        .replace(/-\.\s*([^\-\.\>]+?)\s*\.->/g, '-.-|$1|');
 
       const transitionRegex = /([^\s\-\>\(\[\{\|\}]+)\s*(?:(-->|---|-\.-|==>))\s*(?:\|(.+?)\|)?\s*([^\s\-\>\(\[\{\|\}]+)/g;
       let startIdx = 0;

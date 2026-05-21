@@ -773,109 +773,130 @@ export function optimizeTreeBusRouting<T extends {
         const sourceCenter = getAnchorLocal(sourceId, null);
         if (!sourceCenter) return;
 
-        const alignedEdges: typeof groupEdges = [];
-        groupEdges.forEach(edge => {
+        // Calculate average offset to determine dominant flow direction dynamically
+        let sumX = 0;
+        let sumY = 0;
+        let validOffsetsCount = 0;
+        const targetOffsets = groupEdges.map(edge => {
             const targetCenter = getAnchorLocal(edge.target, null);
-            if (!targetCenter) return;
-            const deltaX = targetCenter.x - sourceCenter.x;
-            const deltaY = targetCenter.y - sourceCenter.y;
-            let isAligned = false;
-            const effSrcHandle = edge.sourceHandle;
-            if (effSrcHandle === 'r' || effSrcHandle === 'right') isAligned = deltaX > 1;
-            else if (effSrcHandle === 'l' || effSrcHandle === 'left') isAligned = deltaX < -1;
-            else if (effSrcHandle === 'b' || effSrcHandle === 'bottom') isAligned = deltaY > 1;
-            else if (effSrcHandle === 't' || effSrcHandle === 'top') isAligned = deltaY < -1;
-            else {
-                if (layoutDir.includes('TB')) isAligned = deltaY > 1;
-                else if (layoutDir.includes('BT')) isAligned = deltaY < -1;
-                else if (layoutDir.includes('LR')) isAligned = deltaX > 1;
-                else if (layoutDir.includes('RL')) isAligned = deltaX < -1;
+            if (!targetCenter) return null;
+            sumX += targetCenter.x - sourceCenter.x;
+            sumY += targetCenter.y - sourceCenter.y;
+            validOffsetsCount++;
+            return {
+                edge,
+                deltaX: targetCenter.x - sourceCenter.x,
+                deltaY: targetCenter.y - sourceCenter.y
+            };
+        }).filter((offset): offset is { edge: T; deltaX: number; deltaY: number } => offset !== null);
+
+        if (targetOffsets.length < minBusSize) return;
+
+        const avgX = validOffsetsCount > 0 ? sumX / validOffsetsCount : 0;
+        const avgY = validOffsetsCount > 0 ? sumY / validOffsetsCount : 0;
+
+        // Default fallback to configured layout direction if average offset is tiny/ambiguous
+        let dynamicDir: 'TB' | 'BT' | 'LR' | 'RL' = 'TB';
+        if (layoutDir.includes('BT')) dynamicDir = 'BT';
+        else if (layoutDir.includes('LR')) dynamicDir = 'LR';
+        else if (layoutDir.includes('RL')) dynamicDir = 'RL';
+
+        if (Math.abs(avgX) >= 10 || Math.abs(avgY) >= 10) {
+            if (Math.abs(avgY) >= Math.abs(avgX)) {
+                dynamicDir = avgY >= 0 ? 'TB' : 'BT';
+            } else {
+                dynamicDir = avgX >= 0 ? 'LR' : 'RL';
             }
-            if (isAligned) alignedEdges.push(edge);
+        }
+
+        const isGroupHorizontal = dynamicDir === 'LR' || dynamicDir === 'RL';
+
+        const alignedEdges: typeof groupEdges = [];
+        targetOffsets.forEach(o => {
+            let isAligned = false;
+            if (dynamicDir === 'TB') isAligned = o.deltaY > -5;
+            else if (dynamicDir === 'BT') isAligned = o.deltaY < 5;
+            else if (dynamicDir === 'LR') isAligned = o.deltaX > -5;
+            else if (dynamicDir === 'RL') isAligned = o.deltaX < 5;
+            
+            if (isAligned) alignedEdges.push(o.edge);
         });
 
         if (alignedEdges.length < minBusSize) return;
 
-        const domainGroups = new Map<string, typeof alignedEdges>();
-        alignedEdges.forEach(edge => {
-            const domainKey = parentMap.get(edge.target) ?? '__root__';
-            if (!domainGroups.has(domainKey)) domainGroups.set(domainKey, []);
-            domainGroups.get(domainKey)?.push(edge);
-        });
+        // Treat all aligned edges as a single tree bus trunk group instead of partitioning by subdomain domainKey
+        const domainEdges = alignedEdges;
+        const domainKey = 'all';
 
-        domainGroups.forEach((domainEdges, domainKey) => {
-            if (domainEdges.length < minBusSize) return;
-
-            const firstEdge = domainEdges[0];
-            let effectiveSourceHandle = firstEdge.sourceHandle;
-            if (!effectiveSourceHandle) {
-                if (layoutDir.includes('TB')) effectiveSourceHandle = 'b';
-                else if (layoutDir.includes('BT')) effectiveSourceHandle = 't';
-                else if (layoutDir.includes('LR')) effectiveSourceHandle = 'r';
-                else if (layoutDir.includes('RL')) effectiveSourceHandle = 'l';
-                else effectiveSourceHandle = 'b';
+        const firstEdge = domainEdges[0];
+        let effectiveSourceHandle = firstEdge.sourceHandle;
+        if (!effectiveSourceHandle) {
+            if (dynamicDir === 'TB') effectiveSourceHandle = 'b';
+            else if (dynamicDir === 'BT') effectiveSourceHandle = 't';
+            else if (dynamicDir === 'LR') effectiveSourceHandle = 'r';
+            else if (dynamicDir === 'RL') effectiveSourceHandle = 'l';
+            else effectiveSourceHandle = 'b';
+        } else {
+            if (dynamicDir === 'TB' || dynamicDir === 'BT') {
+                if (effectiveSourceHandle === 'l' || effectiveSourceHandle === 'r' || effectiveSourceHandle === 'left' || effectiveSourceHandle === 'right') {
+                    effectiveSourceHandle = dynamicDir === 'TB' ? 'b' : 't';
+                }
             } else {
-                if (layoutDir.includes('TB') || layoutDir.includes('BT')) {
-                    if (effectiveSourceHandle === 'l' || effectiveSourceHandle === 'r' || effectiveSourceHandle === 'left' || effectiveSourceHandle === 'right') {
-                        effectiveSourceHandle = layoutDir.includes('TB') ? 'b' : 't';
+                if (effectiveSourceHandle === 't' || effectiveSourceHandle === 'b' || effectiveSourceHandle === 'top' || effectiveSourceHandle === 'bottom') {
+                    effectiveSourceHandle = dynamicDir === 'LR' ? 'r' : 'l';
+                }
+            }
+        }
+
+        const srcAnchor = getAnchorLocal(sourceId, effectiveSourceHandle);
+        if (!srcAnchor) return;
+
+        let dirX = 0, dirY = 0;
+        if (effectiveSourceHandle === 'r' || effectiveSourceHandle === 'right') dirX = 1;
+        else if (effectiveSourceHandle === 'l' || effectiveSourceHandle === 'left') dirX = -1;
+        else if (effectiveSourceHandle === 'b' || effectiveSourceHandle === 'bottom') dirY = 1;
+        else if (effectiveSourceHandle === 't' || effectiveSourceHandle === 'top') dirY = -1;
+
+        const branchPoint = { x: srcAnchor.x + dirX * trunkLength, y: srcAnchor.y + dirY * trunkLength };
+
+        domainEdges.forEach(edge => {
+            let effectiveTargetHandle = edge.targetHandle;
+            if (!effectiveTargetHandle) {
+                if (dynamicDir === 'TB') effectiveTargetHandle = 't';
+                else if (dynamicDir === 'BT') effectiveTargetHandle = 'b';
+                else if (dynamicDir === 'LR') effectiveTargetHandle = 'l';
+                else if (dynamicDir === 'RL') effectiveTargetHandle = 'r';
+                else effectiveTargetHandle = 't';
+            } else {
+                if (dynamicDir === 'TB' || dynamicDir === 'BT') {
+                    if (effectiveTargetHandle === 'l' || effectiveTargetHandle === 'r' || effectiveTargetHandle === 'left' || effectiveTargetHandle === 'right') {
+                        effectiveTargetHandle = dynamicDir === 'TB' ? 't' : 'b';
                     }
                 } else {
-                    if (effectiveSourceHandle === 't' || effectiveSourceHandle === 'b' || effectiveSourceHandle === 'top' || effectiveSourceHandle === 'bottom') {
-                        effectiveSourceHandle = layoutDir.includes('LR') ? 'r' : 'l';
+                    if (effectiveTargetHandle === 't' || effectiveTargetHandle === 'b' || effectiveTargetHandle === 'top' || effectiveTargetHandle === 'bottom') {
+                        effectiveTargetHandle = dynamicDir === 'LR' ? 'l' : 'r';
                     }
                 }
             }
 
-            const srcAnchor = getAnchorLocal(sourceId, effectiveSourceHandle);
-            if (!srcAnchor) return;
+            const tgtAnchor = getAnchorLocal(edge.target, effectiveTargetHandle);
+            if (!tgtAnchor) return;
 
-            let dirX = 0, dirY = 0;
-            if (effectiveSourceHandle === 'r' || effectiveSourceHandle === 'right') dirX = 1;
-            else if (effectiveSourceHandle === 'l' || effectiveSourceHandle === 'left') dirX = -1;
-            else if (effectiveSourceHandle === 'b' || effectiveSourceHandle === 'bottom') dirY = 1;
-            else if (effectiveSourceHandle === 't' || effectiveSourceHandle === 'top') dirY = -1;
+            const points: Array<{ x: number, y: number }> = [];
+            points.push({ x: Math.round(srcAnchor.x), y: Math.round(srcAnchor.y) });
+            points.push({ x: Math.round(branchPoint.x), y: Math.round(branchPoint.y) });
 
-            const branchPoint = { x: srcAnchor.x + dirX * trunkLength, y: srcAnchor.y + dirY * trunkLength };
+            if (!isGroupHorizontal) {
+                points.push({ x: Math.round(tgtAnchor.x), y: Math.round(branchPoint.y) });
+                points.push({ x: Math.round(tgtAnchor.x), y: Math.round(tgtAnchor.y) });
+            } else {
+                points.push({ x: Math.round(branchPoint.x), y: Math.round(tgtAnchor.y) });
+                points.push({ x: Math.round(tgtAnchor.x), y: Math.round(tgtAnchor.y) });
+            }
 
-            domainEdges.forEach(edge => {
-                let effectiveTargetHandle = edge.targetHandle;
-                if (!effectiveTargetHandle) {
-                    if (layoutDir.includes('TB')) effectiveTargetHandle = 't';
-                    else if (layoutDir.includes('BT')) effectiveTargetHandle = 'b';
-                    else if (layoutDir.includes('LR')) effectiveTargetHandle = 'l';
-                    else if (layoutDir.includes('RL')) effectiveTargetHandle = 'r';
-                    else effectiveTargetHandle = 't';
-                } else {
-                    if (layoutDir.includes('TB') || layoutDir.includes('BT')) {
-                        if (effectiveTargetHandle === 'l' || effectiveTargetHandle === 'r' || effectiveTargetHandle === 'left' || effectiveTargetHandle === 'right') {
-                            effectiveTargetHandle = layoutDir.includes('TB') ? 't' : 'b';
-                        }
-                    } else {
-                        if (effectiveTargetHandle === 't' || effectiveTargetHandle === 'b' || effectiveTargetHandle === 'top' || effectiveTargetHandle === 'bottom') {
-                            effectiveTargetHandle = layoutDir.includes('LR') ? 'l' : 'r';
-                        }
-                    }
-                }
-
-                const tgtAnchor = getAnchorLocal(edge.target, effectiveTargetHandle);
-                if (!tgtAnchor) return;
-
-                const points: Array<{ x: number, y: number }> = [];
-                points.push({ x: Math.round(srcAnchor.x), y: Math.round(srcAnchor.y) });
-                points.push({ x: Math.round(branchPoint.x), y: Math.round(branchPoint.y) });
-
-                if (!isHorizontal) {
-                    points.push({ x: Math.round(tgtAnchor.x), y: Math.round(branchPoint.y) });
-                    points.push({ x: Math.round(tgtAnchor.x), y: Math.round(tgtAnchor.y) });
-                } else {
-                    points.push({ x: Math.round(branchPoint.x), y: Math.round(tgtAnchor.y) });
-                    points.push({ x: Math.round(tgtAnchor.x), y: Math.round(tgtAnchor.y) });
-                }
-
-                treeRoutingMap.set(edge.id, {
-                    type: 'tree-out', points, trunkId: `trunk-out-${sourceId}-${domainKey}`,
-                    effectiveSourceHandle, effectiveTargetHandle
-                });
+            treeRoutingMap.set(edge.id, {
+                type: 'tree-out', points, trunkId: `trunk-out-${sourceId}-${domainKey}`,
+                effectiveSourceHandle, effectiveTargetHandle
             });
         });
     });
@@ -889,106 +910,130 @@ export function optimizeTreeBusRouting<T extends {
         const targetCenter = getAnchorLocal(targetId, null);
         if (!targetCenter) return;
 
-        const alignedEdges: typeof validEdges = [];
-        validEdges.forEach(edge => {
+        // Calculate average offset to determine dominant flow direction dynamically
+        let sumX = 0;
+        let sumY = 0;
+        let validOffsetsCount = 0;
+        const sourceOffsets = validEdges.map(edge => {
             const sourceCenter = getAnchorLocal(edge.source, null);
-            if (!sourceCenter) return;
-            const deltaX = sourceCenter.x - targetCenter.x;
-            const deltaY = sourceCenter.y - targetCenter.y;
-            let isAligned = false;
-            const effTgtHandle = edge.targetHandle;
-            if (effTgtHandle === 'l' || effTgtHandle === 'left') isAligned = deltaX < -30;
-            else if (effTgtHandle === 'r' || effTgtHandle === 'right') isAligned = deltaX > 30;
-            else if (effTgtHandle === 't' || effTgtHandle === 'top') isAligned = deltaY < -30;
-            else if (effTgtHandle === 'b' || effTgtHandle === 'bottom') isAligned = deltaY > 30;
-            else {
-                if (layoutDir.includes('TB')) isAligned = deltaY < -30;
-                else if (layoutDir.includes('BT')) isAligned = deltaY > 30;
-                else if (layoutDir.includes('LR')) isAligned = deltaX < -30;
-                else if (layoutDir.includes('RL')) isAligned = deltaX > 30;
+            if (!sourceCenter) return null;
+            sumX += sourceCenter.x - targetCenter.x;
+            sumY += sourceCenter.y - targetCenter.y;
+            validOffsetsCount++;
+            return {
+                edge,
+                deltaX: sourceCenter.x - targetCenter.x,
+                deltaY: sourceCenter.y - targetCenter.y
+            };
+        }).filter((offset): offset is { edge: T; deltaX: number; deltaY: number } => offset !== null);
+
+        if (sourceOffsets.length < minBusSize) return;
+
+        const avgX = validOffsetsCount > 0 ? sumX / validOffsetsCount : 0;
+        const avgY = validOffsetsCount > 0 ? sumY / validOffsetsCount : 0;
+
+        // Default fallback to configured layout direction if average offset is tiny/ambiguous
+        let dynamicDir: 'TB' | 'BT' | 'LR' | 'RL' = 'TB';
+        if (layoutDir.includes('BT')) dynamicDir = 'BT';
+        else if (layoutDir.includes('LR')) dynamicDir = 'LR';
+        else if (layoutDir.includes('RL')) dynamicDir = 'RL';
+
+        if (Math.abs(avgX) >= 10 || Math.abs(avgY) >= 10) {
+            // Note: For incoming edges, target is at the center, so delta = source - target.
+            // If deltaY > 0, source is below target, meaning the flow is BT (source -> target).
+            // If deltaY < 0, source is above target, meaning the flow is TB (source -> target).
+            if (Math.abs(avgY) >= Math.abs(avgX)) {
+                dynamicDir = avgY >= 0 ? 'BT' : 'TB';
+            } else {
+                dynamicDir = avgX >= 0 ? 'RL' : 'LR';
             }
-            if (isAligned) alignedEdges.push(edge);
+        }
+
+        const isGroupHorizontal = dynamicDir === 'LR' || dynamicDir === 'RL';
+
+        const alignedEdges: typeof validEdges = [];
+        sourceOffsets.forEach(o => {
+            let isAligned = false;
+            if (dynamicDir === 'TB') isAligned = o.deltaY < 5;
+            else if (dynamicDir === 'BT') isAligned = o.deltaY > -5;
+            else if (dynamicDir === 'LR') isAligned = o.deltaX < 5;
+            else if (dynamicDir === 'RL') isAligned = o.deltaX > -5;
+            
+            if (isAligned) alignedEdges.push(o.edge);
         });
 
         if (alignedEdges.length < minBusSize) return;
 
-        const domainGroups = new Map<string, typeof alignedEdges>();
-        alignedEdges.forEach(edge => {
-            const domainKey = parentMap.get(edge.source) ?? '__root__';
-            if (!domainGroups.has(domainKey)) domainGroups.set(domainKey, []);
-            domainGroups.get(domainKey)?.push(edge);
-        });
+        // Treat all aligned edges as a single tree bus trunk group instead of partitioning by subdomain domainKey
+        const domainEdges = alignedEdges;
+        const domainKey = 'all';
 
-        domainGroups.forEach((domainEdges, domainKey) => {
-            if (domainEdges.length < minBusSize) return;
-
-            const firstEdge = domainEdges[0];
-            let effectiveTargetHandle = firstEdge.targetHandle;
-            if (!effectiveTargetHandle) {
-                if (layoutDir.includes('TB')) effectiveTargetHandle = 't';
-                else if (layoutDir.includes('BT')) effectiveTargetHandle = 'b';
-                else if (layoutDir.includes('LR')) effectiveTargetHandle = 'l';
-                else if (layoutDir.includes('RL')) effectiveTargetHandle = 'r';
-                else effectiveTargetHandle = 't';
+        const firstEdge = domainEdges[0];
+        let effectiveTargetHandle = firstEdge.targetHandle;
+        if (!effectiveTargetHandle) {
+            if (dynamicDir === 'TB') effectiveTargetHandle = 't';
+            else if (dynamicDir === 'BT') effectiveTargetHandle = 'b';
+            else if (dynamicDir === 'LR') effectiveTargetHandle = 'l';
+            else if (dynamicDir === 'RL') effectiveTargetHandle = 'r';
+            else effectiveTargetHandle = 't';
+        } else {
+            if (dynamicDir === 'TB' || dynamicDir === 'BT') {
+                if (effectiveTargetHandle === 'l' || effectiveTargetHandle === 'r' || effectiveTargetHandle === 'left' || effectiveTargetHandle === 'right') {
+                    effectiveTargetHandle = dynamicDir === 'TB' ? 't' : 'b';
+                }
             } else {
-                if (layoutDir.includes('TB') || layoutDir.includes('BT')) {
-                    if (effectiveTargetHandle === 'l' || effectiveTargetHandle === 'r' || effectiveTargetHandle === 'left' || effectiveTargetHandle === 'right') {
-                        effectiveTargetHandle = layoutDir.includes('TB') ? 't' : 'b';
+                if (effectiveTargetHandle === 't' || effectiveTargetHandle === 'b' || effectiveTargetHandle === 'top' || effectiveTargetHandle === 'bottom') {
+                    effectiveTargetHandle = dynamicDir === 'LR' ? 'l' : 'r';
+                }
+            }
+        }
+
+        const tgtAnchor = getAnchorLocal(targetId, effectiveTargetHandle);
+        if (!tgtAnchor) return;
+
+        let dirX = 0, dirY = 0;
+        if (effectiveTargetHandle === 'l' || effectiveTargetHandle === 'left') dirX = -1;
+        else if (effectiveTargetHandle === 'r' || effectiveTargetHandle === 'right') dirX = 1;
+        else if (effectiveTargetHandle === 't' || effectiveTargetHandle === 'top') dirY = -1;
+        else if (effectiveTargetHandle === 'b' || effectiveTargetHandle === 'bottom') dirY = 1;
+
+        const mergePoint = { x: tgtAnchor.x + dirX * trunkLength, y: tgtAnchor.y + dirY * trunkLength };
+
+        domainEdges.forEach(edge => {
+            let effectiveSourceHandle = edge.sourceHandle;
+            if (!effectiveSourceHandle) {
+                if (dynamicDir === 'TB') effectiveSourceHandle = 'b';
+                else if (dynamicDir === 'BT') effectiveSourceHandle = 't';
+                else if (dynamicDir === 'LR') effectiveSourceHandle = 'r';
+                else if (dynamicDir === 'RL') effectiveSourceHandle = 'l';
+                else effectiveSourceHandle = 'b';
+            } else {
+                if (dynamicDir === 'TB' || dynamicDir === 'BT') {
+                    if (effectiveSourceHandle === 'l' || effectiveSourceHandle === 'r' || effectiveSourceHandle === 'left' || effectiveSourceHandle === 'right') {
+                        effectiveSourceHandle = dynamicDir === 'TB' ? 'b' : 't';
                     }
                 } else {
-                    if (effectiveTargetHandle === 't' || effectiveTargetHandle === 'b' || effectiveTargetHandle === 'top' || effectiveTargetHandle === 'bottom') {
-                        effectiveTargetHandle = layoutDir.includes('LR') ? 'l' : 'r';
+                    if (effectiveSourceHandle === 't' || effectiveSourceHandle === 'b' || effectiveSourceHandle === 'top' || effectiveSourceHandle === 'bottom') {
+                        effectiveSourceHandle = dynamicDir === 'LR' ? 'r' : 'l';
                     }
                 }
             }
 
-            const tgtAnchor = getAnchorLocal(targetId, effectiveTargetHandle);
-            if (!tgtAnchor) return;
+            const srcAnchor = getAnchorLocal(edge.source, effectiveSourceHandle);
+            if (!srcAnchor) return;
 
-            let dirX = 0, dirY = 0;
-            if (effectiveTargetHandle === 'l' || effectiveTargetHandle === 'left') dirX = -1;
-            else if (effectiveTargetHandle === 'r' || effectiveTargetHandle === 'right') dirX = 1;
-            else if (effectiveTargetHandle === 't' || effectiveTargetHandle === 'top') dirY = -1;
-            else if (effectiveTargetHandle === 'b' || effectiveTargetHandle === 'bottom') dirY = 1;
+            const points: Array<{ x: number, y: number }> = [];
+            points.push({ x: Math.round(srcAnchor.x), y: Math.round(srcAnchor.y) });
 
-            const mergePoint = { x: tgtAnchor.x + dirX * trunkLength, y: tgtAnchor.y + dirY * trunkLength };
+            if (!isGroupHorizontal) points.push({ x: Math.round(srcAnchor.x), y: Math.round(mergePoint.y) });
+            else points.push({ x: Math.round(mergePoint.x), y: Math.round(srcAnchor.y) });
 
-            domainEdges.forEach(edge => {
-                let effectiveSourceHandle = edge.sourceHandle;
-                if (!effectiveSourceHandle) {
-                    if (layoutDir.includes('TB')) effectiveSourceHandle = 'b';
-                    else if (layoutDir.includes('BT')) effectiveSourceHandle = 't';
-                    else if (layoutDir.includes('LR')) effectiveSourceHandle = 'r';
-                    else if (layoutDir.includes('RL')) effectiveSourceHandle = 'l';
-                    else effectiveSourceHandle = 'b';
-                } else {
-                    if (layoutDir.includes('TB') || layoutDir.includes('BT')) {
-                        if (effectiveSourceHandle === 'l' || effectiveSourceHandle === 'r' || effectiveSourceHandle === 'left' || effectiveSourceHandle === 'right') {
-                            effectiveSourceHandle = layoutDir.includes('TB') ? 'b' : 't';
-                        }
-                    } else {
-                        if (effectiveSourceHandle === 't' || effectiveSourceHandle === 'b' || effectiveSourceHandle === 'top' || effectiveSourceHandle === 'bottom') {
-                            effectiveSourceHandle = layoutDir.includes('LR') ? 'r' : 'l';
-                        }
-                    }
-                }
+            points.push({ x: Math.round(mergePoint.x), y: Math.round(mergePoint.y) });
+            points.push({ x: Math.round(tgtAnchor.x), y: Math.round(tgtAnchor.y) });
 
-                const srcAnchor = getAnchorLocal(edge.source, effectiveSourceHandle);
-                if (!srcAnchor) return;
-
-                const points: Array<{ x: number, y: number }> = [];
-                points.push({ x: Math.round(srcAnchor.x), y: Math.round(srcAnchor.y) });
-
-                if (!isHorizontal) points.push({ x: Math.round(srcAnchor.x), y: Math.round(mergePoint.y) });
-                else points.push({ x: Math.round(mergePoint.x), y: Math.round(srcAnchor.y) });
-
-                points.push({ x: Math.round(mergePoint.x), y: Math.round(mergePoint.y) });
-                points.push({ x: Math.round(tgtAnchor.x), y: Math.round(tgtAnchor.y) });
-
-                treeRoutingMap.set(edge.id, {
-                    type: 'tree-in', points, trunkId: `trunk-in-${targetId}-${domainKey}`,
-                    effectiveSourceHandle, effectiveTargetHandle
-                });
+            treeRoutingMap.set(edge.id, {
+                type: 'tree-in', points, trunkId: `trunk-in-${targetId}-${domainKey}`,
+                effectiveSourceHandle, effectiveTargetHandle
             });
         });
     });

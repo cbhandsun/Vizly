@@ -120,6 +120,9 @@ class PerformanceMonitor {
    */
   private initializeMonitoring(): void {
     if (!this.isEnabled) return;
+    if (typeof window === 'undefined' || (typeof process !== 'undefined' && process.env.NODE_ENV === 'test')) {
+      return;
+    }
 
     // 监听JavaScript错误
     window.addEventListener('error', this.handleJavaScriptError.bind(this));

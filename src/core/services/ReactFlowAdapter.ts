@@ -142,6 +142,8 @@ export class ReactFlowAdapter {
         id: edgeData.id ?? `e-${edgeData.source}-${edgeData.target}-${Math.random().toString(36).substring(2,9)}`,
         source: edgeData.source,
         target: edgeData.target,
+        sourceHandle: edgeData.sourceHandle,
+        targetHandle: edgeData.targetHandle,
         type: edgeType as EdgeType, // 显式类型断言
         styleType,
         label: edgeData.label,

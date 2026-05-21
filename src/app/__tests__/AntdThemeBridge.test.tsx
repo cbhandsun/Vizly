@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React from 'react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import type { Theme } from '@/core';
 import AntdThemeBridge from '../AntdThemeBridge';
@@ -54,8 +55,9 @@ const integrationStub = {
   })
 };
 
-jest.mock('@/core', () => {
+vi.mock('@/core', () => {
   return {
+    AntdApiBridge: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     useConfigIntegration: () => [
       {
         integration: {

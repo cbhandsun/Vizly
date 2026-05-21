@@ -4,7 +4,7 @@ import type { LayoutOptions } from '../types/layout';
 import type { StandardNodeData } from '../models/DiagramModels';
 import dagre from 'dagre';
 import { ILayoutStrategy } from './LayoutStrategyManager';
-import { decideEdgeRouting, separateParallelEdges, globalOptimizeEdgeRouting, bundleEdges, layerBasedEdgeRouting, optimizeEdgeLabelPositions, beautifyOrthogonalEdges, optimizeTreeBusRouting } from '../utils/HandlePicker';
+import { decideEdgeRouting, separateParallelEdges, globalOptimizeEdgeRouting, bundleEdges, layerBasedEdgeRouting, optimizeEdgeLabelPositions, beautifyOrthogonalEdges, optimizeTreeBusRouting, assignGlobalPorts } from '../utils/HandlePicker';
 import { routeEdgesWithELK } from '../utils/elkEdgeRouter';
 import { diagramConfigManager } from '../components/config/DiagramConfig';
 import {
@@ -1160,6 +1160,9 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // 这模拟了 DevTools 打开时 console.log 造成的微小延迟，解决 F12 打开/关闭的差异问题
         await Promise.resolve();
 
+        // 预分配智能端口（支持多路重心对齐）
+        const globalPorts = assignGlobalPorts(sortedNodesForRouting, clonedEdges, routingConfig);
+
         clonedEdges.forEach(edge => {
             const source = idMap.get(edge.source);
             const target = idMap.get(edge.target);
@@ -1185,22 +1188,25 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             const explicitTargetHandle = edge.targetHandle && !isAutoHandle(edge, 'target')
                 ? normalizeHandle(edge.targetHandle)
                 : undefined;
-            const routingConfigForEdge = explicitSourceHandle && explicitTargetHandle
-                ? {
-                    ...routingConfig,
-                    preAssignedPorts: {
-                        ...(routingConfig as any).preAssignedPorts,
-                        [source.id]: {
-                            ...((routingConfig as any).preAssignedPorts?.[source.id] ?? {}),
-                            source: explicitSourceHandle
-                        },
-                        [target.id]: {
-                            ...((routingConfig as any).preAssignedPorts?.[target.id] ?? {}),
-                            target: explicitTargetHandle
-                        }
-                    }
-                }
-                : routingConfig;
+
+            const mergedPorts = { ...globalPorts };
+            if (explicitSourceHandle) {
+                mergedPorts[source.id] = {
+                    ...globalPorts[source.id],
+                    source: explicitSourceHandle
+                };
+            }
+            if (explicitTargetHandle) {
+                mergedPorts[target.id] = {
+                    ...globalPorts[target.id],
+                    target: explicitTargetHandle
+                };
+            }
+
+            const routingConfigForEdge = {
+                ...routingConfig,
+                preAssignedPorts: mergedPorts
+            };
 
             const routingResult = decideEdgeRouting(
                 source,

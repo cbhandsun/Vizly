@@ -1,21 +1,20 @@
-
-import { EdgeDecisionService } from '../EdgeDecisionService';
-import { EdgeType } from '@/core';
-import { decideEdgeRouting } from '@/core';
+import { EdgeDecisionService } from '../../core/services/EdgeDecisionService';
+import { EdgeType } from '../../core/factories/EdgeFactory';
+import { decideEdgeRouting } from '../../core/utils/HandlePicker';
 import { Node } from '@xyflow/react';
 
 // Mock the dependencies
-jest.mock('@/utils/HandlePicker', () => ({
-    decideEdgeRouting: jest.fn()
+vi.mock('../../core/utils/HandlePicker', () => ({
+    decideEdgeRouting: vi.fn()
 }));
 
-jest.mock('@/components/config/DiagramConfig', () => ({
+vi.mock('../../core/components/config/DiagramConfig', () => ({
     diagramConfigManager: {
         getConfig: () => ({ edge: {} })
     }
 }));
 
-jest.mock('@/config/LayeredConfigManager', () => ({
+vi.mock('../../core/config/LayeredConfigManager', () => ({
     LayeredConfigManager: {
         getInstance: () => ({
             get: (key: string, def: any) => def
@@ -25,11 +24,11 @@ jest.mock('@/config/LayeredConfigManager', () => ({
 
 describe('EdgeDecisionService', () => {
     let service: EdgeDecisionService;
-    const mockDecideEdgeRouting = decideEdgeRouting as jest.Mock;
+    const mockDecideEdgeRouting = decideEdgeRouting as any;
 
     beforeEach(() => {
         service = new EdgeDecisionService();
-        jest.clearAllMocks();
+        vi.clearAllMocks();
     });
 
     it('should be defined', () => {

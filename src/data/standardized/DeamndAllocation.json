@@ -393,7 +393,9 @@
       "source": "check-rem",
       "target": "task-direct-a",
       "type": "main",
-      "label": "耗尽"
+      "label": "耗尽",
+      "sourceHandle": "right",
+      "targetHandle": "right"
     },
     {
       "id": "e14",

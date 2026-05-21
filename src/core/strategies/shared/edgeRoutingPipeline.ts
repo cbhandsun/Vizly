@@ -657,5 +657,13 @@ export async function runEdgeRoutingPipeline(
     }
   }
 
+  // ⭐️ [FIX] Ensure all handles are expanded to full format ('top', 'bottom', 'left', 'right')
+  // to avoid matching failures in React Flow / FlowchartNode!
+  finalEdges = finalEdges.map(edge => ({
+    ...edge,
+    sourceHandle: edge.sourceHandle ? expandHandle(String(edge.sourceHandle)) : edge.sourceHandle,
+    targetHandle: edge.targetHandle ? expandHandle(String(edge.targetHandle)) : edge.targetHandle,
+  }));
+
   return finalEdges;
 }

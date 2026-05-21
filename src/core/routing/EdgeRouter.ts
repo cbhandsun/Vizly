@@ -109,10 +109,8 @@ export class EdgeRouter {
                 usage,
                 geometry
             );
-            const hasHardPreAssignedPorts = !!(
-                config.preAssignedPorts?.[sourceNode.id]?.source &&
-                config.preAssignedPorts?.[targetNode.id]?.target
-            );
+            const sPre = config.preAssignedPorts?.[sourceNode.id]?.source;
+            const tPre = config.preAssignedPorts?.[targetNode.id]?.target;
 
             // [FIX-C-shape] Post-port-selection guard: prevent C-shaped paths.
             // When both ports are horizontal (right/left) but nodes are primarily vertically
@@ -136,14 +134,14 @@ export class EdgeRouter {
                 const srcIsVert  = isVerticalHandle(portResult.sourceHandle);
                 const tgtIsVert  = isVerticalHandle(portResult.targetHandle);
 
-                if (!hasHardPreAssignedPorts && srcIsHoriz && tgtIsHoriz && addy > addx * 2) {
+                if (!sPre && srcIsHoriz && tgtIsHoriz && addy > addx * 2) {
                     // Both horizontal but strong vertical dominance → switch to vertical
                     portResult.sourceHandle = ddy > 0 ? 'b' : 't';
-                    portResult.targetHandle = ddy > 0 ? 't' : 'b';
-                } else if (!hasHardPreAssignedPorts && srcIsVert && tgtIsVert && addx > addy * 2) {
+                    if (!tPre) portResult.targetHandle = ddy > 0 ? 't' : 'b';
+                } else if (!sPre && srcIsVert && tgtIsVert && addx > addy * 2) {
                     // Both vertical but strong horizontal dominance → switch to horizontal
                     portResult.sourceHandle = ddx > 0 ? 'r' : 'l';
-                    portResult.targetHandle = ddx > 0 ? 'l' : 'r';
+                    if (!tPre) portResult.targetHandle = ddx > 0 ? 'l' : 'r';
                 }
             }
 

@@ -135,22 +135,43 @@ export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record
         const avgCy = sumCy / validCount;
 
         // 虚拟一个“重心节点”进行方向判断
-        const virtualTarget = { cx: avgCx, cy: avgCy }; // 简化对象
+        const virtualTarget = { cx: avgCx, cy: avgCy };
 
-        // 使用之前的几何重叠逻辑判断重心方向
         const dx = virtualTarget.cx - c.cx;
         const dy = virtualTarget.cy - c.cy;
 
-        // 简单斜率判断 (Bias towards vertical for Tree layouts if slightly ambiguous)
-        // 但这里为了通用性，使用纯几何
-        if (Math.abs(dx) > Math.abs(dy)) {
-            return dx > 0 ? 'right' : 'left';
-        } else {
+        // 💡 改进：引入对布局方向 (layoutDirection) 的感知
+        const dir = String(_cfg?.layoutDirection || '').toUpperCase();
+        const isH = dir === 'LR' || dir === 'RL';
+
+        if (isH) {
+            // 水平流向：优先选择左右端口
+            if (dx > 0) return 'right';
+            if (dx < 0) return 'left';
             return dy > 0 ? 'bottom' : 'top';
+        } else {
+            // 垂直流向 (默认 / TB)：优先选择上下端口
+            if (dy > 0) return 'bottom';
+            if (dy < 0) return 'top';
+            return dx > 0 ? 'right' : 'left';
         }
     };
 
     // 3. 遍历所有边，分别决定 Source 和 TargetHandle
+    const edgeDecisions: Record<string, { sHandle: string; tHandle: string }> = {};
+    const dir = String(_cfg?.layoutDirection || '').toUpperCase();
+    const isH = dir === 'LR' || dir === 'RL';
+
+    const getSideSign = (center: any, target: any) => {
+        const c = getBounds(center);
+        const t = getBounds(target);
+        if (isH) {
+            return (t.cx - c.cx) >= 0 ? 1 : -1;
+        } else {
+            return (t.cy - c.cy) >= 0 ? 1 : -1;
+        }
+    };
+
     for (const edge of edges) {
         const src = nodeMap.get(edge.source);
         const tgt = nodeMap.get(edge.target);
@@ -161,10 +182,13 @@ export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record
 
         // Source Side Decision
         const srcOut = outEdges.get(edge.source) || [];
-        // 如果是 1-to-N Hub (出度 > 1)，使用聚合重心方向 (Hub Dominant Side)
+        // 如果是 1-to-N Hub (出度 > 1)，仅对相同流动方向的分支目标进行重心方向聚合
         if (srcOut.length > 1) {
-            // 获取所有 target 节点
-            const targets = srcOut.map(e => nodeMap.get(e.target)).filter(Boolean);
+            const tgtSign = getSideSign(src, tgt);
+            const targets = srcOut
+                .map(e => nodeMap.get(e.target))
+                .filter(Boolean)
+                .filter(t => getSideSign(src, t) === tgtSign);
             sHandle = getDominantSide(src, targets);
         } else {
             // 单独连接，退化为两点判定 (与之前逻辑一致)
@@ -173,20 +197,53 @@ export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record
 
         // Target Side Decision
         const tgtIn = inEdges.get(edge.target) || [];
-        // 如果是 N-to-1 Hub (入度 > 1)，使用聚合重心方向
+        // 如果是 N-to-1 Hub (入度 > 1)，仅对相同流动方向的来源节点进行重心方向聚合
         if (tgtIn.length > 1) {
-            const sources = tgtIn.map(e => nodeMap.get(e.source)).filter(Boolean);
+            const srcSign = getSideSign(tgt, src);
+            const sources = tgtIn
+                .map(e => nodeMap.get(e.source))
+                .filter(Boolean)
+                .filter(s => getSideSign(tgt, s) === srcSign);
             tHandle = getDominantSide(tgt, sources);
         } else {
             // 单独连接，退化为两点判定
             tHandle = getDominantSide(tgt, [src]);
         }
 
-        result[edge.id] = { source: sHandle, target: tHandle };
-        if (!result[edge.source]) result[edge.source] = {};
-        result[edge.source].source = sHandle;
-        if (!result[edge.target]) result[edge.target] = {};
-        result[edge.target].target = tHandle;
+        edgeDecisions[edge.id] = { sHandle, tHandle };
+    }
+
+    const nodeSourceHandles = new Map<string, Set<string>>();
+    const nodeTargetHandles = new Map<string, Set<string>>();
+
+    for (const edge of edges) {
+        const dec = edgeDecisions[edge.id];
+        if (!dec) continue;
+
+        result[edge.id] = { source: dec.sHandle, target: dec.tHandle };
+
+        if (!nodeSourceHandles.has(edge.source)) nodeSourceHandles.set(edge.source, new Set());
+        nodeSourceHandles.get(edge.source)!.add(dec.sHandle);
+
+        if (!nodeTargetHandles.has(edge.target)) nodeTargetHandles.set(edge.target, new Set());
+        nodeTargetHandles.get(edge.target)!.add(dec.tHandle);
+    }
+
+    // 仅当所有连接到该节点的边在端口方向上达成一致时，才在节点层级预分配端口
+    for (const [nodeId, handles] of nodeSourceHandles.entries()) {
+        if (handles.size === 1) {
+            const handle = Array.from(handles)[0];
+            if (!result[nodeId]) result[nodeId] = {};
+            result[nodeId].source = handle;
+        }
+    }
+
+    for (const [nodeId, handles] of nodeTargetHandles.entries()) {
+        if (handles.size === 1) {
+            const handle = Array.from(handles)[0];
+            if (!result[nodeId]) result[nodeId] = {};
+            result[nodeId].target = handle;
+        }
     }
 
     return result;
@@ -273,7 +330,8 @@ export function decideEdgeRouting(
     const parentIds = new Set<string>();
     if (allNodes) {
         for (const n of allNodes) {
-            if (n.parentId) parentIds.add(n.parentId);
+            const pId = n.parentId || n.parentNode;
+            if (pId) parentIds.add(pId);
         }
     }
 
@@ -284,16 +342,16 @@ export function decideEdgeRouting(
             if (parentIds.has(n.id)) return false;
 
             const t = String(n.type || '');
-            return t !== 'domain' && t !== 'group' && t !== 'subGroup' && !String(t).includes('container');
+            return t !== 'domain' && t !== 'group' && t !== 'subGroup' && t !== 'titleGroup' && !String(t).includes('container');
         })
         .map(n => ({
             x: getAbsolutePosition(n).x ?? 0,
             y: getAbsolutePosition(n).y ?? 0,
             width: n.width ?? n.measured?.width ?? n.style?.width ?? 100,
             height: n.height ?? n.measured?.height ?? n.style?.height ?? 50,
-            // [FIX] Add padding so A* routes with 40px clearance from each node,
-            // preventing paths from hugging node boundaries (previous: no padding → paths stop at node edge)
-            padding: 40,
+            // [FIX] Use 10px hard clearance to prevent blocking narrow gaps between vertically adjacent nodes.
+            // Soft buffer zones (20px/40px) in buildPathfindingGrid will still keep lines 40px away when possible.
+            padding: 10,
         }));
 
     const cfgEdge = diagramConfigManager?.getConfig?.()?.edge || {};
@@ -356,11 +414,13 @@ export function decideEdgeRouting(
         }
     }
 
+    const layoutDir = fallbackIsValid ? (fallbackDir as any) : inferredLayoutDirection;
+
     const enrichedCfg = {
         ...cfg,
         mode: effectiveMode,
         globalPath: effectiveGlobalPath,
-        layoutDirection: inferredLayoutDirection,
+        layoutDirection: layoutDir,
         // [OPT] Main Thread Fast-Pass
         // Limit expansions to prevent blocking the UI.
         // Complex paths will be refined by the Worker.
