@@ -947,6 +947,7 @@ const DiagramViewer: React.FC = () => {
                     showExport: true,
                     showThemeSelector: false,
                     showStyleSwitcher: false,
+                    hideCenterIsland: resolvedPluginId === 'mindmap',
                     leftChildren: (
                         <>
                             <div className="flex items-center max-w-[240px]">

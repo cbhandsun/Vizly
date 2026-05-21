@@ -3,6 +3,19 @@ import { ProGanttTask, useProTimelineEngine } from '../../../hooks/useProTimelin
 import { CalendarOutlined, ClockCircleOutlined, FlagFilled, CaretRightFilled } from '@ant-design/icons';
 import { useTheme } from '../../../themes/useCoreTheme';
 
+const getAvatarColor = (name: string) => {
+    const colors = [
+        '#1890ff', '#2f54eb', '#722ed1', '#eb2f96', '#fa8c16',
+        '#faad14', '#a0d911', '#52c41a', '#13c2c2'
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const idx = Math.abs(hash) % colors.length;
+    return colors[idx];
+};
+
 export interface ProTaskLayerProps {
     tasks: ProGanttTask[];
     onTaskClick?: (taskId: string) => void;
@@ -11,6 +24,7 @@ export interface ProTaskLayerProps {
     onHoverTask?: (id: string | null) => void;
     onTaskUpdate?: (taskId: string, updates: Partial<ProGanttTask>) => void;
     onTaskConnect?: (sourceId: string, targetId: string) => void;
+    criticalPathTaskIds?: Set<string>;
 }
 
 const ROW_HEIGHT = 42;
@@ -93,8 +107,17 @@ function TaskTooltip({ task, x, y, theme }: { task: ProGanttTask; x: number; y: 
     );
 }
 
-export default function ProTaskLayer({ tasks, onTaskClick, onTaskDragEnd, hoveredTaskId, onHoverTask, onTaskUpdate, onTaskConnect }: ProTaskLayerProps) {
-    const { xToDate, pixelsPerDay, dateToX } = useProTimelineEngine();
+export default function ProTaskLayer({ 
+    tasks, 
+    onTaskClick, 
+    onTaskDragEnd, 
+    hoveredTaskId, 
+    onHoverTask, 
+    onTaskUpdate, 
+    onTaskConnect,
+    criticalPathTaskIds
+}: ProTaskLayerProps) {
+    const { xToDate, pixelsPerDay, dateToX, showBaseline, showCriticalPath } = useProTimelineEngine();
     const [theme] = useTheme();
     const [dragState, setDragState] = useState<DragState | null>(null);
     const [dragDeltaX, setDragDeltaX] = useState(0);
@@ -257,111 +280,251 @@ export default function ProTaskLayer({ tasks, onTaskClick, onTaskDragEnd, hovere
                 const isDarkTheme = theme?.mode === 'dark';
                 const textColor = (type === 'event' || type === 'milestone') ? (isDarkTheme ? 'rgba(255,255,255,0.85)' : '#434343') : '#ffffff';
 
-                // === Summary Bar (Roll-up bracket) ===
-                if (type === 'summary') {
-                    return (
-                        <div key={task.id}
+                const isCritical = showCriticalPath && criticalPathTaskIds?.has(task.id);
+
+                // Render baseline bar under the task bar if enabled
+                const renderBaselineBar = showBaseline && task.baselineStartDate && task.baselineEndDate && (type === 'phase' || type === 'event' || type === 'milestone');
+                let baselineBarElement = null;
+                if (renderBaselineBar) {
+                    const bLeft = dateToX(task.baselineStartDate!);
+                    const bRight = dateToX(task.baselineEndDate!);
+                    const bWidth = Math.max(6, bRight - bLeft);
+                    const bTop = y + 22;
+                    baselineBarElement = (
+                        <div
+                            key={`${task.id}-baseline`}
                             style={{
-                                position: 'absolute', left: x, top: y + 8, width: Math.max(4, w), height: 12,
-                                pointerEvents: 'auto', cursor: 'pointer',
+                                position: 'absolute',
+                                left: type === 'milestone' ? bLeft - 5 : bLeft,
+                                top: bTop,
+                                width: type === 'milestone' ? 10 : bWidth,
+                                height: 6,
+                                borderRadius: 3,
+                                background: 'rgba(128, 128, 128, 0.45)',
+                                border: '1.2px dashed rgba(120, 120, 120, 0.75)',
+                                pointerEvents: 'none',
+                                zIndex: 0,
                             }}
-                            onClick={(e) => { e.stopPropagation(); onTaskClick?.(task.id); }}
-                            onMouseEnter={(e) => handleTaskMouseEnter(e, task)}
-                            onMouseLeave={(e) => handleTaskMouseLeave(e, task)}
-                            onMouseMove={handleTaskMouseMove}
-                        >
-                            {/* Top Bar */}
-                            <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 4, background: barColor }} />
-                            {/* Left Triangle */}
-                            <div style={{
-                                position: 'absolute', left: 0, top: 0,
-                                width: 0, height: 0,
-                                borderTop: `12px solid ${barColor}`,
-                                borderRight: '8px solid transparent',
-                            }} />
-                            {/* Right Triangle */}
-                            <div style={{
-                                position: 'absolute', right: 0, top: 0,
-                                width: 0, height: 0,
-                                borderTop: `12px solid ${barColor}`,
-                                borderLeft: '8px solid transparent',
-                            }} />
-                        </div>
+                        />
                     );
                 }
 
-                // === Milestone ===
-                if (type === 'milestone') {
-                    return (
-                        <div key={task.id}
-                            style={{
-                                position: 'absolute', left: x - 14, top: y, width: 28, height: 28,
-                                pointerEvents: 'auto', cursor: isDragging ? 'grabbing' : 'grab',
-                            }}
-                            onClick={(e) => { e.stopPropagation(); onTaskClick?.(task.id); }}
-                            onPointerDown={(e) => handleTaskPointerDown(e, task, 'move')}
-                            onMouseEnter={(e) => handleTaskMouseEnter(e, task)}
-                            onMouseLeave={(e) => handleTaskMouseLeave(e, task)}
-                            onMouseMove={handleTaskMouseMove}
-                        >
-                            <div style={{
-                                position: 'absolute', left: 4, top: 4, width: 20, height: 20,
-                                backgroundColor: isSelected ? '#fff' : barColor,
-                                border: `2.5px solid ${barColor}`,
-                                transform: `rotate(45deg)${isDragging ? ' scale(1.15)' : isHovered ? ' scale(1.08)' : ''}`,
-                                boxShadow: isSelected
-                                    ? `0 0 0 4px ${barColor}25, 0 4px 12px rgba(0,0,0,0.12)`
-                                    : isHovered
-                                        ? `0 0 12px ${barColor}40`
-                                        : '0 2px 6px rgba(0,0,0,0.12)',
-                                transition: isDragging ? 'none' : 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
-                                <FlagFilled style={{ fontSize: 9, color: isSelected ? barColor : '#fff', transform: 'rotate(-45deg)' }} />
+                const mainBarElement = (() => {
+                    // === Summary Bar (Roll-up bracket) ===
+                    if (type === 'summary') {
+                        return (
+                            <div key={task.id}
+                                style={{
+                                    position: 'absolute', left: x, top: y + 8, width: Math.max(4, w), height: 12,
+                                    pointerEvents: 'auto', cursor: 'pointer',
+                                }}
+                                onClick={(e) => { e.stopPropagation(); onTaskClick?.(task.id); }}
+                                onMouseEnter={(e) => handleTaskMouseEnter(e, task)}
+                                onMouseLeave={(e) => handleTaskMouseLeave(e, task)}
+                                onMouseMove={handleTaskMouseMove}
+                            >
+                                {/* Top Bar */}
+                                <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 4, background: barColor }} />
+                                {/* Left Triangle */}
+                                <div style={{
+                                    position: 'absolute', left: 0, top: 0,
+                                    width: 0, height: 0,
+                                    borderTop: `12px solid ${barColor}`,
+                                    borderRight: '8px solid transparent',
+                                }} />
+                                {/* Right Triangle */}
+                                <div style={{
+                                    position: 'absolute', right: 0, top: 0,
+                                    width: 0, height: 0,
+                                    borderTop: `12px solid ${barColor}`,
+                                    borderLeft: '8px solid transparent',
+                                }} />
                             </div>
-                            <div style={{
-                                position: 'absolute', left: 30, top: 6, width: 160, fontSize: 11,
-                                fontWeight: 600, color: textColor, whiteSpace: 'nowrap', pointerEvents: 'auto',
-                                textShadow: isDarkTheme ? '0 1px 3px rgba(0,0,0,0.8)' : '0 1px 3px #fff',
-                            }}>
-                                {editingTaskId === task.id ? (
-                                    <input 
-                                        autoFocus value={editingText} onChange={e => setEditingText(e.target.value)}
-                                        onBlur={commitEdit} onKeyDown={handleKeyDown}
-                                        style={{ background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontWeight: 'inherit', fontSize: 'inherit', width: '100%', padding: 0 }}
-                                    />
-                                ) : (
-                                    <span onDoubleClick={(e) => { e.stopPropagation(); setEditingTaskId(task.id); setEditingText(task.name); }}>{task.name}</span>
+                        );
+                    }
+
+                    // === Milestone ===
+                    if (type === 'milestone') {
+                        const milestoneBorderColor = isCritical ? '#ff4d4f' : barColor;
+                        return (
+                            <div key={task.id}
+                                style={{
+                                    position: 'absolute', left: x - 14, top: y, width: 28, height: 28,
+                                    pointerEvents: 'auto', cursor: isDragging ? 'grabbing' : 'grab',
+                                }}
+                                onClick={(e) => { e.stopPropagation(); onTaskClick?.(task.id); }}
+                                onPointerDown={(e) => handleTaskPointerDown(e, task, 'move')}
+                                onMouseEnter={(e) => handleTaskMouseEnter(e, task)}
+                                onMouseLeave={(e) => handleTaskMouseLeave(e, task)}
+                                onMouseMove={handleTaskMouseMove}
+                            >
+                                <div style={{
+                                    position: 'absolute', left: 4, top: 4, width: 20, height: 20,
+                                    backgroundColor: isSelected ? '#fff' : (isCritical ? '#ff4d4f' : barColor),
+                                    border: `2.5px solid ${milestoneBorderColor}`,
+                                    transform: `rotate(45deg)${isDragging ? ' scale(1.15)' : isHovered ? ' scale(1.08)' : ''}`,
+                                    boxShadow: isSelected
+                                        ? `0 0 0 4px ${milestoneBorderColor}25, 0 4px 12px rgba(0,0,0,0.12)`
+                                        : isHovered
+                                            ? `0 0 12px ${milestoneBorderColor}40`
+                                            : '0 2px 6px rgba(0,0,0,0.12)',
+                                    transition: isDragging ? 'none' : 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    ...(isCritical ? { animation: 'pro-timeline-critical-glow 2s infinite ease-in-out' } : {})
+                                }}>
+                                    <FlagFilled style={{ fontSize: 9, color: isSelected ? milestoneBorderColor : '#fff', transform: 'rotate(-45deg)' }} />
+                                </div>
+                                <div style={{
+                                    position: 'absolute', left: 30, top: 6, width: 220, fontSize: 11,
+                                    fontWeight: 600, color: textColor, whiteSpace: 'nowrap', pointerEvents: 'auto',
+                                    textShadow: isDarkTheme ? '0 1px 3px rgba(0,0,0,0.8)' : '0 1px 3px #fff',
+                                    display: 'flex', alignItems: 'center', gap: 4
+                                }}>
+                                    {task.priority && (
+                                        <span style={{
+                                            width: 6, height: 6, borderRadius: '50%',
+                                            backgroundColor: task.priority === 'high' ? '#ff4d4f' : task.priority === 'medium' ? '#fa8c16' : '#1890ff',
+                                            display: 'inline-block',
+                                            flexShrink: 0
+                                        }} />
+                                    )}
+                                    {editingTaskId === task.id ? (
+                                        <input 
+                                            autoFocus value={editingText} onChange={e => setEditingText(e.target.value)}
+                                            onBlur={commitEdit} onKeyDown={handleKeyDown}
+                                            style={{ background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontWeight: 'inherit', fontSize: 'inherit', width: '100%', padding: 0 }}
+                                        />
+                                    ) : (
+                                        <span onDoubleClick={(e) => { e.stopPropagation(); setEditingTaskId(task.id); setEditingText(task.name); }}>{task.name}</span>
+                                    )}
+                                    {task.assignee && (
+                                        <div style={{
+                                            width: 16, height: 16, borderRadius: '50%',
+                                            backgroundColor: '#ffffff',
+                                            padding: 1,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                                            flexShrink: 0,
+                                        }} title={`负责人: ${task.assignee}`}>
+                                            <div style={{
+                                                width: '100%', height: '100%', borderRadius: '50%',
+                                                backgroundColor: getAvatarColor(task.assignee),
+                                                color: '#fff', fontSize: 8, fontWeight: 600,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            }}>
+                                                {task.assignee.trim().charAt(0).toUpperCase()}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    }
+
+                    // === Event (Pill / Badge style) ===
+                    if (type === 'event') {
+                        return (
+                            <div key={task.id}
+                                style={{
+                                    position: 'absolute', left: x, top: y, height: BAR_HEIGHT,
+                                    pointerEvents: 'auto', cursor: isDragging && dragState.mode === 'move' ? 'grabbing' : 'grab',
+                                    display: 'flex', alignItems: 'center', gap: 6,
+                                    padding: '0 12px 0 4px',
+                                    borderRadius: BAR_HEIGHT / 2,
+                                    background: isSelected ? (isDarkTheme ? 'rgba(0,0,0,0.8)' : '#fff') : (isDarkTheme ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.85)'),
+                                    backdropFilter: 'blur(4px)',
+                                    border: `1.5px solid ${isCritical ? '#ff4d4f' : barColor}`,
+                                    boxShadow: isSelected 
+                                        ? `0 0 0 3px ${barColor}30, 0 4px 12px rgba(0,0,0,0.1)` 
+                                        : isHovered 
+                                            ? '0 4px 12px rgba(0,0,0,0.08)' 
+                                            : '0 1px 4px rgba(0,0,0,0.04)',
+                                    color: textColor,
+                                    fontSize: 12, fontWeight: 600,
+                                    transition: isDragging ? 'none' : 'all 0.2s',
+                                    transform: isDragging ? 'scale(1.02)' : isHovered ? 'translateY(-1px)' : 'none',
+                                    whiteSpace: 'nowrap',
+                                    zIndex: isHovered || isSelected ? 10 : 1,
+                                    ...(isCritical ? { animation: 'pro-timeline-critical-glow 2s infinite ease-in-out' } : {})
+                                }}
+                                onClick={(e) => { e.stopPropagation(); onTaskClick?.(task.id); }}
+                                onPointerDown={(e) => handleTaskPointerDown(e, task, 'move')}
+                                onMouseEnter={(e) => handleTaskMouseEnter(e, task)}
+                                onMouseLeave={(e) => handleTaskMouseLeave(e, task)}
+                                onMouseMove={handleTaskMouseMove}
+                            >
+                                <div style={{
+                                    width: 20, height: 20, borderRadius: '50%',
+                                    background: isCritical ? '#ff4d4f' : barColor, color: '#fff',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    flexShrink: 0
+                                }}>
+                                    <ClockCircleOutlined style={{ fontSize: 11 }} />
+                                </div>
+                                {task.priority && (
+                                    <span style={{
+                                        width: 6, height: 6, borderRadius: '50%',
+                                        backgroundColor: task.priority === 'high' ? '#ff4d4f' : task.priority === 'medium' ? '#fa8c16' : '#1890ff',
+                                        display: 'inline-block',
+                                        flexShrink: 0
+                                    }} />
+                                )}
+                                <span style={{ textShadow: isDarkTheme ? '0 1px 2px rgba(0,0,0,0.8)' : '0 1px 2px #fff', pointerEvents: 'auto' }}>
+                                    {editingTaskId === task.id ? (
+                                        <input 
+                                            autoFocus value={editingText} onChange={e => setEditingText(e.target.value)}
+                                            onBlur={commitEdit} onKeyDown={handleKeyDown}
+                                            style={{ background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontWeight: 'inherit', fontSize: 'inherit', width: 120, padding: 0 }}
+                                        />
+                                    ) : (
+                                        <span onDoubleClick={(e) => { e.stopPropagation(); setEditingTaskId(task.id); setEditingText(task.name); }}>{task.name}</span>
+                                    )}
+                                </span>
+                                {task.assignee && (
+                                    <div style={{
+                                        width: 16, height: 16, borderRadius: '50%',
+                                        backgroundColor: '#ffffff',
+                                        padding: 1,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                                        flexShrink: 0,
+                                        marginLeft: 2,
+                                    }} title={`负责人: ${task.assignee}`}>
+                                        <div style={{
+                                            width: '100%', height: '100%', borderRadius: '50%',
+                                            backgroundColor: getAvatarColor(task.assignee),
+                                            color: '#fff', fontSize: 8, fontWeight: 600,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        }}>
+                                            {task.assignee.trim().charAt(0).toUpperCase()}
+                                        </div>
+                                    </div>
                                 )}
                             </div>
-                        </div>
-                    );
-                }
+                        );
+                    }
 
-                // === Event (Pill / Badge style) ===
-                if (type === 'event') {
+                    // === Phase / Default bar ===
                     return (
                         <div key={task.id}
                             style={{
-                                position: 'absolute', left: x, top: y, height: BAR_HEIGHT,
+                                position: 'absolute', left: x, top: y, width: Math.max(8, w), height: BAR_HEIGHT,
                                 pointerEvents: 'auto', cursor: isDragging && dragState.mode === 'move' ? 'grabbing' : 'grab',
-                                display: 'flex', alignItems: 'center', gap: 6,
-                                padding: '0 12px 0 4px',
-                                borderRadius: BAR_HEIGHT / 2,
-                                background: isSelected ? (isDarkTheme ? 'rgba(0,0,0,0.8)' : '#fff') : (isDarkTheme ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.85)'),
-                                backdropFilter: 'blur(4px)',
-                                border: `1.5px solid ${barColor}`,
-                                boxShadow: isSelected 
-                                    ? `0 0 0 3px ${barColor}30, 0 4px 12px rgba(0,0,0,0.1)` 
-                                    : isHovered 
-                                        ? '0 4px 12px rgba(0,0,0,0.08)' 
-                                        : '0 1px 4px rgba(0,0,0,0.04)',
-                                color: textColor,
-                                fontSize: 12, fontWeight: 600,
-                                transition: isDragging ? 'none' : 'all 0.2s',
+                                borderRadius:  6,
+                                background: `linear-gradient(180deg, ${isCritical ? '#ff4d4f' : barColor}F0 0%, ${isCritical ? '#ff7875' : barColor}D8 100%)`,
+                                boxShadow: isSelected
+                                    ? `0 0 0 2px ${isDarkTheme ? '#141414' : '#fff'}, 0 0 0 4px ${isCritical ? '#ff4d4f' : barColor}60, 0 4px 16px rgba(0,0,0,0.12)`
+                                    : isDragging
+                                        ? `0 8px 24px rgba(0,0,0,0.18)`
+                                        : isHovered
+                                            ? `0 2px 12px ${isCritical ? '#ff4d4f' : barColor}30`
+                                            : '0 1px 4px rgba(0,0,0,0.08)',
+                                border: `1px solid ${isCritical ? '#ff4d4f' : (isDarkTheme ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)')}`,
+                                transition: isDragging ? 'none' : 'box-shadow 0.2s, transform 0.2s',
                                 transform: isDragging ? 'scale(1.02)' : isHovered ? 'translateY(-1px)' : 'none',
-                                whiteSpace: 'nowrap',
-                                zIndex: isHovered || isSelected ? 10 : 1,
+                                overflow: 'hidden',
+                                opacity: isDragging ? 0.92 : 1,
+                                ...(isCritical ? { animation: 'pro-timeline-critical-glow 2s infinite ease-in-out' } : {})
                             }}
                             onClick={(e) => { e.stopPropagation(); onTaskClick?.(task.id); }}
                             onPointerDown={(e) => handleTaskPointerDown(e, task, 'move')}
@@ -369,137 +532,123 @@ export default function ProTaskLayer({ tasks, onTaskClick, onTaskDragEnd, hovere
                             onMouseLeave={(e) => handleTaskMouseLeave(e, task)}
                             onMouseMove={handleTaskMouseMove}
                         >
+                            {/* 进度条背景轨道 */}
                             <div style={{
-                                width: 20, height: 20, borderRadius: '50%',
-                                background: barColor, color: '#fff',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                flexShrink: 0
+                                position: 'absolute', left: 3, right: 3, bottom: 3, height: 4,
+                                borderRadius: 2, background: 'rgba(0,0,0,0.15)', zIndex: 0,
                             }}>
-                                <ClockCircleOutlined style={{ fontSize: 11 }} />
-                            </div>
-                            <span style={{ textShadow: isDarkTheme ? '0 1px 2px rgba(0,0,0,0.8)' : '0 1px 2px #fff', pointerEvents: 'auto' }}>
-                                {editingTaskId === task.id ? (
-                                    <input 
-                                        autoFocus value={editingText} onChange={e => setEditingText(e.target.value)}
-                                        onBlur={commitEdit} onKeyDown={handleKeyDown}
-                                        style={{ background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontWeight: 'inherit', fontSize: 'inherit', width: 120, padding: 0 }}
-                                    />
-                                ) : (
-                                    <span onDoubleClick={(e) => { e.stopPropagation(); setEditingTaskId(task.id); setEditingText(task.name); }}>{task.name}</span>
+                                <div style={{
+                                    width: `${renderProgress}%`, height: '100%', borderRadius: 2,
+                                    background: 'rgba(255,255,255,0.6)',
+                                    transition: isDragging && dragState.mode === 'progress' ? 'none' : 'width 0.3s ease',
+                                }} />
+
+                                {/* 交互式进度手柄 */}
+                                {type === 'phase' && (
+                                    <div
+                                        style={{
+                                            position: 'absolute', left: `${renderProgress}%`, top: -4, bottom: -4,
+                                            width: 12, marginLeft: -6, cursor: 'col-resize', zIndex: 5,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                        }}
+                                        onPointerDown={(e) => { e.stopPropagation(); handleTaskPointerDown(e, task, 'progress'); }}
+                                    >
+                                        <CaretRightFilled style={{ 
+                                            color: '#fff', fontSize: 10, transform: 'rotate(90deg)',
+                                            opacity: isHovered || isDragging ? 1 : 0, transition: 'opacity 0.2s',
+                                            filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))'
+                                        }} />
+                                    </div>
                                 )}
-                            </span>
-                        </div>
-                    );
-                }
+                            </div>
 
-                // === Phase / Default bar ===
-                return (
-                    <div key={task.id}
-                        style={{
-                            position: 'absolute', left: x, top: y, width: Math.max(8, w), height: BAR_HEIGHT,
-                            pointerEvents: 'auto', cursor: isDragging && dragState.mode === 'move' ? 'grabbing' : 'grab',
-                            borderRadius:  6,
-                            background: `linear-gradient(180deg, ${barColor}F0 0%, ${barColor}D8 100%)`,
-                            boxShadow: isSelected
-                                ? `0 0 0 2px ${isDarkTheme ? '#141414' : '#fff'}, 0 0 0 4px ${barColor}60, 0 4px 16px rgba(0,0,0,0.12)`
-                                : isDragging
-                                    ? `0 8px 24px rgba(0,0,0,0.18)`
-                                    : isHovered
-                                        ? `0 2px 12px ${barColor}30`
-                                        : '0 1px 4px rgba(0,0,0,0.08)',
-                            border: `1px solid ${isDarkTheme ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)'}`,
-                            transition: isDragging ? 'none' : 'box-shadow 0.2s, transform 0.2s',
-                            transform: isDragging ? 'scale(1.02)' : isHovered ? 'translateY(-1px)' : 'none',
-                            overflow: 'hidden',
-                            opacity: isDragging ? 0.92 : 1,
-                        }}
-                        onClick={(e) => { e.stopPropagation(); onTaskClick?.(task.id); }}
-                        onPointerDown={(e) => handleTaskPointerDown(e, task, 'move')}
-                        onMouseEnter={(e) => handleTaskMouseEnter(e, task)}
-                        onMouseLeave={(e) => handleTaskMouseLeave(e, task)}
-                        onMouseMove={handleTaskMouseMove}
-                    >
-                        {/* 进度条背景轨道 */}
-                        <div style={{
-                            position: 'absolute', left: 3, right: 3, bottom: 3, height: 4,
-                            borderRadius: 2, background: 'rgba(0,0,0,0.15)', zIndex: 0,
-                        }}>
                             <div style={{
-                                width: `${renderProgress}%`, height: '100%', borderRadius: 2,
-                                background: 'rgba(255,255,255,0.6)',
-                                transition: isDragging && dragState.mode === 'progress' ? 'none' : 'width 0.3s ease',
-                            }} />
+                                position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center',
+                                gap: 5, padding: '0 8px', height: '100%', paddingBottom: 4,
+                                color: '#ffffff', fontSize: 12, fontWeight: 500, pointerEvents: 'none',
+                                textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+                            }}>
+                                <CalendarOutlined style={{ opacity: 0.85, fontSize: 11 }}/>
+                                {task.priority && (
+                                    <span style={{
+                                        width: 6, height: 6, borderRadius: '50%',
+                                        backgroundColor: task.priority === 'high' ? '#ff4d4f' : task.priority === 'medium' ? '#fa8c16' : '#1890ff',
+                                        display: 'inline-block',
+                                        flexShrink: 0
+                                    }} />
+                                )}
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, pointerEvents: 'auto' }}>
+                                    {editingTaskId === task.id ? (
+                                        <input 
+                                            autoFocus value={editingText} onChange={e => setEditingText(e.target.value)}
+                                            onBlur={commitEdit} onKeyDown={handleKeyDown}
+                                            style={{ background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontWeight: 'inherit', fontSize: 'inherit', width: '100%', padding: 0 }}
+                                        />
+                                    ) : (
+                                        <span onDoubleClick={(e) => { e.stopPropagation(); setEditingTaskId(task.id); setEditingText(task.name); }}>{task.name}</span>
+                                    )}
+                                </span>
+                                {renderProgress > 0 && w > 80 && (
+                                    <span style={{ fontSize: 10, opacity: 0.8, fontWeight: 600 }}>{renderProgress}%</span>
+                                )}
+                                {task.assignee && (
+                                    <div style={{
+                                        width: 16, height: 16, borderRadius: '50%',
+                                        backgroundColor: '#ffffff',
+                                        padding: 1,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                                        flexShrink: 0,
+                                        marginLeft: 2,
+                                    }} title={`负责人: ${task.assignee}`}>
+                                        <div style={{
+                                            width: '100%', height: '100%', borderRadius: '50%',
+                                            backgroundColor: getAvatarColor(task.assignee),
+                                            color: '#fff', fontSize: 8, fontWeight: 600,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        }}>
+                                            {task.assignee.trim().charAt(0).toUpperCase()}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
-                            {/* 交互式进度手柄 */}
+                            {/* 右侧拉伸手柄 */}
                             {type === 'phase' && (
                                 <div
                                     style={{
-                                        position: 'absolute', left: `${renderProgress}%`, top: -4, bottom: -4,
-                                        width: 12, marginLeft: -6, cursor: 'col-resize', zIndex: 5,
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                        position: 'absolute', right: 0, top: 0, bottom: 0, width: 8,
+                                        cursor: 'ew-resize', zIndex: 3,
+                                        background: isHovered || isSelected ? 'rgba(255,255,255,0.2)' : 'transparent',
+                                        borderRadius: '0 6px 6px 0',
+                                        transition: 'background 0.15s',
                                     }}
-                                    onPointerDown={(e) => { e.stopPropagation(); handleTaskPointerDown(e, task, 'progress'); }}
-                                >
-                                    <CaretRightFilled style={{ 
-                                        color: '#fff', fontSize: 10, transform: 'rotate(90deg)',
-                                        opacity: isHovered || isDragging ? 1 : 0, transition: 'opacity 0.2s',
-                                        filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))'
-                                    }} />
-                                </div>
+                                    onPointerDown={(e) => { e.stopPropagation(); handleTaskPointerDown(e, task, 'resize-right'); }}
+                                    onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.35)'; }}
+                                    onMouseLeave={(e) => { (e.target as HTMLElement).style.background = isHovered || isSelected ? 'rgba(255,255,255,0.2)' : 'transparent'; }}
+                                />
                             )}
-                        </div>
 
-                        <div style={{
-                            position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center',
-                            gap: 5, padding: '0 8px', height: '100%', paddingBottom: 4,
-                            color: '#ffffff', fontSize: 12, fontWeight: 500, pointerEvents: 'none',
-                            textShadow: '0 1px 2px rgba(0,0,0,0.4)',
-                        }}>
-                            <CalendarOutlined style={{ opacity: 0.85, fontSize: 11 }}/>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, pointerEvents: 'auto' }}>
-                                {editingTaskId === task.id ? (
-                                    <input 
-                                        autoFocus value={editingText} onChange={e => setEditingText(e.target.value)}
-                                        onBlur={commitEdit} onKeyDown={handleKeyDown}
-                                        style={{ background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontWeight: 'inherit', fontSize: 'inherit', width: '100%', padding: 0 }}
-                                    />
-                                ) : (
-                                    <span onDoubleClick={(e) => { e.stopPropagation(); setEditingTaskId(task.id); setEditingText(task.name); }}>{task.name}</span>
-                                )}
-                            </span>
-                            {renderProgress > 0 && w > 80 && (
-                                <span style={{ fontSize: 10, opacity: 0.8, fontWeight: 600 }}>{renderProgress}%</span>
-                            )}
-                        </div>
-
-                        {/* 右侧拉伸手柄 */}
-                        {type === 'phase' && (
+                            {/* 连线锚点 (Hover 时显示) */}
                             <div
                                 style={{
-                                    position: 'absolute', right: 0, top: 0, bottom: 0, width: 8,
-                                    cursor: 'ew-resize', zIndex: 3,
-                                    background: isHovered || isSelected ? 'rgba(255,255,255,0.2)' : 'transparent',
-                                    borderRadius: '0 6px 6px 0',
-                                    transition: 'background 0.15s',
+                                    position: 'absolute', right: -16, top: '50%', marginTop: -6, width: 12, height: 12,
+                                    borderRadius: '50%', background: '#fff', border: `2px solid ${isCritical ? '#ff4d4f' : barColor}`,
+                                    cursor: 'crosshair', zIndex: 20,
+                                    opacity: isHovered ? 1 : 0, pointerEvents: isHovered ? 'auto' : 'none',
+                                    transition: 'opacity 0.2s', boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                                 }}
-                                onPointerDown={(e) => { e.stopPropagation(); handleTaskPointerDown(e, task, 'resize-right'); }}
-                                onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.35)'; }}
-                                onMouseLeave={(e) => { (e.target as HTMLElement).style.background = isHovered || isSelected ? 'rgba(255,255,255,0.2)' : 'transparent'; }}
+                                onPointerDown={(e) => { e.stopPropagation(); handleTaskPointerDown(e, task, 'connect'); }}
                             />
-                        )}
+                        </div>
+                    );
+                })();
 
-                        {/* 连线锚点 (Hover 时显示) */}
-                        <div
-                            style={{
-                                position: 'absolute', right: -16, top: '50%', marginTop: -6, width: 12, height: 12,
-                                borderRadius: '50%', background: '#fff', border: `2px solid ${barColor}`,
-                                cursor: 'crosshair', zIndex: 20,
-                                opacity: isHovered ? 1 : 0, pointerEvents: isHovered ? 'auto' : 'none',
-                                transition: 'opacity 0.2s', boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                            }}
-                            onPointerDown={(e) => { e.stopPropagation(); handleTaskPointerDown(e, task, 'connect'); }}
-                        />
-                    </div>
+                return (
+                    <React.Fragment key={task.id}>
+                        {mainBarElement}
+                        {baselineBarElement}
+                    </React.Fragment>
                 );
             })}
 

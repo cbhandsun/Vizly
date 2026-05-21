@@ -37,6 +37,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   rightChildren,
   title,
   setIsCommandOpen,
+  hideCenterIsland = false,
 }) => {
   const { t } = useTranslation();
   const screens = Grid.useBreakpoint();
@@ -150,10 +151,12 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
       <div className="flex-1 flex items-center justify-center min-w-0">
         <div className="flex items-center gap-2 max-w-full">
           {/* Core Tools Pill */}
-          <div className={`${islandBaseClass} px-2 shrink-0`}>
-            {centerChildren}
-            <div id="vizly-plugin-center-island-portal" className="flex items-center gap-0.5 empty:hidden" />
-          </div>
+          {!hideCenterIsland && (
+            <div className={`${islandBaseClass} px-2 shrink-0`}>
+              {centerChildren}
+              <div id="vizly-plugin-center-island-portal" className="flex items-center gap-0.5 empty:hidden" />
+            </div>
+          )}
 
           {/* Contextual Toolbar Pill (Dynamic Actions) */}
           <div 

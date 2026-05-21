@@ -61,6 +61,10 @@ export interface TopToolbarProps {
    * 顶部标题文案（可选）
    */
   title?: string;
+  /**
+   * 是否彻底隐藏统一设计器的中间主工具栏（如缩放、网格等）
+   */
+  hideCenterIsland?: boolean;
 }
 
 /**

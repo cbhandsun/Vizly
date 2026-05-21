@@ -69,6 +69,7 @@ interface FlowchartToolbarProps {
     hideLayoutControls?: boolean;
     hideGridControls?: boolean;
     hideFlowFocusControls?: boolean;
+    hideUndoRedoControls?: boolean;
     // --- 文件操作 (File IO) ---
     onImportClick?: () => void;
     onExport?: () => void;
@@ -127,6 +128,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     hideLayoutControls,
     hideGridControls,
     hideFlowFocusControls,
+    hideUndoRedoControls,
     isDrawingMode,
     isMarqueeActive,
     toggleSelectionMode,
@@ -483,7 +485,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     const MainWorkflowTools = (
         <div className="flex items-center gap-0.5">
             {/* ── Undo / Redo ── */}
-            {!isMobile && (
+            {!isMobile && !hideUndoRedoControls && (
                 <>
                     <Tooltip title={t('designer.toolbar.undo')}>
                         <Button type="text" icon={<FaUndo size={13} />} onClick={onUndo} disabled={!canUndo} className={canUndo ? tbtn : tbtnDisabled} />

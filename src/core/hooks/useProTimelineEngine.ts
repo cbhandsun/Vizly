@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+export type ProTimelineViewMode = 'day' | 'week' | 'month' | 'quarter';
+
 export interface ProGanttTask {
   id: string;
   name: string;
@@ -13,6 +15,14 @@ export interface ProGanttTask {
   // WBS / Hierarchy fields
   parentId?: string;
   isExpanded?: boolean;
+  
+  // Custom metadata fields
+  assignee?: string;
+  priority?: 'high' | 'medium' | 'low';
+
+  // Baseline metadata fields
+  baselineStartDate?: string;
+  baselineEndDate?: string;
 
   // Computed output
   _computed?: {
@@ -133,14 +143,20 @@ export function calculateSwimlanes(tasks: ProGanttTask[]): ProGanttTask[] {
 // Global engine store
 interface ProTimelineState {
   pixelsPerDay: number;
-  zoomLevel: number; // 1 = daily, 0.5 = weekly, 0.1 = monthly, etc.
+  zoomLevel: number; // For micro-zooming inside the current viewMode
+  viewMode: ProTimelineViewMode;
   panX: number;
   panY: number;
+  showCriticalPath: boolean;
+  showBaseline: boolean;
   setPan: (x: number, y: number) => void;
   setPanByDelta: (dx: number, dy: number) => void;
   setZoom: (zoom: number) => void;
+  setViewMode: (mode: ProTimelineViewMode) => void;
   dateToX: (isoDate: string) => number;
   xToDate: (x: number) => string;
+  toggleCriticalPath: () => void;
+  toggleBaseline: () => void;
 }
 
 const BASE_PIXELS_PER_DAY = 24;
@@ -148,11 +164,41 @@ const BASE_PIXELS_PER_DAY = 24;
 export const useProTimelineEngine = create<ProTimelineState>((set, get) => ({
   pixelsPerDay: BASE_PIXELS_PER_DAY,
   zoomLevel: 1,
+  viewMode: 'day',
   panX: 0,
   panY: 0,
+  showCriticalPath: false,
+  showBaseline: false,
   setPan: (x, y) => set({ panX: x, panY: y }),
   setPanByDelta: (dx, dy) => set(s => ({ panX: s.panX + dx, panY: s.panY + dy })),
-  setZoom: (zoom) => set({ zoomLevel: zoom, pixelsPerDay: BASE_PIXELS_PER_DAY * zoom }),
+  toggleCriticalPath: () => set(s => ({ showCriticalPath: !s.showCriticalPath })),
+  toggleBaseline: () => set(s => ({ showBaseline: !s.showBaseline })),
+  
+  setZoom: (zoom) => set(s => {
+      const modePixels: Record<ProTimelineViewMode, number> = {
+          day: 24,
+          week: 6,
+          month: 1.8,
+          quarter: 0.6
+      };
+      const basePx = modePixels[s.viewMode] || 24;
+      return { zoomLevel: zoom, pixelsPerDay: basePx * zoom };
+  }),
+
+  setViewMode: (mode) => set(() => {
+      const modePixels: Record<ProTimelineViewMode, number> = {
+          day: 24,
+          week: 6,
+          month: 1.8,
+          quarter: 0.6
+      };
+      const basePx = modePixels[mode] || 24;
+      return {
+          viewMode: mode,
+          zoomLevel: 1,
+          pixelsPerDay: basePx
+      };
+  }),
   
   dateToX: (isoDate: string) => {
       const { pixelsPerDay } = get();
@@ -173,3 +219,232 @@ export const useProTimelineEngine = create<ProTimelineState>((set, get) => ({
       return d.toISOString().split('T')[0];
   }
 }));
+
+// ===== 工作日避让与工期联动辅助函数 =====
+
+export function isWeekend(dateStr: string): boolean {
+  const d = new Date(dateStr);
+  const day = d.getDay();
+  return day === 0 || day === 6;
+}
+
+export function adjustToWorkDay(dateStr: string, direction: 'forward' | 'backward' = 'forward'): string {
+  const d = new Date(dateStr);
+  while (d.getDay() === 0 || d.getDay() === 6) {
+      d.setDate(d.getDate() + (direction === 'forward' ? 1 : -1));
+  }
+  return d.toISOString().split('T')[0];
+}
+
+export function addWorkDays(startDateStr: string, workDays: number): string {
+  if (workDays <= 1) {
+      return adjustToWorkDay(startDateStr, 'forward');
+  }
+  let currentStr = adjustToWorkDay(startDateStr, 'forward');
+  const d = new Date(currentStr);
+  let added = 1;
+  while (added < workDays) {
+      d.setDate(d.getDate() + 1);
+      const day = d.getDay();
+      if (day !== 0 && day !== 6) {
+          added++;
+      }
+  }
+  return d.toISOString().split('T')[0];
+}
+
+export function getWorkDays(startDateStr: string, endDateStr: string): number {
+  const start = new Date(startDateStr);
+  const end = new Date(endDateStr);
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || start.getTime() > end.getTime()) {
+      return 0;
+  }
+  let workDays = 0;
+  const current = new Date(start);
+  while (current.getTime() <= end.getTime()) {
+      const day = current.getDay();
+      if (day !== 0 && day !== 6) {
+          workDays++;
+      }
+      current.setDate(current.getDate() + 1);
+  }
+  return workDays;
+}
+
+export function getWorkDaysSigned(startStr: string, endStr: string): number {
+  const s = new Date(startStr);
+  const e = new Date(endStr);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
+  if (s.toISOString().split('T')[0] === e.toISOString().split('T')[0]) return 0;
+  
+  if (s.getTime() < e.getTime()) {
+      let count = 0;
+      const curr = new Date(s);
+      while (curr.getTime() < e.getTime()) {
+          const day = curr.getDay();
+          if (day !== 0 && day !== 6) {
+              count++;
+          }
+          curr.setDate(curr.getDate() + 1);
+      }
+      return count;
+  } else {
+      let count = 0;
+      const curr = new Date(e);
+      while (curr.getTime() < s.getTime()) {
+          const day = curr.getDay();
+          if (day !== 0 && day !== 6) {
+              count++;
+          }
+          curr.setDate(curr.getDate() + 1);
+      }
+      return -count;
+  }
+}
+
+export function addWorkDaysSigned(startDateStr: string, workDays: number): string {
+  if (workDays === 0) {
+      return adjustToWorkDay(startDateStr, 'forward');
+  }
+  let currentStr = adjustToWorkDay(startDateStr, workDays > 0 ? 'forward' : 'backward');
+  const d = new Date(currentStr);
+  let count = 0;
+  const absWorkDays = Math.abs(workDays);
+  while (count < absWorkDays) {
+      d.setDate(d.getDate() + (workDays > 0 ? 1 : -1));
+      const day = d.getDay();
+      if (day !== 0 && day !== 6) {
+          count++;
+      }
+  }
+  return d.toISOString().split('T')[0];
+}
+
+// ===== 关键路径 CPM 算法 =====
+
+export function calculateCriticalPath(
+  tasks: { id: string; startDate: string; endDate: string; type?: string }[],
+  edges: { source: string; target: string }[]
+): Set<string> {
+  const criticalSet = new Set<string>();
+  
+  const leafTasks = tasks.filter(t => t.type !== 'summary' && t.startDate && t.endDate);
+  if (leafTasks.length === 0) return criticalSet;
+
+  let projectStartStr = leafTasks[0].startDate;
+  leafTasks.forEach(t => {
+      if (t.startDate < projectStartStr) {
+          projectStartStr = t.startDate;
+      }
+  });
+
+  const nodeMap = new Map<string, {
+      id: string;
+      duration: number;
+      es: number;
+      ee: number;
+      ls: number;
+      le: number;
+      preds: string[];
+      succs: string[];
+  }>();
+
+  leafTasks.forEach(t => {
+      const dur = getWorkDays(t.startDate, t.endDate);
+      const initialES = getWorkDaysSigned(projectStartStr, t.startDate);
+      nodeMap.set(t.id, {
+          id: t.id,
+          duration: t.type === 'milestone' ? 0 : Math.max(1, dur),
+          es: initialES,
+          ee: initialES + (t.type === 'milestone' ? 0 : Math.max(1, dur)),
+          ls: 0,
+          le: 0,
+          preds: [],
+          succs: []
+      });
+  });
+
+  edges.forEach(e => {
+      if (nodeMap.has(e.source) && nodeMap.has(e.target)) {
+          nodeMap.get(e.source)!.succs.push(e.target);
+          nodeMap.get(e.target)!.preds.push(e.source);
+      }
+  });
+
+  const inDegree = new Map<string, number>();
+  nodeMap.forEach((node, id) => {
+      inDegree.set(id, node.preds.length);
+  });
+
+  const queue: string[] = [];
+  inDegree.forEach((deg, id) => {
+      if (deg === 0) queue.push(id);
+  });
+
+  const topoOrder: string[] = [];
+  while (queue.length > 0) {
+      const u = queue.shift()!;
+      topoOrder.push(u);
+      
+      const node = nodeMap.get(u)!;
+      node.succs.forEach(vId => {
+          const currentDeg = inDegree.get(vId)! - 1;
+          inDegree.set(vId, currentDeg);
+          if (currentDeg === 0) {
+              queue.push(vId);
+          }
+      });
+  }
+
+  if (topoOrder.length < nodeMap.size) {
+      return criticalSet;
+  }
+
+  topoOrder.forEach(uId => {
+      const u = nodeMap.get(uId)!;
+      let maxEEOfPreds = u.es;
+      u.preds.forEach(pId => {
+          const p = nodeMap.get(pId)!;
+          if (p.ee > maxEEOfPreds) {
+              maxEEOfPreds = p.ee;
+          }
+      });
+      u.es = maxEEOfPreds;
+      u.ee = u.es + u.duration;
+  });
+
+  let projectEnd = 0;
+  nodeMap.forEach(node => {
+      if (node.ee > projectEnd) {
+          projectEnd = node.ee;
+      }
+  });
+
+  for (let i = topoOrder.length - 1; i >= 0; i--) {
+      const uId = topoOrder[i];
+      const u = nodeMap.get(uId)!;
+      
+      if (u.succs.length === 0) {
+          u.le = projectEnd;
+      } else {
+          let minLSOfSuccs = Infinity;
+          u.succs.forEach(sId => {
+              const s = nodeMap.get(sId)!;
+              if (s.ls < minLSOfSuccs) {
+                  minLSOfSuccs = s.ls;
+              }
+          });
+          u.le = minLSOfSuccs;
+      }
+      u.ls = u.le - u.duration;
+  }
+
+  nodeMap.forEach((node, id) => {
+      const totalSlack = node.ls - node.es;
+      if (totalSlack <= 0) {
+          criticalSet.add(id);
+      }
+  });
+
+  return criticalSet;
+}

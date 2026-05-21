@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { ProGanttTask } from '../../../hooks/useProTimelineEngine';
-import { Dropdown, MenuProps } from 'antd';
-import { CaretRightOutlined, CaretDownOutlined, CalendarOutlined, FlagFilled, ClockCircleOutlined, FolderOpenOutlined, PlusOutlined } from '@ant-design/icons';
+import { ProGanttTask, getWorkDays, addWorkDays, getWorkDaysSigned, useProTimelineEngine } from '../../../hooks/useProTimelineEngine';
+import { Dropdown, MenuProps, Select } from 'antd';
+import { CaretRightOutlined, CaretDownOutlined, CalendarOutlined, FlagFilled, ClockCircleOutlined, FolderOpenOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useTheme } from '../../../themes/useCoreTheme';
 
 export interface ProTaskListPanelProps {
@@ -17,6 +17,7 @@ export interface ProTaskListPanelProps {
     onTaskExpandToggle?: (id: string) => void;
     onTaskUpdate?: (id: string, updates: Partial<ProGanttTask>) => void;
     onTaskAdd?: (parentId: string | null, type: 'phase' | 'milestone') => void;
+    onTaskDelete?: (id: string) => void;
 }
 
 const ROW_HEIGHT = 42;
@@ -37,13 +38,14 @@ const getTypeIcons = (theme: any): Record<string, React.ReactNode> => ({
 
 export default function ProTaskListPanel({
     tasks, width, onWidthChange, hoveredTaskId, onHoverTask, onClickTask, selectedTaskId, scrollTop, onScrollTopChange,
-    onTaskExpandToggle, onTaskUpdate, onTaskAdd
+    onTaskExpandToggle, onTaskUpdate, onTaskAdd, onTaskDelete
 }: ProTaskListPanelProps) {
     const [isResizing, setIsResizing] = useState(false);
-    const [editingCell, setEditingCell] = useState<{ id: string, field: 'name' | 'startDate' | 'duration' } | null>(null);
+    const [editingCell, setEditingCell] = useState<{ id: string, field: 'name' | 'startDate' | 'duration' | 'assignee' | 'priority' } | null>(null);
     const [editValue, setEditValue] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
     const [theme] = useTheme();
+    const { showBaseline } = useProTimelineEngine();
 
     const isDark = theme?.mode === 'dark';
     const panelBg = theme?.palette?.neutral?.background || (isDark ? '#141414' : '#fff');
@@ -62,19 +64,50 @@ export default function ProTaskListPanel({
     useEffect(() => {
         if (editingCell && inputRef.current) {
             inputRef.current.focus();
-            if (editingCell.field === 'name') {
+            if (editingCell.field === 'name' || editingCell.field === 'assignee') {
                 inputRef.current.select();
             }
         }
     }, [editingCell]);
 
+    const getAvatarColor = useCallback((name: string) => {
+        const colors = [
+            '#1890ff', '#2f54eb', '#722ed1', '#eb2f96', '#fa8c16',
+            '#faad14', '#a0d911', '#52c41a', '#13c2c2'
+        ];
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) {
+            hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const idx = Math.abs(hash) % colors.length;
+        return colors[idx];
+    }, []);
+
+    const priorityTag = useCallback((priority?: 'high' | 'medium' | 'low') => {
+        if (!priority) return <span style={{ color: disabledTextColor }}>—</span>;
+        const config = {
+            high: { bg: isDark ? 'rgba(255,77,79,0.15)' : '#fff1f0', border: isDark ? 'rgba(255,77,79,0.3)' : '#ffa39e', text: '#ff4d4f', label: '高' },
+            medium: { bg: isDark ? 'rgba(250,140,22,0.15)' : '#fff7e6', border: isDark ? 'rgba(250,140,22,0.3)' : '#ffd591', text: '#fa8c16', label: '中' },
+            low: { bg: isDark ? 'rgba(24,144,255,0.15)' : '#e6f7ff', border: isDark ? 'rgba(24,144,255,0.3)' : '#91d5ff', text: '#1890ff', label: '低' },
+        };
+        const c = config[priority];
+        return (
+            <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                background: c.bg, border: `1px solid ${c.border}`, color: c.text,
+                lineHeight: 1
+            }}>
+                {c.label}
+            </span>
+        );
+    }, [isDark, disabledTextColor]);
+
     // 计算每个任务的工期天数 (Helper for edit compute)
     const getDuration = useCallback((t: ProGanttTask) => {
         if (t.type === 'milestone') return 0;
         if (!t.startDate || !t.endDate) return null;
-        const d1 = new Date(t.startDate).getTime();
-        const d2 = new Date(t.endDate).getTime();
-        return Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+        return getWorkDays(t.startDate, t.endDate);
     }, []);
 
     // Save and commit edit
@@ -88,23 +121,23 @@ export default function ProTaskListPanel({
                     onTaskUpdate?.(id, { name: editValue.trim() });
                 } else if (field === 'startDate' && editValue) {
                     const oldDur = getDuration(task) || 1;
-                    const d1 = new Date(editValue);
                     if (task.type === 'milestone') {
                         onTaskUpdate?.(id, { startDate: editValue, endDate: editValue });
                     } else {
-                        d1.setDate(d1.getDate() + oldDur);
-                        const newEnd = d1.toISOString().split('T')[0];
+                        const newEnd = addWorkDays(editValue, oldDur);
                         onTaskUpdate?.(id, { startDate: editValue, endDate: newEnd });
                     }
                 } else if (field === 'duration') {
                     const num = parseInt(editValue, 10);
                     if (!isNaN(num) && num >= 0) {
                         const start = task.startDate || new Date().toISOString().split('T')[0];
-                        const d1 = new Date(start);
-                        d1.setDate(d1.getDate() + num);
-                        const newEnd = d1.toISOString().split('T')[0];
+                        const newEnd = addWorkDays(start, num);
                         onTaskUpdate?.(id, { startDate: start, endDate: newEnd });
                     }
+                } else if (field === 'assignee') {
+                    onTaskUpdate?.(id, { assignee: editValue.trim() || undefined });
+                } else if (field === 'priority') {
+                    onTaskUpdate?.(id, { priority: (editValue || undefined) as any });
                 }
             }
         }
@@ -125,7 +158,7 @@ export default function ProTaskListPanel({
         const startW = width;
 
         const onMove = (ev: PointerEvent) => {
-            const newW = Math.max(200, Math.min(500, startW + (ev.clientX - startX)));
+            const newW = Math.max(280, Math.min(650, startW + (ev.clientX - startX)));
             onWidthChange(newW);
         };
         const onUp = () => {
@@ -140,7 +173,7 @@ export default function ProTaskListPanel({
 
     return (
         <div style={{
-            width, minWidth: 200, maxWidth: 500,
+            width, minWidth: 280, maxWidth: 650,
             borderRight: `1px solid ${borderColor}`,
             background: panelBg,
             display: 'flex', flexDirection: 'column',
@@ -156,9 +189,11 @@ export default function ProTaskListPanel({
                 letterSpacing: '0.5px', textTransform: 'uppercase',
                 flexShrink: 0,
             }}>
-                <span style={{ flex: 1 }}>任务名称</span>
-                <span style={{ width: 62, textAlign: 'right' }}>开始</span>
-                <span style={{ width: 46, textAlign: 'right' }}>工期</span>
+                <span style={{ flex: 1, minWidth: 120 }}>任务名称</span>
+                <span style={{ width: 75, textAlign: 'left', paddingLeft: 8 }}>负责人</span>
+                <span style={{ width: 65, textAlign: 'center' }}>优先级</span>
+                <span style={{ width: 80, textAlign: 'right', paddingRight: 8 }}>开始</span>
+                <span style={{ width: 44, textAlign: 'right' }}>工期</span>
             </div>
 
             {/* 任务行 (可滚动) */}
@@ -257,38 +292,156 @@ export default function ProTaskListPanel({
                                 )}
                             </div>
 
-                            {/* Hover Quick Add Menu */}
+                            {/* Hover Quick Add Menu & Delete Button */}
                             {isHovered && (
-                                <Dropdown
-                                    menu={{
-                                        items: [
-                                            { key: 'phase', icon: <FolderOpenOutlined />, label: '添加子阶段 (Phase)' },
-                                            { key: 'milestone', icon: <FlagFilled />, label: '添加里程碑 (Milestone)' }
-                                        ],
-                                        onClick: ({ key }) => {
-                                            if (onTaskAdd) onTaskAdd(task.id, key as any);
-                                        }
-                                    }}
-                                    trigger={['click']}
-                                    placement="bottomRight"
-                                >
-                                    <div 
-                                        style={{ width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 4, color: primaryColor, opacity: 0.8 }}
-                                        onClick={e => e.stopPropagation()}
-                                        onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : '#e6f7ff'}
-                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                                    <Dropdown
+                                        menu={{
+                                            items: [
+                                                { key: 'phase', icon: <FolderOpenOutlined />, label: '添加子阶段 (Phase)' },
+                                                { key: 'milestone', icon: <FlagFilled />, label: '添加里程碑 (Milestone)' }
+                                            ],
+                                            onClick: ({ key }) => {
+                                                if (onTaskAdd) onTaskAdd(task.id, key as any);
+                                            }
+                                        }}
+                                        trigger={['click']}
+                                        placement="bottomRight"
                                     >
-                                        <PlusOutlined style={{ fontSize: 13 }} />
+                                        <div 
+                                            style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 4, color: primaryColor, opacity: 0.8 }}
+                                            onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.1)' : '#e6f7ff'}
+                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                            title="添加子项"
+                                        >
+                                            <PlusOutlined style={{ fontSize: 12 }} />
+                                        </div>
+                                    </Dropdown>
+
+                                    <div 
+                                        style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderRadius: 4, color: theme?.palette?.error?.main || '#ff4d4f', opacity: 0.8 }}
+                                        onClick={(e) => { e.stopPropagation(); onTaskDelete?.(task.id); }}
+                                        onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,77,79,0.15)' : '#fff1f0'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                        title="删除该任务及其所有子任务"
+                                    >
+                                        <DeleteOutlined style={{ fontSize: 12 }} />
                                     </div>
-                                </Dropdown>
+                                </div>
                             )}
+
+                            {/* Assignee */}
+                            <div 
+                                style={{
+                                    width: 75, height: '100%', display: 'flex', alignItems: 'center',
+                                    paddingLeft: 8, flexShrink: 0, minWidth: 0,
+                                }}
+                            >
+                                {editingCell?.id === task.id && editingCell?.field === 'assignee' ? (
+                                    <input
+                                        ref={inputRef}
+                                        value={editValue}
+                                        onChange={e => setEditValue(e.target.value)}
+                                        onBlur={commitEdit}
+                                        onKeyDown={handleKeyDown}
+                                        style={{
+                                            width: '100%', border: `1px solid ${primaryColor}`, borderRadius: 4, 
+                                            padding: '2px 4px', fontSize: 12, outline: 'none',
+                                            background: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
+                                            color: rowTextColorPrimary,
+                                            boxShadow: `0 0 0 2px ${primaryColor}33`
+                                        }}
+                                    />
+                                ) : (
+                                    <div 
+                                        style={{ 
+                                            display: 'flex', alignItems: 'center', gap: 6, 
+                                            width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' 
+                                        }}
+                                        onDoubleClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingCell({ id: task.id, field: 'assignee' });
+                                            setEditValue(task.assignee || '');
+                                        }}
+                                    >
+                                        {task.assignee ? (
+                                            <>
+                                                <div style={{
+                                                    width: 20, height: 20, borderRadius: '50%',
+                                                    backgroundColor: getAvatarColor(task.assignee),
+                                                    color: '#fff', fontSize: 10, fontWeight: 600,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    flexShrink: 0
+                                                }}>
+                                                    {task.assignee.trim().charAt(0).toUpperCase()}
+                                                </div>
+                                                <span style={{ fontSize: 12, color: rowTextColorPrimary, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {task.assignee}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <span style={{ color: disabledTextColor, fontSize: 12 }}>—</span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Priority */}
+                            <div 
+                                style={{
+                                    width: 65, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    flexShrink: 0,
+                                }}
+                            >
+                                {editingCell?.id === task.id && editingCell?.field === 'priority' ? (
+                                    <Select
+                                        size="small"
+                                        value={task.priority || undefined}
+                                        bordered={false}
+                                        open={true}
+                                        onDropdownVisibleChange={(open) => {
+                                            if (!open) {
+                                                setTimeout(() => setEditingCell(null), 150);
+                                            }
+                                        }}
+                                        onChange={(val) => {
+                                            onTaskUpdate?.(task.id, { priority: val || undefined });
+                                            setEditingCell(null);
+                                        }}
+                                        style={{ width: '100%', fontSize: 11 }}
+                                        dropdownStyle={{ zIndex: 10000 }}
+                                        placeholder="选择"
+                                        allowClear
+                                        options={[
+                                            { value: 'high', label: '高' },
+                                            { value: 'medium', label: '中' },
+                                            { value: 'low', label: '低' },
+                                        ]}
+                                    />
+                                ) : (
+                                    <div 
+                                        style={{ 
+                                            display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%'
+                                        }}
+                                        onDoubleClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingCell({ id: task.id, field: 'priority' });
+                                            setEditValue(task.priority || '');
+                                        }}
+                                    >
+                                        {priorityTag(task.priority)}
+                                    </div>
+                                )}
+                            </div>
 
                             <div 
                                 style={{
                                     width: 80, textAlign: 'right', fontSize: 11,
                                     color: hasChildren ? disabledTextColor : rowTextColorSecondary, fontVariantNumeric: 'tabular-nums',
-                                    flexShrink: 0, paddingRight: 8, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-                                    cursor: hasChildren ? 'not-allowed' : 'text'
+                                    flexShrink: 0, paddingRight: 8, height: '100%', 
+                                    display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center',
+                                    cursor: hasChildren ? 'not-allowed' : 'text',
+                                    lineHeight: 1.2
                                 }}
                                 onDoubleClick={(e) => {
                                     e.stopPropagation();
@@ -315,7 +468,15 @@ export default function ProTaskListPanel({
                                         }}
                                     />
                                 ) : (
-                                    dateLabel
+                                    <>
+                                        <div>{dateLabel}</div>
+                                        {showBaseline && task.baselineStartDate && (() => {
+                                            const diff = getWorkDaysSigned(task.baselineStartDate, task.startDate);
+                                            if (diff > 0) return <div style={{ fontSize: 9, color: '#ff4d4f', whiteSpace: 'nowrap', marginTop: 1, fontWeight: 600 }}>迟 {diff} 天</div>;
+                                            if (diff < 0) return <div style={{ fontSize: 9, color: '#52c41a', whiteSpace: 'nowrap', marginTop: 1, fontWeight: 600 }}>提 {-diff} 天</div>;
+                                            return <div style={{ fontSize: 9, color: rowTextColorSecondary, opacity: 0.6, whiteSpace: 'nowrap', marginTop: 1 }}>对齐</div>;
+                                        })()}
+                                    </>
                                 )}
                             </div>
 

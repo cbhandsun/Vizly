@@ -183,6 +183,10 @@ export interface DiagramTypePlugin {
   hideGridControls?: boolean;
   /** 隐藏通用工具条中的主链路（高亮/精简）功能组按钮 */
   hideFlowFocusControls?: boolean;
+  /** 隐藏通用工具条中的撤销/重做/历史控制键 */
+  hideUndoRedoControls?: boolean;
+  /** 完全隐藏统一设计器的中间主工具栏 (通常对于第三方自渲染画布有用) */
+  hideCenterIsland?: boolean;
 
   // ====== 行为 ======
   /** 节点拖入画布时的默认数据工厂 */

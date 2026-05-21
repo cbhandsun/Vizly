@@ -6,7 +6,7 @@ import { useTheme } from '../../../themes/useCoreTheme';
 const HEADER_HEIGHT = 52;
 
 export default function ProTimelineAxis() {
-    const { panX, panY, pixelsPerDay, xToDate, dateToX } = useProTimelineEngine();
+    const { panX, panY, pixelsPerDay, xToDate, dateToX, viewMode } = useProTimelineEngine();
     const [theme] = useTheme();
     
     // Virtualize rendering window
@@ -27,50 +27,145 @@ export default function ProTimelineAxis() {
     const weekendBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)';
 
     const { days, months } = useMemo(() => {
-        const dArr: { x: number; w: number; label: string; isWeekend: boolean; isToday: boolean; isMonthStart: boolean; key: string }[] = [];
+        const dArr: { x: number; w: number; label: string; isWeekend?: boolean; isToday?: boolean; isMonthStart?: boolean; key: string }[] = [];
         const mArr: { x: number; w: number; label: string; key: string }[] = [];
 
         const startD = dayjs(xToDate(windowStartPx));
         const endD = dayjs(xToDate(windowEndPx));
         const today = dayjs().format('YYYY-MM-DD');
-        
-        // Months
-        let cursorM = startD.startOf('month');
-        while (cursorM.isBefore(endD) || cursorM.isSame(endD, 'month')) {
-            const nextM = cursorM.add(1, 'month');
-            const x1 = dateToX(cursorM.format('YYYY-MM-DD'));
-            const x2 = dateToX(nextM.format('YYYY-MM-DD'));
-            mArr.push({
-                x: x1, w: x2 - x1,
-                label: cursorM.format('YYYY年 M月'),
-                key: cursorM.format('YYYY-MM')
-            });
-            cursorM = nextM;
-        }
 
-        // Days (switch to weeks if too dense)
-        const showWeeks = pixelsPerDay < 10;
-        let cursorD = showWeeks ? startD.day(0) : startD.startOf('day');
-        while (cursorD.isBefore(endD) || cursorD.isSame(endD, 'day')) {
-            const nextD = showWeeks ? cursorD.add(7, 'day') : cursorD.add(1, 'day');
-            const x1 = dateToX(cursorD.format('YYYY-MM-DD'));
-            const x2 = dateToX(nextD.format('YYYY-MM-DD'));
-            const dow = cursorD.day();
-            const isWeekend = dow === 0 || dow === 6;
-            const isToday = cursorD.format('YYYY-MM-DD') === today;
-            const isMonthStart = cursorD.date() === 1;
-            
-            dArr.push({
-                x: x1, w: x2 - x1,
-                label: showWeeks ? cursorD.format('M/D') : cursorD.format('DD'),
-                isWeekend, isToday, isMonthStart,
-                key: cursorD.format('YYYY-MM-DD')
-            });
-            cursorD = nextD;
+        if (viewMode === 'day') {
+            // Months
+            let cursorM = startD.startOf('month');
+            while (cursorM.isBefore(endD) || cursorM.isSame(endD, 'month')) {
+                const nextM = cursorM.add(1, 'month');
+                const x1 = dateToX(cursorM.format('YYYY-MM-DD'));
+                const x2 = dateToX(nextM.format('YYYY-MM-DD'));
+                mArr.push({
+                    x: x1, w: x2 - x1,
+                    label: cursorM.format('YYYY年 M月'),
+                    key: cursorM.format('YYYY-MM')
+                });
+                cursorM = nextM;
+            }
+
+            // Days
+            let cursorD = startD.startOf('day');
+            while (cursorD.isBefore(endD) || cursorD.isSame(endD, 'day')) {
+                const nextD = cursorD.add(1, 'day');
+                const x1 = dateToX(cursorD.format('YYYY-MM-DD'));
+                const x2 = dateToX(nextD.format('YYYY-MM-DD'));
+                const dow = cursorD.day();
+                const isWeekend = dow === 0 || dow === 6;
+                const isToday = cursorD.format('YYYY-MM-DD') === today;
+                const isMonthStart = cursorD.date() === 1;
+
+                dArr.push({
+                    x: x1, w: x2 - x1,
+                    label: cursorD.format('DD'),
+                    isWeekend, isToday, isMonthStart,
+                    key: cursorD.format('YYYY-MM-DD')
+                });
+                cursorD = nextD;
+            }
+        } else if (viewMode === 'week') {
+            // Months
+            let cursorM = startD.startOf('month');
+            while (cursorM.isBefore(endD) || cursorM.isSame(endD, 'month')) {
+                const nextM = cursorM.add(1, 'month');
+                const x1 = dateToX(cursorM.format('YYYY-MM-DD'));
+                const x2 = dateToX(nextM.format('YYYY-MM-DD'));
+                mArr.push({
+                    x: x1, w: x2 - x1,
+                    label: cursorM.format('YYYY年 M月'),
+                    key: cursorM.format('YYYY-MM')
+                });
+                cursorM = nextM;
+            }
+
+            // Weeks
+            let cursorW = startD.day(1); // Monday
+            while (cursorW.isBefore(endD) || cursorW.isSame(endD, 'day')) {
+                const nextW = cursorW.add(7, 'day');
+                const x1 = dateToX(cursorW.format('YYYY-MM-DD'));
+                const x2 = dateToX(nextW.format('YYYY-MM-DD'));
+                const isToday = dayjs().isBetween(cursorW, nextW, 'day', '[)');
+
+                dArr.push({
+                    x: x1, w: x2 - x1,
+                    label: cursorW.format('M/D'),
+                    isToday,
+                    key: cursorW.format('YYYY-MM-DD')
+                });
+                cursorW = nextW;
+            }
+        } else if (viewMode === 'month') {
+            // Years
+            let cursorY = startD.startOf('year');
+            while (cursorY.isBefore(endD) || cursorY.isSame(endD, 'year')) {
+                const nextY = cursorY.add(1, 'year');
+                const x1 = dateToX(cursorY.format('YYYY-MM-DD'));
+                const x2 = dateToX(nextY.format('YYYY-MM-DD'));
+                mArr.push({
+                    x: x1, w: x2 - x1,
+                    label: cursorY.format('YYYY年'),
+                    key: cursorY.format('YYYY')
+                });
+                cursorY = nextY;
+            }
+
+            // Months
+            let cursorM = startD.startOf('month');
+            while (cursorM.isBefore(endD) || cursorM.isSame(endD, 'month')) {
+                const nextM = cursorM.add(1, 'month');
+                const x1 = dateToX(cursorM.format('YYYY-MM-DD'));
+                const x2 = dateToX(nextM.format('YYYY-MM-DD'));
+                const isToday = dayjs().format('YYYY-MM') === cursorM.format('YYYY-MM');
+
+                dArr.push({
+                    x: x1, w: x2 - x1,
+                    label: cursorM.format('M月'),
+                    isToday,
+                    key: cursorM.format('YYYY-MM')
+                });
+                cursorM = nextM;
+            }
+        } else if (viewMode === 'quarter') {
+            // Years
+            let cursorY = startD.startOf('year');
+            while (cursorY.isBefore(endD) || cursorY.isSame(endD, 'year')) {
+                const nextY = cursorY.add(1, 'year');
+                const x1 = dateToX(cursorY.format('YYYY-MM-DD'));
+                const x2 = dateToX(nextY.format('YYYY-MM-DD'));
+                mArr.push({
+                    x: x1, w: x2 - x1,
+                    label: cursorY.format('YYYY年'),
+                    key: cursorY.format('YYYY')
+                });
+                cursorY = nextY;
+            }
+
+            // Quarters
+            let cursorQ = startD.startOf('quarter');
+            while (cursorQ.isBefore(endD) || cursorQ.isSame(endD, 'quarter')) {
+                const nextQ = cursorQ.add(1, 'quarter');
+                const x1 = dateToX(cursorQ.format('YYYY-MM-DD'));
+                const x2 = dateToX(nextQ.format('YYYY-MM-DD'));
+                const qNum = Math.floor(cursorQ.month() / 3) + 1;
+                const isToday = dayjs().isBetween(cursorQ, nextQ, 'day', '[)');
+
+                dArr.push({
+                    x: x1, w: x2 - x1,
+                    label: `Q${qNum}`,
+                    isToday,
+                    key: `${cursorQ.format('YYYY')}-Q${qNum}`
+                });
+                cursorQ = nextQ;
+            }
         }
 
         return { days: dArr, months: mArr };
-    }, [windowStartPx, windowEndPx, pixelsPerDay, xToDate, dateToX]);
+    }, [windowStartPx, windowEndPx, viewMode, pixelsPerDay, xToDate, dateToX]);
 
     return (
         <div style={{

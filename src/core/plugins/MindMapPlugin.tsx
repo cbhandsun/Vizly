@@ -151,8 +151,9 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
     hideGridControls = true;
     hideLayoutControls = true;
     hideFlowFocusControls = true;
-    // Also hide the bottom toolbar's undo/redo and zoom (mind-elixir handles them)
-    hideZoomControls = false;  // Keep zoom for pan/zoom convenience
+    hideZoomControls = true;
+    hideUndoRedoControls = true;
+    hideCenterIsland = true;
 
     // ── Initial State ─────────────────────────────────────────────────────────
     getEmptyState() {

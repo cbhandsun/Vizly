@@ -1,27 +1,56 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useNodes, useEdges, useReactFlow } from '@xyflow/react';
-import { useProTimelineEngine, calculateSwimlanes, ProGanttTask } from '../../../hooks/useProTimelineEngine';
+import { 
+  useProTimelineEngine, 
+  calculateSwimlanes, 
+  ProGanttTask,
+  adjustToWorkDay,
+  addWorkDays,
+  getWorkDays,
+  getWorkDaysSigned,
+  addWorkDaysSigned,
+  calculateCriticalPath
+} from '../../../hooks/useProTimelineEngine';
 import ProTimelineAxis from './ProTimelineAxis';
 import ProTaskLayer from './ProTaskLayer';
 import ProDependencyLayer from './ProDependencyLayer';
 import ProTaskListPanel from './ProTaskListPanel';
+import { ProResourceDrawer } from './ProResourceDrawer';
 import dayjs from 'dayjs';
 import { useTheme } from '../../../themes/useCoreTheme';
+import { appMessage } from '../../../utils/antdStaticBridge';
 
-import { ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons';
-import { Button, Tooltip } from 'antd';
+import { ZoomInOutlined, ZoomOutOutlined, CameraOutlined, DeleteOutlined, BranchesOutlined, HistoryOutlined, TeamOutlined } from '@ant-design/icons';
+import { Button, Tooltip, Segmented, Switch } from 'antd';
 
 const ROW_HEIGHT = 42;
 const HEADER_HEIGHT = 52;
 
 export default function ProTimelineCanvas() {
-  const { panX, panY, setPanByDelta, setPan, setZoom, zoomLevel, dateToX, xToDate, pixelsPerDay } = useProTimelineEngine();
+  const { 
+    panX, panY, setPanByDelta, setPan, setZoom, zoomLevel, dateToX, 
+    xToDate, pixelsPerDay, viewMode, setViewMode,
+    showCriticalPath, showBaseline, toggleCriticalPath, toggleBaseline
+  } = useProTimelineEngine();
   const timelineRef = useRef<HTMLDivElement>(null);
   const [isDragPan, setIsDragPan] = useState(false);
-  const [panelWidth, setPanelWidth] = useState(280);
+  const [panelWidth, setPanelWidth] = useState(380);
   const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
-    const [theme] = useTheme({ autoInitialize: true });
+  const [showResourceDrawer, setShowResourceDrawer] = useState(false);
+  
+  const gridWidth = useMemo(() => {
+      switch (viewMode) {
+          case 'week': return pixelsPerDay * 7;
+          case 'month': return pixelsPerDay * 30;
+          case 'quarter': return pixelsPerDay * 90;
+          case 'day':
+          default:
+              return pixelsPerDay;
+      }
+  }, [viewMode, pixelsPerDay]);
+
+  const [theme] = useTheme({ autoInitialize: true });
     
     // Theme Token Mappings
     const isDark = theme?.mode === 'dark';
@@ -41,6 +70,36 @@ export default function ProTimelineCanvas() {
   const edges = useEdges();
   const { updateNodeData, setNodes, setEdges } = useReactFlow();
 
+  const handleSaveBaseline = useCallback(() => {
+      let count = 0;
+      setNodes(ns => ns.map(n => {
+          count++;
+          return {
+              ...n,
+              data: {
+                  ...n.data,
+                  baselineStartDate: n.data.date,
+                  baselineEndDate: n.data.endDate || n.data.date
+              }
+          };
+      }));
+      if (count > 0) {
+          appMessage.success('已成功锁定当前项目排期为基线快照');
+      }
+  }, [setNodes]);
+
+  const handleClearBaseline = useCallback(() => {
+      setNodes(ns => ns.map(n => ({
+          ...n,
+          data: {
+              ...n.data,
+              baselineStartDate: undefined,
+              baselineEndDate: undefined
+          }
+      })));
+      appMessage.success('已成功清空当前项目的基线排期');
+  }, [setNodes]);
+
     // Convert nodes → ProGanttTasks
     const tasks = useMemo<ProGanttTask[]>(() => {
         return nodes.filter(n => ['phase', 'event', 'milestone', 'summary'].includes(n.data.type as string) || n.type === 'timelineNode').map(n => {
@@ -58,9 +117,32 @@ export default function ProTimelineCanvas() {
                 status: n.data.status as string,
                 parentId: n.data.parentId as string | undefined,
                 isExpanded: n.data.isExpanded as boolean | undefined,
+                assignee: n.data.assignee as string | undefined,
+                priority: n.data.priority as 'high' | 'medium' | 'low' | undefined,
+                baselineStartDate: n.data.baselineStartDate as string | undefined,
+                baselineEndDate: n.data.baselineEndDate as string | undefined,
             };
         }).filter(t => t.startDate || t.type === 'summary' || t.type === 'phase');
     }, [nodes, edges]);
+
+  // 计算关键路径上的叶子任务 ID 集合
+  const criticalPathTaskIds = useMemo(() => {
+      if (!showCriticalPath) return new Set<string>();
+      
+      const simpleTasks = tasks.map(t => ({
+          id: t.id,
+          startDate: t.startDate,
+          endDate: t.endDate,
+          type: t.type,
+      }));
+      
+      const simpleEdges = edges.map(e => ({
+          source: e.source,
+          target: e.target
+      }));
+      
+      return calculateCriticalPath(simpleTasks, simpleEdges);
+  }, [tasks, edges, showCriticalPath]);
   
   // 1D-Packing & Hierarchical Rollup
   const packedTasks = useMemo(() => {
@@ -152,15 +234,31 @@ export default function ProTimelineCanvas() {
       const node = nodes.find(n => n.id === taskId);
       if (!node) return;
 
-      const oldEndDateStr = (node.data.endDate as string) || (node.data.date as string);
-      const oldEndTs = new Date(oldEndDateStr).getTime();
-      const newEndTs = new Date(newEndDate).getTime();
-      const deltaMs = newEndTs - oldEndTs;
+      const oldStartDate = node.data.date as string;
+      const oldEndDate = (node.data.endDate as string) || oldStartDate;
+
+      const isMove = newStartDate !== oldStartDate;
+      let finalStart = newStartDate;
+      let finalEnd = newEndDate;
+      let deltaWorkDays = 0;
+
+      if (isMove) {
+          const duration = getWorkDays(oldStartDate, oldEndDate);
+          finalStart = adjustToWorkDay(newStartDate, 'forward');
+          finalEnd = addWorkDays(finalStart, duration);
+          deltaWorkDays = getWorkDaysSigned(oldStartDate, finalStart);
+      } else {
+          finalStart = oldStartDate;
+          const proposedDuration = getWorkDays(finalStart, newEndDate);
+          const duration = Math.max(1, proposedDuration);
+          finalEnd = addWorkDays(finalStart, duration);
+          deltaWorkDays = getWorkDaysSigned(oldEndDate, finalEnd);
+      }
 
       // 更新拖拽源节点
-      updateNodeData(taskId, { date: newStartDate, endDate: newEndDate });
+      updateNodeData(taskId, { date: finalStart, endDate: finalEnd });
 
-      if (deltaMs === 0 || isNaN(deltaMs)) return;
+      if (deltaWorkDays === 0) return;
 
       // 构建依赖图 (源 -> 目标集合)
       const adj = new Map<string, string[]>();
@@ -186,13 +284,11 @@ export default function ProTimelineCanvas() {
               const tgtNode = nodes.find(n => n.id === tgtId);
               if (!tgtNode || !tgtNode.data.date) continue;
 
-              const tStartTs = new Date(tgtNode.data.date as string).getTime();
-              const tEndTs = new Date((tgtNode.data.endDate as string) || (tgtNode.data.date as string)).getTime();
-              
-              if (isNaN(tStartTs) || isNaN(tEndTs)) continue;
+              const tStartStr = tgtNode.data.date as string;
+              const tEndStr = (tgtNode.data.endDate as string) || tStartStr;
 
-              const newTgtStart = new Date(tStartTs + deltaMs).toISOString().split('T')[0];
-              const newTgtEnd = new Date(tEndTs + deltaMs).toISOString().split('T')[0];
+              const newTgtStart = addWorkDaysSigned(tStartStr, deltaWorkDays);
+              const newTgtEnd = addWorkDaysSigned(tEndStr, deltaWorkDays);
               
               // 触发下游更新
               updateNodeData(tgtId, { date: newTgtStart, endDate: newTgtEnd });
@@ -209,10 +305,43 @@ export default function ProTimelineCanvas() {
         if ('endDate' in updates) rfUpdates.endDate = updates.endDate;
         if ('isExpanded' in updates) rfUpdates.isExpanded = updates.isExpanded;
         if ('parentId' in updates) rfUpdates.parentId = updates.parentId;
+        if ('assignee' in updates) rfUpdates.assignee = updates.assignee;
+        if ('priority' in updates) rfUpdates.priority = updates.priority;
         updateNodeData(taskId, rfUpdates);
     }, [updateNodeData]);
 
     const onTaskConnect = useCallback((sourceId: string, targetId: string) => {
+        const sourceNode = nodes.find(n => n.id === sourceId);
+        const targetNode = nodes.find(n => n.id === targetId);
+        if (!sourceNode || !targetNode) return;
+
+        // 1. Time Causality Check
+        const sDateStr = sourceNode.data?.endDate || sourceNode.data?.date;
+        const tDateStr = targetNode.data?.date;
+
+        if (sDateStr && tDateStr) {
+            const sTime = dayjs(sDateStr as string).valueOf();
+            const tTime = dayjs(tDateStr as string).valueOf();
+            if (sTime > tTime) {
+                appMessage.warning('依赖校验失败：前置任务的结束时间不能晚于后置任务的开始时间！');
+                return;
+            }
+        }
+
+        // 2. Prevent Cyclic Dependencies (check if path exists from target -> source)
+        const hasPath = (current: string, destination: string, visited: Set<string> = new Set()): boolean => {
+            if (current === destination) return true;
+            if (visited.has(current)) return false;
+            visited.add(current);
+            const outEdges = edges.filter(e => e.source === current);
+            return outEdges.some(e => hasPath(e.target, destination, visited));
+        };
+
+        if (hasPath(targetId, sourceId)) {
+            appMessage.warning('依赖校验失败：检测到循环依赖，无法连接！');
+            return;
+        }
+
         setEdges(eds => {
             if (eds.some(e => e.source === sourceId && e.target === targetId)) return eds;
             return [...eds, {
@@ -222,6 +351,35 @@ export default function ProTimelineCanvas() {
                 type: 'smoothstep'
             }];
         });
+    }, [nodes, edges, setEdges]);
+
+    const handleTaskDelete = useCallback((taskId: string) => {
+        // 1. 递归收集要删除的节点ID及其后代ID
+        const toDeleteIds = new Set<string>();
+        toDeleteIds.add(taskId);
+
+        const collectDescendants = (parentId: string) => {
+            nodes.forEach(n => {
+                if (n.data?.parentId === parentId) {
+                    if (!toDeleteIds.has(n.id)) {
+                        toDeleteIds.add(n.id);
+                        collectDescendants(n.id);
+                    }
+                }
+            });
+        };
+        collectDescendants(taskId);
+
+        // 2. 更新 nodes 和 edges 状态
+        setNodes(ns => ns.filter(n => !toDeleteIds.has(n.id)));
+        setEdges(eds => eds.filter(e => !toDeleteIds.has(e.source) && !toDeleteIds.has(e.target)));
+        
+        appMessage.success('任务及子任务删除成功！');
+    }, [nodes, setNodes, setEdges]);
+
+    const handleDeleteDependency = useCallback((sourceId: string, targetId: string) => {
+        setEdges(eds => eds.filter(e => !(e.source === sourceId && e.target === targetId)));
+        appMessage.success('依赖关系删除成功！');
     }, [setEdges]);
 
     const onTaskExpandToggle = useCallback((taskId: string) => {
@@ -309,6 +467,7 @@ export default function ProTimelineCanvas() {
             onTaskUpdate={onTaskUpdate}
             onTaskExpandToggle={onTaskExpandToggle}
             onTaskAdd={handleTaskAdd}
+            onTaskDelete={handleTaskDelete}
         />
 
         {/* ===== 右侧时间轴区 ===== */}
@@ -361,17 +520,19 @@ export default function ProTimelineCanvas() {
             </div>
 
             {/* 周末列着色 (CSS O(1) 优化) */}
-            <div style={{ 
-                position: 'absolute', left: 0, top: HEADER_HEIGHT, right: 0, bottom: 0, 
-                pointerEvents: 'none', zIndex: 1,
-                background: `repeating-linear-gradient(to right, transparent 0, transparent ${2 * pixelsPerDay}px, ${weekendBg} ${2 * pixelsPerDay}px, ${weekendBg} ${4 * pixelsPerDay}px, transparent ${4 * pixelsPerDay}px, transparent ${7 * pixelsPerDay}px)`,
-                backgroundPosition: `${panX}px 0`,
-            }} />
+            {viewMode === 'day' && (
+                <div style={{ 
+                    position: 'absolute', left: 0, top: HEADER_HEIGHT, right: 0, bottom: 0, 
+                    pointerEvents: 'none', zIndex: 1,
+                    background: `repeating-linear-gradient(to right, transparent 0, transparent ${2 * pixelsPerDay}px, ${weekendBg} ${2 * pixelsPerDay}px, ${weekendBg} ${4 * pixelsPerDay}px, transparent ${4 * pixelsPerDay}px, transparent ${7 * pixelsPerDay}px)`,
+                    backgroundPosition: `${panX}px 0`,
+                }} />
+            )}
 
             {/* 垂直日期网格线 */}
             <div style={{
                 position: 'absolute', left: 0, top: 0, right: 0, bottom: 0,
-                backgroundSize: `${pixelsPerDay}px ${ROW_HEIGHT}px`,
+                backgroundSize: `${gridWidth}px ${ROW_HEIGHT}px`,
                 backgroundImage: `linear-gradient(to right, ${gridLine} 1px, transparent 1px)`,
                 backgroundPosition: `${panX}px ${HEADER_HEIGHT}px`,
                 pointerEvents: 'none', zIndex: 1,
@@ -413,18 +574,98 @@ export default function ProTimelineCanvas() {
                })()}
 
                <ProTimelineAxis />
-               <ProDependencyLayer tasks={packedTasks} hoveredTaskId={hoveredTaskId} />
-               <ProTaskLayer 
-                  tasks={packedTasks} 
-                  onTaskClick={onTaskClick}
-                  onTaskDragEnd={onTaskDragEnd}
-                  hoveredTaskId={hoveredTaskId}
-                  onHoverTask={setHoveredTaskId}
-                  onTaskUpdate={onTaskUpdate}
-                  onTaskConnect={onTaskConnect}
-               />
+                <ProDependencyLayer 
+                   tasks={packedTasks} 
+                   hoveredTaskId={hoveredTaskId} 
+                   onDeleteDependency={handleDeleteDependency}
+                   criticalPathTaskIds={criticalPathTaskIds}
+                />
+                <ProTaskLayer 
+                   tasks={packedTasks} 
+                   onTaskClick={onTaskClick}
+                   onTaskDragEnd={onTaskDragEnd}
+                   hoveredTaskId={hoveredTaskId}
+                   onHoverTask={setHoveredTaskId}
+                   onTaskUpdate={onTaskUpdate}
+                   onTaskConnect={onTaskConnect}
+                   criticalPathTaskIds={criticalPathTaskIds}
+                />
             </div>
 
+            {/* ===== Pro Timeline Analytics Bar (项目高级分析控制器) ===== */}
+            <div style={{
+                position: 'absolute',
+                bottom: 24,
+                right: 335,
+                background: glassBg,
+                backdropFilter: 'blur(12px) saturate(180%)',
+                border: `1px solid ${borderColor}`,
+                borderRadius: 99,
+                boxShadow: `0 6px 16px ${shadowColor}`,
+                padding: '4px 14px',
+                zIndex: 100,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12
+            }}>
+                <Tooltip title="分析团队工时与资源负载">
+                    <Button 
+                        type="text" 
+                        size="small" 
+                        shape="circle"
+                        icon={<TeamOutlined />} 
+                        onClick={() => setShowResourceDrawer(true)}
+                        style={{ color: showResourceDrawer ? '#1890ff' : secondaryTextColor }}
+                    />
+                </Tooltip>
+                
+                <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                    <span style={{ color: secondaryTextColor, fontWeight: 500 }}>关键路径</span>
+                    <Switch 
+                        size="small" 
+                        checked={showCriticalPath} 
+                        onChange={toggleCriticalPath}
+                    />
+                </div>
+                
+                <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                    <span style={{ color: secondaryTextColor, fontWeight: 500 }}>对比基线</span>
+                    <Switch 
+                        size="small" 
+                        checked={showBaseline} 
+                        onChange={toggleBaseline}
+                    />
+                </div>
+
+                <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
+
+                <Tooltip title="锁定当前排期为基线快照">
+                    <Button 
+                        type="text" 
+                        size="small" 
+                        shape="circle"
+                        icon={<CameraOutlined />} 
+                        onClick={handleSaveBaseline}
+                        style={{ color: secondaryTextColor }}
+                    />
+                </Tooltip>
+
+                <Tooltip title="清空基线排期">
+                    <Button 
+                        type="text" 
+                        size="small" 
+                        shape="circle"
+                        icon={<DeleteOutlined />} 
+                        onClick={handleClearBaseline}
+                        danger
+                    />
+                </Tooltip>
+            </div>
+ 
             {/* ===== Timeline Zoom Bar (Gantt 专用缩放控制器) ===== */}
             <div style={{
                 position: 'absolute',
@@ -435,12 +676,30 @@ export default function ProTimelineCanvas() {
                 border: `1px solid ${borderColor}`,
                 borderRadius: 99,
                 boxShadow: `0 6px 16px ${shadowColor}`,
-                padding: '4px 8px',
+                padding: '4px 12px 4px 8px',
                 zIndex: 100,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 4
+                gap: 8
             }}>
+                <Segmented
+                    size="small"
+                    value={viewMode}
+                    onChange={(val) => setViewMode(val as any)}
+                    options={[
+                        { label: '天', value: 'day' },
+                        { label: '周', value: 'week' },
+                        { label: '月', value: 'month' },
+                        { label: '季', value: 'quarter' }
+                    ]}
+                    style={{
+                        background: 'transparent',
+                        fontSize: 12,
+                    }}
+                />
+                
+                <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
+
                 <Tooltip title="缩小时间轴区域">
                     <Button 
                         type="text" 
@@ -479,6 +738,14 @@ export default function ProTimelineCanvas() {
                     />
                 </Tooltip>
             </div>
+
+            {/* ===== Pro Resource Drawer ===== */}
+            <ProResourceDrawer
+                open={showResourceDrawer}
+                onClose={() => setShowResourceDrawer(false)}
+                tasks={packedTasks}
+                onTaskClick={onTaskClick}
+            />
         </div>
     </div>
   );
@@ -496,6 +763,16 @@ function ProTimelineKeyframes() {
                 0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.7); }
                 70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(255, 77, 79, 0); }
                 100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 77, 79, 0); }
+            }
+            @keyframes pro-timeline-critical-glow {
+                0% { box-shadow: 0 0 4px rgba(255, 77, 79, 0.5), inset 0 0 2px rgba(255, 77, 79, 0.3); }
+                50% { box-shadow: 0 0 12px rgba(255, 77, 79, 0.85), inset 0 0 4px rgba(255, 77, 79, 0.5); }
+                100% { box-shadow: 0 0 4px rgba(255, 77, 79, 0.5), inset 0 0 2px rgba(255, 77, 79, 0.3); }
+            }
+            @keyframes pro-timeline-dash-flow {
+                to {
+                    stroke-dashoffset: -20;
+                }
             }
         `;
         document.head.appendChild(style);

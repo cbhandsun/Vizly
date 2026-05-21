@@ -87,6 +87,7 @@ export interface DesignerHeaderLayerProps {
         hideLayoutControls?: boolean;
         hideGridControls?: boolean;
         hideFlowFocusControls?: boolean;
+        hideUndoRedoControls?: boolean;
         isDrawingMode?: boolean;
         isMarqueeActive?: boolean;
         toggleSelectionMode?: () => void;
@@ -224,6 +225,7 @@ export const DesignerHeaderLayer = React.memo(
                     hideLayoutControls={toolbar.hideLayoutControls}
                     hideGridControls={toolbar.hideGridControls}
                     hideFlowFocusControls={toolbar.hideFlowFocusControls}
+                    hideUndoRedoControls={toolbar.hideUndoRedoControls}
                     isDrawingMode={toolbar.isDrawingMode}
                     isMarqueeActive={toolbar.isMarqueeActive}
                     toggleSelectionMode={toolbar.toggleSelectionMode}
@@ -278,7 +280,8 @@ export const DesignerHeaderLayer = React.memo(
             prevProps.toolbar.hideLayoutControls === nextProps.toolbar.hideLayoutControls &&
             prevProps.toolbar.hideGridControls === nextProps.toolbar.hideGridControls &&
             prevProps.toolbar.hideFlowFocusControls === nextProps.toolbar.hideFlowFocusControls &&
-            prevProps.toolbar.hideZoomControls === nextProps.toolbar.hideZoomControls
+            prevProps.toolbar.hideZoomControls === nextProps.toolbar.hideZoomControls &&
+            prevProps.toolbar.hideUndoRedoControls === nextProps.toolbar.hideUndoRedoControls
         );
     }
 );

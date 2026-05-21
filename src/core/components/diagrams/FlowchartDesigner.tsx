@@ -1417,6 +1417,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                                     hideLayoutControls: activePlugin?.hideLayoutControls,
                                     hideGridControls: activePlugin?.hideGridControls,
                                     hideFlowFocusControls: activePlugin?.hideFlowFocusControls,
+                                    hideUndoRedoControls: activePlugin?.hideUndoRedoControls,
                                     isDrawingMode,
                                     isMarqueeActive,
                                     toggleSelectionMode: () => {
