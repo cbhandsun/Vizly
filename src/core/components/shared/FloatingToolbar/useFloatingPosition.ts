@@ -108,14 +108,29 @@ export function useFloatingPosition({
 
         const placeBelow = actualPlacement === 'bottom';
 
-        // 响应式水平限位：避免工具栏溢出屏幕或被右侧面板遮挡
+        // 响应式水平限位：避免工具栏溢出屏幕或被左右侧面板遮挡
         const isMobile = window.innerWidth <= 768;
-        const rightPanelSafeZone = isMobile ? 20 : 340; // 移动端不考虑右侧面板
+        let rightOffset = isMobile ? 20 : 340;
+        let leftOffset = isMobile ? 0 : 0;
+
+        if (!isMobile && typeof document !== 'undefined') {
+            const rootStyle = getComputedStyle(document.documentElement);
+            const rVal = parseFloat(rootStyle.getPropertyValue('--right-sidebar-offset'));
+            if (!isNaN(rVal)) rightOffset = rVal;
+            const lVal = parseFloat(rootStyle.getPropertyValue('--left-sidebar-offset'));
+            if (!isNaN(lVal)) leftOffset = lVal;
+        }
+
         const toolbarHalfWidth = 160; // 预估工具栏宽度的一半，保证 translateX(-50%) 不越界
         
-        const maxRight = window.innerWidth - rightPanelSafeZone;
-        const clampedX = Math.min(screenCenterX, Math.max(maxRight, toolbarHalfWidth + 16));
-        const safeX = Math.max(clampedX, toolbarHalfWidth + 16);
+        const minLeft = leftOffset + toolbarHalfWidth + 16;
+        const maxRight = window.innerWidth - rightOffset - toolbarHalfWidth - 16;
+        
+        // Ensure constraints are valid even in extremely narrow screens
+        const safeMinLeft = Math.min(minLeft, maxRight);
+        const safeMaxRight = Math.max(minLeft, maxRight);
+        
+        const safeX = Math.min(safeMaxRight, Math.max(safeMinLeft, screenCenterX));
 
         const style: React.CSSProperties = {
             left: safeX,

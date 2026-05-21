@@ -74,18 +74,14 @@
     position: absolute;
     z-index: 1005;
     will-change: left, top;
-    transition:
-        left 0.2s ease,
-        top 0.2s ease;
+    transition: none;
 }
 
 .floating-toolbar-container--fixed {
     position: fixed;
     z-index: 1000;
     will-change: left, top;
-    transition:
-        left 0.12s ease-out,
-        top 0.12s ease-out;
+    transition: none;
 }
 
 .floating-toolbar-container--square {

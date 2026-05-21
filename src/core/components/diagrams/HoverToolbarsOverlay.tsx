@@ -69,6 +69,13 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
                     onDelete={handleDeleteWithToast}
                     onDuplicate={handleDuplicateWithToast}
                     onChangeColor={(color) => {
+                        // Real-time preview (disable snapshot to prevent flooding the undo/redo stack)
+                        updateNodesBatch(selectedNodes.map((n: any) => n.id), {
+                            theme: { main: color, border: color, text: '#fff' }
+                        }, { snapshot: false });
+                    }}
+                    onChangeColorComplete={(color) => {
+                        // Commit the final color and take a single history snapshot
                         updateNodesBatch(selectedNodes.map((n: any) => n.id), {
                             theme: { main: color, border: color, text: '#fff' }
                         });

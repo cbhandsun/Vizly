@@ -61,6 +61,7 @@ export interface FloatingContextToolbarProps {
     onDelete: () => void;
     onDuplicate: () => void;
     onChangeColor: (color: string) => void;
+    onChangeColorComplete?: (color: string) => void;
     onLock: (locked: boolean) => void;
     onOpacity: (opacity: number) => void;
     onBringToFront: () => void;
@@ -273,6 +274,11 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
                             onChange={(color: AggregationColor | string) => {
                                 const hex = typeof color === 'string' ? color : color.toHexString();
                                 onChangeColor(hex);
+                            }}
+                            onChangeComplete={(color: AggregationColor) => {
+                                if (onChangeColorComplete) {
+                                    onChangeColorComplete(color.toHexString());
+                                }
                             }}
                             disabledAlpha
                             presets={[{
