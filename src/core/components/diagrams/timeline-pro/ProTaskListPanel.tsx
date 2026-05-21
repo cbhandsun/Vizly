@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { ProGanttTask, getWorkDays, addWorkDays, getWorkDaysSigned, useProTimelineEngine } from '../../../hooks/useProTimelineEngine';
-import { Dropdown, MenuProps, Select } from 'antd';
+import { Dropdown, MenuProps, Select, Tooltip } from 'antd';
 import { CaretRightOutlined, CaretDownOutlined, CalendarOutlined, FlagFilled, ClockCircleOutlined, FolderOpenOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useTheme } from '../../../themes/useCoreTheme';
 
@@ -18,6 +18,7 @@ export interface ProTaskListPanelProps {
     onTaskUpdate?: (id: string, updates: Partial<ProGanttTask>) => void;
     onTaskAdd?: (parentId: string | null, type: 'phase' | 'milestone') => void;
     onTaskDelete?: (id: string) => void;
+    cyclicTaskIds?: Set<string>;
 }
 
 const ROW_HEIGHT = 42;
@@ -38,7 +39,7 @@ const getTypeIcons = (theme: any): Record<string, React.ReactNode> => ({
 
 export default function ProTaskListPanel({
     tasks, width, onWidthChange, hoveredTaskId, onHoverTask, onClickTask, selectedTaskId, scrollTop, onScrollTopChange,
-    onTaskExpandToggle, onTaskUpdate, onTaskAdd, onTaskDelete
+    onTaskExpandToggle, onTaskUpdate, onTaskAdd, onTaskDelete, cyclicTaskIds
 }: ProTaskListPanelProps) {
     const [isResizing, setIsResizing] = useState(false);
     const [editingCell, setEditingCell] = useState<{ id: string, field: 'name' | 'startDate' | 'duration' | 'assignee' | 'priority' } | null>(null);
@@ -263,6 +264,7 @@ export default function ProTaskListPanel({
                                     fontWeight: type === 'summary' || isSelected ? 600 : 400,
                                     margin: '0 8px', minWidth: 0,
                                     display: 'flex', alignItems: 'center', height: '100%',
+                                    gap: 4,
                                 }}
                                 onDoubleClick={(e) => {
                                     e.stopPropagation();
@@ -270,6 +272,11 @@ export default function ProTaskListPanel({
                                     setEditValue(task.name);
                                 }}
                             >
+                                {cyclicTaskIds?.has(task.id) && (
+                                    <Tooltip title="检测到循环依赖关系！">
+                                        <span style={{ color: '#faad14', cursor: 'pointer', fontSize: 13, flexShrink: 0 }}>⚠️</span>
+                                    </Tooltip>
+                                )}
                                 {editingCell?.id === task.id && editingCell?.field === 'name' ? (
                                     <input
                                         ref={inputRef}

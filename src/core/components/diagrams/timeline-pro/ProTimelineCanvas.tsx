@@ -125,10 +125,8 @@ export default function ProTimelineCanvas() {
         }).filter(t => t.startDate || t.type === 'summary' || t.type === 'phase');
     }, [nodes, edges]);
 
-  // 计算关键路径上的叶子任务 ID 集合
-  const criticalPathTaskIds = useMemo(() => {
-      if (!showCriticalPath) return new Set<string>();
-      
+  // 始终运行 CPM 拓扑以提供底层的循环依赖安全检测
+  const cpmResult = useMemo(() => {
       const simpleTasks = tasks.map(t => ({
           id: t.id,
           startDate: t.startDate,
@@ -142,7 +140,15 @@ export default function ProTimelineCanvas() {
       }));
       
       return calculateCriticalPath(simpleTasks, simpleEdges);
-  }, [tasks, edges, showCriticalPath]);
+  }, [tasks, edges]);
+
+  const criticalPathTaskIds = useMemo(() => {
+      return showCriticalPath ? cpmResult.criticalPathTaskIds : new Set<string>();
+  }, [cpmResult, showCriticalPath]);
+
+  const cyclicTaskIds = useMemo(() => {
+      return cpmResult.cyclicTaskIds;
+  }, [cpmResult]);
   
   // 1D-Packing & Hierarchical Rollup
   const packedTasks = useMemo(() => {
@@ -230,6 +236,92 @@ export default function ProTimelineCanvas() {
       setNodes(ns => ns.map(n => ({ ...n, selected: n.id === taskId })));
   }, [setNodes]);
 
+  // 前置驱动智能级联自动避让排期核心算法
+  const applyAutoScheduling = useCallback((taskId: string, targetStartDate: string, targetEndDate: string) => {
+      // 1. 初始化待更新日期 Map (ID -> { date, endDate })
+      const updatesMap = new Map<string, { date: string, endDate: string }>();
+      updatesMap.set(taskId, { date: targetStartDate, endDate: targetEndDate });
+
+      // 2. 检测是否存在依赖环。如果有环，为了防止级联死循环，只更新源节点，并跳过后续级联调度。
+      if (cpmResult.cyclicTaskIds.size > 0) {
+          updateNodeData(taskId, { date: targetStartDate, endDate: targetEndDate });
+          return;
+      }
+
+      // 3. 开始做级联避让队列推演 (以 modified 任务为起点)
+      const adj = new Map<string, string[]>();
+      edges.forEach(e => {
+          if (!adj.has(e.source)) adj.set(e.source, []);
+          adj.get(e.source)!.push(e.target);
+      });
+
+      const queue: string[] = [taskId];
+      const visited = new Set<string>();
+      visited.add(taskId);
+
+      while (queue.length > 0) {
+          const currId = queue.shift()!;
+          
+          let currEnd = '';
+          if (updatesMap.has(currId)) {
+              currEnd = updatesMap.get(currId)!.endDate;
+          } else {
+              const n = nodes.find(x => x.id === currId);
+              if (n) {
+                  currEnd = (n.data.endDate as string) || (n.data.date as string);
+              }
+          }
+          if (!currEnd) continue;
+
+          const targets = adj.get(currId) || [];
+          for (const tgtId of targets) {
+              if (visited.has(tgtId)) continue;
+              
+              const tgtNode = nodes.find(n => n.id === tgtId);
+              if (!tgtNode || !tgtNode.data.date) continue;
+
+              const tStartStr = tgtNode.data.date as string;
+              const tEndStr = (tgtNode.data.endDate as string) || tStartStr;
+
+              // milestone 等特殊类型判定
+              const isMilestone = tgtNode.data.type === 'milestone';
+              const currNode = nodes.find(n => n.id === currId);
+              const isCurrMilestone = currNode?.data.type === 'milestone';
+
+              // 计算后继任务的最早可能开始日期 minStart
+              const minStart = (() => {
+                  if (isMilestone || isCurrMilestone) {
+                      return adjustToWorkDay(currEnd, 'forward');
+                  } else {
+                      const d = new Date(currEnd);
+                      d.setDate(d.getDate() + 1);
+                      return adjustToWorkDay(d.toISOString().split('T')[0], 'forward');
+                  }
+              })();
+
+              const currentTgtStartValue = dayjs(tStartStr).valueOf();
+              const minTgtStartValue = dayjs(minStart).valueOf();
+
+              // 如果后继任务的当前开始日期比 minStart 还要早，说明被“顶”到了，需要发生向后避让
+              if (currentTgtStartValue < minTgtStartValue) {
+                  const duration = getWorkDays(tStartStr, tEndStr);
+                  const newTgtStart = minStart;
+                  const newTgtEnd = addWorkDays(newTgtStart, duration);
+
+                  updatesMap.set(tgtId, { date: newTgtStart, endDate: newTgtEnd });
+
+                  visited.add(tgtId);
+                  queue.push(tgtId);
+              }
+          }
+      }
+
+      // 4. 批量更新 React Flow node 数据
+      updatesMap.forEach((val, id) => {
+          updateNodeData(id, val);
+      });
+  }, [nodes, edges, updateNodeData, cpmResult]);
+
   const onTaskDragEnd = useCallback((taskId: string, newStartDate: string, newEndDate: string) => {
       const node = nodes.find(n => n.id === taskId);
       if (!node) return;
@@ -240,75 +332,58 @@ export default function ProTimelineCanvas() {
       const isMove = newStartDate !== oldStartDate;
       let finalStart = newStartDate;
       let finalEnd = newEndDate;
-      let deltaWorkDays = 0;
 
       if (isMove) {
           const duration = getWorkDays(oldStartDate, oldEndDate);
           finalStart = adjustToWorkDay(newStartDate, 'forward');
           finalEnd = addWorkDays(finalStart, duration);
-          deltaWorkDays = getWorkDaysSigned(oldStartDate, finalStart);
       } else {
           finalStart = oldStartDate;
           const proposedDuration = getWorkDays(finalStart, newEndDate);
           const duration = Math.max(1, proposedDuration);
           finalEnd = addWorkDays(finalStart, duration);
-          deltaWorkDays = getWorkDaysSigned(oldEndDate, finalEnd);
       }
 
-      // 更新拖拽源节点
-      updateNodeData(taskId, { date: finalStart, endDate: finalEnd });
+      applyAutoScheduling(taskId, finalStart, finalEnd);
+  }, [nodes, applyAutoScheduling]);
 
-      if (deltaWorkDays === 0) return;
-
-      // 构建依赖图 (源 -> 目标集合)
-      const adj = new Map<string, string[]>();
-      edges.forEach(e => {
-          if (!adj.has(e.source)) adj.set(e.source, []);
-          adj.get(e.source)!.push(e.target);
-      });
-
-      // 级联推演 (BFS)
-      const queue = [taskId];
-      const visited = new Set<string>();
-      visited.add(taskId);
-
-      while (queue.length > 0) {
-          const curr = queue.shift()!;
-          const targets = adj.get(curr) || [];
+  const onTaskUpdate = useCallback((taskId: string, updates: Partial<ProGanttTask>) => {
+      const rfUpdates: any = {};
+      let dateChanged = false;
+      let targetStart = '';
+      let targetEnd = '';
+      
+      const node = nodes.find(n => n.id === taskId);
+      if (node) {
+          const currentStart = node.data.date as string;
+          const currentEnd = (node.data.endDate as string) || currentStart;
           
-          for (const tgtId of targets) {
-              if (visited.has(tgtId)) continue;
-              visited.add(tgtId);
-              queue.push(tgtId);
-              
-              const tgtNode = nodes.find(n => n.id === tgtId);
-              if (!tgtNode || !tgtNode.data.date) continue;
-
-              const tStartStr = tgtNode.data.date as string;
-              const tEndStr = (tgtNode.data.endDate as string) || tStartStr;
-
-              const newTgtStart = addWorkDaysSigned(tStartStr, deltaWorkDays);
-              const newTgtEnd = addWorkDaysSigned(tEndStr, deltaWorkDays);
-              
-              // 触发下游更新
-              updateNodeData(tgtId, { date: newTgtStart, endDate: newTgtEnd });
+          targetStart = updates.startDate || updates.date || currentStart;
+          targetEnd = updates.endDate || currentEnd;
+          
+          if (targetStart !== currentStart || targetEnd !== currentEnd) {
+              dateChanged = true;
           }
       }
-  }, [nodes, edges, updateNodeData]);
 
-    const onTaskUpdate = useCallback((taskId: string, updates: Partial<ProGanttTask>) => {
-        const rfUpdates: any = {};
-        if ('name' in updates) rfUpdates.label = updates.name;
-        if ('progress' in updates) rfUpdates.progress = updates.progress;
-        if ('startDate' in updates) rfUpdates.date = updates.startDate;
-        if ('date' in updates) rfUpdates.date = updates.date; // fallback
-        if ('endDate' in updates) rfUpdates.endDate = updates.endDate;
-        if ('isExpanded' in updates) rfUpdates.isExpanded = updates.isExpanded;
-        if ('parentId' in updates) rfUpdates.parentId = updates.parentId;
-        if ('assignee' in updates) rfUpdates.assignee = updates.assignee;
-        if ('priority' in updates) rfUpdates.priority = updates.priority;
-        updateNodeData(taskId, rfUpdates);
-    }, [updateNodeData]);
+      if ('name' in updates) rfUpdates.label = updates.name;
+      if ('progress' in updates) rfUpdates.progress = updates.progress;
+      if ('isExpanded' in updates) rfUpdates.isExpanded = updates.isExpanded;
+      if ('parentId' in updates) rfUpdates.parentId = updates.parentId;
+      if ('assignee' in updates) rfUpdates.assignee = updates.assignee;
+      if ('priority' in updates) rfUpdates.priority = updates.priority;
+
+      if (Object.keys(rfUpdates).length > 0) {
+          updateNodeData(taskId, rfUpdates);
+      }
+
+      if (dateChanged && targetStart && targetEnd) {
+          const finalStart = adjustToWorkDay(targetStart, 'forward');
+          const duration = getWorkDays(targetStart, targetEnd);
+          const finalEnd = addWorkDays(finalStart, Math.max(1, duration));
+          applyAutoScheduling(taskId, finalStart, finalEnd);
+      }
+  }, [nodes, updateNodeData, applyAutoScheduling]);
 
     const onTaskConnect = useCallback((sourceId: string, targetId: string) => {
         const sourceNode = nodes.find(n => n.id === sourceId);
@@ -468,6 +543,7 @@ export default function ProTimelineCanvas() {
             onTaskExpandToggle={onTaskExpandToggle}
             onTaskAdd={handleTaskAdd}
             onTaskDelete={handleTaskDelete}
+            cyclicTaskIds={cyclicTaskIds}
         />
 
         {/* ===== 右侧时间轴区 ===== */}
@@ -485,6 +561,35 @@ export default function ProTimelineCanvas() {
             onPointerUp={handlePointerUp}
             onDoubleClick={handleDoubleClick}
         >
+            {/* 循环依赖警告 Alert 横幅 */}
+            {cyclicTaskIds.size > 0 && (
+                <div style={{
+                    position: 'absolute',
+                    left: 20,
+                    right: 20,
+                    top: 68,
+                    background: isDark ? 'rgba(250, 173, 20, 0.18)' : 'rgba(250, 173, 20, 0.08)',
+                    border: '1px solid rgba(250, 173, 20, 0.3)',
+                    borderRadius: 8,
+                    padding: '10px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    backdropFilter: 'blur(8px)',
+                    zIndex: 20,
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 16 }}>⚠️</span>
+                        <div>
+                            <strong style={{ color: '#faad14', fontSize: 13 }}>排期警告：检测到循环依赖！</strong>
+                            <div style={{ color: textColor, fontSize: 11, marginTop: 2 }}>
+                                共有 {cyclicTaskIds.size} 个任务相互循环引用，导致排期引擎挂起。请检查标黄的任务与连线。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* 行背景 (斑马纹 + hover 高亮 - O(1) Canvas 优化) */}
             <div style={{ position: 'absolute', left: 0, right: 0, top: HEADER_HEIGHT + panY, bottom: 0, pointerEvents: 'none', zIndex: 0 }}>
                 {/* 基础斑马纹 */}
@@ -579,6 +684,7 @@ export default function ProTimelineCanvas() {
                    hoveredTaskId={hoveredTaskId} 
                    onDeleteDependency={handleDeleteDependency}
                    criticalPathTaskIds={criticalPathTaskIds}
+                   cyclicTaskIds={cyclicTaskIds}
                 />
                 <ProTaskLayer 
                    tasks={packedTasks} 
@@ -589,6 +695,7 @@ export default function ProTimelineCanvas() {
                    onTaskUpdate={onTaskUpdate}
                    onTaskConnect={onTaskConnect}
                    criticalPathTaskIds={criticalPathTaskIds}
+                   cyclicTaskIds={cyclicTaskIds}
                 />
             </div>
 
@@ -768,6 +875,11 @@ function ProTimelineKeyframes() {
                 0% { box-shadow: 0 0 4px rgba(255, 77, 79, 0.5), inset 0 0 2px rgba(255, 77, 79, 0.3); }
                 50% { box-shadow: 0 0 12px rgba(255, 77, 79, 0.85), inset 0 0 4px rgba(255, 77, 79, 0.5); }
                 100% { box-shadow: 0 0 4px rgba(255, 77, 79, 0.5), inset 0 0 2px rgba(255, 77, 79, 0.3); }
+            }
+            @keyframes pro-timeline-cyclic-glow {
+                0% { box-shadow: 0 0 4px rgba(250, 173, 20, 0.5), inset 0 0 2px rgba(250, 173, 20, 0.3); }
+                50% { box-shadow: 0 0 12px rgba(250, 173, 20, 0.9), inset 0 0 4px rgba(250, 173, 20, 0.5); }
+                100% { box-shadow: 0 0 4px rgba(250, 173, 20, 0.5), inset 0 0 2px rgba(250, 173, 20, 0.3); }
             }
             @keyframes pro-timeline-dash-flow {
                 to {

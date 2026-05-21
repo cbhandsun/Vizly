@@ -25,6 +25,7 @@ export interface ProTaskLayerProps {
     onTaskUpdate?: (taskId: string, updates: Partial<ProGanttTask>) => void;
     onTaskConnect?: (sourceId: string, targetId: string) => void;
     criticalPathTaskIds?: Set<string>;
+    cyclicTaskIds?: Set<string>;
 }
 
 const ROW_HEIGHT = 42;
@@ -115,7 +116,8 @@ export default function ProTaskLayer({
     onHoverTask, 
     onTaskUpdate, 
     onTaskConnect,
-    criticalPathTaskIds
+    criticalPathTaskIds,
+    cyclicTaskIds
 }: ProTaskLayerProps) {
     const { xToDate, pixelsPerDay, dateToX, showBaseline, showCriticalPath } = useProTimelineEngine();
     const [theme] = useTheme();
@@ -345,7 +347,8 @@ export default function ProTaskLayer({
 
                     // === Milestone ===
                     if (type === 'milestone') {
-                        const milestoneBorderColor = isCritical ? '#ff4d4f' : barColor;
+                        const isCyclic = cyclicTaskIds?.has(task.id);
+                        const milestoneBorderColor = isCyclic ? '#faad14' : (isCritical ? '#ff4d4f' : barColor);
                         return (
                             <div key={task.id}
                                 style={{
@@ -360,8 +363,8 @@ export default function ProTaskLayer({
                             >
                                 <div style={{
                                     position: 'absolute', left: 4, top: 4, width: 20, height: 20,
-                                    backgroundColor: isSelected ? '#fff' : (isCritical ? '#ff4d4f' : barColor),
-                                    border: `2.5px solid ${milestoneBorderColor}`,
+                                    backgroundColor: isSelected ? '#fff' : (isCyclic ? '#faad14' : (isCritical ? '#ff4d4f' : barColor)),
+                                    border: isCyclic ? `2px dashed #faad14` : `2.5px solid ${milestoneBorderColor}`,
                                     transform: `rotate(45deg)${isDragging ? ' scale(1.15)' : isHovered ? ' scale(1.08)' : ''}`,
                                     boxShadow: isSelected
                                         ? `0 0 0 4px ${milestoneBorderColor}25, 0 4px 12px rgba(0,0,0,0.12)`
@@ -370,7 +373,9 @@ export default function ProTaskLayer({
                                             : '0 2px 6px rgba(0,0,0,0.12)',
                                     transition: isDragging ? 'none' : 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    ...(isCritical ? { animation: 'pro-timeline-critical-glow 2s infinite ease-in-out' } : {})
+                                    ...(isCyclic 
+                                        ? { animation: 'pro-timeline-cyclic-glow 2s infinite ease-in-out' }
+                                        : (isCritical ? { animation: 'pro-timeline-critical-glow 2s infinite ease-in-out' } : {}))
                                 }}>
                                     <FlagFilled style={{ fontSize: 9, color: isSelected ? milestoneBorderColor : '#fff', transform: 'rotate(-45deg)' }} />
                                 </div>
@@ -423,6 +428,7 @@ export default function ProTaskLayer({
 
                     // === Event (Pill / Badge style) ===
                     if (type === 'event') {
+                        const isCyclic = cyclicTaskIds?.has(task.id);
                         return (
                             <div key={task.id}
                                 style={{
@@ -433,9 +439,11 @@ export default function ProTaskLayer({
                                     borderRadius: BAR_HEIGHT / 2,
                                     background: isSelected ? (isDarkTheme ? 'rgba(0,0,0,0.8)' : '#fff') : (isDarkTheme ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.85)'),
                                     backdropFilter: 'blur(4px)',
-                                    border: `1.5px solid ${isCritical ? '#ff4d4f' : barColor}`,
+                                    border: isCyclic
+                                        ? `2px dashed #faad14`
+                                        : `1.5px solid ${isCritical ? '#ff4d4f' : barColor}`,
                                     boxShadow: isSelected 
-                                        ? `0 0 0 3px ${barColor}30, 0 4px 12px rgba(0,0,0,0.1)` 
+                                        ? `0 0 0 3px ${isCyclic ? '#faad14' : barColor}30, 0 4px 12px rgba(0,0,0,0.1)` 
                                         : isHovered 
                                             ? '0 4px 12px rgba(0,0,0,0.08)' 
                                             : '0 1px 4px rgba(0,0,0,0.04)',
@@ -445,7 +453,9 @@ export default function ProTaskLayer({
                                     transform: isDragging ? 'scale(1.02)' : isHovered ? 'translateY(-1px)' : 'none',
                                     whiteSpace: 'nowrap',
                                     zIndex: isHovered || isSelected ? 10 : 1,
-                                    ...(isCritical ? { animation: 'pro-timeline-critical-glow 2s infinite ease-in-out' } : {})
+                                    ...(isCyclic
+                                        ? { animation: 'pro-timeline-cyclic-glow 2s infinite ease-in-out' }
+                                        : (isCritical ? { animation: 'pro-timeline-critical-glow 2s infinite ease-in-out' } : {}))
                                 }}
                                 onClick={(e) => { e.stopPropagation(); onTaskClick?.(task.id); }}
                                 onPointerDown={(e) => handleTaskPointerDown(e, task, 'move')}
@@ -455,7 +465,7 @@ export default function ProTaskLayer({
                             >
                                 <div style={{
                                     width: 20, height: 20, borderRadius: '50%',
-                                    background: isCritical ? '#ff4d4f' : barColor, color: '#fff',
+                                    background: isCyclic ? '#faad14' : (isCritical ? '#ff4d4f' : barColor), color: '#fff',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     flexShrink: 0
                                 }}>
@@ -505,26 +515,33 @@ export default function ProTaskLayer({
                     }
 
                     // === Phase / Default bar ===
+                    const isCyclic = cyclicTaskIds?.has(task.id);
                     return (
                         <div key={task.id}
                             style={{
                                 position: 'absolute', left: x, top: y, width: Math.max(8, w), height: BAR_HEIGHT,
                                 pointerEvents: 'auto', cursor: isDragging && dragState.mode === 'move' ? 'grabbing' : 'grab',
                                 borderRadius:  6,
-                                background: `linear-gradient(180deg, ${isCritical ? '#ff4d4f' : barColor}F0 0%, ${isCritical ? '#ff7875' : barColor}D8 100%)`,
+                                background: isCyclic
+                                    ? `linear-gradient(180deg, #faad14F0 0%, #ffd666D8 100%)`
+                                    : `linear-gradient(180deg, ${isCritical ? '#ff4d4f' : barColor}F0 0%, ${isCritical ? '#ff7875' : barColor}D8 100%)`,
                                 boxShadow: isSelected
-                                    ? `0 0 0 2px ${isDarkTheme ? '#141414' : '#fff'}, 0 0 0 4px ${isCritical ? '#ff4d4f' : barColor}60, 0 4px 16px rgba(0,0,0,0.12)`
+                                    ? `0 0 0 2px ${isDarkTheme ? '#141414' : '#fff'}, 0 0 0 4px ${isCyclic ? '#faad14' : (isCritical ? '#ff4d4f' : barColor)}60, 0 4px 16px rgba(0,0,0,0.12)`
                                     : isDragging
                                         ? `0 8px 24px rgba(0,0,0,0.18)`
                                         : isHovered
-                                            ? `0 2px 12px ${isCritical ? '#ff4d4f' : barColor}30`
+                                            ? `0 2px 12px ${isCyclic ? '#faad14' : (isCritical ? '#ff4d4f' : barColor)}30`
                                             : '0 1px 4px rgba(0,0,0,0.08)',
-                                border: `1px solid ${isCritical ? '#ff4d4f' : (isDarkTheme ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)')}`,
+                                border: isCyclic
+                                    ? `2px dashed #faad14`
+                                    : `1px solid ${isCritical ? '#ff4d4f' : (isDarkTheme ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)')}`,
                                 transition: isDragging ? 'none' : 'box-shadow 0.2s, transform 0.2s',
                                 transform: isDragging ? 'scale(1.02)' : isHovered ? 'translateY(-1px)' : 'none',
                                 overflow: 'hidden',
                                 opacity: isDragging ? 0.92 : 1,
-                                ...(isCritical ? { animation: 'pro-timeline-critical-glow 2s infinite ease-in-out' } : {})
+                                ...(isCyclic
+                                    ? { animation: 'pro-timeline-cyclic-glow 2s infinite ease-in-out' }
+                                    : (isCritical ? { animation: 'pro-timeline-critical-glow 2s infinite ease-in-out' } : {}))
                             }}
                             onClick={(e) => { e.stopPropagation(); onTaskClick?.(task.id); }}
                             onPointerDown={(e) => handleTaskPointerDown(e, task, 'move')}

@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { ProGanttTask, useProTimelineEngine } from '../../../hooks/useProTimelineEngine';
 import { useTheme } from '../../../themes/useCoreTheme';
 
@@ -6,6 +7,7 @@ export interface ProDependencyLayerProps {
     hoveredTaskId?: string | null;
     onDeleteDependency?: (sourceId: string, targetId: string) => void;
     criticalPathTaskIds?: Set<string>;
+    cyclicTaskIds?: Set<string>;
 }
 
 const ROW_HEIGHT = 42;
@@ -13,7 +15,7 @@ const HEADER_HEIGHT = 52;
 const BAR_HEIGHT = 28;
 const BAR_TOP_MARGIN = (ROW_HEIGHT - BAR_HEIGHT) / 2;
 
-export default function ProDependencyLayer({ tasks, hoveredTaskId, onDeleteDependency, criticalPathTaskIds }: ProDependencyLayerProps) {
+export default function ProDependencyLayer({ tasks, hoveredTaskId, onDeleteDependency, criticalPathTaskIds, cyclicTaskIds }: ProDependencyLayerProps) {
     const { showCriticalPath } = useProTimelineEngine();
     const [theme] = useTheme();
     const [hoveredEdge, setHoveredEdge] = useState<{ sourceId: string; targetId: string } | null>(null);
@@ -72,6 +74,36 @@ export default function ProDependencyLayer({ tasks, hoveredTaskId, onDeleteDepen
             const isHighlighted = hoveredTaskId === task.id || hoveredTaskId === depId;
             const isEdgeHovered = hoveredEdge?.sourceId === depId && hoveredEdge?.targetId === task.id;
             const isCriticalEdge = showCriticalPath && criticalPathTaskIds?.has(depId) && criticalPathTaskIds?.has(task.id);
+            const isCyclicEdge = cyclicTaskIds?.has(depId) && cyclicTaskIds?.has(task.id);
+
+            let strokeColor = inactiveColor;
+            if (isEdgeHovered) {
+                strokeColor = theme?.palette?.error?.main || '#ff4d4f';
+            } else if (isCyclicEdge) {
+                strokeColor = '#faad14';
+            } else if (isHighlighted) {
+                strokeColor = activeColor;
+            } else if (isCriticalEdge) {
+                strokeColor = '#ff4d4f';
+            }
+
+            let strokeWidthVal = 1.5;
+            if (isEdgeHovered) strokeWidthVal = 2.5;
+            else if (isCyclicEdge || isHighlighted || isCriticalEdge) strokeWidthVal = 2;
+
+            let strokeDashVal = 'none';
+            if (isHighlighted || isEdgeHovered) strokeDashVal = '6 4';
+            else if (isCyclicEdge) strokeDashVal = '6 4';
+            else if (isCriticalEdge) strokeDashVal = '5 5';
+
+            let opacityVal = isDark ? 0.8 : 0.5;
+            if (isEdgeHovered || isHighlighted) opacityVal = 1;
+            else if (isCyclicEdge || isCriticalEdge) opacityVal = 0.95;
+
+            let markerVal = 'url(#dep-arrow)';
+            if (isEdgeHovered || isCriticalEdge) markerVal = 'url(#dep-arrow-err)';
+            else if (isCyclicEdge) markerVal = 'url(#dep-arrow-cyclic)';
+            else if (isHighlighted) markerVal = 'url(#dep-arrow-hl)';
 
             paths.push(
                 <g
@@ -84,14 +116,14 @@ export default function ProDependencyLayer({ tasks, hoveredTaskId, onDeleteDepen
                     <path 
                         d={d}
                         fill="none" 
-                        stroke={isEdgeHovered ? (theme?.palette?.error?.main || '#ff4d4f') : (isHighlighted ? activeColor : (isCriticalEdge ? '#ff4d4f' : inactiveColor))}
-                        strokeWidth={isEdgeHovered ? 2.5 : (isHighlighted ? 2 : (isCriticalEdge ? 2 : 1.5))}
-                        opacity={isEdgeHovered ? 1 : (isHighlighted ? 1 : (isCriticalEdge ? 0.95 : (isDark ? 0.8 : 0.5)))}
-                        strokeDasharray={isHighlighted || isEdgeHovered ? '6 4' : (isCriticalEdge ? '5 5' : 'none')}
-                        markerEnd={isEdgeHovered || isCriticalEdge ? "url(#dep-arrow-err)" : (isHighlighted ? "url(#dep-arrow-hl)" : "url(#dep-arrow)")}
+                        stroke={strokeColor}
+                        strokeWidth={strokeWidthVal}
+                        opacity={opacityVal}
+                        strokeDasharray={strokeDashVal}
+                        markerEnd={markerVal}
                         style={{ 
                             transition: 'stroke 0.15s, opacity 0.15s, stroke-width 0.15s',
-                            animation: isHighlighted || isEdgeHovered || isCriticalEdge ? 'pro-timeline-dash-flow 1s linear infinite' : 'none',
+                            animation: isHighlighted || isEdgeHovered || isCriticalEdge || isCyclicEdge ? 'pro-timeline-dash-flow 1s linear infinite' : 'none',
                             pointerEvents: 'visibleStroke',
                         }}
                     />
@@ -165,6 +197,9 @@ export default function ProDependencyLayer({ tasks, hoveredTaskId, onDeleteDepen
                 </marker>
                 <marker id="dep-arrow-err" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
                     <path d="M 0 1 L 7 4 L 0 7 Z" fill={theme?.palette?.error?.main || '#ff4d4f'} />
+                </marker>
+                <marker id="dep-arrow-cyclic" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                    <path d="M 0 1 L 7 4 L 0 7 Z" fill="#faad14" />
                 </marker>
             </defs>
             {paths}

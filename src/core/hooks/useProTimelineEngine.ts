@@ -322,14 +322,22 @@ export function addWorkDaysSigned(startDateStr: string, workDays: number): strin
 
 // ===== 关键路径 CPM 算法 =====
 
+export interface CriticalPathResult {
+  criticalPathTaskIds: Set<string>;
+  cyclicTaskIds: Set<string>;
+}
+
 export function calculateCriticalPath(
   tasks: { id: string; startDate: string; endDate: string; type?: string }[],
   edges: { source: string; target: string }[]
-): Set<string> {
+): CriticalPathResult {
   const criticalSet = new Set<string>();
+  const cyclicTaskIds = new Set<string>();
   
   const leafTasks = tasks.filter(t => t.type !== 'summary' && t.startDate && t.endDate);
-  if (leafTasks.length === 0) return criticalSet;
+  if (leafTasks.length === 0) {
+      return { criticalPathTaskIds: criticalSet, cyclicTaskIds };
+  }
 
   let projectStartStr = leafTasks[0].startDate;
   leafTasks.forEach(t => {
@@ -397,7 +405,15 @@ export function calculateCriticalPath(
   }
 
   if (topoOrder.length < nodeMap.size) {
-      return criticalSet;
+      nodeMap.forEach((_, id) => {
+          if (!topoOrder.includes(id)) {
+              cyclicTaskIds.add(id);
+          }
+      });
+      return {
+          criticalPathTaskIds: new Set<string>(),
+          cyclicTaskIds
+      };
   }
 
   topoOrder.forEach(uId => {
@@ -446,5 +462,8 @@ export function calculateCriticalPath(
       }
   });
 
-  return criticalSet;
+  return {
+      criticalPathTaskIds: criticalSet,
+      cyclicTaskIds
+  };
 }
