@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useReactFlow } from '@xyflow/react';
@@ -44,7 +44,12 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
   }, [cfgState.integration]);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const minimapRef = useRef<HTMLDivElement>(null);
+  const minimapRef = useRef<HTMLDivElement | null>(null);
+  const [minimapElement, setMinimapElement] = useState<HTMLDivElement | null>(null);
+  const setMinimapRef = useCallback((node: HTMLDivElement | null) => {
+    minimapRef.current = node;
+    setMinimapElement(node);
+  }, []);
   const anchorRef = useRef<HTMLDivElement>(null);
 
   const reactFlowInstance = useReactFlow();
@@ -130,7 +135,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
 
   // 原生轮播放大
   useEffect(() => {
-    const el = minimapRef.current;
+    const el = minimapElement;
     if (!el || !zoomable) return;
     const wheelHandler = (ev: WheelEvent) => nav.handleMiniMapWheel(ev);
     try {
@@ -141,7 +146,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
     return () => {
       try { el.removeEventListener('wheel', wheelHandler); } catch { return; }
     };
-  }, [zoomable, nav]);
+  }, [minimapElement, zoomable, nav]);
 
   // 动态调整 Portal 位置，根据 container 边界变化实时更新 containerRect 缓存
   useEffect(() => {
@@ -196,6 +201,10 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
     large: { width: 240, height: 180 }
   };
 
+  const currentSizeConfig = sizeConfigs[overlay.currentSize];
+  const minimapWidth = extractValidNumber(style?.width, currentSizeConfig.width) - 4;
+  const minimapHeight = extractValidNumber(style?.height, currentSizeConfig.height) - 32;
+
   // 通过 containerRect 与 container-relative offset 动态算出绝对的 screen 位置
   const absoluteLeft = containerRect 
     ? containerRect.left + overlay.offset.left 
@@ -207,8 +216,8 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
   const containerStyle: React.CSSProperties = {
     bottom: `${absoluteBottom}px`,
     left: `${absoluteLeft}px`,
-    width: overlay.isMinimized ? '44px' : `${sizeConfigs[overlay.currentSize].width}px`,
-    height: overlay.isMinimized ? '44px' : `${sizeConfigs[overlay.currentSize].height}px`,
+    width: overlay.isMinimized ? '44px' : `${currentSizeConfig.width}px`,
+    height: overlay.isMinimized ? '44px' : `${currentSizeConfig.height}px`,
     ...style
   };
 
@@ -256,7 +265,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
               </div>
 
               <div
-                ref={minimapRef}
+                ref={setMinimapRef}
                 style={{
                   position: 'absolute', top: '30px', left: '2px', right: '2px', bottom: '2px',
                   pointerEvents: 'auto', cursor: nav.isMinimapDragging ? 'grabbing' : 'crosshair'
@@ -264,7 +273,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
                 onClick={(e) => nav.handleMiniMapClick(e, overlay.isDragging)}
                 onMouseDown={nav.handleMinimapMouseDown}
               >
-                {miniMapReady && minimapRef.current ? (
+                {miniMapReady && minimapElement ? (
                   (() => {
                     const nodes = reactFlowInstance.getNodes();
                     // [FIX] Build a lookup map and compute absolute positions by walking
@@ -307,12 +316,11 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
                         }}>初始化缩略图…</div>
                       );
                     }
-                    const rect = minimapRef.current.getBoundingClientRect();
                     const viewport = viewportForRender;
                     const rfRoot = (anchorRef.current?.closest?.('.react-flow') as HTMLElement | null) || (document.querySelector('.react-flow') as HTMLElement | null);
                     const rendererEl = (rfRoot?.querySelector?.('.react-flow__renderer') as HTMLElement | null) || rfRoot;
-                    const baseWidth = rendererEl?.clientWidth ?? rect.width;
-                    const baseHeight = rendererEl?.clientHeight ?? rect.height;
+                    const baseWidth = rendererEl?.clientWidth ?? minimapWidth;
+                    const baseHeight = rendererEl?.clientHeight ?? minimapHeight;
                     const renderUiScale = getUiScale();
                     const visiblePixelWidth = Math.max(1, baseWidth / renderUiScale);
                     const visiblePixelHeight = Math.max(1, baseHeight / renderUiScale);
@@ -328,8 +336,8 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
                     const unionMaxY = Math.max(maxY, vyWorld + vHeightWorld);
                     const totalWidth = Math.max(1, safeNumber(unionMaxX - unionMinX, 1));
                     const totalHeight = Math.max(1, safeNumber(unionMaxY - unionMinY, 1));
-                    const scaleX = rect.width / totalWidth;
-                    const scaleY = rect.height / totalHeight;
+                    const scaleX = minimapWidth / totalWidth;
+                    const scaleY = minimapHeight / totalHeight;
 
                     const vx = (vxWorld - unionMinX) * scaleX;
                     const vy = (vyWorld - unionMinY) * scaleY;
@@ -337,10 +345,10 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
                     const vHeight = vHeightWorld * scaleY;
                     const vxClamped = Math.max(0, vx);
                     const vyClamped = Math.max(0, vy);
-                    const vWidthClamped = Math.max(1, Math.min(vWidth, rect.width - vxClamped));
-                    const vHeightClamped = Math.max(1, Math.min(vHeight, rect.height - vyClamped));
+                    const vWidthClamped = Math.max(1, Math.min(vWidth, minimapWidth - vxClamped));
+                    const vHeightClamped = Math.max(1, Math.min(vHeight, minimapHeight - vyClamped));
                     return (
-                      <svg width={rect.width} height={rect.height} style={{ display: 'block' }}>
+                      <svg width={minimapWidth} height={minimapHeight} style={{ display: 'block' }}>
                         {(() => {
                           const primary = String(currentTheme?.palette?.primary?.main || '#667EEA');
                           return (
@@ -351,7 +359,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
                             </defs>
                           );
                         })()}
-                        <rect x={0} y={0} width={rect.width} height={rect.height} fill="var(--glass-bg, rgba(255, 255, 255, 0.45))" />
+                        <rect x={0} y={0} width={minimapWidth} height={minimapHeight} fill="var(--glass-bg, rgba(255, 255, 255, 0.45))" />
                         {nodes.map((n, idx) => {
                           // Use the same getAbsPos helper for consistent positioning
                           const abs = getAbsPos(n);

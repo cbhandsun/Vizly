@@ -25,7 +25,6 @@ interface AdvancedExportModalProps {
  */
 export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visible, onClose }) => {
   const { t } = useTranslation();
-  const { nodes } = useDiagramStore();
   const [format, setFormat] = useState<ExportOptions['format']>('png');
   const [pixelRatio, setPixelRatio] = useState<number>(2);
   const [includeBackground, setIncludeBackground] = useState<boolean>(true);
@@ -35,7 +34,8 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
   const handleExport = async () => {
     setExporting(true);
     try {
-      await downloadImage(nodes as any[], {
+      const currentNodes = useDiagramStore.getState().nodes;
+      await downloadImage(currentNodes as any[], {
         format,
         pixelRatio,
         includeBackground,
@@ -51,7 +51,8 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
   };
 
   const handleCopyClipboard = async () => {
-    const success = await copyImageToClipboard(nodes);
+    const currentNodes = useDiagramStore.getState().nodes;
+    const success = await copyImageToClipboard(currentNodes);
     if (success) {
       appMessage.success(t('advancedExport.copySuccess'));
       onClose();

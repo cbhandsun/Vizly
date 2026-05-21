@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useMemo } from 'react';
 
 interface Warehouse3DContextType {
     autoRotate: boolean;
@@ -24,14 +24,16 @@ export const Warehouse3DProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     const triggerResetView = () => setResetViewTrigger(prev => prev + 1);
 
+    const contextValue = useMemo(() => ({
+        autoRotate, setAutoRotate,
+        showLabels, setShowLabels,
+        showFlow, setShowFlow,
+        showRealism, setShowRealism,
+        resetViewTrigger, triggerResetView
+    }), [autoRotate, showLabels, showFlow, showRealism, resetViewTrigger]);
+
     return (
-        <Warehouse3DContext.Provider value={{
-            autoRotate, setAutoRotate,
-            showLabels, setShowLabels,
-            showFlow, setShowFlow,
-            showRealism, setShowRealism,
-            resetViewTrigger, triggerResetView
-        }}>
+        <Warehouse3DContext.Provider value={contextValue}>
             {children}
         </Warehouse3DContext.Provider>
     );

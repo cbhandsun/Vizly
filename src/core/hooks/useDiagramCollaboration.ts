@@ -9,7 +9,8 @@ import { collaborationService } from '../services/CollaborationService';
  * 将 Zustand 状态与 Yjs 共享类型进行双向绑定
  */
 export function useDiagramCollaboration(diagramId: string, enabled: boolean = true) {
-    const { nodes, edges, setNodes, setEdges } = useDiagramStore();
+    const setNodes = useDiagramStore(state => state.setNodes);
+    const setEdges = useDiagramStore(state => state.setEdges);
     
     // 标记当前更新是否来自协同同步，防止死循环
     const isRemoteUpdateRef = useRef(false);
@@ -53,10 +54,12 @@ export function useDiagramCollaboration(diagramId: string, enabled: boolean = tr
         yComments.observe(observeHandler);
 
         // 4. 初始化本地数据到云端 (如果云端为空)
-        if (yNodes.size === 0 && nodes.length > 0) {
+        const currentNodes = useDiagramStore.getState().nodes;
+        const currentEdges = useDiagramStore.getState().edges;
+        if (yNodes.size === 0 && currentNodes.length > 0) {
             doc.transact(() => {
-                nodes.forEach(n => yNodes.set(n.id, n));
-                edges.forEach(e => yEdges.set(e.id, e));
+                currentNodes.forEach(n => yNodes.set(n.id, n));
+                currentEdges.forEach(e => yEdges.set(e.id, e));
                 // 同步初始评论
                 const currentComments = useDiagramStore.getState().comments;
                 currentComments.forEach(c => yComments.set(c.id, c));

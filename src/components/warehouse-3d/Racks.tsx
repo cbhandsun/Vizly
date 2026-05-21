@@ -11,19 +11,20 @@ interface InstanceData {
     color?: THREE.Color;
 }
 
-const Racks: React.FC = () => {
-    // Shared Geometries
-    const postGeo = new THREE.BoxGeometry(0.2, 1, 0.2); // Base height 1, scaled by instance
-    const beamGeo = new THREE.BoxGeometry(1, 0.1, 2.6); // Base length 1, scaled by instance
-    const palletGeo = new THREE.BoxGeometry(1.4, 0.15, 1.4);
-    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+// Shared Geometries (Created once and reused across all renders)
+const postGeo = new THREE.BoxGeometry(0.2, 1, 0.2); // Base height 1, scaled by instance
+const beamGeo = new THREE.BoxGeometry(1, 0.1, 2.6); // Base length 1, scaled by instance
+const palletGeo = new THREE.BoxGeometry(1.4, 0.15, 1.4);
+const boxGeo = new THREE.BoxGeometry(1, 1, 1);
 
-    // Shared Materials
-    const postMat = new THREE.MeshStandardMaterial({ color: "#34495e", metalness: 0.8 });
-    const beamMatHP = new THREE.MeshStandardMaterial({ color: WAREHOUSE.COLORS.RACKS_HIGH_BAY });
-    const beamMatMZ = new THREE.MeshStandardMaterial({ color: WAREHOUSE.COLORS.RACKS_MEZZANINE });
-    const palletMat = new THREE.MeshStandardMaterial({ color: "#8d6e63" });
-    const boxMat = new THREE.MeshStandardMaterial({ color: "#e67e22" });
+// Shared Materials (Created once and reused across all renders)
+const postMat = new THREE.MeshStandardMaterial({ color: "#34495e", metalness: 0.8 });
+const beamMatHP = new THREE.MeshStandardMaterial({ color: WAREHOUSE.COLORS.RACKS_HIGH_BAY });
+const beamMatMZ = new THREE.MeshStandardMaterial({ color: WAREHOUSE.COLORS.RACKS_MEZZANINE });
+const palletMat = new THREE.MeshStandardMaterial({ color: "#8d6e63" });
+const boxMat = new THREE.MeshStandardMaterial({ color: "#e67e22" });
+
+const Racks: React.FC = () => {
 
     // Configuration for High Bay Racks
     const highBayConfig = useMemo<InstanceData[]>(() => {

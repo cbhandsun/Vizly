@@ -14,7 +14,10 @@ const { Text } = Typography;
 export const CommentPanel: React.FC = () => {
     const { t } = useTranslation();
     const { token } = theme.useToken();
-    const { comments, removeComment, updateComment, setActiveCommentId } = useDiagramStore();
+    const comments = useDiagramStore(state => state.comments);
+    const removeComment = useDiagramStore(state => state.removeComment);
+    const updateComment = useDiagramStore(state => state.updateComment);
+    const setActiveCommentId = useDiagramStore(state => state.setActiveCommentId);
     const { setCenter } = useReactFlow();
     
     const [searchTerm, setSearchTerm] = useState('');

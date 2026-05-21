@@ -16,6 +16,7 @@ const EMPTY_ARRAY: any[] = [];
 
 export const ContextMenuLayer: React.FC<ContextMenuLayerProps> = ({ onAction, activePlugin, pluginCtx }) => {
   const contextMenu = useDiagramStore((state: any) => state.contextMenu);
+  const setContextMenu = useDiagramStore((state: any) => state.setContextMenu);
   const selectedNodes = useDiagramStore((state: any) => state.selectedNodes);
   const selectedEdges = useDiagramStore((state: any) => state.selectedEdges);
   

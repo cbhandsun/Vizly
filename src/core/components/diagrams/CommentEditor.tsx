@@ -13,7 +13,9 @@ interface CommentEditorProps {
 
 export const CommentEditor: React.FC<CommentEditorProps> = ({ comment, onClose }) => {
     const { token } = theme.useToken();
-    const { updateComment, removeComment, user } = useDiagramStore();
+    const updateComment = useDiagramStore(state => state.updateComment);
+    const removeComment = useDiagramStore(state => state.removeComment);
+    const user = useDiagramStore(state => state.user);
     const [replyText, setReplyText] = useState('');
 
     const handleAddReply = () => {
