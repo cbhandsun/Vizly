@@ -522,7 +522,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       })();
 
       // 允许向下收缩以确保完整放入首屏，避免宽图/横向布局在初始化或切换时被截断
-      const MIN_FIT_ZOOM = 0.18;
+      const MIN_FIT_ZOOM = 0.45;
 
       // 计算按宽度适配的缩放比，并顶端对齐
       // 应用 fitRatio 调整目标宽度，实现"留白"效果（解决 100% 撑满过于拥挤的问题）
