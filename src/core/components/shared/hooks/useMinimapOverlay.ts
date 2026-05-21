@@ -1,22 +1,65 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-interface OverlayState {
-    isMinimized: boolean;
-    currentSize: 'small' | 'medium' | 'large';
-    position: { left: number; bottom: number };
-    isDragging: boolean;
+interface Offset {
+    left: number;
+    bottom: number;
 }
 
 export function useMinimapOverlay(
     defaultSize: 'small' | 'medium' | 'large' = 'large',
     containerRef: React.RefObject<HTMLDivElement | null>
 ) {
-    const [isMinimized, setIsMinimized] = useState(false);
-    const [currentSize, setCurrentSize] = useState<'small' | 'medium' | 'large'>(defaultSize);
-    const [position, setPosition] = useState({ bottom: 76, left: 24 });
+    const [isMinimized, setIsMinimized] = useState<boolean>(() => {
+        try {
+            return localStorage.getItem('designer.minimap.minimized') === 'true';
+        } catch {
+            return false;
+        }
+    });
+
+    const [currentSize, setCurrentSize] = useState<'small' | 'medium' | 'large'>(() => {
+        try {
+            const saved = localStorage.getItem('designer.minimap.size');
+            return (saved === 'small' || saved === 'medium' || saved === 'large') ? saved : defaultSize;
+        } catch {
+            return defaultSize;
+        }
+    });
+
+    const [offset, setOffset] = useState<Offset>(() => {
+        try {
+            const saved = localStorage.getItem('designer.minimap.offset');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (typeof parsed.left === 'number' && typeof parsed.bottom === 'number') {
+                    return parsed;
+                }
+            }
+        } catch {}
+        return { bottom: 76, left: 24 };
+    });
+
     const [isDragging, setIsDragging] = useState(false);
 
-    const dragStartRef = useRef({ x: 0, y: 0, startLeft: 0, startBottom: 0 });
+    const dragStartRef = useRef({ x: 0, y: 0, startOffsetLeft: 0, startOffsetBottom: 0 });
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('designer.minimap.minimized', String(isMinimized));
+        } catch {}
+    }, [isMinimized]);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('designer.minimap.size', currentSize);
+        } catch {}
+    }, [currentSize]);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('designer.minimap.offset', JSON.stringify(offset));
+        } catch {}
+    }, [offset]);
 
     const toggleMinimize = useCallback(() => setIsMinimized(prev => !prev), []);
 
@@ -45,15 +88,15 @@ export function useMinimapOverlay(
         dragStartRef.current = {
             x: e.clientX,
             y: e.clientY,
-            startLeft: position.left,
-            startBottom: position.bottom
+            startOffsetLeft: offset.left,
+            startOffsetBottom: offset.bottom
         };
         
         cancelViewportAnimation();
 
         document.body.style.userSelect = 'none';
         document.body.style.cursor = 'grabbing';
-    }, [isMinimized, position]);
+    }, [isMinimized, offset]);
 
     const handleMouseMove = useCallback((e: MouseEvent) => {
         if (!isDragging) return;
@@ -61,8 +104,8 @@ export function useMinimapOverlay(
         const deltaX = e.clientX - dragStartRef.current.x;
         const deltaY = e.clientY - dragStartRef.current.y;
 
-        const newLeft = dragStartRef.current.startLeft + deltaX;
-        const newBottom = dragStartRef.current.startBottom - deltaY;
+        const newOffsetLeft = dragStartRef.current.startOffsetLeft + deltaX;
+        const newOffsetBottom = dragStartRef.current.startOffsetBottom - deltaY;
 
         const getParentSize = () => {
             const parent = containerRef.current?.offsetParent as HTMLElement;
@@ -80,9 +123,9 @@ export function useMinimapOverlay(
         const minBottom = 10;
         const maxBottom = parentHeight - containerHeight - 10;
 
-        setPosition({
-            left: Math.max(minLeft, Math.min(newLeft, maxLeft)),
-            bottom: Math.max(minBottom, Math.min(newBottom, maxBottom))
+        setOffset({
+            left: Math.max(minLeft, Math.min(newOffsetLeft, maxLeft)),
+            bottom: Math.max(minBottom, Math.min(newOffsetBottom, maxBottom))
         });
     }, [isDragging, containerRef]);
 
@@ -97,7 +140,7 @@ export function useMinimapOverlay(
     return {
         isMinimized, toggleMinimize,
         currentSize, cycleSize,
-        position, setPosition,
+        offset, setOffset,
         isDragging, handleDragStart, handleMouseMove, handleMouseUp
     };
 }

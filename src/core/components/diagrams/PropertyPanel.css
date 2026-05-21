@@ -35,6 +35,8 @@
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     box-shadow: none;
+    opacity: 1;
+    overflow: visible;
 }
 
 /* 收起状态 */

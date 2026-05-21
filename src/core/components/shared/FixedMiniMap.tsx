@@ -51,6 +51,9 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
 
   // Overlay interactions controller
   const overlay = useMinimapOverlay(defaultSize, containerRef);
+  
+  // 缓存画布容器的 Bound 用于计算 Portal 绝对位置
+  const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
 
   // 订阅视口变化以驱动 minimap 缩略图矩形的实时更新
   const [viewportForRender, setViewportForRender] = useState<{ x: number; y: number; zoom: number }>(reactFlowInstance.getViewport());
@@ -140,7 +143,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
     };
   }, [zoomable, nav]);
 
-  // 动态调整 Portal 位置
+  // 动态调整 Portal 位置，根据 container 边界变化实时更新 containerRect 缓存
   useEffect(() => {
     const anchor = anchorRef.current;
     if (!anchor) return;
@@ -149,12 +152,28 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
 
     const updatePosition = () => {
       const rect = container.getBoundingClientRect();
-      const distLeft = rect.left + 24;
-      const distBottom = window.innerHeight - rect.bottom + 76;
+      setContainerRect(rect);
 
-      overlay.setPosition(prev => {
-        if (Math.abs(prev.left - distLeft) > 1 || Math.abs(prev.bottom - distBottom) > 1) {
-          return { left: Math.max(10, distLeft), bottom: Math.max(10, distBottom) };
+      // 如果容器尺寸收缩，自动纠正溢出边界的 relative offset
+      overlay.setOffset(prev => {
+        const getParentSize = () => {
+          const parent = container.offsetParent as HTMLElement;
+          if (parent) return { width: parent.clientWidth, height: parent.clientHeight };
+          return { width: window.innerWidth, height: window.innerHeight };
+        };
+        const { width: parentWidth, height: parentHeight } = getParentSize();
+        const miniMapRect = containerRef.current?.getBoundingClientRect();
+        const containerWidth = miniMapRect?.width || 240;
+        const containerHeight = miniMapRect?.height || 180;
+
+        const maxLeft = Math.max(10, parentWidth - containerWidth - 10);
+        const maxBottom = Math.max(10, parentHeight - containerHeight - 10);
+
+        const nextLeft = Math.max(10, Math.min(prev.left, maxLeft));
+        const nextBottom = Math.max(10, Math.min(prev.bottom, maxBottom));
+
+        if (nextLeft !== prev.left || nextBottom !== prev.bottom) {
+          return { left: nextLeft, bottom: nextBottom };
         }
         return prev;
       });
@@ -169,7 +188,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
       ro.disconnect();
       window.removeEventListener('resize', updatePosition);
     };
-  }, [overlay.setPosition]);
+  }, [overlay.setOffset]);
 
   const sizeConfigs = {
     small: { width: 160, height: 120 },
@@ -177,9 +196,17 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
     large: { width: 240, height: 180 }
   };
 
+  // 通过 containerRect 与 container-relative offset 动态算出绝对的 screen 位置
+  const absoluteLeft = containerRect 
+    ? containerRect.left + overlay.offset.left 
+    : 24;
+  const absoluteBottom = containerRect 
+    ? (window.innerHeight - containerRect.bottom) + overlay.offset.bottom 
+    : 76;
+
   const containerStyle: React.CSSProperties = {
-    bottom: `${overlay.position.bottom}px`,
-    left: `${overlay.position.left}px`,
+    bottom: `${absoluteBottom}px`,
+    left: `${absoluteLeft}px`,
     width: overlay.isMinimized ? '44px' : `${sizeConfigs[overlay.currentSize].width}px`,
     height: overlay.isMinimized ? '44px' : `${sizeConfigs[overlay.currentSize].height}px`,
     ...style
