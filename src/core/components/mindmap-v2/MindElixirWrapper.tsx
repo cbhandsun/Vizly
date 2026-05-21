@@ -25,7 +25,7 @@ import 'mind-elixir/style.css';
 
 import { PluginContext } from '../../types/plugin';
 import { VIZLY_HYPER_THEME, VIZLY_HYPER_DARK_THEME, VIZLY_THEMES } from './theme';
-import { migrateV1ToV2, directionStringToInt, markdownToNodeObj, opmlToNodeObj } from './migrate';
+import { migrateV1ToV2, directionStringToInt, markdownToNodeObj, opmlToNodeObj, downloadText } from './migrate';
 import { isMindMapV2 } from './types';
 import { registerMindElixirInstance, unregisterMindElixirInstance } from './mindElixirStore';
 import MindMapContextMenu, { type CtxPos } from './MindMapContextMenu';
@@ -33,10 +33,14 @@ import MindMapFloatingBar from './MindMapFloatingBar';
 import MindMapBatchBar from './MindMapBatchBar';
 import MindMapEmptyGuide from './MindMapEmptyGuide';
 import MindMapOutlinePanel from './MindMapOutlinePanel';
+import MindMapHistoryPanel from './MindMapHistoryPanel';
+import { MindMapTaskKanban } from './MindMapTaskKanban';
+import { setCurrentDiagramId, addHistoryRecord, emitToggleHistory } from './mindmapHistoryStore';
 import MindMapYjsIntegration from './MindMapYjsIntegration';
 import MindMapBoundaries from './MindMapBoundaries';
 import MindMapMultiplayerCursors from './MindMapMultiplayerCursors';
 import { emitToggleOutline } from './mindmapOutlineStore';
+import { MindMapSpeakerNotes } from './MindMapSpeakerNotes';
 import { findNodeById } from './migrate';
 import { marked } from 'marked';
 
@@ -74,6 +78,28 @@ export function useMindElixir() {
 // ─── CSS fix: inject a style override so gradient backgrounds actually render ──
 // mind-elixir uses `background-color: var(--main-bgcolor)` but CSS gradients are
 // not valid values for background-color — they need the `background` shorthand.
+const ME_DYNAMIC_THEME_ID = 'me-dynamic-theme-override';
+function injectThemeStyles(theme: any) {
+    if (!theme || !theme.palette) return;
+    let style = document.getElementById(ME_DYNAMIC_THEME_ID) as HTMLStyleElement | null;
+    if (!style) {
+        style = document.createElement('style');
+        style.id = ME_DYNAMIC_THEME_ID;
+        document.head.appendChild(style);
+    }
+    let cssText = '';
+    const palette = theme.palette;
+    palette.forEach((color: string, index: number) => {
+        cssText += `
+            .map-container me-main > me-wrapper:nth-of-type(${index + 1}) > me-parent > me-tpc {
+                background: ${color} !important;
+                color: #ffffff !important;
+            }
+        `;
+    });
+    style.textContent = cssText;
+}
+
 const ME_GRADIENT_FIX_ID = 'me-gradient-bg-fix';
 function injectGradientFix() {
     if (document.getElementById(ME_GRADIENT_FIX_ID)) return;
@@ -464,7 +490,66 @@ function saveData(ctx: PluginContext, mind: MindElixirInstance): void {
     }
 }
 
+function flattenMindmapTree(root: NodeObj, parentId: string | null = null, depth = 0, side?: 'left' | 'right'): { nodes: any[], edges: any[] } {
+    const nodes: any[] = [];
+    const edges: any[] = [];
+
+    const nodeSide = root.side || side || 'right';
+
+    nodes.push({
+        id: root.id,
+        type: 'mindmap',
+        data: {
+            label: root.topic,
+            depth,
+            side: root.id === 'root' ? undefined : nodeSide,
+            parentId: parentId || undefined,
+            note: root.note,
+            url: root.hyperLink,
+            tags: root.tags,
+            icons: root.icons,
+        }
+    });
+
+    if (parentId) {
+        edges.push({
+            id: `edge_${parentId}_${root.id}`,
+            source: parentId,
+            target: root.id,
+        });
+    }
+
+    if (root.children) {
+        root.children.forEach(child => {
+            const childRes = flattenMindmapTree(child, root.id, depth + 1, nodeSide);
+            nodes.push(...childRes.nodes);
+            edges.push(...childRes.edges);
+        });
+    }
+
+    return { nodes, edges };
+}
+
 // ─── Wrapper Component ────────────────────────────────────────────────────────
+const OP_NAMES_MAP: Record<string, string> = {
+    insertSibling: '添加兄弟节点',
+    addChild: '添加子节点',
+    removeNodes: '删除节点',
+    removeNode: '删除节点',
+    setNodeTopic: '修改节点文本',
+    moveNode: '移动节点位置',
+    setNodeNote: '修改节点备注',
+    setNodeTags: '修改节点标签',
+    setNodeIcons: '修改节点图标',
+    setNodeHyperLink: '修改节点链接',
+    outline_structure_change: '大纲拖拽排序',
+    template_apply: '套用模板',
+    ai_custom_action: 'AI 交互式指令处理',
+    clearHistory: '清空历史',
+    import: '导入数据',
+    restore_version: '恢复历史版本'
+};
+
 interface MindElixirWrapperProps {
     ctx: PluginContext;
     isDark?: boolean;
@@ -500,6 +585,11 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             ? (VIZLY_THEMES[storedThemeKey] ?? (isDark ? VIZLY_HYPER_DARK_THEME : VIZLY_HYPER_THEME))
             : (isDark ? VIZLY_HYPER_DARK_THEME : VIZLY_HYPER_THEME);
 
+        const diagramId = ctx.diagramId;
+        if (diagramId) {
+            setCurrentDiagramId(diagramId);
+        }
+
         const mind = new MindElixir({
             el: containerRef.current,
             direction: (initialData.direction ?? MindElixir.SIDE) as 0 | 1 | 2,
@@ -525,6 +615,20 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         mindRef.current = mind;
         setInstance(mind);
         registerMindElixirInstance(mind);  // expose to toolbar and other out-of-tree consumers
+
+        if (diagramId) {
+            addHistoryRecord('加载思维导图', initialData.nodeData);
+        }
+
+        // ── 拦截 changeTheme 并同步彩虹色样式 ──────────────────────────
+        const originalChangeTheme = mind.changeTheme.bind(mind);
+        mind.changeTheme = (newTheme: any) => {
+            originalChangeTheme(newTheme);
+            injectThemeStyles(newTheme);
+        };
+
+        // 首次初始化后执行一次
+        injectThemeStyles(theme);
 
         // ── 系统深色/浅色主题自动跟随 ─────────────────────────────────────────
         const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -574,7 +678,20 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
 
         // Debounced auto-save on every operation
         const debouncedSave = debounce(() => saveRef.current(), 800);
-        mind.bus.addListener('operation', debouncedSave);
+        const onOperation = (op: any) => {
+            debouncedSave();
+            
+            // Record history snapshot
+            const opName = op?.name;
+            const desc = OP_NAMES_MAP[opName] || '更新思维导图';
+            try {
+                const nodeData = mind.getData().nodeData;
+                addHistoryRecord(desc, nodeData);
+            } catch (err) {
+                console.error('[History record failed]', err);
+            }
+        };
+        mind.bus.addListener('operation', onOperation);
 
         // ── Collapsed count badges (data-driven) ─────────────────────────────
         // Walk the nodeData tree; for each collapsed node inject a child-count badge
@@ -636,6 +753,12 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             if (e.altKey && e.key.toLowerCase() === 'o') {
                 e.preventDefault();
                 emitToggleOutline();
+                return;
+            }
+            // Alt+H — toggle history panel
+            if (e.altKey && e.key.toLowerCase() === 'h') {
+                e.preventDefault();
+                emitToggleHistory();
                 return;
             }
             // Ctrl+Shift+C — copy selected node topic to clipboard
@@ -709,6 +832,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             mind.container?.removeEventListener('mouseover', handleNoteOver);
             mind.container?.removeEventListener('mouseout', handleNoteOut);
             document.removeEventListener('keydown', handleGlobalKeys);
+            document.getElementById(ME_DYNAMIC_THEME_ID)?.remove();
             // mind-elixir doesn't have a formal destroy() — unmounting the div is enough
             unregisterMindElixirInstance();
             mindRef.current = null;
@@ -723,6 +847,105 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         if (!mindRef.current) return;
         mindRef.current.changeTheme(isDark ? VIZLY_HYPER_DARK_THEME : VIZLY_HYPER_THEME);
     }, [isDark]);
+
+    // Register __flowDataBridge for AI chat panel & other global integrations
+    useEffect(() => {
+        const diagramId = ctx.diagramId;
+        if (!diagramId) return;
+
+        if (!(window as any).__flowDataBridge) {
+            (window as any).__flowDataBridge = {};
+        }
+
+        const bridgeObj = {
+            get nodes() {
+                if (!mindRef.current) return [];
+                const data = mindRef.current.getData();
+                return flattenMindmapTree(data.nodeData).nodes;
+            },
+            get edges() {
+                if (!mindRef.current) return [];
+                const data = mindRef.current.getData();
+                return flattenMindmapTree(data.nodeData).edges;
+            },
+            importData: async (newData: any) => {
+                if (!mindRef.current) return;
+                try {
+                    const v2 = migrateV1ToV2(newData);
+                    mindRef.current.refresh(v2);
+                    saveData(ctx, mindRef.current);
+                } catch (err) {
+                    console.error('[AI Bridge] importData failed:', err);
+                }
+            },
+            addNode: async (args: { label: string; shape?: string }) => {
+                if (!mindRef.current) return;
+                try {
+                    const parentId = mindRef.current.currentNode?.id || 'root';
+                    const parent = mindRef.current.findEle(parentId);
+                    if (parent) {
+                        const newId = `node_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+                        mindRef.current.addChild(parent, {
+                            id: newId,
+                            topic: args.label,
+                        });
+                        saveData(ctx, mindRef.current);
+                        return newId;
+                    }
+                } catch (err) {
+                    console.error('[AI Bridge] addNode failed:', err);
+                }
+            },
+            addChild: async (args: { parentId: string; label: string; side?: 'left' | 'right' }) => {
+                if (!mindRef.current) return;
+                try {
+                    const parent = mindRef.current.findEle(args.parentId);
+                    if (parent) {
+                        const newId = `node_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+                        mindRef.current.addChild(parent, {
+                            id: newId,
+                            topic: args.label,
+                            side: args.side,
+                        });
+                        saveData(ctx, mindRef.current);
+                        return newId;
+                    }
+                } catch (err) {
+                    console.error('[AI Bridge] addChild failed:', err);
+                }
+            },
+            deleteNodes: async (ids: string[]) => {
+                if (!mindRef.current) return;
+                try {
+                    const els = ids.map(id => mindRef.current!.findEle(id)).filter(Boolean);
+                    if (els.length > 0) {
+                        mindRef.current.removeNodes(els);
+                        saveData(ctx, mindRef.current);
+                    }
+                } catch (err) {
+                    console.error('[AI Bridge] deleteNodes failed:', err);
+                }
+            },
+            collapse: async (id: string, collapsed: boolean) => {
+                if (!mindRef.current) return;
+                try {
+                    const el = mindRef.current.findEle(id);
+                    if (el) {
+                        mindRef.current.expandNode(el, !collapsed);
+                        saveData(ctx, mindRef.current);
+                    }
+                } catch (err) {
+                    console.error('[AI Bridge] collapse failed:', err);
+                }
+            }
+        };
+
+        (window as any).__flowDataBridge[diagramId] = bridgeObj;
+
+        return () => {
+            delete (window as any).__flowDataBridge?.[diagramId];
+        };
+    }, [ctx, instance]);
 
     // Drag-to-import handler: drop .md / .opml files onto canvas
     const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -790,8 +1013,10 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                 <div
                     ref={containerRef}
                     id="vizly-mind-elixir-root"
-                    style={{ width: '100%', height: '100%' }}
-                />
+                    style={{ width: '100%', height: '100%', position: 'relative' }}
+                >
+                    <MindMapSpeakerNotes />
+                </div>
                 {isDragOver && (
                     <div style={{
                         position: 'absolute', inset: 0, zIndex: 100,
@@ -819,6 +1044,12 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
 
                 {/* Outline view panel — slides in from the right */}
                 <MindMapOutlinePanel />
+
+                {/* Revision History panel — slides in from the right */}
+                <MindMapHistoryPanel />
+
+                {/* AI Task Kanban panel — slides in from the right */}
+                <MindMapTaskKanban />
             </div>
 
             {/* Custom context menu */}

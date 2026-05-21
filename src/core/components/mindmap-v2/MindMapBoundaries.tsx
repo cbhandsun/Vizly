@@ -21,9 +21,9 @@ export default function MindMapBoundaries() {
         if (!instance?.container) return;
 
         const containerEle = instance.container.querySelector('.map-container') as HTMLElement;
-        if (containerEle) {
-            setMapContainer(containerEle);
-        }
+        if (!containerEle) return;
+
+        setMapContainer(containerEle);
 
         const updateBoundaries = () => {
             if (!containerEle) return;
@@ -82,19 +82,52 @@ export default function MindMapBoundaries() {
         // 1. Update on operation (layout changes, add/remove nodes)
         const handleOp = () => {
             updateBoundaries();
-            setTimeout(updateBoundaries, 150); // Give flexbox layout time to settle
         };
         instance.bus.addListener('operation', handleOp);
-        
-        // 2. Poll fallback for node collapse animations or window resizes 
-        // that don't emit operations but change bounding rects
-        const interval = setInterval(updateBoundaries, 200);
+
+        // 2. MutationObserver to watch DOM structure/attribute changes
+        const mutationObserver = new MutationObserver((mutations) => {
+            const isInternal = mutations.every(m => {
+                const target = m.target as HTMLElement;
+                return target.closest && target.closest('.mindmap-boundary-layer');
+            });
+            if (!isInternal) {
+                updateBoundaries();
+            }
+        });
+        mutationObserver.observe(containerEle, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            characterData: true,
+        });
+
+        // 3. ResizeObserver to watch container or main layout resizing
+        const resizeObserver = new ResizeObserver(() => {
+            updateBoundaries();
+        });
+        const mainEle = containerEle.querySelector('me-main');
+        if (mainEle) {
+            resizeObserver.observe(mainEle);
+        }
+        resizeObserver.observe(containerEle);
+
+        // 4. Also listen to image load events inside the container
+        const handleLoad = (e: Event) => {
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'IMG') {
+                updateBoundaries();
+            }
+        };
+        containerEle.addEventListener('load', handleLoad, true);
 
         return () => {
             if (typeof instance.bus.removeListener === 'function') {
                 instance.bus.removeListener('operation', handleOp);
             }
-            clearInterval(interval);
+            mutationObserver.disconnect();
+            resizeObserver.disconnect();
+            containerEle.removeEventListener('load', handleLoad, true);
         };
     }, [instance]);
 
@@ -102,9 +135,17 @@ export default function MindMapBoundaries() {
 
     // Convert hex to rgba for background filling
     const hexToRgba = (hex: string, alpha: number) => {
-        const r = parseInt(hex.slice(1, 3), 16) || 99;
-        const g = parseInt(hex.slice(3, 5), 16) || 102;
-        const b = parseInt(hex.slice(5, 7), 16) || 241;
+        const cleanHex = hex.replace('#', '');
+        let r = 99, g = 102, b = 241;
+        if (cleanHex.length === 3) {
+            r = parseInt(cleanHex[0] + cleanHex[0], 16) || 99;
+            g = parseInt(cleanHex[1] + cleanHex[1], 16) || 102;
+            b = parseInt(cleanHex[2] + cleanHex[2], 16) || 241;
+        } else if (cleanHex.length === 6) {
+            r = parseInt(cleanHex.slice(0, 2), 16) || 99;
+            g = parseInt(cleanHex.slice(2, 4), 16) || 102;
+            b = parseInt(cleanHex.slice(4, 6), 16) || 241;
+        }
         return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     };
 

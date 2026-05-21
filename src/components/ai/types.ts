@@ -44,6 +44,8 @@ export interface AIChatPanelProps {
     canvasOps?: CanvasOperations;
     /** 当前插件 ID */
     pluginId?: string;
+    /** 当前图表 ID */
+    diagramId?: string;
 }
 
 export type { Message, Conversation };

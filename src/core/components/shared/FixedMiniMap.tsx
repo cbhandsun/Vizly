@@ -75,6 +75,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
       if (stopped) return;
       const nodes = reactFlowInstance.getNodes?.() || [];
       if (!nodes.length) {
+        setMiniMapReady(true);
         requestAnimationFrame(check);
         return;
       }

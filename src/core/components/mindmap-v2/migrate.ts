@@ -71,6 +71,26 @@ export function migrateV1ToV2(v1: VizlyMindMapV1Data): VizlyMindMapV2Data {
             children: childIds.map(id => convertNode(nodeMap.get(id)!)).filter(Boolean),
         };
 
+        // Migrate note
+        const note = rfNode.data?.note || rfNode.data?.description;
+        if (note) {
+            nodeObj.note = stripHtml(note);
+        }
+
+        // Migrate hyperlink
+        const url = rfNode.data?.url || rfNode.data?.hyperLink;
+        if (url) {
+            nodeObj.hyperLink = url;
+        }
+
+        // Migrate icon/icons
+        const icon = rfNode.data?.icon;
+        if (icon) {
+            nodeObj.icons = [icon];
+        } else if (rfNode.data?.icons) {
+            nodeObj.icons = rfNode.data.icons;
+        }
+
         // Migrate style
         const branchColor = rfNode.data?.branchColor as string | undefined;
         if (branchColor) {

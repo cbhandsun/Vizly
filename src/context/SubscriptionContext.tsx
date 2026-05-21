@@ -71,7 +71,18 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
 export const useSubscription = () => {
   const context = useContext(SubscriptionContext);
   if (!context) {
-    throw new Error('useSubscription must be used within a SubscriptionProvider');
+    console.warn('[HMR Warning] useSubscription was called outside of a SubscriptionProvider. Returning temporary fallback context.');
+    return {
+      tier: 'free' as UserTier,
+      setTier: () => {},
+      hasFeature: () => false,
+      isUpgradeModalVisible: false,
+      showUpgradeModal: () => {},
+      hideUpgradeModal: () => {},
+      upgradeFeatureContext: undefined,
+      jwtToken: undefined
+    };
   }
   return context;
 };
+

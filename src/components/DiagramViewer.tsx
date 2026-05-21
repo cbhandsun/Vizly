@@ -1128,6 +1128,7 @@ const DiagramViewer: React.FC = () => {
                                                         <AIChatView
                                                             onOpenConfig={() => setAiConfigVisible(true)}
                                                             pluginId={resolvedPluginId || 'flowchart-diagram'}
+                                                            diagramId={selectedDiagramId}
                                                             onPreviewJson={(json: string) => {
                                                                 const bridge = (window as any).__flowDataBridge?.[selectedDiagramId];
                                                                 if (bridge && bridge.importData) {

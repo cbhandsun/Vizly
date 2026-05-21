@@ -7,11 +7,11 @@
  *  - 无需打开侧边属性面板或右键菜单
  */
 import React, { useEffect, useState, useRef } from 'react';
-import { Tooltip, Popover } from 'antd';
+import { Tooltip, Popover, Input } from 'antd';
 import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { findNodeById } from './migrate';
-import { expandNodeWithAI, getAncestorPath } from './mindmapAIService';
+import { expandNodeWithAI, getAncestorPath, summarizeNodeWithAI, processNodeWithAICustomAction } from './mindmapAIService';
 import { PlusOutlined, LoadingOutlined } from '@ant-design/icons';
 import styles from './FloatingBar.module.css';
 
@@ -37,8 +37,11 @@ const MindMapFloatingBar: React.FC = () => {
     const [noteText, setNoteText] = useState('');
     const [aiOpen, setAiOpen] = useState(false);
     const [aiExpanding, setAiExpanding] = useState(false);
+    const [aiSummarizing, setAiSummarizing] = useState(false);
     const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
     const [aiError, setAiError] = useState('');
+    const [customAiPrompt, setCustomAiPrompt] = useState('');
+    const [aiCustomLoading, setAiCustomLoading] = useState(false);
     const barRef = useRef<HTMLDivElement>(null);
 
 
@@ -160,6 +163,90 @@ const MindMapFloatingBar: React.FC = () => {
         } catch (e) {}
     };
 
+    const handleAISummarize = async () => {
+        if (!mind || aiSummarizing || !obj.children?.length) return;
+        setAiSummarizing(true);
+        setAiError('');
+        try {
+            const childrenTopics = obj.children.map((c: any) => c.topic || '');
+            const result = await summarizeNodeWithAI(obj.topic, childrenTopics);
+            if ('error' in result) {
+                setAiError(result.error);
+            } else if (result.topic && result.topic !== obj.topic) {
+                const tpcEl = getTpc();
+                if (tpcEl) {
+                    mind.setNodeTopic(tpcEl as any, result.topic);
+                }
+                setAiOpen(false);
+            }
+        } catch (e: any) {
+            setAiError(e?.message ?? '归纳失败');
+        } finally {
+            setAiSummarizing(false);
+        }
+    };
+
+    const handleCustomAISubmit = async () => {
+        const prompt = customAiPrompt.trim();
+        if (!prompt || !mind || aiCustomLoading) return;
+        setAiCustomLoading(true);
+        setAiError('');
+        try {
+            const data = mind.getData();
+            const ancestorPath = getAncestorPath(data.nodeData, pos.nodeId);
+            const mapTitle = data.nodeData.topic;
+
+            const result = await processNodeWithAICustomAction({
+                node: obj,
+                customPrompt: prompt,
+                ancestorPath,
+                mapTitle,
+            });
+
+            if (result.error) {
+                setAiError(result.error);
+            } else {
+                const tpcEl = getTpc();
+                if (tpcEl) {
+                    if (result.topic) {
+                        mind.setNodeTopic(tpcEl as any, result.topic);
+                    }
+
+                    const nodeInTree = findNodeById(data.nodeData, pos.nodeId);
+                    if (nodeInTree) {
+                        if (result.note !== undefined) {
+                            nodeInTree.note = result.note;
+                        }
+                        if (result.tags !== undefined) {
+                            nodeInTree.tags = result.tags;
+                        }
+                        if (result.icons !== undefined) {
+                            nodeInTree.icons = result.icons;
+                        }
+                        if (result.newChildren && result.newChildren.length > 0) {
+                            if (!nodeInTree.children) nodeInTree.children = [];
+                            nodeInTree.children.push(...result.newChildren);
+                            nodeInTree.expanded = true;
+                        }
+
+                        mind.refresh(data);
+                        mind.bus.fire('operation', {
+                            name: 'ai_custom',
+                            obj: nodeInTree,
+                        });
+                    }
+
+                    setCustomAiPrompt('');
+                    setAiOpen(false);
+                }
+            }
+        } catch (e: any) {
+            setAiError(e?.message ?? '运行失败');
+        } finally {
+            setAiCustomLoading(false);
+        }
+    };
+
     // ── Button style ─────────────────────────────────────────────────────────
     const Btn: React.FC<{ icon: string; tip: string; danger?: boolean; onClick: () => void }> = ({ icon, tip, danger, onClick }) => (
         <Tooltip title={tip} placement="top" mouseEnterDelay={0.4}>
@@ -221,6 +308,30 @@ const MindMapFloatingBar: React.FC = () => {
                                 {s}
                             </div>
                         ))}
+                        {hasChildren && (
+                            <div className={styles.aiSummarizeSection}>
+                                <button
+                                    className={styles.aiSummarizeBtn}
+                                    onClick={handleAISummarize}
+                                    disabled={aiSummarizing}
+                                >
+                                    {aiSummarizing ? <LoadingOutlined /> : '🪄'} AI 智能归纳当前节点
+                                </button>
+                            </div>
+                        )}
+                        <div style={{ marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 8 }}>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>💬 自定义 AI 指令</div>
+                            <Input.Search
+                                placeholder="如: 翻译成英文、写个详细备注..."
+                                value={customAiPrompt}
+                                onChange={e => setCustomAiPrompt(e.target.value)}
+                                onSearch={handleCustomAISubmit}
+                                enterButton={aiCustomLoading ? <LoadingOutlined /> : "运行"}
+                                loading={aiCustomLoading}
+                                size="small"
+                                style={{ width: '100%' }}
+                            />
+                        </div>
                     </div>
                 }
             >

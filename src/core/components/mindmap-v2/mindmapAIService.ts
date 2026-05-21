@@ -114,3 +114,503 @@ export function getAncestorPath(root: NodeObj, targetId: string): string[] {
     }
     return dfs(root, []) ?? [];
 }
+
+/** 根据用户提示词 (Prompt)，使用 AI 生成完整的思维导图 JSON 树 */
+export async function generateMindMapFromPrompt(promptText: string): Promise<{ nodeData: NodeObj } | { error: string }> {
+    const config = getAIConfig();
+    const [providerId, modelId] = config.activeModelKey.split(':');
+    const provider = config.providers.find(p => p.id === providerId);
+
+    if (!provider || !provider.enabled || !provider.apiKey || !provider.baseUrl) {
+        return { error: '请先在 AI 设置中配置有效的 Provider 和 API Key' };
+    }
+
+    if (!modelId) {
+        return { error: '请在 AI 设置中选择一个模型' };
+    }
+
+    const systemPrompt = `你是一个专业的思维导图生成助手。请根据用户的需求，生成一份结构清晰、多层级、细节丰富且视觉直观的思维导图，并严格以 JSON 格式输出。
+不要输出任何 markdown 格式的标记字符（如 \`\`\`json 等），不要输出任何解释说明性文本，只需输出合法的 JSON 本身。
+
+JSON 结构必须严格符合以下 TypeScript 类型：
+interface NodeObj {
+    id: string; // 节点唯一ID，请使用随机短字符串或带前缀的标识符，如 "n_1", "n_2"
+    topic: string; // 节点名称
+    children?: NodeObj[]; // 子节点数组
+    expanded?: boolean; // 是否展开，通常根节点设为 true，其他可选
+    note?: string; // 选填。对此节点的详细备注或解释说明，支持普通文本（如名词定义、步骤解释等）
+    hyperLink?: string; // 选填。与此节点相关的权威参考网址或链接（如维基百科、官方文档等）
+    icons?: string[]; // 选填。与此节点非常相符的 emoji 小图标数组（最多 2 个，如 ["💻", "🚀"]）
+    tags?: string[]; // 选填。给该节点打上的简短标签，如 ["重点", "难点", "基础", "第1步"]，最多 2 个
+}
+
+为了使思维导图内容详实，请尽量在有深度概念、需要补充说明的节点上提供 'note'，在某些有公开文档的主题上提供 'hyperLink'，并在核心或步骤节点上打上适当的 'tags' 和 'icons'。
+根节点的 id 请设为 "root"。
+尽量生成 3 至 4 层结构，子节点数量适中，词条简洁有力（3~8字为宜）。`;
+
+    const userPrompt = `请为主题"${promptText}"生成一个思维导图 JSON 树结构。`;
+
+    try {
+        const response = await fetch(
+            `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${provider.apiKey}`,
+                },
+                body: JSON.stringify({
+                    model: modelId,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt },
+                    ],
+                    max_tokens: 1500,
+                    temperature: 0.7,
+                }),
+            }
+        );
+
+        if (!response.ok) {
+            const errText = await response.text();
+            return { error: `AI 接口错误 ${response.status}: ${errText.slice(0, 120)}` };
+        }
+
+        const data = await response.json();
+        let content: string = data.choices?.[0]?.message?.content ?? '';
+
+        // Clean markdown wraps
+        content = content.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+
+        const parsed = JSON.parse(content);
+        const nodeData = cleanAndValidateTree(parsed, true);
+        return { nodeData };
+    } catch (e: any) {
+        return { error: `请求失败：${e?.message ?? String(e)}` };
+    }
+}
+
+function cleanAndValidateTree(node: any, isRoot = false): NodeObj {
+    const id = isRoot ? 'root' : (node.id || `ai_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
+    const clean: NodeObj = {
+        id,
+        topic: node.topic || '(无标题)',
+        expanded: isRoot ? true : (node.expanded !== false),
+        children: (node.children ?? []).map((c: any) => cleanAndValidateTree(c, false)),
+    };
+    if (node.note) clean.note = String(node.note);
+    if (node.hyperLink) clean.hyperLink = String(node.hyperLink);
+    if (node.icons && Array.isArray(node.icons)) {
+        clean.icons = node.icons.map(String);
+    } else if (node.icon) {
+        clean.icons = [String(node.icon)];
+    }
+    if (node.tags && Array.isArray(node.tags)) {
+        clean.tags = node.tags.map(String);
+    }
+    return clean;
+}
+
+/** 使用 AI 根据子节点内容归纳修改当前节点的主题 */
+export async function summarizeNodeWithAI(nodeTopic: string, childrenTopics: string[]): Promise<{ topic: string } | { error: string }> {
+    const config = getAIConfig();
+    const [providerId, modelId] = config.activeModelKey.split(':');
+    const provider = config.providers.find(p => p.id === providerId);
+
+    if (!provider || !provider.enabled || !provider.apiKey || !provider.baseUrl) {
+        return { error: '请先在 AI 设置中配置有效的 Provider 和 API Key' };
+    }
+
+    if (!modelId) {
+        return { error: '请在 AI 设置中选择一个模型' };
+    }
+
+    const prompt = `当前节点名称：${nodeTopic}
+子分支内容：
+${childrenTopics.map(t => `- ${t}`).join('\n')}
+
+请根据上述子分支的具体内容，对当前父节点的名称进行重新归纳和提炼，使其更加精准、概括和有逻辑性。
+要求：
+- 只返回一个精简的新节点名称（字数在 3~10 字之间）
+- 不要包含任何其他解释性文字，不要有引号或编号
+- 如果无法更好地归纳，请直接返回原名称"${nodeTopic}"`;
+
+    try {
+        const response = await fetch(
+            `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${provider.apiKey}`,
+                },
+                body: JSON.stringify({
+                    model: modelId,
+                    messages: [
+                        { role: 'system', content: '你是一个思维导图优化助手。请只输出重新归纳后的节点名称，不要包含任何额外文字。' },
+                        { role: 'user', content: prompt },
+                    ],
+                    max_tokens: 60,
+                    temperature: 0.5,
+                }),
+            }
+        );
+
+        if (!response.ok) {
+            const errText = await response.text();
+            return { error: `AI 接口错误 ${response.status}: ${errText.slice(0, 120)}` };
+        }
+
+        const data = await response.json();
+        let topic = (data.choices?.[0]?.message?.content ?? '').trim();
+        topic = topic.replace(/^["'“‘]/, '').replace(/["'”’]$/, '').trim();
+        return { topic: topic || nodeTopic };
+    } catch (e: any) {
+        return { error: `请求失败：${e?.message ?? String(e)}` };
+    }
+}
+
+export interface AICustomActionOptions {
+    node: NodeObj;
+    customPrompt: string;
+    ancestorPath?: string[];
+    mapTitle?: string;
+}
+
+export interface AICustomActionResult {
+    topic?: string;
+    note?: string;
+    tags?: string[];
+    icons?: string[];
+    newChildren?: NodeObj[];
+    error?: string;
+}
+
+/**
+ * 接收选定节点及自定义指令，由 AI 返回局部更新字段（JSON）
+ */
+export async function processNodeWithAICustomAction(
+    options: AICustomActionOptions
+): Promise<AICustomActionResult> {
+    const { node, customPrompt, ancestorPath = [], mapTitle } = options;
+
+    const config = getAIConfig();
+    const [providerId, modelId] = config.activeModelKey.split(':');
+    const provider = config.providers.find(p => p.id === providerId);
+
+    if (!provider || !provider.enabled || !provider.apiKey || !provider.baseUrl) {
+        return { error: '请先在 AI 设置中配置有效的 Provider 和 API Key' };
+    }
+
+    if (!modelId) {
+        return { error: '请在 AI 设置中选择一个模型' };
+    }
+
+    const contextPath = [...ancestorPath, node.topic].join(' > ');
+
+    const systemPrompt = `你是一个专业的思维导图节点智能处理助手。用户选择了一个节点，并输入了一条处理指令。
+你必须根据指令对该节点自身属性（名称 topic、备注 note、标签 tags、图标 icons）进行修改，或者为其生成新的子节点数组（newChildren）。
+
+当前选中节点的信息：
+- 节点名称 (topic): "${node.topic}"
+- 详细备注 (note): "${node.note || '(无)'}"
+- 标签 (tags): ${JSON.stringify(node.tags || [])}
+- 图标 (icons): ${JSON.stringify(node.icons || [])}
+- 上下文层级路径: "${contextPath}"
+${mapTitle ? `- 整个导图的主题: "${mapTitle}"` : ''}
+
+用户的处理指令：
+"${customPrompt}"
+
+请严格以 JSON 格式输出修改后的节点增量数据，不要输出任何 markdown 格式的标记字符（如 \`\`\`json 等），不要有任何解释说明文字，只输出合法的 JSON 本身。
+JSON 结构中只能包含以下可选字段：
+{
+  "topic": "修改后的节点名称（如果指令要求改写、翻译或提炼名称，否则可以省略或返回原名称）",
+  "note": "修改后的详细备注内容（如果指令要求写备注、扩写、补充详细说明，否则可以省略）",
+  "tags": ["新标签"], // 字符串数组。最多2个，如 ["紧急"]。如果指令要求加/改标签，返回更新后的完整标签数组
+  "icons": ["emoji"], // 字符串数组。最多2个，如 ["🔴"]。如果指令要求加/改图标，返回更新后的完整图标数组
+  "newChildren": [
+     // 如果指令要求“增加子项”、“扩写步骤”、“生成创意”等，在此字段返回新生成的子节点数组，每个子节点也是 NodeObj 结构：
+     {
+       "topic": "子节点名称 (3-8字)",
+       "note": "子节点详细备注（可选）",
+       "icons": ["emoji"], // 可选
+       "tags": ["标签"] // 可选
+     }
+  ]
+}
+
+注意：
+1. 请根据指令的目的，只返回受影响的字段。例如，如果指令仅说“翻译成英文”，则通常只需返回翻译后的 "topic" 和 "note"（若有）。
+2. 如果指令说“扩写3个子步骤”，则应保持当前节点的 "topic" 不变，只在 "newChildren" 中返回 3 个子节点。
+3. 保持词条简洁有力（3~8字为宜）。`;
+
+    const userPrompt = `请根据我的指令"${customPrompt}"，处理当前节点并返回增量修改 JSON。`;
+
+    try {
+        const response = await fetch(
+            `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${provider.apiKey}`,
+                },
+                body: JSON.stringify({
+                    model: modelId,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt },
+                    ],
+                    max_tokens: 1000,
+                    temperature: 0.7,
+                }),
+            }
+        );
+
+        if (!response.ok) {
+            const errText = await response.text();
+            return { error: `AI 接口错误 ${response.status}: ${errText.slice(0, 120)}` };
+        }
+
+        const data = await response.json();
+        let content: string = data.choices?.[0]?.message?.content ?? '';
+
+        // 清洗 Markdown 包裹
+        content = content.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+
+        const parsed = JSON.parse(content);
+        
+        // 清洗 newChildren 结构
+        if (parsed.newChildren && Array.isArray(parsed.newChildren)) {
+            parsed.newChildren = parsed.newChildren.map((c: any) => {
+                const childId = `ai_custom_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+                return {
+                    id: childId,
+                    topic: c.topic || '新节点',
+                    note: c.note ? String(c.note) : undefined,
+                    icons: Array.isArray(c.icons) ? c.icons.map(String) : (c.icon ? [String(c.icon)] : undefined),
+                    tags: Array.isArray(c.tags) ? c.tags.map(String) : undefined,
+                    children: []
+                };
+            });
+        }
+
+        return parsed;
+    } catch (e: any) {
+        return { error: `请求失败：${e?.message ?? String(e)}` };
+    }
+}
+
+/** 生成当前节点的演讲提词逐字稿 */
+export async function generateSpeakerNotes(
+    nodeTopic: string,
+    noteText?: string,
+    childText?: string,
+    tone = '专业商务'
+): Promise<{ notes: string } | { error: string }> {
+    const config = getAIConfig();
+    const [providerId, modelId] = config.activeModelKey.split(':');
+    const provider = config.providers.find(p => p.id === providerId);
+
+    if (!provider || !provider.enabled || !provider.apiKey || !provider.baseUrl) {
+        return { error: '请先在 AI 设置中配置有效的 Provider 和 API Key' };
+    }
+
+    if (!modelId) {
+        return { error: '请在 AI 设置中选择一个模型' };
+    }
+
+    const systemPrompt = `你是一个专业的演讲教练和演讲稿助手。根据用户提供的思维导图节点主题、备注和子节点内容，生成一段 100 到 200 字的口语化演讲演讲稿（逐字稿）。
+请根据指定的语气风格生成。
+生成的演讲稿应当：
+- 直接输出演讲逐字稿内容，不要有任何开场白、括号注释或说明，也不要使用 markdown 语法包裹（如不需要 \`\`\` ）。
+- 字数严格控制在 100~200 字之间。
+- 适合口语化表达，流畅自然，适合演示演讲时朗读。`;
+
+    const userPrompt = `
+当前演讲的节点主题："${nodeTopic}"
+${noteText ? `此节点的详细备注："${noteText}"` : ''}
+${childText ? `此节点包含的子概念/大纲："${childText}"` : ''}
+演讲语气风格限制："${tone}"
+
+请为此节点生成对应的演讲稿。`;
+
+    try {
+        const response = await fetch(
+            `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${provider.apiKey}`,
+                },
+                body: JSON.stringify({
+                    model: modelId,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt },
+                    ],
+                    max_tokens: 400,
+                    temperature: 0.7,
+                }),
+            }
+        );
+
+        if (!response.ok) {
+            const errText = await response.text();
+            return { error: `AI 接口错误 ${response.status}: ${errText.slice(0, 120)}` };
+        }
+
+        const data = await response.json();
+        const notes = (data.choices?.[0]?.message?.content ?? '').trim();
+        return { notes };
+    } catch (e: any) {
+        return { error: `请求失败：${e?.message ?? String(e)}` };
+    }
+}
+
+/** 分析两个非层级节点之间的语义关系并返回 2~5 字的精炼关系 Label */
+export async function analyzeNodesRelationship(
+    sourceTopic: string,
+    targetTopic: string
+): Promise<{ relationText: string } | { error: string }> {
+    const config = getAIConfig();
+    const [providerId, modelId] = config.activeModelKey.split(':');
+    const provider = config.providers.find(p => p.id === providerId);
+
+    if (!provider || !provider.enabled || !provider.apiKey || !provider.baseUrl) {
+        return { error: '请先在 AI 设置中配置有效的 Provider 和 API Key' };
+    }
+
+    if (!modelId) {
+        return { error: '请在 AI 设置中选择一个模型' };
+    }
+
+    const systemPrompt = `你是一个思维导图语义关系分析专家。你的任务是分析用户指定的两个思维导图节点之间的关系，并给出一个极为精炼的关系标签。
+你的回答必须是且仅能是 2 到 5 个字的中文名词或动词短语（如：“互补”、“因果”、“对比”、“组成部分”、“演进”、“依赖”、“竞品关系”等）。
+不要输出任何解释说明性文字，不要包含任何标点符号或包裹引号，只需返回那 2-5 个字的关系词本身。`;
+
+    const userPrompt = `节点 A 的主题: "${sourceTopic}"
+节点 B 的主题: "${targetTopic}"
+请用 2-5 个字概括节点 A 与节点 B 的语义关系：`;
+
+    try {
+        const response = await fetch(
+            `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${provider.apiKey}`,
+                },
+                body: JSON.stringify({
+                    model: modelId,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt },
+                    ],
+                    max_tokens: 30,
+                    temperature: 0.5,
+                }),
+            }
+        );
+
+        if (!response.ok) {
+            const errText = await response.text();
+            return { error: `AI 接口错误 ${response.status}: ${errText.slice(0, 120)}` };
+        }
+
+        const data = await response.json();
+        let relationText = (data.choices?.[0]?.message?.content ?? '').trim();
+        // 清洗掉可能的引号
+        relationText = relationText.replace(/^["'“‘]/, '').replace(/["'”’]$/, '').trim();
+        return { relationText };
+    } catch (e: any) {
+        return { error: `请求失败：${e?.message ?? String(e)}` };
+    }
+}
+
+export interface TaskItemInput {
+    id: string;
+    topic: string;
+    context: string; // 祖先路径
+}
+
+export interface TaskClassificationResult {
+    id: string;
+    status: 'todo' | 'doing' | 'done';
+    priority: '高' | '中' | '低';
+}
+
+/** 使用 AI 智能分析分类任务 */
+export async function classifyTasksWithAI(
+    tasks: TaskItemInput[]
+): Promise<{ classifications: TaskClassificationResult[] } | { error: string }> {
+    const config = getAIConfig();
+    const [providerId, modelId] = config.activeModelKey.split(':');
+    const provider = config.providers.find(p => p.id === providerId);
+
+    if (!provider || !provider.enabled || !provider.apiKey || !provider.baseUrl) {
+        return { error: '请先在 AI 设置中配置有效的 Provider 和 API Key' };
+    }
+
+    if (!modelId) {
+        return { error: '请在 AI 设置中选择一个模型' };
+    }
+
+    const systemPrompt = `你是一个专业的敏捷项目经理和任务管理专家。你的任务是分析用户提供的脑图叶子节点（任务项），根据它们的语义、关联上下文和依赖关系，智能地将它们分类到看板的不同状态轨道（"todo" 待办, "doing" 进行中, "done" 已完成），并赋予合适的优先级（"高"、"中"、"低"）。
+通常绝大多数任务初始状态应为 "todo"，少部分已经在进行中的概念可归为 "doing"，完成的概念归为 "done"。
+必须严格返回如下格式的 JSON 数组，不要有任何 Markdown 包裹（如不要 \`\`\`json ），不要有任何额外的文字或解释：
+[
+  {
+    "id": "任务ID",
+    "status": "todo" | "doing" | "done",
+    "priority": "高" | "中" | "低"
+  }
+]`;
+
+    const userPrompt = `待分类任务列表：
+${JSON.stringify(tasks, null, 2)}
+
+请对它们进行分类和优先级规划。`;
+
+    try {
+        const response = await fetch(
+            `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${provider.apiKey}`,
+                },
+                body: JSON.stringify({
+                    model: modelId,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt },
+                    ],
+                    max_tokens: 1500,
+                    temperature: 0.5,
+                }),
+            }
+        );
+
+        if (!response.ok) {
+            const errText = await response.text();
+            return { error: `AI 接口错误 ${response.status}: ${errText.slice(0, 120)}` };
+        }
+
+        const data = await response.json();
+        let content = (data.choices?.[0]?.message?.content ?? '').trim();
+        content = content.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+
+        const classifications = JSON.parse(content);
+        return { classifications };
+    } catch (e: any) {
+        return { error: `请求失败：${e?.message ?? String(e)}` };
+    }
+}
+
+
+

@@ -188,6 +188,7 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
 
     // AI expand state
     const [aiExpanding, setAiExpanding] = useState(false);
+    const [aiSummarizing, setAiSummarizing] = useState(false);
     const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
     const [aiError, setAiError] = useState('');
 
@@ -209,6 +210,30 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
             setAiExpanding(false);
         }
     }, [mind, node, aiExpanding]);
+
+    const handleAISummarize = useCallback(async () => {
+        if (!mind || aiSummarizing || !node.children?.length) return;
+        setAiSummarizing(true);
+        setAiError('');
+        try {
+            const childrenTopics = node.children.map((c: any) => c.topic || '');
+            const result = await summarizeNodeWithAI(node.topic, childrenTopics);
+            if ('error' in result) {
+                setAiError(result.error);
+                setAiSuggestions(['error']);
+            } else if (result.topic && result.topic !== node.topic) {
+                const tpcEl = mind.findEle(node.id);
+                if (tpcEl) {
+                    mind.setNodeTopic(tpcEl, result.topic);
+                }
+            }
+        } catch (e: any) {
+            setAiError(e?.message ?? '归纳失败');
+            setAiSuggestions(['error']);
+        } finally {
+            setAiSummarizing(false);
+        }
+    }, [mind, node, aiSummarizing]);
 
     const handleAIApply = useCallback(async (topic: string) => {
         if (!mind) return;
@@ -249,39 +274,52 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                 双击画布编辑文字 (F2)
             </Button>
 
-            {/* AI Expand */}
-            <Popover
-                trigger="click"
-                placement="left"
-                open={aiSuggestions.length > 0 || !!aiError}
-                onOpenChange={v => { if (!v) { setAiSuggestions([]); setAiError(''); } }}
-                title={<span style={{ fontSize: 12 }}>🤖 AI 建议子主题（点击添加）</span>}
-                content={
-                    <div style={{ width: 220 }}>
-                        {aiError && <div style={{ color: '#ef4444', fontSize: 12 }}>{aiError}</div>}
-                        {aiSuggestions.map(s => (
-                            <div key={s} onClick={() => handleAIApply(s)}
-                                style={{ padding: '5px 8px', cursor: 'pointer', borderRadius: 6,
-                                    fontSize: 13, marginBottom: 3,
-                                    background: 'rgba(99,102,241,0.05)',
-                                    border: '1px solid rgba(99,102,241,0.12)',
-                                    transition: 'background 0.15s' }}
-                                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(99,102,241,0.15)')}
-                                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(99,102,241,0.05)')}
-                            >
-                                <PlusOutlined style={{ marginRight: 6, color: '#6366f1', fontSize: 10 }} />
-                                {s}
-                            </div>
-                        ))}
-                    </div>
-                }
-            >
-                <Button size="small" type="primary" ghost icon={<RobotOutlined />}
-                    onClick={handleAIExpand} loading={aiExpanding}
-                    style={{ width: '100%', marginBottom: 14 }}>
-                    AI 扩展子主题
-                </Button>
-            </Popover>
+            {/* AI Expand & AI Summarize */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+                <Popover
+                    trigger="click"
+                    placement="left"
+                    open={aiSuggestions.length > 0 || !!aiError}
+                    onOpenChange={v => { if (!v) { setAiSuggestions([]); setAiError(''); } }}
+                    title={<span style={{ fontSize: 12 }}>🤖 AI 建议子主题（点击添加）</span>}
+                    content={
+                        <div style={{ width: 220 }}>
+                            {aiError && <div style={{ color: '#ef4444', fontSize: 12 }}>{aiError}</div>}
+                            {aiSuggestions.map(s => {
+                                if (s === 'error') return null;
+                                return (
+                                    <div key={s} onClick={() => handleAIApply(s)}
+                                        style={{ padding: '5px 8px', cursor: 'pointer', borderRadius: 6,
+                                            fontSize: 13, marginBottom: 3,
+                                            background: 'rgba(99,102,241,0.05)',
+                                            border: '1px solid rgba(99,102,241,0.12)',
+                                            transition: 'background 0.15s' }}
+                                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(99,102,241,0.15)')}
+                                        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(99,102,241,0.05)')}
+                                    >
+                                        <PlusOutlined style={{ marginRight: 6, color: '#6366f1', fontSize: 10 }} />
+                                        {s}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    }
+                >
+                    <Button size="small" type="primary" ghost icon={<RobotOutlined />}
+                        onClick={handleAIExpand} loading={aiExpanding}
+                        style={{ width: '100%' }}>
+                        AI 扩展子主题
+                    </Button>
+                </Popover>
+
+                {node.children && node.children.length > 0 && (
+                    <Button size="small" type="dashed" icon={<RobotOutlined />}
+                        onClick={handleAISummarize} loading={aiSummarizing}
+                        style={{ width: '100%' }}>
+                        AI 智能归纳节点
+                    </Button>
+                )}
+            </div>
 
             {/* Icons 已选 + picker */}
             {icons.length > 0 && (

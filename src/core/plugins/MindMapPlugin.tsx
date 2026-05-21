@@ -191,4 +191,56 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
             },
         ];
     }
+
+    // ── AI Actions (GAP-10 Phase 2) ──
+    async onAIAction(action: string, params: any, ctx: PluginContext): Promise<boolean> {
+        const diagramId = ctx.diagramId;
+        if (!diagramId) return false;
+        const bridge = (window as any).__flowDataBridge?.[diagramId];
+        if (!bridge) return false;
+
+        switch (action) {
+            case 'addChild':
+                if (bridge.addChild) {
+                    await bridge.addChild({
+                        parentId: params.parentId || 'root',
+                        label: params.label,
+                        side: params.side,
+                    });
+                    return true;
+                }
+                return false;
+
+            case 'deleteNodes':
+                if (bridge.deleteNodes && params.ids) {
+                    await bridge.deleteNodes(params.ids);
+                    return true;
+                }
+                return false;
+
+            case 'collapse':
+                if (bridge.collapse) {
+                    await bridge.collapse(params.id, params.collapsed);
+                    return true;
+                }
+                return false;
+
+            case 'exportMindmapMd':
+                if (bridge.exportMindmapMd) {
+                    await bridge.exportMindmapMd();
+                    return true;
+                }
+                return false;
+
+            case 'export':
+                if (bridge.export) {
+                    await bridge.export({ type: params.type });
+                    return true;
+                }
+                return false;
+
+            default:
+                return false;
+        }
+    }
 }

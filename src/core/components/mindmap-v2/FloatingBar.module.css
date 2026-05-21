@@ -257,3 +257,34 @@
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
+
+.aiSummarizeSection {
+    border-top: 1px dashed rgba(255, 255, 255, 0.1);
+    padding-top: 8px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.aiSummarizeBtn {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(99, 102, 241, 0.3) 100%);
+    border: 1px solid rgba(168, 85, 247, 0.4);
+    border-radius: 6px;
+    color: #fff;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-weight: 600;
+    transition: all 0.15s;
+}
+
+.aiSummarizeBtn:hover {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.5) 0%, rgba(99, 102, 241, 0.5) 100%);
+    border-color: rgba(168, 85, 247, 0.6);
+    box-shadow: 0 4px 12px rgba(168, 85, 247, 0.2);
+}

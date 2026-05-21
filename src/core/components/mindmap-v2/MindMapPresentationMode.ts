@@ -130,13 +130,17 @@ export interface PresentationController {
 export function usePresentationMode(
     mind: MindElixirInstance | null,
     onStop?: () => void,
+    onNodeFocus?: (node: NodeObj | null) => void,
     containerId = 'vizly-mind-elixir-root'
 ): PresentationController {
     const isActiveRef = useRef(false);
     const indexRef = useRef(0);
     const nodeIdsRef = useRef<string[]>([]);
     const onStopRef = useRef(onStop);
+    const onNodeFocusRef = useRef(onNodeFocus);
+
     useEffect(() => { onStopRef.current = onStop; }, [onStop]);
+    useEffect(() => { onNodeFocusRef.current = onNodeFocus; }, [onNodeFocus]);
 
     const getContainer = () => document.getElementById(containerId);
 
@@ -152,6 +156,7 @@ export function usePresentationMode(
             // find topic text
             const obj = mind.getObjById(id, nodeData);
             showHUD(obj?.topic ?? id, idx, ids.length);
+            onNodeFocusRef.current?.(obj ?? null);
         } catch (e) {
             console.warn('[Presentation] navigate error:', e);
         }
@@ -171,6 +176,8 @@ export function usePresentationMode(
 
         removeHUD();
         mind?.clearSelection?.();
+
+        onNodeFocusRef.current?.(null);
 
         // Notify Toolbar so it can sync its isPresenting state
         onStopRef.current?.();

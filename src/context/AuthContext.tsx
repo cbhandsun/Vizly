@@ -35,6 +35,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             setUser(session?.user ?? null);
+            if (typeof window !== 'undefined') {
+                (window as any).__currentUserId = session?.user?.id || null;
+            }
             setLoading(false);
             if (session?.user) {
                 LayeredConfigManager.getInstance().setCloudAdapter({
@@ -53,6 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
             setUser(session?.user ?? null);
+            if (typeof window !== 'undefined') {
+                (window as any).__currentUserId = session?.user?.id || null;
+            }
             setLoading(false);
             if (session?.user) {
                 LayeredConfigManager.getInstance().setCloudAdapter({
@@ -119,7 +125,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
     const context = useContext(AuthContext);
     if (context === undefined) {
-        throw new Error('useAuth must be used within an AuthProvider');
+        console.warn('[HMR Warning] useAuth was called outside of an AuthProvider. Returning temporary fallback context.');
+        const dummyResult = async () => ({ data: { user: null, session: null }, error: null });
+        return {
+            user: null,
+            session: null,
+            loading: false,
+            signInWithEmail: dummyResult,
+            signInWithPassword: dummyResult,
+            signUp: dummyResult,
+            updatePassword: dummyResult,
+            signOut: async () => {},
+        } as any;
     }
     return context;
 }
+

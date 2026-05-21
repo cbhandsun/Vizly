@@ -37,11 +37,12 @@ import {
     ZoomOutOutlined,
     PrinterOutlined,
     QuestionCircleOutlined,
+    ProjectOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import MindElixir from 'mind-elixir';
 import type { NodeObj } from 'mind-elixir';
-import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
+import { getMindElixirInstance, subscribeMindElixir, setPresentationState, toggleKanban, subscribeKanban } from './mindElixirStore';
 import {
     directionStringToInt, nodeObjToMarkdown, nodeObjToOpml, downloadText,
     markdownToNodeObj, opmlToNodeObj, countNodes, getTreeDepth, nodeObjToFlowchartJson
@@ -50,9 +51,11 @@ import { VIZLY_THEME_OPTIONS, VIZLY_THEMES } from './theme';
 import { usePresentationMode } from './MindMapPresentationMode';
 import { emitOpenSearch } from './mindmapSearchStore';
 import { emitToggleOutline } from './mindmapOutlineStore';
+import { emitToggleHistory } from './mindmapHistoryStore';
 import MindMapShortcutsModal from './MindMapShortcutsModal';
 import MindMapTemplates from './MindMapTemplates';
 import { exportXmind } from './exportXmind';
+import { analyzeNodesRelationship } from './mindmapAIService';
 
 
 const DIRECTION_OPTIONS = [
@@ -86,6 +89,13 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
     const mind = getMindElixirInstance();
     const { t } = useTranslation();
 
+    const [isKanbanOpen, setIsKanbanOpen] = useState(false);
+    useEffect(() => subscribeKanban(o => setIsKanbanOpen(o)), []);
+
+    const handleToggleKanban = useCallback(() => {
+        toggleKanban();
+    }, []);
+
     // ── Canvas background pattern ──────────────────────────────────────────────
     const [bgPattern, setBgPattern] = useState<'none' | 'grid' | 'dots'>(() =>
         (localStorage.getItem('vizly_mindmap_bg') as any) ?? 'none'
@@ -105,15 +115,26 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
 
     // Presentation mode — declare state first so callback closure is clean
     const [isPresenting, setIsPresenting] = useState(false);
-    const presentation = usePresentationMode(mind, () => setIsPresenting(false));
+    const presentation = usePresentationMode(
+        mind,
+        () => {
+            setIsPresenting(false);
+            setPresentationState(false, null);
+        },
+        (node) => {
+            setPresentationState(true, node);
+        }
+    );
 
     const handlePresentation = useCallback(() => {
         if (isPresenting) {
             presentation.stop();
             setIsPresenting(false);
+            setPresentationState(false, null);
         } else {
             presentation.start();
             setIsPresenting(true);
+            // usePresentationMode start will navigate to the first node and call nodeFocus.
         }
     }, [isPresenting, presentation]);
 
@@ -401,8 +422,39 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
                 if (!arrowFromRef.current) {
                     arrowFromRef.current = el;
                 } else {
+                    const fromEl = arrowFromRef.current;
                     try {
-                        mind.createArrow(arrowFromRef.current, el);
+                        mind.createArrow(fromEl, el);
+                        // AI 语义智能分析与命名
+                        const arrows = mind.arrows || [];
+                        const newArrow = arrows[arrows.length - 1];
+                        if (newArrow) {
+                            newArrow.label = '...'; // 加载状态
+                            mind.renderArrow();
+
+                            const fromId = fromEl.dataset?.nodeid;
+                            const toId = el.dataset?.nodeid;
+                            if (fromId && toId) {
+                                const data = mind.getData();
+                                const fromNode = mind.getObjById(fromId, data.nodeData);
+                                const toNode = mind.getObjById(toId, data.nodeData);
+                                if (fromNode && toNode) {
+                                    analyzeNodesRelationship(fromNode.topic, toNode.topic).then((res) => {
+                                        if ('error' in res) {
+                                            newArrow.label = '关联'; // 兜底
+                                        } else {
+                                            newArrow.label = res.relationText;
+                                        }
+                                        mind.renderArrow();
+                                        // 触发 operation 记录，同步协同和静默保存
+                                        mind.bus.fire('operation', {
+                                            name: 'editArrowLabel',
+                                            obj: newArrow,
+                                        });
+                                    });
+                                }
+                            }
+                        }
                     } catch (e) { console.warn('[Arrow]', e); }
                     arrowFromRef.current = null;
                     setArrowMode(false);
@@ -760,6 +812,25 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
                 >
                     ☰
                 </Button>
+            </Tooltip>
+
+            {/* History version toggle */}
+            <Tooltip title="历史快照 (Alt+H)">
+                <Button size="small" type="text"
+                    onClick={emitToggleHistory}
+                    style={{ fontSize: 13 }}
+                >
+                    🕒
+                </Button>
+            </Tooltip>
+
+            {/* Kanban toggle */}
+            <Tooltip title="AI 敏捷任务看板">
+                <Button size="small" type="text"
+                    icon={<ProjectOutlined />}
+                    onClick={handleToggleKanban}
+                    style={{ color: isKanbanOpen ? '#6366f1' : undefined }}
+                />
             </Tooltip>
 
             {/* Shortcuts help */}

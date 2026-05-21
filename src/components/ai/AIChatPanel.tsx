@@ -206,7 +206,7 @@ const MemoizedMessageItem = React.memo(MessageItem, (prev, next) => {
  * The internal view component for AI Chat, suitable for both Drawer and Sidebar embedding.
  */
 
-export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, onOpenConfig, onApplyJson, onPreviewJson, diagramNodesRef, diagramEdgesRef, canvasOps, pluginId }) => {
+export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, onOpenConfig, onApplyJson, onPreviewJson, diagramNodesRef, diagramEdgesRef, canvasOps, pluginId, diagramId }) => {
     // --- i18n ---
     const { t } = useTranslation();
     // --- Auth ---
@@ -445,7 +445,8 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                         getEdges: () => diagramEdgesRef?.current || [],
                         addNode: canvasOps?.onAddNode,
                         updateNodesBatch: (ids: any, updates: any) => canvasOps?.onUpdateNodes?.(ids, updates),
-                        takeSnapshot: () => {} 
+                        takeSnapshot: () => {},
+                        diagramId
                     } : null);
 
                     if (ctx) {
@@ -848,6 +849,12 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         // 再次检查
         if (!activeProvider || !activeModel) {
             appMessage.warning('没有找到可用的模型，请先在设置中启用模型');
+            onOpenConfig();
+            return;
+        }
+
+        if (!activeProvider.apiKey) {
+            appMessage.warning(`请先在 AI 设置中配置 ${activeProvider.name} 的 API Key`);
             onOpenConfig();
             return;
         }

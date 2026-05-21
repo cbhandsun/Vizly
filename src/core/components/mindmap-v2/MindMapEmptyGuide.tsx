@@ -7,9 +7,10 @@
  * 设计参考：Notion、Whimsical 的空状态页面
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import type { NodeObj } from 'mind-elixir';
+import { generateMindMapFromPrompt } from './mindmapAIService';
 
 function countNodes(node: NodeObj): number {
     return 1 + (node.children ?? []).reduce((acc, c) => acc + countNodes(c), 0);
@@ -26,17 +27,43 @@ const TIPS = [
 const MindMapEmptyGuide: React.FC = () => {
     const [isEmpty, setIsEmpty] = useState(false);
     const [visible, setVisible] = useState(true);
+    
+    // AI states
+    const [prompt, setPrompt] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
     const mind = getMindElixirInstance();
 
     // Check if map is "empty" (only root node)
-    const checkEmpty = () => {
+    const checkEmpty = useCallback(() => {
         try {
             const data = mind?.getData();
             if (!data) return;
             const n = countNodes(data.nodeData);
             setIsEmpty(n <= 1);
         } catch {}
+    }, [mind]);
+
+    const handleAIGenerate = async () => {
+        if (!mind || !prompt.trim() || loading) return;
+        setLoading(true);
+        setError('');
+        try {
+            const res = await generateMindMapFromPrompt(prompt.trim());
+            if ('error' in res) {
+                setError(res.error || '生成失败，请重试');
+            } else {
+                mind.refresh({ nodeData: res.nodeData });
+                mind.toCenter();
+                setPrompt('');
+                checkEmpty();
+            }
+        } catch (err: any) {
+            setError(err?.message ?? '请求失败，请检查网络或配置');
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -44,8 +71,7 @@ const MindMapEmptyGuide: React.FC = () => {
         checkEmpty();
         mind.bus.addListener('operation', checkEmpty);
         return () => { mind.bus.removeListener('operation', checkEmpty); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [mind]);
+    }, [mind, checkEmpty]);
 
     // Also subscribe to mind instance changes
     useEffect(() => {
@@ -53,8 +79,7 @@ const MindMapEmptyGuide: React.FC = () => {
             if (m) setTimeout(checkEmpty, 500);
         });
         return unsub;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [checkEmpty]);
 
     if (!isEmpty || !visible) return null;
 
@@ -106,6 +131,67 @@ const MindMapEmptyGuide: React.FC = () => {
                         border: '1px solid rgba(255,255,255,0.15)',
                         borderRadius: 4, padding: '1px 5px', fontFamily: 'monospace',
                     }}>Tab</kbd> 添加第一个子节点
+                </div>
+
+                {/* AI prompt box */}
+                <div style={{
+                    pointerEvents: 'all',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                    width: 240,
+                    marginTop: 8,
+                    borderTop: '1px dashed rgba(99,102,241,0.2)',
+                    paddingTop: 12,
+                }}>
+                    <input
+                        type="text"
+                        placeholder="✨ 输入主题让 AI 一键建图..."
+                        value={prompt}
+                        onChange={e => setPrompt(e.target.value)}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter' && !loading) handleAIGenerate();
+                        }}
+                        disabled={loading}
+                        style={{
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1.5px solid rgba(99,102,241,0.25)',
+                            borderRadius: 8,
+                            padding: '6px 10px',
+                            fontSize: 12,
+                            color: '#fff',
+                            outline: 'none',
+                            transition: 'border 0.2s',
+                        }}
+                    />
+                    <button
+                        onClick={handleAIGenerate}
+                        disabled={loading || !prompt.trim()}
+                        style={{
+                            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                            border: 'none',
+                            borderRadius: 8,
+                            padding: '6px 12px',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: '#fff',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            opacity: (loading || !prompt.trim()) ? 0.6 : 1,
+                            transition: 'opacity 0.2s',
+                            boxShadow: '0 4px 12px rgba(99,102,241,0.2)',
+                        }}
+                    >
+                        {loading ? '🪄 生成中...' : '🪄 AI 一键建图'}
+                    </button>
+                    {error && (
+                        <div style={{ color: '#f87171', fontSize: 10, textAlign: 'center', marginTop: 2, maxWidth: 240, wordBreak: 'break-word' }}>
+                            {error}
+                        </div>
+                    )}
                 </div>
             </div>
 

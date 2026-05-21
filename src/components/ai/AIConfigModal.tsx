@@ -133,7 +133,20 @@ export const getAIConfigKey = (userId?: string | null): string => {
 
 export const getAIConfig = (userId?: string | null): AIConfigState => {
     try {
-        const raw = localStorage.getItem(getAIConfigKey(userId));
+        let keyToUse = getAIConfigKey(userId);
+        if (!userId) {
+            if (typeof window !== 'undefined' && (window as any).__currentUserId) {
+                keyToUse = getAIConfigKey((window as any).__currentUserId);
+            } else if (typeof localStorage !== 'undefined') {
+                const keys = Object.keys(localStorage);
+                const userKey = keys.find(k => k.startsWith(AI_CONFIG_KEY + '_') && k !== AI_CONFIG_KEY + '_anonymous');
+                if (userKey) {
+                    keyToUse = userKey;
+                }
+            }
+        }
+
+        const raw = localStorage.getItem(keyToUse);
         if (raw) {
             const parsed = JSON.parse(raw);
             // Basic validation or migration could go here
