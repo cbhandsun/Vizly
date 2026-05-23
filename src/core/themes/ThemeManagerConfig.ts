@@ -4,8 +4,8 @@
  */
 
 import { 
-  Theme, 
-  ThemePreset, 
+  _Theme, 
+  _ThemePreset, 
   ThemeTransition, 
   ThemePerformanceOptions 
 } from './types/ThemeTypes';

@@ -618,7 +618,7 @@ export function fishboneLayout(
 
     // 4. Handle remaining nodes (orphans)
     let orphanOffsetX = 100;
-    const minYFound = Math.min(...Array.from(positions.values()).map(p => p.y), spineY);
+    const _minYFound = Math.min(...Array.from(positions.values()).map(p => p.y), spineY);
     const maxYFound = Math.max(...Array.from(positions.values()).map(p => p.y), spineY);
 
     for (const n of nodes) {

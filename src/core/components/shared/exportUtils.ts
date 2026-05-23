@@ -70,7 +70,7 @@ function parseTranslateFromTransform(transform: string | null | undefined): { x:
     }
   }
   // translate(xpx, ypx) 或 translate(x, y)
-  const tr = t.match(/translate\(\s*([\-\d\.]+)(px)?\s*,\s*([\-\d\.]+)(px)?\s*\)/);
+  const tr = t.match(/translate\(\s*([-\d.]+)(px)?\s*,\s*([-\d.]+)(px)?\s*\)/);
   if (tr) {
     const x = parseFloat(tr[1]);
     const y = parseFloat(tr[3]);
@@ -89,7 +89,7 @@ function parseScaleFromTransform(transform: string | null | undefined): number {
   if (!t || t === 'none') return 1;
   const m = t.match(/matrix\(([^)]+)\)/);
   if (m) {
-    const parts = m[1].split(/[\,\s]+/).map(Number);
+    const parts = m[1].split(/[,\s]+/).map(Number);
     if (parts.length >= 6 && parts.every(n => !isNaN(n))) {
       const a = parts[0];
       const d = parts[3];
@@ -97,7 +97,7 @@ function parseScaleFromTransform(transform: string | null | undefined): number {
       return scale || 1;
     }
   }
-  const s = t.match(/scale\(\s*([\-\d\.]+)\s*\)/);
+  const s = t.match(/scale\(\s*([-\d.]+)\s*\)/);
   if (s) {
     const scale = parseFloat(s[1]);
     return isFinite(scale) ? scale : 1;

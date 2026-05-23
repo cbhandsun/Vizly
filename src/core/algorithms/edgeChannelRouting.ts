@@ -57,7 +57,7 @@ export class ChannelManager {
         start: Point,
         end: Point,
         edgeId: string,
-        preferredPosition?: number
+        _preferredPosition?: number
     ): number {
         const isHorizontal = Math.abs(start.y - end.y) < 1;
         const channels = isHorizontal ? this.horizontalChannels : this.verticalChannels;

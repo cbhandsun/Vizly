@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, Card, Button, Input, Space, message, Typography, Empty, Row, Col, Spin, Select, Popconfirm, Tabs, Tag, Checkbox } from 'antd';
+import { Modal, Card, Button, Input, Space, Typography, Empty, Row, Col, Spin, Select, Popconfirm, Tabs, Tag, Checkbox } from 'antd';
 import {
     CloudOutlined,
     EyeOutlined,
@@ -187,7 +187,11 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
     const toggleSelect = (id: string) => {
         setSelectedIds(prev => {
             const next = new Set(prev);
-            next.has(id) ? next.delete(id) : next.add(id);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
             return next;
         });
     };

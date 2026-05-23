@@ -10,7 +10,7 @@
 import type {
     CostContext,
     CostResult,
-    EdgeRoutingWeights,
+    _EdgeRoutingWeights,
     Point,
     Rectangle,
     RoutingPlugin
@@ -287,7 +287,7 @@ export class CostEvaluator {
         const WRONG_AXIS_PENALTY = 2000;
         const PREFERRED_AXIS_BONUS = 1200;
         const L_SHAPE_BONUS = 1500;
-        const CROSS_AXIS_PENALTY = 800;
+        const _CROSS_AXIS_PENALTY = 800;
 
         const absDx = Math.abs(dx);
         const absDy = Math.abs(dy);

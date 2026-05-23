@@ -4,7 +4,7 @@
  * Manages a local key in localStorage
  */
 
-const KEY_STORAGE_NAME = 'DiagramView.CryptoKey';
+const _KEY_STORAGE_NAME = 'DiagramView.CryptoKey';
 
 export class CryptoService {
     // A fixed salt for our application's key derivation
@@ -80,7 +80,7 @@ export class CryptoService {
             return `ENC:${ivStr}:${dataStr}`;
         } catch (e) {
             console.error('Encryption failed', e);
-            throw new Error('Failed to encrypt data');
+            throw new Error('Failed to encrypt data', { cause: e });
         }
     }
 

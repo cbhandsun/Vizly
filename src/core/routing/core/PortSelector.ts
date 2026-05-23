@@ -93,7 +93,7 @@ export class PortSelector {
         return {
             sourceHandle: bestCandidate.candidate.source,
             targetHandle: bestCandidate.candidate.target,
-            cost: bestCost,
+            cost: bestCandidate.cost,
             autoSource: true,
             autoTarget: true
         };
@@ -116,8 +116,8 @@ export class PortSelector {
     ): PortCandidate[] {
         const isTB = geo.layoutDirection?.includes('TB');
         const isBT = geo.layoutDirection?.includes('BT');
-        const isLR = geo.layoutDirection?.includes('LR');
-        const isRL = geo.layoutDirection?.includes('RL');
+        const _isLR = geo.layoutDirection?.includes('LR');
+        const _isRL = geo.layoutDirection?.includes('RL');
 
         // [OPT] 提前剪枝：根据几何主轴快速缩减候选集
         // 仅在非反向边时剪枝，反向边需要 same-side 候选

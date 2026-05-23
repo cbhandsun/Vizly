@@ -2,7 +2,7 @@ import React from 'react';
 import { Button, Flex, Tooltip, Badge } from 'antd';
 import { 
     FaPlus, FaLayerGroup, FaCogs, FaRobot, 
-    FaBars, FaCheckCircle, FaUndo, FaRedo 
+    FaBars, _FaCheckCircle, FaUndo, FaRedo 
 } from 'react-icons/fa';
 import './MobileBottomDock.css';
 

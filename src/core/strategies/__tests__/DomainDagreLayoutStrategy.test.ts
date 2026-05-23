@@ -1,7 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import { LayoutType } from '../../types/layout';
 import DomainDagreLayoutStrategy from '../DomainDagreLayoutStrategy';
+
+vi.hoisted(() => {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+        writable: true,
+        value: () => ({
+            font: '',
+            measureText: (text: string) => ({ width: String(text || '').length * 8 }),
+        }),
+    });
+});
 
 const makeNode = (id: string, domain: string, subDomain: string): ReactFlowNode => ({
     id,
@@ -123,7 +133,7 @@ describe('DomainDagreLayoutStrategy', () => {
         const sourceAbs = absolutePositionOf(source, result.nodes);
         const targetAbs = absolutePositionOf(target, result.nodes);
         const sourceSize = sizeOf(source);
-        const targetSize = sizeOf(target);
+        const _targetSize = sizeOf(target);
         const computedPath = ((routed.data as any)?.computedPath ?? []) as Array<{ x: number; y: number }>;
 
         expect(routed.sourceHandle).toBe('right');

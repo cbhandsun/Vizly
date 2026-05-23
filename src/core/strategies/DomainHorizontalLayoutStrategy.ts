@@ -526,8 +526,8 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
           .sort((a, b) => orderKeyOf(a) - orderKeyOf(b));
         let cy = innerTop;
         for (const sg of sgs) {
-          const oldX = num(((sg as any)?.position?.x), innerLeft - subPadH);
-          const oldY = num(((sg as any)?.position?.y), cy);
+          const _oldX = num(((sg as any)?.position?.x), innerLeft - subPadH);
+          const _oldY = num(((sg as any)?.position?.y), cy);
           const newX = innerLeft - subPadH;
           const newY = cy;
           (sg as any).position = { x: newX, y: newY } as any;

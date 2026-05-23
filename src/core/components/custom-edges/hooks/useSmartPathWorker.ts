@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
-import type { MutableRefObject, Dispatch, SetStateAction } from 'react';
+import type { MutableRefObject } from 'react';
 import { Edge, Position } from '@xyflow/react';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
-import { createFilletedPath } from '../../../algorithms/smartEdgeUtils'; // [FIX] Import utility
+import {  } from '../../../algorithms/smartEdgeUtils'; // [FIX] Import utility
 // import WorkerPool from '../../../workers/WorkerPool'; // Replaced by Coordinator
 
 // Define types locally to avoid circular deps
@@ -111,88 +111,7 @@ const useLayoutStabilityReset = (
     }, [isLayoutStable, lastFingerprintRef]);
 };
 
-const useHydratedPath = (
-    params: {
-        elkPoints: Point2D[] | null;
-        computedPoints: Point2D[] | null;
-        edgeConfig: SmartEdgeOptions;
-        edgeData: { algorithm?: string };
-        id: string;
-        path: string | null;
-        setPath: Dispatch<SetStateAction<string | null>>;
-        setSmartPoints: Dispatch<SetStateAction<Array<Point2D> | null>>;
-        setIsLoading: Dispatch<SetStateAction<boolean>>;
-        isHydratedRef: MutableRefObject<boolean>;
-        isMountedRef: MutableRefObject<boolean>;
-        isLayoutStable: boolean;
-        nodesDragging?: boolean;
-    }
-) => {
-    const {
-        elkPoints,
-        computedPoints,
-        edgeConfig,
-        edgeData,
-        id,
-        path,
-        setPath,
-        setSmartPoints,
-        setIsLoading,
-        isHydratedRef,
-        isMountedRef,
-        isLayoutStable,
-        nodesDragging
-    } = params;
 
-    const lastElkSigRef = useRef<string>('');
-    const lastComputedSigRef = useRef<string>('');
-
-    const sig = (pts: Point2D[] | null): string => {
-        if (!pts || pts.length < 2) return '';
-        // [FIX] Hash ALL points to prevent stale path retention when internal geometry changes 
-        // but start/end nodes remain identical.
-        return pts.map(p => `${Math.round(p.x)},${Math.round(p.y)}`).join('|');
-    };
-
-    useEffect(() => {
-        if (!isMountedRef.current) return;
-        if (!isLayoutStable && !nodesDragging) return;
-
-        if (elkPoints) {
-            const s = sig(elkPoints);
-            if (s && s === lastElkSigRef.current) return;
-            lastElkSigRef.current = s;
-            const svgPath = createFilletedPath(elkPoints, edgeConfig.borderRadius ?? 8);
-            setTimeout(() => {
-                if (!isMountedRef.current) return;
-                if (path !== svgPath) {
-                    setPath(svgPath);
-                    setSmartPoints(elkPoints);
-                }
-                setIsLoading(false);
-            }, 0);
-            return;
-        }
-
-        if (computedPoints) {
-            const s = sig(computedPoints);
-            if (s && s === lastComputedSigRef.current) return;
-            lastComputedSigRef.current = s;
-            const svgPath = createFilletedPath(computedPoints, edgeConfig.borderRadius ?? 8);
-            setTimeout(() => {
-                if (!isMountedRef.current) return;
-                if (path !== svgPath) {
-                    // [FIX N-1] 取消注释：computedPoints 分支必须同步更新 path，
-                    // 否则 ELK 布局完成后边路径永远停在旧布局形状
-                    setPath(svgPath);
-                    setSmartPoints(computedPoints);
-                    setIsLoading(false);
-                    isHydratedRef.current = true;
-                }
-            }, 0);
-        }
-    }, [computedPoints, edgeConfig.borderRadius, edgeData?.algorithm, elkPoints, id, isLayoutStable, nodesDragging, isMountedRef, path, setIsLoading, setPath, setSmartPoints, isHydratedRef]);
-};
 
 // Helper interface for the hook's input props
 export interface MultiEdgeInfo {
@@ -375,7 +294,7 @@ const useObstacles = (
                     return;
                 }
 
-                if (!!n?.data?.hidden) return;
+                if (n?.data?.hidden) return;
                 if (typeof n?.data?.isObstacle === 'boolean' && !n.data.isObstacle) return;
 
                 const z = typeof n?.zIndex === 'number' ? n.zIndex : (typeof n?.style?.zIndex === 'number' ? n.style.zIndex : 0);
@@ -681,7 +600,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
             };
 
             // Nodes & Edges for Worker
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
             const nodesArr = Array.from(simpleNodeMap.values()).map((n: any) => {
                 // [FIX] If this is source or target, use the FRESH node we created above!
                 if (n.id === source && sourceNode) return sourceNode;

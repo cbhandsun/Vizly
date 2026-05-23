@@ -63,7 +63,7 @@ export class DataRegistry {
 
       // 3. 尝试从云端加载通用模板库 (Remote Templates)
       // 如果云端下发了同名的模板，会以云端的最后写入为准覆盖本地硬编码数据
-      const remoteLoaded = await this.loadRemoteTemplates();
+      const _remoteLoaded = await this.loadRemoteTemplates();
 
       // 4. 注册本地持久化数据 (User's IndexedDB Data)
       // 用户本地修改的图表拥有最高优先级
@@ -83,7 +83,7 @@ export class DataRegistry {
    * 注册数据适配器
    */
   private registerAdapters(): void {
-    const dataService = this.dataService;
+    const _dataService = this.dataService;
 
     // 移除ArchitectureDataAdapter，直接使用标准格式
     // dataService.registerAdapter('architecture', new ArchitectureDataAdapter());

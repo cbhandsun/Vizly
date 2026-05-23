@@ -21,7 +21,7 @@ const STORAGE_CONFIG_KEY = 'diagram_storage_config';
 
 export class S3StorageProvider implements IStorageProvider {
     name = 'S3 Compatible Storage';
-    id: 's3' = 's3';
+    id = 's3' as const;
 
     private static instance: S3StorageProvider;
     private client: S3Client | null = null;

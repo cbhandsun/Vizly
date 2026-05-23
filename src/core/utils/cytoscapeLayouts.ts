@@ -53,7 +53,7 @@ export async function enforceSubGroupChildrenLayoutCytoscape(
     const innerLeft = num(pos.x, 0) + SUB_H;
     const innerTop = num(pos.y, 0) + TOP_PAD;
     const innerRight = size.w > 0 ? (num(pos.x, 0) + size.w - SUB_H) : (innerLeft + Math.max(1, num((cfgFull?.layout?.mainColumnWidth), 400)));
-    const innerWidth = Math.max(1, innerRight - innerLeft);
+    const _innerWidth = Math.max(1, innerRight - innerLeft);
 
     const childIds = children.filter(cid => {
       const n = idMap.get(cid);

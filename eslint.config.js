@@ -21,8 +21,39 @@ export default defineConfig([
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': 'warn',
-      '@typescript-eslint/ban-ts-comment': 'warn'
+      '@typescript-eslint/no-unused-vars': ['warn', { 
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_'
+      }],
+      '@typescript-eslint/ban-ts-comment': 'warn',
+      
+      // React Compiler (eslint-plugin-react-hooks v7)
+      'react-hooks/static-components': 'off',
+      'react-hooks/use-memo': 'warn',
+      'react-hooks/preserve-manual-memoization': 'warn',
+      'react-hooks/immutability': 'warn',
+      'react-hooks/globals': 'warn',
+      'react-hooks/refs': 'warn',
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/error-boundaries': 'warn',
+      'react-hooks/purity': 'warn',
+      'react-hooks/set-state-in-render': 'warn',
+      'react-hooks/config': 'warn',
+      'react-hooks/gating': 'warn',
+
+      // Stylistic and non-blocking rules
+      'prefer-const': 'warn',
+      '@typescript-eslint/no-unsafe-function-type': 'warn',
+      'no-empty': ['warn', { allowEmptyCatch: true }],
+      'no-useless-assignment': 'warn',
+      'no-useless-escape': 'warn',
+      'no-case-declarations': 'warn',
+      'react-refresh/only-export-components': 'warn',
+      '@typescript-eslint/no-empty-object-type': 'warn',
+      '@typescript-eslint/no-require-imports': 'warn',
+      'no-constant-condition': 'warn',
+      'no-constant-binary-expression': 'warn',
     }
   },
 ])

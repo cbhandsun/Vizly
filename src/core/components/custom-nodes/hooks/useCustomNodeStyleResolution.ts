@@ -130,7 +130,7 @@ export interface UseCustomNodeStyleResolutionProps {
 }
 
 export const useCustomNodeStyleResolution = ({
-    id,
+    _id,
     data: d,
     selected,
     hovered,

@@ -3,21 +3,52 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'path'
+import { realpathSync } from 'fs'
+
+const projectRoot = process.cwd()
+const projectRealRoot = realpathSync(projectRoot)
 
 // https://vite.dev/config/
 export default defineConfig({
+  root: projectRoot,
   plugins: [
     react(),
     tailwindcss(),
   ],
+  server: {
+    fs: {
+      allow: [projectRoot, projectRealRoot],
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: './src/test/setup.ts',
+    coverage: {
+      provider: 'v8',
+      allowExternal: true,
+      reporter: ['text', 'html', 'json', 'lcov'],
+      reportsDirectory: './coverage',
+      exclude: [
+        'dist/**',
+        'coverage/**',
+        'node_modules/**',
+        'src/**/*.d.ts',
+        'src/test/**',
+        'src/vite-env.d.ts',
+        'src/main.tsx',
+        'src/core/vite-env.d.ts',
+      ],
+      thresholds: {
+        statements: 50,
+        branches: 39,
+        functions: 50,
+        lines: 52,
+      },
+    },
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, './src'),
+      '@': resolve(projectRoot, './src'),
     },
   },
   build: {

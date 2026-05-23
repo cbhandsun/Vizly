@@ -353,7 +353,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
 
             // 调试：打印节点尺寸信息
-            const sampleNodes = leafNodes.slice(0, 3);
+            const _sampleNodes = leafNodes.slice(0, 3);
 
             // 过滤边：移除引用不存在或隐藏节点的边
             const visibleNodeIds = new Set(leafNodes.map(n => n.id));
@@ -899,8 +899,8 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // 调试：打印域的尺寸
         domainLayoutNodes.forEach(d => {
             // [FIX] 忽略 RF measured，只用 style
-            const w = (d as any).style?.width || 200;
-            const h = (d as any).style?.height || 80;
+            const _w = (d as any).style?.width || 200;
+            const _h = (d as any).style?.height || 80;
         });
 
         if (domainLayoutNodes.length > 0) {
@@ -1098,7 +1098,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         });
 
         // 调试日志：检查几个节点的尺寸信息
-        const sampleLeafs = leafNodes.slice(0, 3);
+        const _sampleLeafs = leafNodes.slice(0, 3);
 
         const cfgEdge = cfg?.edge || {};
         const routingConfig = {

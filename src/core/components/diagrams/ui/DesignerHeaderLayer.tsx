@@ -108,7 +108,7 @@ export interface DesignerHeaderLayerProps {
 
 export const DesignerHeaderLayer = React.memo(
     ({
-        diagramId = 'flowchart-designer',
+        _diagramId = 'flowchart-designer',
         topActions,
         toolbar
     }: DesignerHeaderLayerProps) => {

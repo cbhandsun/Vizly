@@ -25,7 +25,7 @@ import {
     useFloatingPosition,
     useSelectedNodeBounds,
     useNodesDragging,
-    type OverflowItem,
+    type _OverflowItem,
 } from '../shared/FloatingToolbar';
 
 // ─── Constants ───────────────────────────────────────────────────────────────

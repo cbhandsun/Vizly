@@ -6,7 +6,7 @@ export type { SavedDiagram };
 
 export class SupabaseStorageProvider implements IStorageProvider {
     name = 'Supabase Cloud';
-    id: 'supabase' = 'supabase';
+    id = 'supabase' as const;
 
     isConfigured(): boolean {
         // Assume configured if module loaded (env vars checking could happen here)

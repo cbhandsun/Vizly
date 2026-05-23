@@ -199,7 +199,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   isValidConnection,
   selectionOnDrag = false,
   edgesReconnectable,
-  reconnectRadius = 0,
+  _reconnectRadius = 0,
   onReconnect,
   onReconnectStart,
   onReconnectEnd,

@@ -205,13 +205,8 @@ const getMetricColor = (status: MetricBadge['status']) => {
 
 // ====== 主组件 ======
 const ArchitectureNode: React.FC<NodeProps<Node<ArchitectureNodeData>>> = ({ data, selected }) => {
-    // 🛡️ 防御性编程：防止外部传入无效数据导致白屏 (GAP-01)
-    if (!data) {
-        console.warn('ArchitectureNode rendered without data');
-        return <div style={{width: 130, height: 80, background: '#fafafa', border: '1px solid #d9d9d9', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>Invalid Node</div>;
-    }
-
-    const { label, type, icon, description, status = 'normal', themeColor, metrics = [], linterErrors = [] } = data;
+    // 使用空对象作为回退，以避免对不存在的 data 解构导致崩溃
+    const { label, type, icon, description, status = 'normal', themeColor, metrics = [], linterErrors = [] } = data || {};
     const color = themeColor || (type ? DEFAULT_COLORS[type] : null) || '#1890ff';
 
     const safeMetrics = Array.isArray(metrics) ? metrics : [];
@@ -251,6 +246,12 @@ const ArchitectureNode: React.FC<NodeProps<Node<ArchitectureNodeData>>> = ({ dat
             default: return <StackedRectShape color={color} label={l} />;
         }
     }, [type, color, label]);
+
+    // 🛡️ 防御性编程：防止外部传入无效数据导致白屏 (GAP-01)
+    if (!data) {
+        console.warn('ArchitectureNode rendered without data');
+        return <div style={{width: 130, height: 80, background: '#fafafa', border: '1px solid #d9d9d9', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>Invalid Node</div>;
+    }
 
     return (
         <div style={outerStyle}>

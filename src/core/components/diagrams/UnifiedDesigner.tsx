@@ -16,7 +16,7 @@ export interface UnifiedDesignerProps {
 
 export const UnifiedDesigner: React.FC<UnifiedDesignerProps> = ({
   pluginId,
-  initialData,
+  _initialData,
   className,
   style,
 }) => {

@@ -17,8 +17,8 @@ const IconNode = ({ data, selected, id }: IconNodeProps) => {
     const nodeData = useStore((s: any) => s.nodeLookup?.get(id) || s.nodeInternals?.get(id));
 
     // Support NodeResizer dimensions
-    const nodeWidth = (nodeData?.measured?.width || (nodeData as any)?.width || 100) as number;
-    const nodeHeight = (nodeData?.measured?.height || (nodeData as any)?.height || 100) as number;
+    const _nodeWidth = (nodeData?.measured?.width || (nodeData as any)?.width || 100) as number;
+    const _nodeHeight = (nodeData?.measured?.height || (nodeData as any)?.height || 100) as number;
 
     const {
         isHovered,

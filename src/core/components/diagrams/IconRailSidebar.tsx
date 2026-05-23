@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Input, Collapse, Typography, theme, Tooltip, Flex, Popover, Slider, Button, List, Empty, Tree } from 'antd';
 import {
-    FaShapes, FaCompass, FaStream, FaStar, FaSearch,
+    _FaShapes, FaCompass, FaStream, FaStar, FaSearch,
     FaPlay, FaBox, FaTimes,
     FaSearchPlus, FaSearchMinus, FaRegComment
 } from 'react-icons/fa';
@@ -15,17 +15,17 @@ import { NodeTemplatePanel } from './NodeTemplatePanel';
 import type { NodeTemplate } from './hooks/useNodeTemplates';
 import type { LayerConfig } from './hooks/useLayerManagement';
 import {
-    FaPlay as FaPlayIcon, FaSquare, FaStop, FaDatabase, FaQuestion,
-    FaLayerGroup, FaThLarge, FaImage,
-    FaKeyboard,
-    FaServer, FaNetworkWired, FaLock, FaPlug, FaUser, FaEnvelope, FaBell, FaCog, FaCode, FaTerminal
+    FaPlay as _FaPlayIcon, _FaSquare, _FaStop, _FaDatabase, _FaQuestion,
+    _FaLayerGroup, _FaThLarge, _FaImage,
+    _FaKeyboard,
+    _FaServer, _FaNetworkWired, _FaLock, _FaPlug, _FaUser, _FaEnvelope, _FaBell, _FaCog, _FaCode, _FaTerminal
 } from 'react-icons/fa';
 import { CommentPanel } from './CommentPanel';
 import './IconRailSidebar.css';
 
 const { Text } = Typography;
 
-type DrawerPanel = 'shapes' | 'navigator' | 'layers' | 'templates' | null;
+type _DrawerPanel = 'shapes' | 'navigator' | 'layers' | 'templates' | null;
 
 interface IconRailSidebarProps {
     nodes?: Node[];
@@ -55,7 +55,7 @@ interface IconRailSidebarProps {
     isMobile?: boolean; // GAP-11
 }
 
-type NodeConfig = Record<string, unknown>;
+type _NodeConfig = Record<string, unknown>;
 
 export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
     nodes = [],

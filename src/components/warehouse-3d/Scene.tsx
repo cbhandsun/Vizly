@@ -1,7 +1,7 @@
 import React from 'react';
 import { Canvas } from '@react-three/fiber';
 import {
-    OrbitControls, Environment, PerspectiveCamera, ContactShadows, Sky,
+    OrbitControls, _Environment, PerspectiveCamera, ContactShadows, Sky,
     AdaptiveDpr, AdaptiveEvents, Bvh
 } from '@react-three/drei';
 import WarehouseModel from './WarehouseModel';

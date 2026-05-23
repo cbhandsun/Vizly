@@ -141,7 +141,7 @@ export class VisibilityGraphCache {
      * @returns True if cached
      */
     has(obstacles: Rectangle[], options?: { obstacleOffset?: number }): boolean {
-        const key = this.generateCacheKey(obstacles) + `|off:${options?.obstacleOffset ?? 15}`;
+        const key = this.generateCacheKey(obstacles) + `|off:${options?.obstacleOffset ?? 5}`;
         return this.cache.has(key);
     }
 
@@ -152,7 +152,7 @@ export class VisibilityGraphCache {
      * @returns Cache entry or undefined
      */
     peek(obstacles: Rectangle[], options?: { obstacleOffset?: number }): CacheEntry | undefined {
-        const key = this.generateCacheKey(obstacles) + `|off:${options?.obstacleOffset ?? 15}`;
+        const key = this.generateCacheKey(obstacles) + `|off:${options?.obstacleOffset ?? 5}`;
         return this.cache.get(key);
     }
 

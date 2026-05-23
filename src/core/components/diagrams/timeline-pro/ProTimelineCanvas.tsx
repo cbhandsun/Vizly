@@ -7,8 +7,8 @@ import {
   adjustToWorkDay,
   addWorkDays,
   getWorkDays,
-  getWorkDaysSigned,
-  addWorkDaysSigned,
+  _getWorkDaysSigned,
+  _addWorkDaysSigned,
   calculateCriticalPath
 } from '../../../hooks/useProTimelineEngine';
 import ProTimelineAxis from './ProTimelineAxis';

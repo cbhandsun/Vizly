@@ -191,17 +191,17 @@ export class CenteredLayoutStrategy implements ILayoutStrategy {
       try {
         const cfgFull: any = diagramConfigManager.getConfig() || {};
         const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-        const hPad = num(cfgFull?.domain?.padding?.horizontal, 40);
+        const _hPad = num(cfgFull?.domain?.padding?.horizontal, 40);
         const titleH = num(cfgFull?.domain?.title?.height, 40);
         const titleV = num(cfgFull?.domain?.title?.padding?.vertical, 12);
         const domainIds = finalNodes.filter(n => String(n.type || '') === 'titleGroup').map(n => String(((n.data as any)?.domain || '')));
         for (const d of domainIds) {
           const dc = finalNodes.find(n => String(n.type || '') === 'titleGroup' && String(((n.data as any)?.domain || '')) === d);
           if (!dc) continue;
-          const x = num(((dc as any)?.position?.x), 0);
+          const _x = num(((dc as any)?.position?.x), 0);
           const y = num(((dc as any)?.position?.y), 0);
-          const w = num((((dc as any)?.measured?.width ?? (dc as any)?.style?.width)), 0);
-          const h = num((((dc as any)?.measured?.height ?? (dc as any)?.style?.height)), 0);
+          const _w = num((((dc as any)?.measured?.width ?? (dc as any)?.style?.width)), 0);
+          const _h = num((((dc as any)?.measured?.height ?? (dc as any)?.style?.height)), 0);
           const innerTop = y + titleH + titleV;
           const inDomain = finalNodes.filter(n => ((n.data as any)?.domain === d) && String(n.type || '') !== 'titleGroup');
           let minContentY = Infinity;

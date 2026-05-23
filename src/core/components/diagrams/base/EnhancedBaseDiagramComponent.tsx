@@ -226,12 +226,12 @@ export const EnhancedBaseDiagramComponent: React.FC<EnhancedBaseDiagramProps> = 
   config: customConfig,
   nodes,
   edges,
-  edgeMode = 'native',
+  _edgeMode = 'native',
   className,
   style,
-  miniMapPannable,
-  miniMapZoomable,
-  miniMapStyle,
+  _miniMapPannable,
+  _miniMapZoomable,
+  _miniMapStyle,
   configIntegration,
   themeId,
   enablePerformanceOptimization = true,
@@ -239,7 +239,7 @@ export const EnhancedBaseDiagramComponent: React.FC<EnhancedBaseDiagramProps> = 
   onThemeChange,
   ...props
 }) => {
-  const flowStyles = useFlowStyles();
+  const _flowStyles = useFlowStyles();
   
   // 使用增强配置和主题系统
   const config = useEnhancedConfig(configIntegration, customConfig);

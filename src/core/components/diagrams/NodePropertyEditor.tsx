@@ -15,7 +15,7 @@ import {
     Row,
     Col,
     Slider,
-    DatePicker,
+    _DatePicker,
     Button,
     Switch
 } from 'antd';
@@ -29,11 +29,11 @@ import {
     AlignCenterOutlined,
     AlignRightOutlined,
     ClockCircleOutlined,
-    PlusOutlined,
-    DeleteOutlined,
-    ArrowUpOutlined,
-    ArrowDownOutlined,
-    SearchOutlined
+    _PlusOutlined,
+    _DeleteOutlined,
+    _ArrowUpOutlined,
+    _ArrowDownOutlined,
+    _SearchOutlined
 } from '@ant-design/icons';
 import { FaSearch } from 'react-icons/fa';
 import type { Color } from 'antd/es/color-picker';

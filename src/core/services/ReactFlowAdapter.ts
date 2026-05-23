@@ -108,7 +108,7 @@ export class ReactFlowAdapter {
        *   依据全局 edge.mode 与 edge.pathType 映射到明确类型；
        * - 移除任何“无法识别→贝塞尔/平滑”的回退；未知/auto 一律映射为阶梯（step）。
        */
-      const cfgEdge = diagramConfigManager.getConfig().edge as any;
+      const _cfgEdge = diagramConfigManager.getConfig().edge as any;
       /**
        * 函数级注释：默认类型选择收敛
        * 行为：适配层不参与类型智能选择，默认统一为 STEP；类型最终由稳定窗口后统一处理。

@@ -156,18 +156,7 @@ export class EdgeRouter {
             // 确保有 obstacles 数据（由HandlePicker注入）
             if ((type === 'advanced-smart-step' || type === 'step' || type === 'advanced-smart-straight' || type === 'advanced-smart-bezier') && (config as any).obstacles) {
 
-                // 计算边界盒 (包含 Source, Target 和所有 Obstacles)
-                let minX = Math.min(sourceNode.position.x, targetNode.position.x);
-                let minY = Math.min(sourceNode.position.y, targetNode.position.y);
-                let maxX = Math.max(sourceNode.position.x + sourceNode.dimensions.width, targetNode.position.x + targetNode.dimensions.width);
-                let maxY = Math.max(sourceNode.position.y + sourceNode.dimensions.height, targetNode.position.y + targetNode.dimensions.height);
 
-                // 扩展边界以容纳绕路
-                const padding = 600;
-                minX -= padding;
-                minY -= padding;
-                maxX += padding;
-                maxY += padding;
 
                 const sh = normalizeHandle(portResult.sourceHandle);
                 const th = normalizeHandle(portResult.targetHandle);

@@ -379,7 +379,7 @@ export function generateSimplePath(
             if (opts.targetPos === 'bottom' && dy > 0) return false;
         }
         
-        let localLineObs = lineObstacles;
+        let _localLineObs = lineObstacles;
         if (allowLineCrossings) {
             // Only check collinear overlaps, ignore crossings
             return !isPathBlocked(path, obstacles, padding, []) && 

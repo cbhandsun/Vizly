@@ -14,8 +14,8 @@ import {
   ThemeBorderRadius,
   ThemeShadow,
   ThemeAnimation,
-  ThemeTransition,
-  ThemePerformanceOptions
+  _ThemeTransition,
+  _ThemePerformanceOptions
 } from './types/ThemeTypes';
 import { ThemeMode } from './types/ThemeTypes';
 import { LayeredConfigManager, ConfigLayer } from '../config/LayeredConfigManager';

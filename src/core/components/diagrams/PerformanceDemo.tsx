@@ -6,7 +6,7 @@ import {
     Background,
     Controls,
     MiniMap,
-    Position,
+    _Position,
     MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';

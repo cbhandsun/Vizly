@@ -127,7 +127,7 @@ export class HorizontalLayoutStrategy implements ILayoutStrategy {
 
         // Debug log for '作业域' to help troubleshooting
         if ((dTrim.includes('作业域') || dTrim.includes('Job')) && (import.meta as any)?.env?.DEV) {
-           const idx = Array.isArray(arr) ? findInArr(arr) : 'N/A';
+           const _idx = Array.isArray(arr) ? findInArr(arr) : 'N/A';
         }
 
         if (Array.isArray(arr)) { 

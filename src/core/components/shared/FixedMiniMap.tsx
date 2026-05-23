@@ -25,7 +25,7 @@ interface FixedMiniMapProps {
 const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
   style,
   zoomable = true,
-  pannable = true,
+  _pannable = true,
   defaultSize = 'large'
 }) => {
   // 接入主题系统

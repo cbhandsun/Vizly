@@ -124,6 +124,7 @@ import { appMessage, appModal } from '@/core/utils/antdStaticBridge';
 
 // useMindMapOrchestrator decoupled
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const FallbackNode = ({ type, data }: any) => {
     const { t } = useTranslation();
     return (
@@ -164,7 +165,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     businessData,
     extraExportItems,
     isYjsSynced,
-    onSyncPush,
+    _onSyncPush,
     activeUsers = [],
     yAwareness,
     onCloudSave,
@@ -193,7 +194,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     const { t } = useTranslation();
     const preset = useDiagramStylePreset_v2();
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-    const screenToFlowPosition = reactFlowInstance?.screenToFlowPosition;
+    const _screenToFlowPosition = reactFlowInstance?.screenToFlowPosition;
 
     // ?Define handleFitView early to avoid TDZ (Temporal Dead Zone) in hooks and effects
     const handleFitView = useCallback(() => {
@@ -213,7 +214,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
 
     const [internalEdgeMode, setInternalEdgeMode] = useState<'advanced-smart' | 'native'>(externalEdgeMode);
     useEffect(() => setInternalEdgeMode(externalEdgeMode), [externalEdgeMode]);
-    const edgeMode = internalEdgeMode;
+    const _edgeMode = internalEdgeMode;
 
     const [internalShowOnlyMainFlow, setInternalShowOnlyMainFlow] = useState(externalShowOnlyMainFlow);
     const [internalHighlightMainFlow, setInternalHighlightMainFlow] = useState(externalHighlightMainFlow);
@@ -354,7 +355,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
 
     const {
-        isGesturing,
+        _isGesturing,
         currentZoom,
         showOverlay,
         handleTouchStart,
@@ -533,13 +534,13 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         layerSyncedNodes, visibleEdges, onNodesChangeWithLock, onEdgesChangeWithLock,
         handleLabelOffsetChange, handleLabelStyleChange, handleWaypointsChange, handleEdgeLabelChange,
         handleGroup, handleUngroup,
-        selectionMode, isMarqueeActive, setIsMarqueeActive,
-        guides, clearGuides,
+        _selectionMode, isMarqueeActive, setIsMarqueeActive,
+        guides, _clearGuides,
         handleAlign, handleDistribute, canAlign, canDistribute,
         hasCopiedStyle, copyStyle, pasteStyle,
-        templates, groupedTemplates, saveAsTemplate, saveGroupAsTemplate, createFromTemplate, deleteTemplate, renameTemplate,
+        templates, groupedTemplates, saveAsTemplate, _saveGroupAsTemplate, createFromTemplate, deleteTemplate, renameTemplate,
         annotations, annotationMode, addAnnotation, updateAnnotation, deleteAnnotation, toggleResolved, ANNOTATION_COLORS,
-        quickAddMenu, handleAddNode, closeMenu, openQuickAddMenu, getFlowPosition,
+        quickAddMenu, handleAddNode, closeMenu, openQuickAddMenu, _getFlowPosition,
         setQuickConnectPreview, nodesWithGhost, finalEdgesWithGhost,
         isConnecting, connectPreview, onConnectStart, enhancedOnConnect, enhancedOnConnectEnd,
         isValidConnection,
@@ -562,7 +563,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     const { updateLocalCursor } = useDiagramCollaboration(diagramId, !isReadonly);
     const isCommentMode = useDiagramStore(state => state.isCommentMode);
     const setIsCommentMode = useDiagramStore(state => state.setIsCommentMode);
-    const addComment = useDiagramStore(state => state.addComment);
+    const _addComment = useDiagramStore(state => state.addComment);
 
     // 3. Event Handlers Domain Controller
     // commandPaletteVisible and shortcutHelpVisible already declared in Component root state section
@@ -573,7 +574,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         onEdgeContextMenu,
         onPaneContextMenu,
         onPaneClick: contextMenuPaneClick,
-        onPaneClick,
+        _onPaneClick,
         handleContextMenuAction,
         handleSelectAll,
         handleBringToFront,
@@ -587,7 +588,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         handleDuplicateWithToast,
         handleGroupWithToast,
         handleUngroupWithToast,
-        onContextMenuActionWithToast,
+        _onContextMenuActionWithToast,
         handleLock,
         // 隐藏功能暴露
         handleMatchSize,
@@ -1227,7 +1228,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         <EdgeUpdateProvider callbacks={edgeCallbacks}>
             <NodeUpdateProvider updateNodesBatch={updateNodesBatch} businessData={businessData}>
                 {(() => {
-                    const actualLeftOffset = isSidebarHidden ? 0 : (leftDrawerOpen ? 64 + leftDrawerWidth : 64);
+                    const _actualLeftOffset = isSidebarHidden ? 0 : (leftDrawerOpen ? 64 + leftDrawerWidth : 64);
                     return (
                         <UnifiedDesignerShell
                             id={id}

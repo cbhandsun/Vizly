@@ -39,8 +39,8 @@ interface ConfigItem {
 export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
   isOpen,
   onClose,
-  className = '',
-  style,
+  _className = '',
+  _style,
 }) => {
   const { t } = useTranslation();
   const [state, actions] = useConfigIntegration();
@@ -676,7 +676,7 @@ useEffect(() => {
 // 处理配置值变更
 // 处理配置值变更
 const getEngineNodeLayout = useCallback((nodeStrategy?: string) => {
-  const normalized = String(nodeStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_\-]/g, '');
+  const normalized = String(nodeStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
   const map: Record<string, string> = {
     dagrelayout: 'dagre',
     dagre: 'dagre',

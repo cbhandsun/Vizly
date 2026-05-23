@@ -118,7 +118,7 @@ export const debugUtils = {
   /**
    * 函数执行追踪
    */
-  trace: (fn: Function, context?: string) => {
+  trace: (fn: (...args: any[]) => any, context?: string) => {
     if (!isDevelopment) return fn;
 
     return function (this: any, ...args: any[]) {

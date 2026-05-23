@@ -67,7 +67,7 @@ const parseNodeContent = (raw: string): { title: string; body: string } => {
 };
 
 const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
-    id,
+    _id,
     data: d,
     selected,
     setHovered,
@@ -90,7 +90,7 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
     resolvedIcon,
 }) => {
     // 实际使用的图标：用户手动 > hook 推断 > null
-    const effectiveIcon = d?.icon || resolvedIcon || null;
+    const _effectiveIcon = d?.icon || resolvedIcon || null;
 
     const renderDebugOverlay = () => {
         if (!debugEnabled) return null;

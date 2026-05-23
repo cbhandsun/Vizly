@@ -8,8 +8,8 @@ import { dispatchDiagramControl } from '../components/shared/diagramControl';
 import {
   getTargetDiagramElement,
   temporarilyHideElements,
-  exportElementToPngDataUrl,
-  exportElementToSvgDataUrl,
+  _exportElementToPngDataUrl,
+  _exportElementToSvgDataUrl,
   exportFullDiagramByAdjustingViewportToPngDataUrl,
   exportFullDiagramByAdjustingViewportToSvgDataUrl,
   buildExportFileName

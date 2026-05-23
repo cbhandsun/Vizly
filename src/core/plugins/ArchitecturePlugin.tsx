@@ -14,7 +14,7 @@ import {
     ApiOutlined, SwapOutlined, HddOutlined, CloudServerOutlined, LaptopOutlined,
     SearchOutlined, SafetyCertificateOutlined,
     CheckCircleOutlined, WarningOutlined, CloseCircleOutlined, InfoCircleOutlined,
-    ApartmentOutlined, NodeIndexOutlined, PartitionOutlined, ColumnWidthOutlined
+    ApartmentOutlined, NodeIndexOutlined, PartitionOutlined, _ColumnWidthOutlined
 } from '@ant-design/icons';
 import { useTopologyLinter } from '../hooks/useTopologyLinter';
 import { useDiagramStore } from '../store/useDiagramStore';

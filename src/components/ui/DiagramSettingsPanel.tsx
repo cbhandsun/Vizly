@@ -7,7 +7,7 @@ import {
     Zap, 
     Layers, 
     Settings2, 
-    LineChart, 
+    _LineChart, 
     Filter, 
     ChevronRight,
     Cpu,
@@ -40,7 +40,7 @@ interface DiagramSettingsPanelProps {
 
 export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
     selectedDiagram,
-    selectedDiagramId,
+    _selectedDiagramId,
     edgeMode,
     onEdgeModeChange,
     layoutStrategy,
@@ -64,7 +64,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
         const checkStrategies = async () => {
             const selectable = LayoutStrategyManager.getShared().isNodeLayoutExternallySelectable(layoutStrategy);
             const all = LayoutStrategyManager.getShared().getAvailableNodeStrategies();
-            const normLayout = String(layoutStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_\-]/g, '');
+            const normLayout = String(layoutStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
             const isDomainVert = (normLayout === 'domainvertical' || normLayout === 'domainverticallayout');
             const isDomainHoriz = (normLayout === 'domainhorizontal' || normLayout === 'domainhorizontallayout');
 
@@ -103,7 +103,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
     };
 
     const getEngineNodeLayout = (nodeStrategy?: string) => {
-        const normalized = String(nodeStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_\-]/g, '');
+        const normalized = String(nodeStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
         const map: Record<string, string> = {
             dagrelayout: 'dagre',
             dagre: 'dagre',
@@ -269,14 +269,14 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                     <SettingRow 
                         icon={Cpu} 
                         label={(() => {
-                            const norm = String(layoutStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_\-]/g, '');
+                            const norm = String(layoutStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
                             const isDomainElk = norm === 'domainelk' || norm === 'domainelklayout';
                             return isDomainElk ? t('designer.settings.elkAlgorithm') : t('designer.settings.nodeLayout');
                         })()}
                         description={t('designer.settings.nodeLayoutDesc', '子域内节点的排布微调')}
                     >
                         {(() => {
-                            const norm = String(layoutStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_\-]/g, '');
+                            const norm = String(layoutStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
                             const isDomainElk = norm === 'domainelk' || norm === 'domainelklayout';
                             if (isDomainElk) {
                                 return (
@@ -359,7 +359,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                 >
                                     {(() => {
                                         const all = LayoutStrategyManager.getShared().getAvailableNodeStrategies();
-                                        const norm2 = String(layoutStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_\-]/g, '');
+                                        const norm2 = String(layoutStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
                                         const isDomainVert = (norm2 === 'domainvertical' || norm2 === 'domainverticallayout');
                                         const isDomainHoriz = (norm2 === 'domainhorizontal' || norm2 === 'domainhorizontallayout');
                                         const isCytoscape = (s: any) => {

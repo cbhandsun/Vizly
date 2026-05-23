@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Layout, Input, Collapse, Typography, theme, Tooltip, Flex, Popover, Slider, Button, Tabs, List, Empty, Tree } from 'antd';
 import {
-    FaPlay, FaSquare, FaStop, FaDatabase, FaQuestion,
+    FaPlay, _FaSquare, _FaStop, _FaDatabase, _FaQuestion,
     FaLayerGroup, FaBox, FaThLarge, FaImage,
-    FaKeyboard, FaSearch, FaChevronRight, FaChevronLeft, FaSearchPlus, FaSearchMinus,
+    _FaKeyboard, FaSearch, FaChevronRight, FaChevronLeft, FaSearchPlus, FaSearchMinus,
     FaCompass, FaShapes, FaStream, FaStar,
     FaServer, FaNetworkWired, FaLock, FaPlug, FaUser, FaEnvelope, FaBell, FaCog, FaCode, FaTerminal
 } from 'react-icons/fa';

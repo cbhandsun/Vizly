@@ -334,7 +334,7 @@ export const useDiagramControls = (diagramId: string, enableMainFlowAnimation: b
         const loadedImages: HTMLImageElement[] = [];
         let imagesLoaded = 0;
 
-        const MAX_GIF_SIDE = 1200;
+        const _MAX_GIF_SIDE = 1200;
         frames.forEach((frameDataUrl, index) => {
           const img = new Image();
           img.onload = () => {

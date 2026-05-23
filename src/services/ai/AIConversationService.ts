@@ -18,8 +18,8 @@ export interface Conversation {
     updatedAt: number;
 }
 
-const CONVERSATIONS_STORAGE_KEY = 'AIChatPanel.conversations';
-const ACTIVE_CONVERSATION_ID_KEY = 'AIChatPanel.activeId';
+const _CONVERSATIONS_STORAGE_KEY = 'AIChatPanel.conversations';
+const _ACTIVE_CONVERSATION_ID_KEY = 'AIChatPanel.activeId';
 
 class AIConversationService {
     private currentUserId: string | null = null;

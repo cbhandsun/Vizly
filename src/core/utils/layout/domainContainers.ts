@@ -29,7 +29,7 @@ export const applyDomainGrouping = (
   const cfgFull = diagramConfigManager.getConfig() as any;
   const domainCfg = cfgFull?.domain || {};
   const padH = Number(domainCfg?.padding?.horizontal) || 24;
-  const padV = Number(domainCfg?.padding?.vertical) || 16;
+  const _padV = Number(domainCfg?.padding?.vertical) || 16;
   const titleH = Number(domainCfg?.title?.height) || 50;
   const titleVPad = Number(domainCfg?.title?.padding?.vertical) || 12;
   const titleSafe = Number(domainCfg?.title?.safeGap) || 16;
@@ -37,7 +37,7 @@ export const applyDomainGrouping = (
   const layoutCfgStrict = diagramConfigManager.getLayoutConfig() as any;
   const autoScaleHStrict = Number((cfgFull?.layout?.autoGapScale?.h)) || 1;
   const baseHGapStrict = Number((layoutCfgStrict?.NODE_H_GAP)) || 120;
-  const hGapEffStrict = Math.max(8, Math.floor(baseHGapStrict * Math.min(1.0, autoScaleHStrict)));
+  const _hGapEffStrict = Math.max(8, Math.floor(baseHGapStrict * Math.min(1.0, autoScaleHStrict)));
   const layoutCfg = diagramConfigManager.getLayoutConfig() as any;
   const autoScaleH = Number((cfgFull?.layout?.autoGapScale?.h)) || 1;
   const baseHGap = Number((layoutCfg?.NODE_H_GAP)) || 120;
@@ -141,11 +141,11 @@ export const enforceDomainContainerStrictContainment = (
   const cfgFull = diagramConfigManager.getConfig() as any;
     const domainCfg = cfgFull?.domain || {};
   const padH = Number(domainCfg?.padding?.horizontal) || 24;
-  const padV = Number(domainCfg?.padding?.vertical) || 16;
+  const _padV = Number(domainCfg?.padding?.vertical) || 16;
   const titleH = Number(domainCfg?.title?.height) || 50;
   const titleVPad = Number(domainCfg?.title?.padding?.vertical) || 12;
   const titleSafe = Number(domainCfg?.title?.safeGap) || 16;
-  const bottomSafe = Number((domainCfg as any)?.bottomSafeGap ?? (domainCfg as any)?.padding?.bottom ?? (titleVPad + titleSafe));
+  const _bottomSafe = Number((domainCfg as any)?.bottomSafeGap ?? (domainCfg as any)?.padding?.bottom ?? (titleVPad + titleSafe));
   const layoutCfgStrict = diagramConfigManager.getLayoutConfig() as any;
   const autoScaleHStrict = Number((cfgFull?.layout?.autoGapScale?.h)) || 1;
   const baseHGapStrict = Number((layoutCfgStrict?.NODE_H_GAP)) || 120;
@@ -202,10 +202,10 @@ export const enforceDomainContainerStrictContainment = (
     const layoutCfgStrict = diagramConfigManager.getLayoutConfig() as any;
     const autoScaleHStrict = Number((cfgFull?.layout?.autoGapScale?.h)) || 1;
     const baseHGapStrict = Number((layoutCfgStrict?.NODE_H_GAP)) || 120;
-    const hGapEffStrict = Math.max(8, Math.floor(baseHGapStrict * Math.min(1.0, autoScaleHStrict)));
+    const _hGapEffStrict = Math.max(8, Math.floor(baseHGapStrict * Math.min(1.0, autoScaleHStrict)));
     const bbox = calculateBoundingBox(childrenCandidates);
     const contentHStrict = Math.max(0, bbox.height);
-    const childCountStrict = childrenCandidates.length;
+    const _childCountStrict = childrenCandidates.length;
     const bottomSafeEff = Number((domainCfg as any)?.bottomSafeGap ?? (titleVPad + titleSafe));
     const width = bbox.width + padH * 2 + safeEdgeW;
     const height = contentHStrict + titleH + titleVPad + titleSafe + bottomSafeEff;
@@ -224,8 +224,8 @@ export const enforceDomainContainerStrictContainment = (
         ? Array.from(childClasses.reduce((m, v) => m.set(v, (m.get(v) || 0) + 1), new Map<string, number>()).entries()).sort((a, b) => b[1] - a[1])[0][0]
         : undefined;
 
-      const curW = num(((old as any)?.measured?.width ?? (old as any)?.style?.width), 0);
-      const curH = num(((old as any)?.measured?.height ?? (old as any)?.style?.height), 0);
+      const _curW = num(((old as any)?.measured?.width ?? (old as any)?.style?.width), 0);
+      const _curH = num(((old as any)?.measured?.height ?? (old as any)?.style?.height), 0);
       const finalW = width; // 浠ユ渶缁堟姇褰变负鍑嗭紝鍏佽鏀剁缉
       const finalH = height;
       const anchoredX = num(((old as any)?.position?.x), x);
@@ -496,7 +496,7 @@ export const pullUpSubGroupsByIncomingEdges = (
   const titleH = num(cfgFull?.domain?.title?.height, 40);
   const titleV = num(cfgFull?.domain?.title?.padding?.vertical, 12);
   const titleSafe = num(cfgFull?.domain?.title?.safeGap, 16);
-  const sideSafe = Math.max(12, num(cfgFull?.domain?.sideSafeGap, 8));
+  const _sideSafe = Math.max(12, num(cfgFull?.domain?.sideSafeGap, 8));
 
   const updated = nodes.map(n => ({ ...n }));
   const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
@@ -597,7 +597,7 @@ export const finalizeDomainWidthsByProjection = (
   const updated = nodes.map(n => ({ ...n }));
   const padH = num(cfgFull?.domain?.padding?.horizontal, 24);
   const sideSafe = Math.max(12, num(cfgFull?.domain?.sideSafeGap, 8));
-  const subPadH = num((cfgFull?.subDomain?.padding?.horizontal ?? cfgFull?.subGroup?.padding?.horizontal ?? (diagramConfigManager.getLayoutConfig() as any)?.SUB_GROUP_PADDING?.H), 30);
+  const _subPadH = num((cfgFull?.subDomain?.padding?.horizontal ?? cfgFull?.subGroup?.padding?.horizontal ?? (diagramConfigManager.getLayoutConfig() as any)?.SUB_GROUP_PADDING?.H), 30);
   const domains = updated.filter(n => String(n.type || '') === 'titleGroup');
   const widthBySubOnly = Boolean(((diagramConfigManager.getConfig() as any)?.layout?.domainWidthBySubGroupsOnly !== false));
   for (const dc of domains) {
@@ -659,7 +659,7 @@ export const finalizeDomainHeightsByProjection = (
   for (const dc of domains) {
     const dId = String((((dc as any).data?.domain || '')));
     if (!dId) continue;
-    const x = num(((dc as any)?.position?.x), 0);
+    const _x = num(((dc as any)?.position?.x), 0);
     const y = num(((dc as any)?.position?.y), 0);
     const innerTop = y + titleH + titleV + titleSafe;
     let maxBottom = innerTop;

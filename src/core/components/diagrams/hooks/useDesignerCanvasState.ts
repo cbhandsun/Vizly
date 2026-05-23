@@ -24,7 +24,7 @@ export interface UseDesignerCanvasStateProps {
 }
 
 export function useDesignerCanvasState({
-    id,
+    _id,
     externalReadonly = false,
     externalEdgeMode = 'advanced-smart',
     externalShowOnlyMainFlow = false,

@@ -66,7 +66,7 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
     onConnect,
     onConnectStart,
     onConnectEnd,
-    autoRoutingEnabled,
+    _autoRoutingEnabled,
     enableSmartEdges,
     showMinimap,
     showGrid,

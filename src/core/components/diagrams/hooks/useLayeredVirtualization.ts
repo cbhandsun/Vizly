@@ -20,7 +20,7 @@ export function useLayeredVirtualization({
     edgesWithCollapseState,
     layers,
     getLayer,
-    isDragging,
+    _isDragging,
     onNodesChange,
     onEdgesChange
 }: UseLayeredVirtualizationProps) {

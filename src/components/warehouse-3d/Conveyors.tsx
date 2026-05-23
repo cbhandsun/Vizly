@@ -282,7 +282,10 @@ const InboundPackages: React.FC = () => {
 
         for (let i = 0; i < count; i++) {
             const t = (time * speed + i * (pathPeriod / count)) % pathPeriod;
-            let x = -60 + t, z = 0, y = 5.1, rotation = 0;
+            const x = -60 + t;
+            const y = 5.1;
+            let z = 0;
+            let rotation = 0;
             if (t > 40) {
                 const curveT = (t - 40) / 13;
                 const smoothT = Math.sin((curveT - 0.5) * Math.PI) * 0.5 + 0.5;

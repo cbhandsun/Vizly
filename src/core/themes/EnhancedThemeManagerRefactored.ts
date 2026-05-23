@@ -6,12 +6,12 @@
 import {
   Theme,
   ThemePreset,
-  ThemeTransition,
-  ThemePerformanceOptions,
-  ThemeEvent,
-  ThemeEventListener,
-  ThemeChangeEvent,
-  ThemePresetEvent,
+  _ThemeTransition,
+  _ThemePerformanceOptions,
+  _ThemeEvent,
+  _ThemeEventListener,
+  _ThemeChangeEvent,
+  _ThemePresetEvent,
   ThemeColor
 } from './types/ThemeTypes';
 
@@ -25,8 +25,8 @@ import {
   getAvailableThemeIds,
   preloadThemePreset,
   clearThemePresetCache,
-  getCachedThemePreset,
-  isThemePresetCached,
+  _getCachedThemePreset,
+  _isThemePresetCached,
   getCacheStats
 } from './ThemePresetLoader';
 

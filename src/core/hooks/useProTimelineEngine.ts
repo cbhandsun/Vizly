@@ -121,7 +121,7 @@ export function calculateSwimlanes(tasks: ProGanttTask[]): ProGanttTask[] {
   const hierarchicalTasks = buildHierarchicalTasks(tasks);
   
   // Only allocate lanes for visible tasks
-  const visibleTasks = hierarchicalTasks.filter(t => t._computed!.isVisible);
+  const _visibleTasks = hierarchicalTasks.filter(t => t._computed!.isVisible);
   
   // Sort by start date to pack lanes efficiently, BUT actually for a Gantt chart,
   // the order in the list *dictates* the row index when we have a fixed task list panel!

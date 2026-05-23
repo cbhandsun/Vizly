@@ -447,7 +447,7 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
     // [CHECKPOINT 1] Dagre 布局完成后，记录子节点**相对位置**
     const sgsCheck1 = updatedNodes.filter(n => String(n.type || '') === 'subGroup');
     for (const sg of sgsCheck1) {
-      const sgDesc = String((sg.data as any)?.description || sg.id);
+      const _sgDesc = String((sg.data as any)?.description || sg.id);
       const sgX = (sg.position as any)?.x || 0;
       const sgY = (sg.position as any)?.y || 0;
       const children = Array.isArray((sg.data as any)?.children) ? (sg.data as any).children as string[] : [];
@@ -456,9 +456,9 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
         if (child) {
           const cx = (child.position as any)?.x || 0;
           const cy = (child.position as any)?.y || 0;
-          const relX = cx - sgX;
-          const relY = cy - sgY;
-          const dagreRel = (child.data as any)?.__dagreRel;
+          const _relX = cx - sgX;
+          const _relY = cy - sgY;
+          const _dagreRel = (child.data as any)?.__dagreRel;
         }
       });
     }
@@ -605,7 +605,7 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
               let currentOrphanY = orphansY;
               for (const orphan of orphans) {
                 const oh = num((orphan as any)?.measured?.height ?? (orphan as any)?.style?.height, 60);
-                const ow = num((orphan as any)?.measured?.width ?? (orphan as any)?.style?.width, 150);
+                const _ow = num((orphan as any)?.measured?.width ?? (orphan as any)?.style?.width, 150);
                 (orphan as any).position = { x: Math.round(orphanX), y: Math.round(currentOrphanY) };
                 currentOrphanY += oh + subGroupGap;
                 orphansBottom = currentOrphanY;
@@ -3230,7 +3230,7 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
     // [CHECKPOINT 3] 布局策略最终返回前 - 检查最终位置
     const sgsCheck3 = updatedNodes.filter(n => String(n.type || '') === 'subGroup');
     for (const sg of sgsCheck3) {
-      const sgDesc = String((sg.data as any)?.description || sg.id);
+      const _sgDesc = String((sg.data as any)?.description || sg.id);
       const sgX = (sg.position as any)?.x || 0;
       const sgY = (sg.position as any)?.y || 0;
       const children = Array.isArray((sg.data as any)?.children) ? (sg.data as any).children as string[] : [];
@@ -3239,9 +3239,9 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
         if (child) {
           const cx = (child.position as any)?.x || 0;
           const cy = (child.position as any)?.y || 0;
-          const relX = cx - sgX;
-          const relY = cy - sgY;
-          const dagreRel = (child.data as any)?.__dagreRel;
+          const _relX = cx - sgX;
+          const _relY = cy - sgY;
+          const _dagreRel = (child.data as any)?.__dagreRel;
         }
       });
     }

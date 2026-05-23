@@ -56,7 +56,7 @@ export const sortNodesInRow = (nodes: ReactFlowNode[]): ReactFlowNode[] => {
 
 
 // 检测线段是否与矩形相交
-function isLineIntersectingRect(
+function _isLineIntersectingRect(
   start: Position,
   end: Position,
   rect: Rectangle
@@ -330,7 +330,7 @@ export const pushFreeNodesBelowSubGroupRow = (nodes: ReactFlowNode[]): ReactFlow
     const sgs = updated.filter(n => String(n.type || '') === 'subGroup' && String(((n.data as any)?.domain || '')) === dId);
     let maxBottom = innerTop;
     for (const sg of sgs) {
-      const sx = num(((sg as any)?.position?.x), 0);
+      const _sx = num(((sg as any)?.position?.x), 0);
       const sy = num(((sg as any)?.position?.y), 0);
       const sh = getH(sg);
       maxBottom = Math.max(maxBottom, sy + sh);
@@ -345,7 +345,7 @@ export const pushFreeNodesBelowSubGroupRow = (nodes: ReactFlowNode[]): ReactFlow
       const mx = num(((m as any)?.position?.x), 0);
       const my = num(((m as any)?.position?.y), 0);
       const mw = getW(m);
-      const mh = getH(m);
+      const _mh = getH(m);
       const targetY = Math.max(my, maxBottom + vGap);
       const minX = innerLeft;
       const maxX = Math.max(innerLeft, innerRight - mw);

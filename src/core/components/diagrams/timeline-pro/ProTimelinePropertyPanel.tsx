@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import { Collapse, Typography, Empty, Input, DatePicker, Slider, Select, Divider, Button, Popconfirm } from 'antd';
 import { SettingOutlined, DeleteOutlined } from '@ant-design/icons';
@@ -19,37 +19,31 @@ export interface ProTimelinePropertyPanelProps {
 export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> = ({
     ctx, selectedNodes
 }) => {
-    if (!ctx || !selectedNodes) {
-        return (
-            <div style={{ padding: 24, textAlign: 'center' }}>
-                <Empty description="请选择甘特图任务进行编辑" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-            </div>
-        );
-    }
-    const { setNodes } = ctx;
-
-    const activeNodeId = selectedNodes.length === 1 ? selectedNodes[0].id : null;
-    const freshNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
-    const nodeData = freshNode ? freshNode.data : null;
-    const isGanttTask = nodeData && ['phase', 'milestone', 'summary', 'event'].includes(nodeData.type as string);
     const [theme] = useTheme();
     const isDark = theme?.mode === 'dark';
     const labelColor = isDark ? 'rgba(255,255,255,0.45)' : '#8c8c8c';
     const borderColor = isDark ? '#303030' : '#f0f0f0';
 
+    const activeNodeId = selectedNodes && selectedNodes.length === 1 ? selectedNodes[0].id : null;
+    const freshNode = selectedNodes && selectedNodes.length === 1 ? selectedNodes[0] : null;
+    const nodeData = freshNode ? freshNode.data : null;
+    const isGanttTask = nodeData && ['phase', 'milestone', 'summary', 'event'].includes(nodeData.type as string);
+
     const updateNodeData = useCallback((key: string, value: any) => {
-        if (!selectedNodes[0]) return;
+        if (!selectedNodes || !selectedNodes[0]) return;
         const nodeId = selectedNodes[0].id;
+        const setNodes = ctx?.setNodes;
+        if (!setNodes) return;
         setNodes((nds: Node[]) => nds.map((n: Node) => {
             if (n.id === nodeId) {
                 return { ...n, data: { ...n.data, [key]: value } };
             }
             return n;
         }));
-    }, [selectedNodes, setNodes]);
+    }, [selectedNodes, ctx]);
 
     const handleDelete = useCallback(() => {
-        if (!activeNodeId) return;
+        if (!activeNodeId || !ctx) return;
         
         // 1. 递归收集要删除的节点ID及其后代ID
         const currentNodes = ctx.getNodes();
@@ -74,6 +68,14 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
         
         appMessage.success('任务及子任务删除成功！');
     }, [activeNodeId, ctx]);
+
+    if (!ctx || !selectedNodes) {
+        return (
+            <div style={{ padding: 24, textAlign: 'center' }}>
+                <Empty description="请选择甘特图任务进行编辑" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            </div>
+        );
+    }
 
     if (!isGanttTask) {
         return (

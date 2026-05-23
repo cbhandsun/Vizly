@@ -205,6 +205,10 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
     // editingId/editingValue/searchText are included so title renders update when edit/search mode changes
     }, [nodes, edges, editingId, editingValue, searchText, startEdit, commitEdit, cancelEdit]);
 
+    const selectedKeys = useMemo(() => {
+        return nodes.filter((n: any) => n.selected).map((n: any) => n.id);
+    }, [nodes]);
+
     if (treeData.length === 0) {
         return <Empty description="暂无导图节点" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
     }
@@ -225,10 +229,6 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
             setNodes((nds: any[]) => nds.map(n => ({ ...n, selected: n.id === nodeId })));
         }
     };
-
-    const selectedKeys = useMemo(() => {
-        return nodes.filter((n: any) => n.selected).map((n: any) => n.id);
-    }, [nodes]);
 
     return (
         <div style={{ padding: '12px 8px', height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 0 }}>

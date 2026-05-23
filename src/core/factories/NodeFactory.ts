@@ -192,7 +192,7 @@ export class NodeFactory {
     // - 确保工厂计算的宽高能容纳 CustomNode 强加的形状安全边距，防止文本溢出
     // 函数级注释：形状回撤
     // 说明：统一回撤形状对尺寸的影响，额外内边距归零
-    const shape = 'rectangle';
+    const _shape = 'rectangle';
     const shapePaddingH = 0;
     const shapePaddingV = 0;
 
@@ -237,7 +237,7 @@ export class NodeFactory {
       // 2. 垂直布局结构尺寸（紧凑形状采用“角标叠加”图标，不占据文本布局空间）
       // 函数级注释：为了最大化圆形/菱形等紧凑形状的文本空间，图标改为绝对定位角标，因此在尺寸计算中不再计入图标高度。
       const iconSize = 0;
-      const iconGap = 0;
+      const _iconGap = 0;
 
       // 宽度：取（文本宽度, 图标宽度）最大值 + 内边距 + 形状边距
       const contentWidth = Math.max(iconSize, textWidth);

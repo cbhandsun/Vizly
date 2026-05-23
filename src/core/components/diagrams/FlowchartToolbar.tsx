@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     FaUndo, FaRedo, FaSearchPlus, FaSearchMinus, FaCompressArrowsAlt, FaArrowsAltH,
-    FaFileExport, FaFolderOpen, FaMagic, FaVectorSquare, FaTh, FaKeyboard
+    FaFileExport, FaFolderOpen, FaMagic, _FaVectorSquare, FaTh, FaKeyboard
 } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'antd';

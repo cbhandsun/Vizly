@@ -73,7 +73,7 @@ const CanvasEdgeLayer = memo(() => {
             if (!sourceNode || !targetNode) return;
 
             // Resolve effective type (handle swapped type for canvas mode)
-            const edgeType = (edge.data?.originalType as string) || edge.type || 'default';
+            const _edgeType = (edge.data?.originalType as string) || edge.type || 'default';
 
             let pathString = '';
 

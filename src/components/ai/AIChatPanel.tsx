@@ -1,18 +1,18 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import Drawer from 'antd/es/drawer';
+// import Drawer from 'antd/es/drawer';
 import Modal from 'antd/es/modal';
 import Input from 'antd/es/input';
 import Button from 'antd/es/button';
-import Avatar from 'antd/es/avatar';
+// import Avatar from 'antd/es/avatar';
 import Collapse from 'antd/es/collapse';
 
 import Dropdown from 'antd/es/dropdown';
 import Select from 'antd/es/select';
-import message from 'antd/es/message';
+// import message from 'antd/es/message';
 import Space from 'antd/es/space';
 import Typography from 'antd/es/typography';
 import {
-    ApartmentOutlined,
+    
     AudioOutlined,
     CheckCircleOutlined,
     CloudOutlined,
@@ -23,21 +23,21 @@ import {
     DeleteOutlined,
     DownOutlined,
     EditOutlined,
-    HistoryOutlined,
-    LeftOutlined,
+    _HistoryOutlined,
+    _LeftOutlined,
     MenuFoldOutlined,
-    MenuUnfoldOutlined,
+    _MenuUnfoldOutlined,
     PlusOutlined,
-    RightOutlined,
+    _RightOutlined,
     SendOutlined,
     SettingOutlined,
-    ThunderboltOutlined,
-    UserOutlined,
+    _ThunderboltOutlined,
+    _UserOutlined,
     RobotOutlined
 } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { getAIConfig, AI_CONFIG_KEY, getAIConfigKey } from './AIConfigModal';
+import { getAIConfig, getAIConfigKey } from './AIConfigModal';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { unifiedStorage } from '@/services/UnifiedStorageService';
@@ -54,10 +54,10 @@ import {
 import List from 'antd/es/list';
 import Tooltip from 'antd/es/tooltip';
 import Popconfirm from 'antd/es/popconfirm';
-import { Node, Edge } from '@xyflow/react';
+import {   } from '@xyflow/react';
 import { extractJson } from './useAIChatStreaming';
 import { 
-    CanvasOperations, 
+     
     AIChatPanelProps
 } from './types';
 import ShortcutsGuide from './ShortcutsGuide';
@@ -72,7 +72,7 @@ const generateId = (prefix: string = 'msg') =>
     `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
 // --- Typing Indicator Component ---
-const TypingIndicator: React.FC = () => (
+const _TypingIndicator: React.FC = () => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '12px 16px', background: 'rgba(22, 119, 255, 0.05)', borderRadius: 12, width: 'fit-content', margin: '8px 0' }}>
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1677ff', animation: 'typingDotBreath 1.4s infinite ease-in-out', animationDelay: '0s' }} />
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1677ff', animation: 'typingDotBreath 1.4s infinite ease-in-out', animationDelay: '0.2s' }} />
@@ -87,8 +87,8 @@ const TypingIndicator: React.FC = () => (
 );
 
 // --- Constants ---
-const HISTORY_STORAGE_KEY = 'AIChatPanel.history';
-const CUSTOM_PRESETS_STORAGE_KEY = 'DiagramView.CustomPresets';
+const _HISTORY_STORAGE_KEY = 'AIChatPanel.history';
+const _CUSTOM_PRESETS_STORAGE_KEY = 'DiagramView.CustomPresets';
 
 // --- Message Item Component (with Memo) ---
 interface MessageItemProps {
@@ -106,7 +106,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
     onPreviewJson, 
     onApplyJson, 
     handleSaveDiagramTo,
-    unifiedStorage
+    _unifiedStorage
 }) => {
     const isAi = item.role === 'assistant';
 
@@ -814,7 +814,9 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         }
 
         const config = getAIConfig(user?.id);
-        let [pId, ...mIdParts] = (config.activeModelKey || '').split(':');
+        const parts = (config.activeModelKey || '').split(':');
+        let pId = parts[0];
+        const mIdParts = parts.slice(1);
         let mId = mIdParts.join(':'); // 支持模型ID中包含冒号的情况
         let activeProvider = config.providers.find(p => p.id === pId);
         let activeModel = activeProvider?.models.find(m => m.id === mId);

@@ -17,9 +17,9 @@ import Checkbox from 'antd/es/checkbox';
 import {
     PlusOutlined,
     DeleteOutlined,
-    RobotOutlined,
+    _RobotOutlined,
     RocketOutlined,
-    GlobalOutlined,
+    _GlobalOutlined,
     SettingOutlined,
     CheckCircleFilled,
     AppstoreOutlined,

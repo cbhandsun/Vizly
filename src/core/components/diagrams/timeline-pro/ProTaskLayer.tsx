@@ -61,7 +61,7 @@ function TaskTooltip({ task, x, y, theme }: { task: ProGanttTask; x: number; y: 
     const titleColor = isDark ? '#fff' : '#262626';
     const labelColor = isDark ? '#8c8c8c' : '#8c8c8c';
     const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
-    const primaryColor = theme?.palette?.primary?.main || '#1890ff';
+    const _primaryColor = theme?.palette?.primary?.main || '#1890ff';
     const successColor = theme?.palette?.success?.main || '#52c41a';
 
     return (
@@ -254,7 +254,8 @@ export default function ProTaskLayer({
         >
             {tasks.map(task => {
                 if (!task._computed || !task._computed.isVisible) return null;
-                let { x, w, laneIndex } = task._computed;
+                let { x, w } = task._computed;
+                const { laneIndex } = task._computed;
                 
                 const isDragging = dragState?.taskId === task.id;
                 let renderProgress = task.progress ?? 0;
@@ -702,7 +703,7 @@ export default function ProTaskLayer({
                 
                 if (dragState.mode === 'progress') {
                     // Progress Value Box
-                    let px = task._computed.x + (task._computed.w * dragProgress / 100);
+                    const px = task._computed.x + (task._computed.w * dragProgress / 100);
                     const py = HEADER_HEIGHT + task._computed.laneIndex * ROW_HEIGHT - 6;
                     return (
                         <div style={{
@@ -716,7 +717,7 @@ export default function ProTaskLayer({
 
                 if (dragDateLabel) {
                     // Date Format Box
-                    let labelX = dragState.mode === 'move' ? snapX(dragState.origX + dragDeltaX) : dragState.origX;
+                    const labelX = dragState.mode === 'move' ? snapX(dragState.origX + dragDeltaX) : dragState.origX;
                     const labelY = HEADER_HEIGHT + task._computed.laneIndex * ROW_HEIGHT - 6;
                     return (
                         <div style={{

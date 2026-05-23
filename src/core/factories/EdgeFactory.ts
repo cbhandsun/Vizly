@@ -165,7 +165,7 @@ export class EdgeFactory {
     // 创建边缘
     // 主题信息用于原生边标签样式（确保普通/智能文案一致且不被路径穿过）
     const theme = getConfigIntegration()?.getThemeManager?.()?.getCurrentTheme?.();
-    const labelBg = theme?.diagram?.canvas?.background || '#fff';
+    const _labelBg = theme?.diagram?.canvas?.background || '#fff';
     const labelFontSize = theme?.typography?.fontSize?.sm || '0.85rem';
     const labelFontFamily = theme?.typography?.fontFamily;
     const strokeColor = (edgeStyle as any)?.stroke || (config.strokeColor) || '#64748b';
@@ -752,7 +752,7 @@ export class EdgeFactory {
     }
 
     // 样式验证
-    if (config.strokeWidth && config.strokeWidth <= 0) {
+    if (config.strokeWidth !== undefined && config.strokeWidth <= 0) {
       errors.push('线条宽度必须大于0');
     }
 

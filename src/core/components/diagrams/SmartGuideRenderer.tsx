@@ -58,7 +58,7 @@ export const SmartGuideRenderer: React.FC<SmartGuideRendererProps> = React.memo(
                                     // 检测是 X 方向间距还是 Y 方向间距
                                     // X 方向：segments 的 start/end 代表 X 坐标，position 代表 Y（中心高度）
                                     // Y 方向：segments 的 start/end 代表 Y 坐标，position 代表 X（中心宽度）
-                                    const isXSpacing = seg.start > 100 || seg.end > 100; // heuristic — 改为看哪个轴
+                                    const _isXSpacing = seg.start > 100 || seg.end > 100; // heuristic — 改为看哪个轴
 
                                     return (
                                         <React.Fragment key={si}>

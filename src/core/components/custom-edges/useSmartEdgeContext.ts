@@ -1,5 +1,5 @@
 // @ts-nocheck
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 // src/components/custom-edges/useSmartEdgeContext.ts
 import { useMemo, useCallback, useRef } from 'react';
 import { useStore } from '@xyflow/react';
@@ -510,7 +510,9 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         if (result) {
             // [FIX] Only log in development — avoids console flooding in production
             // (this runs inside useMemo, firing on every drag frame for each reverse edge)
-            import.meta.env.DEV && console.log(`[ReverseEdge] ${source}→${target} isReverse=TRUE  dx=${Math.round(dx)} dy=${Math.round(dy)} refDir=${refDir} geomReverse=${geomReverse} sHandle=${sourceHandleId} tHandle=${targetHandleId}`);
+            if (import.meta.env.DEV) {
+                console.log(`[ReverseEdge] ${source}→${target} isReverse=TRUE  dx=${Math.round(dx)} dy=${Math.round(dy)} refDir=${refDir} geomReverse=${geomReverse} sHandle=${sourceHandleId} tHandle=${targetHandleId}`);
+            }
         }
 
 

@@ -57,7 +57,7 @@ export class MermaidParser {
       const trimmedLine = line.trim();
       if (trimmedLine.match(/^(graph|flowchart)\s+(TD|LR|TB|BT|RL)/i)) return;
 
-      const subgraphMatch = trimmedLine.match(/subgraph\s+([^\s\[\(\{]+)(?:\s+\[(.+?)\])?/i);
+      const subgraphMatch = trimmedLine.match(/subgraph\s+([^\s[({]+)(?:\s+\[(.+?)\])?/i);
       if (subgraphMatch) {
         const id = subgraphMatch[1];
         const label = subgraphMatch[2] || id;
@@ -71,7 +71,7 @@ export class MermaidParser {
       }
 
       // Extract explicit node definitions e.g. A[Label] or B((Circle))
-      const nodeDefRegex = /([^\s\-\>\(\[\{\|\}]+)\s*(?:(\[\(|\[\/|\[\\|\[|\(\[|\(\(|\(|\{\{|\{)(.+?)(?:\)\]|\]\)|\)\)|\\\/]|\/\]|\]|\}\text|\}|\)))/g;
+      const nodeDefRegex = /([^\s\->([{|}]+)\s*(?:(\[\(|\[\/|\[\\|\[|\(\[|\(\(|\(|\{\{|\{)(.+?)(?:\)\]|\]\)|\)\)|\\\/]|\/\]|\]|\}\text|\}|\)))/g;
       let m;
       while ((m = nodeDefRegex.exec(trimmedLine)) !== null) {
         this.ensureNodeExists(nodes, m[1], currentParentId, ARCH_KEYWORDS, m[3], 'architectureNode', m[2]);
@@ -82,13 +82,13 @@ export class MermaidParser {
 
       // Normalize labeled edges: --text--> becomes -->|text|
       const normalizedLine = cleanedLine
-        .replace(/--\s*([^\-\>]+?)\s*-->/g, '-->|$1|')
-        .replace(/==\s*([^=\>]+?)\s*==>/g, '==>|$1|')
-        .replace(/--\s*([^\-]+?)\s*---/g, '---|$1|')
+        .replace(/--\s*([^\->]+?)\s*-->/g, '-->|$1|')
+        .replace(/==\s*([^=>]+?)\s*==>/g, '==>|$1|')
+        .replace(/--\s*([^-]+?)\s*---/g, '---|$1|')
         .replace(/-\.->/g, '-.-')
-        .replace(/-\.\s*([^\-\.\>]+?)\s*\.->/g, '-.-|$1|');
+        .replace(/-\.\s*([^\-.>]+?)\s*\.->/g, '-.-|$1|');
 
-      const transitionRegex = /([^\s\-\>\(\[\{\|\}]+)\s*(?:(-->|---|-\.-|==>))\s*(?:\|(.+?)\|)?\s*([^\s\-\>\(\[\{\|\}]+)/g;
+      const transitionRegex = /([^\s\->([{|}]+)\s*(?:(-->|---|-\.-|==>))\s*(?:\|(.+?)\|)?\s*([^\s\->([{|}]+)/g;
       let startIdx = 0;
       while (true) {
         transitionRegex.lastIndex = startIdx;
@@ -250,7 +250,7 @@ export class MermaidParser {
   // ─── Shared Helpers ────────────────────────────────────────────────────────
 
   private extractId(text: string): string {
-    const match = text.match(/^([^\s\-\>\(\[\{\|\}]+)/);
+    const match = text.match(/^([^\s\->([{|}]+)/);
     return match ? match[1] : text.trim();
   }
 

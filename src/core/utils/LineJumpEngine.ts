@@ -168,7 +168,7 @@ export function applyLineJumps(
             // 半圆弧跳线（向上凸起）
             // sweep-flag 取决于方向：向右走 sweep=1, 向左走 sweep=0
             parts.push(`A ${r} ${r} 0 0 ${goingRight ? 1 : 0} ${arcEndX} ${y}`);
-            currentX = arcEndX;
+            _currentX = arcEndX;
         }
 
         // 补全到线段终点

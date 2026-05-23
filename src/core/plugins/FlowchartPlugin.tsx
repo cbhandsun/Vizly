@@ -1,5 +1,4 @@
 import React from 'react';
-import type { Node, Edge } from '@xyflow/react';
 import { theme, Tooltip, Typography, Input, Button, Divider } from 'antd';
 import { 
     SearchOutlined, AlignLeftOutlined, AlignCenterOutlined, AlignRightOutlined, 
@@ -232,7 +231,11 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                                 const angle = (Math.PI / spikes) * i - Math.PI / 2;
                                 const px = cx + Math.cos(angle) * r;
                                 const py = cy + Math.sin(angle) * r;
-                                i === 0 ? ctxCanvas.moveTo(px, py) : ctxCanvas.lineTo(px, py);
+                                if (i === 0) {
+                                    ctxCanvas.moveTo(px, py);
+                                } else {
+                                    ctxCanvas.lineTo(px, py);
+                                }
                             }
                             ctxCanvas.closePath();
                             break;

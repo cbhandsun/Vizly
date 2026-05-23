@@ -59,7 +59,7 @@ export function analyzeDiagram(
   const leafNodes = nodes.filter(
     n => n.type !== 'titleGroup' && n.type !== 'titleGroupNode' && n.type !== 'group' && n.type !== 'subGroup'
   );
-  const nodeIds = new Set(leafNodes.map(n => n.id));
+  const _nodeIds = new Set(leafNodes.map(n => n.id));
 
   // 1. 孤立节点检测
   const connectedIds = new Set<string>();

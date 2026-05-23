@@ -164,7 +164,7 @@ const BRACKET_TO_SHAPE: [RegExp, string][] = [
 ];
 
 function parseNodeDef(text: string): { id: string; label: string; shape: string } | null {
-    const idMatch = text.match(/^([a-zA-Z0-9_]+)([\[\(\{<>].*)/);
+    const idMatch = text.match(/^([a-zA-Z0-9_]+)([[({<>].*)/);
     if (!idMatch) return null;
 
     const id = idMatch[1];

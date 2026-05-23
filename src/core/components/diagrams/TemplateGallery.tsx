@@ -21,8 +21,8 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = React.memo(({
 }) => {
     const { t, i18n } = useTranslation();
     const {
-        templates,
-        templatesByCategory,
+        _templates,
+        _templatesByCategory,
         loading,
         deleteTemplate,
         filterTemplates

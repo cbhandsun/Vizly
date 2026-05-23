@@ -40,7 +40,7 @@ function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], dir: 'TB'
     const isH = dir === 'LR';
     const defSrc = isH ? 'right' : 'bottom';
     const defTgt = isH ? 'left' : 'top';
-    let orphan = 0, expanded = 0, defaulted = 0;
+    let _orphan = 0, _expanded = 0, _defaulted = 0;
 
     const sanitized = resultEdges
         .filter(e => {
@@ -84,7 +84,7 @@ export function useLayoutStrategy({
     nodesRef,
     edgesRef,
     takeSnapshot,
-    reactFlowInstance,
+    _reactFlowInstance,
     diagramId,
 }: UseLayoutStrategyParams) {
     // [对齐 SVG 版] 跟踪当前域布局策略和方向

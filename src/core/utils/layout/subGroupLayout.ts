@@ -244,7 +244,7 @@ export const rankSnapSubGroupChildren = (
     const sg = sgs[i];
     const pos = (sg as any).position || { x: 0, y: 0 };
     const w = num((((sg as any)?.measured?.width ?? (sg as any)?.style?.width ?? (sg as any)?.width)), 0);
-    const h = num((((sg as any)?.measured?.height ?? (sg as any)?.style?.height ?? (sg as any)?.height)), 0);
+    const _h = num((((sg as any)?.measured?.height ?? (sg as any)?.style?.height ?? (sg as any)?.height)), 0);
     const innerLeft = num(pos.x, 0) + SUB_H;
     const innerRight = num(pos.x, 0) + Math.max(1, w) - SUB_H;
     const innerTop = num(pos.y, 0) + TOP_PAD;
@@ -506,7 +506,7 @@ export const layoutNodesByGhostDomainColumns = (
   const cfgFull = diagramConfigManager.getConfig() as any;
   const layoutCfg = diagramConfigManager.getLayoutConfig() as any;
   const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-  const H_GAP = num(layoutCfg?.NODE_H_GAP, 120);
+  const _H_GAP = num(layoutCfg?.NODE_H_GAP, 120);
   const V_GAP = num(layoutCfg?.NODE_V_GAP, 80);
   const COL_PAD = Math.max(12, num(cfgFull?.domain?.padding?.horizontal, 24));
   const COL_GAP = Math.max(24, num(cfgFull?.domain?.gap, 40));
@@ -537,7 +537,7 @@ export const layoutNodesByGhostDomainColumns = (
   const orderedKeys = keys.slice().sort((a, b) => avgX(groups.get(a) || []) - avgX(groups.get(b) || []));
 
   let cx = LEFT;
-  const halfIdx = Math.floor(orderedKeys.length / 2);
+  const _halfIdx = Math.floor(orderedKeys.length / 2);
   for (let idxKey = 0; idxKey < orderedKeys.length; idxKey++) {
     const k = orderedKeys[idxKey];
     const arr = (groups.get(k) || []).slice().sort((a, b) => num(((a as any)?.position?.y), 0) - num(((b as any)?.position?.y), 0));
@@ -1078,7 +1078,7 @@ export const strengthenSubGroupsInDomainWithGridStrict = (
   vGap: number,
   iterations: number = 6
 ): ReactFlowNode[] => {
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
+  const _num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
   const updated = nodes.map(n => ({ ...n }));
   const belongsToDomain = (n: ReactFlowNode) => {
     const d = String((((n as any)?.data || {}) as any)?.domain || '');
@@ -1178,7 +1178,7 @@ export const resolveSubGroupsOverlapWithD3Force = (
   iterations: number = 100,
   strength: number = 0.5
 ): ReactFlowNode[] => {
-  const cfgFull = diagramConfigManager.getConfig() as any;
+  const _cfgFull = diagramConfigManager.getConfig() as any;
   const layoutCfg = diagramConfigManager.getLayoutConfig() as any;
   const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
   const updated = nodes.map(n => ({ ...n }));
@@ -1380,7 +1380,7 @@ export const expandSubGroupContainersBySemantic = (
   const rightSafe = Math.max(6, Math.floor(hGap * 0.25));
 
   updated.filter(n => String(n.type || '') === 'subGroup').forEach(sg => {
-    const keyRaw = String((((sg as any)?.data?.subDomain) || '')).trim();
+    const _keyRaw = String((((sg as any)?.data?.subDomain) || '')).trim();
     const childIds = Array.isArray(((sg as any)?.data || {})?.children) ? ((((sg as any).data).children as string[])) : [];
     const members = childIds
       .map(id => updated.find(nn => nn.id === id))
@@ -1475,7 +1475,7 @@ export const enforceSubGroupStrictContainmentByChildren = (
   const padTop = ensureTitleClearance ? Math.max(padTopConf, titleClearance) : padTopConf;
   const padBottom = num(cfgFull?.subDomain?.padding?.bottom, num(layoutCfg?.SUB_GROUP_PADDING?.V_BOTTOM, 20));
   const hGap = num(layoutCfg?.NODE_H_GAP, 120);
-  const rightSafe = Math.max(6, Math.floor(hGap * 0.25));
+  const _rightSafe = Math.max(6, Math.floor(hGap * 0.25));
 
   const getSize = (n: ReactFlowNode): { w: number; h: number } => {
     const defW = num((layoutCfg?.NODE_MIN_WIDTH), 120);
@@ -1497,8 +1497,8 @@ export const enforceSubGroupStrictContainmentByChildren = (
     if (list.length <= 0) return;
 
     // 获取容器当前位置
-    const sgX = num(((sg as any)?.position?.x), 0);
-    const sgY = num(((sg as any)?.position?.y), 0);
+    const _sgX = num(((sg as any)?.position?.x), 0);
+    const _sgY = num(((sg as any)?.position?.y), 0);
 
     // 直接使用绝对坐标计算内容边界（与 reflowSubGroupChildrenDagre 一致）
     let absMinX = Infinity, absMinY = Infinity, absMaxX = -Infinity, absMaxY = -Infinity;
@@ -1724,7 +1724,7 @@ export const resolveSubGroupOverlaps = (
       const subPadTop = num((layoutCfg?.SUB_GROUP_PADDING?.V_TOP ?? cfgFull?.subDomain?.padding?.top ?? cfgFull?.subDomain?.padding?.vertical), Math.max(12, Math.floor(padH * 0.8)));
       const left = num(((titleGroup as any)?.position?.x), 0) + padH;
       const innerTop = num(((titleGroup as any)?.position?.y), 0) + titleH + titleV + titleSafe;
-      const right = left + num((((titleGroup as any)?.measured?.width ?? (titleGroup as any)?.style?.width)), 0) - padH * 2;
+      const _right = left + num((((titleGroup as any)?.measured?.width ?? (titleGroup as any)?.style?.width)), 0) - padH * 2;
       const sgs = updated.filter(n => String(n.type || '') === 'subGroup' && String(((n.data as any)?.domain || '')) === d)
         .slice().sort((a, b) => {
           const ra = getRect(a); const rb = getRect(b);
@@ -1734,7 +1734,7 @@ export const resolveSubGroupOverlaps = (
       const rowTop = innerTop - subTitleH - subTitleV - subPadTop;
       let cursorX = left - subPadH;
       let rowMaxH = 0;
-      const totalW = sgs.reduce((sum, sg) => sum + getRect(sg).w, 0);
+      const _totalW = sgs.reduce((sum, sg) => sum + getRect(sg).w, 0);
       const canSingleRow = true;
       if (canSingleRow) {
         for (const sg of sgs) {
@@ -1799,7 +1799,7 @@ export const recomputeSubGroupContainersBasic = (
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
   };
 
-  const ROW_TOL = Math.max(6, Math.floor(vGap * 0.3));
+  const _ROW_TOL = Math.max(6, Math.floor(vGap * 0.3));
 
   updated.filter(n => String(n.type || '') === 'subGroup').forEach(sg => {
     const children = Array.isArray((sg.data as any)?.children) ? (sg.data as any).children as string[] : [];
@@ -1891,7 +1891,7 @@ export const recomputeSubGroupContainersBasic = (
     // 行间垂直留白：动态按行基准高度与配置 vGap 组合确定
     const avgRowH = rowHeights.length ? Math.round(rowHeights.reduce((s, h) => s + h, 0) / rowHeights.length) : num((cfgFull?.node as any)?.height, 80);
     const vGapEff = Math.max(8, Math.min(vGap, Math.floor(avgRowH * 0.6)));
-    const interRowGaps = Math.max(0, rows.length - 1) * vGapEff;
+    const _interRowGaps = Math.max(0, rows.length - 1) * vGapEff;
 
     // 2) 璁＄畻瀹瑰櫒灏哄锛氫互鍑犱綍鎶曞奖涓哄敮涓€渚濇嵁锛堜弗鏍煎寘鍚?+ 閫傚害瀹夊叏鐣欑櫧锛?
     const contentW = Math.max(0, maxX - minX);
@@ -1955,7 +1955,7 @@ export const packSubGroupsInDomain = (
   const titleV = num(cfgFull?.domain?.title?.padding?.vertical, 12);
   const titleSafe = num(cfgFull?.domain?.title?.safeGap, 16);
   const hGapBase = num(layoutCfg?.NODE_H_GAP, 120);
-  const vGapBase = num(layoutCfg?.NODE_V_GAP, 80);
+  const _vGapBase = num(layoutCfg?.NODE_V_GAP, 80);
 
   const updated = nodes.map(n => ({ ...n }));
   const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
@@ -2199,15 +2199,15 @@ export const packSubGroupsVerticallySymmetric = (
   const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
   const updated = nodes.map(n => ({ ...n }));
   const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
-  const padH = num(cfgFull?.domain?.padding?.horizontal, 24);
-  const titleH = num(cfgFull?.domain?.title?.height, 40);
+  const _padH = num(cfgFull?.domain?.padding?.horizontal, 24);
+  const _titleH = num(cfgFull?.domain?.title?.height, 40);
   const titleV = num(cfgFull?.domain?.title?.padding?.vertical, 12);
   const titleSafe = num(cfgFull?.domain?.title?.safeGap, 16);
-  const bottomSafe = num((cfgFull?.domain as any)?.bottomSafeGap ?? (cfgFull?.domain as any)?.padding?.bottom ?? (titleV + titleSafe), titleV + titleSafe);
+  const _bottomSafe = num((cfgFull?.domain as any)?.bottomSafeGap ?? (cfgFull?.domain as any)?.padding?.bottom ?? (titleV + titleSafe), titleV + titleSafe);
   const subPadTop = num(((cfgFull?.subDomain || {}) as any)?.padding?.top, num(layoutCfg?.SUB_GROUP_PADDING?.V_TOP, 28));
   const subTitleH = num(((cfgFull?.subDomain || {}) as any)?.title?.height, 28);
   const subTitleV = num(((cfgFull?.subDomain || {}) as any)?.title?.padding?.vertical, 8);
-  const vGap = (typeof gapVOverride === 'number' && isFinite(gapVOverride)) ? gapVOverride : num(layoutCfg?.NODE_V_GAP, 80);
+  const _vGap = (typeof gapVOverride === 'number' && isFinite(gapVOverride)) ? gapVOverride : num(layoutCfg?.NODE_V_GAP, 80);
 
   // 已回滚：不再执行垂直对称打包，返回原节点集合
   return nodes.map(n => ({ ...n }));
@@ -2571,7 +2571,7 @@ export const centerSubGroupChildrenHorizontally = (
   const ensureClear = !!layoutCfg?.ENSURE_SUB_GROUP_TITLE_CLEARANCE;
   const titleClear = num(layoutCfg?.SUB_GROUP_TITLE_CLEARANCE, titleH + titleV);
   const subPadTop = num((layoutCfg?.SUB_GROUP_PADDING?.V_TOP ?? cfgFull?.subDomain?.padding?.top ?? cfgFull?.subDomain?.padding?.vertical), 28);
-  const TOP_PAD = (ensureClear ? Math.max(titleH + titleV, titleClear) : (titleH + titleV)) + subPadTop;
+  const _TOP_PAD = (ensureClear ? Math.max(titleH + titleV, titleClear) : (titleH + titleV)) + subPadTop;
   const updated = nodes.map(n => ({ ...n }));
   const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
   const getW = (n: ReactFlowNode) => num((((n as any)?.measured?.width ?? (n as any)?.style?.width ?? (n as any)?.width)), num(layoutCfg?.NODE_MIN_WIDTH, 120));
@@ -2587,7 +2587,7 @@ export const centerSubGroupChildrenHorizontally = (
     const innerLeft = num(pos.x, 0) + SUB_H;
     const innerRight = sizeW > 0 ? (num(pos.x, 0) + sizeW - SUB_H) : (innerLeft + Math.max(1, num((diagramConfigManager.getConfig() as any)?.layout?.mainColumnWidth, 400)));
     const selfAvailW = Math.max(1, innerRight - innerLeft);
-    const availW = selfAvailW; // Math.max(1, (domainInnerW ?? selfAvailW));
+    const _availW = selfAvailW; // Math.max(1, (domainInnerW ?? selfAvailW));
     // 以域内部中心为参考进行居中 -> 已禁用，强制使用子域自身宽度居中，避免与 layoutStrategy 的对齐冲突
     const domainCenterX: number | null = null;
     // try { ... } catch {} logic removed to enforce strict local centering
@@ -2621,7 +2621,7 @@ export const centerSubGroupChildrenHorizontally = (
       const r = row.slice().sort((a, b) => getX(a) - getX(b));
       const widthsRow = r.map(n => getW(n));
       const boxSum = widthsRow.reduce((s, w) => s + w, 0);
-      const gapsDefault = Math.max(0, r.length - 1) * H_GAP;
+      const _gapsDefault = Math.max(0, r.length - 1) * H_GAP;
       const avail = Math.max(1, innerRight - innerLeft);
       const gapEff = (() => {
         if (r.length <= 1) return 0;
@@ -2684,7 +2684,7 @@ export const leftAlignSubGroupChildrenHorizontally = (
     if (!(sizeW > 0)) continue;
     const innerLeft = num(pos.x, 0) + SUB_H;
     const innerRight = num(pos.x, 0) + sizeW - SUB_H;
-    const innerTop = num(pos.y, 0) + TOP_PAD;
+    const _innerTop = num(pos.y, 0) + TOP_PAD;
     let domainCenterX: number | null = null;
     try {
       const dKey = String((((sg as any)?.data?.domain || ''))).trim();
@@ -2695,7 +2695,7 @@ export const leftAlignSubGroupChildrenHorizontally = (
         const domainPadHLocal = num(((diagramConfigManager.getConfig() as any)?.domain?.padding?.horizontal), 24);
         const innerLeftDom = tgX + domainPadHLocal;
         const domainInnerW = Math.max(1, tW - domainPadHLocal * 2);
-        domainCenterX = innerLeftDom + domainInnerW / 2;
+        _domainCenterX = innerLeftDom + domainInnerW / 2;
       }
     } catch {
       // ignore
@@ -2803,7 +2803,7 @@ export const finalizeSubGroupHeightsByProjection = (
     const contentH = Math.max(0, maxBottom - innerTop);
     const contentW = Math.max(0, maxRight - (isFinite(minLeft) ? minLeft : innerLeft));
     const newW = contentW + subPadH * 2;
-    const keepW = num((((sg as any)?.measured?.width ?? (sg as any)?.style?.width ?? (sg as any)?.width)), newW);
+    const _keepW = num((((sg as any)?.measured?.width ?? (sg as any)?.style?.width ?? (sg as any)?.width)), newW);
     const newH = subTitleH + subTitleV + subPadTop + contentH + subBottomSafe;
     // 计算所属域的内部左/右边界，用于钳制子域容器左边不被越界
     let leftClamp = -Infinity; let rightClamp = Infinity;
@@ -2899,7 +2899,7 @@ export const finalizeSubGroupHeightsByProjectionPreserveAnchor = (
     for (const m of list) {
       const p = (m as any)?.position || { x: 0, y: 0 } as any;
       const s = getSize(m);
-      const nx = num((p as any).x, innerLeft);
+      const _nx = num((p as any).x, innerLeft);
       const ny = num((p as any).y, innerTop);
       maxBottom = Math.max(maxBottom, ny + s.h);
     }
@@ -3578,7 +3578,7 @@ export const reflowSubGroupChildrenDagre = (
 
   // 详细高度调试日志（显示容器边界和节点位置）
   const sgDesc = String((sg.data as any)?.description || sg.id);
-  const containerTop = sy;
+  const _containerTop = sy;
   const containerBottom = sy + newH;
   const contentAreaTop = innerTop;
   const contentAreaBottom = sy + newH - padBottom;
@@ -4092,9 +4092,9 @@ export const centerSubGroupsInDomain = (
 
   // 基础配置
   const padH = num(cfgFull?.domain?.padding?.horizontal, 24);
-  const titleH = num(cfgFull?.domain?.title?.height, 40);
-  const titleV = num(cfgFull?.domain?.title?.padding?.vertical, 12);
-  const titleSafe = num(cfgFull?.domain?.title?.safeGap, 16);
+  const _titleH = num(cfgFull?.domain?.title?.height, 40);
+  const _titleV = num(cfgFull?.domain?.title?.padding?.vertical, 12);
+  const _titleSafe = num(cfgFull?.domain?.title?.safeGap, 16);
 
   const domains = updated.filter(n => String(n.type || '') === 'titleGroup');
 
@@ -4219,7 +4219,7 @@ export const unifySubGroupWidthsByDomain = (
     const alignPref = String(layeredCfg.get<string>('diagram.layout.subGroupAlign', 'center') || 'center').toLowerCase();
     const maxW = sgs.reduce((m, sg) => Math.max(m, num((((sg as any)?.measured?.width ?? (sg as any)?.style?.width ?? (sg as any)?.width)), 0)), 0);
     const targetContentW = Math.max(1, availW - 2 * sideSafe);
-    const subPadH = num((cfgFull?.subDomain?.padding?.horizontal ?? cfgFull?.subGroup?.padding?.horizontal ?? layoutCfg?.SUB_GROUP_PADDING?.H), 30);
+    const _subPadH = num((cfgFull?.subDomain?.padding?.horizontal ?? cfgFull?.subGroup?.padding?.horizontal ?? layoutCfg?.SUB_GROUP_PADDING?.H), 30);
     const unifiedW = alignPref === 'center'
       // 为保证左右内容留白都等于 sideSafe，需要在内容宽度基础上加上两侧子域水平内边距 -> 已修正：不再加倍内边距，严格匹配可用内容宽
       ? Math.max(minW, targetContentW)
@@ -4328,7 +4328,7 @@ export const equalizeSubGroupMarginsByProjection = (
   const updated = nodes.map(n => ({ ...n }));
   const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
   const padH = num(cfgFull?.domain?.padding?.horizontal, 24);
-  const sideSafe = Math.max(0, num(cfgFull?.domain?.sideSafeGap, 8));
+  const _sideSafe = Math.max(0, num(cfgFull?.domain?.sideSafeGap, 8));
   const subPadHDefault = Math.max(16, Math.floor(padH * 0.8));
   const tgs = updated.filter(n => String(n.type || '') === 'titleGroup');
   for (const tg of tgs) {
@@ -4387,14 +4387,14 @@ export const equalizeSubGroupVerticalMarginsByProjection = (
   const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
   const updated = nodes.map(n => ({ ...n }));
   const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
-  const padH = num(cfgFull?.domain?.padding?.horizontal, 24);
-  const titleH = num(cfgFull?.domain?.title?.height, 40);
+  const _padH = num(cfgFull?.domain?.padding?.horizontal, 24);
+  const _titleH = num(cfgFull?.domain?.title?.height, 40);
   const titleV = num(cfgFull?.domain?.title?.padding?.vertical, 12);
   const titleSafe = num(cfgFull?.domain?.title?.safeGap, 16);
-  const bottomSafe = num((cfgFull?.domain as any)?.bottomSafeGap ?? (cfgFull?.domain as any)?.padding?.bottom ?? (titleV + titleSafe), titleV + titleSafe);
-  const subPadTopDefault = 28;
-  const subTitleHDefault = 28;
-  const subTitleVDefault = 8;
+  const _bottomSafe = num((cfgFull?.domain as any)?.bottomSafeGap ?? (cfgFull?.domain as any)?.padding?.bottom ?? (titleV + titleSafe), titleV + titleSafe);
+  const _subPadTopDefault = 28;
+  const _subTitleHDefault = 28;
+  const _subTitleVDefault = 8;
   // 宸插洖鎾わ細涓嶅啀杩涜涓婁笅鐣欑櫧鎶曞奖鏍℃锛岀洿鎺ヨ繑鍥炲師鑺傜偣闆嗗悎
   return nodes.map(n => ({ ...n }));
 };

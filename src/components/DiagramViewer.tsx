@@ -1,11 +1,11 @@
 // @ts-nocheck
-import React, { Suspense, useState, useRef, useEffect, ErrorInfo, ReactNode, lazy, useMemo, useCallback } from 'react';
+import React, { Suspense, useState, useRef, useEffect, lazy, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FaCog } from 'react-icons/fa';
-import Button from 'antd/es/button';
+import {  } from 'react-icons/fa';
+// import Button from 'antd/es/button';
 import Spin from 'antd/es/spin';
-import Result from 'antd/es/result';
-import Avatar from 'antd/es/avatar';
+// import Result from 'antd/es/result';
+// import Avatar from 'antd/es/avatar';
 import { ConfigProvider } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useDiagramControls } from '@/core/hooks/useDiagramControls';
@@ -18,25 +18,25 @@ import { useConfigIntegration, useConfigValue } from '@/core/hooks/useConfigInte
 import { useDiagramHostStorage } from '@/core/hooks/useDiagramHostStorage';
 import { useSubscription } from '../context/SubscriptionContext';
 
-import { type DiagramControlAction } from '@/core/components/shared/diagramControl';
-import { dispatchDiagramControl } from '@/core/components/shared/diagramControl';
+import { type  } from '@/core/components/shared/diagramControl';
+import {  } from '@/core/components/shared/diagramControl';
 const RoutingDebugPanel = React.lazy(() => import('./debug/RoutingDebugPanel').then(m => ({ default: m.RoutingDebugPanel })));
 import { LayeredConfigManager, ConfigLayer } from '@/core/config/LayeredConfigManager';
 import { DiagramLayout } from './layout/DiagramLayout';
 import { CommandPalette, type CommandItem } from '@/core/components/ui/CommandPalette';
-import { createPortal } from 'react-dom';
-import { useDraggablePanel } from '../hooks/useDraggablePanel';
-import { MdDragIndicator } from 'react-icons/md';
+import {  } from 'react-dom';
+import {  } from '../hooks/useDraggablePanel';
+import {  } from 'react-icons/md';
 import { ShortcutsHelpModal } from '@/core/components/ui/ShortcutsHelpModal';
 import { CollaborationModal } from './ui/CollaborationModal';
 import { useYjsCollaboration } from './diagrams/collaboration/YjsProviderHooks';
-import { TeamOutlined } from '@ant-design/icons';
+import {  } from '@ant-design/icons';
 import { useCloudSave } from './diagrams/hooks/useCloudSave';
 const AIConfigModal = React.lazy(() => import('./ai/AIConfigModal'));
 const AIChatView = React.lazy(() => import('./ai/AIChatPanel').then(m => ({ default: m.AIChatView })));
 const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
-import { CloudOutlined, AppstoreOutlined, FolderOpenOutlined, LockOutlined, UnlockOutlined, HomeOutlined, CodeOutlined } from '@ant-design/icons';
-import { Dropdown, Tooltip, Switch, message, Modal, Input } from 'antd';
+import {        } from '@ant-design/icons';
+import {      Input } from 'antd';
 const CloudStorageManagerModal = React.lazy(() => import('./storage/CloudStorageManagerModal').then(m => ({ default: m.CloudStorageManagerModal })));
 import { MermaidImportModal } from './ui/MermaidImportModal';
 import { dataService } from '@/services/DataService';
@@ -751,6 +751,14 @@ const DiagramViewer: React.FC = () => {
         }
     }, []);
 
+    const handleAiTabIntercept = useCallback(() => {
+        if (!hasFeature('ai-assistant')) {
+            showUpgradeModal(t('diagramViewer.aiAssistant'));
+            return false;
+        }
+        return true;
+    }, [hasFeature, showUpgradeModal, t]);
+
     const commandItems: CommandItem[] = useMemo(() => {
         const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '');
         const mod = isMac ? '⌘' : 'Ctrl';
@@ -1237,13 +1245,7 @@ const DiagramViewer: React.FC = () => {
                                                         />
                                                     </Suspense>
                                                 }
-                                                onAiTabIntercept={useCallback(() => {
-                                                    if (!hasFeature('ai-assistant')) {
-                                                        showUpgradeModal(t('diagramViewer.aiAssistant'));
-                                                        return false;
-                                                    }
-                                                    return true;
-                                                }, [hasFeature, showUpgradeModal, t])}
+                                                onAiTabIntercept={handleAiTabIntercept}
                                                 renderThemeSelector={
                                                     <EnhancedThemeSelector />
                                                 }

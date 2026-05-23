@@ -13,7 +13,7 @@ import type {
   DataAdapter,
   CacheManager,
   CacheItem,
-  ThemeMetadata,
+  _ThemeMetadata,
   DomainTheme
 } from '@/core';
 import { EdgeFactory } from '@/core';

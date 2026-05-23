@@ -11,7 +11,7 @@ import './FlowchartNode.css';
 export interface FlowchartNodeProps extends NodeProps<Node<FlowchartNodeData>> { }
 
 const FlowchartNode = ({ data, selected, id, dragging }: FlowchartNodeProps) => {
-    const isConnecting = useStore((s) => s.connection.inProgress);
+    const _isConnecting = useStore((s) => s.connection.inProgress);
     const nodeData = useStore((s: any) => s.nodeLookup?.get(id) || s.nodeInternals?.get(id));
 
     const nodeWidth = (nodeData?.measured?.width || (nodeData as any)?.width || 150) as number;
@@ -24,9 +24,9 @@ const FlowchartNode = ({ data, selected, id, dragging }: FlowchartNodeProps) => 
         contentRef,
         editStartRef,
         handleUpdateData,
-        handleDelete,
-        handleClone,
-        handleDomainClassChange,
+        _handleDelete,
+        _handleClone,
+        _handleDomainClassChange,
         handleQuickClone
     } = useFlowchartNodeInteractions(id as string, data, selected);
 
@@ -37,7 +37,7 @@ const FlowchartNode = ({ data, selected, id, dragging }: FlowchartNodeProps) => 
         mainColor,
         finalBorderColor,
         finalBgColor,
-        resolvedIcon,
+        _resolvedIcon,
         businessState,
         nodeStyle
     } = useFlowchartNodeStyleResolution({ data, selected });

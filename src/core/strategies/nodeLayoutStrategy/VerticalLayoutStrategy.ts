@@ -126,7 +126,7 @@ export class VerticalLayoutStrategy implements ILayoutStrategy {
 
         // Debug log for '作业域' to help troubleshooting
         if ((dTrim.includes('作业域') || dTrim.includes('Job')) && (import.meta as any)?.env?.DEV) {
-           const idx = Array.isArray(arr) ? findInArr(arr) : 'N/A';
+           const _idx = Array.isArray(arr) ? findInArr(arr) : 'N/A';
         }
 
         if (Array.isArray(arr)) { 
@@ -340,7 +340,7 @@ export class VerticalLayoutStrategy implements ILayoutStrategy {
       }
       // 统一域宽（配置驱动）
       try {
-        const isElkFirst = String(((options as any)?.nodeLayout || (diagramConfigManager.getConfig() as any)?.diagram?.layout?.nodeStrategy || '')).toLowerCase().replace(/\s+/g,'').replace(/[+_\-]/g,'').includes('elk');
+        const isElkFirst = String(((options as any)?.nodeLayout || (diagramConfigManager.getConfig() as any)?.diagram?.layout?.nodeStrategy || '')).toLowerCase().replace(/\s+/g,'').replace(/[+_-]/g,'').includes('elk');
         if (isElkFirst) { /* ELK-first 下不做域宽统一与居中压缩 */ }
         const cfgFull: any = diagramConfigManager.getConfig() || {};
         const unify = !!cfgFull?.domain?.unifyWidth;
@@ -362,7 +362,7 @@ export class VerticalLayoutStrategy implements ILayoutStrategy {
       } catch {}
       // 域顶端锚定（内容上收至标题安全区）
       try {
-        const isElkFirst = String(((options as any)?.nodeLayout || (diagramConfigManager.getConfig() as any)?.diagram?.layout?.nodeStrategy || '')).toLowerCase().replace(/\s+/g,'').replace(/[+_\-]/g,'').includes('elk');
+        const isElkFirst = String(((options as any)?.nodeLayout || (diagramConfigManager.getConfig() as any)?.diagram?.layout?.nodeStrategy || '')).toLowerCase().replace(/\s+/g,'').replace(/[+_-]/g,'').includes('elk');
         if (isElkFirst) { /* ELK-first 下尽量保留 ELK 输出，不做居中与顶端上收 */ }
         const cfgFull: any = diagramConfigManager.getConfig() || {};
         const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
@@ -405,7 +405,7 @@ export class VerticalLayoutStrategy implements ILayoutStrategy {
        * - 行为：计算每个域的内容水平投影 minX/maxX 与可用宽度（去除左右域内边距），将所有成员整体平移到居中位置，并随后进行严格包含与钳制。
        */
       try {
-        const isElkFirst = String(((options as any)?.nodeLayout || (diagramConfigManager.getConfig() as any)?.diagram?.layout?.nodeStrategy || '')).toLowerCase().replace(/\s+/g,'').replace(/[+_\-]/g,'').includes('elk');
+        const isElkFirst = String(((options as any)?.nodeLayout || (diagramConfigManager.getConfig() as any)?.diagram?.layout?.nodeStrategy || '')).toLowerCase().replace(/\s+/g,'').replace(/[+_-]/g,'').includes('elk');
         if (isElkFirst) { throw new Error('skip-center-elastic-in-elk-first'); }
         const numLocal = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
         const cfgFull: any = diagramConfigManager.getConfig() || {};
@@ -470,7 +470,7 @@ export class VerticalLayoutStrategy implements ILayoutStrategy {
        * - 行为：按子域内部左右锚（去除水平内边距）计算 children 的水平投影并整体平移至居中，同时进行左右钳制并在之后执行严格包含与钳制。
        */
       try {
-        const isElkFirst = String(((options as any)?.nodeLayout || (diagramConfigManager.getConfig() as any)?.diagram?.layout?.nodeStrategy || '')).toLowerCase().replace(/\s+/g,'').replace(/[+_\-]/g,'').includes('elk');
+        const isElkFirst = String(((options as any)?.nodeLayout || (diagramConfigManager.getConfig() as any)?.diagram?.layout?.nodeStrategy || '')).toLowerCase().replace(/\s+/g,'').replace(/[+_-]/g,'').includes('elk');
         if (isElkFirst) { throw new Error('skip-subgroup-left-anchor-unify-in-elk-first'); }
         const numLocal = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
         const cfgFull: any = diagramConfigManager.getConfig() || {};
@@ -485,7 +485,7 @@ export class VerticalLayoutStrategy implements ILayoutStrategy {
           const sgX = numLocal(((sg as any)?.position?.x), 0);
           const sgY = numLocal(((sg as any)?.position?.y), 0);
           const sgW = numLocal((((sg as any)?.measured?.width ?? (sg as any)?.style?.width)), 0);
-          const sgH = numLocal((((sg as any)?.measured?.height ?? (sg as any)?.style?.height)), 0);
+          const _sgH = numLocal((((sg as any)?.measured?.height ?? (sg as any)?.style?.height)), 0);
           const innerLeftSg = sgX + subPadH;
           const innerRightSg = sgX + sgW - subPadH;
           const innerTopSg = sgY + subTitleH + subTitleV + subPadTop;

@@ -124,8 +124,8 @@ export const assignChildrenToSubGroups = (
 ): ReactFlowNode[] => {
   const num = (v: any, fallback: number) => (typeof v === 'number' && isFinite(v) && v > 0) ? v : fallback;
   const { NODE_WIDTH, NODE_HEIGHT } = diagramConfigManager.getLayoutConfig() as any;
-  const defW = num(NODE_WIDTH, 240);
-  const defH = num(NODE_HEIGHT, 120);
+  const _defW = num(NODE_WIDTH, 240);
+  const _defH = num(NODE_HEIGHT, 120);
 
   const isGroupType = (t: any) => new Set(['subGroup', 'titleGroup', 'group', 'domain']).has(String(t || ''));
 
@@ -375,7 +375,7 @@ export const normalizeSubGroupDomainByChildren = (
 export const auditAndFixSubGroupChildrenBindings = (
   nodes: ReactFlowNode[]
 ): ReactFlowNode[] => {
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
+  const _num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
   const updated = nodes.map(n => ({ ...n }));
   const subGroups = updated.filter(n => String(n.type || '') === 'subGroup');
   const bizNodes = updated.filter(n => {

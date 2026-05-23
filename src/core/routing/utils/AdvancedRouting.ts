@@ -334,7 +334,7 @@ export function globalOptimizeEdgeRouting<T extends { id: string; source: string
             if (edgeIndices.length < 2) continue;
             const srcNode = idMap.get(sourceId);
             if (!srcNode) continue;
-            const srcPos = getAnchor(srcNode, null);
+            const _srcPos = getAnchor(srcNode, null);
             const positionThreshold = 150;
             const subGroups: number[][] = [];
 
@@ -718,7 +718,7 @@ export function optimizeTreeBusRouting<T extends {
 
     const idMap = new Map<string, any>(nodes.map(n => [n.id, n]));
     const layoutDir = String(layoutDirection).toUpperCase();
-    const isHorizontal = layoutDir.includes('LR') || layoutDir.includes('RL');
+    const _isHorizontal = layoutDir.includes('LR') || layoutDir.includes('RL');
 
     const parentMap = new Map<string, string>();
     nodes.forEach(n => {

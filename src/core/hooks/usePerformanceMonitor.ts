@@ -154,7 +154,7 @@ export function useResourcePerformance() {
     return {
       onLoad: (event: React.SyntheticEvent<HTMLImageElement>) => {
         const img = event.currentTarget;
-        const loadTime = performance.now();
+        const _loadTime = performance.now();
         
         // 获取资源加载时间
         const entries = performance.getEntriesByName(img.src);

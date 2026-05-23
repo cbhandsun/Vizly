@@ -40,7 +40,7 @@ interface UseToastActionsProps {
 
 export function useToastActions({
     messageApi,
-    notificationApi,
+    _notificationApi,
     handleDelete,
     handleDuplicate,
     handleCopy,
@@ -102,8 +102,8 @@ export function useToastActions({
         let edgesCount = 0;
         try {
             const parsed = JSON.parse(raw) as { nodes?: unknown[]; edges?: unknown[] };
-            nodesCount = Array.isArray(parsed.nodes) ? parsed.nodes.length : 0;
-            edgesCount = Array.isArray(parsed.edges) ? parsed.edges.length : 0;
+            _nodesCount = Array.isArray(parsed.nodes) ? parsed.nodes.length : 0;
+            _edgesCount = Array.isArray(parsed.edges) ? parsed.edges.length : 0;
         } catch { void 0; }
         handlePaste();
     }, [clipboardKey, handlePaste, messageApi, t]);

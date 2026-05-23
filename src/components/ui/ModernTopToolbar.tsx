@@ -30,7 +30,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   isFullscreen,
   onToggleFullscreen,
   showThemeSelector = true,
-  showStyleSwitcher = true,
+  _showStyleSwitcher = true,
   showExport = true,
   leftChildren,
   centerChildren,
@@ -43,7 +43,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   const screens = Grid.useBreakpoint();
   
   // Responsive flags
-  const isCompact = !screens.xl; // < 1200px
+  const _isCompact = !screens.xl; // < 1200px
   const isMobile = !screens.md;  // < 768px
   
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '');

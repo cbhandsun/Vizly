@@ -121,8 +121,8 @@ function isShortOrthogonalPath(points: Point[]): boolean {
 export const StablePathEdge = memo<EdgeProps>((props) => {
     const {
         id,
-        source,
-        target,
+        _source,
+        _target,
         sourceX,
         sourceY,
         targetX,
@@ -135,10 +135,10 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         markerStart,
         label,
         labelStyle,
-        labelShowBg,
-        labelBgStyle,
-        labelBgPadding,
-        labelBgBorderRadius,
+        _labelShowBg,
+        _labelBgStyle,
+        _labelBgPadding,
+        _labelBgBorderRadius,
     } = props;
 
     // ReactFlow perf check: we are completely safe from global node movement here

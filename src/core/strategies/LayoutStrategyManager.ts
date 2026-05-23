@@ -251,7 +251,7 @@ export class LayoutStrategyManager {
     const norm = this.normalizeName(name).toLowerCase();
     const nodeCount = Array.isArray(nodes) ? nodes.length : 0;
     const edgeCount = Array.isArray(edges) ? edges.length : 0;
-    const dense = (nodeCount >= 24) || (edgeCount >= nodeCount && nodeCount > 0) || (edgeCount >= 24);
+    const _dense = (nodeCount >= 24) || (edgeCount >= nodeCount && nodeCount > 0) || (edgeCount >= 24);
     if (norm === 'domainverticallayout' || norm === 'domainvertical') return 'VerticalLayout';
     if (norm === 'domainhorizontallayout' || norm === 'domainhorizontal') return 'VerticalLayout';
     if (norm === 'domainelklayout' || norm === 'domainelk') return 'HorizontalLayout';

@@ -267,12 +267,12 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           });
 
           const bboxWidth = Math.max(1, maxX - minX);
-          const bboxHeight = Math.max(1, maxY - minY);
+          const _bboxHeight = Math.max(1, maxY - minY);
 
           // 使用实际的 react-flow__renderer 画布尺寸
           // 获取实际的图表容器尺寸（去掉diagram-viewer的16px边距）
           const containerWidth = viewportEl.clientWidth - 32; // 减去左右16px边距
-          const containerHeight = viewportEl.clientHeight - 32; // 减去上下16px边距
+          const _containerHeight = viewportEl.clientHeight - 32; // 减去上下16px边距
 
           // 图表内部使用较小的padding，避免贴边
           const padding = 8;

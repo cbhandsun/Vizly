@@ -8,7 +8,7 @@ import {
 } from 'antd';
 import {
     FontSizeOutlined, DeleteOutlined, PlusOutlined, EditOutlined,
-    LinkOutlined, FileTextOutlined, SmileOutlined, TagsOutlined, RobotOutlined,
+    LinkOutlined, _FileTextOutlined, SmileOutlined, TagsOutlined, RobotOutlined,
 } from '@ant-design/icons';
 import type { NodeObj, TagObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';

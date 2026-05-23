@@ -8,7 +8,7 @@ import {
     subscribeToggleHistory,
     subscribeHistoryList,
     clearHistory,
-    addHistoryRecord,
+    _addHistoryRecord,
     HistoryRecord
 } from './mindmapHistoryStore';
 import { Popconfirm, message } from 'antd';

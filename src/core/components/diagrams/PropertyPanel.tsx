@@ -6,7 +6,7 @@ import { FlowchartNodeData } from '../custom-nodes/FlowchartNode';
 import {
     Collapse,
     Typography,
-    Empty,
+    _Empty,
 } from 'antd';
 import {
     SettingOutlined,
@@ -124,7 +124,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
         if (typeof me === 'object' && me.type === MarkerType.Arrow) return 'open-arrow';
         return 'arrow';
     });
-    const commonEdgeColor = getCommonValue(selectedEdges, (e) => e.style?.stroke);
+    const _commonEdgeColor = getCommonValue(selectedEdges, (e) => e.style?.stroke);
 
     const handleNodeColorChange = useCallback((color: Color, field: string) => {
         armSnapshot();

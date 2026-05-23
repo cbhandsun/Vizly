@@ -11,8 +11,8 @@ import { FaPalette, FaCheck, FaTimes } from 'react-icons/fa';
 import {
     diagramStyleManager,
     FlowStylePreset,
-    StylePresetCategory,
-    STYLE_CATEGORIES,
+    _StylePresetCategory,
+    _STYLE_CATEGORIES,
 } from '@/core';
 import { useDiagramStylePreset_v2 } from '@/core/hooks/useDiagramStylePreset_v2';
 import { theme } from 'antd';
@@ -146,7 +146,7 @@ const PresetCard: React.FC<{
  * 增强版风格方案选择器组件
  */
 export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
-    size = 'md',
+    _size = 'md',
     className = '',
     style,
     borderless = false,

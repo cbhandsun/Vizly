@@ -22,7 +22,7 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
     
     const { 
         safeFinalPath, opacity, crossfadeOpacity, finalLabelX, finalLabelY, 
-        nodesDragging, isStale, isBusEdge, isLoading,
+        nodesDragging, _isStale, _isBusEdge, _isLoading,
         shouldRenderDebugVisuals, shouldRenderPortHeatmap, obstacles, centeredCoords, workerSmartLabelPos,
         workerSmartPoints
     } = router;

@@ -41,7 +41,7 @@ export const ThemeSwitcherPanel: React.FC<ThemeSwitcherPanelProps> = ({ classNam
             if (!state.integration) return;
 
             const presetManager = state.integration.getPresetManager();
-            const themeObj = presetManager.applyPreset(preset.id);
+            const _themeObj = presetManager.applyPreset(preset.id);
             await setTheme(preset.id);
             
             // Broadcast global event

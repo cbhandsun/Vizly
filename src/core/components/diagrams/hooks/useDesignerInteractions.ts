@@ -114,7 +114,7 @@ export function useDesignerInteractions({
     const addComment = useDiagramStore(state => state.addComment);
     const updateComment = useDiagramStore(state => state.updateComment);
     const removeComment = useDiagramStore(state => state.removeComment);
-    const setIsCommentMode = useDiagramStore(state => state.setIsCommentMode);
+    const _setIsCommentMode = useDiagramStore(state => state.setIsCommentMode);
     
     const ANNOTATION_COLORS = ['#facc15', '#f87171', '#60a5fa', '#34d399', '#c084fc', '#fb923c'];
 

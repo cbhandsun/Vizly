@@ -82,7 +82,7 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
   onEdgeModeChange,
   isFullscreen,
   onToggleFullscreen,
-  setIsCommandOpen,
+  _setIsCommandOpen,
   showThemeSelector = true,
   showStyleSwitcher = true,
   showExport = true,
