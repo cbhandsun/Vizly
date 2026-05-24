@@ -1470,8 +1470,43 @@ export class EdgeRoutingWorker {
                             if (!isPathBlocked(waypoints, routingObstacles, 4)) {
                                 pathPoints = waypoints;
                                 strategyName = 'Global Trunk Direct';
+                            } else if (trunkEnd) {
+                                // [FIX-shared-convergence] 3-segment trunk A* failed. Route from source
+                                // directly to the shared convergence point (trunkEnd) so all M2O/O2M
+                                // siblings arrive at the SAME junction (e.g., (1120,1599)) regardless
+                                // of which segment caused the blockage.
+                                //
+                                // Key insight: the previous seg1 grid only covered the horizontal band
+                                // from startOff → trunkStart, too narrow to route AROUND obstacles.
+                                // This A* uses a full-extent grid (source → trunkEnd) that covers
+                                // the vertical space needed to detour below blocking nodes.
+                                const convGrid = gridBuilder.buildGrid(
+                                    spatialIndex || graph.obstacles,
+                                    {
+                                        startX: startWithOffset.x,
+                                        startY: startWithOffset.y,
+                                        endX: trunkEnd.x,
+                                        endY: trunkEnd.y,
+                                    },
+                                    job.source,
+                                    job.target
+                                );
+                                const convSeg = astar.findPath(startWithOffset, trunkEnd, {
+                                    grid: convGrid,
+                                    obstacles: routingObstacles,
+                                    clearanceRects,
+                                    config,
+                                    congestionGrid: runtime.congestionGrid,
+                                });
+                                if (convSeg?.length) {
+                                    // Snap last waypoint to exact trunkEnd so all siblings align precisely
+                                    convSeg[convSeg.length - 1] = { x: trunkEnd.x, y: trunkEnd.y };
+                                    pathPoints = [startPt, ...convSeg, endPt];
+                                    strategyName = 'Global Trunk Convergence';
+                                    console.log(`[TRUNK-DBG] ${job.edgeId} → ${strategyName}`);
+                                }
+                                // If convergence A* also fails → fall through to standard A*/VG routing
                             }
-                            // If blocked, pathPoints stays null → falls through to standard A*/VG routing
                         }
                     }
                 }
