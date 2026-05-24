@@ -250,6 +250,27 @@ export { LineJumpEngine, JUMP_RADIUS };
  */
 import { collapseCollinearBacktracks } from '../algorithms/smartEdgeUtils';
 
+/** 与 createFilletedPath 相同的最终正交化 pass */
+function enforceOrthogonality(pts: Point[]): Point[] {
+    let diagFixed = false;
+    const orthoList: Point[] = [pts[0]];
+    for (let i = 0; i < pts.length - 1; i++) {
+        const pa = pts[i];
+        const pb = pts[i + 1];
+        const ddx = Math.abs(pa.x - pb.x);
+        const ddy = Math.abs(pa.y - pb.y);
+        if (ddx > 1 && ddy > 1) {
+            const lturn = ddy >= ddx
+                ? { x: pb.x, y: pa.y }
+                : { x: pa.x, y: pb.y };
+            orthoList.push(lturn);
+            diagFixed = true;
+        }
+        orthoList.push({ x: pb.x, y: pb.y });
+    }
+    return diagFixed ? collapseCollinearBacktracks(orthoList) : pts;
+}
+
 export function injectLineJumps(
     points: Point[], 
     jumps: IntersectionInfo[], 
@@ -274,7 +295,7 @@ export function injectLineJumps(
 
     // [FIX] 消除共线折返点，与 createFilletedPath 保持完全一致的预处理
     // 防止因折返段导致的 fillet 数学计算异常（产生重叠的垂直/水平线段）
-    const normalizedPoints = collapseCollinearBacktracks(cleanPoints);
+    const normalizedPoints = enforceOrthogonality(collapseCollinearBacktracks(cleanPoints));
     if (normalizedPoints.length < 2) return '';
 
     // [FIX-FILLET] 同时注入跳线弧和圆角曲线

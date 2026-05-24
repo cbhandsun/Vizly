@@ -2745,16 +2745,45 @@ export function createFilletedPath(
 
     if (renderPoints.length < 2) return '';
 
+    // [FIX] Final strict orthogonality pass: any remaining diagonal segment
+    // (both dx>1 AND dy>1) means an intermediate waypoint was lost upstream.
+    // Insert an L-turn to restore proper right-angle routing.
+    // Rule: dominant-axis-first — if mostly vertical (dy>dx), go horizontal first
+    // (insert the x-target at current y), so the path arrives at the target vertically.
+    // This is the "final defense" — createFilletedPath guarantees orthogonal SVG output.
+    let diagFixed = false;
+    const orthoList: Point[] = [renderPoints[0]];
+    for (let i = 0; i < renderPoints.length - 1; i++) {
+        const pa = renderPoints[i];
+        const pb = renderPoints[i + 1];
+        const ddx = Math.abs(pa.x - pb.x);
+        const ddy = Math.abs(pa.y - pb.y);
+        if (ddx > 1 && ddy > 1) {
+            // Insert L-turn: dominant-axis first
+            const lturn = ddy >= ddx
+                ? { x: pb.x, y: pa.y }  // horizontal first → vertical approach to target
+                : { x: pa.x, y: pb.y }; // vertical first   → horizontal approach to target
+            orthoList.push(lturn);
+            diagFixed = true;
+        }
+        orthoList.push({ x: pb.x, y: pb.y });
+    }
+    const finalRenderPoints = diagFixed
+        ? collapseCollinearBacktracks(orthoList)
+        : renderPoints;
+
+    if (finalRenderPoints.length < 2) return '';
+
     if (cornerRadius <= 0) {
-        return "M " + renderPoints.map(p => `${p.x} ${p.y}`).join(" L ");
+        return "M " + finalRenderPoints.map(p => `${p.x} ${p.y}`).join(" L ");
     }
 
-    let path = `M ${renderPoints[0].x} ${renderPoints[0].y}`;
+    let path = `M ${finalRenderPoints[0].x} ${finalRenderPoints[0].y}`;
 
-    for (let i = 1; i < renderPoints.length - 1; i++) {
-        const pPrev = renderPoints[i - 1];
-        const pCurr = renderPoints[i];
-        const pNext = renderPoints[i + 1];
+    for (let i = 1; i < finalRenderPoints.length - 1; i++) {
+        const pPrev = finalRenderPoints[i - 1];
+        const pCurr = finalRenderPoints[i];
+        const pNext = finalRenderPoints[i + 1];
 
         // 1. Calculate vectors
         const v1 = { x: pCurr.x - pPrev.x, y: pCurr.y - pPrev.y };
@@ -2814,10 +2843,11 @@ export function createFilletedPath(
     }
 
     // Final segment to last point
-    const last = renderPoints[renderPoints.length - 1];
+    const last = finalRenderPoints[finalRenderPoints.length - 1];
     path += ` L ${last.x} ${last.y}`;
 
     return path;
+
 }
 
 // [NEW] Offsets path segments by a fixed amount perpendicular to their direction
