@@ -1687,12 +1687,23 @@ export class EdgeRoutingCoordinator {
             }
         });
 
+        // Perturbation coefficient: small enough not to override the primary Y/X
+        // coordinate ordering, but large enough to disambiguate edges that travel
+        // in opposite directions within the same spatial band. Edges going left→right
+        // and right→left with the same average Y would otherwise be assigned
+        // arbitrary order, sometimes producing avoidable crossings.
+        const directionPerturbation = GROUP_SIZE * 0.08;
+
         // Process Horizontal Groups
         horizontalGroups.forEach(group => {
-            // Sort by specific Y geometry (Source Y + Target Y)
+            // Sort by Y geometry + small direction perturbation to reduce crossings.
+            // Edges going left-to-right get a slight upward bias, right-to-left a
+            // slight downward bias, so they naturally separate when Y-coords are close.
             group.sort((a, b) => {
-                const valA = a.sourceY + a.targetY;
-                const valB = b.sourceY + b.targetY;
+                const dirA = Math.sign(a.targetX - a.sourceX); // +1 LTR, -1 RTL, 0 vertical
+                const dirB = Math.sign(b.targetX - b.sourceX);
+                const valA = a.sourceY + a.targetY + dirA * directionPerturbation;
+                const valB = b.sourceY + b.targetY + dirB * directionPerturbation;
                 if (Math.abs(valA - valB) > 1) return valA - valB;
                 // Tie-breaker for stable bus ordering
                 return (a.outgoingIndex || 0) - (b.outgoingIndex || 0) || (a.incomingIndex || 0) - (b.incomingIndex || 0) || a.edgeId.localeCompare(b.edgeId);
@@ -1706,10 +1717,12 @@ export class EdgeRoutingCoordinator {
 
         // Process Vertical Groups
         verticalGroups.forEach(group => {
-            // Sort by specific X geometry
+            // Sort by X geometry + small direction perturbation (top-to-bottom vs bottom-to-top).
             group.sort((a, b) => {
-                const valA = a.sourceX + a.targetX;
-                const valB = b.sourceX + b.targetX;
+                const dirA = Math.sign(a.targetY - a.sourceY); // +1 TTB, -1 BTT
+                const dirB = Math.sign(b.targetY - b.sourceY);
+                const valA = a.sourceX + a.targetX + dirA * directionPerturbation;
+                const valB = b.sourceX + b.targetX + dirB * directionPerturbation;
                 if (Math.abs(valA - valB) > 1) return valA - valB;
                 // Tie-breaker
                 return (a.outgoingIndex || 0) - (b.outgoingIndex || 0) || (a.incomingIndex || 0) - (b.incomingIndex || 0) || a.edgeId.localeCompare(b.edgeId);
@@ -2082,7 +2095,7 @@ export class EdgeRoutingCoordinator {
                     secondaryCoord: branchCoord,
                 };
             }),
-            { primaryWeight: 10, branchOrderWeight: 7, secondaryWeight: 2 }
+            { primaryWeight: 12, branchOrderWeight: 8, secondaryWeight: 2 }
         );
         const sortedEdgeIds = sortedGlobal.map((e: any) => e.id);
 

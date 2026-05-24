@@ -34,7 +34,7 @@ export function optimizeHubPortOrder<T>(
     const primaryWeight = options.primaryWeight ?? 10;
     const secondaryWeight = options.secondaryWeight ?? 1;
     const branchOrderWeight = options.branchOrderWeight ?? 6;
-    const maxPasses = options.maxPasses ?? 3;
+    const maxPasses = options.maxPasses ?? 6;
 
     const ordered = [...items].sort((a, b) =>
         a.branchCoord - b.branchCoord
@@ -43,11 +43,30 @@ export function optimizeHubPortOrder<T>(
         || a.id.localeCompare(b.id)
     );
 
+    // Cocktail Shaker Sort: alternates forward and backward passes.
+    // A forward pass bubbles the "worst" element to the end; the backward
+    // pass bubbles the "best" to the front. This halves the number of
+    // rounds needed compared to single-direction Bubble Sort, which is
+    // important when N >= 5 and edge elements need many hops to reach
+    // their correct position.
     let currentScore = scoreOrder(ordered, primaryWeight, secondaryWeight, branchOrderWeight);
     for (let pass = 0; pass < maxPasses; pass++) {
         let changed = false;
 
+        // Forward sweep: push high-score elements toward the end
         for (let i = 0; i < ordered.length - 1; i++) {
+            swap(ordered, i, i + 1);
+            const nextScore = scoreOrder(ordered, primaryWeight, secondaryWeight, branchOrderWeight);
+            if (nextScore < currentScore) {
+                currentScore = nextScore;
+                changed = true;
+            } else {
+                swap(ordered, i, i + 1);
+            }
+        }
+
+        // Backward sweep: push low-score elements toward the front
+        for (let i = ordered.length - 2; i >= 0; i--) {
             swap(ordered, i, i + 1);
             const nextScore = scoreOrder(ordered, primaryWeight, secondaryWeight, branchOrderWeight);
             if (nextScore < currentScore) {
