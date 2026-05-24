@@ -51,22 +51,40 @@ import {
   centerSubGroupsInDomain,
   countSubGroupOverlapsByDomain,
   enforceSubGroupStrictContainmentByChildren,
+  enforceDomainNoOverlapStrict,
+  enforceGlobalNoOverlapStrict,
+  enforceSubGroupNoOverlapStrict,
   enforceSubGroupTitleClearance,
   expandSubGroupContainersBySemantic,
   expandSubGroupsToDomainWidth,
+  fitSubGroupsToDomainSymmetric,
   finalizeSubGroupHeightsByProjection,
   finalizeSubGroupHeightsByProjectionPreserveAnchor,
   finalizeSubGroupWidthsByProjectionPreserveAnchor,
+  layoutNodesByGhostDomainColumns,
+  laneGridPackByDomain,
   leftAlignSubGroupChildrenHorizontally,
+  packDomainNodesGrid,
   packSubGroupChildrenRigid,
+  packSubGroupChildrenGridStrict,
   packSubGroupsInDomain,
   recomputeSubGroupContainersBasic,
+  rankSnapDomainFreeNodes,
+  rankSnapSubGroupChildren,
+  resolveAllNodeOverlapsGlobal,
+  resolveFreeNodeOverlapsInDomain,
   reflowSubGroupChildrenVertical,
   resolveSubGroupOverlaps,
+  resolveSubGroupChildrenOverlapsStrict,
   scaleDomainContentToFitWidth,
   snapFreeNodesToRowsInDomain,
   snapSubGroupChildrenToRowsStrict,
+  splitDenseRowsInSubGroupsAdaptive,
   stackSubGroupsVertically,
+  strengthenDomainsAggressive,
+  strengthenSubGroupsInDomainWithGridStrict,
+  unifySubGroupGapsInDomain,
+  unifySubGroupHeightsByDomain,
   unifySubGroupLeftAnchors,
   writeSubGroupChildrenRelativeOffsets,
 } from '../subGroupLayout';
@@ -106,6 +124,19 @@ const sgNode = (id: string, x: number, y: number, width = 120, height = 100, chi
   data: { domain: 'D', subDomain: id, children },
 });
 
+const byId = (nodes: any[], id: string) => nodes.find(n => n.id === id) as any;
+const rectOf = (node: any) => ({
+  x: node.position.x,
+  y: node.position.y,
+  w: node.measured?.width ?? node.style?.width ?? node.width,
+  h: node.measured?.height ?? node.style?.height ?? node.height,
+});
+const overlaps = (a: any, b: any) => {
+  const ra = rectOf(a);
+  const rb = rectOf(b);
+  return ra.x < rb.x + rb.w && ra.x + ra.w > rb.x && ra.y < rb.y + rb.h && ra.y + ra.h > rb.y;
+};
+
 describe('subGroup layout helpers', () => {
   it('snaps free domain nodes into centered non-overlapping rows', () => {
     const result = snapFreeNodesToRowsInDomain([
@@ -135,6 +166,112 @@ describe('subGroup layout helpers', () => {
     expect(b.position.y).toBe(140);
     expect(c.position.y).toBeGreaterThan(a.position.y);
     expect(packed.measured.height).toBeGreaterThan(100);
+  });
+
+  it('rank-snaps subgroup children and free domain nodes into stable layers', () => {
+    const rankedSub = rankSnapSubGroupChildren([
+      sg(['a', 'b', 'c'], 340, 260),
+      child('a', 110, 148),
+      child('b', 280, 152),
+      child('c', 180, 230),
+    ] as never);
+
+    expect(byId(rankedSub, 'a').position.y).toBe(140);
+    expect(byId(rankedSub, 'b').position.y).toBe(140);
+    expect(byId(rankedSub, 'c').position.y).toBeGreaterThan(byId(rankedSub, 'a').position.y);
+    expect(byId(rankedSub, 'sg').measured.height).toBeGreaterThan(110);
+
+    const rankedFree = rankSnapDomainFreeNodes([
+      domain(420, 300),
+      child('a', 20, 100, { subDomain: undefined }),
+      child('b', 280, 104, { subDomain: undefined }),
+      child('c', 180, 190, { subDomain: undefined }),
+    ] as never);
+
+    expect(byId(rankedFree, 'a').position.y).toBe(62);
+    expect(byId(rankedFree, 'b').position.y).toBe(62);
+    expect(byId(rankedFree, 'c').position.y).toBeGreaterThan(byId(rankedFree, 'a').position.y);
+  });
+
+  it('separates overlapping business nodes globally and within a domain', () => {
+    const base = [
+      child('a', 0, 0, { subDomain: undefined }),
+      child('b', 10, 5, { subDomain: undefined }),
+      child('c', 260, 0, { domain: 'E', subDomain: undefined }),
+    ] as any[];
+
+    const global = resolveAllNodeOverlapsGlobal(base as never, 20, 20) as any[];
+    expect(overlaps(byId(global, 'a'), byId(global, 'b'))).toBe(false);
+    expect(byId(global, 'c').position).toEqual({ x: 260, y: 0 });
+
+    const strict = enforceGlobalNoOverlapStrict(base as never, 20, 20, 2) as any[];
+    expect(overlaps(byId(strict, 'a'), byId(strict, 'b'))).toBe(false);
+
+    const domainOnly = resolveFreeNodeOverlapsInDomain([
+      domain(420, 300),
+      child('a', 20, 100, { subDomain: undefined }),
+      child('b', 30, 105, { subDomain: undefined }),
+      child('c', 30, 105, { domain: 'E', subDomain: undefined }),
+    ] as never, 20, 20) as any[];
+    expect(overlaps(byId(domainOnly, 'a'), byId(domainOnly, 'b'))).toBe(false);
+    expect(byId(domainOnly, 'c').position).toEqual({ x: 30, y: 105 });
+  });
+
+  it('packs domain content with grid, ghost columns, and lane columns', () => {
+    const loose = [
+      child('a', 0, 0, { subDomain: undefined }),
+      child('b', 10, 10, { subDomain: undefined }),
+      child('c', 20, 20, { subDomain: undefined }),
+      child('x', 500, 0, { domain: 'E', subDomain: undefined }),
+      child('y', 510, 10, { domain: 'E', subDomain: undefined }),
+    ] as any[];
+
+    const grid = packDomainNodesGrid(loose as never, 'D', 30, 30) as any[];
+    expect(byId(grid, 'b').position.y).toBeGreaterThanOrEqual(40);
+    expect(byId(grid, 'x').position).toEqual({ x: 500, y: 0 });
+
+    const strict = enforceDomainNoOverlapStrict(loose as never, 'D', 20, 20, 2) as any[];
+    expect(overlaps(byId(strict, 'a'), byId(strict, 'b'))).toBe(false);
+
+    const strengthened = strengthenDomainsAggressive(loose as never, ['D'], 20, 20) as any[];
+    expect(overlaps(byId(strengthened, 'a'), byId(strengthened, 'b'))).toBe(false);
+
+    const ghost = layoutNodesByGhostDomainColumns(loose as never) as any[];
+    expect(byId(ghost, 'x').position.x).toBeGreaterThan(byId(ghost, 'a').position.x);
+
+    const lanes = laneGridPackByDomain(loose as never, 30, 30, 'vertical') as any[];
+    expect(byId(lanes, 'x').position.x).toBeGreaterThan(byId(lanes, 'a').position.x);
+  });
+
+  it('grid-packs, de-overlaps, and splits dense subgroup children', () => {
+    const dense = [
+      sg(['a', 'b', 'c', 'd', 'e'], 260, 160),
+      child('a', 120, 150, { sequence: 3 }),
+      child('b', 120, 150, { sequence: 1 }),
+      child('c', 120, 150, { sequence: 2 }),
+      child('d', 120, 150, { sequence: 4 }),
+      child('e', 120, 150, { sequence: 5 }),
+    ] as any[];
+
+    const grid = packSubGroupChildrenGridStrict(dense as never) as any[];
+    expect(byId(grid, 'b').position.x).toBeLessThanOrEqual(byId(grid, 'c').position.x);
+    expect(byId(grid, 'd').position.y).toBeGreaterThanOrEqual(byId(grid, 'b').position.y);
+
+    const separated = enforceSubGroupNoOverlapStrict(dense as never, 20, 20, 3) as any[];
+    expect(byId(separated, 'a').position).not.toEqual(byId(dense, 'a').position);
+    expect(byId(separated, 'b').position.x).toBeGreaterThanOrEqual(byId(separated, 'sg').position.x + 20);
+
+    const strict = resolveSubGroupChildrenOverlapsStrict(dense as never, 20, 20) as any[];
+    expect(byId(strict, 'a').position.y).toBeGreaterThanOrEqual(byId(strict, 'sg').position.y + 40);
+
+    const split = splitDenseRowsInSubGroupsAdaptive(dense as never, 2) as any[];
+    const childYs = ['a', 'b', 'c', 'd', 'e'].map(id => byId(split, id).position.y);
+    expect(new Set(childYs).size).toBeGreaterThan(1);
+    expect(byId(split, 'sg').measured.height).toBeGreaterThan(byId(dense, 'sg').measured.height);
+
+    const strengthened = strengthenSubGroupsInDomainWithGridStrict(dense as never, 'D', 20, 20, 2) as any[];
+    expect(byId(strengthened, 'sg').measured.width).toBeGreaterThan(0);
+    expect(byId(strengthened, 'a').position.y).toBeGreaterThanOrEqual(byId(strengthened, 'sg').position.y);
   });
 
   it('records subgroup-relative offsets and rigidly repacks children by those offsets', () => {

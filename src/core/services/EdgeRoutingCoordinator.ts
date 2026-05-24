@@ -1812,7 +1812,8 @@ export class EdgeRoutingCoordinator {
         // ==================== [FIX-hemisphere] Flow-Direction Hemisphere Grouping ====================
         // 行业标准（ELK/draw.io）：先算质心确定主流方向，再沿主流方向分成 2 个 180° 半球。
         // 这样自然合并相邻象限（如"左上"和"左下"都归入同一半球）。
-        // 对于强烈偏离主流的边（交叉轴 > 2× 主轴），单独分到垂直端口（"逃逸"）。
+        // 对于普通前向边，强烈偏离主流的边（交叉轴 > 2× 主轴）可单独分到逃逸端口。
+        // 对于反向反馈边，保持严格 180° 半球分组，避免同一回流束被拆成 left/bottom 等单边组。
         //
         // 示例（主流=下方）：
         //   正下方的 peer → bottom 半球 ✓
@@ -1841,13 +1842,38 @@ export class EdgeRoutingCoordinator {
         // 主流方向：质心偏移更大的轴
         const isVerticalFlow = Math.abs(flowDy) >= Math.abs(flowDx);
 
-        // Step 2: 按半球 + 垂直逃逸分组
+        // Step 2: 按半球 + 普通边逃逸分组
         const sideGroups = new Map<string, any[]>();
+        const jobByEdgeId = new Map(busGroupJobs.map(job => [job.edgeId, job]));
+        const isReverseByGeometry = (edge: any): boolean => {
+            const sourceRect = getNodeRect(edge.source);
+            const targetRect = getNodeRect(edge.target);
+            if (!sourceRect || !targetRect) return false;
+            const sourceCenter = { x: sourceRect.x + sourceRect.width / 2, y: sourceRect.y + sourceRect.height / 2 };
+            const targetCenter = { x: targetRect.x + targetRect.width / 2, y: targetRect.y + targetRect.height / 2 };
+            const dx = targetCenter.x - sourceCenter.x;
+            const dy = targetCenter.y - sourceCenter.y;
+            const absDx = Math.abs(dx);
+            const absDy = Math.abs(dy);
+            switch (layoutDir) {
+                case 'RL':
+                    return dx > 0 && absDx > absDy;
+                case 'TB':
+                    return dy < 0 && absDy > absDx;
+                case 'BT':
+                    return dy > 0 && absDy > absDx;
+                case 'LR':
+                default:
+                    return dx < 0 && absDx > absDy;
+            }
+        };
 
         globalPeers.forEach(peerEdge => {
             const peerId = isManyToOne ? peerEdge.source : peerEdge.target;
             const peerRect = getNodeRect(peerId);
             if (!peerRect) return;
+            const peerJob = jobByEdgeId.get(peerEdge.id);
+            const keepTrueHemisphere = !!peerJob?.isReverseEdge || isReverseByGeometry(peerEdge);
 
             const peerCenter = { x: peerRect.x + peerRect.width / 2, y: peerRect.y + peerRect.height / 2 };
             const dx = peerCenter.x - hubCenter.x;
@@ -1857,7 +1883,7 @@ export class EdgeRoutingCoordinator {
             if (isVerticalFlow) {
                 // 主流=上下 → 默认按 y 分半球
                 // 逃逸：如果 |dx| > 2*|dy| 且 |dx| > 50px，说明 peer 强烈偏向左右
-                if (Math.abs(dx) > Math.abs(dy) * 2 && Math.abs(dx) > 50) {
+                if (!keepTrueHemisphere && Math.abs(dx) > Math.abs(dy) * 2 && Math.abs(dx) > 50) {
                     side = dx < 0 ? 'left' : 'right';
                 } else {
                     side = dy < 0 ? 'top' : 'bottom';
@@ -1865,7 +1891,7 @@ export class EdgeRoutingCoordinator {
             } else {
                 // 主流=左右 → 默认按 x 分半球
                 // 逃逸：如果 |dy| > 2*|dx| 且 |dy| > 50px
-                if (Math.abs(dy) > Math.abs(dx) * 2 && Math.abs(dy) > 50) {
+                if (!keepTrueHemisphere && Math.abs(dy) > Math.abs(dx) * 2 && Math.abs(dy) > 50) {
                     side = dy < 0 ? 'top' : 'bottom';
                 } else {
                     side = dx < 0 ? 'left' : 'right';
@@ -1894,7 +1920,8 @@ export class EdgeRoutingCoordinator {
             // 单条边的组：降级为普通 A* 路由（只在有多个组时）
             if (groupEdges.length === 1 && sideGroups.size > 1) {
                 const job = busGroupJobs.find(j => j.edgeId === groupEdges[0].id);
-                if (job) {
+                const shouldKeepSingletonBus = !!job?.isReverseEdge || isReverseByGeometry(groupEdges[0]);
+                if (job && !shouldKeepSingletonBus) {
                     if (isManyToOne) {
                         job.isManyToOne = false;
                         job.incomingCount = 1;
@@ -1905,7 +1932,7 @@ export class EdgeRoutingCoordinator {
                         job.outgoingIndex = 0;
                     }
                 }
-                return;
+                if (!shouldKeepSingletonBus) return;
             }
 
             // 计算该象限的 peer 节点矩形列表

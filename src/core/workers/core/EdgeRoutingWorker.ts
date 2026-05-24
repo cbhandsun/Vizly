@@ -408,7 +408,7 @@ export class EdgeRoutingWorker {
         // Passing sRect/tRect as otherRect caused per-edge "strong alignment override",
         // making some edges exit the hub from different ports. Pass undefined to ensure
         // all edges in the same trunk group share the same hub port.
-        if (job.isOneToMany && job.busTrunkSource && job.busTrunkTarget && !hasFixedSourcePort) {
+        if (job.isOneToMany && !job.isManyToOne && job.busTrunkSource && job.busTrunkTarget && !hasFixedSourcePort) {
             startPos = resolvePortFromTrunkAxis(sRect, undefined, false);
             hasFixedSourcePort = true;
         }
@@ -491,7 +491,7 @@ export class EdgeRoutingWorker {
             busPeerGroupMembers = peerGroupForBus.members;
         }
 
-        if (!hasFixedSourcePort && job.isOneToMany && peerGroupForBus) {
+        if (!hasFixedSourcePort && job.isOneToMany && !job.isManyToOne && peerGroupForBus) {
             const nodes = graph.nodes as unknown as GraphNode[];
             if (peerGroupForBus.edges.length > 1) {
                 const result = busDetector.calculateBusConsensus(
@@ -889,6 +889,13 @@ export class EdgeRoutingWorker {
             }
         }
 
+        const isPrecomputedSharedTrunkMember =
+            !!(job.busTrunkSource && job.busTrunkTarget) && (((job as any).peerGroupSize || 0) > 1);
+
+        if (isPrecomputedSharedTrunkMember && job.isManyToOne && !hasExplicitSource) {
+            startPos = resolvePortFromTrunkAxis(sRect, tRect, false);
+            hasFixedSourcePort = true;
+        }
 
         // 6. Coordinates with Distribution
         // [Bus Optimization] Force coalesced ports for Bus Hubs (Tree Root) to create a clean bundle
@@ -1013,7 +1020,7 @@ export class EdgeRoutingWorker {
                         else if (trunkPortPos === Position.Bottom && rdy < -tRect.height / 2) wouldSelfCross = true;
                     }
 
-                    if (wouldSelfCross) {
+                    if (wouldSelfCross && !isSharedGlobalTrunk) {
                         // Skip trunkPort: use geometric port selection instead, and skip trunk entirely
                         skipTrunkDueToSelfCross = true;
                     } else {
@@ -1394,6 +1401,13 @@ export class EdgeRoutingWorker {
                             const stitched = ensureSafeStitch(trunkInternal, startWithOffset, endWithOffset, routingObstacles);
                             pathPoints = [startPt, ...stitched, endPt];
                             strategyName = 'Trunk A*';
+                        } else if (isSharedGlobalTrunk) {
+                            // Shared bus members must not silently fall back to an independent
+                            // VG route; that breaks the common trunk even though the Coordinator
+                            // already assigned a verified peer group/axis. Preserve the trunk
+                            // waypoints as the last resort and let post-processing clean them up.
+                            pathPoints = waypoints;
+                            strategyName = 'Global Trunk Direct';
                         }
                     }
                 }
@@ -1555,7 +1569,11 @@ export class EdgeRoutingWorker {
                     endPt
                 ];
             }
-            strategyName = 'Reverse U-Turn';
+            if (isPathBlocked(pathPoints, routingObstacles, 4)) {
+                pathPoints = null;
+            } else {
+                strategyName = 'Reverse U-Turn';
+            }
         }
 
         // Fallback to standard routing if trunk routing failed or not applicable

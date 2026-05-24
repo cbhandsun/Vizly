@@ -67,7 +67,7 @@ function buildVerticalFanIn(
 
     for (const { edgeId, points } of members) {
         const junction = { x: trunkX, y: collectorY };
-        const candidate = buildPathToVerticalTrunk(points, junction, { x: trunkX, y: targetY }, spacing);
+        const candidate = buildPathToVerticalTrunk(points, junction, { x: trunkX, y: targetY }, spacing, edgeId, options);
         if (!isCandidateAcceptable(edgeId, points, candidate, spacing, options)) return null;
         candidates.set(edgeId, candidate);
     }
@@ -106,7 +106,7 @@ function buildHorizontalFanIn(
 
     for (const { edgeId, points } of members) {
         const junction = { x: collectorX, y: trunkY };
-        const candidate = buildPathToHorizontalTrunk(points, junction, { x: targetX, y: trunkY }, spacing);
+        const candidate = buildPathToHorizontalTrunk(points, junction, { x: targetX, y: trunkY }, spacing, edgeId, options);
         if (!isCandidateAcceptable(edgeId, points, candidate, spacing, options)) return null;
         candidates.set(edgeId, candidate);
     }
@@ -118,8 +118,15 @@ function buildHorizontalFanIn(
     return candidates;
 }
 
-function buildPathToVerticalTrunk(points: Point[], junction: Point, target: Point, spacing: number): Point[] {
-    const prefix = sourcePrefix(points);
+function buildPathToVerticalTrunk(
+    points: Point[],
+    junction: Point,
+    target: Point,
+    spacing: number,
+    edgeId: string,
+    options: ManyToOneFanInOptions
+): Point[] {
+    const prefix = sourcePrefix(points, junction, edgeId, options);
     const anchor = prefix[prefix.length - 1];
     const candidate = [...prefix];
     const lateralGap = Math.abs(anchor.x - junction.x);
@@ -146,8 +153,15 @@ function buildPathToVerticalTrunk(points: Point[], junction: Point, target: Poin
     return simplifyOrthogonal(candidate);
 }
 
-function buildPathToHorizontalTrunk(points: Point[], junction: Point, target: Point, spacing: number): Point[] {
-    const prefix = sourcePrefix(points);
+function buildPathToHorizontalTrunk(
+    points: Point[],
+    junction: Point,
+    target: Point,
+    spacing: number,
+    edgeId: string,
+    options: ManyToOneFanInOptions
+): Point[] {
+    const prefix = sourcePrefix(points, junction, edgeId, options);
     const anchor = prefix[prefix.length - 1];
     const candidate = [...prefix];
     const lateralGap = Math.abs(anchor.y - junction.y);
@@ -174,16 +188,52 @@ function buildPathToHorizontalTrunk(points: Point[], junction: Point, target: Po
     return simplifyOrthogonal(candidate);
 }
 
-function sourcePrefix(points: Point[]): Point[] {
-    const prefix = [{ ...points[0] }];
+function sourcePrefix(
+    points: Point[],
+    junction: Point | undefined,
+    edgeId: string,
+    options: ManyToOneFanInOptions
+): Point[] {
+    const first = pointFacingJunction(points[0], junction, sourceRectForEdge(edgeId, options));
+    const prefix = [first];
     const next = points[1];
     const keepsOrthogonalStub = next
         && (Math.abs(next.x - points[0].x) < EPS || Math.abs(next.y - points[0].y) < EPS)
         && (Math.abs(next.x - points[0].x) > EPS || Math.abs(next.y - points[0].y) > EPS);
     if (points.length > 2 && keepsOrthogonalStub) {
+        if (junction) {
+            const before = Math.abs(points[0].x - junction.x) + Math.abs(points[0].y - junction.y);
+            const after = Math.abs(next.x - junction.x) + Math.abs(next.y - junction.y);
+            if (after > before + EPS) return prefix;
+        }
         prefix.push({ ...next });
     }
     return prefix;
+}
+
+function sourceRectForEdge(edgeId: string, options: ManyToOneFanInOptions): Rectangle | undefined {
+    return options.ignoredRectsByEdge?.get(edgeId)?.[0];
+}
+
+function pointFacingJunction(fallback: Point, junction: Point | undefined, rect: Rectangle | undefined): Point {
+    if (!junction || !rect) return { ...fallback };
+
+    const centerX = rect.x + rect.width / 2;
+    const centerY = rect.y + rect.height / 2;
+    const dx = junction.x - centerX;
+    const dy = junction.y - centerY;
+
+    if (Math.abs(dx) >= Math.abs(dy)) {
+        return {
+            x: dx >= 0 ? rect.x + rect.width : rect.x,
+            y: centerY
+        };
+    }
+
+    return {
+        x: centerX,
+        y: dy >= 0 ? rect.y + rect.height : rect.y
+    };
 }
 
 function sourceAnchor(points: Point[]): Point {

@@ -549,6 +549,40 @@ describe('refineManyToOneFanIn', () => {
         expect(rebuilt).not.toContainEqual({ x: 188, y: 138 });
     });
 
+    it('moves a reverse source stub to the source side facing the shared fan-in trunk', () => {
+        const wmsRect = { x: 50, y: 812, width: 282, height: 118 };
+        const paths = new Map([
+            ['wms-visibility', [
+                { x: 191, y: 812 },
+                { x: 191, y: 780 },
+                { x: 394.5, y: 780 },
+                { x: 394.5, y: 1440 },
+                { x: 1434.3375, y: 1440 },
+                { x: 1434.3375, y: 1540 },
+            ]],
+            ['tms-visibility', [
+                { x: 1064.75, y: 812 },
+                { x: 1064.75, y: 1446 },
+                { x: 1434.3375, y: 1446 },
+                { x: 1434.3375, y: 1540 },
+            ]],
+        ]);
+
+        const result = refineManyToOneFanIn(paths, [
+            { targetId: 'visibility', edgeIds: ['wms-visibility', 'tms-visibility'] },
+        ], {
+            spacing: 12,
+            ignoredRectsByEdge: new Map([
+                ['wms-visibility', [wmsRect]],
+            ]),
+        });
+
+        const rebuilt = result.get('wms-visibility')!;
+        expect(rebuilt[0]).toEqual({ x: 332, y: 871 });
+        expect(rebuilt).not.toContainEqual({ x: 191, y: 780 });
+        expect(rebuilt.some(point => Math.abs(point.x - 1434.3375) < 1)).toBe(true);
+    });
+
     it('collects horizontal fan-in branches on one shared trunk junction', () => {
         const paths = new Map([
             ['top', [
