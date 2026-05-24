@@ -1627,11 +1627,23 @@ export class EdgeRoutingCoordinator {
                     usedPorts // 传入该 hub 的 O2M 已占端口
                 );
             } else {
-                // Fallback for non-bus incoming groups
-                groupJobs.sort((a, b) => (a.sourceY || 0) - (b.sourceY || 0));
-                groupJobs.forEach((job, index) => {
-                    job.incomingIndex = index;
-                    job.incomingCount = groupJobs.length;
+                // Fallback for non-bus incoming groups.
+                // [FIX] 按「端口侧」分组，保证不同侧入边各自居中，互不干扰。
+                // 原先按节点全量计数，导致从不同侧进入的边被错误地扩散离中心。
+                const sideBuckets = new Map<string, PathFindingJob[]>();
+                for (const job of groupJobs) {
+                    const side = (job.sourceRect && job.targetRect)
+                        ? EdgeRoutingCoordinator.inferPortSide(job.sourceRect, job.targetRect, 'target')
+                        : 'unknown';
+                    if (!sideBuckets.has(side)) sideBuckets.set(side, []);
+                    sideBuckets.get(side)!.push(job);
+                }
+                sideBuckets.forEach(sideJobs => {
+                    sideJobs.sort((a, b) => (a.sourceY || 0) - (b.sourceY || 0));
+                    sideJobs.forEach((job, index) => {
+                        job.incomingIndex = index;
+                        job.incomingCount = sideJobs.length;
+                    });
                 });
             }
         });
@@ -2469,37 +2481,11 @@ export class EdgeRoutingCoordinator {
      *   combined total = outCount + inCount
      *
      * 只处理 non-bus 边（bus 边有自己的 hubPortConflict 机制）。
+     * 只有单向（全入或全出）的侧直接跳过，保持默认居中行为。
      */
     private assignSameSidePortSeparation(jobs: PathFindingJob[]): void {
         const eligibleJobs = jobs.filter(j => j.sourceRect && j.targetRect);
         if (eligibleJobs.length === 0) return;
-
-        /**
-         * 根据源/目标矩形的相对位置，推断某端点将使用的端口侧方向。
-         * role='source' → 推断 source 节点的出口侧
-         * role='target' → 推断 target 节点的入口侧
-         */
-        const inferSide = (
-            sRect: Rectangle,
-            tRect: Rectangle,
-            role: 'source' | 'target'
-        ): 'left' | 'right' | 'top' | 'bottom' => {
-            const sCx = sRect.x + sRect.width / 2;
-            const sCy = sRect.y + sRect.height / 2;
-            const tCx = tRect.x + tRect.width / 2;
-            const tCy = tRect.y + tRect.height / 2;
-            const dx = tCx - sCx;
-            const dy = tCy - sCy;
-            if (Math.abs(dx) >= Math.abs(dy)) {
-                return role === 'source'
-                    ? (dx >= 0 ? 'right' : 'left')
-                    : (dx >= 0 ? 'left' : 'right');
-            } else {
-                return role === 'source'
-                    ? (dy >= 0 ? 'bottom' : 'top')
-                    : (dy >= 0 ? 'top' : 'bottom');
-            }
-        };
 
         // 以 (nodeId, side) 为键，记录出边列表和入边列表
         type SideData = { outJobs: PathFindingJob[]; inJobs: PathFindingJob[] };
@@ -2518,18 +2504,19 @@ export class EdgeRoutingCoordinator {
 
             // 非 bus 出边：登记 source 节点的出口侧
             if (!job.isOneToMany) {
-                const side = inferSide(sRect, tRect, 'source');
+                const side = EdgeRoutingCoordinator.inferPortSide(sRect, tRect, 'source');
                 getSlot(job.source, side).outJobs.push(job);
             }
 
             // 非 bus 入边：登记 target 节点的入口侧
             if (!job.isManyToOne) {
-                const side = inferSide(sRect, tRect, 'target');
+                const side = EdgeRoutingCoordinator.inferPortSide(sRect, tRect, 'target');
                 getSlot(job.target, side).inJobs.push(job);
             }
         }
 
         // 对存在「同侧 in/out 冲突」的节点，分配不重叠的区间
+        // 若某侧只有单方向（只入或只出），直接跳过 → 保持默认居中
         for (const [, sideMap] of registry) {
             for (const [, { outJobs, inJobs }] of sideMap) {
                 if (outJobs.length === 0 || inJobs.length === 0) continue;
@@ -2548,6 +2535,33 @@ export class EdgeRoutingCoordinator {
                     job.incomingCount = total;
                 });
             }
+        }
+    }
+
+    /**
+     * [SHARED] 根据源/目标矩形中心的相对位置，推断某端点的端口侧方向。
+     * role='source' → 推断 source 节点的出口侧（出边离开的方向）
+     * role='target' → 推断 target 节点的入口侧（入边进入的方向）
+     */
+    private static inferPortSide(
+        sRect: Rectangle,
+        tRect: Rectangle,
+        role: 'source' | 'target'
+    ): 'left' | 'right' | 'top' | 'bottom' {
+        const sCx = sRect.x + sRect.width / 2;
+        const sCy = sRect.y + sRect.height / 2;
+        const tCx = tRect.x + tRect.width / 2;
+        const tCy = tRect.y + tRect.height / 2;
+        const dx = tCx - sCx;
+        const dy = tCy - sCy;
+        if (Math.abs(dx) >= Math.abs(dy)) {
+            return role === 'source'
+                ? (dx >= 0 ? 'right' : 'left')
+                : (dx >= 0 ? 'left' : 'right');
+        } else {
+            return role === 'source'
+                ? (dy >= 0 ? 'bottom' : 'top')
+                : (dy >= 0 ? 'top' : 'bottom');
         }
     }
 }
