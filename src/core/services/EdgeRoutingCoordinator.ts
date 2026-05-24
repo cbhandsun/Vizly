@@ -523,6 +523,7 @@ export class EdgeRoutingCoordinator {
         // This is critical because if parallel routing fails or is disabled,
         // we still need the trunk geometry for proper bus routing.
         this.assignBusIndices(jobs, graph);
+        this.assignSameSidePortSeparation(jobs); // [FIX] In/Out port zone separation
         this.assignGlobalChannels(jobs);
 
         const results: PathFindingResult[] = [];
@@ -825,6 +826,9 @@ export class EdgeRoutingCoordinator {
 
             // [FIX] Assign Bus Indices for Nudge
             this.assignBusIndices(jobs, group.graph);
+
+            // [FIX] In/Out port zone separation (same node, same side)
+            this.assignSameSidePortSeparation(jobs);
 
             // [FIX] Assign Global Channels for Crossing Reduction
             this.assignGlobalChannels(jobs);
@@ -2451,6 +2455,100 @@ export class EdgeRoutingCoordinator {
         this.cache.clear();
         this.routedLabelObstacles.clear();
         EdgeRoutingCoordinator.instance = null;
+    }
+    /**
+     * [FIX] In/Out Port Zone Separation.
+     *
+     * 问题：当节点 N 同时作为出边 source（N→A, N→B）和入边 target（C→N, D→N），
+     * 且两组边都使用 N 的同一侧端口时，getDistributedPortPoint 会让两组都以
+     * 该侧中心为基准扩散 → 互相覆盖、产生视觉交叉。
+     *
+     * 修复：检测同节点、同侧的 in/out 冲突，将端口区间合并为连续序列：
+     *   出边（source 角色）: combined index = 0 .. outCount-1
+     *   入边（target 角色）: combined index = outCount .. outCount+inCount-1
+     *   combined total = outCount + inCount
+     *
+     * 只处理 non-bus 边（bus 边有自己的 hubPortConflict 机制）。
+     */
+    private assignSameSidePortSeparation(jobs: PathFindingJob[]): void {
+        const eligibleJobs = jobs.filter(j => j.sourceRect && j.targetRect);
+        if (eligibleJobs.length === 0) return;
+
+        /**
+         * 根据源/目标矩形的相对位置，推断某端点将使用的端口侧方向。
+         * role='source' → 推断 source 节点的出口侧
+         * role='target' → 推断 target 节点的入口侧
+         */
+        const inferSide = (
+            sRect: Rectangle,
+            tRect: Rectangle,
+            role: 'source' | 'target'
+        ): 'left' | 'right' | 'top' | 'bottom' => {
+            const sCx = sRect.x + sRect.width / 2;
+            const sCy = sRect.y + sRect.height / 2;
+            const tCx = tRect.x + tRect.width / 2;
+            const tCy = tRect.y + tRect.height / 2;
+            const dx = tCx - sCx;
+            const dy = tCy - sCy;
+            if (Math.abs(dx) >= Math.abs(dy)) {
+                return role === 'source'
+                    ? (dx >= 0 ? 'right' : 'left')
+                    : (dx >= 0 ? 'left' : 'right');
+            } else {
+                return role === 'source'
+                    ? (dy >= 0 ? 'bottom' : 'top')
+                    : (dy >= 0 ? 'top' : 'bottom');
+            }
+        };
+
+        // 以 (nodeId, side) 为键，记录出边列表和入边列表
+        type SideData = { outJobs: PathFindingJob[]; inJobs: PathFindingJob[] };
+        const registry = new Map<string, Map<string, SideData>>();
+
+        const getSlot = (nodeId: string, side: string): SideData => {
+            if (!registry.has(nodeId)) registry.set(nodeId, new Map());
+            const m = registry.get(nodeId)!;
+            if (!m.has(side)) m.set(side, { outJobs: [], inJobs: [] });
+            return m.get(side)!;
+        };
+
+        for (const job of eligibleJobs) {
+            const sRect = job.sourceRect!;
+            const tRect = job.targetRect!;
+
+            // 非 bus 出边：登记 source 节点的出口侧
+            if (!job.isOneToMany) {
+                const side = inferSide(sRect, tRect, 'source');
+                getSlot(job.source, side).outJobs.push(job);
+            }
+
+            // 非 bus 入边：登记 target 节点的入口侧
+            if (!job.isManyToOne) {
+                const side = inferSide(sRect, tRect, 'target');
+                getSlot(job.target, side).inJobs.push(job);
+            }
+        }
+
+        // 对存在「同侧 in/out 冲突」的节点，分配不重叠的区间
+        for (const [, sideMap] of registry) {
+            for (const [, { outJobs, inJobs }] of sideMap) {
+                if (outJobs.length === 0 || inJobs.length === 0) continue;
+
+                const total = outJobs.length + inJobs.length;
+
+                // 出边区间：0 .. outCount-1（靠近节点上半/左半）
+                outJobs.forEach((job, i) => {
+                    job.outgoingIndex = i;
+                    job.outgoingCount = total;
+                });
+
+                // 入边区间：outCount .. total-1（靠近节点下半/右半）
+                inJobs.forEach((job, i) => {
+                    job.incomingIndex = outJobs.length + i;
+                    job.incomingCount = total;
+                });
+            }
+        }
     }
 }
 
