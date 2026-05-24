@@ -286,9 +286,14 @@ function getTrackSpacing(group: Segment[], baseSpacing: number, trackCount: numb
         }
     }
 
-    const isVerticalBundle = !group[0]?.isHoriz;
-    const isLongSharedRun = maxOverlap > baseSpacing * 12;
-    if (!isVerticalBundle || !isLongSharedRun) return baseSpacing;
+    // Scale spacing proportionally to how long the shared run is.
+    // Short overlaps (< 4× baseSpacing ≈ 48px) use base spacing.
+    // Longer overlaps gradually widen so dense bundles are visually legible.
+    // Cap at 2× baseSpacing (24px) to avoid pushing lines into obstacles.
+    const MIN_OVERLAP_FOR_SCALE = baseSpacing * 4; // 48px at default 12
+    if (maxOverlap <= MIN_OVERLAP_FOR_SCALE) return baseSpacing;
 
-    return Math.max(baseSpacing, Math.min(baseSpacing * 1.6, baseSpacing + 8));
+    const scale = Math.min(1, (maxOverlap - MIN_OVERLAP_FOR_SCALE) / (baseSpacing * 20));
+    return Math.round(baseSpacing + scale * baseSpacing);
 }
+
