@@ -1485,11 +1485,9 @@ export class EdgeRoutingCoordinator {
 
         // [FIX] Helper to get Absolute Position with Parent Traversal
         const getAbsolutePosition = (node: any): { x: number, y: number } => {
-            // Priority 1: RF Computed Absolute (Fastest)
-            if (node.computed?.positionAbsolute) return node.computed.positionAbsolute;
-            if (node.positionAbsolute) return node.positionAbsolute;
-
-            // Priority 2: Manual Parent Traversal
+            // Priority 1: Manual Parent Traversal (most reliable for nested nodes)
+            // During initial layout, computed.positionAbsolute may be stale or not yet updated
+            // with parent offsets, so we always traverse manually for child nodes.
             const pId = node.parentId || node.parentNode;
             if (pId && nodeMap.has(pId)) {
                 const parent = nodeMap.get(pId);
@@ -1499,6 +1497,10 @@ export class EdgeRoutingCoordinator {
                     y: parentAbs.y + (node.position?.y ?? 0)
                 };
             }
+
+            // Priority 2: RF Computed Absolute (for root nodes only)
+            if (node.computed?.positionAbsolute) return node.computed.positionAbsolute;
+            if (node.positionAbsolute) return node.positionAbsolute;
 
             // Priority 3: Base Case (No parent, return relative)
             return node.position || { x: node.x ?? 0, y: node.y ?? 0 };
@@ -2112,7 +2114,23 @@ export class EdgeRoutingCoordinator {
                 job.incomingIndex = 0;
             }
 
-            // Assign Trunk Coordinates
+            // [FIX-dual-trunk] Assign direction-specific trunk hints.
+            // Worker reads (job as any).o2mTrunk / m2oTrunk to resolve ports independently
+            // for each end of a dual-identity edge (both O2M and M2O).
+            // Previously only busTrunkSource/Target was written — M2O phase overwrote O2M data.
+            const trunkData = trunk.direction === 'vertical'
+                ? { source: { x: trunk.axis, y: trunk.range.min }, target: { x: trunk.axis, y: trunk.range.max } }
+                : { source: { x: trunk.range.min, y: trunk.axis }, target: { x: trunk.range.max, y: trunk.axis } };
+
+            if (isManyToOne) {
+                (job as any).m2oTrunk = trunkData;
+                (job as any).m2oTrunkPort = trunk.suggestedPort;
+            } else {
+                (job as any).o2mTrunk = trunkData;
+                (job as any).o2mTrunkPort = trunk.suggestedPort;
+            }
+
+            // Assign Trunk Coordinates (kept for backward compat: isGlobalTrunkMember, trunk segment build)
             if (trunk.direction === 'vertical') {
                 job.busTrunkSource = { x: trunk.axis, y: trunk.range.min };
                 job.busTrunkTarget = { x: trunk.axis, y: trunk.range.max };
@@ -2133,8 +2151,8 @@ export class EdgeRoutingCoordinator {
             (job as any).trunkPortTangent = trunkPortTangent;
 
             // [S4] Port 注入已移至 Worker 内部（几何推算）。
-            // Coordinator 仅传递 busTrunkSource/busTrunkTarget 几何元数据，
-            // 端口方向由 Worker 的 L263-305 几何逻辑自主决定，消除双层决策冲突。
+            // Coordinator 仅传递 busTrunkSource/busTrunkTarget + o2mTrunk/m2oTrunk 几何元数据，
+            // 端口方向由 Worker 的几何逻辑自主决定，消除双层决策冲突。
 
             job.layoutDirection = layoutDir;
         });

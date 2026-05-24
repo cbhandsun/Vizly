@@ -127,23 +127,46 @@ export class PathPostProcessor {
         // [FIX] BorderRadius Protection: ensure stubs are always long enough for filleted corners
         const safeMinFirst = Math.max(config.postProcessing.minFirstSegment, config.postProcessing.borderRadius + 5);
         const safeMinLast = Math.max(config.postProcessing.minLastSegment, config.postProcessing.borderRadius + 5);
-        finalPoints = ensureMinLastSegment(finalPoints, safeMinLast);
-        finalPoints = ensureMinFirstSegment(finalPoints, safeMinFirst);
+        finalPoints = ensureMinLastSegment(finalPoints, safeMinLast, endPos);
+        finalPoints = ensureMinFirstSegment(finalPoints, safeMinFirst, startPos);
+
+        // Phase 0b: Strip points inside source/target nodes
+        // A* excludes source/target from obstacles, so intermediate waypoints may
+        // land inside the node body. Remove them — Phase 1 simplification with
+        // simplifyObstacles will reconnect the path correctly (going around the node).
+        if (extraObstacles && extraObstacles.length >= 2 && finalPoints.length > 2) {
+            const sR = extraObstacles[0];
+            const tR = extraObstacles[1];
+            const isInside = (p: Point, r: Rectangle) =>
+                p.x > r.x + 2 && p.x < r.x + r.width - 2 &&
+                p.y > r.y + 2 && p.y < r.y + r.height - 2;
+
+            finalPoints = finalPoints.filter((p, i) => {
+                if (i === 0 || i === finalPoints.length - 1) return true; // keep start/end
+                return !isInside(p, sR) && !isInside(p, tR);
+            });
+        }
 
         // Phase 1: Simplification & Redundancy Removal
         const posOptions = { sourcePos: startPos, targetPos: endPos };
-        finalPoints = simplifyPath(finalPoints, config.algorithm.gridSize * 2, obstacles, posOptions);
+        // [FIX] Merge extraObstacles (source/target node rects) into obstacle list.
+        // routingObstacles excludes source/target to let A* enter the port zone,
+        // but simplification must NOT shortcut through the source/target node bodies.
+        const simplifyObstacles = extraObstacles && extraObstacles.length > 0
+            ? [...obstacles, ...extraObstacles]
+            : obstacles;
+        finalPoints = simplifyPath(finalPoints, config.algorithm.gridSize * 2, simplifyObstacles, posOptions);
         // [NEW] Handle 4-point C-shape paths before removeLargeBacktrack (which requires ≥5 pts)
-        finalPoints = trySimplify4PointCShape(finalPoints, obstacles, posOptions);
+        finalPoints = trySimplify4PointCShape(finalPoints, simplifyObstacles, posOptions);
         // [BACKTRACK-V2] Orthogonal-safe large backtrack removal.
         // Threshold: 20px minimum (catches trunk junction micro-backtracks like 52px)
         // Only fires when: dominant direction is clear (≥2:1), AND
         // corner is provably perpendicular to both incoming and outgoing segments.
-        finalPoints = removeLargeBacktrack(finalPoints, obstacles, posOptions, 20);
-        finalPoints = collapseRedundantBends(finalPoints, obstacles, config.postProcessing.redundantBendThreshold, posOptions);
+        finalPoints = removeLargeBacktrack(finalPoints, simplifyObstacles, posOptions, 20);
+        finalPoints = collapseRedundantBends(finalPoints, simplifyObstacles, config.postProcessing.redundantBendThreshold, posOptions);
 
         // Phase 2: Cleanup (Jogs, Backtracks)
-        finalPoints = removeSmallJogs(finalPoints, obstacles, posOptions);
+        finalPoints = removeSmallJogs(finalPoints, simplifyObstacles, posOptions);
         finalPoints = collapseCollinearBacktracks(preventEndpointCollinearBacktrack(finalPoints));
 
         // Phase 3: Nudging (Separating parallel paths)
@@ -228,7 +251,7 @@ export class PathPostProcessor {
                 targetPos: endPos,
                 sourceMinLength: isBus ? undefined : safeMinFirst,
                 targetMinLength: isBus ? undefined : safeMinLast
-            }, obstacles) || finalPoints;
+            }, simplifyObstacles) || finalPoints;
             if (!isBus) {
                 finalPoints = snapAxis(finalPoints);
                 finalPoints = collapseCollinearBacktracks(preventEndpointCollinearBacktrack(finalPoints));
@@ -243,17 +266,17 @@ export class PathPostProcessor {
         // is pure O(N²) waste. Only run if finalThreshold adds meaningful resolution.
         const phase1Threshold = config.algorithm.gridSize * 2;
         if (finalSimplificationThreshold > phase1Threshold + 5) {
-            finalPoints = simplifyPath(finalPoints, finalSimplificationThreshold, obstacles, posOptions);
+            finalPoints = simplifyPath(finalPoints, finalSimplificationThreshold, simplifyObstacles, posOptions);
         }
         
         // [FIX] Aggressively eliminate tiny orthogonal stair-steps created by A* grid snapping 
         // to continuous anchor coordinates before final simplification. Use a dynamic threshold
         // that is strictly greater than the grid size to catch 1-grid-step jogs (e.g., 20px).
-        finalPoints = removeTinyOrthogonalJogs(finalPoints, Math.max(config.algorithm.gridSize * 1.5, 40), obstacles, posOptions);
+        finalPoints = removeTinyOrthogonalJogs(finalPoints, Math.max(config.algorithm.gridSize * 1.5, 40), simplifyObstacles, posOptions);
         // [FIX] Skip second collapseRedundantBends to preserve pathfinding obstacle avoidance
         // Only apply if preserveObstacleAvoidance is explicitly disabled
         if (config.postProcessing.preserveObstacleAvoidance === false) {
-            finalPoints = collapseRedundantBends(finalPoints, obstacles, config.postProcessing.finalRedundantBendThreshold, posOptions);
+            finalPoints = collapseRedundantBends(finalPoints, simplifyObstacles, config.postProcessing.finalRedundantBendThreshold, posOptions);
         }
         if (!isBus) {
             finalPoints = snapAxis(finalPoints);
@@ -267,6 +290,7 @@ export class PathPostProcessor {
         // trunk junction alignment (e.g. 52px overshoot at merge point).
         // This is safe after snapAxis because the points are already axis-snapped.
         finalPoints = collapseCollinearBacktracks(finalPoints);
+
 
         // Phase 6: SVG Path Generation
         // Visibility Graph often produces an already-clean single-bend orthogonal route.

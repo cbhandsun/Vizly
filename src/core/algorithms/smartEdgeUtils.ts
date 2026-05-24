@@ -2682,8 +2682,68 @@ export function createFilletedPath(
     const finalPoints = collapseCollinearBacktracks(normalizedPoints);
     if (finalPoints.length < 2) return '';
 
-    // Replace normalizedPoints reference for the rest of the function
-    const renderPoints = finalPoints;
+    // [FIX-orthogonal] Short-segment elimination: remove S/Z-jog segments shorter than 2*cornerRadius.
+    // When A* grid-snapping produces a tiny lateral offset (e.g. 9.75px), the resulting
+    // micro-segment forces cornerRadius to compress (e.g. 8→4.875), visually creating
+    // a diagonal "kink" instead of a clean orthogonal corner.
+    // Strategy: scan for 3-point A→B→C where seg AB or BC is very short AND the
+    // surrounding segments form an S-shape (same direction before and after the bridge).
+    // Snap B to eliminate the jog, then re-collapse collinear points.
+    const shortThreshold = cornerRadius * 2;
+    let shortChanged = false;
+    for (let pass = 0; pass < 2; pass++) {
+        for (let i = 1; i < finalPoints.length - 1; i++) {
+            const prev = finalPoints[i - 1];
+            const curr = finalPoints[i];
+            const next = finalPoints[i + 1];
+
+            const segPrev = Math.abs(curr.x - prev.x) + Math.abs(curr.y - prev.y);
+            const segNext = Math.abs(next.x - curr.x) + Math.abs(next.y - curr.y);
+
+            // Check if current point creates a short bridge
+            const shortSeg = Math.min(segPrev, segNext);
+            if (shortSeg >= shortThreshold) continue;
+
+            // Determine if this is an S-jog: prev-curr and curr-next are in the same axis
+            const prevHoriz = Math.abs(prev.y - curr.y) < 1;
+            const nextHoriz = Math.abs(curr.y - next.y) < 1;
+            const prevVert = Math.abs(prev.x - curr.x) < 1;
+            const nextVert = Math.abs(curr.x - next.x) < 1;
+
+            // S-jog: H→V→H or V→H→V where the bridge (middle) segment is short
+            if (prevVert && nextVert && segPrev < shortThreshold) {
+                // Short horizontal bridge between two vertical segments
+                // Snap curr.x and next.x to prev.x to straighten
+                curr.x = prev.x;
+                // If next is a corner, snap its x too
+                if (i + 2 < finalPoints.length) {
+                    // Only snap next if it keeps the path valid
+                    const afterNext = finalPoints[i + 2];
+                    if (Math.abs(afterNext.y - next.y) < 1) {
+                        // afterNext→next is horizontal, safe to move next.x
+                        next.x = prev.x;
+                    }
+                }
+                shortChanged = true;
+            } else if (prevHoriz && nextHoriz && segPrev < shortThreshold) {
+                // Short vertical bridge between two horizontal segments
+                curr.y = prev.y;
+                if (i + 2 < finalPoints.length) {
+                    const afterNext = finalPoints[i + 2];
+                    if (Math.abs(afterNext.x - next.x) < 1) {
+                        next.y = prev.y;
+                    }
+                }
+                shortChanged = true;
+            }
+        }
+    }
+    // Re-collapse if we straightened any jogs
+    const renderPoints = shortChanged
+        ? collapseCollinearBacktracks(finalPoints)
+        : finalPoints;
+
+    if (renderPoints.length < 2) return '';
 
     if (cornerRadius <= 0) {
         return "M " + renderPoints.map(p => `${p.x} ${p.y}`).join(" L ");

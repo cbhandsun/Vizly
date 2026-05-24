@@ -260,16 +260,19 @@ export class TrunkCalculator {
                 // [FIX-robust-collision] 多轮扫描以应对重叠障碍物
                 let collisionFound = true;
                 let safetyAttempt = 0;
+                const corridorHalf = 10;
+
                 while (collisionFound && safetyAttempt < 3) {
                     collisionFound = false;
                     // 使用 10px 的通道宽度进行检测，防止贴边导致的视觉穿透
                     const blockers = filteredObstacles.filter(o =>
-                        o.x < axis + 10 && o.x + o.width > axis - 10 &&
+                        o.x < axis + corridorHalf && o.x + o.width > axis - corridorHalf &&
                         o.y < range.max + spacing && o.y + o.height > range.min - spacing
                     );
 
                     if (blockers.length > 0) {
                         collisionFound = true;
+
                         if (isLeft) {
                             // 主干在左侧：推向更左侧。推开后重新吸附到网格（向下取整，确保远离 Hub 和障碍物）
                             const minX = Math.min(...blockers.map(o => o.x));
@@ -292,6 +295,7 @@ export class TrunkCalculator {
             } else {
                 axis = Math.max(axis, hubNode.x + hubNode.width + spacing);
             }
+
 
             return { axis, direction: 'vertical', range, suggestedPort };
 
@@ -343,10 +347,11 @@ export class TrunkCalculator {
             if (filteredObstacles && filteredObstacles.length > 0) {
                 let collisionFound = true;
                 let safetyAttempt = 0;
+                const corridorHalf = 10;
                 while (collisionFound && safetyAttempt < 3) {
                     collisionFound = false;
                     const blockers = filteredObstacles.filter(o =>
-                        o.y < axis + 10 && o.y + o.height > axis - 10 &&
+                        o.y < axis + corridorHalf && o.y + o.height > axis - corridorHalf &&
                         o.x < range.max + spacing && o.x + o.width > range.min - spacing
                     );
                     if (blockers.length > 0) {

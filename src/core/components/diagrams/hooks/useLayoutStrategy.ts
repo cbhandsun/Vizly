@@ -45,7 +45,7 @@ function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], dir: 'TB'
     const sanitized = resultEdges
         .filter(e => {
             const ok = nodeIdSet.has(e.source) && nodeIdSet.has(e.target);
-            if (!ok) { orphan++; console.warn(`[Layout] ⚠️ 移除孤立边: ${e.id}, src=${nodeIdSet.has(e.source)}, tgt=${nodeIdSet.has(e.target)}`); }
+            if (!ok) { _orphan++; console.warn(`[Layout] ⚠️ 移除孤立边: ${e.id}, src=${nodeIdSet.has(e.source)}, tgt=${nodeIdSet.has(e.target)}`); }
             return ok;
         })
         .map(e => {
@@ -56,8 +56,8 @@ function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], dir: 'TB'
             const tgtH = expandHandle(e.targetHandle);
             edge.sourceHandle = srcH || defSrc;
             edge.targetHandle = tgtH || defTgt;
-            if (srcH) expanded++; else defaulted++;
-            if (tgtH) expanded++; else defaulted++;
+            if (srcH) _expanded++; else _defaulted++;
+            if (tgtH) _expanded++; else _defaulted++;
 
             // ⭐ [FIX] 切换布局时清除连线的自定义控制点缓冲，让重新计算的布局能够生效起步；但保留布局策略计算好的路径/总线/ELK信息
             edge.data = {

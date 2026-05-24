@@ -71,12 +71,14 @@ export function refineOrthogonalWaypointsDetailed(
     }
 
     const buddyEdgeIds = new Set<string>();
-    const buddyTypeByEdgeId = new Map<string, BuddyGroup['type']>();
+    // [FIX-dual] 使用 Set 存储类型，支持双身份边同时是 o2m 和 m2o
+    const buddyTypesByEdgeId = new Map<string, Set<BuddyGroup['type']>>();
     const fixedEdgeIds = options.fixedEdgeIds ?? new Set<string>();
     (options.buddyGroups ?? []).forEach(group => {
         group.edgeIds.forEach(edgeId => {
             buddyEdgeIds.add(edgeId);
-            buddyTypeByEdgeId.set(edgeId, group.type);
+            if (!buddyTypesByEdgeId.has(edgeId)) buddyTypesByEdgeId.set(edgeId, new Set());
+            buddyTypesByEdgeId.get(edgeId)!.add(group.type);
         });
     });
 
@@ -121,6 +123,9 @@ export function refineOrthogonalWaypointsDetailed(
     for (let pass = 0; pass < maxPasses && (currentScore.totalScore > 0 || hasCompressibleDoglegs(result, fixedEdgeIds, spacing)); pass++) {
         let changedInPass = false;
         let checked = 0;
+        // [FIX-obstacle] Buddy 边不再完全跳过。
+        // 它们参与 refiner，但通过 getProtectedTrunkLocks 保护 trunk 段。
+        // 只有 fixedEdgeIds（缓存命中的边）才完全跳过。
         const orderedEdgeIds = [...result.keys()]
             .filter(edgeId => !fixedEdgeIds.has(edgeId))
             .sort((a, b) => (currentScore.byEdge.get(b) ?? 0) - (currentScore.byEdge.get(a) ?? 0));
@@ -142,7 +147,7 @@ export function refineOrthogonalWaypointsDetailed(
                 spacing,
                 currentScore,
                 options.candidateAxes,
-                getProtectedTrunkLocks(buddyTypeByEdgeId.get(edgeId))
+                getProtectedTrunkLocks(buddyTypesByEdgeId.get(edgeId))
             );
             const compactedCandidate = candidate ?? findObstacleAwareDoglegCompaction(
                 edgeId,
@@ -152,7 +157,7 @@ export function refineOrthogonalWaypointsDetailed(
                 hardObstacles,
                 spacing,
                 currentScore,
-                getProtectedTrunkLocks(buddyTypeByEdgeId.get(edgeId))
+                getProtectedTrunkLocks(buddyTypesByEdgeId.get(edgeId))
             ) ?? findWrongSideDoglegCompaction(
                 edgeId,
                 points,
@@ -161,7 +166,7 @@ export function refineOrthogonalWaypointsDetailed(
                 hardObstacles,
                 spacing,
                 currentScore,
-                getProtectedTrunkLocks(buddyTypeByEdgeId.get(edgeId))
+                getProtectedTrunkLocks(buddyTypesByEdgeId.get(edgeId))
             ) ?? findOuterLaneReroute(
                 edgeId,
                 points,
@@ -170,7 +175,7 @@ export function refineOrthogonalWaypointsDetailed(
                 hardObstacles,
                 spacing,
                 currentScore,
-                getProtectedTrunkLocks(buddyTypeByEdgeId.get(edgeId))
+                getProtectedTrunkLocks(buddyTypesByEdgeId.get(edgeId))
             );
 
             if (!compactedCandidate) continue;
@@ -259,10 +264,11 @@ interface ProtectedTrunkLocks {
     lockLastJunction?: boolean;
 }
 
-function getProtectedTrunkLocks(type: BuddyGroup['type'] | undefined): ProtectedTrunkLocks {
+function getProtectedTrunkLocks(types: Set<BuddyGroup['type']> | undefined): ProtectedTrunkLocks {
+    if (!types) return {};
     return {
-        lockFirstJunction: type === 'o2m',
-        lockLastJunction: type === 'm2o',
+        lockFirstJunction: types.has('o2m'),
+        lockLastJunction: types.has('m2o'),
     };
 }
 
