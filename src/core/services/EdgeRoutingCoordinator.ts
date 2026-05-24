@@ -2521,6 +2521,16 @@ export class EdgeRoutingCoordinator {
             for (const [, { outJobs, inJobs }] of sideMap) {
                 if (outJobs.length === 0 || inJobs.length === 0) continue;
 
+                // [FIX] 跳过纯「双向对」（A→B + B→A 互为逆向）。
+                // 双向对已经由 assignGlobalChannels 在路径层做了 bidirectionalChannel 偏移，
+                // 如果再做端口分离就会「双重偏移」——用户看到的就是「单向节点端口不居中」。
+                // 只对非对称的同侧冲突（A→N 入 + N→C 出，C≠A）做端口区间分离。
+                const outPairs = new Set(outJobs.map(j => `${j.source}\0${j.target}`));
+                const isBidirectionalOnly = inJobs.every(j =>
+                    outPairs.has(`${j.target}\0${j.source}`)  // reversed edge exists in outJobs
+                ) && outJobs.length === inJobs.length;
+                if (isBidirectionalOnly) continue;
+
                 const total = outJobs.length + inJobs.length;
 
                 // 出边区间：0 .. outCount-1（靠近节点上半/左半）
