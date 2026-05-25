@@ -652,6 +652,48 @@ export class EdgeRoutingWorker {
             hasFixedTargetPort = true;
         }
 
+        // [SAFETY] Same-Side Overshoot Override (fires even for explicit handles)
+        // If an explicit sourceHandle/targetHandle is stored in edge data (e.g. from a stale
+        // localStorage cache), and it creates a geometric overshoot (same-side + target is on the
+        // far side → the path has to loop around), override it with the geometry-optimal port.
+        //
+        // Example: source=right, target=right, but targetCenter is clearly to the RIGHT of source.
+        //          This forces the path to overshoot rightward and loop back — never what users want.
+        //
+        // Guard: only override when not a global trunk member (trunk ports are intentionally strict)
+        //        and not a bus edge (those have their own consensus logic).
+        if (!isGlobalTrunkMember && !job.isOneToMany && !job.isManyToOne) {
+            const overshootDx = (tRect.x + tRect.width / 2) - (sRect.x + sRect.width / 2);
+            const overshootDy = (tRect.y + tRect.height / 2) - (sRect.y + sRect.height / 2);
+            const OVERSHOOT_THRESHOLD = 40; // px: target must be clearly on the far side
+
+            let hasSourceOvershoot = false;
+            let hasTargetOvershoot = false;
+
+            // Source same-side overshoot: exiting toward the opposite of where target is
+            if (startPos === Position.Right && overshootDx < -OVERSHOOT_THRESHOLD) hasSourceOvershoot = true;
+            if (startPos === Position.Left && overshootDx > OVERSHOOT_THRESHOLD) hasSourceOvershoot = true;
+            if (startPos === Position.Bottom && overshootDy < -OVERSHOOT_THRESHOLD) hasSourceOvershoot = true;
+            if (startPos === Position.Top && overshootDy > OVERSHOOT_THRESHOLD) hasSourceOvershoot = true;
+
+            // Target same-side overshoot: same port as source → path has to loop around
+            if (startPos === endPos) {
+                if (startPos === Position.Right && overshootDx > OVERSHOOT_THRESHOLD) hasTargetOvershoot = true;
+                if (startPos === Position.Left && overshootDx < -OVERSHOOT_THRESHOLD) hasTargetOvershoot = true;
+                if (startPos === Position.Bottom && overshootDy > OVERSHOOT_THRESHOLD) hasTargetOvershoot = true;
+                if (startPos === Position.Top && overshootDy < -OVERSHOOT_THRESHOLD) hasTargetOvershoot = true;
+            }
+
+            if (hasSourceOvershoot || hasTargetOvershoot) {
+                // Recompute optimal ports ignoring explicit constraints
+                startPos = pResult.sourcePos;
+                endPos = pResult.targetPos;
+                hasFixedSourcePort = true;
+                hasFixedTargetPort = true;
+            }
+        }
+
+
         // 5.5 [FIX] Reverse Edge: Smart Bypass Port Selection (AFTER port selection)
         // Runs AFTER all bus/trunk/portSelector logic so it has final authority.
         // Forces same-side ports on a PERPENDICULAR side to create a U-turn bypass path.
