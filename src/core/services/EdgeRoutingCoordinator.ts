@@ -1949,16 +1949,19 @@ export class EdgeRoutingCoordinator {
             if (groupEdges.length === 0) return;
 
             // 单条边的组：降级为普通 A* 路由（只在有多个组时）
+            // [FIX] 保留 isManyToOne/isOneToMany 标志不清除，
+            // 这样 Worker 仍知道这是"bus"边（isBus=true → allowTargetSlide=false）。
+            // 如果清除了标志，Worker 会滑动端口→端口偏离中心。
             if (groupEdges.length === 1 && sideGroups.size > 1) {
                 const job = busGroupJobs.find(j => j.edgeId === groupEdges[0].id);
                 const shouldKeepSingletonBus = !!job?.isReverseEdge || isReverseByGeometry(groupEdges[0]);
                 if (job && !shouldKeepSingletonBus) {
                     if (isManyToOne) {
-                        job.isManyToOne = false;
+                        // 不清除 job.isManyToOne，保持 isBus=true 让 Worker 禁止端口滑动
                         job.incomingCount = 1;
                         job.incomingIndex = 0;
                     } else {
-                        job.isOneToMany = false;
+                        // 同理，保持 job.isOneToMany
                         job.outgoingCount = 1;
                         job.outgoingIndex = 0;
                     }
@@ -2527,7 +2530,7 @@ export class EdgeRoutingCoordinator {
                 // 只对非对称的同侧冲突（A→N 入 + N→C 出，C≠A）做端口区间分离。
                 const outPairs = new Set(outJobs.map(j => `${j.source}\0${j.target}`));
                 const isBidirectionalOnly = inJobs.every(j =>
-                    outPairs.has(`${j.target}\0${j.source}`)  // reversed edge exists in outJobs
+                    outPairs.has(`${j.target}\0${j.source}`)
                 ) && outJobs.length === inJobs.length;
                 if (isBidirectionalOnly) continue;
 

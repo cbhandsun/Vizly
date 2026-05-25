@@ -928,6 +928,10 @@ export class EdgeRoutingWorker {
 
         const outgoingCount = forceSourceCoalesce ? 1 : (job.outgoingCount || 1);
         const incomingCount = forceTargetCoalesce ? 1 : (job.incomingCount || 1);
+        // [FIX] 只有多条平行边时才滑动端口。
+        // 单条边（count=1）若允许滑动，sharedCenter 可能远离 strictMinY 边界，
+        // 导致端口被夹到节点侧边的 25% 位置而非居中（例如上游系统→L-OMS）。
+        // 解决方案：仅当 outgoingCount/incomingCount > 1 时传入 sharedCenter。
         const allowSourceSlide = !isBus && config.portSelection.enableDynamicPorts;
         const allowTargetSlide = !isBus && config.portSelection.enableDynamicPorts;
 
@@ -943,13 +947,13 @@ export class EdgeRoutingWorker {
             sRect, startPos,
             forceSourceCoalesce ? 0 : (job.outgoingIndex || 0),
             outgoingCount,
-            allowSourceSlide ? sharedCenter : undefined
+            allowSourceSlide && outgoingCount > 1 ? sharedCenter : undefined
         );
         const endPt = portSelector.getDistributedPortPoint(
             tRect, endPos,
             forceTargetCoalesce ? 0 : (job.incomingIndex || 0),
             incomingCount,
-            allowTargetSlide ? sharedCenter : undefined
+            allowTargetSlide && incomingCount > 1 ? sharedCenter : undefined
         );
 
         // Apply Offsets (Stubs) to avoid being trapped in obstacle padding
