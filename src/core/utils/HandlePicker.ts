@@ -387,6 +387,11 @@ export function decideEdgeRouting(
     // excluded from obstacles), producing paths that appear to hug the group boundary.
     // We mark the container with isSoftZone so it raises cost but doesn't block access
     // (otherwise A* would never reach the target node inside the container).
+    //
+    // [FIX v2] Only add soft zone for TRUE cross-domain edges (different top-level domains).
+    // Intra-domain edges crossing between subdomains (e.g. "数据准备" → "初分逻辑" within
+    // "策略计算") should route DIRECTLY through the gap without penalty. The old code added
+    // the target subdomain as expensive, causing A* to detour far around it.
     // Find parent container using pre-built parentMap
     const getParentId = (nodeId: string) => parentMap.get(nodeId);
 
@@ -395,22 +400,30 @@ export function decideEdgeRouting(
     const isCrossGroup = !!(sParentId && tParentId && sParentId !== tParentId);
 
     if (isCrossGroup) {
-        const tParentNode = (allNodes || []).find((n: any) => n.id === tParentId);
-        if (tParentNode) {
-            const tParentPos = getAbsolutePosition(tParentNode);
-            const tParentW = tParentNode.width ?? tParentNode.measured?.width ?? tParentNode.style?.width ?? 400;
-            const tParentH = tParentNode.height ?? tParentNode.measured?.height ?? tParentNode.style?.height ?? 300;
-            // Mark as soft zone: A* sees it as expensive but not impossible to traverse.
-            // This makes A* prefer going AROUND the container boundary first, then enter
-            // from the correct handle side near the target node.
-            obstacles.push({
-                x: tParentPos.x,
-                y: tParentPos.y,
-                width: tParentW,
-                height: tParentH,
-                padding: 40, // Increased padding to ensure visible distance from group border
-                isSoftZone: true, // signals PathFinder to treat as high-cost, not blocked
-            } as any);
+        // Check if they share a common grandparent domain (intra-domain cross-subdomain)
+        const sGrandParentId = getParentId(sParentId!);
+        const tGrandParentId = getParentId(tParentId!);
+        const isIntraDomain = !!(sGrandParentId && tGrandParentId && sGrandParentId === tGrandParentId);
+
+        // Only add soft zone for true cross-domain edges, not intra-domain subdomain crossings
+        if (!isIntraDomain) {
+            const tParentNode = (allNodes || []).find((n: any) => n.id === tParentId);
+            if (tParentNode) {
+                const tParentPos = getAbsolutePosition(tParentNode);
+                const tParentW = tParentNode.width ?? tParentNode.measured?.width ?? tParentNode.style?.width ?? 400;
+                const tParentH = tParentNode.height ?? tParentNode.measured?.height ?? tParentNode.style?.height ?? 300;
+                // Mark as soft zone: A* sees it as expensive but not impossible to traverse.
+                // This makes A* prefer going AROUND the container boundary first, then enter
+                // from the correct handle side near the target node.
+                obstacles.push({
+                    x: tParentPos.x,
+                    y: tParentPos.y,
+                    width: tParentW,
+                    height: tParentH,
+                    padding: 40, // Increased padding to ensure visible distance from group border
+                    isSoftZone: true, // signals PathFinder to treat as high-cost, not blocked
+                } as any);
+            }
         }
     }
 

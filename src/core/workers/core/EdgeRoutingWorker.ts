@@ -685,9 +685,23 @@ export class EdgeRoutingWorker {
             }
 
             if (hasSourceOvershoot || hasTargetOvershoot) {
-                // Recompute optimal ports ignoring explicit constraints
-                startPos = pResult.sourcePos;
-                endPos = pResult.targetPos;
+                // [CRITICAL FIX] Re-run port selection WITHOUT constraints.
+                // The original pResult was computed with constrainedSourcePos/constrainedTargetPos
+                // locked to the explicit handle values (e.g. both=Right). This means pResult
+                // only evaluated the R→R combination and returned R→R — using it here is a no-op!
+                //
+                // We must run an UNCONSTRAINED evaluation so all 16 port combinations are scored
+                // and the geometrically optimal one (e.g. R→L for upper-right target) is selected.
+                const unconstrainedResult = portSelector.selectPorts(sRect, tRect, routingObstacles, {
+                    effectiveDir: busOrientation.busDir,
+                    portUsage,
+                    sourceId: job.source,
+                    targetId: job.target,
+                    lineObstacles: graph.pendingEdges,
+                    // NO constrainedSourcePos / constrainedTargetPos — evaluate all combinations
+                });
+                startPos = unconstrainedResult.sourcePos;
+                endPos = unconstrainedResult.targetPos;
                 hasFixedSourcePort = true;
                 hasFixedTargetPort = true;
             }

@@ -1182,12 +1182,52 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
             const sUsage = nodeUsage[source.id] || {};
             const tUsage = nodeUsage[target.id] || {};
-            const explicitSourceHandle = edge.sourceHandle && !isAutoHandle(edge, 'source')
+            let explicitSourceHandle = edge.sourceHandle && !isAutoHandle(edge, 'source')
                 ? normalizeHandle(edge.sourceHandle)
                 : undefined;
-            const explicitTargetHandle = edge.targetHandle && !isAutoHandle(edge, 'target')
+            let explicitTargetHandle = edge.targetHandle && !isAutoHandle(edge, 'target')
                 ? normalizeHandle(edge.targetHandle)
                 : undefined;
+
+            // [FIX] Same-side overshoot guard for explicit handles.
+            // JSON data or stale localStorage may contain explicit handles that create
+            // geometrically absurd paths (e.g. both=right when target is far to the right,
+            // causing a huge U-turn loop). Detect this and DROP the explicit handles,
+            // letting globalPorts + geometry choose the optimal ports.
+            if (explicitSourceHandle && explicitTargetHandle) {
+                const sAbsPos = (source as any).positionAbsolute || source.position;
+                const tAbsPos = (target as any).positionAbsolute || target.position;
+                const sDims = { width: (source as any).measured?.width || (source as any).style?.width || 200, height: (source as any).measured?.height || (source as any).style?.height || 80 };
+                const tDims = { width: (target as any).measured?.width || (target as any).style?.width || 200, height: (target as any).measured?.height || (target as any).style?.height || 80 };
+                const oCenterDx = (tAbsPos.x + tDims.width / 2) - (sAbsPos.x + sDims.width / 2);
+                const oCenterDy = (tAbsPos.y + tDims.height / 2) - (sAbsPos.y + sDims.height / 2);
+                const OVERSHOOT_PX = 40;
+
+                const sh = explicitSourceHandle; // 'r','l','t','b'
+                const th = explicitTargetHandle;
+
+                // Same-side overshoot: source and target use the same side, and target is
+                // clearly on that same side → path loops around
+                let isSameSideOvershoot = false;
+                if (sh === th) {
+                    if (sh === 'r' && oCenterDx > OVERSHOOT_PX) isSameSideOvershoot = true;
+                    if (sh === 'l' && oCenterDx < -OVERSHOOT_PX) isSameSideOvershoot = true;
+                    if (sh === 'b' && oCenterDy > OVERSHOOT_PX) isSameSideOvershoot = true;
+                    if (sh === 't' && oCenterDy < -OVERSHOOT_PX) isSameSideOvershoot = true;
+                }
+                // Source exits AWAY from target (opposite direction)
+                let isSourceAwayFromTarget = false;
+                if (sh === 'r' && oCenterDx < -OVERSHOOT_PX) isSourceAwayFromTarget = true;
+                if (sh === 'l' && oCenterDx > OVERSHOOT_PX) isSourceAwayFromTarget = true;
+                if (sh === 'b' && oCenterDy < -OVERSHOOT_PX) isSourceAwayFromTarget = true;
+                if (sh === 't' && oCenterDy > OVERSHOOT_PX) isSourceAwayFromTarget = true;
+
+                if (isSameSideOvershoot || isSourceAwayFromTarget) {
+                    // Drop explicit handles — let globalPorts and geometry decide
+                    explicitSourceHandle = undefined;
+                    explicitTargetHandle = undefined;
+                }
+            }
 
             const mergedPorts = { ...globalPorts };
             if (explicitSourceHandle) {
