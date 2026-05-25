@@ -523,7 +523,7 @@ export class EdgeRoutingCoordinator {
         // This is critical because if parallel routing fails or is disabled,
         // we still need the trunk geometry for proper bus routing.
         this.assignBusIndices(jobs, graph);
-        this.assignSameSidePortSeparation(jobs); // [FIX] In/Out port zone separation
+        this.assignSameSidePortSeparation(jobs, graph); // [FIX] In/Out port zone separation
         this.assignGlobalChannels(jobs);
 
         const results: PathFindingResult[] = [];
@@ -828,7 +828,27 @@ export class EdgeRoutingCoordinator {
             this.assignBusIndices(jobs, group.graph);
 
             // [FIX] In/Out port zone separation (same node, same side)
-            this.assignSameSidePortSeparation(jobs);
+            this.assignSameSidePortSeparation(jobs, group.graph);
+
+            // [FIX] Sync separation/bus indices back to latestRequests.request.job
+            // buildJob does a shallow copy, so mutations to the job object do NOT
+            // propagate back to request.job. Without this sync, the cache key
+            // (which includes outgoingIndex, incomingCount etc.) is stale and the
+            // old cached path is returned, bypassing the new port separation layout.
+            for (const job of jobs) {
+                const entry = this.latestRequests.get(job.edgeId);
+                if (entry) {
+                    const rj = entry.request.job as Partial<PathFindingJob>;
+                    rj.outgoingIndex = job.outgoingIndex;
+                    rj.outgoingCount = job.outgoingCount;
+                    rj.incomingIndex = job.incomingIndex;
+                    rj.incomingCount = job.incomingCount;
+                    rj.isOneToMany   = job.isOneToMany;
+                    rj.isManyToOne   = job.isManyToOne;
+                    rj.busTrunkSource = job.busTrunkSource;
+                    rj.busTrunkTarget = job.busTrunkTarget;
+                }
+            }
 
             // [FIX] Assign Global Channels for Crossing Reduction
             this.assignGlobalChannels(jobs);
@@ -2486,112 +2506,185 @@ export class EdgeRoutingCoordinator {
      *   - 鍙湁鍚屼晶鍚屾椂瀛樺湪鍑烘Ы鍜屽叆妲芥椂鎵嶅垎绂伙紱鍗曠被鍒欒烦杩囷紙淇濇寔灞呬腑锛?
      *   - 鎸夊绔川蹇冩帓搴忓喅瀹氬嚭缁?鍏ョ粍鍝釜鍦ㄥ墠锛岄伩鍏嶈瑙変氦鍙?
      */
-    private assignSameSidePortSeparation(jobs: PathFindingJob[]): void {
+    private assignSameSidePortSeparation(jobs: PathFindingJob[], graph: SharedGraphContext): void {
         const eligibleJobs = jobs.filter(j => j.sourceRect && j.targetRect);
         if (eligibleJobs.length === 0) return;
 
-        // Step 1: Collect outgoing and incoming jobs per (nodeId, side).
-        // Bus trunk edges are included so we can detect in/out conflicts on hub sides.
-        // key = `${nodeId}::${side}`, value = { outJobs, inJobs }
-        const buckets = new Map<string, { outJobs: PathFindingJob[]; inJobs: PathFindingJob[] }>();
-        const getBucket = (nodeId: string, side: string) => {
-            const k = `${nodeId}::${side}`;
-            if (!buckets.has(k)) buckets.set(k, { outJobs: [], inJobs: [] });
-            return buckets.get(k)!;
+        // Build a rect lookup from the graph so we can reconstruct rects for cached edges.
+        // We need this because latestRequests does not persist sourceRect/targetRect.
+        const allNodes = (graph.nodes || []) as Array<{
+            id: string;
+            position?: { x: number; y: number };
+            measured?: { width?: number; height?: number };
+            width?: number; height?: number;
+            parentId?: string; parentNode?: string;
+            positionAbsolute?: { x: number; y: number };
+            computed?: { positionAbsolute?: { x: number; y: number } };
+        }>;
+        const nodeMap = new Map(allNodes.map(n => [n.id, n]));
+
+        const getAbsPos = (n: typeof allNodes[number]): { x: number; y: number } => {
+            const pId = n.parentId || (n as any).parentNode;
+            if (pId) {
+                const parent = nodeMap.get(pId);
+                if (parent) {
+                    const pp = getAbsPos(parent);
+                    return { x: pp.x + (n.position?.x || 0), y: pp.y + (n.position?.y || 0) };
+                }
+            }
+            return n.positionAbsolute
+                || n.computed?.positionAbsolute
+                || n.position
+                || { x: 0, y: 0 };
         };
-        for (const job of eligibleJobs) {
-            const sRect = job.sourceRect!;
-            const tRect = job.targetRect!;
-            // Register to source node outgoing side (includes bus outgoing edges)
-            const outSide = EdgeRoutingCoordinator.inferPortSide(sRect, tRect, 'source');
-            getBucket(job.source, outSide).outJobs.push(job);
-            // Register to target node incoming side (includes bus incoming edges)
-            const inSide = EdgeRoutingCoordinator.inferPortSide(sRect, tRect, 'target');
-            getBucket(job.target, inSide).inJobs.push(job);
+
+        const getNodeRect = (id: string): Rectangle | undefined => {
+            const n = nodeMap.get(id);
+            if (!n) return undefined;
+            const w = n.width || n.measured?.width || 150;
+            const h = n.height || n.measured?.height || 80;
+            const pos = getAbsPos(n);
+            return { x: pos.x, y: pos.y, width: w, height: h };
+        };
+
+        // Step 1: Build buckets from ALL known edges (current batch + latestRequests cache).
+        // Routing is batched: when only one edge re-routes, sibling edges on the same node
+        // side are already cached. We need global view to detect same-side in/out conflicts.
+        //
+        // We use latestRequests for cached edges (source/target/isOneToMany/isManyToOne are
+        // stored there), and reconstruct rects from the graph nodes.
+        // Index re-assignment (Step 2) only touches jobs in the CURRENT batch.
+        const currentJobIds = new Set(eligibleJobs.map(j => j.edgeId));
+
+        // Lightweight edge descriptor used for bucket building
+        interface EdgeDesc {
+            edgeId: string;
+            source: string; target: string;
+            isOneToMany: boolean; isManyToOne: boolean;
+            sourceRect: Rectangle; targetRect: Rectangle;
+        }
+        const allEdges: EdgeDesc[] = [];
+
+        // Current batch (already have rects)
+        for (const j of eligibleJobs) {
+            allEdges.push({
+                edgeId: j.edgeId, source: j.source, target: j.target,
+                isOneToMany: !!j.isOneToMany, isManyToOne: !!j.isManyToOne,
+                sourceRect: j.sourceRect!, targetRect: j.targetRect!,
+            });
+        }
+        // Cached edges from latestRequests (reconstruct rects from graph)
+        for (const [edgeId, val] of this.latestRequests) {
+            if (currentJobIds.has(edgeId)) continue;
+            const cj = (val as any)?.request?.job;
+            if (!cj) continue;
+            const srcRect = getNodeRect(cj.source);
+            const tgtRect = getNodeRect(cj.target);
+            if (!srcRect || !tgtRect) continue;
+            allEdges.push({
+                edgeId, source: cj.source, target: cj.target,
+                isOneToMany: !!cj.isOneToMany, isManyToOne: !!cj.isManyToOne,
+                sourceRect: srcRect, targetRect: tgtRect,
+            });
         }
 
-        // Step 2: For each (nodeId, side) that has BOTH outgoing and incoming edges, separate ports.
-        // If a side only has one type (all-out or all-in), skip it - no separation needed.
-        for (const [key, { outJobs, inJobs }] of buckets) {
-            if (outJobs.length === 0 || inJobs.length === 0) continue;
+        // key = `${nodeId}::${side}`, value = { outEdges, inEdges }
+        const buckets = new Map<string, { outEdges: EdgeDesc[]; inEdges: EdgeDesc[] }>();
+        const getBucket = (nodeId: string, side: string) => {
+            const k = `${nodeId}::${side}`;
+            if (!buckets.has(k)) buckets.set(k, { outEdges: [], inEdges: [] });
+            return buckets.get(k)!;
+        };
+        for (const e of allEdges) {
+            const outSide = EdgeRoutingCoordinator.inferPortSide(e.sourceRect, e.targetRect, 'source');
+            getBucket(e.source, outSide).outEdges.push(e);
+            const inSide = EdgeRoutingCoordinator.inferPortSide(e.sourceRect, e.targetRect, 'target');
+            getBucket(e.target, inSide).inEdges.push(e);
+        }
+
+        // Step 2: For each (nodeId, side) with BOTH outgoing and incoming edges, separate ports.
+        // If a side only has one type (all-out or all-in), skip - no separation needed.
+        for (const [key, { outEdges, inEdges }] of buckets) {
+            if (outEdges.length === 0 || inEdges.length === 0) continue;
 
             const colonIdx = key.indexOf('::');
             const nodeId = key.slice(0, colonIdx);
             const side   = key.slice(colonIdx + 2);
 
-            // Count slots:
-            // - bus trunk out group (isOneToMany) = 1 slot (shared trunk port, preserved)
-            // - non-bus solo out edges = 1 slot each
-            // - bus trunk in group (isManyToOne) = 1 slot (shared trunk port, preserved)
-            // - non-bus solo in edges = 1 slot each
-            const outBusJobs  = outJobs.filter(j => j.isOneToMany);
-            const outSoloJobs = outJobs.filter(j => !j.isOneToMany);
-            const outSlotCount = (outBusJobs.length > 0 ? 1 : 0) + outSoloJobs.length;
+            // Slot counting: bus trunk group = 1 slot (shared port preserved), solo = 1 slot each
+            const outBusEdges  = outEdges.filter(e => e.isOneToMany);
+            const outSoloEdges = outEdges.filter(e => !e.isOneToMany);
+            const outSlotCount = (outBusEdges.length > 0 ? 1 : 0) + outSoloEdges.length;
 
-            const inBusJobs  = inJobs.filter(j => j.isManyToOne);
-            const inSoloJobs = inJobs.filter(j => !j.isManyToOne);
-            const inSlotCount = (inBusJobs.length > 0 ? 1 : 0) + inSoloJobs.length;
+            const inBusEdges  = inEdges.filter(e => e.isManyToOne);
+            const inSoloEdges = inEdges.filter(e => !e.isManyToOne);
+            const inSlotCount = (inBusEdges.length > 0 ? 1 : 0) + inSoloEdges.length;
 
             const totalSlots = outSlotCount + inSlotCount;
 
-            // Decide which group goes to the "front" (smaller coord) based on peer centroids.
-            // left/right: front = smaller Y; top/bottom: front = smaller X
-            const oppCoord = (job: PathFindingJob, asSource: boolean): number => {
-                const r = asSource ? job.targetRect! : job.sourceRect!;
+            // Order groups by peer centroid along the side axis
+            const oppCoordE = (e: EdgeDesc, asSource: boolean): number => {
+                const r = asSource ? e.targetRect : e.sourceRect;
                 return (side === 'top' || side === 'bottom')
                     ? r.x + r.width  / 2
                     : r.y + r.height / 2;
             };
-            const outCentroid = outJobs.reduce((s, j) => s + oppCoord(j, true),  0) / outJobs.length;
-            const inCentroid  = inJobs.reduce( (s, j) => s + oppCoord(j, false), 0) / inJobs.length;
-            // outFirst=true => out-group occupies lower indices (front of side)
+            const outCentroid = outEdges.reduce((s, e) => s + oppCoordE(e, true),  0) / outEdges.length;
+            const inCentroid  = inEdges.reduce( (s, e) => s + oppCoordE(e, false), 0) / inEdges.length;
             const outFirst = outCentroid <= inCentroid;
             const outBase  = outFirst ? 0 : inSlotCount;
             const inBase   = outFirst ? outSlotCount : 0;
 
-            // Assign bus out group: all edges share the same slot (trunk shared port is preserved)
-            if (outBusJobs.length > 0) {
-                outBusJobs.forEach(j => {
-                    const existing = j.outgoingCount || 1;
-                    if (existing <= 1) {
-                        // Was centered (count=1): map to separated slot
-                        j.outgoingCount = totalSlots;
-                        j.outgoingIndex = outBase;
-                    } else {
-                        // hubPortConflict already set count=2 (O2M/M2O each got 1 slot).
-                        // Overlay the in/out separation on top: shift existing index by outBase.
-                        j.outgoingCount = totalSlots;
-                        j.outgoingIndex = outBase + (j.outgoingIndex || 0);
-                    }
-                });
+            // Now apply to CURRENT batch jobs only
+            // Helper: find the PathFindingJob for a given edgeId
+            const jobFor = (edgeId: string): PathFindingJob | undefined =>
+                eligibleJobs.find(j => j.edgeId === edgeId);
+
+            // Assign out-bus edges (they all share one slot - trunk preserved)
+            const outBusCurrent = outBusEdges.filter(e => currentJobIds.has(e.edgeId));
+            for (const e of outBusCurrent) {
+                const j = jobFor(e.edgeId)!;
+                const existing = j.outgoingCount || 1;
+                if (existing <= 1) {
+                    j.outgoingCount = totalSlots;
+                    j.outgoingIndex = outBase;
+                } else {
+                    // hubPortConflict set count=2; overlay separation offset
+                    j.outgoingCount = totalSlots;
+                    j.outgoingIndex = outBase + (j.outgoingIndex || 0);
+                }
             }
-            // Assign non-bus solo out edges: each gets its own slot
-            outSoloJobs.sort((a, b) =>
-                oppCoord(a, true) - oppCoord(b, true) || a.edgeId.localeCompare(b.edgeId));
-            outSoloJobs.forEach((j, i) => {
+            // Assign out-solo edges (stable sort by peer coord)
+            const outSoloCurrent = outSoloEdges.filter(e => currentJobIds.has(e.edgeId));
+            outSoloCurrent.sort((a, b) =>
+                oppCoordE(a, true) - oppCoordE(b, true) || a.edgeId.localeCompare(b.edgeId));
+            outSoloCurrent.forEach((e, i) => {
+                const j = jobFor(e.edgeId)!;
                 j.outgoingCount = totalSlots;
-                j.outgoingIndex = outBase + (outBusJobs.length > 0 ? 1 : 0) + i;
+                j.outgoingIndex = outBase + (outBusEdges.length > 0 ? 1 : 0) + i;
             });
 
-            // Assign bus in group: all edges share the same slot
-            if (inBusJobs.length > 0) {
-                inBusJobs.forEach(j => {
-                    const existing = j.incomingCount || 1;
-                    if (existing <= 1) {
-                        j.incomingCount = totalSlots;
-                        j.incomingIndex = inBase;
-                    } else {
-                        j.incomingCount = totalSlots;
-                        j.incomingIndex = inBase + (j.incomingIndex || 0);
-                    }
-                });
+            // Assign in-bus edges
+            const inBusCurrent = inBusEdges.filter(e => currentJobIds.has(e.edgeId));
+            for (const e of inBusCurrent) {
+                const j = jobFor(e.edgeId)!;
+                const existing = j.incomingCount || 1;
+                if (existing <= 1) {
+                    j.incomingCount = totalSlots;
+                    j.incomingIndex = inBase;
+                } else {
+                    j.incomingCount = totalSlots;
+                    j.incomingIndex = inBase + (j.incomingIndex || 0);
+                }
             }
-            // Assign non-bus solo in edges: each gets its own slot
-            inSoloJobs.sort((a, b) =>
-                oppCoord(a, false) - oppCoord(b, false) || a.edgeId.localeCompare(b.edgeId));
-            inSoloJobs.forEach((j, i) => {
+            // Assign in-solo edges
+            const inSoloCurrent = inSoloEdges.filter(e => currentJobIds.has(e.edgeId));
+            inSoloCurrent.sort((a, b) =>
+                oppCoordE(a, false) - oppCoordE(b, false) || a.edgeId.localeCompare(b.edgeId));
+            inSoloCurrent.forEach((e, i) => {
+                const j = jobFor(e.edgeId)!;
                 j.incomingCount = totalSlots;
-                j.incomingIndex = inBase + (inBusJobs.length > 0 ? 1 : 0) + i;
+                j.incomingIndex = inBase + (inBusEdges.length > 0 ? 1 : 0) + i;
             });
         }
 
