@@ -52,8 +52,8 @@ export interface PortUsageStats {
 }
 
 // [Phase 1] Trunk Routing Configuration Constants
-const TRUNK_CONFIG = {
-    /** Unified deadzone threshold for side classification (±30px) */
+            const TRUNK_CONFIG = {
+    /** Unified deadzone threshold for side classification (卤30px) */
     DEADZONE_THRESHOLD: 30,
     /** Minimum edges to form a bus trunk */
     MIN_BUS_SIZE: 2,
@@ -104,7 +104,7 @@ function classifyEdgeSide(delta: number, dirSign: number, edgeType?: string): nu
     }
 
     // Apply unified deadzone threshold
-    const isForward = (delta * dirSign) > -TRUNK_CONFIG.DEADZONE_THRESHOLD;
+            const isForward = (delta * dirSign) > -TRUNK_CONFIG.DEADZONE_THRESHOLD;
     return isForward ? 1 : -1;
 }
 
@@ -132,7 +132,7 @@ export class EdgeRoutingCoordinator {
     private routedLabelObstacles: Map<string, Rectangle & { edgeId: string; ownerId: string }> = new Map();
 
     private graphVersion: number = 0;
-    // [P0-2] graphVersion 订阅者集合，用于 useSyncExternalStore 响应式订阅
+    // [P0-2] graphVersion 璁㈤槄鑰呴泦鍚堬紝鐢ㄤ簬 useSyncExternalStore 鍝嶅簲寮忚闃?
     private graphVersionSubscribers: Set<() => void> = new Set();
 
     // [P2-3] Port Usage for Congestion Awareness
@@ -166,14 +166,14 @@ export class EdgeRoutingCoordinator {
 
     private isDragging: boolean = false;
 
-    // [COLD-START] 冷启动保护：freeze 期间所有 scheduleBatchRouting 调用被挂起
-    // 直到 unfreeze() 被调用，再一次性批量触发，避免节点测量不稳定时 A* 大量无效迭代
+    // [COLD-START] 鍐峰惎鍔ㄤ繚鎶わ細freeze 鏈熼棿鎵€鏈?scheduleBatchRouting 璋冪敤琚寕璧?
+    // 鐩村埌 unfreeze() 琚皟鐢紝鍐嶄竴娆℃€ф壒閲忚Е鍙戯紝閬垮厤鑺傜偣娴嬮噺涓嶇ǔ瀹氭椂 A* 澶ч噺鏃犳晥杩唬
     private isFrozen: boolean = false;
     private frozenDuringColdStart: boolean = false;
 
     /**
-     * [COLD-START] 冻结路由调度。
-     * 在从缓存加载数据时调用，防止节点尺寸未稳定前触发大量 A* 计算。
+     * [COLD-START] 鍐荤粨璺敱璋冨害銆?
+     * 鍦ㄤ粠缂撳瓨鍔犺浇鏁版嵁鏃惰皟鐢紝闃叉鑺傜偣灏哄鏈ǔ瀹氬墠瑙﹀彂澶ч噺 A* 璁＄畻銆?
      */
     public freeze(): void {
         this.isFrozen = true;
@@ -185,21 +185,21 @@ export class EdgeRoutingCoordinator {
     }
 
     /**
-     * [COLD-START] 解冻路由调度，并立即触发一次批量计算。
-     * 在节点测量稳定后（RF measured.width > 0）调用。
+     * [COLD-START] 瑙ｅ喕璺敱璋冨害锛屽苟绔嬪嵆瑙﹀彂涓€娆℃壒閲忚绠椼€?
+     * 鍦ㄨ妭鐐规祴閲忕ǔ瀹氬悗锛圧F measured.width > 0锛夎皟鐢ㄣ€?
      */
     public unfreeze(): void {
         if (!this.isFrozen) return;
         this.isFrozen = false;
         this.frozenDuringColdStart = false;
-        // 立即触发一次批量路由（所有积压的请求都在 latestRequests 里）
+        // 绔嬪嵆瑙﹀彂涓€娆℃壒閲忚矾鐢憋紙鎵€鏈夌Н鍘嬬殑璇锋眰閮藉湪 latestRequests 閲岋級
         if (this.latestRequests.size > 0) {
             this.markAllDirty();
             this.scheduleBatchRouting();
         }
     }
 
-    /** [COLD-START] 将所有已知边标记为脏 */
+    /** [COLD-START] 灏嗘墍鏈夊凡鐭ヨ竟鏍囪涓鸿剰 */
     private markAllDirty(): void {
         this.latestRequests.forEach((_, edgeId) => this.dirtyEdges.add(edgeId));
         this.allEdges.forEach(e => this.dirtyEdges.add(e.id));
@@ -222,12 +222,12 @@ export class EdgeRoutingCoordinator {
      * Call this after manually marking edges as dirty.
      */
     public scheduleBatchRouting(): void {
-        // [COLD-START] 冻结期间挂起所有调度，等 unfreeze() 统一触发
+        // [COLD-START] 鍐荤粨鏈熼棿鎸傝捣鎵€鏈夎皟搴︼紝绛?unfreeze() 缁熶竴瑙﹀彂
         if (this.isFrozen) return;
 
-        // [FIX C-1] 标准防抖：每次调用先清除旧计时器再重新设置。
-        // [H-10] 拖拽中提升去抖到 60ms，减少 ~75% 的路由触发次数，
-        //        释放 Worker pool 给交互响应使用。拖拽结束后恢复 16ms。
+        // [FIX C-1] 鏍囧噯闃叉姈锛氭瘡娆¤皟鐢ㄥ厛娓呴櫎鏃ц鏃跺櫒鍐嶉噸鏂拌缃€?
+        // [H-10] 鎷栨嫿涓彁鍗囧幓鎶栧埌 60ms锛屽噺灏?~75% 鐨勮矾鐢辫Е鍙戞鏁帮紝
+        //        閲婃斁 Worker pool 缁欎氦浜掑搷搴斾娇鐢ㄣ€傛嫋鎷界粨鏉熷悗鎭㈠ 16ms銆?
         if (this.pendingTimeout) {
             clearTimeout(this.pendingTimeout);
         }
@@ -290,17 +290,17 @@ export class EdgeRoutingCoordinator {
     }
 
     /**
-     * [P0-2] 订阅 graphVersion 变化。
-     * 返回取消订阅函数，配合 useSyncExternalStore 使用。
-     * 这样 useSmartPathWorker 可以响应式地追踪版本变化，
-     * 而不需要把 getGraphVersion() 函数调用放进 deps array。
+     * [P0-2] 璁㈤槄 graphVersion 鍙樺寲銆?
+     * 杩斿洖鍙栨秷璁㈤槄鍑芥暟锛岄厤鍚?useSyncExternalStore 浣跨敤銆?
+     * 杩欐牱 useSmartPathWorker 鍙互鍝嶅簲寮忓湴杩借釜鐗堟湰鍙樺寲锛?
+     * 鑰屼笉闇€瑕佹妸 getGraphVersion() 鍑芥暟璋冪敤鏀捐繘 deps array銆?
      */
     public subscribeGraphVersion(callback: () => void): () => void {
         this.graphVersionSubscribers.add(callback);
         return () => this.graphVersionSubscribers.delete(callback);
     }
 
-    /** [P0-2] 通知所有 graphVersion 订阅者 */
+    /** [P0-2] 閫氱煡鎵€鏈?graphVersion 璁㈤槄鑰?*/
     private notifyGraphVersionSubscribers(): void {
         this.graphVersionSubscribers.forEach(cb => cb());
     }
@@ -471,14 +471,14 @@ export class EdgeRoutingCoordinator {
         const isBus = !!job.isOneToMany || !!job.isManyToOne;
 
         // 1. Generate Cache Key
-        const cacheParams = {
+            const cacheParams = {
             ...this.extractCacheableParams(job, graph),
             version: this.graphVersion
         };
         const key = this.cache.generateKey(edgeId, cacheParams);
 
         // 2. Check Cache
-        const cached = isBus ? null : this.cache.get(key);
+            const cached = isBus ? null : this.cache.get(key);
         if (cached) {
             this.monitor.track({
                 edgeId: edgeId,
@@ -497,7 +497,7 @@ export class EdgeRoutingCoordinator {
                 // called multiple times for the same edge, the old resolver would be
                 // overwritten, orphaning the old Promise (it would never resolve).
                 // By chaining, ALL Promises for this edge resolve together.
-                const previousResolve = existing.resolve;
+            const previousResolve = existing.resolve;
                 existing.resolve = (result: PathFindingResult | PromiseLike<PathFindingResult>) => {
                     previousResolve(result);
                     resolve(result);
@@ -535,7 +535,7 @@ export class EdgeRoutingCoordinator {
             } catch (err) {
                 console.error(`[Coordinator] Serial routing failed for ${job.edgeId}:`, err);
                 // [FIX] Return fallback path instead of empty string to ensure visibility
-                const fallbackPath = `M ${job.sourceX} ${job.sourceY} L ${job.targetX} ${job.targetY}`;
+            const fallbackPath = `M ${job.sourceX} ${job.sourceY} L ${job.targetX} ${job.targetY}`;
                 results.push({
                     jobId: job.jobId,
                     edgeId: job.edgeId,
@@ -630,7 +630,7 @@ export class EdgeRoutingCoordinator {
         this.allEdges = edges;
         this.edgeDependencies.clear();
 
-        // Build dependency map: edge → nodes it depends on
+        // Build dependency map: edge 鈫?nodes it depends on
         edges.forEach(edge => {
             const deps = new Set<string>();
             deps.add(edge.source);
@@ -869,9 +869,9 @@ export class EdgeRoutingCoordinator {
                 const latestSeq = this.latestRequests.get(req.edgeId)?.seq;
                 // [FIX] Do NOT skip processing when seq mismatches.
                 // The old code returned early here, but this left the pendingResolver
-                // permanently unresolved — the component's Promise.then() never fires.
+                // permanently unresolved 鈥?the component's Promise.then() never fires.
                 // The result is still fresh (just computed by the Worker), so use it.
-                const isSuperseded = typeof expectedSeq === 'number' && typeof latestSeq === 'number' && expectedSeq !== latestSeq;
+            const isSuperseded = typeof expectedSeq === 'number' && typeof latestSeq === 'number' && expectedSeq !== latestSeq;
 
                 const result = results[index];
 
@@ -907,13 +907,13 @@ export class EdgeRoutingCoordinator {
                     this.cache.set(key, result);
                 }
 
-                // [FIX] Track Performance — 含策略名称 + 路径质量指标
+                // [FIX] Track Performance 鈥?鍚瓥鐣ュ悕绉?+ 璺緞璐ㄩ噺鎸囨爣
                 this.monitor.track({
                     edgeId: req.edgeId,
                     routingTime: performance.now() - startTime,
                     cacheHit: false,
                     workerTime: result.metadata?.executionTime,
-                    strategy: result.metadata?.strategy,       // 传递策略名，供分布图使用
+                    strategy: result.metadata?.strategy,       // 浼犻€掔瓥鐣ュ悕锛屼緵鍒嗗竷鍥句娇鐢?
                     bendCount: (result.metadata as any)?.bendCount,
                     efficiencyRatio: (result.metadata as any)?.efficiencyRatio,
                 });
@@ -926,15 +926,15 @@ export class EdgeRoutingCoordinator {
                     console.dir(result, { depth: null });
                     if (this.onDebugData) {
                         const trunkData = this.trunkDebugData.get(req.edgeId);
-                        // [Trunk Vis] 注入 trunkAxis/trunkVertical/peerGroupMembers
-                        // 让 VisualizerTab 可以在 Canvas 上绘制主干轴虚线和 Peer Group 包围框
-                        const trunkVisualization = trunkData?.trunk ? {
+                        // [Trunk Vis] 娉ㄥ叆 trunkAxis/trunkVertical/peerGroupMembers
+                        // 璁?VisualizerTab 鍙互鍦?Canvas 涓婄粯鍒朵富骞茶酱铏氱嚎鍜?Peer Group 鍖呭洿妗?
+            const trunkVisualization = trunkData?.trunk ? {
                             trunkAxis: trunkData.trunk.axis,
                             trunkVertical: trunkData.trunk.direction === 'vertical',
                             trunkRange: trunkData.trunk.range,
                         } : {};
-                        // 从 jobs 中尝试提取 peerGroup 信息
-                        const jobAny = jobs[index] as any;
+                        // 浠?jobs 涓皾璇曟彁鍙?peerGroup 淇℃伅
+            const jobAny = jobs[index] as any;
                         const peerGroupInfo = jobAny?.peerGroupMembers ? {
                             peerGroupMembers: jobAny.peerGroupMembers,
                             peerGroupSize: jobAny.peerGroupSize ?? jobAny.peerGroupMembers?.length,
@@ -954,7 +954,7 @@ export class EdgeRoutingCoordinator {
                                 typeInfluenced: trunkData.typeInfluenced,
                                 trunk: trunkData.trunk
                             } : null,
-                            // [Trunk Vis] 将 trunk/peer 数据注入 portSelection，让 VisualizerTab 可读取
+                            // [Trunk Vis] 灏?trunk/peer 鏁版嵁娉ㄥ叆 portSelection锛岃 VisualizerTab 鍙鍙?
                             algorithmDebug: {
                                 ...((result.debugInfo as any)?.algorithmDebug ?? {}),
                                 portSelection: {
@@ -979,7 +979,7 @@ export class EdgeRoutingCoordinator {
                 // registered during async computation, the geometric result is still
                 // valid (coordinates haven't changed, only the seq counter advanced
                 // due to React re-renders).
-                const pending = this.pendingResolvers.get(req.edgeId);
+            const pending = this.pendingResolvers.get(req.edgeId);
                 if (pending) {
                     pending.resolve(result);
                     this.pendingResolvers.delete(req.edgeId);
@@ -1312,10 +1312,10 @@ export class EdgeRoutingCoordinator {
      * Called by UI loop or scheduler.
      */
     public async routeIncremental(context: SharedGraphContext): Promise<Map<string, PathFindingResult>> {
-        // [FIX C-9] 使用真实的节点变化检测（取代原来的空函数）
-        const changedNodeIds = this.identifyChangedNodes(context.nodes as any[], this.allEdges);
+        // [FIX C-9] 浣跨敤鐪熷疄鐨勮妭鐐瑰彉鍖栨娴嬶紙鍙栦唬鍘熸潵鐨勭┖鍑芥暟锛?
+            const changedNodeIds = this.identifyChangedNodes(context.nodes as any[], this.allEdges);
         if (changedNodeIds.length > 0) {
-            // 将检测到的移动节点标记为 dirty，使外部无需手动调用 markNodesChanged
+            // 灏嗘娴嬪埌鐨勭Щ鍔ㄨ妭鐐规爣璁颁负 dirty锛屼娇澶栭儴鏃犻渶鎵嬪姩璋冪敤 markNodesChanged
             this.markNodesChanged(changedNodeIds);
         }
 
@@ -1323,17 +1323,17 @@ export class EdgeRoutingCoordinator {
     }
 
 
-    // [FIX C-9] 节点位置快照，用于增量检测
+    // [FIX C-9] 鑺傜偣浣嶇疆蹇収锛岀敤浜庡閲忔娴?
     private _nodePositionSnapshot = new Map<string, { x: number; y: number }>();
 
     /**
-     * [FIX C-9] 基于位置快照检测显著移动的节点。
-     * 与上次路由时的坐标对比，超过阈值（2px）则标记为"已变化"。
-     * 同时更新快照以备下次对比。
+     * [FIX C-9] 鍩轰簬浣嶇疆蹇収妫€娴嬫樉钁楃Щ鍔ㄧ殑鑺傜偣銆?
+     * 涓庝笂娆¤矾鐢辨椂鐨勫潗鏍囧姣旓紝瓒呰繃闃堝€硷紙2px锛夊垯鏍囪涓?宸插彉鍖?銆?
+     * 鍚屾椂鏇存柊蹇収浠ュ涓嬫瀵规瘮銆?
      */
     private identifyChangedNodes(allNodes: any[], _allEdges: Edge[]): string[] {
-        const MOVE_THRESHOLD = 2; // px，小于此值认为是数值噪声
-        const changedIds: string[] = [];
+        const MOVE_THRESHOLD = 2; // px锛屽皬浜庢鍊艰涓烘槸鏁板€煎櫔澹?
+            const changedIds: string[] = [];
 
         for (const node of allNodes) {
             const id: string = node.id;
@@ -1349,7 +1349,7 @@ export class EdgeRoutingCoordinator {
             }
         }
 
-        // 清理已删除的节点快照（防内存泄漏）
+        // 娓呯悊宸插垹闄ょ殑鑺傜偣蹇収锛堥槻鍐呭瓨娉勬紡锛?
         if (this._nodePositionSnapshot.size > allNodes.length + 50) {
             const aliveIds = new Set(allNodes.map((n: any) => n.id));
             for (const id of this._nodePositionSnapshot.keys()) {
@@ -1461,7 +1461,7 @@ export class EdgeRoutingCoordinator {
         // coordinate requests may arrive carrying temporally staggered snapshot graph instances. 
         // We MUST manually ensure that every single job designated for processing in this exact 
         // batch is physically represented within the relational matrix, otherwise siblings will be splintered.
-        const rawGraphEdges = (graph.edges || []) as Array<{ id: string; source: string; target: string; sourceHandle?: string; targetHandle?: string }>;
+            const rawGraphEdges = (graph.edges || []) as Array<{ id: string; source: string; target: string; sourceHandle?: string; targetHandle?: string }>;
         const consolidatedEdgesMap = new Map<string, typeof rawGraphEdges[number]>();
         
         rawGraphEdges.forEach(e => consolidatedEdgesMap.set(e.id, e));
@@ -1481,14 +1481,14 @@ export class EdgeRoutingCoordinator {
         const defaultConfig = createDefaultRoutingConfig();
 
         // [FIX] Create Node Map for O(1) lookup and Parent Traversal
-        const nodeMap = new Map<string, typeof allNodes[number]>();
+            const nodeMap = new Map<string, typeof allNodes[number]>();
         allNodes.forEach(n => {
             nodeMap.set(n.id, n);
             this.nodeParentMap.set(n.id, n.parentId || (n as any).parentNode);
         });
 
         // [FIX] Helper to get Absolute Position with Parent Traversal
-        const getAbsolutePosition = (node: any): { x: number, y: number } => {
+            const getAbsolutePosition = (node: any): { x: number, y: number } => {
             // Priority 1: Manual Parent Traversal (most reliable for nested nodes)
             // During initial layout, computed.positionAbsolute may be stale or not yet updated
             // with parent offsets, so we always traverse manually for child nodes.
@@ -1511,7 +1511,7 @@ export class EdgeRoutingCoordinator {
         };
 
         // Helper: Get Node Rect
-        const getNodeRect = (id: string): Rectangle | undefined => {
+            const getNodeRect = (id: string): Rectangle | undefined => {
             const n = nodeMap.get(id);
             if (!n) return undefined;
             const w = n.width || n.measured?.width || 150;
@@ -1533,7 +1533,7 @@ export class EdgeRoutingCoordinator {
 
         // [FIX] Build obstacle list for trunk axis collision avoidance
         // Without this, TrunkCalculator places axes blindly through node bodies.
-        const CONTAINER_TYPES = new Set(['group', 'subGroup', 'titleGroup', 'domain', 'subDomain', 'swimlane', 'annotation', 'background', 'sticky', 'comment']);
+            const CONTAINER_TYPES = new Set(['group', 'subGroup', 'titleGroup', 'domain', 'subDomain', 'swimlane', 'annotation', 'background', 'sticky', 'comment']);
         const trunkObstacles: Rectangle[] = [];
         allNodes.forEach(n => {
             const type = (n as any).type || '';
@@ -1545,7 +1545,7 @@ export class EdgeRoutingCoordinator {
         });
 
         // 1. One-to-Many Processing (Source Groups)
-        const sourceGroups = new Map<string, PathFindingJob[]>();
+            const sourceGroups = new Map<string, PathFindingJob[]>();
         jobs.forEach(job => {
             // [FIX] Context flag `job.isOneToMany` might be stale due to React cache optimizations.
             // We use global `allEdges` to establish the Ground Truth.
@@ -1556,10 +1556,10 @@ export class EdgeRoutingCoordinator {
             sourceGroups.get(job.source)?.push(job);
         });
 
-        // [FIX-port-conflict] 收集每个 hub 在 O2M 阶段已使用的端口组，
-        // 供 M2O 阶段做同侧端口排序。行业里通常把整条 bus/trunk 当成
-        // 一个端口占用对象，而不是按单条边逐个排序。
-        const hubOutPortGroups = new Map<string, Map<string, HubPortGroupInfo>>();
+        // [FIX-port-conflict] 鏀堕泦姣忎釜 hub 鍦?O2M 闃舵宸蹭娇鐢ㄧ殑绔彛缁勶紝
+        // 渚?M2O 闃舵鍋氬悓渚х鍙ｆ帓搴忋€傝涓氶噷閫氬父鎶婃暣鏉?bus/trunk 褰撴垚
+        // 涓€涓鍙ｅ崰鐢ㄥ璞★紝鑰屼笉鏄寜鍗曟潯杈归€愪釜鎺掑簭銆?
+            const hubOutPortGroups = new Map<string, Map<string, HubPortGroupInfo>>();
 
         sourceGroups.forEach((groupJobs, sourceId) => {
             const busJobs = groupJobs.filter(j => j.isOneToMany);
@@ -1577,8 +1577,8 @@ export class EdgeRoutingCoordinator {
                     trunkObstacles
                 );
 
-                // 收集 O2M 已占用的端口组及其切线方向质心。
-                const usedPorts = new Map<string, HubPortGroupInfo>();
+                // 鏀堕泦 O2M 宸插崰鐢ㄧ殑绔彛缁勫強鍏跺垏绾挎柟鍚戣川蹇冦€?
+            const usedPorts = new Map<string, HubPortGroupInfo>();
                 busJobs.forEach(j => {
                     const port = (j as any).trunkPort;
                     if (!port) return;
@@ -1599,7 +1599,7 @@ export class EdgeRoutingCoordinator {
         });
 
         // 2. Many-to-One Processing (Target Groups)
-        const targetGroups = new Map<string, PathFindingJob[]>();
+            const targetGroups = new Map<string, PathFindingJob[]>();
         jobs.forEach(job => {
             // [FIX] Establish Ground Truth for N:1 relationships
             const globalIncoming = allEdges.filter(e => e.target === job.target);
@@ -1624,13 +1624,13 @@ export class EdgeRoutingCoordinator {
                     layoutDir,
                     true, // isManyToOne = true
                     trunkObstacles,
-                    usedPorts // 传入该 hub 的 O2M 已占端口
+                    usedPorts // 浼犲叆璇?hub 鐨?O2M 宸插崰绔彛
                 );
             } else {
                 // Fallback for non-bus incoming groups.
-                // [FIX] 按「端口侧」分组，保证不同侧入边各自居中，互不干扰。
-                // 原先按节点全量计数，导致从不同侧进入的边被错误地扩散离中心。
-                const sideBuckets = new Map<string, PathFindingJob[]>();
+                // [FIX] 鎸夈€岀鍙ｄ晶銆嶅垎缁勶紝淇濊瘉涓嶅悓渚у叆杈瑰悇鑷眳涓紝浜掍笉骞叉壈銆?
+                // 鍘熷厛鎸夎妭鐐瑰叏閲忚鏁帮紝瀵艰嚧浠庝笉鍚屼晶杩涘叆鐨勮竟琚敊璇湴鎵╂暎绂讳腑蹇冦€?
+            const sideBuckets = new Map<string, PathFindingJob[]>();
                 for (const job of groupJobs) {
                     const side = (job.sourceRect && job.targetRect)
                         ? EdgeRoutingCoordinator.inferPortSide(job.sourceRect, job.targetRect, 'target')
@@ -1650,7 +1650,7 @@ export class EdgeRoutingCoordinator {
 
         // 3. Parallel Groups (Non-Bus)
         // Ensure basic indexing for parallel edges not handled by bus logic
-        const parallelGroups = new Map<string, PathFindingJob[]>();
+            const parallelGroups = new Map<string, PathFindingJob[]>();
         jobs.forEach(job => {
             if (job.isOneToMany || job.isManyToOne) return; // Already handled
             const key = `${job.source}->${job.target}`;
@@ -1662,7 +1662,7 @@ export class EdgeRoutingCoordinator {
             if (group.length <= 1) return;
             group.sort((a, b) => {
                 // @ts-expect-error
-                const diff = (a.targetPos?.y || a.targetY || 0) - (b.targetPos?.y || b.targetY || 0);
+            const diff = (a.targetPos?.y || a.targetY || 0) - (b.targetPos?.y || b.targetY || 0);
                 return diff;
             });
             // We don't explicitly assign indices here as PortSelector handles it, but good to sort.
@@ -1681,7 +1681,7 @@ export class EdgeRoutingCoordinator {
         const verticalGroups = new Map<number, PathFindingJob[]>();
         // [FIX P3] Config-driven group size: based on gridSize * 10 to adapt to different grid configs.
         // Default 150px (= 10px grid * 10). Users with larger grids get proportionally larger bands.
-        const gridSize = (jobs[0] as any)?._graphConfig?.algorithm?.gridSize ?? 15;
+            const gridSize = (jobs[0] as any)?._graphConfig?.algorithm?.gridSize ?? 15;
         const GROUP_SIZE = Math.max(100, gridSize * 10);
 
         jobs.forEach(job => {
@@ -1690,13 +1690,13 @@ export class EdgeRoutingCoordinator {
             // Determine dominant direction
             if (dx > dy) {
                 // Horizontal: Group by Y band
-                const midY = (job.sourceY + job.targetY) / 2;
+            const midY = (job.sourceY + job.targetY) / 2;
                 const key = Math.floor(midY / GROUP_SIZE);
                 if (!horizontalGroups.has(key)) horizontalGroups.set(key, []);
                 horizontalGroups.get(key)?.push(job);
             } else {
                 // Vertical: Group by X band
-                const midX = (job.sourceX + job.targetX) / 2;
+            const midX = (job.sourceX + job.targetX) / 2;
                 const key = Math.floor(midX / GROUP_SIZE);
                 if (!verticalGroups.has(key)) verticalGroups.set(key, []);
                 verticalGroups.get(key)?.push(job);
@@ -1705,10 +1705,10 @@ export class EdgeRoutingCoordinator {
 
         // Perturbation coefficient: small enough not to override the primary Y/X
         // coordinate ordering, but large enough to disambiguate edges that travel
-        // in opposite directions within the same spatial band. Edges going left→right
-        // and right→left with the same average Y would otherwise be assigned
+        // in opposite directions within the same spatial band. Edges going left鈫抮ight
+        // and right鈫抣eft with the same average Y would otherwise be assigned
         // arbitrary order, sometimes producing avoidable crossings.
-        const directionPerturbation = GROUP_SIZE * 0.08;
+            const directionPerturbation = GROUP_SIZE * 0.08;
 
         // Process Horizontal Groups
         horizontalGroups.forEach(group => {
@@ -1717,7 +1717,7 @@ export class EdgeRoutingCoordinator {
             // slight downward bias, so they naturally separate when Y-coords are close.
             group.sort((a, b) => {
                 const dirA = Math.sign(a.targetX - a.sourceX); // +1 LTR, -1 RTL, 0 vertical
-                const dirB = Math.sign(b.targetX - b.sourceX);
+            const dirB = Math.sign(b.targetX - b.sourceX);
                 const valA = a.sourceY + a.targetY + dirA * directionPerturbation;
                 const valB = b.sourceY + b.targetY + dirB * directionPerturbation;
                 if (Math.abs(valA - valB) > 1) return valA - valB;
@@ -1736,7 +1736,7 @@ export class EdgeRoutingCoordinator {
             // Sort by X geometry + small direction perturbation (top-to-bottom vs bottom-to-top).
             group.sort((a, b) => {
                 const dirA = Math.sign(a.targetY - a.sourceY); // +1 TTB, -1 BTT
-                const dirB = Math.sign(b.targetY - b.sourceY);
+            const dirB = Math.sign(b.targetY - b.sourceY);
                 const valA = a.sourceX + a.targetX + dirA * directionPerturbation;
                 const valB = b.sourceX + b.targetX + dirB * directionPerturbation;
                 if (Math.abs(valA - valB) > 1) return valA - valB;
@@ -1753,19 +1753,19 @@ export class EdgeRoutingCoordinator {
 
     /**
      * [FIX C-4] Assign Bidirectional / Parallel Channels
-     * 原来只处理 pair.length === 2 的双向对，N>2 的同向平行边全部重叠。
-     * 新逻辑：按 (source, target) 分组（无方向），对组内每条边分配独立的 channel index。
+     * 鍘熸潵鍙鐞?pair.length === 2 鐨勫弻鍚戝锛孨>2 鐨勫悓鍚戝钩琛岃竟鍏ㄩ儴閲嶅彔銆?
+     * 鏂伴€昏緫锛氭寜 (source, target) 鍒嗙粍锛堟棤鏂瑰悜锛夛紝瀵圭粍鍐呮瘡鏉¤竟鍒嗛厤鐙珛鐨?channel index銆?
      * 
-     * 分道策略：
-     *   - 2 条边：channel 0 和 1，视觉上向两侧各偏移 spacing/2
-     *   - N 条边：channel 0..N-1，均匀分配，视觉上整体居中
+     * 鍒嗛亾绛栫暐锛?
+     *   - 2 鏉¤竟锛歝hannel 0 鍜?1锛岃瑙変笂鍚戜袱渚у悇鍋忕Щ spacing/2
+     *   - N 鏉¤竟锛歝hannel 0..N-1锛屽潎鍖€鍒嗛厤锛岃瑙変笂鏁翠綋灞呬腑
      */
     private assignBidirectionalChannels(jobs: PathFindingJob[]): void {
         const defaultConfig = createDefaultRoutingConfig();
         const baseSpacing = defaultConfig.bus.bidirectionalSpacing || 25;
 
-        // 用无方向的 canonical key 分组：key(A,B) === key(B,A)
-        const pairMap = new Map<string, PathFindingJob[]>();
+        // 鐢ㄦ棤鏂瑰悜鐨?canonical key 鍒嗙粍锛歬ey(A,B) === key(B,A)
+            const pairMap = new Map<string, PathFindingJob[]>();
         jobs.forEach(job => {
             const k1 = `${job.source}\u0000${job.target}`;
             const k2 = `${job.target}\u0000${job.source}`;
@@ -1775,24 +1775,24 @@ export class EdgeRoutingCoordinator {
         });
 
         pairMap.forEach((group) => {
-            if (group.length < 2) return; // 单条边不需要分道
+            if (group.length < 2) return; // 鍗曟潯杈逛笉闇€瑕佸垎閬?
 
-            // 确定性排序：先按方向（source-target 字符串），再按 edgeId
+            // 纭畾鎬ф帓搴忥細鍏堟寜鏂瑰悜锛坰ource-target 瀛楃涓诧級锛屽啀鎸?edgeId
             group.sort((a, b) => {
-                const dirA = `${a.source}→${a.target}`;
-                const dirB = `${b.source}→${b.target}`;
+                const dirA = `${a.source}鈫?{a.target}`;
+                const dirB = `${b.source}鈫?{b.target}`;
                 const cmp = dirA.localeCompare(dirB);
                 return cmp !== 0 ? cmp : a.edgeId.localeCompare(b.edgeId);
             });
 
             const n = group.length;
-            // 硬偏移模式：baseSpacing 已是最终偏移量，按边数收窄
+            // 纭亸绉绘ā寮忥細baseSpacing 宸叉槸鏈€缁堝亸绉婚噺锛屾寜杈规暟鏀剁獎
             const spacing = baseSpacing * Math.min(1, 3 / n);
 
             group.forEach((job, index) => {
                 job.bidirectionalChannel = index;
                 job.bidirectionalSpacing = spacing;
-                // [NEW] 总通道数，供 Worker 居中计算偏移
+                // [NEW] 鎬婚€氶亾鏁帮紝渚?Worker 灞呬腑璁＄畻鍋忕Щ
                 (job as any).bidirectionalCount = n;
             });
         });
@@ -1841,17 +1841,17 @@ export class EdgeRoutingCoordinator {
         const hubCenter = { x: hubRect.x + hubRect.width / 2, y: hubRect.y + hubRect.height / 2 };
 
         // ==================== [FIX-hemisphere] Flow-Direction Hemisphere Grouping ====================
-        // 行业标准（ELK/draw.io）：先算质心确定主流方向，再沿主流方向分成 2 个 180° 半球。
-        // 这样自然合并相邻象限（如"左上"和"左下"都归入同一半球）。
-        // 对于普通前向边，强烈偏离主流的边（交叉轴 > 2× 主轴）可单独分到逃逸端口。
-        // 对于反向反馈边，保持严格 180° 半球分组，避免同一回流束被拆成 left/bottom 等单边组。
+        // 琛屼笟鏍囧噯锛圗LK/draw.io锛夛細鍏堢畻璐ㄥ績纭畾涓绘祦鏂瑰悜锛屽啀娌夸富娴佹柟鍚戝垎鎴?2 涓?180掳 鍗婄悆銆?
+        // 杩欐牱鑷劧鍚堝苟鐩搁偦璞￠檺锛堝"宸︿笂"鍜?宸︿笅"閮藉綊鍏ュ悓涓€鍗婄悆锛夈€?
+        // 瀵逛簬鏅€氬墠鍚戣竟锛屽己鐑堝亸绂讳富娴佺殑杈癸紙浜ゅ弶杞?> 2脳 涓昏酱锛夊彲鍗曠嫭鍒嗗埌閫冮€哥鍙ｃ€?
+        // 瀵逛簬鍙嶅悜鍙嶉杈癸紝淇濇寔涓ユ牸 180掳 鍗婄悆鍒嗙粍锛岄伩鍏嶅悓涓€鍥炴祦鏉熻鎷嗘垚 left/bottom 绛夊崟杈圭粍銆?
         //
-        // 示例（主流=下方）：
-        //   正下方的 peer → bottom 半球 ✓
-        //   左下方的 peer → bottom 半球 ✓（邻近象限自然合并）
-        //   纯右方的 peer → right 逃逸端口（交叉轴远大于主轴）
+        // 绀轰緥锛堜富娴?涓嬫柟锛夛細
+        //   姝ｄ笅鏂圭殑 peer 鈫?bottom 鍗婄悆 鉁?
+        //   宸︿笅鏂圭殑 peer 鈫?bottom 鍗婄悆 鉁擄紙閭昏繎璞￠檺鑷劧鍚堝苟锛?
+        //   绾彸鏂圭殑 peer 鈫?right 閫冮€哥鍙ｏ紙浜ゅ弶杞磋繙澶т簬涓昏酱锛?
 
-        // Step 1: 计算 peer 质心，确定主流方向
+        // Step 1: 璁＄畻 peer 璐ㄥ績锛岀‘瀹氫富娴佹柟鍚?
         let centroidX = 0, centroidY = 0, validCount = 0;
         globalPeers.forEach(peerEdge => {
             const peerId = isManyToOne ? peerEdge.source : peerEdge.target;
@@ -1863,18 +1863,18 @@ export class EdgeRoutingCoordinator {
             }
         });
 
-        // Fallback: 如果没有有效 peer，直接返回
+        // Fallback: 濡傛灉娌℃湁鏈夋晥 peer锛岀洿鎺ヨ繑鍥?
         if (validCount === 0) return;
         centroidX /= validCount;
         centroidY /= validCount;
 
         const flowDx = centroidX - hubCenter.x;
         const flowDy = centroidY - hubCenter.y;
-        // 主流方向：质心偏移更大的轴
-        const isVerticalFlow = Math.abs(flowDy) >= Math.abs(flowDx);
+        // 涓绘祦鏂瑰悜锛氳川蹇冨亸绉绘洿澶х殑杞?
+            const isVerticalFlow = Math.abs(flowDy) >= Math.abs(flowDx);
 
-        // Step 2: 按半球 + 普通边逃逸分组
-        const sideGroups = new Map<string, any[]>();
+        // Step 2: 鎸夊崐鐞?+ 鏅€氳竟閫冮€稿垎缁?
+            const sideGroups = new Map<string, any[]>();
         const jobByEdgeId = new Map(busGroupJobs.map(job => [job.edgeId, job]));
         const isReverseByGeometry = (edge: any): boolean => {
             const sourceRect = getNodeRect(edge.source);
@@ -1912,16 +1912,16 @@ export class EdgeRoutingCoordinator {
 
             let side: string;
             if (isVerticalFlow) {
-                // 主流=上下 → 默认按 y 分半球
-                // 逃逸：如果 |dx| > 2*|dy| 且 |dx| > 50px，说明 peer 强烈偏向左右
+                // 涓绘祦=涓婁笅 鈫?榛樿鎸?y 鍒嗗崐鐞?
+                // 閫冮€革細濡傛灉 |dx| > 2*|dy| 涓?|dx| > 50px锛岃鏄?peer 寮虹儓鍋忓悜宸﹀彸
                 if (!keepTrueHemisphere && Math.abs(dx) > Math.abs(dy) * 2 && Math.abs(dx) > 50) {
                     side = dx < 0 ? 'left' : 'right';
                 } else {
                     side = dy < 0 ? 'top' : 'bottom';
                 }
             } else {
-                // 主流=左右 → 默认按 x 分半球
-                // 逃逸：如果 |dy| > 2*|dx| 且 |dy| > 50px
+                // 涓绘祦=宸﹀彸 鈫?榛樿鎸?x 鍒嗗崐鐞?
+                // 閫冮€革細濡傛灉 |dy| > 2*|dx| 涓?|dy| > 50px
                 if (!keepTrueHemisphere && Math.abs(dy) > Math.abs(dx) * 2 && Math.abs(dy) > 50) {
                     side = dy < 0 ? 'top' : 'bottom';
                 } else {
@@ -1944,24 +1944,24 @@ export class EdgeRoutingCoordinator {
             sideGroups.get(side)!.push(peerEdge);
         });
 
-        // 逐半球组计算主干线
+        // 閫愬崐鐞冪粍璁＄畻涓诲共绾?
         sideGroups.forEach((groupEdges, _side) => {
             if (groupEdges.length === 0) return;
 
-            // 单条边的组：降级为普通 A* 路由（只在有多个组时）
-            // [FIX] 保留 isManyToOne/isOneToMany 标志不清除，
-            // 这样 Worker 仍知道这是"bus"边（isBus=true → allowTargetSlide=false）。
-            // 如果清除了标志，Worker 会滑动端口→端口偏离中心。
+            // 鍗曟潯杈圭殑缁勶細闄嶇骇涓烘櫘閫?A* 璺敱锛堝彧鍦ㄦ湁澶氫釜缁勬椂锛?
+            // [FIX] 淇濈暀 isManyToOne/isOneToMany 鏍囧織涓嶆竻闄わ紝
+            // 杩欐牱 Worker 浠嶇煡閬撹繖鏄?bus"杈癸紙isBus=true 鈫?allowTargetSlide=false锛夈€?
+            // 濡傛灉娓呴櫎浜嗘爣蹇楋紝Worker 浼氭粦鍔ㄧ鍙ｂ啋绔彛鍋忕涓績銆?
             if (groupEdges.length === 1 && sideGroups.size > 1) {
                 const job = busGroupJobs.find(j => j.edgeId === groupEdges[0].id);
                 const shouldKeepSingletonBus = !!job?.isReverseEdge || isReverseByGeometry(groupEdges[0]);
                 if (job && !shouldKeepSingletonBus) {
                     if (isManyToOne) {
-                        // 不清除 job.isManyToOne，保持 isBus=true 让 Worker 禁止端口滑动
+                        // 涓嶆竻闄?job.isManyToOne锛屼繚鎸?isBus=true 璁?Worker 绂佹绔彛婊戝姩
                         job.incomingCount = 1;
                         job.incomingIndex = 0;
                     } else {
-                        // 同理，保持 job.isOneToMany
+                        // 鍚岀悊锛屼繚鎸?job.isOneToMany
                         job.outgoingCount = 1;
                         job.outgoingIndex = 0;
                     }
@@ -1969,27 +1969,27 @@ export class EdgeRoutingCoordinator {
                 if (!shouldKeepSingletonBus) return;
             }
 
-            // 计算该象限的 peer 节点矩形列表
+            // 璁＄畻璇ヨ薄闄愮殑 peer 鑺傜偣鐭╁舰鍒楄〃
             const subPeers = groupEdges.map(e =>
                 getNodeRect(isManyToOne ? e.source : e.target)
             ).filter((r): r is Rectangle => !!r);
 
-            // 直接调用 calculateTreeTrunk — 每个象限的 peer 天然在同侧，
-            // 不需要双干线并行间距（calculateParallelTrunks 的 forward/backward 拆分）
+            // 鐩存帴璋冪敤 calculateTreeTrunk 鈥?姣忎釜璞￠檺鐨?peer 澶╃劧鍦ㄥ悓渚э紝
+            // 涓嶉渶瑕佸弻骞茬嚎骞惰闂磋窛锛坈alculateParallelTrunks 鐨?forward/backward 鎷嗗垎锛?
             const trunk = trunkCalculator.calculateTreeTrunk(
                 hubRect,
                 subPeers,
                 isManyToOne,
                 defaultConfig,
                 layoutDir,
-                undefined, // 让 calculateTreeTrunk 自行计算质心
+                undefined, // 璁?calculateTreeTrunk 鑷璁＄畻璐ㄥ績
                 obstacles
             );
 
-            // [FIX-port-spread] 同侧端口扩展（Port Spreading）
-            // 当 M2O 和 O2M 共享同一端口侧时，不翻转也不偏移 trunk axis，
-            // 而是通过 hubPortSlot 告诉 Worker 在该侧使用不同的连接点位置。
-            // slot 按端口切线方向质心排序：slot 0 偏左/偏上，slot 1 偏右/偏下。
+            // [FIX-port-spread] 鍚屼晶绔彛鎵╁睍锛圥ort Spreading锛?
+            // 褰?M2O 鍜?O2M 鍏变韩鍚屼竴绔彛渚ф椂锛屼笉缈昏浆涔熶笉鍋忕Щ trunk axis锛?
+            // 鑰屾槸閫氳繃 hubPortSlot 鍛婅瘔 Worker 鍦ㄨ渚т娇鐢ㄤ笉鍚岀殑杩炴帴鐐逛綅缃€?
+            // slot 鎸夌鍙ｅ垏绾挎柟鍚戣川蹇冩帓搴忥細slot 0 鍋忓乏/鍋忎笂锛宻lot 1 鍋忓彸/鍋忎笅銆?
             const currentGroupTangent = (() => {
                 let sum = 0;
                 let count = 0;
@@ -2020,28 +2020,28 @@ export class EdgeRoutingCoordinator {
                 });
             }
 
-            // [FIX-dual-lane] 对侧走廊分离（Opposite-Side Corridor Separation）
+            // [FIX-dual-lane] 瀵逛晶璧板粖鍒嗙锛圤pposite-Side Corridor Separation锛?
             //
-            // 问题：当 O2M 和 M2O 共享同一端口侧时，两者的 A* 分支路径
-            // 都被迫绕过同一组障碍物到达同一侧走廊（如 x≈1571），导致交织。
+            // 闂锛氬綋 O2M 鍜?M2O 鍏变韩鍚屼竴绔彛渚ф椂锛屼袱鑰呯殑 A* 鍒嗘敮璺緞
+            // 閮借杩粫杩囧悓涓€缁勯殰纰嶇墿鍒拌揪鍚屼竴渚ц蛋寤婏紙濡?x鈮?571锛夛紝瀵艰嚧浜ょ粐銆?
             //
-            // 行业做法（ELK Channel Routing）：
-            // O2M 和 M2O 使用不同侧的走廊。O2M 走障碍物右侧，M2O 走左侧。
+            // 琛屼笟鍋氭硶锛圗LK Channel Routing锛夛細
+            // O2M 鍜?M2O 浣跨敤涓嶅悓渚х殑璧板粖銆侽2M 璧伴殰纰嶇墿鍙充晶锛孧2O 璧板乏渚с€?
             //
-            // 实现：把 M2O 的 trunk axis 镜像到 hub 的对侧，
-            // 这样 M2O 的分支从一开始就走左侧（或上方）走廊。
+            // 瀹炵幇锛氭妸 M2O 鐨?trunk axis 闀滃儚鍒?hub 鐨勫渚э紝
+            // 杩欐牱 M2O 鐨勫垎鏀粠涓€寮€濮嬪氨璧板乏渚э紙鎴栦笂鏂癸級璧板粖銆?
             //
-            //   Left corridor ←  Hub  → Right corridor
-            //        M2O ────┤  ├──── O2M
-            //                │  │
+            //   Left corridor 鈫? Hub  鈫?Right corridor
+            //        M2O 鈹€鈹€鈹€鈹€鈹? 鈹溾攢鈹€鈹€鈹€ O2M
+            //                鈹? 鈹?
             //              peers...
             if (hasPortConflict) {
                 if (trunk.direction === 'vertical') {
-                    // O2M trunk 在 hub 右侧 (axis > hubCenter.x) → M2O 镜像到左侧
-                    // O2M trunk 在 hub 左侧 (axis < hubCenter.x) → M2O 镜像到右侧
-                    const hubCenterX = hubRect.x + hubRect.width / 2;
-                    const o2mOffset = trunk.axis - hubCenterX; // 正=右, 负=左
-                    trunk.axis = hubCenterX - o2mOffset; // 镜像到对面
+                    // O2M trunk 鍦?hub 鍙充晶 (axis > hubCenter.x) 鈫?M2O 闀滃儚鍒板乏渚?
+                    // O2M trunk 鍦?hub 宸︿晶 (axis < hubCenter.x) 鈫?M2O 闀滃儚鍒板彸渚?
+            const hubCenterX = hubRect.x + hubRect.width / 2;
+                    const o2mOffset = trunk.axis - hubCenterX; // 姝?鍙? 璐?宸?
+                    trunk.axis = hubCenterX - o2mOffset; // 闀滃儚鍒板闈?
                 } else {
                     const hubCenterY = hubRect.y + hubRect.height / 2;
                     const o2mOffset = trunk.axis - hubCenterY;
@@ -2061,14 +2061,14 @@ export class EdgeRoutingCoordinator {
         layoutDir: string,
         getNodeRect: (id: string) => Rectangle | undefined,
         isManyToOne: boolean,
-        hubPortConflict: boolean = false,  // [FIX-port-spread] 是否与另一方向共享端口
+        hubPortConflict: boolean = false,  // [FIX-port-spread] 鏄惁涓庡彟涓€鏂瑰悜鍏变韩绔彛
         peerGroupKeyOverride?: string,
         hubPortSlot: number = 0,
         trunkPortTangent?: number
     ): void {
         // [FIX] Removed dirtyEdges.add + scheduleBatchRouting that caused infinite recursion:
         // assignTrunkGeometry is called FROM batchRouteDirtyEdges, so marking edges dirty here
-        // triggers another batchRouteDirtyEdges → infinite cascade.
+        // triggers another batchRouteDirtyEdges 鈫?infinite cascade.
 
         // Debug attachment
         edges.forEach((edge: any) => {
@@ -2101,7 +2101,7 @@ export class EdgeRoutingCoordinator {
         // then a greedy adjacent-swap pass reduces mismatches between trunk order
         // and peer spatial order. This is the local equivalent of layered graph
         // crossing minimization's barycenter + greedy-switch stage.
-        const sortedGlobal = optimizeHubPortOrder(
+            const sortedGlobal = optimizeHubPortOrder(
             edges.map((edge: any) => {
                 const rect = getNodeRect(isManyToOne ? edge.source : edge.target);
                 const branchCoord = trunkProjection(rect);
@@ -2142,14 +2142,15 @@ export class EdgeRoutingCoordinator {
                 job.outgoingCount = hubPortConflict ? 2 : 1;
                 job.outgoingIndex = 0;
                 // Peer side (Target)
-                job.incomingCount = 1; 
+                job.incomingCount = 1;
                 job.incomingIndex = 0;
             }
+
 
             // [FIX-dual-trunk] Assign direction-specific trunk hints.
             // Worker reads (job as any).o2mTrunk / m2oTrunk to resolve ports independently
             // for each end of a dual-identity edge (both O2M and M2O).
-            // Previously only busTrunkSource/Target was written — M2O phase overwrote O2M data.
+            // Previously only busTrunkSource/Target was written 鈥?M2O phase overwrote O2M data.
             const trunkData = trunk.direction === 'vertical'
                 ? { source: { x: trunk.axis, y: trunk.range.min }, target: { x: trunk.axis, y: trunk.range.max } }
                 : { source: { x: trunk.range.min, y: trunk.axis }, target: { x: trunk.range.max, y: trunk.axis } };
@@ -2171,27 +2172,27 @@ export class EdgeRoutingCoordinator {
                 job.busTrunkTarget = { x: trunk.range.max, y: trunk.axis };
             }
 
-            // [Trunk Vis] 注入 peerGroup 信息，供调试面板的 Canvas 可视化
+            // [Trunk Vis] 娉ㄥ叆 peerGroup 淇℃伅锛屼緵璋冭瘯闈㈡澘鐨?Canvas 鍙鍖?
             (job as any).peerGroupMembers = sortedEdgeIds;
-            // [FIX] hubId 在 assignTrunkGeometry 作用域内不可用，改用可推导的 hub 节点 ID
+            // [FIX] hubId 鍦?assignTrunkGeometry 浣滅敤鍩熷唴涓嶅彲鐢紝鏀圭敤鍙帹瀵肩殑 hub 鑺傜偣 ID
             const peerGroupKey = peerGroupKeyOverride ?? (isManyToOne
-                ? (edge.target as string)   // M2O: hub 是公共 target
-                : (edge.source as string));  // O2M: hub 是公共 source
+                ? (edge.target as string)   // M2O: hub 鏄叕鍏?target
+                : (edge.source as string));  // O2M: hub 鏄叕鍏?source
             (job as any).peerGroupKey = peerGroupKey;
             (job as any).peerGroupSize = edges.length;
             (job as any).trunkPort = trunk.suggestedPort; // Pass suggested port direction
             (job as any).trunkPortTangent = trunkPortTangent;
 
-            // [S4] Port 注入已移至 Worker 内部（几何推算）。
-            // Coordinator 仅传递 busTrunkSource/busTrunkTarget + o2mTrunk/m2oTrunk 几何元数据，
-            // 端口方向由 Worker 的几何逻辑自主决定，消除双层决策冲突。
+            // [S4] Port 娉ㄥ叆宸茬Щ鑷?Worker 鍐呴儴锛堝嚑浣曟帹绠楋級銆?
+            // Coordinator 浠呬紶閫?busTrunkSource/busTrunkTarget + o2mTrunk/m2oTrunk 鍑犱綍鍏冩暟鎹紝
+            // 绔彛鏂瑰悜鐢?Worker 鐨勫嚑浣曢€昏緫鑷富鍐冲畾锛屾秷闄ゅ弻灞傚喅绛栧啿绐併€?
 
             job.layoutDirection = layoutDir;
         });
     }
 
     /**
-     * [SharedTrunk] Public accessor — returns the latest shared trunk segments.
+     * [SharedTrunk] Public accessor 鈥?returns the latest shared trunk segments.
      * Called by useSmartPathWorker to pass trunk data to the canvas rendering layer.
      */
     public getSharedTrunks(): SharedTrunkSegment[] {
@@ -2203,12 +2204,12 @@ export class EdgeRoutingCoordinator {
      *
      * For each group of N edges sharing a common trunk axis:
      *  1. Identify the trunk junction points in each edge's path.
-     *  2. Build ONE shared trunk path covering the full span (min_branch_x → hub).
-     *  3. Trim each edge's path to the branch-only portion (source → junction).
+     *  2. Build ONE shared trunk path covering the full span (min_branch_x 鈫?hub).
+     *  3. Trim each edge's path to the branch-only portion (source 鈫?junction).
      *
      * Visual result:
-     *  Before: N overlapping SVG paths each drawing source → trunk → hub
-     *  After : N branch-only paths (source → junction) + 1 shared trunk path (junction → hub)
+     *  Before: N overlapping SVG paths each drawing source 鈫?trunk 鈫?hub
+     *  After : N branch-only paths (source 鈫?junction) + 1 shared trunk path (junction 鈫?hub)
      */
     private mergeTrunkSegments(
         results: (PathFindingResult | null)[],
@@ -2238,11 +2239,11 @@ export class EdgeRoutingCoordinator {
         if (validResults.length === 0) return;
 
         // [UPGRADE] Include ALL edges in overlap detection, but bus/trunk edges from the
-        // same group are treated as "buddies" — they intentionally share trunk segments
+        // same group are treated as "buddies" 鈥?they intentionally share trunk segments
         // and should NOT be separated. Only non-buddy overlaps get channel-routed.
 
         // Step 1: Clean collinear points from all paths
-        const cleanPath = (raw: Point[]): Point[] => {
+            const cleanPath = (raw: Point[]): Point[] => {
             if (raw.length < 3) return raw;
             const cleaned: Point[] = [{ x: raw[0].x, y: raw[0].y }];
             for (let i = 1; i < raw.length - 1; i++) {
@@ -2259,7 +2260,7 @@ export class EdgeRoutingCoordinator {
         };
 
         // Step 2: Build edgePaths map for globalChannelRouting
-        const edgePaths = new Map<string, Point[]>();
+            const edgePaths = new Map<string, Point[]>();
         const activeEdgeIds = new Set(validResults.map(r => r.edgeId));
         const fixedContextPaths = graphKey
             ? this.collectFixedPathContext(graphKey, validResults, activeEdgeIds)
@@ -2272,11 +2273,11 @@ export class EdgeRoutingCoordinator {
         }
         const fixedEdgeIds = new Set(fixedContextPaths.keys());
 
-        // Step 3: Build buddy groups — bus/trunk edges sharing the same normalized
+        // Step 3: Build buddy groups 鈥?bus/trunk edges sharing the same normalized
         // direction + hemisphere trunk group.
         // O2M buddy group: protect first segment (shared source trunk)
         // M2O buddy group: protect last segment (shared target trunk)
-        const buddyGroupMap = new Map<string, { edgeIds: Set<string>; type: 'o2m' | 'm2o' }>(); // groupKey → group info
+            const buddyGroupMap = new Map<string, { edgeIds: Set<string>; type: 'o2m' | 'm2o' }>(); // groupKey 鈫?group info
         requests.forEach((req, index) => {
             const job = (assignedJobs?.[index] ?? req.job) as any;
             if (job.isOneToMany) {
@@ -2293,7 +2294,7 @@ export class EdgeRoutingCoordinator {
         // Keep even a single dirty member of a larger bus fixed. Its siblings may be
         // satisfied from cache and absent from this batch, but the trunk segment still
         // must not be nudged away from the shared axis.
-        const buddyGroups = [...buddyGroupMap.values()].filter(g => g.edgeIds.size >= 1);
+            const buddyGroups = [...buddyGroupMap.values()].filter(g => g.edgeIds.size >= 1);
 
 
 
@@ -2344,7 +2345,7 @@ export class EdgeRoutingCoordinator {
                 if (!newPoints || newPoints.length < 2) continue;
 
                 // Check if path actually changed
-                const changed = newPoints.length !== r.points.length
+            const changed = newPoints.length !== r.points.length
                     || newPoints.some((p, i) => {
                         const orig = r.points[i];
                         return !orig || Math.abs(p.x - orig.x) > 0.5 || Math.abs(p.y - orig.y) > 0.5;
@@ -2355,8 +2356,8 @@ export class EdgeRoutingCoordinator {
 
                 // [FIX C-5] Use canonical createFilletedPath instead of hand-rolled Q-bezier.
                 // This ensures nudged paths go through micro-jog elimination, collinear collapse,
-                // and consistent A-arc rendering — matching all other edge rendering paths.
-                const radius = (config as any)?.borderRadius ?? 8;
+                // and consistent A-arc rendering 鈥?matching all other edge rendering paths.
+            const radius = (config as any)?.borderRadius ?? 8;
                 r.path = createFilletedPath(newPoints, radius);
 
                 // Update label position
@@ -2447,8 +2448,8 @@ export class EdgeRoutingCoordinator {
     }
 
     /**
-     * [DEV] 强制清空所有路由缓存并递增 graphVersion，让所有边重新计算路径。
-     * 用于修改了路由算法后无需重启即可验证效果。
+     * [DEV] 寮哄埗娓呯┖鎵€鏈夎矾鐢辩紦瀛樺苟閫掑 graphVersion锛岃鎵€鏈夎竟閲嶆柊璁＄畻璺緞銆?
+     * 鐢ㄤ簬淇敼浜嗚矾鐢辩畻娉曞悗鏃犻渶閲嶅惎鍗冲彲楠岃瘉鏁堟灉銆?
      */
     public clearAllCaches(): void {
         this.graphVersion++;
@@ -2472,90 +2473,136 @@ export class EdgeRoutingCoordinator {
         EdgeRoutingCoordinator.instance = null;
     }
     /**
-     * [FIX] In/Out Port Zone Separation.
+     * [FIX] In/Out Port Zone Separation on Same Side.
      *
-     * 问题：当节点 N 同时作为出边 source（N→A, N→B）和入边 target（C→N, D→N），
-     * 且两组边都使用 N 的同一侧端口时，getDistributedPortPoint 会让两组都以
-     * 该侧中心为基准扩散 → 互相覆盖、产生视觉交叉。
+     * 闂锛氳妭鐐?N 鐨勬煇涓€渚у悓鏃舵湁鍑鸿竟锛圢 浣滀负 source锛夊拰鍏ヨ竟锛圢 浣滀负 target锛夋椂锛?
+     * 涓ょ被绔彛閮戒互渚ц竟涓績涓哄熀鍑嗭紝瀵艰嚧閲嶅彔銆?
      *
-     * 修复：检测同节点、同侧的 in/out 冲突，将端口区间合并为连续序列：
-     *   出边（source 角色）: combined index = 0 .. outCount-1
-     *   入边（target 角色）: combined index = outCount .. outCount+inCount-1
-     *   combined total = outCount + inCount
-     *
-     * 只处理 non-bus 边（bus 边有自己的 hubPortConflict 机制）。
-     * 只有单向（全入或全出）的侧直接跳过，保持默认居中行为。
+     * 淇绛栫暐锛?
+     *   - bus trunk 鍑鸿竟缁勶細鏁翠綋绠?1 涓?outgoing slot锛堜繚鎸?trunk 鍏变韩绔彛涓嶅彉锛?
+     *   - bus trunk 鍏ヨ竟缁勶細鏁翠綋绠?1 涓?incoming slot
+     *   - 闈?bus 鍗曠嫭鍑鸿竟锛氬悇鍗?1 涓?outgoing slot
+     *   - 闈?bus 鍗曠嫭鍏ヨ竟锛氬悇鍗?1 涓?incoming slot
+     *   - 鍙湁鍚屼晶鍚屾椂瀛樺湪鍑烘Ы鍜屽叆妲芥椂鎵嶅垎绂伙紱鍗曠被鍒欒烦杩囷紙淇濇寔灞呬腑锛?
+     *   - 鎸夊绔川蹇冩帓搴忓喅瀹氬嚭缁?鍏ョ粍鍝釜鍦ㄥ墠锛岄伩鍏嶈瑙変氦鍙?
      */
     private assignSameSidePortSeparation(jobs: PathFindingJob[]): void {
         const eligibleJobs = jobs.filter(j => j.sourceRect && j.targetRect);
         if (eligibleJobs.length === 0) return;
 
-        // 以 (nodeId, side) 为键，记录出边列表和入边列表
-        type SideData = { outJobs: PathFindingJob[]; inJobs: PathFindingJob[] };
-        const registry = new Map<string, Map<string, SideData>>();
-
-        const getSlot = (nodeId: string, side: string): SideData => {
-            if (!registry.has(nodeId)) registry.set(nodeId, new Map());
-            const m = registry.get(nodeId)!;
-            if (!m.has(side)) m.set(side, { outJobs: [], inJobs: [] });
-            return m.get(side)!;
+        // Step 1: Collect outgoing and incoming jobs per (nodeId, side).
+        // Bus trunk edges are included so we can detect in/out conflicts on hub sides.
+        // key = `${nodeId}::${side}`, value = { outJobs, inJobs }
+        const buckets = new Map<string, { outJobs: PathFindingJob[]; inJobs: PathFindingJob[] }>();
+        const getBucket = (nodeId: string, side: string) => {
+            const k = `${nodeId}::${side}`;
+            if (!buckets.has(k)) buckets.set(k, { outJobs: [], inJobs: [] });
+            return buckets.get(k)!;
         };
-
         for (const job of eligibleJobs) {
             const sRect = job.sourceRect!;
             const tRect = job.targetRect!;
-
-            // 非 bus 出边：登记 source 节点的出口侧
-            if (!job.isOneToMany) {
-                const side = EdgeRoutingCoordinator.inferPortSide(sRect, tRect, 'source');
-                getSlot(job.source, side).outJobs.push(job);
-            }
-
-            // 非 bus 入边：登记 target 节点的入口侧
-            if (!job.isManyToOne) {
-                const side = EdgeRoutingCoordinator.inferPortSide(sRect, tRect, 'target');
-                getSlot(job.target, side).inJobs.push(job);
-            }
+            // Register to source node outgoing side (includes bus outgoing edges)
+            const outSide = EdgeRoutingCoordinator.inferPortSide(sRect, tRect, 'source');
+            getBucket(job.source, outSide).outJobs.push(job);
+            // Register to target node incoming side (includes bus incoming edges)
+            const inSide = EdgeRoutingCoordinator.inferPortSide(sRect, tRect, 'target');
+            getBucket(job.target, inSide).inJobs.push(job);
         }
 
-        // 对存在「同侧 in/out 冲突」的节点，分配不重叠的区间
-        // 若某侧只有单方向（只入或只出），直接跳过 → 保持默认居中
-        for (const [, sideMap] of registry) {
-            for (const [, { outJobs, inJobs }] of sideMap) {
-                if (outJobs.length === 0 || inJobs.length === 0) continue;
+        // Step 2: For each (nodeId, side) that has BOTH outgoing and incoming edges, separate ports.
+        // If a side only has one type (all-out or all-in), skip it - no separation needed.
+        for (const [key, { outJobs, inJobs }] of buckets) {
+            if (outJobs.length === 0 || inJobs.length === 0) continue;
 
-                // [FIX] 跳过纯「双向对」（A→B + B→A 互为逆向）。
-                // 双向对已经由 assignGlobalChannels 在路径层做了 bidirectionalChannel 偏移，
-                // 如果再做端口分离就会「双重偏移」——用户看到的就是「单向节点端口不居中」。
-                // 只对非对称的同侧冲突（A→N 入 + N→C 出，C≠A）做端口区间分离。
-                const outPairs = new Set(outJobs.map(j => `${j.source}\0${j.target}`));
-                const isBidirectionalOnly = inJobs.every(j =>
-                    outPairs.has(`${j.target}\0${j.source}`)
-                ) && outJobs.length === inJobs.length;
-                if (isBidirectionalOnly) continue;
+            const colonIdx = key.indexOf('::');
+            const nodeId = key.slice(0, colonIdx);
+            const side   = key.slice(colonIdx + 2);
 
-                const total = outJobs.length + inJobs.length;
+            // Count slots:
+            // - bus trunk out group (isOneToMany) = 1 slot (shared trunk port, preserved)
+            // - non-bus solo out edges = 1 slot each
+            // - bus trunk in group (isManyToOne) = 1 slot (shared trunk port, preserved)
+            // - non-bus solo in edges = 1 slot each
+            const outBusJobs  = outJobs.filter(j => j.isOneToMany);
+            const outSoloJobs = outJobs.filter(j => !j.isOneToMany);
+            const outSlotCount = (outBusJobs.length > 0 ? 1 : 0) + outSoloJobs.length;
 
-                // 出边区间：0 .. outCount-1（靠近节点上半/左半）
-                outJobs.forEach((job, i) => {
-                    job.outgoingIndex = i;
-                    job.outgoingCount = total;
+            const inBusJobs  = inJobs.filter(j => j.isManyToOne);
+            const inSoloJobs = inJobs.filter(j => !j.isManyToOne);
+            const inSlotCount = (inBusJobs.length > 0 ? 1 : 0) + inSoloJobs.length;
+
+            const totalSlots = outSlotCount + inSlotCount;
+
+            // Decide which group goes to the "front" (smaller coord) based on peer centroids.
+            // left/right: front = smaller Y; top/bottom: front = smaller X
+            const oppCoord = (job: PathFindingJob, asSource: boolean): number => {
+                const r = asSource ? job.targetRect! : job.sourceRect!;
+                return (side === 'top' || side === 'bottom')
+                    ? r.x + r.width  / 2
+                    : r.y + r.height / 2;
+            };
+            const outCentroid = outJobs.reduce((s, j) => s + oppCoord(j, true),  0) / outJobs.length;
+            const inCentroid  = inJobs.reduce( (s, j) => s + oppCoord(j, false), 0) / inJobs.length;
+            // outFirst=true => out-group occupies lower indices (front of side)
+            const outFirst = outCentroid <= inCentroid;
+            const outBase  = outFirst ? 0 : inSlotCount;
+            const inBase   = outFirst ? outSlotCount : 0;
+
+            // Assign bus out group: all edges share the same slot (trunk shared port is preserved)
+            if (outBusJobs.length > 0) {
+                outBusJobs.forEach(j => {
+                    const existing = j.outgoingCount || 1;
+                    if (existing <= 1) {
+                        // Was centered (count=1): map to separated slot
+                        j.outgoingCount = totalSlots;
+                        j.outgoingIndex = outBase;
+                    } else {
+                        // hubPortConflict already set count=2 (O2M/M2O each got 1 slot).
+                        // Overlay the in/out separation on top: shift existing index by outBase.
+                        j.outgoingCount = totalSlots;
+                        j.outgoingIndex = outBase + (j.outgoingIndex || 0);
+                    }
                 });
+            }
+            // Assign non-bus solo out edges: each gets its own slot
+            outSoloJobs.sort((a, b) =>
+                oppCoord(a, true) - oppCoord(b, true) || a.edgeId.localeCompare(b.edgeId));
+            outSoloJobs.forEach((j, i) => {
+                j.outgoingCount = totalSlots;
+                j.outgoingIndex = outBase + (outBusJobs.length > 0 ? 1 : 0) + i;
+            });
 
-                // 入边区间：outCount .. total-1（靠近节点下半/右半）
-                inJobs.forEach((job, i) => {
-                    job.incomingIndex = outJobs.length + i;
-                    job.incomingCount = total;
+            // Assign bus in group: all edges share the same slot
+            if (inBusJobs.length > 0) {
+                inBusJobs.forEach(j => {
+                    const existing = j.incomingCount || 1;
+                    if (existing <= 1) {
+                        j.incomingCount = totalSlots;
+                        j.incomingIndex = inBase;
+                    } else {
+                        j.incomingCount = totalSlots;
+                        j.incomingIndex = inBase + (j.incomingIndex || 0);
+                    }
                 });
+            }
+            // Assign non-bus solo in edges: each gets its own slot
+            inSoloJobs.sort((a, b) =>
+                oppCoord(a, false) - oppCoord(b, false) || a.edgeId.localeCompare(b.edgeId));
+            inSoloJobs.forEach((j, i) => {
+                j.incomingCount = totalSlots;
+                j.incomingIndex = inBase + (inBusJobs.length > 0 ? 1 : 0) + i;
+            });
+        }
+
+        // Clear bidirectional offsets for separated edges to prevent double-displacement
+        for (const job of eligibleJobs) {
+            if ((job.outgoingCount && job.outgoingCount > 1) || (job.incomingCount && job.incomingCount > 1)) {
+                job.bidirectionalChannel = undefined;
+                job.bidirectionalSpacing = undefined;
             }
         }
     }
-
-    /**
-     * [SHARED] 根据源/目标矩形中心的相对位置，推断某端点的端口侧方向。
-     * role='source' → 推断 source 节点的出口侧（出边离开的方向）
-     * role='target' → 推断 target 节点的入口侧（入边进入的方向）
-     */
     private static inferPortSide(
         sRect: Rectangle,
         tRect: Rectangle,
@@ -2579,15 +2626,14 @@ export class EdgeRoutingCoordinator {
     }
 }
 
-// [DEV] 在 window 上挂载调试工具，开发模式下可在控制台直接调用
+// [DEV] Debug tools on window object (dev mode only)
 if (typeof window !== 'undefined' && import.meta.env.DEV) {
     (window as any).__vizly_routing__ = {
-        /** 清空所有路由缓存，强制下一次渲染重新计算所有连线路径 */
+        /** Clear all routing caches and force full re-route */
         clearCache: () => EdgeRoutingCoordinator.getInstance().clearAllCaches(),
-        /** 获取 Coordinator 实例 */
+        /** Get Coordinator instance */
         coordinator: () => EdgeRoutingCoordinator.getInstance(),
     };
     console.info('[Vizly Dev] Routing debug tools available: window.__vizly_routing__.clearCache()');
 }
-
 
