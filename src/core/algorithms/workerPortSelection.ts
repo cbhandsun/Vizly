@@ -128,8 +128,10 @@ export function selectPortsForWorker(
         }
 
         // X 差距明显大于 Y 时，考虑使用水平端口
-        // [OPTIMIZATION] Increase threshold from 2 to 4
-        if (absDx > absDy * 4 && absDx > 100) {
+        // Threshold: 1.5x (was 4x) — a notably wider-than-tall displacement should use left/right ports.
+        // The old 4x threshold caused edges with mixed horizontal+vertical displacement to stay on
+        // top/bottom ports, then get overridden by obstacle detection to right/right (causing loops).
+        if (absDx > absDy * 1.5 && absDx > 80) {
             if (dx > 0) {
                 sourcePos = Position.Right;
                 targetPos = Position.Left;

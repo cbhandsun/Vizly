@@ -721,12 +721,34 @@ function evaluatePortCombination(
     const GEOMETRY_AXIS_BONUS = -1000; // [FIX] Reduced from -2000 to prevent port flapping during diagonal transitions
 
     // Apply bonus based on ACTUAL geometry (not config)
-    if (geometry === 'vertical-forward' || geometry === 'vertical-reverse') {
-        // Vertical geometry: STRONGLY prefer vertical ports
+    if (geometry === 'vertical-forward') {
+        // Pure downward flow: STRONGLY prefer vertical ports (Bottom → Top natural flow)
         if (isSourceVerticalPort && isTargetVerticalPort) {
             estimatedCost += GEOMETRY_AXIS_BONUS; // Both ports are vertical
         } else if (isSourceVerticalPort || isTargetVerticalPort) {
             estimatedCost += GEOMETRY_AXIS_BONUS / 2; // One port is vertical
+        }
+    } else if (geometry === 'vertical-reverse') {
+        // Upward flow (back-edge) — prefer based on horizontal offset:
+        // If there is significant horizontal displacement, horizontal ports (R->L, L->R)
+        // route directly through the open space between nodes.
+        // Only give vertical bonus when nodes are mostly stacked (little horizontal offset).
+        const absHorizOffset = Math.abs(dx);
+        const absVertOffset = Math.abs(dy);
+        if (absHorizOffset > absVertOffset * 0.4) {
+            // Meaningful horizontal component: prefer horizontal ports
+            if (isSourceHorizontalPort && isTargetHorizontalPort) {
+                estimatedCost += GEOMETRY_AXIS_BONUS;
+            } else if (isSourceHorizontalPort || isTargetHorizontalPort) {
+                estimatedCost += GEOMETRY_AXIS_BONUS / 2;
+            }
+        } else {
+            // Mostly vertical: prefer vertical ports (B->T Z-shape)
+            if (isSourceVerticalPort && isTargetVerticalPort) {
+                estimatedCost += GEOMETRY_AXIS_BONUS;
+            } else if (isSourceVerticalPort || isTargetVerticalPort) {
+                estimatedCost += GEOMETRY_AXIS_BONUS / 2;
+            }
         }
     } else if (geometry === 'horizontal-forward' || geometry === 'horizontal-reverse') {
         // Horizontal geometry: STRONGLY prefer horizontal ports

@@ -287,18 +287,22 @@ export function getPortRulesForGeometry(type: GeometryType): PortRules {
         /**
          * VERTICAL REVERSE (Target is ABOVE)
          * Feedback loop — source is BELOW target
-         * 
-         * [FIX] 原来 forbidden 包含 B->T，这是错的。
-         * Decision(Bottom) → 上方 Start/End(Top) 是 2 弯的合理路径（Z形）。
-         * 禁止 B->T 导致路由器被迫选 L->L 或 R->R C形，形成矩形环路。
+         *
+         * [FIX v2] Primary preferred: cross-side L-shapes (R->L, L->R, B->T).
+         * These route DIRECTLY through the open space between nodes.
+         *
+         * OLD BUG: L->L and R->R were listed as Primary. But same-side C-shapes
+         * loop AROUND the right/left side of both nodes — ugly long detours when
+         * there is significant horizontal offset (dx≠0). They should only be used
+         * as fallbacks when the direct cross-side path is blocked.
          */
         'vertical-reverse': {
             preferred: [
-                'L->L',  // Primary: Left->Left (C-Shape, 2 bends)
-                'R->R',  // Primary: Right->Right (C-Shape, 2 bends)
-                'B->T',  // [FIX] Secondary: Bottom->Top (Z-Shape 2 bends, was wrongly forbidden)
-                'L->R',  // Secondary: Left->Right (cross-side)
-                'R->L',  // Secondary: Right->Left (cross-side)
+                'R->L',  // Primary: Right exit → Left entry (direct when target is upper-right)
+                'L->R',  // Primary: Left exit → Right entry (direct when target is upper-left)
+                'B->T',  // Secondary: Bottom → Top (Z-shape, 2 bends)
+                'R->R',  // Fallback: C-shape right (only when cross-side is blocked)
+                'L->L',  // Fallback: C-shape left (only when cross-side is blocked)
             ],
             forbidden: [
                 'T->T', 'T->B',  // Top as source output is wrong direction
