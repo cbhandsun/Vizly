@@ -1407,8 +1407,9 @@ export class EdgeRoutingCoordinator {
 
         //
         try {
-            // [FIX] Assign Bus Indices for Nudge
-            this.assignBusIndices(jobs, graph);
+            // NOTE: assignBusIndices is already called in batchRouteDirtyEdges BEFORE
+            // assignSameSidePortSeparation. Calling it again here would overwrite
+            // the incomingCount/outgoingCount values set by port separation logic.
 
             // Use calculatePaths (alias for routeBatch) compatibility
             const results = await this.parallelPool.calculatePaths(jobs, graph);
