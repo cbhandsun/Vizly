@@ -103,6 +103,8 @@ export class PathPostProcessor {
             let trunkPoints = snapAxis(points);
             // [BACKTRACK-V2] Orthogonal-safe backtrack removal for trunk paths
             trunkPoints = removeLargeBacktrack(trunkPoints, obstacles, { sourcePos: startPos, targetPos: endPos });
+            // [FIX] Remove cross-axis C-shaped detours that trunk geometry may produce
+            trunkPoints = removeCrossAxisDetour(trunkPoints, obstacles, { sourcePos: startPos, targetPos: endPos });
             // [FIX] Also remove tiny orthogonal jogs (e.g. 10px S-bends from port offset)
             // that Trunk Direct geometry construction may produce.
             const jogThreshold = Math.max(config.algorithm.gridSize * 1.5, 40);
