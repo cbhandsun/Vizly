@@ -22,7 +22,8 @@ import {
     removeTinyOrthogonalJogs,
     removeLargeBacktrack,
     trySimplify4PointCShape,
-    removeCrossAxisDetour
+    removeCrossAxisDetour,
+    removeMainAxisOvershoot
 } from '../../algorithms/smartEdgeUtils';
 
 export interface PostProcessContext {
@@ -103,6 +104,13 @@ export class PathPostProcessor {
             let trunkPoints = snapAxis(points);
             // [BACKTRACK-V2] Orthogonal-safe backtrack removal for trunk paths
             trunkPoints = removeLargeBacktrack(trunkPoints, obstacles, { sourcePos: startPos, targetPos: endPos });
+            
+            // [FIX] Remove main-axis overshoot: path goes past destination then folds back.
+            // e.g. wms→visibility: path goes to x=-32 when dst.x=180, then folds back.
+            // removeLargeBacktrack can't handle this because the ratio check rejects
+            // near-diagonal paths (dx/dy ≈ 1.07:1 < 1.2:1).
+            trunkPoints = removeMainAxisOvershoot(trunkPoints, obstacles);
+            
             // [FIX] Remove cross-axis C-shaped detours that trunk geometry may produce
             trunkPoints = removeCrossAxisDetour(trunkPoints, obstacles, { sourcePos: startPos, targetPos: endPos });
             // [FIX] Also remove tiny orthogonal jogs (e.g. 10px S-bends from port offset)
