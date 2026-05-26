@@ -2153,15 +2153,29 @@ export class EdgeRoutingCoordinator {
             if (isManyToOne) {
                 // Hub is Target. All M2O edges coalesce to ONE shared trunk port.
                 // When O2M also uses this side, the two trunk bundles are ordered by tangent barycenter.
-                job.incomingCount = hubPortConflict ? 2 : 1;
-                job.incomingIndex = hubPortConflict ? hubPortSlot : 0;
+                // [FIX] Unique per-edge index for anchor spreading
+                const groupSize = sortedGlobal.length;
+                if (hubPortConflict) {
+                    job.incomingCount = 2;
+                    job.incomingIndex = hubPortSlot;
+                } else {
+                    job.incomingCount = groupSize;
+                    job.incomingIndex = index;
+                }
                 // Peer side (Source)
                 job.outgoingCount = 1;
                 job.outgoingIndex = 0;
             } else {
-                // Hub is Source. All O2M edges coalesce to ONE shared trunk port (slot 0).
-                job.outgoingCount = hubPortConflict ? 2 : 1;
-                job.outgoingIndex = 0;
+                // Hub is Source. O2M edges fan out from the hub side.
+                // [FIX] Unique per-edge outgoingIndex for anchor spreading.
+                const groupSize = sortedGlobal.length;
+                if (hubPortConflict) {
+                    job.outgoingCount = 2;
+                    job.outgoingIndex = 0;
+                } else {
+                    job.outgoingCount = groupSize;
+                    job.outgoingIndex = index;
+                }
                 // Peer side (Target)
                 job.incomingCount = 1;
                 job.incomingIndex = 0;
@@ -2688,9 +2702,9 @@ export class EdgeRoutingCoordinator {
                 inBusTrunkGroups.get(trunkX)!.push(e);
             }
 
-            // Slot counts: each distinct trunk group = 1 slot, each solo edge = 1 slot
-            const outSlotCount = outBusTrunkGroups.size + outSoloEdges.length;
-            const inSlotCount  = inBusTrunkGroups.size + inSoloEdges.length;
+            // Slot counts: each bus edge = 1 slot (they now have unique indices), each solo edge = 1 slot
+            const outSlotCount = outBusEdges.length + outSoloEdges.length;
+            const inSlotCount  = inBusEdges.length + inSoloEdges.length;
 
             const hasOut = outEdges.length > 0;
             const hasIn  = inEdges.length  > 0;
@@ -2728,7 +2742,7 @@ export class EdgeRoutingCoordinator {
                     const j = jobByEdgeId.get(e.edgeId);
                     if (!j) return;
                     j.outgoingCount = totalSlots;
-                    j.outgoingIndex = outBase + outBusTrunkGroups.size + i;
+                    j.outgoingIndex = outBase + outBusEdges.length + i;
                 });
                 // Apply zone shift to in-bus edges
                 for (const e of inBusEdges) {
@@ -2747,7 +2761,7 @@ export class EdgeRoutingCoordinator {
                     const j = jobByEdgeId.get(e.edgeId);
                     if (!j) return;
                     j.incomingCount = totalSlots;
-                    j.incomingIndex = inBase + inBusTrunkGroups.size + i;
+                    j.incomingIndex = inBase + inBusEdges.length + i;
                 });
 
             } else if (hasOut && outSoloEdges.length >= 2) {
@@ -2760,7 +2774,7 @@ export class EdgeRoutingCoordinator {
                     const j = jobByEdgeId.get(e.edgeId);
                     if (!j) return;
                     j.outgoingCount = totalSlots;
-                    j.outgoingIndex = outBusTrunkGroups.size + i;
+                    j.outgoingIndex = outBusEdges.length + i;
                 });
 
             } else if (hasIn && inSoloEdges.length >= 2) {
@@ -2773,7 +2787,7 @@ export class EdgeRoutingCoordinator {
                     const j = jobByEdgeId.get(e.edgeId);
                     if (!j) return;
                     j.incomingCount = totalSlots;
-                    j.incomingIndex = inBusTrunkGroups.size + i;
+                    j.incomingIndex = inBusEdges.length + i;
                 });
             }
         }

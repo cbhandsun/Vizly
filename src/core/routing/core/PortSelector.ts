@@ -200,34 +200,6 @@ export class PortSelector {
             } else {
                 candidates = [geo.dx >= 0 ? { source: 'r', target: 'l' } : { source: 'l', target: 'r' }];
             }
-
-            // [FIX] Preserve preAssigned L-shape candidates after strict filtering.
-            // assignGlobalPorts computes per-edge handle directions based on the node's
-            // ROLE in the graph (e.g. target='top' because L-OMS is above WMS).
-            // The strict horizontal filter removes ALL vertical candidates, but the
-            // preAssigned L-shape (e.g. b→t) may be the correct choice — it creates
-            // a clean L-shape path (exit bottom → horizontal cross → enter top).
-            // Re-add it so CostEvaluator can compare it against purely horizontal options.
-            if (config.preAssignedPorts) {
-                const sPre2 = config.preAssignedPorts[sourceNode.id]?.source;
-                const tPre2 = config.preAssignedPorts[targetNode.id]?.target;
-                if (sPre2 && !candidates.some(c => c.source === sPre2)) {
-                    // Source-side preAssigned was filtered out — add L-shape candidates
-                    for (const tgt of ['l', 'r', 't', 'b']) {
-                        if (!candidates.some(c => c.source === sPre2 && c.target === tgt)) {
-                            candidates.push({ source: sPre2, target: tgt });
-                        }
-                    }
-                }
-                if (tPre2 && !candidates.some(c => c.target === tPre2)) {
-                    // Target-side preAssigned was filtered out — add L-shape candidates
-                    for (const src of ['l', 'r', 't', 'b']) {
-                        if (!candidates.some(c => c.source === src && c.target === tPre2)) {
-                            candidates.push({ source: src, target: tPre2 });
-                        }
-                    }
-                }
-            }
         }
 
         // 几何首选候选置顶 (Geometric Primary)

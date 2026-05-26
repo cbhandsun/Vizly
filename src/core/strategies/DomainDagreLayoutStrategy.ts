@@ -1230,37 +1230,15 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             }
 
             const mergedPorts = { ...globalPorts };
-
-            // [FIX] Lift per-edge handle decisions into per-node entries.
-            // assignGlobalPorts stores per-edge decisions as globalPorts[edge.id],
-            // but PortSelector only reads globalPorts[nodeId]. When per-node
-            // consensus doesn't exist (e.g. L-OMS has 3 outgoing edges in different
-            // directions), the per-edge decision is lost. Lift it here.
-            const edgePorts = globalPorts[edge.id];
-            if (edgePorts) {
-                if (edgePorts.source) {
-                    mergedPorts[source.id] = {
-                        ...mergedPorts[source.id],
-                        source: edgePorts.source
-                    };
-                }
-                if (edgePorts.target) {
-                    mergedPorts[target.id] = {
-                        ...mergedPorts[target.id],
-                        target: edgePorts.target
-                    };
-                }
-            }
-
             if (explicitSourceHandle) {
                 mergedPorts[source.id] = {
-                    ...mergedPorts[source.id],
+                    ...globalPorts[source.id],
                     source: explicitSourceHandle
                 };
             }
             if (explicitTargetHandle) {
                 mergedPorts[target.id] = {
-                    ...mergedPorts[target.id],
+                    ...globalPorts[target.id],
                     target: explicitTargetHandle
                 };
             }
