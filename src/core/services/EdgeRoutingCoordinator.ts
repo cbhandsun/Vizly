@@ -1925,7 +1925,10 @@ export class EdgeRoutingCoordinator {
             const peerRect = getNodeRect(peerId);
             if (!peerRect) return;
             const peerJob = jobByEdgeId.get(peerEdge.id);
-            const keepTrueHemisphere = !!peerJob?.isReverseEdge || isReverseByGeometry(peerEdge);
+            // [FIX] Only use explicit isReverseEdge from edge context, NOT isReverseByGeometry.
+            // isReverseByGeometry was too aggressive: it blocked normal forward edges (e.g. L-OMS→WMS)
+            // from escaping to their natural port side just because they go "backward" in layout direction.
+            const keepTrueHemisphere = !!peerJob?.isReverseEdge;
 
             const peerCenter = { x: peerRect.x + peerRect.width / 2, y: peerRect.y + peerRect.height / 2 };
             const dx = peerCenter.x - hubCenter.x;
@@ -1935,7 +1938,7 @@ export class EdgeRoutingCoordinator {
             if (isVerticalFlow) {
                 // 涓绘祦=涓婁笅 鈫?榛樿鎸?y 鍒嗗崐鐞?
                 // 閫冮€革細濡傛灉 |dx| > 2*|dy| 涓?|dx| > 50px锛岃鏄?peer 寮虹儓鍋忓悜宸﹀彸
-                if (!keepTrueHemisphere && Math.abs(dx) > Math.abs(dy) * 2 && Math.abs(dx) > 50) {
+                if (!keepTrueHemisphere && Math.abs(dx) > Math.abs(dy) * 1.5 && Math.abs(dx) > 50) {
                     side = dx < 0 ? 'left' : 'right';
                 } else {
                     side = dy < 0 ? 'top' : 'bottom';
@@ -1943,7 +1946,7 @@ export class EdgeRoutingCoordinator {
             } else {
                 // 涓绘祦=宸﹀彸 鈫?榛樿鎸?x 鍒嗗崐鐞?
                 // 閫冮€革細濡傛灉 |dy| > 2*|dx| 涓?|dy| > 50px
-                if (!keepTrueHemisphere && Math.abs(dy) > Math.abs(dx) * 2 && Math.abs(dy) > 50) {
+                if (!keepTrueHemisphere && Math.abs(dy) > Math.abs(dx) * 1.5 && Math.abs(dy) > 50) {
                     side = dy < 0 ? 'top' : 'bottom';
                 } else {
                     side = dx < 0 ? 'left' : 'right';
@@ -1975,7 +1978,7 @@ export class EdgeRoutingCoordinator {
             // 濡傛灉娓呴櫎浜嗘爣蹇楋紝Worker 浼氭粦鍔ㄧ鍙ｂ啋绔彛鍋忕涓績銆?
             if (groupEdges.length === 1 && sideGroups.size > 1) {
                 const job = busGroupJobs.find(j => j.edgeId === groupEdges[0].id);
-                const shouldKeepSingletonBus = !!job?.isReverseEdge || isReverseByGeometry(groupEdges[0]);
+                const shouldKeepSingletonBus = !!job?.isReverseEdge;
                 if (job && !shouldKeepSingletonBus) {
                     if (isManyToOne) {
                         // 涓嶆竻闄?job.isManyToOne锛屼繚鎸?isBus=true 璁?Worker 绂佹绔彛婊戝姩
