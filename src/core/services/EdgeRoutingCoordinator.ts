@@ -2667,9 +2667,13 @@ export class EdgeRoutingCoordinator {
                     : r.y + r.height / 2;
             };
 
-            // Solo edges: no trunk geometry, handled entirely by this function
-            const outSoloEdges = outEdges.filter(e => !e.isOneToMany && !e.isManyToOne);
-            const inSoloEdges  = inEdges.filter( e => !e.isOneToMany && !e.isManyToOne);
+            // Solo edges: no trunk geometry on THIS side, handled entirely by this function
+            // [FIX] For out-edges, only isOneToMany matters (source-side fan-out).
+            // isManyToOne is a target-side property and irrelevant for source port classification.
+            // Previously, dual-identity edges (isOneToMany=false, isManyToOne=true) fell through
+            // both solo and bus filters, getting no port separation at all.
+            const outSoloEdges = outEdges.filter(e => !e.isOneToMany);
+            const inSoloEdges  = inEdges.filter( e => !e.isManyToOne);
             // Bus edges: have trunk geometry, only zone-shifted if needed
             const outBusEdges  = outEdges.filter(e => e.isOneToMany);
             const inBusEdges   = inEdges.filter( e => e.isManyToOne);
