@@ -878,7 +878,8 @@ export function removeCrossAxisDetour(
             const mainB = mainCoord(B);
 
             // Determine which side to route around: prefer the side closer to the destination
-            const PADDING = 30;
+            const PADDING = 50;
+            const validCandidates: { clearCross: number; mid1: Point; mid2: Point; zLen: number }[] = [];
             // Find blocking obstacle range in cross-axis
             const crossMin = Math.min(crossA, crossB);
             const crossMax = Math.max(crossA, crossB);
@@ -916,12 +917,19 @@ export function removeCrossAxisDetour(
                 if (zLen >= origLen - 20) continue; // Must be shorter
 
                 if (!isBlocked(A, mid1) && !isBlocked(mid1, mid2) && !isBlocked(mid2, B)) {
-                    return [
-                        ...points.slice(0, i + 1),
-                        mid1, mid2,
-                        ...points.slice(returnIdx)
-                    ];
+                    validCandidates.push({ clearCross, mid1, mid2, zLen });
                 }
+            }
+
+            // Pick the shortest valid candidate
+            if (validCandidates.length > 0) {
+                validCandidates.sort((a, b) => a.zLen - b.zLen);
+                const best = validCandidates[0];
+                return [
+                    ...points.slice(0, i + 1),
+                    best.mid1, best.mid2,
+                    ...points.slice(returnIdx)
+                ];
             }
         }
     }
