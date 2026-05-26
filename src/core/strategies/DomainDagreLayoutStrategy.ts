@@ -1314,6 +1314,106 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
 
         // ═══════════════════════════════════════════════════════════════
+        // [FIX] Port Ordering: Avoid unnecessary crossings for same-side edges
+        //
+        // When multiple edges share the same side of a node (e.g. two edges
+        // exit from the bottom of WMS), their anchor points default to the
+        // center of that side. Without reordering, the edge going to the
+        // LEFT target may be placed to the RIGHT of the edge going to the
+        // RIGHT target — creating an X-crossing.
+        //
+        // Fix: group edges by (node, side), sort by the opposing endpoint's
+        // perpendicular coordinate, and spread anchor points evenly.
+        // ═══════════════════════════════════════════════════════════════
+        {
+            // Collect edges by source-side and target-side
+            type EdgePortInfo = { edgeIdx: number; edge: any; otherPos: { x: number; y: number }; handle: string };
+            const sourceGroups = new Map<string, EdgePortInfo[]>(); // key: nodeId:handle
+            const targetGroups = new Map<string, EdgePortInfo[]>();
+
+            clonedEdges.forEach((edge, idx) => {
+                const src = idMap.get(edge.source);
+                const tgt = idMap.get(edge.target);
+                if (!src || !tgt) return;
+
+                const sh = normalizeHandle(edge.sourceHandle || 'bottom');
+                const th = normalizeHandle(edge.targetHandle || 'top');
+
+                const tAbsPos = (tgt as any).positionAbsolute || tgt.position;
+                const sAbsPos = (src as any).positionAbsolute || src.position;
+                const tDims = { width: (tgt as any).measured?.width || (tgt as any).style?.width || 200, height: (tgt as any).measured?.height || (tgt as any).style?.height || 80 };
+                const sDims = { width: (src as any).measured?.width || (src as any).style?.width || 200, height: (src as any).measured?.height || (src as any).style?.height || 80 };
+
+                const sKey = `${edge.source}:${sh}:source`;
+                if (!sourceGroups.has(sKey)) sourceGroups.set(sKey, []);
+                sourceGroups.get(sKey)!.push({
+                    edgeIdx: idx, edge, handle: sh,
+                    otherPos: { x: tAbsPos.x + tDims.width / 2, y: tAbsPos.y + tDims.height / 2 }
+                });
+
+                const tKey = `${edge.target}:${th}:target`;
+                if (!targetGroups.has(tKey)) targetGroups.set(tKey, []);
+                targetGroups.get(tKey)!.push({
+                    edgeIdx: idx, edge, handle: th,
+                    otherPos: { x: sAbsPos.x + sDims.width / 2, y: sAbsPos.y + sDims.height / 2 }
+                });
+            });
+
+            const reorderPortAnchors = (groups: Map<string, EdgePortInfo[]>, role: 'source' | 'target') => {
+                for (const [key, group] of groups) {
+                    if (group.length < 2) continue;
+
+                    const nodeId = key.split(':')[0];
+                    const handle = key.split(':')[1];
+                    const node = idMap.get(nodeId);
+                    if (!node) continue;
+
+                    const absPos = (node as any).positionAbsolute || node.position;
+                    const dims = {
+                        width: (node as any).measured?.width || (node as any).style?.width || 200,
+                        height: (node as any).measured?.height || (node as any).style?.height || 80
+                    };
+
+                    // For top/bottom ports: sort by other endpoint's X coordinate
+                    // For left/right ports: sort by other endpoint's Y coordinate
+                    const isVerticalPort = handle === 't' || handle === 'b';
+                    group.sort((a, b) => {
+                        if (isVerticalPort) return a.otherPos.x - b.otherPos.x;
+                        return a.otherPos.y - b.otherPos.y;
+                    });
+
+                    // Spread anchor points evenly along the port side
+                    const n = group.length;
+                    for (let i = 0; i < n; i++) {
+                        const fraction = (i + 1) / (n + 1); // e.g. for 2 edges: 1/3, 2/3
+                        const entry = group[i];
+                        const path = (entry.edge.data as any)?.computedPath;
+                        if (!path || path.length < 2) continue;
+
+                        const ptIdx = role === 'source' ? 0 : path.length - 1;
+                        if (isVerticalPort) {
+                            // Spread along X axis
+                            path[ptIdx] = {
+                                ...path[ptIdx],
+                                x: absPos.x + dims.width * fraction
+                            };
+                        } else {
+                            // Spread along Y axis
+                            path[ptIdx] = {
+                                ...path[ptIdx],
+                                y: absPos.y + dims.height * fraction
+                            };
+                        }
+                    }
+                }
+            };
+
+            reorderPortAnchors(sourceGroups, 'source');
+            reorderPortAnchors(targetGroups, 'target');
+        }
+
+
+        // ═══════════════════════════════════════════════════════════════
         // [FIX] 禁用 P4-P8 后处理管道（对齐 DiagramView-SVG 设计）
         // 根因：P7 beautifyOrthogonalEdges / P8 optimizeTreeBusRouting
         // 使用短格式 handle ID ('r'/'l'/'t'/'b')，与 FlowchartNode 的
