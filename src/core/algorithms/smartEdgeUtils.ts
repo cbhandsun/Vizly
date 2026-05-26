@@ -679,6 +679,140 @@ export function trySimplify4PointCShape(
     return points;
 }
 
+/**
+ * [NEW] removeCrossAxisDetour
+ *
+ * 检测并修复"交叉轴 C 形绕路"——路径在非主方向先偏向错误一侧再折回。
+ *
+ * 典型场景（loms→visibility）：
+ *   (1064,652) → (1064,718) → (902,718) → (902,1416) → (1434,1416) → (1434,1540)
+ *   整体 dx=+370（向右），但路径先向左(1064→902)再向右(902→1434)，多走了 1064px。
+ *
+ * 修复策略：找到交叉轴的反向偏移段 (A→B)，尝试镜像到目标侧 (A→B')。
+ * 如果镜像路径不穿过障碍物，则替换。
+ *
+ * 条件约束：
+ * - 仅对 ≥5 点的路径生效
+ * - 反向偏移量须 > 50px (避免误触小调整)
+ * - 替代路径须不穿过障碍物
+ */
+export function removeCrossAxisDetour(
+    points: Point[],
+    obstacles: Rectangle[] | SpatialIndex = [],
+    options?: { sourcePos?: Position; targetPos?: Position }
+): Point[] {
+    if (points.length < 5) return points;
+
+    const src = points[0];
+    const dst = points[points.length - 1];
+    const totalDx = dst.x - src.x;
+    const totalDy = dst.y - src.y;
+    const isMainVertical = Math.abs(totalDy) >= Math.abs(totalDx);
+
+    // 主方向上的 cross-axis
+    const crossSign = isMainVertical
+        ? (totalDx > 0 ? 1 : totalDx < 0 ? -1 : 0) // x 方向
+        : (totalDy > 0 ? 1 : totalDy < 0 ? -1 : 0); // y 方向
+
+    if (crossSign === 0) return points; // 交叉轴无偏移
+
+    const crossCoord = (p: Point) => isMainVertical ? p.x : p.y;
+    const mainCoord = (p: Point) => isMainVertical ? p.y : p.x;
+
+    const rects = Array.isArray(obstacles)
+        ? obstacles.map(obs => ({ x: obs.x, y: obs.y, width: obs.width, height: obs.height }))
+        : typeof (obstacles as any).getAll === 'function' ? (obstacles as any).getAll().map((obs: any) => ({ x: obs.x, y: obs.y, width: obs.width, height: obs.height })) : [];
+
+    const isBlocked = (a: Point, b: Point): boolean => {
+        const CLEAR = 8;
+        const minX = Math.min(a.x, b.x) - CLEAR;
+        const maxX = Math.max(a.x, b.x) + CLEAR;
+        const minY = Math.min(a.y, b.y) - CLEAR;
+        const maxY = Math.max(a.y, b.y) + CLEAR;
+        return rects.some((obs: any) =>
+            obs.x < maxX && obs.x + obs.width > minX &&
+            obs.y < maxY && obs.y + obs.height > minY
+        );
+    };
+
+    // 扫描路径，找到第一个 cross-axis 反向偏移段
+    for (let i = 0; i < points.length - 1; i++) {
+        const segCross = crossCoord(points[i + 1]) - crossCoord(points[i]);
+        // 检查是否反向（相对于整体 cross 方向）
+        if (segCross * crossSign >= 0) continue; // 同向或零，跳过
+        if (Math.abs(segCross) < 50) continue; // 太小，不处理
+
+        // 找到反向偏移段 i→i+1
+        // 找到这个偏移"恢复"的位置（路径回到起始 cross 位置的点）
+        const startCross = crossCoord(points[i]);
+        let returnIdx = -1;
+        for (let j = i + 2; j < points.length; j++) {
+            // 当路径回到或超过 startCross 时
+            if ((crossCoord(points[j]) - startCross) * crossSign >= 0) {
+                returnIdx = j;
+                break;
+            }
+        }
+        if (returnIdx < 0) continue;
+
+        // 尝试 shortcut: 把 points[i]→...→points[returnIdx] 替换为直连
+        const A = points[i];
+        const B = points[returnIdx];
+
+        // 生成正交 shortcut: A → corner → B
+        const corner1 = { x: A.x, y: B.y };
+        const corner2 = { x: B.x, y: A.y };
+
+        // 优先选择不破坏正交性的拐角
+        const prevIsH = i > 0 ? Math.abs(points[i - 1].y - A.y) < 2 : false;
+        const prevIsV = i > 0 ? Math.abs(points[i - 1].x - A.x) < 2 : false;
+        const nextIsH = returnIdx < points.length - 1 ? Math.abs(B.y - points[returnIdx + 1].y) < 2 : false;
+        const nextIsV = returnIdx < points.length - 1 ? Math.abs(B.x - points[returnIdx + 1].x) < 2 : false;
+
+        // corner1 {A.x, B.y}: A→corner1 竖直, corner1→B 水平
+        // 需要 incoming 到 A 是水平 (prevIsH) 且 outgoing 从 B 是竖直 (nextIsV)
+        const c1ok = prevIsV && nextIsH;
+        const c2ok = prevIsH && nextIsV;
+
+        // 计算 shortcut 长度
+        const origLen = (() => {
+            let len = 0;
+            for (let k = i; k < returnIdx; k++) {
+                len += Math.abs(points[k].x - points[k + 1].x) + Math.abs(points[k].y - points[k + 1].y);
+            }
+            return len;
+        })();
+
+        // 尝试 corner1
+        if (c1ok || (!c1ok && !c2ok)) {
+            const shortLen = Math.abs(A.x - corner1.x) + Math.abs(A.y - corner1.y) +
+                             Math.abs(corner1.x - B.x) + Math.abs(corner1.y - B.y);
+            if (shortLen < origLen - 20 && !isBlocked(A, corner1) && !isBlocked(corner1, B)) {
+                return [
+                    ...points.slice(0, i + 1),
+                    corner1,
+                    ...points.slice(returnIdx)
+                ];
+            }
+        }
+
+        // 尝试 corner2
+        if (c2ok || (!c1ok && !c2ok)) {
+            const shortLen = Math.abs(A.x - corner2.x) + Math.abs(A.y - corner2.y) +
+                             Math.abs(corner2.x - B.x) + Math.abs(corner2.y - B.y);
+            if (shortLen < origLen - 20 && !isBlocked(A, corner2) && !isBlocked(corner2, B)) {
+                return [
+                    ...points.slice(0, i + 1),
+                    corner2,
+                    ...points.slice(returnIdx)
+                ];
+            }
+        }
+    }
+
+    return points;
+}
+
 export function removeLargeBacktrack(
     points: Point[],
     obstacles: Rectangle[] | SpatialIndex = [],
@@ -694,9 +828,11 @@ export function removeLargeBacktrack(
     const totalDy = dst.y - src.y;
     const isMainHorizontal = Math.abs(totalDx) >= Math.abs(totalDy);
 
-    // Require a CLEAR dominant direction (≥2:1 ratio), abort otherwise
-    if (isMainHorizontal  && Math.abs(totalDx) < Math.abs(totalDy) * 2) return points;
-    if (!isMainHorizontal && Math.abs(totalDy) < Math.abs(totalDx) * 2) return points;
+    // Require a clear dominant direction (≥1.2:1 ratio), abort otherwise
+    // [FIX] Relaxed from 2:1 to 1.2:1 to handle near-diagonal paths like
+    // tms→downstream (dx=646, dy=728) where U-turns still need removal.
+    if (isMainHorizontal  && Math.abs(totalDx) < Math.abs(totalDy) * 1.2) return points;
+    if (!isMainHorizontal && Math.abs(totalDy) < Math.abs(totalDx) * 1.2) return points;
 
     const mainSign = isMainHorizontal
         ? (totalDx > 0 ? 1 : -1)

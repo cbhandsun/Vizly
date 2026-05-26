@@ -21,7 +21,8 @@ import {
     ensureMinFirstSegment,
     removeTinyOrthogonalJogs,
     removeLargeBacktrack,
-    trySimplify4PointCShape
+    trySimplify4PointCShape,
+    removeCrossAxisDetour
 } from '../../algorithms/smartEdgeUtils';
 
 export interface PostProcessContext {
@@ -99,11 +100,16 @@ export class PathPostProcessor {
         if (context.metadata.strategy && context.metadata.strategy.includes('Trunk Direct')) {
             // [H-1] Apply snapAxis before return to eliminate sub-pixel diagonal artifacts
             // that arise from fractional coordinate math in trunk geometry construction.
-            const snapped = snapAxis(points);
+            let trunkPoints = snapAxis(points);
             // [BACKTRACK-V2] Orthogonal-safe backtrack removal for trunk paths
-            const detracked = removeLargeBacktrack(snapped, obstacles, { sourcePos: startPos, targetPos: endPos });
-            const svgPath = createFilletedPath(detracked, this.config.postProcessing.borderRadius);
-            return { points: detracked, svgPath };
+            trunkPoints = removeLargeBacktrack(trunkPoints, obstacles, { sourcePos: startPos, targetPos: endPos });
+            // [FIX] Also remove tiny orthogonal jogs (e.g. 10px S-bends from port offset)
+            // that Trunk Direct geometry construction may produce.
+            const jogThreshold = Math.max(config.algorithm.gridSize * 1.5, 40);
+            trunkPoints = removeTinyOrthogonalJogs(trunkPoints, jogThreshold, obstacles, { sourcePos: startPos, targetPos: endPos });
+            trunkPoints = collapseCollinearBacktracks(trunkPoints);
+            const svgPath = createFilletedPath(trunkPoints, this.config.postProcessing.borderRadius);
+            return { points: trunkPoints, svgPath };
         }
 
         if (context.metadata.strategy === 'Reverse U-Turn') {
@@ -163,6 +169,8 @@ export class PathPostProcessor {
         // Only fires when: dominant direction is clear (≥2:1), AND
         // corner is provably perpendicular to both incoming and outgoing segments.
         finalPoints = removeLargeBacktrack(finalPoints, simplifyObstacles, posOptions, 20);
+        // [FIX] Remove cross-axis C-shaped detours (e.g. path goes left then right when target is to the right)
+        finalPoints = removeCrossAxisDetour(finalPoints, simplifyObstacles, posOptions);
         finalPoints = collapseRedundantBends(finalPoints, simplifyObstacles, config.postProcessing.redundantBendThreshold, posOptions);
 
         // Phase 2: Cleanup (Jogs, Backtracks)
