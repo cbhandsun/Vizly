@@ -2396,12 +2396,20 @@ export function removeTinyOrthogonalJogs(
                     const newP2 = { x: p2.x, y: p0.y };
                     const newP3 = { x: p3.x, y: p0.y };
 
-                    // If p3 is End Point, aligning to p0 might break p2->p3 orthogonality or shorten stub.
-                    let canAlign1 = !isEnd;
+                    // [FIX] When isEnd=true, default to allowing alignment if target port is horizontal
+                    // (flattening Y doesn't break horizontal port connections).
+                    let canAlign1 = true;
                     if (isEnd && options.targetPos) {
                         const isTargetHoriz = options.targetPos === Position.Left || options.targetPos === Position.Right;
-                        const lastLen = Math.abs(newP3.x - newP2.x);
-                        if (isTargetHoriz && lastLen < 30) canAlign1 = false;
+                        if (isTargetHoriz) {
+                            // Horizontal target port: Y-flatten is safe, check min segment
+                            const lastLen = Math.abs(newP3.x - newP2.x);
+                            if (lastLen < 5) canAlign1 = false;
+                        } else {
+                            // Vertical target port: must preserve Y, flattening to p0.y may break it
+                            const lastLen = Math.abs(newP3.y - newP2.y);
+                            if (lastLen < 30) canAlign1 = false;
+                        }
                     }
 
                     if (canAlign1 && !isBlocked([p0, newP1, newP2, newP3])) {
@@ -2417,12 +2425,17 @@ export function removeTinyOrthogonalJogs(
                     const newP1b = { x: p1.x, y: p3.y };
                     const newP2b = { x: p2.x, y: p3.y };
 
-                    // If p0 is Start Point, aligning to p3 might break p0->p1 orthogonality or shorten stub.
-                    let canAlign2 = !isStart;
+                    // [FIX] When isStart=true, default to allowing alignment if source port is horizontal
+                    let canAlign2 = true;
                     if (isStart && options.sourcePos) {
                         const isSourceHoriz = options.sourcePos === Position.Left || options.sourcePos === Position.Right;
-                        const firstLen = Math.abs(newP1b.x - newP0b.x);
-                        if (isSourceHoriz && firstLen < 30) canAlign2 = false;
+                        if (isSourceHoriz) {
+                            const firstLen = Math.abs(newP1b.x - newP0b.x);
+                            if (firstLen < 5) canAlign2 = false;
+                        } else {
+                            const firstLen = Math.abs(newP1b.y - newP0b.y);
+                            if (firstLen < 30) canAlign2 = false;
+                        }
                     }
 
                     if (canAlign2 && !isBlocked([newP0b, newP1b, newP2b, p3])) {
@@ -2451,11 +2464,21 @@ export function removeTinyOrthogonalJogs(
                     const newP2 = { x: p0.x, y: p2.y };
                     const newP3 = { x: p0.x, y: p3.y };
 
-                    let canAlign1 = !isEnd;
+                    // [FIX] When isEnd=true, default to allowing alignment if target port is vertical
+                    // (flattening X doesn't break vertical port connections).
+                    // Only block if target is horizontal AND the last segment would be too short.
+                    let canAlign1 = true;
                     if (isEnd && options.targetPos) {
                         const isTargetVert = options.targetPos === Position.Top || options.targetPos === Position.Bottom;
-                        const lastLen = Math.abs(newP3.y - newP2.y);
-                        if (isTargetVert && lastLen < 30) canAlign1 = false;
+                        if (isTargetVert) {
+                            // Vertical target port: X-flatten is safe, just check min segment length
+                            const lastLen = Math.abs(newP3.y - newP2.y);
+                            if (lastLen < 5) canAlign1 = false;
+                        } else {
+                            // Horizontal target port: must preserve X, so flattening to p0.x may break it
+                            const lastLen = Math.abs(newP3.x - newP2.x);
+                            if (lastLen < 30) canAlign1 = false;
+                        }
                     }
 
                     if (canAlign1 && !isBlocked([p0, newP1, newP2, newP3])) {
@@ -2471,11 +2494,17 @@ export function removeTinyOrthogonalJogs(
                     const newP1b = { x: p3.x, y: p1.y };
                     const newP2b = { x: p3.x, y: p2.y };
 
-                    let canAlign2 = !isStart;
+                    // [FIX] When isStart=true, default to allowing alignment if source port is vertical
+                    let canAlign2 = true;
                     if (isStart && options.sourcePos) {
                         const isSourceVert = options.sourcePos === Position.Top || options.sourcePos === Position.Bottom;
-                        const firstLen = Math.abs(newP1b.y - newP0b.y);
-                        if (isSourceVert && firstLen < 30) canAlign2 = false;
+                        if (isSourceVert) {
+                            const firstLen = Math.abs(newP1b.y - newP0b.y);
+                            if (firstLen < 5) canAlign2 = false;
+                        } else {
+                            const firstLen = Math.abs(newP1b.x - newP0b.x);
+                            if (firstLen < 30) canAlign2 = false;
+                        }
                     }
 
                     if (canAlign2 && !isBlocked([newP0b, newP1b, newP2b, p3])) {

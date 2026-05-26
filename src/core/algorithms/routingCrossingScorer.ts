@@ -157,7 +157,66 @@ export class RoutingCrossingScorer {
             if (!collinearX && !collinearY) simplified.push(curr);
         }
         simplified.push(deduped[deduped.length - 1]);
-        return simplified;
+
+        // [FIX] Micro-jog elimination: remove tiny S-bends that look like diagonal lines.
+        // Pattern: ...-A-B-C-D-... where B-C is a very short segment (< threshold) perpendicular
+        // to A-B and C-D. Removing B and C makes A connect directly to D via the dominant axis.
+        const MICRO_JOG_THRESHOLD = 15; // px
+        let result = simplified;
+        let changed = true;
+        while (changed) {
+            changed = false;
+            const next: Point[] = [result[0]];
+            for (let i = 1; i < result.length - 2; i++) {
+                const a = next[next.length - 1];
+                const b = result[i];
+                const c = result[i + 1];
+                const d = result[i + 2];
+                // Check if B-C is a short perpendicular jog
+                const bcDx = Math.abs(c.x - b.x);
+                const bcDy = Math.abs(c.y - b.y);
+                const bcIsHoriz = bcDy < 1.5 && bcDx > 0;
+                const bcIsVert = bcDx < 1.5 && bcDy > 0;
+                if (bcIsHoriz && bcDx < MICRO_JOG_THRESHOLD) {
+                    // B-C is a short horizontal jog; A-B should be vertical, C-D should be vertical
+                    const abIsVert = Math.abs(a.x - b.x) < 1.5;
+                    const cdIsVert = Math.abs(c.x - d.x) < 1.5;
+                    if (abIsVert && cdIsVert) {
+                        // Snap: extend A's x-line down to D's y-level, skip B and C
+                        // Use the average x to avoid bias
+                        const snapX = (a.x + d.x) / 2;
+                        next[next.length - 1] = { x: snapX, y: a.y };
+                        // Skip B and C, adjust D
+                        result[i + 2] = { x: snapX, y: d.y };
+                        i += 1; // skip C (B already skipped by not pushing)
+                        changed = true;
+                        continue;
+                    }
+                } else if (bcIsVert && bcDy < MICRO_JOG_THRESHOLD) {
+                    // B-C is a short vertical jog; A-B should be horizontal, C-D should be horizontal
+                    const abIsHoriz = Math.abs(a.y - b.y) < 1.5;
+                    const cdIsHoriz = Math.abs(c.y - d.y) < 1.5;
+                    if (abIsHoriz && cdIsHoriz) {
+                        const snapY = (a.y + d.y) / 2;
+                        next[next.length - 1] = { x: a.x, y: snapY };
+                        result[i + 2] = { x: d.x, y: snapY };
+                        i += 1;
+                        changed = true;
+                        continue;
+                    }
+                }
+                next.push(b);
+            }
+            // Push remaining points
+            for (let i = Math.max(1, next.length === 1 ? 1 : result.length - 2); i < result.length; i++) {
+                if (next.length === 0 || result[i] !== next[next.length - 1]) {
+                    next.push(result[i]);
+                }
+            }
+            result = next;
+        }
+
+        return result;
     }
 
     public static pathHitsObstacle(points: Point[], obstacles: Rectangle[], padding = 3): boolean {
