@@ -841,8 +841,9 @@ export function removeLargeBacktrack(
     const minBacktrackDist = Math.max(threshold, totalSpan * 0.25);
 
     const mainCoord = (p: Point) => isMainHorizontal ? p.x : p.y;
-    const isHoriz   = (a: Point, b: Point) => Math.abs(a.y - b.y) < 1;
-    const isVert    = (a: Point, b: Point) => Math.abs(a.x - b.x) < 1;
+    // [FIX] Relaxed from <1 to <10 to handle trunk geometry precision errors (~8px)
+    const isHoriz   = (a: Point, b: Point) => Math.abs(a.y - b.y) < 10;
+    const isVert    = (a: Point, b: Point) => Math.abs(a.x - b.x) < 10;
 
     const isBlocked = (a: Point, b: Point): boolean => {
         const rects = Array.isArray(obstacles) ? (obstacles as Rectangle[]) : [];
@@ -866,20 +867,45 @@ export function removeLargeBacktrack(
         const pts = result;
         if (pts.length < 5) break;
 
-        // Protect first stub (0→1) and last stub (n-2→n-1); scan interior only
-        for (let i = 1; i <= pts.length - 4; i++) {
+        // Protect first stub (0→1); scan interior up to pts.length-3
+        // [FIX] Previously used pts.length-4, which missed overshoot patterns near path end
+        for (let i = 1; i <= pts.length - 3; i++) {
             const segDelta = mainCoord(pts[i + 1]) - mainCoord(pts[i]);
             if ((segDelta * mainSign) >= -minBacktrackDist) continue;
 
             const backtrackLevel = mainCoord(pts[i]);
             let returnIdx = -1;
-            for (let j = i + 2; j <= Math.min(pts.length - 2, i + 8); j++) {
+            for (let j = i + 2; j <= Math.min(pts.length - 1, i + 8); j++) {
                 if ((mainCoord(pts[j]) - backtrackLevel) * mainSign >= 0) {
                     returnIdx = j;
                     break;
                 }
             }
-            if (returnIdx < 0 || returnIdx >= pts.length - 1) continue;
+            // [FIX] For overshoot patterns: the path went past the destination
+            // in the main direction and then folded back (e.g. x goes to -32 when dst is at x=180).
+            // pts[i] is the fold-back start, which is the most extreme overshoot point.
+            if (returnIdx < 0) {
+                const foldStartCoord = mainCoord(pts[i]);
+                const dstCoord = mainCoord(dst);
+                // "past dst" means fold-back start is further than dst in main direction
+                const isPastDst = (foldStartCoord - dstCoord) * mainSign > 0;
+                if (isPastDst) {
+                    // Find the closest point to dst after the fold
+                    let bestJ = -1;
+                    let bestDist = Infinity;
+                    for (let j = i + 1; j <= pts.length - 1; j++) {
+                        const dist = Math.abs(mainCoord(pts[j]) - dstCoord);
+                        if (dist < bestDist) {
+                            bestDist = dist;
+                            bestJ = j;
+                        }
+                    }
+                    if (bestJ >= i + 1) {
+                        returnIdx = bestJ;
+                    }
+                }
+            }
+            if (returnIdx < 0) continue;
 
             const A = pts[i];
             const B = pts[returnIdx];
@@ -889,8 +915,18 @@ export function removeLargeBacktrack(
             // corner2 = {B.x, A.y}: A→corner2 is H (need incomingV), corner2→B is V (need outgoingH)
             const incomingIsH = isHoriz(pts[i - 1], A);
             const incomingIsV = isVert(pts[i - 1], A);
-            const outgoingIsH = isHoriz(B, pts[returnIdx + 1]);
-            const outgoingIsV = isVert(B, pts[returnIdx + 1]);
+            
+            let outgoingIsH: boolean;
+            let outgoingIsV: boolean;
+            if (returnIdx >= pts.length - 1) {
+                // B is the endpoint — no outgoing segment to check.
+                // Any corner direction is valid, so both are "ok".
+                outgoingIsH = true;
+                outgoingIsV = true;
+            } else {
+                outgoingIsH = isHoriz(B, pts[returnIdx + 1]);
+                outgoingIsV = isVert(B, pts[returnIdx + 1]);
+            }
 
             const corner1ok = incomingIsH && outgoingIsV;
             const corner2ok = incomingIsV && outgoingIsH;
