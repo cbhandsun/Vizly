@@ -696,6 +696,63 @@ export function trySimplify4PointCShape(
  * - 反向偏移量须 > 50px (避免误触小调整)
  * - 替代路径须不穿过障碍物
  */
+/**
+ * straightenMicroOffset
+ * 
+ * 当路径的起点和终点在某一轴上"几乎对齐"时（偏移 < maxOffset），
+ * 将路径拉直为两点直线。解决 wms→wcs 类型的渐变偏移 S 弯。
+ * 
+ * 例如：(191,930)→(191,1045)→(186,1050)→(181,1090)
+ * dx=10, dy=160 → 几乎垂直对齐 → 拉直为 (186,930)→(186,1090)
+ */
+export function straightenMicroOffset(
+    points: Point[],
+    obstacles: Rectangle[] | SpatialIndex = [],
+    maxOffset: number = 15
+): Point[] {
+    if (points.length < 3) return points;
+
+    const src = points[0];
+    const dst = points[points.length - 1];
+    const dx = Math.abs(dst.x - src.x);
+    const dy = Math.abs(dst.y - src.y);
+
+    const rects = Array.isArray(obstacles) ? (obstacles as Rectangle[]) : [];
+    const isBlocked = (a: Point, b: Point): boolean => {
+        const CLEAR = 4;
+        const minX = Math.min(a.x, b.x) - CLEAR;
+        const maxX = Math.max(a.x, b.x) + CLEAR;
+        const minY = Math.min(a.y, b.y) - CLEAR;
+        const maxY = Math.max(a.y, b.y) + CLEAR;
+        return rects.some(obs =>
+            obs.x < maxX && obs.x + obs.width > minX &&
+            obs.y < maxY && obs.y + obs.height > minY
+        );
+    };
+
+    // Nearly vertical alignment: small dx, large dy
+    if (dx < maxOffset && dy > dx * 3) {
+        const midX = Math.round((src.x + dst.x) / 2);
+        const a = { x: midX, y: src.y };
+        const b = { x: midX, y: dst.y };
+        if (!isBlocked(a, b)) {
+            return [a, b];
+        }
+    }
+
+    // Nearly horizontal alignment: small dy, large dx
+    if (dy < maxOffset && dx > dy * 3) {
+        const midY = Math.round((src.y + dst.y) / 2);
+        const a = { x: src.x, y: midY };
+        const b = { x: dst.x, y: midY };
+        if (!isBlocked(a, b)) {
+            return [a, b];
+        }
+    }
+
+    return points;
+}
+
 export function removeCrossAxisDetour(
     points: Point[],
     obstacles: Rectangle[] | SpatialIndex = [],
@@ -806,6 +863,65 @@ export function removeCrossAxisDetour(
                     corner2,
                     ...points.slice(returnIdx)
                 ];
+            }
+        }
+
+        // Z-shape fallback: A → mid1 → mid2 → B
+        // When both L-shape corners are blocked, try routing around the obstacle
+        // by finding a clear channel in the cross-axis direction.
+        // For isMainVertical (cross = x): try x values outside the blocking obstacle range
+        // Path shape: A(Ax,Ay) → (clearX, Ay) → (clearX, By) → B(Bx, By)
+        {
+            const crossA = crossCoord(A);
+            const crossB = crossCoord(B);
+            const mainA = mainCoord(A);
+            const mainB = mainCoord(B);
+
+            // Determine which side to route around: prefer the side closer to the destination
+            const PADDING = 30;
+            // Find blocking obstacle range in cross-axis
+            const crossMin = Math.min(crossA, crossB);
+            const crossMax = Math.max(crossA, crossB);
+            
+            // Try routing on the far side of destination (cross direction same as overall)
+            const candidateChannels: number[] = [];
+            // Side 1: beyond destination cross coordinate
+            candidateChannels.push(Math.max(crossA, crossB) + PADDING);
+            // Side 2: beyond source cross coordinate (opposite)
+            candidateChannels.push(Math.min(crossA, crossB) - PADDING);
+
+            // Also try scanning obstacle edges for a clear channel
+            for (const obs of rects) {
+                const obsMin = isMainVertical ? obs.x : obs.y;
+                const obsMax = isMainVertical ? obs.x + obs.width : obs.y + obs.height;
+                const obsCrossMin = obsMin;
+                const obsCrossMax = obsMax;
+                // Only consider obstacles that are in the main-axis range between A and B
+                const obsMainMin = isMainVertical ? obs.y : obs.x;
+                const obsMainMax = isMainVertical ? obs.y + obs.height : obs.x + obs.width;
+                if (obsMainMax < Math.min(mainA, mainB) || obsMainMin > Math.max(mainA, mainB)) continue;
+                
+                candidateChannels.push(obsCrossMax + PADDING); // just past right/bottom edge
+                candidateChannels.push(obsCrossMin - PADDING); // just past left/top edge
+            }
+
+            for (const clearCross of candidateChannels) {
+                const mid1 = isMainVertical ? { x: clearCross, y: A.y } : { x: A.x, y: clearCross };
+                const mid2 = isMainVertical ? { x: clearCross, y: B.y } : { x: B.x, y: clearCross };
+                
+                const zLen = Math.abs(crossCoord(A) - clearCross) + 
+                             Math.abs(mainA - mainB) + 
+                             Math.abs(clearCross - crossCoord(B));
+                
+                if (zLen >= origLen - 20) continue; // Must be shorter
+
+                if (!isBlocked(A, mid1) && !isBlocked(mid1, mid2) && !isBlocked(mid2, B)) {
+                    return [
+                        ...points.slice(0, i + 1),
+                        mid1, mid2,
+                        ...points.slice(returnIdx)
+                    ];
+                }
             }
         }
     }

@@ -23,7 +23,8 @@ import {
     removeLargeBacktrack,
     trySimplify4PointCShape,
     removeCrossAxisDetour,
-    removeMainAxisOvershoot
+    removeMainAxisOvershoot,
+    straightenMicroOffset
 } from '../../algorithms/smartEdgeUtils';
 
 export interface PostProcessContext {
@@ -118,6 +119,8 @@ export class PathPostProcessor {
             const jogThreshold = Math.max(config.algorithm.gridSize * 1.5, 40);
             trunkPoints = removeTinyOrthogonalJogs(trunkPoints, jogThreshold, obstacles, { sourcePos: startPos, targetPos: endPos });
             trunkPoints = collapseCollinearBacktracks(trunkPoints);
+            // [FIX] Straighten micro-offset S-bends (e.g. wms→wcs: 191→186→181)
+            trunkPoints = straightenMicroOffset(trunkPoints, obstacles);
             const svgPath = createFilletedPath(trunkPoints, this.config.postProcessing.borderRadius);
             return { points: trunkPoints, svgPath };
         }
@@ -185,7 +188,12 @@ export class PathPostProcessor {
 
         // Phase 2: Cleanup (Jogs, Backtracks)
         finalPoints = removeSmallJogs(finalPoints, simplifyObstacles, posOptions);
+        // [FIX] Remove tiny orthogonal jogs (small S-bends) in general paths too
+        const jogThresholdGeneral = Math.max(config.algorithm.gridSize * 1.5, 40);
+        finalPoints = removeTinyOrthogonalJogs(finalPoints, jogThresholdGeneral, simplifyObstacles, posOptions);
         finalPoints = collapseCollinearBacktracks(preventEndpointCollinearBacktrack(finalPoints));
+        // [FIX] Straighten micro-offset S-bends (e.g. 191→186→181, dx=10 vs dy=160)
+        finalPoints = straightenMicroOffset(finalPoints, simplifyObstacles);
 
         // Phase 3: Nudging (Separating parallel paths)
         // [IMPORTANT] Run Nudge BEFORE final Orthogonalization to ensure shifted lines are correctly aligned.
