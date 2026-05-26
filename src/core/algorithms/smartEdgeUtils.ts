@@ -826,12 +826,12 @@ export function removeLargeBacktrack(
 
     const totalDx = dst.x - src.x;
     const totalDy = dst.y - src.y;
-    // [FIX] No ratio check — any path with a significant reverse segment
-    // (>= minBacktrackDist) should have backtrack removal attempted.
-    // Previously required 2:1 then 1.2:1, which rejected near-diagonal paths
-    // like wms→visibility (dx=718, dy=669). Safety comes from the obstacle
-    // check and minimum backtrack distance (100px), not from angle filtering.
+    // Require a clear dominant direction (≥1.2:1 ratio), abort otherwise
+    // [FIX] Relaxed from 2:1 to 1.2:1 to handle near-diagonal paths like
+    // tms→downstream (dx=646, dy=728) where U-turns still need removal.
     const isMainHorizontal = Math.abs(totalDx) >= Math.abs(totalDy);
+    if (isMainHorizontal  && Math.abs(totalDx) < Math.abs(totalDy) * 1.2) return points;
+    if (!isMainHorizontal && Math.abs(totalDy) < Math.abs(totalDx) * 1.2) return points;
 
     const mainSign = isMainHorizontal
         ? (totalDx > 0 ? 1 : -1)
@@ -841,9 +841,8 @@ export function removeLargeBacktrack(
     const minBacktrackDist = Math.max(threshold, totalSpan * 0.25);
 
     const mainCoord = (p: Point) => isMainHorizontal ? p.x : p.y;
-    // [FIX] Relaxed from <1 to <10 to handle trunk geometry precision errors (~8px)
-    const isHoriz   = (a: Point, b: Point) => Math.abs(a.y - b.y) < 10;
-    const isVert    = (a: Point, b: Point) => Math.abs(a.x - b.x) < 10;
+    const isHoriz   = (a: Point, b: Point) => Math.abs(a.y - b.y) < 1;
+    const isVert    = (a: Point, b: Point) => Math.abs(a.x - b.x) < 1;
 
     const isBlocked = (a: Point, b: Point): boolean => {
         const rects = Array.isArray(obstacles) ? (obstacles as Rectangle[]) : [];
