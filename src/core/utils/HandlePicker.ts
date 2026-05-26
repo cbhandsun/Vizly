@@ -182,29 +182,14 @@ export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record
 
         // Source Side Decision
         const srcOut = outEdges.get(edge.source) || [];
-        // 如果是 1-to-N Hub (出度 > 1)，使用和 Worker processBusGroups 一致的 hemisphere escape 逻辑
-        // 而不是简单的重心方向。这防止远离主轴的节点（如 TMS 偏左）把其他节点拖入错误的 handle。
+        // 如果是 1-to-N Hub (出度 > 1)，仅对相同流动方向的分支目标进行重心方向聚合
         if (srcOut.length > 1) {
-            const c = getBounds(src);
-            const tgtB = getBounds(tgt);
-            const dx = tgtB.cx - c.cx;
-            const dy = tgtB.cy - c.cy;
-
-            if (isH) {
-                // 水平流：默认左右，escape 到上下 (45° = 1.0x)
-                if (Math.abs(dy) > Math.abs(dx) * 1.0 && Math.abs(dy) > 50) {
-                    sHandle = dy < 0 ? 'top' : 'bottom';
-                } else {
-                    sHandle = dx < 0 ? 'left' : 'right';
-                }
-            } else {
-                // 垂直流：默认上下，escape 到左右 (45° = 1.0x)
-                if (Math.abs(dx) > Math.abs(dy) * 1.0 && Math.abs(dx) > 50) {
-                    sHandle = dx < 0 ? 'left' : 'right';
-                } else {
-                    sHandle = dy < 0 ? 'top' : 'bottom';
-                }
-            }
+            const tgtSign = getSideSign(src, tgt);
+            const targets = srcOut
+                .map(e => nodeMap.get(e.target))
+                .filter(Boolean)
+                .filter(t => getSideSign(src, t) === tgtSign);
+            sHandle = getDominantSide(src, targets);
         } else {
             // 单独连接，退化为两点判定 (与之前逻辑一致)
             sHandle = getDominantSide(src, [tgt]);
@@ -212,26 +197,14 @@ export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record
 
         // Target Side Decision
         const tgtIn = inEdges.get(edge.target) || [];
-        // N-to-1 Hub: 使用和 Worker 一致的 hemisphere escape 逻辑
+        // 如果是 N-to-1 Hub (入度 > 1)，仅对相同流动方向的来源节点进行重心方向聚合
         if (tgtIn.length > 1) {
-            const c = getBounds(tgt);
-            const srcB = getBounds(src);
-            const dx = srcB.cx - c.cx;
-            const dy = srcB.cy - c.cy;
-
-            if (isH) {
-                if (Math.abs(dy) > Math.abs(dx) * 1.0 && Math.abs(dy) > 50) {
-                    tHandle = dy < 0 ? 'top' : 'bottom';
-                } else {
-                    tHandle = dx < 0 ? 'left' : 'right';
-                }
-            } else {
-                if (Math.abs(dx) > Math.abs(dy) * 1.0 && Math.abs(dx) > 50) {
-                    tHandle = dx < 0 ? 'left' : 'right';
-                } else {
-                    tHandle = dy < 0 ? 'top' : 'bottom';
-                }
-            }
+            const srcSign = getSideSign(tgt, src);
+            const sources = tgtIn
+                .map(e => nodeMap.get(e.source))
+                .filter(Boolean)
+                .filter(s => getSideSign(tgt, s) === srcSign);
+            tHandle = getDominantSide(tgt, sources);
         } else {
             // 单独连接，退化为两点判定
             tHandle = getDominantSide(tgt, [src]);
