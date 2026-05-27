@@ -1968,6 +1968,31 @@ export class EdgeRoutingCoordinator {
             sideGroups.get(side)!.push(peerEdge);
         });
 
+
+        // [FIX] Pre-merge singletons into largest group BEFORE trunk calculation.
+        // Prevents escaped edges (e.g. Customs dx/dy=2.2x) from losing shared O2M trunk.
+        if (sideGroups.size > 1) {
+            let largestSide = '';
+            let largestCount = 0;
+            for (const [s, edges] of sideGroups) {
+                if (edges.length > largestCount) {
+                    largestCount = edges.length;
+                    largestSide = s;
+                }
+            }
+            const singletonKeys = [];
+            for (const [s, edges] of sideGroups) {
+                if (s !== largestSide && edges.length === 1) {
+                    const sJob = busGroupJobs.find(j => j.edgeId === edges[0].id);
+                    if (!sJob?.isReverseEdge) {
+                        sideGroups.get(largestSide).push(...edges);
+                        singletonKeys.push(s);
+                    }
+                }
+            }
+            for (const k of singletonKeys) sideGroups.delete(k);
+        }
+
         // 閫愬崐鐞冪粍璁＄畻涓诲共绾?
         sideGroups.forEach((groupEdges, _side) => {
             if (groupEdges.length === 0) return;
@@ -1976,22 +2001,6 @@ export class EdgeRoutingCoordinator {
             // [FIX] 淇濈暀 isManyToOne/isOneToMany 鏍囧織涓嶆竻闄わ紝
             // 杩欐牱 Worker 浠嶇煡閬撹繖鏄?bus"杈癸紙isBus=true 鈫?allowTargetSlide=false锛夈€?
             // 濡傛灉娓呴櫎浜嗘爣蹇楋紝Worker 浼氭粦鍔ㄧ鍙ｂ啋绔彛鍋忕涓績銆?
-            if (groupEdges.length === 1 && sideGroups.size > 1) {
-                const job = busGroupJobs.find(j => j.edgeId === groupEdges[0].id);
-                const shouldKeepSingletonBus = !!job?.isReverseEdge;
-                if (job && !shouldKeepSingletonBus) {
-                    if (isManyToOne) {
-                        // 涓嶆竻闄?job.isManyToOne锛屼繚鎸?isBus=true 璁?Worker 绂佹绔彛婊戝姩
-                        job.incomingCount = 1;
-                        job.incomingIndex = 0;
-                    } else {
-                        // 鍚岀悊锛屼繚鎸?job.isOneToMany
-                        job.outgoingCount = 1;
-                        job.outgoingIndex = 0;
-                    }
-                }
-                if (!shouldKeepSingletonBus) return;
-            }
 
             // 璁＄畻璇ヨ薄闄愮殑 peer 鑺傜偣鐭╁舰鍒楄〃
             const subPeers = groupEdges.map(e =>
@@ -2203,6 +2212,12 @@ export class EdgeRoutingCoordinator {
                 ? (edge.target as string)   // M2O: hub 鏄叕鍏?target
                 : (edge.source as string));  // O2M: hub 鏄叕鍏?source
             (job as any).peerGroupKey = peerGroupKey;
+            // [FIX] Direction-specific keys: M2O must not overwrite O2M grouping
+            if (isManyToOne) {
+                (job as any).m2oPeerGroupKey = peerGroupKey;
+            } else {
+                (job as any).o2mPeerGroupKey = peerGroupKey;
+            }
             (job as any).peerGroupSize = edges.length;
             (job as any).trunkPort = trunk.suggestedPort; // Pass suggested port direction
             (job as any).trunkPortTangent = trunkPortTangent;
@@ -2693,7 +2708,9 @@ export class EdgeRoutingCoordinator {
             for (const e of outBusEdges) {
                 const j = jobByEdgeId.get(e.edgeId) ?? (this.latestRequests.get(e.edgeId) as any)?.request?.job;
                 const trunkCoord = Math.round((j?.busTrunkSource?.x ?? j?.busTrunkTarget?.x ?? 0) * 10);
-                const groupKey = j?.peerGroupKey ?? `${e.source}:${trunkCoord}`;
+                // [FIX] Use o2mPeerGroupKey (source-side) not generic peerGroupKey,
+                // which M2O phase overwrites for dual-identity edges (O2M+M2O).
+                const groupKey = j?.o2mPeerGroupKey ?? j?.peerGroupKey ?? `${e.source}:${trunkCoord}`;
                 if (!outBusTrunkGroups.has(groupKey)) outBusTrunkGroups.set(groupKey, []);
                 outBusTrunkGroups.get(groupKey)!.push(e);
             }
