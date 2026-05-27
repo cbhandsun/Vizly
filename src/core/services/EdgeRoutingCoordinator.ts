@@ -1871,12 +1871,8 @@ export class EdgeRoutingCoordinator {
         //   姝ｄ笅鏂圭殑 peer 鈫?bottom 鍗婄悆 鉁?
         //   宸︿笅鏂圭殑 peer 鈫?bottom 鍗婄悆 鉁擄紙閭昏繎璞￠檺鑷劧鍚堝苟锛?
         //   绾彸鏂圭殑 peer 鈫?right 閫冮€哥鍙ｏ紙浜ゅ弶杞磋繙澶т簬涓昏酱锛?
-        // 示例（主流 下方）：
-        //   正下方的 peer → bottom 半球 ✓
-        //   左下方的 peer → bottom 半球 ✓（邻近象限自然合并）
-        //   纯右方的 peer → right 逃逸端口（交叉轴远大于主轴）
 
-        // Step 1: 计算 peer 质心，确定主流方向
+        // Step 1: 璁＄畻 peer 璐ㄥ績锛岀‘瀹氫富娴佹柟鍚?
         let centroidX = 0, centroidY = 0, validCount = 0;
         globalPeers.forEach(peerEdge => {
             const peerId = isManyToOne ? peerEdge.source : peerEdge.target;
@@ -1888,7 +1884,7 @@ export class EdgeRoutingCoordinator {
             }
         });
 
-        // Fallback: 如果没有有效 peer，直接返回
+        // Fallback: 濡傛灉娌℃湁鏈夋晥 peer锛岀洿鎺ヨ繑鍥?
         if (validCount === 0) return;
         centroidX /= validCount;
         centroidY /= validCount;
@@ -1942,16 +1938,15 @@ export class EdgeRoutingCoordinator {
             if (isVerticalFlow) {
                 // 涓绘祦=涓婁笅 鈫?榛樿鎸?y 鍒嗗崐鐞?
                 // 閫冮€革細濡傛灉 |dx| > 2*|dy| 涓?|dx| > 50px锛岃鏄?peer 寮虹儓鍋忓悜宸﹀彸
-                if (!keepTrueHemisphere && Math.abs(dx) > Math.abs(dy) * 4.0 && Math.abs(dx) > 50) {
+                if (!keepTrueHemisphere && Math.abs(dx) > Math.abs(dy) * 1.0 && Math.abs(dx) > 50) {
                     side = dx < 0 ? 'left' : 'right';
                 } else {
                     side = dy < 0 ? 'top' : 'bottom';
                 }
             } else {
                 // 涓绘祦=宸﹀彸 鈫?榛樿鎸?x 鍒嗗崐鐞?
-                // 閫冮€革細濡傛灉 |dy| > 2.5*|dx| 涓?|dy| > 50px
-                // [FIX] Raised from 1.0x to 2.5x — prevent O2M trunk splitting for oblique peers
-                if (!keepTrueHemisphere && Math.abs(dy) > Math.abs(dx) * 4.0 && Math.abs(dy) > 50) {
+                // 閫冮€革細濡傛灉 |dy| > 2*|dx| 涓?|dy| > 50px
+                if (!keepTrueHemisphere && Math.abs(dy) > Math.abs(dx) * 1.0 && Math.abs(dy) > 50) {
                     side = dy < 0 ? 'top' : 'bottom';
                 } else {
                     side = dx < 0 ? 'left' : 'right';
@@ -2166,7 +2161,6 @@ export class EdgeRoutingCoordinator {
                 // Peer side (Source)
                 job.outgoingCount = 1;
                 job.outgoingIndex = 0;
-
             } else {
                 // Hub is Source. All O2M edges coalesce to ONE shared trunk port (slot 0).
                 job.outgoingCount = hubPortConflict ? 2 : 1;
@@ -2174,7 +2168,6 @@ export class EdgeRoutingCoordinator {
                 // Peer side (Target)
                 job.incomingCount = 1;
                 job.incomingIndex = 0;
-
             }
 
 
@@ -2210,12 +2203,6 @@ export class EdgeRoutingCoordinator {
                 ? (edge.target as string)   // M2O: hub 鏄叕鍏?target
                 : (edge.source as string));  // O2M: hub 鏄叕鍏?source
             (job as any).peerGroupKey = peerGroupKey;
-            // [FIX] Direction-specific keys prevent M2O phase overwriting O2M grouping
-            if (isManyToOne) {
-                (job as any).m2oPeerGroupKey = peerGroupKey;
-            } else {
-                (job as any).o2mPeerGroupKey = peerGroupKey;
-            }
             (job as any).peerGroupSize = edges.length;
             (job as any).trunkPort = trunk.suggestedPort; // Pass suggested port direction
             (job as any).trunkPortTangent = trunkPortTangent;
@@ -2525,7 +2512,6 @@ export class EdgeRoutingCoordinator {
      */
     private assignSameSidePortSeparation(jobs: PathFindingJob[], graph: SharedGraphContext): void {
         const eligibleJobs = jobs.filter(j => j.sourceRect && j.targetRect);
-
         if (eligibleJobs.length === 0) return;
 
         // Build a rect lookup from the graph so we can reconstruct rects for cached edges.
@@ -2675,7 +2661,6 @@ export class EdgeRoutingCoordinator {
             const side = key.slice(colonIdx + 2);
 
 
-
             // Coordinate of the opposite-side node along the port axis
             // (Y for left/right ports, X for top/bottom ports)
             const oppCoordE = (e: EdgeDesc, asSource: boolean): number => {
@@ -2707,13 +2692,8 @@ export class EdgeRoutingCoordinator {
             const outBusTrunkGroups = new Map<string, EdgeDesc[]>();
             for (const e of outBusEdges) {
                 const j = jobByEdgeId.get(e.edgeId) ?? (this.latestRequests.get(e.edgeId) as any)?.request?.job;
-                // O2M: all edges from the same source share ONE fan-out trunk port.
-                // peerGroupKey groups them correctly; fallback = just source (no trunkCoord),
-                // because different O2M edges from loms have different busTrunkSource coords
-                // but still share the same source port slot.
-                // [FIX] Use o2mPeerGroupKey (source-side key) not generic peerGroupKey,
-                // which M2O phase overwrites for dual-identity edges (O2M+M2O).
-                const groupKey = j?.o2mPeerGroupKey ?? j?.peerGroupKey ?? e.source;
+                const trunkCoord = Math.round((j?.busTrunkSource?.x ?? j?.busTrunkTarget?.x ?? 0) * 10);
+                const groupKey = j?.peerGroupKey ?? `${e.source}:${trunkCoord}`;
                 if (!outBusTrunkGroups.has(groupKey)) outBusTrunkGroups.set(groupKey, []);
                 outBusTrunkGroups.get(groupKey)!.push(e);
             }
@@ -2736,7 +2716,6 @@ export class EdgeRoutingCoordinator {
 
             const hasOut = outEdges.length > 0;
             const hasIn  = inEdges.length  > 0;
-
 
 
             if (hasOut && hasIn) {
