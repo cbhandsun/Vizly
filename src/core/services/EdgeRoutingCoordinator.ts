@@ -2580,9 +2580,10 @@ export class EdgeRoutingCoordinator {
         const extractTrunkPortSide = (j: PathFindingJob): { outSide?: string; inSide?: string } => {
             const any = j as any;
             // O2M trunk port (source side of a one-to-many edge)
-            const o2mPort = any.o2mTrunkPort || (j.isOneToMany && !j.isManyToOne ? any.trunkPort : null);
+            // [FIX] Don't exclude dual-identity edges (isOneToMany && isManyToOne)
+            const o2mPort = any.o2mTrunkPort || (j.isOneToMany ? any.trunkPort : null);
             // M2O trunk port (target side of a many-to-one edge)
-            const m2oPort = any.m2oTrunkPort || (j.isManyToOne && !j.isOneToMany ? any.trunkPort : null);
+            const m2oPort = any.m2oTrunkPort || (j.isManyToOne ? any.trunkPort : null);
             return {
                 outSide: o2mPort ? String(o2mPort).toLowerCase() : undefined,
                 inSide: m2oPort ? String(m2oPort).toLowerCase() : undefined,
@@ -2609,9 +2610,10 @@ export class EdgeRoutingCoordinator {
             const tgtRect = getNodeRect(cj.target);
             if (!srcRect || !tgtRect) continue;
             // Extract trunk port side from cached job data
+            // [FIX] Don't exclude dual-identity edges (isOneToMany && isManyToOne)
             const cjAny = cj as any;
-            const cachedO2mPort = cjAny.o2mTrunkPort || (cj.isOneToMany && !cj.isManyToOne ? cjAny.trunkPort : null);
-            const cachedM2oPort = cjAny.m2oTrunkPort || (cj.isManyToOne && !cj.isOneToMany ? cjAny.trunkPort : null);
+            const cachedO2mPort = cjAny.o2mTrunkPort || (cj.isOneToMany ? cjAny.trunkPort : null);
+            const cachedM2oPort = cjAny.m2oTrunkPort || (cj.isManyToOne ? cjAny.trunkPort : null);
             allEdges.push({
                 edgeId, source: cj.source, target: cj.target,
                 isOneToMany: !!cj.isOneToMany, isManyToOne: !!cj.isManyToOne,
@@ -2658,6 +2660,7 @@ export class EdgeRoutingCoordinator {
             const colonIdx = key.indexOf('::');
             const side = key.slice(colonIdx + 2);
 
+
             // Coordinate of the opposite-side node along the port axis
             // (Y for left/right ports, X for top/bottom ports)
             const oppCoordE = (e: EdgeDesc, asSource: boolean): number => {
@@ -2678,21 +2681,33 @@ export class EdgeRoutingCoordinator {
             const outBusEdges  = outEdges.filter(e => e.isOneToMany);
             const inBusEdges   = inEdges.filter( e => e.isManyToOne);
 
-            // Count distinct bus trunk groups by busTrunkSource x-coordinate
-            // Each distinct trunk group = 1 slot in the port side
-            const outBusTrunkGroups = new Map<number, EdgeDesc[]>(); // key = trunk x (rounded)
+            // Count distinct bus trunk groups.
+            // For out-bus edges: group by peerGroupKey (same source fan-out shares a trunk).
+            //   Fallback: source + busTrunkSource coordinate.
+            // For in-bus edges: group by peerGroupKey (same target fan-in shares a trunk).
+            //   Fallback: source + busTrunkTarget coordinate.
+            // [FIX] Previously, key was just the trunk coordinate, causing edges from
+            // different sources (e.g. tms→bms vs wms→bms) to merge into 1 group
+            // when their trunk coordinates happened to match, producing 0 port separation.
+            const outBusTrunkGroups = new Map<string, EdgeDesc[]>();
             for (const e of outBusEdges) {
                 const j = jobByEdgeId.get(e.edgeId) ?? (this.latestRequests.get(e.edgeId) as any)?.request?.job;
-                const trunkX = Math.round((j?.busTrunkSource?.x ?? j?.busTrunkTarget?.x ?? 0) * 10);
-                if (!outBusTrunkGroups.has(trunkX)) outBusTrunkGroups.set(trunkX, []);
-                outBusTrunkGroups.get(trunkX)!.push(e);
+                const trunkCoord = Math.round((j?.busTrunkSource?.x ?? j?.busTrunkTarget?.x ?? 0) * 10);
+                const groupKey = j?.peerGroupKey ?? `${e.source}:${trunkCoord}`;
+                if (!outBusTrunkGroups.has(groupKey)) outBusTrunkGroups.set(groupKey, []);
+                outBusTrunkGroups.get(groupKey)!.push(e);
             }
-            const inBusTrunkGroups = new Map<number, EdgeDesc[]>();
+            const inBusTrunkGroups = new Map<string, EdgeDesc[]>();
             for (const e of inBusEdges) {
                 const j = jobByEdgeId.get(e.edgeId) ?? (this.latestRequests.get(e.edgeId) as any)?.request?.job;
-                const trunkX = Math.round((j?.busTrunkTarget?.x ?? j?.busTrunkSource?.x ?? 0) * 10);
-                if (!inBusTrunkGroups.has(trunkX)) inBusTrunkGroups.set(trunkX, []);
-                inBusTrunkGroups.get(trunkX)!.push(e);
+                const trunkCoord = Math.round((j?.busTrunkTarget?.x ?? j?.busTrunkSource?.x ?? 0) * 10);
+                // [FIX] For in-bus edges, always use SOURCE as key discriminator.
+                // peerGroupKey groups by target (same M2O fan-in = same key), which
+                // defeats the purpose of port separation. We need different slots
+                // for edges from different sources arriving at the same target.
+                const groupKey = `${e.source}:${trunkCoord}`;
+                if (!inBusTrunkGroups.has(groupKey)) inBusTrunkGroups.set(groupKey, []);
+                inBusTrunkGroups.get(groupKey)!.push(e);
             }
 
             // Slot counts: each distinct trunk group = 1 slot, each solo edge = 1 slot
@@ -2701,6 +2716,7 @@ export class EdgeRoutingCoordinator {
 
             const hasOut = outEdges.length > 0;
             const hasIn  = inEdges.length  > 0;
+
 
             if (hasOut && hasIn) {
                 // Case A: mixed — separate in/out zones by shifting bus slots and sorting solo slots
@@ -2781,6 +2797,45 @@ export class EdgeRoutingCoordinator {
                     if (!j) return;
                     j.incomingCount = totalSlots;
                     j.incomingIndex = inBusTrunkGroups.size + i;
+                });
+
+            } else if (hasOut && !hasIn && outBusTrunkGroups.size >= 2) {
+                // Case D: pure-out with multiple distinct bus trunk groups (no solo edges)
+                // Each trunk group gets its own slot for port separation.
+                const totalSlots = outSlotCount;
+                const sortedGroupKeys = [...outBusTrunkGroups.keys()].sort();
+                sortedGroupKeys.forEach((gk, groupIdx) => {
+                    for (const e of outBusTrunkGroups.get(gk)!) {
+                        if (!currentJobIds.has(e.edgeId)) continue;
+                        const j = jobByEdgeId.get(e.edgeId);
+                        if (!j) continue;
+                        j.outgoingCount = totalSlots;
+                        j.outgoingIndex = groupIdx;
+                    }
+                });
+
+            } else if (hasIn && !hasOut && inBusTrunkGroups.size >= 2) {
+                // Case E: pure-in with multiple distinct bus trunk groups (no solo edges)
+                // Each trunk group gets its own slot for port separation.
+                // Sort groups by source centroid to minimize crossing.
+                const totalSlots = inSlotCount;
+
+                const sortedGroupKeys = [...inBusTrunkGroups.keys()].sort((a, b) => {
+                    const edgesA = inBusTrunkGroups.get(a)!;
+                    const edgesB = inBusTrunkGroups.get(b)!;
+                    const centA = edgesA.reduce((s, e) => s + oppCoordE(e, false), 0) / edgesA.length;
+                    const centB = edgesB.reduce((s, e) => s + oppCoordE(e, false), 0) / edgesB.length;
+                    return centA - centB || a.localeCompare(b);
+                });
+                sortedGroupKeys.forEach((gk, groupIdx) => {
+                    for (const e of inBusTrunkGroups.get(gk)!) {
+
+                        if (!currentJobIds.has(e.edgeId)) continue;
+                        const j = jobByEdgeId.get(e.edgeId);
+                        if (!j) continue;
+                        j.incomingCount = totalSlots;
+                        j.incomingIndex = groupIdx;
+                    }
                 });
             }
         }
