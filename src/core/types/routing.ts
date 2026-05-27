@@ -308,6 +308,38 @@ export interface PathfindingContext {
 
 // Worker Input
 
+/**
+ * [ELK-Refactor] Typed contract for bus (O2M/M2O) routing data.
+ * Replaces 15+ `(job as any).xxx` dynamic properties with a single typed object.
+ *
+ * Ownership rules (inspired by ELK's layered processor architecture):
+ * - Stage 2 (processBusGroups): writes grouping fields (busIndex, peerGroup*)
+ * - Stage 3 (assignTrunkGeometry): writes trunk geometry + sets portFrozen=true
+ * - Stage 4 (assignSameSidePortSeparation): READ-ONLY for frozen bus edges
+ * - Stage 5 (Worker): READ-ONLY for all bus routing plan fields
+ */
+export interface BusRoutingPlan {
+    // === Written by Stage 2 (processBusGroups) — grouping metadata ===
+    busIndex: number;
+    peerGroupKey: string;
+    o2mPeerGroupKey?: string;
+    m2oPeerGroupKey?: string;
+    peerGroupSize: number;
+    peerGroupMembers: string[];
+
+    // === Written by Stage 3 (assignTrunkGeometry) — trunk geometry ===
+    trunkPort: Position;
+    trunkPortTangent: number;
+    o2mTrunk?: { source: Point; target: Point };
+    m2oTrunk?: { source: Point; target: Point };
+    o2mTrunkPort?: Position;
+    m2oTrunkPort?: Position;
+    trunkBranchCoord?: number;
+
+    // === Freeze flag — set by Stage 3, checked by Stage 4 & Worker ===
+    portFrozen: boolean;
+}
+
 export interface PathFindingJob {
     jobId: string;
     source: string;
@@ -322,58 +354,51 @@ export interface PathFindingJob {
     targetHandle?: string | null;
     isManyToOne?: boolean;
     isOneToMany?: boolean;
-    effectiveIsManyToOne?: boolean; // [COMPAT] Support for alternative naming
-    effectiveIsOneToMany?: boolean; // [COMPAT] Support for alternative naming
+    effectiveIsManyToOne?: boolean;
+    effectiveIsOneToMany?: boolean;
     layoutDirection?: 'LR' | 'RL' | 'TB' | 'BT' | string;
     busTrunkSource?: Point;
     busTrunkTarget?: Point;
-    busTrunkPort?: Position; // [DEPRECATED] kept for backward compatibility if needed, but preferable to remove usage
+    busTrunkPort?: Position;
 
-    // [NEW] Specific suggested ports for Source and Target sides
     busSourcePort?: Position;
     busTargetPort?: Position;
 
-    // [FIX] Pass Absolute Node Geometry to Worker to avoid Relative vs Absolute mismatch
     sourceRect?: Rectangle;
     targetRect?: Rectangle;
 
-    // Candidate Ports: allow worker to choose the best port
     candidatePorts?: {
         source: Array<{ id: string; x: number; y: number; dir: string; usage?: number }>;
         target: Array<{ id: string; x: number; y: number; dir: string; usage?: number }>;
     };
 
-    // [P2-3] Graph data moved to SharedGraphContext
-    // nodes, edges, obstacles, config are now in SharedGraphContext
-
     edgeId: string;
 
-    // Bus Routing Metadata
+    // Bus Routing Metadata (legacy — gradually migrating to busRoutingPlan)
     outgoingIndex?: number;
     outgoingCount?: number;
     incomingIndex?: number;
     incomingCount?: number;
-    /** Order of this branch along a precomputed shared trunk. */
     trunkOrderIndex?: number;
     trunkOrderCount?: number;
-    /** Peer center projected onto the shared trunk axis. */
     trunkBranchCoord?: number;
+
+    // [ELK-Refactor] Typed bus routing plan — replaces (job as any).xxx
+    busRoutingPlan?: BusRoutingPlan;
 
     // Global Channel Metadata
     globalChannelIndex?: number;
     globalChannelCount?: number;
     globalChannelType?: 'horizontal' | 'vertical';
 
-    // [FIX] Bidirectional Edge Separation
-    bidirectionalChannel?: number;     // 0 for forward, 1 for backward in A↔B pair
-    bidirectionalSpacing?: number;     // Spacing override for bidirectional edges
+    // Bidirectional Edge Separation
+    bidirectionalChannel?: number;
+    bidirectionalSpacing?: number;
 
-    // [NEW] Reverse Edge Flag - triggers bypass routing strategy in Worker
     isReverseEdge?: boolean;
-
-    // Debug
     debug?: boolean;
 }
+
 
 
 // [NEW] Shared Context for Batch Processing

@@ -967,7 +967,7 @@ export class EdgeRoutingWorker {
         }
 
         const isPrecomputedSharedTrunkMember =
-            !!(job.busTrunkSource && job.busTrunkTarget) && (((job as any).peerGroupSize || 0) > 1);
+            !!(job.busTrunkSource && job.busTrunkTarget) && ((job.busRoutingPlan?.peerGroupSize ?? (job as any).peerGroupSize ?? 0) > 1);
 
         if (isPrecomputedSharedTrunkMember && job.isManyToOne && !hasExplicitSource) {
             startPos = resolvePortFromTrunkAxis(sRect, tRect, false, m2oTrunk ?? undefined);
@@ -1032,7 +1032,7 @@ export class EdgeRoutingWorker {
         const isBusScenario = (job.isOneToMany || job.isManyToOne);
         const peerCount = job.isOneToMany ? (job.outgoingCount || 1) : (job.incomingCount || 1);
         const hasPrecomputedTrunk = !!(job.busTrunkSource && job.busTrunkTarget);
-        const isSharedGlobalTrunk = hasPrecomputedTrunk && (((job as any).peerGroupSize || 0) > 1);
+        const isSharedGlobalTrunk = hasPrecomputedTrunk && ((job.busRoutingPlan?.peerGroupSize ?? (job as any).peerGroupSize ?? 0) > 1);
 
         // Use trunk if precomputed by Coordinator OR if local calculation deems it necessary
         // [Imp-12] Lower threshold to 1 for explict bus scenarios to ensure uniform routing style
@@ -1069,8 +1069,8 @@ export class EdgeRoutingWorker {
                 // [FIX-cross-domain] Force port alignment with trunkPort if provided
                 let skipTrunkDueToSelfCross = false;
                 // [FIX-dual] 双身份边分别处理 O2M source port 和 M2O target port
-                const o2mPort = (job as any).o2mTrunkPort || ((job as any).trunkPort && job.isOneToMany && !job.isManyToOne ? (job as any).trunkPort : null);
-                const m2oPort = (job as any).m2oTrunkPort || ((job as any).trunkPort && job.isManyToOne && !job.isOneToMany ? (job as any).trunkPort : null);
+                const o2mPort = job.busRoutingPlan?.o2mTrunkPort ?? (job as any).o2mTrunkPort ?? ((job as any).trunkPort && job.isOneToMany && !job.isManyToOne ? (job as any).trunkPort : null);
+                const m2oPort = job.busRoutingPlan?.m2oTrunkPort ?? (job as any).m2oTrunkPort ?? ((job as any).trunkPort && job.isManyToOne && !job.isOneToMany ? (job as any).trunkPort : null);
                 const hasAnyTrunkPort = !!(o2mPort || m2oPort);
                 if (hasAnyTrunkPort) {
                     const sCx = sRect.x + sRect.width / 2;

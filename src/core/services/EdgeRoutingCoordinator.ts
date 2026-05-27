@@ -2222,6 +2222,28 @@ export class EdgeRoutingCoordinator {
             (job as any).trunkPort = trunk.suggestedPort; // Pass suggested port direction
             (job as any).trunkPortTangent = trunkPortTangent;
 
+            // [ELK-Refactor] Populate typed busRoutingPlan (single source of truth)
+            const plan = {
+                busIndex: index,
+                peerGroupKey,
+                peerGroupSize: edges.length,
+                peerGroupMembers: sortedEdgeIds,
+                trunkPort: trunk.suggestedPort,
+                trunkPortTangent,
+                trunkBranchCoord: trunkProjection(peerRect),
+                portFrozen: true,
+            } as any;
+            if (isManyToOne) {
+                plan.m2oPeerGroupKey = peerGroupKey;
+                plan.m2oTrunk = trunkData;
+                plan.m2oTrunkPort = trunk.suggestedPort;
+            } else {
+                plan.o2mPeerGroupKey = peerGroupKey;
+                plan.o2mTrunk = trunkData;
+                plan.o2mTrunkPort = trunk.suggestedPort;
+            }
+            job.busRoutingPlan = { ...(job.busRoutingPlan ?? {}), ...plan };
+
             // [S4] Port 娉ㄥ叆宸茬Щ鑷?Worker 鍐呴儴锛堝嚑浣曟帹绠楋級銆?
             // Coordinator 浠呬紶閫?busTrunkSource/busTrunkTarget + o2mTrunk/m2oTrunk 鍑犱綍鍏冩暟鎹紝
             // 绔彛鏂瑰悜鐢?Worker 鐨勫嚑浣曢€昏緫鑷富鍐冲畾锛屾秷闄ゅ弻灞傚喅绛栧啿绐併€?
@@ -2765,18 +2787,27 @@ export class EdgeRoutingCoordinator {
                             if (!currentJobIds.has(e.edgeId)) continue;
                             const j = jobByEdgeId.get(e.edgeId);
                             if (!j) continue;
-                            j.outgoingCount = totalSlots;
-                            j.outgoingIndex = outBase + groupIdx;
+                            // [ELK-Refactor] portFrozen: skip count overwrite
+                            if (!j.busRoutingPlan?.portFrozen) {
+                                j.outgoingCount = totalSlots;
+                                j.outgoingIndex = outBase + groupIdx;
+                            } else {
+                                j.outgoingIndex = (j.outgoingIndex ?? 0) + outBase;
+                            }
                         }
                     });
                 } else {
-                    // [FIX-freeze] Single trunk group: keep Stage 3 count/index.
-                    // Only apply zone base shift to index, don't overwrite count.
+                    // [ELK-Refactor] Single trunk group: portFrozen edges keep Stage 3 count.
                     for (const e of outBusEdges) {
                         if (!currentJobIds.has(e.edgeId)) continue;
                         const j = jobByEdgeId.get(e.edgeId);
                         if (!j) continue;
-                        j.outgoingIndex = (j.outgoingIndex ?? 0) + outBase;
+                        if (j.busRoutingPlan?.portFrozen) {
+                            j.outgoingIndex = (j.outgoingIndex ?? 0) + outBase;
+                        } else {
+                            j.outgoingCount = totalSlots;
+                            j.outgoingIndex = outBase;
+                        }
                     }
                 }
                 // Apply zone-relative slots to out-solo edges
@@ -2802,18 +2833,27 @@ export class EdgeRoutingCoordinator {
                             if (!currentJobIds.has(e.edgeId)) continue;
                             const j = jobByEdgeId.get(e.edgeId);
                             if (!j) continue;
-                            j.incomingCount = totalSlots;
-                            j.incomingIndex = inBase + groupIdx;
+                            // [ELK-Refactor] portFrozen: skip count overwrite
+                            if (!j.busRoutingPlan?.portFrozen) {
+                                j.incomingCount = totalSlots;
+                                j.incomingIndex = inBase + groupIdx;
+                            } else {
+                                j.incomingIndex = (j.incomingIndex ?? 0) + inBase;
+                            }
                         }
                     });
                 } else {
-                    // [FIX-freeze] Single trunk group: keep Stage 3 count/index.
-                    // Only apply zone base shift to index, don't overwrite count.
+                    // [ELK-Refactor] Single trunk group: portFrozen edges keep Stage 3 count.
                     for (const e of inBusEdges) {
                         if (!currentJobIds.has(e.edgeId)) continue;
                         const j = jobByEdgeId.get(e.edgeId);
                         if (!j) continue;
-                        j.incomingIndex = (j.incomingIndex ?? 0) + inBase;
+                        if (j.busRoutingPlan?.portFrozen) {
+                            j.incomingIndex = (j.incomingIndex ?? 0) + inBase;
+                        } else {
+                            j.incomingCount = totalSlots;
+                            j.incomingIndex = inBase;
+                        }
                     }
                 }
                 // Apply zone-relative slots to in-solo edges
