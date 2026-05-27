@@ -2734,16 +2734,35 @@ export class EdgeRoutingCoordinator {
                 const sortedInSolo = [...inSoloEdges].sort((a, b) =>
                     oppCoordE(a, false) - oppCoordE(b, false) || a.edgeId.localeCompare(b.edgeId));
 
-                // Apply zone shift to out-bus edges (preserve intra-group index, add zone offset)
-                for (const e of outBusEdges) {
-                    if (!currentJobIds.has(e.edgeId)) continue;
-                    const j = jobByEdgeId.get(e.edgeId);
-                    if (!j) continue;
-                    const preexisting = j.outgoingCount ?? 1;
-                    j.outgoingCount = totalSlots;
-                    j.outgoingIndex = preexisting > 1
-                        ? outBase + (j.outgoingIndex ?? 0)
-                        : outBase;
+                // Apply zone shift to out-bus edges — assign distinct slots per trunk group
+                if (outBusTrunkGroups.size >= 2) {
+                    const sortedOutGroupKeys = [...outBusTrunkGroups.keys()].sort((a, b) => {
+                        const ea = outBusTrunkGroups.get(a)!;
+                        const eb = outBusTrunkGroups.get(b)!;
+                        const ca = ea.reduce((s, e) => s + oppCoordE(e, true), 0) / ea.length;
+                        const cb = eb.reduce((s, e) => s + oppCoordE(e, true), 0) / eb.length;
+                        return ca - cb || a.localeCompare(b);
+                    });
+                    sortedOutGroupKeys.forEach((gk, groupIdx) => {
+                        for (const e of outBusTrunkGroups.get(gk)!) {
+                            if (!currentJobIds.has(e.edgeId)) continue;
+                            const j = jobByEdgeId.get(e.edgeId);
+                            if (!j) continue;
+                            j.outgoingCount = totalSlots;
+                            j.outgoingIndex = outBase + groupIdx;
+                        }
+                    });
+                } else {
+                    for (const e of outBusEdges) {
+                        if (!currentJobIds.has(e.edgeId)) continue;
+                        const j = jobByEdgeId.get(e.edgeId);
+                        if (!j) continue;
+                        const preexisting = j.outgoingCount ?? 1;
+                        j.outgoingCount = totalSlots;
+                        j.outgoingIndex = preexisting > 1
+                            ? outBase + (j.outgoingIndex ?? 0)
+                            : outBase;
+                    }
                 }
                 // Apply zone-relative slots to out-solo edges
                 sortedOutSolo.forEach((e, i) => {
@@ -2753,16 +2772,37 @@ export class EdgeRoutingCoordinator {
                     j.outgoingCount = totalSlots;
                     j.outgoingIndex = outBase + outBusTrunkGroups.size + i;
                 });
-                // Apply zone shift to in-bus edges
-                for (const e of inBusEdges) {
-                    if (!currentJobIds.has(e.edgeId)) continue;
-                    const j = jobByEdgeId.get(e.edgeId);
-                    if (!j) continue;
-                    const preexisting = j.incomingCount ?? 1;
-                    j.incomingCount = totalSlots;
-                    j.incomingIndex = preexisting > 1
-                        ? inBase + (j.incomingIndex ?? 0)
-                        : inBase;
+                // Apply zone shift to in-bus edges — assign distinct slots per trunk group
+                if (inBusTrunkGroups.size >= 2) {
+                    // Multiple distinct sources → each gets a separate slot in the in-zone
+                    const sortedInGroupKeys = [...inBusTrunkGroups.keys()].sort((a, b) => {
+                        const ea = inBusTrunkGroups.get(a)!;
+                        const eb = inBusTrunkGroups.get(b)!;
+                        const ca = ea.reduce((s, e) => s + oppCoordE(e, false), 0) / ea.length;
+                        const cb = eb.reduce((s, e) => s + oppCoordE(e, false), 0) / eb.length;
+                        return ca - cb || a.localeCompare(b);
+                    });
+                    sortedInGroupKeys.forEach((gk, groupIdx) => {
+                        for (const e of inBusTrunkGroups.get(gk)!) {
+                            if (!currentJobIds.has(e.edgeId)) continue;
+                            const j = jobByEdgeId.get(e.edgeId);
+                            if (!j) continue;
+                            j.incomingCount = totalSlots;
+                            j.incomingIndex = inBase + groupIdx;
+                        }
+                    });
+                } else {
+                    // Single trunk group → just apply zone shift
+                    for (const e of inBusEdges) {
+                        if (!currentJobIds.has(e.edgeId)) continue;
+                        const j = jobByEdgeId.get(e.edgeId);
+                        if (!j) continue;
+                        const preexisting = j.incomingCount ?? 1;
+                        j.incomingCount = totalSlots;
+                        j.incomingIndex = preexisting > 1
+                            ? inBase + (j.incomingIndex ?? 0)
+                            : inBase;
+                    }
                 }
                 // Apply zone-relative slots to in-solo edges
                 sortedInSolo.forEach((e, i) => {
