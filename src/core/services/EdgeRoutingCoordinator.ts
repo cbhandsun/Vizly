@@ -2770,15 +2770,13 @@ export class EdgeRoutingCoordinator {
                         }
                     });
                 } else {
+                    // [FIX-freeze] Single trunk group: keep Stage 3 count/index.
+                    // Only apply zone base shift to index, don't overwrite count.
                     for (const e of outBusEdges) {
                         if (!currentJobIds.has(e.edgeId)) continue;
                         const j = jobByEdgeId.get(e.edgeId);
                         if (!j) continue;
-                        const preexisting = j.outgoingCount ?? 1;
-                        j.outgoingCount = totalSlots;
-                        j.outgoingIndex = preexisting > 1
-                            ? outBase + (j.outgoingIndex ?? 0)
-                            : outBase;
+                        j.outgoingIndex = (j.outgoingIndex ?? 0) + outBase;
                     }
                 }
                 // Apply zone-relative slots to out-solo edges
@@ -2809,16 +2807,13 @@ export class EdgeRoutingCoordinator {
                         }
                     });
                 } else {
-                    // Single trunk group → just apply zone shift
+                    // [FIX-freeze] Single trunk group: keep Stage 3 count/index.
+                    // Only apply zone base shift to index, don't overwrite count.
                     for (const e of inBusEdges) {
                         if (!currentJobIds.has(e.edgeId)) continue;
                         const j = jobByEdgeId.get(e.edgeId);
                         if (!j) continue;
-                        const preexisting = j.incomingCount ?? 1;
-                        j.incomingCount = totalSlots;
-                        j.incomingIndex = preexisting > 1
-                            ? inBase + (j.incomingIndex ?? 0)
-                            : inBase;
+                        j.incomingIndex = (j.incomingIndex ?? 0) + inBase;
                     }
                 }
                 // Apply zone-relative slots to in-solo edges
