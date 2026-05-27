@@ -847,6 +847,8 @@ export class EdgeRoutingCoordinator {
                     rj.isManyToOne   = job.isManyToOne;
                     rj.busTrunkSource = job.busTrunkSource;
                     rj.busTrunkTarget = job.busTrunkTarget;
+                    // [ELK-Refactor] Sync typed plan back to latestRequests
+                    rj.busRoutingPlan = job.busRoutingPlan;
                 }
             }
 
@@ -1938,7 +1940,7 @@ export class EdgeRoutingCoordinator {
             if (isVerticalFlow) {
                 // 涓绘祦=涓婁笅 鈫?榛樿鎸?y 鍒嗗崐鐞?
                 // 閫冮€革細濡傛灉 |dx| > 2*|dy| 涓?|dx| > 50px锛岃鏄?peer 寮虹儓鍋忓悜宸﹀彸
-                if (!keepTrueHemisphere && Math.abs(dx) > Math.abs(dy) * 1.0 && Math.abs(dx) > 50) {
+                if (!keepTrueHemisphere && globalPeers.length > 3 && Math.abs(dx) > Math.abs(dy) * 1.0 && Math.abs(dx) > 50) {
                     side = dx < 0 ? 'left' : 'right';
                 } else {
                     side = dy < 0 ? 'top' : 'bottom';
@@ -1946,7 +1948,7 @@ export class EdgeRoutingCoordinator {
             } else {
                 // 涓绘祦=宸﹀彸 鈫?榛樿鎸?x 鍒嗗崐鐞?
                 // 閫冮€革細濡傛灉 |dy| > 2*|dx| 涓?|dy| > 50px
-                if (!keepTrueHemisphere && Math.abs(dy) > Math.abs(dx) * 1.0 && Math.abs(dy) > 50) {
+                if (!keepTrueHemisphere && globalPeers.length > 3 && Math.abs(dy) > Math.abs(dx) * 1.0 && Math.abs(dy) > 50) {
                     side = dy < 0 ? 'top' : 'bottom';
                 } else {
                     side = dx < 0 ? 'left' : 'right';
