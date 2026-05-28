@@ -4,7 +4,7 @@ import dagre from 'dagre';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import { LayoutStrategyManager } from '../strategies/LayoutStrategyManager';
 import { animateLayoutTransition } from '../utils/animateLayoutTransition';
-import { refineLayout, extractNodeGroups } from '../strategies/shared/LayoutRefinement';
+import { refineLayout } from '../strategies/shared/LayoutRefinement';
 
 export type LayoutDirection = 'TB' | 'LR';
 export type LayoutAlgorithm = 'dagre' | 'elk';
@@ -284,16 +284,9 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
                 const result = await strategy.calculateLayout(nodes, edges, layoutOptions);
 
                 if (result.nodes.length > 0) {
-                    // ⭐ 路由感知后处理（域感知模式）+ 平滑过渡动画
+                    // 域布局策略已完成所有位置计算，禁止后处理微调
                     setEdges(result.edges);
-                    const nodeGroups = extractNodeGroups(result.nodes);
-                    const { nodes: refinedDomainNodes } = refineLayout(result.nodes, edges, {
-                        direction,
-                        enableChannelSpacing: true,
-                        enableCrossingMinimization: true,
-                        nodeGroups,
-                    });
-                    await animateLayoutTransition(setNodes, refinedDomainNodes);
+                    await animateLayoutTransition(setNodes, result.nodes);
                 } else {
                     console.warn('[AutoLayout][domain] 策略返回 0 个节点，布局未应用');
                 }

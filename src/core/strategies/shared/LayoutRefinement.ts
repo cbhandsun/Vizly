@@ -784,46 +784,91 @@ function syncContainerNodes(
 ): Node[] {
   if (containers.length === 0) return refinedBusiness;
 
-  // 建立原始节点位置映射
-  const originalPos = new Map(originalNodes.map(n => [n.id, n.position]));
-  const refinedPos = new Map(refinedBusiness.map(n => [n.id, n.position]));
-
-  // 计算每个容器的子节点整体偏移
-  const parentChildren = new Map<string, string[]>();
-  for (const n of originalNodes) {
+  // 建立 parentId → children 映射
+  const refinedById = new Map(refinedBusiness.map(n => [n.id, n]));
+  const parentChildren = new Map<string, Node[]>();
+  for (const n of refinedBusiness) {
     const pid = (n as any).parentId;
-    if (pid) {
-      if (!parentChildren.has(pid)) parentChildren.set(pid, []);
-      parentChildren.get(pid)!.push(n.id);
-    }
+    if (!pid) continue;
+    if (!parentChildren.has(pid)) parentChildren.set(pid, []);
+    parentChildren.get(pid)!.push(n);
   }
+
+  // 从原始节点获取容器的 padding 信息
+  // 域布局策略设置的 padding 大约为：top=70, right=20, bottom=20, left=20
+  // 如果容器有 style.padding 我们优先使用，否则用默认值
+  const DEFAULT_PADDING = { top: 70, right: 20, bottom: 20, left: 20 };
 
   const adjustedContainers = containers.map(c => {
     const children = parentChildren.get(c.id) || [];
     if (children.length === 0) return c;
 
-    // 计算子节点的平均偏移
-    let dx = 0, dy = 0, count = 0;
-    for (const childId of children) {
-      const orig = originalPos.get(childId);
-      const refined = refinedPos.get(childId);
-      if (orig && refined) {
-        dx += refined.x - orig.x;
-        dy += refined.y - orig.y;
-        count++;
+    // 子节点的 position 是相对于父容器的本地坐标
+    // 找出子节点边界框
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const child of children) {
+      const cx = child.position.x;
+      const cy = child.position.y;
+      const cw = (child as any).width || (child as any).measured?.width || (child.style as any)?.width || 200;
+      const ch = (child as any).height || (child as any).measured?.height || (child.style as any)?.height || 100;
+      if (cx < minX) minX = cx;
+      if (cy < minY) minY = cy;
+      if (cx + cw > maxX) maxX = cx + cw;
+      if (cy + ch > maxY) maxY = cy + ch;
+    }
+
+    // 安全检查：如果边界框无效（子节点没有有效坐标），跳过
+    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return c;
+
+    // 读取容器原始 style 中的 padding（如果有）
+    const style = (c.style || {}) as Record<string, any>;
+    const padLeft = typeof style.paddingLeft === 'number' ? style.paddingLeft : DEFAULT_PADDING.left;
+    const padTop = typeof style.paddingTop === 'number' ? style.paddingTop : DEFAULT_PADDING.top;
+    const padRight = typeof style.paddingRight === 'number' ? style.paddingRight : DEFAULT_PADDING.right;
+    const padBottom = typeof style.paddingBottom === 'number' ? style.paddingBottom : DEFAULT_PADDING.bottom;
+
+    // 如果子节点在容器内的位置偏移了，调整容器位置和尺寸使之重新包裹
+    // 策略：如果子节点左上角（minX, minY）不再等于 padding，
+    // 我们通过移动所有子节点或调整容器来修复。
+    // 最安全的方式：重新计算容器尺寸以包裹所有子节点
+    const newWidth = (maxX - minX) + padLeft + padRight;
+    const newHeight = (maxY - minY) + padTop + padBottom;
+
+    // 子节点相对于容器左上角的期望偏移
+    // 如果 minX != padLeft，说明子节点整体左移或右移了
+    const driftX = minX - padLeft;
+    const driftY = minY - padTop;
+
+    // 通过移动容器来补偿漂移（而不是移动子节点，避免打断本地坐标）
+    const newPos = {
+      x: c.position.x + driftX,
+      y: c.position.y + driftY,
+    };
+
+    // 同时调整所有子节点的本地坐标，消除漂移
+    for (const child of children) {
+      const updated = refinedById.get(child.id);
+      if (updated) {
+        updated.position = {
+          x: updated.position.x - driftX,
+          y: updated.position.y - driftY,
+        };
       }
     }
-    if (count === 0) return c;
-    dx /= count;
-    dy /= count;
 
-    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return c;
+    // 只在实际有变化时才更新容器
+    const posChanged = Math.abs(newPos.x - c.position.x) > 0.5 || Math.abs(newPos.y - c.position.y) > 0.5;
+    const sizeChanged = Math.abs(newWidth - (style.width || 0)) > 0.5 || Math.abs(newHeight - (style.height || 0)) > 0.5;
+
+    if (!posChanged && !sizeChanged) return c;
 
     return {
       ...c,
-      position: {
-        x: c.position.x + dx,
-        y: c.position.y + dy,
+      position: newPos,
+      style: {
+        ...style,
+        width: Math.max(newWidth, style.width || 0),
+        height: Math.max(newHeight, style.height || 0),
       },
     };
   });

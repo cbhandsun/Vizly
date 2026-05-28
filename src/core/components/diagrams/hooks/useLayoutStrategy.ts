@@ -6,7 +6,7 @@ import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator
 import { flushObstacles } from '../../custom-edges/ObstacleContext';
 import { buildChildrenMap, getDescendantIds } from './useCollapsibleGroups';
 import { dispatchDiagramControl } from '../../shared/diagramControl';
-import { refineLayout, extractNodeGroups } from '../../../strategies/shared/LayoutRefinement';
+import { refineLayout } from '../../../strategies/shared/LayoutRefinement';
 
 
 interface UseLayoutStrategyParams {
@@ -325,16 +325,8 @@ export function useLayoutStrategy({
                     // [FIX] 保留非流程图节点（mindmap、sticky-note 等）：布局算法不处理它们，但不能丢弃
                     const resultNodeIds = new Set(result.nodes.map((n: any) => n.id));
                     const preservedNodes = allNodes.filter(n => nonLayoutTypes.has(n.type || '') && !resultNodeIds.has(n.id));
-                    const finalNodesRaw = [...result.nodes, ...preservedNodes];
-                    // ⭐ 路由感知后处理（域感知模式：不跨域移动节点）
-                    const nodeGroups = extractNodeGroups(result.nodes);
-                    const { nodes: finalNodes } = refineLayout(finalNodesRaw, layoutEdges, {
-                        direction: dir,
-                        enableChannelSpacing: true,
-                        enableCrossingMinimization: true,
-                        enableNodeNudging: false,
-                        nodeGroups,
-                    });
+                    const finalNodes = [...result.nodes, ...preservedNodes];
+                    // 域布局策略已完成所有位置计算，禁止后处理微调
                     // [FIX] Clear edges + cache BEFORE animation
                     setEdges(sanitizeLayoutEdges(finalNodes, result.edges, dir));
                     EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
