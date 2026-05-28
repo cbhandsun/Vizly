@@ -316,9 +316,7 @@
       "source": "calc-theory-ratio",
       "target": "sort-demand",
       "type": "main",
-      "label": "Max_Ratio",
-      "sourceHandle": "right",
-      "targetHandle": "left"
+      "label": "Max_Ratio"
     },
     {
       "id": "e4",
@@ -367,13 +365,7 @@
       "source": "fix-quota",
       "target": "greedy-spec",
       "type": "dependency",
-      "label": "Quota A",
-      "data": {
-        "constraints": {
-          "obstacleBehavior": "strict",
-          "priority": -1
-        }
-      }
+      "label": "Quota A"
     },
     {
       "id": "e11",
@@ -393,9 +385,7 @@
       "source": "check-rem",
       "target": "task-direct-a",
       "type": "main",
-      "label": "耗尽",
-      "sourceHandle": "right",
-      "targetHandle": "right"
+      "label": "耗尽"
     },
     {
       "id": "e14",
