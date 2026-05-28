@@ -6,6 +6,7 @@ import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator
 import { flushObstacles } from '../../custom-edges/ObstacleContext';
 import { buildChildrenMap, getDescendantIds } from './useCollapsibleGroups';
 import { dispatchDiagramControl } from '../../shared/diagramControl';
+import { refineLayout, extractNodeGroups } from '../../../strategies/shared/LayoutRefinement';
 
 
 interface UseLayoutStrategyParams {
@@ -176,7 +177,14 @@ export function useLayoutStrategy({
                 // [FIX] 保留非流程图节点
                 const treeNodeIds = new Set(newNodes.map(n => n.id));
                 const treePreserved = allNodes.filter(n => nonLayoutTypes.has(n.type || '') && !treeNodeIds.has(n.id));
-                const treeResult = [...newNodes, ...treePreserved];
+                const treeResultRaw = [...newNodes, ...treePreserved];
+                // ⭐ 路由感知后处理：优化节点位置以改善连线质量
+                const { nodes: treeResult } = refineLayout(treeResultRaw, layoutEdges, {
+                    direction: dir,
+                    enableChannelSpacing: true,
+                    enableCrossingMinimization: true,
+                    enableNodeNudging: false,
+                });
                 // [FIX] Clear handles + cached data BEFORE animation — let smart port selection decide
                 setEdges(prev => prev.map(e => ({ ...e, sourceHandle: null, targetHandle: null, data: { ...e.data, waypoints: [], computedPath: undefined, elkPath: undefined, algorithm: undefined, _layoutEpoch: undefined } })));
                 EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
@@ -202,7 +210,14 @@ export function useLayoutStrategy({
                 // [FIX] 保留非流程图节点
                 const forceNodeIds = new Set(newNodes.map(n => n.id));
                 const forcePreserved = allNodes.filter(n => nonLayoutTypes.has(n.type || '') && !forceNodeIds.has(n.id));
-                const forceResult = [...newNodes, ...forcePreserved];
+                const forceResultRaw = [...newNodes, ...forcePreserved];
+                // ⭐ 路由感知后处理
+                const { nodes: forceResult } = refineLayout(forceResultRaw, layoutEdges, {
+                    direction: dir,
+                    enableChannelSpacing: true,
+                    enableCrossingMinimization: true,
+                    enableNodeNudging: false,
+                });
                 // [FIX] Clear handles + cached data BEFORE animation — let smart port selection decide
                 setEdges(prev => prev.map(e => ({
                     ...e,
@@ -310,7 +325,16 @@ export function useLayoutStrategy({
                     // [FIX] 保留非流程图节点（mindmap、sticky-note 等）：布局算法不处理它们，但不能丢弃
                     const resultNodeIds = new Set(result.nodes.map((n: any) => n.id));
                     const preservedNodes = allNodes.filter(n => nonLayoutTypes.has(n.type || '') && !resultNodeIds.has(n.id));
-                    const finalNodes = [...result.nodes, ...preservedNodes];
+                    const finalNodesRaw = [...result.nodes, ...preservedNodes];
+                    // ⭐ 路由感知后处理（域感知模式：不跨域移动节点）
+                    const nodeGroups = extractNodeGroups(result.nodes);
+                    const { nodes: finalNodes } = refineLayout(finalNodesRaw, layoutEdges, {
+                        direction: dir,
+                        enableChannelSpacing: true,
+                        enableCrossingMinimization: true,
+                        enableNodeNudging: false,
+                        nodeGroups,
+                    });
                     // [FIX] Clear edges + cache BEFORE animation
                     setEdges(sanitizeLayoutEdges(finalNodes, result.edges, dir));
                     EdgeRoutingCoordinator.getInstance().forceClearAllCaches();

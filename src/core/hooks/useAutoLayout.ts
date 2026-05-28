@@ -4,6 +4,7 @@ import dagre from 'dagre';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import { LayoutStrategyManager } from '../strategies/LayoutStrategyManager';
 import { animateLayoutTransition } from '../utils/animateLayoutTransition';
+import { refineLayout, extractNodeGroups } from '../strategies/shared/LayoutRefinement';
 
 export type LayoutDirection = 'TB' | 'LR';
 export type LayoutAlgorithm = 'dagre' | 'elk';
@@ -78,8 +79,13 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
                     };
                 });
 
-                // ⭐ 平滑过渡动画
-                await animateLayoutTransition(setNodes, newNodes);
+                // ⭐ 路由感知后处理 + 平滑过渡动画
+                const { nodes: refinedNodes } = refineLayout(newNodes, edges, {
+                    direction,
+                    enableChannelSpacing: true,
+                    enableCrossingMinimization: true,
+                });
+                await animateLayoutTransition(setNodes, refinedNodes);
             } catch (err) {
                 console.error('ELK Layout Failed:', err);
             }
@@ -129,8 +135,13 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
                 };
             });
 
-            // ⭐ 平滑过渡动画
-            await animateLayoutTransition(setNodes, newNodes);
+            // ⭐ 路由感知后处理 + 平滑过渡动画
+            const { nodes: refinedNodes } = refineLayout(newNodes, edges, {
+                direction,
+                enableChannelSpacing: true,
+                enableCrossingMinimization: true,
+            });
+            await animateLayoutTransition(setNodes, refinedNodes);
         }
 
         window.requestAnimationFrame(() => {
@@ -225,8 +236,13 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
                     };
                 });
 
-                // ⭐ 平滑过渡动画
-                await animateLayoutTransition(setNodes, newNodes);
+                // ⭐ 路由感知后处理 + 平滑过渡动画
+                const { nodes: refinedTreeNodes } = refineLayout(newNodes, edges, {
+                    direction: options.direction || 'TB',
+                    enableChannelSpacing: true,
+                    enableCrossingMinimization: true,
+                });
+                await animateLayoutTransition(setNodes, refinedTreeNodes);
                 // 更新边的 handle（FlowchartNode 的 Handle 都有 id，边必须指定）
                 const dir = options.direction || 'TB';
                 const srcH = dir === 'LR' ? 'right' : 'bottom';
@@ -268,9 +284,16 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
                 const result = await strategy.calculateLayout(nodes, edges, layoutOptions);
 
                 if (result.nodes.length > 0) {
-                    // ⭐ 平滑过渡动画
+                    // ⭐ 路由感知后处理（域感知模式）+ 平滑过渡动画
                     setEdges(result.edges);
-                    await animateLayoutTransition(setNodes, result.nodes);
+                    const nodeGroups = extractNodeGroups(result.nodes);
+                    const { nodes: refinedDomainNodes } = refineLayout(result.nodes, edges, {
+                        direction,
+                        enableChannelSpacing: true,
+                        enableCrossingMinimization: true,
+                        nodeGroups,
+                    });
+                    await animateLayoutTransition(setNodes, refinedDomainNodes);
                 } else {
                     console.warn('[AutoLayout][domain] 策略返回 0 个节点，布局未应用');
                 }
