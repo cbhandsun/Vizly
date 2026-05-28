@@ -462,8 +462,10 @@ export function generateSimplePath(
         candidates = candidates.slice(0, 10);
 
         // Add explicit U-shape bypass candidates
-        candidates.push(Math.max(start.x, end.x) + 30);
-        candidates.push(Math.min(start.x, end.x) - 30);
+        // [FIX] 动态 U-bypass 距离：取源/目标间距离的 20%，最小 30px，最大 200px
+        const uBypassMargin = Math.max(30, Math.min(200, Math.abs(dx) * 0.2));
+        candidates.push(Math.max(start.x, end.x) + uBypassMargin);
+        candidates.push(Math.min(start.x, end.x) - uBypassMargin);
 
         for (const midX of candidates) {
             const path = [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
@@ -495,8 +497,10 @@ export function generateSimplePath(
         candidatesY = candidatesY.slice(0, 10);
 
         // Add explicit U-shape bypass candidates
-        candidatesY.push(Math.max(start.y, end.y) + 30);
-        candidatesY.push(Math.min(start.y, end.y) - 30);
+        // [FIX] 动态 U-bypass 距离：取源/目标间距离的 20%，最小 30px，最大 200px
+        const uBypassMarginY = Math.max(30, Math.min(200, Math.abs(dy) * 0.2));
+        candidatesY.push(Math.max(start.y, end.y) + uBypassMarginY);
+        candidatesY.push(Math.min(start.y, end.y) - uBypassMarginY);
 
         for (const midY of candidatesY) {
             const path = [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
@@ -1384,7 +1388,58 @@ export function findPath(
 
 
             restoreSavedCells();
-            return optimizePath(result, obstacles);
+            const optimized = optimizePath(result, obstacles);
+
+            // [FIX-detour-cap] libavoid 风格：绕行上限检查
+            // 如果 A* 结果路径长度 > 曼哈顿距离 × DETOUR_RATIO，降级为简单 L/Z 型路径
+            // 行业标准：libavoid 约 3-4 倍，yFiles 无显式上限但隐含约 3 倍
+            const DETOUR_RATIO = 1.8;
+            const directDist = Math.abs(end.x - start.x) + Math.abs(end.y - start.y);
+            let detourLen = 0;
+            for (let di = 0; di < optimized.length - 1; di++) {
+                detourLen += Math.abs(optimized[di + 1].x - optimized[di].x) + Math.abs(optimized[di + 1].y - optimized[di].y);
+            }
+
+            if (detourLen > directDist * DETOUR_RATIO && directDist > 100) {
+                // 路径绕行过大，尝试放宽障碍物检查生成更短路径
+                const relaxedPath = generateSimplePath(start, end, [], lineObstacles, {
+                    enableBuffer: false,
+                    maxSegments: 4,
+                    sourcePos: generateOpts?.sourcePos,
+                    targetPos: generateOpts?.targetPos
+                });
+                if (relaxedPath) {
+                    return simplifyPath(relaxedPath);
+                }
+                // 最终 fallback：端口感知的 Z 型连接（允许交叉，LineJumpEngine 会处理）
+                // 根据源端口方向决定先水平还是先垂直
+                const sPos = generateOpts?.sourcePos;
+                const tPos = generateOpts?.targetPos;
+                const isSourceHoriz = sPos === 'left' || sPos === 'right';
+                const isTargetHoriz = tPos === 'left' || tPos === 'right';
+                
+                let fallbackPath: Point[];
+                if (isSourceHoriz && !isTargetHoriz) {
+                    // 水平出发 → 垂直到达：H-V-H 型
+                    const midX = (start.x + end.x) / 2;
+                    fallbackPath = [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
+                } else if (!isSourceHoriz && isTargetHoriz) {
+                    // 垂直出发 → 水平到达：V-H-V 型
+                    const midY = (start.y + end.y) / 2;
+                    fallbackPath = [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
+                } else if (isSourceHoriz) {
+                    // 两端都水平：H-V-H 型
+                    const midX = (start.x + end.x) / 2;
+                    fallbackPath = [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
+                } else {
+                    // 两端都垂直或未指定：V-H-V 型
+                    const midY = (start.y + end.y) / 2;
+                    fallbackPath = [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
+                }
+                return simplifyPath(fallbackPath);
+            }
+
+            return optimized;
         }
 
         // Explore neighbors

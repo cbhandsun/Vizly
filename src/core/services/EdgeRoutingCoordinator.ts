@@ -1940,7 +1940,7 @@ export class EdgeRoutingCoordinator {
             if (isVerticalFlow) {
                 // 涓绘祦=涓婁笅 鈫?榛樿鎸?y 鍒嗗崐鐞?
                 // 閫冮€革細濡傛灉 |dx| > 2*|dy| 涓?|dx| > 50px锛岃鏄?peer 寮虹儓鍋忓悜宸﹀彸
-                if (!keepTrueHemisphere && globalPeers.length > 3 && Math.abs(dx) > Math.abs(dy) * 1.0 && Math.abs(dx) > 50) {
+                if (!keepTrueHemisphere && globalPeers.length > 3 && Math.abs(dx) > Math.abs(dy) * 0.8 && Math.abs(dx) > 50) {
                     side = dx < 0 ? 'left' : 'right';
                 } else {
                     side = dy < 0 ? 'top' : 'bottom';
@@ -1948,7 +1948,7 @@ export class EdgeRoutingCoordinator {
             } else {
                 // 涓绘祦=宸﹀彸 鈫?榛樿鎸?x 鍒嗗崐鐞?
                 // 閫冮€革細濡傛灉 |dy| > 2*|dx| 涓?|dy| > 50px
-                if (!keepTrueHemisphere && globalPeers.length > 3 && Math.abs(dy) > Math.abs(dx) * 1.0 && Math.abs(dy) > 50) {
+                if (!keepTrueHemisphere && globalPeers.length > 3 && Math.abs(dy) > Math.abs(dx) * 0.8 && Math.abs(dy) > 50) {
                     side = dy < 0 ? 'top' : 'bottom';
                 } else {
                     side = dx < 0 ? 'left' : 'right';
@@ -1966,6 +1966,8 @@ export class EdgeRoutingCoordinator {
                 typeInfluenced: false
             });
 
+
+
             if (!sideGroups.has(side)) sideGroups.set(side, []);
             sideGroups.get(side)!.push(peerEdge);
         });
@@ -1982,12 +1984,16 @@ export class EdgeRoutingCoordinator {
                     largestSide = s;
                 }
             }
-            const singletonKeys = [];
+            const singletonKeys: string[] = [];
+            const isOpposite = (a: string, b: string): boolean =>
+                (a === 'top' && b === 'bottom') || (a === 'bottom' && b === 'top') ||
+                (a === 'left' && b === 'right') || (a === 'right' && b === 'left');
             for (const [s, edges] of sideGroups) {
                 if (s !== largestSide && edges.length === 1) {
                     const sJob = busGroupJobs.find(j => j.edgeId === edges[0].id);
-                    if (!sJob?.isReverseEdge) {
-                        sideGroups.get(largestSide).push(...edges);
+                    // Don't merge if: (1) reverse edge, or (2) opposite hemisphere
+                    if (!sJob?.isReverseEdge && !isOpposite(s, largestSide)) {
+                        sideGroups.get(largestSide)!.push(...edges);
                         singletonKeys.push(s);
                     }
                 }
@@ -1995,7 +2001,8 @@ export class EdgeRoutingCoordinator {
             for (const k of singletonKeys) sideGroups.delete(k);
         }
 
-        // 閫愬崐鐞冪粍璁＄畻涓诲共绾?
+
+
         sideGroups.forEach((groupEdges, _side) => {
             if (groupEdges.length === 0) return;
 
@@ -2020,6 +2027,8 @@ export class EdgeRoutingCoordinator {
                 undefined, // 璁?calculateTreeTrunk 鑷璁＄畻璐ㄥ績
                 obstacles
             );
+
+
 
             // [FIX-port-spread] 鍚屼晶绔彛鎵╁睍锛圥ort Spreading锛?
             // 褰?M2O 鍜?O2M 鍏变韩鍚屼竴绔彛渚ф椂锛屼笉缈昏浆涔熶笉鍋忕Щ trunk axis锛?

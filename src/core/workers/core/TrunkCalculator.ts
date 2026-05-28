@@ -173,11 +173,11 @@ export class TrunkCalculator {
         const dy = Math.abs(peersCenter.y - hubCenter.y);
 
         // If Vertical separation is dominant (Process Flow)
-        if (dy > dx * 1.5 && dy > 40) {
+        if (dy > dx * 1.2 && dy > 40) {
             isHorizontal = false; // Force Vertical Flow Mode (Horizontal Trunk)
         }
         // If Horizontal separation is dominant (Timeline/Swimlane Flow)
-        else if (dx > dy * 1.5 && dx > 40) {
+        else if (dx > dy * 1.2 && dx > 40) {
             isHorizontal = true; // Force Horizontal Flow Mode (Vertical Trunk)
         }
 
@@ -295,7 +295,18 @@ export class TrunkCalculator {
             } else {
                 axis = Math.max(axis, hubNode.x + hubNode.width + spacing);
             }
-
+            // [FIX-peer-penetration] After obstacle collision may push axis into a peer node
+            // (which was filtered from obstacles). Ensure axis doesn't penetrate any peer.
+            for (const peer of peerNodes) {
+                if (axis > peer.x - 10 && axis < peer.x + peer.width + 10) {
+                    // Axis is inside this peer — push to nearest edge
+                    if (isLeft) {
+                        axis = Math.floor((peer.x - spacing) / grid) * grid;
+                    } else {
+                        axis = Math.ceil((peer.x + peer.width + spacing) / grid) * grid;
+                    }
+                }
+            }
 
             return { axis, direction: 'vertical', range, suggestedPort };
 
@@ -379,6 +390,17 @@ export class TrunkCalculator {
 
             if (config.debug && !suggestedPort!) {
                 console.error('[TrunkCalculator] suggestedPort was never assigned for horizontal trunk!', { isManyToOne, isTop });
+            }
+
+            // [FIX-peer-penetration] Ensure axis doesn't penetrate any peer node (Y direction).
+            for (const peer of peerNodes) {
+                if (axis > peer.y - 10 && axis < peer.y + peer.height + 10) {
+                    if (isTop) {
+                        axis = Math.floor((peer.y - spacing) / grid) * grid;
+                    } else {
+                        axis = Math.ceil((peer.y + peer.height + spacing) / grid) * grid;
+                    }
+                }
             }
 
             return { axis, direction: 'horizontal', range, suggestedPort };
