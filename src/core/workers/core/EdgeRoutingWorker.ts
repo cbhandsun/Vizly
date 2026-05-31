@@ -247,6 +247,11 @@ export class EdgeRoutingWorker {
 
         const clearanceRects = [sRect, tRect];
 
+        // [FIX] Extract domain/subdomain container boundaries for soft routing penalty.
+        // When edges cross these boundaries, A* incurs a CONTAINER_BORDER (400) cost,
+        // encouraging paths to follow container edges rather than cutting through.
+        const containerBorders: Rectangle[] = (graph as any).containerBounds ?? [];
+
 
 
         // 4. Pre-processing: Bus Consensus & Direction
@@ -413,7 +418,7 @@ export class EdgeRoutingWorker {
         // [FIX-dual] 去掉 !job.isManyToOne 互斥条件。
         // 双身份边同时有 O2M 和 M2O 的 trunk 数据，两端独立处理。
         // O2M 端使用 o2mTrunk 数据推算 source port。
-        const o2mTrunk = (job as any).o2mTrunk;
+        const o2mTrunk = job.busRoutingPlan?.o2mTrunk ?? job.o2mTrunk ?? (job as any).o2mTrunk;
         if (job.isOneToMany && o2mTrunk && !hasFixedSourcePort) {
             startPos = resolvePortFromTrunkAxis(sRect, undefined, false, o2mTrunk);
             hasFixedSourcePort = true;
@@ -425,12 +430,8 @@ export class EdgeRoutingWorker {
         // → If trunk is ABOVE target: target faces UP → Position.Top
         // → If trunk is BELOW target: target faces DOWN → Position.Bottom
         // [FIX-shared-port] Same fix: don't pass per-edge source rect to hub port calculation.
-        // [FIX-dual-port] For dual-identity edges (both O2M and M2O), skip M2O target port override.
-        // The O2M trunk already controls the routing path; M2O's port should only affect its own hub side.
-        // Without this guard, M2O trunk forces BMS to face right (toward its M2O trunk axis),
-        // conflicting with the O2M path that approaches BMS from above.
-        const m2oTrunk = (job as any).m2oTrunk;
-        if (job.isManyToOne && m2oTrunk && !hasFixedTargetPort && !job.isOneToMany) {
+        const m2oTrunk = job.busRoutingPlan?.m2oTrunk ?? job.m2oTrunk ?? (job as any).m2oTrunk;
+        if (job.isManyToOne && m2oTrunk && !hasFixedTargetPort) {
             endPos = resolvePortFromTrunkAxis(tRect, undefined, true, m2oTrunk);
             hasFixedTargetPort = true;
         }
@@ -486,15 +487,17 @@ export class EdgeRoutingWorker {
             return { edges: chosen, key: filtered.length >= 2 ? refKey : 'ALL', members: chosen.map(e => e.id) };
         };
 
-        // [FIX-dual] 双身份边需要两组 peerGroup。
-        // 优先取 O2M 的 peerGroup（因为 source hub 端的共享更重要）。
-        // 如果只有 M2O，取 M2O 的 peerGroup。
-        const peerGroupForBus = (() => {
+        // Dual-identity edges need two independent peer groups:
+        // O2M owns the source-side fan-out; M2O owns the target-side fan-in.
+        const o2mPeerGroup = (() => {
             if (job.isOneToMany) {
                 const allPeers = (graph.edges as unknown as GraphEdge[]).filter(e => e.source === job.source);
                 if (allPeers.length === 0) return null;
                 return pickPeerGroup(job.source, true, allPeers, busOrientation.isHorz);
             }
+            return null;
+        })();
+        const m2oPeerGroup = (() => {
             if (job.isManyToOne) {
                 const allPeers = (graph.edges as unknown as GraphEdge[]).filter(e => e.target === job.target);
                 if (allPeers.length === 0) return null;
@@ -502,19 +505,26 @@ export class EdgeRoutingWorker {
             }
             return null;
         })();
+        const peerGroupForDebug = o2mPeerGroup ?? m2oPeerGroup;
 
-        if (peerGroupForBus) {
-            busPeerGroupSize = peerGroupForBus.edges.length;
-            busPeerGroupKey = peerGroupForBus.key;
-            busPeerGroupMembers = peerGroupForBus.members;
+        if (peerGroupForDebug) {
+            busPeerGroupSize = Math.max(o2mPeerGroup?.edges.length ?? 0, m2oPeerGroup?.edges.length ?? 0);
+            busPeerGroupKey = [
+                o2mPeerGroup ? `o2m:${o2mPeerGroup.key}` : null,
+                m2oPeerGroup ? `m2o:${m2oPeerGroup.key}` : null,
+            ].filter(Boolean).join('|') || peerGroupForDebug.key;
+            busPeerGroupMembers = Array.from(new Set([
+                ...(o2mPeerGroup?.members ?? []),
+                ...(m2oPeerGroup?.members ?? []),
+            ]));
         }
 
         // [FIX-dual] 去掉 !job.isManyToOne 互斥。O2M hub source port consensus。
-        if (!hasFixedSourcePort && job.isOneToMany && peerGroupForBus) {
+        if (!hasFixedSourcePort && job.isOneToMany && o2mPeerGroup) {
             const nodes = graph.nodes as unknown as GraphNode[];
-            if (peerGroupForBus.edges.length > 1) {
+            if (o2mPeerGroup.edges.length > 1) {
                 const result = busDetector.calculateBusConsensus(
-                    false, sRect, peerGroupForBus.edges,
+                    false, sRect, o2mPeerGroup.edges,
                     nodes, spatialIndex || null, routingObstacles, startPos, hasExplicitSource
                 );
                 startPos = result.position;
@@ -522,11 +532,11 @@ export class EdgeRoutingWorker {
             }
         }
 
-        if (!hasFixedTargetPort && job.isManyToOne && peerGroupForBus) {
+        if (!hasFixedTargetPort && job.isManyToOne && m2oPeerGroup) {
             const nodes = graph.nodes as unknown as GraphNode[];
-            if (peerGroupForBus.edges.length > 1) {
+            if (m2oPeerGroup.edges.length > 1) {
                 const result = busDetector.calculateBusConsensus(
-                    true, tRect, peerGroupForBus.edges,
+                    true, tRect, m2oPeerGroup.edges,
                     nodes, spatialIndex || null, routingObstacles, endPos, hasExplicitTarget
                 );
                 endPos = result.position;
@@ -1026,6 +1036,7 @@ export class EdgeRoutingWorker {
         // [DEBUG] Container for pathfinding internals (grid, visited nodes)
         // [PERF] Only collect heavy debug data if explicitly requested for this edge
         const shouldCollectDebugData = job.debug === true;
+        const shouldLogRouteDebug = config.debug === true && (config as any).verboseConsole === true;
         const debugData: { visited?: Point[]; grid?: { minX: number, minY: number, cols: number, rows: number, size: number, data: Int32Array } } = {};
 
         // [总线主干道] Check if trunk routing should be applied
@@ -1164,7 +1175,7 @@ export class EdgeRoutingWorker {
                     const branchTargetY = Math.max(trunkYMin, Math.min(trunkYMax, endWithOffset.y));
                     trunkStart = { x: trunkAxis, y: branchSourceY };
                     trunkEnd = { x: trunkAxis, y: branchTargetY };
-                    console.log(`[TRUNK-DBG] ${job.edgeId} VERTICAL axis=${trunkAxis} busSrc=(${job.busTrunkSource.x.toFixed(1)},${job.busTrunkSource.y.toFixed(1)}) busTgt=(${job.busTrunkTarget.x.toFixed(1)},${job.busTrunkTarget.y.toFixed(1)}) trunkStart=(${trunkStart.x.toFixed(1)},${trunkStart.y.toFixed(1)}) trunkEnd=(${trunkEnd.x.toFixed(1)},${trunkEnd.y.toFixed(1)}) startOff=(${startWithOffset.x.toFixed(1)},${startWithOffset.y.toFixed(1)}) endOff=(${endWithOffset.x.toFixed(1)},${endWithOffset.y.toFixed(1)})`);
+                    if (shouldLogRouteDebug) console.log(`[TRUNK-DBG] ${job.edgeId} VERTICAL axis=${trunkAxis} busSrc=(${job.busTrunkSource.x.toFixed(1)},${job.busTrunkSource.y.toFixed(1)}) busTgt=(${job.busTrunkTarget.x.toFixed(1)},${job.busTrunkTarget.y.toFixed(1)}) trunkStart=(${trunkStart.x.toFixed(1)},${trunkStart.y.toFixed(1)}) trunkEnd=(${trunkEnd.x.toFixed(1)},${trunkEnd.y.toFixed(1)}) startOff=(${startWithOffset.x.toFixed(1)},${startWithOffset.y.toFixed(1)}) endOff=(${endWithOffset.x.toFixed(1)},${endWithOffset.y.toFixed(1)})`);
                 } else {
                     // Horizontal trunk: trunk axis is a Y value.
                     // [FIX-shared-trunk] The horizontal segment must span the FULL group range
@@ -1184,7 +1195,7 @@ export class EdgeRoutingWorker {
                     // trunkEnd   = point on trunk for this edge's TARGET branch
                     trunkStart = { x: branchSourceX, y: trunkAxis };
                     trunkEnd   = { x: branchTargetX, y: trunkAxis };
-                    console.log(`[TRUNK-DBG] ${job.edgeId} HORIZONTAL axis=${trunkAxis} busSrc=(${job.busTrunkSource.x.toFixed(1)},${job.busTrunkSource.y.toFixed(1)}) busTgt=(${job.busTrunkTarget.x.toFixed(1)},${job.busTrunkTarget.y.toFixed(1)}) trunkStart=(${trunkStart.x.toFixed(1)},${trunkStart.y.toFixed(1)}) trunkEnd=(${trunkEnd.x.toFixed(1)},${trunkEnd.y.toFixed(1)})`);
+                    if (shouldLogRouteDebug) console.log(`[TRUNK-DBG] ${job.edgeId} HORIZONTAL axis=${trunkAxis} busSrc=(${job.busTrunkSource.x.toFixed(1)},${job.busTrunkSource.y.toFixed(1)}) busTgt=(${job.busTrunkTarget.x.toFixed(1)},${job.busTrunkTarget.y.toFixed(1)}) trunkStart=(${trunkStart.x.toFixed(1)},${trunkStart.y.toFixed(1)}) trunkEnd=(${trunkEnd.x.toFixed(1)},${trunkEnd.y.toFixed(1)})`);
                 } // end horizontal trunk branch
 
                 // [FIX] Detour Guard: Skip trunk routing when the precomputed trunk
@@ -1371,8 +1382,163 @@ export class EdgeRoutingWorker {
                 }
             }
 
+            // Dual-identity edges are both O2M and M2O. A single generic busTrunk can only
+            // preserve one side, because the Coordinator writes O2M and M2O trunk geometry in
+            // separate passes. Build a composite route that uses both direction-specific trunks:
+            // source stub -> O2M shared trunk -> handoff -> M2O shared trunk -> target stub.
+            if (
+                !pathPoints &&
+                job.isOneToMany &&
+                job.isManyToOne &&
+                o2mTrunk &&
+                m2oTrunk
+            ) {
+                type TrunkHint = { source: Point; target: Point };
+                type TrunkInfo = {
+                    isVertical: boolean;
+                    axis: number;
+                    min: number;
+                    max: number;
+                };
+
+                const getTrunkInfo = (trunk: TrunkHint): TrunkInfo => {
+                    const trunkVertical = Math.abs(trunk.source.x - trunk.target.x) < 1.0;
+                    return trunkVertical
+                        ? {
+                            isVertical: true,
+                            axis: trunk.source.x,
+                            min: Math.min(trunk.source.y, trunk.target.y),
+                            max: Math.max(trunk.source.y, trunk.target.y),
+                        }
+                        : {
+                            isVertical: false,
+                            axis: trunk.source.y,
+                            min: Math.min(trunk.source.x, trunk.target.x),
+                            max: Math.max(trunk.source.x, trunk.target.x),
+                        };
+                };
+
+                const clamp = (value: number, min: number, max: number) =>
+                    Math.max(min, Math.min(max, value));
+
+                const projectToTrunk = (trunk: TrunkHint, point: Point): Point => {
+                    const info = getTrunkInfo(trunk);
+                    return info.isVertical
+                        ? { x: info.axis, y: clamp(point.y, info.min, info.max) }
+                        : { x: clamp(point.x, info.min, info.max), y: info.axis };
+                };
+
+                const pointOnTrunk = (info: TrunkInfo, branchCoord: number): Point =>
+                    info.isVertical
+                        ? { x: info.axis, y: clamp(branchCoord, info.min, info.max) }
+                        : { x: clamp(branchCoord, info.min, info.max), y: info.axis };
+
+                const chooseParallelHandoff = (
+                    sourceInfo: TrunkInfo,
+                    targetInfo: TrunkInfo,
+                    sourceEntryCoord: number,
+                    targetExitCoord: number,
+                    travelDirection: number
+                ) => {
+                    const overlapMin = Math.max(sourceInfo.min, targetInfo.min);
+                    const overlapMax = Math.min(sourceInfo.max, targetInfo.max);
+                    const minimumSharedTail = 24;
+
+                    if (overlapMin <= overlapMax) {
+                        let coord = travelDirection >= 0 ? overlapMax : overlapMin;
+                        if (Math.abs(targetExitCoord - coord) < minimumSharedTail && overlapMax - overlapMin > minimumSharedTail) {
+                            coord = travelDirection >= 0
+                                ? clamp(targetExitCoord - minimumSharedTail, overlapMin, overlapMax)
+                                : clamp(targetExitCoord + minimumSharedTail, overlapMin, overlapMax);
+                        }
+                        if (Math.abs(coord - sourceEntryCoord) < minimumSharedTail && overlapMax - overlapMin > minimumSharedTail) {
+                            coord = travelDirection >= 0
+                                ? clamp(sourceEntryCoord + minimumSharedTail, overlapMin, overlapMax)
+                                : clamp(sourceEntryCoord - minimumSharedTail, overlapMin, overlapMax);
+                        }
+                        return {
+                            sourceExitCoord: coord,
+                            targetEntryCoord: coord,
+                        };
+                    }
+
+                    return {
+                        sourceExitCoord: travelDirection >= 0 ? sourceInfo.max : sourceInfo.min,
+                        targetEntryCoord: travelDirection >= 0 ? targetInfo.min : targetInfo.max,
+                    };
+                };
+
+                const pushOrthogonal = (points: Point[], next: Point) => {
+                    const last = points[points.length - 1];
+                    if (!last || samePoint(last, next)) return;
+                    if (Math.abs(last.x - next.x) < 0.5 || Math.abs(last.y - next.y) < 0.5) {
+                        points.push(next);
+                        return;
+                    }
+
+                    const cornerA = { x: next.x, y: last.y };
+                    const cornerB = { x: last.x, y: next.y };
+                    const pathA = [last, cornerA, next];
+                    const pathB = [last, cornerB, next];
+                    if (!isPathBlocked(pathA, routingObstacles, 4)) {
+                        points.push(cornerA, next);
+                    } else if (!isPathBlocked(pathB, routingObstacles, 4)) {
+                        points.push(cornerB, next);
+                    } else {
+                        points.push(cornerA, next);
+                    }
+                };
+
+                const sourceInfo = getTrunkInfo(o2mTrunk);
+                const targetInfo = getTrunkInfo(m2oTrunk);
+                const sourceEntry = projectToTrunk(o2mTrunk, startWithOffset);
+                const targetExit = projectToTrunk(m2oTrunk, endWithOffset);
+                let sourceExit = projectToTrunk(o2mTrunk, endWithOffset);
+                let targetEntry = projectToTrunk(m2oTrunk, sourceExit);
+
+                if (sourceInfo.isVertical === targetInfo.isVertical) {
+                    if (sourceInfo.isVertical) {
+                        const travelDirection = Math.sign(endWithOffset.y - startWithOffset.y) || 1;
+                        const handoff = chooseParallelHandoff(
+                            sourceInfo,
+                            targetInfo,
+                            sourceEntry.y,
+                            targetExit.y,
+                            travelDirection
+                        );
+                        sourceExit = pointOnTrunk(sourceInfo, handoff.sourceExitCoord);
+                        targetEntry = pointOnTrunk(targetInfo, handoff.targetEntryCoord);
+                    } else {
+                        const travelDirection = Math.sign(endWithOffset.x - startWithOffset.x) || 1;
+                        const handoff = chooseParallelHandoff(
+                            sourceInfo,
+                            targetInfo,
+                            sourceEntry.x,
+                            targetExit.x,
+                            travelDirection
+                        );
+                        sourceExit = pointOnTrunk(sourceInfo, handoff.sourceExitCoord);
+                        targetEntry = pointOnTrunk(targetInfo, handoff.targetEntryCoord);
+                    }
+                }
+
+                const waypoints: Point[] = [startPt];
+                pushOrthogonal(waypoints, startWithOffset);
+                pushOrthogonal(waypoints, sourceEntry);
+                pushOrthogonal(waypoints, sourceExit);
+                pushOrthogonal(waypoints, targetEntry);
+                pushOrthogonal(waypoints, targetExit);
+                pushOrthogonal(waypoints, endWithOffset);
+                pushOrthogonal(waypoints, endPt);
+
+                if (!isPathBlocked(waypoints, routingObstacles, 4)) {
+                    pathPoints = waypoints;
+                    strategyName = 'Dual Global Trunk Direct';
+                }
+            }
+
             // Execute Trunk Routing if we have valid trunk points (after unified C-shape guard)
-            if (trunkStart && trunkEnd && trunkAxis !== null) {
+            if (!pathPoints && trunkStart && trunkEnd && trunkAxis !== null) {
                 // [Validation] Ensure the trunk provides minimal clearance from the Hub to prevent overlap
                 const hubRect = job.isOneToMany ? sRect : tRect;
                 const hubCenterAxis = isVertical
@@ -1439,11 +1605,11 @@ export class EdgeRoutingWorker {
                     if (!isBlocked && analyzer.intersectsAnyObstacle(trunkStart, trunkEnd, trunkObstacles, dynamicPadding)) isBlocked = true;
                     if (!isBlocked && analyzer.intersectsAnyObstacle(trunkEnd, endWithOffset, trunkObstacles, dynamicPadding)) isBlocked = true;
 
-                    console.log(`[TRUNK-DBG] ${job.edgeId} isBlocked=${isBlocked} dynamicPadding=${dynamicPadding.toFixed(1)} isSharedGlobal=${isSharedGlobalTrunk}`);
+                    if (shouldLogRouteDebug) console.log(`[TRUNK-DBG] ${job.edgeId} isBlocked=${isBlocked} dynamicPadding=${dynamicPadding.toFixed(1)} isSharedGlobal=${isSharedGlobalTrunk}`);
                     if (!isBlocked) {
                         pathPoints = waypoints;
                         strategyName = hasPrecomputedTrunk ? 'Global Trunk Direct' : 'Local Trunk Direct';
-                        console.log(`[TRUNK-DBG] ${job.edgeId} → ${strategyName}`);
+                        if (shouldLogRouteDebug) console.log(`[TRUNK-DBG] ${job.edgeId} → ${strategyName}`);
                     }
                     // [FIX] We do NOT invalidate trunkStart here anymore. 
                     // If it is blocked, we let it fall through to the Trunk A* fallback segment
@@ -1460,6 +1626,7 @@ export class EdgeRoutingWorker {
                             obstacles: routingObstacles,
                             clearanceRects,
                             config,
+                            containerBorders,
                             congestionGrid: runtime.congestionGrid,
                             debugOut: shouldCollectDebugData ? debugData : undefined
                         });
@@ -1486,6 +1653,7 @@ export class EdgeRoutingWorker {
                             obstacles: routingObstacles,
                             clearanceRects,
                             config,
+                            containerBorders,
                             congestionGrid: runtime.congestionGrid,
                             debugOut: shouldCollectDebugData ? debugData : undefined
                         });
@@ -1499,6 +1667,7 @@ export class EdgeRoutingWorker {
                             obstacles: routingObstacles,
                             clearanceRects,
                             config,
+                            containerBorders,
                             congestionGrid: runtime.congestionGrid,
                             debugOut: shouldCollectDebugData ? debugData : undefined
                         });
@@ -1556,6 +1725,7 @@ export class EdgeRoutingWorker {
                                     obstacles: routingObstacles,
                                     clearanceRects,
                                     config,
+                                    containerBorders,
                                     congestionGrid: runtime.congestionGrid,
                                 });
                                 if (convSeg?.length) {
@@ -1563,7 +1733,7 @@ export class EdgeRoutingWorker {
                                     convSeg[convSeg.length - 1] = { x: trunkEnd.x, y: trunkEnd.y };
                                     pathPoints = [startPt, ...convSeg, endPt];
                                     strategyName = 'Global Trunk Convergence';
-                                    console.log(`[TRUNK-DBG] ${job.edgeId} → ${strategyName}`);
+                                    if (shouldLogRouteDebug) console.log(`[TRUNK-DBG] ${job.edgeId} → ${strategyName}`);
                                 }
                                 // If convergence A* also fails → fall through to standard A*/VG routing
                             }
@@ -1790,6 +1960,7 @@ export class EdgeRoutingWorker {
                     clearanceRects,
                     config: activeConfig,
                     lineObstacles,               // [FIX] 将已路由边作为软避障目标
+                    containerBorders,            // [FIX] 域/子域容器边界软惩罚
                     congestionGrid: runtime.congestionGrid, // [NEW] 
                     debugOut: shouldCollectDebugData ? debugData : undefined // [DEBUG]
                 });
@@ -1891,7 +2062,9 @@ export class EdgeRoutingWorker {
                 bidirectionalChannel: job.bidirectionalChannel,
                 bidirectionalSpacing: job.bidirectionalSpacing,
                 bidirectionalCount: (job as any).bidirectionalCount,
-                strategy: strategyName // [FIX] Pass strategy to prevent overwriting 'Trunk Direct'
+                strategy: strategyName, // [FIX] Pass strategy to prevent overwriting 'Trunk Direct'
+                peerGroupSize: job.busRoutingPlan?.peerGroupSize ?? (job as any).peerGroupSize,
+                hasSharedTrunk: isSharedGlobalTrunk,
             }
         };
 

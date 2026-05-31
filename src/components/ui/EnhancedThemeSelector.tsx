@@ -10,11 +10,11 @@ import { useTranslation } from 'react-i18next';
 import { theme } from 'antd';
 import { FaPalette, FaCog, FaDownload, FaUpload, FaPlus, FaTrash, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
 
-import { useConfigIntegration, useTheme } from '@/core';
+import { useConfigIntegration } from '@/core/hooks/useConfigIntegration';
+import { useTheme } from '@/core/themes/useCoreTheme';
 import { useDraggablePanel } from '../../hooks/useDraggablePanel';
-import { Theme } from '@/core';
-import { ThemeMode } from '@/core';
-import { ThemePreset, PresetCategory } from '@/core';
+import type { Theme, ThemeMode } from '@/core/themes/types/ThemeTypes';
+import type { ThemePreset, PresetCategory } from '@/core/themes/ThemePresetManager';
 
 import { getCachedThemePreset } from '@/core/themes/ThemePresetLoader';
 

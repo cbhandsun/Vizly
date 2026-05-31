@@ -1,4 +1,4 @@
-import type { StandardDiagramData } from '@/core';
+import type { StandardDiagramData } from '@/core/models/DiagramModels';
 
 const PRESET_MODULES = import.meta.glob<{ default: StandardDiagramData }>('./*.json', { eager: true });
 

@@ -111,6 +111,8 @@ export class EdgeRouter {
             );
             const sPre = config.preAssignedPorts?.[sourceNode.id]?.source;
             const tPre = config.preAssignedPorts?.[targetNode.id]?.target;
+            const forcePreAssigned = config.preAssignedPortPolicy === 'force'
+                || (config.preAssignedPortPolicy !== 'prefer' && config.directionalHandlePolicy === 'force');
 
             // [FIX-C-shape] Post-port-selection guard: prevent C-shaped paths.
             // When both ports are horizontal (right/left) but nodes are primarily vertically
@@ -133,15 +135,19 @@ export class EdgeRouter {
                 const tgtIsHoriz = isHorizontalHandle(portResult.targetHandle);
                 const srcIsVert  = isVerticalHandle(portResult.sourceHandle);
                 const tgtIsVert  = isVerticalHandle(portResult.targetHandle);
+                const layoutDir = String(config.layoutDirection || '').toUpperCase();
+                const isVerticalReverseWithSideRoom =
+                    ((layoutDir.includes('TB') && ddy < 0) || (layoutDir.includes('BT') && ddy > 0))
+                    && addx > addy * 0.35;
 
-                if (!sPre && srcIsHoriz && tgtIsHoriz && addy > addx * 2) {
+                if (!isVerticalReverseWithSideRoom && !(forcePreAssigned && sPre) && srcIsHoriz && tgtIsHoriz && addy > addx * 2) {
                     // Both horizontal but strong vertical dominance → switch to vertical
                     portResult.sourceHandle = ddy > 0 ? 'b' : 't';
-                    if (!tPre) portResult.targetHandle = ddy > 0 ? 't' : 'b';
-                } else if (!sPre && srcIsVert && tgtIsVert && addx > addy * 2) {
+                    if (!(forcePreAssigned && tPre)) portResult.targetHandle = ddy > 0 ? 't' : 'b';
+                } else if (!(forcePreAssigned && sPre) && srcIsVert && tgtIsVert && addx > addy * 2) {
                     // Both vertical but strong horizontal dominance → switch to horizontal
                     portResult.sourceHandle = ddx > 0 ? 'r' : 'l';
-                    if (!tPre) portResult.targetHandle = ddx > 0 ? 'l' : 'r';
+                    if (!(forcePreAssigned && tPre)) portResult.targetHandle = ddx > 0 ? 'l' : 'r';
                 }
             }
 

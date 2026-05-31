@@ -435,7 +435,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
             rls: routingLabelSig
         };
 
-        if (!isLayoutStable && !nodesDragging) {
+        if (!isLayoutStable && !nodesDragging && !isLoading) {
             return;
         }
 

@@ -132,6 +132,125 @@ describe('EdgeRoutingWorker', () => {
         }));
     });
 
+    it('keeps O2M source and M2O target ports independent for dual-identity edges', () => {
+        const result = route({
+            edgeId: 'dual-bus',
+            isOneToMany: true,
+            isManyToOne: true,
+            o2mTrunk: {
+                source: { x: 160, y: 20 },
+                target: { x: 160, y: 220 },
+            },
+            m2oTrunk: {
+                source: { x: 260, y: -120 },
+                target: { x: 360, y: -120 },
+            },
+            o2mTrunkPort: Position.Right,
+            m2oTrunkPort: Position.Top,
+            busRoutingPlan: {
+                busIndex: 0,
+                peerGroupKey: 'dual',
+                o2mPeerGroupKey: 'o2m:source:right',
+                m2oPeerGroupKey: 'm2o:target:top',
+                peerGroupSize: 2,
+                peerGroupMembers: ['dual-bus', 'source-to-other', 'other-to-target'],
+                trunkPort: Position.Right,
+                trunkPortTangent: 0,
+                o2mTrunkPort: Position.Right,
+                m2oTrunkPort: Position.Top,
+                portFrozen: true,
+            },
+        }, {
+            nodes: [
+                { id: 'source', position: { x: 0, y: 0 }, measured: { width: 80, height: 40 } },
+                { id: 'target', position: { x: 300, y: 0 }, measured: { width: 80, height: 40 } },
+                { id: 'other-target', position: { x: 300, y: 220 }, measured: { width: 80, height: 40 } },
+                { id: 'other-source', position: { x: 40, y: -220 }, measured: { width: 80, height: 40 } },
+            ],
+            edges: [
+                { id: 'dual-bus', source: 'source', target: 'target' },
+                { id: 'source-to-other', source: 'source', target: 'other-target' },
+                { id: 'other-to-target', source: 'other-source', target: 'target' },
+            ],
+        });
+
+        expect(result.error).toBeUndefined();
+        expect(result.sourcePos).toBe(Position.Right);
+        expect(result.targetPos).toBe(Position.Top);
+    });
+
+    it('routes dual-identity edges through both shared trunks', () => {
+        const result = route({
+            edgeId: 'dual-composite-bus',
+            isOneToMany: true,
+            isManyToOne: true,
+            outgoingCount: 2,
+            incomingCount: 2,
+            o2mTrunk: {
+                source: { x: 160, y: 20 },
+                target: { x: 160, y: 220 },
+            },
+            m2oTrunk: {
+                source: { x: 260, y: 120 },
+                target: { x: 260, y: 320 },
+            },
+            o2mTrunkPort: Position.Right,
+            m2oTrunkPort: Position.Left,
+            busTrunkSource: { x: 260, y: 120 },
+            busTrunkTarget: { x: 260, y: 320 },
+            busRoutingPlan: {
+                busIndex: 0,
+                peerGroupKey: 'dual',
+                o2mPeerGroupKey: 'o2m:source:right',
+                m2oPeerGroupKey: 'm2o:target:left',
+                peerGroupSize: 2,
+                peerGroupMembers: ['dual-composite-bus', 'source-to-other', 'other-to-target'],
+                trunkPort: Position.Left,
+                trunkPortTangent: 0,
+                o2mTrunk: {
+                    source: { x: 160, y: 20 },
+                    target: { x: 160, y: 220 },
+                },
+                m2oTrunk: {
+                    source: { x: 260, y: 120 },
+                    target: { x: 260, y: 320 },
+                },
+                o2mTrunkPort: Position.Right,
+                m2oTrunkPort: Position.Left,
+                portFrozen: true,
+            },
+        }, {
+            targetNode: { position: { x: 300, y: 300 } },
+            nodes: [
+                { id: 'source', position: { x: 0, y: 0 }, measured: { width: 80, height: 40 } },
+                { id: 'target', position: { x: 300, y: 300 }, measured: { width: 80, height: 40 } },
+                { id: 'other-target', position: { x: 300, y: 120 }, measured: { width: 80, height: 40 } },
+                { id: 'other-source', position: { x: 40, y: 120 }, measured: { width: 80, height: 40 } },
+            ],
+            edges: [
+                { id: 'dual-composite-bus', source: 'source', target: 'target' },
+                { id: 'source-to-other', source: 'source', target: 'other-target' },
+                { id: 'other-to-target', source: 'other-source', target: 'target' },
+            ],
+        });
+
+        const hasVerticalSpan = (axis: number, minSpan: number) =>
+            result.points.some((point, index, points) => {
+                if (index === 0) return false;
+                const previous = points[index - 1];
+                return Math.abs(previous.x - axis) < 0.5
+                    && Math.abs(point.x - axis) < 0.5
+                    && Math.abs(point.y - previous.y) >= minSpan;
+            });
+
+        expect(result.error).toBeUndefined();
+        expect(result.metadata?.strategy).toBe('Dual Global Trunk Direct');
+        expect(result.sourcePos).toBe(Position.Right);
+        expect(result.targetPos).toBe(Position.Left);
+        expect(hasVerticalSpan(160, 100)).toBe(true);
+        expect(hasVerticalSpan(260, 60)).toBe(true);
+    });
+
     it('uses a deterministic top U-turn for horizontal reverse edges', () => {
         const result = route({
             edgeId: 'reverse-horizontal',

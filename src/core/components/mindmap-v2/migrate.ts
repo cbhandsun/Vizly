@@ -4,10 +4,25 @@
 import type { NodeObj } from 'mind-elixir';
 import type { VizlyMindMapV1Data, VizlyMindMapV2Data } from './types';
 import { VIZLY_HYPER_THEME } from './theme';
+import { applyTaskMeta, getTaskMeta, normalizeTags, type TaskPriority, type TaskStatus } from './mindmapTaskModel';
 
 /** Strip HTML tags from a label string */
 function stripHtml(html: string): string {
     return html.replace(/<[^>]+>/g, '').trim() || 'Untitled';
+}
+
+function escapeXmlAttr(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function hasTaskSignal(node: NodeObj): boolean {
+    const tags = normalizeTags(node.tags as unknown[] | undefined);
+    return Boolean((node as { task?: unknown }).task)
+        || tags.some(tag => ['待办', '进行中', '已完成', 'todo', 'doing', 'done', '高', '中', '低', '高优先级', '中优先级', '低优先级'].includes(tag));
 }
 
 /**
@@ -124,6 +139,16 @@ export function nodeObjToMarkdown(node: NodeObj, depth = 0): string {
     const prefix = depth === 0 ? '# ' : indent + '- ';
     const lines = [prefix + node.topic];
     if (node.note) lines.push(indent + `  > ${node.note}`);
+    if (hasTaskSignal(node)) {
+        const task = getTaskMeta(node);
+        const statusLabel = task.status === 'done' ? '已完成' : task.status === 'doing' ? '进行中' : '待办';
+        const taskParts = [`状态: ${statusLabel}`];
+        if (task.priority && task.priority !== '无') taskParts.push(`优先级: ${task.priority}`);
+        if (task.assignee) taskParts.push(`负责人: ${task.assignee}`);
+        if (task.dueDate) taskParts.push(`截止: ${task.dueDate}`);
+        if (task.progress) taskParts.push(`进度: ${task.progress}%`);
+        lines.push(indent + `  > 任务: ${taskParts.join(' | ')}`);
+    }
     for (const child of node.children ?? []) {
         lines.push(nodeObjToMarkdown(child, depth + 1));
     }
@@ -134,14 +159,18 @@ export function nodeObjToMarkdown(node: NodeObj, depth = 0): string {
 export function nodeObjToOpml(root: NodeObj): string {
     function convertNode(node: NodeObj, depth: number): string {
         const indent = '  '.repeat(depth + 2);
-        const text = node.topic
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
+        const text = escapeXmlAttr(node.topic);
         const extras: string[] = [];
-        if (node.note) extras.push(`_note="${node.note.replace(/"/g, '&quot;')}"`);
-        if (node.hyperLink) extras.push(`url="${node.hyperLink}"`);
+        if (node.note) extras.push(`_note="${escapeXmlAttr(node.note)}"`);
+        if (node.hyperLink) extras.push(`url="${escapeXmlAttr(node.hyperLink)}"`);
+        if (hasTaskSignal(node)) {
+            const task = getTaskMeta(node);
+            extras.push(`_vizly_task_status="${task.status}"`);
+            extras.push(`_vizly_task_priority="${task.priority}"`);
+            if (task.assignee) extras.push(`_vizly_task_assignee="${escapeXmlAttr(task.assignee)}"`);
+            if (task.dueDate) extras.push(`_vizly_task_due_date="${escapeXmlAttr(task.dueDate)}"`);
+            if (task.progress) extras.push(`_vizly_task_progress="${task.progress}"`);
+        }
         const extrasStr = extras.length ? ' ' + extras.join(' ') : '';
         const children = node.children ?? [];
         if (children.length === 0) {
@@ -342,6 +371,12 @@ export function opmlToNodeObj(opmlStr: string): NodeObj {
         const topic = el.getAttribute('text') ?? el.getAttribute('_text') ?? '节点';
         const note = el.getAttribute('_note') ?? undefined;
         const hyperLink = el.getAttribute('url') ?? undefined;
+        const status = el.getAttribute('_vizly_task_status') as TaskStatus | null;
+        const priority = el.getAttribute('_vizly_task_priority') as TaskPriority | null;
+        const assignee = el.getAttribute('_vizly_task_assignee') ?? undefined;
+        const dueDate = el.getAttribute('_vizly_task_due_date') ?? undefined;
+        const progressValue = el.getAttribute('_vizly_task_progress');
+        const progress = progressValue === null ? undefined : Number(progressValue);
 
         const children: NodeObj[] = [];
         for (const child of Array.from(el.children)) {
@@ -353,6 +388,15 @@ export function opmlToNodeObj(opmlStr: string): NodeObj {
         const node: NodeObj = { id: genId(), topic, children };
         if (note) node.note = note;
         if (hyperLink) node.hyperLink = hyperLink;
+        if (status || priority || assignee || dueDate || Number.isFinite(progress)) {
+            applyTaskMeta(node, {
+                status: status === 'doing' || status === 'done' || status === 'todo' ? status : undefined,
+                priority: priority === '高' || priority === '中' || priority === '低' || priority === '无' ? priority : undefined,
+                assignee,
+                dueDate,
+                progress: Number.isFinite(progress) ? progress : undefined,
+            });
+        }
         return node;
     }
 

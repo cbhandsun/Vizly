@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">71.19% </span>
+                <span class="strong">71.65% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>173/243</span>
+                <span class='fraction'>177/247</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">45.48% </span>
+                <span class="strong">45.39% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>126/277</span>
+                <span class='fraction'>128/282</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">76.11% </span>
+                <span class="strong">76.58% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>153/201</span>
+                <span class='fraction'>157/205</span>
             </div>
         
             
@@ -510,7 +510,20 @@
 <a name='L445'></a><a href='#L445'>445</a>
 <a name='L446'></a><a href='#L446'>446</a>
 <a name='L447'></a><a href='#L447'>447</a>
-<a name='L448'></a><a href='#L448'>448</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L448'></a><a href='#L448'>448</a>
+<a name='L449'></a><a href='#L449'>449</a>
+<a name='L450'></a><a href='#L450'>450</a>
+<a name='L451'></a><a href='#L451'>451</a>
+<a name='L452'></a><a href='#L452'>452</a>
+<a name='L453'></a><a href='#L453'>453</a>
+<a name='L454'></a><a href='#L454'>454</a>
+<a name='L455'></a><a href='#L455'>455</a>
+<a name='L456'></a><a href='#L456'>456</a>
+<a name='L457'></a><a href='#L457'>457</a>
+<a name='L458'></a><a href='#L458'>458</a>
+<a name='L459'></a><a href='#L459'>459</a>
+<a name='L460'></a><a href='#L460'>460</a>
+<a name='L461'></a><a href='#L461'>461</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -900,14 +913,26 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -916,6 +941,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1346,6 +1372,11 @@ export function decideEdgeRouting(
     // excluded from obstacles), producing paths that appear to hug the group boundary.
     // We mark the container with isSoftZone so it raises cost but doesn't block access
     // (otherwise A* would never reach the target node inside the container).
+    //
+    // [FIX v2] Only add soft zone for TRUE cross-domain edges (different top-level domains).
+    // Intra-domain edges crossing between subdomains (e.g. "数据准备" → "初分逻辑" within
+    // "策略计算") should route DIRECTLY through the gap without penalty. The old code added
+    // the target subdomain as expensive, causing A* to detour far around it.
     // Find parent container using pre-built parentMap
     const getParentId = (nodeId: string) =&gt; parentMap.get(nodeId);
 &nbsp;
@@ -1354,22 +1385,30 @@ export function decideEdgeRouting(
     const isCrossGroup = !!(sParentId &amp;&amp; tParentId &amp;&amp; sParentId !== tParentId);
 &nbsp;
     if (isCrossGroup) {
-        const tParentNode = (allNodes || <span class="branch-1 cbranch-no" title="branch not covered" >[])</span>.find((n: any) =&gt; n.id === tParentId);
-        <span class="missing-if-branch" title="else path not taken" >E</span>if (tParentNode) {
-            const tParentPos = getAbsolutePosition(tParentNode);
-            const tParentW = tParentNode.width ?? <span class="branch-1 cbranch-no" title="branch not covered" >tParentNode.measured?.width ?? <span class="branch-2 cbranch-no" title="branch not covered" >t</span>ParentNode.style?.width ?? <span class="branch-3 cbranch-no" title="branch not covered" >4</span>00;</span>
-            const tParentH = tParentNode.height ?? <span class="branch-1 cbranch-no" title="branch not covered" >tParentNode.measured?.height ?? <span class="branch-2 cbranch-no" title="branch not covered" >t</span>ParentNode.style?.height ?? <span class="branch-3 cbranch-no" title="branch not covered" >3</span>00;</span>
-            // Mark as soft zone: A* sees it as expensive but not impossible to traverse.
-            // This makes A* prefer going AROUND the container boundary first, then enter
-            // from the correct handle side near the target node.
-            obstacles.push({
-                x: tParentPos.x,
-                y: tParentPos.y,
-                width: tParentW,
-                height: tParentH,
-                padding: 40, // Increased padding to ensure visible distance from group border
-                isSoftZone: true, // signals PathFinder to treat as high-cost, not blocked
-            } as any);
+        // Check if they share a common grandparent domain (intra-domain cross-subdomain)
+        const sGrandParentId = getParentId(sParentId!);
+        const tGrandParentId = getParentId(tParentId!);
+        const isIntraDomain = !!(sGrandParentId &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >tGrandParentId &amp;&amp; <span class="branch-2 cbranch-no" title="branch not covered" >s</span>GrandParentId === tGrandParentId);</span>
+&nbsp;
+        // Only add soft zone for true cross-domain edges, not intra-domain subdomain crossings
+        <span class="missing-if-branch" title="else path not taken" >E</span>if (!isIntraDomain) {
+            const tParentNode = (allNodes || <span class="branch-1 cbranch-no" title="branch not covered" >[])</span>.find((n: any) =&gt; n.id === tParentId);
+            <span class="missing-if-branch" title="else path not taken" >E</span>if (tParentNode) {
+                const tParentPos = getAbsolutePosition(tParentNode);
+                const tParentW = tParentNode.width ?? <span class="branch-1 cbranch-no" title="branch not covered" >tParentNode.measured?.width ?? <span class="branch-2 cbranch-no" title="branch not covered" >t</span>ParentNode.style?.width ?? <span class="branch-3 cbranch-no" title="branch not covered" >4</span>00;</span>
+                const tParentH = tParentNode.height ?? <span class="branch-1 cbranch-no" title="branch not covered" >tParentNode.measured?.height ?? <span class="branch-2 cbranch-no" title="branch not covered" >t</span>ParentNode.style?.height ?? <span class="branch-3 cbranch-no" title="branch not covered" >3</span>00;</span>
+                // Mark as soft zone: A* sees it as expensive but not impossible to traverse.
+                // This makes A* prefer going AROUND the container boundary first, then enter
+                // from the correct handle side near the target node.
+                obstacles.push({
+                    x: tParentPos.x,
+                    y: tParentPos.y,
+                    width: tParentW,
+                    height: tParentH,
+                    padding: 40, // Increased padding to ensure visible distance from group border
+                    isSoftZone: true, // signals PathFinder to treat as high-cost, not blocked
+                } as any);
+            }
         }
     }
 &nbsp;
@@ -1411,7 +1450,7 @@ export function decideEdgeRouting(
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-24T02:13:19.059Z
+                at 2026-05-29T15:43:23.984Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

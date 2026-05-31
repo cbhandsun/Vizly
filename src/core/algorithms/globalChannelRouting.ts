@@ -24,7 +24,7 @@ interface Segment {
     minVal: number;
     maxVal: number;
     isBuddy: boolean;
-    buddyGroupKey?: string;
+    buddyGroupKeys?: Set<string>;
 }
 
 /**
@@ -47,13 +47,16 @@ export function globalChannelRouting(
     fixedEdgeIds: Set<string> = new Set()
 ): Map<string, Point[]> {
     const buddyEdgeIds = new Set<string>();
-    const buddyGroupByEdgeId = new Map<string, string>();
+    const buddyGroupByEdgeId = new Map<string, Set<string>>();
     if (buddyGroups) {
         buddyGroups.forEach((group, index) => {
             const groupKey = `${group.type}:${index}`;
             for (const edgeId of group.edgeIds) {
                 buddyEdgeIds.add(edgeId);
-                buddyGroupByEdgeId.set(edgeId, groupKey);
+                if (!buddyGroupByEdgeId.has(edgeId)) {
+                    buddyGroupByEdgeId.set(edgeId, new Set());
+                }
+                buddyGroupByEdgeId.get(edgeId)!.add(groupKey);
             }
         });
     }
@@ -77,7 +80,7 @@ export function globalChannelRouting(
             if (isHoriz) {
                 segments.push({
                     edgeId, segIdx: j, isHoriz: true, isBuddy,
-                    buddyGroupKey: buddyGroupByEdgeId.get(edgeId),
+                    buddyGroupKeys: buddyGroupByEdgeId.get(edgeId),
                     fixedVal: Math.round((p1.y + p2.y) / 2),
                     minVal: Math.min(p1.x, p2.x),
                     maxVal: Math.max(p1.x, p2.x),
@@ -85,7 +88,7 @@ export function globalChannelRouting(
             } else if (isVert) {
                 segments.push({
                     edgeId, segIdx: j, isHoriz: false, isBuddy,
-                    buddyGroupKey: buddyGroupByEdgeId.get(edgeId),
+                    buddyGroupKeys: buddyGroupByEdgeId.get(edgeId),
                     fixedVal: Math.round((p1.x + p2.x) / 2),
                     minVal: Math.min(p1.y, p2.y),
                     maxVal: Math.max(p1.y, p2.y),
@@ -146,7 +149,7 @@ export function globalChannelRouting(
                 const sharedTrack = assignments.find(a => {
                     const other = a.seg;
                     if (!other.isBuddy) return false;
-                    if (!seg.buddyGroupKey || other.buddyGroupKey !== seg.buddyGroupKey) return false;
+                    if (!shareBuddyGroup(seg.buddyGroupKeys, other.buddyGroupKeys)) return false;
                     if (other.isHoriz !== seg.isHoriz) return false;
                     if (Math.abs(other.fixedVal - seg.fixedVal) >= GROUP_TOLERANCE) return false;
                     const overlapLen = Math.min(other.maxVal, seg.maxVal) - Math.max(other.minVal, seg.minVal);
@@ -274,6 +277,14 @@ export function globalChannelRouting(
     return result;
 }
 
+function shareBuddyGroup(a: Set<string> | undefined, b: Set<string> | undefined): boolean {
+    if (!a || !b) return false;
+    for (const group of a) {
+        if (b.has(group)) return true;
+    }
+    return false;
+}
+
 function getTrackSpacing(group: Segment[], baseSpacing: number, trackCount: number): number {
     if (trackCount <= 1 || group.length < 2) return baseSpacing;
 
@@ -296,4 +307,3 @@ function getTrackSpacing(group: Segment[], baseSpacing: number, trackCount: numb
     const scale = Math.min(1, (maxOverlap - MIN_OVERLAP_FOR_SCALE) / (baseSpacing * 20));
     return Math.round(baseSpacing + scale * baseSpacing);
 }
-

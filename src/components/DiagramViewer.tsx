@@ -39,23 +39,73 @@ import {        } from '@ant-design/icons';
 import {      Input } from 'antd';
 const CloudStorageManagerModal = React.lazy(() => import('./storage/CloudStorageManagerModal').then(m => ({ default: m.CloudStorageManagerModal })));
 import { MermaidImportModal } from './ui/MermaidImportModal';
-import { dataService } from '@/services/DataService';
-import { PRESET_MAP } from '@/data/standardized';
-import { CUSTOM_PRESETS_STORAGE_KEY } from './diagrams/ui/TemplateCascaderMenu';
-import { unifiedStorage } from '@/services/UnifiedStorageService';
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
 import { invalidateRemoteDiagramPreview } from '@/core/utils/remoteDiagramPreview';
-import { TemplateCascaderMenu } from './diagrams/ui/TemplateCascaderMenu';
 import DiagramControlBridge from '@/core/components/shared/DiagramControlBridge';
 
 
 
 const DraggableSettingsPanel = React.lazy(() => import('./ui/DraggableSettingsPanel').then(m => ({ default: m.DraggableSettingsPanel })));
+const TemplateCascaderMenu = React.lazy(() => import('./diagrams/ui/TemplateCascaderMenu').then(m => ({ default: m.TemplateCascaderMenu })));
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { resolvePluginId } from '@/core/plugins/registry';
 
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { appModal } from '@/core/utils/antdStaticBridge';
+
+const CUSTOM_PRESETS_STORAGE_KEY = 'diagram-custom-presets';
+
+const ensureBuiltInPlugins = async () => {
+    const { PluginRegistry } = await import('@/core/services/PluginRegistry');
+    const registry = PluginRegistry.getInstance();
+
+    if (!registry.getPlugin('flowchart')) {
+        const [
+            { FlowchartPlugin },
+            { ArchitecturePlugin },
+            { TimelinePlugin },
+            { MindMapPlugin },
+            { SwimlanePlugin },
+            { ERDiagramPlugin },
+            { NetworkTopologyPlugin },
+            { SequencePlugin },
+        ] = await Promise.all([
+            import('@/core/plugins/FlowchartPlugin'),
+            import('@/core/plugins/ArchitecturePlugin'),
+            import('@/core/plugins/TimelinePlugin'),
+            import('@/core/plugins/MindMapPlugin'),
+            import('@/core/plugins/SwimlanePlugin'),
+            import('@/core/plugins/ERDiagramPlugin'),
+            import('@/core/plugins/NetworkTopologyPlugin'),
+            import('@/core/plugins/SequencePlugin'),
+        ]);
+
+        registry.register(new FlowchartPlugin(), true);
+        registry.register(new ArchitecturePlugin());
+        registry.register(new TimelinePlugin());
+        registry.register(new MindMapPlugin());
+        registry.register(new SwimlanePlugin());
+        registry.register(new ERDiagramPlugin());
+        registry.register(new NetworkTopologyPlugin());
+        registry.register(new SequencePlugin());
+    }
+
+    return registry;
+};
+
+const loadFlowchartDesigner = async (pluginId?: string) => {
+    const [{ default: FlowchartDesigner }] = await Promise.all([
+        import('@/core/components/diagrams/FlowchartDesigner'),
+        ensureBuiltInPlugins(),
+    ]);
+
+    return {
+        default: (props: any) => React.createElement(
+            FlowchartDesigner,
+            pluginId ? { ...props, pluginId } : props
+        )
+    };
+};
 
 
 const DiagramViewer: React.FC = () => {
@@ -198,15 +248,31 @@ const DiagramViewer: React.FC = () => {
     } = useUIState(panelRef);
     const { handleToggleFullscreen: handleFsControl } = useDiagramControls(selectedDiagramId);
     const selectedDiagram = diagramDefinitions.find(d => d.id === selectedDiagramId);
+    const [sessionDocType, setSessionDocType] = useState<string | undefined>();
+
+    useEffect(() => {
+        let cancelled = false;
+        if (!selectedDiagramId || selectedDiagram) {
+            setSessionDocType(undefined);
+            return;
+        }
+
+        void import('@/services/DataService').then(({ dataService }) => {
+            if (cancelled) return;
+            try {
+                setSessionDocType(dataService.getDiagram(selectedDiagramId)?.type);
+            } catch {
+                setSessionDocType(undefined);
+            }
+        });
+
+        return () => { cancelled = true; };
+    }, [selectedDiagramId, selectedDiagram]);
 
     // Look up local storage or dataService to find the type
     const docType = useMemo(() => {
         if (!selectedDiagramId || selectedDiagram) return undefined;
-        try {
-            // 1. In-memory DataService (valid within current session)
-            const doc = dataService.getDiagram(selectedDiagramId);
-            if (doc?.type) return doc.type;
-        } catch { /* ignore */ }
+        if (sessionDocType) return sessionDocType;
         try {
             // 2. vizly_diagrams localStorage (written by older versions / external tools)
             const raw = localStorage.getItem('vizly_diagrams');
@@ -233,7 +299,7 @@ const DiagramViewer: React.FC = () => {
             }
         } catch { /* ignore */ }
         return undefined;
-    }, [selectedDiagramId, selectedDiagram]);
+    }, [selectedDiagramId, selectedDiagram, sessionDocType]);
 
     // Bridge: diagram.type → plugin registry ID
     // template type 值与 plugin.id 注册名之间存在历史差异，此映射表统一桥接
@@ -247,27 +313,11 @@ const DiagramViewer: React.FC = () => {
             // Plugins that override the canvas entirely (mindmap, timeline, network...)
             // register themselves via PluginRegistry and contribute canvas + toolbar via hooks.
             // The legacy UnifiedDesigner is just an architecture skeleton and must NOT be used here.
-            return lazy(() => import('@/core').then(async m => {
-                if (m.initializePlugins) m.initializePlugins();
-                // Ensure plugin-specific registration happens before render
-                if (resolvedPluginId === 'mindmap') {
-                    const { PluginRegistry } = m;
-                    if (!PluginRegistry.getInstance().getPlugin('mindmap')) {
-                        const { MindMapPlugin } = await import('../core/plugins/MindMapPlugin');
-                        PluginRegistry.getInstance().register(new MindMapPlugin());
-                    }
-                }
-                return {
-                    default: (props: any) => React.createElement(m.FlowchartDesigner, { ...props, pluginId: resolvedPluginId })
-                };
-            }));
+            return lazy(() => loadFlowchartDesigner(resolvedPluginId));
         }
 
         // Fallback to FlowchartDesigner if not found
-        return lazy(() => import('@/core').then(m => {
-            if (m.initializePlugins) m.initializePlugins();
-            return { default: m.FlowchartDesigner };
-        }));
+        return lazy(() => loadFlowchartDesigner());
     }, [selectedDiagram?.component, docType, resolvedPluginId]);
 
     // 仅显示主流程（动线）开关状态（函数级注释）
@@ -342,6 +392,7 @@ const DiagramViewer: React.FC = () => {
                         // selectedDiagramId && dispatchDiagramControl('loadLocalJson', { json: JSON.stringify(dataToSave) });
                     } else {
                         const snap = await tryAttachDiagramSnapshot(dataToSave, selectedDiagramId);
+                        const { unifiedStorage } = await import('@/services/UnifiedStorageService');
                         const provider = unifiedStorage.getProvider(target);
                         if (!provider.isConfigured()) throw new Error(`${target} 驱动未配置`);
 
@@ -382,6 +433,7 @@ const DiagramViewer: React.FC = () => {
             const hide = appMessage.loading(t('diagramViewer.directSave.saving', { provider: cloudMeta.provider }), 0);
             try {
                 const snap = await tryAttachDiagramSnapshot(bridge, selectedDiagramId);
+                const { unifiedStorage } = await import('@/services/UnifiedStorageService');
                 const provider = unifiedStorage.getProvider(cloudMeta.provider);
                 await provider.saveDiagram({
                     id: cloudMeta.id || bridge.id,
@@ -968,6 +1020,7 @@ const DiagramViewer: React.FC = () => {
                                             const providerName = rootGroup === 's3' ? 's3' : 'supabase';
                                             const messageKey = appMessage.loading(t('storage.manager.downloading'), 0);
                                             try {
+                                                const { unifiedStorage } = await import('@/services/UnifiedStorageService');
                                                 const provider = unifiedStorage.getProvider(providerName);
                                                 const savedDiagram = await provider.loadDiagram(leafKey);
                                                 if (savedDiagram && savedDiagram.content) {
@@ -1034,6 +1087,7 @@ const DiagramViewer: React.FC = () => {
                                                 }
                                             }
                                             
+                                            const { PRESET_MAP } = await import('@/data/standardized');
                                             const preset = PRESET_MAP[leafKey];
                                             if (preset) {
                                                 const trueId = preset.id || leafKey;

@@ -23,6 +23,11 @@ export interface LineSegment {
     isHorizontal: boolean;
 }
 
+export interface EdgeEndpointInfo {
+    source?: string | null;
+    target?: string | null;
+}
+
 export interface IntersectionInfo {
     point: Point;
     /** 水平线边 ID（此边需要画弧） */
@@ -32,6 +37,7 @@ export interface IntersectionInfo {
 }
 
 const JUMP_RADIUS = 6;
+const ENDPOINT_CONTACT_TOLERANCE = 1.5;
 
 /**
  * 从 Point[] 提取所有正交线段
@@ -64,7 +70,10 @@ function extractSegments(points: Point[], edgeId: string): LineSegment[] {
 /**
  * 计算所有 H×V 交叉点
  */
-function findIntersections(segments: LineSegment[]): IntersectionInfo[] {
+function findIntersections(
+    segments: LineSegment[],
+    edgeEndpointInfo: Map<string, EdgeEndpointInfo>
+): IntersectionInfo[] {
     const hSegments = segments.filter(s => s.isHorizontal);
     const vSegments = segments.filter(s => !s.isHorizontal);
     const intersections: IntersectionInfo[] = [];
@@ -77,14 +86,23 @@ function findIntersections(segments: LineSegment[]): IntersectionInfo[] {
         for (const v of vSegments) {
             // 同一条边不生成跳线
             if (h.edgeId === v.edgeId) continue;
+            if (shareEndpointGroup(h.edgeId, v.edgeId, edgeEndpointInfo)) continue;
 
             const vMinY = Math.min(v.p1.y, v.p2.y);
             const vMaxY = Math.max(v.p1.y, v.p2.y);
             const vX = v.p1.x;
 
-            // 严格交叉（不含端点共享）
-            if (vX > hMinX + JUMP_RADIUS && vX < hMaxX - JUMP_RADIUS &&
-                hY > vMinY + JUMP_RADIUS && hY < vMaxY - JUMP_RADIUS) {
+            const insideHorizontal = vX > hMinX + JUMP_RADIUS && vX < hMaxX - JUMP_RADIUS;
+            const strictVerticalInterior = hY > vMinY + JUMP_RADIUS && hY < vMaxY - JUMP_RADIUS;
+            const touchesVerticalEndpoint = (
+                Math.abs(hY - vMinY) <= ENDPOINT_CONTACT_TOLERANCE ||
+                Math.abs(hY - vMaxY) <= ENDPOINT_CONTACT_TOLERANCE
+            ) && Math.abs(vMaxY - vMinY) > JUMP_RADIUS * 2;
+
+            // Strict crossings need a jump. So do non-buddy T contacts where
+            // another edge endpoint lands inside a long horizontal sweep; those
+            // read visually as false connections.
+            if (insideHorizontal && (strictVerticalInterior || touchesVerticalEndpoint)) {
                 intersections.push({
                     point: { x: vX, y: hY },
                     horizontalEdgeId: h.edgeId,
@@ -95,6 +113,17 @@ function findIntersections(segments: LineSegment[]): IntersectionInfo[] {
     }
 
     return intersections;
+}
+
+function shareEndpointGroup(
+    edgeA: string,
+    edgeB: string,
+    edgeEndpointInfo: Map<string, EdgeEndpointInfo>
+): boolean {
+    const a = edgeEndpointInfo.get(edgeA);
+    const b = edgeEndpointInfo.get(edgeB);
+    if (!a || !b) return false;
+    return (!!a.source && a.source === b.source) || (!!a.target && a.target === b.target);
 }
 
 /**
@@ -111,6 +140,8 @@ class LineJumpEngine {
     
     /** 每条边的 Point[] */
     private edgePoints: Map<string, Point[]> = new Map();
+    /** Edge endpoint ids, used to keep O2M/M2O buddy junctions intact. */
+    private edgeEndpointInfo: Map<string, EdgeEndpointInfo> = new Map();
     /** 缓存的全局线段 */
     private segmentsCache: LineSegment[] | null = null;
     /** 缓存的全局交叉点 */
@@ -119,6 +150,7 @@ class LineJumpEngine {
     private version: number = 0;
     // [FIX N-6] 订阅者集合，供 useSyncExternalStore 使用
     private subscribers: Set<() => void> = new Set();
+    private notifyScheduled = false;
     // [P2-3] globalChannelRouting 结果缓存：
     // 原问题：31 条边各自调用 globalChannelRouting(allPaths) = 31 次 O(E²) 计算。
     // 修复：将结果缓存在单例内，engineVersion 不变时直接复用。
@@ -133,10 +165,14 @@ class LineJumpEngine {
     }
 
     /** 注册一条边的路径点 */
-    registerEdge(edgeId: string, points: Point[]): void {
+    registerEdge(edgeId: string, points: Point[], endpointInfo?: EdgeEndpointInfo): void {
         const existing = this.edgePoints.get(edgeId);
+        const existingInfo = this.edgeEndpointInfo.get(edgeId);
+        const sameInfo =
+            (existingInfo?.source ?? null) === (endpointInfo?.source ?? null) &&
+            (existingInfo?.target ?? null) === (endpointInfo?.target ?? null);
         // 浅比较避免无效刷新
-        if (existing && existing.length === points.length) {
+        if (existing && existing.length === points.length && sameInfo) {
             let same = true;
             for (let i = 0; i < points.length; i++) {
                 if (Math.abs(existing[i].x - points[i].x) > 0.5 || 
@@ -148,12 +184,19 @@ class LineJumpEngine {
             if (same) return;
         }
         this.edgePoints.set(edgeId, points);
+        if (endpointInfo) {
+            this.edgeEndpointInfo.set(edgeId, endpointInfo);
+        } else {
+            this.edgeEndpointInfo.delete(edgeId);
+        }
         this.invalidateCache();
     }
 
     /** 注销一条边 */
     unregisterEdge(edgeId: string): void {
-        if (this.edgePoints.delete(edgeId)) {
+        const removedPath = this.edgePoints.delete(edgeId);
+        const removedInfo = this.edgeEndpointInfo.delete(edgeId);
+        if (removedPath || removedInfo) {
             this.invalidateCache();
         }
     }
@@ -205,6 +248,7 @@ class LineJumpEngine {
     /** 清理 */
     cleanup(): void {
         this.edgePoints.clear();
+        this.edgeEndpointInfo.clear();
         this.invalidateCache();
         LineJumpEngine.instance = null;
     }
@@ -214,8 +258,20 @@ class LineJumpEngine {
         this.intersectionsCache = null;
         this.channelRoutingCache = null; // [P2-3] 同步清空通道分配缓存
         this.version++;
-        // [FIX N-6] 通知所有订阅者版本已变化
-        this.subscribers.forEach(cb => cb());
+        // Batch initial edge registration/unregistration bursts into one React
+        // notification. Otherwise N edges registering one by one wakes every
+        // subscribed edge N times during page load.
+        if (this.notifyScheduled) return;
+        this.notifyScheduled = true;
+        const notify = () => {
+            this.notifyScheduled = false;
+            this.subscribers.forEach(cb => cb());
+        };
+        if (typeof queueMicrotask === 'function') {
+            queueMicrotask(notify);
+        } else {
+            Promise.resolve().then(notify);
+        }
     }
 
     private computeIntersections(): IntersectionInfo[] {
@@ -229,7 +285,7 @@ class LineJumpEngine {
         this.segmentsCache = segments;
 
         // 计算交叉
-        this.intersectionsCache = findIntersections(segments);
+        this.intersectionsCache = findIntersections(segments, this.edgeEndpointInfo);
         return this.intersectionsCache;
     }
 }

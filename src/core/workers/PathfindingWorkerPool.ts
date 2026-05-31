@@ -33,23 +33,26 @@ export class PathfindingWorkerPool {
     private activeTasks: Map<number, WorkerTask> = new Map();
     private completedTasks: number = 0;
     private totalTaskTime: number = 0;
-    private readonly poolSize: number;
+    private readonly maxPoolSize: number;
 
     // [H-8] Priority-aware waiter queue — entries with lower priority number are served first
     private workerWaiters: Array<{ resolve: (workerIndex: number) => void; reject: (err: Error) => void; priority: number }> = [];
 
     constructor(poolSize?: number) {
         const cpuCores = (navigator.hardwareConcurrency || 4);
-        this.poolSize = poolSize || Math.min(cpuCores, 8);
-        this.initializePool();
+        this.maxPoolSize = poolSize || Math.min(6, Math.max(2, Math.ceil(cpuCores / 2)));
     }
 
     private initialized = false;
 
-    private initializePool(): void {
-        if (this.initialized) return;
+    private initializePool(targetSize = 1): void {
+        const desiredSize = Math.max(1, Math.min(this.maxPoolSize, targetSize));
+        if (this.workers.length >= desiredSize) {
+            this.initialized = this.workers.length > 0;
+            return;
+        }
 
-        for (let i = 0; i < this.poolSize; i++) {
+        for (let i = this.workers.length; i < desiredSize; i++) {
             try {
                 const worker = new PathfindingWorker();
                 // [FIX] Catch startup crashes. If worker dies on load, it won't trigger later event listeners.
@@ -66,11 +69,23 @@ export class PathfindingWorkerPool {
         this.initialized = true;
     }
 
+    private ensurePoolSizeForJobs(jobCount: number): void {
+        this.initializePool(this.getDesiredWorkerCount(jobCount));
+    }
+
+    private getDesiredWorkerCount(jobCount: number): number {
+        if (jobCount <= 0) return 1;
+        if (jobCount <= 30) return Math.min(2, this.maxPoolSize);
+        if (jobCount <= 80) return Math.min(3, this.maxPoolSize);
+        return this.maxPoolSize;
+    }
+
     /**
      * [P1.1] Acquire a worker index, waiting if none available.
      * Uses a promise queue instead of setTimeout polling.
      */
     private acquireWorker(): Promise<number> {
+        this.initializePool(1);
         // Fast path: worker immediately available
         if (this.availableWorkers.size > 0) {
             const workerIndex = this.availableWorkers.values().next().value!;
@@ -93,6 +108,7 @@ export class PathfindingWorkerPool {
      * [H-8] Acquire a worker with explicit priority (0 = interactive, 1 = normal, 2 = background)
      */
     private acquireWorkerWithPriority(priority: number): Promise<number> {
+        this.initializePool(1);
         if (this.availableWorkers.size > 0) {
             const workerIndex = this.availableWorkers.values().next().value!;
             this.availableWorkers.delete(workerIndex);
@@ -139,6 +155,7 @@ export class PathfindingWorkerPool {
         onProgress?: (completed: number, total: number) => void
     ): Promise<PathFindingResult[]> {
         if (jobs.length === 0) return [];
+        this.ensurePoolSizeForJobs(jobs.length);
 
         const groups = this.groupJobs(jobs, graph);
         const results: PathFindingResult[] = new Array(jobs.length);
@@ -307,7 +324,8 @@ export class PathfindingWorkerPool {
      */
     private groupJobs(jobs: PathFindingJob[], graph: SharedGraphContext): WorkerTask[][] {
         const BATCH_SIZE = 50;
-        const chunkSize = Math.min(Math.ceil(jobs.length / Math.max(1, this.poolSize)), BATCH_SIZE);
+        const activePoolSize = Math.max(1, this.workers.length);
+        const chunkSize = Math.min(Math.ceil(jobs.length / activePoolSize), BATCH_SIZE);
         const effectiveChunkSize = Math.max(chunkSize, 20);
 
         // [P3] 先按 hub 分组：相同 source（O2M）或 target（M2O）的 bus 边放入同一组
@@ -356,7 +374,7 @@ export class PathfindingWorkerPool {
      */
     getStats(): PoolStats {
         return {
-            poolSize: this.poolSize,
+            poolSize: this.workers.length,
             activeWorkers: this.activeTasks.size,
             queuedTasks: this.taskQueue.length,
             completedTasks: this.completedTasks,

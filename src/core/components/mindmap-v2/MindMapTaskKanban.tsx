@@ -12,13 +12,22 @@ import {
     ClockCircleOutlined,
     IssuesCloseOutlined,
 } from '@ant-design/icons';
+import {
+    applyTaskMeta,
+    getTaskMeta,
+    type TaskPriority,
+    type TaskStatus,
+} from './mindmapTaskModel';
 
 interface KanbanTask {
     id: string;
     topic: string;
     note?: string;
-    status: 'todo' | 'doing' | 'done';
-    priority: '高' | '中' | '低' | '无';
+    status: TaskStatus;
+    priority: TaskPriority;
+    dueDate?: string;
+    assignee?: string;
+    progress?: number;
     ancestors: string[];
 }
 
@@ -36,35 +45,21 @@ export const MindMapTaskKanban: React.FC = () => {
     // 深度遍历，找出叶子节点及祖先路径
     const extractTasksFromTree = useCallback((node: NodeObj, ancestors: string[] = []): KanbanTask[] => {
         const currentAncestors = [...ancestors, node.topic];
+        const hasTaskMeta = !!(node as any).task;
         const isLeaf = !node.children || node.children.length === 0;
 
-        if (isLeaf) {
-            // 解析 tags 中的状态与优先级
-            const tags = node.tags || [];
-            let status: 'todo' | 'doing' | 'done' = 'todo';
-            if (tags.includes('已完成') || tags.includes('done')) {
-                status = 'done';
-            } else if (tags.includes('进行中') || tags.includes('doing')) {
-                status = 'doing';
-            } else if (tags.includes('待办') || tags.includes('todo')) {
-                status = 'todo';
-            }
-
-            let priority: '高' | '中' | '低' | '无' = '无';
-            if (tags.includes('高') || tags.includes('高优先级')) {
-                priority = '高';
-            } else if (tags.includes('中') || tags.includes('中优先级')) {
-                priority = '中';
-            } else if (tags.includes('低') || tags.includes('低优先级')) {
-                priority = '低';
-            }
+        if (isLeaf || hasTaskMeta) {
+            const task = getTaskMeta(node);
 
             return [{
                 id: node.id,
                 topic: node.topic || '(无标题)',
                 note: node.note,
-                status,
-                priority,
+                status: task.status,
+                priority: task.priority,
+                dueDate: task.dueDate,
+                assignee: task.assignee,
+                progress: task.progress,
                 ancestors: ancestors
             }];
         }
@@ -102,8 +97,7 @@ export const MindMapTaskKanban: React.FC = () => {
         };
     }, [mind, open, refreshTasks]);
 
-    // 更新节点 Tags 状态
-    const updateTaskTags = useCallback((taskId: string, targetStatus: 'todo' | 'doing' | 'done', targetPriority?: '高' | '中' | '低' | '无') => {
+    const updateTaskMeta = useCallback((taskId: string, targetStatus: TaskStatus, targetPriority?: TaskPriority) => {
         if (!mind) return;
         const tpcEl = mind.findEle(taskId);
         if (!tpcEl) return;
@@ -112,27 +106,9 @@ export const MindMapTaskKanban: React.FC = () => {
         const node = mind.getObjById(taskId, data.nodeData);
         if (!node) return;
 
-        const statusTags = ['待办', '进行中', '已完成', 'todo', 'doing', 'done'];
-        const priorityTags = ['高', '中', '低', '高优先级', '中优先级', '低优先级'];
-        
-        let newTags = (node.tags || []).filter(t => !statusTags.includes(t) && !priorityTags.includes(t));
-
-        if (targetStatus === 'done') {
-            newTags.push('已完成');
-        } else if (targetStatus === 'doing') {
-            newTags.push('进行中');
-        } else {
-            newTags.push('待办');
-        }
-
         const prio = targetPriority !== undefined ? targetPriority : (tasks.find(t => t.id === taskId)?.priority || '无');
-        if (prio !== '无') {
-            newTags.push(prio);
-        }
-
-        newTags = Array.from(new Set(newTags));
-
-        mind.reshapeNode(tpcEl, { tags: newTags });
+        applyTaskMeta(node, { status: targetStatus, priority: prio });
+        mind.reshapeNode(tpcEl, { task: (node as any).task, tags: node.tags } as any);
         mind.bus.fire('operation', {
             name: 'reshapeNode',
             obj: node,
@@ -157,12 +133,12 @@ export const MindMapTaskKanban: React.FC = () => {
         setDragOverColumn(null);
         const taskId = e.dataTransfer.getData('text/plain');
         if (taskId) {
-            updateTaskTags(taskId, colName);
+            updateTaskMeta(taskId, colName);
         }
     };
 
     const handleCheckboxChange = (taskId: string, checked: boolean) => {
-        updateTaskTags(taskId, checked ? 'done' : 'todo');
+        updateTaskMeta(taskId, checked ? 'done' : 'todo');
     };
 
     // ─── AI 智能整理看板 ────────────────────────────────────────────────────────
@@ -190,20 +166,8 @@ export const MindMapTaskKanban: React.FC = () => {
                     const data = mind.getData();
                     const node = mind.getObjById(item.id, data.nodeData);
                     if (node) {
-                        const statusTags = ['待办', '进行中', '已完成', 'todo', 'doing', 'done'];
-                        const priorityTags = ['高', '中', '低', '高优先级', '中优先级', '低优先级'];
-                        let newTags = (node.tags || []).filter(t => !statusTags.includes(t) && !priorityTags.includes(t));
-
-                        if (item.status === 'done') newTags.push('已完成');
-                        else if (item.status === 'doing') newTags.push('进行中');
-                        else newTags.push('待办');
-
-                        if (item.priority !== '无' && item.priority) {
-                            newTags.push(item.priority);
-                        }
-
-                        newTags = Array.from(new Set(newTags));
-                        mind.reshapeNode(tpcEl, { tags: newTags });
+                        applyTaskMeta(node, { status: item.status, priority: item.priority });
+                        mind.reshapeNode(tpcEl, { task: (node as any).task, tags: node.tags } as any);
                         updatedCount++;
                     }
                 }
@@ -231,8 +195,11 @@ export const MindMapTaskKanban: React.FC = () => {
 
         const formatTask = (t: KanbanTask) => {
             const prioStr = t.priority !== '无' ? ` [${t.priority}优先级]` : '';
+            const ownerStr = t.assignee ? ` @${t.assignee}` : '';
+            const dueStr = t.dueDate ? ` due:${t.dueDate}` : '';
+            const progressStr = t.progress ? ` ${t.progress}%` : '';
             const pathStr = t.ancestors.length > 0 ? ` (来自: ${t.ancestors.join(' > ')})` : '';
-            return `- [ ] ${t.topic}${prioStr}${pathStr}${t.note ? `\n  > 备注: ${t.note}` : ''}`;
+            return `- [ ] ${t.topic}${prioStr}${ownerStr}${dueStr}${progressStr}${pathStr}${t.note ? `\n  > 备注: ${t.note}` : ''}`;
         };
 
         const formatDoneTask = (t: KanbanTask) => {
@@ -325,15 +292,20 @@ export const MindMapTaskKanban: React.FC = () => {
                                     <span style={cardPathStyle}>
                                         {t.ancestors.slice(-2).join(' > ') || '根节点'}
                                     </span>
-                                    {t.priority !== '无' && (
-                                        <Tag color={
-                                            t.priority === '高' ? 'error'
-                                            : t.priority === '中' ? 'warning'
-                                            : 'processing'
-                                        } style={tagStyle}>
-                                            {t.priority}
-                                        </Tag>
-                                    )}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                        {t.assignee && <span style={metaPillStyle}>@{t.assignee}</span>}
+                                        {t.dueDate && <span style={metaPillStyle}>{t.dueDate}</span>}
+                                        {typeof t.progress === 'number' && t.progress > 0 && <span style={metaPillStyle}>{t.progress}%</span>}
+                                        {t.priority !== '无' && (
+                                            <Tag color={
+                                                t.priority === '高' ? 'error'
+                                                : t.priority === '中' ? 'warning'
+                                                : 'processing'
+                                            } style={tagStyle}>
+                                                {t.priority}
+                                            </Tag>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))
@@ -595,6 +567,15 @@ const tagStyle: React.CSSProperties = {
     margin: 0,
     padding: '0 4px',
     lineHeight: '1.5',
+};
+
+const metaPillStyle: React.CSSProperties = {
+    fontSize: '9px',
+    color: 'rgba(255,255,255,0.55)',
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '999px',
+    padding: '1px 5px',
 };
 
 if (typeof document !== 'undefined') {

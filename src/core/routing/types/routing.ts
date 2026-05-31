@@ -82,6 +82,7 @@ export interface RoutingConfig {
     layoutDirection?: string;
     routedPaths?: Array<{ points: Array<Point> }>;
     preAssignedPorts?: Record<string, { source?: string; target?: string }>;
+    preAssignedPortPolicy?: 'prefer' | 'force';
     nodePortConstraints?: Record<string, { source?: string[]; target?: string[] }>;
     routingPlugins?: string[];
 }

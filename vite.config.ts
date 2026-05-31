@@ -2,10 +2,11 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { resolve } from 'path'
+import { dirname, resolve } from 'path'
 import { realpathSync } from 'fs'
+import { fileURLToPath } from 'url'
 
-const projectRoot = process.cwd()
+const projectRoot = dirname(fileURLToPath(import.meta.url))
 const projectRealRoot = realpathSync(projectRoot)
 
 // https://vite.dev/config/

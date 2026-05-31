@@ -13,10 +13,9 @@ import type {
   DataAdapter,
   CacheManager,
   CacheItem,
-  _ThemeMetadata,
   DomainTheme
-} from '@/core';
-import { EdgeFactory } from '@/core';
+} from '@/core/models/DiagramModels';
+import { EdgeFactory } from '@/core/factories/EdgeFactory';
 import { unifiedStorage as storageService } from './UnifiedStorageService';
 import { localDB } from './IndexedDBStorage';
 

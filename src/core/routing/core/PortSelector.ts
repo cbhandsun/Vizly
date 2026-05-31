@@ -42,7 +42,9 @@ export class PortSelector {
 
         const sPre = config.preAssignedPorts?.[sourceNode.id]?.source;
         const tPre = config.preAssignedPorts?.[targetNode.id]?.target;
-        if (sPre && tPre) {
+        const forcePreAssigned = config.preAssignedPortPolicy === 'force'
+            || (config.preAssignedPortPolicy !== 'prefer' && config.directionalHandlePolicy === 'force');
+        if (forcePreAssigned && sPre && tPre) {
             return {
                 sourceHandle: sPre,
                 targetHandle: tPre,

@@ -26,6 +26,8 @@ import { createFilletedPath } from '../algorithms/smartEdgeUtils';
 import { refineOrthogonalWaypointsDetailed, type WaypointRefinementSummary } from '../algorithms/orthogonalWaypointRefiner';
 import { optimizeHubPortOrder } from '../algorithms/hubPortOrderOptimizer';
 import { refineManyToOneFanIn, type ManyToOneFanInGroup } from '../algorithms/manyToOneFanIn';
+import { repairHardObstacleViolations } from '../algorithms/hardObstaclePathRepair';
+import { repairEdgeCrossingViolations } from '../algorithms/edgeCrossingRepair';
 
 /**
  * [P0-2] Main coordination service for edge routing.
@@ -130,6 +132,7 @@ export class EdgeRoutingCoordinator {
     /** [SharedTrunk] Accumulated shared trunk segments from latest batch, keyed by group ID */
     private sharedTrunks: Map<string, SharedTrunkSegment> = new Map();
     private routedLabelObstacles: Map<string, Rectangle & { edgeId: string; ownerId: string }> = new Map();
+    private latestRoutedPaths: Map<string, { graphKey: string; points: Point[]; updatedAt: number }> = new Map();
 
     private graphVersion: number = 0;
     // [P0-2] graphVersion 璁㈤槄鑰呴泦鍚堬紝鐢ㄤ簬 useSyncExternalStore 鍝嶅簲寮忚闃?
@@ -329,12 +332,14 @@ export class EdgeRoutingCoordinator {
             // Mark only affected edges as dirty
             for (const edgeId of affectedEdges) {
                 this.dirtyEdges.add(edgeId);
+                this.latestRoutedPaths.delete(edgeId);
             }
         } else {
             // Fallback: full invalidation when no specific nodes provided
             this.graphVersion++;
             this.notifyGraphVersionSubscribers();
             this.cache.clear();
+            this.latestRoutedPaths.clear();
             this.dirtyEdges.clear();
             this.allEdges.forEach(edge => this.dirtyEdges.add(edge.id));
         }
@@ -370,6 +375,7 @@ export class EdgeRoutingCoordinator {
         this.dirtyEdges.clear();
         this.edgeDependencies.clear();
         this.latestRequests.clear();
+        this.latestRoutedPaths.clear();
         this.routedLabelObstacles.clear();
         this.graphVersion++;
         this.notifyGraphVersionSubscribers();
@@ -485,6 +491,9 @@ export class EdgeRoutingCoordinator {
                 routingTime: performance.now() - startTime,
                 cacheHit: true
             });
+            const graphKey = this.buildGraphKey(graph);
+            this.latestRequests.set(edgeId, { request, graphKey, seq: ++this.requestSeq, updatedAt: performance.now() });
+            this.storeLatestRoutedPath(edgeId, cached, graphKey);
             return cached;
         }
 
@@ -570,7 +579,7 @@ export class EdgeRoutingCoordinator {
             }
         }
         return {
-            rv: 11,
+            rv: 12,
             s: job.source,
             t: job.target,
             sx: Math.round(job.sourceX ?? 0),
@@ -771,6 +780,18 @@ export class EdgeRoutingCoordinator {
         };
         const key = this.cache.generateKey(request.edgeId, cacheParams);
         return this.cache.get(key) ?? null;
+    }
+
+    private storeLatestRoutedPath(edgeId: string, result: PathFindingResult, graphKey: string): void {
+        if (!result.points || result.points.length < 2 || result.error) {
+            this.latestRoutedPaths.delete(edgeId);
+            return;
+        }
+        this.latestRoutedPaths.set(edgeId, {
+            graphKey,
+            points: result.points.map(point => ({ x: point.x, y: point.y })),
+            updatedAt: performance.now(),
+        });
     }
 
     /**
@@ -990,6 +1011,7 @@ export class EdgeRoutingCoordinator {
                 }
 
                 resultsMap.set(req.edgeId, result);
+                this.storeLatestRoutedPath(req.edgeId, result, group.graphKey);
                 this.updateRoutedLabelObstacle(req.edgeId, result, group.graph);
                 // Only clear dirty flag if this is the latest request
                 if (!isSuperseded) {
@@ -1045,12 +1067,14 @@ export class EdgeRoutingCoordinator {
             if (entry.graphKey !== graphKey) continue;
 
             const cached = this.getCachedResult(entry.request);
-            if (!cached?.points || cached.points.length < 2) continue;
+            const latest = this.latestRoutedPaths.get(edgeId);
+            const points = cached?.points ?? (latest?.graphKey === graphKey ? latest.points : null);
+            if (!points || points.length < 2) continue;
 
             // [FIX P3] Spatial filter: include edges whose ANY segment falls within the expanded bbox.
             // Fallback to node-ID filter only if we couldn't compute a bounding box.
             if (hasBounds) {
-                const inBounds = cached.points.some(pt =>
+                const inBounds = points.some(pt =>
                     pt.x >= bboxMinX && pt.x <= bboxMaxX &&
                     pt.y >= bboxMinY && pt.y <= bboxMaxY
                 );
@@ -1061,10 +1085,10 @@ export class EdgeRoutingCoordinator {
                 if (sourceId && !relatedNodeIds.has(sourceId) && targetId && !relatedNodeIds.has(targetId)) continue;
             }
 
-            for (let i = 0; i < cached.points.length - 1; i++) {
+            for (let i = 0; i < points.length - 1; i++) {
                 pendingEdges.push({
-                    start: cached.points[i],
-                    end: cached.points[i + 1]
+                    start: points[i],
+                    end: points[i + 1]
                 });
                 if (pendingEdges.length >= rawSegmentLimit) {
                     return this.compactLineObstacles(pendingEdges, maxSegments);
@@ -1123,9 +1147,11 @@ export class EdgeRoutingCoordinator {
             if (entry.graphKey !== graphKey) continue;
 
             const cached = this.getCachedResult(entry.request);
-            if (!cached?.points || cached.points.length < 2) continue;
-            if (!overlapsBBox(cached.points)) continue;
-            fixedPaths.set(edgeId, cached.points.map(p => ({ x: p.x, y: p.y })));
+            const latest = this.latestRoutedPaths.get(edgeId);
+            const points = cached?.points ?? (latest?.graphKey === graphKey ? latest.points : null);
+            if (!points || points.length < 2) continue;
+            if (!overlapsBBox(points)) continue;
+            fixedPaths.set(edgeId, points.map(p => ({ x: p.x, y: p.y })));
         }
 
         return fixedPaths;
@@ -2314,21 +2340,66 @@ export class EdgeRoutingCoordinator {
         // same group are treated as "buddies" 鈥?they intentionally share trunk segments
         // and should NOT be separated. Only non-buddy overlaps get channel-routed.
 
-        // Step 1: Clean collinear points from all paths
+        // Step 1: Normalize worker paths before channel routing.
             const cleanPath = (raw: Point[]): Point[] => {
-            if (raw.length < 3) return raw;
-            const cleaned: Point[] = [{ x: raw[0].x, y: raw[0].y }];
-            for (let i = 1; i < raw.length - 1; i++) {
-                const prev = cleaned[cleaned.length - 1];
-                const curr = raw[i];
-                const next = raw[i + 1];
-                const isHorizontal = Math.abs(prev.y - curr.y) < 1 && Math.abs(curr.y - next.y) < 1;
-                const isVertical = Math.abs(prev.x - curr.x) < 1 && Math.abs(curr.x - next.x) < 1;
-                if (isHorizontal || isVertical) continue;
-                cleaned.push({ x: curr.x, y: curr.y });
+            const axisOf = (a: Point, b: Point): 'h' | 'v' | null => {
+                if (Math.abs(a.y - b.y) < 1.5 && Math.abs(a.x - b.x) > 1.5) return 'h';
+                if (Math.abs(a.x - b.x) < 1.5 && Math.abs(a.y - b.y) > 1.5) return 'v';
+                return null;
+            };
+            const manhattan = (a: Point, b: Point): number => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+            const collapseCollinear = (points: Point[]): Point[] => {
+                if (points.length < 3) return points;
+                const cleaned: Point[] = [{ x: points[0].x, y: points[0].y }];
+                for (let i = 1; i < points.length - 1; i++) {
+                    const prev = cleaned[cleaned.length - 1];
+                    const curr = points[i];
+                    const next = points[i + 1];
+                    const isHorizontal = Math.abs(prev.y - curr.y) < 1 && Math.abs(curr.y - next.y) < 1;
+                    const isVertical = Math.abs(prev.x - curr.x) < 1 && Math.abs(curr.x - next.x) < 1;
+                    if (isHorizontal || isVertical) continue;
+                    cleaned.push({ x: curr.x, y: curr.y });
+                }
+                cleaned.push({ x: points[points.length - 1].x, y: points[points.length - 1].y });
+                return cleaned;
+            };
+
+            const rounded = raw
+                .map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }))
+                .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
+            if (rounded.length < 2) return rounded;
+
+            const orthogonal: Point[] = [rounded[0]];
+            for (let i = 1; i < rounded.length; i++) {
+                const prev = orthogonal[orthogonal.length - 1];
+                const curr = rounded[i];
+                if (Math.abs(prev.x - curr.x) > 1.5 && Math.abs(prev.y - curr.y) > 1.5) {
+                    const next = rounded[i + 1];
+                    const hv = { x: curr.x, y: prev.y };
+                    const vh = { x: prev.x, y: curr.y };
+                    const hvScore = next && axisOf(hv, curr) !== axisOf(curr, next) ? 1 : 0;
+                    const vhScore = next && axisOf(vh, curr) !== axisOf(curr, next) ? 1 : 0;
+                    orthogonal.push(hvScore <= vhScore ? hv : vh);
+                }
+                orthogonal.push(curr);
             }
-            cleaned.push({ x: raw[raw.length - 1].x, y: raw[raw.length - 1].y });
-            return cleaned;
+
+            let cleaned = collapseCollinear(orthogonal);
+            let changed = true;
+            while (changed) {
+                changed = false;
+                for (let i = 1; i < cleaned.length - 1; i++) {
+                    const prev = cleaned[i - 1];
+                    const curr = cleaned[i];
+                    const next = cleaned[i + 1];
+                    if ((manhattan(prev, curr) < 8 || manhattan(curr, next) < 8) && axisOf(prev, next)) {
+                        cleaned = [...cleaned.slice(0, i), ...cleaned.slice(i + 1)];
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            return collapseCollinear(cleaned);
         };
 
         // Step 2: Build edgePaths map for globalChannelRouting
@@ -2352,13 +2423,14 @@ export class EdgeRoutingCoordinator {
             const buddyGroupMap = new Map<string, { edgeIds: Set<string>; type: 'o2m' | 'm2o' }>(); // groupKey 鈫?group info
         requests.forEach((req, index) => {
             const job = (assignedJobs?.[index] ?? req.job) as any;
+            const plan = job.busRoutingPlan ?? {};
             if (job.isOneToMany) {
-                const key = job.peerGroupKey ?? `o2m:${job.source}`;
+                const key = plan.o2mPeerGroupKey ?? job.o2mPeerGroupKey ?? `o2m:${job.source}`;
                 if (!buddyGroupMap.has(key)) buddyGroupMap.set(key, { edgeIds: new Set(), type: 'o2m' });
                 buddyGroupMap.get(key)!.edgeIds.add(req.edgeId);
             }
             if (job.isManyToOne) {
-                const key = job.peerGroupKey ?? `m2o:${job.target}`;
+                const key = plan.m2oPeerGroupKey ?? job.m2oPeerGroupKey ?? `m2o:${job.target}`;
                 if (!buddyGroupMap.has(key)) buddyGroupMap.set(key, { edgeIds: new Set(), type: 'm2o' });
                 buddyGroupMap.get(key)!.edgeIds.add(req.edgeId);
             }
@@ -2405,10 +2477,45 @@ export class EdgeRoutingCoordinator {
             if (refinementResult) {
                 this.attachWaypointRefinementDebug(validResults, refinementResult.summary);
             }
+            const ignoredRectsByEdge = this.buildFanInIgnoredRects(requests, assignedJobs);
+            const hardObstacleIgnoredRectsByEdge = ignoredRectsByEdge;
             refinedPaths = refineManyToOneFanIn(refinedPaths, this.buildManyToOneFanInGroups(requests, graph, assignedJobs), {
                 spacing,
                 obstacles: (graph.obstacles ?? []) as Rectangle[],
-                ignoredRectsByEdge: this.buildFanInIgnoredRects(requests, assignedJobs),
+                ignoredRectsByEdge,
+            });
+            refinedPaths = repairHardObstacleViolations(refinedPaths, {
+                spacing,
+                obstacles: (graph.obstacles ?? []) as Rectangle[],
+                ignoredRectsByEdge: hardObstacleIgnoredRectsByEdge,
+                buddyGroups,
+            });
+            refinedPaths = repairEdgeCrossingViolations(refinedPaths, {
+                spacing,
+                obstacles: (graph.obstacles ?? []) as Rectangle[],
+                ignoredRectsByEdge: hardObstacleIgnoredRectsByEdge,
+                buddyGroups,
+                mutableEdgeIds: currentBatchEdgeIds,
+                allowObstacleHitIfImprovesCrossing: true,
+            });
+            refinedPaths = repairHardObstacleViolations(refinedPaths, {
+                spacing,
+                obstacles: (graph.obstacles ?? []) as Rectangle[],
+                ignoredRectsByEdge: hardObstacleIgnoredRectsByEdge,
+                buddyGroups,
+            });
+            refinedPaths = repairEdgeCrossingViolations(refinedPaths, {
+                spacing,
+                obstacles: (graph.obstacles ?? []) as Rectangle[],
+                ignoredRectsByEdge: hardObstacleIgnoredRectsByEdge,
+                buddyGroups,
+                mutableEdgeIds: currentBatchEdgeIds,
+            });
+            refinedPaths = repairHardObstacleViolations(refinedPaths, {
+                spacing,
+                obstacles: (graph.obstacles ?? []) as Rectangle[],
+                ignoredRectsByEdge: hardObstacleIgnoredRectsByEdge,
+                buddyGroups,
             });
 
             // Step 3: Apply back to results
@@ -2527,6 +2634,7 @@ export class EdgeRoutingCoordinator {
         this.graphVersion++;
         this.notifyGraphVersionSubscribers();
         this.cache.clear();
+        this.latestRoutedPaths.clear();
         this.routedLabelObstacles.clear();
         this.dirtyEdges.clear();
         this.allEdges.forEach(edge => this.dirtyEdges.add(edge.id));
@@ -2718,16 +2826,38 @@ export class EdgeRoutingCoordinator {
                     : r.y + r.height / 2;
             };
 
+            const outHubCounts = new Map<string, number>();
+            const inHubCounts = new Map<string, number>();
+            for (const e of outEdges) outHubCounts.set(e.source, (outHubCounts.get(e.source) ?? 0) + 1);
+            for (const e of inEdges) inHubCounts.set(e.target, (inHubCounts.get(e.target) ?? 0) + 1);
+            const isOutSharedHub = (e: EdgeDesc) => e.isOneToMany || (outHubCounts.get(e.source) ?? 0) > 1;
+            const isInSharedHub = (e: EdgeDesc) => e.isManyToOne || (inHubCounts.get(e.target) ?? 0) > 1;
+
             // Solo edges: no trunk geometry on THIS side, handled entirely by this function
             // [FIX] For out-edges, only isOneToMany matters (source-side fan-out).
             // isManyToOne is a target-side property and irrelevant for source port classification.
             // Previously, dual-identity edges (isOneToMany=false, isManyToOne=true) fell through
             // both solo and bus filters, getting no port separation at all.
-            const outSoloEdges = outEdges.filter(e => !e.isOneToMany);
-            const inSoloEdges  = inEdges.filter( e => !e.isManyToOne);
+            const outSoloEdges = outEdges.filter(e => !isOutSharedHub(e));
+            const inSoloEdges  = inEdges.filter( e => !isInSharedHub(e));
             // Bus edges: have trunk geometry, only zone-shifted if needed
-            const outBusEdges  = outEdges.filter(e => e.isOneToMany);
-            const inBusEdges   = inEdges.filter( e => e.isManyToOne);
+            const outBusEdges  = outEdges.filter(e => isOutSharedHub(e));
+            const inBusEdges   = inEdges.filter( e => isInSharedHub(e));
+
+            for (const e of outBusEdges) {
+                if (!currentJobIds.has(e.edgeId)) continue;
+                const j = jobByEdgeId.get(e.edgeId);
+                if (j && !j.isOneToMany && (outHubCounts.get(e.source) ?? 0) > 1) {
+                    j.isOneToMany = true;
+                }
+            }
+            for (const e of inBusEdges) {
+                if (!currentJobIds.has(e.edgeId)) continue;
+                const j = jobByEdgeId.get(e.edgeId);
+                if (j && !j.isManyToOne && (inHubCounts.get(e.target) ?? 0) > 1) {
+                    j.isManyToOne = true;
+                }
+            }
 
             // Count distinct bus trunk groups.
             // For out-bus edges: group by peerGroupKey (same source fan-out shares a trunk).
@@ -2743,7 +2873,7 @@ export class EdgeRoutingCoordinator {
                 const trunkCoord = Math.round((j?.busTrunkSource?.x ?? j?.busTrunkTarget?.x ?? 0) * 10);
                 // [FIX] Use o2mPeerGroupKey (source-side) not generic peerGroupKey,
                 // which M2O phase overwrites for dual-identity edges (O2M+M2O).
-                const groupKey = j?.o2mPeerGroupKey ?? j?.peerGroupKey ?? `${e.source}:${trunkCoord}`;
+                const groupKey = j?.o2mPeerGroupKey ?? j?.peerGroupKey ?? `implicit-o2m:${e.source}:${side}:${trunkCoord}`;
                 if (!outBusTrunkGroups.has(groupKey)) outBusTrunkGroups.set(groupKey, []);
                 outBusTrunkGroups.get(groupKey)!.push(e);
             }
@@ -2751,11 +2881,14 @@ export class EdgeRoutingCoordinator {
             for (const e of inBusEdges) {
                 const j = jobByEdgeId.get(e.edgeId) ?? (this.latestRequests.get(e.edgeId) as any)?.request?.job;
                 const trunkCoord = Math.round((j?.busTrunkTarget?.x ?? j?.busTrunkSource?.x ?? 0) * 10);
-                // [FIX] For in-bus edges, always use SOURCE as key discriminator.
-                // peerGroupKey groups by target (same M2O fan-in = same key), which
-                // defeats the purpose of port separation. We need different slots
-                // for edges from different sources arriving at the same target.
-                const groupKey = `${e.source}:${trunkCoord}`;
+                // M2O fan-in edges that share the same target/side are one trunk group.
+                // Splitting by source here breaks the hard "shared trunk" invariant and
+                // makes each incoming edge claim a separate target slot.
+                const groupKey =
+                    j?.m2oPeerGroupKey ??
+                    j?.busRoutingPlan?.m2oPeerGroupKey ??
+                    j?.peerGroupKey ??
+                    `implicit-m2o:${e.target}:${side}:${trunkCoord}`;
                 if (!inBusTrunkGroups.has(groupKey)) inBusTrunkGroups.set(groupKey, []);
                 inBusTrunkGroups.get(groupKey)!.push(e);
             }
@@ -2875,6 +3008,24 @@ export class EdgeRoutingCoordinator {
                     j.incomingCount = totalSlots;
                     j.incomingIndex = inBase + inBusTrunkGroups.size + i;
                 });
+
+            } else if (hasOut && !hasIn && outBusTrunkGroups.size === 1 && outSoloEdges.length === 0) {
+                for (const e of outBusEdges) {
+                    if (!currentJobIds.has(e.edgeId)) continue;
+                    const j = jobByEdgeId.get(e.edgeId);
+                    if (!j) continue;
+                    j.outgoingCount = 1;
+                    j.outgoingIndex = 0;
+                }
+
+            } else if (hasIn && !hasOut && inBusTrunkGroups.size === 1 && inSoloEdges.length === 0) {
+                for (const e of inBusEdges) {
+                    if (!currentJobIds.has(e.edgeId)) continue;
+                    const j = jobByEdgeId.get(e.edgeId);
+                    if (!j) continue;
+                    j.incomingCount = 1;
+                    j.incomingIndex = 0;
+                }
 
             } else if (hasOut && outSoloEdges.length >= 2) {
                 // Case B: pure-out with multiple solo edges — sort by target centroid

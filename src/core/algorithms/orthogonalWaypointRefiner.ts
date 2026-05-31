@@ -16,6 +16,8 @@ export interface WaypointRefinementOptions {
     };
     enableReroute?: boolean;
     maxRerouteEdges?: number;
+    maxRerouteCandidates?: number;
+    maxSegmentShiftCandidatesPerEdge?: number;
     scoring?: Omit<RoutingCrossingScorerOptions, 'buddyGroups' | 'softObstacles'>;
 }
 
@@ -32,6 +34,8 @@ export interface WaypointRefinementSummary {
 interface ScoreSummary {
     totalScore: number;
     hardCrossings: number;
+    buddyCrossings: number;
+    parallelOverlaps: number;
     softCrossings: number;
     softNearMisses: number;
     turnbacks: number;
@@ -70,13 +74,11 @@ export function refineOrthogonalWaypointsDetailed(
         };
     }
 
-    const buddyEdgeIds = new Set<string>();
     // [FIX-dual] 使用 Set 存储类型，支持双身份边同时是 o2m 和 m2o
     const buddyTypesByEdgeId = new Map<string, Set<BuddyGroup['type']>>();
     const fixedEdgeIds = options.fixedEdgeIds ?? new Set<string>();
     (options.buddyGroups ?? []).forEach(group => {
         group.edgeIds.forEach(edgeId => {
-            buddyEdgeIds.add(edgeId);
             if (!buddyTypesByEdgeId.has(edgeId)) buddyTypesByEdgeId.set(edgeId, new Set());
             buddyTypesByEdgeId.get(edgeId)!.add(group.type);
         });
@@ -111,14 +113,16 @@ export function refineOrthogonalWaypointsDetailed(
             rerouteChanges,
             changedEdgeIds: [...changedEdgeIds],
             consideredEdges,
-            skippedBuddyEdges: buddyEdgeIds.size,
+            skippedBuddyEdges: 0,
         },
     });
 
     if (currentScore.totalScore === 0 && !hasCompressibleDoglegs(result, fixedEdgeIds, spacing)) return buildSummary();
 
-    const maxPasses = options.maxPasses ?? 2;
-    const maxEdgesPerPass = options.maxEdgesPerPass ?? 80;
+    const maxPasses = Math.min(options.maxPasses ?? 2, getDefaultMaxPasses(result.size));
+    const maxEdgesPerPass = Math.min(options.maxEdgesPerPass ?? Infinity, getDefaultMaxEdgesPerPass(result.size));
+    const maxSegmentShiftCandidatesPerEdge =
+        options.maxSegmentShiftCandidatesPerEdge ?? getDefaultMaxSegmentShiftCandidates(result.size);
 
     for (let pass = 0; pass < maxPasses && (currentScore.totalScore > 0 || hasCompressibleDoglegs(result, fixedEdgeIds, spacing)); pass++) {
         let changedInPass = false;
@@ -128,6 +132,8 @@ export function refineOrthogonalWaypointsDetailed(
         // 只有 fixedEdgeIds（缓存命中的边）才完全跳过。
         const orderedEdgeIds = [...result.keys()]
             .filter(edgeId => !fixedEdgeIds.has(edgeId))
+            .filter(edgeId => (currentScore.byEdge.get(edgeId) ?? 0) > 0
+                || hasCompressibleDogleg(result.get(edgeId), spacing))
             .sort((a, b) => (currentScore.byEdge.get(b) ?? 0) - (currentScore.byEdge.get(a) ?? 0));
 
         for (const edgeId of orderedEdgeIds) {
@@ -147,7 +153,8 @@ export function refineOrthogonalWaypointsDetailed(
                 spacing,
                 currentScore,
                 options.candidateAxes,
-                getProtectedTrunkLocks(buddyTypesByEdgeId.get(edgeId))
+                getProtectedTrunkLocks(buddyTypesByEdgeId.get(edgeId)),
+                maxSegmentShiftCandidatesPerEdge
             );
             const compactedCandidate = candidate ?? findObstacleAwareDoglegCompaction(
                 edgeId,
@@ -193,13 +200,14 @@ export function refineOrthogonalWaypointsDetailed(
         const rerouteResult = rerouteWorstEdges(
             result,
             scorer,
-            buddyEdgeIds,
+            buddyTypesByEdgeId,
             fixedEdgeIds,
             hardObstacles,
             spacing,
             currentScore,
             options.candidateAxes,
-            options.maxRerouteEdges ?? 8
+            Math.min(options.maxRerouteEdges ?? Infinity, getDefaultMaxRerouteEdges(result.size)),
+            Math.min(options.maxRerouteCandidates ?? Infinity, getDefaultMaxRerouteCandidates(result.size))
         );
         currentScore = rerouteResult.score;
         rerouteResult.changedEdgeIds.forEach(edgeId => changedEdgeIds.add(edgeId));
@@ -213,21 +221,22 @@ export function refineOrthogonalWaypointsDetailed(
 function rerouteWorstEdges(
     paths: Map<string, Point[]>,
     scorer: RoutingCrossingScorer,
-    buddyEdgeIds: Set<string>,
+    buddyTypesByEdgeId: Map<string, Set<BuddyGroup['type']>>,
     fixedEdgeIds: Set<string>,
     hardObstacles: Rectangle[],
     spacing: number,
     currentScore: ReturnType<RoutingCrossingScorer['score']>,
     candidateAxes: WaypointRefinementOptions['candidateAxes'],
-    maxEdges: number
+    maxEdges: number,
+    maxCandidatesPerEdge: number
 ): {
     score: ReturnType<RoutingCrossingScorer['score']>;
     changedEdgeIds: string[];
     consideredEdges: number;
 } {
     const ordered = [...paths.keys()]
-        .filter(edgeId => !buddyEdgeIds.has(edgeId))
         .filter(edgeId => !fixedEdgeIds.has(edgeId))
+        .filter(edgeId => (currentScore.byEdge.get(edgeId) ?? 0) > 0)
         .sort((a, b) => (currentScore.byEdge.get(b) ?? 0) - (currentScore.byEdge.get(a) ?? 0))
         .slice(0, maxEdges);
 
@@ -247,7 +256,9 @@ function rerouteWorstEdges(
             hardObstacles,
             spacing,
             score,
-            candidateAxes
+            candidateAxes,
+            getProtectedTrunkLocks(buddyTypesByEdgeId.get(edgeId)),
+            maxCandidatesPerEdge
         );
 
         if (!candidate) continue;
@@ -259,9 +270,51 @@ function rerouteWorstEdges(
     return { score, changedEdgeIds, consideredEdges };
 }
 
+function getDefaultMaxRerouteEdges(pathCount: number): number {
+    if (pathCount > 80) return 3;
+    if (pathCount > 40) return 4;
+    if (pathCount > 20) return 4;
+    return 8;
+}
+
+function getDefaultMaxPasses(pathCount: number): number {
+    if (pathCount > 80) return 1;
+    if (pathCount > 40) return 1;
+    if (pathCount > 20) return 2;
+    return 2;
+}
+
+function getDefaultMaxEdgesPerPass(pathCount: number): number {
+    if (pathCount > 80) return 24;
+    if (pathCount > 40) return 32;
+    if (pathCount > 20) return 18;
+    return 80;
+}
+
+function getDefaultMaxRerouteCandidates(pathCount: number): number {
+    if (pathCount > 80) return 48;
+    if (pathCount > 40) return 72;
+    if (pathCount > 20) return 160;
+    return 128;
+}
+
+function getDefaultMaxSegmentShiftCandidates(pathCount: number): number {
+    if (pathCount > 80) return 24;
+    if (pathCount > 40) return 32;
+    if (pathCount > 20) return 32;
+    return 128;
+}
+
 interface ProtectedTrunkLocks {
     lockFirstJunction?: boolean;
     lockLastJunction?: boolean;
+}
+
+type OrthogonalDirection = 'L' | 'R' | 'U' | 'D';
+
+interface EndpointLocks {
+    firstJunction?: Point;
+    lastJunction?: Point;
 }
 
 function getProtectedTrunkLocks(types: Set<BuddyGroup['type']> | undefined): ProtectedTrunkLocks {
@@ -276,6 +329,8 @@ function summarizeScore(score: ReturnType<RoutingCrossingScorer['score']>): Scor
     return {
         totalScore: score.totalScore,
         hardCrossings: score.hardCrossings,
+        buddyCrossings: score.buddyCrossings,
+        parallelOverlaps: score.parallelOverlaps,
         softCrossings: score.softCrossings,
         softNearMisses: score.softNearMisses,
         turnbacks: score.turnbacks,
@@ -293,13 +348,16 @@ function findLowerScoreVariant(
     spacing: number,
     currentScore: ReturnType<RoutingCrossingScorer['score']>,
     candidateAxes?: WaypointRefinementOptions['candidateAxes'],
-    protectedTrunkLocks: ProtectedTrunkLocks = {}
+    protectedTrunkLocks: ProtectedTrunkLocks = {},
+    maxCandidates = 128
 ): { points: Point[]; score: ReturnType<RoutingCrossingScorer['score']> } | null {
     let best: { points: Point[]; score: ReturnType<RoutingCrossingScorer['score']>; length: number } | null = null;
     const originalLength = RoutingCrossingScorer.pathLength(points);
     const originalStartDir = getFirstDirection(points);
     const originalEndDir = getLastDirection(points);
+    let scoredCandidates = 0;
 
+    segmentLoop:
     for (let segIdx = 1; segIdx < points.length - 2; segIdx++) {
         if (touchesProtectedTrunkJunction(segIdx, points.length, protectedTrunkLocks)) continue;
         const a = points[segIdx];
@@ -334,14 +392,18 @@ function findLowerScoreVariant(
 
                 const simplified = RoutingCrossingScorer.simplifyOrthogonalPoints(candidate);
                 if (simplified.length < 2) continue;
+                if (samePath(simplified, points)) continue;
                 if (!isStrictlyOrthogonalPath(simplified)) continue;
                 if (!preservesEndpointDirections(simplified, originalStartDir, originalEndDir)) continue;
+                if (!preservesProtectedTrunkJunctions(simplified, points, protectedTrunkLocks)) continue;
                 if (RoutingCrossingScorer.pathLength(simplified) > originalLength + spacing * 8) continue;
                 if (RoutingCrossingScorer.pathHitsObstacle(simplified, hardObstacles)) continue;
+                if (scoredCandidates >= maxCandidates) break segmentLoop;
 
             const trial = new Map(allPaths);
             trial.set(edgeId, simplified);
             const length = RoutingCrossingScorer.pathLength(simplified);
+            scoredCandidates++;
             const score = scorer.score(trial);
             const isImprovement = scorer.isBetter(score, currentScore);
             const isSafeCompaction = isScoreNoWorse(score, currentScore)
@@ -403,6 +465,7 @@ function findObstacleAwareDoglegCompaction(
     const originalLength = RoutingCrossingScorer.pathLength(points);
     const originalStartDir = getFirstDirection(points);
     const originalEndDir = getLastDirection(points);
+    const originalHitObstacleIndexes = collectHitObstacleIndexes(points, hardObstacles);
     const padding = Math.max(8, spacing);
     const minY = Math.min(topY, bottomY);
     const maxY = Math.max(topY, bottomY);
@@ -456,9 +519,10 @@ function findObstacleAwareDoglegCompaction(
         }
 
         if (candidate.length < 2) continue;
+        if (samePath(candidate, points)) continue;
         if (!isStrictlyOrthogonalPath(candidate)) continue;
         if (!preservesEndpointDirections(candidate, originalStartDir, originalEndDir)) continue;
-        if (pathIntroducesObstacleHit(candidate, points, hardObstacles)) continue;
+        if (pathIntroducesObstacleHit(candidate, originalHitObstacleIndexes, hardObstacles)) continue;
 
         const length = RoutingCrossingScorer.pathLength(candidate);
         if (length >= originalLength - spacing * 3) continue;
@@ -467,6 +531,8 @@ function findObstacleAwareDoglegCompaction(
         trial.set(edgeId, candidate);
         const score = scorer.score(trial);
         const safe = score.hardCrossings <= currentScore.hardCrossings
+            && score.buddyCrossings <= currentScore.buddyCrossings
+            && score.parallelOverlaps <= currentScore.parallelOverlaps
             && score.softCrossings <= currentScore.softCrossings
             && score.turnbacks <= currentScore.turnbacks
             && score.bends <= currentScore.bends;
@@ -502,6 +568,7 @@ function findWrongSideDoglegCompaction(
     const originalLength = RoutingCrossingScorer.pathLength(points);
     const originalStartDir = getFirstDirection(points);
     const originalEndDir = getLastDirection(points);
+    const originalHitObstacleIndexes = collectHitObstacleIndexes(points, hardObstacles);
     let best: { points: Point[]; score: ReturnType<RoutingCrossingScorer['score']>; length: number } | null = null;
 
     for (let segIdx = 1; segIdx < points.length - 2; segIdx++) {
@@ -573,9 +640,10 @@ function findWrongSideDoglegCompaction(
             ]);
 
             if (candidate.length < 2) continue;
+            if (samePath(candidate, points)) continue;
             if (!isStrictlyOrthogonalPath(candidate)) continue;
             if (!preservesEndpointDirections(candidate, originalStartDir, originalEndDir)) continue;
-            if (pathIntroducesObstacleHit(candidate, points, hardObstacles)) continue;
+            if (pathIntroducesObstacleHit(candidate, originalHitObstacleIndexes, hardObstacles)) continue;
 
             const length = RoutingCrossingScorer.pathLength(candidate);
             if (length >= originalLength - spacing * 4) continue;
@@ -584,6 +652,8 @@ function findWrongSideDoglegCompaction(
             trial.set(edgeId, candidate);
             const score = scorer.score(trial);
             const safe = score.hardCrossings <= currentScore.hardCrossings
+                && score.buddyCrossings <= currentScore.buddyCrossings
+                && score.parallelOverlaps <= currentScore.parallelOverlaps
                 && score.softCrossings <= currentScore.softCrossings
                 && score.softNearMisses <= currentScore.softNearMisses
                 && score.turnbacks <= currentScore.turnbacks
@@ -648,6 +718,7 @@ function findOuterLaneReroute(
     ]);
 
     if (candidate.length < 2) return null;
+    if (samePath(candidate, points)) return null;
     if (!isStrictlyOrthogonalPath(candidate)) return null;
     if (!preservesEndpointDirections(candidate, originalStartDir, originalEndDir)) return null;
 
@@ -667,7 +738,7 @@ function findOuterLaneReroute(
     const originalLength = RoutingCrossingScorer.pathLength(points);
     const candidateLength = RoutingCrossingScorer.pathLength(candidate);
     if (candidateLength > originalLength + spacing * 12) return null;
-    if (pathIntroducesObstacleHit(candidate, points, hardObstacles)) return null;
+    if (pathIntroducesObstacleHit(candidate, collectHitObstacleIndexes(points, hardObstacles), hardObstacles)) return null;
 
     const trial = new Map(allPaths);
     trial.set(edgeId, candidate);
@@ -720,8 +791,7 @@ function rangesOverlap(aMin: number, aMax: number, bMin: number, bMax: number): 
     return aMax > bMin && bMax > aMin;
 }
 
-function pathIntroducesObstacleHit(candidate: Point[], original: Point[], obstacles: Rectangle[]): boolean {
-    const originalHits = collectHitObstacleIndexes(original, obstacles);
+function pathIntroducesObstacleHit(candidate: Point[], originalHits: Set<number>, obstacles: Rectangle[]): boolean {
     for (let i = 0; i < candidate.length - 1; i++) {
         const a = candidate[i];
         const b = candidate[i + 1];
@@ -754,6 +824,8 @@ function isScoreNoWorse(
     current: ReturnType<RoutingCrossingScorer['score']>
 ): boolean {
     return candidate.hardCrossings <= current.hardCrossings
+        && candidate.buddyCrossings <= current.buddyCrossings
+        && candidate.parallelOverlaps <= current.parallelOverlaps
         && candidate.softCrossings <= current.softCrossings
         && candidate.softNearMisses <= current.softNearMisses
         && candidate.turnbacks <= current.turnbacks
@@ -763,15 +835,21 @@ function isScoreNoWorse(
 function hasCompressibleDoglegs(edgePaths: Map<string, Point[]>, fixedEdgeIds: Set<string>, spacing: number): boolean {
     for (const [edgeId, points] of edgePaths) {
         if (fixedEdgeIds.has(edgeId) || points.length < 5) continue;
-        for (let segIdx = 1; segIdx < points.length - 2; segIdx++) {
-            const a = points[segIdx];
-            const b = points[segIdx + 1];
-            const isHorizontal = Math.abs(a.y - b.y) < 1.5;
-            const isVertical = Math.abs(a.x - b.x) < 1.5;
-            if (!isHorizontal && !isVertical) continue;
-            if (getDoglegCompactionAxisValues(points, segIdx, isHorizontal, spacing).length > 0) {
-                return true;
-            }
+        if (hasCompressibleDogleg(points, spacing)) return true;
+    }
+    return false;
+}
+
+function hasCompressibleDogleg(points: Point[] | undefined, spacing: number): boolean {
+    if (!points || points.length < 5) return false;
+    for (let segIdx = 1; segIdx < points.length - 2; segIdx++) {
+        const a = points[segIdx];
+        const b = points[segIdx + 1];
+        const isHorizontal = Math.abs(a.y - b.y) < 1.5;
+        const isVertical = Math.abs(a.x - b.x) < 1.5;
+        if (!isHorizontal && !isVertical) continue;
+        if (getDoglegCompactionAxisValues(points, segIdx, isHorizontal, spacing).length > 0) {
+            return true;
         }
     }
     return false;
@@ -785,6 +863,29 @@ function touchesProtectedTrunkJunction(segIdx: number, pointCount: number, locks
     return false;
 }
 
+function buildEndpointLocks(points: Point[], locks: ProtectedTrunkLocks): EndpointLocks {
+    return {
+        firstJunction: locks.lockFirstJunction && points.length > 2 ? clonePoint(points[1]) : undefined,
+        lastJunction: locks.lockLastJunction && points.length > 2 ? clonePoint(points[points.length - 2]) : undefined,
+    };
+}
+
+function preservesProtectedTrunkJunctions(
+    candidate: Point[],
+    original: Point[],
+    locks: ProtectedTrunkLocks
+): boolean {
+    if (locks.lockFirstJunction) {
+        if (candidate.length < 3 || original.length < 3) return false;
+        if (!samePoint(candidate[1], original[1])) return false;
+    }
+    if (locks.lockLastJunction) {
+        if (candidate.length < 3 || original.length < 3) return false;
+        if (!samePoint(candidate[candidate.length - 2], original[original.length - 2])) return false;
+    }
+    return true;
+}
+
 function findLowerScoreReroute(
     edgeId: string,
     points: Point[],
@@ -793,25 +894,41 @@ function findLowerScoreReroute(
     hardObstacles: Rectangle[],
     spacing: number,
     currentScore: ReturnType<RoutingCrossingScorer['score']>,
-    candidateAxes?: WaypointRefinementOptions['candidateAxes']
+    candidateAxes?: WaypointRefinementOptions['candidateAxes'],
+    protectedTrunkLocks: ProtectedTrunkLocks = {},
+    maxCandidates = 128
 ): { points: Point[]; score: ReturnType<RoutingCrossingScorer['score']> } | null {
     const start = points[0];
     const end = points[points.length - 1];
     const originalStartDir = getFirstDirection(points);
     const originalEndDir = getLastDirection(points);
     const originalLength = RoutingCrossingScorer.pathLength(points);
+    const originalHitObstacleIndexes = collectHitObstacleIndexes(points, hardObstacles);
     const routeAwareAxes = buildRouteAwareAxes(edgeId, allPaths, points, spacing);
-    const candidates = buildRerouteCandidates(start, end, mergeCandidateAxes(candidateAxes, routeAwareAxes), spacing);
+    const pathAxes = buildPathAxes(points);
+    const candidates = buildRerouteCandidates(
+        start,
+        end,
+        mergeCandidateAxes(mergeCandidateAxes(candidateAxes, routeAwareAxes), pathAxes),
+        spacing,
+        originalStartDir,
+        originalEndDir,
+        buildEndpointLocks(points, protectedTrunkLocks),
+        maxCandidates
+    );
     let best: { points: Point[]; score: ReturnType<RoutingCrossingScorer['score']>; length: number } | null = null;
 
     for (const candidate of candidates) {
         const simplified = RoutingCrossingScorer.simplifyOrthogonalPoints(candidate);
         if (simplified.length < 2) continue;
+        if (samePath(simplified, points)) continue;
         if (!isStrictlyOrthogonalPath(simplified)) continue;
         if (!preservesEndpointDirections(simplified, originalStartDir, originalEndDir)) continue;
+        if (!preservesProtectedTrunkJunctions(simplified, points, protectedTrunkLocks)) continue;
         const length = RoutingCrossingScorer.pathLength(simplified);
-        if (length > originalLength + spacing * 12) continue;
-        if (RoutingCrossingScorer.pathHitsObstacle(simplified, hardObstacles)) continue;
+        const maxLengthIncrease = Math.max(spacing * 12, originalLength * 0.2);
+        if (length > originalLength + maxLengthIncrease) continue;
+        if (pathIntroducesObstacleHit(simplified, originalHitObstacleIndexes, hardObstacles)) continue;
 
         const trial = new Map(allPaths);
         trial.set(edgeId, simplified);
@@ -866,8 +983,12 @@ function buildRouteAwareAxes(
                 if (y < minY || y > maxY || segMaxX < minX || segMinX > maxX) continue;
                 horizontal.add(Math.round(y - spacing));
                 horizontal.add(Math.round(y + spacing));
+                horizontal.add(Math.round(y - spacing * 2));
+                horizontal.add(Math.round(y + spacing * 2));
                 vertical.add(Math.round(segMinX - spacing));
                 vertical.add(Math.round(segMaxX + spacing));
+                vertical.add(Math.round(segMinX - spacing * 2));
+                vertical.add(Math.round(segMaxX + spacing * 2));
             } else if (isVertical) {
                 const x = (a.x + b.x) / 2;
                 const segMinY = Math.min(a.y, b.y);
@@ -875,8 +996,12 @@ function buildRouteAwareAxes(
                 if (x < minX || x > maxX || segMaxY < minY || segMinY > maxY) continue;
                 vertical.add(Math.round(x - spacing));
                 vertical.add(Math.round(x + spacing));
+                vertical.add(Math.round(x - spacing * 2));
+                vertical.add(Math.round(x + spacing * 2));
                 horizontal.add(Math.round(segMinY - spacing));
                 horizontal.add(Math.round(segMaxY + spacing));
+                horizontal.add(Math.round(segMinY - spacing * 2));
+                horizontal.add(Math.round(segMaxY + spacing * 2));
             }
         }
     }
@@ -885,6 +1010,21 @@ function buildRouteAwareAxes(
         horizontal: [...horizontal].slice(0, 160),
         vertical: [...vertical].slice(0, 160),
     };
+}
+
+function buildPathAxes(points: Point[]): { horizontal: number[]; vertical: number[] } {
+    const horizontal = new Set<number>();
+    const vertical = new Set<number>();
+    for (let i = 0; i < points.length - 1; i++) {
+        const a = points[i];
+        const b = points[i + 1];
+        if (Math.abs(a.y - b.y) < 1.5) {
+            horizontal.add(Math.round((a.y + b.y) / 2));
+        } else if (Math.abs(a.x - b.x) < 1.5) {
+            vertical.add(Math.round((a.x + b.x) / 2));
+        }
+    }
+    return { horizontal: [...horizontal], vertical: [...vertical] };
 }
 
 function preservesEndpointDirections(
@@ -915,7 +1055,7 @@ function isStrictlyOrthogonalPath(points: Point[]): boolean {
     return true;
 }
 
-function getFirstDirection(points: Point[]): 'L' | 'R' | 'U' | 'D' | null {
+function getFirstDirection(points: Point[]): OrthogonalDirection | null {
     for (let i = 0; i < points.length - 1; i++) {
         const dir = RoutingCrossingScorer.segmentDirection(points[i], points[i + 1]);
         if (dir) return dir;
@@ -923,7 +1063,7 @@ function getFirstDirection(points: Point[]): 'L' | 'R' | 'U' | 'D' | null {
     return null;
 }
 
-function getLastDirection(points: Point[]): 'L' | 'R' | 'U' | 'D' | null {
+function getLastDirection(points: Point[]): OrthogonalDirection | null {
     for (let i = points.length - 2; i >= 0; i--) {
         const dir = RoutingCrossingScorer.segmentDirection(points[i], points[i + 1]);
         if (dir) return dir;
@@ -935,7 +1075,11 @@ function buildRerouteCandidates(
     start: Point,
     end: Point,
     candidateAxes: WaypointRefinementOptions['candidateAxes'],
-    spacing: number
+    spacing: number,
+    startDir: OrthogonalDirection | null,
+    endDir: OrthogonalDirection | null,
+    endpointLocks: EndpointLocks = {},
+    maxCandidates = 128
 ): Point[][] {
     const candidates: Point[][] = [];
     const horizontalAxes = selectNearAxes(candidateAxes?.horizontal, start.y, end.y, spacing);
@@ -976,6 +1120,73 @@ function buildRerouteCandidates(
         candidates.push([start, { x: start.x, y: axis }, { x: end.x, y: axis }, end]);
     }
 
+    const startEscapes = buildStartEscapePoints(start, startDir, spacing, endpointLocks.firstJunction);
+    const endApproaches = buildEndApproachPoints(end, endDir, spacing, endpointLocks.lastJunction);
+    const horizontalCorridors = [...escapeHorizontalAxes].slice(0, 40);
+    const verticalCorridors = [...escapeVerticalAxes].slice(0, 40);
+
+    if (startDir && endDir) {
+        if (isHorizontalDirection(startDir) && isHorizontalDirection(endDir)) {
+            for (const startEscape of startEscapes) {
+                for (const endApproach of endApproaches) {
+                    for (const axis of horizontalCorridors) {
+                        if (endpointLocks.firstJunction && Math.abs(axis - startEscape.y) < 1.5) continue;
+                        if (endpointLocks.lastJunction && Math.abs(axis - endApproach.y) < 1.5) continue;
+                        candidates.push([
+                            start,
+                            startEscape,
+                            { x: startEscape.x, y: axis },
+                            { x: endApproach.x, y: axis },
+                            endApproach,
+                            end,
+                        ]);
+                    }
+                }
+            }
+        } else if (!isHorizontalDirection(startDir) && !isHorizontalDirection(endDir)) {
+            for (const startEscape of startEscapes) {
+                for (const endApproach of endApproaches) {
+                    for (const axis of verticalCorridors) {
+                        if (endpointLocks.firstJunction && Math.abs(axis - startEscape.x) < 1.5) continue;
+                        if (endpointLocks.lastJunction && Math.abs(axis - endApproach.x) < 1.5) continue;
+                        candidates.push([
+                            start,
+                            startEscape,
+                            { x: axis, y: startEscape.y },
+                            { x: axis, y: endApproach.y },
+                            endApproach,
+                            end,
+                        ]);
+                    }
+                }
+            }
+        } else if (isHorizontalDirection(startDir) && !isHorizontalDirection(endDir)) {
+            for (const startEscape of startEscapes) {
+                for (const endApproach of endApproaches) {
+                    candidates.push([
+                        start,
+                        startEscape,
+                        { x: startEscape.x, y: endApproach.y },
+                        endApproach,
+                        end,
+                    ]);
+                }
+            }
+        } else {
+            for (const startEscape of startEscapes) {
+                for (const endApproach of endApproaches) {
+                    candidates.push([
+                        start,
+                        startEscape,
+                        { x: endApproach.x, y: startEscape.y },
+                        endApproach,
+                        end,
+                    ]);
+                }
+            }
+        }
+    }
+
     // Centered fallback doglegs keep the path short when semantic axes are sparse.
     candidates.push([start, { x: midX, y: start.y }, { x: midX, y: end.y }, end]);
     candidates.push([start, { x: start.x, y: midY }, { x: end.x, y: midY }, end]);
@@ -987,7 +1198,79 @@ function buildRerouteCandidates(
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
+    }).sort((a, b) => candidatePathLength(a) - candidatePathLength(b))
+        .slice(0, maxCandidates);
+}
+
+function buildStartEscapePoints(
+    start: Point,
+    direction: OrthogonalDirection | null,
+    spacing: number,
+    lockedPoint?: Point
+): Point[] {
+    if (lockedPoint) return [clonePoint(lockedPoint)];
+    if (!direction) return [];
+    return uniquePoints([4, 8, 12].map(mult => pointAlongDirection(start, direction, spacing * mult)));
+}
+
+function buildEndApproachPoints(
+    end: Point,
+    direction: OrthogonalDirection | null,
+    spacing: number,
+    lockedPoint?: Point
+): Point[] {
+    if (lockedPoint) return [clonePoint(lockedPoint)];
+    if (!direction) return [];
+    return uniquePoints([4, 8, 12].map(mult => pointAlongDirection(end, oppositeDirection(direction), spacing * mult)));
+}
+
+function candidatePathLength(points: Point[]): number {
+    return RoutingCrossingScorer.pathLength(RoutingCrossingScorer.simplifyOrthogonalPoints(points));
+}
+
+function pointAlongDirection(point: Point, direction: OrthogonalDirection, distance: number): Point {
+    switch (direction) {
+        case 'L': return { x: point.x - distance, y: point.y };
+        case 'R': return { x: point.x + distance, y: point.y };
+        case 'U': return { x: point.x, y: point.y - distance };
+        case 'D': return { x: point.x, y: point.y + distance };
+    }
+}
+
+function oppositeDirection(direction: OrthogonalDirection): OrthogonalDirection {
+    switch (direction) {
+        case 'L': return 'R';
+        case 'R': return 'L';
+        case 'U': return 'D';
+        case 'D': return 'U';
+    }
+}
+
+function isHorizontalDirection(direction: OrthogonalDirection): boolean {
+    return direction === 'L' || direction === 'R';
+}
+
+function uniquePoints(points: Point[]): Point[] {
+    const seen = new Set<string>();
+    return points.filter(point => {
+        const key = `${Math.round(point.x)},${Math.round(point.y)}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
     });
+}
+
+function clonePoint(point: Point): Point {
+    return { x: point.x, y: point.y };
+}
+
+function samePoint(a: Point, b: Point, tolerance = 1.5): boolean {
+    return Math.abs(a.x - b.x) <= tolerance && Math.abs(a.y - b.y) <= tolerance;
+}
+
+function samePath(a: Point[], b: Point[], tolerance = 1.5): boolean {
+    if (a.length !== b.length) return false;
+    return a.every((point, index) => samePoint(point, b[index], tolerance));
 }
 
 function selectNearAxes(axes: number[] | undefined, a: number, b: number, spacing: number): number[] {
@@ -1000,7 +1283,7 @@ function selectNearAxes(axes: number[] | undefined, a: number, b: number, spacin
     values.add((a + b) / 2);
     return [...values]
         .sort((x, y) => Math.abs(x - (a + b) / 2) - Math.abs(y - (a + b) / 2))
-        .slice(0, 18);
+        .slice(0, 12);
 }
 
 function getCrossingAwareAxisValues(
@@ -1181,5 +1464,7 @@ function getCandidateAxisValues(base: number, semanticAxes: number[] | undefined
         }
     }
 
-    return [...values].sort((a, b) => Math.abs(a - base) - Math.abs(b - base));
+    return [...values]
+        .sort((a, b) => Math.abs(a - base) - Math.abs(b - base))
+        .slice(0, 36);
 }

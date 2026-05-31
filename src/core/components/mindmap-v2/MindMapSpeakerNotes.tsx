@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import type { NodeObj } from 'mind-elixir';
-import { getPresentationState, subscribePresentation } from './mindElixirStore';
+import { getMindElixirInstance, getPresentationState, subscribePresentation } from './mindElixirStore';
 import { generateSpeakerNotes } from './mindmapAIService';
-import { Spin, Button, Select, Tooltip } from 'antd';
-import { ReloadOutlined, MessageOutlined, SoundOutlined } from '@ant-design/icons';
+import { Spin, Button, Select, Tooltip, message } from 'antd';
+import { CopyOutlined, ReloadOutlined, SaveOutlined, MessageOutlined, SoundOutlined } from '@ant-design/icons';
 
 const TONE_OPTIONS = [
     { label: '💼 专业商务', value: '专业商务' },
@@ -106,6 +106,40 @@ export const MindMapSpeakerNotes: React.FC = () => {
         fetchNotes(currentNode, tone);
     };
 
+    const handleCopyNotes = async () => {
+        if (!notes.trim()) return;
+        try {
+            await navigator.clipboard.writeText(notes);
+            message.success('演讲提词已复制');
+        } catch {
+            message.error('复制失败，请检查浏览器剪贴板权限');
+        }
+    };
+
+    const handleSaveNotes = async () => {
+        if (!currentNode || !notes.trim()) return;
+        const mind = getMindElixirInstance();
+        if (!mind) return;
+
+        try {
+            const tpcEl = mind.findEle(currentNode.id);
+            if (!tpcEl) return;
+            const nextNote = currentNode.note
+                ? `${currentNode.note.trim()}\n\n---\n演讲提词：\n${notes.trim()}`
+                : notes.trim();
+            await mind.reshapeNode(tpcEl, { ...currentNode, note: nextNote });
+            mind.bus.fire('operation', {
+                name: 'saveSpeakerNotes',
+                obj: { ...currentNode, note: nextNote },
+            });
+            setCurrentNode({ ...currentNode, note: nextNote });
+            message.success('已保存到当前节点备注');
+        } catch (err) {
+            console.error('[SpeakerNotes] save failed:', err);
+            message.error('保存失败，请重试');
+        }
+    };
+
     if (!isPresenting || !currentNode) return null;
 
     return (
@@ -125,6 +159,26 @@ export const MindMapSpeakerNotes: React.FC = () => {
                         dropdownStyle={dropdownStyle}
                         style={selectStyle}
                     />
+                    <Tooltip title="复制提词">
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<CopyOutlined />}
+                            onClick={handleCopyNotes}
+                            disabled={!notes.trim() || loading}
+                            style={iconButtonStyle}
+                        />
+                    </Tooltip>
+                    <Tooltip title="保存到节点备注">
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<SaveOutlined />}
+                            onClick={handleSaveNotes}
+                            disabled={!notes.trim() || loading}
+                            style={iconButtonStyle}
+                        />
+                    </Tooltip>
                     <Tooltip title="重新生成">
                         <Button
                             type="text"

@@ -16,9 +16,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import EnhancedStyleSwitcher from '@/components/shared/EnhancedStyleSwitcher';
 import { EnhancedThemeSelector } from './EnhancedThemeSelector';
-import { LayoutStrategyManager } from '@/core';
-import { LayeredConfigManager, ConfigLayer } from '@/core';
-import { DiagramDefinition } from '@/core';
+import { LayoutStrategyManager } from '@/core/strategies/LayoutStrategyManager';
+import { LayeredConfigManager, ConfigLayer } from '@/core/config/LayeredConfigManager';
+import type { DiagramDefinition } from '@/core/types/diagram-components';
 import { ConfigurationPanel } from './ConfigurationPanel';
 
 interface DiagramSettingsPanelProps {

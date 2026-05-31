@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useMemo, useRef, useLayoutEffect, useState, useEffect, useCallback } from 'react';
-import { ReactFlow, Background, BackgroundVariant, Controls, useReactFlow, ReactFlowProvider, EdgeLabelRenderer, useStore, SelectionMode, ConnectionMode } from '@xyflow/react';
+import { ReactFlow, Background, BackgroundVariant, Controls, useReactFlow, ReactFlowProvider, EdgeLabelRenderer, useStore, useStoreApi, useUpdateNodeInternals, SelectionMode, ConnectionMode } from '@xyflow/react';
 import type {
   Node,
   Edge,
@@ -205,6 +205,8 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   onReconnectEnd,
 }: BaseReactFlowProps) => {
   const rfInstance = useReactFlow();
+  const rfStore = useStoreApi();
+  const updateNodeInternals = useUpdateNodeInternals();
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [hasInitialized, setHasInitialized] = useState(false);
@@ -268,7 +270,10 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
    * 目的：仅渲染可视区域内的元素，降低大图场景下的 DOM 与绘制开销。
    * 行为：在所有场景开启 `onlyRenderVisibleElements`，与自定义滚轮缩放兼容。
    */
-  const proOptions = useMemo(() => ({ onlyRenderVisibleElements: true, hideAttribution: true }), []);
+  const proOptions = useMemo(() => ({
+    onlyRenderVisibleElements: isLargeGraph,
+    hideAttribution: true,
+  }), [isLargeGraph]);
 
   // 稳定 defaultEdgeOptions 引用，避免 StoreUpdater 每帧 setState 导致无限循环
   const defaultEdgeOptions = useMemo(() => ({
@@ -670,6 +675,29 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       if (sourceHandle === edge.sourceHandle && targetHandle === edge.targetHandle) return edge;
       return { ...edge, sourceHandle, targetHandle };
     };
+    const normalizeTreeBusHandles = (edge: Edge): Edge => {
+      const data = ((edge.data || {}) as Record<string, any>);
+      if (!data.isTreeBus && !data.treeRouting) return edge;
+      const treeRouting = data.treeRouting && typeof data.treeRouting === 'object' ? data.treeRouting : {};
+      const sourceHandle = expandHandle(String(treeRouting.effectiveSourceHandle || edge.sourceHandle || ''));
+      const targetHandle = expandHandle(String(treeRouting.effectiveTargetHandle || edge.targetHandle || ''));
+      if (!sourceHandle && !targetHandle) return edge;
+      const nextSource = sourceHandle || edge.sourceHandle;
+      const nextTarget = targetHandle || edge.targetHandle;
+      if (nextSource === edge.sourceHandle && nextTarget === edge.targetHandle) return edge;
+      return {
+        ...edge,
+        sourceHandle: nextSource,
+        targetHandle: nextTarget,
+        data: {
+          ...data,
+          computedPath: undefined,
+          elkPath: undefined,
+          algorithm: undefined,
+          _layoutEpoch: Date.now(),
+        },
+      };
+    };
     const isVerticalHandle = (handle?: string | null) => {
       const s = String(handle || '').toLowerCase();
       return s === 'top' || s === 'bottom' || s === 't' || s === 'b';
@@ -677,6 +705,70 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     const getNodeX = (node: Node | undefined) => {
       const pos = (node as any)?.positionAbsolute ?? node?.position ?? { x: 0 };
       return Number(pos.x || 0);
+    };
+    const getNodeRect = (node: Node | undefined) => {
+      if (!node) return null;
+      const pos = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
+      const width = (node as any).measured?.width ?? node.width ?? (node.style as any)?.width ?? 0;
+      const height = (node as any).measured?.height ?? node.height ?? (node.style as any)?.height ?? 0;
+      return {
+        x: Number(pos.x || 0),
+        y: Number(pos.y || 0),
+        width: Number(width || 0),
+        height: Number(height || 0),
+      };
+    };
+    const anchorForHandle = (
+      rect: { x: number; y: number; width: number; height: number },
+      handle?: string | null
+    ) => {
+      const h = (expandHandle(String(handle || '')) || '').toLowerCase();
+      if (h === 'left') return { x: rect.x, y: rect.y + rect.height / 2 };
+      if (h === 'right') return { x: rect.x + rect.width, y: rect.y + rect.height / 2 };
+      if (h === 'top') return { x: rect.x + rect.width / 2, y: rect.y };
+      if (h === 'bottom') return { x: rect.x + rect.width / 2, y: rect.y + rect.height };
+      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    };
+    const isNearPoint = (
+      a: { x: number; y: number },
+      b: { x: number; y: number },
+      tolerance = 80
+    ) => Math.abs(a.x - b.x) <= tolerance && Math.abs(a.y - b.y) <= tolerance;
+    const normalizeStaleComputedPath = (edge: Edge): Edge => {
+      const data = ((edge.data || {}) as Record<string, any>);
+      const path = data.computedPath;
+      if (!Array.isArray(path) || path.length < 2) return edge;
+
+      const sourceRect = getNodeRect(nodeById.get(edge.source));
+      const targetRect = getNodeRect(nodeById.get(edge.target));
+      if (!sourceRect || !targetRect || !sourceRect.width || !sourceRect.height || !targetRect.width || !targetRect.height) {
+        return edge;
+      }
+
+      const first = path[0];
+      const last = path[path.length - 1];
+      if (!first || !last || !Number.isFinite(Number(first.x)) || !Number.isFinite(Number(first.y))
+        || !Number.isFinite(Number(last.x)) || !Number.isFinite(Number(last.y))) {
+        return {
+          ...edge,
+          data: { ...data, computedPath: undefined, elkPath: undefined, algorithm: undefined },
+        };
+      }
+
+      const sourceAnchor = anchorForHandle(sourceRect, edge.sourceHandle);
+      const targetAnchor = anchorForHandle(targetRect, edge.targetHandle);
+      if (isNearPoint(first, sourceAnchor) && isNearPoint(last, targetAnchor)) return edge;
+
+      return {
+        ...edge,
+        data: {
+          ...data,
+          computedPath: undefined,
+          elkPath: undefined,
+          algorithm: undefined,
+          _layoutEpoch: Date.now(),
+        },
+      };
     };
     const normalizeCrossContainerManualHandles = (edge: Edge): Edge => {
       const data = ((edge.data || {}) as Record<string, any>);
@@ -704,24 +796,79 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         },
       };
     };
+    const normalizeAutoReverseSideHandles = (edge: Edge): Edge => {
+      const data = ((edge.data || {}) as Record<string, any>);
+      if (data.isTreeBus || data.treeRouting) return edge;
+      const autoSides = Array.isArray(data.auto)
+        ? data.auto.map((side: any) => String(side).toLowerCase())
+        : [];
+      const manualSides = Array.isArray(data.manualHandleSides)
+        ? data.manualHandleSides.map((side: any) => String(side).toLowerCase())
+        : [];
+      const autoSource = autoSides.includes('source') || data.autoSource === true;
+      const autoTarget = autoSides.includes('target') || data.autoTarget === true;
+      if (!autoSource || !autoTarget || manualSides.includes('source') || manualSides.includes('target')) return edge;
+
+      const sourceNode = nodeById.get(edge.source);
+      const targetNode = nodeById.get(edge.target);
+      if (!sourceNode || !targetNode) return edge;
+
+      const sourcePos = (sourceNode as any).positionAbsolute ?? sourceNode.position ?? { x: 0, y: 0 };
+      const targetPos = (targetNode as any).positionAbsolute ?? targetNode.position ?? { x: 0, y: 0 };
+      const sourceW = (sourceNode as any).measured?.width ?? sourceNode.width ?? (sourceNode.style as any)?.width ?? 0;
+      const sourceH = (sourceNode as any).measured?.height ?? sourceNode.height ?? (sourceNode.style as any)?.height ?? 0;
+      const targetW = (targetNode as any).measured?.width ?? targetNode.width ?? (targetNode.style as any)?.width ?? 0;
+      const targetH = (targetNode as any).measured?.height ?? targetNode.height ?? (targetNode.style as any)?.height ?? 0;
+      const dx = (Number(targetPos.x || 0) + Number(targetW || 0) / 2) - (Number(sourcePos.x || 0) + Number(sourceW || 0) / 2);
+      const dy = (Number(targetPos.y || 0) + Number(targetH || 0) / 2) - (Number(sourcePos.y || 0) + Number(sourceH || 0) / 2);
+      const layoutDir = String(data.layoutDirection || (sourceNode.data as any)?.layoutDirection || 'TB').toUpperCase();
+      const isVerticalReverseWithSideRoom =
+        ((layoutDir.includes('TB') && dy < 0) || (layoutDir.includes('BT') && dy > 0))
+        && Math.abs(dx) > Math.abs(dy) * 0.35;
+      if (!isVerticalReverseWithSideRoom) return edge;
+
+      const nextHandles = dx >= 0
+        ? { sourceHandle: 'right', targetHandle: 'left' }
+        : { sourceHandle: 'left', targetHandle: 'right' };
+      if (edge.sourceHandle === nextHandles.sourceHandle && edge.targetHandle === nextHandles.targetHandle) return edge;
+      return {
+        ...edge,
+        ...nextHandles,
+        data: {
+          ...data,
+          runtimeHandleLock: {
+            ...(data.runtimeHandleLock && typeof data.runtimeHandleLock === 'object' ? data.runtimeHandleLock : {}),
+            source: true,
+            target: true,
+          },
+          computedPath: undefined,
+          elkPath: undefined,
+          algorithm: undefined,
+          _layoutEpoch: Date.now(),
+        },
+      };
+    };
 
     // P2: Canvas Hybrid Rendering Mode for Large Graphs
     if (isLargeGraph) {
-      return edges.map(e => ({
-        ...normalizeRuntimeHandles(e),
-        type: 'canvas-ref',
-        data: {
-          ...((e.data || {}) as Record<string, unknown>),
-          originalType: e.type || 'default'
-        }
-      }));
+      return edges.map(rawEdge => {
+        const e = normalizeStaleComputedPath(normalizeRuntimeHandles(normalizeAutoReverseSideHandles(normalizeTreeBusHandles(normalizeCrossContainerManualHandles(rawEdge)))));
+        return {
+          ...e,
+          type: 'canvas-ref',
+          data: {
+            ...((e.data || {}) as Record<string, unknown>),
+            originalType: e.type || 'default'
+          }
+        };
+      });
     }
 
     if (enableSmartEdges) {
       if (typeof smartEdgePadding !== 'number' || !isFinite(smartEdgePadding)) return edges;
 
       return edges.map((rawEdge) => {
-        const e = normalizeRuntimeHandles(normalizeCrossContainerManualHandles(rawEdge));
+        const e = normalizeStaleComputedPath(normalizeRuntimeHandles(normalizeAutoReverseSideHandles(normalizeTreeBusHandles(normalizeCrossContainerManualHandles(rawEdge)))));
         const type = String(e.type || '');
         const lower = type.toLowerCase();
 
@@ -760,7 +907,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       });
     }
     return edges.map((rawEdge) => {
-      const e = normalizeRuntimeHandles(normalizeCrossContainerManualHandles(rawEdge));
+      const e = normalizeStaleComputedPath(normalizeRuntimeHandles(normalizeAutoReverseSideHandles(normalizeTreeBusHandles(normalizeCrossContainerManualHandles(rawEdge)))));
       const type = String(e.type || '');
       const lower = type.toLowerCase();
       const nextType = (() => {
@@ -774,6 +921,92 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       return { ...e, type: nextType as any, label: nextLabel } as Edge;
     });
   }, [edges, nodes, enableSmartEdges, smartEdgePadding, isLargeGraph]);
+
+  const nodeInternalsRefreshKey = useMemo(() => {
+    return nodes.map((node) => {
+      const measured = (node as any).measured;
+      const width = measured?.width ?? node.width ?? (node.style as any)?.width ?? '';
+      const height = measured?.height ?? node.height ?? (node.style as any)?.height ?? '';
+      return `${node.id}:${node.position?.x ?? 0}:${node.position?.y ?? 0}:${width}:${height}`;
+    }).join('|');
+  }, [nodes]);
+
+  useEffect(() => {
+    if (nodes.length === 0) return;
+    const nodeIds = nodes.map(node => node.id);
+    const getNodeElement = (id: string) => {
+      const safeId = String(id).replace(/"/g, '\\"');
+      return containerRef.current?.querySelector(`.react-flow__node[data-id="${safeId}"]`) as HTMLElement | null;
+    };
+    const refresh = () => {
+      const state = rfStore.getState() as any;
+      const internalsMap = new Map<string, { id: string; nodeElement: HTMLElement; force: boolean }>();
+      for (const id of nodeIds) {
+        const nodeElement = getNodeElement(id);
+        if (nodeElement) internalsMap.set(id, { id, nodeElement, force: true });
+      }
+      if (internalsMap.size > 0 && typeof state.updateNodeInternals === 'function') {
+        state.updateNodeInternals(internalsMap, { triggerFitView: false });
+        return;
+      }
+      updateNodeInternals(nodeIds);
+    };
+    const allRenderableHandlesMeasured = () => {
+      const state = rfStore.getState() as any;
+      const nodeLookup = state.nodeLookup as Map<string, any> | undefined;
+      if (!nodeLookup) return false;
+      return nodeIds.every((id) => {
+        const element = getNodeElement(id);
+        if (!element || !element.querySelector('.react-flow__handle')) return true;
+        const bounds = nodeLookup.get(id)?.internals?.handleBounds;
+        return Boolean((bounds?.source?.length || 0) + (bounds?.target?.length || 0));
+      });
+    };
+    let retryTimer: number | undefined;
+    let attempts = 0;
+    const retryUntilMeasured = () => {
+      refresh();
+      retryTimer = window.setTimeout(() => {
+        attempts += 1;
+        if (!allRenderableHandlesMeasured() && attempts < 8) {
+          retryUntilMeasured();
+        }
+      }, attempts < 3 ? 120 : 280);
+    };
+    const raf = window.requestAnimationFrame(retryUntilMeasured);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
+  }, [nodes.length, nodeInternalsRefreshKey, updateNodeInternals, rfStore]);
+
+  useEffect(() => {
+    if (nodes.length === 0) return;
+    let cancelled = false;
+    const nodeIds = nodes.map(node => node.id);
+    const refreshFromMountedDom = () => {
+      if (cancelled) return;
+      const state = rfStore.getState() as any;
+      const internalsMap = new Map<string, { id: string; nodeElement: HTMLElement; force: boolean }>();
+      for (const id of nodeIds) {
+        const safeId = String(id).replace(/"/g, '\\"');
+        const nodeElement = containerRef.current?.querySelector(`.react-flow__node[data-id="${safeId}"]`) as HTMLElement | null;
+        if (nodeElement) internalsMap.set(id, { id, nodeElement, force: true });
+      }
+      if (internalsMap.size > 0 && typeof state.updateNodeInternals === 'function') {
+        state.updateNodeInternals(internalsMap, { triggerFitView: false });
+      } else {
+        updateNodeInternals(nodeIds);
+      }
+    };
+    const raf = window.requestAnimationFrame(refreshFromMountedDom);
+    const timers = [240, 720, 1440, 2400].map((delay) => window.setTimeout(refreshFromMountedDom, delay));
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(raf);
+      for (const timer of timers) window.clearTimeout(timer);
+    };
+  }, [nodes.length, rfStore, updateNodeInternals]);
 
   /**
    * 函数级注释：导出期间隐藏背景网格
@@ -860,11 +1093,14 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       clearTimeout(readyTimeoutRef.current);
       readyTimeoutRef.current = null;
     }
-    const hasSize = containerSize.width > 0 && containerSize.height > 0;
+    const liveRect = containerRef.current?.getBoundingClientRect();
+    const liveWidth = liveRect?.width ?? 0;
+    const liveHeight = liveRect?.height ?? 0;
+    const hasSize = (containerSize.width > 0 && containerSize.height > 0) || (liveWidth > 0 && liveHeight > 0);
     if (hasSize) {
-      readyTimeoutRef.current = window.setTimeout(() => {
+      if (!isContainerReady) {
         setIsContainerReady(true);
-      }, 120);
+      }
     } else {
       if (!isContainerReady) {
         setIsContainerReady(false);
@@ -900,6 +1136,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       } : { width: '100%', height: '100%', position: 'relative' }}>
         <ReactFlow
           proOptions={proOptions}
+          onlyRenderVisibleElements={isLargeGraph}
           nodes={nodes}
           edges={displayEdges}
           nodeTypes={nodeTypes}

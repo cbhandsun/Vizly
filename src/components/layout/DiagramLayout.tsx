@@ -5,9 +5,9 @@ import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { ModernTopToolbar } from '../ui/ModernTopToolbar';
 import { TopToolbarProps } from '../ui/TopToolbar';
 import ModernDiagramMenu from '../ModernDiagramMenu';
-import { ModernFlowchartSidebar } from '@/core';
-import { DiagramDefinition } from '@/core';
-import { diagramConfigManager } from '@/core';
+import { ModernFlowchartSidebar } from '@/core/components/diagrams/ModernFlowchartSidebar';
+import type { DiagramDefinition } from '@/core/types/diagram-components';
+import { diagramConfigManager } from '@/core/components/config/DiagramConfig';
 
 const { Header, Sider, Content } = Layout;
 

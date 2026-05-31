@@ -30,9 +30,10 @@ describe('PortSelector', () => {
     };
 
     describe('selectOptimalPorts', () => {
-        it('should return pre-assigned ports directly if config contains them for both nodes', () => {
+        it('should return pre-assigned ports directly when handle policy is force', () => {
             const config: RoutingConfig = {
                 ...defaultConfig,
+                directionalHandlePolicy: 'force',
                 preAssignedPorts: {
                     source: { source: 't' },
                     target: { target: 'b' }
@@ -45,6 +46,43 @@ describe('PortSelector', () => {
                 cost: 0,
                 autoSource: false,
                 autoTarget: false
+            });
+        });
+
+        it('should treat pre-assigned ports as soft hints when handle policy is prefer', () => {
+            const config: RoutingConfig = {
+                ...defaultConfig,
+                preAssignedPorts: {
+                    source: { source: 't' },
+                    target: { target: 'b' }
+                }
+            };
+            const result = portSelector.selectOptimalPorts(sNode, tNode, config, defaultWeights);
+            expect(result).toMatchObject({
+                sourceHandle: 'r',
+                targetHandle: 'l',
+                autoSource: true,
+                autoTarget: true
+            });
+            expect(result.cost).toBeLessThan(Infinity);
+        });
+
+        it('should allow forced direction without hard-locking automatic pre-assigned ports', () => {
+            const config: RoutingConfig = {
+                ...defaultConfig,
+                directionalHandlePolicy: 'force',
+                preAssignedPortPolicy: 'prefer',
+                preAssignedPorts: {
+                    source: { source: 't' },
+                    target: { target: 'b' }
+                }
+            };
+            const result = portSelector.selectOptimalPorts(sNode, tNode, config, defaultWeights);
+            expect(result).toMatchObject({
+                sourceHandle: 'r',
+                targetHandle: 'l',
+                autoSource: true,
+                autoTarget: true
             });
         });
 

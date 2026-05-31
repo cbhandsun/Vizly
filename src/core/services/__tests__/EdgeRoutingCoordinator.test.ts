@@ -1,14 +1,27 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EdgeRoutingCoordinator } from '../EdgeRoutingCoordinator';
-import { Position } from '../../../types/routing';
-import type { PathFindingJob } from '../../../types/routing';
-import type { Rectangle } from '../../../algorithms/geometryUtils';
+import { Position } from '../../types/routing';
+import type { PathFindingJob, Rectangle } from '../../types/routing';
 
-// Mock WorkerPool since we only test the coordinator's synchronous partitioning logic
-vi.mock('../../WorkerPool', () => {
+// Mock worker pools since these tests only cover synchronous coordinator partitioning logic.
+vi.mock('../../workers/WorkerPool', () => {
     return {
-        WorkerPool: vi.fn().mockImplementation(() => ({
-            calculatePath: vi.fn(),
+        default: {
+            getInstance: vi.fn(() => ({
+                calculatePath: vi.fn(),
+                markDirty: vi.fn(),
+                terminate: vi.fn(),
+            })),
+        },
+    };
+});
+
+vi.mock('../../workers/PathfindingWorkerPool', () => {
+    return {
+        PathfindingWorkerPool: vi.fn().mockImplementation(() => ({
+            calculatePaths: vi.fn(),
+            getStats: vi.fn(() => null),
+            terminate: vi.fn(),
         })),
     };
 });
@@ -69,39 +82,166 @@ describe('EdgeRoutingCoordinator: assignSameSidePortSeparation', () => {
             },
         ];
 
+        const graph = {
+            nodes: [
+                { id: 'A', position: { x: sRect.x, y: sRect.y }, width: sRect.width, height: sRect.height },
+                { id: 'B', position: { x: tRectB.x, y: tRectB.y }, width: tRectB.width, height: tRectB.height },
+                { id: 'C', position: { x: tRectC.x, y: tRectC.y }, width: tRectC.width, height: tRectC.height },
+            ],
+        };
+
         // 强行调用私有方法
-        (coordinator as any).assignSameSidePortSeparation(jobs);
+        (coordinator as any).assignSameSidePortSeparation(jobs, graph);
 
         // 预期结果：
-        // 在节点 A 的 bottom 侧有三条边冲突：
-        // 1. edge-to-C (对端 C.center.x = -50)
-        // 2. edge-to-B (对端 B.center.x = 350)
-        // 3. edge-back-from-B (对端 B.center.x = 350)
-        // 根据 getOppositeCoord 排序，C 在最左侧，所以 edge-to-C (job2) 排在最前 (index = 0)。
-        // edge-to-B (job1) 与 edge-back-from-B (job3) 对端都是 B，根据 edgeId 排序。
-        // edge-back-from-B ('edge-back-from-B') 比 edge-to-B ('edge-to-B') 的 ASCII 值小，
-        // 所以 edge-back-from-B (job3) 排在第二 (index = 1)，edge-to-B (job1) 排在最后 (index = 2)。
+        // 在节点 A 的 bottom 侧，两个同源出边先作为隐式 fan-out 共享一个出端槽，
+        // 再和入边做 in/out zone 分离，避免同侧入边和出边混在一起。
+        // out zone: edge-to-C + edge-to-B (index 0)
+        // in zone : edge-back-from-B (index 1)
 
         const job1 = jobs.find(j => j.edgeId === 'edge-to-B')!;
         const job2 = jobs.find(j => j.edgeId === 'edge-to-C')!;
         const job3 = jobs.find(j => j.edgeId === 'edge-back-from-B')!;
 
         // 验证分配的端口 index 和 count
-        // job2 (A -> C) 为出边，应该在 A.bottom 占 index = 0，总数 3
+        // job2 (A -> C) 为出边，应该共享 A.bottom 的 fan-out 槽 index = 0，总数 2
         expect(job2.outgoingIndex).toBe(0);
-        expect(job2.outgoingCount).toBe(3);
+        expect(job2.outgoingCount).toBe(2);
 
-        // job3 (B -> A) 为入边，应该在 A.bottom 占 index = 1，总数 3
+        // job3 (B -> A) 为入边，应该在 A.bottom 的 in-zone 占 index = 1，总数 2
         expect(job3.incomingIndex).toBe(1);
-        expect(job3.incomingCount).toBe(3);
+        expect(job3.incomingCount).toBe(2);
 
-        // job1 (A -> B) 为出边，应该在 A.bottom 占 index = 2，总数 3
-        expect(job1.outgoingIndex).toBe(2);
-        expect(job1.outgoingCount).toBe(3);
+        // job1 (A -> B) 与 job2 同源，应该共享 A.bottom 的 fan-out 槽
+        expect(job1.outgoingIndex).toBe(0);
+        expect(job1.outgoingCount).toBe(2);
 
         // 因为被分配了同侧端口分离（outgoingCount/incomingCount = 3 > 1），
         // 它们在路径层面的双向偏移 bidirectionalChannel 应该被成功清除，以防双重偏移。
         expect(job3.bidirectionalChannel).toBeUndefined();
         expect(job3.bidirectionalSpacing).toBeUndefined();
+    });
+
+    it('keeps a same-target M2O fan-in on one shared incoming slot', () => {
+        const coordinator = EdgeRoutingCoordinator.getInstance();
+
+        const targetRect: Rectangle = { x: 400, y: 400, width: 140, height: 80 };
+        const sourceRects: Record<string, Rectangle> = {
+            A: { x: 120, y: 120, width: 120, height: 70 },
+            B: { x: 400, y: 120, width: 120, height: 70 },
+            C: { x: 680, y: 120, width: 120, height: 70 },
+        };
+
+        const jobs: PathFindingJob[] = Object.entries(sourceRects).map(([source, sourceRect], index) => ({
+            jobId: `job-${source}`,
+            edgeId: `edge-${source}`,
+            source,
+            target: 'WMS',
+            sourceX: sourceRect.x + sourceRect.width / 2,
+            sourceY: sourceRect.y + sourceRect.height,
+            targetX: targetRect.x + targetRect.width / 2,
+            targetY: targetRect.y,
+            sourceRect,
+            targetRect,
+            isOneToMany: false,
+            isManyToOne: true,
+            incomingCount: 1,
+            incomingIndex: 0,
+            m2oTrunk: {
+                source: { x: 470, y: 250 },
+                target: { x: 470, y: 400 },
+            },
+            m2oTrunkPort: Position.Top,
+            busTrunkSource: { x: 470, y: 250 },
+            busTrunkTarget: { x: 470, y: 400 },
+            busRoutingPlan: {
+                busIndex: index,
+                peerGroupKey: 'm2o:WMS:top',
+                m2oPeerGroupKey: 'm2o:WMS:top',
+                peerGroupSize: 3,
+                peerGroupMembers: ['edge-A', 'edge-B', 'edge-C'],
+                trunkPort: Position.Top,
+                trunkPortTangent: 0,
+                m2oTrunk: {
+                    source: { x: 470, y: 250 },
+                    target: { x: 470, y: 400 },
+                },
+                m2oTrunkPort: Position.Top,
+                portFrozen: true,
+            },
+        }));
+
+        const graph = {
+            nodes: [
+                ...Object.entries(sourceRects).map(([id, rect]) => ({
+                    id,
+                    position: { x: rect.x, y: rect.y },
+                    width: rect.width,
+                    height: rect.height,
+                })),
+                {
+                    id: 'WMS',
+                    position: { x: targetRect.x, y: targetRect.y },
+                    width: targetRect.width,
+                    height: targetRect.height,
+                },
+            ],
+        };
+
+        (coordinator as any).assignSameSidePortSeparation(jobs, graph);
+
+        for (const job of jobs) {
+            expect(job.incomingCount).toBe(1);
+            expect(job.incomingIndex).toBe(0);
+        }
+    });
+
+    it('treats unflagged same-target incoming edges on one side as an implicit shared trunk group', () => {
+        const coordinator = EdgeRoutingCoordinator.getInstance();
+
+        const targetRect: Rectangle = { x: 400, y: 400, width: 140, height: 80 };
+        const sourceRects: Record<string, Rectangle> = {
+            A: { x: 260, y: 120, width: 120, height: 70 },
+            B: { x: 540, y: 120, width: 120, height: 70 },
+        };
+
+        const jobs: PathFindingJob[] = Object.entries(sourceRects).map(([source, sourceRect]) => ({
+            jobId: `job-${source}`,
+            edgeId: `edge-${source}`,
+            source,
+            target: 'WMS',
+            sourceX: sourceRect.x + sourceRect.width / 2,
+            sourceY: sourceRect.y + sourceRect.height,
+            targetX: targetRect.x + targetRect.width / 2,
+            targetY: targetRect.y,
+            sourceRect,
+            targetRect,
+            isOneToMany: false,
+            isManyToOne: false,
+        }));
+
+        const graph = {
+            nodes: [
+                ...Object.entries(sourceRects).map(([id, rect]) => ({
+                    id,
+                    position: { x: rect.x, y: rect.y },
+                    width: rect.width,
+                    height: rect.height,
+                })),
+                {
+                    id: 'WMS',
+                    position: { x: targetRect.x, y: targetRect.y },
+                    width: targetRect.width,
+                    height: targetRect.height,
+                },
+            ],
+        };
+
+        (coordinator as any).assignSameSidePortSeparation(jobs, graph);
+
+        for (const job of jobs) {
+            expect(job.incomingCount).toBe(1);
+            expect(job.incomingIndex).toBe(0);
+        }
     });
 });

@@ -39,6 +39,7 @@ import { setCurrentDiagramId, addHistoryRecord, emitToggleHistory } from './mind
 import MindMapYjsIntegration from './MindMapYjsIntegration';
 import MindMapBoundaries from './MindMapBoundaries';
 import MindMapMultiplayerCursors from './MindMapMultiplayerCursors';
+import { MindMapAIPanel } from './MindMapAIPanel';
 import { emitToggleOutline } from './mindmapOutlineStore';
 import { MindMapSpeakerNotes } from './MindMapSpeakerNotes';
 import { findNodeById } from './migrate';
@@ -1050,6 +1051,9 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
 
                 {/* AI Task Kanban panel — slides in from the right */}
                 <MindMapTaskKanban />
+
+                {/* Unified AI assistant panel — create, expand, refine */}
+                <MindMapAIPanel />
             </div>
 
             {/* Custom context menu */}

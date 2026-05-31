@@ -22,6 +22,8 @@ export interface PathfinderOptions {
     clearanceRects?: Rectangle[]; // [NEW] Areas to clear (e.g. source/target nodes)
     // [FIX] 接收其他边的路径线段作为软避障目标（A* 会尝试绕开但不硬性拦截）
     lineObstacles?: import('../../algorithms/pathfinding').LineObstacle[];
+    // [FIX] 域/子域容器边界 — 穿越时施加软惩罚（CONTAINER_BORDER=400），引导路径沿容器边缘走
+    containerBorders?: Rectangle[];
     debugOut?: { visited?: Point[]; grid?: { minX: number, minY: number, cols: number, rows: number, size: number, data: Int32Array } };
     sourcePos?: import('../../types/routing').Position;
     targetPos?: import('../../types/routing').Position;
@@ -63,8 +65,8 @@ export class AStarPathfinder {
                 options.grid,        // prebuiltGrid
                 undefined,           // guideLines
                 true,                // returnNullOnFail
-                [],                  // dynamicObstacles
-                [],                  // containerBorders
+                [],                                   // dynamicObstacles
+                options.containerBorders ?? [],        // [FIX] containerBorders — 域/子域容器边界软惩罚
                 options.congestionGrid, // [NEW]
                 options.clearanceRects,  // [NEW]
                 { sourcePos: options.sourcePos, targetPos: options.targetPos } // [NEW]

@@ -38,11 +38,13 @@ import {
     PrinterOutlined,
     QuestionCircleOutlined,
     ProjectOutlined,
+    RobotOutlined,
+    DeploymentUnitOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import MindElixir from 'mind-elixir';
 import type { NodeObj } from 'mind-elixir';
-import { getMindElixirInstance, subscribeMindElixir, setPresentationState, toggleKanban, subscribeKanban } from './mindElixirStore';
+import { getMindElixirInstance, subscribeMindElixir, setPresentationState, toggleKanban, subscribeKanban, toggleAIPanel, subscribeAIPanel } from './mindElixirStore';
 import {
     directionStringToInt, nodeObjToMarkdown, nodeObjToOpml, downloadText,
     markdownToNodeObj, opmlToNodeObj, countNodes, getTreeDepth, nodeObjToFlowchartJson
@@ -56,6 +58,8 @@ import MindMapShortcutsModal from './MindMapShortcutsModal';
 import MindMapTemplates from './MindMapTemplates';
 import { exportXmind } from './exportXmind';
 import { analyzeNodesRelationship } from './mindmapAIService';
+import { nodeObjToPitchMarkdown } from './mindmapPitchExport';
+import { arrangeMindMapTree } from './mindmapAutoArrange';
 
 
 const DIRECTION_OPTIONS = [
@@ -94,6 +98,13 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
 
     const handleToggleKanban = useCallback(() => {
         toggleKanban();
+    }, []);
+
+    const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
+    useEffect(() => subscribeAIPanel(o => setIsAIPanelOpen(o)), []);
+
+    const handleToggleAIPanel = useCallback(() => {
+        toggleAIPanel();
     }, []);
 
     // ── Canvas background pattern ──────────────────────────────────────────────
@@ -186,6 +197,23 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
         mind?.toCenter();
     }, [mind]);
 
+    const handleAutoArrange = useCallback(() => {
+        if (!mind) return;
+        try {
+            const data = mind.getData();
+            const nodeData = arrangeMindMapTree(data.nodeData);
+            mind.refresh({ ...data, nodeData });
+            mind.layout();
+            setTimeout(() => mind.toCenter(), 80);
+            mind.bus.fire('operation', {
+                name: 'autoArrangeMindmap',
+                obj: nodeData,
+            });
+        } catch (e) {
+            console.warn('[MindMap] auto arrange failed:', e);
+        }
+    }, [mind]);
+
     const handleUndo = useCallback(() => {
         mind?.undo();
     }, [mind]);
@@ -276,6 +304,15 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
             const json = nodeObjToFlowchartJson(data.nodeData);
             downloadText('mindmap_to_flowchart.vizly', json, 'application/json');
         } catch (e) { console.error('Flowchart export failed:', e); }
+    }, [mind]);
+
+    const handleExportPitchMarkdown = useCallback(() => {
+        if (!mind) return;
+        try {
+            const data = mind.getData();
+            const md = nodeObjToPitchMarkdown(data.nodeData);
+            downloadText('mindmap_pitch.md', md, 'text/markdown;charset=utf-8');
+        } catch (e) { console.error('Pitch export failed:', e); }
     }, [mind]);
 
     const handleExportXmind = useCallback(async () => {
@@ -394,6 +431,8 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
         { key: 'markdown', label: '导出 Markdown', icon: <DownloadOutlined />, onClick: handleExportMarkdown },
         { key: 'opml',     label: '导出 OPML',     icon: <DownloadOutlined />, onClick: handleExportOpml },
         { key: 'json',     label: '导出 JSON',     icon: <DownloadOutlined />, onClick: handleExportJson },
+        { type: 'divider' as const },
+        { key: 'pitch-md', label: '导出演示稿 Markdown', icon: <PlaySquareOutlined />, onClick: handleExportPitchMarkdown },
         { type: 'divider' as const },
         { key: 'flowchart',label: '转为流程图格式', icon: <ShareAltOutlined />, onClick: handleExportFlowchart },
         { type: 'divider' as const },
@@ -668,6 +707,10 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
                 <Button size="small" type="text" icon={<FullscreenOutlined />} onClick={handleFitView} disabled={!mind} />
             </Tooltip>
 
+            <Tooltip title="自动整理分支">
+                <Button size="small" type="text" icon={<DeploymentUnitOutlined />} onClick={handleAutoArrange} disabled={!mind} />
+            </Tooltip>
+
             {/* Zoom controls */}
             {mind && (
                 <div style={{
@@ -764,6 +807,16 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
 
             {/* Templates */}
             <MindMapTemplates />
+
+            {/* Unified AI assistant */}
+            <Tooltip title="AI 思维导图助手">
+                <Button size="small" type="text"
+                    icon={<RobotOutlined />}
+                    onClick={handleToggleAIPanel}
+                    disabled={!mind}
+                    style={{ color: isAIPanelOpen ? '#8b5cf6' : undefined }}
+                />
+            </Tooltip>
 
             {/* Canvas background preset */}
             <Dropdown

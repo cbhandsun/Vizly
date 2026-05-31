@@ -1,7 +1,7 @@
 
 import React, { Suspense } from 'react';
 import { useLocation } from 'react-router-dom';
-import DiagramViewer from "@/components/DiagramViewer";
+const DiagramViewer = React.lazy(() => import('@/components/DiagramViewer'));
 const ThemeColorComparison = React.lazy(() => import('@/pages/ThemeColorComparison'));
 const ThemeSideBySideComparison = React.lazy(() => import('@/pages/ThemeSideBySideComparison'));
 const DocsPreview = React.lazy(() => import('@/pages/DocsPreview'));
@@ -95,7 +95,11 @@ const AppRoutes = () => {
   }
 
   // 默认显示正常的图表查看器
-  return <DiagramViewer />;
+  return (
+    <Suspense fallback={<div style={{ padding: 16 }}>加载图表...</div>}>
+      <DiagramViewer />
+    </Suspense>
+  );
 };
 
 export default AppRoutes;

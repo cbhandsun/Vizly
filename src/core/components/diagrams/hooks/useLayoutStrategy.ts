@@ -41,6 +41,67 @@ function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], dir: 'TB'
     const isH = dir === 'LR';
     const defSrc = isH ? 'right' : 'bottom';
     const defTgt = isH ? 'left' : 'top';
+    const axisOf = (a: { x: number; y: number }, b: { x: number; y: number }): 'h' | 'v' | null => {
+        if (Math.abs(a.y - b.y) < 1.5 && Math.abs(a.x - b.x) > 1.5) return 'h';
+        if (Math.abs(a.x - b.x) < 1.5 && Math.abs(a.y - b.y) > 1.5) return 'v';
+        return null;
+    };
+    const normalizeComputedPath = (raw: unknown): Array<{ x: number; y: number }> | undefined => {
+        if (!Array.isArray(raw) || raw.length < 2) return undefined;
+        const points = raw
+            .map((p: any) => ({ x: Number(p?.x), y: Number(p?.y) }))
+            .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
+        if (points.length < 2) return undefined;
+
+        const orthogonal: Array<{ x: number; y: number }> = [points[0]];
+        for (let i = 1; i < points.length; i++) {
+            const prev = orthogonal[orthogonal.length - 1];
+            const curr = points[i];
+            if (Math.abs(prev.x - curr.x) > 1.5 && Math.abs(prev.y - curr.y) > 1.5) {
+                const next = points[i + 1];
+                const hv = { x: curr.x, y: prev.y };
+                const vh = { x: prev.x, y: curr.y };
+                const hvScore = next && axisOf(hv, curr) !== axisOf(curr, next) ? 1 : 0;
+                const vhScore = next && axisOf(vh, curr) !== axisOf(curr, next) ? 1 : 0;
+                orthogonal.push(hvScore <= vhScore ? hv : vh);
+            }
+            orthogonal.push(curr);
+        }
+
+        const collapse = (pts: Array<{ x: number; y: number }>) => {
+            if (pts.length < 3) return pts;
+            const out: Array<{ x: number; y: number }> = [pts[0]];
+            for (let i = 1; i < pts.length - 1; i++) {
+                const prev = out[out.length - 1];
+                const curr = pts[i];
+                const next = pts[i + 1];
+                const sameX = Math.abs(prev.x - curr.x) < 1.5 && Math.abs(curr.x - next.x) < 1.5;
+                const sameY = Math.abs(prev.y - curr.y) < 1.5 && Math.abs(curr.y - next.y) < 1.5;
+                if (!sameX && !sameY) out.push(curr);
+            }
+            out.push(pts[pts.length - 1]);
+            return out;
+        };
+
+        let cleaned = collapse(orthogonal);
+        let changed = true;
+        while (changed) {
+            changed = false;
+            for (let i = 1; i < cleaned.length - 1; i++) {
+                const prev = cleaned[i - 1];
+                const curr = cleaned[i];
+                const next = cleaned[i + 1];
+                const shortIn = Math.abs(prev.x - curr.x) + Math.abs(prev.y - curr.y) < 8;
+                const shortOut = Math.abs(curr.x - next.x) + Math.abs(curr.y - next.y) < 8;
+                if ((shortIn || shortOut) && axisOf(prev, next)) {
+                    cleaned = [...cleaned.slice(0, i), ...cleaned.slice(i + 1)];
+                    changed = true;
+                    break;
+                }
+            }
+        }
+        return collapse(cleaned);
+    };
     let _orphan = 0, _expanded = 0, _defaulted = 0;
 
     const sanitized = resultEdges
@@ -61,10 +122,11 @@ function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], dir: 'TB'
             if (tgtH) _expanded++; else _defaulted++;
 
             // ⭐ [FIX] 切换布局时清除连线的自定义控制点缓冲，让重新计算的布局能够生效起步；但保留布局策略计算好的路径/总线/ELK信息
+            const computedPath = normalizeComputedPath(e.data?.computedPath);
             edge.data = {
                 ...edge.data,
                 waypoints: [],
-                computedPath: e.data?.computedPath,
+                computedPath: computedPath ?? e.data?.computedPath,
                 elkPath: e.data?.elkPath,
                 treeRouting: e.data?.treeRouting,
                 isTreeBus: e.data?.isTreeBus,
@@ -345,7 +407,14 @@ export function useLayoutStrategy({
                                 // Touch edges to force re-render with fresh positionAbsolute
                                 setEdges(prev => prev.map(e => ({
                                     ...e,
-                                    data: { ...e.data, _layoutEpoch: Date.now() }
+                                    data: {
+                                        ...e.data,
+                                        waypoints: [],
+                                        computedPath: undefined,
+                                        elkPath: undefined,
+                                        algorithm: undefined,
+                                        _layoutEpoch: Date.now(),
+                                    }
                                 })));
                                 flushObstacles();
                                 resolve();

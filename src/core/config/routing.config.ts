@@ -100,7 +100,7 @@ export const FAST_PRESET: UnifiedRoutingConfig = {
         source: 30,
         target: 30
     },
-    debug: true
+    debug: false
 };
 
 /**
@@ -185,7 +185,7 @@ export const QUALITY_PRESET: UnifiedRoutingConfig = {
         source: 40,
         target: 40
     },
-    debug: true
+    debug: false
 };
 
 /**

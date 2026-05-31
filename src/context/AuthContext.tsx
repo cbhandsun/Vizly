@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
-import { supabase } from '@/services/supabase';
-import { storageService } from '@/services/SupabaseStorage';
+import type { User, Session, AuthError } from '@supabase/supabase-js';
 
 interface AuthContextType {
     user: User | null;
@@ -16,9 +14,34 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-import { LayeredConfigManager } from '@/core';
-
 const noSupabaseError = { error: { message: 'Supabase is not configured', name: 'AuthError', status: 0 } as unknown as AuthError };
+
+let supabaseModulePromise: Promise<typeof import('@/services/supabase')> | null = null;
+
+const loadSupabaseClient = async () => {
+    supabaseModulePromise ??= import('@/services/supabase');
+    const { supabase } = await supabaseModulePromise;
+    return supabase;
+};
+
+const configureCloudAdapter = async (session: Session | null) => {
+    if (!session?.user) return;
+
+    const [{ LayeredConfigManager }, { storageService }] = await Promise.all([
+        import('@/core/config/LayeredConfigManager'),
+        import('@/services/SupabaseStorage')
+    ]);
+
+    LayeredConfigManager.getInstance().setCloudAdapter({
+        syncWithCloud: async (onConfigLoaded: (key: string, value: any) => void) => {
+            const cloudConfigs = await storageService.loadAllConfigs();
+            cloudConfigs.forEach(({ key, value }: { key: string; value: any }) => onConfigLoaded(key, value));
+        },
+        saveConfig: async (key: string, data: any) => {
+            await storageService.saveConfig(key, data, session.user.id);
+        }
+    });
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
@@ -26,13 +49,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!supabase) {
-            setLoading(false);
-            return;
-        }
+        let cancelled = false;
+        let unsubscribe: (() => void) | undefined;
 
-        // 1. Initial Session Check
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        const applySession = (session: Session | null) => {
+            if (cancelled) return;
             setSession(session);
             setUser(session?.user ?? null);
             if (typeof window !== 'undefined') {
@@ -40,43 +61,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
             setLoading(false);
             if (session?.user) {
-                LayeredConfigManager.getInstance().setCloudAdapter({
-                    syncWithCloud: async (onConfigLoaded) => {
-                        const cloudConfigs = await storageService.loadAllConfigs();
-                        cloudConfigs.forEach(({ key, value }) => onConfigLoaded(key, value));
-                    },
-                    saveConfig: async (key, data) => {
-                        await storageService.saveConfig(key, data, session.user.id);
-                    }
+                void configureCloudAdapter(session).catch((error) => {
+                    console.error('Failed to configure cloud adapter:', error);
                 });
             }
+        };
+
+        const initializeAuth = async () => {
+            const supabase = await loadSupabaseClient();
+            if (cancelled) return;
+
+            if (!supabase) {
+                setLoading(false);
+                return;
+            }
+
+            // 1. Initial Session Check
+            const { data: { session } } = await supabase.auth.getSession();
+            applySession(session);
+
+            // 2. Subscription to Auth Changes
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+                applySession(session);
+            });
+            unsubscribe = () => subscription.unsubscribe();
+        };
+
+        void initializeAuth().catch((error) => {
+            console.error('Auth initialization failed:', error);
+            if (!cancelled) setLoading(false);
         });
 
-        // 2. Subscription to Auth Changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-            if (typeof window !== 'undefined') {
-                (window as any).__currentUserId = session?.user?.id || null;
-            }
-            setLoading(false);
-            if (session?.user) {
-                LayeredConfigManager.getInstance().setCloudAdapter({
-                    syncWithCloud: async (onConfigLoaded) => {
-                        const cloudConfigs = await storageService.loadAllConfigs();
-                        cloudConfigs.forEach(({ key, value }) => onConfigLoaded(key, value));
-                    },
-                    saveConfig: async (key, data) => {
-                        await storageService.saveConfig(key, data, session.user.id);
-                    }
-                });
-            }
-        });
-
-        return () => subscription.unsubscribe();
+        return () => {
+            cancelled = true;
+            unsubscribe?.();
+        };
     }, []);
 
     const signInWithEmail = async (email: string) => {
+        const supabase = await loadSupabaseClient();
         if (!supabase) return noSupabaseError;
         return supabase.auth.signInWithOtp({
             email,
@@ -87,11 +110,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const signInWithPassword = async (email: string, password: string) => {
+        const supabase = await loadSupabaseClient();
         if (!supabase) return noSupabaseError;
         return supabase.auth.signInWithPassword({ email, password });
     };
 
     const signUp = async (email: string, password: string) => {
+        const supabase = await loadSupabaseClient();
         if (!supabase) return noSupabaseError;
         return supabase.auth.signUp({
             email,
@@ -103,11 +128,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const signOut = async () => {
+        const supabase = await loadSupabaseClient();
         if (!supabase) return noSupabaseError;
         return supabase.auth.signOut();
     };
 
     const updatePassword = async (password: string) => {
+        const supabase = await loadSupabaseClient();
         if (!supabase) return noSupabaseError;
         return supabase.auth.updateUser({ password });
     };

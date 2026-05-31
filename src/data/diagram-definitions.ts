@@ -1,6 +1,6 @@
 // diagram-definitions.ts
 import { lazy, createElement } from 'react';
-import { DiagramDefinition } from '@/core';
+import type { DiagramDefinition } from '@/core/types/diagram-components';
 import {
   FaSitemap,
   FaWarehouse,
@@ -12,12 +12,64 @@ import {
   FaBrain,
 } from 'react-icons/fa';
 
+const ensureBuiltInPlugins = async () => {
+  const { PluginRegistry } = await import('@/core/services/PluginRegistry');
+  const registry = PluginRegistry.getInstance();
+
+  if (!registry.getPlugin('flowchart')) {
+    const [
+      { FlowchartPlugin },
+      { ArchitecturePlugin },
+      { TimelinePlugin },
+      { MindMapPlugin },
+      { SwimlanePlugin },
+      { ERDiagramPlugin },
+      { NetworkTopologyPlugin },
+      { SequencePlugin },
+    ] = await Promise.all([
+      import('@/core/plugins/FlowchartPlugin'),
+      import('@/core/plugins/ArchitecturePlugin'),
+      import('@/core/plugins/TimelinePlugin'),
+      import('@/core/plugins/MindMapPlugin'),
+      import('@/core/plugins/SwimlanePlugin'),
+      import('@/core/plugins/ERDiagramPlugin'),
+      import('@/core/plugins/NetworkTopologyPlugin'),
+      import('@/core/plugins/SequencePlugin'),
+    ]);
+
+    registry.register(new FlowchartPlugin(), true);
+    registry.register(new ArchitecturePlugin());
+    registry.register(new TimelinePlugin());
+    registry.register(new MindMapPlugin());
+    registry.register(new SwimlanePlugin());
+    registry.register(new ERDiagramPlugin());
+    registry.register(new NetworkTopologyPlugin());
+    registry.register(new SequencePlugin());
+  }
+
+  return registry;
+};
+
+const loadFlowchartDesigner = async (pluginId?: string) => {
+  const [{ default: FlowchartDesigner }] = await Promise.all([
+    import('@/core/components/diagrams/FlowchartDesigner'),
+    ensureBuiltInPlugins(),
+  ]);
+
+  return {
+    default: (props: any) => createElement(
+      FlowchartDesigner,
+      pluginId ? { ...props, pluginId } : props
+    )
+  };
+};
+
 export const diagramDefinitions: DiagramDefinition[] = [
   {
     id: 'generic-standard-diagram',
     name: '通用标准架构图',
     titleKey: 'diagram.title.genericStandard',
-    component: lazy(() => import('@/core').then(m => ({ default: m.FlowchartDesigner }))),
+    component: lazy(() => loadFlowchartDesigner()),
     tags: ['generic', 'standard', 'json'],
     icon: FaSitemap,
     supportsLayoutSwitch: true,
@@ -34,9 +86,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
   {
     id: 'architecture-diagram-unified',
     name: '🌟 统一架构：企业架构图',
-    component: lazy(() => import('@/core').then(m => ({
-      default: (props: any) => createElement(m.FlowchartDesigner, { ...props, pluginId: 'architecture-diagram' })
-    }))),
+    component: lazy(() => loadFlowchartDesigner('architecture-diagram')),
     category: 'other',
     tags: ['enterprise', 'architecture', 'unified', 'plugin'],
     icon: FaSitemap,
@@ -44,20 +94,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
   {
     id: 'timeline-diagram-v2',
     name: '🌟 统一架构：时间线图',
-    component: lazy(() => import('@/core').then(m => {
-      const ensureRegistered = () => {
-        const { PluginRegistry, TimelinePlugin } = m;
-        if (!PluginRegistry.getInstance().getPlugin('timeline-diagram') && TimelinePlugin) {
-            PluginRegistry.getInstance().register(new TimelinePlugin());
-        }
-      };
-      return {
-        default: (props: any) => {
-           ensureRegistered();
-           return createElement(m.FlowchartDesigner, { ...props, pluginId: 'timeline-diagram' });
-        }
-      };
-    })),
+    component: lazy(() => loadFlowchartDesigner('timeline-diagram')),
     category: 'other',
     tags: ['timeline', 'project', 'unified', 'plugin'],
     icon: FaCalendarCheck,
@@ -68,15 +105,19 @@ export const diagramDefinitions: DiagramDefinition[] = [
     // [Fix] 注册逻辑提升到 .then() 链中：lazy() 的 Promise resolve 前注册完毕，
     // 消除了在渲染路径中 fire-and-forget async 调用导致的竞态窗口。
     component: lazy(() =>
-      import('@/core').then(async m => {
-        const { PluginRegistry } = m;
-        if (!PluginRegistry.getInstance().getPlugin('standard-flow')) {
+      Promise.all([
+        import('@/core/components/diagrams/FlowchartDesigner'),
+        import('@/core/services/PluginRegistry'),
+      ]).then(async ([designerModule, registryModule]) => {
+        const { PluginRegistry } = registryModule;
+        const registry = PluginRegistry.getInstance();
+        if (!registry.getPlugin('standard-flow')) {
           const { StandardFlowPlugin } = await import('../components/diagrams/plugins/StandardFlowPlugin');
-          PluginRegistry.getInstance().register(new StandardFlowPlugin(), true);
+          registry.register(new StandardFlowPlugin(), true);
         }
         return {
           default: (props: any) =>
-            createElement(m.FlowchartDesigner, { ...props, pluginId: 'standard-flow' })
+            createElement(designerModule.default, { ...props, pluginId: 'standard-flow' })
         };
       })
     ),
@@ -89,15 +130,19 @@ export const diagramDefinitions: DiagramDefinition[] = [
     name: '🌟 统一架构：示例插件 (SDK)',
     // [Fix] 注册逻辑提升到 .then() 链中（同 standard-flow-unified）
     component: lazy(() =>
-      import('@/core').then(async m => {
-        const { PluginRegistry } = m;
-        if (!PluginRegistry.getInstance().getPlugin('hello-world')) {
+      Promise.all([
+        import('@/core/components/diagrams/FlowchartDesigner'),
+        import('@/core/services/PluginRegistry'),
+      ]).then(async ([designerModule, registryModule]) => {
+        const { PluginRegistry } = registryModule;
+        const registry = PluginRegistry.getInstance();
+        if (!registry.getPlugin('hello-world')) {
           const { HelloWorldPlugin } = await import('../components/diagrams/plugins/HelloWorldPlugin');
-          PluginRegistry.getInstance().register(new HelloWorldPlugin());
+          registry.register(new HelloWorldPlugin());
         }
         return {
           default: (props: any) =>
-            createElement(m.FlowchartDesigner, { ...props, pluginId: 'hello-world' })
+            createElement(designerModule.default, { ...props, pluginId: 'hello-world' })
         };
       })
     ),
@@ -124,7 +169,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
   {
     id: 'smart-edge-enhanced',
     name: 'Smart Edge Enhancements',
-    component: lazy(() => import('@/core').then(m => ({ default: m.SmartEdgeDemoEnhanced }))),
+    component: lazy(() => import('@/core/components/diagrams/SmartEdgeDemoEnhanced')),
     category: 'debug',
     tags: ['smart-edge', 'demo', 'enhancements'],
     icon: FaCodeBranch,
@@ -132,7 +177,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
   {
     id: 'edge-mode-test',
     name: 'Edge Mode Test',
-    component: lazy(() => import('@/core').then(m => ({ default: m.EdgeModeTest }))),
+    component: lazy(() => import('@/core/components/diagrams/EdgeModeTest')),
     category: 'debug',
     tags: ['smart-edge', 'native', 'pathType', 'test'],
     icon: FaEdit,
@@ -140,7 +185,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
   {
     id: 'performance-demo',
     name: 'Smart Edge Performance',
-    component: lazy(() => import('@/core').then(m => ({ default: m.PerformanceDemo }))),
+    component: lazy(() => import('@/core/components/diagrams/PerformanceDemo').then(m => ({ default: m.PerformanceDemo }))),
     category: 'debug',
     tags: ['performance', 'smart-edge', 'demo'],
     icon: FaCodeBranch,
@@ -149,7 +194,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
     id: 'flowchart-designer',
     name: '流程图设计器',
     titleKey: 'diagram.title.flowchartDesigner',
-    component: lazy(() => import('@/core').then(m => ({ default: m.FlowchartDesigner }))),
+    component: lazy(() => loadFlowchartDesigner()),
     category: 'other',
     tags: ['flowchart', 'designer', 'tool'],
     icon: FaEdit,
@@ -157,9 +202,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
   {
     id: 'network-topology-unified',
     name: '🌟 统一架构：网络拓扑图',
-    component: lazy(() => import('@/core').then(m => ({
-      default: (props: any) => createElement(m.FlowchartDesigner, { ...props, pluginId: 'network' })
-    }))),
+    component: lazy(() => loadFlowchartDesigner('network')),
     category: 'other',
     tags: ['network', 'topology', 'aws', 'azure', 'gcp', 'unified', 'plugin'],
     icon: FaNetworkWired,
@@ -168,17 +211,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
     id: 'mindmap-unified',
     name: '🌿 统一架构：思维导图',
     component: lazy(() =>
-      import('@/core').then(async m => {
-        const { PluginRegistry } = m;
-        if (!PluginRegistry.getInstance().getPlugin('mindmap')) {
-          const { MindMapPlugin } = await import('../core/plugins/MindMapPlugin');
-          PluginRegistry.getInstance().register(new MindMapPlugin());
-        }
-        return {
-          default: (props: any) =>
-            createElement(m.FlowchartDesigner, { ...props, pluginId: 'mindmap' })
-        };
-      })
+      loadFlowchartDesigner('mindmap')
     ),
     category: 'other',
     tags: ['mindmap', 'mind-map', 'brainstorm', 'unified', 'plugin'],

@@ -1125,6 +1125,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // Enforce strict direction for Dagre to ensure stability
         if (routingConfig.mode === 'advanced-smart') {
             routingConfig.directionalHandlePolicy = 'force';
+            (routingConfig as any).preAssignedPortPolicy = 'prefer';
         }
 
         // [FIX] 确保传入 decideEdgeRouting 的节点数组顺序是确定性的
@@ -1182,10 +1183,22 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
             const sUsage = nodeUsage[source.id] || {};
             const tUsage = nodeUsage[target.id] || {};
-            let explicitSourceHandle = edge.sourceHandle && !isAutoHandle(edge, 'source')
+            const edgeDataForManual = (edge.data ?? {}) as Record<string, any>;
+            const manualSides = Array.isArray(edgeDataForManual.manualHandleSides)
+                ? edgeDataForManual.manualHandleSides.map((side: any) => String(side).toLowerCase())
+                : [];
+            const manualHandles = edgeDataForManual.manualHandles ?? edgeDataForManual._manualHandles;
+            const hasManualSourceHandle = manualSides.includes('source')
+                || manualHandles === true
+                || Boolean(manualHandles && typeof manualHandles === 'object' && manualHandles.source);
+            const hasManualTargetHandle = manualSides.includes('target')
+                || manualHandles === true
+                || Boolean(manualHandles && typeof manualHandles === 'object' && manualHandles.target);
+
+            let explicitSourceHandle = edge.sourceHandle && hasManualSourceHandle && !isAutoHandle(edge, 'source')
                 ? normalizeHandle(edge.sourceHandle)
                 : undefined;
-            let explicitTargetHandle = edge.targetHandle && !isAutoHandle(edge, 'target')
+            let explicitTargetHandle = edge.targetHandle && hasManualTargetHandle && !isAutoHandle(edge, 'target')
                 ? normalizeHandle(edge.targetHandle)
                 : undefined;
 
@@ -1270,14 +1283,23 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 preAssignedPorts: mergedPorts
             };
 
-            const routingResult = decideEdgeRouting(
-                source,
-                target,
-                sortedNodesForRouting,  // [FIX] 使用排序后的节点数组确保确定性
-                { ...routingConfigForEdge, routedPaths },  // P1: 传入已路由路径
-                { source: sUsage, target: tUsage },
-                true
-            );
+            const routingResult = explicitSourceHandle && explicitTargetHandle
+                ? {
+                    type: 'advanced-smart-step' as const,
+                    sourceHandle: explicitSourceHandle,
+                    targetHandle: explicitTargetHandle,
+                    autoSource: false,
+                    autoTarget: false,
+                    computedPath: [] as Array<{ x: number; y: number }>,
+                }
+                : decideEdgeRouting(
+                    source,
+                    target,
+                    sortedNodesForRouting,  // [FIX] 使用排序后的节点数组确保确定性
+                    { ...routingConfigForEdge, routedPaths },  // P1: 传入已路由路径
+                    { source: sUsage, target: tUsage },
+                    true
+                );
 
             edge.type = routingResult.type;
             edge.sourceHandle = expandHandle(routingResult.sourceHandle);

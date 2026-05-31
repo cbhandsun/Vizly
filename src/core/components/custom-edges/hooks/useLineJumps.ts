@@ -5,6 +5,8 @@ import type { Point, IntersectionInfo } from '../../../services/LineJumpEngine';
 
 interface UseLineJumpsOptions {
     edgeId: string;
+    sourceId?: string | null;
+    targetId?: string | null;
     /** 原始路径点（未 filleted） */
     points: Point[] | null | undefined;
     /** 是否启用跳线弧 */
@@ -22,7 +24,7 @@ interface UseLineJumpsResult {
     jumpPath: string | null;
 }
 
-export function useLineJumps({ edgeId, points, enabled = true, renderJumps = enabled, cornerRadius = 16 }: UseLineJumpsOptions): UseLineJumpsResult {
+export function useLineJumps({ edgeId, sourceId, targetId, points, enabled = true, renderJumps = enabled, cornerRadius = 16 }: UseLineJumpsOptions): UseLineJumpsResult {
     const engine = LineJumpEngine.getInstance();
 
     // [FIX N-6] 用 useSyncExternalStore 订阅 engine 的版本变化
@@ -41,12 +43,12 @@ export function useLineJumps({ edgeId, points, enabled = true, renderJumps = ena
             engine.unregisterEdge(edgeId);
             return;
         }
-        engine.registerEdge(edgeId, points);
+        engine.registerEdge(edgeId, points, { source: sourceId, target: targetId });
 
         return () => {
             engine.unregisterEdge(edgeId);
         };
-    }, [edgeId, points, enabled, engine]);
+    }, [edgeId, sourceId, targetId, points, enabled, engine]);
 
     // 查询交叉点
     const result = useMemo(() => {

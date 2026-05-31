@@ -46,6 +46,8 @@ export interface PostProcessContext {
         bidirectionalChannel?: number;     // [FIX Phase 2] Bidirectional pair channel (0/1)
         bidirectionalSpacing?: number;     // [FIX Phase 2] Spacing for bidirectional pairs
         strategy?: string;
+        peerGroupSize?: number;
+        hasSharedTrunk?: boolean;
     };
     extraObstacles?: Rectangle[];
 }
@@ -103,6 +105,20 @@ export class PathPostProcessor {
             // [H-1] Apply snapAxis before return to eliminate sub-pixel diagonal artifacts
             // that arise from fractional coordinate math in trunk geometry construction.
             let trunkPoints = snapAxis(points);
+            const isSharedTrunk = isBus && (
+                metadata.hasSharedTrunk === true ||
+                (metadata.peerGroupSize ?? 0) > 1
+            );
+
+            if (isSharedTrunk) {
+                trunkPoints = cleanupConstructedPath(trunkPoints);
+                const svgPath = createFilletedPath(
+                    trunkPoints,
+                    this.config.postProcessing.borderRadius
+                );
+                return { points: trunkPoints, svgPath };
+            }
+
             // [BACKTRACK-V2] Orthogonal-safe backtrack removal for trunk paths
             trunkPoints = removeLargeBacktrack(trunkPoints, obstacles, { sourcePos: startPos, targetPos: endPos });
             

@@ -21,6 +21,8 @@ import {
 } from '../../utils/HandlePicker';
 import { routeEdgesWithELK } from '../../utils/elkEdgeRouter';
 import { expandHandle } from '../../routing/utils/handleUtils';
+import { repairEdgeCrossingViolations } from '../../algorithms/edgeCrossingRepair';
+import type { BuddyGroup } from '../../algorithms/globalChannelRouting';
 
 const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
 type Point = { x: number; y: number };
@@ -95,7 +97,13 @@ function getEdgePath(edge: any): Point[] {
     .filter((p: Point) => Number.isFinite(p.x) && Number.isFinite(p.y));
 }
 
-function compactPath(points: Point[]): Point[] {
+function axisOf(a: Point, b: Point): 'h' | 'v' | null {
+  if (Math.abs(a.y - b.y) < 0.5 && Math.abs(a.x - b.x) > 0.5) return 'h';
+  if (Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) > 0.5) return 'v';
+  return null;
+}
+
+function compactCollinearPath(points: Point[]): Point[] {
   const deduped: Point[] = [];
   for (const p of points) {
     const prev = deduped[deduped.length - 1];
@@ -115,6 +123,147 @@ function compactPath(points: Point[]): Point[] {
   }
   result.push(deduped[deduped.length - 1]);
   return result;
+}
+
+function chooseDiagonalBend(prev: Point | undefined, a: Point, b: Point, next: Point | undefined): Point {
+  const hv = { x: b.x, y: a.y };
+  const vh = { x: a.x, y: b.y };
+  const score = (bend: Point) => {
+    const firstAxis = axisOf(a, bend);
+    const lastAxis = axisOf(bend, b);
+    const prevAxis = prev ? axisOf(prev, a) : null;
+    const nextAxis = next ? axisOf(b, next) : null;
+    const firstLen = Math.abs(a.x - bend.x) + Math.abs(a.y - bend.y);
+    const lastLen = Math.abs(bend.x - b.x) + Math.abs(bend.y - b.y);
+    return (prevAxis && firstAxis && prevAxis !== firstAxis ? 2 : 0)
+      + (nextAxis && lastAxis && nextAxis !== lastAxis ? 2 : 0)
+      + (Math.min(firstLen, lastLen) < 8 ? 3 : 0);
+  };
+  return score(hv) <= score(vh) ? hv : vh;
+}
+
+function expandDiagonalSegments(points: Point[]): Point[] {
+  if (points.length <= 1) return points;
+  const expanded: Point[] = [points[0]];
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = expanded[expanded.length - 1];
+    const b = points[i + 1];
+    if (Math.abs(a.x - b.x) < 0.5 || Math.abs(a.y - b.y) < 0.5) {
+      expanded.push(b);
+      continue;
+    }
+    const bend = chooseDiagonalBend(expanded[expanded.length - 2], a, b, points[i + 2]);
+    expanded.push(bend, b);
+  }
+  return expanded;
+}
+
+function removeShortJogs(points: Point[], threshold = 6): Point[] {
+  let result = points;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = 1; i < result.length - 1; i++) {
+      const prev = result[i - 1];
+      const cur = result[i];
+      const next = result[i + 1];
+      const prevLen = Math.abs(prev.x - cur.x) + Math.abs(prev.y - cur.y);
+      const nextLen = Math.abs(cur.x - next.x) + Math.abs(cur.y - next.y);
+      if ((prevLen < threshold || nextLen < threshold) && axisOf(prev, next)) {
+        result = [...result.slice(0, i), ...result.slice(i + 1)];
+        changed = true;
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+function compactPath(points: Point[]): Point[] {
+  const rounded = compactCollinearPath(points);
+  const orthogonal = expandDiagonalSegments(rounded);
+  return compactCollinearPath(removeShortJogs(compactCollinearPath(orthogonal)));
+}
+
+function pathEquals(a: Point[], b: Point[]): boolean {
+  return a.length === b.length && a.every((p, i) =>
+    Math.abs(p.x - b[i]?.x) <= 0.5 && Math.abs(p.y - b[i]?.y) <= 0.5
+  );
+}
+
+function withComputedPath(edge: Edge, path: Point[], flags: Record<string, unknown> = {}): Edge {
+  const data: any = { ...(edge.data || {}), ...flags, computedPath: path };
+  if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
+    data.treeRouting = { ...data.treeRouting, points: path };
+  }
+  return { ...edge, data };
+}
+
+function sanitizeComputedPaths(edges: Edge[]): Edge[] {
+  return edges.map(edge => {
+    const path = getEdgePath(edge);
+    if (path.length < 2) return edge;
+    const compacted = compactPath(path);
+    if (pathEquals(path, compacted)) return edge;
+    return withComputedPath(edge, compacted, { orthogonalSanitized: true });
+  });
+}
+
+function buildPipelineBuddyGroups(edges: Edge[]): BuddyGroup[] {
+  const bySource = new Map<string, Set<string>>();
+  const byTarget = new Map<string, Set<string>>();
+  for (const edge of edges) {
+    if (!edge.id) continue;
+    if (edge.source) {
+      if (!bySource.has(edge.source)) bySource.set(edge.source, new Set());
+      bySource.get(edge.source)!.add(edge.id);
+    }
+    if (edge.target) {
+      if (!byTarget.has(edge.target)) byTarget.set(edge.target, new Set());
+      byTarget.get(edge.target)!.add(edge.id);
+    }
+  }
+
+  const groups: BuddyGroup[] = [];
+  for (const edgeIds of bySource.values()) {
+    if (edgeIds.size >= 2) groups.push({ type: 'o2m', edgeIds });
+  }
+  for (const edgeIds of byTarget.values()) {
+    if (edgeIds.size >= 2) groups.push({ type: 'm2o', edgeIds });
+  }
+  return groups;
+}
+
+function repairSharedTrunkAwareCrossings(edges: Edge[], nodes: ReactFlowNode[]): Edge[] {
+  const edgePaths = new Map<string, Point[]>();
+  for (const edge of edges) {
+    const path = compactPath(getEdgePath(edge));
+    if (edge.id && path.length >= 2) edgePaths.set(edge.id, path);
+  }
+  if (edgePaths.size < 2) return edges;
+
+  const obstaclesByNode = getRoutingObstacles(nodes);
+  const ignoredRectsByEdge = new Map<string, Rect[]>();
+  for (const edge of edges) {
+    const ignored = [obstaclesByNode.get(edge.source), obstaclesByNode.get(edge.target)]
+      .filter((rect): rect is Rect => !!rect);
+    if (ignored.length > 0) ignoredRectsByEdge.set(edge.id, ignored);
+  }
+
+  const repaired = repairEdgeCrossingViolations(edgePaths, {
+    spacing: 12,
+    maxIterations: 8,
+    buddyGroups: buildPipelineBuddyGroups(edges),
+    obstacles: Array.from(obstaclesByNode.values()),
+    ignoredRectsByEdge,
+  });
+
+  return edges.map(edge => {
+    const path = repaired.get(edge.id);
+    const original = edgePaths.get(edge.id);
+    if (!path || !original || pathEquals(path, original)) return edge;
+    return withComputedPath(edge, path, { crossingOptimized: true, sharedTrunkAware: true });
+  });
 }
 
 function toSegments(points: Point[]): Segment[] {
@@ -384,14 +533,7 @@ function reduceEdgeCrossingsWithWaypoints(
     const changed = !original || path.length !== original.length ||
       path.some((p, i) => Math.abs(p.x - original[i]?.x) > 0.5 || Math.abs(p.y - original[i]?.y) > 0.5);
     if (!changed) return edge;
-    return {
-      ...edge,
-      data: {
-        ...(edge.data || {}),
-        computedPath: path,
-        crossingOptimized: true,
-      },
-    };
+    return withComputedPath(edge, path, { crossingOptimized: true });
   });
 }
 
@@ -619,8 +761,10 @@ export async function runEdgeRoutingPipeline(
     layoutDirection,
   });
 
-  // P8.5: 交叉感知拐点重排
-  finalEdges = reduceEdgeCrossingsWithWaypoints(finalEdges, nodes, layoutDirection);
+  // P8.5: 总线后处理。P8 会重写 treeRouting.points，这里同步修正正交/交叉，保护共享主干。
+  finalEdges = sanitizeComputedPaths(finalEdges);
+  finalEdges = repairSharedTrunkAwareCrossings(finalEdges, nodes);
+  finalEdges = sanitizeComputedPaths(finalEdges);
 
   // P9: 边标签智能避让
   finalEdges = optimizeEdgeLabelPositions(finalEdges, nodes, {

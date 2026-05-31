@@ -6,7 +6,7 @@ import { PluginRegistry } from '../../../services/PluginRegistry';
 import { LayoutOptimizer } from '../../layout/LayoutOptimizer';
 import { analyzeDiagram } from '@/utils/diagramAnalyzer';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
-import { PRESET_MAP } from '@/data/standardized';
+import { loadStandardPresetById } from '@/data/standardized/presetLoader';
 import { cancelLayoutTransition, suspendLayoutTransitions } from '../../../utils/animateLayoutTransition';
 import { expandHandle } from '../../../routing/utils/handleUtils';
 
@@ -475,6 +475,25 @@ export function useDesignerSystemSync({
     const hasRestoredAutoSave = useRef(false);
     const needsInitialFitView = useRef(false);
     const processedDiagramId = useRef(id);
+    const [presetLookup, setPresetLookup] = useState<{ id?: string; ready: boolean; preset: any | null }>({
+        id,
+        ready: false,
+        preset: null,
+    });
+
+    useEffect(() => {
+        let cancelled = false;
+        setPresetLookup({ id, ready: false, preset: null });
+
+        void loadStandardPresetById(id).then((preset) => {
+            if (!cancelled) setPresetLookup({ id, ready: true, preset });
+        }).catch((error) => {
+            console.error('[DesignerSystemSync] load standard preset failed:', error);
+            if (!cancelled) setPresetLookup({ id, ready: true, preset: null });
+        });
+
+        return () => { cancelled = true; };
+    }, [id]);
 
     // If ID changed dynamically WITHOUT unmount, reset local initialization flags
     if (processedDiagramId.current !== id) {
@@ -484,9 +503,10 @@ export function useDesignerSystemSync({
     }
 
     useEffect(() => {
+        if (!presetLookup.ready || presetLookup.id !== id) return;
         if (hasRestoredAutoSave.current) return;
 
-        const preset = id ? PRESET_MAP[id] : null;
+        const preset = presetLookup.preset;
         const isStandardPreset = !!preset && !String(id || '').startsWith('custom:');
         setAutosaveEnabled(!isStandardPreset);
 
@@ -651,7 +671,7 @@ export function useDesignerSystemSync({
                 }).catch(e => console.error('[DesignerSystemSync] import DataRegistry failed:', e));
             }
         }
-    }, [loadSaved, clearSaved, setNodes, setEdges, pluginId, id]);
+    }, [loadSaved, clearSaved, setNodes, setEdges, pluginId, id, presetLookup]);
 
     // Deferred view adjustment: waits for reactFlowInstance to become available
     useEffect(() => {

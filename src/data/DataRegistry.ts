@@ -3,7 +3,7 @@
  * 统一管理所有标准化的架构图数据
  */
 
-import type { StandardDiagramData } from '@/core';
+import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import { DataService } from '../services/DataService';
 import { localDB } from '../services/IndexedDBStorage';
 import { supabase } from '../services/supabase';

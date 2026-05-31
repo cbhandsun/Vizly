@@ -19,12 +19,12 @@ import { Button as AntButton, Input, Popover, Tooltip, theme as antdTheme } from
 import type { InputRef } from 'antd';
 import { MoreOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
-import { DiagramDefinition } from '@/core';
-import { useConfigIntegration } from '@/core';
-import { PanelZoomApi, usePanelZoom } from '@/core';
+import type { DiagramDefinition } from '@/core/types/diagram-components';
+import { useConfigIntegration } from '@/core/hooks/useConfigIntegration';
+import { PanelZoomApi, usePanelZoom } from '@/core/hooks/usePanelZoom';
 import { AuthStatusCompact } from './auth/AuthStatus';
-import {  useDiagramFilter  } from '@/core';
-import {  useDiagramHostStorage  } from '@/core';
+import { useDiagramFilter } from '@/core/hooks/useDiagramFilter';
+import { useDiagramHostStorage } from '@/core/hooks/useDiagramHostStorage';
 
 interface ModernDiagramMenuProps {
   diagrams?: DiagramDefinition[];

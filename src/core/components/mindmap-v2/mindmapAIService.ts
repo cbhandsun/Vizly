@@ -7,6 +7,11 @@
 
 import { AI_CONFIG_KEY, getAIConfig } from '@/components/ai/AIConfigModal';
 import type { NodeObj } from 'mind-elixir';
+import {
+    parseTaskClassifications,
+    type TaskClassificationResult,
+    type TaskItemInput,
+} from './mindmapTaskAIParsing';
 
 export interface AIExpandOptions {
     /** 当前节点 */
@@ -531,17 +536,7 @@ export async function analyzeNodesRelationship(
     }
 }
 
-export interface TaskItemInput {
-    id: string;
-    topic: string;
-    context: string; // 祖先路径
-}
-
-export interface TaskClassificationResult {
-    id: string;
-    status: 'todo' | 'doing' | 'done';
-    priority: '高' | '中' | '低';
-}
+export type { TaskClassificationResult, TaskItemInput } from './mindmapTaskAIParsing';
 
 /** 使用 AI 智能分析分类任务 */
 export async function classifyTasksWithAI(
@@ -602,10 +597,12 @@ ${JSON.stringify(tasks, null, 2)}
         }
 
         const data = await response.json();
-        let content = (data.choices?.[0]?.message?.content ?? '').trim();
-        content = content.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+        const content = (data.choices?.[0]?.message?.content ?? '').trim();
 
-        const classifications = JSON.parse(content);
+        const classifications = parseTaskClassifications(content);
+        if (classifications.length === 0) {
+            return { error: 'AI 未返回可用的任务分类结果' };
+        }
         return { classifications };
     } catch (e: any) {
         return { error: `请求失败：${e?.message ?? String(e)}` };

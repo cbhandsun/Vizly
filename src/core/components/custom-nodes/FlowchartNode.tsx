@@ -211,6 +211,24 @@ const FlowchartNode = ({ data, selected, id, dragging }: FlowchartNodeProps) => 
                             isConnectableStart={true}
                             isConnectableEnd={true}
                         />
+                        <Handle
+                            type="target"
+                            position={posMap[dir]}
+                            id={dir}
+                            className="flowchart-handle flowchart-handle-bidirectional flowchart-handle-target-shadow"
+                            isConnectableStart={false}
+                            isConnectableEnd={true}
+                            style={{ opacity: 0, pointerEvents: 'none' }}
+                        />
+                        <Handle
+                            type="target"
+                            position={posMap[dir]}
+                            id={shortIdMap[dir]}
+                            className="flowchart-handle flowchart-handle-bidirectional flowchart-handle-alias flowchart-handle-target-shadow"
+                            isConnectableStart={false}
+                            isConnectableEnd={true}
+                            style={{ opacity: 0, pointerEvents: 'none' }}
+                        />
                     </React.Fragment>
                 );
             })}

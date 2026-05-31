@@ -269,7 +269,7 @@ export function createDefaultRoutingConfig(): UnifiedRoutingConfig {
             source: 25,  // [FIX] 降低：borderRadius=4 不再需要 40px 偏移
             target: 25
         },
-        debug: true,
+        debug: false,
         experimental: {
             enable1BendVG: true,      // [P0-1] 启用1-Bend优化
             enableLPNudge: true,      // [P0-2] 启用LP Nudge
@@ -360,6 +360,10 @@ export interface PathFindingJob {
     busTrunkSource?: Point;
     busTrunkTarget?: Point;
     busTrunkPort?: Position;
+    o2mTrunk?: { source: Point; target: Point };
+    m2oTrunk?: { source: Point; target: Point };
+    o2mTrunkPort?: Position;
+    m2oTrunkPort?: Position;
 
     busSourcePort?: Position;
     busTargetPort?: Position;
@@ -412,6 +416,7 @@ export interface SharedGraphContext {
     softObstacles?: Array<Rectangle & { edgeId?: string; ownerId?: string }>;
     routingLabels?: Array<Rectangle & { edgeId?: string; ownerId?: string }>;
     pendingEdges?: LineObstacle[];  // [P2-3] Moved from PathFindingJob
+    containerBounds?: Rectangle[];  // [FIX] Domain/SubDomain container boundaries for soft routing penalty
     config: Partial<UnifiedRoutingConfig>;
     graphVersion?: number; // [Imp-8] For Worker Caching
 }

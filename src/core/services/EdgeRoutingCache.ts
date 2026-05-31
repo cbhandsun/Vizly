@@ -37,10 +37,13 @@ export class EdgeRoutingCache {
         // [FIX C-2] 改为固定顺序的字段拼接，替代 JSON.stringify。
         // JSON.stringify 在不同调用路径构造的对象上 key 顺序可能不一致，
         // 导致相同坐标产生不同 cache key，缓存命中率趋近于零。
-        // 固定顺序：edgeId | s | t | sx | sy | tx | ty | sr | tr | type | bus | pe | version
+        // Keep port fields and routing version in the key: endpoint coordinates can
+        // remain stable while the selected side/handle changes, which changes the
+        // required first/last segment direction and must invalidate stale paths.
         const p = params as any;
         return [
             edgeId,
+            p.rv ?? 0,
             p.s ?? '',
             p.t ?? '',
             p.sx ?? 0,
@@ -50,6 +53,10 @@ export class EdgeRoutingCache {
             p.sr ?? '0',
             p.tr ?? '0',
             p.type ?? 's',
+            p.sourceHandle ?? '',
+            p.targetHandle ?? '',
+            p.sourcePosition ?? '',
+            p.targetPosition ?? '',
             p.bus ?? '',
             p.pe ?? 0,  // [H-9] pendingEdges XOR hash — changes when neighboring edges reroute
             p.version ?? 0,
@@ -100,12 +107,13 @@ export class EdgeRoutingCache {
 
     /**
      * [P2.1] Delete all cache entries for a specific edge.
-     * Keys are formatted as `${edgeId}:${params}`, so we match by prefix.
+     * Keys are formatted as `${edgeId}|...`, so match the pipe-delimited prefix.
      */
     public deleteByEdgeId(edgeId: string): void {
-        const prefix = `${edgeId}:`;
+        const pipePrefix = `${edgeId}|`;
+        const legacyColonPrefix = `${edgeId}:`;
         for (const key of this.cache.keys()) {
-            if (key.startsWith(prefix)) {
+            if (key.startsWith(pipePrefix) || key.startsWith(legacyColonPrefix)) {
                 this.cache.delete(key);
             }
         }

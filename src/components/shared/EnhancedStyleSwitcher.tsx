@@ -11,9 +11,7 @@ import { FaPalette, FaCheck, FaTimes } from 'react-icons/fa';
 import {
     diagramStyleManager,
     FlowStylePreset,
-    _StylePresetCategory,
-    _STYLE_CATEGORIES,
-} from '@/core';
+} from '@/core/components/shared/DiagramStyleManager';
 import { useDiagramStylePreset_v2 } from '@/core/hooks/useDiagramStylePreset_v2';
 import { theme } from 'antd';
 

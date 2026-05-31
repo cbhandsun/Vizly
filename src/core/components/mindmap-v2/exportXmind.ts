@@ -8,6 +8,7 @@
  */
 
 import type { NodeObj } from 'mind-elixir';
+import { getTaskMeta, normalizeTags } from './mindmapTaskModel';
 
 // ─── XMind 内部类型 ────────────────────────────────────────────────────────────
 
@@ -41,7 +42,30 @@ function xid(): string {
 
 // ─── Convert mind-elixir NodeObj → XmindTopic recursively ────────────────────
 
-function nodeToXmindTopic(node: NodeObj, depth: number): XmindTopic {
+function taskNoteText(node: NodeObj): string {
+    const task = getTaskMeta(node);
+    const hasTask =
+        !!(node as any).task ||
+        task.status !== 'todo' ||
+        task.priority !== '无' ||
+        !!task.assignee ||
+        !!task.dueDate ||
+        !!task.progress;
+
+    if (!hasTask) return '';
+
+    const parts = [
+        `状态: ${task.status === 'done' ? '已完成' : task.status === 'doing' ? '进行中' : '待办'}`,
+        task.priority !== '无' ? `优先级: ${task.priority}` : null,
+        task.assignee ? `负责人: ${task.assignee}` : null,
+        task.dueDate ? `截止: ${task.dueDate}` : null,
+        task.progress ? `进度: ${task.progress}%` : null,
+    ].filter(Boolean);
+
+    return `任务:\n${parts.join('\n')}`;
+}
+
+export function nodeToXmindTopic(node: NodeObj, depth: number): XmindTopic {
     const topic: XmindTopic = {
         id: node.id || xid(),
         class: 'topic',
@@ -64,12 +88,13 @@ function nodeToXmindTopic(node: NodeObj, depth: number): XmindTopic {
 
     // Tags → labels
     if (node.tags && node.tags.length > 0) {
-        topic.labels = node.tags;
+        topic.labels = normalizeTags(node.tags as unknown[] | undefined);
     }
 
-    // Note → notes.plain
-    if (node.note) {
-        topic.notes = { plain: { content: node.note } };
+    // Note + task metadata → notes.plain
+    const noteParts = [node.note, taskNoteText(node)].filter(Boolean);
+    if (noteParts.length > 0) {
+        topic.notes = { plain: { content: noteParts.join('\n\n') } };
     }
 
     // Hyperlink → href

@@ -1,9 +1,9 @@
 // @ts-nocheck
 import React, { useEffect, useMemo, useState } from 'react';
 import { ConfigProvider, App as AntdApp, theme as antdTheme } from 'antd';
-import { useConfigIntegration } from '@/core';
-import { AntdApiBridge } from '@/core';
-import type { Theme } from '@/core';
+import { useConfigIntegration } from '@/core/hooks/useConfigIntegration';
+import { AntdApiBridge } from '@/core/components/shared/AntdApiBridge';
+import type { Theme } from '@/core/themes/types/ThemeTypes';
 
 type BridgeTokens = {
   mode: 'light' | 'dark';

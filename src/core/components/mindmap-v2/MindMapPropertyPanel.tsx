@@ -4,7 +4,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Input, InputNumber, Divider, Typography, Space, Button, Tooltip, Popover, Tag,
+    Input, InputNumber, Divider, Typography, Space, Button, Tooltip, Popover, Tag, Select,
 } from 'antd';
 import {
     FontSizeOutlined, DeleteOutlined, PlusOutlined, EditOutlined,
@@ -13,7 +13,14 @@ import {
 import type { NodeObj, TagObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { VIZLY_THEME_OPTIONS } from './theme';
-import { expandNodeWithAI, getAncestorPath } from './mindmapAIService';
+import { expandNodeWithAI, getAncestorPath, summarizeNodeWithAI } from './mindmapAIService';
+import {
+    applyTaskMeta,
+    getTaskMeta,
+    type MindMapTaskMeta,
+    type TaskPriority,
+    type TaskStatus,
+} from './mindmapTaskModel';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -40,6 +47,19 @@ const PRESET_TAGS: TagObj[] = [
 const QUICK_COLORS = [
     '#6366f1', '#8b5cf6', '#06b6d4', '#10b981',
     '#f59e0b', '#ef4444', '#ec4899', '#64748b', '#ffffff', '#1e293b',
+];
+
+const TASK_STATUS_OPTIONS: Array<{ label: string; value: TaskStatus }> = [
+    { label: '待办', value: 'todo' },
+    { label: '进行中', value: 'doing' },
+    { label: '已完成', value: 'done' },
+];
+
+const TASK_PRIORITY_OPTIONS: Array<{ label: string; value: TaskPriority }> = [
+    { label: '无', value: '无' },
+    { label: '低', value: '低' },
+    { label: '中', value: '中' },
+    { label: '高', value: '高' },
 ];
 
 // ─── ColorSwatch ──────────────────────────────────────────────────────────────
@@ -123,6 +143,12 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
     // ─ Shape & Line width ──────────────────────────────────────────────────────────
     const [shapeClass, setShapeClass] = useState<string>((node as any).shapeClass ?? '');
     const [branchWidth, setBranchWidth] = useState<number>((node as any).branchWidth ?? 0);
+    const initialTask = getTaskMeta(node);
+    const [taskStatus, setTaskStatus] = useState<TaskStatus>(initialTask.status);
+    const [taskPriority, setTaskPriority] = useState<TaskPriority>(initialTask.priority);
+    const [taskDueDate, setTaskDueDate] = useState(initialTask.dueDate ?? '');
+    const [taskAssignee, setTaskAssignee] = useState(initialTask.assignee ?? '');
+    const [taskProgress, setTaskProgress] = useState(initialTask.progress ?? 0);
 
     useEffect(() => {
         setTopic(node.topic || '');
@@ -137,6 +163,12 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
         setTags((node.tags ?? []).map(t => typeof t === 'string' ? { text: t } : t as TagObj));
         setShapeClass((node as any).shapeClass ?? '');
         setBranchWidth((node as any).branchWidth ?? 0);
+        const task = getTaskMeta(node);
+        setTaskStatus(task.status);
+        setTaskPriority(task.priority);
+        setTaskDueDate(task.dueDate ?? '');
+        setTaskAssignee(task.assignee ?? '');
+        setTaskProgress(task.progress ?? 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [node.id]);
 
@@ -183,6 +215,21 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
         handleTagAdd({ text: t, style: { background: '#f1f5f9', color: '#475569', borderColor: '#cbd5e1' } });
         setTagInput('');
     }, [tagInput, handleTagAdd]);
+
+    const updateTask = useCallback((patch: Partial<MindMapTaskMeta>) => {
+        const draft = {
+            ...node,
+            tags: [...(node.tags ?? [])],
+            task: { ...((node as any).task ?? {}) },
+        } as NodeObj & { task?: MindMapTaskMeta };
+        const next = applyTaskMeta(draft, patch);
+        setTaskStatus(next.status ?? 'todo');
+        setTaskPriority(next.priority ?? '无');
+        setTaskDueDate(next.dueDate ?? '');
+        setTaskAssignee(next.assignee ?? '');
+        setTaskProgress(next.progress ?? 0);
+        reshape({ ...({ task: draft.task, tags: draft.tags } as any) });
+    }, [node, reshape]);
 
     const isRoot = !node.parent;
 
@@ -380,6 +427,62 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                     value={tagInput} onChange={e => setTagInput(e.target.value)}
                     onPressEnter={handleTagInputConfirm}
                     onBlur={handleTagInputConfirm} />
+            </Row>
+
+            <Divider style={{ margin: '10px 0' }} />
+
+            <Row label="任务状态">
+                <Select
+                    size="small"
+                    value={taskStatus}
+                    options={TASK_STATUS_OPTIONS}
+                    onChange={value => updateTask({ status: value })}
+                    style={{ width: '100%' }}
+                />
+            </Row>
+
+            <Row label="任务优先级">
+                <Select
+                    size="small"
+                    value={taskPriority}
+                    options={TASK_PRIORITY_OPTIONS}
+                    onChange={value => updateTask({ priority: value })}
+                    style={{ width: '100%' }}
+                />
+            </Row>
+
+            <Row label="任务负责人">
+                <Input
+                    size="small"
+                    value={taskAssignee}
+                    placeholder="负责人"
+                    onChange={e => setTaskAssignee(e.target.value)}
+                    onBlur={() => updateTask({ assignee: taskAssignee.trim() })}
+                    onPressEnter={() => updateTask({ assignee: taskAssignee.trim() })}
+                />
+            </Row>
+
+            <Row label="截止日期">
+                <Input
+                    size="small"
+                    type="date"
+                    value={taskDueDate}
+                    onChange={e => {
+                        setTaskDueDate(e.target.value);
+                        updateTask({ dueDate: e.target.value });
+                    }}
+                />
+            </Row>
+
+            <Row label="任务进度">
+                <InputNumber
+                    min={0}
+                    max={100}
+                    value={taskProgress}
+                    suffix="%"
+                    style={{ width: '100%' }}
+                    onChange={value => updateTask({ progress: value ?? 0 })}
+                />
             </Row>
 
             <Divider style={{ margin: '10px 0' }} />

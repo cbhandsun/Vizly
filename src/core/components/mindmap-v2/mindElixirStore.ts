@@ -14,18 +14,19 @@ import type { MindElixirInstance } from 'mind-elixir';
 
 
 let _activeInstance: MindElixirInstance | null = null;
-const _listeners = new Set<() => void>();
+type MindElixirListener = (instance: MindElixirInstance | null) => void;
+const _listeners = new Set<MindElixirListener>();
 
 /** Called by MindElixirWrapper when a new instance is initialized */
 export function registerMindElixirInstance(instance: MindElixirInstance): void {
     _activeInstance = instance;
-    _listeners.forEach(fn => fn());
+    _listeners.forEach(fn => fn(_activeInstance));
 }
 
 /** Called by MindElixirWrapper on cleanup */
 export function unregisterMindElixirInstance(): void {
     _activeInstance = null;
-    _listeners.forEach(fn => fn());
+    _listeners.forEach(fn => fn(_activeInstance));
 }
 
 /** Get the currently active mind-elixir instance (may be null) */
@@ -34,7 +35,7 @@ export function getMindElixirInstance(): MindElixirInstance | null {
 }
 
 /** Subscribe to instance changes (returns unsubscribe fn) */
-export function subscribeMindElixir(fn: () => void): () => void {
+export function subscribeMindElixir(fn: MindElixirListener): () => void {
     _listeners.add(fn);
     return () => _listeners.delete(fn);
 }
@@ -66,11 +67,33 @@ const _kanbanListeners = new Set<(open: boolean) => void>();
 export function toggleKanban(open?: boolean): void {
     _isKanbanOpen = open !== undefined ? open : !_isKanbanOpen;
     _kanbanListeners.forEach(fn => fn(_isKanbanOpen));
+    if (_isKanbanOpen && _isAIPanelOpen) {
+        _isAIPanelOpen = false;
+        _aiPanelListeners.forEach(fn => fn(_isAIPanelOpen));
+    }
 }
 
 export function subscribeKanban(fn: (open: boolean) => void): () => void {
     _kanbanListeners.add(fn);
     return () => _kanbanListeners.delete(fn);
+}
+
+// ─── AI Assistant Global State ───────────────────────────────────────────────
+let _isAIPanelOpen = false;
+const _aiPanelListeners = new Set<(open: boolean) => void>();
+
+export function toggleAIPanel(open?: boolean): void {
+    _isAIPanelOpen = open !== undefined ? open : !_isAIPanelOpen;
+    _aiPanelListeners.forEach(fn => fn(_isAIPanelOpen));
+    if (_isAIPanelOpen && _isKanbanOpen) {
+        _isKanbanOpen = false;
+        _kanbanListeners.forEach(fn => fn(_isKanbanOpen));
+    }
+}
+
+export function subscribeAIPanel(fn: (open: boolean) => void): () => void {
+    _aiPanelListeners.add(fn);
+    return () => _aiPanelListeners.delete(fn);
 }
 
 

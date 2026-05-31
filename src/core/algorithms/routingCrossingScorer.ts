@@ -4,6 +4,8 @@ import type { BuddyGroup } from './globalChannelRouting';
 export interface CrossingScore {
     totalScore: number;
     hardCrossings: number;
+    buddyCrossings: number;
+    parallelOverlaps: number;
     softCrossings: number;
     softNearMisses: number;
     turnbacks: number;
@@ -18,6 +20,9 @@ export interface RoutingCrossingScorerOptions {
     softObstacleWeight?: number;
     softNearMissWeight?: number;
     softNearMissPadding?: number;
+    buddyCrossingWeight?: number;
+    parallelOverlapWeight?: number;
+    parallelOverlapMinLength?: number;
     turnbackWeight?: number;
     bendWeight?: number;
 }
@@ -31,12 +36,15 @@ interface OrthogonalSegment {
 }
 
 export class RoutingCrossingScorer {
-    private readonly buddyGroupByEdgeId = new Map<string, string>();
+    private readonly buddyGroupByEdgeId = new Map<string, Set<string>>();
     private readonly softObstacles: Rectangle[];
     private readonly hardCrossingWeight: number;
     private readonly softObstacleWeight: number;
     private readonly softNearMissWeight: number;
     private readonly softNearMissPadding: number;
+    private readonly buddyCrossingWeight: number;
+    private readonly parallelOverlapWeight: number;
+    private readonly parallelOverlapMinLength: number;
     private readonly turnbackWeight: number;
     private readonly bendWeight: number;
 
@@ -46,12 +54,20 @@ export class RoutingCrossingScorer {
         this.softObstacleWeight = options.softObstacleWeight ?? 120;
         this.softNearMissWeight = options.softNearMissWeight ?? 35;
         this.softNearMissPadding = options.softNearMissPadding ?? 10;
+        this.buddyCrossingWeight = options.buddyCrossingWeight ?? 220;
+        this.parallelOverlapWeight = options.parallelOverlapWeight ?? 45;
+        this.parallelOverlapMinLength = options.parallelOverlapMinLength ?? 48;
         this.turnbackWeight = options.turnbackWeight ?? 18;
         this.bendWeight = options.bendWeight ?? 2;
 
         options.buddyGroups?.forEach((group, index) => {
             const key = `${group.type}:${index}`;
-            group.edgeIds.forEach(edgeId => this.buddyGroupByEdgeId.set(edgeId, key));
+            group.edgeIds.forEach(edgeId => {
+                if (!this.buddyGroupByEdgeId.has(edgeId)) {
+                    this.buddyGroupByEdgeId.set(edgeId, new Set());
+                }
+                this.buddyGroupByEdgeId.get(edgeId)!.add(key);
+            });
         });
     }
 
@@ -59,6 +75,8 @@ export class RoutingCrossingScorer {
         const segments = this.extractSegments(paths);
         const byEdge = new Map<string, number>();
         let hardCrossings = 0;
+        let buddyCrossings = 0;
+        let parallelOverlaps = 0;
         let softCrossings = 0;
         let softNearMisses = 0;
         let turnbacks = 0;
@@ -69,12 +87,35 @@ export class RoutingCrossingScorer {
                 const s1 = segments[i];
                 const s2 = segments[j];
                 if (s1.edgeId === s2.edgeId) continue;
-                if (this.sameBuddyGroup(s1.edgeId, s2.edgeId)) continue;
+                const sameBuddy = this.sameBuddyGroup(s1.edgeId, s2.edgeId);
 
                 if (RoutingCrossingScorer.segmentsStrictlyCross(s1, s2)) {
-                    hardCrossings++;
-                    this.addEdgeScore(byEdge, s1.edgeId, this.hardCrossingWeight);
-                    this.addEdgeScore(byEdge, s2.edgeId, this.hardCrossingWeight);
+                    if (sameBuddy) {
+                        buddyCrossings++;
+                        this.addEdgeScore(byEdge, s1.edgeId, this.buddyCrossingWeight);
+                        this.addEdgeScore(byEdge, s2.edgeId, this.buddyCrossingWeight);
+                    } else {
+                        hardCrossings++;
+                        this.addEdgeScore(byEdge, s1.edgeId, this.hardCrossingWeight);
+                        this.addEdgeScore(byEdge, s2.edgeId, this.hardCrossingWeight);
+                    }
+                    continue;
+                }
+
+                // Same-buddy collinear overlap is the intentional shared trunk. Only
+                // perpendicular same-buddy crossings are visual defects.
+                if (sameBuddy) continue;
+
+                const overlapUnits = RoutingCrossingScorer.parallelOverlapUnits(
+                    s1,
+                    s2,
+                    this.parallelOverlapMinLength
+                );
+                if (overlapUnits > 0) {
+                    parallelOverlaps += overlapUnits;
+                    const delta = overlapUnits * this.parallelOverlapWeight;
+                    this.addEdgeScore(byEdge, s1.edgeId, delta);
+                    this.addEdgeScore(byEdge, s2.edgeId, delta);
                 }
             }
         }
@@ -107,11 +148,15 @@ export class RoutingCrossingScorer {
 
         return {
             totalScore: hardCrossings * this.hardCrossingWeight
+                + buddyCrossings * this.buddyCrossingWeight
+                + parallelOverlaps * this.parallelOverlapWeight
                 + softCrossings * this.softObstacleWeight
                 + softNearMisses * this.softNearMissWeight
                 + turnbacks * this.turnbackWeight
                 + bends * this.bendWeight,
             hardCrossings,
+            buddyCrossings,
+            parallelOverlaps,
             softCrossings,
             softNearMisses,
             turnbacks,
@@ -121,8 +166,10 @@ export class RoutingCrossingScorer {
     }
 
     public isBetter(candidate: CrossingScore, current: CrossingScore): boolean {
-        if (candidate.totalScore !== current.totalScore) return candidate.totalScore < current.totalScore;
         if (candidate.hardCrossings !== current.hardCrossings) return candidate.hardCrossings < current.hardCrossings;
+        if (candidate.buddyCrossings !== current.buddyCrossings) return candidate.buddyCrossings < current.buddyCrossings;
+        if (candidate.totalScore !== current.totalScore) return candidate.totalScore < current.totalScore;
+        if (candidate.parallelOverlaps !== current.parallelOverlaps) return candidate.parallelOverlaps < current.parallelOverlaps;
         if (candidate.softCrossings !== current.softCrossings) return candidate.softCrossings < current.softCrossings;
         if (candidate.softNearMisses !== current.softNearMisses) return candidate.softNearMisses < current.softNearMisses;
         if (candidate.turnbacks !== current.turnbacks) return candidate.turnbacks < current.turnbacks;
@@ -158,65 +205,7 @@ export class RoutingCrossingScorer {
         }
         simplified.push(deduped[deduped.length - 1]);
 
-        // [FIX] Micro-jog elimination: remove tiny S-bends that look like diagonal lines.
-        // Pattern: ...-A-B-C-D-... where B-C is a very short segment (< threshold) perpendicular
-        // to A-B and C-D. Removing B and C makes A connect directly to D via the dominant axis.
-        const MICRO_JOG_THRESHOLD = 15; // px
-        let result = simplified;
-        let changed = true;
-        while (changed) {
-            changed = false;
-            const next: Point[] = [result[0]];
-            for (let i = 1; i < result.length - 2; i++) {
-                const a = next[next.length - 1];
-                const b = result[i];
-                const c = result[i + 1];
-                const d = result[i + 2];
-                // Check if B-C is a short perpendicular jog
-                const bcDx = Math.abs(c.x - b.x);
-                const bcDy = Math.abs(c.y - b.y);
-                const bcIsHoriz = bcDy < 1.5 && bcDx > 0;
-                const bcIsVert = bcDx < 1.5 && bcDy > 0;
-                if (bcIsHoriz && bcDx < MICRO_JOG_THRESHOLD) {
-                    // B-C is a short horizontal jog; A-B should be vertical, C-D should be vertical
-                    const abIsVert = Math.abs(a.x - b.x) < 1.5;
-                    const cdIsVert = Math.abs(c.x - d.x) < 1.5;
-                    if (abIsVert && cdIsVert) {
-                        // Snap: extend A's x-line down to D's y-level, skip B and C
-                        // Use the average x to avoid bias
-                        const snapX = (a.x + d.x) / 2;
-                        next[next.length - 1] = { x: snapX, y: a.y };
-                        // Skip B and C, adjust D
-                        result[i + 2] = { x: snapX, y: d.y };
-                        i += 1; // skip C (B already skipped by not pushing)
-                        changed = true;
-                        continue;
-                    }
-                } else if (bcIsVert && bcDy < MICRO_JOG_THRESHOLD) {
-                    // B-C is a short vertical jog; A-B should be horizontal, C-D should be horizontal
-                    const abIsHoriz = Math.abs(a.y - b.y) < 1.5;
-                    const cdIsHoriz = Math.abs(c.y - d.y) < 1.5;
-                    if (abIsHoriz && cdIsHoriz) {
-                        const snapY = (a.y + d.y) / 2;
-                        next[next.length - 1] = { x: a.x, y: snapY };
-                        result[i + 2] = { x: d.x, y: snapY };
-                        i += 1;
-                        changed = true;
-                        continue;
-                    }
-                }
-                next.push(b);
-            }
-            // Push remaining points
-            for (let i = Math.max(1, next.length === 1 ? 1 : result.length - 2); i < result.length; i++) {
-                if (next.length === 0 || result[i] !== next[next.length - 1]) {
-                    next.push(result[i]);
-                }
-            }
-            result = next;
-        }
-
-        return result;
+        return simplified;
     }
 
     public static pathHitsObstacle(points: Point[], obstacles: Rectangle[], padding = 3): boolean {
@@ -303,8 +292,13 @@ export class RoutingCrossingScorer {
     }
 
     private sameBuddyGroup(edgeA: string, edgeB: string): boolean {
-        const groupA = this.buddyGroupByEdgeId.get(edgeA);
-        return !!groupA && groupA === this.buddyGroupByEdgeId.get(edgeB);
+        const groupsA = this.buddyGroupByEdgeId.get(edgeA);
+        const groupsB = this.buddyGroupByEdgeId.get(edgeB);
+        if (!groupsA || !groupsB) return false;
+        for (const group of groupsA) {
+            if (groupsB.has(group)) return true;
+        }
+        return false;
     }
 
     private addEdgeScore(byEdge: Map<string, number>, edgeId: string, delta: number): void {
@@ -331,6 +325,24 @@ export class RoutingCrossingScorer {
             && !RoutingCrossingScorer.pointsNear(h.b, { x, y }, EPS)
             && !RoutingCrossingScorer.pointsNear(v.a, { x, y }, EPS)
             && !RoutingCrossingScorer.pointsNear(v.b, { x, y }, EPS);
+    }
+
+    private static parallelOverlapUnits(s1: OrthogonalSegment, s2: OrthogonalSegment, minLength: number): number {
+        if (s1.isHorizontal !== s2.isHorizontal) return 0;
+        const EPS = 2;
+        let overlap = 0;
+        if (s1.isHorizontal) {
+            if (Math.abs(s1.a.y - s2.a.y) > EPS) return 0;
+            overlap = Math.min(Math.max(s1.a.x, s1.b.x), Math.max(s2.a.x, s2.b.x))
+                - Math.max(Math.min(s1.a.x, s1.b.x), Math.min(s2.a.x, s2.b.x));
+        } else {
+            if (Math.abs(s1.a.x - s2.a.x) > EPS) return 0;
+            overlap = Math.min(Math.max(s1.a.y, s1.b.y), Math.max(s2.a.y, s2.b.y))
+                - Math.max(Math.min(s1.a.y, s1.b.y), Math.min(s2.a.y, s2.b.y));
+        }
+
+        if (overlap < minLength) return 0;
+        return Math.max(1, Math.round(overlap / minLength));
     }
 
     private static pointsNear(a: Point, b: Point, tolerance: number): boolean {

@@ -101,9 +101,16 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
   if (!isLoading) {
       hasLoadedOnceRef.current = true;
   }
-  const opacity = (nodesDragging || hasLoadedOnceRef.current || hasCacheOnMount.current) ? 1 : 0;
+  // Keep the fallback path visible while the worker is still routing. Hiding the
+  // whole edge during initial loading makes routing slowness look like missing edges.
+  const opacity = (nodesDragging || isLoading || hasLoadedOnceRef.current || hasCacheOnMount.current) ? 1 : 0;
 
-  const isBusEdge = !!((multiEdgeInfo as any)?.isOneToMany || (multiEdgeInfo as any)?.isManyToOne);
+  const isBusEdge = !!(
+      (multiEdgeInfo as any)?.isOneToMany ||
+      (multiEdgeInfo as any)?.isManyToOne ||
+      edgeData?.isTreeBus ||
+      edgeData?.treeRouting
+  );
 
   // 3. Channel Routing
   // [UPGRADE] Channel routing is now handled at the Coordinator level (applyGlobalNudge),
@@ -172,15 +179,23 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       : workerSmartPoints;
   const { jumpPath } = useLineJumps({
       edgeId: id,
+      sourceId: source,
+      targetId: target,
       points: jumpInputPoints,
       enabled: !nodesDragging && !isLoading && !isStale,
-      // Bus/trunk edges should be treated as one integrated trunk visual:
-      // keep them registered for other edges, but do not draw jump arcs on them.
+      // Preserve bus/tree trunk geometry exactly. Jump arcs visually bend the
+      // shared trunk, which is worse than an ordinary crossing under the routing
+      // goals (orthogonal > obstacle avoidance > shared trunk > fewer crossings).
       renderJumps: !isBusEdge,
       cornerRadius: edgeConfig.borderRadius || 4,
   });
 
-  const safeFinalPath = jumpPath || finalPath || `M ${props.sourceX} ${props.sourceY} L ${props.targetX} ${props.targetY}`;
+  const busGeometryPath = useMemo(() => {
+      if (!isBusEdge || !jumpInputPoints || jumpInputPoints.length < 2) return null;
+      return createFilletedPath(jumpInputPoints, edgeConfig.borderRadius || 4);
+  }, [isBusEdge, jumpInputPoints, edgeConfig.borderRadius]);
+
+  const safeFinalPath = jumpPath || busGeometryPath || finalPath || `M ${props.sourceX} ${props.sourceY} L ${props.targetX} ${props.targetY}`;
 
   // 7. Crossfade Opacity
   const prevPathRef = useRef<string>(safeFinalPath);

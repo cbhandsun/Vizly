@@ -875,28 +875,18 @@ export function findPath(
 
     // 1. Grid Setup (Or Reuse)
     let grid: PathfindingGrid;
+    const congestionCosts = prebuiltGrid && congestionGrid && congestionGrid.length === prebuiltGrid.data.length
+        ? congestionGrid
+        : undefined;
 
     if (prebuiltGrid) {
         // [FIX] COW Save/Restore: Instead of cloning the entire 2MB Int32Array,
         // we mutate the shared grid in-place (only ~20-30 cells for clearLaunchZone,
         // lineObstacles, safety unblock) and restore original values after A* search.
         // This eliminates ~52MB of memory copies per batch of 26 edges.
-        // Exception: congestionGrid modifies ALL cells, so we must clone in that case.
-        if (congestionGrid && congestionGrid.length === prebuiltGrid.data.length) {
-            // Full clone required for congestion merge
-            grid = {
-                ...prebuiltGrid,
-                data: new Int32Array(prebuiltGrid.data)
-            };
-            for (let i = 0; i < grid.data.length; i++) {
-                if (grid.data[i] < COSTS.OBSTACLE) {
-                    grid.data[i] += congestionGrid[i];
-                }
-            }
-        } else {
-            // Zero-copy: reuse grid directly, will save/restore modified cells
-            grid = prebuiltGrid;
-        }
+        // Congestion is a soft per-search surcharge and is applied lazily in the
+        // neighbor cost lookup below, avoiding a full Int32Array clone per edge.
+        grid = prebuiltGrid;
     } else {
         // Build fresh
         grid = buildPathfindingGrid(obstacles, { startX: start.x, startY: start.y, endX: end.x, endY: end.y }, gridSize);
@@ -1459,7 +1449,7 @@ export function findPath(
             if (cost >= COSTS.OBSTACLE) continue;
 
             // 2. Cost Calculation
-            let moveCost = cost;
+            let moveCost = cost + (congestionCosts?.[neighborIdx] ?? 0);
             // Add penalty for direction change to encourage straight lines
             if (directionTo[currentIdx] !== 0 && directionTo[currentIdx] !== direction) {
                 moveCost += COSTS.DIRECTION_CHANGE;

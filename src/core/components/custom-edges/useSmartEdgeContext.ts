@@ -295,13 +295,20 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         return { manualSource: false, manualTarget: false };
     }, [props.data]);
 
+    const runtimeHandleLock = useMemo(() => {
+        const raw = (props.data as any)?.runtimeHandleLock ?? (props.data as any)?._runtimeHandleLock;
+        if (raw === true) return { source: true, target: true };
+        if (raw && typeof raw === 'object') {
+            return { source: Boolean((raw as any).source), target: Boolean((raw as any).target) };
+        }
+        return { source: false, target: false };
+    }, [props.data]);
+
     const respectSourceHandle = Boolean(sourceHandleId)
-        && manualFlags.manualSource
-        && !autoFlags.autoSource;
+        && (runtimeHandleLock.source || (manualFlags.manualSource && !autoFlags.autoSource));
 
     const respectTargetHandle = Boolean(targetHandleId)
-        && manualFlags.manualTarget
-        && !autoFlags.autoTarget;
+        && (runtimeHandleLock.target || (manualFlags.manualTarget && !autoFlags.autoTarget));
 
     // ---------- 0️⃣ Edge configuration ----------
     const edgeConfig = useMemo(() => {
