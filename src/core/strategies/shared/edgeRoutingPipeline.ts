@@ -811,6 +811,10 @@ export async function runEdgeRoutingPipeline(
   finalEdges = sanitizeComputedPaths(finalEdges);
   finalEdges = repairSharedTrunkAwareObstacles(finalEdges, nodes, 18);
   finalEdges = sanitizeComputedPaths(finalEdges);
+  finalEdges = repairSharedTrunkAwareCrossings(finalEdges, nodes);
+  finalEdges = sanitizeComputedPaths(finalEdges);
+  finalEdges = repairSharedTrunkAwareObstacles(finalEdges, nodes, 18);
+  finalEdges = sanitizeComputedPaths(finalEdges);
 
   // P9: 边标签智能避让
   finalEdges = optimizeEdgeLabelPositions(finalEdges, nodes, {

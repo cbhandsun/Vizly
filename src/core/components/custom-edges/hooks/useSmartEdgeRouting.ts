@@ -10,6 +10,7 @@ import { useLayoutStability } from '../../../context/LayoutStabilityContext';
 import { useChannelRouting } from './useChannelRouting';
 import { useLineJumps } from './useLineJumps';
 import { createFilletedPath, getSmartLabelPosition, getClosestDistanceToPath } from '../../../algorithms/smartEdgeUtils';
+import { repairEdgeCrossingViolations } from '../../../algorithms/edgeCrossingRepair';
 
 const _getRenderedPathCache = () => {
     if (typeof window === 'undefined') return new Map<string, string>();
@@ -44,6 +45,112 @@ const snapSimpleOrthogonalPath = (path: string): string => {
     }
 
     return commands.map(point => `${point.cmd} ${point.x} ${point.y}`).join(' ');
+};
+
+type PathPoint = { x: number; y: number };
+
+const parseRenderedPathPoints = (path: string): PathPoint[] => {
+    const tokens = [...path.matchAll(/[a-zA-Z]|[-+]?\d*\.?\d+(?:e[-+]?\d+)?/gi)].map(match => match[0]);
+    const points: PathPoint[] = [];
+    let index = 0;
+    let command = '';
+    let current: PathPoint = { x: 0, y: 0 };
+    const isCommand = (token: string) => /^[a-zA-Z]$/.test(token);
+    const nextNumber = () => Number(tokens[index++]);
+    const push = (x: number, y: number, relative: boolean) => {
+        current = { x: relative ? current.x + x : x, y: relative ? current.y + y : y };
+        points.push({ ...current });
+    };
+
+    while (index < tokens.length) {
+        if (isCommand(tokens[index])) command = tokens[index++];
+        if (!command) break;
+        const upper = command.toUpperCase();
+        const relative = command !== upper;
+        if (upper === 'M' || upper === 'L') {
+            while (index + 1 < tokens.length && !isCommand(tokens[index])) {
+                push(nextNumber(), nextNumber(), relative);
+            }
+            if (upper === 'M') command = relative ? 'l' : 'L';
+        } else if (upper === 'H') {
+            while (index < tokens.length && !isCommand(tokens[index])) {
+                const x = nextNumber();
+                push(relative ? x : x, relative ? 0 : current.y, relative);
+            }
+        } else if (upper === 'V') {
+            while (index < tokens.length && !isCommand(tokens[index])) {
+                const y = nextNumber();
+                push(relative ? 0 : current.x, relative ? y : y, relative);
+            }
+        } else if (upper === 'A') {
+            while (index + 6 < tokens.length && !isCommand(tokens[index])) {
+                nextNumber(); nextNumber(); nextNumber(); nextNumber(); nextNumber();
+                push(nextNumber(), nextNumber(), relative);
+            }
+        } else if (upper === 'C') {
+            while (index + 5 < tokens.length && !isCommand(tokens[index])) {
+                nextNumber(); nextNumber(); nextNumber(); nextNumber();
+                push(nextNumber(), nextNumber(), relative);
+            }
+        } else if (upper === 'Q') {
+            while (index + 3 < tokens.length && !isCommand(tokens[index])) {
+                nextNumber(); nextNumber();
+                push(nextNumber(), nextNumber(), relative);
+            }
+        } else {
+            while (index < tokens.length && !isCommand(tokens[index])) index++;
+        }
+    }
+
+    return points.filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
+};
+
+const isTwoPointOrthogonalPath = (points: PathPoint[]): boolean => {
+    if (points.length !== 2) return false;
+    const [a, b] = points;
+    return Math.abs(a.x - b.x) < 1 || Math.abs(a.y - b.y) < 1;
+};
+
+const repairTwoPointRenderedCrossing = (
+    edgeId: string,
+    path: string,
+    radius: number,
+    enabled: boolean,
+    obstacles: Array<{ x: number; y: number; width: number; height: number }> = [],
+): string => {
+    if (!enabled || !path || /[CQ]/i.test(path)) return path;
+    const currentPoints = parseRenderedPathPoints(path);
+    if (!isTwoPointOrthogonalPath(currentPoints)) return path;
+
+    const cache = _getRenderedPathCache();
+    if (cache.size < 2) return path;
+
+    const paths = new Map<string, PathPoint[]>();
+    paths.set(edgeId, currentPoints);
+    cache.forEach((cachedPath, cachedEdgeId) => {
+        if (cachedEdgeId === edgeId || !cachedPath || /[CQ]/i.test(cachedPath)) return;
+        const points = parseRenderedPathPoints(cachedPath);
+        if (points.length >= 2) paths.set(cachedEdgeId, points);
+    });
+    if (paths.size < 2) return path;
+
+    const repaired = repairEdgeCrossingViolations(paths, {
+        spacing: 12,
+        maxIterations: 3,
+        obstacles,
+        mutableEdgeIds: new Set([edgeId]),
+    }).get(edgeId);
+    if (!repaired || repaired.length < 2) return path;
+    const changed = repaired.length !== currentPoints.length
+        || repaired.some((point, idx) => {
+            const original = currentPoints[idx];
+            return !original || Math.abs(point.x - original.x) > 0.5 || Math.abs(point.y - original.y) > 0.5;
+        });
+    if (!changed) return path;
+
+    const repairedPath = createFilletedPath(repaired, radius);
+    cache.set(edgeId, repairedPath);
+    return repairedPath;
 };
 
 export interface UseSmartEdgeRoutingReturn {
@@ -222,8 +329,14 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       return createFilletedPath(jumpInputPoints, edgeConfig.borderRadius || 4);
   }, [isBusEdge, jumpInputPoints, edgeConfig.borderRadius]);
 
-  const safeFinalPath = snapSimpleOrthogonalPath(
+  const safeFinalPath = repairTwoPointRenderedCrossing(
+      id,
+      snapSimpleOrthogonalPath(
       jumpPath || busGeometryPath || finalPath || `M ${props.sourceX} ${props.sourceY} L ${props.targetX} ${props.targetY}`
+      ),
+      edgeConfig.borderRadius || 4,
+      !isBusEdge && !nodesDragging && !isLoading && !isStale,
+      safeObstacles
   );
 
   // 7. Crossfade Opacity

@@ -579,7 +579,7 @@ export class EdgeRoutingCoordinator {
             }
         }
         return {
-            rv: 13,
+            rv: 15,
             s: job.source,
             t: job.target,
             sx: Math.round(job.sourceX ?? 0),
@@ -2523,6 +2523,7 @@ export class EdgeRoutingCoordinator {
             }
             const ignoredRectsByEdge = this.buildFanInIgnoredRects(requests, assignedJobs);
             const hardObstacleIgnoredRectsByEdge = ignoredRectsByEdge;
+            const hardObstacleMinClearance = Math.max(18, spacing * 1.5);
             refinedPaths = refineManyToOneFanIn(refinedPaths, this.buildManyToOneFanInGroups(requests, graph, assignedJobs), {
                 spacing,
                 obstacles: hardObstacles,
@@ -2547,7 +2548,7 @@ export class EdgeRoutingCoordinator {
                 obstacles: hardObstacles,
                 ignoredRectsByEdge: hardObstacleIgnoredRectsByEdge,
                 buddyGroups,
-                minClearance: Math.max(18, spacing * 1.5),
+                minClearance: hardObstacleMinClearance,
             });
             refinedPaths = repairEdgeCrossingViolations(refinedPaths, {
                 spacing,
@@ -2561,6 +2562,21 @@ export class EdgeRoutingCoordinator {
                 obstacles: hardObstacles,
                 ignoredRectsByEdge: hardObstacleIgnoredRectsByEdge,
                 buddyGroups,
+                minClearance: hardObstacleMinClearance,
+            });
+            refinedPaths = repairEdgeCrossingViolations(refinedPaths, {
+                spacing,
+                obstacles: hardObstacles,
+                ignoredRectsByEdge: hardObstacleIgnoredRectsByEdge,
+                buddyGroups,
+                mutableEdgeIds: currentBatchEdgeIds,
+            });
+            refinedPaths = repairHardObstacleViolations(refinedPaths, {
+                spacing,
+                obstacles: hardObstacles,
+                ignoredRectsByEdge: hardObstacleIgnoredRectsByEdge,
+                buddyGroups,
+                minClearance: hardObstacleMinClearance,
             });
 
             // Step 3: Apply back to results

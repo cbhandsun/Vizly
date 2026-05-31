@@ -290,7 +290,7 @@ function buildDetourCandidates(
 ): Array<{ edgeId: string; points: Point[] }> {
     if (mutableEdgeIds && !mutableEdgeIds.has(moving.edgeId)) return [];
     const points = allPaths.get(moving.edgeId);
-    if (!points || points.length < 3) return [];
+    if (!points || points.length < 2) return [];
     if (moving.h === blocker.h) return [];
 
     const buddyTypes = buddyTypesByEdgeId.get(moving.edgeId);
@@ -328,6 +328,31 @@ function buildDetourCandidates(
                 ...points.slice(moving.segIdx + 1).map(p => ({ ...p })),
             ]);
         }
+
+        const blockerPoints = allPaths.get(blocker.edgeId);
+        if (blockerPoints && blockerPoints.length >= 2) {
+            const minBlockerX = Math.min(...blockerPoints.map(point => point.x));
+            const maxBlockerX = Math.max(...blockerPoints.map(point => point.x));
+            const detourYs = [...new Set(blockerPoints.flatMap(point => [
+                Math.round(point.y - spacing),
+                Math.round(point.y + spacing),
+            ]))].sort((y1, y2) => Math.abs(y1 - moving.a.y) - Math.abs(y2 - moving.a.y));
+            const wideSideXs = [minBlockerX - spacing, maxBlockerX + spacing]
+                .sort((x1, x2) => Math.abs(x1 - moving.a.x) - Math.abs(x2 - moving.a.x));
+
+            for (const detourY of detourYs) {
+                if (Math.abs(detourY - moving.a.y) < EPS || Math.abs(detourY - moving.b.y) < EPS) continue;
+                for (const sideX of wideSideXs) {
+                    add([
+                        ...points.slice(0, moving.segIdx + 1).map(p => ({ ...p })),
+                        { x: moving.a.x, y: detourY },
+                        { x: sideX, y: detourY },
+                        { x: sideX, y: moving.b.y },
+                        ...points.slice(moving.segIdx + 1).map(p => ({ ...p })),
+                    ]);
+                }
+            }
+        }
     } else if (moving.h && blocker.v) {
         const direction = Math.sign(moving.b.x - moving.a.x);
         if (direction === 0) return [];
@@ -350,6 +375,31 @@ function buildDetourCandidates(
                 { x: moving.b.x, y: sideY },
                 ...points.slice(moving.segIdx + 1).map(p => ({ ...p })),
             ]);
+        }
+
+        const blockerPoints = allPaths.get(blocker.edgeId);
+        if (blockerPoints && blockerPoints.length >= 2) {
+            const minBlockerY = Math.min(...blockerPoints.map(point => point.y));
+            const maxBlockerY = Math.max(...blockerPoints.map(point => point.y));
+            const detourXs = [...new Set(blockerPoints.flatMap(point => [
+                Math.round(point.x - spacing),
+                Math.round(point.x + spacing),
+            ]))].sort((x1, x2) => Math.abs(x1 - moving.a.x) - Math.abs(x2 - moving.a.x));
+            const wideSideYs = [minBlockerY - spacing, maxBlockerY + spacing]
+                .sort((y1, y2) => Math.abs(y1 - moving.a.y) - Math.abs(y2 - moving.a.y));
+
+            for (const detourX of detourXs) {
+                if (Math.abs(detourX - moving.a.x) < EPS || Math.abs(detourX - moving.b.x) < EPS) continue;
+                for (const sideY of wideSideYs) {
+                    add([
+                        ...points.slice(0, moving.segIdx + 1).map(p => ({ ...p })),
+                        { x: detourX, y: moving.a.y },
+                        { x: detourX, y: sideY },
+                        { x: moving.b.x, y: sideY },
+                        ...points.slice(moving.segIdx + 1).map(p => ({ ...p })),
+                    ]);
+                }
+            }
         }
     }
 

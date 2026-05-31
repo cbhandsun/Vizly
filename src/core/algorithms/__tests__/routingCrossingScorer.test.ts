@@ -690,6 +690,79 @@ describe('repairHardObstacleViolations', () => {
         expect(isOrthogonalPath(repaired)).toBe(true);
     });
 
+    it('keeps the WMS quota loop away from the mixed allocation boundary', () => {
+        const fixQuota = { x: 2063.05, y: 402, width: 252, height: 96 };
+        const greedySpec = { x: 60, y: 1670, width: 220, height: 96 };
+        const allocMixed = { x: 693, y: 1926, width: 204, height: 96 };
+        const paths = new Map([
+            ['e10', [
+                { x: 2063, y: 450 },
+                { x: 1952, y: 450 },
+                { x: 1952, y: 2022 },
+                { x: 669, y: 2022 },
+                { x: 669, y: 1718 },
+                { x: 280, y: 1718 },
+            ]],
+        ]);
+
+        const repaired = repairHardObstacleViolations(paths, {
+            spacing: 12,
+            obstacles: [fixQuota, greedySpec, allocMixed],
+            ignoredRectsByEdge: new Map([['e10', [fixQuota, greedySpec]]]),
+            minClearance: 18,
+            maxIterationsPerEdge: 6,
+        }).get('e10')!;
+
+        expect(minDistanceToRect(paths.get('e10')!, allocMixed)).toBe(0);
+        expect(minDistanceToRect(repaired, allocMixed)).toBeGreaterThanOrEqual(18);
+        expect(repaired[0]).toEqual(paths.get('e10')?.[0]);
+        expect(repaired[repaired.length - 1]).toEqual(paths.get('e10')?.[5]);
+        expect(isOrthogonalPath(repaired)).toBe(true);
+    });
+
+    it('rechecks crossings after final quota-loop clearance repair', () => {
+        const mergeRes = { x: 564, y: 1478, width: 211, height: 96 };
+        const paths = new Map([
+            ['e10', [
+                { x: 1228, y: 390 },
+                { x: 1228, y: 470 },
+                { x: 1324, y: 470 },
+                { x: 1324, y: 1484 },
+                { x: 799, y: 1484 },
+                { x: 799, y: 1598 },
+                { x: 540, y: 1598 },
+                { x: 540, y: 1478 },
+                { x: 216, y: 1478 },
+            ]],
+            ['e17', [
+                { x: 669.5, y: 1574 },
+                { x: 669.5, y: 1734 },
+            ]],
+        ]);
+        const scorer = new RoutingCrossingScorer();
+
+        const crossed = repairEdgeCrossingViolations(paths, {
+            spacing: 12,
+            obstacles: [mergeRes],
+            maxIterations: 8,
+        });
+        const crossedByVertical = repairEdgeCrossingViolations(paths, {
+            spacing: 12,
+            obstacles: [mergeRes],
+            ignoredRectsByEdge: new Map([['e17', [mergeRes]]]),
+            maxIterations: 8,
+            mutableEdgeIds: new Set(['e17']),
+        });
+
+        expect(scorer.score(paths).hardCrossings).toBe(1);
+        expect(scorer.score(crossed).hardCrossings).toBe(0);
+        expect(scorer.score(crossedByVertical).hardCrossings).toBe(0);
+        expect(pathHitsRectInterior(crossed.get('e10')!, mergeRes)).toBe(false);
+        expect(crossed.get('e10')?.[0]).toEqual(paths.get('e10')?.[0]);
+        expect(crossed.get('e10')?.[crossed.get('e10')!.length - 1]).toEqual(paths.get('e10')?.[8]);
+        expect(isOrthogonalPath(crossed.get('e10')!)).toBe(true);
+    });
+
     it('repairs stacked WMS trunk hits over multiple iterations', () => {
         const taskDirectA = { x: 116, y: 2383, width: 172, height: 96 };
         const taskRepB = { x: 106, y: 2639, width: 191, height: 96 };
