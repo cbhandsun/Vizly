@@ -22,6 +22,7 @@ import {
 import { routeEdgesWithELK } from '../../utils/elkEdgeRouter';
 import { expandHandle } from '../../routing/utils/handleUtils';
 import { repairEdgeCrossingViolations } from '../../algorithms/edgeCrossingRepair';
+import { repairHardObstacleViolations } from '../../algorithms/hardObstaclePathRepair';
 import type { BuddyGroup } from '../../algorithms/globalChannelRouting';
 
 const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
@@ -263,6 +264,47 @@ function repairSharedTrunkAwareCrossings(edges: Edge[], nodes: ReactFlowNode[]):
     const original = edgePaths.get(edge.id);
     if (!path || !original || pathEquals(path, original)) return edge;
     return withComputedPath(edge, path, { crossingOptimized: true, sharedTrunkAware: true });
+  });
+}
+
+function repairSharedTrunkAwareObstacles(
+  edges: Edge[],
+  nodes: ReactFlowNode[],
+  minClearance = 0,
+): Edge[] {
+  const edgePaths = new Map<string, Point[]>();
+  for (const edge of edges) {
+    const path = compactPath(getEdgePath(edge));
+    if (edge.id && path.length >= 2) edgePaths.set(edge.id, path);
+  }
+  if (edgePaths.size === 0) return edges;
+
+  const obstaclesByNode = getRoutingObstacles(nodes);
+  const ignoredRectsByEdge = new Map<string, Rect[]>();
+  for (const edge of edges) {
+    const ignored = [obstaclesByNode.get(edge.source), obstaclesByNode.get(edge.target)]
+      .filter((rect): rect is Rect => !!rect);
+    if (ignored.length > 0) ignoredRectsByEdge.set(edge.id, ignored);
+  }
+
+  const repaired = repairHardObstacleViolations(edgePaths, {
+    spacing: 12,
+    maxIterationsPerEdge: 6,
+    buddyGroups: buildPipelineBuddyGroups(edges),
+    obstacles: Array.from(obstaclesByNode.values()),
+    ignoredRectsByEdge,
+    minClearance,
+  });
+
+  return edges.map(edge => {
+    const path = repaired.get(edge.id);
+    const original = edgePaths.get(edge.id);
+    if (!path || !original || pathEquals(path, original)) return edge;
+    return withComputedPath(edge, path, {
+      hardObstacleRepaired: true,
+      obstacleClearanceOptimized: minClearance > 0,
+      sharedTrunkAware: true,
+    });
   });
 }
 
@@ -763,7 +805,11 @@ export async function runEdgeRoutingPipeline(
 
   // P8.5: 总线后处理。P8 会重写 treeRouting.points，这里同步修正正交/交叉，保护共享主干。
   finalEdges = sanitizeComputedPaths(finalEdges);
+  finalEdges = repairSharedTrunkAwareObstacles(finalEdges, nodes);
+  finalEdges = sanitizeComputedPaths(finalEdges);
   finalEdges = repairSharedTrunkAwareCrossings(finalEdges, nodes);
+  finalEdges = sanitizeComputedPaths(finalEdges);
+  finalEdges = repairSharedTrunkAwareObstacles(finalEdges, nodes, 18);
   finalEdges = sanitizeComputedPaths(finalEdges);
 
   // P9: 边标签智能避让

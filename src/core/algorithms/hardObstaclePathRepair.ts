@@ -8,6 +8,7 @@ export interface HardObstacleRepairOptions {
     buddyGroups?: BuddyGroup[];
     spacing?: number;
     maxIterationsPerEdge?: number;
+    minClearance?: number;
 }
 
 interface SegmentHit {
@@ -52,10 +53,10 @@ export function repairHardObstacleViolations(
 
         const ignored = options.ignoredRectsByEdge?.get(edgeId) ?? [];
         for (let iteration = 0; iteration < maxIterations; iteration++) {
-            const hit = findFirstObstacleHit(points, obstacles, ignored);
+            const hit = findFirstObstacleHit(points, obstacles, ignored, options.minClearance ?? 0);
             if (!hit) break;
 
-            const repaired = chooseBestRepair(edgeId, points, hit, result, obstacles, ignored, spacing, scorer);
+            const repaired = chooseBestRepair(edgeId, points, hit, result, obstacles, ignored, spacing, scorer, options.minClearance ?? 0);
             if (!repaired || samePath(repaired, points)) break;
 
             points = repaired;
@@ -74,7 +75,8 @@ function chooseBestRepair(
     obstacles: Rectangle[],
     ignored: Rectangle[],
     spacing: number,
-    scorer: RoutingCrossingScorer
+    scorer: RoutingCrossingScorer,
+    minClearance: number
 ): Point[] | null {
     const candidates = buildRepairCandidates(points, hit, spacing)
         .map(simplifyRepairPoints)
@@ -82,10 +84,10 @@ function chooseBestRepair(
         .filter(isOrthogonal)
         .filter(candidate => !samePath(candidate, points));
 
-    const originalHitCount = countObstacleHits(points, obstacles, ignored);
+    const originalHitCount = countObstacleViolations(points, obstacles, ignored, minClearance);
     let best: { points: Point[]; hitCount: number; score: number; length: number } | null = null;
     for (const candidate of candidates) {
-        const hitCount = countObstacleHits(candidate, obstacles, ignored);
+        const hitCount = countObstacleViolations(candidate, obstacles, ignored, minClearance);
         if (hitCount >= originalHitCount) continue;
 
         const trial = new Map(allPaths);
@@ -188,7 +190,7 @@ function buildRepairCandidates(points: Point[], hit: SegmentHit, spacing: number
     return candidates;
 }
 
-function findFirstObstacleHit(points: Point[], obstacles: Rectangle[], ignored: Rectangle[]): SegmentHit | null {
+function findFirstObstacleHit(points: Point[], obstacles: Rectangle[], ignored: Rectangle[], minClearance: number): SegmentHit | null {
     for (let i = 0; i < points.length - 1; i++) {
         const a = points[i];
         const b = points[i + 1];
@@ -198,7 +200,10 @@ function findFirstObstacleHit(points: Point[], obstacles: Rectangle[], ignored: 
 
         for (const obstacle of obstacles) {
             if (ignored.some(rect => sameRect(rect, obstacle))) continue;
-            if (segmentIntersectsRectInterior(a, b, obstacle, 2)) {
+            if (
+                segmentIntersectsRectInterior(a, b, obstacle, 2)
+                || (minClearance > 0 && segmentDistanceToRect(a, b, obstacle) < minClearance)
+            ) {
                 return { segIdx: i, obstacle, horizontal };
             }
         }
@@ -206,15 +211,53 @@ function findFirstObstacleHit(points: Point[], obstacles: Rectangle[], ignored: 
     return null;
 }
 
-function countObstacleHits(points: Point[], obstacles: Rectangle[], ignored: Rectangle[]): number {
+function countObstacleViolations(points: Point[], obstacles: Rectangle[], ignored: Rectangle[], minClearance: number): number {
     let count = 0;
     for (let i = 0; i < points.length - 1; i++) {
         for (const obstacle of obstacles) {
             if (ignored.some(rect => sameRect(rect, obstacle))) continue;
-            if (segmentIntersectsRectInterior(points[i], points[i + 1], obstacle, 2)) count++;
+            if (
+                segmentIntersectsRectInterior(points[i], points[i + 1], obstacle, 2)
+                || (minClearance > 0 && segmentDistanceToRect(points[i], points[i + 1], obstacle) < minClearance)
+            ) {
+                count++;
+            }
         }
     }
     return count;
+}
+
+function segmentDistanceToRect(a: Point, b: Point, rect: Rectangle): number {
+    const left = rect.x;
+    const right = rect.x + rect.width;
+    const top = rect.y;
+    const bottom = rect.y + rect.height;
+
+    if (Math.abs(a.x - b.x) < EPS) {
+        const x = a.x;
+        const minY = Math.min(a.y, b.y);
+        const maxY = Math.max(a.y, b.y);
+        const overlapsY = Math.max(minY, top) <= Math.min(maxY, bottom);
+        if (overlapsY && x >= left && x <= right) return 0;
+        if (overlapsY) return Math.min(Math.abs(x - left), Math.abs(x - right));
+        const dx = x < left ? left - x : x > right ? x - right : 0;
+        const dy = maxY < top ? top - maxY : minY > bottom ? minY - bottom : 0;
+        return Math.hypot(dx, dy);
+    }
+
+    if (Math.abs(a.y - b.y) < EPS) {
+        const y = a.y;
+        const minX = Math.min(a.x, b.x);
+        const maxX = Math.max(a.x, b.x);
+        const overlapsX = Math.max(minX, left) <= Math.min(maxX, right);
+        if (overlapsX && y >= top && y <= bottom) return 0;
+        if (overlapsX) return Math.min(Math.abs(y - top), Math.abs(y - bottom));
+        const dx = maxX < left ? left - maxX : minX > right ? minX - right : 0;
+        const dy = y < top ? top - y : y > bottom ? y - bottom : 0;
+        return Math.hypot(dx, dy);
+    }
+
+    return Infinity;
 }
 
 function segmentIntersectsRectInterior(a: Point, b: Point, rect: Rectangle, padding: number): boolean {

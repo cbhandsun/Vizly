@@ -605,6 +605,91 @@ describe('repairHardObstacleViolations', () => {
         expect(isOrthogonalPath(repaired)).toBe(true);
     });
 
+    it('doglegs the WMS quota feedback lane around downstream allocation work', () => {
+        const fixQuota = { x: 1833, y: 402, width: 230, height: 96 };
+        const greedySpec = { x: 116, y: 1670, width: 164, height: 96 };
+        const allocMixed = { x: 567, y: 1974, width: 204, height: 96 };
+        const paths = new Map([
+            ['e10', [
+                { x: 2063, y: 450 },
+                { x: 1952, y: 450 },
+                { x: 1952, y: 2022 },
+                { x: 328, y: 2022 },
+                { x: 328, y: 1718 },
+                { x: 280, y: 1718 },
+            ]],
+        ]);
+
+        const repaired = repairHardObstacleViolations(paths, {
+            spacing: 12,
+            obstacles: [fixQuota, greedySpec, allocMixed],
+            ignoredRectsByEdge: new Map([['e10', [fixQuota, greedySpec]]]),
+            maxIterationsPerEdge: 6,
+        }).get('e10')!;
+
+        expect(pathHitsRectInterior(paths.get('e10')!, allocMixed)).toBe(true);
+        expect(pathHitsRectInterior(repaired, allocMixed)).toBe(false);
+        expect(repaired[0]).toEqual(paths.get('e10')?.[0]);
+        expect(repaired[repaired.length - 1]).toEqual(paths.get('e10')?.[5]);
+        expect(isOrthogonalPath(repaired)).toBe(true);
+    });
+
+    it('adds a final clearance dogleg for near-miss business nodes', () => {
+        const source = { x: 487.625, y: 658, width: 204, height: 96 };
+        const target = { x: 466.625, y: 1170, width: 246, height: 96 };
+        const nearNode = { x: 299.875, y: 914, width: 273, height: 96 };
+        const paths = new Map([
+            ['e-shortage-no', [
+                { x: 589.625, y: 754 },
+                { x: 589.625, y: 1170 },
+            ]],
+        ]);
+
+        const repaired = repairHardObstacleViolations(paths, {
+            spacing: 12,
+            obstacles: [source, target, nearNode],
+            ignoredRectsByEdge: new Map([['e-shortage-no', [source, target]]]),
+            minClearance: 18,
+        }).get('e-shortage-no')!;
+
+        expect(minDistanceToRect(paths.get('e-shortage-no')!, nearNode)).toBeLessThan(18);
+        expect(minDistanceToRect(repaired, nearNode)).toBeGreaterThanOrEqual(18);
+        expect(repaired[0]).toEqual(paths.get('e-shortage-no')?.[0]);
+        expect(repaired[repaired.length - 1]).toEqual(paths.get('e-shortage-no')?.[1]);
+        expect(isOrthogonalPath(repaired)).toBe(true);
+    });
+
+    it('lifts a return lane away from a non-endpoint obstacle boundary', () => {
+        const fixQuota = { x: 1102, y: 294, width: 252, height: 96 };
+        const greedySpec = { x: 114, y: 1478, width: 204, height: 96 };
+        const mergeRes = { x: 564, y: 1478, width: 211, height: 96 };
+        const paths = new Map([
+            ['e10', [
+                { x: 1228, y: 390 },
+                { x: 1228, y: 470 },
+                { x: 1324, y: 470 },
+                { x: 1324, y: 1484 },
+                { x: 799, y: 1484 },
+                { x: 799, y: 1478 },
+                { x: 216, y: 1478 },
+            ]],
+        ]);
+
+        const repaired = repairHardObstacleViolations(paths, {
+            spacing: 12,
+            obstacles: [fixQuota, greedySpec, mergeRes],
+            ignoredRectsByEdge: new Map([['e10', [fixQuota, greedySpec]]]),
+            minClearance: 18,
+            maxIterationsPerEdge: 6,
+        }).get('e10')!;
+
+        expect(minDistanceToRect(paths.get('e10')!, mergeRes)).toBe(0);
+        expect(minDistanceToRect(repaired, mergeRes)).toBeGreaterThanOrEqual(18);
+        expect(repaired[0]).toEqual(paths.get('e10')?.[0]);
+        expect(repaired[repaired.length - 1]).toEqual(paths.get('e10')?.[6]);
+        expect(isOrthogonalPath(repaired)).toBe(true);
+    });
+
     it('repairs stacked WMS trunk hits over multiple iterations', () => {
         const taskDirectA = { x: 116, y: 2383, width: 172, height: 96 };
         const taskRepB = { x: 106, y: 2639, width: 191, height: 96 };
@@ -796,6 +881,44 @@ describe('repairEdgeCrossingViolations', () => {
         expect(scorer.score(result).hardCrossings).toBe(0);
         expect(result.get('e10')?.[1]).toEqual(paths.get('e10')?.[1]);
         expect(result.get('e15')?.[result.get('e15')!.length - 2]).toEqual(paths.get('e15')?.[2]);
+    });
+
+    it('moves the WMS quota return lane away from the merge-resource vertical lane', () => {
+        const paths = new Map([
+            ['e10', [
+                { x: 1228, y: 390 },
+                { x: 1228, y: 462 },
+                { x: 1324, y: 462 },
+                { x: 1324, y: 1580 },
+                { x: 216, y: 1580 },
+                { x: 216, y: 1478 },
+            ]],
+            ['e17', [
+                { x: 669.5, y: 1574 },
+                { x: 669.5, y: 1734 },
+            ]],
+            ['e16', [
+                { x: 1228, y: 390 },
+                { x: 1228, y: 1416 },
+                { x: 670, y: 1416 },
+                { x: 670, y: 1478 },
+            ]],
+        ]);
+        const buddyGroups = [
+            { type: 'o2m' as const, edgeIds: new Set(['e10', 'e16']) },
+        ];
+        const scorer = new RoutingCrossingScorer({ buddyGroups, parallelOverlapMinLength: 24 });
+
+        const result = repairEdgeCrossingViolations(paths, {
+            spacing: 12,
+            maxIterations: 8,
+            buddyGroups,
+        });
+
+        expect(scorer.score(paths).hardCrossings).toBe(1);
+        expect(scorer.score(result).hardCrossings).toBe(0);
+        expect(result.get('e10')?.[1]).toEqual(paths.get('e10')?.[1]);
+        expect(result.get('e16')?.[1]).toEqual(paths.get('e16')?.[1]);
     });
 
     it('preserves or extends an O2M source trunk while detouring a crossing branch', () => {
@@ -1212,6 +1335,54 @@ function pathHitsRectInterior(
     }
 
     return false;
+}
+
+function minDistanceToRect(
+    points: Array<{ x: number; y: number }>,
+    rect: { x: number; y: number; width: number; height: number }
+): number {
+    let minDistance = Infinity;
+    for (let i = 0; i < points.length - 1; i++) {
+        minDistance = Math.min(minDistance, segmentDistanceToRect(points[i], points[i + 1], rect));
+    }
+    return minDistance;
+}
+
+function segmentDistanceToRect(
+    a: { x: number; y: number },
+    b: { x: number; y: number },
+    rect: { x: number; y: number; width: number; height: number }
+): number {
+    const left = rect.x;
+    const right = rect.x + rect.width;
+    const top = rect.y;
+    const bottom = rect.y + rect.height;
+
+    if (Math.abs(a.x - b.x) < 1) {
+        const x = a.x;
+        const minY = Math.min(a.y, b.y);
+        const maxY = Math.max(a.y, b.y);
+        const overlapsY = Math.max(minY, top) <= Math.min(maxY, bottom);
+        if (overlapsY && x >= left && x <= right) return 0;
+        if (overlapsY) return Math.min(Math.abs(x - left), Math.abs(x - right));
+        const dx = x < left ? left - x : x > right ? x - right : 0;
+        const dy = maxY < top ? top - maxY : minY > bottom ? minY - bottom : 0;
+        return Math.hypot(dx, dy);
+    }
+
+    if (Math.abs(a.y - b.y) < 1) {
+        const y = a.y;
+        const minX = Math.min(a.x, b.x);
+        const maxX = Math.max(a.x, b.x);
+        const overlapsX = Math.max(minX, left) <= Math.min(maxX, right);
+        if (overlapsX && y >= top && y <= bottom) return 0;
+        if (overlapsX) return Math.min(Math.abs(y - top), Math.abs(y - bottom));
+        const dx = maxX < left ? left - maxX : minX > right ? minX - right : 0;
+        const dy = y < top ? top - y : y > bottom ? y - bottom : 0;
+        return Math.hypot(dx, dy);
+    }
+
+    return Infinity;
 }
 
 function isOrthogonalPath(points: Array<{ x: number; y: number }>): boolean {

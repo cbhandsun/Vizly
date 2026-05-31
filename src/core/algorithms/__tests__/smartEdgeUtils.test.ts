@@ -199,6 +199,13 @@ describe('smartEdgeUtils geometry primitives', () => {
     expect(jumpPath).toContain('Q 50 -7.5 55 0');
   });
 
+  it('snaps half-pixel drift on two-point near-orthogonal SVG paths', () => {
+    expect(createFilletedPath([
+      { x: 242.5, y: 902 },
+      { x: 243, y: 1062 },
+    ], 4)).toBe('M 242.5 902 L 242.5 1062');
+  });
+
   it('offsets orthogonal paths and generates greedy orthogonal routes', () => {
     expect(offsetPathSegments([
       { x: 0, y: 0 },

@@ -18,11 +18,28 @@ interface Point {
 /**
  * 将路径点数组转换为 SVG path 的 d 属性
  */
+function snapNearOrthogonalPoints(points: Point[]): Point[] {
+    const snapped = points.map(p => ({ ...p }));
+    for (let i = 0; i < snapped.length - 1; i++) {
+        const a = snapped[i];
+        const b = snapped[i + 1];
+        const dx = Math.abs(a.x - b.x);
+        const dy = Math.abs(a.y - b.y);
+        if (dx > 0.25 && dx <= 0.5 && dy > 0.5) {
+            b.x = a.x;
+        } else if (dy > 0.25 && dy <= 0.5 && dx > 0.5) {
+            b.y = a.y;
+        }
+    }
+    return snapped;
+}
+
 function pointsToPath(points: Point[]): string {
     if (!points || points.length < 2) return '';
 
+    const snapped = snapNearOrthogonalPoints(points);
     // 使用 M (移动到起点) 和 L (连线到后续点)
-    const [start, ...rest] = points;
+    const [start, ...rest] = snapped;
     const pathData = [`M ${start.x} ${start.y}`];
 
     for (const point of rest) {
@@ -43,7 +60,7 @@ function pointsToRoundedPath(points: Point[], radius: number = 8): string {
 
     // [FIX] Snap near-orthogonal segments to perfect orthogonal BEFORE generating curves.
     // This prevents diagonal L/Q commands caused by fractional handle coordinate offsets (e.g. dx=12, dy=419).
-    const snapped = points.map(p => ({ ...p }));
+    const snapped = snapNearOrthogonalPoints(points);
     for (let i = 0; i < snapped.length - 1; i++) {
         const a = snapped[i];
         const b = snapped[i + 1];

@@ -19,6 +19,33 @@ const _getRenderedPathCache = () => {
     return (window as any).__dv_rendered_path_cache__ as Map<string, string>;
 };
 
+const snapSimpleOrthogonalPath = (path: string): string => {
+    if (!path || /[ACQSTZ]/i.test(path)) return path;
+    const matches = [...path.matchAll(/[ML]\s*(-?\d*\.?\d+(?:e[-+]?\d+)?)\s+(-?\d*\.?\d+(?:e[-+]?\d+)?)/gi)];
+    if (matches.length < 2) return path;
+
+    const commands = matches.map(match => ({
+        cmd: match[0].trim()[0].toUpperCase(),
+        x: Number(match[1]),
+        y: Number(match[2]),
+    }));
+    if (!commands.every(point => Number.isFinite(point.x) && Number.isFinite(point.y))) return path;
+
+    for (let i = 0; i < commands.length - 1; i++) {
+        const a = commands[i];
+        const b = commands[i + 1];
+        const dx = Math.abs(a.x - b.x);
+        const dy = Math.abs(a.y - b.y);
+        if (dx > 0.25 && dx <= 0.5 && dy > 0.5) {
+            b.x = a.x;
+        } else if (dy > 0.25 && dy <= 0.5 && dx > 0.5) {
+            b.y = a.y;
+        }
+    }
+
+    return commands.map(point => `${point.cmd} ${point.x} ${point.y}`).join(' ');
+};
+
 export interface UseSmartEdgeRoutingReturn {
   safeFinalPath: string;
   finalLabelX: number;
@@ -195,7 +222,9 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       return createFilletedPath(jumpInputPoints, edgeConfig.borderRadius || 4);
   }, [isBusEdge, jumpInputPoints, edgeConfig.borderRadius]);
 
-  const safeFinalPath = jumpPath || busGeometryPath || finalPath || `M ${props.sourceX} ${props.sourceY} L ${props.targetX} ${props.targetY}`;
+  const safeFinalPath = snapSimpleOrthogonalPath(
+      jumpPath || busGeometryPath || finalPath || `M ${props.sourceX} ${props.sourceY} L ${props.targetX} ${props.targetY}`
+  );
 
   // 7. Crossfade Opacity
   const prevPathRef = useRef<string>(safeFinalPath);

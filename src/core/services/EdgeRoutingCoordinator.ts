@@ -579,7 +579,7 @@ export class EdgeRoutingCoordinator {
             }
         }
         return {
-            rv: 12,
+            rv: 13,
             s: job.source,
             t: job.target,
             sx: Math.round(job.sourceX ?? 0),
@@ -1290,6 +1290,49 @@ export class EdgeRoutingCoordinator {
         });
 
         return soft;
+    }
+
+    private collectHardRoutingObstacles(graph: SharedGraphContext): Rectangle[] {
+        const hard: Rectangle[] = [];
+        const seen = new Set<string>();
+        const pushRect = (rect: Partial<Rectangle> | undefined) => {
+            if (!rect) return;
+            const x = Number(rect.x);
+            const y = Number(rect.y);
+            const width = Number(rect.width);
+            const height = Number(rect.height);
+            if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) return;
+            if (width <= 1 || height <= 1) return;
+            const key = `${Math.round(x * 10) / 10}:${Math.round(y * 10) / 10}:${Math.round(width * 10) / 10}:${Math.round(height * 10) / 10}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            hard.push({ x, y, width, height });
+        };
+
+        (graph.obstacles ?? []).forEach(pushRect);
+
+        const nodes = (graph.nodes ?? []) as Array<{
+            type?: string;
+            position?: { x?: number; y?: number };
+            positionAbsolute?: { x?: number; y?: number };
+            computed?: { positionAbsolute?: { x?: number; y?: number } };
+            measured?: { width?: number; height?: number };
+            width?: number;
+            height?: number;
+        }>;
+        const containerTypes = new Set(['group', 'subGroup', 'titleGroup', 'domain', 'subDomain', 'swimlane']);
+        nodes.forEach(node => {
+            if (containerTypes.has(String(node.type ?? ''))) return;
+            const pos = node.computed?.positionAbsolute ?? node.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
+            pushRect({
+                x: pos.x,
+                y: pos.y,
+                width: node.measured?.width ?? node.width,
+                height: node.measured?.height ?? node.height,
+            });
+        });
+
+        return hard;
     }
 
     private updateRoutedLabelObstacle(edgeId: string, result: PathFindingResult, graph: SharedGraphContext): void {
@@ -2450,12 +2493,13 @@ export class EdgeRoutingCoordinator {
             const nudgedPaths = globalChannelRouting(edgePaths, spacing, buddyGroups, fixedEdgeIds);
             const currentBatchEdgeIds = new Set(requests.map(req => req.edgeId));
             const postProcessing = config?.postProcessing;
+            const hardObstacles = this.collectHardRoutingObstacles(graph);
             const refinementEnabled = postProcessing?.enableWaypointRefinement !== false;
             const refinementResult = refinementEnabled
                 ? refineOrthogonalWaypointsDetailed(nudgedPaths, {
                     buddyGroups,
                     fixedEdgeIds,
-                    hardObstacles: (graph.obstacles ?? []) as Rectangle[],
+                    hardObstacles,
                     softObstacles: this.collectSoftRoutingObstacles(graph, currentBatchEdgeIds),
                     spacing,
                     maxPasses: postProcessing?.waypointRefinementPasses,
@@ -2481,18 +2525,18 @@ export class EdgeRoutingCoordinator {
             const hardObstacleIgnoredRectsByEdge = ignoredRectsByEdge;
             refinedPaths = refineManyToOneFanIn(refinedPaths, this.buildManyToOneFanInGroups(requests, graph, assignedJobs), {
                 spacing,
-                obstacles: (graph.obstacles ?? []) as Rectangle[],
+                obstacles: hardObstacles,
                 ignoredRectsByEdge,
             });
             refinedPaths = repairHardObstacleViolations(refinedPaths, {
                 spacing,
-                obstacles: (graph.obstacles ?? []) as Rectangle[],
+                obstacles: hardObstacles,
                 ignoredRectsByEdge: hardObstacleIgnoredRectsByEdge,
                 buddyGroups,
             });
             refinedPaths = repairEdgeCrossingViolations(refinedPaths, {
                 spacing,
-                obstacles: (graph.obstacles ?? []) as Rectangle[],
+                obstacles: hardObstacles,
                 ignoredRectsByEdge: hardObstacleIgnoredRectsByEdge,
                 buddyGroups,
                 mutableEdgeIds: currentBatchEdgeIds,
@@ -2500,20 +2544,21 @@ export class EdgeRoutingCoordinator {
             });
             refinedPaths = repairHardObstacleViolations(refinedPaths, {
                 spacing,
-                obstacles: (graph.obstacles ?? []) as Rectangle[],
+                obstacles: hardObstacles,
                 ignoredRectsByEdge: hardObstacleIgnoredRectsByEdge,
                 buddyGroups,
+                minClearance: Math.max(18, spacing * 1.5),
             });
             refinedPaths = repairEdgeCrossingViolations(refinedPaths, {
                 spacing,
-                obstacles: (graph.obstacles ?? []) as Rectangle[],
+                obstacles: hardObstacles,
                 ignoredRectsByEdge: hardObstacleIgnoredRectsByEdge,
                 buddyGroups,
                 mutableEdgeIds: currentBatchEdgeIds,
             });
             refinedPaths = repairHardObstacleViolations(refinedPaths, {
                 spacing,
-                obstacles: (graph.obstacles ?? []) as Rectangle[],
+                obstacles: hardObstacles,
                 ignoredRectsByEdge: hardObstacleIgnoredRectsByEdge,
                 buddyGroups,
             });

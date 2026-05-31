@@ -3023,7 +3023,7 @@ export function createFilletedPath(
         const b = normalizedPoints[i + 1];
         const dx = Math.abs(a.x - b.x);
         const dy = Math.abs(a.y - b.y);
-        if (dx > 0.5 && dy > 0.5) {
+        if (dx > 0.25 && dy > 0.25) {
             // Use proportional threshold: if the minor-axis is <15% of major-axis
             // AND the minor-axis is <25px (safety cap), snap to orthogonal.
             // This handles A* grid quantization artifacts (~20px) on long segments
