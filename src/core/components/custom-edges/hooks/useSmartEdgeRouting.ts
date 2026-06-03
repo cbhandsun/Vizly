@@ -23,7 +23,7 @@ import {
     type RoutingNodeRect,
 } from '../../../algorithms/containerHeaderSkimRepair';
 
-const RENDERED_PATH_CACHE_VERSION = 'late-o2m-fanout-trunk-v1';
+const RENDERED_PATH_CACHE_VERSION = 'late-o2m-fanout-trunk-v2';
 
 const _getRenderedPathCache = () => {
     if (typeof window === 'undefined') return new Map<string, string>();

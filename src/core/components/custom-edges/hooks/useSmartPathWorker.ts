@@ -42,7 +42,7 @@ export interface EdgeData {
 
 type Point2D = { x: number; y: number };
 
-const RENDERED_PATH_CACHE_VERSION = 'late-o2m-fanout-trunk-v1';
+const RENDERED_PATH_CACHE_VERSION = 'late-o2m-fanout-trunk-v2';
 
 const _getElkPoints = (edgeData: EdgeData): Point2D[] | null => {
     if (!edgeData?.elkPath || !Array.isArray(edgeData.elkPath) || edgeData.elkPath.length <= 1) return null;

@@ -223,6 +223,27 @@ describe('repairDirectionalSourceExitPath', () => {
     expect(repaired).toBeNull();
   });
 
+  it('keeps a deep lower-left fan-out vertical when lateral drift is not dominant', () => {
+    const repaired = repairDirectionalSourceExitPath([
+      { x: 1228, y: 390 },
+      { x: 1228, y: 1250 },
+      { x: 216, y: 1250 },
+      { x: 216, y: 1478 },
+    ], {
+      edgeId: 'e10',
+      sourceId: 'fix-quota',
+      targetId: 'greedy-spec',
+      nodes: [
+        { id: 'fix-quota', type: 'custom', x: 1102, y: 294, width: 252, height: 96 },
+        { id: 'greedy-spec', type: 'custom', x: 114, y: 1478, width: 204, height: 96 },
+        { id: 'titlegroup-resource', type: 'titleGroup', x: 20, y: 1346, width: 1421, height: 761 },
+        { id: 'subgroup-direct', type: 'subGroup', x: 90, y: 1418, width: 260, height: 657 },
+      ],
+    });
+
+    expect(repaired).toBeNull();
+  });
+
   it('keeps a long lower-left shared-source edge on its vertical source stem', () => {
     const repaired = repairDirectionalSourceExitPath([
       { x: 1228, y: 390 },
