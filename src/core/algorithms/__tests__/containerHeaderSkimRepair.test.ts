@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  detectContainerHeaderSkimRisk,
   repairContainerHeaderSkimPath,
   repairDirectionalSourceExitPath,
   repairEndpointPortConstraintPath,
@@ -18,6 +19,21 @@ const firstSegment = (points: Array<{ x: number; y: number }>) => [points[0], po
 const lastSegment = (points: Array<{ x: number; y: number }>) => [points[points.length - 2], points[points.length - 1]] as const;
 
 describe('repairContainerHeaderSkimPath', () => {
+  it('detects a locked WMS edge skimming the resource-allocation header', () => {
+    const risk = detectContainerHeaderSkimRisk([
+      { x: 505.8, y: 2690 },
+      { x: 505.8, y: 3022 },
+      { x: 192, y: 3022 },
+      { x: 192, y: 3094 },
+    ], {
+      sourceId: 'fix-quota',
+      targetId: 'greedy-spec',
+      nodes: baseNodes,
+    });
+
+    expect(risk).toBe(true);
+  });
+
   it('lifts an entering edge off the target container header band', () => {
     const repaired = repairContainerHeaderSkimPath([
       { x: 505.8, y: 2690 },

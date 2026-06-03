@@ -20,6 +20,7 @@ import {
     repairDirectionalSourceExitPath,
     repairEndpointPortConstraintPath,
     repairTangentialEndpointEntryPath,
+    detectContainerHeaderSkimRisk,
     type RoutingNodeRect,
 } from '../../../algorithms/containerHeaderSkimRepair';
 
@@ -1521,15 +1522,27 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       && !edgeData?.isTreeBus
       && !edgeData?.treeRouting;
   const canApplyLocalDoglegRepair = canUseFreshWorkerPath;
-  const canApplyContainerHeaderSkimRepair = !nodesDragging
-      && !isLoading
-      && !isLayoutPathLocked
-      && routingNodeRects.length > 0;
   const canApplySameSourceFanOutRepair = canUseFreshWorkerPath;
 
   const snappedFinalPath = snapSimpleOrthogonalPath(
       jumpPath || busGeometryPath || finalPath || `M ${props.sourceX} ${props.sourceY} L ${props.targetX} ${props.targetY}`
   );
+  const snappedFinalPointsForQuality = orthogonalizePointChain(parseRenderedPathPoints(snappedFinalPath));
+  const lockedPathNeedsContainerRepair = isLayoutPathLocked
+      && snappedFinalPointsForQuality.length >= 2
+      && (
+          pathHasObstacleHit(snappedFinalPointsForQuality, safeObstacles)
+          || !pathEndpointsTouchCurrentNodes(snappedFinalPointsForQuality, source, target, routingNodeRects)
+          || detectContainerHeaderSkimRisk(snappedFinalPointsForQuality, {
+              sourceId: source,
+              targetId: target,
+              nodes: routingNodeRects,
+          })
+      );
+  const canApplyContainerHeaderSkimRepair = !nodesDragging
+      && !isLoading
+      && routingNodeRects.length > 0
+      && (!isLayoutPathLocked || lockedPathNeedsContainerRepair);
   const microJogRepairedPath = repairNearlyAlignedMicroJog(
       id,
       snappedFinalPath,

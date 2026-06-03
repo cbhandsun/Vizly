@@ -545,3 +545,18 @@ export function repairContainerHeaderSkimPath(
     ]);
     return validateCandidate(candidate, current, options);
 }
+
+export function detectContainerHeaderSkimRisk(
+    points: Point[],
+    options: Pick<ContainerHeaderSkimRepairOptions, 'sourceId' | 'targetId' | 'nodes'>,
+): boolean {
+    const current = simplifyOrthogonalPoints(points);
+    if (current.length < 3) return false;
+
+    const source = options.nodes.find(node => node.id === options.sourceId);
+    const target = options.nodes.find(node => node.id === options.targetId);
+    if (!source || !target) return false;
+
+    const targetContainers = targetContainersFor(options.nodes, source, target);
+    return targetContainers.length > 0 && hasHeaderSkim(current, targetContainers);
+}
