@@ -23,7 +23,7 @@ import {
     type RoutingNodeRect,
 } from '../../../algorithms/containerHeaderSkimRepair';
 
-const RENDERED_PATH_CACHE_VERSION = 'late-o2m-fanout-trunk-v2';
+const RENDERED_PATH_CACHE_VERSION = 'domain-dagre-computed-path-v1';
 
 const _getRenderedPathCache = () => {
     if (typeof window === 'undefined') return new Map<string, string>();
@@ -1398,6 +1398,10 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       isSharedTrunkEdge ||
       edgeData?.treeRouting
   );
+  const isLayoutPathLocked = !!(
+      edgeData?.layoutPathLocked ||
+      (edgeData as any)?._layoutPathLocked
+  );
   const renderCornerRadius = structuralCornerRadius;
 
   // 3. Channel Routing
@@ -1497,14 +1501,16 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       if (!isBusEdge || !jumpInputPoints || jumpInputPoints.length < 2) return null;
       return createFilletedPath(jumpInputPoints, renderCornerRadius);
   }, [isBusEdge, jumpInputPoints, renderCornerRadius]);
-  const canApplyRenderedSoftRepair = canUseFreshWorkerPath
+  const canApplyRenderedSoftRepair = !isLayoutPathLocked
+      && canUseFreshWorkerPath
       && !edgeData?.isTreeBus
       && !edgeData?.treeRouting;
-  const canApplyLocalDoglegRepair = canUseFreshWorkerPath;
+  const canApplyLocalDoglegRepair = !isLayoutPathLocked && canUseFreshWorkerPath;
   const canApplyContainerHeaderSkimRepair = !nodesDragging
       && !isLoading
+      && !isLayoutPathLocked
       && routingNodeRects.length > 0;
-  const canApplySameSourceFanOutRepair = canUseFreshWorkerPath;
+  const canApplySameSourceFanOutRepair = !isLayoutPathLocked && canUseFreshWorkerPath;
 
   const snappedFinalPath = snapSimpleOrthogonalPath(
       jumpPath || busGeometryPath || finalPath || `M ${props.sourceX} ${props.sourceY} L ${props.targetX} ${props.targetY}`

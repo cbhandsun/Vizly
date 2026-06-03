@@ -42,7 +42,14 @@ export interface EdgeData {
 
 type Point2D = { x: number; y: number };
 
-const RENDERED_PATH_CACHE_VERSION = 'late-o2m-fanout-trunk-v2';
+const RENDERED_PATH_CACHE_VERSION = 'domain-dagre-computed-path-v1';
+
+const pointsToOrthogonalPath = (points: Point2D[]): string => {
+    if (!Array.isArray(points) || points.length === 0) return '';
+    return points
+        .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+        .join(' ');
+};
 
 const _getElkPoints = (edgeData: EdgeData): Point2D[] | null => {
     if (!edgeData?.elkPath || !Array.isArray(edgeData.elkPath) || edgeData.elkPath.length <= 1) return null;
@@ -418,6 +425,15 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
     useEffect(() => {
         if (!isMountedRef.current) return;
         if (elkPoints) return;
+        if (computedPoints && computedPoints.length > 1 && !nodesDragging) {
+            const computedPath = pointsToOrthogonalPath(computedPoints);
+            setPath(computedPath);
+            setSmartPoints(computedPoints);
+            setIsLoading(false);
+            isHydratedRef.current = false;
+            lastFingerprintRef.current = '';
+            return;
+        }
 
         const layoutEpoch = edgeData?._layoutEpoch ?? 0;
 
@@ -858,7 +874,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
         centeredCoords, source, target, fallbackPositions, obstacles, simpleNodeMap,
         edgeConfig, layoutDirection, zoomLevel,
         respectSourceHandle, respectTargetHandle, sourceHandleId, targetHandleId,
-        id, edgeDataSig, multiEdgeInfo, isLayoutStable, nodesDragging, elkPoints,
+        id, edgeDataSig, multiEdgeInfo, isLayoutStable, nodesDragging, elkPoints, computedPoints,
         isReverseEdge, isBus, graphVersion, routingLabelSig
     ]);
 

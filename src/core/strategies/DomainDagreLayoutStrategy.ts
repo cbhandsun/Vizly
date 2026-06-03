@@ -1394,6 +1394,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             // [FIX] 将 A* 计算的障碍物避让路径存储到 edge.data，供边渲染器使用
             if (routingResult.computedPath && routingResult.computedPath.length >= 2) {
                 (edge.data as any).computedPath = routingResult.computedPath;
+                (edge.data as any).layoutPathLocked = true;
                 // 使用 advanced-smart-step 边类型，它会优先读取 computedPath
                 edge.type = 'advanced-smart-step';
             }
