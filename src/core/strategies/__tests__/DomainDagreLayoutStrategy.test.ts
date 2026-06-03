@@ -4,6 +4,7 @@ import { LayoutType } from '../../types/layout';
 import DomainDagreLayoutStrategy from '../DomainDagreLayoutStrategy';
 import demandAllocation from '../../../data/standardized/DeamndAllocation.json';
 import { standardDataToCanvas } from '../../components/diagrams/designerUtils';
+import { detectLocalDoglegRisks } from '../../algorithms/localDoglegQuality';
 
 vi.hoisted(() => {
     Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
@@ -169,6 +170,8 @@ describe('DomainDagreLayoutStrategy', () => {
         for (const edge of outgoing) {
             const path = ((edge.data as any)?.computedPath ?? []) as Array<{ x: number; y: number }>;
             expect(edge.sourceHandle).toBe('bottom');
+            expect((edge.data as any)?.layoutPathLocked).toBe(true);
+            expect((edge.data as any)?.runtimeHandleLock).toMatchObject({ source: true, target: true });
             expect(path.length).toBeGreaterThanOrEqual(2);
 
             const sourceAbs = absolutePositionOf(fixQuota, result.nodes);
@@ -183,5 +186,9 @@ describe('DomainDagreLayoutStrategy', () => {
             expect(Math.abs(second.x - first.x)).toBeLessThanOrEqual(2);
             expect(second.y).toBeGreaterThan(first.y + 24);
         }
+
+        const poolAEdge = result.edges.find(e => e.id === 'e5')!;
+        const poolAPath = ((poolAEdge.data as any)?.computedPath ?? []) as Array<{ x: number; y: number }>;
+        expect(detectLocalDoglegRisks(poolAPath)).toEqual([]);
     });
 });

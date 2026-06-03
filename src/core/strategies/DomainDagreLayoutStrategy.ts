@@ -1395,6 +1395,13 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             if (routingResult.computedPath && routingResult.computedPath.length >= 2) {
                 (edge.data as any).computedPath = routingResult.computedPath;
                 (edge.data as any).layoutPathLocked = true;
+                (edge.data as any).runtimeHandleLock = {
+                    ...(((edge.data as any).runtimeHandleLock && typeof (edge.data as any).runtimeHandleLock === 'object')
+                        ? (edge.data as any).runtimeHandleLock
+                        : {}),
+                    source: true,
+                    target: true,
+                };
                 // 使用 advanced-smart-step 边类型，它会优先读取 computedPath
                 edge.type = 'advanced-smart-step';
             }

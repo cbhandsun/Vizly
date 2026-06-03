@@ -42,7 +42,7 @@ export interface EdgeData {
 
 type Point2D = { x: number; y: number };
 
-const RENDERED_PATH_CACHE_VERSION = 'domain-dagre-computed-path-v1';
+const RENDERED_PATH_CACHE_VERSION = 'domain-dagre-computed-path-v2';
 
 const pointsToOrthogonalPath = (points: Point2D[]): string => {
     if (!Array.isArray(points) || points.length === 0) return '';

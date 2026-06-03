@@ -23,7 +23,7 @@ import {
     type RoutingNodeRect,
 } from '../../../algorithms/containerHeaderSkimRepair';
 
-const RENDERED_PATH_CACHE_VERSION = 'domain-dagre-computed-path-v1';
+const RENDERED_PATH_CACHE_VERSION = 'domain-dagre-computed-path-v2';
 
 const _getRenderedPathCache = () => {
     if (typeof window === 'undefined') return new Map<string, string>();
@@ -732,7 +732,8 @@ const repairEarlySameSourceFanOut = (
     const end = points[points.length - 1];
     const firstVertical = Math.abs(start.x - first.x) < 1;
     const lastVertical = Math.abs(beforeEnd.x - end.x) < 1;
-    if (!firstVertical || !lastVertical) return path;
+    const lastHorizontal = Math.abs(beforeEnd.y - end.y) < 1;
+    if (!firstVertical || (!lastVertical && !lastHorizontal)) return path;
 
     const totalDy = end.y - start.y;
     const totalDx = end.x - start.x;
@@ -741,7 +742,7 @@ const repairEarlySameSourceFanOut = (
     const flowDir = Math.sign(totalDy);
     if (flowDir === 0) return path;
     const firstDir = Math.sign(first.y - start.y);
-    const lastDir = Math.sign(end.y - beforeEnd.y);
+    const lastDir = lastVertical ? Math.sign(end.y - beforeEnd.y) : flowDir;
     if (firstDir !== flowDir || lastDir !== flowDir) return path;
 
     const bridge = points.find((point, index) => {
@@ -757,16 +758,26 @@ const repairEarlySameSourceFanOut = (
     const bridgeProgress = Math.abs(bridge.y - start.y) / Math.max(1, Math.abs(totalDy));
     if (bridgeProgress > 0.6) return path;
 
-    const targetStub = Math.min(72, Math.max(40, Math.abs(end.y - beforeEnd.y) >= 24 ? Math.abs(end.y - beforeEnd.y) * 0.35 : 40));
+    const targetStub = lastVertical
+        ? Math.min(72, Math.max(40, Math.abs(end.y - beforeEnd.y) >= 24 ? Math.abs(end.y - beforeEnd.y) * 0.35 : 40))
+        : Math.min(96, Math.max(56, Math.abs(totalDy) * 0.18));
     const approachY = end.y - flowDir * targetStub;
     if (Math.abs(approachY - start.y) < 80) return path;
 
-    const candidate = orthogonalizePointChain([
-        start,
-        { x: start.x, y: approachY },
-        { x: end.x, y: approachY },
-        end,
-    ]);
+    const candidate = orthogonalizePointChain(lastVertical
+        ? [
+            start,
+            { x: start.x, y: approachY },
+            { x: end.x, y: approachY },
+            end,
+        ]
+        : [
+            start,
+            { x: start.x, y: approachY },
+            { x: beforeEnd.x, y: approachY },
+            { ...beforeEnd },
+            end,
+        ]);
     const currentLength = manhattanLength(points);
     const candidateLength = manhattanLength(candidate);
     if (candidateLength > currentLength + 12) return path;
@@ -824,6 +835,10 @@ const repairRedundantOuterLoop = (
     const repairedPath = createFilletedPath(candidate, radius);
     _setRenderedPathCacheValue(edgeId, repairedPath);
     return repairedPath;
+};
+
+export const __smartEdgeRoutingTestUtils = {
+    repairEarlySameSourceFanOut,
 };
 
 const repairNearlyAlignedMicroJog = (
@@ -1505,12 +1520,12 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       && canUseFreshWorkerPath
       && !edgeData?.isTreeBus
       && !edgeData?.treeRouting;
-  const canApplyLocalDoglegRepair = !isLayoutPathLocked && canUseFreshWorkerPath;
+  const canApplyLocalDoglegRepair = canUseFreshWorkerPath;
   const canApplyContainerHeaderSkimRepair = !nodesDragging
       && !isLoading
       && !isLayoutPathLocked
       && routingNodeRects.length > 0;
-  const canApplySameSourceFanOutRepair = !isLayoutPathLocked && canUseFreshWorkerPath;
+  const canApplySameSourceFanOutRepair = canUseFreshWorkerPath;
 
   const snappedFinalPath = snapSimpleOrthogonalPath(
       jumpPath || busGeometryPath || finalPath || `M ${props.sourceX} ${props.sourceY} L ${props.targetX} ${props.targetY}`

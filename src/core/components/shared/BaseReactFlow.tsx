@@ -770,7 +770,14 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         },
       };
     };
+    const hasLockedComputedPath = (edge: Edge): boolean => {
+      const data = ((edge.data || {}) as Record<string, any>);
+      return (data.layoutPathLocked === true || data._layoutPathLocked === true)
+        && Array.isArray(data.computedPath)
+        && data.computedPath.length >= 2;
+    };
     const normalizeCrossContainerManualHandles = (edge: Edge): Edge => {
+      if (hasLockedComputedPath(edge)) return edge;
       const data = ((edge.data || {}) as Record<string, any>);
       const manualSides = Array.isArray(data.manualHandleSides)
         ? data.manualHandleSides.map((side: any) => String(side).toLowerCase())
@@ -797,6 +804,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       };
     };
     const normalizeAutoReverseSideHandles = (edge: Edge): Edge => {
+      if (hasLockedComputedPath(edge)) return edge;
       const data = ((edge.data || {}) as Record<string, any>);
       if (data.isTreeBus || data.treeRouting) return edge;
       const autoSides = Array.isArray(data.auto)
