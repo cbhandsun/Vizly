@@ -1156,6 +1156,69 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             const auto = Array.isArray(data.auto) ? data.auto : [];
             return Boolean(data[side === 'source' ? 'autoSource' : 'autoTarget']) || auto.includes(side);
         };
+        const oppositeHandle = (h: string): string => {
+            const normalized = normalizeHandle(h);
+            if (normalized === 'l') return 'right';
+            if (normalized === 'r') return 'left';
+            if (normalized === 't') return 'bottom';
+            if (normalized === 'b') return 'top';
+            return 'bottom';
+        };
+        const sourceOutCounts = new Map<string, number>();
+        const targetInCounts = new Map<string, number>();
+        clonedEdges.forEach(edge => {
+            sourceOutCounts.set(edge.source, (sourceOutCounts.get(edge.source) || 0) + 1);
+            targetInCounts.set(edge.target, (targetInCounts.get(edge.target) || 0) + 1);
+        });
+        const shouldForceRolePorts = (
+            edge: Edge,
+            source: ReactFlowNode,
+            target: ReactFlowNode,
+            edgePorts?: { source?: string; target?: string }
+        ) => {
+            if (!edgePorts) return false;
+            const layoutDir = String(options.direction || 'TB').toUpperCase();
+            const isVerticalFlow = layoutDir === 'TB' || layoutDir === 'BT';
+            const isHorizontalFlow = layoutDir === 'LR' || layoutDir === 'RL';
+            const sourcePre = normalizeHandle(edgePorts.source);
+            const targetPre = normalizeHandle(edgePorts.target);
+            const sPos = (source as any).positionAbsolute ?? source.position ?? { x: 0, y: 0 };
+            const tPos = (target as any).positionAbsolute ?? target.position ?? { x: 0, y: 0 };
+            const sDims = {
+                width: (source as any).measured?.width || (source as any).style?.width || 200,
+                height: (source as any).measured?.height || (source as any).style?.height || 80,
+            };
+            const tDims = {
+                width: (target as any).measured?.width || (target as any).style?.width || 200,
+                height: (target as any).measured?.height || (target as any).style?.height || 80,
+            };
+            const dx = (tPos.x + tDims.width / 2) - (sPos.x + sDims.width / 2);
+            const dy = (tPos.y + tDims.height / 2) - (sPos.y + sDims.height / 2);
+            const sourceFanOut = (sourceOutCounts.get(edge.source) || 0) > 1;
+            const targetFanIn = (targetInCounts.get(edge.target) || 0) > 1;
+
+            if (isVerticalFlow) {
+                const sourceMatchesFlow = sourceFanOut && (sourcePre === 'b' || sourcePre === 't')
+                    && Math.abs(dy) > 30
+                    && ((sourcePre === 'b' && dy > 0) || (sourcePre === 't' && dy < 0));
+                const targetMatchesFlow = targetFanIn && (targetPre === 't' || targetPre === 'b')
+                    && Math.abs(dy) > 30
+                    && ((targetPre === 't' && dy > 0) || (targetPre === 'b' && dy < 0));
+                return sourceMatchesFlow || targetMatchesFlow;
+            }
+
+            if (isHorizontalFlow) {
+                const sourceMatchesFlow = sourceFanOut && (sourcePre === 'r' || sourcePre === 'l')
+                    && Math.abs(dx) > 30
+                    && ((sourcePre === 'r' && dx > 0) || (sourcePre === 'l' && dx < 0));
+                const targetMatchesFlow = targetFanIn && (targetPre === 'l' || targetPre === 'r')
+                    && Math.abs(dx) > 30
+                    && ((targetPre === 'l' && dx > 0) || (targetPre === 'r' && dx < 0));
+                return sourceMatchesFlow || targetMatchesFlow;
+            }
+
+            return false;
+        };
 
         // [FIX] 强制同步点：让出到微任务队列，确保所有待处理的状态更新完成
         // 这模拟了 DevTools 打开时 console.log 造成的微小延迟，解决 F12 打开/关闭的差异问题
@@ -1282,6 +1345,22 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 ...routingConfig,
                 preAssignedPorts: mergedPorts
             };
+            const forceRolePorts = shouldForceRolePorts(edge, source, target, edgePorts);
+            if (forceRolePorts) {
+                (routingConfigForEdge as any).preAssignedPortPolicy = 'force';
+                if (edgePorts?.source && !mergedPorts[target.id]?.target) {
+                    mergedPorts[target.id] = {
+                        ...mergedPorts[target.id],
+                        target: oppositeHandle(edgePorts.source),
+                    };
+                }
+                if (edgePorts?.target && !mergedPorts[source.id]?.source) {
+                    mergedPorts[source.id] = {
+                        ...mergedPorts[source.id],
+                        source: oppositeHandle(edgePorts.target),
+                    };
+                }
+            }
 
             const routingResult = explicitSourceHandle && explicitTargetHandle
                 ? {
@@ -1435,18 +1514,56 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                         if (!path || path.length < 2) continue;
 
                         const ptIdx = role === 'source' ? 0 : path.length - 1;
+                        const adjacentIdx = role === 'source' ? 1 : path.length - 2;
+                        const stubLength = 32;
                         if (isVerticalPort) {
                             // Spread along X axis
+                            const nextX = absPos.x + dims.width * fraction;
+                            const oldAdjacent = { ...path[adjacentIdx] };
                             path[ptIdx] = {
                                 ...path[ptIdx],
-                                x: absPos.x + dims.width * fraction
+                                x: nextX
                             };
+                            const isSidewaysFirstSegment = Math.abs(oldAdjacent.y - path[ptIdx].y) < 0.5;
+                            if (isSidewaysFirstSegment) {
+                                const outward = handle === 't' ? -1 : 1;
+                                path[adjacentIdx] = {
+                                    x: nextX,
+                                    y: path[ptIdx].y + outward * stubLength
+                                };
+                            } else {
+                                path[adjacentIdx] = {
+                                    ...path[adjacentIdx],
+                                    x: nextX
+                                };
+                            }
                         } else {
                             // Spread along Y axis
+                            const nextY = absPos.y + dims.height * fraction;
+                            const oldAdjacent = { ...path[adjacentIdx] };
                             path[ptIdx] = {
                                 ...path[ptIdx],
-                                y: absPos.y + dims.height * fraction
+                                y: nextY
                             };
+                            const isSidewaysFirstSegment = Math.abs(oldAdjacent.x - path[ptIdx].x) < 0.5;
+                            if (isSidewaysFirstSegment) {
+                                const outward = handle === 'l' ? -1 : 1;
+                                path[adjacentIdx] = {
+                                    x: path[ptIdx].x + outward * stubLength,
+                                    y: nextY
+                                };
+                            } else {
+                                path[adjacentIdx] = {
+                                    ...path[adjacentIdx],
+                                    y: nextY
+                                };
+                            }
+                        }
+                        if (
+                            Math.abs(path[ptIdx].x - path[adjacentIdx].x) < 0.5 &&
+                            Math.abs(path[ptIdx].y - path[adjacentIdx].y) < 0.5
+                        ) {
+                            path.splice(adjacentIdx, 1);
                         }
                     }
                 }
@@ -1696,7 +1813,15 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             if (count === 0) return 'bottom';
             const dx = sumX / count - c.cx;
             const dy = sumY / count - c.cy;
-            if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 'right' : 'left';
+            const layoutDir = String(options.direction || 'TB').toUpperCase();
+            const isHorizontalFlow = layoutDir === 'LR' || layoutDir === 'RL';
+            if (isHorizontalFlow) {
+                if (count > 1 && Math.abs(dx) > 30) return dx > 0 ? 'right' : 'left';
+                if (Math.abs(dy) > Math.abs(dx) * 1.1) return dy > 0 ? 'bottom' : 'top';
+                return dx > 0 ? 'right' : 'left';
+            }
+            if (count > 1 && Math.abs(dy) > 30) return dy > 0 ? 'bottom' : 'top';
+            if (Math.abs(dx) > Math.abs(dy) * 1.1) return dx > 0 ? 'right' : 'left';
             return dy > 0 ? 'bottom' : 'top';
         };
         const oppositeHandle = (h: string): string => {

@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import { LayoutType } from '../../types/layout';
 import DomainDagreLayoutStrategy from '../DomainDagreLayoutStrategy';
+import demandAllocation from '../../../data/standardized/DeamndAllocation.json';
+import { standardDataToCanvas } from '../../components/diagrams/designerUtils';
 
 vi.hoisted(() => {
     Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
@@ -141,5 +143,45 @@ describe('DomainDagreLayoutStrategy', () => {
         expect(computedPath.length).toBeGreaterThanOrEqual(2);
         expect(Math.abs(computedPath[0].x - (sourceAbs.x + sourceSize.width + 1))).toBeLessThanOrEqual(1);
         expect(Math.abs(computedPath[computedPath.length - 1].x - (targetAbs.x - 1))).toBeLessThanOrEqual(1);
+    });
+
+    it('keeps WMS quota fan-out on the vertical process axis in horizontal subdomain dagre', async () => {
+        const canvas = await standardDataToCanvas(demandAllocation as any);
+        const presetLayout = (demandAllocation as any).layout;
+
+        const result = await new DomainDagreLayoutStrategy().calculateLayout(canvas.nodes, canvas.edges, {
+            type: LayoutType.DAGRE,
+            direction: 'TB',
+            nodeLayout: 'dagre',
+            generateDomainGroups: true,
+            generateSubDomainGroups: true,
+            domainSubGroupDirection: 'LR',
+            subDomainNodeDirection: 'TB',
+            domainOrder: presetLayout.domainOrder,
+            subDomainOrder: presetLayout.subDomainOrder,
+        } as any);
+
+        const fixQuota = result.nodes.find(n => n.id === 'fix-quota')!;
+        const outgoing = result.edges.filter(e => e.source === 'fix-quota');
+        expect(fixQuota).toBeTruthy();
+        expect(outgoing.map(e => e.id).sort()).toEqual(['e10', 'e16']);
+
+        for (const edge of outgoing) {
+            const path = ((edge.data as any)?.computedPath ?? []) as Array<{ x: number; y: number }>;
+            expect(edge.sourceHandle).toBe('bottom');
+            expect(path.length).toBeGreaterThanOrEqual(2);
+
+            const sourceAbs = absolutePositionOf(fixQuota, result.nodes);
+            const sourceSize = sizeOf(fixQuota);
+            const sourceBottomY = sourceAbs.y + sourceSize.height;
+            const first = path[0];
+            const second = path[1];
+
+            expect(first.x).toBeGreaterThanOrEqual(sourceAbs.x - 1);
+            expect(first.x).toBeLessThanOrEqual(sourceAbs.x + sourceSize.width + 1);
+            expect(first.y).toBeGreaterThanOrEqual(sourceBottomY);
+            expect(Math.abs(second.x - first.x)).toBeLessThanOrEqual(2);
+            expect(second.y).toBeGreaterThan(first.y + 24);
+        }
     });
 });

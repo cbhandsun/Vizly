@@ -144,16 +144,26 @@ export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record
         const dir = String(_cfg?.layoutDirection || '').toUpperCase();
         const isH = dir === 'LR' || dir === 'RL';
 
+        const PRIMARY_AXIS_RATIO = 1.1;
+
         if (isH) {
             // 水平流向：优先选择左右端口
-            if (dx > 0) return 'right';
-            if (dx < 0) return 'left';
-            return dy > 0 ? 'bottom' : 'top';
+            if (validCount > 1 && Math.abs(dx) > 30) {
+                return dx > 0 ? 'right' : 'left';
+            }
+            if (Math.abs(dy) >= Math.abs(dx) * PRIMARY_AXIS_RATIO) {
+                return dy > 0 ? 'bottom' : 'top';
+            }
+            return dx > 0 ? 'right' : 'left';
         } else {
             // 垂直流向 (默认 / TB)：优先选择上下端口
-            if (dy > 0) return 'bottom';
-            if (dy < 0) return 'top';
-            return dx > 0 ? 'right' : 'left';
+            if (validCount > 1 && Math.abs(dy) > 30) {
+                return dy > 0 ? 'bottom' : 'top';
+            }
+            if (Math.abs(dx) >= Math.abs(dy) * PRIMARY_AXIS_RATIO) {
+                return dx > 0 ? 'right' : 'left';
+            }
+            return dy > 0 ? 'bottom' : 'top';
         }
     };
 
