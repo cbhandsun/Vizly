@@ -15,6 +15,7 @@ import {
     buildAlignedDirectPath,
     detectLocalDoglegRisks,
 } from '../../../algorithms/localDoglegQuality';
+import { repairHardObstacleViolations } from '../../../algorithms/hardObstaclePathRepair';
 import {
     repairContainerHeaderSkimPath,
     repairDirectionalSourceExitPath,
@@ -838,8 +839,33 @@ const repairRedundantOuterLoop = (
     return repairedPath;
 };
 
+const repairHardObstacleRenderedPath = (
+    edgeId: string,
+    path: string,
+    radius: number,
+    enabled: boolean,
+    obstacles: Array<{ x: number; y: number; width: number; height: number }> = [],
+): string => {
+    if (!enabled || !path || /[CQ]/i.test(path)) return path;
+    const points = orthogonalizePointChain(parseRenderedPathPoints(path));
+    if (points.length < 2 || !pathHasObstacleHit(points, obstacles)) return path;
+
+    const repaired = repairHardObstacleViolations(new Map([[edgeId, points]]), {
+        obstacles,
+        spacing: 12,
+        minClearance: 18,
+        maxIterationsPerEdge: 6,
+    }).get(edgeId);
+    if (!repaired || repaired.length < 2 || pathHasObstacleHit(repaired, obstacles)) return path;
+
+    const repairedPath = createFilletedPath(repaired, radius);
+    _setRenderedPathCacheValue(edgeId, repairedPath);
+    return repairedPath;
+};
+
 export const __smartEdgeRoutingTestUtils = {
     repairEarlySameSourceFanOut,
+    repairHardObstacleRenderedPath,
 };
 
 const repairNearlyAlignedMicroJog = (
@@ -1695,9 +1721,16 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       canApplyLocalDoglegRepair,
       safeObstacles
   );
-  const finalLocalDoglegPath = repairLocalMicroDoglegs(
+  const hardObstacleRepairedPath = repairHardObstacleRenderedPath(
       id,
       finalAlignedDoglegPath,
+      renderCornerRadius,
+      canApplyContainerHeaderSkimRepair || lockedPathNeedsContainerRepair,
+      safeObstacles
+  );
+  const finalLocalDoglegPath = repairLocalMicroDoglegs(
+      id,
+      hardObstacleRepairedPath,
       renderCornerRadius,
       canApplyLocalDoglegRepair,
       safeObstacles
