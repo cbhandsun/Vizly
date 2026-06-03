@@ -325,6 +325,9 @@ export class TrunkCalculator {
 
             const grid = 20;
             const standardOffset = spacing + 20;
+            const averagePeerHeight = peerNodes.reduce((sum, peer) => sum + peer.height, 0) / peerNodes.length;
+            const branchClearance = Math.max(spacing * 2, averagePeerHeight * 0.75);
+            const lateFanoutThreshold = Math.max(spacing * 3, branchClearance * 1.5);
 
             if (isTop) {
                 // Trunk on Top: midpoint between peers' bottom and hub's top
@@ -332,7 +335,11 @@ export class TrunkCalculator {
                 // [FIX-elbow-consistency] Use snapped offset
                 const preferred = Math.floor((hubNode.y - standardOffset) / grid) * grid;
                 const peerSafe = pBounds.maxY + 10;
-                axis = Math.max(peerSafe, Math.min(preferred, minSafe));
+                // O2M fan-outs read better when a long shared stem splits close to the peer layer,
+                // not immediately beside the source node.
+                const lateFanoutAxis = Math.ceil((pBounds.maxY + branchClearance) / grid) * grid;
+                const canDelayFanout = !isManyToOne && (minSafe - lateFanoutAxis) > lateFanoutThreshold;
+                axis = Math.max(peerSafe, Math.min(canDelayFanout ? lateFanoutAxis : preferred, minSafe));
                 suggestedPort = 'top';
             } else {
                 // Trunk on Bottom: midpoint between hub's bottom and peers' top
@@ -340,7 +347,11 @@ export class TrunkCalculator {
                 // [FIX-elbow-consistency] Use snapped offset
                 const preferred = Math.ceil((hubNode.y + hubNode.height + standardOffset) / grid) * grid;
                 const peerSafe = pBounds.minY - 10;
-                axis = Math.min(peerSafe, Math.max(preferred, minSafe));
+                // O2M fan-outs read better when a long shared stem splits close to the peer layer,
+                // not immediately beside the source node.
+                const lateFanoutAxis = Math.floor((pBounds.minY - branchClearance) / grid) * grid;
+                const canDelayFanout = !isManyToOne && (lateFanoutAxis - minSafe) > lateFanoutThreshold;
+                axis = Math.min(peerSafe, Math.max(canDelayFanout ? lateFanoutAxis : preferred, minSafe));
                 suggestedPort = 'bottom';
             }
 

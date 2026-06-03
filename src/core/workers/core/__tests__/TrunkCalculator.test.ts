@@ -173,6 +173,21 @@ describe('TrunkCalculator', () => {
             expect(result.axis).toBeGreaterThanOrEqual(fixQuota.y + fixQuota.height + 30);
         });
 
+        it('delays long O2M vertical fan-out splitting until near the peer layer', () => {
+            const fixQuota: Rectangle = { x: 379.8, y: 2594, width: 252, height: 96 };
+            const peers: Rectangle[] = [
+                { x: 82, y: 3094, width: 220, height: 96 },
+                { x: 430, y: 3094, width: 220, height: 96 },
+            ];
+
+            const result = trunkCalculator.calculateTreeTrunk(fixQuota, peers, false, defaultConfig, 'LR');
+
+            expect(result.direction).toBe('horizontal');
+            expect(result.suggestedPort).toBe('bottom');
+            expect(result.axis).toBeGreaterThan(fixQuota.y + fixQuota.height + 200);
+            expect(result.axis).toBeLessThan(peers[0].y - 40);
+        });
+
         it('should force horizontal flow mode (vertical trunk) if dx is dominant', () => {
             const peersHorizontal = [
                 { x: 400, y: 100, width: 80, height: 60 }

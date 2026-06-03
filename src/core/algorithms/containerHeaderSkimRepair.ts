@@ -234,7 +234,7 @@ const chooseHorizontalSourceSide = (source: Rectangle, target: Rectangle, curren
     const absDx = Math.abs(dx);
     const absDy = Math.abs(dy);
     if (absDx < Math.max(160, source.width * 1.2)) return null;
-    if (absDx < absDy * 0.4) return null;
+    if (absDx < absDy * 0.75) return null;
     return dx < 0 ? 'left' : 'right';
 };
 

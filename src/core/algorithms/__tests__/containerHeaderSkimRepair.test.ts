@@ -207,7 +207,7 @@ describe('repairEndpointPortConstraintPath', () => {
 });
 
 describe('repairDirectionalSourceExitPath', () => {
-  it('moves a far lateral cross-container edge out through the source side', () => {
+  it('keeps a lower-left fan-out on its vertical source stem when vertical flow dominates', () => {
     const repaired = repairDirectionalSourceExitPath([
       { x: 505.8, y: 2690 },
       { x: 505.8, y: 2852 },
@@ -220,17 +220,10 @@ describe('repairDirectionalSourceExitPath', () => {
       nodes: baseNodes,
     });
 
-    expect(repaired).toEqual([
-      { x: 505.8, y: 2690 },
-      { x: 505.8, y: 2762 },
-      { x: 283.8, y: 2762 },
-      { x: 283.8, y: 2852 },
-      { x: 192, y: 2852 },
-      { x: 192, y: 3094 },
-    ]);
+    expect(repaired).toBeNull();
   });
 
-  it('also moves a lower-left shared-source edge out through the source side', () => {
+  it('keeps a long lower-left shared-source edge on its vertical source stem', () => {
     const repaired = repairDirectionalSourceExitPath([
       { x: 1228, y: 390 },
       { x: 1228, y: 1250 },
@@ -248,14 +241,31 @@ describe('repairDirectionalSourceExitPath', () => {
       ],
     });
 
-    expect(repaired).toEqual([
+    expect(repaired).toBeNull();
+  });
+
+  it('moves a horizontally dominant cross-container edge out through the source side', () => {
+    const repaired = repairDirectionalSourceExitPath([
       { x: 1228, y: 390 },
-      { x: 1228, y: 462 },
-      { x: 1006, y: 462 },
-      { x: 1006, y: 1250 },
-      { x: 670, y: 1250 },
-      { x: 670, y: 1478 },
-    ]);
+      { x: 1228, y: 650 },
+      { x: 320, y: 650 },
+      { x: 320, y: 760 },
+    ], {
+      edgeId: 'e-lateral',
+      sourceId: 'fix-quota',
+      targetId: 'lateral-target',
+      nodes: [
+        { id: 'fix-quota', type: 'custom', x: 1102, y: 294, width: 252, height: 96 },
+        { id: 'lateral-target', type: 'custom', x: 214, y: 760, width: 212, height: 96 },
+        { id: 'titlegroup-resource', type: 'titleGroup', x: 20, y: 650, width: 700, height: 500 },
+      ],
+    });
+
+    expect(repaired).not.toBeNull();
+    const [start, next] = firstSegment(repaired!);
+    expect(next.x).toBeCloseTo(start.x, 3);
+    expect(next.y).toBeGreaterThan(start.y);
+    expect(repaired!.some(point => point.x < start.x - 100)).toBe(true);
   });
 
   it('does not change a short mostly vertical edge', () => {

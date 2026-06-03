@@ -383,7 +383,7 @@ export class EdgeRoutingCoordinator {
         // Clear global SVG path cache to prevent "flying lines" UI fallback
         try {
             const w = window as any;
-            w.__dv_rendered_path_cache_version__ = 'endpoint-orthogonal-container-entry-v8';
+            w.__dv_rendered_path_cache_version__ = 'late-o2m-fanout-trunk-v1';
             const cache = w.__dv_rendered_path_cache__;
             if (cache instanceof Map) {
                 cache.clear();
