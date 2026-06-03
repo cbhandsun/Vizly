@@ -21,6 +21,7 @@ import {
   offsetPathSegments,
   optimizeOrthogonalPath,
   removeShortDiagonals,
+  straightenAlignedLocalDogleg,
   removeTinyOrthogonalJogs,
   routeWithAStar,
   simplifyPath,
@@ -181,14 +182,54 @@ describe('smartEdgeUtils geometry primitives', () => {
     ]);
   });
 
+  it('moves tiny side-step jogs onto a clean middle lane when direct flattening is blocked', () => {
+    const axisBlockers = [
+      { x: 99, y: 40, width: 2, height: 120 },
+      { x: 111, y: 40, width: 2, height: 120 },
+    ];
+
+    expect(removeTinyOrthogonalJogs([
+      { x: 100, y: 0 },
+      { x: 100, y: 80 },
+      { x: 112, y: 80 },
+      { x: 112, y: 200 },
+    ], 40, axisBlockers)).toEqual([
+      { x: 100, y: 0 },
+      { x: 106, y: 0 },
+      { x: 106, y: 200 },
+      { x: 112, y: 200 },
+    ]);
+  });
+
+  it('does not move endpoint jogs onto a lane that violates port direction', () => {
+    const axisBlockers = [
+      { x: 99, y: 40, width: 2, height: 120 },
+      { x: 111, y: 40, width: 2, height: 120 },
+    ];
+    const points = [
+      { x: 100, y: 0 },
+      { x: 100, y: 80 },
+      { x: 112, y: 80 },
+      { x: 112, y: 200 },
+    ];
+
+    expect(removeTinyOrthogonalJogs(points, 40, axisBlockers, { sourcePos: Position.Bottom })).toEqual(points);
+  });
+
   it('creates filleted and jump-aware SVG paths', () => {
     const filleted = createFilletedPath([
       { x: 0, y: 0 },
       { x: 40, y: 0 },
       { x: 40, y: 40 },
     ], 10);
-    expect(filleted).toContain(' A ');
-    expect(filleted).toContain(' L 40 40');
+    expect(filleted).toMatch(/^M 0 0 L 30 0 A 9\.999999999999998 9\.999999999999998 0 0 1 40 10 L 40 40$/);
+    expect(filleted).not.toMatch(/[CQ]/);
+
+    expect(createFilletedPath([
+      { x: 0, y: 0 },
+      { x: 40, y: 0 },
+      { x: 40, y: 40 },
+    ], 0)).toBe('M 0 0 L 40 0 L 40 40');
 
     const jumpPath = createPathWithJumpsFromObstacles(
       [{ x: 0, y: 0 }, { x: 100, y: 0 }],
@@ -204,6 +245,56 @@ describe('smartEdgeUtils geometry primitives', () => {
       { x: 242.5, y: 902 },
       { x: 243, y: 1062 },
     ], 4)).toBe('M 242.5 902 L 242.5 1062');
+
+    expect(createFilletedPath([
+      { x: 248.99652099609375, y: 645.4461669921875 },
+      { x: 248.99478912353516, y: 1062.5556640625 },
+    ], 0)).toBe('M 248.99652099609375 645.4461669921875 L 248.99652099609375 1062.5556640625');
+  });
+
+  it('removes render-time tiny dogleg bridges before corner filleting', () => {
+    const path = createFilletedPath([
+      { x: 243, y: 646 },
+      { x: 243, y: 686 },
+      { x: 391, y: 686 },
+      { x: 391, y: 782 },
+      { x: 403, y: 782 },
+      { x: 403, y: 926 },
+      { x: 243, y: 926 },
+      { x: 243, y: 1062 },
+    ], 8);
+
+    expect(path).not.toContain('397 782');
+    expect(path).not.toContain('A 5.999999999999999');
+  });
+
+  it('straightens aligned local doglegs when the direct corridor is clear', () => {
+    expect(straightenAlignedLocalDogleg([
+      { x: 249, y: 1850 },
+      { x: 249, y: 1890 },
+      { x: 297, y: 1890 },
+      { x: 297, y: 1970 },
+      { x: 249, y: 1970 },
+      { x: 249, y: 2010 },
+    ], [], { sourcePos: Position.Bottom, targetPos: Position.Top })).toEqual([
+      { x: 249, y: 1850 },
+      { x: 249, y: 2010 },
+    ]);
+  });
+
+  it('keeps aligned local doglegs when the direct corridor crosses an obstacle', () => {
+    const points = [
+      { x: 249, y: 1850 },
+      { x: 249, y: 1890 },
+      { x: 297, y: 1890 },
+      { x: 297, y: 1970 },
+      { x: 249, y: 1970 },
+      { x: 249, y: 2010 },
+    ];
+
+    expect(straightenAlignedLocalDogleg(points, [
+      { x: 220, y: 1900, width: 70, height: 40 },
+    ], { sourcePos: Position.Bottom, targetPos: Position.Top })).toEqual(points);
   });
 
   it('offsets orthogonal paths and generates greedy orthogonal routes', () => {

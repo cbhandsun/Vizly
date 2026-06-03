@@ -172,12 +172,15 @@ export class TrunkCalculator {
         const dx = Math.abs(peersCenter.x - hubCenter.x);
         const dy = Math.abs(peersCenter.y - hubCenter.y);
 
-        // If Vertical separation is dominant (Process Flow)
-        if (dy > dx * 1.2 && dy > 40) {
+        const flowDominanceRatio = 1.05;
+        // If vertical separation is clearly dominant (process flow), prefer top/bottom ports.
+        // A 1.2 threshold was too strict for lower-left WMS fan-outs: the trunk stayed on
+        // the left side even though the readable route should leave through the bottom.
+        if (dy > dx * flowDominanceRatio && dy > 40) {
             isHorizontal = false; // Force Vertical Flow Mode (Horizontal Trunk)
         }
         // If Horizontal separation is dominant (Timeline/Swimlane Flow)
-        else if (dx > dy * 1.2 && dx > 40) {
+        else if (dx > dy * flowDominanceRatio && dx > 40) {
             isHorizontal = true; // Force Horizontal Flow Mode (Vertical Trunk)
         }
 

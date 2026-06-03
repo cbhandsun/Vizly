@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { EdgeRoutingCoordinator } from '../EdgeRoutingCoordinator';
 import { Position } from '../../types/routing';
 import type { PathFindingJob, Rectangle } from '../../types/routing';
+import { TrunkCalculator } from '../../workers/core/TrunkCalculator';
 
 // Mock worker pools since these tests only cover synchronous coordinator partitioning logic.
 vi.mock('../../workers/WorkerPool', () => {
@@ -242,6 +243,60 @@ describe('EdgeRoutingCoordinator: assignSameSidePortSeparation', () => {
         for (const job of jobs) {
             expect(job.incomingCount).toBe(1);
             expect(job.incomingIndex).toBe(0);
+        }
+    });
+
+    it('keeps lower-left WMS fan-outs grouped on the bottom source port', () => {
+        const coordinator = EdgeRoutingCoordinator.getInstance();
+        const rects = new Map<string, Rectangle>([
+            ['fix-quota', { x: 1102, y: 294, width: 252, height: 96 }],
+            ['greedy-spec', { x: 114, y: 1478, width: 204, height: 96 }],
+            ['merge-res', { x: 564, y: 1478, width: 211, height: 96 }],
+        ]);
+        const globalPeers = [
+            { id: 'e10', source: 'fix-quota', target: 'greedy-spec', type: 'dependency' },
+            { id: 'e16', source: 'fix-quota', target: 'merge-res', type: 'data' },
+        ];
+        const jobs = globalPeers.map((edge): PathFindingJob => ({
+            jobId: `job-${edge.id}`,
+            edgeId: edge.id,
+            source: edge.source,
+            target: edge.target,
+            sourceRect: rects.get(edge.source),
+            targetRect: rects.get(edge.target),
+            sourceX: 0,
+            sourceY: 0,
+            targetX: 0,
+            targetY: 0,
+            isOneToMany: true,
+            isManyToOne: false,
+        }));
+
+        (coordinator as any).processBusGroups(
+            'fix-quota',
+            jobs,
+            globalPeers,
+            (id: string) => rects.get(id),
+            new TrunkCalculator(),
+            {
+                bus: {
+                    trunkBase: 40,
+                    trunkMultiplier: 10,
+                    parallelTrunkSpacing: 60,
+                    parallelTrunkStrategy: 'count-based',
+                },
+            },
+            'LR',
+            false,
+            [...rects.values()],
+        );
+
+        for (const job of jobs) {
+            expect((job as any).o2mTrunkPort).toBe(Position.Bottom);
+            expect((job as any).o2mPeerGroupKey).toBe('o2m:fix-quota:bottom');
+            expect(job.busRoutingPlan?.o2mTrunkPort).toBe(Position.Bottom);
+            expect(job.busRoutingPlan?.o2mPeerGroupKey).toBe('o2m:fix-quota:bottom');
+            expect(job.busTrunkSource?.y).toBe(job.busTrunkTarget?.y);
         }
     });
 });

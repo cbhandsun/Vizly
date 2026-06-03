@@ -312,9 +312,11 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
 
     // ---------- 0️⃣ Edge configuration ----------
     const edgeConfig = useMemo(() => {
-        // [FIX] Default strictOrthogonal to FALSE: explicitly requiring `strictOrthogonal: true` to enable sharp corners.
-        // Previously defaulted to true (because `undefined !== false`), which silently set borderRadius=0 for all edges.
-        const strictOverride = (props.data as any)?.edgeConfig?.strictOrthogonal === true;
+        const strictOverride = (props.data as any)?.edgeConfig?.strictOrthogonal !== false;
+        const dataBorderRadius = Number((props.data as any)?.borderRadius);
+        const defaultBorderRadius = Number.isFinite(dataBorderRadius)
+            ? Math.max(0, dataBorderRadius)
+            : 8;
 
         const DEFAULT_EDGE_CONFIG = {
             bundleStrength: 0.6,
@@ -322,7 +324,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             obstaclePadding: 2,
             labelCollisionOffset: 8,
             jitterThresholdMultiplier: 2,
-            borderRadius: strictOverride ? 0 : 8, // [FIX] Hyper-Glass V3: 8px smooth orthogonal corners (industry standard)
+            borderRadius: defaultBorderRadius,
             sourceOffset: 12, // Reduced from 25 for tighter handle connection
             targetOffset: 15, // Reduced from 35 for tighter handle connection
             minLastSegment: 15, // Reduced from 30 for tighter handle connection
@@ -413,9 +415,10 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
     // [FIX C-6] O(E²)→O(E)：全局方向投票不再依赖 storeEdges（每帧引用变化），
     // 改为仅依赖 edgeTopologySig（连接关系字符串签名），同一渲染批次内只计算一次。
     // 使用模块级缓存：相同签名复用上次结果，避免每条边组件重复投票。
+    const edgeLayoutDirectionOverride = (props.data as any)?.layoutDirection;
     const globalBaseDirection = useMemo((): 'LR' | 'RL' | 'TB' | 'BT' => {
         // Priority 1: Explicit edge-level override（每条边可独立覆盖）
-        const edgeDir = (props.data as any)?.layoutDirection;
+        const edgeDir = edgeLayoutDirectionOverride;
         if (edgeDir === 'LR' || edgeDir === 'RL' || edgeDir === 'TB' || edgeDir === 'BT') return edgeDir;
 
         // Priority 2: 基于拓扑签名缓存的多数投票
@@ -459,7 +462,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         if (_directionVoteCache.size > 20) _directionVoteCache.clear();
         _directionVoteCache.set(edgeTopologySig, result);
         return result;
-    }, [props.data, edgeTopologySig, storeEdges, getAbsPos]);
+    }, [edgeLayoutDirectionOverride, edgeTopologySig, getAbsPos]);
 
 
     const isReverseEdge = useMemo(() => {

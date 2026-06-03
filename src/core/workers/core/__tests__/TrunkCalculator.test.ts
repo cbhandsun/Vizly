@@ -162,6 +162,17 @@ describe('TrunkCalculator', () => {
             expect(result.suggestedPort).toBe('bottom');
         });
 
+        it('uses a bottom trunk for lower-left fan-outs that are still vertical process flow', () => {
+            const fixQuota: Rectangle = { x: 1102, y: 294, width: 252, height: 96 };
+            const greedySpec: Rectangle = { x: 114, y: 1478, width: 204, height: 96 };
+
+            const result = trunkCalculator.calculateTreeTrunk(fixQuota, [greedySpec], false, defaultConfig, 'LR');
+
+            expect(result.direction).toBe('horizontal');
+            expect(result.suggestedPort).toBe('bottom');
+            expect(result.axis).toBeGreaterThanOrEqual(fixQuota.y + fixQuota.height + 30);
+        });
+
         it('should force horizontal flow mode (vertical trunk) if dx is dominant', () => {
             const peersHorizontal = [
                 { x: 400, y: 100, width: 80, height: 60 }

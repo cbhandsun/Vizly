@@ -753,6 +753,56 @@ export function straightenMicroOffset(
     return points;
 }
 
+export function straightenAlignedLocalDogleg(
+    points: Point[],
+    obstacles: Rectangle[] | SpatialIndex = [],
+    options?: { sourcePos?: Position; targetPos?: Position },
+    maxLateralSpread: number = 72
+): Point[] {
+    if (points.length < 4) return points;
+
+    const src = points[0];
+    const dst = points[points.length - 1];
+    const nearlyVertical = Math.abs(src.x - dst.x) <= 1;
+    const nearlyHorizontal = Math.abs(src.y - dst.y) <= 1;
+    if (!nearlyVertical && !nearlyHorizontal) return points;
+
+    if (nearlyVertical) {
+        const sourceNeedsVertical = !options?.sourcePos || options.sourcePos === Position.Top || options.sourcePos === Position.Bottom;
+        const targetNeedsVertical = !options?.targetPos || options.targetPos === Position.Top || options.targetPos === Position.Bottom;
+        if (!sourceNeedsVertical || !targetNeedsVertical) return points;
+    }
+    if (nearlyHorizontal) {
+        const sourceNeedsHorizontal = !options?.sourcePos || options.sourcePos === Position.Left || options.sourcePos === Position.Right;
+        const targetNeedsHorizontal = !options?.targetPos || options.targetPos === Position.Left || options.targetPos === Position.Right;
+        if (!sourceNeedsHorizontal || !targetNeedsHorizontal) return points;
+    }
+
+    const currentLength = points.slice(0, -1).reduce((sum, point, index) => {
+        const next = points[index + 1];
+        return sum + Math.abs(next.x - point.x) + Math.abs(next.y - point.y);
+    }, 0);
+    const directLength = Math.max(1, Math.abs(dst.x - src.x) + Math.abs(dst.y - src.y));
+    const lateralSpread = nearlyVertical
+        ? Math.max(...points.map(point => point.x)) - Math.min(...points.map(point => point.x))
+        : Math.max(...points.map(point => point.y)) - Math.min(...points.map(point => point.y));
+    if (lateralSpread < 16 || lateralSpread > maxLateralSpread) return points;
+    if (currentLength / directLength < 1.15 || currentLength - directLength < 24) return points;
+
+    const direct = nearlyVertical
+        ? [{ ...src }, { x: src.x, y: dst.y }]
+        : [{ ...src }, { x: dst.x, y: src.y }];
+
+    const rects = Array.isArray(obstacles)
+        ? obstacles.map(obs => ({ x: obs.x, y: obs.y, width: obs.width, height: obs.height }))
+        : typeof (obstacles as any).getAll === 'function'
+            ? (obstacles as any).getAll().map((obs: any) => ({ x: obs.x, y: obs.y, width: obs.width, height: obs.height }))
+            : [];
+
+    if (isPathBlocked(direct, rects, -1)) return points;
+    return direct;
+}
+
 export function removeCrossAxisDetour(
     points: Point[],
     obstacles: Rectangle[] | SpatialIndex = [],
@@ -2738,6 +2788,42 @@ export function removeTinyOrthogonalJogs(
         return isPathBlocked(pts, strictObstacles, -1);
     };
 
+    const canUseCandidate = (candidate: Point[], windowStart: number): boolean => {
+        const first = candidate[0];
+        const second = candidate[1];
+        const beforeLast = candidate[candidate.length - 2];
+        const last = candidate[candidate.length - 1];
+
+        if (windowStart === 0 && options.sourcePos) {
+            const firstIsVertical = Math.abs(first.x - second.x) < 2;
+            const firstIsHorizontal = Math.abs(first.y - second.y) < 2;
+            const sourceNeedsVertical = options.sourcePos === Position.Top || options.sourcePos === Position.Bottom;
+            const sourceNeedsHorizontal = options.sourcePos === Position.Left || options.sourcePos === Position.Right;
+            if ((sourceNeedsVertical && !firstIsVertical) || (sourceNeedsHorizontal && !firstIsHorizontal)) {
+                return false;
+            }
+        }
+
+        if (windowStart === res.length - 4 && options.targetPos) {
+            const lastIsVertical = Math.abs(beforeLast.x - last.x) < 2;
+            const lastIsHorizontal = Math.abs(beforeLast.y - last.y) < 2;
+            const targetNeedsVertical = options.targetPos === Position.Top || options.targetPos === Position.Bottom;
+            const targetNeedsHorizontal = options.targetPos === Position.Left || options.targetPos === Position.Right;
+            if ((targetNeedsVertical && !lastIsVertical) || (targetNeedsHorizontal && !lastIsHorizontal)) {
+                return false;
+            }
+        }
+
+        return !isBlocked(candidate);
+    };
+
+    const replaceWindow = (start: number, candidate: Point[]) => {
+        for (let offset = 0; offset < 4; offset++) {
+            res[start + offset].x = candidate[offset].x;
+            res[start + offset].y = candidate[offset].y;
+        }
+    };
+
     while (changed && maxIter > 0) {
         changed = false;
         maxIter--;
@@ -2816,6 +2902,24 @@ export function removeTinyOrthogonalJogs(
                         changed = true;
                         continue;
                     }
+
+                    // Strategy 3: move the local bridge onto a shared middle lane.
+                    // This removes tiny mid-route notches when both original axes are
+                    // too close to an obstacle, while keeping the path orthogonal.
+                    const midY = Math.round((p0.y + p3.y) / 2);
+                    if (Math.abs(midY - p0.y) > 1 && Math.abs(midY - p3.y) > 1) {
+                        const midCandidate = [
+                            p0,
+                            { x: p0.x, y: midY },
+                            { x: p3.x, y: midY },
+                            p3,
+                        ];
+                        if (canUseCandidate(midCandidate, i)) {
+                            replaceWindow(i, midCandidate);
+                            changed = true;
+                            continue;
+                        }
+                    }
                 }
             }
 
@@ -2884,6 +2988,24 @@ export function removeTinyOrthogonalJogs(
                         p2.x = p3.x;
                         changed = true;
                         continue;
+                    }
+
+                    // Strategy 3: move the local bridge onto a shared middle lane.
+                    // This turns a small V-H-V side-step into one clean detour when
+                    // either original vertical axis would collide.
+                    const midX = Math.round((p0.x + p3.x) / 2);
+                    if (Math.abs(midX - p0.x) > 1 && Math.abs(midX - p3.x) > 1) {
+                        const midCandidate = [
+                            p0,
+                            { x: midX, y: p0.y },
+                            { x: midX, y: p3.y },
+                            p3,
+                        ];
+                        if (canUseCandidate(midCandidate, i)) {
+                            replaceWindow(i, midCandidate);
+                            changed = true;
+                            continue;
+                        }
                     }
                 }
             }
@@ -3018,12 +3140,21 @@ export function createFilletedPath(
     // [FIX] Snap near-orthogonal segments to perfect orthogonal BEFORE generating arcs.
     // Eliminates diagonal artifacts caused by fractional handle/port coordinate misalignment (e.g. dx=9, dy=36).
     // This is the final defense layer — all SVG rendering paths (Worker, hydration, channel) converge here.
+    const microAxisSnap = 1;
     for (let i = 0; i < normalizedPoints.length - 1; i++) {
         const a = normalizedPoints[i];
         const b = normalizedPoints[i + 1];
         const dx = Math.abs(a.x - b.x);
         const dy = Math.abs(a.y - b.y);
-        if (dx > 0.25 && dy > 0.25) {
+        if (dx <= microAxisSnap && dy > microAxisSnap) {
+            b.x = a.x;
+            continue;
+        }
+        if (dy <= microAxisSnap && dx > microAxisSnap) {
+            b.y = a.y;
+            continue;
+        }
+        if (dx > microAxisSnap && dy > microAxisSnap) {
             // Use proportional threshold: if the minor-axis is <15% of major-axis
             // AND the minor-axis is <25px (safety cap), snap to orthogonal.
             // This handles A* grid quantization artifacts (~20px) on long segments
@@ -3082,6 +3213,46 @@ export function createFilletedPath(
     const finalPoints = collapseCollinearBacktracks(normalizedPoints);
     if (finalPoints.length < 2) return '';
 
+    const shortThreshold = cornerRadius * 2;
+    let shortChanged = false;
+
+    for (let pass = 0; pass < 2; pass++) {
+        for (let i = 0; i + 3 < finalPoints.length; i++) {
+            const a = finalPoints[i];
+            const b = finalPoints[i + 1];
+            const c = finalPoints[i + 2];
+            const d = finalPoints[i + 3];
+            const canMoveWindowEnd = i + 3 < finalPoints.length - 1;
+
+            const firstVertical = Math.abs(a.x - b.x) < 1;
+            const bridgeHorizontal = Math.abs(b.y - c.y) < 1;
+            const secondVertical = Math.abs(c.x - d.x) < 1;
+            if (firstVertical && bridgeHorizontal && secondVertical) {
+                const bridgeLength = Math.abs(b.x - c.x);
+                const sameDirection = Math.sign(b.y - a.y) === Math.sign(d.y - c.y);
+                if (canMoveWindowEnd && sameDirection && bridgeLength > 0.5 && bridgeLength < shortThreshold) {
+                    finalPoints.splice(i + 1, 3, { x: a.x, y: d.y });
+                    shortChanged = true;
+                    i = Math.max(-1, i - 2);
+                    continue;
+                }
+            }
+
+            const firstHorizontal = Math.abs(a.y - b.y) < 1;
+            const bridgeVertical = Math.abs(b.x - c.x) < 1;
+            const secondHorizontal = Math.abs(c.y - d.y) < 1;
+            if (firstHorizontal && bridgeVertical && secondHorizontal) {
+                const bridgeLength = Math.abs(b.y - c.y);
+                const sameDirection = Math.sign(b.x - a.x) === Math.sign(d.x - c.x);
+                if (canMoveWindowEnd && sameDirection && bridgeLength > 0.5 && bridgeLength < shortThreshold) {
+                    finalPoints.splice(i + 1, 3, { x: d.x, y: a.y });
+                    shortChanged = true;
+                    i = Math.max(-1, i - 2);
+                }
+            }
+        }
+    }
+
     // [FIX-orthogonal] Short-segment elimination: remove S/Z-jog segments shorter than 2*cornerRadius.
     // When A* grid-snapping produces a tiny lateral offset (e.g. 9.75px), the resulting
     // micro-segment forces cornerRadius to compress (e.g. 8→4.875), visually creating
@@ -3089,8 +3260,6 @@ export function createFilletedPath(
     // Strategy: scan for 3-point A→B→C where seg AB or BC is very short AND the
     // surrounding segments form an S-shape (same direction before and after the bridge).
     // Snap B to eliminate the jog, then re-collapse collinear points.
-    const shortThreshold = cornerRadius * 2;
-    let shortChanged = false;
     for (let pass = 0; pass < 2; pass++) {
         for (let i = 1; i < finalPoints.length - 1; i++) {
             const prev = finalPoints[i - 1];

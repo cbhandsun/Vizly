@@ -179,6 +179,66 @@ describe('EdgeRoutingWorker', () => {
         expect(result.targetPos).toBe(Position.Top);
     });
 
+    it('keeps a lower-left shared fan-out orthogonal to the source and target nodes', () => {
+        const result = route({
+            edgeId: 'e10',
+            isOneToMany: true,
+            isManyToOne: false,
+            outgoingCount: 1,
+            incomingCount: 1,
+            o2mTrunk: {
+                source: { x: 1940, y: 342 },
+                target: { x: 1940, y: 1526 },
+            },
+            o2mTrunkPort: Position.Left,
+            busTrunkSource: { x: 1940, y: 342 },
+            busTrunkTarget: { x: 1940, y: 1526 },
+            busRoutingPlan: {
+                busIndex: 0,
+                peerGroupKey: 'o2m:fix-quota:left',
+                o2mPeerGroupKey: 'o2m:fix-quota:left',
+                peerGroupSize: 2,
+                peerGroupMembers: ['e10', 'e16'],
+                trunkPort: Position.Left,
+                trunkPortTangent: 0,
+                o2mTrunk: {
+                    source: { x: 1940, y: 342 },
+                    target: { x: 1940, y: 1526 },
+                },
+                o2mTrunkPort: Position.Left,
+                portFrozen: true,
+            },
+        }, {
+            sourceNode: {
+                id: 'fix-quota',
+                position: { x: 1102, y: 294 },
+                measured: { width: 252, height: 96 },
+            },
+            targetNode: {
+                id: 'greedy-spec',
+                position: { x: 114, y: 1478 },
+                measured: { width: 204, height: 96 },
+            },
+            nodes: [
+                { id: 'fix-quota', position: { x: 1102, y: 294 }, measured: { width: 252, height: 96 } },
+                { id: 'greedy-spec', position: { x: 114, y: 1478 }, measured: { width: 204, height: 96 } },
+                { id: 'merge-res', position: { x: 564, y: 1478 }, measured: { width: 211, height: 96 } },
+            ],
+            edges: [
+                { id: 'e10', source: 'fix-quota', target: 'greedy-spec' },
+                { id: 'e16', source: 'fix-quota', target: 'merge-res' },
+            ],
+        });
+
+        const selected = (result.debugInfo as any)?.algorithmDebug?.portSelection?.selected;
+        expect(result.error).toBeUndefined();
+        expect(result.sourcePos).toBe(Position.Bottom);
+        expect(result.targetPos).toBe(Position.Top);
+        expect(selected).toEqual({ source: Position.Bottom, target: Position.Top });
+        expect(result.points[0].x).toBe(result.points[1].x);
+        expect(result.points.at(-1)?.x).toBe(result.points.at(-2)?.x);
+    });
+
     it('routes dual-identity edges through both shared trunks', () => {
         const result = route({
             edgeId: 'dual-composite-bus',

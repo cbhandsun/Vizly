@@ -301,6 +301,53 @@ export class EdgeRoutingWorker {
         // [S4] isGlobalTrunkMember is still used by portSelector allowSourceOverride / allowTargetOverride.
         const isGlobalTrunkMember = !!(job.busTrunkSource && job.busTrunkTarget);
 
+        const directPortToward = (rect: Rectangle, otherRect: Rectangle): { port: Position; absDx: number; absDy: number } => {
+            const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+            const otherCenter = { x: otherRect.x + otherRect.width / 2, y: otherRect.y + otherRect.height / 2 };
+            const dx = otherCenter.x - center.x;
+            const dy = otherCenter.y - center.y;
+            const absDx = Math.abs(dx);
+            const absDy = Math.abs(dy);
+            const port = absDx > absDy
+                ? (dx > 0 ? Position.Right : Position.Left)
+                : (dy > 0 ? Position.Bottom : Position.Top);
+            return { port, absDx, absDy };
+        };
+
+        const chooseEndpointOrthogonalPort = (
+            rect: Rectangle,
+            otherRect: Rectangle | undefined,
+            trunkPort: Position
+        ): Position => {
+            if (!otherRect) return trunkPort;
+            const { port: directPort, absDx, absDy } = directPortToward(rect, otherRect);
+            const trunkIsHorizontalSide = trunkPort === Position.Left || trunkPort === Position.Right;
+            const directIsVerticalSide = directPort === Position.Top || directPort === Position.Bottom;
+            const trunkIsVerticalSide = trunkPort === Position.Top || trunkPort === Position.Bottom;
+            const directIsHorizontalSide = directPort === Position.Left || directPort === Position.Right;
+            const directionalAxisRatio = 1.1;
+
+            if (
+                trunkIsHorizontalSide &&
+                directIsVerticalSide &&
+                absDy >= absDx * directionalAxisRatio &&
+                absDy > rect.height / 2
+            ) {
+                return directPort;
+            }
+
+            if (
+                trunkIsVerticalSide &&
+                directIsHorizontalSide &&
+                absDx >= absDy * directionalAxisRatio &&
+                absDx > rect.width / 2
+            ) {
+                return directPort;
+            }
+
+            return trunkPort;
+        };
+
         /**
          * [S5-P2] Unified trunk axis port resolver — with approach-direction conflict guard.
          *
@@ -339,23 +386,7 @@ export class EdgeRoutingWorker {
             // |dy| >> |dx|, ratio > 3), the trunk axis port (e.g., Right) forces a U-turn
             // detour. Use the direct geometric port instead even for trunk members.
             if (otherRect) {
-                const otherCenter = { x: otherRect.x + otherRect.width / 2, y: otherRect.y + otherRect.height / 2 };
-                const dx = isTargetSide
-                    ? (otherCenter.x - center.x)
-                    : (center.x - otherCenter.x);
-                const dy = isTargetSide
-                    ? (otherCenter.y - center.y)
-                    : (center.y - otherCenter.y);
-
-                let directPort: Position;
-                if (Math.abs(dx) > Math.abs(dy)) {
-                    directPort = dx > 0 ? Position.Left : Position.Right;
-                } else {
-                    directPort = dy > 0 ? Position.Top : Position.Bottom;
-                }
-
-                const absDx = Math.abs(dx);
-                const absDy = Math.abs(dy);
+                const { port: directPort, absDx, absDy } = directPortToward(rect, otherRect);
                 const dominantRatio = Math.max(absDx, absDy) / (Math.min(absDx, absDy) + 1);
                 if (dominantRatio > 3 && (
                     (absDy > absDx && (trunkPort === Position.Left || trunkPort === Position.Right)) ||
@@ -363,6 +394,10 @@ export class EdgeRoutingWorker {
                 )) {
                     // Strong geometric dominance overrides trunk port assignment
                     return directPort;
+                }
+                const endpointPort = chooseEndpointOrthogonalPort(rect, otherRect, trunkPort);
+                if (endpointPort !== trunkPort) {
+                    return endpointPort;
                 }
             }
 
@@ -374,21 +409,7 @@ export class EdgeRoutingWorker {
             }
 
             if (otherRect) {
-                const otherCenter = { x: otherRect.x + otherRect.width / 2, y: otherRect.y + otherRect.height / 2 };
-                const dx = isTargetSide
-                    ? (otherCenter.x - center.x)  // source → target: dx from target's perspective is source-direction
-                    : (center.x - otherCenter.x);  // source side: dx toward target
-                const dy = isTargetSide
-                    ? (otherCenter.y - center.y)
-                    : (center.y - otherCenter.y);
-
-                // Direct approach port (from-source direction when isTargetSide)
-                let directPort: Position;
-                if (Math.abs(dx) > Math.abs(dy)) {
-                    directPort = dx > 0 ? Position.Left : Position.Right;  // source is to the left → enter Left
-                } else {
-                    directPort = dy > 0 ? Position.Top : Position.Bottom;  // source is above → enter Top
-                }
+                const { port: directPort } = directPortToward(rect, otherRect);
 
                 if (isTargetSide) {
                     if (trunkPort === directPort) {
@@ -420,7 +441,7 @@ export class EdgeRoutingWorker {
         // O2M 端使用 o2mTrunk 数据推算 source port。
         const o2mTrunk = job.busRoutingPlan?.o2mTrunk ?? job.o2mTrunk ?? (job as any).o2mTrunk;
         if (job.isOneToMany && o2mTrunk && !hasFixedSourcePort) {
-            startPos = resolvePortFromTrunkAxis(sRect, undefined, false, o2mTrunk);
+            startPos = resolvePortFromTrunkAxis(sRect, tRect, false, o2mTrunk);
             hasFixedSourcePort = true;
         }
 
@@ -1094,14 +1115,15 @@ export class EdgeRoutingWorker {
                     // O2M: set source port
                     if (job.isOneToMany && o2mPort && !hasExplicitSource) {
                         let selfCross = false;
-                        if (o2mPort === Position.Left && dx > sRect.width / 2) selfCross = true;
-                        else if (o2mPort === Position.Right && dx < -sRect.width / 2) selfCross = true;
-                        else if (o2mPort === Position.Top && dy > sRect.height / 2) selfCross = true;
-                        else if (o2mPort === Position.Bottom && dy < -sRect.height / 2) selfCross = true;
+                        const resolvedO2mPort = chooseEndpointOrthogonalPort(sRect, tRect, o2mPort as Position);
+                        if (resolvedO2mPort === Position.Left && dx > sRect.width / 2) selfCross = true;
+                        else if (resolvedO2mPort === Position.Right && dx < -sRect.width / 2) selfCross = true;
+                        else if (resolvedO2mPort === Position.Top && dy > sRect.height / 2) selfCross = true;
+                        else if (resolvedO2mPort === Position.Bottom && dy < -sRect.height / 2) selfCross = true;
                         if (selfCross && !isSharedGlobalTrunk) {
                             skipTrunkDueToSelfCross = true;
                         } else {
-                            startPos = o2mPort as Position;
+                            startPos = resolvedO2mPort;
                             hasFixedSourcePort = true;
                         }
                     }
@@ -1111,14 +1133,15 @@ export class EdgeRoutingWorker {
                         const rdx = sCx - tCx;
                         const rdy = sCy - tCy;
                         let selfCross = false;
-                        if (m2oPort === Position.Left && rdx > tRect.width / 2) selfCross = true;
-                        else if (m2oPort === Position.Right && rdx < -tRect.width / 2) selfCross = true;
-                        else if (m2oPort === Position.Top && rdy > tRect.height / 2) selfCross = true;
-                        else if (m2oPort === Position.Bottom && rdy < -tRect.height / 2) selfCross = true;
+                        const resolvedM2oPort = m2oPort as Position;
+                        if (resolvedM2oPort === Position.Left && rdx > tRect.width / 2) selfCross = true;
+                        else if (resolvedM2oPort === Position.Right && rdx < -tRect.width / 2) selfCross = true;
+                        else if (resolvedM2oPort === Position.Top && rdy > tRect.height / 2) selfCross = true;
+                        else if (resolvedM2oPort === Position.Bottom && rdy < -tRect.height / 2) selfCross = true;
                         if (selfCross && !isSharedGlobalTrunk) {
                             skipTrunkDueToSelfCross = true;
                         } else {
-                            endPos = m2oPort as Position;
+                            endPos = resolvedM2oPort;
                             hasFixedTargetPort = true;
                         }
                     }

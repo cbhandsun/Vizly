@@ -382,7 +382,9 @@ export class EdgeRoutingCoordinator {
         
         // Clear global SVG path cache to prevent "flying lines" UI fallback
         try {
-            const cache = (window as any).__dv_rendered_path_cache__;
+            const w = window as any;
+            w.__dv_rendered_path_cache_version__ = 'endpoint-orthogonal-container-entry-v8';
+            const cache = w.__dv_rendered_path_cache__;
             if (cache instanceof Map) {
                 cache.clear();
             }
@@ -1287,6 +1289,16 @@ export class EdgeRoutingCoordinator {
                 width: Math.max(0, width - 16),
                 height: titleHeight,
             });
+
+            if (titleLikeTypes.has(type)) {
+                const x = pos.x ?? 0;
+                const y = pos.y ?? 0;
+                const border = 8;
+                pushRect({ x: x - border / 2, y, width: border, height });
+                pushRect({ x: x + width - border / 2, y, width: border, height });
+                pushRect({ x, y: y - border / 2, width, height: border });
+                pushRect({ x, y: y + height - border / 2, width, height: border });
+            }
         });
 
         return soft;
@@ -1945,6 +1957,7 @@ export class EdgeRoutingCoordinator {
 
         // Step 1: 璁＄畻 peer 璐ㄥ績锛岀‘瀹氫富娴佹柟鍚?
         let centroidX = 0, centroidY = 0, validCount = 0;
+        const hemisphereEscapeRatio = 1.25;
         globalPeers.forEach(peerEdge => {
             const peerId = isManyToOne ? peerEdge.source : peerEdge.target;
             const peerRect = getNodeRect(peerId);
@@ -2009,7 +2022,7 @@ export class EdgeRoutingCoordinator {
             if (isVerticalFlow) {
                 // 涓绘祦=涓婁笅 鈫?榛樿鎸?y 鍒嗗崐鐞?
                 // 閫冮€革細濡傛灉 |dx| > 2*|dy| 涓?|dx| > 50px锛岃鏄?peer 寮虹儓鍋忓悜宸﹀彸
-                if (!keepTrueHemisphere && globalPeers.length > 3 && Math.abs(dx) > Math.abs(dy) * 0.8 && Math.abs(dx) > 50) {
+                if (!keepTrueHemisphere && globalPeers.length > 3 && Math.abs(dx) > Math.abs(dy) * hemisphereEscapeRatio && Math.abs(dx) > 50) {
                     side = dx < 0 ? 'left' : 'right';
                 } else {
                     side = dy < 0 ? 'top' : 'bottom';
@@ -2017,7 +2030,7 @@ export class EdgeRoutingCoordinator {
             } else {
                 // 涓绘祦=宸﹀彸 鈫?榛樿鎸?x 鍒嗗崐鐞?
                 // 閫冮€革細濡傛灉 |dy| > 2*|dx| 涓?|dy| > 50px
-                if (!keepTrueHemisphere && globalPeers.length > 3 && Math.abs(dy) > Math.abs(dx) * 0.8 && Math.abs(dy) > 50) {
+                if (!keepTrueHemisphere && globalPeers.length > 3 && Math.abs(dy) > Math.abs(dx) * hemisphereEscapeRatio && Math.abs(dy) > 50) {
                     side = dy < 0 ? 'top' : 'bottom';
                 } else {
                     side = dx < 0 ? 'left' : 'right';

@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'reac
 import type { MutableRefObject } from 'react';
 import { Edge, Position } from '@xyflow/react';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
-import {  } from '../../../algorithms/smartEdgeUtils'; // [FIX] Import utility
 // import WorkerPool from '../../../workers/WorkerPool'; // Replaced by Coordinator
 
 // Define types locally to avoid circular deps
@@ -42,6 +41,8 @@ export interface EdgeData {
 }
 
 type Point2D = { x: number; y: number };
+
+const RENDERED_PATH_CACHE_VERSION = 'endpoint-orthogonal-container-entry-v8';
 
 const _getElkPoints = (edgeData: EdgeData): Point2D[] | null => {
     if (!edgeData?.elkPath || !Array.isArray(edgeData.elkPath) || edgeData.elkPath.length <= 1) return null;
@@ -709,7 +710,9 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                     sourceOffset: edgeConfig.sourceOffset ?? 20,
                     targetOffset: edgeConfig.targetOffset ?? 32,
                     minLastSegment: edgeConfig.minLastSegment ?? 30,
-                    borderRadius: (edgeData?.borderRadius as number) ?? edgeConfig.borderRadius ?? 4,
+                    borderRadius: edgeConfig.strictOrthogonal
+                        ? 0
+                        : ((edgeData?.borderRadius as number) ?? edgeConfig.borderRadius ?? 4),
                     gridSize: edgeConfig.gridSize ?? 20,
                     jumpRadius: edgeConfig.jumpRadius ?? 10,
                     shouldSimplify
@@ -773,7 +776,15 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                 // and mounts a new one. The old Promise resolves after unmount, so isMountedRef=false.
                 // By caching the path here, the new component instance can pick it up immediately.
                 if (res?.path && !res.error) {
-                    const pathCache = (window as any).__dv_rendered_path_cache__;
+                    const w = window as any;
+                    if (
+                        w.__dv_rendered_path_cache_version__ !== RENDERED_PATH_CACHE_VERSION
+                        || !(w.__dv_rendered_path_cache__ instanceof Map)
+                    ) {
+                        w.__dv_rendered_path_cache__ = new Map<string, string>();
+                        w.__dv_rendered_path_cache_version__ = RENDERED_PATH_CACHE_VERSION;
+                    }
+                    const pathCache = w.__dv_rendered_path_cache__;
                     if (pathCache instanceof Map) {
                         pathCache.set(id, res.path);
                     }

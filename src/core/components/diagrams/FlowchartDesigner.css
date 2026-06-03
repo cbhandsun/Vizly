@@ -446,6 +446,7 @@
     transition: stroke-width 0.18s ease, stroke 0.18s ease, filter 0.18s ease;
     stroke-linecap: round;
     stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
 }
 
 /* 杈规偓鍋滐細鎵╁ぇ閫忔槑 hitbox + 涓昏壊楂樹寒 + 绮捐嚧鍏夋檿 */
@@ -463,17 +464,17 @@
    [FIX] 蹇呴』鐢?!important 绐佺牬鍐呰仈 style="stroke:..." 浼樺厛绾?*/
 .react-flow__edge:hover .react-flow__edge-path {
     stroke: var(--designer-accent, #6366f1) !important;
-    stroke-width: 3 !important;
+    stroke-width: 2.2 !important;
     filter:
-        drop-shadow(0 0 4px rgba(99, 102, 241, 0.45))
-        drop-shadow(0 0 10px rgba(99, 102, 241, 0.20)) !important;
+        drop-shadow(0 0 2px rgba(99, 102, 241, 0.28))
+        drop-shadow(0 0 4px rgba(99, 102, 241, 0.12)) !important;
 }
 
 /* 閫変腑鐨勮竟 鈥?鍩虹鍝佺墝鑹诧紙Hyper-Glass 瑕嗙洊灞?L741 鎻愪緵鏈€缁?stroke-width + filter锛?*/
 .react-flow__edge.selected .react-flow__edge-path {
     stroke: var(--designer-accent, #6366f1) !important;
-    stroke-width: 3 !important;
-    filter: drop-shadow(0 0 4px var(--designer-accent-alpha, rgba(99, 102, 241, 0.45))) !important;
+    stroke-width: 2.35 !important;
+    filter: drop-shadow(0 0 3px var(--designer-accent-alpha, rgba(99, 102, 241, 0.32))) !important;
 }
 
 /* 杩炴帴鎴愬姛鍔ㄧ敾 鈥?缁胯壊鑴夊啿 */
@@ -484,9 +485,9 @@
 
 /* 鍔ㄧ敾杩炵嚎 鈥?鍛煎惛娴佸姩 */
 @keyframes edge-glow-pulse {
-    0%   { filter: drop-shadow(0 0 2px rgba(99, 102, 241, 0.4)); stroke-width: 2; }
-    50%  { filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.7)); stroke-width: 3; }
-    100% { filter: drop-shadow(0 0 2px rgba(99, 102, 241, 0.4)); stroke-width: 2; }
+    0%   { filter: drop-shadow(0 0 1.5px rgba(99, 102, 241, 0.26)); stroke-width: 1.9; }
+    50%  { filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.42)); stroke-width: 2.35; }
+    100% { filter: drop-shadow(0 0 1.5px rgba(99, 102, 241, 0.26)); stroke-width: 1.9; }
 }
 
 .react-flow__edge-path.animated {
@@ -513,6 +514,11 @@ circle.react-flow__edgeupdater:active {
     z-index: 0 !important;
 }
 
+.react-flow__edge,
+.react-flow__edge.selected {
+    z-index: 0 !important;
+}
+
 .react-flow__nodes {
     z-index: auto !important;
 }
@@ -529,8 +535,7 @@ circle.custom-edge-updater {
     pointer-events: none;
 }
 
-/* 鎮仠/閫変腑鏃舵樉绀?*/
-.react-flow__edge:hover circle.custom-edge-updater,
+/* Show endpoint dots only for selection/endpoint drag; plain hover should not look like a port connection. */
 .react-flow__edge.selected circle.custom-edge-updater {
     opacity: 1;
     r: 5;
@@ -742,10 +747,10 @@ circle.custom-edge-updater {
 /* 閫変腑杈?鈥?鍝佺墝鑹插彂鍏夊己璋冿紙涓?L470 鐨勯€変腑瑙勫垯缁熶竴锛屾澶勭敤浜?Hyper-Glass 瑕嗙洊灞傦級 */
 .react-flow__edge.selected .react-flow__edge-path {
     stroke: var(--designer-accent) !important;
-    stroke-width: 3px !important;
+    stroke-width: 2.35px !important;
     filter:
-        drop-shadow(0 0 4px rgba(99, 102, 241, 0.50))
-        drop-shadow(0 0 10px rgba(99, 102, 241, 0.20));
+        drop-shadow(0 0 3px rgba(99, 102, 241, 0.34))
+        drop-shadow(0 0 5px rgba(99, 102, 241, 0.12));
     transition: stroke-width 0.2s ease, filter 0.2s ease;
 }
 

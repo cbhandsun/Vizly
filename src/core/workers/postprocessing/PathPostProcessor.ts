@@ -24,8 +24,149 @@ import {
     trySimplify4PointCShape,
     removeCrossAxisDetour,
     removeMainAxisOvershoot,
-    straightenMicroOffset
+    straightenMicroOffset,
+    straightenAlignedLocalDogleg
 } from '../../algorithms/smartEdgeUtils';
+
+const EPSILON = 1;
+
+const portVector = (position: Position): Point => {
+    switch (position) {
+        case Position.Top: return { x: 0, y: -1 };
+        case Position.Bottom: return { x: 0, y: 1 };
+        case Position.Left: return { x: -1, y: 0 };
+        case Position.Right: return { x: 1, y: 0 };
+        default: return { x: 0, y: 0 };
+    }
+};
+
+const portStubPoint = (point: Point, position: Position, length: number): Point => {
+    const vector = portVector(position);
+    return {
+        x: point.x + vector.x * length,
+        y: point.y + vector.y * length,
+    };
+};
+
+const firstMeaningfulSegment = (points: Point[]): { from: Point; to: Point } | null => {
+    if (points.length < 2) return null;
+    const from = points[0];
+    for (let i = 1; i < points.length; i++) {
+        const to = points[i];
+        if (Math.abs(to.x - from.x) > EPSILON || Math.abs(to.y - from.y) > EPSILON) {
+            return { from, to };
+        }
+    }
+    return null;
+};
+
+const lastMeaningfulSegment = (points: Point[]): { from: Point; to: Point } | null => {
+    if (points.length < 2) return null;
+    const to = points[points.length - 1];
+    for (let i = points.length - 2; i >= 0; i--) {
+        const from = points[i];
+        if (Math.abs(to.x - from.x) > EPSILON || Math.abs(to.y - from.y) > EPSILON) {
+            return { from, to };
+        }
+    }
+    return null;
+};
+
+const segmentFollowsVector = (segment: { from: Point; to: Point } | null, vector: Point): boolean => {
+    if (!segment) return false;
+    const dx = segment.to.x - segment.from.x;
+    const dy = segment.to.y - segment.from.y;
+    if (Math.abs(vector.x) > 0) {
+        return Math.abs(dy) <= EPSILON && dx * vector.x > EPSILON;
+    }
+    if (Math.abs(vector.y) > 0) {
+        return Math.abs(dx) <= EPSILON && dy * vector.y > EPSILON;
+    }
+    return false;
+};
+
+const segmentCrossesRectInterior = (a: Point, b: Point, rect: Rectangle, padding = 2): boolean => {
+    const left = rect.x + padding;
+    const right = rect.x + rect.width - padding;
+    const top = rect.y + padding;
+    const bottom = rect.y + rect.height - padding;
+    if (right <= left || bottom <= top) return false;
+
+    if (Math.abs(a.x - b.x) <= EPSILON) {
+        const x = a.x;
+        if (x <= left || x >= right) return false;
+        return Math.max(Math.min(a.y, b.y), top) < Math.min(Math.max(a.y, b.y), bottom);
+    }
+
+    if (Math.abs(a.y - b.y) <= EPSILON) {
+        const y = a.y;
+        if (y <= top || y >= bottom) return false;
+        return Math.max(Math.min(a.x, b.x), left) < Math.min(Math.max(a.x, b.x), right);
+    }
+
+    return true;
+};
+
+const pathCrossesObstacleInterior = (points: Point[], obstacles: Rectangle[]): boolean => {
+    for (let i = 0; i < points.length - 1; i++) {
+        for (const obstacle of obstacles) {
+            if (segmentCrossesRectInterior(points[i], points[i + 1], obstacle)) return true;
+        }
+    }
+    return false;
+};
+
+const dedupeAdjacentPoints = (points: Point[]): Point[] => {
+    const deduped: Point[] = [];
+    for (const point of points) {
+        const previous = deduped[deduped.length - 1];
+        if (!previous || Math.abs(previous.x - point.x) > EPSILON || Math.abs(previous.y - point.y) > EPSILON) {
+            deduped.push({ ...point });
+        }
+    }
+    return deduped;
+};
+
+const preserveEndpointPortDirections = (
+    points: Point[],
+    startPos: Position,
+    endPos: Position,
+    sourceStubLength: number,
+    targetStubLength: number,
+    obstacles: Rectangle[],
+): Point[] => {
+    if (points.length < 2) return points;
+
+    const sourceVector = portVector(startPos);
+    const targetVector = portVector(endPos);
+    const sourceOk = segmentFollowsVector(firstMeaningfulSegment(points), sourceVector);
+    const targetOk = segmentFollowsVector(lastMeaningfulSegment(points), { x: -targetVector.x, y: -targetVector.y });
+    if (sourceOk && targetOk) return points;
+
+    const repaired = points.map(point => ({ ...point }));
+    if (!targetOk) {
+        repaired.splice(repaired.length - 1, 0, portStubPoint(repaired[repaired.length - 1], endPos, targetStubLength));
+    }
+    if (!sourceOk) {
+        repaired.splice(1, 0, portStubPoint(repaired[0], startPos, sourceStubLength));
+    }
+
+    const orthogonal = makePathOrthogonal(repaired, {
+        sourcePos: startPos,
+        targetPos: endPos,
+        sourceMinLength: sourceStubLength,
+        targetMinLength: targetStubLength,
+    }, obstacles) || repaired;
+    const cleaned = collapseCollinearBacktracks(preventEndpointCollinearBacktrack(dedupeAdjacentPoints(orthogonal)));
+    const finalSourceOk = segmentFollowsVector(firstMeaningfulSegment(cleaned), sourceVector);
+    const finalTargetOk = segmentFollowsVector(lastMeaningfulSegment(cleaned), { x: -targetVector.x, y: -targetVector.y });
+
+    if (!finalSourceOk || !finalTargetOk || pathCrossesObstacleInterior(cleaned, obstacles)) {
+        return points;
+    }
+
+    return cleaned;
+};
 
 export interface PostProcessContext {
     config: UnifiedRoutingConfig;
@@ -119,6 +260,10 @@ export class PathPostProcessor {
                 return { points: trunkPoints, svgPath };
             }
 
+            const trunkSimplifyObstacles = extraObstacles && extraObstacles.length > 0
+                ? [...obstacles, ...extraObstacles]
+                : obstacles;
+
             // [BACKTRACK-V2] Orthogonal-safe backtrack removal for trunk paths
             trunkPoints = removeLargeBacktrack(trunkPoints, obstacles, { sourcePos: startPos, targetPos: endPos });
             
@@ -137,6 +282,15 @@ export class PathPostProcessor {
             trunkPoints = collapseCollinearBacktracks(trunkPoints);
             // [FIX] Straighten micro-offset S-bends (e.g. wms→wcs: 191→186→181)
             trunkPoints = straightenMicroOffset(trunkPoints, obstacles);
+            trunkPoints = straightenAlignedLocalDogleg(trunkPoints, trunkSimplifyObstacles, { sourcePos: startPos, targetPos: endPos });
+            trunkPoints = preserveEndpointPortDirections(
+                trunkPoints,
+                startPos,
+                endPos,
+                Math.max(config.postProcessing.minFirstSegment, config.postProcessing.borderRadius + 5),
+                Math.max(config.postProcessing.minLastSegment, config.postProcessing.borderRadius + 5),
+                trunkSimplifyObstacles
+            );
             const svgPath = createFilletedPath(trunkPoints, this.config.postProcessing.borderRadius);
             return { points: trunkPoints, svgPath };
         }
@@ -210,6 +364,7 @@ export class PathPostProcessor {
         finalPoints = collapseCollinearBacktracks(preventEndpointCollinearBacktrack(finalPoints));
         // [FIX] Straighten micro-offset S-bends (e.g. 191→186→181, dx=10 vs dy=160)
         finalPoints = straightenMicroOffset(finalPoints, simplifyObstacles);
+        finalPoints = straightenAlignedLocalDogleg(finalPoints, simplifyObstacles, posOptions);
 
         // Phase 3: Nudging (Separating parallel paths)
         // [IMPORTANT] Run Nudge BEFORE final Orthogonalization to ensure shifted lines are correctly aligned.
@@ -315,6 +470,7 @@ export class PathPostProcessor {
         // to continuous anchor coordinates before final simplification. Use a dynamic threshold
         // that is strictly greater than the grid size to catch 1-grid-step jogs (e.g., 20px).
         finalPoints = removeTinyOrthogonalJogs(finalPoints, Math.max(config.algorithm.gridSize * 1.5, 40), simplifyObstacles, posOptions);
+        finalPoints = straightenAlignedLocalDogleg(finalPoints, simplifyObstacles, posOptions);
         // [FIX] Skip second collapseRedundantBends to preserve pathfinding obstacle avoidance
         // Only apply if preserveObstacleAvoidance is explicitly disabled
         if (config.postProcessing.preserveObstacleAvoidance === false) {
@@ -332,6 +488,17 @@ export class PathPostProcessor {
         // trunk junction alignment (e.g. 52px overshoot at merge point).
         // This is safe after snapAxis because the points are already axis-snapped.
         finalPoints = collapseCollinearBacktracks(finalPoints);
+
+        if (!isBus) {
+            finalPoints = preserveEndpointPortDirections(
+                finalPoints,
+                startPos,
+                endPos,
+                safeMinFirst,
+                safeMinLast,
+                simplifyObstacles
+            );
+        }
 
 
         // Phase 6: SVG Path Generation

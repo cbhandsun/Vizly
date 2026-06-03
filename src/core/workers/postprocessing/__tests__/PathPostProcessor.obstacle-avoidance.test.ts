@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Position } from '../../../types/flow';
 import type { Point, Rectangle } from '../../../types/routing';
+import { createDefaultRoutingConfig } from '../../../types/routing';
 import {
   ensureMinFirstSegment,
   ensureMinLastSegment,
@@ -8,6 +9,7 @@ import {
   simplifyPath,
   removeTinyOrthogonalJogs,
 } from '../../../algorithms/smartEdgeUtils';
+import { PathPostProcessor } from '../PathPostProcessor';
 
 // ─── Helpers ───────────────────────────────────────────────────────
 
@@ -172,6 +174,48 @@ describe('obstacle avoidance: Phase 0 — port direction enforcement', () => {
     // Last segment should approach from the LEFT direction
     const secondToLast = result[result.length - 2];
     expect(secondToLast.x).toBeLessThan(1447);
+  });
+});
+
+describe('post-processing endpoint port direction guard', () => {
+  it('preserves a legal bottom source exit after trunk cleanup would leave a tangential first segment', () => {
+    const processor = new PathPostProcessor(createDefaultRoutingConfig());
+    const sourceRect: Rectangle = { x: 466.624, y: 1170, width: 245.996, height: 95.996 };
+    const targetRect: Rectangle = { x: 146.499, y: 1498, width: 203.997, height: 95.996 };
+    const tangentialTrunkPoints: Point[] = [
+      { x: 589.625, y: 1266 },
+      { x: 454.5, y: 1266 },
+      { x: 454.5, y: 1546 },
+      { x: 350.496, y: 1546 },
+    ];
+
+    const result = processor.process(tangentialTrunkPoints, {
+      config: createDefaultRoutingConfig(),
+      obstacles: [],
+      startPos: Position.Bottom as any,
+      endPos: Position.Right as any,
+      extraObstacles: [sourceRect, targetRect],
+      metadata: {
+        isOneToMany: false,
+        isManyToOne: false,
+        outgoingIndex: 0,
+        outgoingCount: 1,
+        incomingIndex: 0,
+        incomingCount: 1,
+        strategy: 'Trunk Direct',
+      },
+    });
+
+    expect(result.points.length).toBeGreaterThan(tangentialTrunkPoints.length);
+    expect(result.points[1].x).toBeCloseTo(result.points[0].x, 3);
+    expect(result.points[1].y).toBeGreaterThan(result.points[0].y);
+
+    const last = result.points[result.points.length - 1];
+    const prev = result.points[result.points.length - 2];
+    expect(prev.y).toBeCloseTo(last.y, 3);
+    expect(prev.x).toBeGreaterThan(last.x);
+    expect(pathCrossesRect(result.points, sourceRect)).toBe(false);
+    expect(pathCrossesRect(result.points, targetRect)).toBe(false);
   });
 });
 
