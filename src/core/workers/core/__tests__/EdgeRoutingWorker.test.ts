@@ -237,6 +237,8 @@ describe('EdgeRoutingWorker', () => {
         expect(selected).toEqual({ source: Position.Bottom, target: Position.Top });
         expect(result.points[0].x).toBe(result.points[1].x);
         expect(result.points.at(-1)?.x).toBe(result.points.at(-2)?.x);
+        expect(result.metadata?.strategy).not.toBe('Global Trunk Direct');
+        expect(Math.max(...result.points.map(point => point.x))).toBeLessThan(1400);
     });
 
     it('routes dual-identity edges through both shared trunks', () => {

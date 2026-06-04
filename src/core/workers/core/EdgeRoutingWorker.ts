@@ -1241,6 +1241,31 @@ export class EdgeRoutingWorker {
                     // If trunk path is >2x longer than direct, skip trunk.
                     // This catches cases like receipt→putaway (direct=230px, trunk=580px).
                     let skipTrunk = !isSharedGlobalTrunk && directManhattan > 0 && trunkManhattan > directManhattan * 2;
+                    let preservePortsWhenSkippingTrunk = false;
+
+                    const verticalEndpointPair =
+                        (startPos === Position.Top || startPos === Position.Bottom)
+                        && (endPos === Position.Top || endPos === Position.Bottom);
+                    const horizontalEndpointPair =
+                        (startPos === Position.Left || startPos === Position.Right)
+                        && (endPos === Position.Left || endPos === Position.Right);
+                    const sourceToTargetDelta = isVertical
+                        ? endWithOffset.x - startWithOffset.x
+                        : endWithOffset.y - startWithOffset.y;
+                    const sourceToTrunkDelta = isVertical
+                        ? trunkStart.x - startWithOffset.x
+                        : trunkStart.y - startWithOffset.y;
+                    const farSideTrunk =
+                        Math.abs(sourceToTargetDelta) > 80
+                        && Math.abs(sourceToTrunkDelta) > 80
+                        && Math.sign(sourceToTargetDelta) !== Math.sign(sourceToTrunkDelta);
+                    const orthogonalEndpointPairMatchesTrunk =
+                        (isVertical && verticalEndpointPair)
+                        || (!isVertical && horizontalEndpointPair);
+                    if (!skipTrunk && isSharedGlobalTrunk && farSideTrunk && orthogonalEndpointPairMatchesTrunk) {
+                        skipTrunk = true;
+                        preservePortsWhenSkippingTrunk = true;
+                    }
 
                     // [FIX-C-shape] Additional guard: detect C-shape routing from vertical trunk.
                     // C-shape occurs when the path goes: source → (right) → trunkX → (down) → (left) → target.
@@ -1270,10 +1295,12 @@ export class EdgeRoutingWorker {
                         trunkStart = null;
                         trunkEnd = null;
                         trunkAxis = null;
-                        // [T6] 使用提取的公共助手函数重置端口
-                        resetPortsToGeometric();
+                        if (!preservePortsWhenSkippingTrunk) {
+                            // [T6] 使用提取的公共助手函数重置端口
+                            resetPortsToGeometric();
+                        }
                         // 重算端口锄点坐标以匹配新端口
-                        if (!hasExplicitSource && !hasExplicitTarget) {
+                        if (!preservePortsWhenSkippingTrunk && !hasExplicitSource && !hasExplicitTarget) {
                             const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, job.outgoingCount || 1);
                             const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, job.incomingCount || 1);
                             const portOffset: number = (config.algorithm as any).portOffset ?? 40;
