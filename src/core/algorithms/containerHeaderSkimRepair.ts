@@ -395,7 +395,12 @@ export function repairTangentialEndpointEntryPath(
     const finalHorizontal = Math.abs(prev.y - end.y) < EPS;
     const finalVertical = Math.abs(prev.x - end.x) < EPS;
     const needsVerticalEntry = side === 'top' || side === 'bottom';
-    if ((needsVerticalEntry && finalVertical) || (!needsVerticalEntry && finalHorizontal)) return null;
+    const entryLength = Math.abs(prev.x - end.x) + Math.abs(prev.y - end.y);
+    const minEntryStub = Math.max(DEFAULT_ENDPOINT_STUB, Math.min(target.width, target.height) * 0.5);
+    if (
+        ((needsVerticalEntry && finalVertical) || (!needsVerticalEntry && finalHorizontal))
+        && entryLength >= minEntryStub
+    ) return null;
 
     const clearance = options.clearance ?? DEFAULT_CONTAINER_ENTRY_CLEARANCE;
     const targetContainers = targetContainersFor(options.nodes, source, target);

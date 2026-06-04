@@ -125,6 +125,25 @@ describe('repairTangentialEndpointEntryPath', () => {
 
     expect(repaired).toBeNull();
   });
+
+  it('lifts a short perpendicular target stub away from the node edge', () => {
+    const repaired = repairTangentialEndpointEntryPath([
+      { x: 505.8, y: 2690 },
+      { x: 192, y: 3078 },
+      { x: 192, y: 3094 },
+    ], {
+      edgeId: 'e10',
+      sourceId: 'fix-quota',
+      targetId: 'greedy-spec',
+      nodes: baseNodes,
+    });
+
+    expect(repaired).not.toBeNull();
+    const [prev, end] = lastSegment(repaired!);
+    expect(prev.x).toBeCloseTo(end.x);
+    expect(end.y - prev.y).toBeGreaterThanOrEqual(48);
+    expect(prev.y).toBeLessThan(3046);
+  });
 });
 
 describe('repairEndpointPortConstraintPath', () => {

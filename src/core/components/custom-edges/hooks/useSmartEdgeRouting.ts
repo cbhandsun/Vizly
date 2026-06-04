@@ -141,6 +141,55 @@ const pathEndpointsTouchCurrentNodes = (
         && pointTouchesRectBoundary(points[points.length - 1], targetNode);
 };
 
+const getEndpointSide = (
+    point: PathPoint | undefined,
+    rect: { x: number; y: number; width: number; height: number } | undefined,
+): 'top' | 'right' | 'bottom' | 'left' | null => {
+    if (!point || !rect) return null;
+    const candidates: Array<{ side: 'top' | 'right' | 'bottom' | 'left'; distance: number }> = [
+        { side: 'top', distance: Math.abs(point.y - rect.y) },
+        { side: 'right', distance: Math.abs(point.x - (rect.x + rect.width)) },
+        { side: 'bottom', distance: Math.abs(point.y - (rect.y + rect.height)) },
+        { side: 'left', distance: Math.abs(point.x - rect.x) },
+    ];
+    candidates.sort((a, b) => a.distance - b.distance);
+    return candidates[0]?.distance <= 3 ? candidates[0].side : null;
+};
+
+const pathHasShortEndpointStub = (
+    points: PathPoint[],
+    sourceId: string,
+    targetId: string,
+    nodes: RoutingNodeRect[],
+): boolean => {
+    if (points.length < 2) return false;
+    const endpoints = [
+        { node: nodes.find(item => item.id === sourceId), point: points[0], adjacent: points[1], role: 'source' as const },
+        { node: nodes.find(item => item.id === targetId), point: points[points.length - 1], adjacent: points[points.length - 2], role: 'target' as const },
+    ];
+
+    return endpoints.some(({ node, point, adjacent, role }) => {
+        const side = getEndpointSide(point, node);
+        if (!node || !side || !adjacent) return false;
+        const minStub = Math.max(48, Math.min(node.width, node.height) * 0.5);
+        const segmentLength = Math.abs(point.x - adjacent.x) + Math.abs(point.y - adjacent.y);
+        const axisAligned = side === 'top' || side === 'bottom'
+            ? Math.abs(point.x - adjacent.x) < 1
+            : Math.abs(point.y - adjacent.y) < 1;
+        if (!axisAligned) return true;
+
+        const outward = side === 'top'
+            ? adjacent.y < point.y
+            : side === 'bottom'
+                ? adjacent.y > point.y
+                : side === 'left'
+                    ? adjacent.x < point.x
+                    : adjacent.x > point.x;
+        if (!outward) return true;
+        return segmentLength < minStub && role === 'target';
+    });
+};
+
 const parseRenderedPathPoints = (path: string): PathPoint[] => {
     const tokens = [...path.matchAll(/[a-zA-Z]|[-+]?\d*\.?\d+(?:e[-+]?\d+)?/gi)].map(match => match[0]);
     const points: PathPoint[] = [];
@@ -1559,6 +1608,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       && (
           pathHasObstacleHit(snappedFinalPointsForQuality, safeObstacles)
           || !pathEndpointsTouchCurrentNodes(snappedFinalPointsForQuality, source, target, routingNodeRects)
+          || pathHasShortEndpointStub(snappedFinalPointsForQuality, source, target, routingNodeRects)
           || detectContainerHeaderSkimRisk(snappedFinalPointsForQuality, {
               sourceId: source,
               targetId: target,
