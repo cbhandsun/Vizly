@@ -141,8 +141,33 @@ describe('repairTangentialEndpointEntryPath', () => {
     expect(repaired).not.toBeNull();
     const [prev, end] = lastSegment(repaired!);
     expect(prev.x).toBeCloseTo(end.x);
-    expect(end.y - prev.y).toBeGreaterThanOrEqual(48);
+    expect(end.y - prev.y).toBeGreaterThanOrEqual(72);
     expect(prev.y).toBeLessThan(3046);
+  });
+
+  it('repairs a visually tight top-entry stub based on target node size', () => {
+    const repaired = repairTangentialEndpointEntryPath([
+      { x: 505.8, y: 2690 },
+      { x: 505.8, y: 3032 },
+      { x: 809, y: 3040 },
+      { x: 817, y: 3048 },
+      { x: 817, y: 3094 },
+    ], {
+      edgeId: 'e16',
+      sourceId: 'fix-quota',
+      targetId: 'merge-res',
+      nodes: [
+        ...baseNodes,
+        { id: 'merge-res', type: 'custom', x: 707, y: 3094, width: 211, height: 96 },
+        { id: 'subgroup-replenish', type: 'subGroup', x: 679, y: 3032, width: 314, height: 699 },
+      ],
+    });
+
+    expect(repaired).not.toBeNull();
+    const [prev, end] = lastSegment(repaired!);
+    expect(prev.x).toBeCloseTo(end.x);
+    expect(end.y - prev.y).toBeGreaterThanOrEqual(72);
+    expect(prev.y).toBeLessThanOrEqual(3022);
   });
 });
 

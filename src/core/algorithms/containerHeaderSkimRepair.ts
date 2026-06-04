@@ -21,6 +21,14 @@ const DEFAULT_SOURCE_EXIT_STUB = 72;
 const DEFAULT_ENDPOINT_STUB = 48;
 const CONTAINER_TYPES = new Set(['group', 'subGroup', 'titleGroup', 'domain', 'subDomain', 'swimlane']);
 
+export const recommendedEndpointEntryStub = (node: Pick<Rectangle, 'width' | 'height'>): number => {
+    const shortSide = Math.min(node.width, node.height);
+    return Math.min(
+        DEFAULT_CONTAINER_ENTRY_CLEARANCE,
+        Math.max(DEFAULT_ENDPOINT_STUB, shortSide * 0.75),
+    );
+};
+
 const isContainerNode = (node: RoutingNodeRect): boolean => CONTAINER_TYPES.has(String(node.type ?? ''));
 
 const nodeCenter = (rect: Rectangle): Point => ({
@@ -396,7 +404,7 @@ export function repairTangentialEndpointEntryPath(
     const finalVertical = Math.abs(prev.x - end.x) < EPS;
     const needsVerticalEntry = side === 'top' || side === 'bottom';
     const entryLength = Math.abs(prev.x - end.x) + Math.abs(prev.y - end.y);
-    const minEntryStub = Math.max(DEFAULT_ENDPOINT_STUB, Math.min(target.width, target.height) * 0.5);
+    const minEntryStub = recommendedEndpointEntryStub(target);
     if (
         ((needsVerticalEntry && finalVertical) || (!needsVerticalEntry && finalHorizontal))
         && entryLength >= minEntryStub

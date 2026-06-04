@@ -22,6 +22,7 @@ import {
     repairEndpointPortConstraintPath,
     repairTangentialEndpointEntryPath,
     detectContainerHeaderSkimRisk,
+    recommendedEndpointEntryStub,
     type RoutingNodeRect,
 } from '../../../algorithms/containerHeaderSkimRepair';
 
@@ -171,7 +172,7 @@ const pathHasShortEndpointStub = (
     return endpoints.some(({ node, point, adjacent, role }) => {
         const side = getEndpointSide(point, node);
         if (!node || !side || !adjacent) return false;
-        const minStub = Math.max(48, Math.min(node.width, node.height) * 0.5);
+        const minStub = recommendedEndpointEntryStub(node);
         const segmentLength = Math.abs(point.x - adjacent.x) + Math.abs(point.y - adjacent.y);
         const axisAligned = side === 'top' || side === 'bottom'
             ? Math.abs(point.x - adjacent.x) < 1
