@@ -13,6 +13,28 @@ export interface AdvancedSmartEdgeGraphicsProps {
     labelManager: UseEdgeLabelInteractionsReturn;
 }
 
+const NUMBER_RE = /-?\d*\.?\d+(?:[eE][-+]?\d+)?/g;
+const PATH_COMMAND_RE = /([MLACQST])([^MLACQST]*)/gi;
+
+const getPathEndpoints = (path: string): { source: { x: number; y: number }; target: { x: number; y: number } } | null => {
+    if (!path) return null;
+
+    let source: { x: number; y: number } | null = null;
+    let target: { x: number; y: number } | null = null;
+    const matches = path.matchAll(PATH_COMMAND_RE);
+    for (const match of matches) {
+        const nums = [...match[2].matchAll(NUMBER_RE)].map(num => Number(num[0]));
+        if (nums.length < 2 || nums.some(num => !Number.isFinite(num))) continue;
+
+        const firstPair = { x: nums[0], y: nums[1] };
+        const lastPair = { x: nums[nums.length - 2], y: nums[nums.length - 1] };
+        if (!source) source = firstPair;
+        target = lastPair;
+    }
+
+    return source && target ? { source, target } : null;
+};
+
 const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: AdvancedSmartEdgeGraphicsProps) => {
     const { 
         id, label, style, markerStart, markerEnd, 
@@ -35,6 +57,7 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
 
     const edgeData = props.data as Record<string, any> | undefined;
     const currentTheme = useEdgeTheme();
+    const visiblePathEndpoints = useMemo(() => getPathEndpoints(safeFinalPath), [safeFinalPath]);
     // [PERF] 消除双订阅：移除第二次 useSmartEdgeContext 调用
     // simpleNodeMap 仅在 debug heatmap 时使用，通过 router 传入
     // 这避免了每条边对 nodeLookup 进行两次订阅，显著减少拖动时的重算量
@@ -164,11 +187,11 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
             
             <g className="custom-edge-updater-group">
                 <circle className="custom-edge-updater custom-edge-updater-source"
-                    cx={workerSmartPoints && workerSmartPoints.length > 0 ? workerSmartPoints[0].x : sourceX}
-                    cy={workerSmartPoints && workerSmartPoints.length > 0 ? workerSmartPoints[0].y : sourceY} />
+                    cx={visiblePathEndpoints?.source.x ?? (workerSmartPoints && workerSmartPoints.length > 0 ? workerSmartPoints[0].x : sourceX)}
+                    cy={visiblePathEndpoints?.source.y ?? (workerSmartPoints && workerSmartPoints.length > 0 ? workerSmartPoints[0].y : sourceY)} />
                 <circle className="custom-edge-updater custom-edge-updater-target"
-                    cx={workerSmartPoints && workerSmartPoints.length > 1 ? workerSmartPoints[workerSmartPoints.length - 1].x : targetX}
-                    cy={workerSmartPoints && workerSmartPoints.length > 1 ? workerSmartPoints[workerSmartPoints.length - 1].y : targetY} />
+                    cx={visiblePathEndpoints?.target.x ?? (workerSmartPoints && workerSmartPoints.length > 1 ? workerSmartPoints[workerSmartPoints.length - 1].x : targetX)}
+                    cy={visiblePathEndpoints?.target.y ?? (workerSmartPoints && workerSmartPoints.length > 1 ? workerSmartPoints[workerSmartPoints.length - 1].y : targetY)} />
             </g>
 
             {resolvedLabelText && (

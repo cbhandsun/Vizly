@@ -28,6 +28,7 @@ import { optimizeHubPortOrder } from '../algorithms/hubPortOrderOptimizer';
 import { refineManyToOneFanIn, type ManyToOneFanInGroup } from '../algorithms/manyToOneFanIn';
 import { repairHardObstacleViolations } from '../algorithms/hardObstaclePathRepair';
 import { repairEdgeCrossingViolations } from '../algorithms/edgeCrossingRepair';
+import { clearRenderedPathCache } from '../routing/renderedPathCache';
 
 /**
  * [P0-2] Main coordination service for edge routing.
@@ -380,15 +381,8 @@ export class EdgeRoutingCoordinator {
         this.graphVersion++;
         this.notifyGraphVersionSubscribers();
         
-        // Clear global SVG path cache to prevent "flying lines" UI fallback
-        try {
-            const w = window as any;
-            w.__dv_rendered_path_cache_version__ = 'domain-dagre-computed-path-v2';
-            const cache = w.__dv_rendered_path_cache__;
-            if (cache instanceof Map) {
-                cache.clear();
-            }
-        } catch (e) {}
+        // Clear global SVG path cache to prevent "flying lines" UI fallback.
+        clearRenderedPathCache();
 
         // Re-mark all known edges as dirty so they re-route on next render
         this.allEdges.forEach(edge => this.dirtyEdges.add(edge.id));
@@ -2710,6 +2704,7 @@ export class EdgeRoutingCoordinator {
         this.cache.clear();
         this.latestRoutedPaths.clear();
         this.routedLabelObstacles.clear();
+        clearRenderedPathCache();
         this.dirtyEdges.clear();
         this.allEdges.forEach(edge => this.dirtyEdges.add(edge.id));
         this.workerPool.markDirty();

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'reac
 import type { MutableRefObject } from 'react';
 import { Edge, Position } from '@xyflow/react';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
+import { setRenderedPathCacheValue } from '../../../routing/renderedPathCache';
 // import WorkerPool from '../../../workers/WorkerPool'; // Replaced by Coordinator
 
 // Define types locally to avoid circular deps
@@ -41,8 +42,6 @@ export interface EdgeData {
 }
 
 type Point2D = { x: number; y: number };
-
-const RENDERED_PATH_CACHE_VERSION = 'domain-dagre-computed-path-v2';
 
 const pointsToOrthogonalPath = (points: Point2D[]): string => {
     if (!Array.isArray(points) || points.length === 0) return '';
@@ -792,18 +791,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                 // and mounts a new one. The old Promise resolves after unmount, so isMountedRef=false.
                 // By caching the path here, the new component instance can pick it up immediately.
                 if (res?.path && !res.error) {
-                    const w = window as any;
-                    if (
-                        w.__dv_rendered_path_cache_version__ !== RENDERED_PATH_CACHE_VERSION
-                        || !(w.__dv_rendered_path_cache__ instanceof Map)
-                    ) {
-                        w.__dv_rendered_path_cache__ = new Map<string, string>();
-                        w.__dv_rendered_path_cache_version__ = RENDERED_PATH_CACHE_VERSION;
-                    }
-                    const pathCache = w.__dv_rendered_path_cache__;
-                    if (pathCache instanceof Map) {
-                        pathCache.set(id, res.path);
-                    }
+                    setRenderedPathCacheValue(id, res.path);
                 }
                 if (!isMountedRef.current) return;
 

@@ -25,29 +25,13 @@ import {
     recommendedEndpointEntryStub,
     type RoutingNodeRect,
 } from '../../../algorithms/containerHeaderSkimRepair';
+import {
+    getRenderedPathCache as _getRenderedPathCache,
+    setRenderedPathCacheValue as _setRenderedPathCacheValue,
+} from '../../../routing/renderedPathCache';
 
-const RENDERED_PATH_CACHE_VERSION = 'domain-dagre-computed-path-v3';
 const RENDERED_BUSINESS_NODE_CLEARANCE = 18;
 const RENDERED_CONTAINER_TYPES = new Set(['group', 'subGroup', 'titleGroup', 'domain', 'subDomain', 'swimlane']);
-
-const _getRenderedPathCache = () => {
-    if (typeof window === 'undefined') return new Map<string, string>();
-    const w = window as any;
-    if (
-        w.__dv_rendered_path_cache_version__ !== RENDERED_PATH_CACHE_VERSION
-        || !(w.__dv_rendered_path_cache__ instanceof Map)
-    ) {
-        w.__dv_rendered_path_cache__ = new Map<string, string>();
-        w.__dv_rendered_path_cache_version__ = RENDERED_PATH_CACHE_VERSION;
-    }
-    return w.__dv_rendered_path_cache__ as Map<string, string>;
-};
-
-const _setRenderedPathCacheValue = (edgeId: string, path: string): void => {
-    const cache = _getRenderedPathCache();
-    if (cache.get(edgeId) === path) return;
-    cache.set(edgeId, path);
-};
 
 const LOCAL_DOGLEG_MAX_DEPTH = 40;
 
