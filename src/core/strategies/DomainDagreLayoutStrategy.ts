@@ -1170,13 +1170,13 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             sourceOutCounts.set(edge.source, (sourceOutCounts.get(edge.source) || 0) + 1);
             targetInCounts.set(edge.target, (targetInCounts.get(edge.target) || 0) + 1);
         });
-        const shouldForceRolePorts = (
+        const getRolePortForce = (
             edge: Edge,
             source: ReactFlowNode,
             target: ReactFlowNode,
             edgePorts?: { source?: string; target?: string }
         ) => {
-            if (!edgePorts) return false;
+            if (!edgePorts) return { sourceFanOut: false, targetFanIn: false };
             const layoutDir = String(options.direction || 'TB').toUpperCase();
             const isVerticalFlow = layoutDir === 'TB' || layoutDir === 'BT';
             const isHorizontalFlow = layoutDir === 'LR' || layoutDir === 'RL';
@@ -1204,7 +1204,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 const targetMatchesFlow = targetFanIn && (targetPre === 't' || targetPre === 'b')
                     && Math.abs(dy) > 30
                     && ((targetPre === 't' && dy > 0) || (targetPre === 'b' && dy < 0));
-                return sourceMatchesFlow || targetMatchesFlow;
+                return { sourceFanOut: sourceMatchesFlow, targetFanIn: targetMatchesFlow };
             }
 
             if (isHorizontalFlow) {
@@ -1214,10 +1214,10 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 const targetMatchesFlow = targetFanIn && (targetPre === 'l' || targetPre === 'r')
                     && Math.abs(dx) > 30
                     && ((targetPre === 'l' && dx > 0) || (targetPre === 'r' && dx < 0));
-                return sourceMatchesFlow || targetMatchesFlow;
+                return { sourceFanOut: sourceMatchesFlow, targetFanIn: targetMatchesFlow };
             }
 
-            return false;
+            return { sourceFanOut: false, targetFanIn: false };
         };
 
         // [FIX] 强制同步点：让出到微任务队列，确保所有待处理的状态更新完成
@@ -1345,16 +1345,17 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 ...routingConfig,
                 preAssignedPorts: mergedPorts
             };
-            const forceRolePorts = shouldForceRolePorts(edge, source, target, edgePorts);
+            const rolePortForce = getRolePortForce(edge, source, target, edgePorts);
+            const forceRolePorts = rolePortForce.sourceFanOut || rolePortForce.targetFanIn;
             if (forceRolePorts) {
                 (routingConfigForEdge as any).preAssignedPortPolicy = 'force';
-                if (edgePorts?.source && !mergedPorts[target.id]?.target) {
+                if (rolePortForce.sourceFanOut && edgePorts?.source && !explicitTargetHandle) {
                     mergedPorts[target.id] = {
                         ...mergedPorts[target.id],
                         target: oppositeHandle(edgePorts.source),
                     };
                 }
-                if (edgePorts?.target && !mergedPorts[source.id]?.source) {
+                if (rolePortForce.targetFanIn && edgePorts?.target && !explicitSourceHandle) {
                     mergedPorts[source.id] = {
                         ...mergedPorts[source.id],
                         source: oppositeHandle(edgePorts.target),

@@ -55,6 +55,33 @@ describe('repairContainerHeaderSkimPath', () => {
     ]);
   });
 
+  it('prioritizes header clearance over ordinary edge crossings', () => {
+    const repaired = repairContainerHeaderSkimPath([
+      { x: 505.8, y: 2690 },
+      { x: 505.8, y: 3022 },
+      { x: 192, y: 3022 },
+      { x: 192, y: 3094 },
+    ], {
+      edgeId: 'e10',
+      sourceId: 'fix-quota',
+      targetId: 'greedy-spec',
+      nodes: baseNodes,
+      otherPaths: new Map([
+        ['ordinary-crossing', [
+          { x: 300, y: 2800 },
+          { x: 300, y: 2900 },
+        ]],
+      ]),
+    });
+
+    expect(repaired).toEqual([
+      { x: 505.8, y: 2690 },
+      { x: 505.8, y: 2852 },
+      { x: 192, y: 2852 },
+      { x: 192, y: 3094 },
+    ]);
+  });
+
   it('keeps a path that is already clear of container headers', () => {
     const repaired = repairContainerHeaderSkimPath([
       { x: 505.8, y: 2690 },
@@ -168,6 +195,52 @@ describe('repairTangentialEndpointEntryPath', () => {
     expect(prev.x).toBeCloseTo(end.x);
     expect(end.y - prev.y).toBeGreaterThanOrEqual(72);
     expect(prev.y).toBeLessThanOrEqual(3022);
+  });
+
+  it('lifts the rendered WMS quota fan-out before it hugs the greedy node top edge', () => {
+    const repaired = repairTangentialEndpointEntryPath([
+      { x: 505.8, y: 2690 },
+      { x: 505.8, y: 3014 },
+      { x: 497.8, y: 3022 },
+      { x: 200, y: 3022 },
+      { x: 192, y: 3030 },
+      { x: 192, y: 3094 },
+    ], {
+      edgeId: 'e10',
+      sourceId: 'fix-quota',
+      targetId: 'greedy-spec',
+      nodes: baseNodes,
+    });
+
+    expect(repaired).not.toBeNull();
+    const [prev, end] = lastSegment(repaired!);
+    expect(prev.x).toBeCloseTo(end.x);
+    expect(end.y - prev.y).toBeGreaterThanOrEqual(72);
+    expect(prev.y).toBeLessThanOrEqual(3022);
+  });
+
+  it('prioritizes a clear target entry over ordinary edge crossings', () => {
+    const repaired = repairTangentialEndpointEntryPath([
+      { x: 505.8, y: 2690 },
+      { x: 192, y: 3078 },
+      { x: 192, y: 3094 },
+    ], {
+      edgeId: 'e10',
+      sourceId: 'fix-quota',
+      targetId: 'greedy-spec',
+      nodes: baseNodes,
+      otherPaths: new Map([
+        ['ordinary-crossing', [
+          { x: 300, y: 2800 },
+          { x: 300, y: 2900 },
+        ]],
+      ]),
+    });
+
+    expect(repaired).not.toBeNull();
+    const [prev, end] = lastSegment(repaired!);
+    expect(prev.x).toBeCloseTo(end.x);
+    expect(end.y - prev.y).toBeGreaterThanOrEqual(72);
   });
 });
 

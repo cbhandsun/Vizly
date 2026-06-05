@@ -26,7 +26,7 @@ import {
     type RoutingNodeRect,
 } from '../../../algorithms/containerHeaderSkimRepair';
 
-const RENDERED_PATH_CACHE_VERSION = 'domain-dagre-computed-path-v2';
+const RENDERED_PATH_CACHE_VERSION = 'domain-dagre-computed-path-v3';
 const RENDERED_BUSINESS_NODE_CLEARANCE = 18;
 const RENDERED_CONTAINER_TYPES = new Set(['group', 'subGroup', 'titleGroup', 'domain', 'subDomain', 'swimlane']);
 

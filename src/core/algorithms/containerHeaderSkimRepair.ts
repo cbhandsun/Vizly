@@ -453,7 +453,7 @@ export function repairTangentialEndpointEntryPath(
         ]);
     }
 
-    return validateCandidate(candidate, current, options);
+    return validateCandidate(candidate, current, { ...options, otherPaths: undefined });
 }
 
 export function repairDirectionalSourceExitPath(
@@ -556,7 +556,7 @@ export function repairContainerHeaderSkimPath(
         { x: end.x, y: corridorY },
         { ...end },
     ]);
-    return validateCandidate(candidate, current, options);
+    return validateCandidate(candidate, current, { ...options, otherPaths: undefined });
 }
 
 export function detectContainerHeaderSkimRisk(

@@ -191,4 +191,40 @@ describe('DomainDagreLayoutStrategy', () => {
         const poolAPath = ((poolAEdge.data as any)?.computedPath ?? []) as Array<{ x: number; y: number }>;
         expect(detectLocalDoglegRisks(poolAPath)).toEqual([]);
     });
+
+    it('keeps WMS quota fan-out entering lower resource nodes from the top', async () => {
+        const canvas = await standardDataToCanvas(demandAllocation as any);
+        const presetLayout = (demandAllocation as any).layout;
+
+        const result = await new DomainDagreLayoutStrategy().calculateLayout(canvas.nodes, canvas.edges, {
+            type: LayoutType.DAGRE,
+            direction: 'TB',
+            nodeLayout: 'dagre',
+            generateDomainGroups: true,
+            generateSubDomainGroups: true,
+            domainSubGroupDirection: 'LR',
+            subDomainNodeDirection: 'TB',
+            domainOrder: presetLayout.domainOrder,
+            subDomainOrder: presetLayout.subDomainOrder,
+        } as any);
+
+        for (const edgeId of ['e10', 'e16']) {
+            const edge = result.edges.find(e => e.id === edgeId)!;
+            const target = result.nodes.find(n => n.id === edge.target)!;
+            const targetAbs = absolutePositionOf(target, result.nodes);
+            const targetSize = sizeOf(target);
+            const path = ((edge.data as any)?.computedPath ?? []) as Array<{ x: number; y: number }>;
+            const beforeEnd = path[path.length - 2];
+            const end = path[path.length - 1];
+
+            expect(edge.sourceHandle).toBe('bottom');
+            expect(edge.targetHandle).toBe('top');
+            expect(path.length).toBeGreaterThanOrEqual(2);
+            expect(end.x).toBeGreaterThanOrEqual(targetAbs.x - 1);
+            expect(end.x).toBeLessThanOrEqual(targetAbs.x + targetSize.width + 1);
+            expect(end.y).toBeCloseTo(targetAbs.y - 1, 1);
+            expect(beforeEnd.x).toBeCloseTo(end.x, 1);
+            expect(beforeEnd.y).toBeLessThan(end.y);
+        }
+    });
 });
