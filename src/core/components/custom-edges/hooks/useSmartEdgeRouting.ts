@@ -28,6 +28,7 @@ import {
 
 const RENDERED_PATH_CACHE_VERSION = 'domain-dagre-computed-path-v2';
 const RENDERED_BUSINESS_NODE_CLEARANCE = 18;
+const RENDERED_CONTAINER_TYPES = new Set(['group', 'subGroup', 'titleGroup', 'domain', 'subDomain', 'swimlane']);
 
 const _getRenderedPathCache = () => {
     if (typeof window === 'undefined') return new Map<string, string>();
@@ -115,6 +116,16 @@ const collectRoutingNodeRects = (nodeMap: Map<string, any>): RoutingNodeRect[] =
     });
     return rects;
 };
+
+const getRenderedBusinessObstacles = (
+    nodes: RoutingNodeRect[],
+    sourceId: string,
+    targetId: string,
+): RoutingNodeRect[] => nodes.filter(node =>
+    node.id !== sourceId
+    && node.id !== targetId
+    && !RENDERED_CONTAINER_TYPES.has(String(node.type ?? ''))
+);
 
 const pointTouchesRectBoundary = (
     point: PathPoint | undefined,
@@ -1460,6 +1471,10 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       () => collectRoutingNodeRects(safeSimpleNodeMap),
       [safeSimpleNodeMap]
   );
+  const renderedBusinessObstacles = useMemo(
+      () => getRenderedBusinessObstacles(routingNodeRects, source, target),
+      [routingNodeRects, source, target]
+  );
   const hasSameSourceFanOut = useMemo(() => {
       return (storeEdges as any[]).some(edge => edge?.id !== id && edge?.source === source);
   }, [storeEdges, id, source]);
@@ -1648,7 +1663,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
   const lockedPathNeedsContainerRepair = isLayoutPathLocked
       && snappedFinalPointsForQuality.length >= 2
       && (
-          pathHasObstacleHit(snappedFinalPointsForQuality, safeObstacles, RENDERED_BUSINESS_NODE_CLEARANCE)
+          pathHasObstacleHit(snappedFinalPointsForQuality, renderedBusinessObstacles, RENDERED_BUSINESS_NODE_CLEARANCE)
           || !pathEndpointsTouchCurrentNodes(snappedFinalPointsForQuality, source, target, routingNodeRects)
           || pathHasShortEndpointStub(snappedFinalPointsForQuality, source, target, routingNodeRects)
           || detectContainerHeaderSkimRisk(snappedFinalPointsForQuality, {
@@ -1817,8 +1832,8 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       id,
       finalAlignedDoglegPath,
       renderCornerRadius,
-      canApplyContainerHeaderSkimRepair || lockedPathNeedsContainerRepair,
-      safeObstacles
+      !nodesDragging && !isLoading && renderedBusinessObstacles.length > 0,
+      renderedBusinessObstacles
   );
   const finalLocalDoglegPath = repairLocalMicroDoglegs(
       id,
@@ -1827,12 +1842,19 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       canApplyLocalDoglegRepair,
       safeObstacles
   );
-  if (finalLocalDoglegPath !== structuralSafePath && (canUseFreshWorkerPath || !isLoading)) {
-      _setRenderedPathCacheValue(id, finalLocalDoglegPath);
+  const finalClearanceRepairedPath = repairHardObstacleRenderedPath(
+      id,
+      finalLocalDoglegPath,
+      renderCornerRadius,
+      !nodesDragging && !isLoading && renderedBusinessObstacles.length > 0,
+      renderedBusinessObstacles
+  );
+  if (finalClearanceRepairedPath !== structuralSafePath && (canUseFreshWorkerPath || !isLoading)) {
+      _setRenderedPathCacheValue(id, finalClearanceRepairedPath);
   }
   const safeFinalPath = edgeConfig.strictOrthogonal && visualCornerRadius > 0
-      ? (createFilletedPath(parseRenderedPathPoints(finalLocalDoglegPath), visualCornerRadius) || finalLocalDoglegPath)
-      : finalLocalDoglegPath;
+      ? (createFilletedPath(parseRenderedPathPoints(finalClearanceRepairedPath), visualCornerRadius) || finalClearanceRepairedPath)
+      : finalClearanceRepairedPath;
   const hasVisibleCandidate = (hasLoadedOnceRef.current || hasCacheOnMount.current) && initialRevealReady;
   const hasCachedVisiblePath = !!_getRenderedPathCache().get(id);
   const canKeepPreviousPathVisible = hasVisibleCandidate && hasCachedVisiblePath && (isLoading || isStale);
