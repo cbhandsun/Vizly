@@ -27,6 +27,7 @@ import {
 } from '../../../algorithms/containerHeaderSkimRepair';
 
 const RENDERED_PATH_CACHE_VERSION = 'domain-dagre-computed-path-v2';
+const RENDERED_BUSINESS_NODE_CLEARANCE = 18;
 
 const _getRenderedPathCache = () => {
     if (typeof window === 'undefined') return new Map<string, string>();
@@ -471,13 +472,52 @@ const segmentHitsRect = (
     return false;
 };
 
+const segmentDistanceToRect = (
+    a: PathPoint,
+    b: PathPoint,
+    rect: { x: number; y: number; width: number; height: number },
+): number => {
+    const left = rect.x;
+    const right = rect.x + rect.width;
+    const top = rect.y;
+    const bottom = rect.y + rect.height;
+
+    if (Math.abs(a.x - b.x) < 1) {
+        const x = a.x;
+        const minY = Math.min(a.y, b.y);
+        const maxY = Math.max(a.y, b.y);
+        const overlapsY = Math.max(minY, top) <= Math.min(maxY, bottom);
+        if (overlapsY && x >= left && x <= right) return 0;
+        if (overlapsY) return Math.min(Math.abs(x - left), Math.abs(x - right));
+        const dx = x < left ? left - x : x > right ? x - right : 0;
+        const dy = maxY < top ? top - maxY : minY > bottom ? minY - bottom : 0;
+        return Math.hypot(dx, dy);
+    }
+
+    if (Math.abs(a.y - b.y) < 1) {
+        const y = a.y;
+        const minX = Math.min(a.x, b.x);
+        const maxX = Math.max(a.x, b.x);
+        const overlapsX = Math.max(minX, left) <= Math.min(maxX, right);
+        if (overlapsX && y >= top && y <= bottom) return 0;
+        if (overlapsX) return Math.min(Math.abs(y - top), Math.abs(y - bottom));
+        const dx = maxX < left ? left - maxX : minX > right ? minX - right : 0;
+        const dy = y < top ? top - y : y > bottom ? y - bottom : 0;
+        return Math.hypot(dx, dy);
+    }
+
+    return Infinity;
+};
+
 const pathHasObstacleHit = (
     points: PathPoint[],
     obstacles: Array<{ x: number; y: number; width: number; height: number }>,
+    minClearance = 0,
 ): boolean => {
     for (let i = 0; i < points.length - 1; i++) {
         for (const obstacle of obstacles) {
             if (segmentHitsRect(points[i], points[i + 1], obstacle)) return true;
+            if (minClearance > 0 && segmentDistanceToRect(points[i], points[i + 1], obstacle) < minClearance) return true;
         }
     }
     return false;
@@ -898,15 +938,16 @@ const repairHardObstacleRenderedPath = (
 ): string => {
     if (!enabled || !path || /[CQ]/i.test(path)) return path;
     const points = orthogonalizePointChain(parseRenderedPathPoints(path));
-    if (points.length < 2 || !pathHasObstacleHit(points, obstacles)) return path;
+    const minClearance = RENDERED_BUSINESS_NODE_CLEARANCE;
+    if (points.length < 2 || !pathHasObstacleHit(points, obstacles, minClearance)) return path;
 
     const repaired = repairHardObstacleViolations(new Map([[edgeId, points]]), {
         obstacles,
         spacing: 12,
-        minClearance: 18,
+        minClearance,
         maxIterationsPerEdge: 6,
     }).get(edgeId);
-    if (!repaired || repaired.length < 2 || pathHasObstacleHit(repaired, obstacles)) return path;
+    if (!repaired || repaired.length < 2 || pathHasObstacleHit(repaired, obstacles, minClearance)) return path;
 
     const repairedPath = createFilletedPath(repaired, radius);
     _setRenderedPathCacheValue(edgeId, repairedPath);
@@ -1607,7 +1648,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
   const lockedPathNeedsContainerRepair = isLayoutPathLocked
       && snappedFinalPointsForQuality.length >= 2
       && (
-          pathHasObstacleHit(snappedFinalPointsForQuality, safeObstacles)
+          pathHasObstacleHit(snappedFinalPointsForQuality, safeObstacles, RENDERED_BUSINESS_NODE_CLEARANCE)
           || !pathEndpointsTouchCurrentNodes(snappedFinalPointsForQuality, source, target, routingNodeRects)
           || pathHasShortEndpointStub(snappedFinalPointsForQuality, source, target, routingNodeRects)
           || detectContainerHeaderSkimRisk(snappedFinalPointsForQuality, {

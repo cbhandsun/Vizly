@@ -37,6 +37,40 @@ const pathHitsRect = (
     return false;
 };
 
+const minDistanceToRect = (
+    points: Array<{ x: number; y: number }>,
+    rect: { x: number; y: number; width: number; height: number }
+): number => {
+    const left = rect.x;
+    const right = rect.x + rect.width;
+    const top = rect.y;
+    const bottom = rect.y + rect.height;
+    let best = Infinity;
+
+    for (let i = 0; i < points.length - 1; i++) {
+        const a = points[i];
+        const b = points[i + 1];
+        if (Math.abs(a.y - b.y) < 1) {
+            const y = a.y;
+            const minX = Math.min(a.x, b.x);
+            const maxX = Math.max(a.x, b.x);
+            const overlapsX = Math.max(minX, left) <= Math.min(maxX, right);
+            if (overlapsX && y >= top && y <= bottom) return 0;
+            if (overlapsX) best = Math.min(best, Math.abs(y - top), Math.abs(y - bottom));
+        }
+        if (Math.abs(a.x - b.x) < 1) {
+            const x = a.x;
+            const minY = Math.min(a.y, b.y);
+            const maxY = Math.max(a.y, b.y);
+            const overlapsY = Math.max(minY, top) <= Math.min(maxY, bottom);
+            if (overlapsY && x >= left && x <= right) return 0;
+            if (overlapsY) best = Math.min(best, Math.abs(x - left), Math.abs(x - right));
+        }
+    }
+
+    return best;
+};
+
 describe('useSmartEdgeRouting repair helpers', () => {
     it('delays same-source fan-out detours when the target enters from a side port', () => {
         const detouredPath = [
@@ -85,5 +119,23 @@ describe('useSmartEdgeRouting repair helpers', () => {
         expect(repaired).not.toBe(crossingPath);
         expect(pathHitsRect(points, greedySpec)).toBe(false);
         expect(pathHitsRect(points, mergeRes)).toBe(false);
+    });
+
+    it('doglegs locked rendered paths away from near-miss business nodes', () => {
+        const nearMissPath = 'M 60 232 L 1120 232';
+        const greedySpec = { x: 100, y: 244, width: 180, height: 92 };
+
+        const repaired = __smartEdgeRoutingTestUtils.repairHardObstacleRenderedPath(
+            'e16',
+            nearMissPath,
+            0,
+            true,
+            [greedySpec]
+        );
+        const points = parsePoints(repaired);
+
+        expect(repaired).not.toBe(nearMissPath);
+        expect(pathHitsRect(points, greedySpec)).toBe(false);
+        expect(minDistanceToRect(points, greedySpec)).toBeGreaterThanOrEqual(18);
     });
 });
