@@ -6,7 +6,10 @@
 import { logger } from '../utils/Logger';
 import { ErrorType, ErrorSeverity, createError } from '../utils/ErrorHandler';
 
+const isPlainConfigObject = (value: unknown): value is Record<string, any> =>
+  Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
+const MAX_PERSISTED_LAYER_CONFIG_CHARS = 256 * 1024;
 
 // 配置层级枚举
 export interface CloudStorageAdapter {
@@ -32,6 +35,9 @@ export const CONFIG_PRIORITY: Record<ConfigLayer, number> = {
   [ConfigLayer.SESSION]: 40,
   [ConfigLayer.RUNTIME]: 50
 };
+
+const isConfigLayer = (value: unknown): value is ConfigLayer =>
+  typeof value === 'string' && Object.values(ConfigLayer).includes(value as ConfigLayer);
 
 // 配置变更事件
 export interface LayeredConfigChangeEvent<T = any> {
@@ -297,25 +303,22 @@ export class LayeredConfigManager {
 
       // 加载全局配置
       if (hasLocalStorage) {
-        const globalConfig = localStorage.getItem('layered-config-global');
-        if (globalConfig) {
-          const data = JSON.parse(globalConfig);
+        const data = this.readPersistedLayerData(localStorage, 'layered-config-global');
+        if (data) {
           this.setLayerData(ConfigLayer.GLOBAL, data, 'localStorage');
         }
 
         // 加载用户配置
-        const userConfig = localStorage.getItem('layered-config-user');
-        if (userConfig) {
-          const data = JSON.parse(userConfig);
-          this.setLayerData(ConfigLayer.USER, data, 'localStorage');
+        const userData = this.readPersistedLayerData(localStorage, 'layered-config-user');
+        if (userData) {
+          this.setLayerData(ConfigLayer.USER, userData, 'localStorage');
         }
       }
 
       // 加载会话配置
       if (hasSessionStorage) {
-        const sessionConfig = sessionStorage.getItem('layered-config-session');
-        if (sessionConfig) {
-          const data = JSON.parse(sessionConfig);
+        const data = this.readPersistedLayerData(sessionStorage, 'layered-config-session');
+        if (data) {
           this.setLayerData(ConfigLayer.SESSION, data, 'sessionStorage');
         }
       }
@@ -337,10 +340,14 @@ export class LayeredConfigManager {
     if (!this.cloudAdapter) return;
     try {
       await this.cloudAdapter.syncWithCloud((key, value) => {
-        if (key === 'layered-config-user') {
-          this.setLayerData(ConfigLayer.USER, value, 'cloud');
-        } else if (key === 'layered-config-global') {
-          this.setLayerData(ConfigLayer.GLOBAL, value, 'cloud');
+        try {
+          if (key === 'layered-config-user') {
+            this.setLayerData(ConfigLayer.USER, value, 'cloud');
+          } else if (key === 'layered-config-global') {
+            this.setLayerData(ConfigLayer.GLOBAL, value, 'cloud');
+          }
+        } catch (error) {
+          this.configLogger.warn('忽略无效云端配置层', { key, error });
         }
       });
     } catch (e) {
@@ -359,7 +366,10 @@ export class LayeredConfigManager {
     const layerData = this.layers.get(layer);
     if (!layerData) return;
 
-    Object.entries(data).forEach(([key, value]) => {
+    const normalized = this.normalizeConfigRecord(data, { requireKnown: false, invalidValueMode: 'drop' });
+    if (Object.keys(normalized).length === 0) return;
+
+    Object.entries(normalized).forEach(([key, value]) => {
       layerData.data.set(key, value);
     });
 
@@ -464,14 +474,8 @@ export class LayeredConfigManager {
     }
 
     // 设置配置值
-    const layerData = this.layers.get(layer);
-    if (!layerData) {
-      throw createError(
-        `无效的配置层: ${layer}`,
-        ErrorType.CONFIG,
-        ErrorSeverity.HIGH
-      );
-    }
+    const layerData = this.getLayerDataOrThrow(layer);
+    if (!layerData) return;
 
     layerData.data.set(key, validatedValue);
     layerData.metadata.lastModified = Date.now();
@@ -497,14 +501,8 @@ export class LayeredConfigManager {
   ): void {
     const oldValue = this.get(key);
 
-    const layerData = this.layers.get(layer);
-    if (!layerData) {
-      throw createError(
-        `无效的配置层: ${layer}`,
-        ErrorType.CONFIG,
-        ErrorSeverity.HIGH
-      );
-    }
+    const layerData = this.getLayerDataOrThrow(layer);
+    if (!layerData) return;
 
     if (!layerData.data.has(key)) {
       return;
@@ -532,6 +530,9 @@ export class LayeredConfigManager {
     configs: Record<string, any>,
     layer: ConfigLayer = ConfigLayer.USER
   ): void {
+    const layerData = this.getLayerDataOrThrow(layer);
+    if (!layerData) return;
+    const normalizedConfigs = this.normalizeConfigRecord(configs, { requireKnown: true, invalidValueMode: 'throw' });
     const changes: Array<{
       key: string;
       oldValue: any;
@@ -540,30 +541,20 @@ export class LayeredConfigManager {
     }> = [];
 
     // 收集所有变更
-    Object.entries(configs).forEach(([key, value]) => {
+    Object.entries(normalizedConfigs).forEach(([key, value]) => {
       const oldValue = this.get(key);
-      const validatedValue = this.validateAndSanitize(key, value);
-
-      if (validatedValue !== undefined) {
-        const layerData = this.layers.get(layer);
-        if (layerData) {
-          layerData.data.set(key, validatedValue);
-          changes.push({
-            key,
-            oldValue,
-            newValue: validatedValue,
-            effectiveValue: validatedValue
-          });
-        }
-      }
+      layerData.data.set(key, value);
+      changes.push({
+        key,
+        oldValue,
+        newValue: value,
+        effectiveValue: value
+      });
     });
 
     // 更新元数据
-    const layerData = this.layers.get(layer);
-    if (layerData) {
-      layerData.metadata.lastModified = Date.now();
-      layerData.metadata.source = 'api-batch';
-    }
+    layerData.metadata.lastModified = Date.now();
+    layerData.metadata.source = 'api-batch';
 
     // 清除缓存
     this.invalidateCache();
@@ -620,7 +611,7 @@ export class LayeredConfigManager {
    * 重置配置层
    */
   public resetLayer(layer: ConfigLayer): void {
-    const layerData = this.layers.get(layer);
+    const layerData = this.getLayerDataOrThrow(layer);
     if (!layerData) return;
 
     const oldData = new Map(layerData.data);
@@ -700,6 +691,74 @@ export class LayeredConfigManager {
       this.configLogger.error(`配置验证异常 ${key}:`, { error });
       return undefined;
     }
+  }
+
+  private readPersistedLayerData(storage: Storage, key: string): Record<string, any> | null {
+    try {
+      const raw = storage.getItem(key);
+      if (!raw) return null;
+      if (raw.length > MAX_PERSISTED_LAYER_CONFIG_CHARS) {
+        storage.removeItem(key);
+        this.configLogger.warn('移除过大的持久化配置层', { key });
+        return null;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!isPlainConfigObject(parsed)) {
+        storage.removeItem(key);
+        return null;
+      }
+
+      return parsed;
+    } catch (error) {
+      try {
+        storage.removeItem(key);
+      } catch {
+        void 0;
+      }
+      this.configLogger.warn('移除损坏的持久化配置层', { key, error });
+      return null;
+    }
+  }
+
+  private getLayerDataOrThrow(layer: ConfigLayer): ConfigLayerData | null {
+    const layerData = this.layers.get(layer);
+    if (!layerData) {
+      throw createError(
+        `无效的配置层: ${layer}`,
+        ErrorType.CONFIG,
+        ErrorSeverity.HIGH
+      );
+    }
+    return layerData;
+  }
+
+  private normalizeConfigRecord(
+    configs: unknown,
+    options: { requireKnown: boolean; invalidValueMode: 'throw' | 'drop' }
+  ): Record<string, any> {
+    if (!isPlainConfigObject(configs)) {
+      throw new Error('配置必须是对象');
+    }
+
+    const normalized: Record<string, any> = {};
+    Object.entries(configs).forEach(([key, value]) => {
+      if (!this.schemas.has(key)) return;
+      const validatedValue = this.validateAndSanitize(key, value);
+      if (validatedValue === undefined) {
+        if (options.invalidValueMode === 'throw') {
+          throw new Error(`配置值验证失败: ${key}`);
+        }
+        return;
+      }
+      normalized[key] = validatedValue;
+    });
+
+    if (options.requireKnown && Object.keys(normalized).length === 0) {
+      throw new Error('没有可识别的配置项');
+    }
+
+    return normalized;
   }
 
   /**
@@ -814,19 +873,27 @@ export class LayeredConfigManager {
     try {
       const data = JSON.parse(configJson);
 
-      if (typeof data === 'object' && data !== null) {
-        // 如果是分层数据
-        if (Object.values(ConfigLayer).some(layer => layer in data)) {
-          Object.entries(data).forEach(([layer, configs]) => {
-            if (Object.values(ConfigLayer).includes(layer as ConfigLayer)) {
-              this.setMultiple(configs as Record<string, any>, layer as ConfigLayer);
-            }
-          });
-        } else {
-          // 如果是平面数据
-          this.setMultiple(data, targetLayer);
-        }
+      if (!isPlainConfigObject(data)) {
+        throw new Error('配置必须是对象');
       }
+
+      // 如果是分层数据，先完成所有层的校验，避免部分写入。
+      if (Object.keys(data).some(isConfigLayer)) {
+        const normalizedByLayer = new Map<ConfigLayer, Record<string, any>>();
+        Object.entries(data).forEach(([layer, configs]) => {
+          if (!isConfigLayer(layer)) return;
+          const normalized = this.normalizeConfigRecord(configs, { requireKnown: false, invalidValueMode: 'throw' });
+          if (Object.keys(normalized).length > 0) {
+            normalizedByLayer.set(layer, normalized);
+          }
+        });
+        if (normalizedByLayer.size === 0) throw new Error('没有可识别的配置项');
+        normalizedByLayer.forEach((configs, layer) => this.setMultiple(configs, layer));
+        return;
+      }
+
+      // 如果是平面数据
+      this.setMultiple(data, targetLayer);
     } catch (error) {
       throw createError(
         '导入配置失败',

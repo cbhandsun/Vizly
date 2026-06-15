@@ -1,11 +1,93 @@
-// @ts-nocheck
 /**
  * 图表配置管理系统
  * 统一管理布局、样式和行为配置
  */
 
-import { LayeredConfigManager, ConfigLayer } from '../../config/LayeredConfigManager';
-import { DiagramTheme } from '../../themes/EnhancedThemeManager';
+const DIAGRAM_CONFIG_STORAGE_KEY = 'architecture-diagram-config';
+const MAX_STORED_DIAGRAM_CONFIG_CHARS = 512 * 1024;
+const MAX_IMPORTED_DIAGRAM_CONFIG_CHARS = 1024 * 1024;
+const MAX_CONFIG_DEPTH = 10;
+const MAX_CONFIG_ARRAY_ITEMS = 2000;
+const MAX_CONFIG_OBJECT_KEYS = 1000;
+const MAX_CONFIG_STRING_CHARS = 64 * 1024;
+const DANGEROUS_CONFIG_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
+type ConfigRecord = Record<string, unknown>;
+type ConfigValue = null | boolean | number | string | ConfigValue[] | { [key: string]: ConfigValue };
+
+const isPlainConfigObject = (value: unknown): value is ConfigRecord =>
+  Boolean(
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)
+  );
+
+const parseBoundedConfigJson = (json: string, maxChars: number, label: string): unknown => {
+  if (json.length > maxChars) {
+    throw new Error(`${label}超过大小限制`);
+  }
+
+  return JSON.parse(json);
+};
+
+const sanitizeConfigValue = (value: unknown, depth = 0): ConfigValue => {
+  if (depth > MAX_CONFIG_DEPTH) {
+    throw new Error('配置对象嵌套过深');
+  }
+
+  if (value === undefined || value === null || typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new Error('配置数字必须是有限值');
+    }
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    if (value.length > MAX_CONFIG_STRING_CHARS) {
+      throw new Error('配置字符串超过大小限制');
+    }
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length > MAX_CONFIG_ARRAY_ITEMS) {
+      throw new Error('配置数组超过长度限制');
+    }
+    return value.map(item => sanitizeConfigValue(item, depth + 1));
+  }
+
+  if (!isPlainConfigObject(value)) {
+    throw new Error('配置值必须是可序列化对象');
+  }
+
+  const entries = Object.entries(value);
+  if (entries.length > MAX_CONFIG_OBJECT_KEYS) {
+    throw new Error('配置对象键数量超过限制');
+  }
+
+  const sanitized: Record<string, ConfigValue> = {};
+  entries.forEach(([key, nestedValue]) => {
+    if (DANGEROUS_CONFIG_KEYS.has(key)) {
+      return;
+    }
+    sanitized[key] = sanitizeConfigValue(nestedValue, depth + 1);
+  });
+
+  return sanitized;
+};
+
+const sanitizeConfigPatch = (value: unknown): Partial<DiagramConfig> => {
+  if (!isPlainConfigObject(value)) {
+    throw new Error('配置必须是对象');
+  }
+
+  return sanitizeConfigValue(value) as Partial<DiagramConfig>;
+};
 
 export interface NodeConfig {
   minWidth: number;
@@ -156,7 +238,7 @@ export interface EdgeConfig {
    * 自定义把手权重配置（函数级注释）
    * 用于覆盖 HandlePicker 中的默认几何权重
    */
-  handleWeights?: any;
+  handleWeights?: Record<string, unknown>;
   /**
    * 垂直偏好阈值（函数级注释）
    * - 当 dy / dx > 此阈值时，视为垂直关系；默认 1.0。
@@ -621,7 +703,7 @@ export class DiagramConfigManager {
       const minHGap = 48; // 更紧凑的水平间距下限
       const minVGap = 36; // 更紧凑的垂直间距下限
       if (!config.node.gap) {
-        config.node.gap = { horizontal: minHGap, vertical: minVGap } as any;
+        config.node.gap = { horizontal: minHGap, vertical: minVGap };
       } else {
         if (typeof config.node.gap.horizontal !== 'number' || config.node.gap.horizontal < minHGap) {
           config.node.gap.horizontal = minHGap;
@@ -641,9 +723,9 @@ export class DiagramConfigManager {
       }
     } catch {
       // 安全兜底，不影响运行
-      config.node.gap = { horizontal: 80, vertical: 36 } as any;
+      config.node.gap = { horizontal: 80, vertical: 36 };
       config.domain.gap = 48;
-      (config.layout as any).layerVerticalGap = 48;
+      config.layout.layerVerticalGap = 48;
     }
     return config;
   }
@@ -652,9 +734,8 @@ export class DiagramConfigManager {
    * 更新配置
    */
   public updateConfig(updates: Partial<DiagramConfig>): void {
-    if (updates.node && typeof updates.node.height !== 'undefined') {
-    }
-    this.config = this.mergeConfig(this.config, updates);
+    const safeUpdates = sanitizeConfigPatch(updates);
+    this.config = this.mergeConfig(this.config, safeUpdates);
     // 每次更新后规范化关键间距
     this.ensureMinGaps();
     this.notifyListeners();
@@ -688,34 +769,39 @@ export class DiagramConfigManager {
    * 深度合并配置
    */
   private mergeConfig(target: DiagramConfig, source: Partial<DiagramConfig>): DiagramConfig {
-    const result = { ...target };
+    const result = { ...target } as unknown as ConfigRecord;
+    const targetRecord = target as unknown as ConfigRecord;
 
-    for (const key in source) {
-      const sourceValue = source[key as keyof DiagramConfig];
-      const targetValue = target[key as keyof DiagramConfig];
+    for (const [key, sourceValue] of Object.entries(source)) {
+      if (DANGEROUS_CONFIG_KEYS.has(key)) {
+        continue;
+      }
+      const targetValue = targetRecord[key];
 
       if (sourceValue && typeof sourceValue === 'object' && !Array.isArray(sourceValue)) {
-        result[key as keyof DiagramConfig] = this.mergeObject(targetValue as any, sourceValue as any);
+        result[key] = this.mergeObject(targetValue, sourceValue as ConfigRecord);
       } else if (sourceValue !== undefined) {
-        result[key as keyof DiagramConfig] = sourceValue as any;
+        result[key] = sourceValue;
       }
     }
 
-    return result;
+    return result as unknown as DiagramConfig;
   }
 
   /**
    * 深度合并对象
    */
-  private mergeObject(target: any, source: any): any {
-    const result = { ...target };
+  private mergeObject(target: unknown, source: ConfigRecord): ConfigRecord {
+    const result: ConfigRecord = isPlainConfigObject(target) ? { ...target } : {};
 
-    for (const key in source) {
-      const sourceValue = source[key];
-      const targetValue = target[key];
+    for (const [key, sourceValue] of Object.entries(source)) {
+      if (DANGEROUS_CONFIG_KEYS.has(key)) {
+        continue;
+      }
+      const targetValue = result[key];
 
       if (sourceValue && typeof sourceValue === 'object' && !Array.isArray(sourceValue)) {
-        result[key] = this.mergeObject(targetValue || {}, sourceValue);
+        result[key] = this.mergeObject(targetValue, sourceValue as ConfigRecord);
       } else if (sourceValue !== undefined) {
         result[key] = sourceValue;
       }
@@ -755,7 +841,12 @@ export class DiagramConfigManager {
         }
       };
 
-      localStorage.setItem('architecture-diagram-config', JSON.stringify(configToSave));
+      const serialized = JSON.stringify(configToSave);
+      if (serialized.length > MAX_STORED_DIAGRAM_CONFIG_CHARS) {
+        console.warn('图表配置超过本地存储大小限制，跳过保存');
+        return;
+      }
+      localStorage.setItem(DIAGRAM_CONFIG_STORAGE_KEY, serialized);
     } catch (error) {
       console.warn('无法保存配置到本地存储:', error);
     }
@@ -766,9 +857,13 @@ export class DiagramConfigManager {
    */
   public loadConfigFromStorage(): void {
     try {
-      const savedConfig = localStorage.getItem('architecture-diagram-config');
+      const savedConfig = localStorage.getItem(DIAGRAM_CONFIG_STORAGE_KEY);
       if (savedConfig) {
-        const parsedConfig = JSON.parse(savedConfig);
+        const parsedConfig = sanitizeConfigPatch(parseBoundedConfigJson(
+          savedConfig,
+          MAX_STORED_DIAGRAM_CONFIG_CHARS,
+          '本地图表配置'
+        ));
         // [FIX] Force markerEnd to 10x10 to override any stale values in localStorage
         if (parsedConfig.edge && parsedConfig.edge.markerEnd) {
           parsedConfig.edge.markerEnd.width = 10;
@@ -778,6 +873,7 @@ export class DiagramConfigManager {
         // 载入后已通过 updateConfig 规范化并保存
       }
     } catch (error) {
+      localStorage.removeItem(DIAGRAM_CONFIG_STORAGE_KEY);
       console.warn('无法从本地存储加载配置:', error);
     }
   }
@@ -825,7 +921,11 @@ export class DiagramConfigManager {
    */
   public importConfig(configJson: string): boolean {
     try {
-      const importedConfig = JSON.parse(configJson);
+      const importedConfig = sanitizeConfigPatch(parseBoundedConfigJson(
+        configJson,
+        MAX_IMPORTED_DIAGRAM_CONFIG_CHARS,
+        '导入图表配置'
+      ));
       this.updateConfig(importedConfig);
       return true;
     } catch (error) {
@@ -879,11 +979,11 @@ export class DiagramConfigManager {
     NODE_FONT_WEIGHT: string;
   } {
     // 确保所有数值配置都是有效数字，防止 NaN 传播
-    const safeNumber = (value: any, defaultValue: number): number => {
+    const safeNumber = (value: unknown, defaultValue: number): number => {
       return (typeof value === 'number' && !isNaN(value) && isFinite(value)) ? value : defaultValue;
     };
 
-    const safeString = (value: any, defaultValue: string): string => {
+    const safeString = (value: unknown, defaultValue: string): string => {
       return (typeof value === 'string' && value.trim()) ? value : defaultValue;
     };
 
@@ -906,18 +1006,18 @@ export class DiagramConfigManager {
       },
       SUB_GROUP_TITLE_CLEARANCE: Math.max(
         safeNumber(this.config.subDomain.padding.top, 28),
-        Math.max(42, safeNumber(this.config.subDomain.title.height, 30)) + safeNumber((this.config.subDomain.title as any)?.safeGap, 16)
+        Math.max(42, safeNumber(this.config.subDomain.title.height, 30)) + safeNumber(this.config.subDomain.title.safeGap, 16)
       ),
       ENSURE_SUB_GROUP_TITLE_CLEARANCE: ((): boolean => {
-        const v = (this.config.subDomain as any)?.ensureTitleClearance;
+        const v = this.config.subDomain.ensureTitleClearance;
         return typeof v === 'boolean' ? v : true;
       })(),
       GROUP_TITLE_HEIGHT: safeNumber(this.config.domain.title.height, 48),
-      GROUP_TITLE_SAFE_GAP: safeNumber((this.config.domain.title as any)?.safeGap, 8),
+      GROUP_TITLE_SAFE_GAP: safeNumber(this.config.domain.title.safeGap, 8),
       GROUP_SIDE_SAFE_GAP: safeNumber(this.config.domain.sideSafeGap, 8),
       GROUP_BOTTOM_SAFE_GAP: safeNumber(this.config.domain.bottomSafeGap, 12),
       SUB_GROUP_TITLE_HEIGHT: safeNumber(this.config.subDomain.title.height, 30),
-      SUB_GROUP_TITLE_SAFE_GAP: safeNumber((this.config.subDomain.title as any)?.safeGap, 16),
+      SUB_GROUP_TITLE_SAFE_GAP: safeNumber(this.config.subDomain.title.safeGap, 16),
       DOMAIN_H_GAP: safeNumber(this.config.domain.gap, 40),
       BE_COLUMN_GAP: safeNumber(this.config.layout.mainColumnWidth, 300),
       NODE_FONT_SIZE: safeNumber(this.config.node.font.size, 28),

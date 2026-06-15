@@ -1,15 +1,18 @@
-// @ts-nocheck
 /**
  * 配置集成模块
  * 将新的分层配置系统与现有组件集成，提供平滑的迁移和兼容性
  */
 
 import { LayeredConfigManager, ConfigLayer } from './LayeredConfigManager';
-import { validators, validateConfigValue, validateConfigBatch } from './ConfigValidation';
+import type { LayeredConfigChangeEvent } from './LayeredConfigManager';
+import { validators } from './ConfigValidation';
 import { DiagramConfigManager } from '../components/config/DiagramConfig';
+import type { CanvasConfig, DomainConfig, EdgeConfig, NodeConfig } from '../components/config/DiagramConfig';
 import { EnhancedThemeManager } from '../themes/EnhancedThemeManager';
 import { ThemePresetManager } from '../themes/ThemePresetManager';
 import { ThemePerformanceOptimizer } from '../themes/ThemePerformanceOptimizer';
+import { coerceThemeImport } from '../themes/themeImportSecurity';
+import type { Theme, ThemePerformanceOptions, ThemePreset } from '../themes/types/ThemeTypes';
 
 export interface IntegrationOptions {
   enableMigration: boolean;
@@ -38,12 +41,33 @@ export interface IntegrationStatus {
   errors: string[];
 }
 
+export interface IntegratedConfigExport {
+  layeredConfig: string;
+  themeConfig: Theme | undefined;
+  presets: ThemePreset[];
+  metadata: {
+    exportTime: string;
+    version: string;
+    status: IntegrationStatus;
+  };
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
 // 配置迁移器
 class ConfigMigrator {
   constructor(
     private layeredConfig: LayeredConfigManager,
     private diagramConfig: DiagramConfigManager
   ) { }
+
+  private setConfigIfDefined(key: string, value: unknown): void {
+    if (value !== undefined) {
+      this.layeredConfig.setConfig(key, value, ConfigLayer.USER);
+    }
+  }
 
   /**
    * 迁移现有配置到分层系统
@@ -83,44 +107,16 @@ class ConfigMigrator {
     return result;
   }
 
-  private async migrateNodeConfig(nodeConfig: any, result: MigrationResult): Promise<void> {
+  private async migrateNodeConfig(nodeConfig: Partial<NodeConfig>, result: MigrationResult): Promise<void> {
     try {
       // 迁移节点样式配置
-      await this.layeredConfig.setConfig(
-        'diagram.node.minWidth',
-        nodeConfig.minWidth,
-        ConfigLayer.USER
-      );
-
-      await this.layeredConfig.setConfig(
-        'diagram.node.maxWidth',
-        nodeConfig.maxWidth,
-        ConfigLayer.USER
-      );
-
-      await this.layeredConfig.setConfig(
-        'diagram.node.height',
-        nodeConfig.height,
-        ConfigLayer.USER
-      );
-
-      await this.layeredConfig.setConfig(
-        'diagram.node.padding',
-        nodeConfig.padding,
-        ConfigLayer.USER
-      );
-
-      await this.layeredConfig.setConfig(
-        'diagram.node.borderRadius',
-        nodeConfig.borderRadius,
-        ConfigLayer.USER
-      );
-
-      await this.layeredConfig.setConfig(
-        'diagram.node.fontSize',
-        nodeConfig.fontSize,
-        ConfigLayer.USER
-      );
+      this.setConfigIfDefined('diagram.node.minWidth', nodeConfig.minWidth);
+      this.setConfigIfDefined('diagram.node.maxWidth', nodeConfig.maxWidth);
+      this.setConfigIfDefined('diagram.node.height', nodeConfig.height);
+      this.setConfigIfDefined('diagram.node.padding.horizontal', nodeConfig.padding?.horizontal);
+      this.setConfigIfDefined('diagram.node.padding.vertical', nodeConfig.padding?.vertical);
+      this.setConfigIfDefined('diagram.node.boxShadow', nodeConfig.boxShadow);
+      this.setConfigIfDefined('diagram.node.font.size', nodeConfig.font?.size);
 
       result.migratedConfigs.push('node');
     } catch (error) {
@@ -131,31 +127,15 @@ class ConfigMigrator {
     }
   }
 
-  private async migrateDomainConfig(domainConfig: any, result: MigrationResult): Promise<void> {
+  private async migrateDomainConfig(domainConfig: Partial<DomainConfig>, result: MigrationResult): Promise<void> {
     try {
-      await this.layeredConfig.setConfig(
-        'diagram.domain.minWidth',
-        domainConfig.minWidth,
-        ConfigLayer.USER
-      );
-
-      await this.layeredConfig.setConfig(
-        'diagram.domain.minHeight',
-        domainConfig.minHeight,
-        ConfigLayer.USER
-      );
-
-      await this.layeredConfig.setConfig(
-        'diagram.domain.padding',
-        domainConfig.padding,
-        ConfigLayer.USER
-      );
-
-      await this.layeredConfig.setConfig(
-        'diagram.domain.margin',
-        domainConfig.margin,
-        ConfigLayer.USER
-      );
+      this.setConfigIfDefined('diagram.domain.padding.horizontal', domainConfig.padding?.horizontal);
+      this.setConfigIfDefined('diagram.domain.padding.vertical', domainConfig.padding?.vertical);
+      this.setConfigIfDefined('diagram.domain.gap', domainConfig.gap);
+      this.setConfigIfDefined('diagram.domain.sideSafeGap', domainConfig.sideSafeGap);
+      this.setConfigIfDefined('diagram.domain.bottomSafeGap', domainConfig.bottomSafeGap);
+      this.setConfigIfDefined('diagram.domain.title.height', domainConfig.title?.height);
+      this.setConfigIfDefined('diagram.domain.title.safeGap', domainConfig.title?.safeGap);
 
       result.migratedConfigs.push('domain');
     } catch (error) {
@@ -166,25 +146,13 @@ class ConfigMigrator {
     }
   }
 
-  private async migrateEdgeConfig(edgeConfig: any, result: MigrationResult): Promise<void> {
+  private async migrateEdgeConfig(edgeConfig: Partial<EdgeConfig>, result: MigrationResult): Promise<void> {
     try {
-      await this.layeredConfig.setConfig(
-        'diagram.edge.strokeWidth',
-        edgeConfig.strokeWidth,
-        ConfigLayer.USER
-      );
-
-      await this.layeredConfig.setConfig(
-        'diagram.edge.strokeDasharray',
-        edgeConfig.strokeDasharray,
-        ConfigLayer.USER
-      );
-
-      await this.layeredConfig.setConfig(
-        'diagram.edge.animated',
-        edgeConfig.animated,
-        ConfigLayer.USER
-      );
+      this.setConfigIfDefined('diagram.edge.strokeWidth', edgeConfig.strokeWidth);
+      this.setConfigIfDefined('diagram.edge.strokeDasharray', edgeConfig.strokeDasharray);
+      this.setConfigIfDefined('diagram.edge.animated', edgeConfig.animated);
+      this.setConfigIfDefined('diagram.edge.mode', edgeConfig.mode);
+      this.setConfigIfDefined('diagram.edge.pathType', edgeConfig.pathType);
 
       result.migratedConfigs.push('edge');
     } catch (error) {
@@ -195,25 +163,12 @@ class ConfigMigrator {
     }
   }
 
-  private async migrateCanvasConfig(canvasConfig: any, result: MigrationResult): Promise<void> {
+  private async migrateCanvasConfig(canvasConfig: Partial<CanvasConfig>, result: MigrationResult): Promise<void> {
     try {
-      await this.layeredConfig.setConfig(
-        'diagram.canvas.background',
-        canvasConfig.background,
-        ConfigLayer.USER
-      );
-
-      await this.layeredConfig.setConfig(
-        'diagram.canvas.grid.size',
-        canvasConfig.grid?.size,
-        ConfigLayer.USER
-      );
-
-      await this.layeredConfig.setConfig(
-        'diagram.canvas.grid.color',
-        canvasConfig.grid?.color,
-        ConfigLayer.USER
-      );
+      this.setConfigIfDefined('diagram.canvas.background', canvasConfig.background);
+      this.setConfigIfDefined('diagram.canvas.grid.size', canvasConfig.grid?.size);
+      this.setConfigIfDefined('diagram.canvas.grid.color', canvasConfig.grid?.color);
+      this.setConfigIfDefined('diagram.canvas.grid.enabled', canvasConfig.grid?.enabled);
 
       result.migratedConfigs.push('canvas');
     } catch (error) {
@@ -227,7 +182,7 @@ class ConfigMigrator {
 
 // 配置同步器
 class ConfigSynchronizer {
-  private syncHandlers: Map<string, (value: any) => void> = new Map();
+  private syncHandlers: Map<string, (value: unknown) => void> = new Map();
 
   constructor(
     private layeredConfig: LayeredConfigManager,
@@ -247,9 +202,9 @@ class ConfigSynchronizer {
      * - 做法：改用全局监听器，按 key 前缀路由到对应的同步处理；
      * - 细节：使用 event.effectiveValue（优先）或 newValue，保证读取到合并后的有效值。
      */
-    this.layeredConfig.addGlobalListener((event) => {
+    this.layeredConfig.addGlobalListener((event: LayeredConfigChangeEvent<unknown>) => {
       const key = event.key || '';
-      const value = (event as any).effectiveValue ?? event.newValue;
+      const value = event.effectiveValue ?? event.newValue;
       if (key.startsWith('diagram.')) {
         this.syncToDiagramConfig(key, value);
       } else if (key.startsWith('theme.')) {
@@ -272,7 +227,7 @@ class ConfigSynchronizer {
    * - 构造部分对象：将叶子值包裹为 { [prop]: value } 传递给对应的同步处理器；
    * - 作用：避免直接扩展原始值（数字/字符串）到对象导致无效合并。
    */
-  private syncToDiagramConfig(key: string, value: any): void {
+  private syncToDiagramConfig(key: string, value: unknown): void {
     const parts = String(key).split('.');
     if (parts[0] !== 'diagram' || parts.length < 2) return;
     const category = parts[1];
@@ -283,7 +238,7 @@ class ConfigSynchronizer {
     handler(normalized);
   }
 
-  private syncToThemeManager(key: string, value: any): void {
+  private syncToThemeManager(key: string, value: unknown): void {
     const handler = this.syncHandlers.get(key);
 
     if (handler) {
@@ -291,7 +246,8 @@ class ConfigSynchronizer {
     }
   }
 
-  private syncNodeConfig(value: any): void {
+  private syncNodeConfig(value: unknown): void {
+    if (!isRecord(value)) return;
     // 更新图表配置管理器中的节点配置
     const currentConfig = this.diagramConfig.getConfig();
     const updatedConfig = {
@@ -302,7 +258,8 @@ class ConfigSynchronizer {
     this.diagramConfig.updateConfig(updatedConfig);
   }
 
-  private syncDomainConfig(value: any): void {
+  private syncDomainConfig(value: unknown): void {
+    if (!isRecord(value)) return;
     const currentConfig = this.diagramConfig.getConfig();
     const updatedConfig = {
       ...currentConfig,
@@ -312,7 +269,8 @@ class ConfigSynchronizer {
     this.diagramConfig.updateConfig(updatedConfig);
   }
 
-  private syncEdgeConfig(value: any): void {
+  private syncEdgeConfig(value: unknown): void {
+    if (!isRecord(value)) return;
     const currentConfig = this.diagramConfig.getConfig();
     const updatedConfig = {
       ...currentConfig,
@@ -322,7 +280,8 @@ class ConfigSynchronizer {
     this.diagramConfig.updateConfig(updatedConfig);
   }
 
-  private syncCanvasConfig(value: any): void {
+  private syncCanvasConfig(value: unknown): void {
+    if (!isRecord(value)) return;
     const currentConfig = this.diagramConfig.getConfig();
     const updatedConfig = {
       ...currentConfig,
@@ -332,7 +291,8 @@ class ConfigSynchronizer {
     this.diagramConfig.updateConfig(updatedConfig);
   }
 
-  private syncLayoutConfig(value: any): void {
+  private syncLayoutConfig(value: unknown): void {
+    if (!isRecord(value)) return;
     const currentConfig = this.diagramConfig.getConfig();
     const updatedConfig = {
       ...currentConfig,
@@ -341,7 +301,8 @@ class ConfigSynchronizer {
     this.diagramConfig.updateConfig(updatedConfig);
   }
 
-  private async syncCurrentTheme(themeId: string): Promise<void> {
+  private async syncCurrentTheme(themeId: unknown): Promise<void> {
+    if (typeof themeId !== 'string' || !themeId.trim()) return;
     try {
       await this.themeManager.setTheme(themeId);
     } catch (error) {
@@ -414,7 +375,7 @@ export class ConfigIntegration {
       // 初始化性能优化器
       if (this.options.enablePerformanceOptimization) {
         try {
-          const performanceOptions = await this.layeredConfig.getConfig('theme.performance');
+          const performanceOptions = await this.layeredConfig.getConfig<Partial<ThemePerformanceOptions>>('theme.performance');
 
           // 提供默认的性能配置，防止undefined错误
           const defaultPerformanceOptions = {
@@ -426,7 +387,7 @@ export class ConfigIntegration {
             preloadThemes: ['light', 'dark']
           };
 
-          const finalPerformanceOptions = performanceOptions ?
+          const finalPerformanceOptions: ThemePerformanceOptions = performanceOptions ?
             { ...defaultPerformanceOptions, ...performanceOptions } :
             defaultPerformanceOptions;
 
@@ -563,23 +524,17 @@ export class ConfigIntegration {
   /**
    * 导出集成配置
    */
-  async exportIntegratedConfig(): Promise<{
-    layeredConfig: any;
-    themeConfig: any;
-    presets: any[];
-    metadata: {
-      exportTime: string;
-      version: string;
-      status: IntegrationStatus;
-    };
-  }> {
+  async exportIntegratedConfig(): Promise<IntegratedConfigExport> {
     const layeredConfig = await this.layeredConfig.exportConfig();
     const themeConfig = this.themeManager.getCurrentTheme();
     const presetsJson = this.presetManager.exportThemePackage(
       this.presetManager.getAllPresets().map(p => p.id),
       { name: 'All Presets' }
     );
-    const presets = presetsJson ? JSON.parse(presetsJson).presets : []; // 解析JSON字符串获取数组
+    const parsedPresets = presetsJson ? JSON.parse(presetsJson) : null;
+    const presets = isRecord(parsedPresets) && Array.isArray(parsedPresets.presets)
+      ? parsedPresets.presets as ThemePreset[]
+      : [];
 
     return {
       layeredConfig,
@@ -596,16 +551,20 @@ export class ConfigIntegration {
   /**
    * 导入集成配置
    */
-  async importIntegratedConfig(config: any): Promise<void> {
+  async importIntegratedConfig(config: unknown): Promise<void> {
     try {
+      if (!isRecord(config)) {
+        throw new Error('Integrated configuration must be an object');
+      }
+
       // 导入分层配置
-      if (config.layeredConfig) {
+      if (typeof config.layeredConfig === 'string') {
         await this.layeredConfig.importConfig(config.layeredConfig);
       }
 
       // 导入主题配置
       if (config.themeConfig) {
-        const theme = config.themeConfig;
+        const theme = coerceThemeImport(config.themeConfig);
         if (theme?.id) {
           this.themeManager.addCustomTheme(theme);
           await this.themeManager.setTheme(theme.id);
@@ -613,8 +572,15 @@ export class ConfigIntegration {
       }
 
       // 导入预设
-      if (config.presets) {
-        await this.presetManager.importPreset(config.presets);
+      if (config.presets !== undefined) {
+        if (!Array.isArray(config.presets)) {
+          throw new Error('Integrated configuration presets must be an array');
+        }
+        await this.presetManager.importThemePackage({
+          version: '1.0',
+          name: 'Imported Presets',
+          presets: config.presets
+        });
       }
     } catch (error) {
       console.error('Failed to import integrated configuration:', error);

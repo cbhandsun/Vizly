@@ -1,10 +1,30 @@
-// @ts-nocheck
 /**
  * 配置验证系统
  * 提供各种配置验证器和数据清理器
  */
 
-import { ConfigValidator, ConfigSchema } from './ConfigValidation';
+export type ConfigValidationResult = true | string;
+
+export interface ConfigValidator<T = unknown> {
+  validate: (value: T) => ConfigValidationResult;
+  sanitize?: (value: T) => T;
+}
+
+export interface ConfigSchema<T = unknown> {
+  key: string;
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+  defaultValue: T;
+  description?: string;
+  validator?: ConfigValidator<T>;
+  group?: string;
+  tags?: string[];
+}
+
+type PlainObject = Record<string, unknown>;
+
+const isPlainObject = (value: unknown): value is PlainObject => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
 
 // 基础验证器
 export const validators = {
@@ -60,11 +80,18 @@ export const validators = {
 
     color: (): ConfigValidator<string> => ({
       validate: (value: string) => {
+        const text = typeof value === 'string' ? value.trim() : '';
         const hexPattern = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
-        const rgbPattern = /^rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)$/;
-        const rgbaPattern = /^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*[\d.]+\s*\)$/;
+        const rgbPattern = /^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/;
+        const rgbaPattern = /^rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(0|1|0?\.\d+)\s*\)$/;
         
-        if (!hexPattern.test(value) && !rgbPattern.test(value) && !rgbaPattern.test(value)) {
+        const rgbMatch = text.match(rgbPattern);
+        const rgbaMatch = text.match(rgbaPattern);
+        const channels = rgbMatch?.slice(1, 4) || rgbaMatch?.slice(1, 4);
+        const validRgb = Boolean(channels && channels.every(channel => Number(channel) >= 0 && Number(channel) <= 255));
+        const validAlpha = !rgbaMatch || Number(rgbaMatch[4]) <= 1;
+
+        if (!hexPattern.test(text) && !(validRgb && validAlpha)) {
           return '颜色格式不正确，支持 HEX、RGB、RGBA 格式';
         }
         return true;
@@ -75,7 +102,10 @@ export const validators = {
     url: (): ConfigValidator<string> => ({
       validate: (value: string) => {
         try {
-          new URL(value);
+          const parsed = new URL(value);
+          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            return 'URL 协议不安全，仅支持 HTTP 或 HTTPS';
+          }
           return true;
         } catch {
           return 'URL 格式不正确';
@@ -164,7 +194,7 @@ export const validators = {
         }
         return true;
       },
-      sanitize: (value: any) => Boolean(value)
+      sanitize: (value: boolean) => Boolean(value)
     })
   },
 
@@ -181,8 +211,9 @@ export const validators = {
       }
     }),
 
-    hasKeys: (keys: string[]): ConfigValidator<Record<string, any>> => ({
-      validate: (value: Record<string, any>) => {
+    hasKeys: (keys: string[]): ConfigValidator<PlainObject> => ({
+      validate: (value: PlainObject) => {
+        if (!isPlainObject(value)) return '必须是对象';
         const missingKeys = keys.filter(key => !(key in value));
         if (missingKeys.length > 0) {
           return `缺少必需的键: ${missingKeys.join(', ')}`;
@@ -191,8 +222,9 @@ export const validators = {
       }
     }),
 
-    shape: (schema: Record<string, ConfigValidator>): ConfigValidator<Record<string, any>> => ({
-      validate: (value: Record<string, any>) => {
+    shape: (schema: Record<string, ConfigValidator<unknown>>): ConfigValidator<PlainObject> => ({
+      validate: (value: PlainObject) => {
+        if (!isPlainObject(value)) return '必须是对象';
         const errors: string[] = [];
         
         Object.entries(schema).forEach(([key, validator]) => {
@@ -209,7 +241,8 @@ export const validators = {
         }
         return true;
       },
-      sanitize: (value: Record<string, any>) => {
+      sanitize: (value: PlainObject) => {
+        if (!isPlainObject(value)) return value;
         const sanitized = { ...value };
         
         Object.entries(schema).forEach(([key, validator]) => {
@@ -227,8 +260,8 @@ export const validators = {
    * 数组验证器
    */
   array: {
-    required: (): ConfigValidator<any[]> => ({
-      validate: (value: any[]) => {
+    required: <T = unknown>(): ConfigValidator<T[]> => ({
+      validate: (value: T[]) => {
         if (!Array.isArray(value)) {
           return '必须是数组';
         }
@@ -236,8 +269,8 @@ export const validators = {
       }
     }),
 
-    minLength: (min: number): ConfigValidator<any[]> => ({
-      validate: (value: any[]) => {
+    minLength: <T = unknown>(min: number): ConfigValidator<T[]> => ({
+      validate: (value: T[]) => {
         if (!Array.isArray(value) || value.length < min) {
           return `数组长度不能少于 ${min}`;
         }
@@ -245,8 +278,8 @@ export const validators = {
       }
     }),
 
-    maxLength: (max: number): ConfigValidator<any[]> => ({
-      validate: (value: any[]) => {
+    maxLength: <T = unknown>(max: number): ConfigValidator<T[]> => ({
+      validate: (value: T[]) => {
         if (!Array.isArray(value) || value.length > max) {
           return `数组长度不能超过 ${max}`;
         }
@@ -254,8 +287,8 @@ export const validators = {
       }
     }),
 
-    items: (itemValidator: ConfigValidator): ConfigValidator<any[]> => ({
-      validate: (value: any[]) => {
+    items: <T = unknown>(itemValidator: ConfigValidator<T>): ConfigValidator<T[]> => ({
+      validate: (value: T[]) => {
         if (!Array.isArray(value)) {
           return '必须是数组';
         }
@@ -273,7 +306,7 @@ export const validators = {
         }
         return true;
       },
-      sanitize: (value: any[]) => {
+      sanitize: (value: T[]) => {
         if (!Array.isArray(value)) return value;
         
         return value.map(item => 
@@ -542,11 +575,11 @@ export const validateConfigValue = <T>(
 
 // 批量验证配置
 export const validateConfigBatch = (
-  configs: Record<string, any>,
+  configs: Record<string, unknown>,
   schemas: ConfigSchema[] = commonSchemas
-): { isValid: boolean; errors: Record<string, string>; sanitizedConfigs: Record<string, any> } => {
+): { isValid: boolean; errors: Record<string, string>; sanitizedConfigs: Record<string, unknown> } => {
   const errors: Record<string, string> = {};
-  const sanitizedConfigs: Record<string, any> = {};
+  const sanitizedConfigs: Record<string, unknown> = {};
 
   Object.entries(configs).forEach(([key, value]) => {
     const result = validateConfigValue(key, value, schemas);

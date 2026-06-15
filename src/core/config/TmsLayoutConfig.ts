@@ -50,6 +50,52 @@ export const DEFAULT_TMS_LAYOUT_CONFIG: TmsLayoutConfig = {
   }
 };
 
+const cloneConfig = (config: TmsLayoutConfig): TmsLayoutConfig => ({
+  MAIN_FLOW: { ...config.MAIN_FLOW },
+  SUPPORT: { ...config.SUPPORT },
+  EXTERNAL: { ...config.EXTERNAL }
+});
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value && typeof value === 'object' && !Array.isArray(value));
+
+const assertFiniteNumber = (
+  value: unknown,
+  path: string,
+  bounds: { min: number; max: number }
+): number => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`Invalid ${path} value`);
+  }
+  if (value < bounds.min || value > bounds.max) {
+    throw new Error(`${path} must be between ${bounds.min} and ${bounds.max}`);
+  }
+  return value;
+};
+
+const coerceCompleteConfig = (value: unknown): TmsLayoutConfig => {
+  if (!isPlainObject(value) || !isPlainObject(value.MAIN_FLOW) || !isPlainObject(value.SUPPORT) || !isPlainObject(value.EXTERNAL)) {
+    throw new Error('Invalid TMS layout config structure');
+  }
+
+  return {
+    MAIN_FLOW: {
+      SPACING_H: assertFiniteNumber(value.MAIN_FLOW.SPACING_H, 'MAIN_FLOW.SPACING_H', { min: 1, max: 5000 }),
+      SPACING_V: assertFiniteNumber(value.MAIN_FLOW.SPACING_V, 'MAIN_FLOW.SPACING_V', { min: 1, max: 5000 }),
+      START_X: assertFiniteNumber(value.MAIN_FLOW.START_X, 'MAIN_FLOW.START_X', { min: -10000, max: 10000 }),
+      START_Y: assertFiniteNumber(value.MAIN_FLOW.START_Y, 'MAIN_FLOW.START_Y', { min: -10000, max: 10000 }),
+    },
+    SUPPORT: {
+      OFFSET_Y: assertFiniteNumber(value.SUPPORT.OFFSET_Y, 'SUPPORT.OFFSET_Y', { min: -10000, max: 10000 }),
+      SPACING_H: assertFiniteNumber(value.SUPPORT.SPACING_H, 'SUPPORT.SPACING_H', { min: 1, max: 5000 }),
+    },
+    EXTERNAL: {
+      TOP_Y: assertFiniteNumber(value.EXTERNAL.TOP_Y, 'EXTERNAL.TOP_Y', { min: -10000, max: 10000 }),
+      BOTTOM_Y: assertFiniteNumber(value.EXTERNAL.BOTTOM_Y, 'EXTERNAL.BOTTOM_Y', { min: -10000, max: 10000 }),
+    }
+  };
+};
+
 /**
  * TMS布局配置管理器
  */
@@ -58,7 +104,7 @@ export class TmsLayoutConfigManager {
   private config: TmsLayoutConfig;
 
   private constructor() {
-    this.config = { ...DEFAULT_TMS_LAYOUT_CONFIG };
+    this.config = cloneConfig(DEFAULT_TMS_LAYOUT_CONFIG);
   }
 
   public static getInstance(): TmsLayoutConfigManager {
@@ -72,27 +118,28 @@ export class TmsLayoutConfigManager {
    * 获取当前配置
    */
   public getConfig(): TmsLayoutConfig {
-    return { ...this.config };
+    return cloneConfig(this.config);
   }
 
   /**
    * 更新配置
    */
   public updateConfig(newConfig: Partial<TmsLayoutConfig>): void {
-    this.config = {
+    const nextConfig = {
       ...this.config,
       ...newConfig,
       MAIN_FLOW: { ...this.config.MAIN_FLOW, ...newConfig.MAIN_FLOW },
       SUPPORT: { ...this.config.SUPPORT, ...newConfig.SUPPORT },
       EXTERNAL: { ...this.config.EXTERNAL, ...newConfig.EXTERNAL }
     };
+    this.config = coerceCompleteConfig(nextConfig);
   }
 
   /**
    * 重置为默认配置
    */
   public resetToDefault(): void {
-    this.config = { ...DEFAULT_TMS_LAYOUT_CONFIG };
+    this.config = cloneConfig(DEFAULT_TMS_LAYOUT_CONFIG);
   }
 
   /**
@@ -107,45 +154,13 @@ export class TmsLayoutConfigManager {
    */
   public importConfig(configJson: string): boolean {
     try {
-      const importedConfig = JSON.parse(configJson) as TmsLayoutConfig;
-      this.validateConfig(importedConfig);
+      const importedConfig = coerceCompleteConfig(JSON.parse(configJson));
       this.config = importedConfig;
       return true;
     } catch (error) {
       console.error('Failed to import TMS layout config:', error);
       return false;
     }
-  }
-
-  /**
-   * 验证配置有效性
-   */
-  private validateConfig(config: TmsLayoutConfig): void {
-    if (!config.MAIN_FLOW || !config.SUPPORT || !config.EXTERNAL) {
-      throw new Error('Invalid TMS layout config structure');
-    }
-
-    const requiredMainFlowKeys = ['SPACING_H', 'SPACING_V', 'START_X', 'START_Y'];
-    const requiredSupportKeys = ['OFFSET_Y', 'SPACING_H'];
-    const requiredExternalKeys = ['TOP_Y', 'BOTTOM_Y'];
-
-    requiredMainFlowKeys.forEach(key => {
-      if (typeof config.MAIN_FLOW[key as keyof typeof config.MAIN_FLOW] !== 'number') {
-        throw new Error(`Invalid MAIN_FLOW.${key} value`);
-      }
-    });
-
-    requiredSupportKeys.forEach(key => {
-      if (typeof config.SUPPORT[key as keyof typeof config.SUPPORT] !== 'number') {
-        throw new Error(`Invalid SUPPORT.${key} value`);
-      }
-    });
-
-    requiredExternalKeys.forEach(key => {
-      if (typeof config.EXTERNAL[key as keyof typeof config.EXTERNAL] !== 'number') {
-        throw new Error(`Invalid EXTERNAL.${key} value`);
-      }
-    });
   }
 }
 

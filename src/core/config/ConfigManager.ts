@@ -2,9 +2,76 @@
  * 统一配置管理系统
  */
 
-import { DiagramConfig, SpacingConfig, ThemeColor } from '../types/common';
+import { DiagramConfig, SpacingConfig } from '../types/common';
 import { logger } from '../utils/Logger';
 import { ErrorType, ErrorSeverity, createError } from '../utils/ErrorHandler';
+
+const isPlainConfigObject = (value: unknown): value is Record<string, any> =>
+  Boolean(
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)
+  );
+
+const MAX_STORED_CONFIG_CHARS = 256 * 1024;
+const MAX_IMPORT_CONFIG_CHARS = 1024 * 1024;
+const MAX_CONFIG_VALUE_DEPTH = 8;
+const MAX_CONFIG_ARRAY_ITEMS = 5000;
+const MAX_CONFIG_OBJECT_KEYS = 1000;
+const MAX_CONFIG_STRING_CHARS = 64 * 1024;
+const DANGEROUS_CONFIG_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
+const parseBoundedConfigJson = (json: string, maxChars: number, label: string): unknown => {
+  if (json.length > maxChars) {
+    throw new Error(`${label}超过大小限制`);
+  }
+
+  return JSON.parse(json);
+};
+
+const sanitizeConfigValue = (value: unknown, depth = 0): any => {
+  if (depth > MAX_CONFIG_VALUE_DEPTH) {
+    throw new Error('配置对象嵌套过深');
+  }
+
+  if (value === null || typeof value === 'boolean' || typeof value === 'number') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    if (value.length > MAX_CONFIG_STRING_CHARS) {
+      throw new Error('配置字符串超过大小限制');
+    }
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length > MAX_CONFIG_ARRAY_ITEMS) {
+      throw new Error('配置数组超过长度限制');
+    }
+    return value.map(item => sanitizeConfigValue(item, depth + 1));
+  }
+
+  if (!isPlainConfigObject(value)) {
+    throw new Error('配置值必须是可序列化对象');
+  }
+
+  const entries = Object.entries(value);
+  if (entries.length > MAX_CONFIG_OBJECT_KEYS) {
+    throw new Error('配置对象键数量超过限制');
+  }
+
+  const sanitized: Record<string, any> = {};
+  entries.forEach(([key, nestedValue]) => {
+    if (DANGEROUS_CONFIG_KEYS.has(key)) {
+      return;
+    }
+    sanitized[key] = sanitizeConfigValue(nestedValue, depth + 1);
+  });
+
+  return sanitized;
+};
 
 // 配置来源枚举
 export enum ConfigSource {
@@ -254,13 +321,21 @@ export class ConfigManager {
           const stored = localStorage.getItem(`config_${storageKey}`);
           
           if (stored !== null) {
-            const value = JSON.parse(stored);
+            const value = sanitizeConfigValue(parseBoundedConfigJson(
+              stored,
+              MAX_STORED_CONFIG_CHARS,
+              `持久化配置 ${key}`
+            ));
             if (this.validateConfig(key, value)) {
               this.configs.set(key, value);
               this.configLogger.debug(`加载持久化配置: ${key}`, { value });
+            } else {
+              localStorage.removeItem(`config_${storageKey}`);
             }
           }
         } catch (error) {
+          const storageKey = definition.storageKey || key;
+          localStorage.removeItem(`config_${storageKey}`);
           this.configLogger.warn(`加载配置失败: ${key}`, { error });
         }
       }
@@ -284,6 +359,25 @@ export class ConfigManager {
     }
 
     return true;
+  }
+
+  private normalizeKnownConfigRecord(configs: unknown): Record<string, any> {
+    if (!isPlainConfigObject(configs)) {
+      throw new Error('配置必须是对象');
+    }
+
+    const knownConfigs: Record<string, any> = {};
+    Object.entries(configs).forEach(([key, value]) => {
+      if (this.definitions.has(key)) {
+        knownConfigs[key] = sanitizeConfigValue(value);
+      }
+    });
+
+    if (Object.keys(knownConfigs).length === 0) {
+      throw new Error('没有可识别的配置项');
+    }
+
+    return knownConfigs;
   }
 
   /**
@@ -360,9 +454,25 @@ export class ConfigManager {
    */
   public set<T = any>(key: string, value: T, source: ConfigSource = ConfigSource.USER_OVERRIDE): void {
     const oldValue = this.configs.get(key);
+    let nextValue: T;
+
+    try {
+      nextValue = sanitizeConfigValue(value) as T;
+    } catch (error) {
+      throw createError(
+      `配置值验证失败: ${key}`,
+      ErrorType.VALIDATION,
+      ErrorSeverity.MEDIUM,
+      {
+        component: 'ConfigManager',
+        action: 'set',
+        data: { key, value, error }
+      }
+    );
+    }
 
     // 验证配置
-    if (!this.validateConfig(key, value)) {
+    if (!this.validateConfig(key, nextValue)) {
       throw createError(
       `配置值验证失败: ${key}`,
       ErrorType.VALIDATION,
@@ -376,15 +486,15 @@ export class ConfigManager {
     }
 
     // 设置配置
-    this.configs.set(key, value);
+    this.configs.set(key, nextValue);
 
     // 持久化
-    this.persistConfig(key, value);
+    this.persistConfig(key, nextValue);
 
     // 通知监听器
-    this.notifyListeners(key, oldValue, value, source);
+    this.notifyListeners(key, oldValue, nextValue, source);
 
-    this.configLogger.info(`配置已更新: ${key}`, { oldValue, newValue: value, source });
+    this.configLogger.info(`配置已更新: ${key}`, { oldValue, newValue: nextValue, source });
   }
 
   /**
@@ -392,10 +502,26 @@ export class ConfigManager {
    */
   public setMultiple(configs: Record<string, any>, source: ConfigSource = ConfigSource.USER_OVERRIDE): void {
     const changes: Array<{ key: string; oldValue: any; newValue: any }> = [];
+    const sanitizedConfigs: Record<string, any> = {};
 
     // 验证所有配置
     for (const [key, value] of Object.entries(configs)) {
-      if (!this.validateConfig(key, value)) {
+      try {
+        sanitizedConfigs[key] = sanitizeConfigValue(value);
+      } catch (error) {
+        throw createError(
+          `批量配置验证失败: ${key}`,
+          ErrorType.VALIDATION,
+          ErrorSeverity.MEDIUM,
+          {
+            component: 'ConfigManager',
+            action: 'setMultiple',
+            data: { key, value, error }
+          }
+        );
+      }
+
+      if (!this.validateConfig(key, sanitizedConfigs[key])) {
         throw createError(
           `批量配置验证失败: ${key}`,
           ErrorType.VALIDATION,
@@ -410,7 +536,7 @@ export class ConfigManager {
     }
 
     // 应用所有配置
-    for (const [key, value] of Object.entries(configs)) {
+    for (const [key, value] of Object.entries(sanitizedConfigs)) {
       const oldValue = this.configs.get(key);
       this.configs.set(key, value);
       this.persistConfig(key, value);
@@ -548,9 +674,10 @@ export class ConfigManager {
    */
   public importConfig(configJson: string): void {
     try {
-      const config = JSON.parse(configJson);
-      this.setMultiple(config, ConfigSource.USER_OVERRIDE);
-      this.configLogger.info('配置导入成功', { keys: Object.keys(config) });
+      const config = parseBoundedConfigJson(configJson, MAX_IMPORT_CONFIG_CHARS, '导入配置');
+      const knownConfig = this.normalizeKnownConfigRecord(config);
+      this.setMultiple(knownConfig, ConfigSource.USER_OVERRIDE);
+      this.configLogger.info('配置导入成功', { keys: Object.keys(knownConfig) });
     } catch (error) {
       throw createError(
         '配置导入失败',
@@ -613,16 +740,17 @@ export class ConfigManager {
    */
   public restoreSnapshot(snapshotJson: string): void {
     try {
-      const snapshot = JSON.parse(snapshotJson);
+      const snapshot = parseBoundedConfigJson(snapshotJson, MAX_IMPORT_CONFIG_CHARS, '配置快照');
       
-      if (!snapshot.configs) {
+      if (!isPlainConfigObject(snapshot) || !isPlainConfigObject(snapshot.configs)) {
         throw new Error('无效的快照格式');
       }
 
-      this.setMultiple(snapshot.configs, ConfigSource.USER_OVERRIDE);
+      const knownConfig = this.normalizeKnownConfigRecord(snapshot.configs);
+      this.setMultiple(knownConfig, ConfigSource.USER_OVERRIDE);
       this.configLogger.info('配置快照恢复成功', { 
         timestamp: snapshot.timestamp,
-        keys: Object.keys(snapshot.configs)
+        keys: Object.keys(knownConfig)
       });
     } catch (error) {
       throw createError(

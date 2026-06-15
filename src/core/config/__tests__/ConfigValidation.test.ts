@@ -23,9 +23,15 @@ describe('ConfigValidation validators', () => {
     expect(validators.string.oneOf(['light', 'dark']).validate('auto')).toBe('值必须是以下之一: light, dark');
     expect(color.validate('#ABC')).toBe(true);
     expect(color.validate('rgb(1, 2, 3)')).toBe(true);
+    expect(color.validate('rgba(1, 2, 3, 0.5)')).toBe(true);
     expect(color.validate('not-color')).toBe('颜色格式不正确，支持 HEX、RGB、RGBA 格式');
+    expect(color.validate('rgb(999, 2, 3)')).toBe('颜色格式不正确，支持 HEX、RGB、RGBA 格式');
+    expect(color.validate('rgba(1, 2, 3, 2)')).toBe('颜色格式不正确，支持 HEX、RGB、RGBA 格式');
     expect(color.sanitize?.('#ABCDEF')).toBe('#abcdef');
     expect(url.validate('https://example.com')).toBe(true);
+    expect(url.validate('http://example.com')).toBe(true);
+    expect(url.validate('javascript:alert(1)')).toBe('URL 协议不安全，仅支持 HTTP 或 HTTPS');
+    expect(url.validate('data:text/html,<script>alert(1)</script>')).toBe('URL 协议不安全，仅支持 HTTP 或 HTTPS');
     expect(url.validate('nope')).toBe('URL 格式不正确');
   });
 
