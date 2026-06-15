@@ -83,22 +83,3 @@ const DiffOverlay: React.FC<DiffOverlayProps> = ({ diff, onClose, versionLabel }
 };
 
 export default DiffOverlay;
-
-/**
- * 工具函数：根据 DiffResult 为节点/边生成 className
- * 用于在 React Flow 中高亮显示差异
- */
-export function getDiffClassName(
-  elementId: string,
-  diff: DiffResult | null
-): string {
-  if (!diff) return '';
-
-  if (diff.addedNodes.includes(elementId) || diff.addedEdges.includes(elementId)) {
-    return 'diff-added';
-  }
-  if (diff.modifiedNodes.some(n => n.id === elementId) || diff.modifiedEdges.some(e => e.id === elementId)) {
-    return 'diff-modified';
-  }
-  return '';
-}
