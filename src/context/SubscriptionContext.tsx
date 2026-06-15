@@ -1,21 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-
-export type UserTier = 'free' | 'pro' | 'enterprise';
-
-interface SubscriptionContextType {
-  tier: UserTier;
-  setTier: (tier: UserTier) => void;
-  hasFeature: (featureName: string) => boolean;
-  isUpgradeModalVisible: boolean;
-  showUpgradeModal: (featureName?: string) => void;
-  hideUpgradeModal: () => void;
-  upgradeFeatureContext?: string;
-  jwtToken?: string;
-}
-
-const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
-
-import { useAuth } from '@/context/AuthContext';
+import React, { useState, ReactNode } from 'react';
+import { useAuth } from '@/context/useAuth';
+import { SubscriptionContext, type UserTier } from './SubscriptionContextValue';
 
 const FREE_FEATURES = ['ai-assistant'];
 const PRO_FEATURES = [...FREE_FEATURES, 'export-hd-svg', 'export-pdf', 'cloud-sync', 'cloud-history', 'premium-templates'];
@@ -27,15 +12,17 @@ const TIER_FEATURES: Record<UserTier, string[]> = {
   enterprise: ENTERPRISE_FEATURES
 };
 
+const coerceUserTier = (value: unknown): UserTier => {
+  return value === 'pro' || value === 'enterprise' ? value : 'free';
+};
+
 export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user, session } = useAuth();
-  const [internalTier, setInternalTier] = useState<UserTier>('free');
   const [isUpgradeModalVisible, setUpgradeModalVisible] = useState(false);
   const [upgradeFeatureContext, setUpgradeFeatureContext] = useState<string | undefined>();
 
-  // 计算最终的 tier:
-  // 如果服务端通过 JWT 的 app_metadata 传递了 tier 优先，否则使用 fallback 的内部状态
-  const tier: UserTier = user?.app_metadata?.tier as UserTier || internalTier || 'free';
+  // Subscription tier must come from server-controlled app metadata.
+  const tier = coerceUserTier(user?.app_metadata?.tier);
   const jwtToken = session?.access_token;
 
   const hasFeature = (featureName: string) => {
@@ -55,7 +42,6 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   return (
     <SubscriptionContext.Provider value={{
       tier,
-      setTier: setInternalTier,
       hasFeature,
       isUpgradeModalVisible,
       showUpgradeModal,
@@ -66,23 +52,5 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       {children}
     </SubscriptionContext.Provider>
   );
-};
-
-export const useSubscription = () => {
-  const context = useContext(SubscriptionContext);
-  if (!context) {
-    console.warn('[HMR Warning] useSubscription was called outside of a SubscriptionProvider. Returning temporary fallback context.');
-    return {
-      tier: 'free' as UserTier,
-      setTier: () => {},
-      hasFeature: () => false,
-      isUpgradeModalVisible: false,
-      showUpgradeModal: () => {},
-      hideUpgradeModal: () => {},
-      upgradeFeatureContext: undefined,
-      jwtToken: undefined
-    };
-  }
-  return context;
 };
 

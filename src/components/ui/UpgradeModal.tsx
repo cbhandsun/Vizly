@@ -1,18 +1,21 @@
-import React, { useState } from 'react';
-import { Modal, Button, Typography, Space, Divider, App } from 'antd';
+import React, { Suspense, useState } from 'react';
+import { Modal, Button, Typography, Space, Divider } from 'antd';
 import { CrownOutlined, CheckCircleFilled } from '@ant-design/icons';
-import { useSubscription } from '@/context/SubscriptionContext';
-import { AuthModal } from '@/components/auth/AuthModal';
+import { useSubscription } from '@/context/useSubscription';
 import { useTranslation } from 'react-i18next';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import { buildSupabaseFunctionUrl, normalizeStripePriceId } from '@/services/runtimeEnv';
+import { isSafeCheckoutRedirectUrl } from './checkoutRedirect';
 
 
 const { Title, Text, Paragraph } = Typography;
+const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then((module) => ({
+  default: module.AuthModal
+})));
 
 export const UpgradeModal: React.FC = () => {
   const { t } = useTranslation();
   const { isUpgradeModalVisible, hideUpgradeModal, upgradeFeatureContext, jwtToken } = useSubscription();
-  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [isAuthModalVisible, setIsAuthModalVisible] = useState(false);
 
@@ -25,14 +28,24 @@ export const UpgradeModal: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`, {
+      const checkoutUrl = buildSupabaseFunctionUrl(
+        import.meta.env.VITE_SUPABASE_URL,
+        'create-checkout-session'
+      );
+      const priceId = normalizeStripePriceId(import.meta.env.VITE_STRIPE_PRO_PRICE_ID);
+
+      if (!checkoutUrl || !priceId) {
+        throw new Error(t('upgrade.checkoutConfigMissing', { defaultValue: 'Checkout is not configured.' }));
+      }
+
+      const response = await fetch(checkoutUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${jwtToken}`
         },
         body: JSON.stringify({
-          priceId: import.meta.env.VITE_STRIPE_PRO_PRICE_ID || 'price_mock_123',
+          priceId,
           successUrl: `${window.location.origin}?success=true`,
           cancelUrl: `${window.location.origin}?canceled=true`,
         })
@@ -56,7 +69,7 @@ export const UpgradeModal: React.FC = () => {
 
       const data = await response.json();
 
-      if (data.url) {
+      if (isSafeCheckoutRedirectUrl(data.url)) {
         window.location.href = data.url; // 重定向至 Stripe 网关
       } else {
         appMessage.error(t('upgrade.checkoutFail', { error: data.error || t('upgrade.unknownError') }));
@@ -112,10 +125,14 @@ export const UpgradeModal: React.FC = () => {
         </div>
       </Modal>
 
-      <AuthModal
-        open={isAuthModalVisible}
-        onCancel={() => setIsAuthModalVisible(false)}
-      />
+      {isAuthModalVisible && (
+        <Suspense fallback={null}>
+          <AuthModal
+            open={isAuthModalVisible}
+            onCancel={() => setIsAuthModalVisible(false)}
+          />
+        </Suspense>
+      )}
     </>
   );
 };
