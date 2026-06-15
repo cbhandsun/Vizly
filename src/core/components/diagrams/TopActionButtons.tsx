@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState, memo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Space, Button, Dropdown, Tooltip, MenuProps, Grid } from 'antd';
+import { Button, Dropdown, Tooltip, MenuProps, Grid } from 'antd';
 import { useTranslation } from 'react-i18next';
 import {
     FaFileExport, FaFolderOpen, FaShareAlt, FaCloudUploadAlt, FaSave,
@@ -136,14 +136,17 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     const [contextPortalTarget, setContextPortalTarget] = useState<HTMLElement | null>(null);
 
     useEffect(() => {
-        const target = document.getElementById('vizly-plugin-right-island-portal');
-        if (target) {
-            setPortalTarget(target);
-        }
-        const contextTarget = document.getElementById('vizly-plugin-context-toolbar-portal');
-        if (contextTarget) {
-            setContextPortalTarget(contextTarget);
-        }
+        const timer = window.setTimeout(() => {
+            const target = document.getElementById('vizly-plugin-right-island-portal');
+            if (target) {
+                setPortalTarget(target);
+            }
+            const contextTarget = document.getElementById('vizly-plugin-context-toolbar-portal');
+            if (contextTarget) {
+                setContextPortalTarget(contextTarget);
+            }
+        }, 0);
+        return () => window.clearTimeout(timer);
     }, []);
 
     // Generate more menu items dynamically for mobile

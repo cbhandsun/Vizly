@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { Input, Collapse, Typography, theme, Tooltip, Flex, Popover, Slider, Button, List, Empty, Tree } from 'antd';
+import { Input, Typography, theme, Tooltip, Flex, Popover, Slider, Button, Empty, Tree } from 'antd';
 import {
     _FaShapes, FaCompass, FaStream, FaStar, FaSearch,
     FaPlay, FaBox, FaTimes,
@@ -8,10 +8,7 @@ import {
 import { Node } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { FlowchartNodeData } from '../custom-nodes/FlowchartNode';
-import { ShapePreview } from './ShapePreview';
-import { PanelZoomApi, usePanelZoom } from '../../hooks/usePanelZoom';
-import { LayerManagementPanel } from './LayerManagementPanel';
-import { NodeTemplatePanel } from './NodeTemplatePanel';
+import { usePanelZoom } from '../../hooks/usePanelZoom';
 import type { NodeTemplate } from './hooks/useNodeTemplates';
 import type { LayerConfig } from './hooks/useLayerManagement';
 import {
@@ -20,10 +17,19 @@ import {
     _FaKeyboard,
     _FaServer, _FaNetworkWired, _FaLock, _FaPlug, _FaUser, _FaEnvelope, _FaBell, _FaCog, _FaCode, _FaTerminal
 } from 'react-icons/fa';
-import { CommentPanel } from './CommentPanel';
 import './IconRailSidebar.css';
 
 const { Text } = Typography;
+
+const LayerManagementPanel = React.lazy(() => import('./LayerManagementPanel').then(module => ({
+    default: module.LayerManagementPanel,
+})));
+const NodeTemplatePanel = React.lazy(() => import('./NodeTemplatePanel').then(module => ({
+    default: module.NodeTemplatePanel,
+})));
+const CommentPanel = React.lazy(() => import('./CommentPanel').then(module => ({
+    default: module.CommentPanel,
+})));
 
 type _DrawerPanel = 'shapes' | 'navigator' | 'layers' | 'templates' | null;
 
@@ -142,8 +148,11 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
 
     useEffect(() => {
         if (searchTerm) {
-            setExpandedKeys(searchExpandedKeys);
-            setAutoExpandParent(true);
+            const timer = window.setTimeout(() => {
+                setExpandedKeys(searchExpandedKeys);
+                setAutoExpandParent(true);
+            }, 0);
+            return () => window.clearTimeout(timer);
         }
     }, [searchTerm, searchExpandedKeys]);
 
@@ -299,31 +308,39 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                 );
             case 'layers':
                 return (
-                    <LayerManagementPanel
-                        layers={layers}
-                        activeLayerId={activeLayerId}
-                        onSetActive={onSetActiveLayer || (() => { })}
-                        onToggleVisibility={onToggleLayerVisibility || (() => { })}
-                        onToggleLock={onToggleLayerLock || (() => { })}
-                        onRename={onRenameLayer || (() => { })}
-                        onCreate={onCreateLayer!}
-                        onDelete={onDeleteLayer || (() => { })}
-                        onReorder={onReorderLayers || (() => { })}
-                        onSetColor={onSetLayerColor}
-                    />
+                    <React.Suspense fallback={null}>
+                        <LayerManagementPanel
+                            layers={layers}
+                            activeLayerId={activeLayerId}
+                            onSetActive={onSetActiveLayer || (() => { })}
+                            onToggleVisibility={onToggleLayerVisibility || (() => { })}
+                            onToggleLock={onToggleLayerLock || (() => { })}
+                            onRename={onRenameLayer || (() => { })}
+                            onCreate={onCreateLayer!}
+                            onDelete={onDeleteLayer || (() => { })}
+                            onReorder={onReorderLayers || (() => { })}
+                            onSetColor={onSetLayerColor}
+                        />
+                    </React.Suspense>
                 );
             case 'templates':
                 return (
-                    <NodeTemplatePanel
-                        templates={templates || []}
-                        groupedTemplates={groupedTemplates || {}}
-                        onUseTemplate={onUseTemplate || (() => { })}
-                        onDeleteTemplate={onDeleteTemplate || (() => { })}
-                        onRenameTemplate={onRenameTemplate || (() => { })}
-                    />
+                    <React.Suspense fallback={null}>
+                        <NodeTemplatePanel
+                            templates={templates || []}
+                            groupedTemplates={groupedTemplates || {}}
+                            onUseTemplate={onUseTemplate || (() => { })}
+                            onDeleteTemplate={onDeleteTemplate || (() => { })}
+                            onRenameTemplate={onRenameTemplate || (() => { })}
+                        />
+                    </React.Suspense>
                 );
             case 'comments':
-                return <CommentPanel />;
+                return (
+                    <React.Suspense fallback={null}>
+                        <CommentPanel />
+                    </React.Suspense>
+                );
             default:
                 return null;
         }

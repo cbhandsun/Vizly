@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Input, Spin, Empty, Tooltip, Typography, message } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Input, Spin, Empty, Tooltip, Typography } from 'antd';
 import { SearchOutlined, CloudDownloadOutlined, FireOutlined } from '@ant-design/icons';
 import { Icon } from '@iconify/react';
 import { PluginContext } from '../../types/plugin';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import { buildIconifySearchUrl, isSafeIconifyIconName, parseIconifySearchResponse } from '@/core/utils/iconifySecurity';
 
 
 const { Text } = Typography;
@@ -21,7 +22,7 @@ const POPULAR_COLLECTIONS = [
     { prefix: 'carbon', title: 'IBM Carbon', icon: 'carbon:carbon' },
 ];
 
-export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
+export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx: _ctx }) => {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
@@ -44,13 +45,9 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
         const fetchIcons = async () => {
             setLoading(true);
             try {
-                const response = await fetch(`https://api.iconify.design/search?query=${encodeURIComponent(debouncedQuery)}&limit=100`);
-                const data = await response.json();
-                if (data.icons) {
-                    setResults(data.icons);
-                } else {
-                    setResults([]);
-                }
+                const response = await fetch(buildIconifySearchUrl({ query: debouncedQuery, limit: 100 }));
+                const data = parseIconifySearchResponse(await response.json(), 100);
+                setResults(data.icons);
             } catch (error) {
                 console.error('Failed to fetch icons:', error);
                 appMessage.error('搜索图标失败，请检查网络连接');
@@ -63,6 +60,10 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx }) => {
     }, [debouncedQuery]);
 
     const onDragStart = (event: React.DragEvent, iconName: string) => {
+        if (!isSafeIconifyIconName(iconName)) {
+            event.preventDefault();
+            return;
+        }
         const target = event.currentTarget as HTMLElement;
         const rect = target.getBoundingClientRect();
         

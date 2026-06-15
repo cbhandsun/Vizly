@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Input, Spin, Empty, Typography, theme, Tooltip } from 'antd';
+import { Input, Spin, Empty, theme, Tooltip } from 'antd';
 import { FaSearch } from 'react-icons/fa';
 import { Icon } from '@iconify/react';
 import { useTranslation } from 'react-i18next';
+import { buildIconifySearchUrl, isSafeIconifyIconName, parseIconifySearchResponse } from '../../utils/iconifySecurity';
 
-const { Text } = Typography;
 
 interface IconResult {
     prefix: string;
@@ -53,12 +53,12 @@ export const IconLibraryPanel: React.FC = () => {
             setError(null);
             try {
                 // Call Iconify public search API
-                const res = await fetch(`https://api.iconify.design/search?query=${encodeURIComponent(query)}&limit=60`);
+                const res = await fetch(buildIconifySearchUrl({ query, limit: 60 }));
                 if (!res.ok) throw new Error('API request failed');
                 
-                const data = await res.json();
-                if (data && data.icons) {
-                    const results: IconResult[] = data.icons.map((id: string) => {
+                const data = parseIconifySearchResponse(await res.json(), 60);
+                if (data.icons.length) {
+                    const results: IconResult[] = data.icons.map((id) => {
                         const [prefix, name] = id.split(':');
                         return { prefix, name, id };
                     });
@@ -80,6 +80,10 @@ export const IconLibraryPanel: React.FC = () => {
     }, [debouncedSearch]);
 
     const onDragStart = (event: React.DragEvent, iconId: string) => {
+        if (!isSafeIconifyIconName(iconId)) {
+            event.preventDefault();
+            return;
+        }
         event.dataTransfer.setData('application/reactflow', JSON.stringify({
             type: 'iconNode',
             typeName: 'iconNode',

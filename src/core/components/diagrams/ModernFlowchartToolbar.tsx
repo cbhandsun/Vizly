@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
+import React, { useState, useEffect, useMemo, memo } from 'react';
 import { createPortal } from 'react-dom';
 import {
     FaUndo, FaRedo, FaSearchPlus, FaSearchMinus, FaCompressArrowsAlt, _FaArrowsAltH,
@@ -17,8 +17,8 @@ import {
 import { BackgroundVariant } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, Button, Dropdown, MenuProps, Popover, Grid } from 'antd';
-import { RobotOutlined } from '@ant-design/icons';
 import { appModal } from '../../utils/antdStaticBridge';
+import { clearFlowchartCache } from '../../utils/clearFlowchartCache';
 
 interface FlowchartToolbarProps {
     canUndo: boolean;
@@ -156,12 +156,15 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     const [bottomPortalTarget, setBottomPortalTarget] = useState<HTMLElement | null>(null);
 
     useEffect(() => {
-        const target = document.getElementById('vizly-plugin-center-island-portal');
-        if (target) setPortalTarget(target);
-        const contextTarget = document.getElementById('vizly-plugin-context-toolbar-portal');
-        if (contextTarget) setContextPortalTarget(contextTarget);
-        const bottomTarget = document.getElementById('vizly-plugin-bottom-island-portal');
-        if (bottomTarget) setBottomPortalTarget(bottomTarget);
+        const timer = window.setTimeout(() => {
+            const target = document.getElementById('vizly-plugin-center-island-portal');
+            if (target) setPortalTarget(target);
+            const contextTarget = document.getElementById('vizly-plugin-context-toolbar-portal');
+            if (contextTarget) setContextPortalTarget(contextTarget);
+            const bottomTarget = document.getElementById('vizly-plugin-bottom-island-portal');
+            if (bottomTarget) setBottomPortalTarget(bottomTarget);
+        }, 0);
+        return () => window.clearTimeout(timer);
     }, []);
 
     const activeLayoutKey = useMemo(() => {
@@ -362,9 +365,8 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                         const diagramId = diagramIdFromUrl
                             || localStorage.getItem('diagramMenu.selectedDiagramId');
 
-                        // 2. 彻底清空所有缓存
-                        localStorage.clear();
-                        sessionStorage.clear();
+                        // 2. 只清理流程图设计器缓存，避免误删 AI 配置、存储密钥和其他图的自动保存
+                        clearFlowchartCache(diagramId);
 
                         // 3. 把图表 ID 写回 localStorage，让应用重启后能正常恢复
                         // 这样无需依赖 URL 参数，与 useDiagramHostStorage 的读取逻辑完全对齐
@@ -380,7 +382,7 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                 });
             },
         },
-    ], [t, gridInfo, showRuler, toggleRuler, toggleMinimap, showMinimap, onShowShortcuts, onImportClick, onExport]);
+    ], [t, gridInfo, toggleGrid, showRuler, toggleRuler, toggleMinimap, showMinimap, onShowShortcuts, onImportClick, onExport]);
 
     const CanvasSettingsContent = (
         <div className="p-1 min-w-[180px]">

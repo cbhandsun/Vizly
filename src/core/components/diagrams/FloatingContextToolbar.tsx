@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Node } from '@xyflow/react';
-import { Popover, Slider, Divider, Dropdown, ColorPicker, type MenuProps } from 'antd';
+import { Divider, Dropdown, ColorPicker, type MenuProps } from 'antd';
 import type { LayerConfig } from './hooks/useLayerManagement';
 import type { AggregationColor } from 'antd/es/color-picker/color';
 import {
@@ -86,13 +86,6 @@ export interface FloatingContextToolbarProps {
 
 // ─── Popover Content Components ──────────────────────────────────────────────
 
-const OpacityPanel: React.FC<{ value: number; onChange: (v: number) => void }> = ({ value, onChange }) => (
-    <div style={{ padding: 8, width: 150 }}>
-        <div style={{ marginBottom: 4 }}>Opacity: {Math.round(value * 100)}%</div>
-        <Slider min={0.1} max={1} step={0.1} value={value} onChange={onChange} />
-    </div>
-);
-
 const AlignPanel: React.FC<{
     onAlign: (dir: string) => void;
     onDistribute: (dir: string) => void;
@@ -114,47 +107,6 @@ const AlignPanel: React.FC<{
         <div style={{ display: 'flex', gap: 2 }}>
             <ToolbarButton icon={<MdHorizontalDistribute />} label="Distribute Horizontally" onClick={() => onDistribute('horizontal')} disabled={!canDistribute} />
             <ToolbarButton icon={<MdVerticalDistribute />} label="Distribute Vertically" onClick={() => onDistribute('vertical')} disabled={!canDistribute} />
-        </div>
-    </div>
-);
-
-const LayerPanel: React.FC<{ onBringToFront: () => void; onSendToBack: () => void }> = ({ onBringToFront, onSendToBack }) => (
-    <div style={{ padding: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <ToolbarButton icon={<FaArrowUp />} label="Bring to Front" onClick={onBringToFront} />
-        <ToolbarButton icon={<FaArrowDown />} label="Send to Back" onClick={onSendToBack} />
-    </div>
-);
-
-const BorderPanel: React.FC<{
-    strokeWidth: number;
-    isDashed: boolean;
-    onUpdateStyle: (style: React.CSSProperties) => void;
-}> = ({ strokeWidth, isDashed, onUpdateStyle }) => (
-    <div style={{ padding: 8, width: 160 }}>
-        <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: '12px', marginBottom: 4 }}>Thickness: {strokeWidth}px</div>
-            <Slider min={0} max={10} step={1} value={strokeWidth} onChange={(val) => onUpdateStyle({ strokeWidth: val })} />
-        </div>
-        <Divider style={{ margin: '8px 0' }} />
-        <div style={{ display: 'flex', gap: 4 }}>
-            <button
-                onClick={() => onUpdateStyle({ strokeDasharray: 'none' })}
-                style={{
-                    flex: 1, padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
-                    border: 'none', fontSize: 12,
-                    background: !isDashed ? 'var(--toolbar-btn-hover-bg)' : 'transparent',
-                    color: !isDashed ? 'var(--toolbar-btn-hover-color)' : 'var(--toolbar-btn-color)',
-                }}
-            >Solid</button>
-            <button
-                onClick={() => onUpdateStyle({ strokeDasharray: '4,4' })}
-                style={{
-                    flex: 1, padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
-                    border: 'none', fontSize: 12,
-                    background: isDashed ? 'var(--toolbar-btn-hover-bg)' : 'transparent',
-                    color: isDashed ? 'var(--toolbar-btn-hover-color)' : 'var(--toolbar-btn-color)',
-                }}
-            >Dashed</button>
         </div>
     </div>
 );

@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Layout, Input, Collapse, Typography, theme, Tooltip, Flex, Popover, Slider, Button, Tabs, List, Empty, Tree } from 'antd';
+import React, { useState } from 'react';
+import { Layout, Input, Collapse, Typography, theme, Tooltip, Flex, Popover, Slider, Button, Tabs, Empty, Tree } from 'antd';
 import {
     FaPlay, _FaSquare, _FaStop, _FaDatabase, _FaQuestion,
     FaLayerGroup, FaBox, FaThLarge, FaImage,
@@ -11,7 +11,6 @@ import { Node } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { FlowchartNodeData } from '../custom-nodes/FlowchartNode';
 import { ShapePreview } from './ShapePreview';
-import { getUiScale } from '../shared/viewportStore';
 import { PanelZoomApi, usePanelZoom } from '../../hooks/usePanelZoom';
 import { LayerManagementPanel } from './LayerManagementPanel';
 import { NodeTemplatePanel } from './NodeTemplatePanel';

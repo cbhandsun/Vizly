@@ -3,8 +3,15 @@ import { Tabs, Tooltip, Button, theme } from 'antd';
 import { Node, Edge } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { FaCog, FaRobot, FaChevronRight, FaChevronLeft } from 'react-icons/fa';
-import PropertyPanel from './PropertyPanel';
 import { DiagramTypePlugin, PluginContext } from '../../types/plugin';
+import {
+    readDesignerRightSidebarCollapsed,
+    readDesignerRightSidebarWidth,
+    writeDesignerRightSidebarCollapsed,
+    writeDesignerRightSidebarWidth,
+} from '../../utils/layoutStorage';
+
+const PropertyPanel = React.lazy(() => import('./PropertyPanel'));
 
 interface DesignerRightSidebarProps {
     activeTab: 'property' | 'ai';
@@ -17,7 +24,7 @@ interface DesignerRightSidebarProps {
     updateEdgesBatch: (ids: string[], data: any) => void;
     onBeforeUpdate: () => void;
     isDraggingNode: boolean;
-    renderAIChatPanel?: React.ReactNode;
+    renderAIChatPanel?: () => React.ReactNode;
     /** 通知父组件当前面板实际宽度 (0=不可见, 42=收起, 320=展开) */
     onWidthChange?: (width: number) => void;
     showAiCrown?: boolean;
@@ -59,21 +66,16 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
 
     // 折叠状态持久化
     const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
-        try {
-            return localStorage.getItem('designer.rightSidebar.collapsed') === 'true';
-        } catch { return false; }
+        return readDesignerRightSidebarCollapsed();
     });
 
     useEffect(() => {
-        try { localStorage.setItem('designer.rightSidebar.collapsed', String(isCollapsed)); } catch { void 0; }
+        writeDesignerRightSidebarCollapsed(isCollapsed);
     }, [isCollapsed]);
 
     // 面板宽度持久化与拖拽逻辑
     const [panelWidth, setPanelWidth] = useState<number>(() => {
-        try {
-            const saved = localStorage.getItem('designer.rightSidebar.width');
-            return saved ? parseInt(saved, 10) : 360;
-        } catch { return 360; }
+        return readDesignerRightSidebarWidth();
     });
 
     useEffect(() => {
@@ -114,8 +116,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
             document.removeEventListener('mouseup', onMouseUp);
             // 结束后保存
             setPanelWidth((finalWidth) => {
-                try { localStorage.setItem('designer.rightSidebar.width', String(finalWidth)); } catch { void 0; }
-                return finalWidth;
+                return writeDesignerRightSidebarWidth(finalWidth);
             });
         };
 
@@ -126,15 +127,21 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
     // 选中节点时自动展开
     useEffect(() => {
         if (hasSelection && isCollapsed) {
-            setIsCollapsed(false);
+            const timer = window.setTimeout(() => {
+                setIsCollapsed(false);
+            }, 0);
+            return () => window.clearTimeout(timer);
         }
-    }, [hasSelection]);
+    }, [hasSelection, isCollapsed]);
 
     const toggle = useCallback(() => setIsCollapsed(prev => !prev), []);
 
     // 通知父组件当前面板实际宽度（用 ref 避免依赖变化）
     const onWidthChangeRef = React.useRef(onWidthChange);
-    onWidthChangeRef.current = onWidthChange;
+    useEffect(() => {
+        onWidthChangeRef.current = onWidthChange;
+    }, [onWidthChange]);
+
     useEffect(() => {
         const width = visible ? (isCollapsed ? RAIL_WIDTH : panelWidth) : 0;
         onWidthChangeRef.current?.(width);
@@ -335,16 +342,20 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                                         ? activePlugin.renderCustomPropertyPanel(pluginCtx, selectedNodes, selectedEdges) 
                                         : null;
                                         
-                                    return CustomPanel || (
-                                        <PropertyPanel
-                                            selectedNodes={selectedNodes}
-                                            selectedEdges={selectedEdges}
-                                            onUpdateNodes={(ids, data) => updateNodesBatch(ids, data, { snapshot: false })}
-                                            onUpdateEdges={updateEdgesBatch}
-                                            onBeforeUpdate={onBeforeUpdate}
-                                            disabled={isDraggingNode}
-                                            docked={true}
-                                        />
+                                    if (CustomPanel) return CustomPanel;
+                                    if (activeTab !== 'property') return null;
+                                    return (
+                                        <React.Suspense fallback={null}>
+                                            <PropertyPanel
+                                                selectedNodes={selectedNodes}
+                                                selectedEdges={selectedEdges}
+                                                onUpdateNodes={(ids, data) => updateNodesBatch(ids, data, { snapshot: false })}
+                                                onUpdateEdges={updateEdgesBatch}
+                                                onBeforeUpdate={onBeforeUpdate}
+                                                disabled={isDraggingNode}
+                                                docked={true}
+                                            />
+                                        </React.Suspense>
                                     );
                                 })()}
                                     </div>
@@ -355,7 +366,7 @@ export const DesignerRightSidebar: React.FC<DesignerRightSidebarProps> = React.m
                                 label: <span style={{ display: 'flex', alignItems: 'center' }}>{t('aiChat.title')} {showAiCrown && <span style={{ marginLeft: 4, fontSize: '13px' }} title="Pro 功能">👑</span>}</span>,
                                 children: (
                                     <div style={{ height: '100%', padding: '0 8px' }}>
-                                        {renderAIChatPanel}
+                                        {activeTab === 'ai' ? renderAIChatPanel() : null}
                                     </div>
                                 )
                             }] : [])
