@@ -2,7 +2,9 @@
  * 上传模版缩略图到 Supabase Storage，并 UPDATE system_templates.thumbnail_url
  *
  * 使用：
- *   SUPABASE_SERVICE_ROLE_KEY=xxx node scripts/upload-thumbnails.mjs
+ *   SUPABASE_URL=https://... SUPABASE_SERVICE_ROLE_KEY=xxx node scripts/upload-thumbnails.mjs
+ *
+ * 该脚本会写入 Storage 和 system_templates，必须使用服务端运维 key，不能使用客户端 anon key。
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -13,10 +15,10 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ 缺少环境变量');
+  console.error('❌ 缺少环境变量，请设置 SUPABASE_URL 和 SUPABASE_SERVICE_ROLE_KEY');
   process.exit(1);
 }
 

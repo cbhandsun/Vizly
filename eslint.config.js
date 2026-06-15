@@ -6,7 +6,16 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores([
+    'dist',
+    'dist-ssr',
+    'coverage',
+    '.coverage',
+    'test-results',
+    'scratch',
+    '.tmp-vizly-smoke-profile-*',
+    'thumbnails',
+  ]),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -55,5 +64,15 @@ export default defineConfig([
       'no-constant-condition': 'warn',
       'no-constant-binary-expression': 'warn',
     }
+  },
+  {
+    files: [
+      'src/core/plugins/**/*.tsx',
+      'src/components/diagrams/plugins/**/*.tsx',
+    ],
+    rules: {
+      // Plugin modules intentionally export plugin classes plus local contribution components.
+      'react-refresh/only-export-components': 'off',
+    },
   },
 ])

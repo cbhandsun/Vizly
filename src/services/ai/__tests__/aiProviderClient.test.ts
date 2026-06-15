@@ -15,7 +15,7 @@ import {
 const provider = {
     name: 'OpenAI',
     baseUrl: 'https://api.openai.com/v1/',
-    apiKey: 'sk-live-secret-value',
+    apiKey: 'sk-test-api-key-placeholder',
 };
 
 describe('aiProviderClient', () => {
@@ -36,9 +36,9 @@ describe('aiProviderClient', () => {
 
         expect(headers).toEqual({
             'Content-Type': 'application/json',
-            Authorization: 'Bearer sk-live-secret-value',
+            Authorization: 'Bearer sk-test-api-key-placeholder',
         });
-        expect(provider.apiKey).toBe('sk-live-secret-value');
+        expect(provider.apiKey).toBe('sk-test-api-key-placeholder');
     });
 
     it('redacts provider error bodies before throwing HTTP errors', async () => {
@@ -74,7 +74,7 @@ describe('aiProviderClient', () => {
         await expect(requestAIModels(provider)).resolves.toEqual({ data: [{ id: 'gpt-4o' }] });
         expect(fetchMock).toHaveBeenCalledWith('https://api.openai.com/v1/models', expect.objectContaining({
             method: 'GET',
-            headers: { Authorization: 'Bearer sk-live-secret-value' },
+            headers: { Authorization: 'Bearer sk-test-api-key-placeholder' },
             signal: expect.any(AbortSignal),
         }));
     });

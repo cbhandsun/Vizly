@@ -75,7 +75,7 @@ describe('logSecurity', () => {
 
     const appender = new RemoteAppender('https://logs.example.com/ingest', LogLevel.WARN, 1, 60_000);
     appender.append(createLogEntry({
-      apiKey: 'sk-live-secret-value',
+      apiKey: 'sk-test-api-key-placeholder',
       nested: { token: 'nested-secret' },
     }));
 

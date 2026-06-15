@@ -4,8 +4,8 @@
  * 使用方法：
  *   node scripts/migrate-presets-to-supabase.mjs
  * 
- * 依赖环境变量：VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
- * （或使用 Service Role Key 绕过 RLS，推荐迁移时用 SERVICE_ROLE_KEY）
+ * 依赖环境变量：SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ * 该脚本会写入 system_templates，必须使用服务端运维 key，不能使用客户端 anon key。
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -16,10 +16,8 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PRESETS_DIR = join(__dirname, '../src/data/standardized');
 
-// 优先使用 Service Role Key（有完整权限，迁移时更安全）
-// 没有的话回退到 Anon Key
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('❌ 缺少 Supabase 环境变量，请设置 SUPABASE_URL 和 SUPABASE_SERVICE_ROLE_KEY');

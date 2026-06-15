@@ -6,10 +6,42 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
+    "lint": "eslint . --cache --cache-strategy content --cache-location node_modules/.cache/eslint/.eslintcache",
+    "typecheck": "tsc --noEmit --pretty false",
+    "verify": "npm run check:artifacts && npm run check:secrets && npm run typecheck && npm run lint && npm run build && npm run check:bundle",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:ci": "npm run check:test-ci-coverage && npm run test:ci:node && npm run test:ci:dom-base && npm run test:ci:context && npm run test:ci:ui && npm run test:ci:core-components && npm run test:ci:mindmap && npm run test:ci:routing",
+    "test:ci:node": "vitest run --maxWorkers=2 --environment=node supabase/__tests__ src/core/algorithms/__tests__ src/core/workers/preprocessing/__tests__ src/core/workers/postprocessing/__tests__",
+    "test:ci:dom-base": "npm run test:ci:dom-utils && npm run test:ci:dom-services && npm run test:ci:dom-workers",
+    "test:ci:dom-utils": "npm run test:ci:dom-utils-security && npm run test:ci:dom-utils-storage && npm run test:ci:dom-utils-import && npm run test:ci:dom-utils-layout && npm run test:ci:dom-utils-misc && npm run test:ci:dom-utils-app",
+    "test:ci:dom-utils-security": "vitest run --maxWorkers=2 src/core/utils/__tests__/CryptoService.test.ts src/core/utils/__tests__/globalErrorHandler.test.ts src/core/utils/__tests__/errorLogger.test.ts src/core/utils/__tests__/Logger.test.ts src/core/utils/__tests__/sanitizeHtml.test.ts src/core/utils/__tests__/remoteDiagramPreview.test.ts src/core/utils/__tests__/logSecurity.test.ts src/core/utils/__tests__/consoleCleanup.test.ts src/core/utils/__tests__/downloadUtils.test.ts src/core/utils/__tests__/exportTextSecurity.test.ts src/core/utils/__tests__/iconifySecurity.test.ts",
+    "test:ci:dom-utils-storage": "vitest run --maxWorkers=2 src/core/utils/__tests__/diagramTypeStorage.test.ts src/core/utils/__tests__/customPresetStorage.test.ts src/core/utils/__tests__/templateUtils.test.ts src/core/utils/__tests__/nodeTemplateStorage.test.ts src/core/utils/__tests__/layerStorage.test.ts src/core/utils/__tests__/minimapOverlayStorage.test.ts src/core/utils/__tests__/diagramMenuStorage.test.ts src/core/utils/__tests__/autoSaveStorage.test.ts src/core/utils/__tests__/layoutStorage.test.ts src/core/utils/__tests__/nodeValidation.test.ts",
+    "test:ci:dom-utils-import": "vitest run --maxWorkers=2 src/core/utils/__tests__/flowchartClipboard.test.ts src/core/utils/__tests__/diagramJsonImport.test.ts src/core/utils/__tests__/coerceDiagram.test.ts src/core/utils/__tests__/fileImportGuards.test.ts src/core/utils/__tests__/dragDropPayload.test.ts src/core/utils/__tests__/imageExporter.test.ts",
+    "test:ci:dom-utils-layout": "vitest run --maxWorkers=2 src/core/utils/__tests__/LayoutAlgorithms.test.ts src/core/utils/__tests__/EnhancedTextMeasurement.test.ts src/core/utils/__tests__/cssVariables.test.ts src/core/utils/__tests__/colorUtils.test.ts src/core/utils/__tests__/domainKey.test.ts",
+    "test:ci:dom-utils-misc": "vitest run --maxWorkers=2 src/core/utils/__tests__/mermaidConverter.test.ts src/core/utils/__tests__/clearFlowchartCache.test.ts src/core/utils/__tests__/dateOnly.test.ts src/core/utils/__tests__/formatRelativeTime.test.ts",
+    "test:ci:dom-utils-app": "vitest run --maxWorkers=2 src/components/ai/__tests__ src/data/__tests__",
+    "test:ci:dom-services": "vitest run --maxWorkers=2 src/services/__tests__ src/services/ai/__tests__",
+    "test:ci:dom-workers": "vitest run --maxWorkers=2 src/core/workers/__tests__ src/core/workers/core/__tests__",
+    "test:ci:context": "vitest run --maxWorkers=2 src/context/__tests__",
+    "test:ci:ui": "vitest run --maxWorkers=2 src/app/__tests__ src/pages/__tests__ src/components/__tests__ src/components/ui/__tests__ src/components/layout/__tests__ src/components/shared/__tests__ src/components/diagrams/ui/__tests__ src/components/diagrams/collaboration/__tests__ src/components/warehouse-3d/__tests__",
+    "test:ci:core-components": "npm run test:ci:core-components-a && npm run test:ci:core-components-b && npm run test:ci:core-components-c",
+    "test:ci:core-components-a": "vitest run --maxWorkers=2 src/core/components/shared/__tests__ src/core/components/ui/__tests__ src/core/hooks/__tests__",
+    "test:ci:core-components-b": "vitest run --maxWorkers=2 src/core/config/__tests__ src/core/themes/__tests__",
+    "test:ci:core-components-c": "vitest run --maxWorkers=2 src/core/components/config/__tests__ src/core/components/custom-edges/hooks/__tests__ src/core/components/diagrams/hooks/__tests__ src/core/components/layout/__tests__",
+    "test:ci:mindmap": "vitest run --maxWorkers=2 src/core/components/mindmap-v2/__tests__",
+    "test:ci:routing": "npm run test:ci:routing-core && npm run test:ci:routing-services && npm run test:ci:routing-layout",
+    "test:ci:routing-core": "vitest run --maxWorkers=2 src/core/factories/__tests__ src/core/plugins/__tests__ src/core/routing/__tests__ src/core/routing/algorithms/__tests__ src/core/routing/core/__tests__ src/core/routing/utils/__tests__",
+    "test:ci:routing-services": "vitest run --maxWorkers=2 src/core/services/__tests__ src/core/strategies/shared/__tests__",
+    "test:ci:routing-layout": "vitest run --maxWorkers=2 src/core/strategies/__tests__ src/core/utils/layout/__tests__",
+    "test:all:lowcpu": "vitest run --maxWorkers=2",
     "test:coverage": "vitest run --coverage",
+    "check:artifacts": "node scripts/check-tracked-artifacts.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "check:audit": "npm audit --omit=optional",
+    "check:test-ci-coverage": "node scripts/check-test-ci-coverage.mjs",
+    "check:bundle": "node scripts/check-bundle-budget.mjs",
+    "smoke:routes": "node scripts/smoke-routes.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -87,5 +119,8 @@
     "typescript-eslint": "^8.58.0",
     "vite": "^8.0.4",
     "vitest": "^4.1.4"
+  },
+  "overrides": {
+    "dompurify": "^3.4.9"
   }
 }

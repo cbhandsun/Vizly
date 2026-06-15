@@ -1,5 +1,57 @@
 # React + TypeScript + Vite
 
+## Local Verification
+
+Run the core local gate before handing off changes:
+
+```powershell
+npm run verify
+```
+
+This checks that generated artifacts are not tracked, scans tracked text files for common secret patterns, then runs TypeScript, ESLint, the production build, and bundle budgets.
+
+Bundle budget limits can be adjusted with `BUNDLE_MAX_JS_CHUNK_KB`, `BUNDLE_MAX_JS_GZIP_CHUNK_KB`, `BUNDLE_MAX_CSS_CHUNK_KB`, `BUNDLE_MAX_CSS_GZIP_CHUNK_KB`, and `BUNDLE_MAX_TOTAL_JS_KB`.
+
+Run the dependency advisory check separately when reviewing dependency changes:
+
+```powershell
+npm run check:audit
+```
+
+This intentionally omits optional native/wasm packages because npm can mark cross-platform optional packages as extraneous on Windows, which makes bare `npm audit` fail before advisory evaluation.
+
+Run the stable low-concurrency test gate for core safety, data, algorithm, UI, routing, and worker coverage:
+
+```powershell
+npm run test:ci
+```
+
+This first checks that every `src/**/__tests__/*.test.ts(x)` and `supabase/**/__tests__/*.test.ts(x)` file is assigned to a CI shard, then runs split Vitest shards for node-only logic, jsdom/browser APIs, UI guards, core components, mind map behavior, and routing/layout internals.
+
+`npm run test:all:lowcpu` runs the full Vitest suite with reduced worker concurrency. It is intentionally separate from `npm run verify` because the full suite is currently too slow for the default local gate.
+
+## Route Smoke Checks
+
+Build first, then run the route smoke check:
+
+```powershell
+npm run build
+npm run smoke:routes
+```
+
+Set `SMOKE_REPORT=1` to print per-route asset diagnostics. Set `SMOKE_BUDGET=1` to enforce route asset budgets for critical asset count, critical decoded KB, and ready time.
+Set `SMOKE_ROUTES=warehouse-3d` to run one or more comma-separated routes while debugging a specific route budget.
+Set `SMOKE_REPEAT=3` to sample each selected route multiple times; budgets use the upper median sample metrics and reports include the worst ready time.
+
+Budget overrides:
+
+```powershell
+$env:SMOKE_BUDGET='1'
+$env:SMOKE_MAX_CRITICAL_ASSETS='100'
+$env:SMOKE_BUDGET_DEFAULT_DIAGRAM_CRITICAL_DECODED_KB='4100'
+npm run smoke:routes
+```
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
