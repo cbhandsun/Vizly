@@ -212,7 +212,7 @@ export class IncrementalRoutingManager {
     ): IncrementalRoutingContext {
         const changedNodeIds = new Set(changedNodes.map(n => n.id));
         const affectedBounds = this.calculateAffectedBounds(changedNodes, allNodes);
-        const { affected, unchanged } = this.identifyAffectedEdges(
+        const { affected: _affected, unchanged } = this.identifyAffectedEdges(
             allEdges,
             allNodes,
             changedNodeIds,
