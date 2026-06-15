@@ -28,7 +28,7 @@ interface ErrorBoundaryState {
 }
 
 // 错误边界属性接口
-interface ErrorBoundaryProps {
+export interface ErrorBoundaryProps {
   children: ReactNode;
   fallback?: (error: Error, errorInfo: ErrorInfo, retry: () => void) => ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo, errorDetails: ErrorDetails) => void;
@@ -372,47 +372,5 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return children;
   }
 }
-
-/**
- * 高阶组件：为组件添加错误边界
- */
-export const withErrorBoundary = <P extends object>(
-  WrappedComponent: React.ComponentType<P>,
-  errorBoundaryProps?: Omit<ErrorBoundaryProps, 'children'>
-) => {
-  const WithErrorBoundaryComponent = (props: P) => (
-    <ErrorBoundary {...errorBoundaryProps}>
-      <WrappedComponent {...props} />
-    </ErrorBoundary>
-  );
-
-  WithErrorBoundaryComponent.displayName = 
-    `withErrorBoundary(${WrappedComponent.displayName || WrappedComponent.name})`;
-
-  return WithErrorBoundaryComponent;
-};
-
-/**
- * Hook：在函数组件中使用错误边界
- */
-export const useErrorHandler = () => {
-  const [error, setError] = React.useState<Error | null>(null);
-
-  const resetError = React.useCallback(() => {
-    setError(null);
-  }, []);
-
-  const captureError = React.useCallback((error: Error) => {
-    safeLog.error('Error captured by useErrorHandler:', error);
-    setError(error);
-  }, []);
-
-  // 如果有错误，抛出它以便错误边界捕获
-  if (error) {
-    throw error;
-  }
-
-  return { captureError, resetError };
-};
 
 export default ErrorBoundary;
