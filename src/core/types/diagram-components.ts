@@ -92,7 +92,7 @@ export interface DiagramComponentProps {
   /** (IoC) 确保内容已保存才能分享 */
   onEnsureSaved?: () => Promise<boolean | string>;
   /** (IoC) 渲染 AI 会话面板 */
-  renderAIChatPanel?: React.ReactNode;
+  renderAIChatPanel?: () => React.ReactNode;
   /** (IoC) 渲染 AI 配置弹窗 */
   renderAIConfigModal?: React.ReactNode;
   /** (IoC) 渲染分享弹窗 */

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Handle, Position, NodeResizer } from '@xyflow/react';
+import { sanitizeInlineHtml } from '../../../utils/sanitizeHtml';
 
 const hexToRgba = (hex: string, alpha: number): string => {
     if (!/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)) {
@@ -121,6 +122,8 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
     };
 
     const renderContent = (content: string) => {
+        const safeContent = sanitizeInlineHtml(content);
+
         if (isEditing) {
             return (
                 <div style={contentStyle}>
@@ -148,17 +151,17 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
             );
         }
 
-        if (!content) return null;
+        if (!safeContent) return null;
 
         // 使用结构化排版（标题 + 描述体）
-        const { title, body } = parseNodeContent(content);
+        const { title, body } = parseNodeContent(safeContent);
 
         // 是否有 HTML 内容（旧格式兼容）
-        const hasHtml = content.includes('<br>') || content.includes('<b>') || content.includes('<strong>');
+        const hasHtml = safeContent.includes('<br>') || safeContent.includes('<b>') || safeContent.includes('<strong>');
 
         if (hasHtml) {
             // 旧格式：HTML 直接渲染，保持兼容
-            const lines = content.split(/<br\s*\/?>/i);
+            const lines = safeContent.split(/<br\s*\/?>/i);
             return (
                 <div style={contentStyle} onDoubleClick={handleDoubleClick}>
 

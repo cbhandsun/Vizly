@@ -5,7 +5,7 @@ export interface MasterDataDomain {
   ids?: string[];
 }
 
-export interface DomainData extends MasterDataDomain {}
+export type DomainData = MasterDataDomain;
 
 export interface MasterDataType {
   [key: string]: MasterDataDomain;

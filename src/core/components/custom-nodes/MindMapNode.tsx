@@ -5,6 +5,7 @@ import { MindMapActionBar } from '../diagrams/mindmap-pro/MindMapActionBar';
 import { FaMinus } from 'react-icons/fa';
 import { ExportOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
+import { toSafeExternalUrl, toSafeImageUrl } from '../../utils/sanitizeHtml';
 import './MindMapNode.css';
 
 export interface MindMapNodeData extends Record<string, unknown> {
@@ -51,10 +52,12 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
     // Rich Content
     const icon = data?.icon;
     const image = data?.image;
+    const safeImage = image ? toSafeImageUrl(image) : null;
     const note = data?.note;
     const tags = data?.tags || [];
     // [T-3] URL link
     const url = data?.url as string | undefined;
+    const safeUrl = url ? toSafeExternalUrl(url) : null;
     // [T-4] Priority marker
     const priority = data?.priority as (1 | 2 | 3) | undefined;
     // [T-5] Progress ring
@@ -170,9 +173,9 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
                 />
             )}
 
-            {image && (
+            {safeImage && (
                 <div className="mindmap-image-wrapper">
-                    <img src={image} alt="Node Graphic" className="mindmap-image" />
+                    <img src={safeImage} alt="Node Graphic" className="mindmap-image" />
                 </div>
             )}
 
@@ -199,15 +202,15 @@ const MindMapNode = ({ id, data, isConnectable, selected }: NodeProps<Node<MindM
                     )}
                 </div>
                 {/* [T-3] URL link icon — click opens URL in new tab */}
-                {url && !isEditing && (
+                {safeUrl && !isEditing && (
                     <a
-                        href={url}
+                        href={safeUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mindmap-url-icon"
                         onClick={(e) => e.stopPropagation()}
                         onPointerDown={(e) => e.stopPropagation()}
-                        title={url}
+                        title={safeUrl}
                     >
                         <ExportOutlined style={{ fontSize: 11, color: '#6366f1', opacity: 0.7 }} />
                     </a>

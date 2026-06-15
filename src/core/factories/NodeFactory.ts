@@ -1,18 +1,10 @@
 import { Node } from '@xyflow/react';
-import { StandardNodeData } from '../models/DiagramModels';
 import { diagramConfigManager } from '../components/config/DiagramConfig';
 import type { Theme } from '../themes/types/ThemeTypes';
 import { enhancedTextMeasurement } from '../utils/EnhancedTextMeasurement';
 import { LayoutOptimizer } from '../components/layout/LayoutOptimizer';
-import { getDomainTheme, resolveThemeDomainKey } from '../utils/domainKey';
+import { getDomainTheme } from '../utils/domainKey';
 import { diagramStyleManager } from '../components/shared/DiagramStyleManager';
-
-/**
- * 模块级调试开关 — 避免每次 createNode 都读 localStorage
- */
-const debugEnabled = (() => {
-  try { const v = localStorage.getItem('architecture-diagram-debug'); return v === '1' || v === 'true'; } catch { return false; }
-})();
 
 /**
  * 紧凑域缩放系数（模块级常量，保证 createNode 与 createNodes 一致）
@@ -159,19 +151,12 @@ export class NodeFactory {
     const maxWidthCap = (typeof diagramConfig?.node?.maxWidth === 'number' && isFinite(diagramConfig.node.maxWidth) && diagramConfig.node.maxWidth > 0)
       ? diagramConfig.node.maxWidth
       : 300;
-    const currentTheme = {}; // 暂时使用空对象，需要集成增强主题管理器
-
     // 计算节点尺寸（支持特定域的紧凑化）
     const layoutOptimizer = LayoutOptimizer.getInstance();
 
     // 读取业务域与域类（domainClass 优先）
     const domainKey: string | undefined = (config as any).domain ?? ((config.data as any)?.domain);
     const domainClass: string | undefined = (config as any).domainClass ?? ((config.data as any)?.domainClass);
-    const compactDomains: Record<string, { fontScale: number; widthScale: number; paddingHScale: number; paddingVScale: number }> = {
-      strategy: { fontScale: 0.85, widthScale: 0.85, paddingHScale: 0.85, paddingVScale: 0.85 },
-      data: { fontScale: 0.85, widthScale: 0.85, paddingHScale: 0.85, paddingVScale: 0.85 },
-      interface: { fontScale: 0.85, widthScale: 0.85, paddingHScale: 0.85, paddingVScale: 0.85 },
-    };
 
     const isCompact = domainKey && COMPACT_DOMAINS[String(domainKey)] !== undefined;
     const fontSizeOverride = isCompact
@@ -294,18 +279,11 @@ export class NodeFactory {
 
     // 确定主题
     const theme = diagramTheme;
-    if (debugEnabled) {
-    }
 
     // 以 domainClass 优先解析域主题颜色；若缺失则最小回退
-    const normalizedDomainKey = resolveThemeDomainKey(theme as any, {
-      domainClass,
-    } as any);
     const domainThemeColor = getDomainTheme(theme as any, {
       domainClass,
     } as any);
-    if (debugEnabled) {
-    }
 
     // 规范化文案字段：统一使用 description（函数级注释）
     // - 优先读取 config.description；其次读取 data.description；最后兜底为节点 id
@@ -455,7 +433,7 @@ export class NodeFactory {
   /**
    * 创建域群组节点
    */
-  createDomainGroup(domain: string, nodesInDomain: Node[], domainTheme: any, options: any): Node {
+  createDomainGroup(domain: string, nodesInDomain: Node[], domainTheme: any, _options: any): Node {
     const id = `domain-${domain}`;
     const nodeConfig: NodeConfig = {
       id,
@@ -477,7 +455,7 @@ export class NodeFactory {
   /**
    * 创建子域群组节点
    */
-  createSubDomainGroup(subDomain: string, nodesInSubDomain: Node[], domainTheme: any, options?: { shape?: string }): Node {
+  createSubDomainGroup(subDomain: string, nodesInSubDomain: Node[], domainTheme: any, _options?: { shape?: string }): Node {
     const id = `subdomain-${subDomain}`;
     const nodeConfig: NodeConfig = {
       id,
@@ -576,7 +554,6 @@ export class NodeFactory {
     domain?: string; // 新增：所属域键，用于布局归属
     children?: string[]; // 新增：子组包含的子节点ID，用于布局策略计算包围盒
   }): Node {
-    const currentTheme = {}; // 暂时使用空对象
     const theme = config.theme || {};
 
     // 添加 NaN 值验证，确保 measured 属性中的数值有效

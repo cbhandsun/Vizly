@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useReactFlow, Node } from '@xyflow/react';
 import type { FlowchartNodeData } from '../FlowchartNode';
 import { MarkerType } from '@xyflow/react';
-import { useNodeUpdate } from '../../diagrams/NodeUpdateContext';
+import { useNodeUpdate } from '../../diagrams/useNodeUpdate';
 
 export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData, selected: boolean) {
     const { setNodes, setEdges, getViewport, setViewport } = useReactFlow();
@@ -11,7 +11,7 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
     const [isHovered, setIsHovered] = useState(false);
     const [bounceAnimate, setBounceAnimate] = useState(false);
     const prevSelectedRef = useRef(selected);
-    const editStartRef = useRef<number | null>(data.isEditing ? Date.now() : null);
+    const editStartRef = useRef<number | null>(null);
     const contentRef = useRef<HTMLDivElement>(null);
 
     // Node Update Helper
@@ -31,11 +31,16 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
     // Bounce Animation on Select
     useEffect(() => {
         if (selected && !prevSelectedRef.current) {
-            setBounceAnimate(true);
-            const timer = setTimeout(() => setBounceAnimate(false), 300);
-            return () => clearTimeout(timer);
+            const startTimer = setTimeout(() => setBounceAnimate(true), 0);
+            const stopTimer = setTimeout(() => setBounceAnimate(false), 300);
+            prevSelectedRef.current = selected;
+            return () => {
+                clearTimeout(startTimer);
+                clearTimeout(stopTimer);
+            };
         }
         prevSelectedRef.current = selected;
+        return undefined;
     }, [selected]);
 
     // Auto-expand Text Bounds

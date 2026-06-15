@@ -1,16 +1,17 @@
 import React, { memo } from 'react';
-import { Handle, Position, NodeProps, NodeResizer, Node, NodeToolbar, useStore } from '@xyflow/react';
+import { Handle, Position, NodeProps, NodeResizer, Node, useStore } from '@xyflow/react';
 import { FlowchartNodeGraphics } from './renderers/FlowchartNodeGraphics';
 import { useFlowchartNodeInteractions } from './hooks/useFlowchartNodeInteractions';
-import { useFlowchartNodeStyleResolution, DOMAIN_CLASSES } from './hooks/useFlowchartNodeStyleResolution';
+import { useFlowchartNodeStyleResolution } from './hooks/useFlowchartNodeStyleResolution';
 import { EditableLabel } from '../diagrams/EditableLabel';
-import type { FlowchartNodeData } from './FlowchartNode';
-import { FaTrash, FaCopy, FaChevronUp, FaChevronRight, FaChevronDown, FaChevronLeft } from 'react-icons/fa';
+import type { FlowchartNodeData } from './hooks/useFlowchartNodeStyleResolution';
+import { FaChevronUp, FaChevronRight, FaChevronDown, FaChevronLeft } from 'react-icons/fa';
+import { sanitizeInlineHtml } from '../../utils/sanitizeHtml';
 import './FlowchartNode.css';
 
-export interface FlowchartNodeProps extends NodeProps<Node<FlowchartNodeData>> { }
+export type FlowchartNodeProps = NodeProps<Node<FlowchartNodeData>>;
 
-const FlowchartNode = ({ data, selected, id, dragging }: FlowchartNodeProps) => {
+const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
     const _isConnecting = useStore((s) => s.connection.inProgress);
     const nodeData = useStore((s: any) => s.nodeLookup?.get(id) || s.nodeInternals?.get(id));
 
@@ -96,11 +97,12 @@ const FlowchartNode = ({ data, selected, id, dragging }: FlowchartNodeProps) => 
             >
                 {(() => {
                     const raw = data.description || data.label || '';
+                    const safeRaw = sanitizeInlineHtml(raw);
 
                     if (data.isEditing) {
                         return (
                             <EditableLabel
-                                value={raw}
+                                value={safeRaw}
                                 onChange={(val) => {
                                     handleUpdateData({ label: val, description: undefined, isEditing: false });
                                 }}
@@ -131,9 +133,9 @@ const FlowchartNode = ({ data, selected, id, dragging }: FlowchartNodeProps) => 
                         );
                     }
 
-                    const lines = raw.includes('<br')
-                        ? raw.split(/<br\s*\/?>/i)
-                        : raw.split('\n');
+                    const lines = safeRaw.includes('<br')
+                        ? safeRaw.split(/<br\s*\/?>/i)
+                        : safeRaw.split('\n');
                     const titleLine = lines[0]?.trim() || '';
                     const bodyLines = lines.slice(1).filter((l: string) => l.trim());
 

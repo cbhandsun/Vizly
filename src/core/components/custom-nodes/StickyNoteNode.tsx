@@ -1,6 +1,6 @@
 import React, { memo, useRef, useEffect } from 'react';
-import { NodeProps, Node, NodeToolbar } from '@xyflow/react';
-import { useNodeUpdate } from '../diagrams/NodeUpdateContext';
+import { NodeProps, Node } from '@xyflow/react';
+import { useNodeUpdate } from '../diagrams/useNodeUpdate';
 import { useDiagramStylePreset_v2 } from '../../hooks/useDiagramStylePreset_v2';
 import './StickyNoteNode.css';
 
@@ -41,8 +41,6 @@ const StickyNoteNode: React.FC<NodeProps<Node<StickyNoteData, 'sticky-note'>>> =
         const newLabel = e.target.value;
         if (onUpdateNodeData) {
             onUpdateNodeData([id], { data: { ...data, label: newLabel } });
-        } else {
-            data.label = newLabel;
         }
         
         // Auto-resize textarea height
@@ -74,12 +72,6 @@ const StickyNoteNode: React.FC<NodeProps<Node<StickyNoteData, 'sticky-note'>>> =
         }
         // Don't swallow enter so people can type multiple lines
         e.stopPropagation(); 
-    };
-
-    const changeColor = (color: keyof typeof colorMap) => {
-        if (onUpdateNodeData) {
-            onUpdateNodeData([id], { data: { ...data, noteColor: color } });
-        }
     };
 
     const bgColor = colorMap[(data.noteColor || 'yellow') as keyof typeof colorMap] || colorMap.yellow;

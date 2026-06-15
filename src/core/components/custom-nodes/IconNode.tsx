@@ -11,7 +11,7 @@ export interface IconNodeData {
     locked?: boolean;
 }
 
-export interface IconNodeProps extends NodeProps<Node<IconNodeData>> { }
+export type IconNodeProps = NodeProps<Node<IconNodeData>>;
 
 const IconNode = ({ data, selected, id }: IconNodeProps) => {
     const nodeData = useStore((s: any) => s.nodeLookup?.get(id) || s.nodeInternals?.get(id));

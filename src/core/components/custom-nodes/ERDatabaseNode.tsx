@@ -18,7 +18,7 @@ export interface ERDatabaseNodeData {
     [key: string]: unknown;
 }
 
-const ERDatabaseNode: React.FC<NodeProps<Node<ERDatabaseNodeData>>> = ({ id, data, selected }) => {
+const ERDatabaseNode: React.FC<NodeProps<Node<ERDatabaseNodeData>>> = ({ data, selected }) => {
     const { tableName, columns = [], themeColor = '#10b981' } = data;
 
     return (

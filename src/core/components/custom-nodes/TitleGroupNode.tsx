@@ -1,36 +1,39 @@
-// @ts-nocheck
-import React from 'react';
-import { Handle, Position, NodeProps, NodeResizer } from '@xyflow/react';
+import React, { type CSSProperties } from 'react';
+import { Handle, Position, NodeResizer, type Node, type NodeProps } from '@xyflow/react';
 import { useTheme } from '../../themes/useCoreTheme';
-import { makeSoftTintGradient } from '../../utils/colorUtils';
 import { resolveThemeDomainKey, getDomainTheme } from '../../utils/domainKey';
-import { Theme } from '../../themes/types/ThemeTypes';
+import type { Theme } from '../../themes/types/ThemeTypes';
 import { ensureReadableText } from '../../utils/colorUtils';
 import { useDiagramStylePreset_v2 } from '../../hooks/useDiagramStylePreset_v2';
 import { useContainerNode } from './useContainerNode';
+import { sanitizeInlineHtml, sanitizeSvgMarkup } from '../../utils/sanitizeHtml';
 import './TitleGroupNode.css';
 
-interface TitleGroupNodeData {
+type TitleGroupStyle = CSSProperties & {
+  strokeDasharray?: string | number;
+};
+
+interface TitleGroupNodeData extends Record<string, unknown> {
   label?: string;
   description?: string;
-  themeColor: string;
-  titleBarHeight: number;
-  baseZIndex: number;
+  themeColor?: string;
+  titleBarHeight?: number;
+  baseZIndex?: number;
   iconSvg?: string;
   subtitle?: string;
   collapsed?: boolean;  // 🆕 节点树折叠状态
   childIds?: string[];  // 🆕 子节点ID列表
   isLane?: boolean;     // 🆕 是否作为泳道分栏
+  hidden?: boolean;
+  isDropTarget?: boolean;
+  domainClass?: string;
+  domain?: string;
+  style?: TitleGroupStyle;
 }
 
-interface TitleGroupNodeProps extends Partial<NodeProps<any>> {
-  id?: string;  // 🆕 节点ID（用于更新状态）
-  data: any;
-  width?: number;
-  height?: number;
-}
+type TitleGroupCssProperties = CSSProperties & Record<`--${string}`, string>;
 
-const TitleGroupNode = React.memo(({ id, data, width = 200, height = 120, selected }: TitleGroupNodeProps & { selected?: boolean }) => {
+const TitleGroupNode = React.memo(({ id, data, selected }: NodeProps<Node<TitleGroupNodeData>>) => {
   const [theme] = useTheme({ autoInitialize: true });
   const preset = useDiagramStylePreset_v2();
 
@@ -46,7 +49,7 @@ const TitleGroupNode = React.memo(({ id, data, width = 200, height = 120, select
     syncLabel: true,
   });
 
-  const domainKey = resolveThemeDomainKey(theme as Theme, {
+  const domainKey = resolveThemeDomainKey(theme as Theme | undefined, {
     domainClass: data?.domainClass,
     domain: data?.domain,
     description: data?.description
@@ -70,6 +73,7 @@ const TitleGroupNode = React.memo(({ id, data, width = 200, height = 120, select
   const displayTitle = (typeof rawTitle === 'string' && rawTitle.trim().length > 0)
     ? rawTitle
     : (chineseTitleMapping[domainKey] || String(domainKey || ''));
+  const safeDisplayTitle = sanitizeInlineHtml(displayTitle);
 
   const domainTheme = theme ? getDomainTheme(theme, { domainClass: data?.domainClass, domain: domainKey }) : null;
   const themeColor = data.themeColor || domainTheme?.main || '#4A90E2';
@@ -99,7 +103,7 @@ const TitleGroupNode = React.memo(({ id, data, width = 200, height = 120, select
     : 'linear-gradient(to bottom, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.25))';
 
   // CSS Variables
-  const nodeStyle = {
+  const nodeStyle: TitleGroupCssProperties = {
     '--group-theme-color': themeColor,
     '--group-border-color': borderColor,
     '--group-text-color': textColor,
@@ -115,7 +119,7 @@ const TitleGroupNode = React.memo(({ id, data, width = 200, height = 120, select
     // isLane: 移除阴影
     boxShadow: data.isLane ? 'none' : undefined,
     zIndex: baseZIndex,
-  } as React.CSSProperties;
+  };
 
   const renderDebugOverlay = () => {
     if (!debugEnabled) return null;
@@ -151,7 +155,7 @@ const TitleGroupNode = React.memo(({ id, data, width = 200, height = 120, select
         {data.iconSvg && (
           <div
             className="title-group-icon"
-            dangerouslySetInnerHTML={{ __html: data.iconSvg }}
+            dangerouslySetInnerHTML={{ __html: sanitizeSvgMarkup(data.iconSvg) }}
           />
         )}
 
@@ -172,9 +176,9 @@ const TitleGroupNode = React.memo(({ id, data, width = 200, height = 120, select
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
-              /<[^>]+>/.test(displayTitle)
-                ? <span dangerouslySetInnerHTML={{ __html: displayTitle }} />
-                : <span>{displayTitle}</span>
+              /<[^>]+>/.test(safeDisplayTitle)
+                ? <span dangerouslySetInnerHTML={{ __html: safeDisplayTitle }} />
+                : <span>{safeDisplayTitle}</span>
             )}
           </div>
           {data.subtitle && (

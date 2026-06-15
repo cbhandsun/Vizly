@@ -1,13 +1,13 @@
-// @ts-nocheck
-import { memo, useEffect, useState } from 'react';
-import { Handle, Position, NodeProps, NodeResizer, useReactFlow } from '@xyflow/react';
-import { GroupNodeData } from '../../models/DiagramModels';
+import { memo, type CSSProperties } from 'react';
+import { Handle, Position, NodeResizer, type Node, type NodeProps } from '@xyflow/react';
+import type { GroupNodeData } from '../../models/DiagramModels';
 import { useTheme } from '../../themes/useCoreTheme';
 import { resolveThemeDomainKey, getDomainTheme } from '../../utils/domainKey';
 import { hexToRgba } from '../shared/layoutUtils';
-import { Theme, ThemeColor } from '../../themes/types/ThemeTypes';
+import type { Theme, ThemeColor } from '../../themes/types/ThemeTypes';
 import { useDiagramStylePreset_v2 } from '../../hooks/useDiagramStylePreset_v2';
 import { useContainerNode } from './useContainerNode';
+import { sanitizeInlineHtml } from '../../utils/sanitizeHtml';
 import './SubGroupNode.css';
 
 // 形状渲染回撤：不再使用 ShapeRenderer，仅保留矩形容器
@@ -27,10 +27,25 @@ import './SubGroupNode.css';
  * 问题背景：原实现使用 getConfigIntegration 获取 ThemeManager 引用，但未订阅主题变化，导致切换主题时子域容器样式不更新。
  * 解决方案：改为使用 useConfigIntegration Hook，以订阅集成状态（含主题）变化，保证主题切换触发组件重渲染。
  */
-const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<GroupNodeData>) => {
+type SubGroupStyle = CSSProperties & {
+  bgAlpha?: number;
+};
+
+type SubGroupNodeData = GroupNodeData & {
+  hidden?: boolean;
+  collapsed?: boolean;
+  isDropTarget?: boolean;
+  theme?: Theme;
+  themeColor?: string;
+  border?: string;
+  borderWidth?: number;
+  domainClass?: string;
+  style?: SubGroupStyle;
+};
+
+const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<Node<SubGroupNodeData>>) => {
   // 订阅配置与主题变化 - 使用全新的引擎内置 useTheme 钩子
   const [currentTheme] = useTheme();
-  const { setNodes } = useReactFlow();
 
   const {
     isEditingTitle, editValue, setEditValue, inputRef,
@@ -77,7 +92,7 @@ const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<G
   const isSvgShape = false;
 
   // Destructure style safely
-  const { backgroundColor: _bgIgnored, background: _bgIgnored2, ...styleRest } = (style || {}) as React.CSSProperties;
+  const { backgroundColor: _bgIgnored, background: _bgIgnored2, ...styleRest } = style || {};
 
   const borderStyleValue = border || preset?.subdomain?.borderStyle || 'dashed';
   const borderWidthValue = borderWidth || preset?.subdomain?.borderWidth || 1;
@@ -99,7 +114,7 @@ const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<G
    */
   const getTitleContent = () => {
     const text = typeof description === 'string' && description.trim().length > 0
-      ? description
+      ? sanitizeInlineHtml(description)
       : '';
     const hasHtml = /<[^>]+>/.test(text);
     return hasHtml
@@ -109,7 +124,7 @@ const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<G
 
   return (
     <div
-      className={`sub-group-node ${selected ? 'selected' : ''} ${(data as { hidden?: boolean }).hidden ? 'hidden' : ''} ${preset?.name === 'glass' ? 'glass' : ''} ${preset?.name === 'blueprint' ? 'blueprint' : ''} ${data.isDropTarget ? 'drop-target' : ''}`}
+      className={`sub-group-node ${selected ? 'selected' : ''} ${data.hidden ? 'hidden' : ''} ${preset?.name === 'glass' ? 'glass' : ''} ${preset?.name === 'blueprint' ? 'blueprint' : ''} ${data.isDropTarget ? 'drop-target' : ''}`}
       style={{
         zIndex,
         width: '100%',

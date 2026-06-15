@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useReactFlow } from '@xyflow/react';
-import { useNodeUpdate } from '../../diagrams/NodeUpdateContext';
+import { useNodeUpdate } from '../../diagrams/useNodeUpdate';
 
 export interface UseCustomNodeInteractionsProps {
     id: string;
@@ -21,7 +21,8 @@ export const useCustomNodeInteractions = ({
 
     // Sync external description changes into local editing text
     useEffect(() => {
-        setEditText(String(data?.description ?? ''));
+        const timer = setTimeout(() => setEditText(String(data?.description ?? '')), 0);
+        return () => clearTimeout(timer);
     }, [data?.description]);
 
     const handleDoubleClick = useCallback((e: React.MouseEvent) => {

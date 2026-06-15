@@ -52,7 +52,8 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
   const [editText, setEditText] = useState(String(data?.label ?? ''));
 
   useEffect(() => {
-    setEditText(String(data?.label ?? ''));
+    const timer = setTimeout(() => setEditText(String(data?.label ?? '')), 0);
+    return () => clearTimeout(timer);
   }, [data?.label]);
 
   const handleLabelDoubleClick = (e: React.MouseEvent) => {
@@ -71,9 +72,9 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
 
   const pathType = (data?.pathType || 'bezier') as CustomEdgeData['pathType'];
 
-  let edgePath = '';
-  let labelX = 0;
-  let labelY = 0;
+  let edgePath: string;
+  let labelX: number;
+  let labelY: number;
 
   // 根据路径类型生成不同的路径
   switch (pathType) {

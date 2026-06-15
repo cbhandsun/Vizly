@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { getDomainTheme, resolveThemeDomainKey } from '../../../utils/domainKey';
-import { pickReadableTextColor, ensureReadableText } from '../../../utils/colorUtils';
+import { ensureReadableText } from '../../../utils/colorUtils';
 import { diagramConfigManager } from '../../config/DiagramConfig';
 import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v2';
 
@@ -415,7 +415,6 @@ export const useCustomNodeStyleResolution = ({
         // label 关键词推断（兜底）
         const label = String(d?.description || d?.label || '');
         return inferIconFromLabel(label);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [d?.icon, d?.domainClass, d?.description, d?.label]);
 
     return {

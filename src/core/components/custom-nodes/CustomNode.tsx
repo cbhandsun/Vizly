@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NodeProps, Node } from '@xyflow/react';
+import { NodeProps } from '@xyflow/react';
 import { useCustomNodeInteractions } from './hooks/useCustomNodeInteractions';
 import { useCustomNodeStyleResolution } from './hooks/useCustomNodeStyleResolution';
 import { CustomNodeGraphics } from './renderers/CustomNodeGraphics';
@@ -11,7 +11,7 @@ export interface CustomNodeProps extends Partial<NodeProps<any>> {
     height?: number;
 }
 
-const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, id, width: propsWidth, height: propsHeight }) => {
+const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, id, width: propsWidth }) => {
     const [hovered, setHovered] = useState(false);
 
     // Domain Controllers
