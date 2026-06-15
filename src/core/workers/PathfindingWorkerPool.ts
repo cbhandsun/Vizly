@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Pathfinding Worker Pool
  * 
@@ -25,6 +24,33 @@ export interface PoolStats {
 
 // Global counter for uniqueness
 let fileIdCounter = 0;
+const WORKER_TASK_TIMEOUT_MS = 10000;
+
+const hasFiniteEndpoint = (job: PathFindingJob): boolean =>
+    Number.isFinite(job.sourceX) &&
+    Number.isFinite(job.sourceY) &&
+    Number.isFinite(job.targetX) &&
+    Number.isFinite(job.targetY);
+
+const createFallbackResult = (job: PathFindingJob, error?: string): PathFindingResult => {
+    const sourceX = Number.isFinite(job.sourceX) ? job.sourceX : 0;
+    const sourceY = Number.isFinite(job.sourceY) ? job.sourceY : 0;
+    const targetX = Number.isFinite(job.targetX) ? job.targetX : sourceX;
+    const targetY = Number.isFinite(job.targetY) ? job.targetY : sourceY;
+
+    return {
+        jobId: job.jobId,
+        edgeId: job.edgeId,
+        path: `M ${sourceX},${sourceY} L ${targetX},${targetY}`,
+        points: [
+            { x: sourceX, y: sourceY },
+            { x: targetX, y: targetY },
+        ],
+        labelX: (sourceX + targetX) / 2,
+        labelY: (sourceY + targetY) / 2,
+        error,
+    };
+};
 
 export class PathfindingWorkerPool {
     private workers: Worker[] = [];
@@ -155,11 +181,26 @@ export class PathfindingWorkerPool {
         onProgress?: (completed: number, total: number) => void
     ): Promise<PathFindingResult[]> {
         if (jobs.length === 0) return [];
+        const results: PathFindingResult[] = new Array(jobs.length);
+        const validJobs: PathFindingJob[] = [];
+
+        jobs.forEach((job, index) => {
+            if (!job.edgeId || !hasFiniteEndpoint(job)) {
+                results[index] = createFallbackResult(job, 'Invalid pathfinding job');
+                return;
+            }
+            validJobs.push(job);
+        });
+
+        if (validJobs.length === 0) {
+            onProgress?.(jobs.length, jobs.length);
+            return results;
+        }
+
         this.ensurePoolSizeForJobs(jobs.length);
 
-        const groups = this.groupJobs(jobs, graph);
-        const results: PathFindingResult[] = new Array(jobs.length);
-        let completedCount = 0;
+        const groups = this.groupJobs(validJobs, graph);
+        let completedCount = jobs.length - validJobs.length;
 
         // [OPT-P1⑤] Pre-build O(1) lookup index — avoids O(N²) findIndex inside forEach
         const idToIdx = new Map<string, number>();
@@ -221,12 +262,12 @@ export class PathfindingWorkerPool {
         return new Promise((resolve, reject) => {
             // [FIX] Fallback timeout to prevent indefinite hanging if worker silently dies
             const timeoutId = setTimeout(() => {
-                console.error(`[DEBUG-WORKER-POOL] Worker ${workerIndex} batch execution timed out (>10s).`);
+                console.warn(`[WorkerPool] Worker ${workerIndex} batch execution timed out after ${WORKER_TASK_TIMEOUT_MS / 1000}s; falling back to serial routing for ${payload.jobs.length} job(s).`);
                 worker.removeEventListener('message', messageHandler);
                 worker.removeEventListener('error', errorHandler);
                 this.releaseWorker(workerIndex);
                 reject(new Error(`Worker ${workerIndex} Batch Timeout (silently failed or stuck).`));
-            }, 10000);
+            }, WORKER_TASK_TIMEOUT_MS);
 
             const messageHandler = (event: MessageEvent) => {
                 const data = event.data;
@@ -286,8 +327,28 @@ export class PathfindingWorkerPool {
         const startTime = performance.now();
 
         return new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+                worker.removeEventListener('message', messageHandler);
+                worker.removeEventListener('error', errorHandler);
+                this.releaseWorker(workerIndex);
+                reject(new Error(`Worker ${workerIndex} path calculation timed out.`));
+            }, WORKER_TASK_TIMEOUT_MS);
+
             const messageHandler = (event: MessageEvent) => {
-                if (event.data.type === 'PATH_RESULT') {
+                const data = event.data;
+                if (data?.error) {
+                    clearTimeout(timeoutId);
+                    this.totalTaskTime += (performance.now() - startTime);
+                    worker.removeEventListener('message', messageHandler);
+                    worker.removeEventListener('error', errorHandler);
+                    this.releaseWorker(workerIndex);
+                    reject(new Error(String(data.error)));
+                    return;
+                }
+
+                const result = data?.type === 'PATH_RESULT' ? data.result : data;
+                if (result?.edgeId && result?.path) {
+                    clearTimeout(timeoutId);
                     this.totalTaskTime += (performance.now() - startTime);
                     this.completedTasks++;
 
@@ -295,11 +356,12 @@ export class PathfindingWorkerPool {
                     worker.removeEventListener('error', errorHandler);
                     this.releaseWorker(workerIndex);
 
-                    resolve(event.data.result);
+                    resolve(result);
                 }
             };
 
             const errorHandler = (error: ErrorEvent) => {
+                clearTimeout(timeoutId);
                 worker.removeEventListener('message', messageHandler);
                 worker.removeEventListener('error', errorHandler);
                 this.releaseWorker(workerIndex);
@@ -309,11 +371,19 @@ export class PathfindingWorkerPool {
             worker.addEventListener('message', messageHandler);
             worker.addEventListener('error', errorHandler);
 
-            worker.postMessage({
-                type: 'CALCULATE_PATH',
-                job,
-                graph
-            });
+            try {
+                worker.postMessage({
+                    type: 'CALCULATE_PATH',
+                    job,
+                    graph
+                });
+            } catch (error) {
+                clearTimeout(timeoutId);
+                worker.removeEventListener('message', messageHandler);
+                worker.removeEventListener('error', errorHandler);
+                this.releaseWorker(workerIndex);
+                reject(error);
+            }
         });
     }
 

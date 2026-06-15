@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Worker 池管理器 (性能优化)
  * 
@@ -40,6 +39,21 @@ interface PoolWorker {
     worker: Worker;
     busy: boolean;
     jobs: Map<string, WorkerJob>;
+}
+
+interface WorkerBatchResultItem {
+    jobId?: unknown;
+    result?: PathFindingResult;
+    error?: unknown;
+}
+
+interface WorkerMessagePayload {
+    batchId?: unknown;
+    results?: unknown;
+    error?: unknown;
+    jobId?: unknown;
+    path?: unknown;
+    result?: PathFindingResult;
 }
 
 /**
@@ -106,66 +120,7 @@ class WorkerPool {
                 };
 
                 worker.onmessage = (e: MessageEvent) => {
-                    // [NEW] Handle Batch Result
-                    const data = e.data as {
-                        batchId?: string;
-                        results?: Array<{ jobId?: string; result?: PathFindingResult; error?: string }>;
-                        error?: string;
-                        jobId?: string;
-                        path?: unknown;
-                        result?: PathFindingResult;
-                    };
-                    const { batchId, results, error } = data;
-
-                    if (batchId && poolWorker.jobs.has(batchId)) {
-                        const batchJob = poolWorker.jobs.get(batchId);
-                        if (!batchJob) return;
-
-                        if (error) {
-                            // Batch failed
-                            for (const sub of batchJob.subJobs.values()) {
-                                sub.reject(new Error(error));
-                            }
-                        } else if (results && Array.isArray(results)) {
-                            // Success
-                            results.forEach((res) => {
-                                const jobId = res.jobId;
-                                if (!jobId) return;
-                                const sub = batchJob.subJobs.get(jobId);
-                                if (sub) {
-                                    if (res.error) sub.reject(new Error(res.error));
-                                    else if (res.result) sub.resolve(res.result);
-                                    else sub.reject(new Error('Worker returned empty result'));
-                                    batchJob.subJobs.delete(jobId);
-                                }
-                            });
-                            // Reject any that weren't returned (shouldn't happen)
-                            for (const sub of batchJob.subJobs.values()) {
-                                sub.reject(new Error("Worker dropped job"));
-                            }
-                        }
-
-                        poolWorker.jobs.delete(batchId);
-                    }
-                    else if (data.jobId && poolWorker.jobs.has(data.jobId)) {
-                        // [LEGACY] Single Job Handling (mapped to Batch-of-1)
-                        const legacyJobId = data.jobId;
-                        const job = poolWorker.jobs.get(legacyJobId);
-                        if (!job) return;
-                        const sub = job.subJobs.get(legacyJobId);
-
-                        if (sub) {
-                            if (data.error) sub.reject(new Error(data.error));
-                            else if (data.path) sub.resolve(data as PathFindingResult);
-                            else if (data.result) sub.resolve(data.result);
-                            else sub.reject(new Error('Worker returned empty result'));
-                        }
-                        poolWorker.jobs.delete(legacyJobId);
-                    }
-
-                    // 标记为非繁忙并处理队列
-                    poolWorker.busy = false;
-                    this.processQueue(); // Keep checking buffer
+                    this.handleWorkerMessage(poolWorker, e);
                 };
 
                 worker.onerror = (err) => {
@@ -213,6 +168,87 @@ class WorkerPool {
         return key;
     }
 
+    private isWorkerMessagePayload(value: unknown): value is WorkerMessagePayload {
+        return !!value && typeof value === 'object' && !Array.isArray(value);
+    }
+
+    private getWorkerErrorMessage(error: unknown, fallback: string): string {
+        return typeof error === 'string' && error.trim() ? error : fallback;
+    }
+
+    private rejectBatchJob(job: WorkerJob, message: string): void {
+        for (const sub of job.subJobs.values()) {
+            sub.reject(new Error(message));
+        }
+        job.subJobs.clear();
+    }
+
+    private handleWorkerMessage(poolWorker: PoolWorker, e: MessageEvent): void {
+        const data = e.data;
+        if (!this.isWorkerMessagePayload(data)) {
+            console.warn('[WorkerPool] Ignoring malformed worker message');
+            return;
+        }
+
+        let handled = false;
+        const batchId = typeof data.batchId === 'string' ? data.batchId : null;
+        const legacyJobId = typeof data.jobId === 'string' ? data.jobId : null;
+
+        if (batchId && poolWorker.jobs.has(batchId)) {
+            handled = true;
+            const batchJob = poolWorker.jobs.get(batchId);
+            if (!batchJob) return;
+
+            if (data.error !== undefined) {
+                this.rejectBatchJob(batchJob, this.getWorkerErrorMessage(data.error, 'Worker batch failed'));
+            } else if (Array.isArray(data.results)) {
+                data.results.forEach((res: WorkerBatchResultItem) => {
+                    const jobId = typeof res?.jobId === 'string' ? res.jobId : null;
+                    if (!jobId) return;
+                    const sub = batchJob.subJobs.get(jobId);
+                    if (sub) {
+                        if (res.error !== undefined) sub.reject(new Error(this.getWorkerErrorMessage(res.error, 'Worker job failed')));
+                        else if (res.result) sub.resolve(res.result);
+                        else sub.reject(new Error('Worker returned empty result'));
+                        batchJob.subJobs.delete(jobId);
+                    }
+                });
+
+                for (const sub of batchJob.subJobs.values()) {
+                    sub.reject(new Error('Worker dropped job'));
+                }
+                batchJob.subJobs.clear();
+            } else {
+                this.rejectBatchJob(batchJob, 'Worker returned malformed batch result');
+            }
+
+            poolWorker.jobs.delete(batchId);
+        }
+        else if (legacyJobId && poolWorker.jobs.has(legacyJobId)) {
+            handled = true;
+            const job = poolWorker.jobs.get(legacyJobId);
+            if (!job) return;
+            const sub = job.subJobs.get(legacyJobId);
+
+            if (sub) {
+                if (data.error !== undefined) sub.reject(new Error(this.getWorkerErrorMessage(data.error, 'Worker job failed')));
+                else if (data.path) sub.resolve(data as PathFindingResult);
+                else if (data.result) sub.resolve(data.result);
+                else sub.reject(new Error('Worker returned empty result'));
+            }
+            job.subJobs.clear();
+            poolWorker.jobs.delete(legacyJobId);
+        }
+
+        if (!handled) {
+            console.warn('[WorkerPool] Ignoring worker message for unknown job');
+            return;
+        }
+
+        poolWorker.busy = false;
+        this.processQueue();
+    }
+
     private getPendingCount(): number {
         let total = 0;
         for (const buffer of this.pendingRequestBuffers.values()) {
@@ -238,60 +274,7 @@ class WorkerPool {
 
             // Setup handlers (same as initPool)
             worker.onmessage = (e: MessageEvent) => {
-                const data = e.data as {
-                    batchId?: string;
-                    results?: Array<{ jobId?: string; result?: PathFindingResult; error?: string }>;
-                    error?: string;
-                    jobId?: string;
-                    path?: unknown;
-                    result?: PathFindingResult;
-                };
-                const { batchId, results, error } = data;
-
-                if (batchId && poolWorker.jobs.has(batchId)) {
-                    const batchJob = poolWorker.jobs.get(batchId);
-                    if (!batchJob) return;
-
-                    if (error) {
-                        for (const sub of batchJob.subJobs.values()) {
-                            sub.reject(new Error(error));
-                        }
-                    } else if (results && Array.isArray(results)) {
-                        results.forEach((res) => {
-                            const jobId = res.jobId;
-                            if (!jobId) return;
-                            const sub = batchJob.subJobs.get(jobId);
-                            if (sub) {
-                                if (res.error) sub.reject(new Error(res.error));
-                                else if (res.result) sub.resolve(res.result);
-                                else sub.reject(new Error('Worker returned empty result'));
-                                batchJob.subJobs.delete(jobId);
-                            }
-                        });
-                        for (const sub of batchJob.subJobs.values()) {
-                            sub.reject(new Error("Worker dropped job"));
-                        }
-                    }
-
-                    poolWorker.jobs.delete(batchId);
-                }
-                else if (data.jobId && poolWorker.jobs.has(data.jobId)) {
-                    const legacyJobId = data.jobId;
-                    const job = poolWorker.jobs.get(legacyJobId);
-                    if (!job) return;
-                    const sub = job.subJobs.get(legacyJobId);
-
-                    if (sub) {
-                        if (data.error) sub.reject(new Error(data.error));
-                        else if (data.path) sub.resolve(data as PathFindingResult);
-                        else if (data.result) sub.resolve(data.result);
-                        else sub.reject(new Error('Worker returned empty result'));
-                    }
-                    poolWorker.jobs.delete(legacyJobId);
-                }
-
-                poolWorker.busy = false;
-                this.processQueue();
+                this.handleWorkerMessage(poolWorker, e);
             };
 
             worker.onerror = (err) => {
