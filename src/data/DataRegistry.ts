@@ -6,7 +6,7 @@
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import { DataService } from '../services/DataService';
 import { localDB } from '../services/IndexedDBStorage';
-import { supabase } from '../services/supabase';
+import { parseRemoteDiagramContent } from '../services/remoteDiagramContent';
 
 // 导入标准化数据
 import enterpriseArchitectureData from './standardized/ArchitectureStandardData.json';
@@ -20,6 +20,45 @@ import wmsOrderToTaskFlowData from './standardized/WmsOrderToTaskFlowData.json';
 import wmsProcessFlowData from './standardized/WmsProcessFlowStandardData.json';
 import demandAllocationData from './standardized/DeamndAllocation.json';
 import blankCanvasStandardData from './standardized/BlankCanvasStandardData.json';
+
+let supabaseModulePromise: Promise<typeof import('../services/supabase')> | null = null;
+
+const shouldLoadRemoteTemplatesOnStartup = () => {
+  return import.meta.env.VITE_ENABLE_REMOTE_TEMPLATES_ON_STARTUP === 'true';
+};
+
+const loadSupabaseClient = async () => {
+  if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+    return null;
+  }
+  supabaseModulePromise ??= import('../services/supabase');
+  const { supabase } = await supabaseModulePromise;
+  return supabase;
+};
+
+export const normalizeLocalDiagramForRegistry = (
+  localDiagram: unknown,
+  builtInDiagram?: StandardDiagramData
+): StandardDiagramData => {
+  const raw = (localDiagram && typeof localDiagram === 'object') ? localDiagram as Record<string, unknown> : {};
+  const builtInLayout = (builtInDiagram as any)?.layout || {};
+  const localLayout = (raw.layout && typeof raw.layout === 'object') ? raw.layout as Record<string, unknown> : {};
+  const merged = builtInDiagram
+    ? {
+        ...raw,
+        id: raw.id || builtInDiagram.id,
+        layout: {
+          ...builtInLayout,
+          ...localLayout,
+        },
+      }
+    : raw;
+
+  return parseRemoteDiagramContent(merged, {
+    id: String((merged as any).id || builtInDiagram?.id || 'local-diagram'),
+    title: String((merged as any).name || (merged as any).metadata?.title || builtInDiagram?.name || 'Local Diagram'),
+  }) as StandardDiagramData;
+};
 
 /**
  * 数据注册中心类
@@ -120,6 +159,9 @@ export class DataRegistry {
    * 支持通过云端配置下发新的行业模板，而无需修改本地代码
    */
   private async loadRemoteTemplates(): Promise<boolean> {
+      if (!shouldLoadRemoteTemplatesOnStartup()) return false;
+
+      const supabase = await loadSupabaseClient();
       if (!supabase) return false;
       
       try {
@@ -127,7 +169,7 @@ export class DataRegistry {
           // 表结构预期: id, title, content (JSON), is_active
           const { data, error } = await supabase
               .from('system_templates')
-              .select('content')
+              .select('id, title, content')
               .eq('is_active', true);
               
           if (error) {
@@ -137,15 +179,22 @@ export class DataRegistry {
           
           if (data && data.length > 0) {
               for (const row of data) {
-                  if (row.content && typeof row.content === 'object') {
-                      this.dataService.registerDiagram(row.content as StandardDiagramData, false);
+                  if (!row.content) continue;
+                  try {
+                      const diagram = parseRemoteDiagramContent(row.content, {
+                          id: row.id || 'remote-template',
+                          title: row.title || row.id || 'Remote Template',
+                      }) as StandardDiagramData;
+                      this.dataService.registerDiagram(diagram, false);
+                  } catch (_templateError) {
+                      console.warn('[DataRegistry] Skipped invalid remote template content.');
                   }
               }
               console.log(`[DataRegistry] Loaded ${data.length} remote templates from cloud.`);
               return true;
           }
           return false;
-      } catch (err) {
+      } catch (_err) {
           console.warn('[DataRegistry] Failed to fetch remote templates, falling back to local static JSONs.');
           return false;
       }
@@ -158,30 +207,18 @@ export class DataRegistry {
       try {
           const localDiagrams = await localDB.listDiagrams();
           for (const diagram of localDiagrams) {
-              const builtIn = this.builtInDiagrams.get(diagram.id);
-              const normalizedDiagram = builtIn ? this.mergeBuiltInLayoutDefaults(diagram, builtIn) : diagram;
-              // 注册到内存，但不重复写入 IndexedDB
-              this.dataService.registerDiagram(normalizedDiagram as StandardDiagramData, false);
+              try {
+                  const builtIn = this.builtInDiagrams.get(diagram.id);
+                  const normalizedDiagram = normalizeLocalDiagramForRegistry(diagram, builtIn);
+                  // 注册到内存，但不重复写入 IndexedDB
+                  this.dataService.registerDiagram(normalizedDiagram, false);
+              } catch (_diagramError) {
+                  console.warn('[DataRegistry] Skipped invalid local diagram from IndexedDB.');
+              }
           }
       } catch (err) {
           console.error('Failed to load local diagrams from IndexedDB', err);
       }
-  }
-
-  /**
-   * 对同 ID 的内置模板本地副本补齐新增 layout 默认值。
-   * 仅填补缺失字段，保留用户本地节点、边和已有布局选择。
-   */
-  private mergeBuiltInLayoutDefaults(localDiagram: any, builtInDiagram: StandardDiagramData): StandardDiagramData {
-      const builtInLayout = (builtInDiagram as any).layout || {};
-      const localLayout = localDiagram.layout || {};
-      return {
-          ...localDiagram,
-          layout: {
-              ...builtInLayout,
-              ...localLayout,
-          }
-      } as StandardDiagramData;
   }
 
   /**

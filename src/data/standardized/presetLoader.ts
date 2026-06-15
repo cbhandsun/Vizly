@@ -1,9 +1,10 @@
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
+import { resolvePresetKey, type StandardPresetKey } from './presetMetadata';
 
 type PresetModule = { default: StandardDiagramData };
 type PresetLoader = () => Promise<PresetModule>;
 
-const PRESET_LOADERS: Record<string, PresetLoader> = {
+const PRESET_LOADERS: Record<StandardPresetKey, PresetLoader> = {
   ArchitectureStandardData: () => import('./ArchitectureStandardData.json'),
   BlankCanvasStandardData: () => import('./BlankCanvasStandardData.json'),
   DeamndAllocation: () => import('./DeamndAllocation.json'),
@@ -17,18 +18,11 @@ const PRESET_LOADERS: Record<string, PresetLoader> = {
   WmsStandardData: () => import('./WmsStandardData.json'),
 };
 
-const PRESET_ID_ALIASES: Record<string, string> = {
-  'enterprise-architecture': 'ArchitectureStandardData',
-  'logistics-planning': 'LogisticsPlanningStandardData',
-  'supply-chain-arch': 'LogisticsStandardData',
-  'wms-architecture': 'WmsStandardData',
-  'wms-demand-allocation-strategy-v2': 'DeamndAllocation',
-};
-
 export const loadStandardPresetById = async (id?: string): Promise<StandardDiagramData | null> => {
-  if (!id) return null;
+  const key = resolvePresetKey(id);
+  if (!key) return null;
 
-  const loader = PRESET_LOADERS[id] || PRESET_LOADERS[PRESET_ID_ALIASES[id]];
+  const loader = PRESET_LOADERS[key];
   if (!loader) return null;
 
   const mod = await loader();

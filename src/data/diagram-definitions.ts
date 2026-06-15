@@ -1,6 +1,7 @@
 // diagram-definitions.ts
 import { lazy, createElement } from 'react';
 import type { DiagramDefinition } from '@/core/types/diagram-components';
+import { ensureBuiltInPlugins } from '@/core/plugins/builtInPlugins';
 import {
   FaSitemap,
   FaWarehouse,
@@ -12,48 +13,10 @@ import {
   FaBrain,
 } from 'react-icons/fa';
 
-const ensureBuiltInPlugins = async () => {
-  const { PluginRegistry } = await import('@/core/services/PluginRegistry');
-  const registry = PluginRegistry.getInstance();
-
-  if (!registry.getPlugin('flowchart')) {
-    const [
-      { FlowchartPlugin },
-      { ArchitecturePlugin },
-      { TimelinePlugin },
-      { MindMapPlugin },
-      { SwimlanePlugin },
-      { ERDiagramPlugin },
-      { NetworkTopologyPlugin },
-      { SequencePlugin },
-    ] = await Promise.all([
-      import('@/core/plugins/FlowchartPlugin'),
-      import('@/core/plugins/ArchitecturePlugin'),
-      import('@/core/plugins/TimelinePlugin'),
-      import('@/core/plugins/MindMapPlugin'),
-      import('@/core/plugins/SwimlanePlugin'),
-      import('@/core/plugins/ERDiagramPlugin'),
-      import('@/core/plugins/NetworkTopologyPlugin'),
-      import('@/core/plugins/SequencePlugin'),
-    ]);
-
-    registry.register(new FlowchartPlugin(), true);
-    registry.register(new ArchitecturePlugin());
-    registry.register(new TimelinePlugin());
-    registry.register(new MindMapPlugin());
-    registry.register(new SwimlanePlugin());
-    registry.register(new ERDiagramPlugin());
-    registry.register(new NetworkTopologyPlugin());
-    registry.register(new SequencePlugin());
-  }
-
-  return registry;
-};
-
 const loadFlowchartDesigner = async (pluginId?: string) => {
   const [{ default: FlowchartDesigner }] = await Promise.all([
     import('@/core/components/diagrams/FlowchartDesigner'),
-    ensureBuiltInPlugins(),
+    ensureBuiltInPlugins(pluginId || 'flowchart'),
   ]);
 
   return {
