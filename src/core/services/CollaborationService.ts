@@ -1,5 +1,10 @@
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
+import {
+    normalizeCollaborationDiagramId,
+    normalizeCollaborationRoomName,
+    normalizeCollaborationServerUrl,
+} from '@/components/diagrams/collaboration/collaborationSecurity';
 
 export interface CollaborationUser {
     id: string;
@@ -34,11 +39,13 @@ class CollaborationService {
         this.userName = user?.name || `用户 ${this.userId.slice(-4)}`;
         this.userColor = COLLAB_COLORS[Math.floor(Math.random() * COLLAB_COLORS.length)];
 
-        const roomName = `vizly-room-${diagramId}`;
+        const safeDiagramId = normalizeCollaborationDiagramId(diagramId);
+        const roomName = normalizeCollaborationRoomName(`vizly-room-${safeDiagramId}`);
         const wsUrl = import.meta.env.VITE_YJS_WS_URL as string | undefined;
+        const safeWsUrl = normalizeCollaborationServerUrl(wsUrl);
 
-        if (wsUrl) {
-            this.provider = new WebsocketProvider(wsUrl, roomName, this.doc);
+        if (safeWsUrl) {
+            this.provider = new WebsocketProvider(safeWsUrl, roomName, this.doc);
 
             // 设置本地 Presence 状态
             this.provider.awareness.setLocalStateField('user', {

@@ -2,7 +2,56 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { Node, Edge, useReactFlow } from '@xyflow/react';
-import { Awareness } from 'y-protocols/awareness';
+import {
+    normalizeCollaborationRoomName,
+    normalizeCollaborationServerUrl,
+    normalizeCollaborationToken,
+} from './collaborationSecurity';
+
+const STORAGE_KEY_NAME = 'vizly_collaborator_name';
+const STORAGE_KEY_COLOR = 'vizly_collaborator_color';
+const COLLABORATOR_COLORS = ['#f43f5e', '#f97316', '#eab308', '#10b981', '#0ea5e9', '#6366f1', '#d946ef'];
+
+interface CollaboratorIdentity {
+    name: string;
+    color: string;
+}
+
+const getRandomIndex = (max: number): number => {
+    if (max <= 0) return 0;
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+        const value = new Uint32Array(1);
+        crypto.getRandomValues(value);
+        return value[0] % max;
+    }
+    return Math.floor(Math.random() * max);
+};
+
+const readStoredCollaboratorIdentity = (): CollaboratorIdentity | null => {
+    if (typeof sessionStorage === 'undefined') return null;
+    try {
+        const name = sessionStorage.getItem(STORAGE_KEY_NAME);
+        const color = sessionStorage.getItem(STORAGE_KEY_COLOR);
+        return name && color ? { name, color } : null;
+    } catch {
+        return null;
+    }
+};
+
+const createCollaboratorIdentity = (): CollaboratorIdentity => ({
+    name: `Guest ${getRandomIndex(1000)}`,
+    color: COLLABORATOR_COLORS[getRandomIndex(COLLABORATOR_COLORS.length)] || COLLABORATOR_COLORS[0],
+});
+
+const persistCollaboratorIdentity = (identity: CollaboratorIdentity): void => {
+    if (typeof sessionStorage === 'undefined') return;
+    try {
+        sessionStorage.setItem(STORAGE_KEY_NAME, identity.name);
+        sessionStorage.setItem(STORAGE_KEY_COLOR, identity.color);
+    } catch {
+        // Storage can be unavailable in private/embedded contexts; collaboration still works for this session.
+    }
+};
 
 // Lightweight, performant strict equality check designed specifically for React Flow elements
 const isElementEqual = (a: any, b: any): boolean => {
@@ -60,18 +109,29 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
     const [synced, setSynced] = useState(false);
     const [activeUsers, setActiveUsers] = useState<any[]>([]);
     const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
+    const [localUser] = useState<CollaboratorIdentity>(() => {
+        const storedIdentity = readStoredCollaboratorIdentity();
+        if (storedIdentity) return storedIdentity;
+
+        const nextIdentity = createCollaboratorIdentity();
+        persistCollaboratorIdentity(nextIdentity);
+        return nextIdentity;
+    });
 
     // GAP-02: Collaboration Optimization. Track references instead of stringifying everything
     const lastSyncedNodesRef = useRef<Map<string, Node>>(new Map());
     const lastSyncedEdgesRef = useRef<Map<string, Edge>>(new Map());
-    
+
     const { doc, provider, yNodes, yEdges } = useMemo(() => {
-        if (!enabled || !serverUrl) return { doc: null, provider: null, yNodes: null, yEdges: null };
+        const safeServerUrl = normalizeCollaborationServerUrl(serverUrl);
+        if (!enabled || !safeServerUrl) return { doc: null, provider: null, yNodes: null, yEdges: null };
         
         const ydoc = new Y.Doc();
-        const wsParams = token ? { params: { token } } : {};
+        const safeToken = normalizeCollaborationToken(token);
+        const safeRoomName = normalizeCollaborationRoomName(roomName);
+        const wsParams = safeToken ? { params: { token: safeToken } } : {};
         
-        const yProvider = new WebsocketProvider(serverUrl, roomName, ydoc, {
+        const yProvider = new WebsocketProvider(safeServerUrl, safeRoomName, ydoc, {
             connect: true,
             ...wsParams
         });
@@ -79,27 +139,13 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
         const nodesMap = ydoc.getMap<Node>('flowchart-nodes');
         const edgesMap = ydoc.getMap<Edge>('flowchart-edges');
 
-        // Setup persistent user identity across reloads
-        const STORAGE_KEY_NAME = 'vizly_collaborator_name';
-        const STORAGE_KEY_COLOR = 'vizly_collaborator_color';
-        let userName = sessionStorage.getItem(STORAGE_KEY_NAME);
-        let userColor = sessionStorage.getItem(STORAGE_KEY_COLOR);
-
-        if (!userName || !userColor) {
-            const colors = ['#f43f5e', '#f97316', '#eab308', '#10b981', '#0ea5e9', '#6366f1', '#d946ef'];
-            userName = 'Guest ' + Math.floor(Math.random() * 1000);
-            userColor = colors[Math.floor(Math.random() * colors.length)];
-            sessionStorage.setItem(STORAGE_KEY_NAME, userName);
-            sessionStorage.setItem(STORAGE_KEY_COLOR, userColor);
-        }
-
         yProvider.awareness.setLocalStateField('user', {
-            name: userName,
-            color: userColor
+            name: localUser.name,
+            color: localUser.color
         });
 
         return { doc: ydoc, provider: yProvider, yNodes: nodesMap, yEdges: edgesMap };
-    }, [roomName, serverUrl, token, enabled]);
+    }, [roomName, serverUrl, token, enabled, localUser]);
 
     useEffect(() => {
         if (!provider || !yNodes || !yEdges) return;
