@@ -1,11 +1,10 @@
 import { useCallback, useState } from 'react';
-import { message } from 'antd';
-import { unifiedStorage } from '@/services/UnifiedStorageService';
-import { tryAttachDiagramSnapshot } from '@/core';
-import { invalidateRemoteDiagramPreview } from '@/core';
-import type { StandardDiagramData } from '@/core';
+import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
+import { invalidateRemoteDiagramPreview } from '@/core/utils/remoteDiagramPreview';
+import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 
+const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
 
 /**
  * 轻量云保存 Hook — 读取 __flowDataBridge 数据并上传到活动云提供商
@@ -14,6 +13,8 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
     const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
     const saveToCloud = useCallback(async () => {
+        const unifiedStorage = await loadUnifiedStorage();
+
         if (!unifiedStorage.isConfigured()) {
             appMessage.error('云存储未配置，请先在设置中配置');
             return;

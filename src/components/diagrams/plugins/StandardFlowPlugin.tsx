@@ -3,15 +3,12 @@ import { Button } from 'antd';
 import { CodeOutlined } from '@ant-design/icons';
 import { FaShapes } from 'react-icons/fa';
 import type { Node, Edge } from '@xyflow/react';
-import {
-  DiagramTypePlugin,
-  PluginContext,
-  SidebarPanel,
-  JsonEditorModal,
-  FlowchartShapesPanel
-} from '@/core';
+import type { DiagramTypePlugin, PluginContext, SidebarPanel } from '@/core/types/plugin';
+import { JsonEditorModal } from '@/core/components/diagrams/JsonEditorModal';
+import { FlowchartShapesPanel } from '@/core/components/diagrams/FlowchartShapesPanel';
 import { TemplateCascaderMenu } from '../ui/TemplateCascaderMenu';
 import { dataService } from '@/services/DataService';
+import { parseRemoteDiagramContent } from '@/services/remoteDiagramContent';
 import { PRESET_MAP, defaultStandardData } from '@/data/standardized';
 
 export class StandardFlowPlugin implements DiagramTypePlugin {
@@ -81,7 +78,7 @@ export class StandardFlowPlugin implements DiagramTypePlugin {
     switch (action) {
       case 'smart-optimize':
         // 插件特定的智能优化逻辑
-        import('@/core').then(({ recommendLayout }) => {
+        import('@/core/utils/layoutRecommender').then(({ recommendLayout }) => {
           const recommendation = recommendLayout(ctx.getNodes(), ctx.getEdges());
           if (recommendation) {
             window.dispatchEvent(new CustomEvent('editor:command', { 
@@ -118,7 +115,7 @@ const StandardTemplateToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
     if (!key) return;
 
     // TODO: 这里应接入真正的加载逻辑（如调用 loadFromCloud 或解析 PRESET_MAP）
-    // 为了简化 Plugin 的状态，可以触发一个全局事件或暴露给父级，也可以直接通过 import('@/core') 解析
+    // 为了简化 Plugin 的状态，可以触发一个全局事件或暴露给父级，也可以直接解析设计器工具。
     let data;
     if (rootGroup === 's3' || rootGroup === 'supabase' || rootGroup === 'system-templates') {
        // 需要通过 dataService 获取（如果有缓存）或后续再处理云加载
@@ -126,12 +123,16 @@ const StandardTemplateToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
        
        if (!data && rootGroup === 'system-templates') {
            // Fallback for cloud system templates
-           import('@/services/supabase').then(async ({ supabase }) => {
+         import('@/services/supabase').then(async ({ supabase }) => {
               if (supabase) {
-                 const { data: remoteData } = await supabase.from('system_templates').select('content').eq('id', key).single();
+                 const { data: remoteData } = await supabase.from('system_templates').select('content, title, id').eq('id', key).single();
                  if (remoteData && remoteData.content) {
-                     import('@/core').then(({ standardDataToCanvas }) => {
-                         standardDataToCanvas(remoteData.content as any).then(({ nodes, edges }) => {
+                     const parsedContent = parseRemoteDiagramContent(remoteData.content, {
+                         id: remoteData.id || key,
+                         title: remoteData.title || key,
+                     });
+                     import('@/core/components/diagrams/designerUtils').then(({ standardDataToCanvas }) => {
+                         standardDataToCanvas(parsedContent).then(({ nodes, edges }) => {
                              ctx.setNodes(nodes);
                              ctx.setEdges(edges);
                              setTimeout(() => {
@@ -149,7 +150,7 @@ const StandardTemplateToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
     }
 
     if (data) {
-      import('@/core').then(({ standardDataToCanvas }) => {
+      import('@/core/components/diagrams/designerUtils').then(({ standardDataToCanvas }) => {
         standardDataToCanvas(data).then(({ nodes, edges }: { nodes: Node[], edges: Edge[] }) => {
            ctx.setNodes(nodes);
            ctx.setEdges(edges);

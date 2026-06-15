@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { Modal, Button, Select, Space, Typography, App, Tooltip, List, Tag, Popconfirm, Spin, theme, Tabs, Input, Avatar, Empty, Alert } from 'antd';
+import { Modal, Button, Select, Space, Typography, Tooltip, List, Tag, Popconfirm, Spin, theme, Tabs, Input, Avatar, Empty, Alert } from 'antd';
 import { FaCopy, FaLink, FaTrash, FaUserPlus } from 'react-icons/fa';
 import { LinkOutlined, TeamOutlined, UserOutlined, CheckCircleFilled, SafetyOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { shareService, ShareRecord, CollaboratorRecord } from '@/services/ShareService';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/context/useAuth';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 
 
@@ -49,7 +49,6 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const { t } = useTranslation();
     const { token } = theme.useToken();
     const { user } = useAuth();
-    const { message } = App.useApp();
     const [activeTab, setActiveTab] = useState('invite');
 
     // Link Share State
@@ -88,7 +87,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         try {
             const list = await shareService.listCollaborators(effectiveId);
             setCollaborators(list);
-        } catch (err) { } finally { setLoadingCollabs(false); }
+        } catch { } finally { setLoadingCollabs(false); }
     }, [open, effectiveId]);
 
     useEffect(() => {

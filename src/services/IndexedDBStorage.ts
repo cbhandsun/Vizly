@@ -1,4 +1,10 @@
 import type { DiagramVersion } from './storage/types';
+import {
+    coerceDiagramVersion,
+    coerceVersionMessage,
+    coerceVersionSnapshotData,
+    isSafeVersionId,
+} from './versionSnapshotSecurity';
 
 const DB_NAME = 'VizlyLocalDB';
 const DB_VERSION = 2;
@@ -43,14 +49,18 @@ export class LocalDB {
     }
 
     async saveVersion(diagramId: string, snapshotData: any, message?: string): Promise<DiagramVersion> {
+        if (!isSafeVersionId(diagramId)) {
+            throw new Error('Invalid diagram id for version history.');
+        }
+        const safeSnapshotData = coerceVersionSnapshotData(snapshotData);
         await this.init();
         return new Promise((resolve, reject) => {
             const version: DiagramVersion = {
                 id: crypto.randomUUID(),
-                diagramId,
-                snapshotData,
+                diagramId: diagramId.trim(),
+                snapshotData: safeSnapshotData,
                 createdAt: Date.now(),
-                message: message || `版本快照`,
+                message: coerceVersionMessage(message),
                 authorId: 'local'
             };
 
@@ -74,10 +84,13 @@ export class LocalDB {
             request.onsuccess = (event) => {
                 const results = (event.target as IDBRequest).result as DiagramVersion[];
                 // Sort descending (newest first)
-                results.sort((a, b) => b.createdAt - a.createdAt);
+                const safeResults = results
+                    .map(result => coerceDiagramVersion({ ...result, snapshotData: null }))
+                    .filter(Boolean) as DiagramVersion[];
+                safeResults.sort((a, b) => b.createdAt - a.createdAt);
                 
                 // Omit snapshotData here for consistency with Supabase if we want, but local is fast enough
-                resolve(results);
+                resolve(safeResults);
             };
             request.onerror = (event) => reject((event.target as IDBRequest).error);
         });
@@ -92,8 +105,9 @@ export class LocalDB {
 
             request.onsuccess = (event) => {
                 const result = (event.target as IDBRequest).result as DiagramVersion;
-                if (result && result.diagramId === diagramId) {
-                    resolve(result);
+                const safeResult = result ? coerceDiagramVersion(result) : null;
+                if (safeResult && safeResult.diagramId === diagramId.trim()) {
+                    resolve(safeResult);
                 } else {
                     resolve(null);
                 }

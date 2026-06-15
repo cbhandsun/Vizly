@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Card, Button, Input, Space, Typography, Empty, Row, Col, Spin, Select, Popconfirm, Tabs, Tag, Checkbox } from 'antd';
 import {
     CloudOutlined,
@@ -13,11 +13,10 @@ import { useNavigate } from 'react-router-dom';
 import { dataRegistry } from '../../data/DataRegistry';
 import { unifiedStorage } from '../../services/UnifiedStorageService';
 import { DiagramMetadata } from '../../services/storage/types';
-import { StandardDiagramData } from '@/core';
+import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '@/context/AuthContext';
-import { AuthModal } from '@/components/auth/AuthModal';
-import { coerceToStandardDiagramDataWithReport } from '@/core';
+import { useAuth } from '@/context/useAuth';
+import { coerceToStandardDiagramDataWithReport } from '@/core/utils/coerceDiagram';
 import RemoteDiagramCover from '@/components/shared/RemoteDiagramCover';
 import { shareService } from '@/services/ShareService';
 import { appMessage } from '@/core/utils/antdStaticBridge';
@@ -26,6 +25,9 @@ import { appMessage } from '@/core/utils/antdStaticBridge';
 const { Text } = Typography;
 const { Search } = Input;
 const { Meta } = Card;
+const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
+    default: module.AuthModal,
+})));
 
 interface CloudStorageManagerModalProps {
     open: boolean;
@@ -51,18 +53,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
     const [batchMode, setBatchMode] = useState(false);
     const [batchDeleting, setBatchDeleting] = useState(false);
 
-    // Initial Data Load
-    useEffect(() => {
-        if (open) {
-            if (activeTab === 'mine') {
-                loadCloudDiagrams();
-            } else {
-                loadSharedDiagrams();
-            }
-        }
-    }, [open, currentProvider, user?.id, activeTab]);
-
-    const loadSharedDiagrams = async () => {
+    const loadSharedDiagrams = useCallback(async () => {
         if (!user) {
             setSharedDiagrams([]);
             return;
@@ -77,9 +68,9 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
         } finally {
             setSharedLoading(false);
         }
-    };
+    }, [user]);
 
-    const loadCloudDiagrams = async () => {
+    const loadCloudDiagrams = useCallback(async () => {
         if (!unifiedStorage.isConfigured()) {
             setCloudDiagrams([]);
             return;
@@ -99,13 +90,23 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
         } finally {
             setLoading(false);
         }
-    };
+    }, [currentProvider, t, user]);
 
-    const handleProviderChange = (value: 'supabase' | 's3') => {
+    // Initial Data Load
+    useEffect(() => {
+        if (!open) return;
+        if (activeTab === 'mine') {
+            void loadCloudDiagrams();
+        } else {
+            void loadSharedDiagrams();
+        }
+    }, [activeTab, loadCloudDiagrams, loadSharedDiagrams, open]);
+
+    const handleProviderChange = useCallback((value: 'supabase' | 's3') => {
         unifiedStorage.setProvider(value);
         setCurrentProvider(value);
         appMessage.info(t('storage.manager.providerSwitched', { provider: value === 's3' ? 'S3' : 'Supabase' }));
-    };
+    }, [t]);
 
     const handleOpenCloud = async (item: DiagramMetadata) => {
         if (currentProvider === 'supabase' && !user) {
@@ -127,8 +128,10 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                 if (warns.length > 0 && report.diagram.nodes.length > 0) {
                     appMessage.warning(t('common.remoteDataRepaired', { reason: warns.map(x => x.message).join('; ') }));
                 }
-                const normalized: StandardDiagramData = {
-                    ...report.diagram,
+                const normalized = localService.registerRemoteDiagram(savedDiagram.content, {
+                    id: savedDiagram.id,
+                    title: savedDiagram.title,
+                }, false, {
                     id: savedDiagram.id,
                     name: savedDiagram.title || report.diagram.name,
                     metadata: {
@@ -142,12 +145,12 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                             openedAt: new Date().toISOString()
                         }
                     }
-                };
+                });
                 // 在设计器中打开时不注册到 dataService，避免触发 GenericStandardDiagram 布局
                 // 检测：全局回调存在 OR 明确的 onOpenInDesigner prop
                 const designerCallback = onOpenInDesigner || (window as any).__flowDesignerOpenCloud;
-                if (!designerCallback) {
-                    localService.registerDiagram(normalized);
+                if (designerCallback) {
+                    localService.deleteDiagram(normalized.id, false);
                 }
 
                 // Close modal and open
@@ -160,7 +163,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                     if (onSelect) {
                         onSelect(normalized);
                     }
-                    navigate(`/?diagram=${savedDiagram.id}`);
+                    navigate(`/?diagram=${encodeURIComponent(savedDiagram.id)}`);
                 }
                 appMessage.success(t('storage.manager.downloadedAndOpened'));
             } else {
@@ -178,8 +181,8 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
         try {
             await unifiedStorage.deleteDiagram(id);
             appMessage.success(t('storage.manager.deleted'));
-            loadCloudDiagrams();
-        } catch (e) {
+            void loadCloudDiagrams();
+        } catch (_e) {
             appMessage.error(t('storage.manager.deleteFailed'));
         }
     };
@@ -226,7 +229,13 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
         }
         setBatchDeleting(false);
         setSelectedIds(new Set());
-        appMessage.success(`已删除 ${success} 个${failed > 0 ? `，${failed} 个失败` : ''}`);
+        if (success === 0 && failed > 0) {
+            appMessage.error(`删除失败：${failed} 个未删除`);
+        } else if (failed > 0) {
+            appMessage.warning(`已删除 ${success} 个，${failed} 个失败`);
+        } else {
+            appMessage.success(`已删除 ${success} 个`);
+        }
         loadCloudDiagrams();
     };
 
@@ -496,7 +505,11 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                 ]}
             />
         </Modal>
-        <AuthModal open={isAuthModalOpen} onCancel={() => setIsAuthModalOpen(false)} />
+        {isAuthModalOpen && (
+            <React.Suspense fallback={null}>
+                <AuthModal open={isAuthModalOpen} onCancel={() => setIsAuthModalOpen(false)} />
+            </React.Suspense>
+        )}
         </>
     );
 };

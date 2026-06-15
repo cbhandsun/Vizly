@@ -4,7 +4,7 @@
  */
 
 import type { Node, Edge } from '@xyflow/react';
-import { DiagramTypePlugin } from '@/core';
+import type { DiagramTypePlugin } from '@/core/types/plugin';
 
 export class HelloWorldPlugin implements DiagramTypePlugin {
   id = 'hello-world';

@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
-import { message } from 'antd';
-import { unifiedStorage } from '@/services/UnifiedStorageService';
+import type { Dispatch, SetStateAction } from 'react';
+import type { Edge, Node } from '@xyflow/react';
 import { DiagramVersion } from '@/services/storage/types';
-import { tryAttachDiagramSnapshot } from '@/core';
+import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import { coerceClipboardData } from '@/core/utils/flowchartClipboard';
 
+const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
 
 export function useVersionHistory(diagramId: string) {
     const [versions, setVersions] = useState<DiagramVersion[]>([]);
@@ -15,6 +17,7 @@ export function useVersionHistory(diagramId: string) {
         if (!diagramId) return;
         setLoading(true);
         try {
+            const unifiedStorage = await loadUnifiedStorage();
             const data = await unifiedStorage.listVersions(diagramId);
             setVersions(data);
         } catch (error) {
@@ -27,8 +30,9 @@ export function useVersionHistory(diagramId: string) {
 
     const saveVersion = useCallback(async (commitMessage: string) => {
         if (!diagramId) return;
-        
+
         try {
+            const unifiedStorage = await loadUnifiedStorage();
             const bridge = (window as any).__flowDataBridge?.[diagramId];
             if (!bridge) {
                 appMessage.error('无法提取当前图表数据');
@@ -52,6 +56,7 @@ export function useVersionHistory(diagramId: string) {
 
     const loadVersionData = useCallback(async (versionId: string) => {
         try {
+            const unifiedStorage = await loadUnifiedStorage();
             return await unifiedStorage.loadVersion(diagramId, versionId);
         } catch (e) {
             console.error("Failed to load version payload:", e);
@@ -71,7 +76,11 @@ export function useVersionHistory(diagramId: string) {
         setPreviewVersion(null);
     }, []);
 
-    const restoreVersion = useCallback(async (versionId: string, setNodes: any, setEdges: any) => {
+    const restoreVersion = useCallback(async (
+        versionId: string,
+        setNodes: Dispatch<SetStateAction<Node[]>>,
+        setEdges: Dispatch<SetStateAction<Edge[]>>
+    ) => {
         const fullVersion = previewVersion?.id === versionId 
             ? previewVersion 
             : await loadVersionData(versionId);
@@ -85,9 +94,14 @@ export function useVersionHistory(diagramId: string) {
             // Restore functionality using the active bridge
             const bridge = (window as any).__flowDataBridge?.[diagramId];
             if (bridge) {
+                const snapshot = coerceClipboardData(fullVersion.snapshotData);
+                if (!snapshot) {
+                    appMessage.error("无法恢复：快照结构无效");
+                    return false;
+                }
                 // If it exposes actions directly
-                setNodes(fullVersion.snapshotData.nodes || []);
-                setEdges(fullVersion.snapshotData.edges || []);
+                setNodes(snapshot.nodes);
+                setEdges(snapshot.edges);
                 
                 // Keep the bridge intact, overwrite internal values if necessary!
                 appMessage.success(`已恢复至快照: ${fullVersion.message || fullVersion.id.substring(0, 8)}`);

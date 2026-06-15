@@ -1,11 +1,9 @@
-import { useState, useCallback, useEffect } from 'react';
-import { message } from 'antd';
-import { unifiedStorage } from '@/services/UnifiedStorageService';
+import { useState, useCallback } from 'react';
 import { DiagramMetadata } from '@/services/storage/types';
-import { StandardDiagramData } from '@/core';
+import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import { dataService } from '@/services/DataService';
 import { appMessage } from '@/core/utils/antdStaticBridge';
-import { supabase } from '@/services/supabase';
+import { parseRemoteDiagramContent } from '@/services/remoteDiagramContent';
 
 export interface SystemTemplateMetadata {
   id: string;
@@ -15,12 +13,20 @@ export interface SystemTemplateMetadata {
   sort_order?: number;
 }
 
+const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
+const loadSupabase = async () => (await import('@/services/supabase')).supabase;
+
 export function useDiagramStorage() {
   const [s3Diagrams, setS3Diagrams] = useState<DiagramMetadata[]>([]);
   const [supabaseDiagrams, setSupabaseDiagrams] = useState<DiagramMetadata[]>([]);
   const [systemTemplates, setSystemTemplates] = useState<SystemTemplateMetadata[]>([]);
 
   const fetchCloudList = useCallback(async () => {
+    const [unifiedStorage, supabase] = await Promise.all([
+      loadUnifiedStorage(),
+      loadSupabase(),
+    ]);
+
     // Fetch from S3
     try {
       const s3Provider = unifiedStorage.getProvider('s3');
@@ -61,10 +67,6 @@ export function useDiagramStorage() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchCloudList();
-  }, [fetchCloudList]);
-
   const loadFromCloud = async (key: string, sourceGroup: string): Promise<StandardDiagramData | null> => {
     // Special handling for generic system templates
     if (sourceGroup === 'system-templates') {
@@ -74,6 +76,7 @@ export function useDiagramStorage() {
       }
       
       // Fallback: If not found in memory, try fetching directly from db
+      const supabase = await loadSupabase();
       if (supabase) {
         const hide = appMessage.loading(`正在从云端模板库加载...`, 0);
         try {
@@ -84,7 +87,7 @@ export function useDiagramStorage() {
             .single();
             
           if (!error && data && data.content) {
-            return data.content as StandardDiagramData;
+            return parseRemoteDiagramContent(data.content, { id: key, title: key }) as StandardDiagramData;
           }
         } finally {
           hide();
@@ -96,10 +99,14 @@ export function useDiagramStorage() {
     if (sourceGroup !== 's3' && sourceGroup !== 'supabase') return null;
     const hide = appMessage.loading(`正在从 ${sourceGroup === 's3' ? 'S3' : 'Supabase'} 加载...`, 0);
     try {
+      const unifiedStorage = await loadUnifiedStorage();
       const provider = unifiedStorage.getProvider(sourceGroup as any);
       const saved = await provider.loadDiagram(key);
       if (saved && saved.content) {
-        return saved.content as StandardDiagramData;
+        return parseRemoteDiagramContent(saved.content, {
+          id: saved.id || key,
+          title: saved.title || key,
+        }) as StandardDiagramData;
       }
     } catch (e) {
       // Fallback: if loadDiagram fails (e.g. shared diagrams), try locally registered data

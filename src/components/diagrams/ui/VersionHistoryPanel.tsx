@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Drawer, Button, Input, List, Typography, Space, Tooltip, Badge, Popconfirm } from 'antd';
-import { ClockCircleOutlined, PlusOutlined, UndoOutlined, EyeOutlined } from '@ant-design/icons';
+import { PlusOutlined, UndoOutlined, EyeOutlined } from '@ant-design/icons';
+import { Clock } from 'lucide-react';
 import { useVersionHistory } from '../hooks/useVersionHistory';
 import { useReactFlow } from '@xyflow/react';
 
@@ -145,7 +146,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                                             background: '#f5f5f5', display: 'flex', 
                                             alignItems: 'center', justifyContent: 'center'
                                         }}>
-                                            <ClockCircleOutlined style={{ color: '#8c8c8c' }} />
+                                            <Clock size={16} color="#8c8c8c" strokeWidth={2} />
                                         </div>
                                     </Badge>
                                 }
