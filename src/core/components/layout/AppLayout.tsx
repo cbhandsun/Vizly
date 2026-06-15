@@ -46,7 +46,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
       key: 'github',
       icon: <FaGithub />,
       label: 'GitHub',
-      onClick: () => window.open('https://github.com/your-repo', '_blank')
+      onClick: () => window.open('https://github.com/your-repo', '_blank', 'noopener,noreferrer')
     }
   ];
 

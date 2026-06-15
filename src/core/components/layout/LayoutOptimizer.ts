@@ -3,33 +3,8 @@
  * 提供智能的节点布局和边缘优化算法
  */
 
-import { Node, Edge } from '@xyflow/react';
 import { enhancedTextMeasurement } from '../../utils/EnhancedTextMeasurement';
 import { diagramConfigManager } from '../config/DiagramConfig';
-
-interface LayoutConfig {
-  NODE_MIN_WIDTH: number;
-  NODE_PADDING: { horizontal: number; vertical: number };
-  NODE_H_GAP: number;
-  NODE_V_GAP: number;
-  GROUP_PADDING: { H: number; V: number };
-  SUB_GROUP_PADDING: { H: number; V_TOP: number; V_BOTTOM: number };
-  SUB_GROUP_TITLE_CLEARANCE: number;
-  ENSURE_SUB_GROUP_TITLE_CLEARANCE: boolean;
-  // 新增域相关详细配置
-  GROUP_TITLE_HEIGHT: number;
-  GROUP_TITLE_SAFE_GAP: number;
-  GROUP_SIDE_SAFE_GAP: number;
-  GROUP_BOTTOM_SAFE_GAP: number;
-  // 新增子域相关详细配置
-  SUB_GROUP_TITLE_HEIGHT: number;
-  SUB_GROUP_TITLE_SAFE_GAP: number;
-  DOMAIN_H_GAP: number;
-  BE_COLUMN_GAP: number;
-  NODE_FONT_SIZE: number;
-  NODE_FONT_FAMILY: string;
-  NODE_FONT_WEIGHT: string;
-}
 
 interface CachedMeasurement {
   width: number;
@@ -239,8 +214,7 @@ export class LayoutOptimizer {
 
     // 统一测量整段内容，获取要点行与最长行宽
     let lines: string[] = [];
-    let maxLineWidth = 0;
-    let totalWidth = minWidth;
+    let totalWidth: number;
     try {
       const measurement = enhancedTextMeasurement.measureNodeContent(description, {
         fontSize: fontSize,
@@ -249,7 +223,7 @@ export class LayoutOptimizer {
         padding: { horizontal: paddingH, vertical: paddingV },
       });
       lines = Array.isArray(measurement.lines) ? measurement.lines : [];
-      maxLineWidth = (typeof measurement.maxLineWidth === 'number' && isFinite(measurement.maxLineWidth)) ? measurement.maxLineWidth : 0;
+      const maxLineWidth = (typeof measurement.maxLineWidth === 'number' && isFinite(measurement.maxLineWidth)) ? measurement.maxLineWidth : 0;
       const rawWidth = Math.max(
         maxLineWidth + paddingH * 2 + 12,
         this.calculateRenderedContentWidth(lines, { fontSize, fontFamily, fontWeight, paddingH })
@@ -347,8 +321,8 @@ export class LayoutOptimizer {
     }
 
     let lines: string[] = [];
-    let scaledWidth = minWidth;
-    let validTotalWidth = minWidth;
+    let scaledWidth: number;
+    let validTotalWidth: number;
     try {
       const measurement = enhancedTextMeasurement.measureNodeContent(description, {
         fontSize,
@@ -792,7 +766,7 @@ export class LayoutOptimizer {
 
     // 根据不同域的特点计算宽度
     switch (domainKey) {
-      case 'mid':
+      case 'mid': {
         // 中台域：多行布局
         const nodeWidths = this.calculateMultipleNodeWidths(domainData.descs, { domainKey });
         const rows = [
@@ -808,6 +782,7 @@ export class LayoutOptimizer {
 
         const groupPaddingH = this.config.GROUP_PADDING?.H ?? 40;
         return maxRowWidth + groupPaddingH * 2;
+      }
 
       case 'data':
         // 数据域：2x3布局
@@ -889,7 +864,7 @@ export class LayoutOptimizer {
     if (!domainData) return 400; // 默认高度
 
     const nodeHeights = this.calculateMultipleNodeHeights(domainData.descs, { domainKey });
-    let contentHeight = 0;
+    let contentHeight: number;
 
     // 根据宽度计算中使用的相同布局逻辑来计算高度
     if (domainData.nodes.length === 6) {
@@ -922,7 +897,7 @@ export class LayoutOptimizer {
     if (!domainData) return 400;
 
     switch (domainKey) {
-      case 'mid':
+      case 'mid': {
         // 中台域：多行布局
         const nodeHeights = this.calculateMultipleNodeHeights(domainData.descs, { domainKey });
         const rows = [
@@ -938,6 +913,7 @@ export class LayoutOptimizer {
 
         const groupPaddingV = this.config.GROUP_PADDING?.V ?? 40;
         return contentHeight + groupPaddingV * 2;
+      }
 
       default:
         return this.calculateSingleLayerDomainHeight(domainData as DomainData, domainKey);
