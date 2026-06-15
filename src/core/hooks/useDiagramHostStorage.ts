@@ -1,4 +1,13 @@
 import { useState, useCallback, useEffect } from 'react';
+import {
+    addRecentDiagramId,
+    readFavoriteDiagramIds,
+    readRecentDiagramIds,
+    readSelectedDiagramId,
+    toggleFavoriteDiagramId,
+    writeFavoriteDiagramIds,
+    writeSelectedDiagramId,
+} from './diagramHostStorage';
 
 export interface DiagramHostStorage {
     selectedDiagramId: string;
@@ -20,78 +29,50 @@ export interface DiagramHostStorage {
 export const useDiagramHostStorage = (defaultId: string): DiagramHostStorage => {
     // 1. Selected Diagram ID
     const [selectedDiagramId, setSelectedDiagramId] = useState<string>(() => {
-        try {
-            const saved = localStorage.getItem('diagramMenu.selectedDiagramId');
-            return saved || defaultId;
-        } catch {
-            return defaultId;
-        }
+        return readSelectedDiagramId(defaultId);
     });
 
     const saveSelectedDiagramId = useCallback((id: string) => {
-        setSelectedDiagramId(id);
-        try {
-            localStorage.setItem('diagramMenu.selectedDiagramId', id);
-        } catch { void 0; }
+        const normalizedId = writeSelectedDiagramId(id);
+        if (normalizedId) setSelectedDiagramId(normalizedId);
     }, []);
 
     // 2. Recent Diagrams
-    const [recentDiagrams, setRecentDiagrams] = useState<string[]>([]);
-
-    // Load initial recent
-    useEffect(() => {
-        try {
-            const raw = localStorage.getItem('diagramMenu.recent');
-            const parsed = raw ? JSON.parse(raw) : [];
-            if (Array.isArray(parsed)) setRecentDiagrams(parsed.map(String));
-        } catch { void 0; }
-    }, []);
+    const [recentDiagrams, setRecentDiagrams] = useState<string[]>(() => {
+        return readRecentDiagramIds();
+    });
 
     const addRecentDiagram = useCallback((id: string) => {
         setRecentDiagrams(prev => {
-            const next = [String(id), ...prev.filter(x => x !== String(id))].slice(0, 12);
-            try {
-                localStorage.setItem('diagramMenu.recent', JSON.stringify(next));
-                window.dispatchEvent(new CustomEvent('diagramMenuRecentChanged'));
-            } catch { void 0; }
+            const next = addRecentDiagramId(id, prev);
+            window.dispatchEvent(new CustomEvent('diagramMenuRecentChanged'));
             return next;
         });
     }, []);
 
     // 3. Favorites (Shared)
-    const [favoriteDiagrams, setFavoriteDiagrams] = useState<string[]>([]);
-
-    const loadFavorites = useCallback(() => {
-        try {
-            const raw = localStorage.getItem('diagramMenu.favorites');
-            const parsed = raw ? JSON.parse(raw) : [];
-            if (Array.isArray(parsed)) setFavoriteDiagrams(parsed.map(String));
-        } catch { void 0; }
-    }, []);
+    const [favoriteDiagrams, setFavoriteDiagrams] = useState<string[]>(() => {
+        return readFavoriteDiagramIds();
+    });
 
     useEffect(() => {
-        loadFavorites();
-        const onFavChanged = () => loadFavorites();
+        const onFavChanged = () => {
+            setFavoriteDiagrams(readFavoriteDiagramIds());
+        };
         window.addEventListener('diagramMenuFavoritesChanged', onFavChanged);
         return () => window.removeEventListener('diagramMenuFavoritesChanged', onFavChanged);
-    }, [loadFavorites]);
+    }, []);
 
     const toggleFavorite = useCallback((id: string) => {
-        const sid = String(id);
         setFavoriteDiagrams(prev => {
-            const next = prev.includes(sid)
-                ? prev.filter(x => x !== sid)
-                : [sid, ...prev];
-
-            try { localStorage.setItem('diagramMenu.favorites', JSON.stringify(next)); } catch { void 0; }
+            const next = toggleFavoriteDiagramId(id, prev);
             window.dispatchEvent(new CustomEvent('diagramMenuFavoritesChanged'));
             return next;
         });
     }, []);
 
     const clearFavorites = useCallback(() => {
-        setFavoriteDiagrams([]);
-        try { localStorage.setItem('diagramMenu.favorites', JSON.stringify([])); } catch { void 0; }
+        setFavoriteDiagrams(writeFavoriteDiagramIds([]));
         window.dispatchEvent(new CustomEvent('diagramMenuFavoritesChanged'));
     }, []);
 

@@ -1,4 +1,7 @@
 import { create } from 'zustand';
+import { formatDateOnly, parseDateOnlyTime, todayDateOnly } from '../utils/dateOnly';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type ProTimelineViewMode = 'day' | 'week' | 'month' | 'quarter';
 
@@ -66,8 +69,8 @@ export function buildHierarchicalTasks(tasks: ProGanttTask[]): ProGanttTask[] {
   function rollupTask(taskId: string): { start: number; end: number; prog: number; count: number } {
       const t = taskMap.get(taskId)!;
       if (t.children.length === 0) {
-          const s = t.startDate ? new Date(t.startDate).getTime() : Infinity;
-          const e = t.endDate ? new Date(t.endDate).getTime() : -Infinity;
+          const s = t.startDate ? parseDateOnlyTime(t.startDate) ?? Infinity : Infinity;
+          const e = t.endDate ? parseDateOnlyTime(t.endDate) ?? -Infinity : -Infinity;
           return { start: isNaN(s) ? Infinity : s, end: isNaN(e) ? -Infinity : e, prog: t.progress ?? 0, count: 1 };
       }
 
@@ -86,8 +89,8 @@ export function buildHierarchicalTasks(tasks: ProGanttTask[]): ProGanttTask[] {
 
       // Update parent dates and progress based on children
       if (minS !== Infinity && maxE !== -Infinity) {
-          t.startDate = new Date(minS).toISOString().split('T')[0];
-          t.endDate = new Date(maxE).toISOString().split('T')[0];
+          t.startDate = formatDateOnly(new Date(minS));
+          t.endDate = formatDateOnly(new Date(maxE));
       }
       if (childCount > 0) {
           t.progress = Math.round(sumP / childCount);
@@ -202,46 +205,52 @@ export const useProTimelineEngine = create<ProTimelineState>((set, get) => ({
   
   dateToX: (isoDate: string) => {
       const { pixelsPerDay } = get();
-      const date = new Date(isoDate);
-      if (isNaN(date.getTime())) return 0;
+      const dateTime = parseDateOnlyTime(isoDate);
+      if (dateTime === null) return 0;
       // Define epoch as 2026-01-01 for relative math positioning
-      const epoch = new Date('2026-01-01T00:00:00Z').getTime();
-      const diffDays = (date.getTime() - epoch) / (1000 * 60 * 60 * 24);
+      const epoch = parseDateOnlyTime('2026-01-01')!;
+      const diffDays = (dateTime - epoch) / DAY_MS;
       return diffDays * pixelsPerDay;
   },
   
   xToDate: (x: number) => {
       const { pixelsPerDay } = get();
-      const epoch = new Date('2026-01-01T00:00:00Z').getTime();
+      const epoch = parseDateOnlyTime('2026-01-01')!;
       const diffDays = x / pixelsPerDay;
-      const targetTime = epoch + diffDays * 24 * 60 * 60 * 1000;
+      const targetTime = epoch + diffDays * DAY_MS;
       const d = new Date(targetTime);
-      return d.toISOString().split('T')[0];
+      return formatDateOnly(d);
   }
 }));
 
 // ===== 工作日避让与工期联动辅助函数 =====
 
 export function isWeekend(dateStr: string): boolean {
-  const d = new Date(dateStr);
+  const time = parseDateOnlyTime(dateStr);
+  if (time === null) return false;
+  const d = new Date(time);
   const day = d.getDay();
   return day === 0 || day === 6;
 }
 
 export function adjustToWorkDay(dateStr: string, direction: 'forward' | 'backward' = 'forward'): string {
-  const d = new Date(dateStr);
+  const time = parseDateOnlyTime(dateStr);
+  if (time === null) return todayDateOnly();
+  const d = new Date(time);
   while (d.getDay() === 0 || d.getDay() === 6) {
       d.setDate(d.getDate() + (direction === 'forward' ? 1 : -1));
   }
-  return d.toISOString().split('T')[0];
+  return formatDateOnly(d);
 }
 
 export function addWorkDays(startDateStr: string, workDays: number): string {
   if (workDays <= 1) {
       return adjustToWorkDay(startDateStr, 'forward');
   }
-  let currentStr = adjustToWorkDay(startDateStr, 'forward');
-  const d = new Date(currentStr);
+  const currentStr = adjustToWorkDay(startDateStr, 'forward');
+  const currentTime = parseDateOnlyTime(currentStr);
+  if (currentTime === null) return todayDateOnly();
+  const d = new Date(currentTime);
   let added = 1;
   while (added < workDays) {
       d.setDate(d.getDate() + 1);
@@ -250,15 +259,17 @@ export function addWorkDays(startDateStr: string, workDays: number): string {
           added++;
       }
   }
-  return d.toISOString().split('T')[0];
+  return formatDateOnly(d);
 }
 
 export function getWorkDays(startDateStr: string, endDateStr: string): number {
-  const start = new Date(startDateStr);
-  const end = new Date(endDateStr);
-  if (isNaN(start.getTime()) || isNaN(end.getTime()) || start.getTime() > end.getTime()) {
+  const startTime = parseDateOnlyTime(startDateStr);
+  const endTime = parseDateOnlyTime(endDateStr);
+  if (startTime === null || endTime === null || startTime > endTime) {
       return 0;
   }
+  const start = new Date(startTime);
+  const end = new Date(endTime);
   let workDays = 0;
   const current = new Date(start);
   while (current.getTime() <= end.getTime()) {
@@ -272,10 +283,12 @@ export function getWorkDays(startDateStr: string, endDateStr: string): number {
 }
 
 export function getWorkDaysSigned(startStr: string, endStr: string): number {
-  const s = new Date(startStr);
-  const e = new Date(endStr);
-  if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
-  if (s.toISOString().split('T')[0] === e.toISOString().split('T')[0]) return 0;
+  const startTime = parseDateOnlyTime(startStr);
+  const endTime = parseDateOnlyTime(endStr);
+  if (startTime === null || endTime === null) return 0;
+  const s = new Date(startTime);
+  const e = new Date(endTime);
+  if (formatDateOnly(s) === formatDateOnly(e)) return 0;
   
   if (s.getTime() < e.getTime()) {
       let count = 0;
@@ -306,8 +319,10 @@ export function addWorkDaysSigned(startDateStr: string, workDays: number): strin
   if (workDays === 0) {
       return adjustToWorkDay(startDateStr, 'forward');
   }
-  let currentStr = adjustToWorkDay(startDateStr, workDays > 0 ? 'forward' : 'backward');
-  const d = new Date(currentStr);
+  const currentStr = adjustToWorkDay(startDateStr, workDays > 0 ? 'forward' : 'backward');
+  const currentTime = parseDateOnlyTime(currentStr);
+  if (currentTime === null) return todayDateOnly();
+  const d = new Date(currentTime);
   let count = 0;
   const absWorkDays = Math.abs(workDays);
   while (count < absWorkDays) {
@@ -317,7 +332,7 @@ export function addWorkDaysSigned(startDateStr: string, workDays: number): strin
           count++;
       }
   }
-  return d.toISOString().split('T')[0];
+  return formatDateOnly(d);
 }
 
 // ===== 关键路径 CPM 算法 =====
