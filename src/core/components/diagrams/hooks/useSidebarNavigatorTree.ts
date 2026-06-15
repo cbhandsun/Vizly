@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { Node } from '@xyflow/react';
 
 export interface NavigatorTreeNode {
@@ -62,13 +62,6 @@ export function useSidebarNavigatorTree(nodes: Node[], searchTerm: string) {
     const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
     const [autoExpandParent, setAutoExpandParent] = useState(true);
 
-    useEffect(() => {
-        if (searchTerm) {
-            setExpandedKeys(searchExpandedKeys);
-            setAutoExpandParent(true);
-        }
-    }, [searchTerm, searchExpandedKeys]);
-
     const onExpand = (newExpandedKeys: React.Key[]) => {
         setExpandedKeys(newExpandedKeys);
         setAutoExpandParent(false);
@@ -76,8 +69,8 @@ export function useSidebarNavigatorTree(nodes: Node[], searchTerm: string) {
 
     return {
         navigatorTreeData: treeData,
-        expandedKeys,
-        autoExpandParent,
+        expandedKeys: searchTerm ? searchExpandedKeys : expandedKeys,
+        autoExpandParent: searchTerm ? true : autoExpandParent,
         onExpand
     };
 }

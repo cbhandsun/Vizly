@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * 共享路由配置管理
  * 
@@ -21,6 +20,15 @@ export type RoutingProfile = (prev: EdgeConfig) => Partial<EdgeConfig>;
 export type LayeredOverrides = Record<string, unknown>;
 
 // ─── 工具函数 ───────────────────────────────────────────────────
+
+const getNumericWeight = (
+    weights: EdgeConfig['handleWeights'],
+    key: string,
+    fallback: number,
+): number => {
+    const value = weights?.[key];
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+};
 
 /**
  * 将 autoPathSelection 同步到 DiagramConfig + LayeredConfigManager。
@@ -139,13 +147,13 @@ export const STANDARD_ROUTING_PROFILE: RoutingProfile = (prev) => ({
 
     // 合并后的权重（原 Effect 1 + Effect 3 的 handleWeights 合并）
     handleWeights: {
-        tbBias: typeof (prev.handleWeights || {} as any).tbBias === 'number' ? (prev.handleWeights || {} as any).tbBias : 220,
-        lrBias: typeof (prev.handleWeights || {} as any).lrBias === 'number' ? (prev.handleWeights || {} as any).lrBias : 140,
-        usagePenalty: typeof (prev.handleWeights || {} as any).usagePenalty === 'number' ? (prev.handleWeights || {} as any).usagePenalty : 12,
-        turn: typeof (prev.handleWeights || {} as any).turn === 'number' ? (prev.handleWeights || {} as any).turn : 12,
-        detourPenalty: typeof (prev.handleWeights || {} as any).detourPenalty === 'number' ? (prev.handleWeights || {} as any).detourPenalty : 600,
-        crossDomainPenalty: typeof (prev.handleWeights || {} as any).crossDomainPenalty === 'number' ? (prev.handleWeights as any).crossDomainPenalty : 8,
-        exitContainerPenalty: typeof (prev.handleWeights || {} as any).exitContainerPenalty === 'number' ? (prev.handleWeights as any).exitContainerPenalty : 10,
+        tbBias: getNumericWeight(prev.handleWeights, 'tbBias', 220),
+        lrBias: getNumericWeight(prev.handleWeights, 'lrBias', 140),
+        usagePenalty: getNumericWeight(prev.handleWeights, 'usagePenalty', 12),
+        turn: getNumericWeight(prev.handleWeights, 'turn', 12),
+        detourPenalty: getNumericWeight(prev.handleWeights, 'detourPenalty', 600),
+        crossDomainPenalty: getNumericWeight(prev.handleWeights, 'crossDomainPenalty', 8),
+        exitContainerPenalty: getNumericWeight(prev.handleWeights, 'exitContainerPenalty', 10),
     },
 });
 

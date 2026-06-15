@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Node, Edge } from '@xyflow/react';
 
 export interface DiagramPage {
@@ -34,7 +34,10 @@ export const useMultiPage = (
     ]);
     const [activePageId, setActivePageId] = useState(DEFAULT_PAGE_ID);
     const pagesRef = useRef(pages);
-    pagesRef.current = pages;
+
+    useEffect(() => {
+        pagesRef.current = pages;
+    }, [pages]);
 
     // 切换页面
     const switchPage = useCallback((targetPageId: string) => {

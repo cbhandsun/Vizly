@@ -1,5 +1,14 @@
-import { useState, useCallback } from 'react';
-import { appMessage as message } from '../../../utils/antdStaticBridge';
+import { useState, useCallback, useEffect } from 'react';
+import { appMessage } from '../../../utils/antdStaticBridge';
+import {
+    coerceActiveLayerId,
+    coerceLayers,
+    DEFAULT_LAYER,
+    readActiveLayerId,
+    readLayers,
+    writeActiveLayerId,
+    writeLayers,
+} from '../../../utils/layerStorage';
 
 export interface LayerConfig {
     id: string;            // 图层 ID
@@ -18,80 +27,98 @@ export interface LayersState {
 export const useLayerManagement = () => {
     // 从 localStorage 恢复图层配置
     const [layers, setLayers] = useState<LayerConfig[]>(() => {
-        try {
-            const saved = localStorage.getItem('flowchart.layers');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    return parsed;
-                }
-            }
-        } catch (error) {
-            console.warn('Failed to restore layer config:', error);
-        }
-        return [{ id: 'layer-0', name: '默认', visible: true, locked: false, zIndex: 0 }];
+        return readLayers();
     });
 
     const [activeLayerId, setActiveLayerId] = useState<string>(() => {
-        try {
-            const saved = localStorage.getItem('flowchart.activeLayerId');
-            return saved || 'layer-0';
-        } catch (error) {
-            return 'layer-0';
-        }
+        const initialLayers = readLayers();
+        return readActiveLayerId(initialLayers);
     });
 
+    useEffect(() => {
+        writeLayers(layers);
+    }, [layers]);
+
+    useEffect(() => {
+        const normalizedActiveLayerId = coerceActiveLayerId(activeLayerId, layers);
+        if (normalizedActiveLayerId !== activeLayerId) {
+            const timer = window.setTimeout(() => {
+                setActiveLayerId(normalizedActiveLayerId);
+            }, 0);
+            return () => window.clearTimeout(timer);
+        }
+        writeActiveLayerId(normalizedActiveLayerId, layers);
+    }, [activeLayerId, layers]);
+
     const createLayer = useCallback((name: string) => {
+        const normalizedName = name.trim().slice(0, 80);
+        if (!normalizedName) {
+            appMessage.warning('图层名称不能为空');
+            return;
+        }
         const newLayer: LayerConfig = {
             id: `layer-${Date.now()}`,
-            name,
+            name: normalizedName,
             visible: true,
             locked: false,
             zIndex: layers.length
         };
-        setLayers(prev => [...prev, newLayer]);
+        setLayers(prev => coerceLayers([...prev, newLayer]));
         setActiveLayerId(newLayer.id);
-        appMessage.success(`已创建图层 "${name}"`);
+        appMessage.success(`已创建图层 "${normalizedName}"`);
     }, [layers.length]);
 
     const deleteLayer = useCallback((layerId: string) => {
-        if (layerId === 'layer-0') {
+        if (layerId === DEFAULT_LAYER.id) {
             appMessage.warning('无法删除默认图层');
             return;
         }
         const layer = layers.find(l => l.id === layerId);
-        setLayers(prev => prev.filter(l => l.id !== layerId));
+        if (!layer) return;
+        setLayers(prev => coerceLayers(prev.filter(l => l.id !== layerId)));
         if (activeLayerId === layerId) {
-            setActiveLayerId('layer-0');
+            setActiveLayerId(DEFAULT_LAYER.id);
         }
         appMessage.success(`已删除图层 "${layer?.name}"`);
     }, [activeLayerId, layers]);
 
     const toggleVisibility = useCallback((layerId: string) => {
-        setLayers(prev => prev.map(l =>
+        setLayers(prev => coerceLayers(prev.map(l =>
             l.id === layerId ? { ...l, visible: !l.visible } : l
-        ));
+        )));
     }, []);
 
     const toggleLock = useCallback((layerId: string) => {
-        setLayers(prev => prev.map(l =>
+        setLayers(prev => coerceLayers(prev.map(l =>
             l.id === layerId ? { ...l, locked: !l.locked } : l
-        ));
+        )));
     }, []);
 
     const renameLayer = useCallback((layerId: string, newName: string) => {
-        setLayers(prev => prev.map(l =>
-            l.id === layerId ? { ...l, name: newName } : l
-        ));
+        const normalizedName = newName.trim().slice(0, 80);
+        if (!normalizedName) return;
+        setLayers(prev => coerceLayers(prev.map(l =>
+            l.id === layerId ? { ...l, name: normalizedName } : l
+        )));
     }, []);
 
     const reorderLayers = useCallback((fromIndex: number, toIndex: number) => {
         setLayers(prev => {
+            if (
+                !Number.isInteger(fromIndex)
+                || !Number.isInteger(toIndex)
+                || fromIndex < 0
+                || toIndex < 0
+                || fromIndex >= prev.length
+                || toIndex >= prev.length
+            ) {
+                return prev;
+            }
             const newLayers = [...prev];
             const [moved] = newLayers.splice(fromIndex, 1);
             newLayers.splice(toIndex, 0, moved);
             // 更新 zIndex
-            return newLayers.map((l, idx) => ({ ...l, zIndex: idx }));
+            return coerceLayers(newLayers.map((l, idx) => ({ ...l, zIndex: idx })));
         });
     }, []);
 
@@ -100,15 +127,22 @@ export const useLayerManagement = () => {
     }, [layers]);
 
     const setLayerColor = useCallback((layerId: string, color: string | undefined) => {
-        setLayers(prev => prev.map(l =>
+        setLayers(prev => coerceLayers(prev.map(l =>
             l.id === layerId ? { ...l, color } : l
-        ));
+        )));
     }, []);
+
+    const setActiveLayerIdSafe = useCallback((layerId: string) => {
+        setActiveLayerId(prev => {
+            const normalized = coerceActiveLayerId(layerId, layers);
+            return normalized || prev;
+        });
+    }, [layers]);
 
     return {
         layers,
         activeLayerId,
-        setActiveLayerId,
+        setActiveLayerId: setActiveLayerIdSafe,
         createLayer,
         deleteLayer,
         toggleVisibility,
