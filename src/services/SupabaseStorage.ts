@@ -1,5 +1,8 @@
 import { supabase } from './supabase';
 import { IStorageProvider, DiagramMetadata, SavedDiagram } from './storage/types';
+import { coerceRemoteDiagramContent } from './remoteDiagramContent';
+import { coerceCloudConfigRows, coerceCloudConfigValue, normalizeCloudConfigKey } from './cloudConfigSecurity';
+import { coerceVersionMessage, coerceVersionSnapshotData } from './versionSnapshotSecurity';
 
 // Backward compatibility export (type mostly)
 export type { SavedDiagram };
@@ -9,25 +12,45 @@ export class SupabaseStorageProvider implements IStorageProvider {
     id = 'supabase' as const;
 
     isConfigured(): boolean {
-        // Assume configured if module loaded (env vars checking could happen here)
-        return true;
+        return Boolean(supabase);
+    }
+
+    private async requireAuthenticatedUser(expectedUserId?: string): Promise<string> {
+        const { data: { user }, error } = await supabase!.auth.getUser();
+        if (error) throw error;
+        if (!user?.id) {
+            throw new Error('Supabase storage requires an authenticated user.');
+        }
+        if (expectedUserId && expectedUserId !== 'anonymous' && expectedUserId !== user.id) {
+            throw new Error('Supabase storage user mismatch.');
+        }
+        return user.id;
     }
 
     async saveDiagram(diagram: SavedDiagram): Promise<SavedDiagram> {
+        const authenticatedUserId = await this.requireAuthenticatedUser();
+        const ownerUserId = diagram.user_id && diagram.user_id !== 'anonymous'
+            ? diagram.user_id
+            : authenticatedUserId;
+        const content = coerceRemoteDiagramContent(diagram.content, {
+            id: diagram.id,
+            title: diagram.title || diagram.id,
+        });
+
         const { data, error } = await supabase!
             .from('diagrams')
             .upsert({
                 id: diagram.id,
                 title: diagram.title,
-                content: diagram.content,
-                user_id: diagram.user_id,
+                content,
+                user_id: ownerUserId,
                 updated_at: new Date().toISOString(),
             })
             .select()
             .single();
 
         if (error) throw error;
-        return data as SavedDiagram;
+        return this.normalizeSavedDiagram(data as SavedDiagram);
     }
 
     async listDiagrams(): Promise<DiagramMetadata[]> {
@@ -54,16 +77,22 @@ export class SupabaseStorageProvider implements IStorageProvider {
             .single();
 
         if (error) throw error;
-        return data as SavedDiagram;
+        return this.normalizeSavedDiagram(data as SavedDiagram);
     }
 
     async deleteDiagram(id: string): Promise<void> {
-        const { error } = await supabase!
+        await this.requireAuthenticatedUser();
+
+        const { data, error } = await supabase!
             .from('diagrams')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .select('id');
 
         if (error) throw error;
+        if (!Array.isArray(data) || data.length !== 1) {
+            throw new Error('Diagram was not deleted. It may not exist or you may not have permission to delete it.');
+        }
     }
 
     // === Version History (GAP-05) ===
@@ -74,13 +103,22 @@ export class SupabaseStorageProvider implements IStorageProvider {
              throw new Error("Version history requires a saved Cloud Diagram (UUID format required).");
         }
 
+        const { data: { user }, error: userError } = await supabase!.auth.getUser();
+        if (userError) throw userError;
+        if (!user?.id) {
+            throw new Error('Version history requires an authenticated user.');
+        }
+
+        const safeSnapshotData = coerceVersionSnapshotData(data);
+        const safeMessage = coerceVersionMessage(message);
+
         const { data: dbData, error } = await supabase!
             .from('diagram_versions')
             .insert({
                 diagram_id: diagramId,
-                snapshot_data: data,
-                message: message || '版本快照',
-                author_id: 'anonymous' // Can be replaced with actual user later
+                snapshot_data: safeSnapshotData,
+                message: safeMessage,
+                author_id: user.id
             })
             .select()
             .single();
@@ -88,10 +126,10 @@ export class SupabaseStorageProvider implements IStorageProvider {
         return {
             id: dbData.id,
             diagramId: dbData.diagram_id,
-            snapshotData: dbData.snapshot_data,
+            snapshotData: coerceVersionSnapshotData(dbData.snapshot_data),
             authorId: dbData.author_id,
             createdAt: new Date(dbData.created_at).getTime(),
-            message: dbData.message
+            message: coerceVersionMessage(dbData.message)
         };
     }
 
@@ -115,7 +153,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
             snapshotData: null, // Don't load snapshot data in list for performance
             authorId: item.author_id,
             createdAt: new Date(item.created_at).getTime(),
-            message: item.message
+            message: coerceVersionMessage(item.message)
         }));
     }
 
@@ -141,21 +179,26 @@ export class SupabaseStorageProvider implements IStorageProvider {
         return {
             id: data.id,
             diagramId: data.diagram_id,
-            snapshotData: data.snapshot_data,
+            snapshotData: coerceVersionSnapshotData(data.snapshot_data),
             authorId: data.author_id,
             createdAt: new Date(data.created_at).getTime(),
-            message: data.message
+            message: coerceVersionMessage(data.message)
         };
     }
 
     // === Config specific to Supabase user configs ===
     async saveConfig(key: string, value: any, user_id: string) {
+        const userId = await this.requireAuthenticatedUser(user_id);
+        const normalizedKey = normalizeCloudConfigKey(key);
+        if (!normalizedKey) throw new Error('Unsupported cloud config key');
+        const normalizedValue = coerceCloudConfigValue(normalizedKey, value);
+
         const { data, error } = await supabase!
             .from('user_configs')
             .upsert({
-                user_id: user_id,
-                key: key,
-                value: value,
+                user_id: userId,
+                key: normalizedKey,
+                value: normalizedValue,
                 updated_at: new Date().toISOString(),
             }, { onConflict: 'user_id,key' })
             .select()
@@ -166,23 +209,48 @@ export class SupabaseStorageProvider implements IStorageProvider {
     }
 
     async loadConfig(key: string) {
+        const userId = await this.requireAuthenticatedUser();
+        const normalizedKey = normalizeCloudConfigKey(key);
+        if (!normalizedKey) throw new Error('Unsupported cloud config key');
+
         const { data, error } = await supabase!
             .from('user_configs')
             .select('value')
-            .eq('key', key)
+            .eq('user_id', userId)
+            .eq('key', normalizedKey)
             .limit(1);
 
         if (error) throw error;
-        if (data && data.length > 0) return data[0].value;
+        if (data && data.length > 0) return coerceCloudConfigValue(normalizedKey, data[0].value);
         return null;
     }
 
     async loadAllConfigs() {
+        const userId = await this.requireAuthenticatedUser();
+
         const { data, error } = await supabase!
             .from('user_configs')
-            .select('key, value');
+            .select('key, value')
+            .eq('user_id', userId);
         if (error) throw error;
-        return data || [];
+        return coerceCloudConfigRows(data || []);
+    }
+
+    private normalizeSavedDiagram(diagram: SavedDiagram): SavedDiagram {
+        const title = typeof diagram.title === 'string' && diagram.title.trim()
+            ? diagram.title.trim()
+            : String(diagram.id || 'Untitled');
+        const id = String(diagram.id || title);
+        const content = coerceRemoteDiagramContent(diagram.content, { id, title });
+
+        return {
+            ...diagram,
+            id,
+            title: content.title || content.metadata?.title || content.name || title,
+            content,
+            updated_at: diagram.updated_at || new Date().toISOString(),
+            user_id: diagram.user_id || 'anonymous',
+        };
     }
 }
 

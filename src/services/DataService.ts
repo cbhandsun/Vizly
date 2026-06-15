@@ -15,9 +15,26 @@ import type {
   CacheItem,
   DomainTheme
 } from '@/core/models/DiagramModels';
-import { EdgeFactory } from '@/core/factories/EdgeFactory';
-import { unifiedStorage as storageService } from './UnifiedStorageService';
 import { localDB } from './IndexedDBStorage';
+import { parseRemoteDiagramContent } from './remoteDiagramContent';
+
+const UNSAFE_DIAGRAM_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
+const stripUnsafeDiagramKeys = <T>(value: T, depth = 0): T => {
+  if (value == null || typeof value !== 'object') return value;
+  if (depth > 20) return (Array.isArray(value) ? [] : {}) as T;
+
+  if (Array.isArray(value)) {
+    return value.map(item => stripUnsafeDiagramKeys(item, depth + 1)) as T;
+  }
+
+  const out: Record<string, unknown> = {};
+  for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+    if (UNSAFE_DIAGRAM_KEYS.has(key)) continue;
+    out[key] = stripUnsafeDiagramKeys(nestedValue, depth + 1);
+  }
+  return out as T;
+};
 
 // === 缓存管理器实现 ===
 
@@ -141,6 +158,7 @@ export class DataService {
   private cache: CacheManager;
   private adapters = new Map<DiagramType, DataAdapter>();
   private dataRegistry = new Map<string, StandardDiagramData>();
+  private queryCacheKeys = new Set<string>();
 
   private constructor() {
     this.cache = new MemoryCacheManager();
@@ -170,19 +188,45 @@ export class DataService {
       throw new Error(`Invalid diagram data: ${diagram?.id || 'null/undefined'}`);
     }
 
-    if (!DataValidator.validateDiagramData(diagram)) {
-      console.warn(`[DataService] Diagram "${diagram.id}" did not pass strict validation, registering with lenient mode.`);
+    const safeDiagram = stripUnsafeDiagramKeys(diagram);
+
+    if (!DataValidator.validateDiagramData(safeDiagram)) {
+      console.warn(`[DataService] Diagram "${safeDiagram.id}" did not pass strict validation, registering with lenient mode.`);
     }
 
-    this.dataRegistry.set(diagram.id, diagram);
-    this.cache.set(`diagram:${diagram.id}`, diagram);
+    this.dataRegistry.set(safeDiagram.id, safeDiagram);
+    this.cache.set(`diagram:${safeDiagram.id}`, safeDiagram);
+    this.invalidateQueryCache();
     
     if (persistToIndexedDB) {
       // Fire and forget, don't block the UI
-      localDB.saveDiagram(diagram).catch(err => {
+      localDB.saveDiagram(safeDiagram).catch(err => {
           console.error('[DataService] Failed to persist diagram to IndexedDB', err);
       });
     }
+  }
+
+  registerRemoteDiagram(
+    content: unknown,
+    fallback: { id: string; title: string },
+    persistToIndexedDB: boolean = true,
+    overrides: Partial<StandardDiagramData> = {}
+  ): StandardDiagramData {
+    const parsed = parseRemoteDiagramContent(content, fallback) as StandardDiagramData;
+    const diagram = {
+      ...parsed,
+      ...overrides,
+      metadata: {
+        ...(parsed.metadata || {}),
+        ...(overrides.metadata || {}),
+      },
+    } as StandardDiagramData;
+    this.registerDiagram(diagram, persistToIndexedDB);
+    const registered = this.getDiagram(diagram.id);
+    if (!registered) {
+      throw new Error(`Failed to register remote diagram: ${diagram.id}`);
+    }
+    return registered;
   }
 
   getDiagram(id: string): StandardDiagramData | null {
@@ -203,6 +247,7 @@ export class DataService {
   deleteDiagram(id: string, removeFromIndexedDB: boolean = true): void {
     this.dataRegistry.delete(id);
     this.cache.delete(`diagram:${id}`);
+    this.invalidateQueryCache();
     
     if (removeFromIndexedDB) {
         localDB.deleteDiagram(id).catch(err => {
@@ -264,7 +309,13 @@ export class DataService {
     };
 
     this.cache.set(cacheKey, result, 2 * 60 * 1000); // 2分钟缓存
+    this.queryCacheKeys.add(cacheKey);
     return result;
+  }
+
+  private invalidateQueryCache(): void {
+    this.queryCacheKeys.forEach(key => this.cache.delete(key));
+    this.queryCacheKeys.clear();
   }
 
   // === 节点数据管理 ===
@@ -378,12 +429,14 @@ export class DataService {
 
   async loadFromStorage(key: string): Promise<StandardDiagramData | null> {
     try {
+      const { unifiedStorage: storageService } = await import('./UnifiedStorageService');
       const savedData = await storageService.loadDiagram(key);
-      const diagramContent = savedData.content as StandardDiagramData;
+      const diagramContent = this.registerRemoteDiagram(savedData.content, {
+        id: savedData.id || key,
+        title: savedData.title || key,
+      });
 
       if (diagramContent && DataValidator.validateDiagramData(diagramContent)) {
-        // 注册到内存以便后续使用
-        this.registerDiagram(diagramContent);
         return diagramContent;
       }
       console.error('Loaded data is not a valid diagram');

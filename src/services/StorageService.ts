@@ -1,5 +1,7 @@
-import { S3Client, ListObjectsV2Command, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { IStorageProvider, DiagramMetadata, SavedDiagram } from './storage/types';
+import { coerceS3StorageConfig, redactSensitiveValue } from './storageSecurity';
+import { parseRemoteDiagramJson } from './remoteDiagramContent';
 
 export interface StorageConfig {
     endpoint: string;
@@ -18,6 +20,13 @@ export interface StorageItem {
 }
 
 const STORAGE_CONFIG_KEY = 'diagram_storage_config';
+const STORAGE_SECRET_SESSION_KEY = `${STORAGE_CONFIG_KEY}_secret`;
+
+const stripSecret = (config: StorageConfig): StorageConfig => ({
+    ...config,
+    secretAccessKey: '',
+});
+
 
 export class S3StorageProvider implements IStorageProvider {
     name = 'S3 Compatible Storage';
@@ -48,7 +57,23 @@ export class S3StorageProvider implements IStorageProvider {
         try {
             const stored = localStorage.getItem(STORAGE_CONFIG_KEY);
             if (stored) {
-                this.config = JSON.parse(stored);
+                const parsed = JSON.parse(stored);
+                const sessionSecret = sessionStorage.getItem(STORAGE_SECRET_SESSION_KEY) || '';
+                const safeConfig = coerceS3StorageConfig(parsed, sessionSecret);
+                if (!safeConfig) {
+                    localStorage.removeItem(STORAGE_CONFIG_KEY);
+                    sessionStorage.removeItem(STORAGE_SECRET_SESSION_KEY);
+                    return;
+                }
+
+                if (safeConfig.secretAccessKey && !sessionSecret) {
+                    sessionStorage.setItem(STORAGE_SECRET_SESSION_KEY, safeConfig.secretAccessKey);
+                }
+
+                this.config = safeConfig;
+                if (parsed.secretAccessKey) {
+                    localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(stripSecret(this.config)));
+                }
                 this.initializeClient();
             }
         } catch (e) {
@@ -57,8 +82,15 @@ export class S3StorageProvider implements IStorageProvider {
     }
 
     saveConfig(config: StorageConfig) {
-        this.config = config;
-        localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(config));
+        const existingSecret = sessionStorage.getItem(STORAGE_SECRET_SESSION_KEY) || '';
+        const safeConfig = coerceS3StorageConfig(config, config.secretAccessKey || existingSecret);
+        if (!safeConfig) {
+            throw new Error('S3 configuration is invalid. Endpoint must use HTTPS or local HTTP, and bucket, region, access key, and secret are required.');
+        }
+
+        this.config = safeConfig;
+        sessionStorage.setItem(STORAGE_SECRET_SESSION_KEY, this.config.secretAccessKey);
+        localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(stripSecret(this.config)));
         this.initializeClient();
     }
 
@@ -68,15 +100,23 @@ export class S3StorageProvider implements IStorageProvider {
 
     private initializeClient() {
         if (!this.config) return;
+        if (!this.config.secretAccessKey) {
+            this.client = null;
+            return;
+        }
 
-        this.client = new S3Client({
-            region: this.config.region,
-            endpoint: this.config.endpoint,
+        this.client = this.createClient(this.config);
+    }
+
+    private createClient(config: StorageConfig): S3Client {
+        return new S3Client({
+            region: config.region,
+            endpoint: config.endpoint,
             credentials: {
-                accessKeyId: this.config.accessKeyId,
-                secretAccessKey: this.config.secretAccessKey,
+                accessKeyId: config.accessKeyId,
+                secretAccessKey: config.secretAccessKey,
             },
-            forcePathStyle: this.config.s3ForcePathStyle ?? true, // Default to true for many S3 compatible services
+            forcePathStyle: config.s3ForcePathStyle ?? true, // Default to true for many S3 compatible services
         });
     }
 
@@ -128,13 +168,14 @@ export class S3StorageProvider implements IStorageProvider {
             }
 
             const str = await response.Body.transformToString();
-            const content = JSON.parse(str);
+            const fallbackTitle = id.replace(/\.json$/i, '');
+            const content = parseRemoteDiagramJson(str, { id, title: fallbackTitle });
 
             // Adapt to SavedDiagram
             // Use metadata from content if available, else standard fallback
             return {
                 id: id,
-                title: content.title || id.replace('.json', ''),
+                title: content.title || content.metadata?.title || content.name || fallbackTitle,
                 content: content,
                 updated_at: (response.LastModified || new Date()).toISOString(),
                 user_id: 's3-user' // S3 doesn't have inherent user concept here
@@ -185,43 +226,49 @@ export class S3StorageProvider implements IStorageProvider {
         }
 
         try {
-            const command = new DeleteObjectCommand({ // Need to import this
+            const command = new DeleteObjectCommand({
                 Bucket: this.config.bucket,
                 Key: id
             });
-            // Auto imports will fail if I don't add it to the top
-            // I'll assume I need to add DeleteObjectCommand to imports
             await this.client.send(command);
         } catch (error) {
-            // throw error; 
+            console.error("Delete diagram failed:", redactSensitiveValue(error));
+            throw error;
         }
     }
 
     // === Operations (Legacy / specific) ===
 
-    async testConnection(): Promise<boolean> {
-        if (!this.client || !this.config) {
+    async testConnection(config?: StorageConfig): Promise<boolean> {
+        const existingSecret = sessionStorage.getItem(STORAGE_SECRET_SESSION_KEY) || '';
+        const configToTest = config
+            ? coerceS3StorageConfig(config, config.secretAccessKey || existingSecret)
+            : this.config;
+
+        if (!configToTest) {
+            throw new Error('S3 configuration is invalid. Endpoint must use HTTPS or local HTTP, and bucket, region, access key, and secret are required.');
+        }
+
+        const client = config ? this.createClient(configToTest) : this.client;
+        if (!client) {
             throw new Error("Storage not configured");
         }
+
         try {
             const command = new ListObjectsV2Command({
-                Bucket: this.config.bucket,
+                Bucket: configToTest.bucket,
                 MaxKeys: 1
             });
-            await this.client.send(command);
+            await client.send(command);
             return true;
         } catch (error: any) {
             console.group("S3 Connection Test Failed");
-            console.error("Original Error:", error);
-            // ...
+            console.error("Original Error:", redactSensitiveValue(error));
             console.groupEnd();
             throw error;
         }
     }
 }
-
-// Additional import needed for DeleteObjectCommand
-import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 
 export const s3Storage = S3StorageProvider.getInstance();
 

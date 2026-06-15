@@ -1,11 +1,84 @@
-import { IStorageProvider, DiagramMetadata, SavedDiagram, DiagramVersion } from './storage/types';
-import { supabaseStorage } from './SupabaseStorage';
-import { s3Storage } from './StorageService';
+import type { IStorageProvider, DiagramMetadata, SavedDiagram, DiagramVersion } from './storage/types';
 import { localVersionDB } from './IndexedDBStorage';
+import { coerceS3StorageConfig } from './storageSecurity';
 
 export type StorageProviderType = 'supabase' | 's3';
 
 const STORAGE_PROVIDER_KEY = 'DiagramView.StorageProvider';
+const S3_CONFIG_KEY = 'diagram_storage_config';
+const S3_SECRET_SESSION_KEY = `${S3_CONFIG_KEY}_secret`;
+
+const isSupabaseConfigured = () => {
+    return Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
+};
+
+const isS3Configured = () => {
+    try {
+        const raw = localStorage.getItem(S3_CONFIG_KEY);
+        if (!raw) return false;
+        const config = coerceS3StorageConfig(
+            JSON.parse(raw),
+            sessionStorage.getItem(S3_SECRET_SESSION_KEY) || ''
+        );
+        return Boolean(config);
+    } catch {
+        return false;
+    }
+};
+
+class LazyStorageProvider implements IStorageProvider {
+    private providerPromise: Promise<IStorageProvider> | null = null;
+
+    constructor(
+        public readonly id: StorageProviderType,
+        public readonly name: string,
+        private readonly isReady: () => boolean,
+        private readonly loadProvider: () => Promise<IStorageProvider>
+    ) {}
+
+    isConfigured(): boolean {
+        return this.isReady();
+    }
+
+    private async provider(): Promise<IStorageProvider> {
+        this.providerPromise ??= this.loadProvider();
+        return this.providerPromise;
+    }
+
+    async listDiagrams(): Promise<DiagramMetadata[]> {
+        return (await this.provider()).listDiagrams();
+    }
+
+    async loadDiagram(id: string): Promise<SavedDiagram> {
+        return (await this.provider()).loadDiagram(id);
+    }
+
+    async saveDiagram(diagram: SavedDiagram): Promise<SavedDiagram> {
+        return (await this.provider()).saveDiagram(diagram);
+    }
+
+    async deleteDiagram(id: string): Promise<void> {
+        return (await this.provider()).deleteDiagram(id);
+    }
+
+    async saveVersion(diagramId: string, data: any, message?: string): Promise<DiagramVersion> {
+        const provider = await this.provider();
+        if (!provider.saveVersion) {
+            throw new Error(`${this.name} does not support version history.`);
+        }
+        return provider.saveVersion(diagramId, data, message);
+    }
+
+    async listVersions(diagramId: string): Promise<DiagramVersion[]> {
+        const provider = await this.provider();
+        return provider.listVersions ? provider.listVersions(diagramId) : [];
+    }
+
+    async loadVersion(diagramId: string, versionId: string): Promise<DiagramVersion | null> {
+        const provider = await this.provider();
+        return provider.loadVersion ? provider.loadVersion(diagramId, versionId) : null;
+    }
+}
 
 export class UnifiedStorageService implements IStorageProvider {
     name = 'Unified Storage';
@@ -25,8 +98,18 @@ export class UnifiedStorageService implements IStorageProvider {
 
     constructor() {
         this.providers = {
-            supabase: supabaseStorage,
-            s3: s3Storage
+            supabase: new LazyStorageProvider(
+                'supabase',
+                'Supabase Cloud',
+                isSupabaseConfigured,
+                async () => (await import('./SupabaseStorage')).supabaseStorage
+            ),
+            s3: new LazyStorageProvider(
+                's3',
+                'S3 Compatible Storage',
+                isS3Configured,
+                async () => (await import('./StorageService')).s3Storage
+            )
         };
         this.loadProviderPreference();
     }

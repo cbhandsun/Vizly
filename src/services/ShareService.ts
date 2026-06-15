@@ -4,6 +4,7 @@
  */
 
 import { supabase } from './supabase';
+import { coerceRemoteDiagramContent } from './remoteDiagramContent';
 
 // === 类型定义 ===
 
@@ -33,6 +34,13 @@ export interface CollaboratorRecord {
     email?: string; // 从 RPC 获取
 }
 
+export interface SharedWithMeRecord {
+    id: string;
+    title: string;
+    updatedAt: Date;
+    role: 'viewer' | 'editor' | 'owner';
+}
+
 // === Token 生成 ===
 
 function generateToken(): string {
@@ -45,13 +53,119 @@ function generateToken(): string {
         .slice(0, 22);
 }
 
+function isValidShareToken(token: string): boolean {
+    return /^[A-Za-z0-9_-]{16,128}$/.test(token);
+}
+
+function isValidUuid(id: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+}
+
+function normalizeInviteEmail(email: string): string | null {
+    const normalized = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return null;
+    return normalized;
+}
+
+function coerceSharedDiagram(diagram: any): any | null {
+    if (!diagram || !diagram.content) return null;
+
+    try {
+        return {
+            ...diagram,
+            content: coerceRemoteDiagramContent(diagram.content, {
+                id: String(diagram.id || 'shared-diagram'),
+                title: typeof diagram.title === 'string' ? diagram.title : 'Shared Diagram',
+            }),
+        };
+    } catch {
+        return null;
+    }
+}
+
+function coerceCollaboratorRecord(value: unknown): CollaboratorRecord | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const row = value as Record<string, unknown>;
+    const diagramId = typeof row.diagram_id === 'string' ? row.diagram_id.trim() : '';
+    const userId = typeof row.user_id === 'string' ? row.user_id.trim() : '';
+    const addedBy = typeof row.added_by === 'string' ? row.added_by.trim() : '';
+    const role = row.role;
+    const createdAt = typeof row.created_at === 'string' ? row.created_at : '';
+
+    if (!isValidUuid(diagramId) || !isValidUuid(userId) || !isValidUuid(addedBy)) return null;
+    if (role !== 'viewer' && role !== 'editor' && role !== 'owner') return null;
+    if (!createdAt || Number.isNaN(new Date(createdAt).getTime())) return null;
+
+    const email = typeof row.email === 'string' ? normalizeInviteEmail(row.email) : null;
+    return {
+        diagram_id: diagramId,
+        user_id: userId,
+        role,
+        added_by: addedBy,
+        created_at: createdAt,
+        ...(email ? { email } : {}),
+    };
+}
+
+function coerceSharedWithMeRecord(value: unknown): SharedWithMeRecord | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const row = value as Record<string, unknown>;
+    const diagramId = typeof row.diagram_id === 'string' ? row.diagram_id.trim() : '';
+    const role = row.role;
+    const createdAt = typeof row.created_at === 'string' ? row.created_at : '';
+    const diagram = Array.isArray(row.diagrams) ? row.diagrams[0] : row.diagrams;
+    const diagramRecord = diagram && typeof diagram === 'object' && !Array.isArray(diagram)
+        ? diagram as Record<string, unknown>
+        : {};
+    const id = typeof diagramRecord.id === 'string' && isValidUuid(diagramRecord.id)
+        ? diagramRecord.id
+        : diagramId;
+    const title = typeof diagramRecord.title === 'string' && diagramRecord.title.trim()
+        ? diagramRecord.title.trim()
+        : 'Unknown Diagram';
+    const updatedAtRaw = typeof diagramRecord.updated_at === 'string'
+        ? diagramRecord.updated_at
+        : createdAt;
+    const updatedAt = new Date(updatedAtRaw);
+
+    if (!isValidUuid(id)) return null;
+    if (role !== 'viewer' && role !== 'editor' && role !== 'owner') return null;
+    if (Number.isNaN(updatedAt.getTime())) return null;
+
+    return { id, title, updatedAt, role };
+}
+
 // === 分享服务 ===
 
 class ShareService {
+    private async assertDiagramOwner(diagramId: string, userId: string): Promise<void> {
+        const { data, error } = await supabase!
+            .from('diagrams')
+            .select('id,user_id')
+            .eq('id', diagramId)
+            .single();
+
+        if (error || !data || data.user_id !== userId) {
+            throw new Error('Share links require the authenticated diagram owner.');
+        }
+    }
+
     /**
      * 为指定图表创建分享链接
      */
     async createShareLink(options: CreateShareOptions): Promise<ShareRecord> {
+        if (!isValidUuid(options.diagramId)) {
+            throw new Error('Share links require a saved cloud diagram id.');
+        }
+
+        const { data: authData, error: authError } = await supabase!.auth.getUser();
+        if (authError) throw authError;
+        const userId = authData.user?.id;
+        if (!userId || userId !== options.userId) {
+            throw new Error('Share links require the authenticated owner.');
+        }
+        await this.assertDiagramOwner(options.diagramId, userId);
+
         const token = generateToken();
 
         const { data, error } = await supabase!
@@ -59,7 +173,7 @@ class ShareService {
             .insert({
                 diagram_id: options.diagramId,
                 share_token: token,
-                created_by: options.userId,
+                created_by: userId,
                 expires_at: options.expiresAt?.toISOString() ?? null,
                 is_active: true,
             })
@@ -77,11 +191,32 @@ class ShareService {
         share: ShareRecord;
         diagram: any;
     } | null> {
-        // 1. 查询分享记录
+        const normalizedToken = token.trim();
+        if (!isValidShareToken(normalizedToken)) return null;
+
+        const { data: rpcRow, error: rpcError } = await supabase!
+            .rpc('get_shared_diagram_by_token', { p_share_token: normalizedToken })
+            .maybeSingle();
+
+        if (!rpcError && rpcRow?.share && rpcRow?.diagram) {
+            const diagram = coerceSharedDiagram(rpcRow.diagram);
+            if (!diagram) return null;
+
+            return {
+                share: rpcRow.share as ShareRecord,
+                diagram,
+            };
+        }
+
+        // Older databases may not have the hardened RPC yet. Keep the legacy
+        // path as a compatibility fallback; RLS will still decide access.
+        const missingRpc = rpcError?.code === 'PGRST202' || rpcError?.code === '42883';
+        if (rpcError && !missingRpc) return null;
+
         const { data: share, error: shareError } = await supabase!
             .from('shared_diagrams')
             .select('*')
-            .eq('share_token', token)
+            .eq('share_token', normalizedToken)
             .eq('is_active', true)
             .single();
 
@@ -101,13 +236,24 @@ class ShareService {
 
         if (diagramError || !diagram) return null;
 
-        return { share: share as ShareRecord, diagram };
+        const safeDiagram = coerceSharedDiagram(diagram);
+        if (!safeDiagram) return null;
+
+        return { share: share as ShareRecord, diagram: safeDiagram };
     }
 
     /**
      * 查询指定图表的所有活跃分享链接
      */
     async listSharesForDiagram(diagramId: string): Promise<ShareRecord[]> {
+        if (!isValidUuid(diagramId)) return [];
+
+        const { data: authData, error: authError } = await supabase!.auth.getUser();
+        if (authError) throw authError;
+        const userId = authData.user?.id;
+        if (!userId) throw new Error('Share links require authentication.');
+        await this.assertDiagramOwner(diagramId, userId);
+
         const { data, error } = await supabase!
             .from('shared_diagrams')
             .select('*')
@@ -123,20 +269,50 @@ class ShareService {
      * 撤销分享
      */
     async revokeShare(shareId: string): Promise<void> {
-        const { error } = await supabase!
+        if (!isValidUuid(shareId)) {
+            throw new Error('Invalid share id.');
+        }
+
+        const { data: authData, error: authError } = await supabase!.auth.getUser();
+        if (authError) throw authError;
+        const userId = authData.user?.id;
+        if (!userId) throw new Error('Share links require authentication.');
+
+        const { data: share, error: shareLoadError } = await supabase!
+            .from('shared_diagrams')
+            .select('id,diagram_id')
+            .eq('id', shareId)
+            .single();
+
+        if (shareLoadError || !share?.diagram_id) {
+            throw new Error('Share link not found.');
+        }
+        await this.assertDiagramOwner(share.diagram_id, userId);
+
+        const { data, error } = await supabase!
             .from('shared_diagrams')
             .update({ is_active: false })
-            .eq('id', shareId);
+            .eq('id', shareId)
+            .select('id');
 
         if (error) throw error;
+        if (!Array.isArray(data) || data.length !== 1) {
+            throw new Error('Share link was not revoked. It may not exist or you may not have permission to revoke it.');
+        }
     }
 
     /**
      * 构造公开分享 URL (用于基于 Token 的分享)
      */
     buildShareUrl(token: string): string {
-        const base = window.location.origin;
-        return `${base}/shared?token=${token}`;
+        const normalizedToken = token.trim();
+        if (!isValidShareToken(normalizedToken)) {
+            throw new Error('Invalid share token.');
+        }
+
+        const path = window.location.pathname || '/';
+        const appPath = path.endsWith('/') ? path : `${path}/`;
+        return `${window.location.origin}${appPath}#/shared?token=${encodeURIComponent(normalizedToken)}`;
     }
 
     // ==========================================
@@ -147,9 +323,20 @@ class ShareService {
      * 通过邮箱添加协作者（调用 RPC）
      */
     async addCollaborator(diagramId: string, email: string, role: 'viewer' | 'editor' = 'viewer'): Promise<{ success: boolean; user_id?: string; error?: string }> {
+        if (!isValidUuid(diagramId)) {
+            throw new Error('Collaborators require a saved cloud diagram id.');
+        }
+        const targetEmail = normalizeInviteEmail(email);
+        if (!targetEmail) {
+            throw new Error('Invalid collaborator email.');
+        }
+        if (role !== 'viewer' && role !== 'editor') {
+            throw new Error('Invalid collaborator role.');
+        }
+
         const { data, error } = await supabase!.rpc('add_diagram_collaborator', {
             p_diagram_id: diagramId,
-            p_target_email: email,
+            p_target_email: targetEmail,
             p_role: role
         });
 
@@ -165,6 +352,8 @@ class ShareService {
      * 获取指定图表的协作者列表（包括其邮箱）
      */
     async listCollaborators(diagramId: string): Promise<CollaboratorRecord[]> {
+        if (!isValidUuid(diagramId)) return [];
+
         // 调用 RPC 获取关联了 auth.users 邮箱的列表
         const { data, error } = await supabase!.rpc('get_diagram_collaborators', {
             p_diagram_id: diagramId
@@ -175,24 +364,42 @@ class ShareService {
             throw new Error(error.message);
         }
 
-        return (data || []) as CollaboratorRecord[];
+        return (Array.isArray(data) ? data : [])
+            .map(coerceCollaboratorRecord)
+            .filter((record): record is CollaboratorRecord => record !== null);
     }
 
     /**
      * 移除协作者
      */
     async removeCollaborator(diagramId: string, targetUserId: string): Promise<void> {
-        const { error } = await supabase!
-            .from('diagram_collaborators')
-            .delete()
-            .eq('diagram_id', diagramId)
-            .eq('user_id', targetUserId);
+        if (!isValidUuid(diagramId) || !isValidUuid(targetUserId)) {
+            throw new Error('Invalid collaborator removal request.');
+        }
+
+        const { data, error } = await supabase!.rpc('remove_diagram_collaborator', {
+            p_diagram_id: diagramId,
+            p_target_user_id: targetUserId,
+        });
+
+        if (error) throw error;
+        if (data && data.success === false) {
+            throw new Error(data.error || 'Failed to remove collaborator');
+        }
+        if (!data || data.success !== true) {
+            throw new Error('Failed to remove collaborator');
+        }
     }
 
     /**
      * 获取“与我共享”的图表列表
      */
-    async listSharedWithMe(): Promise<any[]> {
+    async listSharedWithMe(): Promise<SharedWithMeRecord[]> {
+        const { data: authData, error: authError } = await supabase!.auth.getUser();
+        if (authError) throw authError;
+        const userId = authData.user?.id;
+        if (!userId) throw new Error('Shared diagrams require authentication.');
+
         const { data, error } = await supabase!
             .from('diagram_collaborators')
             .select(`
@@ -201,20 +408,13 @@ class ShareService {
                 created_at,
                 diagrams ( id, title, updated_at )
             `)
-            .eq('user_id', (await supabase!.auth.getUser()).data.user?.id);
+            .eq('user_id', userId);
 
         if (error) throw error;
 
-        // 映射为 DiagramMetadata 或类似的结构给前端用
-        return (data || []).map((row: any) => {
-            const diag = Array.isArray(row.diagrams) ? row.diagrams[0] : row.diagrams;
-            return {
-                id: diag?.id || row.diagram_id,
-                title: diag?.title || 'Unknown Diagram',
-                updatedAt: new Date(diag?.updated_at || row.created_at),
-                role: row.role // 附带权限信息
-            };
-        });
+        return (Array.isArray(data) ? data : [])
+            .map(coerceSharedWithMeRecord)
+            .filter((record): record is SharedWithMeRecord => record !== null);
     }
 }
 
