@@ -1,9 +1,8 @@
-// @ts-nocheck
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
-import type { Theme } from '@/core';
+import type { Theme } from '@/core/themes/types/ThemeTypes';
 import AntdThemeBridge from '../AntdThemeBridge';
 
 type ThemeManagerStub = {
@@ -46,37 +45,29 @@ const makeTheme = (mode: 'light' | 'dark', primary: string, neutralBg: string, n
 
 let themeChangeCb: ((t: Theme) => void) | null = null;
 let currentTheme: Theme = makeTheme('light', '#6366f1', '#fafafa', '#111827', '#e5e7eb');
-const integrationStub = {
-  getThemeManager: () => ({
-    getCurrentTheme: () => currentTheme,
-    addThemeChangeListener: (cb: (t: Theme) => void) => {
-      themeChangeCb = cb;
-      return () => { themeChangeCb = null; };
-    }
-  })
+const themeManagerStub: ThemeManagerStub = {
+  getCurrentTheme: () => currentTheme,
+  addThemeChangeListener: (cb: (t: Theme) => void) => {
+    themeChangeCb = cb;
+    return () => { themeChangeCb = null; };
+  }
 };
 
 vi.mock('@/core', () => {
   return {
-    AntdApiBridge: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-    useConfigIntegration: () => [
-      {
-        integration: {
-          getThemeManager: () => integrationStub.getThemeManager()
-        },
-        isReady: true,
-        isLoading: false,
-        error: null,
-        status: {
-          layeredConfigReady: true,
-          themeSystemReady: true,
-          validationReady: true,
-          performanceOptimizerReady: true,
-          migrationComplete: true
-        }
-      },
-      {}
-    ]
+    __esModule: true
+  };
+});
+
+vi.mock('@/core/components/shared/AntdApiBridge', () => {
+  return {
+    AntdApiBridge: ({ children }: { children: React.ReactNode }) => <>{children}</>
+  };
+});
+
+vi.mock('@/core/themes/EnhancedThemeManager', () => {
+  return {
+    getThemeManager: () => themeManagerStub
   };
 });
 

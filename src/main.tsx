@@ -29,6 +29,8 @@ if (process.env.NODE_ENV === 'production') {
   performanceMonitor.setEnabled(true);
 }
 
+const DATA_REGISTRY_BACKGROUND_WARMUP_DELAY_MS = 8000;
+
 const initializeDataRegistryAfterPaint = () => {
   const run = () => {
     import('./data/DataRegistry')
@@ -48,9 +50,9 @@ const initializeDataRegistryAfterPaint = () => {
     };
 
     if (document.readyState === 'complete') {
-      window.setTimeout(scheduleIdle, 3000);
+      window.setTimeout(scheduleIdle, DATA_REGISTRY_BACKGROUND_WARMUP_DELAY_MS);
     } else {
-      window.addEventListener('load', () => window.setTimeout(scheduleIdle, 3000), { once: true });
+      window.addEventListener('load', () => window.setTimeout(scheduleIdle, DATA_REGISTRY_BACKGROUND_WARMUP_DELAY_MS), { once: true });
     }
   } else {
     run();

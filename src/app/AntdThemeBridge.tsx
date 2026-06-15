@@ -1,8 +1,9 @@
-// @ts-nocheck
 import React, { useEffect, useMemo, useState } from 'react';
-import { ConfigProvider, App as AntdApp, theme as antdTheme } from 'antd';
-import { useConfigIntegration } from '@/core/hooks/useConfigIntegration';
+import AntdApp from 'antd/es/app';
+import ConfigProvider from 'antd/es/config-provider';
+import antdTheme from 'antd/es/theme';
 import { AntdApiBridge } from '@/core/components/shared/AntdApiBridge';
+import { getThemeManager } from '@/core/themes/EnhancedThemeManager';
 import type { Theme } from '@/core/themes/types/ThemeTypes';
 
 type BridgeTokens = {
@@ -121,12 +122,10 @@ const applyCssVariables = (t: BridgeTokens, theme: Theme | null) => {
 };
 
 export const AntdThemeBridge: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [state] = useConfigIntegration({ autoInitialize: true });
   const [tokens, setTokens] = useState<BridgeTokens>(fallbackTokens);
 
   useEffect(() => {
-    const tm = state.integration?.getThemeManager?.();
-    if (!tm) return;
+    const tm = getThemeManager();
 
     const sync = (nextTheme: Theme | null) => {
       const next = toBridgeTokens(nextTheme);
@@ -137,7 +136,7 @@ export const AntdThemeBridge: React.FC<{ children: React.ReactNode }> = ({ child
     sync(tm.getCurrentTheme?.() ?? null);
     const unsubscribe = tm.addThemeChangeListener?.((nextTheme: Theme) => sync(nextTheme ?? null));
     return () => { if (unsubscribe) unsubscribe(); };
-  }, [state.integration]);
+  }, []);
 
   const algorithm = useMemo(() => {
     return tokens.mode === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm;

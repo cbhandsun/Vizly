@@ -1,15 +1,38 @@
 
 import React, { Suspense } from 'react';
 import { useLocation } from 'react-router-dom';
-const DiagramViewer = React.lazy(() => import('@/components/DiagramViewer'));
-const ThemeColorComparison = React.lazy(() => import('@/pages/ThemeColorComparison'));
-const ThemeSideBySideComparison = React.lazy(() => import('@/pages/ThemeSideBySideComparison'));
-const DocsPreview = React.lazy(() => import('@/pages/DocsPreview'));
-const Warehouse3DPage = React.lazy(() => import('@/pages/Warehouse3DPage'));
-const StorageConfigPage = React.lazy(() => import('@/pages/StorageConfigPage'));
-const DiagramManagementPage = React.lazy(() => import('@/pages/DiagramManagementPage'));
-const ShareViewPage = React.lazy(() => import('@/pages/ShareViewPage'));
-const UnifiedDesignerTestPage = React.lazy(() => import('@/pages/UnifiedDesignerTestPage'));
+type LazyPageModule = { default: React.ComponentType };
+
+const withAntdRoute = (loadPage: () => Promise<LazyPageModule>) => React.lazy(async () => {
+  const [{ default: AntdRouteShell }, { default: Page }] = await Promise.all([
+    import('./AntdRouteShell'),
+    loadPage(),
+  ]);
+
+  return {
+    default: () => (
+      <AntdRouteShell>
+        <Page />
+      </AntdRouteShell>
+    ),
+  };
+});
+
+const DiagramViewerRoute = withAntdRoute(() => import('./DiagramViewerRoute'));
+const ThemeColorComparison = withAntdRoute(() => import('@/pages/ThemeColorComparison'));
+const ThemeSideBySideComparison = withAntdRoute(() => import('@/pages/ThemeSideBySideComparison'));
+const DocsPreview = withAntdRoute(() => import('@/pages/DocsPreview'));
+const Warehouse3DPage = withAntdRoute(() => import('@/pages/Warehouse3DPage'));
+const StorageConfigPage = withAntdRoute(() => import('@/pages/StorageConfigPage'));
+const DiagramManagementPage = withAntdRoute(() => import('@/pages/DiagramManagementPage'));
+const ShareViewPage = withAntdRoute(() => import('@/pages/ShareViewPage'));
+const UnifiedDesignerTestPage = withAntdRoute(() => import('@/pages/UnifiedDesignerTestPage'));
+
+const renderRoute = (fallback: string, RouteComponent: React.ComponentType) => (
+  <Suspense fallback={<div style={{ padding: 16 }}>{fallback}</div>}>
+    <RouteComponent />
+  </Suspense>
+);
 
 const AppRoutes = () => {
   // 根据路径或查询参数决定显示哪个组件
@@ -29,77 +52,41 @@ const AppRoutes = () => {
 
   // 如果URL参数包含test=colors，显示主题颜色对比测试页面
   if (testMode === 'colors') {
-    return (
-      <Suspense fallback={<div style={{ padding: 16 }}>加载主题对比页面...</div>}>
-        <ThemeColorComparison />
-      </Suspense>
-    );
+    return renderRoute('加载主题对比页面...', ThemeColorComparison);
   }
 
   if (testMode === 'sidebyside') {
-    return (
-      <Suspense fallback={<div style={{ padding: 16 }}>加载并排对比页面...</div>}>
-        <ThemeSideBySideComparison />
-      </Suspense>
-    );
+    return renderRoute('加载并排对比页面...', ThemeSideBySideComparison);
   }
 
   if (path.startsWith('/docs') || testMode === 'docs') {
-    return (
-      <Suspense fallback={<div style={{ padding: 16 }}>加载文档预览页面...</div>}>
-        <DocsPreview />
-      </Suspense>
-    );
+    return renderRoute('加载文档预览页面...', DocsPreview);
   }
 
   if (path.startsWith('/warehouse-3d') || testMode === '3d') {
-    return (
-      <Suspense fallback={<div style={{ padding: 16 }}>Loading 3D Warehouse...</div>}>
-        <Warehouse3DPage />
-      </Suspense>
-    );
+    return renderRoute('Loading 3D Warehouse...', Warehouse3DPage);
   }
 
   if (path.startsWith('/storage-config')) {
-    return (
-      <Suspense fallback={<div style={{ padding: 16 }}>加载存储配置...</div>}>
-        <StorageConfigPage />
-      </Suspense>
-    );
+    return renderRoute('加载存储配置...', StorageConfigPage);
   }
 
   if (path.startsWith('/shared')) {
-    return (
-      <Suspense fallback={<div style={{ padding: 16 }}>加载分享页面...</div>}>
-        <ShareViewPage />
-      </Suspense>
-    );
+    return renderRoute('加载分享页面...', ShareViewPage);
   }
 
   const isHomeEmpty = (path === '/' || path === '') && !urlParams.has('diagram') && !testMode;
 
   if (path.startsWith('/manage') || isHomeEmpty) {
-    return (
-      <Suspense fallback={<div style={{ padding: 16 }}>加载图表管理...</div>}>
-        <DiagramManagementPage />
-      </Suspense>
-    );
+    return renderRoute('加载图表管理...', DiagramManagementPage);
   }
 
   if (path.startsWith('/unified-test') || testMode === 'unified') {
-    return (
-      <Suspense fallback={<div style={{ padding: 16 }}>加载统一外壳测试页...</div>}>
-        <UnifiedDesignerTestPage />
-      </Suspense>
-    );
+    return renderRoute('加载统一外壳测试页...', UnifiedDesignerTestPage);
   }
 
   // 默认显示正常的图表查看器
-  return (
-    <Suspense fallback={<div style={{ padding: 16 }}>加载图表...</div>}>
-      <DiagramViewer />
-    </Suspense>
-  );
+  return renderRoute('加载图表...', DiagramViewerRoute);
 };
 
 export default AppRoutes;
