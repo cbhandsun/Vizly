@@ -624,7 +624,7 @@ export class EdgeFactory {
       return tc.stroke || tc.border || tc.main || tc.text;
     };
 
-    const getDomainColor = (domainClass?: string, domain?: string): string | undefined => {
+    const getDomainColor = (domainClass?: string, _domain?: string): string | undefined => {
       if (!themeManager) return undefined;
       /**
        * 函数级注释：按域键解析获取主题颜色

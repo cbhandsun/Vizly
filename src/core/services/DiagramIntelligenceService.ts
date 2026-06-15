@@ -47,7 +47,7 @@ export class DiagramIntelligenceService {
      */
     public async optimize(nodes: Node[], edges: Edge[]): Promise<OptimizationResult> {
         let currentNodes = [...nodes];
-        let currentEdges = [...edges];
+        const currentEdges = [...edges];
         let rectifiedOverlaps = 0;
         let alignedNodes = 0;
 

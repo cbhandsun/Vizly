@@ -82,7 +82,7 @@ interface DiagramState {
   onEdgesChange: (changes: EdgeChange[]) => void;
 }
 
-export const useDiagramStore = create<DiagramState>((set, get) => ({
+export const useDiagramStore = create<DiagramState>((set, _get) => ({
   nodes: [],
   edges: [],
   selectedNodes: [],

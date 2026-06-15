@@ -1,9 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Node, Edge } from '@xyflow/react'
 import { StandardDiagramData, StandardEdgeData, LayoutMetadata } from '../models/DiagramModels'
 import { OrchestrationOptions } from '../types/diagrams'
 import { LayoutType, LayoutOptions } from '../types/layout'
-import { ILayoutStrategy, LayoutStrategyManager } from '../strategies/LayoutStrategyManager'
+import { LayoutStrategyManager } from '../strategies/LayoutStrategyManager'
 import { EnhancedThemeManager as ThemeManager } from '../themes/EnhancedThemeManager'
 import { getConfigIntegration } from '../config/ConfigIntegration'
 import { diagramConfigManager } from '../components/config/DiagramConfig'
@@ -239,7 +238,7 @@ export class DiagramOrchestrator {
     } catch { void 0; }
 
     if (layoutType) {
-      let strategy = this.layoutStrategies.getStrategy(layoutType)
+      let strategy = await this.layoutStrategies.getStrategyAsync(layoutType)
       if (!strategy && typeof layoutType === 'string') {
         const rawName = String(layoutType).trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '')
         const fallbackAlias: Record<string, string> = {
@@ -256,7 +255,7 @@ export class DiagramOrchestrator {
           advancedelklayout: 'DomainVerticalLayout'
         }
         const fb = fallbackAlias[rawName]
-        if (fb) strategy = this.layoutStrategies.getStrategy(fb)
+        if (fb) strategy = await this.layoutStrategies.getStrategyAsync(fb)
       }
       if (!strategy) throw new Error(`Unsupported layout type: ${layoutType}`)
       let layoutOptions = this.convertLayoutMetadataToOptions(data.layout)

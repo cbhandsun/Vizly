@@ -3,7 +3,6 @@ import type { StandardDiagramData, StandardNodeData, StandardEdgeData } from '..
 import { NodeFactory } from '../factories/NodeFactory';
 import { EdgeFactory, EdgeStyleType, EdgeType } from '../factories/EdgeFactory';
 import { diagramConfigManager } from '../components/config/DiagramConfig';
-import type { Theme } from '../themes/types/ThemeTypes';
 import { getThemeManager } from '../themes';
 
 /**

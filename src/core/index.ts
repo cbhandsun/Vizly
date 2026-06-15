@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 export { default as FlowchartDesigner } from './components/diagrams/FlowchartDesigner';
 export * from './types/common';
 // removed to avoid diagramConfig duplicate
@@ -17,9 +15,11 @@ export { BaseDiagramComponent, type BaseDiagramConfig } from './components/diagr
 export { ModernFlowchartSidebar } from './components/diagrams/ModernFlowchartSidebar';
 export { default as MermaidDiagram, type MermaidDiagramProps } from './components/diagrams/MermaidDiagram';
 export { getEdgeLabelStyleMenuItems } from './components/diagrams/EdgeLabelStyleMenu';
-export { EdgeUpdateProvider, useEdgeUpdate, useEdgeTheme, type Waypoint } from './components/diagrams/EdgeUpdateContext';
+export { EdgeUpdateProvider, type Waypoint } from './components/diagrams/EdgeUpdateContext';
+export { useEdgeUpdate, useEdgeTheme } from './components/diagrams/useEdgeUpdate';
 export { EditableLabel } from './components/diagrams/EditableLabel';
-export { NodeUpdateProvider, useNodeUpdate, useBusinessData } from './components/diagrams/NodeUpdateContext';
+export { NodeUpdateProvider } from './components/diagrams/NodeUpdateContext';
+export { useNodeUpdate, useBusinessData } from './components/diagrams/useNodeUpdate';
 export { useCollapsibleGroups, getDescendantIds } from './components/diagrams/hooks/useCollapsibleGroups';
 export { DesignerRightSidebar } from './components/diagrams/DesignerRightSidebar';
 export * from './components/diagrams/hooks/useSmartRoutingConfig';
@@ -126,7 +126,9 @@ export { getDomainTheme } from './components/shared/layoutUtils';
 export { default as AppLayout } from './components/layout/AppLayout';
 export { AntdApiBridge } from './components/shared/AntdApiBridge';
 export { CryptoService } from './utils/CryptoService';
-export { ErrorBoundary, withErrorBoundary } from './components/shared/ErrorBoundary';
+export { ErrorBoundary } from './components/shared/ErrorBoundary';
+export { withErrorBoundary } from './components/shared/withErrorBoundary';
+export { useErrorHandler } from './components/shared/useErrorHandler';
 export { usePanelZoom } from './hooks/usePanelZoom';
 export { fetchRemoteDiagramPreview } from './utils/remoteDiagramPreview';
 export * from './themes/types/ThemeTypes';

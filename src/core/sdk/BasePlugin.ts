@@ -10,9 +10,63 @@ import {
   PropertyEditorExtension
 } from '../types/plugin';
 
-import { reactFlowAdapter } from '../services/ReactFlowAdapter';
 import { coerceToStandardDiagramData } from '../utils/coerceDiagram';
 import { diagramStyleManager } from '../components/shared/DiagramStyleManager';
+
+const standardDataToReactFlowLightweight = (standardData: any): { nodes: Node[]; edges: Edge[] } => {
+  const nodes = (standardData.nodes || []).map((nodeData: any, index: number) => {
+    const metadata = nodeData.metadata || {};
+    const description = nodeData.description || nodeData.label || '';
+    const label = nodeData.label || String(description).replace(/<[^>]*>?/gm, '').slice(0, 40) || nodeData.id;
+    const width = metadata.width ?? nodeData.width ?? metadata.style?.width ?? 160;
+    const height = metadata.height ?? nodeData.height ?? metadata.style?.height ?? 80;
+
+    return {
+      id: nodeData.id,
+      type: nodeData.type || 'custom',
+      position: metadata.canvasPosition || nodeData.position || { x: 120 + (index % 4) * 180, y: 120 + Math.floor(index / 4) * 120 },
+      parentId: nodeData.parentId || metadata.parentId,
+      data: {
+        ...(nodeData.data || {}),
+        ...metadata,
+        label,
+        description,
+        domain: nodeData.domain,
+        domainClass: nodeData.domainClass,
+        subDomain: nodeData.subDomain,
+      },
+      style: {
+        ...(metadata.style || {}),
+        width,
+        height,
+      },
+      width,
+      height,
+      measured: { width, height },
+    } as Node;
+  });
+
+  const edges = (standardData.edges || []).map((edgeData: any) => {
+    const metadata = edgeData.metadata || {};
+    return {
+      id: edgeData.id ?? `e-${edgeData.source}-${edgeData.target}`,
+      source: edgeData.source,
+      target: edgeData.target,
+      sourceHandle: edgeData.sourceHandle ?? metadata.sourceHandle,
+      targetHandle: edgeData.targetHandle ?? metadata.targetHandle,
+      type: edgeData.type === 'main' ? 'advanced-smart-step' : edgeData.type || 'advanced-smart-step',
+      label: edgeData.label,
+      markerEnd: edgeData.markerEnd || { type: MarkerType.ArrowClosed },
+      style: edgeData.style,
+      data: {
+        ...(edgeData.data || {}),
+        ...metadata,
+      },
+    } as Edge;
+  });
+
+  return { nodes, edges };
+};
 
 /**
  * BaseDiagramPlugin - Vizly 插件基类
@@ -39,7 +93,7 @@ export abstract class BaseDiagramPlugin implements DiagramTypePlugin {
   /** 
    * 生命周期：捕获旧版本数据并洗牌升迁至当前最新结构 
    */
-  async migrate(data: any, fromVersion: string | undefined): Promise<any> {
+  async migrate(data: any, _fromVersion: string | undefined): Promise<any> {
     return data;
   }
 
@@ -100,7 +154,7 @@ export abstract class BaseDiagramPlugin implements DiagramTypePlugin {
           id: this.id + '_' + Date.now(),
           title: this.name 
         });
-        return reactFlowAdapter.toReactFlow(standardData);
+        return standardDataToReactFlowLightweight(standardData);
       }
     } catch (e) {
       console.warn(`[${this.id}] Standard data coercion failed, falling back to raw:`, e);
@@ -146,23 +200,23 @@ export abstract class BaseDiagramPlugin implements DiagramTypePlugin {
   }
 
   // ====== UI 扩展贡献 ======
-  contributeToolbar?(ctx: PluginContext): React.ReactNode {
+  contributeToolbar?(_ctx: PluginContext): React.ReactNode {
     return null;
   }
 
-  contributeSidebarPanels?(ctx: PluginContext): SidebarPanel[] {
+  contributeSidebarPanels?(_ctx: PluginContext): SidebarPanel[] {
     return [];
   }
 
-  contributeShortcuts?(ctx: PluginContext): KeyboardShortcut[] {
+  contributeShortcuts?(_ctx: PluginContext): KeyboardShortcut[] {
     return [];
   }
 
-  contributeCommands?(ctx: PluginContext): CommandItem[] {
+  contributeCommands?(_ctx: PluginContext): CommandItem[] {
     return [];
   }
 
-  contributePropertyEditors?(ctx: PluginContext): PropertyEditorExtension[] {
+  contributePropertyEditors?(_ctx: PluginContext): PropertyEditorExtension[] {
     return [];
   }
 
