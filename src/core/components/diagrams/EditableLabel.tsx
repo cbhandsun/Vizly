@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { sanitizeInlineHtml } from '../../utils/sanitizeHtml';
 
 interface EditableLabelProps {
     value: string;
@@ -107,7 +108,7 @@ export const EditableLabel: React.FC<EditableLabelProps> = React.memo(({
         setIsEditing(false);
         onEditingChange?.(false);
         if (editRef.current) {
-            const html = editRef.current.innerHTML;
+            const html = sanitizeInlineHtml(editRef.current.innerHTML);
             // Normalize: if content is just plain text (no tags), store as plain text
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = html;
@@ -125,7 +126,7 @@ export const EditableLabel: React.FC<EditableLabelProps> = React.memo(({
             handleBlur();
         } else if (e.key === 'Escape') {
             if (editRef.current) {
-                editRef.current.innerHTML = originalValueRef.current;
+                editRef.current.innerHTML = sanitizeInlineHtml(originalValueRef.current);
             }
             setIsEditing(false);
             onEditingChange?.(false);
@@ -163,7 +164,7 @@ export const EditableLabel: React.FC<EditableLabelProps> = React.memo(({
                     ref={editRef}
                     contentEditable
                     suppressContentEditableWarning
-                    dangerouslySetInnerHTML={{ __html: value }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(value) }}
                     onBlur={handleBlur}
                     onKeyDown={handleKeyDown}
                     style={{
@@ -192,7 +193,7 @@ export const EditableLabel: React.FC<EditableLabelProps> = React.memo(({
             onDoubleClick={handleDoubleClick}
             style={{ cursor: 'text', ...style }}
             className={className}
-            dangerouslySetInnerHTML={{ __html: value }}
+            dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(value) }}
         />
     );
 });

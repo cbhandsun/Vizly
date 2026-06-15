@@ -48,9 +48,9 @@ function useDebouncedCallback<T extends (...args: any[]) => void>(
         timeoutRef.current = setTimeout(() => callbackRef.current(...args), delay);
     }, [delay]) as T;
 
-    (debouncedCallback as any).cancel = () => {
+    useEffect(() => () => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
+    }, []);
 
     return debouncedCallback;
 }

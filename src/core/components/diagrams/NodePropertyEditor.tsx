@@ -15,7 +15,6 @@ import {
     Row,
     Col,
     Slider,
-    _DatePicker,
     Button,
     Switch
 } from 'antd';
@@ -28,7 +27,6 @@ import {
     AlignLeftOutlined,
     AlignCenterOutlined,
     AlignRightOutlined,
-    ClockCircleOutlined,
     _PlusOutlined,
     _DeleteOutlined,
     _ArrowUpOutlined,
@@ -36,6 +34,7 @@ import {
     _SearchOutlined
 } from '@ant-design/icons';
 import { FaSearch } from 'react-icons/fa';
+import { Clock } from 'lucide-react';
 import type { Color } from 'antd/es/color-picker';
 import type { CollapseProps } from 'antd';
 
@@ -360,7 +359,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
 
         items.push({
             key: 'timelineSettings',
-            label: <Space><ClockCircleOutlined />时间线配置</Space>,
+            label: <Space><Clock size={14} strokeWidth={2} />时间线配置</Space>,
             children: (
                 <Form layout="vertical" size="small">
                     <Form.Item label="日期/排期">
@@ -397,7 +396,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
     if (isArrowTimelineNodes) {
         items.push({
             key: 'arrowTimelineSettings',
-            label: <Space><ClockCircleOutlined />时间节点配置</Space>,
+            label: <Space><Clock size={14} strokeWidth={2} />时间节点配置</Space>,
             children: (
                 <ArrowTimelineEventsEditor
                     selectedNodes={selectedNodes}
@@ -513,7 +512,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                     selectedNodes={selectedNodes}
                     updateNodes={updateNodes}
                     armSnapshot={armSnapshot}
-                    onShowIconExplorer={(onSelect) => {
+                    onShowIconExplorer={(_onSelect) => {
                         // For simplicity, we trigger the shared explorer.
                         // If we needed specific logic, we'd pass it through.
                         // But since onShowIconExplorer in params takes no args,

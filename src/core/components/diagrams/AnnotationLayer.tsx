@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { theme, Input, Button, Tooltip, Popconfirm } from 'antd';
-import { CheckOutlined, DeleteOutlined, EditOutlined, CloseOutlined } from '@ant-design/icons';
+import { CheckOutlined, DeleteOutlined, CloseOutlined } from '@ant-design/icons';
 import type { CommentThread as Annotation } from '../../store/useDiagramStore';
 import { useDiagramStore } from '../../store/useDiagramStore';
 
@@ -29,7 +29,6 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
     const [activeId, setActiveId] = useState<string | null>(null);
     const [editText, setEditText] = useState('');
     const [pendingPos, setPendingPos] = useState<{ x: number; y: number } | null>(null);
-    const textAreaRef = useRef<any>(null);
 
     // 批注模式下点击画布空白处创建新批注
     const handleCanvasClick = useCallback((e: React.MouseEvent) => {
@@ -60,13 +59,6 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
         setEditText('');
     }, [pendingPos, editText, onAdd]);
 
-    // 打开编辑
-    const handleOpenEdit = useCallback((ann: Annotation) => {
-        setActiveId(ann.id);
-        setEditText(ann.text);
-        setPendingPos(null);
-    }, []);
-
     // 保存编辑
     const handleSaveEdit = useCallback(() => {
         if (activeId) {
@@ -89,17 +81,13 @@ export const AnnotationLayer: React.FC<AnnotationLayerProps> = ({
 
     // 页面切换时重置编辑状态
     useEffect(() => {
-        setActiveId(null);
-        setPendingPos(null);
-        setEditText('');
+        const timer = window.setTimeout(() => {
+            setActiveId(null);
+            setPendingPos(null);
+            setEditText('');
+        }, 0);
+        return () => window.clearTimeout(timer);
     }, [activePageId]);
-
-    // 自动聚焦
-    useEffect(() => {
-        if (pendingPos && textAreaRef.current) {
-            setTimeout(() => textAreaRef.current?.focus(), 50);
-        }
-    }, [pendingPos]);
 
     // 没有批注、不在批注模式且无待处理状态时，完全不渲染
     if (!annotationMode && annotations.length === 0 && !pendingPos && !activeId) {

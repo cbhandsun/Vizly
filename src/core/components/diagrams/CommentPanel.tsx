@@ -1,13 +1,10 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Input, List, Button, Tag, Typography, Empty, Flex, theme, Space, Badge, Tooltip } from 'antd';
+import { Input, List, Button, Tag, Typography, Empty, Flex, theme, Space, Tooltip } from 'antd';
 import { FaSearch, FaCheck, FaTrash, FaChevronRight, FaRegCommentDots } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { useDiagramStore } from '../../store/useDiagramStore';
 import { useReactFlow } from '@xyflow/react';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
-
-dayjs.extend(relativeTime);
+import { formatRelativeTime } from '../../utils/formatRelativeTime';
 
 const { Text } = Typography;
 
@@ -134,7 +131,7 @@ export const CommentPanel: React.FC = () => {
                                             <Text strong style={{ fontSize: 13 }}>{item.authorName}</Text>
                                         </Space>
                                         <Text type="secondary" style={{ fontSize: 11 }}>
-                                            {dayjs(item.createdAt).fromNow()}
+                                            {formatRelativeTime(item.createdAt)}
                                         </Text>
                                     </Flex>
                                     

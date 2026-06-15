@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Input, Button, List, Typography, Flex, Space, theme, Divider, Avatar } from 'antd';
 import { FaCheck, FaTrash, FaPaperPlane } from 'react-icons/fa';
 import { useDiagramStore, Comment } from '../../store/useDiagramStore';
-import dayjs from 'dayjs';
+import { formatRelativeTime } from '../../utils/formatRelativeTime';
 
 const { Text, Paragraph } = Typography;
 
@@ -57,7 +57,7 @@ export const CommentEditor: React.FC<CommentEditorProps> = ({ comment, onClose }
                             </Avatar>
                             <Flex vertical>
                                 <Text strong style={{ fontSize: 13, lineHeight: 1 }}>{comment.authorName}</Text>
-                                <Text type="secondary" style={{ fontSize: 10 }}>{dayjs(comment.createdAt).fromNow()}</Text>
+                                <Text type="secondary" style={{ fontSize: 10 }}>{formatRelativeTime(comment.createdAt)}</Text>
                             </Flex>
                         </Space>
                         <Space size={4}>
@@ -98,7 +98,7 @@ export const CommentEditor: React.FC<CommentEditorProps> = ({ comment, onClose }
                                 <Flex vertical gap={2} style={{ width: '100%' }}>
                                     <Flex justify="space-between">
                                         <Text strong style={{ fontSize: 12 }}>{reply.authorName}</Text>
-                                        <Text type="secondary" style={{ fontSize: 9 }}>{dayjs(reply.createdAt).fromNow()}</Text>
+                                        <Text type="secondary" style={{ fontSize: 9 }}>{formatRelativeTime(reply.createdAt)}</Text>
                                     </Flex>
                                     <Text style={{ fontSize: 12 }}>{reply.content}</Text>
                                 </Flex>

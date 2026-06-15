@@ -1,9 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Button, Modal, Segmented, message } from 'antd';
+import { Button, Modal, Segmented } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import { coerceStandardDiagramImport, parseDiagramJson } from '@/core/utils/diagramJsonImport';
+import { downloadFile } from '@/core/utils/downloadUtils';
 
 
 const LazyMonacoEditor = React.lazy(() => import('../lazy/LazyMonacoEditor'));
@@ -84,13 +86,22 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
 
     const applyJsonContentToCanvas = async (contentToApply: string) => {
         try {
-            const data = JSON.parse(contentToApply);
+            const parsedData = parseDiagramJson(contentToApply);
+            const data = coerceStandardDiagramImport(parsedData, {
+                id: diagramId || `json-import-${Date.now()}`,
+                title: 'Flowchart Export',
+            });
 
             // 如果有 DiagramID 并且是在标准模式，把修改后的布局和元数据存回去并触发页面刷新（向后兼容布局修改生效）
             if (diagramId && jsonFormatMode === 'standard') {
                 const { dataRegistry } = await import('@/data/DataRegistry');
                 const localSvc = dataRegistry.getDataService();
-                localSvc.registerDiagram(data);
+                localSvc.registerRemoteDiagram({ ...data, id: diagramId }, {
+                    id: diagramId,
+                    title: data.name || data.metadata?.title || 'Flowchart Export',
+                }, false, {
+                    id: diagramId,
+                });
                 appMessage.success('配置已保存！重载视图以应用全部全量布局...');
                 setTimeout(() => window.location.reload(), 500);
                 return true;
@@ -127,7 +138,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
     const handleFormat = useCallback(() => {
         try {
             const content = getActiveContent();
-            const obj = JSON.parse(content || '{}');
+            const obj = parseDiagramJson(content || '{}');
             setActiveContent(JSON.stringify(obj, null, 2));
             appMessage.success(t('designer.flowchart.jsonFormatted') || 'JSON 格式化成功');
         } catch (e: unknown) {
@@ -139,16 +150,10 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
     const handleDownload = useCallback(() => {
         try {
             const content = getActiveContent();
-            JSON.parse(content || '{}');
-            const blob = new Blob([content], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
+            parseDiagramJson(content || '{}');
             const prefix = jsonFormatMode === 'standard' ? 'Diagram_Standard' : 
                            jsonFormatMode === 'pure' ? 'Diagram_Pure' : 'Diagram_ReactFlow';
-            a.download = `${prefix}_${new Date().getTime()}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
+            downloadFile(content, `${prefix}_${new Date().getTime()}.json`, 'application/json');
         } catch (e: unknown) {
             appMessage.error(t('designer.flowchart.invalidJson', { reason: (e as Error).message }));
         }
