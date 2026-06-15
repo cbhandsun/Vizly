@@ -1,5 +1,6 @@
 import type { NodeObj } from 'mind-elixir';
 import type { TaskClassificationResult, TaskItemInput } from './mindmapTaskAIParsing';
+import { normalizeTaskClassification } from './mindmapTaskAIParsing';
 import { applyTaskMeta } from './mindmapTaskModel';
 
 const DONE_RE = /(已完成|完成|done|closed|resolved|上线|发布|验收通过)/i;
@@ -41,7 +42,13 @@ export function collectTaskCandidates(root: NodeObj, targetId: string): TaskItem
 }
 
 export function applyTaskClassifications(root: NodeObj, classifications: TaskClassificationResult[]): number {
-    const byId = new Map(classifications.map(item => [item.id, item]));
+    const byId = new Map<string, TaskClassificationResult>();
+    for (const item of classifications) {
+        const classification = normalizeTaskClassification(item);
+        if (classification && !byId.has(classification.id)) {
+            byId.set(classification.id, classification);
+        }
+    }
     let applied = 0;
 
     const walk = (node: NodeObj) => {

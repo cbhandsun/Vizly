@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance, getPresentationState, subscribePresentation } from './mindElixirStore';
 import { generateSpeakerNotes } from './mindmapAIService';
+import { mergeSpeakerNotesIntoNodeNote } from './mindmapSpeakerNotesSecurity';
+import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 import { Spin, Button, Select, Tooltip, message } from 'antd';
 import { CopyOutlined, ReloadOutlined, SaveOutlined, MessageOutlined, SoundOutlined } from '@ant-design/icons';
 
@@ -124,15 +126,14 @@ export const MindMapSpeakerNotes: React.FC = () => {
         try {
             const tpcEl = mind.findEle(currentNode.id);
             if (!tpcEl) return;
-            const nextNote = currentNode.note
-                ? `${currentNode.note.trim()}\n\n---\n演讲提词：\n${notes.trim()}`
-                : notes.trim();
-            await mind.reshapeNode(tpcEl, { ...currentNode, note: nextNote });
+            const nextNote = mergeSpeakerNotesIntoNodeNote(currentNode.note, notes);
+            const cleanPatch = cleanMindMapNodePatch({ note: nextNote });
+            await mind.reshapeNode(tpcEl, { ...currentNode, ...cleanPatch });
             mind.bus.fire('operation', {
                 name: 'saveSpeakerNotes',
-                obj: { ...currentNode, note: nextNote },
+                obj: { ...currentNode, ...cleanPatch },
             });
-            setCurrentNode({ ...currentNode, note: nextNote });
+            setCurrentNode({ ...currentNode, ...cleanPatch });
             message.success('已保存到当前节点备注');
         } catch (err) {
             console.error('[SpeakerNotes] save failed:', err);

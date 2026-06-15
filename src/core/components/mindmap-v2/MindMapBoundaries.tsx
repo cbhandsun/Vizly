@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useMindElixir } from './MindElixirWrapper';
+import { useMindElixir } from './MindElixirContext';
 
 interface BoundaryBox {
     id: string;
@@ -15,15 +15,16 @@ interface BoundaryBox {
 export default function MindMapBoundaries() {
     const { instance } = useMindElixir();
     const [boundaries, setBoundaries] = useState<BoundaryBox[]>([]);
-    const [mapContainer, setMapContainer] = useState<HTMLElement | null>(null);
+    const mapContainer = useMemo(
+        () => instance?.container?.querySelector('.map-container') as HTMLElement | null,
+        [instance],
+    );
 
     useEffect(() => {
         if (!instance?.container) return;
 
         const containerEle = instance.container.querySelector('.map-container') as HTMLElement;
         if (!containerEle) return;
-
-        setMapContainer(containerEle);
 
         const updateBoundaries = () => {
             if (!containerEle) return;

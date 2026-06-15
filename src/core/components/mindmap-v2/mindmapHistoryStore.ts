@@ -2,6 +2,8 @@
  * mindmapHistoryStore.ts — 思维导图本地快照历史管理器
  */
 import type { NodeObj } from 'mind-elixir';
+import { MINDMAP_TEXT_IMPORT_MAX_BYTES } from '../../utils/fileImportGuards';
+import { cleanAndValidateTree } from './mindmapTreeSanitizer';
 
 export interface HistoryRecord {
     id: string;
@@ -34,6 +36,17 @@ type HistoryListListener = (list: HistoryRecord[]) => void;
 const listListeners = new Set<HistoryListListener>();
 let currentDiagramId = '';
 
+export function serializeHistoryNodeData(nodeData: NodeObj): string {
+    return JSON.stringify(cleanAndValidateTree(nodeData, true));
+}
+
+export function parseHistoryNodeData(data: string): NodeObj {
+    if (data.length > MINDMAP_TEXT_IMPORT_MAX_BYTES) {
+        throw new Error('Mind map history snapshot is too large.');
+    }
+    return cleanAndValidateTree(JSON.parse(data), true);
+}
+
 export function setCurrentDiagramId(diagramId: string) {
     currentDiagramId = diagramId;
     if (diagramId && !diagramHistoryMap[diagramId]) {
@@ -46,7 +59,7 @@ export function setCurrentDiagramId(diagramId: string) {
 
 export function addHistoryRecord(description: string, nodeData: NodeObj) {
     if (!currentDiagramId) return;
-    const serialized = JSON.stringify(nodeData);
+    const serialized = serializeHistoryNodeData(nodeData);
     const list = diagramHistoryMap[currentDiagramId] || [];
 
     // 去重：如果跟上一次快照完全一致，则不重复记录

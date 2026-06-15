@@ -12,6 +12,9 @@ import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { findNodeById } from './migrate';
 import { expandNodeWithAI, getAncestorPath, summarizeNodeWithAI, processNodeWithAICustomAction } from './mindmapAIService';
+import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
+import { cleanMindMapData, cleanMindMapTopic } from './mindmapTreeSanitizer';
+import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import { PlusOutlined, LoadingOutlined } from '@ant-design/icons';
 import styles from './FloatingBar.module.css';
 
@@ -115,6 +118,10 @@ const MindMapFloatingBar: React.FC = () => {
     const getObj = (): NodeObj | null => {
         try { return findNodeById(mind.getData().nodeData, pos.nodeId); } catch { return null; }
     };
+    const reshapeNodePatch = (tpc: unknown, baseObj: NodeObj | null | undefined, patch: Partial<NodeObj> & Record<string, unknown>) => {
+        if (!baseObj) return;
+        mind.reshapeNode(tpc as any, { ...baseObj, ...cleanMindMapNodePatch(patch) } as NodeObj);
+    };
 
     const obj = getObj();
     if (!obj) return null;
@@ -159,8 +166,8 @@ const MindMapFloatingBar: React.FC = () => {
             const tpcEl = getTpc();
             if (!tpcEl) return;
             mind.selectNode(tpcEl as any);
-            await mind.addChild(tpcEl as any, { topic, id: mind.generateNewObj?.().id ?? `n_${Date.now()}` } as NodeObj);
-        } catch (e) {}
+            await mind.addChild(tpcEl as any, cleanMindMapChildNode({ label: topic }, mind.generateNewObj?.().id ?? `n_${Date.now()}`));
+        } catch {}
     };
 
     const handleAISummarize = async () => {
@@ -175,7 +182,7 @@ const MindMapFloatingBar: React.FC = () => {
             } else if (result.topic && result.topic !== obj.topic) {
                 const tpcEl = getTpc();
                 if (tpcEl) {
-                    mind.setNodeTopic(tpcEl as any, result.topic);
+                    mind.setNodeTopic(tpcEl as any, cleanMindMapTopic(result.topic));
                 }
                 setAiOpen(false);
             }
@@ -209,19 +216,24 @@ const MindMapFloatingBar: React.FC = () => {
                 const tpcEl = getTpc();
                 if (tpcEl) {
                     if (result.topic) {
-                        mind.setNodeTopic(tpcEl as any, result.topic);
+                        mind.setNodeTopic(tpcEl as any, cleanMindMapTopic(result.topic));
                     }
 
                     const nodeInTree = findNodeById(data.nodeData, pos.nodeId);
                     if (nodeInTree) {
+                        const cleanPatch = cleanMindMapNodePatch({
+                            note: result.note,
+                            tags: result.tags,
+                            icons: result.icons,
+                        });
                         if (result.note !== undefined) {
-                            nodeInTree.note = result.note;
+                            nodeInTree.note = cleanPatch.note;
                         }
                         if (result.tags !== undefined) {
-                            nodeInTree.tags = result.tags;
+                            nodeInTree.tags = cleanPatch.tags;
                         }
                         if (result.icons !== undefined) {
-                            nodeInTree.icons = result.icons;
+                            nodeInTree.icons = cleanPatch.icons;
                         }
                         if (result.newChildren && result.newChildren.length > 0) {
                             if (!nodeInTree.children) nodeInTree.children = [];
@@ -229,10 +241,11 @@ const MindMapFloatingBar: React.FC = () => {
                             nodeInTree.expanded = true;
                         }
 
-                        mind.refresh(data);
+                        const cleanData = cleanMindMapData(data);
+                        mind.refresh(cleanData);
                         mind.bus.fire('operation', {
                             name: 'ai_custom',
-                            obj: nodeInTree,
+                            obj: findNodeById(cleanData.nodeData, pos.nodeId) ?? cleanData.nodeData,
                         });
                     }
 
@@ -349,12 +362,12 @@ const MindMapFloatingBar: React.FC = () => {
 
             {/* Add child */}
             <Btn icon="➕" tip="添加子节点 (Tab)"
-                onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.addChild(tpc); })} />
+                onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.addChild(tpc, cleanMindMapChildNode()); })} />
 
             {/* Add sibling — not for root */}
             {!isRoot && (
                 <Btn icon="↕️" tip="添加同级节点 (Enter)"
-                    onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.insertSibling('after', tpc); })} />
+                    onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.insertSibling('after', tpc, cleanMindMapChildNode()); })} />
             )}
 
             {/* Duplicate — not for root */}
@@ -396,7 +409,7 @@ const MindMapFloatingBar: React.FC = () => {
                                         const tpc = getTpc();
                                         if (tpc) {
                                             const obj2 = getObj();
-                                            mind.reshapeNode(tpc, { ...obj2!, branchColor: c === 'transparent' ? undefined : c });
+                                            reshapeNodePatch(tpc, obj2, { branchColor: c === 'transparent' ? undefined : c });
                                         }
                                     } catch {}
                                     setColorOpen(false);
@@ -439,7 +452,7 @@ const MindMapFloatingBar: React.FC = () => {
                                     onClick={() => {
                                         try {
                                             const tpc = getTpc();
-                                            if (tpc) mind.reshapeNode(tpc, { ...obj, ...({ shapeClass: key || undefined } as any) });
+                                            if (tpc) reshapeNodePatch(tpc, obj, { shapeClass: key || undefined });
                                         } catch {}
                                         setShapeOpen(false);
                                     }}
@@ -485,14 +498,14 @@ const MindMapFloatingBar: React.FC = () => {
                             <button
                                 className={styles.noteBtnClear}
                                 onClick={() => {
-                                    try { const tpc = getTpc(); if (tpc) mind.reshapeNode(tpc as any, { ...obj, note: undefined }); }
+                                    try { const tpc = getTpc(); if (tpc) reshapeNodePatch(tpc, obj, { note: undefined }); }
                                     catch {} setNoteOpen(false);
                                 }}
                             >清除</button>
                             <button
                                 className={styles.noteBtnSave}
                                 onClick={() => {
-                                    try { const tpc = getTpc(); if (tpc) mind.reshapeNode(tpc as any, { ...obj, note: noteText || undefined }); }
+                                    try { const tpc = getTpc(); if (tpc) reshapeNodePatch(tpc, obj, { note: noteText || undefined }); }
                                     catch {} setNoteOpen(false);
                                 }}
                             >保存</button>
@@ -517,7 +530,7 @@ const MindMapFloatingBar: React.FC = () => {
                     const tpc = getTpc(); 
                     if (tpc) {
                         const newBoundary = (obj as any).boundary ? undefined : { color: '#818cf8', title: '新建分组' };
-                        mind.reshapeNode(tpc as any, { ...obj, boundary: newBoundary } as any);
+                        reshapeNodePatch(tpc, obj, { boundary: newBoundary });
                     }
                 })} 
             />

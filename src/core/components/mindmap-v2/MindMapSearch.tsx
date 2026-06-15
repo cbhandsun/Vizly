@@ -13,6 +13,7 @@ import { SearchOutlined, CloseOutlined, UpOutlined, DownOutlined } from '@ant-de
 import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance } from './mindElixirStore';
 import { findNodeById } from './migrate';
+import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function collectAllNodes(root: NodeObj): NodeObj[] {
@@ -91,18 +92,30 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
         }
     }, [mind, matchIds, matchIdx]);
 
-    useEffect(() => { setMatchIdx(0); setReplaceCount(null); }, [matchIds.length, query]);
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            setMatchIdx(0);
+            setReplaceCount(null);
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [matchIds.length, query]);
 
     useEffect(() => {
+        let timer: number | undefined;
         if (open) {
-            setTimeout(() => inputRef.current?.focus(), 80);
+            timer = window.setTimeout(() => inputRef.current?.focus(), 80);
         } else {
             clearSearchHighlights();
-            setQuery('');
-            setReplaceText('');
-            setShowReplace(false);
-            setReplaceCount(null);
+            timer = window.setTimeout(() => {
+                setQuery('');
+                setReplaceText('');
+                setShowReplace(false);
+                setReplaceCount(null);
+            }, 0);
         }
+        return () => {
+            if (timer !== undefined) window.clearTimeout(timer);
+        };
     }, [open]);
 
     // Escape key
@@ -139,7 +152,7 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
             const tpc = mind.findEle(id);
             if (!tpc) return;
             const newTopic = obj.topic.replace(new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), replaceText);
-            mind.reshapeNode(tpc as any, { ...obj, topic: newTopic });
+            mind.reshapeNode(tpc as any, { ...obj, ...cleanMindMapNodePatch({ topic: newTopic }) });
             setReplaceCount(1);
             // Move to next after replacing
             setTimeout(() => goNext(), 60);
@@ -158,7 +171,7 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
                 if (!tpc) continue;
                 const newTopic = obj.topic.replace(regex, replaceText);
                 if (newTopic !== obj.topic) {
-                    mind.reshapeNode(tpc as any, { ...obj, topic: newTopic });
+                    mind.reshapeNode(tpc as any, { ...obj, ...cleanMindMapNodePatch({ topic: newTopic }) });
                     count++;
                 }
             } catch {}

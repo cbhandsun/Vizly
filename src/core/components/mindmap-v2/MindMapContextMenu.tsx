@@ -7,6 +7,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getMindElixirInstance } from './mindElixirStore';
 import { findNodeById } from './migrate';
+import { toSafeExternalUrl } from '../../utils/sanitizeHtml';
+import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
+import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 
 interface CtxPos { visible: boolean; x: number; y: number; nodeId: string | null; }
 interface Props extends CtxPos { onClose: () => void; }
@@ -67,6 +70,7 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
     const isExpanded = obj?.expanded !== false;
     const hasChildren = (obj?.children?.length ?? 0) > 0;
     const currentShape = (obj as any)?.shapeClass ?? '';
+    const safeHyperLink = obj?.hyperLink ? toSafeExternalUrl(String(obj.hyperLink)) : null;
 
     // Clamp to viewport
     const MENU_W = 230, MENU_H = 420;
@@ -119,11 +123,11 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
             <Item icon="✏️" label="编辑节点" kbd="F2"
                 onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.editTopic(tpc); })} />
             <Item icon="➕" label="添加子节点" kbd="Tab"
-                onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.addChild(tpc); })} />
+                onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.addChild(tpc, cleanMindMapChildNode()); })} />
             {!isRoot && (
                 <>
                     <Item icon="↕️" label="添加同级节点" kbd="Enter"
-                        onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.insertSibling('after', tpc); })} />
+                        onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.insertSibling('after', tpc, cleanMindMapChildNode()); })} />
                     <Item icon="📋" label="复制为同级" kbd="Ctrl+D"
                         onClick={() => act(() => {
                             try { const tpc = getTpc(); if (tpc) mind.copyNode(tpc, tpc); } catch {}
@@ -174,7 +178,7 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
                                     const tpc = getTpc();
                                     if (!tpc || !obj) { onClose(); return; }
                                     try {
-                                        mind.reshapeNode(tpc, { ...obj, ...({ shapeClass: key || undefined } as any) });
+                                        mind.reshapeNode(tpc, { ...obj, ...cleanMindMapNodePatch({ shapeClass: key || undefined }) });
                                     } catch {}
                                     onClose();
                                 }}
@@ -196,13 +200,12 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
                 )}
             </div>
 
-            {obj?.hyperLink && (
+            {safeHyperLink && (
                 <>
                     {DIVIDER}
                     <Item icon="🔗" label="打开超链接"
                         onClick={() => act(() => {
-                            const url = obj.hyperLink!;
-                            window.open(url.startsWith('http') ? url : `https://${url}`, '_blank', 'noopener,noreferrer');
+                            window.open(safeHyperLink, '_blank', 'noopener,noreferrer');
                         })} />
                 </>
             )}

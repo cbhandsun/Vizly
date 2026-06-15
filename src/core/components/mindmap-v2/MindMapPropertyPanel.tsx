@@ -21,6 +21,19 @@ import {
     type TaskPriority,
     type TaskStatus,
 } from './mindmapTaskModel';
+import { toSafeExternalUrl, toSafeImageUrl } from '../../utils/sanitizeHtml';
+import { getImageFileImportError, IMAGE_DATA_URL_IMPORT_MAX_BYTES } from '../../utils/fileImportGuards';
+import {
+    cleanMindMapColor,
+    cleanMindMapNodePatch,
+    cleanMindMapTagObjects,
+} from './mindmapNodePatchSecurity';
+import {
+    cleanMindMapIcons,
+    cleanMindMapNote,
+    cleanMindMapTopic,
+} from './mindmapTreeSanitizer';
+import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -126,18 +139,18 @@ const IconsPicker: React.FC<{ icons: string[]; onToggle: (icon: string) => void 
 // ─── Node Property Panel ───────────────────────────────────────────────────────
 const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
     const mind = getMindElixirInstance();
-    const [topic, setTopic] = useState(node.topic || '');
+    const [topic, setTopic] = useState(cleanMindMapTopic(node.topic, ''));
     const parseFontSize = (n: NodeObj) => parseInt(n.style?.fontSize ?? '14', 10) || 14;
     const [fontSize, setFontSize] = useState(() => parseFontSize(node));
-    const [textColor, setTextColor] = useState(node.style?.color ?? '');
-    const [bgColor, setBgColor] = useState(node.style?.background ?? '');
-    const [branchColor, setBranchColor] = useState(node.branchColor ?? '');
+    const [textColor, setTextColor] = useState(cleanMindMapColor(node.style?.color) ?? '');
+    const [bgColor, setBgColor] = useState(cleanMindMapColor(node.style?.background) ?? '');
+    const [branchColor, setBranchColor] = useState(cleanMindMapColor(node.branchColor) ?? '');
     const [hyperLink, setHyperLink] = useState(node.hyperLink ?? '');
-    const [note, setNote] = useState(node.note ?? '');
+    const [note, setNote] = useState(cleanMindMapNote(node.note) ?? '');
     const [imageUrl, setImageUrl] = useState(node.image?.url ?? '');
-    const [icons, setIcons] = useState<string[]>((node.icons as string[]) ?? []);
+    const [icons, setIcons] = useState<string[]>(cleanMindMapIcons(node.icons) ?? []);
     const [tags, setTags] = useState<TagObj[]>(() => {
-        return (node.tags ?? []).map(t => typeof t === 'string' ? { text: t } : t as TagObj);
+        return cleanMindMapTagObjects(node.tags) ?? [];
     });
     const [tagInput, setTagInput] = useState('');
     // ─ Shape & Line width ──────────────────────────────────────────────────────────
@@ -151,16 +164,16 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
     const [taskProgress, setTaskProgress] = useState(initialTask.progress ?? 0);
 
     useEffect(() => {
-        setTopic(node.topic || '');
+        setTopic(cleanMindMapTopic(node.topic, ''));
         setFontSize(parseFontSize(node));
-        setTextColor(node.style?.color ?? '');
-        setBgColor(node.style?.background ?? '');
-        setBranchColor(node.branchColor ?? '');
+        setTextColor(cleanMindMapColor(node.style?.color) ?? '');
+        setBgColor(cleanMindMapColor(node.style?.background) ?? '');
+        setBranchColor(cleanMindMapColor(node.branchColor) ?? '');
         setHyperLink(node.hyperLink ?? '');
-        setNote(node.note ?? '');
+        setNote(cleanMindMapNote(node.note) ?? '');
         setImageUrl(node.image?.url ?? '');
-        setIcons((node.icons as string[]) ?? []);
-        setTags((node.tags ?? []).map(t => typeof t === 'string' ? { text: t } : t as TagObj));
+        setIcons(cleanMindMapIcons(node.icons) ?? []);
+        setTags(cleanMindMapTagObjects(node.tags) ?? []);
         setShapeClass((node as any).shapeClass ?? '');
         setBranchWidth((node as any).branchWidth ?? 0);
         const task = getTaskMeta(node);
@@ -176,35 +189,50 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
         if (!mind) return;
         try {
             const tpcEl = mind.findEle(node.id);
-            if (tpcEl) mind.reshapeNode(tpcEl, { ...node, ...patch } as NodeObj);
+            const cleanPatch = cleanMindMapNodePatch(patch as Partial<NodeObj> & Record<string, unknown>);
+            if (tpcEl) mind.reshapeNode(tpcEl, { ...node, ...cleanPatch } as NodeObj);
         } catch (e) { console.warn('[Panel] reshapeNode:', e); }
     }, [mind, node]);
 
+    const saveImageUrl = useCallback(() => {
+        const safeUrl = toSafeImageUrl(imageUrl);
+        setImageUrl(safeUrl ?? '');
+        reshape({ image: safeUrl ? { url: safeUrl, width: 160, height: 100, fit: 'contain' } : undefined });
+    }, [imageUrl, reshape]);
+
+    const saveHyperLink = useCallback(() => {
+        const safeUrl = toSafeExternalUrl(hyperLink);
+        setHyperLink(safeUrl ?? '');
+        reshape({ hyperLink: safeUrl ?? undefined });
+    }, [hyperLink, reshape]);
+
     const handleTopicBlur = useCallback(() => {
         if (!mind || !topic.trim()) return;
+        const cleanTopic = cleanMindMapTopic(topic);
+        setTopic(cleanTopic);
         try {
             const tpcEl = mind.findEle(node.id);
-            if (tpcEl) mind.setNodeTopic(tpcEl, topic);
+            if (tpcEl) mind.setNodeTopic(tpcEl, cleanTopic);
         } catch (e) { console.warn('[Panel] setNodeTopic:', e); }
     }, [mind, node.id, topic]);
 
     const handleIconToggle = useCallback((emoji: string) => {
-        const next = icons.includes(emoji)
+        const next = cleanMindMapIcons(icons.includes(emoji)
             ? icons.filter(i => i !== emoji)
-            : [...icons, emoji];
+            : [...icons, emoji]) ?? [];
         setIcons(next);
         reshape({ icons: next });
     }, [icons, reshape]);
 
     const handleTagAdd = useCallback((tagObj: TagObj) => {
         if (tags.some(t => t.text === tagObj.text)) return;
-        const next = [...tags, tagObj];
+        const next = cleanMindMapTagObjects([...tags, tagObj]) ?? [];
         setTags(next);
         reshape({ tags: next });
     }, [tags, reshape]);
 
     const handleTagRemove = useCallback((text: string) => {
-        const next = tags.filter(t => t.text !== text);
+        const next = cleanMindMapTagObjects(tags.filter(t => t.text !== text)) ?? [];
         setTags(next);
         reshape({ tags: next });
     }, [tags, reshape]);
@@ -271,7 +299,7 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
             } else if (result.topic && result.topic !== node.topic) {
                 const tpcEl = mind.findEle(node.id);
                 if (tpcEl) {
-                    mind.setNodeTopic(tpcEl, result.topic);
+                    mind.setNodeTopic(tpcEl, cleanMindMapTopic(result.topic));
                 }
             }
         } catch (e: any) {
@@ -288,7 +316,7 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
             const tpcEl = mind.findEle(node.id);
             if (!tpcEl) return;
             mind.selectNode(tpcEl);
-            await mind.addChild(tpcEl, { topic, id: mind.generateNewObj?.().id ?? `n_${Date.now()}` } as NodeObj);
+            await mind.addChild(tpcEl, cleanMindMapChildNode({ label: topic }, mind.generateNewObj?.().id ?? `n_${Date.now()}`));
         } catch (e) { console.warn('[AI Expand] addChild:', e); }
 
     }, [mind, node]);
@@ -302,11 +330,11 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                 <Space size={2}>
                     <Tooltip title="添加子节点 (Tab)">
                         <Button size="small" type="text" icon={<PlusOutlined />}
-                            onClick={() => { try { const el = mind?.findEle(node.id); if (el) { mind!.selectNode(el); mind!.addChild(el); } } catch {} }} />
+                            onClick={() => { try { const el = mind?.findEle(node.id); if (el) { mind!.selectNode(el); mind!.addChild(el, cleanMindMapChildNode()); } } catch {} }} />
                     </Tooltip>
                     {!isRoot && <Tooltip title="添加兄弟节点 (Enter)">
                         <Button size="small" type="text" icon={<PlusOutlined rotate={90} />}
-                            onClick={() => { try { const el = mind?.findEle(node.id); if (el) { mind!.selectNode(el); mind!.insertSibling('after', el); } } catch {} }} />
+                            onClick={() => { try { const el = mind?.findEle(node.id); if (el) { mind!.selectNode(el); mind!.insertSibling('after', el, cleanMindMapChildNode()); } } catch {} }} />
                     </Tooltip>}
                     {!isRoot && <Tooltip title="删除节点 (Delete)">
                         <Button size="small" type="text" danger icon={<DeleteOutlined />}
@@ -576,15 +604,19 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                 <Input prefix={<LinkOutlined style={{ color: '#94a3b8' }} />}
                     placeholder="https://..." value={hyperLink} size="small"
                     onChange={e => setHyperLink(e.target.value)}
-                    onBlur={() => reshape({ hyperLink: hyperLink.trim() || undefined })}
-                    onPressEnter={() => reshape({ hyperLink: hyperLink.trim() || undefined })} />
+                    onBlur={saveHyperLink}
+                    onPressEnter={saveHyperLink} />
             </Row>
 
             {/* Note */}
             <Row label="备注">
                 <TextArea placeholder="添加备注..." value={note}
                     onChange={e => setNote(e.target.value)}
-                    onBlur={() => reshape({ note: note.trim() || undefined })}
+                    onBlur={() => {
+                        const cleanNote = cleanMindMapNote(note);
+                        setNote(cleanNote ?? '');
+                        reshape({ note: cleanNote });
+                    }}
                     autoSize={{ minRows: 2, maxRows: 5 }} style={{ fontSize: 12 }} />
             </Row>
 
@@ -595,14 +627,8 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                         placeholder="https://... 或点击上传" value={imageUrl} size="small"
                         style={{ flex: 1 }}
                         onChange={e => setImageUrl(e.target.value)}
-                        onBlur={() => {
-                            const url = imageUrl.trim();
-                            reshape({ image: url ? { url, width: 160, height: 100, fit: 'contain' } : undefined });
-                        }}
-                        onPressEnter={() => {
-                            const url = imageUrl.trim();
-                            reshape({ image: url ? { url, width: 160, height: 100, fit: 'contain' } : undefined });
-                        }} />
+                        onBlur={saveImageUrl}
+                        onPressEnter={saveImageUrl} />
                     {/* Local file upload */}
                     <label title="从本地上传图片" style={{
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -615,22 +641,29 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                             onChange={e => {
                                 const file = e.target.files?.[0];
                                 if (!file) return;
+                                const importError = getImageFileImportError(file, IMAGE_DATA_URL_IMPORT_MAX_BYTES);
+                                if (importError) {
+                                    console.warn('[Image Upload]', importError);
+                                    e.target.value = '';
+                                    return;
+                                }
                                 const reader = new FileReader();
                                 reader.onload = ev => {
                                     const dataUrl = ev.target?.result as string;
-                                    if (!dataUrl) return;
-                                    setImageUrl(dataUrl);
-                                    reshape({ image: { url: dataUrl, width: 160, height: 100, fit: 'contain' } });
+                                    const safeUrl = dataUrl ? toSafeImageUrl(dataUrl) : null;
+                                    if (!safeUrl) return;
+                                    setImageUrl(safeUrl);
+                                    reshape({ image: { url: safeUrl, width: 160, height: 100, fit: 'contain' } });
                                 };
                                 reader.readAsDataURL(file);
                                 e.target.value = '';
                             }} />
                     </label>
                 </div>
-                {imageUrl && (
+                {toSafeImageUrl(imageUrl) && (
                     <div style={{ marginTop: 2, borderRadius: 6, overflow: 'hidden',
                         border: '1px solid rgba(99,102,241,0.15)', position: 'relative' }}>
-                        <img src={imageUrl} alt="预览"
+                        <img src={toSafeImageUrl(imageUrl)!} alt="预览"
                             style={{ width: '100%', maxHeight: 100, objectFit: 'contain',
                                 display: 'block', background: '#f8fafc' }}
                             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />

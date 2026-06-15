@@ -5,20 +5,15 @@
  * 模板库：SWOT分析、会议记录、项目计划、读书笔记、问题分析
  */
 import React, { useCallback } from 'react';
-import { Dropdown, Button, Tooltip, message } from 'antd';
+import { Dropdown, Button, Tooltip } from 'antd';
 import { AppstoreAddOutlined } from '@ant-design/icons';
-import type { NodeObj } from 'mind-elixir';
 import MindElixir from 'mind-elixir';
 import { getMindElixirInstance } from './mindElixirStore';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import { templateToNodeObj, type TemplateNode } from './mindmapTemplateModel';
 
 
 // ─── Template definitions ─────────────────────────────────────────────────────
-
-interface TemplateNode {
-    topic: string;
-    children?: TemplateNode[];
-}
 
 interface Template {
     key: string;
@@ -136,20 +131,6 @@ const TEMPLATES: Template[] = [
         },
     },
 ];
-
-// ─── Helper: convert TemplateNode tree to mind-elixir NodeObj tree ─────────────
-
-function templateToNodeObj(t: TemplateNode, depth = 0): NodeObj {
-    const id = `tpl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${depth}`;
-    return {
-        id,
-        topic: t.topic,
-        children: (t.children ?? []).map((c, i) => ({
-            ...templateToNodeObj(c, depth + 1),
-            id: `tpl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${depth}_${i}`,
-        })),
-    } as NodeObj;
-}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 

@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Y from 'yjs';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { collaborationService } from '../../services/CollaborationService';
 import type { MindElixirInstance } from 'mind-elixir';
+import { parseRemoteMindMapYjsData, serializeLocalMindMapYjsData } from './mindmapYjsSecurity';
 
 export default function MindMapYjsIntegration() {
     const [instance, setInstance] = useState<MindElixirInstance | null>(getMindElixirInstance());
@@ -28,7 +29,7 @@ export default function MindMapYjsIntegration() {
         if (remoteData) {
             isRemoteUpdating.current = true;
             try {
-                const data = JSON.parse(remoteData);
+                const data = parseRemoteMindMapYjsData(remoteData);
                 instance.refresh(data);
             } catch (e) {
                 console.error('[MindMap Yjs] Initial sync parse error:', e);
@@ -36,14 +37,14 @@ export default function MindMapYjsIntegration() {
             isRemoteUpdating.current = false;
         } else {
             // Push local data if room is empty
-            yMap.set('nodeData', JSON.stringify(instance.getData()));
+            yMap.set('nodeData', serializeLocalMindMapYjsData(instance.getData()));
         }
 
         // Listen to local mindmap operations
-        const handleLocalOperation = (operation: any) => {
+        const handleLocalOperation = (_operation: any) => {
             if (isRemoteUpdating.current) return;
             try {
-                const currentData = JSON.stringify(instance.getData());
+                const currentData = serializeLocalMindMapYjsData(instance.getData());
                 const lastData = yMap.get('nodeData') as string | undefined;
                 if (currentData !== lastData) {
                     yMap.set('nodeData', currentData);
@@ -62,12 +63,12 @@ export default function MindMapYjsIntegration() {
             if (event.keysChanged.has('nodeData')) {
                 const newDataStr = yMap.get('nodeData') as string | undefined;
                 if (newDataStr) {
-                    const localDataStr = JSON.stringify(instance.getData());
+                    const localDataStr = serializeLocalMindMapYjsData(instance.getData());
                     // Only refresh if truly different to prevent jitter
                     if (newDataStr !== localDataStr) {
                         isRemoteUpdating.current = true;
                         try {
-                            const data = JSON.parse(newDataStr);
+                            const data = parseRemoteMindMapYjsData(newDataStr);
                             // Refresh redraws the map with new data
                             instance.refresh(data);
                         } catch (e) {
@@ -87,7 +88,7 @@ export default function MindMapYjsIntegration() {
                 if (typeof instance.bus.removeListener === 'function') {
                     instance.bus.removeListener('operation', handleLocalOperation);
                 }
-            } catch (e) {}
+            } catch (_e) {}
             yMap.unobserve(handleRemoteChange);
         };
     }, [instance]);

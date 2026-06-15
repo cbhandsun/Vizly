@@ -8,7 +8,7 @@ import {
     subscribeToggleHistory,
     subscribeHistoryList,
     clearHistory,
-    _addHistoryRecord,
+    parseHistoryNodeData,
     HistoryRecord
 } from './mindmapHistoryStore';
 import { Popconfirm, message } from 'antd';
@@ -33,7 +33,7 @@ const MindMapHistoryPanel: React.FC = () => {
             return;
         }
         try {
-            const oldNodeData = JSON.parse(record.data);
+            const oldNodeData = parseHistoryNodeData(record.data);
             const currentData = mind.getData();
             
             // 恢复数据

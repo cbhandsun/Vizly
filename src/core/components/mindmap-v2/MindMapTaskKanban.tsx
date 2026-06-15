@@ -2,22 +2,23 @@ import React, { useEffect, useState, useCallback } from 'react';
 import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir, subscribeKanban, toggleKanban } from './mindElixirStore';
 import { classifyTasksWithAI, type TaskItemInput } from './mindmapAIService';
-import { Spin, Button, Checkbox, Tooltip, message, Tag } from 'antd';
+import { Button, Checkbox, Tooltip, message, Tag } from 'antd';
 import {
     ProjectOutlined,
     CloseOutlined,
     CloudSyncOutlined,
     CopyOutlined,
     CheckCircleOutlined,
-    ClockCircleOutlined,
     IssuesCloseOutlined,
 } from '@ant-design/icons';
+import { Clock } from 'lucide-react';
 import {
     applyTaskMeta,
     getTaskMeta,
     type TaskPriority,
     type TaskStatus,
 } from './mindmapTaskModel';
+import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 
 interface KanbanTask {
     id: string;
@@ -108,7 +109,7 @@ export const MindMapTaskKanban: React.FC = () => {
 
         const prio = targetPriority !== undefined ? targetPriority : (tasks.find(t => t.id === taskId)?.priority || '无');
         applyTaskMeta(node, { status: targetStatus, priority: prio });
-        mind.reshapeNode(tpcEl, { task: (node as any).task, tags: node.tags } as any);
+        mind.reshapeNode(tpcEl, cleanMindMapNodePatch({ task: (node as any).task, tags: node.tags }) as any);
         mind.bus.fire('operation', {
             name: 'reshapeNode',
             obj: node,
@@ -167,7 +168,7 @@ export const MindMapTaskKanban: React.FC = () => {
                     const node = mind.getObjById(item.id, data.nodeData);
                     if (node) {
                         applyTaskMeta(node, { status: item.status, priority: item.priority });
-                        mind.reshapeNode(tpcEl, { task: (node as any).task, tags: node.tags } as any);
+                        mind.reshapeNode(tpcEl, cleanMindMapNodePatch({ task: (node as any).task, tags: node.tags }) as any);
                         updatedCount++;
                     }
                 }
@@ -363,7 +364,7 @@ export const MindMapTaskKanban: React.FC = () => {
 
             {/* 看板列网格 */}
             <div style={kanbanGridStyle}>
-                {renderColumn('todo', '待办事项', <ClockCircleOutlined />, '#818cf8')}
+                {renderColumn('todo', '待办事项', <Clock size={14} strokeWidth={2} />, '#818cf8')}
                 {renderColumn('doing', '进行中', <CheckCircleOutlined />, '#fbbf24')}
                 {renderColumn('done', '已完成', <IssuesCloseOutlined />, '#34d399')}
             </div>

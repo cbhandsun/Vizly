@@ -60,6 +60,11 @@ import { exportXmind } from './exportXmind';
 import { analyzeNodesRelationship } from './mindmapAIService';
 import { nodeObjToPitchMarkdown } from './mindmapPitchExport';
 import { arrangeMindMapTree } from './mindmapAutoArrange';
+import { getFileSizeLimitError, MINDMAP_TEXT_IMPORT_MAX_BYTES } from '../../utils/fileImportGuards';
+import { parseDiagramJson } from '../../utils/diagramJsonImport';
+import { downloadBlob } from '../../utils/downloadUtils';
+import { cleanAndValidateTree, cleanMindMapData } from './mindmapTreeSanitizer';
+import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 
 
 const DIRECTION_OPTIONS = [
@@ -80,13 +85,10 @@ function setExpandedAll(node: NodeObj, expanded: boolean): NodeObj {
 
 const THEME_KEY_LS = 'vizly_mindmap_theme';
 
-// ─── Toolbar Props ────────────────────────────────────────────────────────────
-interface MindElixirToolbarProps {}
-
 // ─── Focus mode state (module-level, shared) ─────────────────────────────────
 let _isFocused = false;
 
-const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
+const MindElixirToolbar: React.FC = () => {
     // Subscribe to store so we re-render when instance becomes available
     const [, setTick] = useState(0);
     useEffect(() => subscribeMindElixir(() => setTick(t => t + 1)), []);
@@ -166,7 +168,7 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
         if (!mind) return;
         const data = mind.getData();
         const dirInt = directionStringToInt(dir) as 0 | 1 | 2;
-        mind.refresh({ ...data, direction: dirInt });
+        mind.refresh({ ...data, nodeData: cleanAndValidateTree(data.nodeData, true), direction: dirInt });
         localStorage.setItem('vizly_mindmap_dir', dir);  // persist direction
     }, [mind]);
 
@@ -182,7 +184,7 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
     const handleCollapseAll = useCallback(() => {
         if (!mind) return;
         const data = mind.getData();
-        const newNodeData = setExpandedAll(data.nodeData, false);
+        const newNodeData = setExpandedAll(cleanAndValidateTree(data.nodeData, true), false);
         newNodeData.expanded = true; // Keep root expanded
         mind.refresh({ ...data, nodeData: newNodeData });
     }, [mind]);
@@ -190,7 +192,7 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
     const handleExpandAll = useCallback(() => {
         if (!mind) return;
         const data = mind.getData();
-        mind.refresh({ ...data, nodeData: setExpandedAll(data.nodeData, true) });
+        mind.refresh({ ...data, nodeData: setExpandedAll(cleanAndValidateTree(data.nodeData, true), true) });
     }, [mind]);
 
     const handleFitView = useCallback(() => {
@@ -201,7 +203,7 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
         if (!mind) return;
         try {
             const data = mind.getData();
-            const nodeData = arrangeMindMapTree(data.nodeData);
+            const nodeData = cleanAndValidateTree(arrangeMindMapTree(data.nodeData), true);
             mind.refresh({ ...data, nodeData });
             mind.layout();
             setTimeout(() => mind.toCenter(), 80);
@@ -229,7 +231,7 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
             const rootTpc = mind.findEle(mind.getData().nodeData.id);
             if (rootTpc) {
                 mind.selectNode(rootTpc);
-                mind.addChild(rootTpc);
+                mind.addChild(rootTpc, cleanMindMapChildNode());
             }
         } catch (e) {
             console.warn('[Toolbar] addRootChild failed:', e);
@@ -241,14 +243,7 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
         try {
             // exportSvg() returns a Blob directly
             const blob = mind.exportSvg();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'mindmap.svg';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            downloadBlob(blob, 'mindmap.svg', 'mindmap.svg');
         } catch (e) {
             console.error('SVG export failed:', e);
         }
@@ -259,14 +254,7 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
         try {
             const blob = await mind.exportPng();
             if (!blob) return;
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'mindmap.png';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            downloadBlob(blob, 'mindmap.png', 'mindmap.png');
         } catch (e) {
             console.error('PNG export failed:', e);
         }
@@ -518,7 +506,7 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
 
     const loadAndRefresh = useCallback((nodeData: import('mind-elixir').NodeObj) => {
         if (!mind) return;
-        mind.refresh({ nodeData });
+        mind.refresh({ nodeData: cleanAndValidateTree(nodeData, true) });
         mind.toCenter();
         (mind as any).clearHistory?.();
     }, [mind]);
@@ -529,26 +517,41 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
     const handleJsonFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !mind) return;
+        const sizeError = getFileSizeLimitError(file, MINDMAP_TEXT_IMPORT_MAX_BYTES, 'mind map JSON');
+        if (sizeError) {
+            console.warn('[Import JSON]', sizeError);
+            e.target.value = '';
+            return;
+        }
         const reader = new FileReader();
         reader.onload = (ev) => {
             try {
-                const json = JSON.parse(ev.target?.result as string);
-                const nodeData = json.nodeData ?? json;
-                loadAndRefresh(nodeData);
+                const json = parseDiagramJson(String(ev.target?.result || ''));
+                const data = cleanMindMapData(json);
+                if (!mind) return;
+                mind.refresh(data);
+                mind.toCenter();
+                (mind as any).clearHistory?.();
             } catch (err) { console.error('[Import JSON]', err); }
         };
         reader.readAsText(file);
         e.target.value = '';
-    }, [mind, loadAndRefresh]);
+    }, [mind]);
 
     const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !mind) return;
+        const sizeError = getFileSizeLimitError(file, MINDMAP_TEXT_IMPORT_MAX_BYTES, 'Markdown');
+        if (sizeError) {
+            console.warn('[Import MD]', sizeError);
+            e.target.value = '';
+            return;
+        }
         const reader = new FileReader();
         reader.onload = (ev) => {
             try {
                 const md = ev.target?.result as string;
-                loadAndRefresh(markdownToNodeObj(md));
+                loadAndRefresh(cleanAndValidateTree(markdownToNodeObj(md), true));
             } catch (err) { console.error('[Import MD]', err); }
         };
         reader.readAsText(file);
@@ -558,11 +561,17 @@ const MindElixirToolbar: React.FC<MindElixirToolbarProps> = () => {
     const handleOpmlFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !mind) return;
+        const sizeError = getFileSizeLimitError(file, MINDMAP_TEXT_IMPORT_MAX_BYTES, 'OPML');
+        if (sizeError) {
+            console.warn('[Import OPML]', sizeError);
+            e.target.value = '';
+            return;
+        }
         const reader = new FileReader();
         reader.onload = (ev) => {
             try {
                 const xml = ev.target?.result as string;
-                loadAndRefresh(opmlToNodeObj(xml));
+                loadAndRefresh(cleanAndValidateTree(opmlToNodeObj(xml), true));
             } catch (err) { console.error('[Import OPML]', err); }
         };
         reader.readAsText(file);

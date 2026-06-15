@@ -1,5 +1,12 @@
 import type { NodeObj } from 'mind-elixir';
 import { getTaskMeta } from './mindmapTaskModel';
+import {
+    cleanMindMapNote,
+    cleanMindMapTopic,
+    MINDMAP_MAX_CHILDREN_PER_NODE,
+    MINDMAP_MAX_DEPTH,
+    MINDMAP_MAX_NODES,
+} from './mindmapTreeSanitizer';
 
 interface PitchNode {
     node: NodeObj;
@@ -9,20 +16,27 @@ interface PitchNode {
 }
 
 function flattenForPitch(node: NodeObj, depth = 0, path: string[] = [], result: PitchNode[] = []): PitchNode[] {
-    const nextPath = [...path, node.topic];
+    if (result.length >= MINDMAP_MAX_NODES || depth > MINDMAP_MAX_DEPTH) return result;
+
+    const nextPath = [...path, cleanText(node.topic)];
     result.push({ node, depth, path: nextPath, index: result.length + 1 });
 
     if (node.expanded !== false) {
-        for (const child of node.children ?? []) {
+        for (const child of (node.children ?? []).slice(0, MINDMAP_MAX_CHILDREN_PER_NODE)) {
             flattenForPitch(child, depth + 1, nextPath, result);
+            if (result.length >= MINDMAP_MAX_NODES) break;
         }
     }
 
     return result;
 }
 
-function cleanText(text: string | undefined): string {
-    return (text ?? '').replace(/\s+/g, ' ').trim();
+function cleanText(text: unknown): string {
+    return cleanMindMapTopic(text, '').replace(/\s+/g, ' ').trim();
+}
+
+function cleanNoteText(text: unknown): string {
+    return (cleanMindMapNote(text) ?? '').replace(/\s+/g, ' ').trim();
 }
 
 function headingLevel(depth: number): string {
@@ -44,8 +58,8 @@ function taskLine(node: NodeObj): string | null {
     const parts = [
         `状态: ${task.status === 'done' ? '已完成' : task.status === 'doing' ? '进行中' : '待办'}`,
         task.priority !== '无' ? `优先级: ${task.priority}` : null,
-        task.assignee ? `负责人: ${task.assignee}` : null,
-        task.dueDate ? `截止: ${task.dueDate}` : null,
+        task.assignee ? `负责人: ${cleanText(task.assignee)}` : null,
+        task.dueDate ? `截止: ${cleanText(task.dueDate)}` : null,
         task.progress ? `进度: ${task.progress}%` : null,
     ].filter(Boolean);
 
@@ -55,7 +69,7 @@ function taskLine(node: NodeObj): string | null {
 function slideSummary(node: NodeObj): string {
     const children = node.expanded === false ? [] : (node.children ?? []);
     if (children.length === 0) {
-        return cleanText(node.note) || '围绕该主题补充背景、关键判断和下一步行动。';
+        return cleanNoteText(node.note) || '围绕该主题补充背景、关键判断和下一步行动。';
     }
 
     const childTopics = children.slice(0, 5).map(child => cleanText(child.topic)).filter(Boolean);
@@ -79,7 +93,7 @@ export function nodeObjToPitchMarkdown(root: NodeObj): string {
 
     for (const item of nodes) {
         const title = cleanText(item.node.topic) || `Slide ${item.index}`;
-        const children = item.node.expanded === false ? [] : (item.node.children ?? []);
+        const children = item.node.expanded === false ? [] : (item.node.children ?? []).slice(0, MINDMAP_MAX_CHILDREN_PER_NODE);
         const task = taskLine(item.node);
 
         lines.push(`${headingLevel(item.depth)} ${item.index}. ${title}`);
@@ -104,7 +118,7 @@ export function nodeObjToPitchMarkdown(root: NodeObj): string {
         if (item.node.note) {
             lines.push('');
             lines.push('备注:');
-            lines.push(cleanText(item.node.note));
+            lines.push(cleanNoteText(item.node.note));
         }
 
         lines.push('');

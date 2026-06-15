@@ -14,8 +14,6 @@
 import React, {
     useEffect,
     useRef,
-    useContext,
-    createContext,
     useCallback,
     useState,
 } from 'react';
@@ -25,9 +23,10 @@ import 'mind-elixir/style.css';
 
 import { PluginContext } from '../../types/plugin';
 import { VIZLY_HYPER_THEME, VIZLY_HYPER_DARK_THEME, VIZLY_THEMES } from './theme';
-import { migrateV1ToV2, directionStringToInt, markdownToNodeObj, opmlToNodeObj, downloadText } from './migrate';
+import { migrateV1ToV2, directionStringToInt, markdownToNodeObj, opmlToNodeObj } from './migrate';
 import { isMindMapV2 } from './types';
 import { registerMindElixirInstance, unregisterMindElixirInstance } from './mindElixirStore';
+import { MindElixirContext } from './MindElixirContext';
 import MindMapContextMenu, { type CtxPos } from './MindMapContextMenu';
 import MindMapFloatingBar from './MindMapFloatingBar';
 import MindMapBatchBar from './MindMapBatchBar';
@@ -43,7 +42,14 @@ import { MindMapAIPanel } from './MindMapAIPanel';
 import { emitToggleOutline } from './mindmapOutlineStore';
 import { MindMapSpeakerNotes } from './MindMapSpeakerNotes';
 import { findNodeById } from './migrate';
+import { getFileSizeLimitError, MINDMAP_TEXT_IMPORT_MAX_BYTES } from '../../utils/fileImportGuards';
 import { marked } from 'marked';
+import { sanitizeMarkdownHtml, toSafeExternalUrl } from '../../utils/sanitizeHtml';
+import { cleanAndValidateTree, cleanMindMapData } from './mindmapTreeSanitizer';
+import { cleanMindMapBridgeNode, cleanMindMapChildNode } from './mindmapBridgeSecurity';
+import { parseMindElixirClipboardNodes } from './mindmapClipboardSecurity';
+import { createSafeMindMapV2Payload } from './mindmapPersistenceSecurity';
+import { getSafeMindMapShortcutAction } from './mindmapKeyboardSecurity';
 
 // ─── Default data shown for a fresh mindmap ──────────────────────────────────
 const DEFAULT_DATA: MindElixirData = {
@@ -60,21 +66,6 @@ const DEFAULT_DATA: MindElixirData = {
     },
     direction: MindElixir.SIDE as 0 | 1 | 2,
 };
-
-// ─── Context: expose mind-elixir instance + selected node to siblings ─────────
-export interface MindElixirContextValue {
-    instance: MindElixirInstance | null;
-    selectedNode: NodeObj | null;
-}
-
-export const MindElixirContext = createContext<MindElixirContextValue>({
-    instance: null,
-    selectedNode: null,
-});
-
-export function useMindElixir() {
-    return useContext(MindElixirContext);
-}
 
 // ─── CSS fix: inject a style override so gradient backgrounds actually render ──
 // mind-elixir uses `background-color: var(--main-bgcolor)` but CSS gradients are
@@ -460,14 +451,8 @@ function loadData(ctx: PluginContext): MindElixirData {
 
 function saveData(ctx: PluginContext, mind: MindElixirInstance): void {
     try {
-        const data = mind.getData();
         const themeKey = localStorage.getItem('vizly_mindmap_theme') ?? 'indigo';
-        const v2Payload = {
-            _version: 'mindmap-v2' as const,
-            nodeData: data.nodeData,
-            direction: data.direction ?? MindElixir.SIDE,
-            themeKey,  // persist theme key so it survives refresh
-        };
+        const v2Payload = createSafeMindMapV2Payload(mind.getData(), themeKey, MindElixir.SIDE as 0 | 1 | 2 | 3);
 
         const setNodes = (ctx as any).setNodes;
         if (!setNodes) return;
@@ -529,6 +514,13 @@ function flattenMindmapTree(root: NodeObj, parentId: string | null = null, depth
     }
 
     return { nodes, edges };
+}
+
+function isMindMapTextEditingTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    if (target.closest('#input-box')) return true;
+    if (target.isContentEditable) return true;
+    return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
 }
 
 // ─── Wrapper Component ────────────────────────────────────────────────────────
@@ -605,7 +597,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             markdown: (text: string) => {
                 try {
                     // parseInline returns string, no wrapping <p> tags
-                    return (marked.parseInline(text) as string) ?? text;
+                    return sanitizeMarkdownHtml((marked.parseInline(text) as string) ?? text);
                 } catch {
                     return text;
                 }
@@ -655,7 +647,8 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                 const obj = mind.getObjById(nodeId, mind.getData().nodeData);
                 if (obj?.hyperLink) {
                     e.preventDefault();
-                    window.open(obj.hyperLink.startsWith('http') ? obj.hyperLink : `https://${obj.hyperLink}`, '_blank', 'noopener,noreferrer');
+                    const safeUrl = toSafeExternalUrl(obj.hyperLink);
+                    if (safeUrl) window.open(safeUrl, '_blank', 'noopener,noreferrer');
                 }
             } catch {}
         };
@@ -693,6 +686,63 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             }
         };
         mind.bus.addListener('operation', onOperation);
+
+        const handleSafeMindElixirPaste = (event: ClipboardEvent) => {
+            const text = event.clipboardData?.getData('text/plain') ?? '';
+            let nodes: NodeObj[] | null;
+            try {
+                nodes = parseMindElixirClipboardNodes(text);
+            } catch (err) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                console.warn('[MindElixirWrapper] blocked unsafe clipboard payload:', err);
+                return;
+            }
+            if (!nodes) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            const target = mind.currentNode;
+            if (!target || nodes.length === 0) return;
+            try {
+                mind.copyNodes(nodes.map(nodeObj => ({ nodeObj })) as any, target);
+            } catch (err) {
+                console.warn('[MindElixirWrapper] safe paste failed:', err);
+            }
+        };
+        mind.container.addEventListener('paste', handleSafeMindElixirPaste, true);
+
+        const handleSafeNodeShortcut = (event: KeyboardEvent) => {
+            const action = getSafeMindMapShortcutAction(event);
+            if (!action || !mind.editable || isMindMapTextEditingTarget(event.target)) return;
+
+            const tpc = mind.currentNode as HTMLElement | null;
+            if (!tpc) return;
+
+            event.preventDefault();
+            event.stopImmediatePropagation();
+
+            try {
+                const nodeObj = (tpc as any).nodeObj as NodeObj | undefined;
+                if (action === 'addChild') {
+                    mind.addChild(tpc, cleanMindMapChildNode());
+                } else if (action === 'insertParent') {
+                    if (nodeObj?.parent) {
+                        mind.insertParent(tpc, cleanMindMapChildNode());
+                    }
+                } else if (nodeObj?.parent) {
+                    mind.insertSibling(
+                        action === 'insertSiblingBefore' ? 'before' : 'after',
+                        tpc,
+                        cleanMindMapChildNode(),
+                    );
+                } else {
+                    mind.addChild(tpc, cleanMindMapChildNode());
+                }
+            } catch (err) {
+                console.warn('[MindElixirWrapper] safe shortcut failed:', err);
+            }
+        };
+        mind.container.addEventListener('keydown', handleSafeNodeShortcut, true);
 
         // ── Collapsed count badges (data-driven) ─────────────────────────────
         // Walk the nodeData tree; for each collapsed node inject a child-count badge
@@ -807,7 +857,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             try {
                 const node = findNodeById(mind.getData().nodeData, nodeId);
                 if (node?.note) {
-                    const html = marked.parse(node.note) as string;
+                    const html = sanitizeMarkdownHtml(marked.parse(node.note) as string);
                     const rect = wrapper.getBoundingClientRect();
                     setNotePreview({ html, x: rect.left, y: rect.top });
                 }
@@ -823,6 +873,8 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         return () => {
             mq.removeEventListener('change', handleColorScheme);
             mind.bus.removeListener('operation', debouncedSave);
+            mind.container.removeEventListener('paste', handleSafeMindElixirPaste, true);
+            mind.container.removeEventListener('keydown', handleSafeNodeShortcut, true);
             mind.bus.removeListener('operation', updateBadgesFromData);
             mind.bus.removeListener('selectNodes', handleSelectNodes);
             mind.bus.removeListener('selectNewNode', handleSelectNewNode);
@@ -872,8 +924,11 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             importData: async (newData: any) => {
                 if (!mindRef.current) return;
                 try {
-                    const v2 = migrateV1ToV2(newData);
-                    mindRef.current.refresh(v2);
+                    const v2 = isMindMapV2(newData) || newData?.nodeData
+                        ? newData
+                        : migrateV1ToV2(newData);
+                    const safeData = cleanMindMapData(v2);
+                    mindRef.current.refresh(safeData);
                     saveData(ctx, mindRef.current);
                 } catch (err) {
                     console.error('[AI Bridge] importData failed:', err);
@@ -886,10 +941,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     const parent = mindRef.current.findEle(parentId);
                     if (parent) {
                         const newId = `node_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
-                        mindRef.current.addChild(parent, {
-                            id: newId,
-                            topic: args.label,
-                        });
+                        mindRef.current.addChild(parent, cleanMindMapBridgeNode(args, newId));
                         saveData(ctx, mindRef.current);
                         return newId;
                     }
@@ -903,11 +955,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     const parent = mindRef.current.findEle(args.parentId);
                     if (parent) {
                         const newId = `node_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
-                        mindRef.current.addChild(parent, {
-                            id: newId,
-                            topic: args.label,
-                            side: args.side,
-                        });
+                        mindRef.current.addChild(parent, cleanMindMapBridgeNode(args, newId));
                         saveData(ctx, mindRef.current);
                         return newId;
                     }
@@ -972,15 +1020,20 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         if (!mind) return;
         const file = e.dataTransfer.files[0];
         if (!file) return;
+        const sizeError = getFileSizeLimitError(file, MINDMAP_TEXT_IMPORT_MAX_BYTES, 'mind map');
+        if (sizeError) {
+            console.warn('[Drag Import]', sizeError);
+            return;
+        }
         const reader = new FileReader();
         reader.onload = (ev) => {
             try {
                 const text = ev.target?.result as string;
                 let nodeData;
                 if (file.name.match(/\.(opml|xml)$/i)) {
-                    nodeData = opmlToNodeObj(text);
+                    nodeData = cleanAndValidateTree(opmlToNodeObj(text), true);
                 } else {
-                    nodeData = markdownToNodeObj(text);
+                    nodeData = cleanAndValidateTree(markdownToNodeObj(text), true);
                 }
                 mind.refresh({ nodeData });
                 mind.toCenter();

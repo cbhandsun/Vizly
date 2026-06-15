@@ -9,6 +9,16 @@
 
 import type { NodeObj } from 'mind-elixir';
 import { getTaskMeta, normalizeTags } from './mindmapTaskModel';
+import { downloadBlob } from '../../utils/downloadUtils';
+import { toSafeExternalUrl, toSafeImageUrl } from '../../utils/sanitizeHtml';
+import {
+    cleanMindMapNote,
+    cleanMindMapTags,
+    cleanMindMapTopic,
+    MINDMAP_MAX_CHILDREN_PER_NODE,
+    MINDMAP_MAX_DEPTH,
+    MINDMAP_MAX_NODES,
+} from './mindmapTreeSanitizer';
 
 // ─── XMind 内部类型 ────────────────────────────────────────────────────────────
 
@@ -33,11 +43,21 @@ interface XmindSheet {
     theme?: { id: string; name: string };
 }
 
+interface ExportContext {
+    count: number;
+}
+
 // ─── Unique ID generator (XMind uses 26-char hex-like IDs) ───────────────────
 
 function xid(): string {
     const hex = () => Math.random().toString(16).slice(2).padEnd(8, '0').slice(0, 8);
     return `${hex()}${hex()}${hex().slice(0, 2)}`;
+}
+
+function safeDimension(value: unknown, fallback: number): number {
+    return typeof value === 'number' && Number.isFinite(value)
+        ? Math.max(1, Math.min(2048, Math.trunc(value)))
+        : fallback;
 }
 
 // ─── Convert mind-elixir NodeObj → XmindTopic recursively ────────────────────
@@ -66,10 +86,15 @@ function taskNoteText(node: NodeObj): string {
 }
 
 export function nodeToXmindTopic(node: NodeObj, depth: number): XmindTopic {
+    return nodeToXmindTopicBounded(node, depth, { count: 0 });
+}
+
+function nodeToXmindTopicBounded(node: NodeObj, depth: number, ctx: ExportContext): XmindTopic {
+    ctx.count += 1;
     const topic: XmindTopic = {
-        id: node.id || xid(),
+        id: cleanMindMapTopic(node.id || xid(), xid()),
         class: 'topic',
-        title: node.topic || '',
+        title: cleanMindMapTopic(node.topic, ''),
     };
 
     // Root structure
@@ -88,33 +113,42 @@ export function nodeToXmindTopic(node: NodeObj, depth: number): XmindTopic {
 
     // Tags → labels
     if (node.tags && node.tags.length > 0) {
-        topic.labels = normalizeTags(node.tags as unknown[] | undefined);
+        topic.labels = cleanMindMapTags(normalizeTags(node.tags as unknown[] | undefined));
     }
 
     // Note + task metadata → notes.plain
-    const noteParts = [node.note, taskNoteText(node)].filter(Boolean);
+    const noteParts = [cleanMindMapNote(node.note), cleanMindMapNote(taskNoteText(node))].filter(Boolean);
     if (noteParts.length > 0) {
         topic.notes = { plain: { content: noteParts.join('\n\n') } };
     }
 
     // Hyperlink → href
     if (node.hyperLink) {
-        topic.href = node.hyperLink.startsWith('http') ? node.hyperLink : `https://${node.hyperLink}`;
+        const safeUrl = toSafeExternalUrl(node.hyperLink);
+        if (safeUrl) topic.href = safeUrl;
     }
 
     // Image
     if (node.image?.url) {
-        topic.image = {
-            src: node.image.url,
-            width: node.image.width ?? 160,
-            height: node.image.height ?? 100,
-        };
+        const safeImageUrl = toSafeImageUrl(node.image.url);
+        if (safeImageUrl) {
+            topic.image = {
+                src: safeImageUrl,
+                width: safeDimension(node.image.width, 160),
+                height: safeDimension(node.image.height, 100),
+            };
+        }
     }
 
     // Children
-    if (node.children && node.children.length > 0) {
+    if (node.children && node.children.length > 0 && depth < MINDMAP_MAX_DEPTH && ctx.count < MINDMAP_MAX_NODES) {
+        const attached: XmindTopic[] = [];
+        for (const child of node.children.slice(0, MINDMAP_MAX_CHILDREN_PER_NODE)) {
+            if (ctx.count >= MINDMAP_MAX_NODES) break;
+            attached.push(nodeToXmindTopicBounded(child, depth + 1, ctx));
+        }
         topic.children = {
-            attached: node.children.map(c => nodeToXmindTopic(c, depth + 1)),
+            attached,
         };
     }
 
@@ -134,7 +168,7 @@ export async function exportXmind(nodeData: NodeObj, filename = 'mindmap'): Prom
     const sheet: XmindSheet = {
         id: xid(),
         class: 'sheet',
-        title: nodeData.topic || 'Mind Map',
+        title: cleanMindMapTopic(nodeData.topic, 'Mind Map'),
         rootTopic: nodeToXmindTopic(nodeData, 0),
         theme: {
             id: 'vizly-dark',
@@ -170,13 +204,5 @@ export async function exportXmind(nodeData: NodeObj, filename = 'mindmap'): Prom
         compressionOptions: { level: 6 },
     });
 
-    // Download
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${filename}.xmind`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, `${filename}.xmind`, 'mindmap.xmind');
 }

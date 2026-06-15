@@ -7,6 +7,8 @@ import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { subscribeOutline } from './mindmapOutlineStore';
 import { nodeObjToMarkdown, downloadText, findNodeById } from './migrate';
+import { cleanMindMapData, cleanMindMapTopic } from './mindmapTreeSanitizer';
+import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 
 // ─── Flatten tree → array ─────────────────────────────────────────────────────
 interface FlatNode {
@@ -79,7 +81,7 @@ const MindMapOutlinePanel: React.FC = () => {
 
     useEffect(() => {
         if (!mind || !open) return;
-        refresh();
+        const initialRefreshTimer = window.setTimeout(refresh, 0);
         const onOp = () => { setTimeout(refresh, 80); };
         const onSelect = (nodeObj: NodeObj | null) => setActiveId((nodeObj as any)?.id ?? null);
         const onDeselect = () => setActiveId(null);
@@ -87,6 +89,7 @@ const MindMapOutlinePanel: React.FC = () => {
         mind.bus.addListener('selectNode', onSelect as any);
         mind.bus.addListener('unselectNode', onDeselect);
         return () => {
+            window.clearTimeout(initialRefreshTimer);
             mind.bus.removeListener('operation', onOp);
             mind.bus.removeListener('selectNode', onSelect as any);
             mind.bus.removeListener('unselectNode', onDeselect);
@@ -99,8 +102,9 @@ const MindMapOutlinePanel: React.FC = () => {
             const data = mind.getData();
             const success = updater(data);
             if (success) {
-                mind.refresh(data);
-                mind.bus.fire('operation', { name: 'outline_structure_change', obj: data.nodeData });
+                const cleanData = cleanMindMapData(data);
+                mind.refresh(cleanData);
+                mind.bus.fire('operation', { name: 'outline_structure_change', obj: cleanData.nodeData });
                 setTimeout(refresh, 80);
             }
         } catch (e) {
@@ -108,17 +112,22 @@ const MindMapOutlinePanel: React.FC = () => {
         }
     }, [mind, refresh]);
 
+    const handleClick = useCallback((id: string) => {
+        if (!mind) return;
+        try {
+            const tpc = mind.findEle(id);
+            if (tpc) { mind.selectNode(tpc); mind.toCenter(); }
+        } catch {}
+        setActiveId(id);
+    }, [mind]);
+
     const handleCreateSibling = useCallback((id: string) => {
         updateTreeAndSave(data => {
             const result = findNodeAndParent(data.nodeData, id);
             if (!result || !result.parent) return false; // Root node cannot have sibling
             
             const newId = `node_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-            const newNode: NodeObj = {
-                id: newId,
-                topic: '',
-                children: []
-            };
+            const newNode = cleanMindMapChildNode({}, newId);
             result.parent.children?.splice(result.index + 1, 0, newNode);
             
             setTimeout(() => {
@@ -128,10 +137,10 @@ const MindMapOutlinePanel: React.FC = () => {
             }, 120);
             return true;
         });
-    }, [updateTreeAndSave]);
+    }, [handleClick, updateTreeAndSave]);
 
     const handleIndent = useCallback((id: string) => {
-        const currentText = editTopicValue;
+        const currentText = cleanMindMapTopic(editTopicValue, '');
         updateTreeAndSave(data => {
             const result = findNodeAndParent(data.nodeData, id);
             if (!result || !result.parent || result.index <= 0) return false;
@@ -154,10 +163,10 @@ const MindMapOutlinePanel: React.FC = () => {
             
             return true;
         });
-    }, [editTopicValue, updateTreeAndSave]);
+    }, [editTopicValue, handleClick, updateTreeAndSave]);
 
     const handleOutdent = useCallback((id: string) => {
-        const currentText = editTopicValue;
+        const currentText = cleanMindMapTopic(editTopicValue, '');
         updateTreeAndSave(data => {
             const result = findNodeAndParent(data.nodeData, id);
             if (!result || !result.parent || result.parent.id === 'root') return false;
@@ -184,10 +193,10 @@ const MindMapOutlinePanel: React.FC = () => {
             
             return true;
         });
-    }, [editTopicValue, updateTreeAndSave]);
+    }, [editTopicValue, handleClick, updateTreeAndSave]);
 
     const handleArrowMove = useCallback((id: string, dir: 'up' | 'down') => {
-        const val = editTopicValue.trim();
+        const val = cleanMindMapTopic(editTopicValue, '').trim();
         if (val && mind) {
             const tpc = mind.findEle(id);
             if (tpc) {
@@ -214,7 +223,7 @@ const MindMapOutlinePanel: React.FC = () => {
             setEditTopicValue(targetNode.topic);
             handleClick(targetNode.id);
         }
-    }, [editTopicValue, mind, nodes, query]);
+    }, [editTopicValue, handleClick, mind, nodes, query]);
 
     const handleExportMarkdown = useCallback(() => {
         if (!mind) return;
@@ -247,8 +256,6 @@ const MindMapOutlinePanel: React.FC = () => {
             pos = 'before';
         } else if (relativeY > height * 0.7) {
             pos = 'after';
-        } else {
-            pos = 'inside';
         }
 
         setDragOverId(targetId);
@@ -323,15 +330,6 @@ const MindMapOutlinePanel: React.FC = () => {
         });
     };
 
-    const handleClick = useCallback((id: string) => {
-        if (!mind) return;
-        try {
-            const tpc = mind.findEle(id);
-            if (tpc) { mind.selectNode(tpc); mind.toCenter(); }
-        } catch {}
-        setActiveId(id);
-    }, [mind]);
-
     const startEdit = useCallback((id: string, currentTopic: string) => {
         setEditingId(id);
         setEditTopicValue(currentTopic);
@@ -339,7 +337,7 @@ const MindMapOutlinePanel: React.FC = () => {
 
     const finishEdit = useCallback((id: string) => {
         setEditingId(null);
-        const val = editTopicValue.trim();
+        const val = cleanMindMapTopic(editTopicValue, '').trim();
         if (!val || !mind) return;
         try {
             const tpc = mind.findEle(id);
@@ -358,7 +356,7 @@ const MindMapOutlinePanel: React.FC = () => {
         try {
             const tpc = mind.findEle(id);
             if (tpc) {
-                mind.addChild(tpc);
+                mind.addChild(tpc, cleanMindMapChildNode());
                 setTimeout(refresh, 100);
             }
         } catch (e) {
@@ -501,7 +499,7 @@ const MindMapOutlinePanel: React.FC = () => {
                                 onKeyDown={e => {
                                     if (e.key === 'Enter') {
                                         e.preventDefault();
-                                        const val = editTopicValue.trim();
+                                        const val = cleanMindMapTopic(editTopicValue, '').trim();
                                         if (val && mind) {
                                             const tpc = mind.findEle(n.id);
                                             if (tpc) mind.setNodeTopic(tpc, val);

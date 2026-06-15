@@ -14,6 +14,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Popover, Tooltip, Popconfirm } from 'antd';
 import { getMindElixirInstance } from './mindElixirStore';
 import type { NodeObj, Topic } from 'mind-elixir';
+import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 
 // ─── Quick palette for batch colour ──────────────────────────────────────────
 const BATCH_COLORS = [
@@ -65,7 +66,7 @@ const MindMapBatchBar: React.FC = () => {
         batch.nodeEls.forEach(el => {
             const obj = batch.nodeObjs.find(o => o.id === (el as HTMLElement).dataset?.nodeid);
             if (obj) {
-                try { mind.reshapeNode(el, { ...obj, branchColor: color }); } catch {}
+                try { mind.reshapeNode(el, { ...obj, ...cleanMindMapNodePatch({ branchColor: color }) }); } catch {}
             }
         });
         setColorOpen(false);

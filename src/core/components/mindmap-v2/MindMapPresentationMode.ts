@@ -100,20 +100,37 @@ function injectPresentationCSS() {
 }
 
 // ─── HUD ──────────────────────────────────────────────────────────────────────
-function showHUD(topic: string, index: number, total: number) {
+const createHudSpan = (className: string, text?: string): HTMLSpanElement => {
+    const span = document.createElement('span');
+    span.className = className;
+    if (text !== undefined) span.textContent = text;
+    return span;
+};
+
+const createHudKey = (text: string): HTMLElement => {
+    const key = document.createElement('kbd');
+    key.textContent = text;
+    return key;
+};
+
+export function showPresentationHUD(topic: string, index: number, total: number) {
     let hud = document.getElementById('me-presentation-hud');
     if (!hud) {
         hud = document.createElement('div');
         hud.id = 'me-presentation-hud';
         document.body.appendChild(hud);
     }
-    hud.innerHTML = `
-        <span class="hud-counter">${index + 1} / ${total}</span>
-        <span class="hud-sep"></span>
-        <span class="hud-topic">${topic}</span>
-        <span class="hud-sep"></span>
-        <kbd>←</kbd><kbd>→</kbd> 导航 &nbsp; <kbd>Esc</kbd> 退出
-    `;
+
+    const nav = document.createDocumentFragment();
+    nav.append(createHudKey('←'), createHudKey('→'), document.createTextNode(' 导航 \u00a0 '), createHudKey('Esc'), document.createTextNode(' 退出'));
+
+    hud.replaceChildren(
+        createHudSpan('hud-counter', `${index + 1} / ${total}`),
+        createHudSpan('hud-sep'),
+        createHudSpan('hud-topic', topic),
+        createHudSpan('hud-sep'),
+        nav
+    );
 }
 
 function removeHUD() {
@@ -155,7 +172,7 @@ export function usePresentationMode(
 
             // find topic text
             const obj = mind.getObjById(id, nodeData);
-            showHUD(obj?.topic ?? id, idx, ids.length);
+            showPresentationHUD(obj?.topic ?? id, idx, ids.length);
             onNodeFocusRef.current?.(obj ?? null);
         } catch (e) {
             console.warn('[Presentation] navigate error:', e);

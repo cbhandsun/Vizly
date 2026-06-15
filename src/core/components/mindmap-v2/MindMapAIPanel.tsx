@@ -30,6 +30,8 @@ import {
     classifyTaskCandidatesLocally,
     collectTaskCandidates,
 } from './mindmapTaskClassification';
+import { cleanMindMapData, cleanMindMapTopic } from './mindmapTreeSanitizer';
+import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 
 const { TextArea } = Input;
 
@@ -55,6 +57,13 @@ function flattenNodes(root: NodeObj): NodeObj[] {
 function appendChildren(node: NodeObj, children: NodeObj[]) {
     node.children = [...(node.children ?? []), ...children];
     node.expanded = true;
+}
+
+function refreshCleanMindMap(mind: ReturnType<typeof getMindElixirInstance>) {
+    if (!mind) return null;
+    const cleaned = cleanMindMapData(mind.getData());
+    mind.refresh(cleaned);
+    return cleaned.nodeData;
 }
 
 export function MindMapAIPanel() {
@@ -133,7 +142,7 @@ export function MindMapAIPanel() {
                 return;
             }
             const current = mind.getData();
-            mind.refresh({ ...current, nodeData: result.nodeData });
+            mind.refresh(cleanMindMapData({ ...current, nodeData: result.nodeData }));
             applyOperation('ai_generate_map', result.nodeData);
             message.success(`已生成 ${countNodes(result.nodeData)} 个节点`);
             setPrompt('');
@@ -170,11 +179,11 @@ export function MindMapAIPanel() {
         if (!node) return;
         const child: NodeObj = {
             id: createAINodeId(),
-            topic,
+            topic: cleanMindMapTopic(topic),
             children: [],
         };
         appendChildren(node, [child]);
-        mind.refresh(mind.getData());
+        refreshCleanMindMap(mind);
         applyOperation('ai_add_suggestion', node);
         setSuggestions(items => items.filter(item => item !== topic));
     }, [applyOperation, mind, targetNode]);
@@ -185,10 +194,10 @@ export function MindMapAIPanel() {
         if (!node) return;
         appendChildren(node, suggestions.map(topic => ({
             id: createAINodeId(),
-            topic,
+            topic: cleanMindMapTopic(topic),
             children: [],
         })));
-        mind.refresh(mind.getData());
+        refreshCleanMindMap(mind);
         applyOperation('ai_add_all_suggestions', node);
         setSuggestions([]);
     }, [applyOperation, mind, suggestions, targetNode]);
@@ -207,8 +216,8 @@ export function MindMapAIPanel() {
             }
             const node = findNodeById(mind.getData().nodeData, targetNode.id);
             if (!node) return;
-            node.topic = result.topic;
-            mind.refresh(mind.getData());
+            node.topic = cleanMindMapTopic(result.topic);
+            refreshCleanMindMap(mind);
             applyOperation('ai_summarize_node', node);
             message.success('已归纳当前节点');
         } finally {
@@ -234,13 +243,19 @@ export function MindMapAIPanel() {
 
             const node = findNodeById(tree, targetNode.id);
             if (!node) return;
-            if (result.topic !== undefined) node.topic = result.topic;
-            if (result.note !== undefined) node.note = result.note;
-            if (result.tags !== undefined) node.tags = result.tags;
-            if (result.icons !== undefined) node.icons = result.icons;
+            const cleanPatch = cleanMindMapNodePatch({
+                topic: result.topic,
+                note: result.note,
+                tags: result.tags,
+                icons: result.icons,
+            });
+            if (result.topic !== undefined) node.topic = cleanPatch.topic;
+            if (result.note !== undefined) node.note = cleanPatch.note;
+            if (result.tags !== undefined) node.tags = cleanPatch.tags;
+            if (result.icons !== undefined) node.icons = cleanPatch.icons;
             if (result.newChildren?.length) appendChildren(node, result.newChildren);
 
-            mind.refresh(mind.getData());
+            refreshCleanMindMap(mind);
             applyOperation('ai_refine_node', node);
             setPrompt('');
             message.success('AI 处理已应用');
@@ -265,7 +280,7 @@ export function MindMapAIPanel() {
                 return;
             }
             const applied = applyTaskClassifications(tree, result.classifications);
-            mind.refresh(mind.getData());
+            refreshCleanMindMap(mind);
             applyOperation('ai_classify_tasks', tree);
             message.success(`已规划 ${applied} 个任务`);
         } finally {
@@ -282,7 +297,7 @@ export function MindMapAIPanel() {
         }
 
         const applied = applyTaskClassifications(tree, classifyTaskCandidatesLocally(taskCandidates));
-        mind.refresh(mind.getData());
+        refreshCleanMindMap(mind);
         applyOperation('local_classify_tasks', tree);
         message.success(`已快速规划 ${applied} 个任务`);
     }, [applyOperation, mind, targetNode, taskCandidates]);

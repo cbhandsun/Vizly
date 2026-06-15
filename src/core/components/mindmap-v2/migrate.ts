@@ -5,10 +5,29 @@ import type { NodeObj } from 'mind-elixir';
 import type { VizlyMindMapV1Data, VizlyMindMapV2Data } from './types';
 import { VIZLY_HYPER_THEME } from './theme';
 import { applyTaskMeta, getTaskMeta, normalizeTags, type TaskPriority, type TaskStatus } from './mindmapTaskModel';
+import { downloadFile } from '../../utils/downloadUtils';
+import { toSafeExternalUrl } from '../../utils/sanitizeHtml';
+import {
+    cleanMindMapIcons,
+    cleanMindMapColor,
+    cleanMindMapNote,
+    cleanMindMapTags,
+    cleanMindMapTopic,
+    MINDMAP_MAX_CHILDREN_PER_NODE,
+    MINDMAP_MAX_DEPTH,
+    MINDMAP_MAX_NODES,
+} from './mindmapTreeSanitizer';
+
+const MAX_IMPORT_TEXT_LENGTH = 512 * 1024;
+const MAX_IMPORT_LINES = 5000;
+
+interface WalkContext {
+    count: number;
+}
 
 /** Strip HTML tags from a label string */
 function stripHtml(html: string): string {
-    return html.replace(/<[^>]+>/g, '').trim() || 'Untitled';
+    return cleanMindMapTopic(html.replace(/<[^>]+>/g, ''), 'Untitled');
 }
 
 function escapeXmlAttr(value: string): string {
@@ -23,6 +42,24 @@ function hasTaskSignal(node: NodeObj): boolean {
     const tags = normalizeTags(node.tags as unknown[] | undefined);
     return Boolean((node as { task?: unknown }).task)
         || tags.some(tag => ['待办', '进行中', '已完成', 'todo', 'doing', 'done', '高', '中', '低', '高优先级', '中优先级', '低优先级'].includes(tag));
+}
+
+function assertImportSize(value: string, label: string): void {
+    if (value.length > MAX_IMPORT_TEXT_LENGTH) {
+        throw new Error(`${label} 内容过大`);
+    }
+}
+
+function safeLines(value: string): string[] {
+    return value.split('\n').slice(0, MAX_IMPORT_LINES);
+}
+
+function canVisit(ctx: WalkContext, depth: number): boolean {
+    return ctx.count < MINDMAP_MAX_NODES && depth <= MINDMAP_MAX_DEPTH;
+}
+
+function cleanTaskText(value: unknown): string | undefined {
+    return cleanMindMapTopic(value, '').trim() || undefined;
 }
 
 /**
@@ -43,7 +80,8 @@ export function directionStringToInt(dir: string): number {
 
 /** Convert from React Flow nodes/edges mindmap-v1 → mind-elixir NodeObj tree */
 export function migrateV1ToV2(v1: VizlyMindMapV1Data): VizlyMindMapV2Data {
-    const { nodes, edges } = v1;
+    const nodes = Array.isArray(v1.nodes) ? v1.nodes.slice(0, MINDMAP_MAX_NODES) : [];
+    const edges = Array.isArray(v1.edges) ? v1.edges : [];
 
     // Build children map from edges
     const childrenMap = new Map<string, string[]>();
@@ -71,43 +109,49 @@ export function migrateV1ToV2(v1: VizlyMindMapV1Data): VizlyMindMapV2Data {
 
     const nodeMap = new Map<string, any>(nodes.map((n: any) => [n.id, n]));
 
-    function convertNode(rfNode: any): NodeObj {
+    const ctx: WalkContext = { count: 0 };
+
+    function convertNode(rfNode: any, depth = 0): NodeObj | null {
+        if (!rfNode || !canVisit(ctx, depth)) return null;
+        ctx.count += 1;
+
         const label = stripHtml((rfNode.data?.label as string) || '');
         const childIds = (childrenMap.get(rfNode.id) || []).sort((a: string, b: string) => {
             const na = nodeMap.get(a);
             const nb = nodeMap.get(b);
             return (na?.position?.y ?? 0) - (nb?.position?.y ?? 0);
-        });
+        }).slice(0, MINDMAP_MAX_CHILDREN_PER_NODE);
 
         const nodeObj: NodeObj = {
-            id: rfNode.id,
+            id: cleanMindMapTopic(rfNode.id, genId()),
             topic: label,
             expanded: !rfNode.data?.collapsed,
-            children: childIds.map(id => convertNode(nodeMap.get(id)!)).filter(Boolean),
+            children: childIds.map(id => convertNode(nodeMap.get(id), depth + 1)).filter(Boolean) as NodeObj[],
         };
 
         // Migrate note
         const note = rfNode.data?.note || rfNode.data?.description;
         if (note) {
-            nodeObj.note = stripHtml(note);
+            nodeObj.note = cleanMindMapNote(stripHtml(note));
         }
 
         // Migrate hyperlink
         const url = rfNode.data?.url || rfNode.data?.hyperLink;
         if (url) {
-            nodeObj.hyperLink = url;
+            const safeUrl = toSafeExternalUrl(String(url));
+            if (safeUrl) nodeObj.hyperLink = safeUrl;
         }
 
         // Migrate icon/icons
         const icon = rfNode.data?.icon;
         if (icon) {
-            nodeObj.icons = [icon];
+            nodeObj.icons = cleanMindMapIcons([icon]);
         } else if (rfNode.data?.icons) {
-            nodeObj.icons = rfNode.data.icons;
+            nodeObj.icons = cleanMindMapIcons(rfNode.data.icons);
         }
 
         // Migrate style
-        const branchColor = rfNode.data?.branchColor as string | undefined;
+        const branchColor = cleanMindMapColor(rfNode.data?.branchColor);
         if (branchColor) {
             nodeObj.style = { color: branchColor };
         }
@@ -115,7 +159,7 @@ export function migrateV1ToV2(v1: VizlyMindMapV1Data): VizlyMindMapV2Data {
         // Migrate tags
         const tags = rfNode.data?.tags as string[] | undefined;
         if (tags && tags.length > 0) {
-            nodeObj.tags = tags;
+            nodeObj.tags = cleanMindMapTags(tags);
         }
 
         return nodeObj;
@@ -127,62 +171,75 @@ export function migrateV1ToV2(v1: VizlyMindMapV1Data): VizlyMindMapV2Data {
 
     return {
         _version: 'mindmap-v2',
-        nodeData: { ...convertNode(rootNode), root: true },
+        nodeData: { ...(convertNode(rootNode) ?? { id: 'root', topic: '中心主题', children: [] }), root: true },
         direction,
         theme: VIZLY_HYPER_THEME,
     };
 }
 
 /** Convert mind-elixir NodeObj back to a simple markdown-like string for AI */
-export function nodeObjToMarkdown(node: NodeObj, depth = 0): string {
+export function nodeObjToMarkdown(node: NodeObj, depth = 0, ctx: WalkContext = { count: 0 }): string {
+    if (!canVisit(ctx, depth)) return '';
+    ctx.count += 1;
+
     const indent = '  '.repeat(depth);
     const prefix = depth === 0 ? '# ' : indent + '- ';
-    const lines = [prefix + node.topic];
-    if (node.note) lines.push(indent + `  > ${node.note}`);
+    const lines = [prefix + cleanMindMapTopic(node.topic, '')];
+    if (node.note) lines.push(indent + `  > ${cleanMindMapNote(node.note) ?? ''}`);
     if (hasTaskSignal(node)) {
         const task = getTaskMeta(node);
         const statusLabel = task.status === 'done' ? '已完成' : task.status === 'doing' ? '进行中' : '待办';
         const taskParts = [`状态: ${statusLabel}`];
         if (task.priority && task.priority !== '无') taskParts.push(`优先级: ${task.priority}`);
-        if (task.assignee) taskParts.push(`负责人: ${task.assignee}`);
-        if (task.dueDate) taskParts.push(`截止: ${task.dueDate}`);
+        if (task.assignee) taskParts.push(`负责人: ${cleanTaskText(task.assignee)}`);
+        if (task.dueDate) taskParts.push(`截止: ${cleanTaskText(task.dueDate)}`);
         if (task.progress) taskParts.push(`进度: ${task.progress}%`);
         lines.push(indent + `  > 任务: ${taskParts.join(' | ')}`);
     }
-    for (const child of node.children ?? []) {
-        lines.push(nodeObjToMarkdown(child, depth + 1));
+    for (const child of (node.children ?? []).slice(0, MINDMAP_MAX_CHILDREN_PER_NODE)) {
+        if (ctx.count >= MINDMAP_MAX_NODES) break;
+        const childMarkdown = nodeObjToMarkdown(child, depth + 1, ctx);
+        if (childMarkdown) lines.push(childMarkdown);
     }
     return lines.join('\n');
 }
 
 /** Convert mind-elixir NodeObj to OPML XML string (compatible with Logseq / Obsidian / OmniOutliner) */
 export function nodeObjToOpml(root: NodeObj): string {
+    const ctx: WalkContext = { count: 0 };
     function convertNode(node: NodeObj, depth: number): string {
+        if (!canVisit(ctx, depth)) return '';
+        ctx.count += 1;
+
         const indent = '  '.repeat(depth + 2);
-        const text = escapeXmlAttr(node.topic);
+        const text = escapeXmlAttr(cleanMindMapTopic(node.topic, ''));
         const extras: string[] = [];
-        if (node.note) extras.push(`_note="${escapeXmlAttr(node.note)}"`);
-        if (node.hyperLink) extras.push(`url="${escapeXmlAttr(node.hyperLink)}"`);
+        const note = cleanMindMapNote(node.note);
+        if (note) extras.push(`_note="${escapeXmlAttr(note)}"`);
+        if (node.hyperLink) {
+            const safeUrl = toSafeExternalUrl(node.hyperLink);
+            if (safeUrl) extras.push(`url="${escapeXmlAttr(safeUrl)}"`);
+        }
         if (hasTaskSignal(node)) {
             const task = getTaskMeta(node);
             extras.push(`_vizly_task_status="${task.status}"`);
             extras.push(`_vizly_task_priority="${task.priority}"`);
-            if (task.assignee) extras.push(`_vizly_task_assignee="${escapeXmlAttr(task.assignee)}"`);
-            if (task.dueDate) extras.push(`_vizly_task_due_date="${escapeXmlAttr(task.dueDate)}"`);
+            if (task.assignee) extras.push(`_vizly_task_assignee="${escapeXmlAttr(cleanTaskText(task.assignee) ?? '')}"`);
+            if (task.dueDate) extras.push(`_vizly_task_due_date="${escapeXmlAttr(cleanTaskText(task.dueDate) ?? '')}"`);
             if (task.progress) extras.push(`_vizly_task_progress="${task.progress}"`);
         }
         const extrasStr = extras.length ? ' ' + extras.join(' ') : '';
-        const children = node.children ?? [];
+        const children = (node.children ?? []).slice(0, MINDMAP_MAX_CHILDREN_PER_NODE);
         if (children.length === 0) {
             return `${indent}<outline text="${text}"${extrasStr}/>`;
         }
-        const childLines = children.map(c => convertNode(c, depth + 1)).join('\n');
+        const childLines = children.map(c => convertNode(c, depth + 1)).filter(Boolean).join('\n');
         return `${indent}<outline text="${text}"${extrasStr}>\n${childLines}\n${indent}</outline>`;
     }
     return [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<opml version="2.0">',
-        '  <head><title>' + root.topic.replace(/</g, '&lt;') + '</title></head>',
+        '  <head><title>' + escapeXmlAttr(cleanMindMapTopic(root.topic, '')) + '</title></head>',
         '  <body>',
         convertNode(root, 0),
         '  </body>',
@@ -192,15 +249,7 @@ export function nodeObjToOpml(root: NodeObj): string {
 
 /** Trigger a browser download of text content */
 export function downloadText(filename: string, content: string, mimeType = 'text/plain') {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadFile(content, filename, mimeType);
 }
 
 /** Convert mind-elixir NodeObj to Vizly Flowchart JSON */
@@ -208,15 +257,22 @@ export function nodeObjToFlowchartJson(root: NodeObj): string {
     const nodes: any[] = [];
     const edges: any[] = [];
     let yCounter = 0;
+    const ctx: WalkContext = { count: 0 };
 
     function traverse(node: NodeObj, depth: number, parentId: string | null) {
-        const id = node.id === 'root' ? 'me_root' : node.id;
+        if (!canVisit(ctx, depth)) return;
+        ctx.count += 1;
+
+        const id = node.id === 'root' ? 'me_root' : cleanMindMapTopic(node.id, genId());
         
         nodes.push({
             id: id,
             type: depth === 0 ? 'terminal' : 'task',
             position: { x: depth * 280, y: yCounter * 110 },
-            data: { label: node.topic, ...(node.note ? { note: node.note } : {}) }
+            data: {
+                label: cleanMindMapTopic(node.topic, ''),
+                ...(node.note ? { note: cleanMindMapNote(node.note) } : {}),
+            }
         });
         
         if (parentId) {
@@ -228,12 +284,13 @@ export function nodeObjToFlowchartJson(root: NodeObj): string {
             });
         }
         
-        const children = node.children || [];
+        const children = (node.children || []).slice(0, MINDMAP_MAX_CHILDREN_PER_NODE);
         if (children.length === 0) {
             yCounter++;
         } else {
             let first = true;
             for (const child of children) {
+                if (ctx.count >= MINDMAP_MAX_NODES) break;
                 if (!first) yCounter++;
                 traverse(child, depth + 1, id);
                 first = false;
@@ -267,7 +324,8 @@ function genId(): string {
  * If both formats are mixed, headings take precedence.
  */
 export function markdownToNodeObj(md: string): NodeObj {
-    const lines = md.split('\n').map(l => l.trimEnd()).filter(l => l.trim());
+    assertImportSize(md, 'Markdown');
+    const lines = safeLines(md).map(l => l.trimEnd()).filter(l => l.trim());
 
     // ── Try heading-based ──────────────────────────────────────────────────────
     const headingLines = lines.filter(l => /^#{1,6}\s/.test(l));
@@ -277,13 +335,17 @@ export function markdownToNodeObj(md: string): NodeObj {
 
         const stack: Array<{ node: NodeObj; depth: number }> = [];
         let root: NodeObj | null = null;
+        const ctx: WalkContext = { count: 0 };
 
         for (const line of lines) {
+            if (ctx.count >= MINDMAP_MAX_NODES) break;
             const m = line.match(/^(#{1,6})\s+(.*)/);
             if (!m) continue;
             const depth = m[1].length - minLevel;
-            const topic = m[2].trim();
+            if (depth > MINDMAP_MAX_DEPTH) continue;
+            const topic = cleanMindMapTopic(m[2].trim());
             const node: NodeObj = { id: genId(), topic, children: [] };
+            ctx.count += 1;
 
             if (depth === 0) {
                 root = node;
@@ -295,8 +357,11 @@ export function markdownToNodeObj(md: string): NodeObj {
                     stack.pop();
                 }
                 const parent = stack[stack.length - 1].node;
-                (parent.children ??= []).push(node);
-                stack.push({ node, depth });
+                const children = parent.children ??= [];
+                if (children.length < MINDMAP_MAX_CHILDREN_PER_NODE) {
+                    children.push(node);
+                    stack.push({ node, depth });
+                }
             }
         }
 
@@ -311,13 +376,18 @@ export function markdownToNodeObj(md: string): NodeObj {
 
     const stack2: Array<{ node: NodeObj; indent: number }> = [];
     let root2: NodeObj | null = null;
+    const ctx2: WalkContext = { count: 0 };
 
     for (const line of lines) {
+        if (ctx2.count >= MINDMAP_MAX_NODES) break;
         const m = line.match(/^\s*[-*+]\s+(.*)/);
         if (!m) continue;
         const indent = getIndent(line);
-        const topic = m[1].trim();
+        const depth = Math.floor(indent / 2);
+        if (depth > MINDMAP_MAX_DEPTH) continue;
+        const topic = cleanMindMapTopic(m[1].trim());
         const node: NodeObj = { id: genId(), topic, children: [] };
+        ctx2.count += 1;
 
         if (stack2.length === 0 || indent === 0) {
             root2 = node;
@@ -328,8 +398,11 @@ export function markdownToNodeObj(md: string): NodeObj {
                 stack2.pop();
             }
             const parent = stack2[stack2.length - 1].node;
-            (parent.children ??= []).push(node);
-            stack2.push({ node, indent });
+            const children = parent.children ??= [];
+            if (children.length < MINDMAP_MAX_CHILDREN_PER_NODE) {
+                children.push(node);
+                stack2.push({ node, indent });
+            }
         }
     }
 
@@ -342,9 +415,9 @@ export function markdownToNodeObj(md: string): NodeObj {
     return {
         id: 'root',
         topic: '导入的思维导图',
-        children: lines.slice(0, 20).map(l => ({
+        children: lines.slice(0, Math.min(20, MINDMAP_MAX_CHILDREN_PER_NODE)).map(l => ({
             id: genId(),
-            topic: l.replace(/^[-*#\s]+/, '').trim() || l,
+            topic: cleanMindMapTopic(l.replace(/^[-*#\s]+/, '').trim() || l),
             children: [],
         })),
     };
@@ -355,6 +428,7 @@ export function markdownToNodeObj(md: string): NodeObj {
  * Compatible with files exported by Logseq, OmniOutliner, and nodeObjToOpml().
  */
 export function opmlToNodeObj(opmlStr: string): NodeObj {
+    assertImportSize(opmlStr, 'OPML');
     const parser = new DOMParser();
     const doc = parser.parseFromString(opmlStr, 'application/xml');
 
@@ -365,21 +439,28 @@ export function opmlToNodeObj(opmlStr: string): NodeObj {
     }
 
     const titleEl = doc.querySelector('head > title');
-    const rootTitle = titleEl?.textContent?.trim() || '导入的思维导图';
+    const rootTitle = cleanMindMapTopic(titleEl?.textContent?.trim(), '导入的思维导图');
+    const ctx: WalkContext = { count: 0 };
 
     function convertOutline(el: Element, depth: number): NodeObj {
-        const topic = el.getAttribute('text') ?? el.getAttribute('_text') ?? '节点';
-        const note = el.getAttribute('_note') ?? undefined;
+        if (!canVisit(ctx, depth)) {
+            return { id: genId(), topic: '节点', children: [] };
+        }
+        ctx.count += 1;
+
+        const topic = cleanMindMapTopic(el.getAttribute('text') ?? el.getAttribute('_text') ?? '节点');
+        const note = cleanMindMapNote(el.getAttribute('_note') ?? undefined);
         const hyperLink = el.getAttribute('url') ?? undefined;
         const status = el.getAttribute('_vizly_task_status') as TaskStatus | null;
         const priority = el.getAttribute('_vizly_task_priority') as TaskPriority | null;
-        const assignee = el.getAttribute('_vizly_task_assignee') ?? undefined;
-        const dueDate = el.getAttribute('_vizly_task_due_date') ?? undefined;
+        const assignee = cleanTaskText(el.getAttribute('_vizly_task_assignee') ?? undefined);
+        const dueDate = cleanTaskText(el.getAttribute('_vizly_task_due_date') ?? undefined);
         const progressValue = el.getAttribute('_vizly_task_progress');
         const progress = progressValue === null ? undefined : Number(progressValue);
 
         const children: NodeObj[] = [];
         for (const child of Array.from(el.children)) {
+            if (children.length >= MINDMAP_MAX_CHILDREN_PER_NODE || ctx.count >= MINDMAP_MAX_NODES) break;
             if (child.tagName.toLowerCase() === 'outline') {
                 children.push(convertOutline(child, depth + 1));
             }
@@ -387,7 +468,10 @@ export function opmlToNodeObj(opmlStr: string): NodeObj {
 
         const node: NodeObj = { id: genId(), topic, children };
         if (note) node.note = note;
-        if (hyperLink) node.hyperLink = hyperLink;
+        if (hyperLink) {
+            const safeUrl = toSafeExternalUrl(hyperLink);
+            if (safeUrl) node.hyperLink = safeUrl;
+        }
         if (status || priority || assignee || dueDate || Number.isFinite(progress)) {
             applyTaskMeta(node, {
                 status: status === 'doing' || status === 'done' || status === 'todo' ? status : undefined,

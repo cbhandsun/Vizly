@@ -5,13 +5,31 @@
  * 根据给定节点的主题和路径，生成若干子主题建议。
  */
 
-import { AI_CONFIG_KEY, getAIConfig } from '@/components/ai/AIConfigModal';
+import { getAIConfig } from '@/components/ai/aiConfigStorage';
+import {
+    formatAIProviderRequestError,
+    requestAIChatCompletionJson,
+    type AIProviderRequestConfig,
+} from '@/services/ai/aiProviderClient';
 import type { NodeObj } from 'mind-elixir';
 import {
     parseTaskClassifications,
     type TaskClassificationResult,
     type TaskItemInput,
 } from './mindmapTaskAIParsing';
+import {
+    cleanAndValidateTree,
+    cleanMindMapIcons,
+    cleanMindMapNote,
+    cleanMindMapTags,
+    cleanMindMapTopic,
+} from './mindmapTreeSanitizer';
+import {
+    cleanSpeakerContext,
+    cleanSpeakerNotes,
+    cleanSpeakerTone,
+    cleanSpeakerTopic,
+} from './mindmapSpeakerNotesSecurity';
 
 export interface AIExpandOptions {
     /** 当前节点 */
@@ -28,6 +46,19 @@ export interface AIExpandResult {
     topics: string[];
     error?: string;
 }
+
+const requestMindMapChat = async (
+    provider: AIProviderRequestConfig,
+    modelId: string,
+    messages: Array<{ role: string; content: string }>,
+    options: { max_tokens: number; temperature: number }
+) => {
+    return requestAIChatCompletionJson(provider, {
+        model: modelId,
+        messages,
+        ...options,
+    });
+};
 
 /** 调用用户配置的 AI 接口，生成子主题列表 */
 export async function expandNodeWithAI(options: AIExpandOptions): Promise<AIExpandResult> {
@@ -60,35 +91,13 @@ export async function expandNodeWithAI(options: AIExpandOptions): Promise<AIExpa
     ].filter(Boolean).join('\n');
 
     try {
-        const response = await fetch(
-            `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`,
+        const data = await requestMindMapChat(provider, modelId, [
             {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${provider.apiKey}`,
-                },
-                body: JSON.stringify({
-                    model: modelId,
-                    messages: [
-                        {
-                            role: 'system',
-                            content: '你是一个专业的思维导图助手。请根据用户的要求生成简洁、准确的子主题列表，每行一个，不要有其他内容。',
-                        },
-                        { role: 'user', content: prompt },
-                    ],
-                    max_tokens: 512,
-                    temperature: 0.7,
-                }),
-            }
-        );
-
-        if (!response.ok) {
-            const errText = await response.text();
-            return { topics: [], error: `AI 接口错误 ${response.status}: ${errText.slice(0, 120)}` };
-        }
-
-        const data = await response.json();
+                role: 'system',
+                content: '你是一个专业的思维导图助手。请根据用户的要求生成简洁、准确的子主题列表，每行一个，不要有其他内容。',
+            },
+            { role: 'user', content: prompt },
+        ], { max_tokens: 512, temperature: 0.7 });
         const raw: string = data.choices?.[0]?.message?.content ?? '';
 
         const topics = raw
@@ -103,7 +112,7 @@ export async function expandNodeWithAI(options: AIExpandOptions): Promise<AIExpa
 
         return { topics };
     } catch (e: any) {
-        return { topics: [], error: `请求失败：${e?.message ?? String(e)}` };
+        return { topics: [], error: formatAIProviderRequestError(e, 120) };
     }
 }
 
@@ -156,32 +165,10 @@ interface NodeObj {
     const userPrompt = `请为主题"${promptText}"生成一个思维导图 JSON 树结构。`;
 
     try {
-        const response = await fetch(
-            `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`,
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${provider.apiKey}`,
-                },
-                body: JSON.stringify({
-                    model: modelId,
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPrompt },
-                    ],
-                    max_tokens: 1500,
-                    temperature: 0.7,
-                }),
-            }
-        );
-
-        if (!response.ok) {
-            const errText = await response.text();
-            return { error: `AI 接口错误 ${response.status}: ${errText.slice(0, 120)}` };
-        }
-
-        const data = await response.json();
+        const data = await requestMindMapChat(provider, modelId, [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+        ], { max_tokens: 1500, temperature: 0.7 });
         let content: string = data.choices?.[0]?.message?.content ?? '';
 
         // Clean markdown wraps
@@ -191,29 +178,8 @@ interface NodeObj {
         const nodeData = cleanAndValidateTree(parsed, true);
         return { nodeData };
     } catch (e: any) {
-        return { error: `请求失败：${e?.message ?? String(e)}` };
+        return { error: formatAIProviderRequestError(e, 120) };
     }
-}
-
-function cleanAndValidateTree(node: any, isRoot = false): NodeObj {
-    const id = isRoot ? 'root' : (node.id || `ai_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
-    const clean: NodeObj = {
-        id,
-        topic: node.topic || '(无标题)',
-        expanded: isRoot ? true : (node.expanded !== false),
-        children: (node.children ?? []).map((c: any) => cleanAndValidateTree(c, false)),
-    };
-    if (node.note) clean.note = String(node.note);
-    if (node.hyperLink) clean.hyperLink = String(node.hyperLink);
-    if (node.icons && Array.isArray(node.icons)) {
-        clean.icons = node.icons.map(String);
-    } else if (node.icon) {
-        clean.icons = [String(node.icon)];
-    }
-    if (node.tags && Array.isArray(node.tags)) {
-        clean.tags = node.tags.map(String);
-    }
-    return clean;
 }
 
 /** 使用 AI 根据子节点内容归纳修改当前节点的主题 */
@@ -241,37 +207,15 @@ ${childrenTopics.map(t => `- ${t}`).join('\n')}
 - 如果无法更好地归纳，请直接返回原名称"${nodeTopic}"`;
 
     try {
-        const response = await fetch(
-            `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`,
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${provider.apiKey}`,
-                },
-                body: JSON.stringify({
-                    model: modelId,
-                    messages: [
-                        { role: 'system', content: '你是一个思维导图优化助手。请只输出重新归纳后的节点名称，不要包含任何额外文字。' },
-                        { role: 'user', content: prompt },
-                    ],
-                    max_tokens: 60,
-                    temperature: 0.5,
-                }),
-            }
-        );
-
-        if (!response.ok) {
-            const errText = await response.text();
-            return { error: `AI 接口错误 ${response.status}: ${errText.slice(0, 120)}` };
-        }
-
-        const data = await response.json();
+        const data = await requestMindMapChat(provider, modelId, [
+            { role: 'system', content: '你是一个思维导图优化助手。请只输出重新归纳后的节点名称，不要包含任何额外文字。' },
+            { role: 'user', content: prompt },
+        ], { max_tokens: 60, temperature: 0.5 });
         let topic = (data.choices?.[0]?.message?.content ?? '').trim();
         topic = topic.replace(/^["'“‘]/, '').replace(/["'”’]$/, '').trim();
-        return { topic: topic || nodeTopic };
+        return { topic: cleanMindMapTopic(topic || nodeTopic, nodeTopic) };
     } catch (e: any) {
-        return { error: `请求失败：${e?.message ?? String(e)}` };
+        return { error: formatAIProviderRequestError(e, 120) };
     }
 }
 
@@ -289,6 +233,32 @@ export interface AICustomActionResult {
     icons?: string[];
     newChildren?: NodeObj[];
     error?: string;
+}
+
+export function sanitizeAICustomActionResult(value: unknown): AICustomActionResult {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return {};
+    }
+    const parsed = value as Record<string, unknown>;
+    const result: AICustomActionResult = {};
+
+    if (parsed.topic !== undefined) result.topic = cleanMindMapTopic(parsed.topic);
+    if (parsed.note !== undefined) result.note = cleanMindMapNote(parsed.note);
+    if (parsed.tags !== undefined) result.tags = cleanMindMapTags(parsed.tags);
+    if (parsed.icons !== undefined) result.icons = cleanMindMapIcons(parsed.icons);
+
+    if (Array.isArray(parsed.newChildren)) {
+        result.newChildren = parsed.newChildren.map((child) => {
+            const childId = `ai_custom_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+            return cleanAndValidateTree({
+                ...(child && typeof child === 'object' && !Array.isArray(child) ? child as Record<string, unknown> : {}),
+                id: childId,
+                children: [],
+            }, false);
+        });
+    }
+
+    return result;
 }
 
 /**
@@ -353,57 +323,19 @@ JSON 结构中只能包含以下可选字段：
     const userPrompt = `请根据我的指令"${customPrompt}"，处理当前节点并返回增量修改 JSON。`;
 
     try {
-        const response = await fetch(
-            `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`,
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${provider.apiKey}`,
-                },
-                body: JSON.stringify({
-                    model: modelId,
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPrompt },
-                    ],
-                    max_tokens: 1000,
-                    temperature: 0.7,
-                }),
-            }
-        );
-
-        if (!response.ok) {
-            const errText = await response.text();
-            return { error: `AI 接口错误 ${response.status}: ${errText.slice(0, 120)}` };
-        }
-
-        const data = await response.json();
+        const data = await requestMindMapChat(provider, modelId, [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+        ], { max_tokens: 1000, temperature: 0.7 });
         let content: string = data.choices?.[0]?.message?.content ?? '';
 
         // 清洗 Markdown 包裹
         content = content.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
 
         const parsed = JSON.parse(content);
-        
-        // 清洗 newChildren 结构
-        if (parsed.newChildren && Array.isArray(parsed.newChildren)) {
-            parsed.newChildren = parsed.newChildren.map((c: any) => {
-                const childId = `ai_custom_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-                return {
-                    id: childId,
-                    topic: c.topic || '新节点',
-                    note: c.note ? String(c.note) : undefined,
-                    icons: Array.isArray(c.icons) ? c.icons.map(String) : (c.icon ? [String(c.icon)] : undefined),
-                    tags: Array.isArray(c.tags) ? c.tags.map(String) : undefined,
-                    children: []
-                };
-            });
-        }
-
-        return parsed;
+        return sanitizeAICustomActionResult(parsed);
     } catch (e: any) {
-        return { error: `请求失败：${e?.message ?? String(e)}` };
+        return { error: formatAIProviderRequestError(e, 120) };
     }
 }
 
@@ -426,6 +358,11 @@ export async function generateSpeakerNotes(
         return { error: '请在 AI 设置中选择一个模型' };
     }
 
+    const safeTopic = cleanSpeakerTopic(nodeTopic);
+    const safeNote = cleanSpeakerContext(noteText);
+    const safeChildText = cleanSpeakerContext(childText);
+    const safeTone = cleanSpeakerTone(tone);
+
     const systemPrompt = `你是一个专业的演讲教练和演讲稿助手。根据用户提供的思维导图节点主题、备注和子节点内容，生成一段 100 到 200 字的口语化演讲演讲稿（逐字稿）。
 请根据指定的语气风格生成。
 生成的演讲稿应当：
@@ -434,44 +371,22 @@ export async function generateSpeakerNotes(
 - 适合口语化表达，流畅自然，适合演示演讲时朗读。`;
 
     const userPrompt = `
-当前演讲的节点主题："${nodeTopic}"
-${noteText ? `此节点的详细备注："${noteText}"` : ''}
-${childText ? `此节点包含的子概念/大纲："${childText}"` : ''}
-演讲语气风格限制："${tone}"
+当前演讲的节点主题："${safeTopic}"
+${safeNote ? `此节点的详细备注："${safeNote}"` : ''}
+${safeChildText ? `此节点包含的子概念/大纲："${safeChildText}"` : ''}
+演讲语气风格限制："${safeTone}"
 
 请为此节点生成对应的演讲稿。`;
 
     try {
-        const response = await fetch(
-            `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`,
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${provider.apiKey}`,
-                },
-                body: JSON.stringify({
-                    model: modelId,
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPrompt },
-                    ],
-                    max_tokens: 400,
-                    temperature: 0.7,
-                }),
-            }
-        );
-
-        if (!response.ok) {
-            const errText = await response.text();
-            return { error: `AI 接口错误 ${response.status}: ${errText.slice(0, 120)}` };
-        }
-
-        const data = await response.json();
-        const notes = (data.choices?.[0]?.message?.content ?? '').trim();
+        const data = await requestMindMapChat(provider, modelId, [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+        ], { max_tokens: 400, temperature: 0.7 });
+        const notes = cleanSpeakerNotes(data.choices?.[0]?.message?.content);
         return { notes };
     } catch (e: any) {
-        return { error: `请求失败：${e?.message ?? String(e)}` };
+        return { error: formatAIProviderRequestError(e, 120) };
     }
 }
 
@@ -501,38 +416,16 @@ export async function analyzeNodesRelationship(
 请用 2-5 个字概括节点 A 与节点 B 的语义关系：`;
 
     try {
-        const response = await fetch(
-            `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`,
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${provider.apiKey}`,
-                },
-                body: JSON.stringify({
-                    model: modelId,
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPrompt },
-                    ],
-                    max_tokens: 30,
-                    temperature: 0.5,
-                }),
-            }
-        );
-
-        if (!response.ok) {
-            const errText = await response.text();
-            return { error: `AI 接口错误 ${response.status}: ${errText.slice(0, 120)}` };
-        }
-
-        const data = await response.json();
+        const data = await requestMindMapChat(provider, modelId, [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+        ], { max_tokens: 30, temperature: 0.5 });
         let relationText = (data.choices?.[0]?.message?.content ?? '').trim();
         // 清洗掉可能的引号
         relationText = relationText.replace(/^["'“‘]/, '').replace(/["'”’]$/, '').trim();
         return { relationText };
     } catch (e: any) {
-        return { error: `请求失败：${e?.message ?? String(e)}` };
+        return { error: formatAIProviderRequestError(e, 120) };
     }
 }
 
@@ -571,32 +464,10 @@ ${JSON.stringify(tasks, null, 2)}
 请对它们进行分类和优先级规划。`;
 
     try {
-        const response = await fetch(
-            `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`,
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${provider.apiKey}`,
-                },
-                body: JSON.stringify({
-                    model: modelId,
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPrompt },
-                    ],
-                    max_tokens: 1500,
-                    temperature: 0.5,
-                }),
-            }
-        );
-
-        if (!response.ok) {
-            const errText = await response.text();
-            return { error: `AI 接口错误 ${response.status}: ${errText.slice(0, 120)}` };
-        }
-
-        const data = await response.json();
+        const data = await requestMindMapChat(provider, modelId, [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+        ], { max_tokens: 1500, temperature: 0.5 });
         const content = (data.choices?.[0]?.message?.content ?? '').trim();
 
         const classifications = parseTaskClassifications(content);
@@ -605,7 +476,7 @@ ${JSON.stringify(tasks, null, 2)}
         }
         return { classifications };
     } catch (e: any) {
-        return { error: `请求失败：${e?.message ?? String(e)}` };
+        return { error: formatAIProviderRequestError(e, 120) };
     }
 }
 

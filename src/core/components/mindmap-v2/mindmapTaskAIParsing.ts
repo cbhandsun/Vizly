@@ -12,6 +12,31 @@ export interface TaskClassificationResult {
 
 const TASK_STATUS_VALUES = new Set<TaskClassificationResult['status']>(['todo', 'doing', 'done']);
 const TASK_PRIORITY_VALUES = new Set<TaskClassificationResult['priority']>(['高', '中', '低']);
+const MAX_AI_TASK_RESPONSE_CHARS = 64 * 1024;
+const MAX_TASK_CLASSIFICATIONS = 500;
+const MAX_TASK_ID_CHARS = 128;
+
+function cleanTaskId(value: unknown): string {
+    if (typeof value !== 'string') return '';
+    return value.trim().slice(0, MAX_TASK_ID_CHARS);
+}
+
+export function normalizeTaskClassification(value: unknown): TaskClassificationResult | null {
+    if (!value || typeof value !== 'object') return null;
+
+    const item = value as Partial<TaskClassificationResult>;
+    const id = cleanTaskId(item.id);
+    if (!id) return null;
+
+    const status = TASK_STATUS_VALUES.has(item.status as TaskClassificationResult['status'])
+        ? item.status as TaskClassificationResult['status']
+        : 'todo';
+    const priority = TASK_PRIORITY_VALUES.has(item.priority as TaskClassificationResult['priority'])
+        ? item.priority as TaskClassificationResult['priority']
+        : '中';
+
+    return { id, status, priority };
+}
 
 function extractJsonArray(content: string): string {
     const cleaned = content
@@ -30,18 +55,27 @@ function extractJsonArray(content: string): string {
 }
 
 export function parseTaskClassifications(content: string): TaskClassificationResult[] {
+    if (content.length > MAX_AI_TASK_RESPONSE_CHARS) {
+        throw new Error('AI 返回的任务分类内容过大');
+    }
+
     const parsed = JSON.parse(extractJsonArray(content));
     if (!Array.isArray(parsed)) {
         throw new Error('AI 返回的任务分类不是数组');
     }
 
-    return parsed.flatMap((item): TaskClassificationResult[] => {
-        if (!item || typeof item !== 'object') return [];
-        const id = typeof item.id === 'string' ? item.id.trim() : '';
-        if (!id) return [];
+    const result: TaskClassificationResult[] = [];
+    const seen = new Set<string>();
 
-        const status = TASK_STATUS_VALUES.has(item.status) ? item.status : 'todo';
-        const priority = TASK_PRIORITY_VALUES.has(item.priority) ? item.priority : '中';
-        return [{ id, status, priority }];
-    });
+    for (const item of parsed) {
+        if (result.length >= MAX_TASK_CLASSIFICATIONS) break;
+
+        const classification = normalizeTaskClassification(item);
+        if (!classification || seen.has(classification.id)) continue;
+
+        seen.add(classification.id);
+        result.push(classification);
+    }
+
+    return result;
 }

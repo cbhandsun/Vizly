@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useMindElixir } from './MindElixirWrapper';
+import { useMindElixir } from './MindElixirContext';
 import { collaborationService } from '../../services/CollaborationService';
 
 interface CursorState {
@@ -12,14 +12,17 @@ interface CursorState {
 export default function MindMapMultiplayerCursors() {
     const { instance } = useMindElixir();
     const [cursors, setCursors] = useState<CursorState[]>([]);
-    const [mapContainer, setMapContainer] = useState<HTMLElement | null>(null);
     const frameRef = useRef<number | null>(null);
+    const mapContainer = useMemo(
+        () => instance?.container?.querySelector('.map-container') as HTMLElement | null,
+        [instance],
+    );
 
     useEffect(() => {
         if (!instance?.container) return;
 
         const containerEle = instance.container.querySelector('.map-container') as HTMLElement;
-        if (containerEle) setMapContainer(containerEle);
+        if (!containerEle) return;
 
         const provider = collaborationService.getProviderSafe();
         if (!provider) return; // Offline mode
