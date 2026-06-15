@@ -2,6 +2,8 @@
  * 统一错误处理系统
  */
 
+import { normalizeRemoteLogEndpoint, redactSensitiveLogValue } from './logSecurity';
+
 // 错误类型枚举
 export enum ErrorType {
   VALIDATION = 'VALIDATION',
@@ -283,13 +285,18 @@ export class ErrorHandler {
   private async logToRemote(error: DiagramError): Promise<void> {
     try {
       if (!this.config.remoteLogEndpoint) return;
+      const endpoint = normalizeRemoteLogEndpoint(this.config.remoteLogEndpoint);
+      if (!endpoint) {
+        console.warn('远程日志端点无效，已跳过发送');
+        return;
+      }
 
-      await fetch(this.config.remoteLogEndpoint, {
+      await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(error.toJSON())
+        body: JSON.stringify(redactSensitiveLogValue(error.toJSON()))
       });
     } catch (logError) {
       console.warn('远程日志发送失败:', logError);

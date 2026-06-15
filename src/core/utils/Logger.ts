@@ -2,6 +2,17 @@
  * 统一日志系统
  */
 
+import { normalizeRemoteLogEndpoint, sanitizeLogEntry } from './logSecurity';
+
+const MAX_STORED_LOG_ENTRIES = 1000;
+const MAX_LOG_STRING_LENGTH = 4000;
+const MAX_LOG_ID_LENGTH = 120;
+const MAX_LOG_TAGS = 20;
+const MAX_LOG_DATA_KEYS = 50;
+const MAX_LOG_DATA_ARRAY_ITEMS = 50;
+const MAX_LOG_DATA_DEPTH = 4;
+const MAX_STORED_LOGS_JSON_LENGTH = 2 * 1024 * 1024;
+
 // 日志级别枚举
 export enum LogLevel {
   DEBUG = 0,
@@ -43,6 +54,111 @@ export interface LogEntry {
   /** 标签 */
   tags?: string[];
 }
+
+const LOG_LEVEL_VALUES = new Set<number>(Object.values(LogLevel).filter((value): value is number => typeof value === 'number'));
+const LOG_TYPE_VALUES = new Set<string>(Object.values(LogType));
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+};
+
+const cleanString = (value: unknown, maxLength: number, fallback = ''): string => {
+  return typeof value === 'string' ? value.slice(0, maxLength) : fallback;
+};
+
+const cleanOptionalString = (value: unknown, maxLength: number): string | undefined => {
+  const cleaned = cleanString(value, maxLength);
+  return cleaned ? cleaned : undefined;
+};
+
+const cleanTimestamp = (value: unknown): number => {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : Date.now();
+};
+
+const boundLogDataValue = (value: unknown, depth: number): unknown => {
+  if (typeof value === 'string') return value.slice(0, MAX_LOG_STRING_LENGTH);
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'boolean' || value === null) return value;
+  if (depth >= MAX_LOG_DATA_DEPTH) return '[truncated]';
+
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, MAX_LOG_DATA_ARRAY_ITEMS)
+      .map(item => boundLogDataValue(item, depth + 1));
+  }
+
+  if (!isRecord(value)) return String(value).slice(0, MAX_LOG_STRING_LENGTH);
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .slice(0, MAX_LOG_DATA_KEYS)
+      .map(([key, entry]) => [
+        key.slice(0, MAX_LOG_ID_LENGTH),
+        boundLogDataValue(entry, depth + 1),
+      ])
+  );
+};
+
+const cleanLogData = (value: unknown): Record<string, unknown> | undefined => {
+  if (!isRecord(value)) return undefined;
+  return boundLogDataValue(value, 0) as Record<string, unknown>;
+};
+
+const cleanTags = (value: unknown): string[] | undefined => {
+  if (!Array.isArray(value)) return undefined;
+  const tags = value
+    .filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+    .slice(0, MAX_LOG_TAGS)
+    .map(tag => tag.slice(0, MAX_LOG_ID_LENGTH));
+  return tags.length > 0 ? tags : undefined;
+};
+
+const cleanStoredLogEntry = (value: unknown): LogEntry | null => {
+  if (!isRecord(value)) return null;
+
+  const id = cleanString(value.id, MAX_LOG_ID_LENGTH);
+  const message = cleanString(value.message, MAX_LOG_STRING_LENGTH);
+  if (!id || !message) return null;
+
+  const level = LOG_LEVEL_VALUES.has(value.level as LogLevel)
+    ? value.level as LogLevel
+    : LogLevel.INFO;
+  const type = LOG_TYPE_VALUES.has(value.type as LogType)
+    ? value.type as LogType
+    : LogType.SYSTEM;
+
+  const sanitized = sanitizeLogEntry({
+    id,
+    timestamp: cleanTimestamp(value.timestamp),
+    level,
+    type,
+    message,
+    data: cleanLogData(value.data),
+    source: cleanOptionalString(value.source, MAX_LOG_ID_LENGTH),
+    userId: cleanOptionalString(value.userId, MAX_LOG_ID_LENGTH),
+    sessionId: cleanOptionalString(value.sessionId, MAX_LOG_ID_LENGTH),
+    tags: cleanTags(value.tags),
+  });
+
+  return {
+    ...sanitized,
+    id: cleanString(sanitized.id, MAX_LOG_ID_LENGTH),
+    message: cleanString(sanitized.message, MAX_LOG_STRING_LENGTH),
+    source: cleanOptionalString(sanitized.source, MAX_LOG_ID_LENGTH),
+    userId: cleanOptionalString(sanitized.userId, MAX_LOG_ID_LENGTH),
+    sessionId: cleanOptionalString(sanitized.sessionId, MAX_LOG_ID_LENGTH),
+    tags: cleanTags(sanitized.tags),
+  };
+};
+
+export const coerceStoredLogEntries = (value: unknown, maxEntries: number = MAX_STORED_LOG_ENTRIES): LogEntry[] => {
+  if (!Array.isArray(value)) return [];
+  const limit = Math.max(0, Math.min(maxEntries, MAX_STORED_LOG_ENTRIES));
+  return value
+    .slice(-limit)
+    .map(cleanStoredLogEntry)
+    .filter((entry): entry is LogEntry => entry !== null);
+};
 
 // 日志输出器接口
 export interface LogAppender {
@@ -106,11 +222,11 @@ export class LocalStorageAppender implements LogAppender {
   constructor(
     minLevel: LogLevel = LogLevel.INFO,
     storageKey: string = 'diagram_logs',
-    maxEntries: number = 1000
+    maxEntries: number = MAX_STORED_LOG_ENTRIES
   ) {
     this.minLevel = minLevel;
     this.storageKey = storageKey;
-    this.maxEntries = maxEntries;
+    this.maxEntries = Math.max(0, Math.min(maxEntries, MAX_STORED_LOG_ENTRIES));
   }
 
   append(entry: LogEntry): void {
@@ -118,7 +234,7 @@ export class LocalStorageAppender implements LogAppender {
 
     try {
       const existingLogs = this.getLogs();
-      existingLogs.push(entry);
+      existingLogs.push(sanitizeLogEntry(entry));
 
       // 限制日志数量
       if (existingLogs.length > this.maxEntries) {
@@ -134,7 +250,8 @@ export class LocalStorageAppender implements LogAppender {
   private getLogs(): LogEntry[] {
     try {
       const stored = localStorage.getItem(this.storageKey);
-      return stored ? JSON.parse(stored) : [];
+      if (stored && stored.length > MAX_STORED_LOGS_JSON_LENGTH) return [];
+      return stored ? coerceStoredLogEntries(JSON.parse(stored), this.maxEntries) : [];
     } catch {
       return [];
     }
@@ -172,7 +289,11 @@ export class RemoteAppender implements LogAppender {
     flushInterval: number = 5000
   ) {
     this.minLevel = minLevel;
-    this.endpoint = endpoint;
+    const normalizedEndpoint = normalizeRemoteLogEndpoint(endpoint);
+    if (!normalizedEndpoint) {
+      throw new Error('Remote log endpoint must use HTTPS, or local HTTP localhost/127.0.0.1.');
+    }
+    this.endpoint = normalizedEndpoint;
     this.batchSize = batchSize;
     this.flushInterval = flushInterval;
     
@@ -200,7 +321,7 @@ export class RemoteAppender implements LogAppender {
   private async flush(): Promise<void> {
     if (this.batch.length === 0) return;
 
-    const logsToSend = [...this.batch];
+    const logsToSend = this.batch.map(sanitizeLogEntry);
     this.batch = [];
 
     try {
