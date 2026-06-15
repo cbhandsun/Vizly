@@ -1,5 +1,5 @@
 import React from 'react';
-import { theme, Tooltip, Typography, Input, Button, Divider } from 'antd';
+import { Tooltip, Typography, Input, Button, Divider } from 'antd';
 import { 
     SearchOutlined, AlignLeftOutlined, AlignCenterOutlined, AlignRightOutlined, 
     VerticalAlignTopOutlined, VerticalAlignMiddleOutlined, VerticalAlignBottomOutlined, 
@@ -137,7 +137,6 @@ const FlowchartToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
 // ---- 拖拽节点图库配置区 ----
 export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
     const { t } = useTranslation();
-    const { token } = theme.useToken();
     const [search, setSearch] = useState('');
 
     const onDragStart = (event: React.DragEvent, nodeType: string, typeName: string, label: string, config: NodeConfig) => {

@@ -7,7 +7,7 @@ import {
 import { LifelineNode } from '../components/custom-nodes/LifelineNode';
 import { SequenceMessageEdge } from '../components/custom-edges/SequenceMessageEdge';
 import { InteractionOutlined, PlusOutlined } from '@ant-design/icons';
-import { Button, Tooltip, Divider, message } from 'antd';
+import { Button, Tooltip, Divider } from 'antd';
 import i18n from '@/i18n';
 import { useTranslation } from 'react-i18next';
 import { appMessage } from '@/core/utils/antdStaticBridge';

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Input, Collapse, Button, Tooltip, Divider } from 'antd';
+import { Input, Button, Tooltip, Divider } from 'antd';
 import {
   DiagramTypePlugin,
   PluginContext,
@@ -31,7 +31,7 @@ export class ArchitecturePlugin implements DiagramTypePlugin {
   brandColor = '#722ed1';
 
   async migrate(data: any, fromVersion: string | undefined): Promise<any> {
-    let migratedData = { ...data };
+    const migratedData = { ...data };
     if (!fromVersion) {
       // Legacy data: ensure all architecture nodes have a type field
       if (Array.isArray(migratedData.nodes)) {
@@ -98,7 +98,7 @@ export class ArchitecturePlugin implements DiagramTypePlugin {
         id: 'arch-linter',
         title: '合规校验',
         icon: <SafetyCertificateOutlined />,
-        content: <LinterPanel ctx={ctx} />
+        content: <LinterPanel />
       }
     ];
   }
@@ -341,7 +341,7 @@ const ArchitectureToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
     );
 };
 
-const LinterPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
+const LinterPanel: React.FC = () => {
     // 订阅 Store 来做高频率更新（如果面板需要实时反映节点移动后的校验结果）
     const nodes = useDiagramStore(s => s.nodes);
     const edges = useDiagramStore(s => s.edges);

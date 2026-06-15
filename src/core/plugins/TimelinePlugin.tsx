@@ -6,11 +6,12 @@ import {
   SidebarPanel
 } from '../types/plugin';
 
-import { CalendarOutlined, ClockCircleOutlined, FlagOutlined, CheckCircleFilled, SyncOutlined, MinusCircleOutlined } from '@ant-design/icons';
+import { FlagOutlined, CheckCircleFilled, SyncOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import { Button } from 'antd';
 import ProTimelineCanvas from '../components/diagrams/timeline-pro/ProTimelineCanvas';
 import { ProTimelinePropertyPanel } from '../components/diagrams/timeline-pro/ProTimelinePropertyPanel';
-import dayjs from 'dayjs';
+import { Calendar, Clock } from 'lucide-react';
+import { addDaysToDateOnly, parseDateOnlyTime, todayDateOnly } from '../utils/dateOnly';
 
 export class TimelinePlugin implements DiagramTypePlugin {
   id = 'timeline-diagram';
@@ -25,7 +26,7 @@ export class TimelinePlugin implements DiagramTypePlugin {
   hideDefaultSidebar = true;
   
   async migrate(data: any, fromVersion: string | undefined): Promise<any> {
-      let migratedData = { ...data };
+      const migratedData = { ...data };
       
       // Example Migration: From 1.0 (or undefined) to 1.1
       // Clean up legacy node properties or enforce new schema defaults
@@ -38,7 +39,7 @@ export class TimelinePlugin implements DiagramTypePlugin {
                       // Ensure every timeline node has a status (legacy data might be missing it)
                       status: n.data?.status || 'pending',
                       // Ensure date strings are standardized if needed
-                      date: n.data?.date || new Date().toISOString().split('T')[0]
+                      date: n.data?.date || todayDateOnly()
                   }
               }));
           }
@@ -92,7 +93,7 @@ export class TimelinePlugin implements DiagramTypePlugin {
       return <TimelineSmartActionBar ctx={ctx} />;
   }
 
-  contributeCanvasComponents(ctx: PluginContext) {
+  contributeCanvasComponents(_ctx: PluginContext) {
       return <ProTimelineCanvas />;
   }
 
@@ -100,7 +101,7 @@ export class TimelinePlugin implements DiagramTypePlugin {
     return [{
       id: 'timeline-components',
       title: '时间轴组件',
-      icon: <ClockCircleOutlined />,
+      icon: <Clock size={14} strokeWidth={2} />,
       content: <TimelinePalette />
     }];
   }
@@ -124,10 +125,10 @@ export class TimelinePlugin implements DiagramTypePlugin {
       const tDateStr = targetNode.data?.date;
 
       if (sDateStr && tDateStr) {
-          const sTime = dayjs(sDateStr as string).valueOf();
-          const tTime = dayjs(tDateStr as string).valueOf();
+          const sTime = parseDateOnlyTime(sDateStr);
+          const tTime = parseDateOnlyTime(tDateStr);
           // Reject reverse-time connections
-          if (sTime > tTime) {
+          if (sTime !== null && tTime !== null && sTime > tTime) {
               return false;
           }
       }
@@ -161,15 +162,15 @@ const TimelinePalette: React.FC = () => {
         event.dataTransfer.setData('application/reactflow', JSON.stringify({
             typeName: 'timelineNode',
             label: defaultLabel,
-            config: { type, status, date: new Date().toISOString().split('T')[0] },
+            config: { type, status, date: todayDateOnly() },
             offsetX, offsetY
         }));
         event.dataTransfer.effectAllowed = 'move';
     };
 
     const items = [
-        { type: 'event',     label: '普通事件',  color: '#1890ff', icon: <ClockCircleOutlined style={{ color: '#1890ff' }} />, bg: '#e6f7ff' },
-        { type: 'phase',     label: '时间阶段',  color: '#52c41a', icon: <CalendarOutlined style={{ color: '#52c41a' }} />,    bg: '#f6ffed' },
+        { type: 'event',     label: '普通事件',  color: '#1890ff', icon: <Clock size={18} color="#1890ff" strokeWidth={2} />, bg: '#e6f7ff' },
+        { type: 'phase',     label: '时间阶段',  color: '#52c41a', icon: <Calendar size={18} color="#52c41a" strokeWidth={2} />,    bg: '#f6ffed' },
         { type: 'milestone', label: '里程碑',    color: '#cf1322', icon: <FlagOutlined style={{ color: '#cf1322' }} />,         bg: '#fff1f0' },
     ];
 
@@ -243,16 +244,16 @@ const TimelineSmartActionBar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
         const timelineNodes = nodes.filter(n => ['phase', 'event', 'milestone'].includes(n.data.type as string) || n.type === 'timelineNode');
         
         let prevNodeId: string | null = null;
-        let newNodeDate = new Date().toISOString().split('T')[0];
+        let newNodeDate = todayDateOnly();
         
         if (timelineNodes.length > 0) {
             const latestNode = timelineNodes.reduce((prev, current) => {
-                const prevD = new Date(prev.data.date as string).getTime();
-                const currD = new Date(current.data.date as string).getTime();
+                const prevD = parseDateOnlyTime(prev.data.endDate || prev.data.date) ?? Number.NEGATIVE_INFINITY;
+                const currD = parseDateOnlyTime(current.data.endDate || current.data.date) ?? Number.NEGATIVE_INFINITY;
                 return prevD > currD ? prev : current;
             });
             prevNodeId = latestNode.id;
-            newNodeDate = dayjs(latestNode.data.endDate as string || latestNode.data.date as string).add(2, 'day').format('YYYY-MM-DD');
+            newNodeDate = addDaysToDateOnly(latestNode.data.endDate || latestNode.data.date, 2);
         }
 
         const newNodeId = `tl-node-${Date.now()}`;
@@ -269,7 +270,7 @@ const TimelineSmartActionBar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
                 date: newNodeDate,
                 ...(type === 'phase' ? {
                     progress: 0,
-                    endDate: dayjs(newNodeDate).add(14, 'day').format('YYYY-MM-DD')
+                    endDate: addDaysToDateOnly(newNodeDate, 14)
                 } : {})
             }
         };
@@ -300,10 +301,10 @@ const TimelineSmartActionBar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px', borderLeft: '1px solid #e8e8e8', marginLeft: 8 }}>
             {/* 追加操作 */}
             <Tooltip title="追加事件">
-                <Button size="small" type="text" icon={<ClockCircleOutlined style={{ color: '#1890ff' }} />} onClick={() => handleAppendNode('event')} />
+                <Button size="small" type="text" icon={<Clock size={14} color="#1890ff" strokeWidth={2} />} onClick={() => handleAppendNode('event')} />
             </Tooltip>
             <Tooltip title="追加阶段">
-                <Button size="small" type="text" icon={<CalendarOutlined style={{ color: '#52c41a' }} />} onClick={() => handleAppendNode('phase')} />
+                <Button size="small" type="text" icon={<Calendar size={14} color="#52c41a" strokeWidth={2} />} onClick={() => handleAppendNode('phase')} />
             </Tooltip>
             <Tooltip title="追加里程碑">
                 <Button size="small" type="text" icon={<FlagOutlined style={{ color: '#cf1322' }} />} onClick={() => handleAppendNode('milestone')} />

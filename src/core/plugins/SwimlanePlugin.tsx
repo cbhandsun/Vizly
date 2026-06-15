@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Space, Typography } from 'antd';
+import { Typography } from 'antd';
 import { DiagramTypePlugin, PluginContext, SidebarPanel } from '../types/plugin';
 import SwimLaneNode from '../components/custom-nodes/SwimLaneNode';
-import { AppstoreOutlined, MenuOutlined, BorderHorizontalOutlined, BorderVerticleOutlined } from '@ant-design/icons';
+import { MenuOutlined, BorderHorizontalOutlined, BorderVerticleOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 
@@ -12,7 +12,7 @@ export class SwimlanePlugin implements DiagramTypePlugin {
     name = '泳道图';
     version = '1.0';
 
-    async migrate(data: any, fromVersion: string | undefined): Promise<any> {
+    async migrate(data: any, _fromVersion: string | undefined): Promise<any> {
         return data;
     }
 
@@ -46,11 +46,11 @@ export class SwimlanePlugin implements DiagramTypePlugin {
         return {}; 
     }
 
-    contributeToolbar(ctx: PluginContext) {
+    contributeToolbar(_ctx: PluginContext) {
         return null;
     }
 
-    contributeSidebarPanels(ctx: PluginContext): SidebarPanel[] {
+    contributeSidebarPanels(_ctx: PluginContext): SidebarPanel[] {
         return [
             {
                 id: 'swimlane-components',

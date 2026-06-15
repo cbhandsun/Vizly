@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { Node, Edge } from '@xyflow/react';
 import { Input, Button, Tooltip, Divider, Segmented } from 'antd';
 import { SearchOutlined, ApartmentOutlined, CloudOutlined, DeploymentUnitOutlined } from '@ant-design/icons';
 import { DiagramTypePlugin, PluginContext, SidebarPanel } from '../types/plugin';
 import { BaseDiagramPlugin } from '../sdk/BasePlugin';
 import NetworkNode from '../components/custom-nodes/NetworkNode';
 import NetworkContainer from '../components/custom-nodes/NetworkContainer';
+import { buildIconifySvgUrl } from '../utils/iconifySecurity';
 
 // ====== 数据定义 ======
 interface IconDef {
@@ -101,7 +101,10 @@ const NetworkPalette: React.FC = () => {
     event.dataTransfer.effectAllowed = 'move';
   };
 
-  const renderIconItem = (def: IconDef) => (
+  const renderIconItem = (def: IconDef) => {
+    const iconUrl = buildIconifySvgUrl(def.icon);
+
+    return (
     <Tooltip key={def.id} title={def.label} placement="right">
       <div
         draggable
@@ -118,27 +121,34 @@ const NetworkPalette: React.FC = () => {
         }}
       >
         <div style={{ fontSize: 24, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <img
-            src={`https://api.iconify.design/${def.icon}.svg`}
-            style={{ width: 24, height: 24 }}
-            loading="lazy"
-            decoding="async"
-            alt={def.label}
-            onError={(e) => {
-              // Fallback: hide broken img, show colored first-letter badge
-              const img = e.currentTarget;
-              img.style.display = 'none';
-              const badge = document.createElement('span');
-              badge.textContent = def.label[0];
-              badge.style.cssText = `display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:${def.color}20;color:${def.color};font-weight:700;font-size:13px;`;
-              img.parentElement?.appendChild(badge);
-            }}
-          />
+          {iconUrl ? (
+            <img
+              src={iconUrl}
+              style={{ width: 24, height: 24 }}
+              loading="lazy"
+              decoding="async"
+              alt={def.label}
+              onError={(e) => {
+                // Fallback: hide broken img, show colored first-letter badge
+                const img = e.currentTarget;
+                img.style.display = 'none';
+                const badge = document.createElement('span');
+                badge.textContent = def.label[0];
+                badge.style.cssText = `display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:${def.color}20;color:${def.color};font-weight:700;font-size:13px;`;
+                img.parentElement?.appendChild(badge);
+              }}
+            />
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, background: `${def.color}20`, color: def.color, fontWeight: 700, fontSize: 13 }}>
+              {def.label[0]}
+            </span>
+          )}
         </div>
         <span style={{ fontSize: 10, textAlign: 'center', overflow: 'hidden', width: '100%', textOverflow: 'ellipsis' }}>{def.label}</span>
       </div>
     </Tooltip>
-  );
+    );
+  };
 
   return (
     <div style={{ padding: '8px 12px' }}>
@@ -231,7 +241,7 @@ export class NetworkTopologyPlugin extends BaseDiagramPlugin implements DiagramT
     };
   }
 
-  contributeToolbar(ctx: PluginContext) {
+  contributeToolbar(_ctx: PluginContext) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px', borderLeft: '1px solid #e8e8e8', marginLeft: 8 }}>
         <Tooltip title="自动布局 (双向)">
@@ -246,7 +256,7 @@ export class NetworkTopologyPlugin extends BaseDiagramPlugin implements DiagramT
     );
   }
 
-  contributeSidebarPanels(ctx: PluginContext): SidebarPanel[] {
+  contributeSidebarPanels(_ctx: PluginContext): SidebarPanel[] {
     return [
       {
         id: 'network-icons',

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import { Space, Typography } from 'antd';
+import { Typography } from 'antd';
 import { DiagramTypePlugin, PluginContext, SidebarPanel } from '../types/plugin';
 import ERDatabaseNode from '../components/custom-nodes/ERDatabaseNode';
 import { DatabaseOutlined, TableOutlined, LinkOutlined } from '@ant-design/icons';
@@ -12,7 +12,7 @@ export class ERDiagramPlugin implements DiagramTypePlugin {
     name = '实体关系图 (ER)';
     version = '1.0';
 
-    async migrate(data: any, fromVersion: string | undefined): Promise<any> {
+    async migrate(data: any, _fromVersion: string | undefined): Promise<any> {
         return data;
     }
 
@@ -80,11 +80,11 @@ export class ERDiagramPlugin implements DiagramTypePlugin {
         return {}; 
     }
 
-    contributeToolbar(ctx: PluginContext) {
+    contributeToolbar(_ctx: PluginContext) {
         return null;
     }
 
-    contributeSidebarPanels(ctx: PluginContext): SidebarPanel[] {
+    contributeSidebarPanels(_ctx: PluginContext): SidebarPanel[] {
         return [
             {
                 id: 'er-components',
