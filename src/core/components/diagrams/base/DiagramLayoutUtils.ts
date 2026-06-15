@@ -1,4 +1,4 @@
-import { Node, Edge } from '@xyflow/react';
+import { Node } from '@xyflow/react';
 import { enhancedTextMeasurement } from '../../../utils/EnhancedTextMeasurement';
 import { diagramConfigManager } from '../../config/DiagramConfig';
 
@@ -208,7 +208,7 @@ export class DiagramLayoutUtils {
       case 'straight':
         return [sourceCenter, targetCenter];
       
-      case 'step':
+      case 'step': {
         const midY = (sourceCenter.y + targetCenter.y) / 2;
         return [
           sourceCenter,
@@ -216,6 +216,7 @@ export class DiagramLayoutUtils {
           { x: targetCenter.x, y: midY },
           targetCenter
         ];
+      }
       
       case 'bezier':
         return [

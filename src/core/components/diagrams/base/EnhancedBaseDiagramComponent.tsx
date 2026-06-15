@@ -4,7 +4,6 @@
  */
 
 import React, { useMemo, useEffect, useState, useCallback, memo } from 'react';
-import type { NodeTypes } from '@xyflow/react';
 import { Node, Edge, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
 import BaseReactFlow from '../../shared/BaseReactFlow';
 import { useFlowStyles } from '../../../hooks/useFlowStyles';
@@ -16,9 +15,7 @@ import { DiagramComponentProps } from '../../../types/diagram-components';
 
 // 新的配置和主题系统
 import { ConfigIntegration } from '../../../config/ConfigIntegration';
-import { LayeredConfigManager } from '../../../config/LayeredConfigManager';
 import { validateConfigValue } from '../../../config/ConfigValidation';
-import { EnhancedThemeManager } from '../../../themes/EnhancedThemeManager';
 import { Theme } from '../../../themes/types/ThemeTypes';
 import { ThemePerformanceOptimizer } from '../../../themes/ThemePerformanceOptimizer';
 
@@ -100,12 +97,16 @@ function useEnhancedConfig(
   configIntegration?: ConfigIntegration,
   customConfig?: Partial<EnhancedBaseDiagramConfig>
 ) {
-  const [config, setConfig] = useState<EnhancedBaseDiagramConfig>(DEFAULT_ENHANCED_CONFIG);
+  const defaultConfig = useMemo(
+    () => ({ ...DEFAULT_ENHANCED_CONFIG, ...customConfig }),
+    [customConfig]
+  );
+  const [config, setConfig] = useState<EnhancedBaseDiagramConfig>(defaultConfig);
 
   useEffect(() => {
     if (!configIntegration) {
-      setConfig({ ...DEFAULT_ENHANCED_CONFIG, ...customConfig });
-      return;
+      const timer = window.setTimeout(() => setConfig(defaultConfig), 0);
+      return () => window.clearTimeout(timer);
     }
 
     const layeredConfig = configIntegration.getLayeredConfigManager();
@@ -139,7 +140,7 @@ function useEnhancedConfig(
         });
       } catch (error) {
         console.warn('Failed to load enhanced config, using defaults:', error);
-        setConfig({ ...DEFAULT_ENHANCED_CONFIG, ...customConfig });
+        setConfig(defaultConfig);
       }
     };
 
@@ -151,7 +152,7 @@ function useEnhancedConfig(
     });
 
     return unsubscribe;
-  }, [configIntegration, customConfig]);
+  }, [configIntegration, customConfig, defaultConfig]);
 
   return config;
 }
@@ -165,18 +166,16 @@ function useEnhancedTheme(
   enablePerformanceOptimization?: boolean
 ) {
   const [currentTheme, setCurrentTheme] = useState<Theme | null>(null);
-  const [performanceOptimizer, setPerformanceOptimizer] = useState<ThemePerformanceOptimizer | null>(null);
+  const performanceOptimizer = useMemo<ThemePerformanceOptimizer | null>(() => {
+    if (!configIntegration || !enablePerformanceOptimization) return null;
+    return configIntegration.getPerformanceOptimizer() || null;
+  }, [configIntegration, enablePerformanceOptimization]);
 
   useEffect(() => {
     if (!configIntegration) return;
 
     const themeManager = configIntegration.getThemeManager();
-    const optimizer = configIntegration.getPerformanceOptimizer();
-
-    // 设置性能优化器
-    if (enablePerformanceOptimization && optimizer) {
-      setPerformanceOptimizer(optimizer);
-    }
+    const optimizer = performanceOptimizer;
 
     // 加载主题
     const loadTheme = async () => {
@@ -212,7 +211,7 @@ function useEnhancedTheme(
     });
 
     return unsubscribe;
-  }, [configIntegration, themeId, enablePerformanceOptimization, currentTheme]);
+  }, [configIntegration, themeId, enablePerformanceOptimization, currentTheme, performanceOptimizer]);
 
   return { currentTheme, performanceOptimizer };
 }
@@ -235,7 +234,7 @@ export const EnhancedBaseDiagramComponent: React.FC<EnhancedBaseDiagramProps> = 
   configIntegration,
   themeId,
   enablePerformanceOptimization = true,
-  onConfigChange,
+  onConfigChange: _onConfigChange,
   onThemeChange,
   ...props
 }) => {
@@ -263,15 +262,6 @@ export const EnhancedBaseDiagramComponent: React.FC<EnhancedBaseDiagramProps> = 
   const handleEdgesChange = useCallback((changes: import('@xyflow/react').EdgeChange[]) => {
     setRfEdges((eds) => applyEdgeChanges(changes, eds));
   }, []);
-
-  // 配置变化处理
-  const handleConfigChange = useCallback((key: string, value: any) => {
-    if (configIntegration) {
-      const layeredConfig = configIntegration.getLayeredConfigManager();
-      layeredConfig.set(key, value);
-    }
-    onConfigChange?.(key, value);
-  }, [configIntegration, onConfigChange]);
 
   // 主题变化处理
   useEffect(() => {

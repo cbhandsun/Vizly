@@ -179,9 +179,7 @@ export function useDiagramStability({
         });
     }, [layoutStrategy, nodeLayoutStrategy, setRfEdges, latestEdgesRef]);
 
-    const lastStableFitKeyRef = useRef<string>('');
-
-    const fitTriggerKey = useMemo(() => {
+    const computedFitTriggerKey = useMemo(() => {
         const layered = LayeredConfigManager.getInstance();
         const containment = String(layered.get<string>('diagram.layout.CONTAINMENT_POLICY', 'elastic') || 'elastic');
         const rank = String(layered.get<string>('diagram.layout.RANK_MODE', 'elk') || 'elk');
@@ -197,16 +195,16 @@ export function useDiagramStability({
         })();
         const edgeModeKey = (edgeMode === 'advanced-smart') ? 'advanced-smart' : 'native';
         const suffix = `${containment}:${rank}:${post}`;
-        const key = baseFitTriggerKey ? `${baseFitTriggerKey}:${suffix}` : `${layoutFitSignature}:${edgeModeKey}:${strategyName}:${nodeLayoutStrategy ?? ''}:${containment}:${rank}:${post}`;
-        
-        // 只有在布局完全稳定后才更新 fitTriggerKey，防止切换布局或重绘过程中的中间抖动
-        if (!isLayoutStable && lastStableFitKeyRef.current) {
-            return lastStableFitKeyRef.current;
-        }
-        
-        lastStableFitKeyRef.current = key;
-        return key;
-    }, [baseFitTriggerKey, layoutFitSignature, edgeMode, layoutStrategy, nodeLayoutStrategy, isLayoutStable]);
+        return baseFitTriggerKey ? `${baseFitTriggerKey}:${suffix}` : `${layoutFitSignature}:${edgeModeKey}:${strategyName}:${nodeLayoutStrategy ?? ''}:${containment}:${rank}:${post}`;
+    }, [baseFitTriggerKey, layoutFitSignature, edgeMode, layoutStrategy, nodeLayoutStrategy]);
+
+    const [fitTriggerKey, setFitTriggerKey] = useState(computedFitTriggerKey);
+
+    useEffect(() => {
+        if (!isLayoutStable) return;
+        const timer = setTimeout(() => setFitTriggerKey(computedFitTriggerKey), 0);
+        return () => clearTimeout(timer);
+    }, [computedFitTriggerKey, isLayoutStable]);
 
     return {
         layoutFitSignature,

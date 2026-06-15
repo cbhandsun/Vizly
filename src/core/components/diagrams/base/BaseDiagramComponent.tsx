@@ -1,5 +1,3 @@
-// @ts-nocheck
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useMemo, useEffect, useState, useCallback, memo, useRef } from 'react';
 import { applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
 import type { Node, Edge, NodeTypes, OnNodesChange, OnEdgesChange, NodeChange, EdgeChange, EdgeTypes } from '@xyflow/react';
@@ -199,7 +197,7 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
   });
 
   // Hook 2: Drag Orchestration
-  const { dragUpdateCounter, livePositionsRef, draggingNodeIds, handleNodeDrag, handleNodeDragStop } = useDiagramDragOrchestration({
+  const { dragUpdateCounter, draggingNodeIds, handleNodeDrag, handleNodeDragStop } = useDiagramDragOrchestration({
       rfNodes
   });
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Radio, Checkbox, Select, Button, Space, message, Divider } from 'antd';
+import { Modal, Radio, Checkbox, Select, Button, Space, Divider } from 'antd';
 import { 
   DownloadOutlined, 
   CopyOutlined, 
@@ -43,7 +43,7 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
       });
       appMessage.success(t('advancedExport.successMsg', { format: format.toUpperCase() }));
       onClose();
-    } catch (e) {
+    } catch (_e) {
       appMessage.error(t('advancedExport.errorMsg'));
     } finally {
       setExporting(false);

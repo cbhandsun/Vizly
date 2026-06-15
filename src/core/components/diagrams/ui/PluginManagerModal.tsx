@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Input, Tabs, Switch, Tag, Button, Typography, Space, Tooltip, Empty, Badge, Skeleton } from 'antd';
+import { Modal, Input, Tabs, Switch, Tag, Button, Typography, Space, Empty, Badge, Skeleton } from 'antd';
 import { 
   _ApiOutlined, 
   SearchOutlined, 
@@ -36,26 +36,14 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
 
-  const registry = PluginRegistry.getInstance();
-
-  const refresh = () => {
-    setLoading(true);
-    setTimeout(() => {
-        const all = registry.getAllPlugins();
-        setPlugins(all);
-        const m: Record<string, boolean> = {};
-        all.forEach(p => {
-          m[p.id] = registry.isPluginActive(p.id);
-        });
-        setActiveMap(m);
-        setLoading(false);
-    }, 400);
-  };
+  const registry = useMemo(() => PluginRegistry.getInstance(), []);
 
   useEffect(() => {
     let cancelled = false;
     if (visible) {
-      setLoading(true);
+      const loadingTimer = window.setTimeout(() => {
+        if (!cancelled) setLoading(true);
+      }, 0);
       const timer = setTimeout(() => {
         if (cancelled) return; // [Fix] prevent setState after unmount / close
         const all = registry.getAllPlugins();
@@ -65,9 +53,13 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({ visible,
         setActiveMap(m);
         setLoading(false);
       }, 400);
-      return () => { cancelled = true; clearTimeout(timer); };
+      return () => {
+        cancelled = true;
+        clearTimeout(loadingTimer);
+        clearTimeout(timer);
+      };
     }
-  }, [visible]);
+  }, [visible, registry]);
 
   const togglePlugin = (id: string, active: boolean) => {
     registry.setPluginActive(id, active);

@@ -7,7 +7,7 @@ import { AnnotationLayer } from '../AnnotationLayer';
 import { PageTabs } from '../PageTabs';
 import { HistoryPanel } from '../HistoryPanel';
 import { CanvasSearchBar } from '../CanvasSearchBar';
-import { Node, Edge } from '@xyflow/react';
+import type { Node } from '@xyflow/react';
 import { PluginContext } from '../../../types/plugin';
 
 export interface DesignerCanvasFeaturesLayerProps {

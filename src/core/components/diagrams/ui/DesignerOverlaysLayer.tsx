@@ -2,15 +2,24 @@ import React from 'react';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 
 // Relative imports for UI components
-import { JsonEditorModal } from '../JsonEditorModal';
 import { CommandPalette as UiCommandPalette } from '../../ui/CommandPalette';
-import { KeyboardShortcutPanel } from '../KeyboardShortcutPanel';
-import { FlowchartShortcutsHelpModal } from '../FlowchartShortcutsHelpModal';
 import { SaveStatusIndicator } from '../SaveStatusIndicator';
-import { PerformanceDashboard } from '../PerformanceDashboard';
-import PresentationMode from '../../presentation/PresentationMode';
-import DiffOverlay from '../DiffOverlay';
 import { DiffResult } from '../../../utils/diagramDiff';
+
+const JsonEditorModal = React.lazy(() => import('../JsonEditorModal').then(module => ({
+    default: module.JsonEditorModal,
+})));
+const KeyboardShortcutPanel = React.lazy(() => import('../KeyboardShortcutPanel').then(module => ({
+    default: module.KeyboardShortcutPanel,
+})));
+const FlowchartShortcutsHelpModal = React.lazy(() => import('../FlowchartShortcutsHelpModal').then(module => ({
+    default: module.FlowchartShortcutsHelpModal,
+})));
+const PerformanceDashboard = React.lazy(() => import('../PerformanceDashboard').then(module => ({
+    default: module.PerformanceDashboard,
+})));
+const PresentationMode = React.lazy(() => import('../../presentation/PresentationMode'));
+const DiffOverlay = React.lazy(() => import('../DiffOverlay'));
 
 export interface DesignerOverlaysLayerProps {
     diagramId?: string;
@@ -82,38 +91,52 @@ export const DesignerOverlaysLayer: React.FC<DesignerOverlaysLayerProps> = ({
 }) => {
     return (
         <>
-            <JsonEditorModal
-                visible={jsonEditor.visible}
-                onClose={() => jsonEditor.setVisible(false)}
-                nodes={jsonEditor.nodes}
-                edges={jsonEditor.edges}
-                setNodes={jsonEditor.setNodes}
-                setEdges={jsonEditor.setEdges}
-                reactFlowInstance={jsonEditor.reactFlowInstance as any}
-                initialContent={jsonEditor.initialContent}
-                diagramId={diagramId}
-            />
+            {jsonEditor.visible && (
+                <React.Suspense fallback={null}>
+                    <JsonEditorModal
+                        visible={jsonEditor.visible}
+                        onClose={() => jsonEditor.setVisible(false)}
+                        nodes={jsonEditor.nodes}
+                        edges={jsonEditor.edges}
+                        setNodes={jsonEditor.setNodes}
+                        setEdges={jsonEditor.setEdges}
+                        reactFlowInstance={jsonEditor.reactFlowInstance as any}
+                        initialContent={jsonEditor.initialContent}
+                        diagramId={diagramId}
+                    />
+                </React.Suspense>
+            )}
 
             {/* Command Palette */}
-            <UiCommandPalette
-                open={commandPalette.visible}
-                onClose={() => commandPalette.setVisible(false)}
-                items={commandPalette.items}
-                getContainer={() => document.getElementById(`diagram-${diagramId}`) as HTMLElement}
-            />
+            {commandPalette.visible && (
+                <UiCommandPalette
+                    open={commandPalette.visible}
+                    onClose={() => commandPalette.setVisible(false)}
+                    items={commandPalette.items}
+                    getContainer={() => document.getElementById(`diagram-${diagramId}`) as HTMLElement}
+                />
+            )}
 
             {/* 快捷键帮助面板 */}
-            <KeyboardShortcutPanel
-                visible={shortcuts.panelVisible}
-                onClose={() => shortcuts.setPanelVisible(false)}
-            />
+            {shortcuts.panelVisible && (
+                <React.Suspense fallback={null}>
+                    <KeyboardShortcutPanel
+                        visible={shortcuts.panelVisible}
+                        onClose={() => shortcuts.setPanelVisible(false)}
+                    />
+                </React.Suspense>
+            )}
 
             {/* Shortcuts Modal */}
-            <FlowchartShortcutsHelpModal
-                open={shortcuts.modalVisible}
-                onClose={() => shortcuts.setModalVisible(false)}
-                getContainer={() => document.getElementById(`diagram-${diagramId}`) as HTMLElement}
-            />
+            {shortcuts.modalVisible && (
+                <React.Suspense fallback={null}>
+                    <FlowchartShortcutsHelpModal
+                        open={shortcuts.modalVisible}
+                        onClose={() => shortcuts.setModalVisible(false)}
+                        getContainer={() => document.getElementById(`diagram-${diagramId}`) as HTMLElement}
+                    />
+                </React.Suspense>
+            )}
 
             {/* 保存状态指示器 */}
             <div style={{
@@ -129,33 +152,39 @@ export const DesignerOverlaysLayer: React.FC<DesignerOverlaysLayerProps> = ({
 
             {/* ⭐ 性能仪表盘 */}
             {status.showPerformanceDashboard && (
-                <div style={{
-                    position: 'absolute',
-                    top: 20,
-                    right: 20,
-                    zIndex: 10,
-                    transition: 'right 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                }}>
-                    <PerformanceDashboard nodeCount={status.nodeCount} edgeCount={status.edgeCount} />
-                </div>
+                <React.Suspense fallback={null}>
+                    <div style={{
+                        position: 'absolute',
+                        top: 20,
+                        right: 20,
+                        zIndex: 10,
+                        transition: 'right 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}>
+                        <PerformanceDashboard nodeCount={status.nodeCount} edgeCount={status.edgeCount} />
+                    </div>
+                </React.Suspense>
             )}
 
             {/* ⣻ Presentation 演示模式 */}
             {presentation.active && (
-                <PresentationMode
-                    slides={presentation.slides}
-                    onFocusNodes={presentation.onFocusNodes}
-                    onExit={() => presentation.setActive(false)}
-                />
+                <React.Suspense fallback={null}>
+                    <PresentationMode
+                        slides={presentation.slides}
+                        onFocusNodes={presentation.onFocusNodes}
+                        onExit={() => presentation.setActive(false)}
+                    />
+                </React.Suspense>
             )}
 
             {/* ⣻ 版本 Diff 覆盖层 */}
             {diff.result && (
-                <DiffOverlay
-                    diff={diff.result}
-                    onClose={() => diff.setResult(null)}
-                    versionLabel="与上一次操作对比"
-                />
+                <React.Suspense fallback={null}>
+                    <DiffOverlay
+                        diff={diff.result}
+                        onClose={() => diff.setResult(null)}
+                        versionLabel="与上一次操作对比"
+                    />
+                </React.Suspense>
             )}
 
             {/* ⣻ AI 配置及分享弹窗交由 props 外部注入 */}
