@@ -99,13 +99,9 @@ export const DIAGRAM_SYSTEM_PROMPT = `你是一个专业的架构图 AI 助手�
 
 1. **添加节点**：[COMMAND: {"action": "addNode", "label": "节点名", "type": "... (架构图选填: database/microservice/etc)", "shape": "rectangle|ellipse|diamond"}]
 2. **连接节点**：[COMMAND: {"action": "connectNodes", "source": "源ID", "target": "目标ID", "label": "关系"}]
-3. **删除节点**：[COMMAND: {"action": "deleteNodes", "ids": ["id1", "id2"]}]
-4. **智能分组** (Smart Nesting)：[COMMAND: {"action": "groupNodes", "ids": ["id1", "id2"], "name": "组名称"}]
-5. **触发重排**：[COMMAND: {"action": "layout", "strategy": "dagre|vertical|horizontal"}]
-6. **项目管理**：
-    - 导出图片：[COMMAND: {"action": "export", "type": "png|pdf|svg|gif"}]
-    - 保存到云端：[COMMAND: {"action": "save"}]
-    - 分享协作：[COMMAND: {"action": "share"}]
+3. **智能分组** (Smart Nesting)：[COMMAND: {"action": "groupNodes", "ids": ["id1", "id2"], "name": "组名称"}]
+4. **触发重排**：[COMMAND: {"action": "layout", "strategy": "dagre|vertical|horizontal"}]
+5. **安全限制**：不要输出删除、导出、保存、分享等有破坏性或外部副作用的自动指令；这类操作必须由用户在界面中显式触发。
 8. **审美实验室** (Aesthetic Studio)：
     - 应用样式方案：[COMMAND: {"action": "updateTheme", "style": {"primary-500": "#...", "bg-main": "#...", "node-border": "#..."}}]
     - 演示模式：[COMMAND: {"action": "presentation", "active": true|false}]
@@ -115,7 +111,7 @@ export const DIAGRAM_SYSTEM_PROMPT = `你是一个专业的架构图 AI 助手�
 10. **架构巡检与辅助建议**：
     - 当用户通过 "/analyze" 或 "/suggest" 提问时，系统会额外注入分析数据。你可以根据这些数据识别缺失的组件（如：发现 Gateway 但缺失 Auth 服务）。
 
-注意：这些指令可以混在你的解释文本中。当你输出这些指令时，UI 会立即执行并在画布上生效。在架构图模式下，addNode 会自动根据 label 或 type 参数智能匹配最佳外观。
+注意：这些低风险指令可以混在你的解释文本中。当你输出这些指令时，UI 会立即执行并在画布上生效。在架构图模式下，addNode 会自动根据 label 或 type 参数智能匹配最佳外观。
 
 ## 交互规则
 - 当用户描述模糊时，先确认需求再生成
@@ -174,11 +170,7 @@ export const MINDMAP_SYSTEM_PROMPT = `你是一个专业的思维导图 (MindMap
 1. **添加子节点**：[COMMAND: {"action": "addChild", "parentId": "parent-id", "label": "子节点名称", "side": "right|left"}]
 2. **头脑风暴** (Brainstorm)：针对某个节点生成多个点子。
 3. **折叠分支**：[COMMAND: {"action": "collapse", "id": "node-id", "collapsed": true}]
-4. **导出 Markdown**：[COMMAND: {"action": "exportMindmapMd"}]（触发 Ctrl+Shift+E 导出为 .md 文件）
-5. **项目管理**：
-    - 导出图片：[COMMAND: {"action": "export", "type": "png|pdf|svg"}]
-    - 保存进云端：[COMMAND: {"action": "save"}]
-    - 发起分享：[COMMAND: {"action": "share"}]
+4. **安全限制**：不要输出删除、导出、保存、分享等有破坏性或外部副作用的自动指令；这类操作必须由用户在界面中显式触发。
 
 请尽量保持输出简洁，多用列表和表情符号进行对话辅助。`;
 
@@ -196,13 +188,13 @@ export const SLASH_COMMAND_PROMPTS: Record<string, (args: string) => string> = {
 直接输出布局指令：[COMMAND: {"action": "layout", "strategy": "${args || 'dagre'}"}]`,
 
   '/export': (args: string) => `用户要求导出图表：${args}
-直接输出导出指令：[COMMAND: {"action": "export", "type": "${args || 'png'}"}]`,
+请提醒用户使用界面上的导出按钮完成导出。不要输出 [COMMAND: ...] 自动导出指令。`,
 
   '/save': () => `用户要求保存图表到云端。
-直接输出保存指令：[COMMAND: {"action": "save"}]`,
+请提醒用户使用界面上的保存按钮完成保存。不要输出 [COMMAND: ...] 自动保存指令。`,
 
   '/share': () => `用户要求分享图表或开启协作。
-直接输出分享指令：[COMMAND: {"action": "share"}]`,
+请提醒用户使用界面上的分享按钮完成分享。不要输出 [COMMAND: ...] 自动分享指令。`,
 
   '/generate': (args: string) => `用户要求生成完整图表：${args}
 请根据描述生成包含 nodes 和 edges 的完整 JSON。

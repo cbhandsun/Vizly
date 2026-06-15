@@ -3,15 +3,12 @@ import { useTranslation } from 'react-i18next';
 import Modal from 'antd/es/modal';
 import Form from 'antd/es/form';
 import Input from 'antd/es/input';
-import message from 'antd/es/message';
 import Switch from 'antd/es/switch';
-import List from 'antd/es/list';
 import Button from 'antd/es/button';
 import Typography from 'antd/es/typography';
 import Space from 'antd/es/space';
 import Tag from 'antd/es/tag';
 import Divider from 'antd/es/divider';
-import Select from 'antd/es/select';
 import Collapse from 'antd/es/collapse';
 import Checkbox from 'antd/es/checkbox';
 import {
@@ -25,165 +22,35 @@ import {
     AppstoreOutlined,
     SyncOutlined
 } from '@ant-design/icons';
+import { useAuth } from '@/context/useAuth';
+import { CryptoService } from '@/core/utils/CryptoService';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+import { normalizeProviderBaseUrl } from '@/services/ai/providerSecurity';
+import {
+    formatAIProviderRequestError,
+    normalizeAIModelsResponse,
+    requestAIChatCompletion,
+    requestAIModels,
+    resolveAIProviderEndpoint,
+} from '@/services/ai/aiProviderClient';
+import {
+    getAIConfig,
+    loadCloudAIConfig,
+    persistAIConfig,
+    setRuntimeAIConfig,
+    type AIConfigState,
+    type AIModel,
+    type AIProviderConfig,
+} from './aiConfigStorage';
 
 const { Text, Title, Paragraph } = Typography;
-
-// --- Types ---
-
-export interface AIModel {
-    id: string;       // Model ID string sent to API (e.g. 'gpt-4o')
-    name: string;     // Display Name
-    group?: string;   // Group name (e.g. 'Anthropic', 'OpenAI')
-    enabled: boolean;
-    isCustom?: boolean;
-}
-
-export interface AIProviderConfig {
-    id: string;
-    name: string;
-    enabled: boolean;
-    baseUrl: string;
-    apiKey: string;
-    icon?: string;
-    models: AIModel[];
-}
-
-export interface AIConfigState {
-    activeModelKey: string; // Format: "providerId:modelId"
-    systemPrompt: string;
-    providers: AIProviderConfig[];
-}
+const loadStorageService = async () => (await import('@/services/SupabaseStorage')).storageService;
 
 interface AIConfigModalProps {
     open: boolean;
     onCancel: () => void;
     onSave: () => void;
 }
-
-// --- Constants ---
-export const AI_CONFIG_KEY = 'DiagramView.AIConfig_V2_Advanced';
-
-const DEFAULT_SYSTEM_PROMPT = `你是一个专业的架构图生成助手。请根据用户的描述生成符合 StandardDiagramData 结构的 JSON 数据。
-JSON 结构简介：
-{
-  "metadata": { "title": "标题", "description": "描述" },
-  "layout": { "type": "hierarchical", "direction": "TB" },
-  "nodes": [ { "id": "node1", "label": "节点1", "domain": "Group1" } ],
-  "edges": [ { "source": "node1", "target": "node2" } ]
-}
-请直接在回复中包含 JSON 代码块 (markdown code block)。
-`;
-
-const DEFAULT_PROVIDERS: AIProviderConfig[] = [
-    {
-        id: 'gemini',
-        name: 'Gemini (Google)',
-        enabled: true,
-        baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-        apiKey: '',
-        icon: 'google',
-        models: [
-            { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash', enabled: true, group: 'Google' },
-            { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', enabled: true, group: 'Google' }
-        ]
-    },
-    {
-        id: 'openai',
-        name: 'OpenAI',
-        enabled: false,
-        baseUrl: 'https://api.openai.com/v1',
-        apiKey: '',
-        icon: 'openai',
-        models: [
-            { id: 'gpt-4o', name: 'GPT-4o', enabled: true, group: 'GPT-4' },
-            { id: 'gpt-4o-mini', name: 'GPT-4o Mini', enabled: true, group: 'GPT-4' },
-            { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', enabled: true, group: 'GPT-3.5' }
-        ]
-    },
-    {
-        id: 'siliconflow',
-        name: '硅基流动 (SiliconFlow)',
-        enabled: false,
-        baseUrl: 'https://api.siliconflow.cn/v1',
-        apiKey: '',
-        icon: 'chip',
-        models: [
-            { id: 'deepseek-ai/DeepSeek-V2.5', name: 'DeepSeek V2.5', enabled: true, group: 'DeepSeek' },
-            { id: 'Qwen/Qwen2.5-72B-Instruct', name: 'Qwen 2.5 72B', enabled: true, group: 'Qwen' }
-        ]
-    },
-    {
-        id: 'o3',
-        name: 'O3 Platform',
-        enabled: false,
-        baseUrl: 'https://api.o3.fan/v1',
-        apiKey: '',
-        icon: 'o3',
-        models: [
-            { id: 'gpt-4o', name: 'GPT-4o (O3)', enabled: true, group: 'OpenAI' },
-            { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', enabled: true, group: 'Anthropic' }
-        ]
-    }
-];
-
-// --- Helpers ---
-export const getAIConfigKey = (userId?: string | null): string => {
-    return userId ? `${AI_CONFIG_KEY}_${userId}` : `${AI_CONFIG_KEY}_anonymous`;
-};
-
-export const getAIConfig = (userId?: string | null): AIConfigState => {
-    try {
-        let keyToUse = getAIConfigKey(userId);
-        if (!userId) {
-            if (typeof window !== 'undefined' && (window as any).__currentUserId) {
-                keyToUse = getAIConfigKey((window as any).__currentUserId);
-            } else if (typeof localStorage !== 'undefined') {
-                const keys = Object.keys(localStorage);
-                const userKey = keys.find(k => k.startsWith(AI_CONFIG_KEY + '_') && k !== AI_CONFIG_KEY + '_anonymous');
-                if (userKey) {
-                    keyToUse = userKey;
-                }
-            }
-        }
-
-        const raw = localStorage.getItem(keyToUse);
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            // Basic validation or migration could go here
-            if (Array.isArray(parsed.providers)) return parsed;
-        }
-
-        // Attempt legacy migration only if it's the old key or anonymous fallback
-        const v1Raw = localStorage.getItem('DiagramView.AIConfig');
-        if (v1Raw) {
-            const v1 = JSON.parse(v1Raw);
-            const providers = [...DEFAULT_PROVIDERS];
-            const gemini = providers.find(p => p.id === 'gemini');
-            if (gemini) {
-                if (v1.baseUrl) gemini.baseUrl = v1.baseUrl;
-                if (v1.apiKey) gemini.apiKey = v1.apiKey;
-            }
-            return {
-                activeModelKey: 'gemini:gemini-2.0-flash-exp',
-                systemPrompt: DEFAULT_SYSTEM_PROMPT,
-                providers
-            };
-        }
-
-    } catch { }
-
-    return {
-        activeModelKey: 'gemini:gemini-2.0-flash-exp',
-        systemPrompt: DEFAULT_SYSTEM_PROMPT,
-        providers: DEFAULT_PROVIDERS
-    };
-};
-
-import { useAuth } from '@/context/AuthContext';
-import { storageService } from '@/services/SupabaseStorage';
-import { CryptoService } from '@/core';
-import { appMessage } from '@/core/utils/antdStaticBridge';
-
 
 const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave }) => {
     const { t } = useTranslation();
@@ -203,23 +70,10 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
 
             // Try to load from cloud if logged in
             if (user) {
-                storageService.loadConfig('ai_config').then(async (cloudConfig) => {
-                    if (cloudConfig && Array.isArray(cloudConfig.providers)) {
-
-                        // Decrypt API Keys
-                        const decryptedProviders = await Promise.all(cloudConfig.providers.map(async (p: AIProviderConfig) => {
-                            if (p.apiKey && p.apiKey.startsWith('ENC:')) {
-                                const decryptedKey = await CryptoService.decrypt(p.apiKey, user.id);
-                                return { ...p, apiKey: decryptedKey };
-                            }
-                            return p;
-                        }));
-
-                        const mergedConfig = { ...cloudConfig, providers: decryptedProviders };
+                loadCloudAIConfig(user.id).then((mergedConfig) => {
+                    if (mergedConfig) {
+                        setRuntimeAIConfig(user.id, mergedConfig);
                         setConfig(mergedConfig);
-
-                        // Update local storage with decrypted values (so we can use them locally)
-                        localStorage.setItem(getAIConfigKey(user.id), JSON.stringify(mergedConfig));
                         window.dispatchEvent(new Event('aiConfigChanged'));
                     }
                 }).catch(err => {
@@ -230,10 +84,15 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     }, [open, user]);
 
     const handleSave = async () => {
-        // 1. Save Local (Plain text, safe on user's device)
-        localStorage.setItem(getAIConfigKey(user?.id), JSON.stringify(config));
+        const invalidProvider = config.providers.find(p => p.enabled && p.baseUrl && !normalizeProviderBaseUrl(p.baseUrl));
+        if (invalidProvider) {
+            appMessage.warning(`${invalidProvider.name} 的 Base URL 必须使用 HTTPS，或本机 HTTP localhost/127.0.0.1。`);
+            return;
+        }
 
-        // 2. Save Cloud (Encrypted)
+        // Keep logged-in secrets in memory and encrypted cloud storage only.
+        persistAIConfig(user?.id, config);
+
         if (user) {
             try {
                 // Clone and encrypt keys
@@ -247,6 +106,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
 
                 const cloudConfig = { ...config, providers: encryptedProviders };
 
+                const storageService = await loadStorageService();
                 await storageService.saveConfig('ai_config', cloudConfig, user.id);
                 appMessage.success(t('aiConfig.saveSuccessCloud'));
             } catch (err) {
@@ -371,8 +231,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 ...prev,
                 activeModelKey: newActiveModelKey
             };
-            // 立即保存到 localStorage
-            localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(newConfig));
+            persistAIConfig(user?.id, newConfig);
             return newConfig;
         });
         appMessage.success(t('aiConfig.switchedTo', { model: modelId }));
@@ -405,34 +264,21 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             appMessage.warning(t('aiConfig.testFillRequired'));
             return;
         }
+        try {
+            resolveAIProviderEndpoint(provider, '/chat/completions');
+        } catch {
+            appMessage.warning(`${provider.name} 的 Base URL 必须使用 HTTPS，或本机 HTTP localhost/127.0.0.1。`);
+            return;
+        }
         setIsTesting(true);
         try {
-            // Simple ping to chat completion
-            const response = await fetch(`${provider.baseUrl.replace(/\/$/, '')}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(provider.apiKey ? { 'Authorization': `Bearer ${provider.apiKey}` } : {})
-                },
-                body: JSON.stringify({
-                    model: provider.models[0]?.id || 'test-model',
-                    messages: [{ role: 'user', content: 'Hello, please reply with "OK".' }]
-                })
-            });
-
-            if (response.ok) {
-                appMessage.success(t('aiConfig.testSuccess'));
-            } else {
-                const errText = await response.text();
-                // Check if HTML
-                if (errText.trim().startsWith('<')) {
-                    appMessage.error(t('aiConfig.testFailHtml', { status: response.status }));
-                } else {
-                    appMessage.error(t('aiConfig.testFail', { status: response.status, message: errText.substring(0, 100) }));
-                }
-            }
+            await requestAIChatCompletion(provider, {
+                model: provider.models[0]?.id || 'test-model',
+                messages: [{ role: 'user', content: 'Hello, please reply with "OK".' }]
+            }, { timeoutMs: 30_000 });
+            appMessage.success(t('aiConfig.testSuccess'));
         } catch (error: any) {
-            appMessage.error(t('aiConfig.testError', { message: error.message }));
+            appMessage.error(t('aiConfig.testError', { message: formatAIProviderRequestError(error, 100) }));
         } finally {
             setIsTesting(false);
         }
@@ -498,55 +344,48 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             appMessage.warning(t('aiConfig.testFillRequired'));
             return;
         }
+        try {
+            resolveAIProviderEndpoint(provider, '/models');
+        } catch {
+            appMessage.warning(`${provider.name} 的 Base URL 必须使用 HTTPS，或本机 HTTP localhost/127.0.0.1。`);
+            return;
+        }
         setIsFetchingModels(true);
         try {
-            const endpoint = `${provider.baseUrl.replace(/\/$/, '')}/models`;
-            const response = await fetch(endpoint, {
-                method: 'GET',
-                headers: {
-                    ...(provider.apiKey ? { 'Authorization': `Bearer ${provider.apiKey}` } : {})
-                }
-            });
+            const models = normalizeAIModelsResponse(await requestAIModels(provider, { timeoutMs: 30_000 }));
+            if (models.length > 0) {
+                const existingModelIds = new Set(provider.models.map(m => m.id));
+                const newModels = models
+                    .filter((m) => !existingModelIds.has(m.id))
+                    .map((m) => {
+                        let group = 'Fetched';
+                        if (m.id.includes('-') || m.id.includes('/')) {
+                            const parts = m.id.split(/[-/]/);
+                            group = parts[0].toUpperCase() === parts[0] ? parts[0] : parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+                        }
+                        if (m.id.toLowerCase().includes('vision')) group = 'Vision';
+                        return {
+                            id: m.id,
+                            name: m.id,
+                            group: group,
+                            enabled: false,
+                            isCustom: true
+                        };
+                    });
 
-            if (response.ok) {
-                const data = await response.json();
-                if (data && data.data && Array.isArray(data.data)) {
-                    const existingModelIds = new Set(provider.models.map(m => m.id));
-                    const newModels = data.data
-                        .filter((m: any) => !existingModelIds.has(m.id))
-                        .map((m: any) => {
-                            let group = 'Fetched';
-                            if (m.id.includes('-') || m.id.includes('/')) {
-                                const parts = m.id.split(/[-/]/);
-                                group = parts[0].toUpperCase() === parts[0] ? parts[0] : parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-                            }
-                            if (m.id.toLowerCase().includes('vision')) group = 'Vision';
-                            return {
-                                id: m.id,
-                                name: m.id,
-                                group: group,
-                                enabled: false,
-                                isCustom: true
-                            };
-                        });
-                    
-                    if (newModels.length > 0) {
-                        setDiscoveredModels(newModels);
-                        setDiscoverySelectedIds([]);
-                        setDiscoverySearchText('');
-                        setDiscoveryModalVisible(true);
-                    } else {
-                        appMessage.info(t('aiConfig.fetchModelsNoNew'));
-                    }
+                if (newModels.length > 0) {
+                    setDiscoveredModels(newModels);
+                    setDiscoverySelectedIds([]);
+                    setDiscoverySearchText('');
+                    setDiscoveryModalVisible(true);
                 } else {
-                    appMessage.error(t('aiConfig.fetchModelsInvalidData'));
+                    appMessage.info(t('aiConfig.fetchModelsNoNew'));
                 }
             } else {
-                const errText = await response.text();
-                appMessage.error(t('aiConfig.testFail', { status: response.status, message: errText.substring(0, 100) }));
+                appMessage.error(t('aiConfig.fetchModelsInvalidData'));
             }
         } catch (error: any) {
-            appMessage.error(t('aiConfig.testError', { message: error.message }));
+            appMessage.error(t('aiConfig.testError', { message: formatAIProviderRequestError(error, 100) }));
         } finally {
             setIsFetchingModels(false);
         }

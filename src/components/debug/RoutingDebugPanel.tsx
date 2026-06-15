@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaChartLine, FaDatabase, FaEye, FaNetworkWired, FaTimes } from 'react-icons/fa';
+import { FaChartLine, FaDatabase, FaEye, FaTimes } from 'react-icons/fa';
 import Button from 'antd/es/button';
 import Tooltip from 'antd/es/tooltip';
 import { theme } from 'antd';

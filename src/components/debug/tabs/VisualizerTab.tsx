@@ -1,5 +1,3 @@
-// @ts-nocheck
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Button from 'antd/es/button';
@@ -10,8 +8,8 @@ import Typography from 'antd/es/typography';
 import Tooltip from 'antd/es/tooltip';
 import { theme } from 'antd';
 import { useTranslation } from 'react-i18next';
-import { EdgeRoutingCoordinator } from '@/core';
-import { AlgorithmDebugInfo, Point } from '@/core';
+import { EdgeRoutingCoordinator } from '@/core/services/EdgeRoutingCoordinator';
+import type { AlgorithmDebugInfo, Point } from '@/core/types/routing';
 
 interface DebugObstacle {
     x: number;
@@ -414,7 +412,6 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                     maxX = first.x + ow;
                     minY = first.y;
                     maxY = first.y + oh;
-                    initialized = true;
                 }
                 for (const o of obstacles) {
                     const ow = o.w ?? o.width ?? 0;

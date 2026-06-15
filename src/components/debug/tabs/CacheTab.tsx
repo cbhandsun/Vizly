@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { EdgeRoutingCoordinator } from '@/core';
+import { EdgeRoutingCoordinator } from '@/core/services/EdgeRoutingCoordinator';
 
 export const CacheTab: React.FC = () => {
     const [stats, setStats] = useState({ size: 0, version: 0 });

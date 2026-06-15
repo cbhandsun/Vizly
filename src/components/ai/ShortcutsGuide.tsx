@@ -9,12 +9,10 @@ import {
     QuestionCircleOutlined,
     GlobalOutlined
 } from '@ant-design/icons';
-import { useTranslation } from 'react-i18next';
 
 const { Text, Title, Paragraph } = Typography;
 
 const ShortcutsGuide: React.FC = () => {
-    const { t } = useTranslation();
     const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '');
     const mod = isMac ? '⌘' : 'Ctrl';
 
