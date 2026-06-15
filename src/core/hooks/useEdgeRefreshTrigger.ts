@@ -52,7 +52,10 @@ export function useEdgeRefreshTrigger(options: RefreshTriggerOptions) {
     const deferredTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pendingEdgeIds = useRef<Set<string>>(new Set());
     const onRefreshRef = useRef(onRefresh);
-    onRefreshRef.current = onRefresh;
+
+    useEffect(() => {
+        onRefreshRef.current = onRefresh;
+    }, [onRefresh]);
 
     // 清理
     useEffect(() => {

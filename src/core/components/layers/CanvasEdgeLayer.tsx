@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, memo } from 'react';
-import { useStore, useReactFlow, ReactFlowState, Edge, Node } from '@xyflow/react';
-import { getBezierPath, getSmoothStepPath, getStraightPath } from '@xyflow/react';
+import { useStore, type Edge } from '@xyflow/react';
+import { getStraightPath } from '@xyflow/react';
 
 
 // Selector to get nodes, edges, transform, and real-time drag state
@@ -75,7 +75,7 @@ const CanvasEdgeLayer = memo(() => {
             // Resolve effective type (handle swapped type for canvas mode)
             const _edgeType = (edge.data?.originalType as string) || edge.type || 'default';
 
-            let pathString = '';
+            let pathString: string;
 
             // 1. Prefer Worker Pre-calculated path (P1)
             if (edge.data?.workerPath) {

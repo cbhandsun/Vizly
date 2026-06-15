@@ -1,10 +1,80 @@
-// @ts-nocheck
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { Node } from '@xyflow/react';
+import type { Node } from '@xyflow/react';
 import { EdgeType } from '../factories/EdgeFactory';
 import { diagramConfigManager } from '../components/config/DiagramConfig';
 import { decideEdgeRouting } from '../utils/HandlePicker';
 import { LayeredConfigManager } from '../config/LayeredConfigManager';
+
+type Point = { x: number; y: number };
+
+type DiagramConfigSnapshot = {
+    edge?: EdgeConfigSnapshot;
+    layout?: { direction?: unknown };
+};
+
+type EdgeConfigSnapshot = Record<string, unknown> & {
+    angleToleranceDeg?: unknown;
+    bezierDistanceThreshold?: unknown;
+    obstacleScopePadding?: unknown;
+    corridorObstacleThreshold?: unknown;
+    directionalHandlePolicy?: unknown;
+    verticalBiasThreshold?: unknown;
+    horizontalBiasThreshold?: unknown;
+    obstaclePadding?: unknown;
+    orthogonalSamplingEnabled?: unknown;
+    orthogonalGridSize?: unknown;
+    orthogonalSampleBudget?: unknown;
+    gridAStarEnabled?: unknown;
+    gridAStarGridSize?: unknown;
+    gridAStarMaxExpansions?: unknown;
+    ignoreContainers?: unknown;
+    crossDomainVerticalPrefer?: unknown;
+    preferLROnHorizontal?: unknown;
+};
+
+type RoutingDecision = {
+    type: EdgeType;
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
+};
+
+type MutableRoutingDecision = {
+    type: EdgeType;
+    sourceHandle: string;
+    targetHandle: string;
+};
+
+type NodeDataRecord = Record<string, unknown> & {
+    domainClass?: unknown;
+    domain?: unknown;
+};
+
+type GeometryNode = Node & {
+    positionAbsolute?: Point;
+    measured?: { width?: number; height?: number };
+    data?: NodeDataRecord;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null;
+
+const getDiagramConfig = (): DiagramConfigSnapshot => {
+    const config = diagramConfigManager.getConfig();
+    return isRecord(config) ? config as DiagramConfigSnapshot : {};
+};
+
+const asNumber = (value: unknown, fallback: number): number => {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : fallback;
+};
+
+const getNodePosition = (node: GeometryNode): Point | undefined =>
+    node.position ?? node.positionAbsolute;
+
+const getNodeWidth = (node: GeometryNode): number =>
+    typeof node.width === 'number' ? node.width : (node.measured?.width ?? 0);
+
+const getNodeHeight = (node: GeometryNode): number =>
+    typeof node.height === 'number' ? node.height : (node.measured?.height ?? 0);
 
 /**
  * Service to encapsulate complex edge routing decisions.
@@ -41,7 +111,7 @@ export class EdgeDecisionService {
         usageTargetMap?: Map<string, Record<string, number>>,
         preferDistinctSides?: boolean,
         smoothFallback?: string
-    ): { type: EdgeType; sourceHandle?: string | null; targetHandle?: string | null } {
+    ): RoutingDecision {
 
         // 1. Determine fallback type based on global settings
         const fallbackType = (() => {
@@ -75,30 +145,30 @@ export class EdgeDecisionService {
         }
 
         // 2. Prepare routing configuration
-        const cfgEdgeLocal = (diagramConfigManager.getConfig() as any)?.edge || {};
+        const cfgEdgeLocal = getDiagramConfig().edge ?? {};
 
         // 3. Delegate to pure geometry utility
         const routing = decideEdgeRouting(
-            s as any,
-            t as any,
-            processedNodes as any,
+            s,
+            t,
+            processedNodes,
             {
                 mode: preferSmart ? 'advanced-smart' : 'native',
                 globalPath,
                 autoPathSelection: enableAutoType,
-                angleToleranceDeg: Number(cfgEdgeLocal.angleToleranceDeg ?? 36),
-                bezierDistanceThreshold: Number(cfgEdgeLocal.bezierDistanceThreshold ?? 280),
-                obstacleScopePadding: preferSmart ? Number(cfgEdgeLocal.obstacleScopePadding ?? 160) : Math.max(40, Number(cfgEdgeLocal.obstacleScopePadding ?? 80)),
-                corridorObstacleThreshold: Number(cfgEdgeLocal.corridorObstacleThreshold ?? 6),
-                directionalHandlePolicy: String(cfgEdgeLocal.directionalHandlePolicy || 'force') as any,
-                verticalBiasThreshold: Number(cfgEdgeLocal.verticalBiasThreshold ?? 1.2),
-                obstaclePadding: preferSmart ? Number(cfgEdgeLocal.obstaclePadding ?? 24) : Math.max(10, Number(cfgEdgeLocal.obstaclePadding ?? 16)),
+                angleToleranceDeg: asNumber(cfgEdgeLocal.angleToleranceDeg, 36),
+                bezierDistanceThreshold: asNumber(cfgEdgeLocal.bezierDistanceThreshold, 280),
+                obstacleScopePadding: preferSmart ? asNumber(cfgEdgeLocal.obstacleScopePadding, 160) : Math.max(40, asNumber(cfgEdgeLocal.obstacleScopePadding, 80)),
+                corridorObstacleThreshold: asNumber(cfgEdgeLocal.corridorObstacleThreshold, 6),
+                directionalHandlePolicy: String(cfgEdgeLocal.directionalHandlePolicy || 'force'),
+                verticalBiasThreshold: asNumber(cfgEdgeLocal.verticalBiasThreshold, 1.2),
+                obstaclePadding: preferSmart ? asNumber(cfgEdgeLocal.obstaclePadding, 24) : Math.max(10, asNumber(cfgEdgeLocal.obstaclePadding, 16)),
                 orthogonalSamplingEnabled: preferSmart ? Boolean(cfgEdgeLocal.orthogonalSamplingEnabled ?? true) : false,
-                orthogonalGridSize: Number(cfgEdgeLocal.orthogonalGridSize ?? 40),
-                orthogonalSampleBudget: preferSmart ? Number(cfgEdgeLocal.orthogonalSampleBudget ?? 3) : 0,
+                orthogonalGridSize: asNumber(cfgEdgeLocal.orthogonalGridSize, 40),
+                orthogonalSampleBudget: preferSmart ? asNumber(cfgEdgeLocal.orthogonalSampleBudget, 3) : 0,
                 gridAStarEnabled: preferSmart ? Boolean(cfgEdgeLocal.gridAStarEnabled ?? true) : false,
-                gridAStarGridSize: Number(cfgEdgeLocal.gridAStarGridSize ?? 40),
-                gridAStarMaxExpansions: preferSmart ? Number(cfgEdgeLocal.gridAStarMaxExpansions ?? 300) : 0,
+                gridAStarGridSize: asNumber(cfgEdgeLocal.gridAStarGridSize, 40),
+                gridAStarMaxExpansions: preferSmart ? asNumber(cfgEdgeLocal.gridAStarMaxExpansions, 300) : 0,
                 ignoreContainers: Boolean(cfgEdgeLocal.ignoreContainers ?? false),
                 layoutDirection: layoutDirection || 'LR'
             },
@@ -129,18 +199,20 @@ export class EdgeDecisionService {
     private applyPostCorrection(
         s: Node,
         t: Node,
-        routing: any,
+        routing: MutableRoutingDecision,
         preferSmart: boolean,
         layoutDirection: string | undefined,
-        cfgEdgeLocal: any
+        cfgEdgeLocal: EdgeConfigSnapshot
     ) {
         try {
-            const sPos = (s as any)?.position ?? (s as any)?.positionAbsolute;
-            const tPos = (t as any)?.position ?? (t as any)?.positionAbsolute;
-            const sW = ((s as any)?.width ?? (s as any)?.measured?.width ?? 0) as number;
-            const sH = ((s as any)?.height ?? (s as any)?.measured?.height ?? 0) as number;
-            const tW = ((t as any)?.width ?? (t as any)?.measured?.width ?? 0) as number;
-            const tH = ((t as any)?.height ?? (t as any)?.measured?.height ?? 0) as number;
+            const sourceNode = s as GeometryNode;
+            const targetNode = t as GeometryNode;
+            const sPos = getNodePosition(sourceNode);
+            const tPos = getNodePosition(targetNode);
+            const sW = getNodeWidth(sourceNode);
+            const sH = getNodeHeight(sourceNode);
+            const tW = getNodeWidth(targetNode);
+            const tH = getNodeHeight(targetNode);
 
             if (sPos && tPos && sW && sH && tW && tH) {
                 const sCenter = { x: sPos.x + sW / 2, y: sPos.y + sH / 2 };
@@ -148,31 +220,31 @@ export class EdgeDecisionService {
                 const dx2 = tCenter.x - sCenter.x;
                 const dy2 = tCenter.y - sCenter.y;
 
-                const vBias = Math.max(0.8, Math.min(2.0, Number(cfgEdgeLocal?.verticalBiasThreshold ?? 1.2)));
-                const hBias = Math.max(0.6, Number((diagramConfigManager.getConfig() as any)?.edge?.horizontalBiasThreshold ?? 1.0));
+                const vBias = Math.max(0.8, Math.min(2.0, asNumber(cfgEdgeLocal.verticalBiasThreshold, 1.2)));
+                const hBias = Math.max(0.6, asNumber(getDiagramConfig().edge?.horizontalBiasThreshold, 1.0));
 
                 const isVerticalMain = Math.abs(dy2) >= Math.abs(dx2) * vBias;
                 const isHorizontalMain = Math.abs(dx2) >= Math.abs(dy2) * hBias;
 
                 const preferVerticalByLayout = isVerticalMain;
 
-                const sDomain = String(((s as any)?.data || {})?.domainClass || ((s as any)?.data || {})?.domain || '') || '';
-                const tDomain = String(((t as any)?.data || {})?.domainClass || ((t as any)?.data || {})?.domain || '') || '';
+                const sDomain = String(sourceNode.data?.domainClass || sourceNode.data?.domain || '') || '';
+                const tDomain = String(targetNode.data?.domainClass || targetNode.data?.domain || '') || '';
                 const crossDomain = sDomain !== tDomain;
-                const crossPrefer = Boolean((cfgEdgeLocal as any)?.crossDomainVerticalPrefer ?? true);
+                const crossPrefer = Boolean(cfgEdgeLocal.crossDomainVerticalPrefer ?? true);
 
                 // [FIX C-8] 使用互斥分支（if...else if）防止垂直和水平修正互相覆盖 handle
                 // 原来两段独立 if 都会写 sourceHandle/targetHandle，第二段会覆盖第一段
                 if (!preferSmart && preferVerticalByLayout && (isVerticalMain || (crossDomain && crossPrefer))) {
                     const desired = dy2 >= 0 ? { s: 'b', t: 't' } : { s: 't', t: 'b' };
-                    (routing as any).sourceHandle = desired.s;
-                    (routing as any).targetHandle = desired.t;
+                    routing.sourceHandle = desired.s;
+                    routing.targetHandle = desired.t;
                 } else {
-                    const preferLR = !!(((diagramConfigManager.getConfig() as any)?.edge || {}).preferLROnHorizontal ?? true);
+                    const preferLR = Boolean(getDiagramConfig().edge?.preferLROnHorizontal ?? true);
                     if (preferLR && isHorizontalMain) {
                         const desiredLR = dx2 >= 0 ? { s: 'r', t: 'l' } : { s: 'l', t: 'r' };
-                        (routing as any).sourceHandle = desiredLR.s;
-                        (routing as any).targetHandle = desiredLR.t;
+                        routing.sourceHandle = desiredLR.s;
+                        routing.targetHandle = desiredLR.t;
                     }
                 }
 

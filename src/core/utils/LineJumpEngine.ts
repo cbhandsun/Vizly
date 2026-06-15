@@ -155,7 +155,6 @@ export function applyLineJumps(
         }
 
         // 在每个交叉点处插入半圆弧跳线
-        let currentX = p1.x;
         const y = p1.y;
         const r = JUMP_RADIUS;
 
@@ -168,7 +167,6 @@ export function applyLineJumps(
             // 半圆弧跳线（向上凸起）
             // sweep-flag 取决于方向：向右走 sweep=1, 向左走 sweep=0
             parts.push(`A ${r} ${r} 0 0 ${goingRight ? 1 : 0} ${arcEndX} ${y}`);
-            _currentX = arcEndX;
         }
 
         // 补全到线段终点

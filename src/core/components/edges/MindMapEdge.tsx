@@ -117,7 +117,7 @@ export const MindMapEdge = ({
     const depth = (sourceNode?.data?.depth as number) || 0;
     const isMainBranch = depth === 0;
 
-    let edgePath = '';
+    let edgePath: string;
     
     const pathParams = {
         sourceX: dSX,

@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { TrunkCalculator } from '../workers/core/TrunkCalculator';
 
 import { createDefaultRoutingConfig } from '../types/routing';
@@ -91,6 +90,20 @@ interface HubPortGroupInfo {
     tangent: number;
     jobs: PathFindingJob[];
 }
+
+type CacheablePathFindingJob = Partial<PathFindingJob> & {
+    sourceRect?: Rectangle;
+    targetRect?: Rectangle;
+    type?: string;
+};
+
+type ParallelSortableJob = PathFindingJob & {
+    targetPos?: { y?: number };
+};
+
+type CongestionAwareGraphConfig = SharedGraphContext['config'] & {
+    portCongestion?: Record<string, number>;
+};
 
 /**
  * [Phase 2] Classify edge side with Edge Type semantic support
@@ -560,7 +573,7 @@ export class EdgeRoutingCoordinator {
      * [P2-3] Extract parameters relevant for caching key
      */
     private extractCacheableParams(
-        job: Partial<PathFindingJob> & { sourceRect?: Rectangle; targetRect?: Rectangle },
+        job: CacheablePathFindingJob,
         _graph: SharedGraphContext,
         pendingEdges?: Array<{ start: { x: number; y: number }; end: { x: number; y: number } }>
     ): Record<string, unknown> {
@@ -587,14 +600,13 @@ export class EdgeRoutingCoordinator {
             // Include obstacles signature? Ideally yes, but maybe graph version handles it.
             // For now rely on graphVersion for global obstacle changes.
             // But if we want local caching, we might need a spatial hash of relevant obstacles.
-            // @ts-expect-error - Job type is loose string in legacy code
             type: job.type || 's', // Smart
-            sourceHandle: (job as any).sourceHandle || '',
-            targetHandle: (job as any).targetHandle || '',
-            sourcePosition: (job as any).sourcePosition || '',
-            targetPosition: (job as any).targetPosition || '',
+            sourceHandle: job.sourceHandle || '',
+            targetHandle: job.targetHandle || '',
+            sourcePosition: job.sourcePosition || '',
+            targetPosition: job.targetPosition || '',
             // [FIX] Include Bus Routing params in cache key
-            bus: `${!!(job as any).isOneToMany}|${!!(job as any).isManyToOne}|${(job as any).busTrunkSource?.x ?? 0},${(job as any).busTrunkSource?.y ?? 0}|${(job as any).busTrunkTarget?.x ?? 0},${(job as any).busTrunkTarget?.y ?? 0}`,
+            bus: `${!!job.isOneToMany}|${!!job.isManyToOne}|${job.busTrunkSource?.x ?? 0},${job.busTrunkSource?.y ?? 0}|${job.busTrunkTarget?.x ?? 0},${job.busTrunkTarget?.y ?? 0}`,
             pe: peHash,  // [H-9] pendingEdges fingerprint
         };
     }
@@ -1469,13 +1481,13 @@ export class EdgeRoutingCoordinator {
     ): Promise<PathFindingResult[]> {
         // [SYNC] Populate allEdges to enable Nudge context for this batch
         if (this.allEdges.length === 0 && jobs.length > 0) {
-            // Map PathFindingJob to Edge-like structure to avoid @ts-ignore
+            // Map PathFindingJob to the minimal Edge-like structure needed for nudge context.
             this.allEdges = jobs.map(job => ({
                 id: job.edgeId,
                 source: job.source,
                 target: job.target,
                 data: {}
-            })) as any[];
+            })) as Edge[];
         }
         if (!this.useParallelRouting || !this.parallelPool) {
             // console.warn('[P0 Parallel] Pool not available, falling back to serial routing');
@@ -1759,8 +1771,9 @@ export class EdgeRoutingCoordinator {
         parallelGroups.forEach(group => {
             if (group.length <= 1) return;
             group.sort((a, b) => {
-                // @ts-expect-error
-            const diff = (a.targetPos?.y || a.targetY || 0) - (b.targetPos?.y || b.targetY || 0);
+                const aa = a as ParallelSortableJob;
+                const bb = b as ParallelSortableJob;
+                const diff = (aa.targetPos?.y || aa.targetY || 0) - (bb.targetPos?.y || bb.targetY || 0);
                 return diff;
             });
             // We don't explicitly assign indices here as PortSelector handles it, but good to sort.
@@ -1914,8 +1927,8 @@ export class EdgeRoutingCoordinator {
         // Attach to graph config? Or job?
         // Since graphConfig is shared, let's put it there.
         if (!graph.config) graph.config = {};
-        // @ts-expect-error - dynamic property
-        graph.config.portCongestion = portUsage; // Workers can read this
+        const config = graph.config as CongestionAwareGraphConfig;
+        config.portCongestion = portUsage; // Workers can read this
     }
 
     /**

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * P4: 增量边路由钩子
  * 
@@ -159,7 +158,6 @@ export function useIncrementalEdgeRouting(
         const shouldThrottle = now - lastUpdateRef.current < throttleMs;
 
         // 检查是否有位置变化
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const hasPositionChange = changes.some(c => c.type === 'position' && (c as any).position);
 
         // 应用节点变化
@@ -198,7 +196,7 @@ export function useIncrementalEdgeRouting(
                 applyRouting(args.currentNodes, args.currentEdges, args.setEdges);
             }, Math.max(0, remaining));
         }
-    }, [applyRouting, throttleMs]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [applyRouting, throttleMs]);
 
     /**
      * 强制完全重新路由

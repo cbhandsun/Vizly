@@ -7,7 +7,7 @@
  * 2. Worker 计算完成后通过 setEdges 更新路径
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useMemo } from 'react';
 import { EdgeProps, getBezierPath } from '@xyflow/react';
 import { useSpring, animated } from '@react-spring/web';
 import {
@@ -39,28 +39,18 @@ export function EnhancedAnimatedEdge({
     style,
     data
 }: EdgeProps) {
-    // 状态管理
-    const [pathData, setPathData] = useState<string>('');
-    const [isComputing, setIsComputing] = useState(false);
-
-    // 计算初始回退路径
-    useEffect(() => {
+    const pathData = useMemo(() => {
         // [NEW] 优先使用 Worker/ELK 计算好的精确路径
         if (data?.elkPath && Array.isArray(data.elkPath)) {
             const points = data.elkPath as Point[];
             if (points.length >= 2) {
-                const elkPathStr = svgPathFromPoints(points);
-                setPathData(elkPathStr);
-                setIsComputing(false); // 已有精确路径，无需计算态
-                return;
+                return svgPathFromPoints(points);
             }
         }
 
         // 降级：如果只有 string 类型的 workerPath
         if (typeof data?.workerPath === 'string') {
-            setPathData(data.workerPath);
-            setIsComputing(false);
-            return;
+            return data.workerPath;
         }
 
         // 再次降级：实时计算简单的曼哈顿路径
@@ -70,20 +60,15 @@ export function EnhancedAnimatedEdge({
         const startDir = parseHandleDirection(sourcePosition);
         const endDir = parseHandleDirection(targetPosition);
 
-        const fallbackPath = computeManhattanPath(
+        return computeManhattanPath(
             startPoint,
             endPoint,
             startDir,
             endDir
         );
 
-        setPathData(fallbackPath);
-        // 如果我们没有 elkPath，说明可能还在等待布局计算，保持 isComputing 为 true (或者根据业务逻辑调整)
-        // 这里为了演示平滑，如果完全没有 path 数据，可以视为 computing
-        // 但通常 fallback 已经足够让用户看到线了，不用一直转圈
-        setIsComputing(false); // 改为 false，因为 fallback 也是有效路径
-
     }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data?.elkPath, data?.workerPath]);
+    const isComputing = false;
 
     // 使用 react-spring 实现路径平滑过渡
     const animatedProps = useSpring({

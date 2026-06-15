@@ -11,7 +11,7 @@
  * 本组件接收 ReactFlow 算出的错误 toX/toY，逆向推导并补偿 uiScale。
  */
 import React from 'react';
-import { ConnectionLineComponentProps, getSmoothStepPath, getBezierPath, getStraightPath } from '@xyflow/react';
+import { ConnectionLineComponentProps, getSmoothStepPath } from '@xyflow/react';
 import { getUiScale } from '../shared/viewportStore';
 import { readDomViewport } from '../../utils/domViewport';
 

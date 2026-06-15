@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { Edge, Node } from '@xyflow/react';
 import { decideEdgeRouting } from '../utils/HandlePicker';
 import { diagramConfigManager } from '../components/config/DiagramConfig';
@@ -9,16 +9,16 @@ export interface EdgeNormalizationOptions {
   overrideConfig?: any; // Optional config object to override global diagram config
 }
 
+const EMPTY_EDGE_CONFIG: Record<string, any> = {};
+
 /**
  * P1 Single Source of Truth for Edge Properties
  *
  * Unifies edge.mode / pathType / autoPathType / autoHandle into a single resolution step.
  * Ensures that what the view layer sees is exactly what should be rendered.
  *
- * [OPT-P2⑧] 精细化 useMemo 依赖粒度：
- * - 节点拓扑签名：只包含 id + 尺寸（忽略位置）→ 拖动不触发重算
- * - 边签名：只包含 source/target/handle/manual 关键字段
- * - 路由决策结果缓存在 ref 中，签名未变时直接复用
+ * Uses explicit React memoization dependencies so edge normalization remains
+ * compatible with React Compiler and does not read or write refs during render.
  */
 export function useEdgeNormalization(
   nodes: Node[],
@@ -32,63 +32,39 @@ export function useEdgeNormalization(
   } = options;
 
   const config = overrideConfig || diagramConfigManager.getConfig();
-  const edgeConfig = config.edge || {};
+  const edgeConfig = config.edge ?? EMPTY_EDGE_CONFIG;
 
-  // [OPT-P2⑧] 节点拓扑签名：id + 尺寸（不包含位置，拖动时不失效）
-  const nodeTopoKey = useMemo(() => {
-    return nodes.map(n => {
-      const w = n.measured?.width ?? (n as any).width ?? 0;
-      const h = n.measured?.height ?? (n as any).height ?? 0;
-      return `${n.id}:${w}:${h}`;
-    }).join('|');
-  }, [nodes]);
-
-  // [OPT-P2⑧] 边拓扑签名：source/target/handle/manualHandles 关键字段
-  const edgeTopoKey = useMemo(() => {
-    return edges.map(e => {
-      const d: any = e.data || {};
-      const mh = d.manualHandles ? '1' : '0';
-      const mhs = Array.isArray(d.manualHandleSides) ? d.manualHandleSides.join(',') : '';
-      return `${e.id}:${e.source}>${e.target}:${e.sourceHandle ?? ''}:${e.targetHandle ?? ''}:${mh}:${mhs}`;
-    }).join('|');
-  }, [edges]);
-
-  // [OPT-P2⑧] 只提取影响路由决策的 edgeConfig 字段
-  const edgeConfigKey = useMemo(() => {
-    return `${edgeConfig.mode}|${edgeConfig.pathType}|${edgeConfig.directionalHandlePolicy}`;
-  }, [edgeConfig]);
-
-  // 签名缓存 ref，签名命中时直接返回上次结果
-  const cacheRef = useRef<{ key: string; result: Edge[] } | null>(null);
+  const routingConfig = useMemo(() => ({
+    mode: (edgeConfig.mode === 'advanced-smart' ? 'advanced-smart' : 'native') as 'advanced-smart' | 'native',
+    globalPath: (edgeConfig.pathType || 'step') as string,
+    autoPathSelection: true,
+    layoutDirection,
+    directionalHandlePolicy: (edgeConfig.directionalHandlePolicy || 'prefer') as 'prefer' | 'force' | 'off',
+    angleToleranceDeg: edgeConfig.angleToleranceDeg,
+    bezierDistanceThreshold: edgeConfig.bezierDistanceThreshold,
+    obstacleScopePadding: edgeConfig.obstacleScopePadding,
+    corridorObstacleThreshold: edgeConfig.corridorObstacleThreshold,
+    verticalBiasThreshold: edgeConfig.verticalBiasThreshold,
+    obstaclePadding: edgeConfig.obstaclePadding,
+    smoothFallback: edgeConfig.smoothFallback,
+  }), [
+    edgeConfig.angleToleranceDeg,
+    edgeConfig.bezierDistanceThreshold,
+    edgeConfig.corridorObstacleThreshold,
+    edgeConfig.directionalHandlePolicy,
+    edgeConfig.mode,
+    edgeConfig.obstaclePadding,
+    edgeConfig.obstacleScopePadding,
+    edgeConfig.pathType,
+    edgeConfig.smoothFallback,
+    edgeConfig.verticalBiasThreshold,
+    layoutDirection,
+  ]);
 
   const normalizedEdges = useMemo(() => {
     if (!enableSmartRouting) {
       return edges;
     }
-
-    // 组合签名：任意一项变化都触发重算
-    const cacheKey = `${nodeTopoKey}::${edgeTopoKey}::${edgeConfigKey}::${layoutDirection}`;
-
-    // 签名命中：节点拖动时最常触发，直接复用
-    if (cacheRef.current && cacheRef.current.key === cacheKey) {
-      return cacheRef.current.result;
-    }
-
-    // Prepare routing config once
-    const routingConfig = {
-      mode: (edgeConfig.mode === 'advanced-smart' ? 'advanced-smart' : 'native') as 'advanced-smart' | 'native',
-      globalPath: (edgeConfig.pathType || 'step') as string,
-      autoPathSelection: true,
-      layoutDirection,
-      directionalHandlePolicy: (edgeConfig.directionalHandlePolicy || 'prefer') as 'prefer' | 'force' | 'off',
-      angleToleranceDeg: edgeConfig.angleToleranceDeg,
-      bezierDistanceThreshold: edgeConfig.bezierDistanceThreshold,
-      obstacleScopePadding: edgeConfig.obstacleScopePadding,
-      corridorObstacleThreshold: edgeConfig.corridorObstacleThreshold,
-      verticalBiasThreshold: edgeConfig.verticalBiasThreshold,
-      obstaclePadding: edgeConfig.obstaclePadding,
-      smoothFallback: edgeConfig.smoothFallback,
-    };
 
     const nodeMap = new Map<string, any>();
     nodes.forEach(n => nodeMap.set(String(n.id), n));
@@ -220,14 +196,9 @@ export function useEdgeNormalization(
       };
     });
 
-    // 写入签名缓存
-    cacheRef.current = { key: cacheKey, result };
     return result;
 
-  // [OPT-P2⑧] 依赖改为签名字符串（而非原始数组引用）
-  // 节点位置变化（拖动）不触发重算，仅拓扑/尺寸/配置变化时触发
-  // nodes/edges 本身仍列入，以确保 getAbsolutePosition 内部逻辑使用最新引用
-  }, [nodeTopoKey, edgeTopoKey, edgeConfigKey, enableSmartRouting, layoutDirection, nodes, edges]);
+  }, [enableSmartRouting, routingConfig, nodes, edges]);
 
   return normalizedEdges;
 }
