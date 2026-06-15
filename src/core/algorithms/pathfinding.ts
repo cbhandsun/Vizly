@@ -379,7 +379,6 @@ export function generateSimplePath(
             if (opts.targetPos === 'bottom' && dy > 0) return false;
         }
         
-        let _localLineObs = lineObstacles;
         if (allowLineCrossings) {
             // Only check collinear overlaps, ignore crossings
             return !isPathBlocked(path, obstacles, padding, []) && 
@@ -430,10 +429,10 @@ export function generateSimplePath(
         
         // [FIX] Explicitly add the exact midpoint to guarantee perfectly symmetrical
         // Z-paths when unobstructed. Odd STEPS would otherwise miss the exact midpoint.
-        let midP = start.x + dx / 2;
+        const midP = start.x + dx / 2;
         candidates.push(midP);
         
-        let STEPS = Math.min(8, Math.max(3, Math.floor(Math.abs(dx) / 20)));
+        const STEPS = Math.min(8, Math.max(3, Math.floor(Math.abs(dx) / 20)));
         for (let i = 1; i < STEPS; i++) {
             candidates.push(start.x + (dx * i) / STEPS);
         }
@@ -476,10 +475,10 @@ export function generateSimplePath(
 
         // --- Try V-H-V 形状: 竖-横-竖 ---
         let candidatesY: number[] = [];
-        let midPy = start.y + dy / 2;
+        const midPy = start.y + dy / 2;
         candidatesY.push(midPy); // Explicitly add midpoint for perfect symmetry
         
-        let STEPS_Y = Math.min(8, Math.max(3, Math.floor(Math.abs(dy) / 20)));
+        const STEPS_Y = Math.min(8, Math.max(3, Math.floor(Math.abs(dy) / 20)));
         for (let i = 1; i < STEPS_Y; i++) {
             candidatesY.push(start.y + (dy * i) / STEPS_Y);
         }
@@ -700,9 +699,7 @@ export function buildPathfindingGrid(
 
     // Apply Obstacles
     const isSpatialIndex = (obs: Rectangle[] | SpatialIndex): obs is SpatialIndex => typeof (obs as SpatialIndex).query === 'function';
-    let relevantObstacles: Rectangle[] = [];
-
-    if (isSpatialIndex(obstacles)) {
+    const relevantObstacles: Rectangle[] = isSpatialIndex(obstacles) ? (() => {
         // Query obstacles intersecting the grid area (plus buffer for safety)
         const buffer = bufferDistanceFar;
         const queryRange = {
@@ -711,10 +708,8 @@ export function buildPathfindingGrid(
             width: (maxX - minX) + buffer * 2,
             height: (maxY - minY) + buffer * 2
         };
-        relevantObstacles = obstacles.query(queryRange);
-    } else {
-        relevantObstacles = obstacles;
-    }
+        return obstacles.query(queryRange);
+    })() : obstacles;
 
     for (const obs of relevantObstacles) {
         // [FIX] Extract custom padding and soft zone flags from obstacle
@@ -757,7 +752,7 @@ export function findPath(
     dynamicObstacles: Rectangle[] = [], // [NEW] Dynamic obstacles (e.g., strict padding) to be added to grid
     containerBorders: Rectangle[] = [], // [NEW] Soft penalty for container borders
     congestionGrid?: Int32Array,   // [NEW] Congestion map
-    clearanceRects: Rectangle[] = [],   // [NEW] Areas to force clear (source/target)
+    _clearanceRects: Rectangle[] = [],   // [NEW] Areas to force clear (source/target)
     generateOpts?: { sourcePos?: Position, targetPos?: Position } // [NEW] Port directions for simple path validation
 ): Point[] | null {
     // [DEBUG] Log findPath invocation for e10 debugging
@@ -1562,7 +1557,7 @@ function optimizePath(
     obstacles: Rectangle[] | SpatialIndex,
     extraObstacles: Rectangle[] = [] // [NEW] Support for soft borders/containers
 ): Point[] {
-    let path = simplifyPath(rawPath);
+    const path = simplifyPath(rawPath);
     if (path.length <= 2) return path;
     
     // Helper to verify if a candidate sub-path is collision-free

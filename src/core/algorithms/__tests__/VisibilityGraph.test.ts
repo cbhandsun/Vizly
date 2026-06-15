@@ -23,7 +23,7 @@ class MockSpatialIndex {
         return this.obstacles;
     }
 
-    queryLine(x1: number, y1: number, x2: number, y2: number) {
+    queryLine(_x1: number, _y1: number, _x2: number, _y2: number) {
         this.queryCalled = true;
         return this.obstacles;
     }

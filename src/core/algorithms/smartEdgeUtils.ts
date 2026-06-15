@@ -616,7 +616,7 @@ export function preventEndpointCollinearBacktrack(points: Point[]) {
 export function trySimplify4PointCShape(
     points: Point[],
     obstacles: Rectangle[] | SpatialIndex = [],
-    options?: { sourcePos?: Position; targetPos?: Position }
+    _options?: { sourcePos?: Position; targetPos?: Position }
 ): Point[] {
     if (points.length !== 4) return points;
 
@@ -806,7 +806,7 @@ export function straightenAlignedLocalDogleg(
 export function removeCrossAxisDetour(
     points: Point[],
     obstacles: Rectangle[] | SpatialIndex = [],
-    options?: { sourcePos?: Position; targetPos?: Position }
+    _options?: { sourcePos?: Position; targetPos?: Position }
 ): Point[] {
     if (points.length < 5) return points;
 
@@ -930,10 +930,6 @@ export function removeCrossAxisDetour(
             // Determine which side to route around: prefer the side closer to the destination
             const PADDING = 50;
             const validCandidates: { clearCross: number; mid1: Point; mid2: Point; zLen: number }[] = [];
-            // Find blocking obstacle range in cross-axis
-            const crossMin = Math.min(crossA, crossB);
-            const crossMax = Math.max(crossA, crossB);
-            
             // Try routing on the far side of destination (cross direction same as overall)
             const candidateChannels: number[] = [];
             // Side 1: beyond destination cross coordinate
@@ -1386,7 +1382,7 @@ export function removeSmallJogs(
                 // Bridge is Horizontal p1->p2 (Variation from p1.x..p2.x)
                 // We want to align p1 and p2 to targetX.
                 if (Math.abs(p1.y - p2.y) < 1 && bridgeLen < 80) {
-                    let targetX = p1.x; // Default
+                    let targetX: number;
                     if (p0Fixed && p3Fixed) {
                         if (Math.abs(p0.x - p3.x) > 1) continue;
                         targetX = p0.x;
@@ -1448,7 +1444,7 @@ export function removeSmallJogs(
             if (isH1 && isH2) {
                 // Bridge is Vertical p1->p2
                 if (Math.abs(p1.x - p2.x) < 1 && bridgeLen < 80) {
-                    let targetY = p1.y; // Default
+                    let targetY: number;
                     if (p0Fixed && p3Fixed) {
                         if (Math.abs(p0.y - p3.y) > 1) continue;
                         targetY = p0.y;
@@ -1734,24 +1730,20 @@ export function createRoundedPathWithJumps(
                 const jr = jumpRadius;
 
                 // Validate jump fit
-                let distToJump = 0;
-                let distTotal = 0;
-
-                if (isHorizontal) {
-                    distTotal = Math.abs(drawEnd.x - drawStart.x);
-                    distToJump = Math.abs(jump.x - drawStart.x);
-                } else {
-                    distTotal = Math.abs(drawEnd.y - drawStart.y);
-                    distToJump = Math.abs(jump.y - drawStart.y);
-                }
+                const distTotal = isHorizontal
+                    ? Math.abs(drawEnd.x - drawStart.x)
+                    : Math.abs(drawEnd.y - drawStart.y);
+                const distToJump = isHorizontal
+                    ? Math.abs(jump.x - drawStart.x)
+                    : Math.abs(jump.y - drawStart.y);
 
                 // Skip if jump is too close to start or end (clipping with corner)
                 if (distToJump < jr || distToJump > distTotal - jr) return;
 
                 // Calculate start/end of the arc
-                let arcStart = { x: 0, y: 0 };
-                let arcEnd = { x: 0, y: 0 };
-                let control = { x: 0, y: 0 };
+                let arcStart: Point;
+                let arcEnd: Point;
+                let control: Point;
 
                 if (isHorizontal) {
                     const sign = drawEnd.x > drawStart.x ? 1 : -1;
@@ -2007,18 +1999,15 @@ export function nudgeSegments(
             let nearestTop = -Infinity;
             let nearestBottom = Infinity;
 
-            let candidates: Rectangle[] = [];
-            if (isSpatialIndex(obstacles)) {
+            let candidates: Rectangle[] = isSpatialIndex(obstacles) ? (() => {
                 const range = {
                     x: xMin,
                     y: y - searchLimit,
                     width: xMax - xMin,
                     height: searchLimit * 2
                 };
-                candidates = obstacles.query(range);
-            } else {
-                candidates = obstacles;
-            }
+                return obstacles.query(range);
+            })() : obstacles;
 
             if (extraObstacles.length > 0) {
                 candidates = candidates.concat(extraObstacles);
@@ -2097,18 +2086,15 @@ export function nudgeSegments(
             let nearestLeft = -Infinity;
             let nearestRight = Infinity;
 
-            let candidates: Rectangle[] = [];
-            if (isSpatialIndex(obstacles)) {
+            let candidates: Rectangle[] = isSpatialIndex(obstacles) ? (() => {
                 const range = {
                     x: x - searchLimit,
                     y: yMin,
                     width: searchLimit * 2,
                     height: yMax - yMin
                 };
-                candidates = obstacles.query(range);
-            } else {
-                candidates = obstacles;
-            }
+                return obstacles.query(range);
+            })() : obstacles;
 
             if (extraObstacles.length > 0) {
                 candidates = candidates.concat(extraObstacles);
@@ -2390,7 +2376,7 @@ export function makePathOrthogonal(
             // 15px catches real layout coordinate misalignment (handle offset vs node center).
             const smallDiagonal = Math.min(dx, dy) < 15;
             if (smallDiagonal) {
-                let corner: Point | null = null;
+                let corner: Point;
                 if (options?.sourcePos && i === 0 && !newStartStub) {
                     const verticalFirst = !(options.sourcePos === Position.Left || options.sourcePos === Position.Right);
                     corner = verticalFirst ? { x: curr.x, y: next.y } : { x: next.x, y: curr.y };
@@ -3643,9 +3629,9 @@ export function createPathWithJumpsFromObstacles(
             // Actually we just draw!
 
             // Calculate Arc Start
-            let arcStart = { x: 0, y: 0 };
-            let arcEnd = { x: 0, y: 0 };
-            let control = { x: 0, y: 0 };
+            let arcStart: Point;
+            let arcEnd: Point;
+            let control: Point;
 
             if (isSegHoriz) {
                 const sign = (drawEnd.x > drawStart.x) ? 1 : -1;

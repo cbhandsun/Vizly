@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { TrunkCalculator, TrunkResult } from '../TrunkCalculator';
-import { Rectangle, Point } from '../../../algorithms/geometryUtils';
+import { TrunkCalculator } from '../TrunkCalculator';
+import { Rectangle } from '../../../algorithms/geometryUtils';
 import { UnifiedRoutingConfig } from '../../../types/routing';
 
 describe('TrunkCalculator', () => {

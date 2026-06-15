@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Position } from '../../types/routing';
 import { Rectangle } from '../../algorithms/pathfinding';
 import { QuadTree, SpatialIndex } from '../../algorithms/SpatialIndex';

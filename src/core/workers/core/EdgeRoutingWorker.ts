@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Edge Routing Worker Orchestrator
  * 
@@ -670,17 +669,13 @@ export class EdgeRoutingWorker {
         // Use optimal ports if they have high confidence or if no consensus was reached
         if (!hasFixedSourcePort && pResult.confidence > config.portSelection.highConfidenceThreshold) {
             startPos = pResult.sourcePos;
-            hasFixedSourcePort = true;
         } else if (!hasFixedSourcePort && !hasExplicitSource && allowSourceOverride && !bestSourceForbidden && (currentForbidden || pResult.confidence > config.portSelection.highConfidenceThreshold) && pResult.sourcePos !== startPos) {
             startPos = pResult.sourcePos;
-            hasFixedSourcePort = true;
         }
         if (!hasFixedTargetPort && pResult.confidence > config.portSelection.highConfidenceThreshold) {
             endPos = pResult.targetPos;
-            hasFixedTargetPort = true;
         } else if (!hasFixedTargetPort && !hasExplicitTarget && allowTargetOverride && !bestTargetForbidden && (currentForbidden || pResult.confidence > config.portSelection.highConfidenceThreshold) && pResult.targetPos !== endPos) {
             endPos = pResult.targetPos;
-            hasFixedTargetPort = true;
         }
 
         // [SAFETY] Same-Side Overshoot Override (fires even for explicit handles)
@@ -733,8 +728,6 @@ export class EdgeRoutingWorker {
                 });
                 startPos = unconstrainedResult.sourcePos;
                 endPos = unconstrainedResult.targetPos;
-                hasFixedSourcePort = true;
-                hasFixedTargetPort = true;
             }
         }
 
@@ -810,8 +803,6 @@ export class EdgeRoutingWorker {
 
                 startPos = reverseBypassSide;
                 endPos = reverseBypassSide;
-                hasFixedSourcePort = true;
-                hasFixedTargetPort = true;
                 isReverseBypassActive = true;
             } else {
                 // Dominant vertical → bypass via Left or Right (perpendicular)
@@ -846,8 +837,6 @@ export class EdgeRoutingWorker {
 
                 startPos = reverseBypassSide;
                 endPos = reverseBypassSide;
-                hasFixedSourcePort = true;
-                hasFixedTargetPort = true;
                 isReverseBypassActive = true;
             }
         }
@@ -992,8 +981,6 @@ export class EdgeRoutingWorker {
                     startPos = Position.Left;
                     endPos = Position.Right;
                 }
-                hasFixedSourcePort = true;
-                hasFixedTargetPort = true;
             }
         }
 
@@ -1002,7 +989,6 @@ export class EdgeRoutingWorker {
 
         if (isPrecomputedSharedTrunkMember && job.isManyToOne && !hasExplicitSource) {
             startPos = resolvePortFromTrunkAxis(sRect, tRect, false, m2oTrunk ?? undefined);
-            hasFixedSourcePort = true;
         }
 
         // 6. Coordinates with Distribution
@@ -1092,8 +1078,6 @@ export class EdgeRoutingWorker {
                     startPos = gdy > 0 ? Position.Bottom : Position.Top;
                     endPos   = gdy > 0 ? Position.Top    : Position.Bottom;
                 }
-                hasFixedSourcePort = false;
-                hasFixedTargetPort = false;
             };
 
             // [Imp-cross-domain] Priority 1: Use Precomputed Trunk from Coordinator (Global Context)
@@ -1124,7 +1108,6 @@ export class EdgeRoutingWorker {
                             skipTrunkDueToSelfCross = true;
                         } else {
                             startPos = resolvedO2mPort;
-                            hasFixedSourcePort = true;
                         }
                     }
 
@@ -1142,7 +1125,6 @@ export class EdgeRoutingWorker {
                             skipTrunkDueToSelfCross = true;
                         } else {
                             endPos = resolvedM2oPort;
-                            hasFixedTargetPort = true;
                         }
                     }
 
@@ -1597,11 +1579,9 @@ export class EdgeRoutingWorker {
                 const hubExtent = isVertical ? hubRect.width / 2 : hubRect.height / 2;
 
                 const dist = Math.abs(trunkAxis - hubCenterAxis);
-                // If trunk is INSIDE the hub (dist < hubExtent), that's invalid.
-                // We add a small buffer (e.g., 5px) to be safe.
-                if (dist < hubExtent + 5) {
-                    trunkStart = null; // Invalidate to fall back to standard routing
-                } else {
+                // If trunk is INSIDE the hub (dist < hubExtent), skip trunk routing and
+                // fall back to the standard routing path.
+                if (dist >= hubExtent + 5) {
                     // [Industry Standard] Construct Manhattan Path directly
                     // Instead of A*, we construct the orthogonal segments:
                     // 1. Branch -> Trunk Axis (Horizontal/Vertical)

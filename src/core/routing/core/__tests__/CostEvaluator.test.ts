@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { costEvaluator, CostEvaluator } from '../CostEvaluator';
-import { CostContext, RoutingPlugin, Point } from '../../types/routing';
+import { CostContext, RoutingPlugin } from '../../types/routing';
 
 describe('CostEvaluator', () => {
     const sNode = { id: 's', position: { x: 0, y: 0 }, dimensions: { width: 100, height: 50 } };

@@ -172,7 +172,7 @@ function buildSharedTrunkJunctionCandidates(
         const types = buddyTypesByEdgeId.get(segment.edgeId);
         if (!types?.has(mode)) return;
 
-        let candidate: Point[] | null = null;
+        let candidate: Point[];
         if (mode === 'o2m') {
             const start = points[0];
             if (!samePoint(start, allPaths.get(crossing.h.edgeId)?.[0] ?? start)

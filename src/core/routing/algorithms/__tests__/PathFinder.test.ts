@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PathFinder, pathFinder } from '../PathFinder';
+import { pathFinder } from '../PathFinder';
 import { Point, Rectangle } from '../../types/routing';
 
 describe('PathFinder', () => {
@@ -57,6 +57,7 @@ describe('PathFinder', () => {
             const obstacles: Rectangle[] = [{ x: 10, y: 0, width: 10, height: 10 }];
 
             const path = pathFinder.findPath(tightBbox, start, goal, gridSize, maxExpansions, obstacles);
+            expect(path).not.toBeNull();
             // 因为 maxY=10，且有 10x10 障碍物在 (10,0)，它必须绕到 y=10 甚至更高。
             // 但如果 tightBbox 允许 y=10 探索，它就可以成功绕过；如果我们将 bbox 限制到极致使之无解：
             const superTightBbox = { minX: 0, minY: 0, maxX: 30, maxY: 5 }; // 连一格(10px)都绕不过去

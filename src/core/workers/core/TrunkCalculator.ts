@@ -209,17 +209,7 @@ export class TrunkCalculator {
         if (isHorizontal) {
             // Vertical Trunk Line (x = constant)
             // Determine side based on centroid relative to hub
-            let isLeft = false;
-
-            if (isManyToOne) {
-                // N -> 1. Peers -> Hub.
-                // If peers are left, trunk is left.
-                isLeft = peersCenter.x < hubCenter.x;
-            } else {
-                // 1 -> N. Hub -> Peers.
-                // If peers are left, trunk is left.
-                isLeft = peersCenter.x < hubCenter.x;
-            }
+            const isLeft = peersCenter.x < hubCenter.x;
 
             const grid = 20;
             const standardOffset = spacing + 20; // Default elbow distance

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { analyzeGeometry } from '../../algorithms/geometry-classifier';
 import { getNodePosition } from '../../algorithms/smartEdgeUtils';
@@ -76,13 +75,7 @@ export const resolveBusOrientation = (
     });
 
     // Decision (Tie-breaker: Global Direction)
-    let finalDir = 'LR'; // Default
-    if (horzVotes > vertVotes) finalDir = 'LR';
-    else if (vertVotes > horzVotes) finalDir = 'TB';
-    else {
-        // Tie: Fallback to global
-        finalDir = globalDir;
-    }
+    const finalDir = horzVotes > vertVotes ? 'LR' : (vertVotes > horzVotes ? 'TB' : globalDir);
 
     return { busDir: finalDir, isHorz: finalDir === 'LR' || finalDir === 'RL' };
 };

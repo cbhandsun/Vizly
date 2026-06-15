@@ -294,7 +294,7 @@ export class EdgeRouter {
     /**
      * 解析边类型
      */
-    private resolveEdgeType(config: RoutingConfig, geometry: any): EdgeType {
+    private resolveEdgeType(config: RoutingConfig, _geometry: any): EdgeType {
         if (config.mode === 'native') {
             const globalPath = config.globalPath || 'bezier';
             if (globalPath.includes('smooth')) return 'smoothstep' as unknown as EdgeType;

@@ -330,16 +330,13 @@ export class RoutingCrossingScorer {
     private static parallelOverlapUnits(s1: OrthogonalSegment, s2: OrthogonalSegment, minLength: number): number {
         if (s1.isHorizontal !== s2.isHorizontal) return 0;
         const EPS = 2;
-        let overlap = 0;
-        if (s1.isHorizontal) {
-            if (Math.abs(s1.a.y - s2.a.y) > EPS) return 0;
-            overlap = Math.min(Math.max(s1.a.x, s1.b.x), Math.max(s2.a.x, s2.b.x))
-                - Math.max(Math.min(s1.a.x, s1.b.x), Math.min(s2.a.x, s2.b.x));
-        } else {
-            if (Math.abs(s1.a.x - s2.a.x) > EPS) return 0;
-            overlap = Math.min(Math.max(s1.a.y, s1.b.y), Math.max(s2.a.y, s2.b.y))
+        if (s1.isHorizontal && Math.abs(s1.a.y - s2.a.y) > EPS) return 0;
+        if (!s1.isHorizontal && Math.abs(s1.a.x - s2.a.x) > EPS) return 0;
+        const overlap = s1.isHorizontal
+            ? Math.min(Math.max(s1.a.x, s1.b.x), Math.max(s2.a.x, s2.b.x))
+                - Math.max(Math.min(s1.a.x, s1.b.x), Math.min(s2.a.x, s2.b.x))
+            : Math.min(Math.max(s1.a.y, s1.b.y), Math.max(s2.a.y, s2.b.y))
                 - Math.max(Math.min(s1.a.y, s1.b.y), Math.min(s2.a.y, s2.b.y));
-        }
 
         if (overlap < minLength) return 0;
         return Math.max(1, Math.round(overlap / minLength));

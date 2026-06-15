@@ -46,9 +46,6 @@ function segmentsIntersect(p1: Point, p2: Point, p3: Point, p4: Point): boolean 
     return t >= 0 && t <= 1 && u >= 0 && u <= 1;
 }
 
-// Helper for logger
-const treeLog = (..._args: any[]) => { /* noop */ };
-
 function axisOf(a: Point, b: Point): 'h' | 'v' | null {
     if (Math.abs(a.y - b.y) <= 1.5 && Math.abs(a.x - b.x) > 1.5) return 'h';
     if (Math.abs(a.x - b.x) <= 1.5 && Math.abs(a.y - b.y) > 1.5) return 'v';
@@ -407,7 +404,7 @@ export function globalOptimizeEdgeRouting<T extends { id: string; source: string
     const topK = cfg.topK ?? 4;
     const idMap = new Map<string, any>(nodes.map(n => [n.id, n]));
 
-    interface EdgeCandidate extends Candidate { }
+    type EdgeCandidate = Candidate;
 
     const edgeCandidates: EdgeCandidate[][] = edges.map((edge, edgeIndex) => {
         const srcNode = idMap.get(edge.source);
@@ -692,7 +689,7 @@ export function globalOptimizeEdgeRouting<T extends { id: string; source: string
         if (!cand) return edge;
 
         const globalPathRaw = String(cfg.globalPath || 'step').toLowerCase();
-        let nextType: EdgeType = EdgeType.STEP;
+        let nextType: EdgeType;
         if (cfg.mode === 'advanced-smart') {
             if (globalPathRaw.includes('straight')) nextType = EdgeType.ADVANCED_SMART_STRAIGHT;
             else if (globalPathRaw.includes('bezier')) nextType = EdgeType.ADVANCED_SMART_BEZIER;

@@ -215,7 +215,7 @@ export class OneBendVisibilityGraph {
     /**
      * 调试日志
      */
-    private log(message: string, ...args: unknown[]): void {
+    private log(_message: string, ..._args: unknown[]): void {
         // if (this.config.debug) {
         //        // }
     }

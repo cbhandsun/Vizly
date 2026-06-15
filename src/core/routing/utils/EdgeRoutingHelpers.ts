@@ -203,7 +203,7 @@ export function getEdgeRoutingCacheStats() {
 export function separateParallelEdges<T extends { source: string; target: string; data?: any }>(
     edges: T[],
     spacing: number = 12,
-    ...args: any[]
+    ..._args: any[]
 ): T[] {
     const groups = new Map<string, T[]>();
 
@@ -299,7 +299,7 @@ export function applyParallelOffset(
  * 则连线 Source->A 应分配在端口的最左侧，Source->C 在最右侧。
  * 这能显著减少出端口时的交叉。
  */
-export function distributePortConnections(edges: any[], nodes: any[], ...args: any[]) {
+export function distributePortConnections(edges: any[], nodes: any[], ..._args: any[]) {
     if (!edges || !nodes) return edges;
     const nodeMap = new Map<string, any>(nodes.map(n => [n.id, n]));
 

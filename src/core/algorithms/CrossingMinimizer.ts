@@ -261,7 +261,7 @@ export class CrossingMinimizer {
     private calculateBarycenter(
         edge: EdgeMetadata,
         _index: number,
-        allEdges: EdgeMetadata[]
+        _allEdges: EdgeMetadata[]
     ): number {
         // 简化：使用source和target的hash值的平均
         const sourceHash = this.stringToNumber(edge.sourceId);
@@ -327,9 +327,8 @@ export class CrossingMinimizer {
     /**
      * 调试日志
      */
-    private log(message: string, ...args: unknown[]): void {
-        if (this.config.debug) {
-        }
+    private log(_message: string, ..._args: unknown[]): void {
+        if (!this.config.debug) return;
     }
 
     /**

@@ -7,7 +7,6 @@
  * - Parallel Separation: 自动分离平行边
  */
 
-import { Position } from '@xyflow/react';
 import { Point, LineObstacle, Rectangle, isPathBlocked } from './pathfinding';
 import { SpatialIndex } from './SpatialIndex';
 

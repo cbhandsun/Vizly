@@ -83,7 +83,7 @@ export function analyzeGeometry(
     // Center-to-center distance is misleading for large nodes — two 300×300 nodes with
     // centers 200px apart actually have a 0px gap between their edges.
     // Boundary gap = max(0, separation along each axis between the two bounding boxes).
-    let isCollocated = false;
+    const isCollocated = (() => {
     if (options?.sourceBounds && options?.targetBounds) {
         const sb = options.sourceBounds;
         const tb = options.targetBounds;
@@ -92,16 +92,16 @@ export function analyzeGeometry(
         const gapY = Math.max(sb.y, tb.y) - Math.min(sb.y + sb.height, tb.y + tb.height);
         // Nodes are collocated if they overlap or are within a small boundary margin
         const BOUNDARY_COLLOCATED_MARGIN = 20;
-        isCollocated = gapX < BOUNDARY_COLLOCATED_MARGIN && gapY < BOUNDARY_COLLOCATED_MARGIN;
-    } else {
-        // Fallback: center-to-center threshold (legacy behavior)
-        const avgNodeSize = options?.sourceSize && options?.targetSize
-            ? (options.sourceSize.width + options.sourceSize.height +
-                options.targetSize.width + options.targetSize.height) / 4
-            : 100;
-        const collocatedThreshold = Math.max(30, avgNodeSize * 0.3);
-        isCollocated = absDx < collocatedThreshold && absDy < collocatedThreshold;
+        return gapX < BOUNDARY_COLLOCATED_MARGIN && gapY < BOUNDARY_COLLOCATED_MARGIN;
     }
+    // Fallback: center-to-center threshold (legacy behavior)
+    const avgNodeSize = options?.sourceSize && options?.targetSize
+        ? (options.sourceSize.width + options.sourceSize.height +
+            options.targetSize.width + options.targetSize.height) / 4
+        : 100;
+    const collocatedThreshold = Math.max(30, avgNodeSize * 0.3);
+    return absDx < collocatedThreshold && absDy < collocatedThreshold;
+    })();
 
     if (isCollocated) {
         return 'collocated';

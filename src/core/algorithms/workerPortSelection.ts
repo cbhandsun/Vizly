@@ -238,18 +238,17 @@ export function selectPortsForWorker(
             const sourcePort = getPortPoint(sourceNode, sourcePos);
             const targetPort = getPortPoint(targetNode, targetPos);
 
-            let isBlocked = false;
-            if (isSpatialIndex(obstacles)) {
+            const isBlocked = isSpatialIndex(obstacles)
+                ? (() => {
                 const candidates = obstacles.query({
                     x: Math.min(sourcePort.x, targetPort.x),
                     y: Math.min(sourcePort.y, targetPort.y),
                     width: Math.abs(sourcePort.x - targetPort.x),
                     height: Math.abs(sourcePort.y - targetPort.y)
                 });
-                isBlocked = candidates.some(obs => lineIntersectsRect(sourcePort, targetPort, obs));
-            } else {
-                isBlocked = obstacles.some(obs => lineIntersectsRect(sourcePort, targetPort, obs));
-            }
+                return candidates.some(obs => lineIntersectsRect(sourcePort, targetPort, obs));
+                })()
+                : obstacles.some(obs => lineIntersectsRect(sourcePort, targetPort, obs));
 
             if (isBlocked) confidence = 0.6;
         }

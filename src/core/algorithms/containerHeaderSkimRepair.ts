@@ -412,7 +412,7 @@ export function repairTangentialEndpointEntryPath(
 
     const clearance = options.clearance ?? DEFAULT_CONTAINER_ENTRY_CLEARANCE;
     const targetContainers = targetContainersFor(options.nodes, source, target);
-    let candidate: Point[] | null = null;
+    let candidate: Point[];
     const start = current[0];
 
     if (side === 'top' || side === 'bottom') {

@@ -422,24 +422,17 @@ export class CostEvaluator {
         const USAGE_THRESHOLD = 2; // 超过2条边共享同一端口时激增惩罚
         const BASE_PENALTY = weights.usagePenalty || 40;
 
-        let sourceCost = 0;
-        let targetCost = 0;
-
         // 源端口惩罚
-        if (sUsage > USAGE_THRESHOLD) {
+        const sourceCost = sUsage > USAGE_THRESHOLD
             // 指数惩罚: 3条边 = 3^2.5 * 40 ≈ 622, 4条边 ≈ 1280, 5条边 ≈ 2236
-            sourceCost = Math.pow(sUsage, 2.5) * BASE_PENALTY;
-        } else {
+            ? Math.pow(sUsage, 2.5) * BASE_PENALTY
             // 线性惩罚: 1条边 = 40, 2条边 = 80
-            sourceCost = sUsage * BASE_PENALTY;
-        }
+            : sUsage * BASE_PENALTY;
 
         // 目标端口惩罚
-        if (tUsage > USAGE_THRESHOLD) {
-            targetCost = Math.pow(tUsage, 2.5) * BASE_PENALTY;
-        } else {
-            targetCost = tUsage * BASE_PENALTY;
-        }
+        const targetCost = tUsage > USAGE_THRESHOLD
+            ? Math.pow(tUsage, 2.5) * BASE_PENALTY
+            : tUsage * BASE_PENALTY;
 
         return sourceCost + targetCost;
     }

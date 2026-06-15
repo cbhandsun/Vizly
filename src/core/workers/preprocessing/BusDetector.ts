@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Bus Detector
  * 
@@ -79,12 +78,7 @@ export class BusDetector {
             }
         });
 
-        let finalDir = 'LR'; // Default
-        if (horzVotes > vertVotes) finalDir = 'LR';
-        else if (vertVotes > horzVotes) finalDir = 'TB';
-        else {
-            finalDir = globalDir;
-        }
+        const finalDir = horzVotes > vertVotes ? 'LR' : (vertVotes > horzVotes ? 'TB' : globalDir);
 
         return { busDir: finalDir, isHorz: finalDir === 'LR' || finalDir === 'RL' };
     }

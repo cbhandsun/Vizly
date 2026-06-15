@@ -77,7 +77,7 @@ export class GlobalEdgeBundler {
 
         // 4. Extract shared segments for each cluster
         const bundleMap = new Map<string, EdgeCluster>();
-        clusters.forEach((cluster, idx) => {
+        clusters.forEach((cluster) => {
             if (cluster.length >= this.config.minClusterSize) {
                 const edgeCluster = this.extractSharedSegments(
                     cluster,
@@ -333,7 +333,7 @@ export class GlobalEdgeBundler {
     private extractSharedSegments(
         cluster: string[],
         paths: Map<string, Point[]>,
-        edges: Edge[]
+        _edges: Edge[]
     ): EdgeCluster {
         // For now, use simple centroid-based approach
         // More sophisticated: compute medoid or use force-directed bundling

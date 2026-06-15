@@ -178,7 +178,7 @@ export class RoutingStrategySelector {
      * Internal strategy selection logic
      */
     private selectStrategyInternal(context: StrategyContext): RoutingAlgorithm {
-        const { obstacleCount, canvasBounds } = context;
+        const { obstacleCount } = context;
 
         // Rule 1: Very sparse graph (< 6 obstacles) → Grid A*
         if (obstacleCount < this.GRID_THRESHOLD) {
