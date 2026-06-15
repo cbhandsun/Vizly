@@ -8,11 +8,11 @@
  */
 
 import React, { useEffect } from 'react';
-import { App } from 'antd';
+import AntdApp from 'antd/es/app';
 import { registerAntdApi } from '../../utils/antdStaticBridge';
 
 export const AntdApiBridge: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { message, modal, notification } = App.useApp();
+  const { message, modal, notification } = AntdApp.useApp();
 
   useEffect(() => {
     registerAntdApi(message, modal, notification);

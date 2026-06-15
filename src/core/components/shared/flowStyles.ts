@@ -1,4 +1,5 @@
 import { MarkerType } from '@xyflow/react';
+import type React from 'react';
 import { type EdgeStyleToken, type FlowStylePreset } from './DiagramStyleManager';
 // useDiagramStylePreset_v2 import removed to break circular dependency.
 
@@ -77,18 +78,24 @@ export const EDGE_LABEL_STYLE = {
 
 // ===== 动态样式（基于 DiagramStyleManager 预设） =====
 
+type ReactFlowEdgeCssVars = {
+  '--xy-edge-stroke': string;
+  '--xy-edge-stroke-width': number;
+};
+
+type ReactFlowEdgeStyle = React.CSSProperties & ReactFlowEdgeCssVars;
+
 function tokenToFlowStyle(token: EdgeStyleToken) {
+  const style: ReactFlowEdgeStyle = {
+    stroke: token.color,
+    strokeWidth: token.width,
+    '--xy-edge-stroke': token.color,
+    '--xy-edge-stroke-width': token.width,
+    ...(token.dash ? { strokeDasharray: token.dash } : {}),
+  };
+
   return {
-    style: {
-      stroke: token.color,
-      strokeWidth: token.width,
-      // React Flow v11+ uses CSS variables for edge stroke; set them to ensure consistency
-      // @ts-ignore: custom CSS variables for React Flow
-      ['--xy-edge-stroke']: token.color,
-      // @ts-ignore: custom CSS variables for React Flow
-      ['--xy-edge-stroke-width']: token.width,
-      ...(token.dash ? { strokeDasharray: token.dash } : {}),
-    } as any,
+    style,
     arrow: {
       type: MarkerType.ArrowClosed,
       color: token.arrow.color,

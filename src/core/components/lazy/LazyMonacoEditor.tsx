@@ -17,11 +17,32 @@ const CDNS = [
     `https://cdn.jsdelivr.net/npm/monaco-editor@${MONACO_VERSION}/min/vs`, // JsDelivr 官方节点
     `https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/${MONACO_VERSION}/min/vs` // Cloudflare 兜底
 ];
+const CDN_TIMEOUT_MS = 2500;
 
 let cdnInitialized = false;
 
 // 懒加载Monaco Editor React组件
 const MonacoEditor = lazy(() => import('@monaco-editor/react'));
+
+const isAllowedMonacoCdn = (cdn: string): boolean => CDNS.includes(cdn);
+
+const probeMonacoCdn = async (cdn: string): Promise<string> => {
+    if (!isAllowedMonacoCdn(cdn)) throw new Error('Unexpected Monaco CDN');
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), CDN_TIMEOUT_MS);
+    try {
+        const res = await fetch(`${cdn}/loader.js`, {
+            method: 'GET',
+            signal: controller.signal,
+            cache: 'force-cache',
+        }).catch(() => null);
+        if (res && res.ok) return cdn;
+        throw new Error('CDN Unavailable');
+    } finally {
+        window.clearTimeout(timeout);
+    }
+};
 
 export interface LazyMonacoEditorProps {
     value?: string;
@@ -49,14 +70,10 @@ export const LazyMonacoEditor: React.FC<LazyMonacoEditorProps> = ({
             try {
                 // 动态拉取测速：谁最快拉到 loader.js 就用谁做基准 CDN
                 const fastest = await Promise.any(
-                    CDNS.map(async (cdn) => {
-                        const res = await fetch(`${cdn}/loader.js`, { method: 'GET' }).catch(() => null);
-                        if (res && res.ok) return cdn;
-                        throw new Error('CDN Unavailable');
-                    })
+                    CDNS.map(probeMonacoCdn)
                 );
-                loader.config({ paths: { vs: fastest } });
-            } catch (e) {
+                loader.config({ paths: { vs: isAllowedMonacoCdn(fastest) ? fastest : CDNS[2] } });
+            } catch (_e) {
                 console.warn('[LazyMonacoEditor] CDN race failed, falling back to jsdelivr.');
                 loader.config({ paths: { vs: CDNS[2] } }); // 故障兜底
             } finally {

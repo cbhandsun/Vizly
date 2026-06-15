@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Input, Button, Space, Card, Empty, Pagination, Spin, Tag, Typography } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Modal, Input, Space, Card, Empty, Pagination, Spin, Tag, Typography } from 'antd';
 import { Icon } from '@iconify/react';
 import { FaSearch } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
+import { buildIconifySearchUrl, isSafeIconifyIconName, parseIconifySearchResponse } from '../../utils/iconifySecurity';
 
 const { Text } = Typography;
 
@@ -42,14 +43,13 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({
     setLoading(true);
     try {
       // Iconify Search API
-      const collectionParam = category ? `&collection=${category}` : '';
       const start = (pageNum - 1) * pageSize;
       const response = await fetch(
-        `https://api.iconify.design/search?query=${query || 'cloud'}${collectionParam}&limit=${pageSize}&start=${start}`
+        buildIconifySearchUrl({ query, collection: category, limit: pageSize, start })
       );
-      const data = await response.json();
-      setIcons(data.icons || []);
-      setTotal(data.total || 0);
+      const data = parseIconifySearchResponse(await response.json(), pageSize);
+      setIcons(data.icons);
+      setTotal(data.total);
     } catch (error) {
       console.error('Failed to search icons:', error);
     } finally {
@@ -140,6 +140,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({
                 } }}
                 className={initialValue === iconName ? 'selected-icon-card' : ''}
                 onClick={() => {
+                  if (!isSafeIconifyIconName(iconName)) return;
                   onSelect(iconName);
                   onClose();
                 }}

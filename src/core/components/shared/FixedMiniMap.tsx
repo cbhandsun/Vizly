@@ -1,19 +1,19 @@
-// @ts-nocheck
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
-import { useReactFlow } from '@xyflow/react';
+import { useReactFlow, type Node } from '@xyflow/react';
 import { extractValidNumber } from '../../utils/nodeValidation';
 import { useConfigIntegration } from '../../hooks/useConfigIntegration';
 import { getDomainTheme } from '../../utils/domainKey';
 import { hexToRgba } from '../shared/layoutUtils';
-import { subscribeViewport, getUiScale } from './viewportStore';
+import { subscribeViewport, getUiScale, type Viewport } from './viewportStore';
 import { FaExpand, FaCompress, FaGripVertical } from 'react-icons/fa';
 import './FixedMiniMap.css';
 
 import { safeNumber } from './hooks/useMinimapMath';
 import { useMinimapOverlay } from './hooks/useMinimapOverlay';
 import { useMinimapNavigation } from './hooks/useMinimapNavigation';
+import type { Theme } from '../../themes/types/ThemeTypes';
 
 interface FixedMiniMapProps {
   style?: React.CSSProperties;
@@ -21,6 +21,43 @@ interface FixedMiniMapProps {
   pannable?: boolean;
   defaultSize?: 'small' | 'medium' | 'large';
 }
+
+type MinimapNodeData = {
+  domainClass?: unknown;
+  domain?: unknown;
+  label?: unknown;
+  description?: unknown;
+};
+
+type MinimapNode = Node<MinimapNodeData>;
+
+const getNodeWidth = (node: MinimapNode): number => (
+  extractValidNumber(node.measured?.width ?? node.width ?? node.style?.width, 200)
+);
+
+const getNodeHeight = (node: MinimapNode): number => (
+  extractValidNumber(node.measured?.height ?? node.height ?? node.style?.height, 100)
+);
+
+const getNodeAbsolutePosition = (node: MinimapNode, nodeMap: Map<string, MinimapNode>): { x: number; y: number } => {
+  let x = safeNumber(node.position?.x, 0);
+  let y = safeNumber(node.position?.y, 0);
+  let current: MinimapNode | undefined = node;
+  let guard = 0;
+  while (current?.parentId && guard < 20) {
+    guard += 1;
+    const parent = nodeMap.get(current.parentId);
+    if (!parent) break;
+    x += safeNumber(parent.position?.x, 0);
+    y += safeNumber(parent.position?.y, 0);
+    current = parent;
+  }
+  return { x, y };
+};
+
+const getStringValue = (value: unknown): string | undefined => (
+  typeof value === 'string' ? value : undefined
+);
 
 const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
   style,
@@ -30,15 +67,23 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
 }) => {
   // 接入主题系统
   const [cfgState, cfgActions] = useConfigIntegration({ autoInitialize: true });
-  const [currentTheme, setCurrentTheme] = useState<any>(cfgActions.getCurrentTheme());
+  const [currentTheme, setCurrentTheme] = useState<Theme | null>(() => cfgActions.getCurrentTheme() ?? null);
   useEffect(() => {
     if (!cfgState.integration) return;
     const tm = cfgState.integration.getThemeManager?.();
     if (!tm) return;
+    let cancelled = false;
     const t = tm.getCurrentTheme?.();
-    if (t) setCurrentTheme(t);
-    const unsubscribe = tm.addThemeChangeListener?.((newTheme: any) => setCurrentTheme(newTheme));
+    if (t) {
+      queueMicrotask(() => {
+        if (!cancelled) setCurrentTheme(t);
+      });
+    }
+    const unsubscribe = tm.addThemeChangeListener?.((newTheme) => {
+      if (!cancelled) setCurrentTheme(newTheme ?? null);
+    });
     return () => {
+      cancelled = true;
       if (unsubscribe) unsubscribe();
     };
   }, [cfgState.integration]);
@@ -52,16 +97,17 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
   }, []);
   const anchorRef = useRef<HTMLDivElement>(null);
 
-  const reactFlowInstance = useReactFlow();
+  const reactFlowInstance = useReactFlow<MinimapNode>();
 
   // Overlay interactions controller
   const overlay = useMinimapOverlay(defaultSize, containerRef);
   
   // 缓存画布容器的 Bound 用于计算 Portal 绝对位置
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
+  const [canvasPixelSize, setCanvasPixelSize] = useState({ width: 800, height: 600 });
 
   // 订阅视口变化以驱动 minimap 缩略图矩形的实时更新
-  const [viewportForRender, setViewportForRender] = useState<{ x: number; y: number; zoom: number }>(reactFlowInstance.getViewport());
+  const [viewportForRender, setViewportForRender] = useState<Viewport>(reactFlowInstance.getViewport());
   useEffect(() => {
     const unsubscribe = subscribeViewport((vp) => setViewportForRender(vp));
     return () => { if (unsubscribe) unsubscribe(); };
@@ -81,8 +127,8 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
       }
       let validCount = 0;
       for (const node of nodes) {
-        const width = extractValidNumber((node as any).width ?? (node as any).measured?.width ?? (node as any).style?.width, 200);
-        const height = extractValidNumber((node as any).height ?? (node as any).measured?.height ?? (node as any).style?.height, 100);
+        const width = getNodeWidth(node);
+        const height = getNodeHeight(node);
         const x = safeNumber(node.position?.x, NaN);
         const y = safeNumber(node.position?.y, NaN);
         if (width > 0 && height > 0 && isFinite(x) && isFinite(y)) {
@@ -99,10 +145,11 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
     };
     check();
     return () => { stopped = true; };
-  }, []); // 移除 reactFlowInstance 依赖
+  }, [reactFlowInstance]);
 
   // Navigation controller
   const nav = useMinimapNavigation(anchorRef, minimapRef, viewportForRender, getUiScale);
+  const setOverlayOffset = overlay.setOffset;
 
   // 全局鼠标移动处理 - Container overlay
   useEffect(() => {
@@ -142,7 +189,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
     try {
       el.addEventListener('wheel', wheelHandler, { passive: false });
     } catch {
-      el.addEventListener('wheel', wheelHandler as any);
+      el.addEventListener('wheel', wheelHandler);
     }
     return () => {
       try { el.removeEventListener('wheel', wheelHandler); } catch { return; }
@@ -159,9 +206,17 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
     const updatePosition = () => {
       const rect = container.getBoundingClientRect();
       setContainerRect(rect);
+      const rfRoot = anchor.closest('.react-flow') as HTMLElement | null;
+      const rendererEl = (rfRoot?.querySelector?.('.react-flow__renderer') as HTMLElement | null) || rfRoot;
+      if (rendererEl) {
+        setCanvasPixelSize({
+          width: Math.max(1, rendererEl.clientWidth || 800),
+          height: Math.max(1, rendererEl.clientHeight || 600),
+        });
+      }
 
       // 如果容器尺寸收缩，自动纠正溢出边界的 relative offset
-      overlay.setOffset(prev => {
+      setOverlayOffset(prev => {
         const getParentSize = () => {
           const parent = container.offsetParent as HTMLElement;
           if (parent) return { width: parent.clientWidth, height: parent.clientHeight };
@@ -194,7 +249,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
       ro.disconnect();
       window.removeEventListener('resize', updatePosition);
     };
-  }, [overlay.setOffset]);
+  }, [setOverlayOffset]);
 
   const sizeConfigs = {
     small: { width: 160, height: 120 },
@@ -281,28 +336,14 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
                     // the parentId chain. internals.positionAbsolute is null at this
                     // call-site (getNodes() returns the external node array without
                     // internal resolution), so we must accumulate manually.
-                    const nodeMap = new Map<string, any>();
+                    const nodeMap = new Map<string, MinimapNode>();
                     nodes.forEach(n => nodeMap.set(n.id, n));
-                    const getAbsPos = (node: any): { x: number; y: number } => {
-                      let x = safeNumber(node.position?.x, 0);
-                      let y = safeNumber(node.position?.y, 0);
-                      let curr = node;
-                      let guard = 0;
-                      while (curr.parentId && guard++ < 20) {
-                        const parent = nodeMap.get(curr.parentId);
-                        if (!parent) break;
-                        x += safeNumber(parent.position?.x, 0);
-                        y += safeNumber(parent.position?.y, 0);
-                        curr = parent;
-                      }
-                      return { x, y };
-                    };
 
                     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
                     nodes.forEach(n => {
-                      const abs = getAbsPos(n);
-                      const w = extractValidNumber((n as any).measured?.width ?? (n as any).width ?? (n as any).style?.width, 200);
-                      const h = extractValidNumber((n as any).measured?.height ?? (n as any).height ?? (n as any).style?.height, 100);
+                      const abs = getNodeAbsolutePosition(n, nodeMap);
+                      const w = getNodeWidth(n);
+                      const h = getNodeHeight(n);
                       if (isFinite(abs.x) && isFinite(abs.y) && w > 0 && h > 0) {
                         minX = Math.min(minX, abs.x); minY = Math.min(minY, abs.y);
                         maxX = Math.max(maxX, abs.x + w); maxY = Math.max(maxY, abs.y + h);
@@ -318,13 +359,9 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
                       );
                     }
                     const viewport = viewportForRender;
-                    const rfRoot = (anchorRef.current?.closest?.('.react-flow') as HTMLElement | null) || (document.querySelector('.react-flow') as HTMLElement | null);
-                    const rendererEl = (rfRoot?.querySelector?.('.react-flow__renderer') as HTMLElement | null) || rfRoot;
-                    const baseWidth = rendererEl?.clientWidth ?? minimapWidth;
-                    const baseHeight = rendererEl?.clientHeight ?? minimapHeight;
                     const renderUiScale = getUiScale();
-                    const visiblePixelWidth = Math.max(1, baseWidth / renderUiScale);
-                    const visiblePixelHeight = Math.max(1, baseHeight / renderUiScale);
+                    const visiblePixelWidth = Math.max(1, canvasPixelSize.width / renderUiScale);
+                    const visiblePixelHeight = Math.max(1, canvasPixelSize.height / renderUiScale);
                     const zoom = safeNumber(viewport.zoom, 1);
                     const vxWorld = -safeNumber(viewport.x, 0) / zoom;
                     const vyWorld = -safeNumber(viewport.y, 0) / zoom;
@@ -363,21 +400,22 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
                         <rect x={0} y={0} width={minimapWidth} height={minimapHeight} fill="var(--glass-bg, rgba(255, 255, 255, 0.45))" />
                         {nodes.map((n, idx) => {
                           // Use the same getAbsPos helper for consistent positioning
-                          const abs = getAbsPos(n);
+                          const abs = getNodeAbsolutePosition(n, nodeMap);
                           const x = abs.x;
                           const y = abs.y;
-                          const w = extractValidNumber((n as any).measured?.width ?? (n as any).width ?? (n as any).style?.width, 200);
-                          const h = extractValidNumber((n as any).measured?.height ?? (n as any).height ?? (n as any).style?.height, 100);
+                          const w = getNodeWidth(n);
+                          const h = getNodeHeight(n);
                           if (!isFinite(x) || !isFinite(y) || w <= 0 || h <= 0) return null;
                           const mx = (x - unionMinX) * scaleX;
                           const my = (y - unionMinY) * scaleY;
                           const mw = w * scaleX;
                           const mh = h * scaleY;
-                          const domainClass = (n as any).data?.domainClass as string | undefined;
-                          const domainKey = typeof (n as any).data?.domain === 'string' ? (n as any).data.domain : (typeof (n as any).data?.label === 'string' ? (n as any).data.label : undefined);
-                          const domainTheme = getDomainTheme(currentTheme, { domainClass, domain: domainKey || 'default', description: (n as any).data?.description });
-                          const isTitleGroup = (n as any)?.type === 'titleGroup';
-                          const isSubGroup = (n as any)?.type === 'subGroup';
+                          const domainClass = getStringValue(n.data?.domainClass);
+                          const domainKey = getStringValue(n.data?.domain) ?? getStringValue(n.data?.label);
+                          const description = getStringValue(n.data?.description);
+                          const domainTheme = getDomainTheme(currentTheme, { domainClass, domain: domainKey || 'default', description });
+                          const isTitleGroup = n.type === 'titleGroup';
+                          const isSubGroup = n.type === 'subGroup';
                           const baseAlpha = isTitleGroup || isSubGroup ? (overlay.currentSize === 'small' ? 0.20 : overlay.currentSize === 'medium' ? 0.24 : 0.28) : (overlay.currentSize === 'small' ? 0.28 : overlay.currentSize === 'medium' ? 0.32 : 0.36);
                           const strokeAlpha = overlay.currentSize === 'small' ? 0.18 : overlay.currentSize === 'medium' ? 0.20 : 0.22;
                           const fill = hexToRgba(String(domainTheme?.main || domainTheme?.border || '#8a8a8a'), baseAlpha);

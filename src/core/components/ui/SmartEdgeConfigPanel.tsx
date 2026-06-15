@@ -1,4 +1,5 @@
 import React from 'react';
+import { diagramConfigManager } from '../config/DiagramConfig';
 
 export interface SmartEdgeSettings {
   edgeMode: 'native' | 'advanced-smart';
@@ -231,7 +232,6 @@ const SmartEdgeConfigPanel: React.FC<SmartEdgeConfigPanelProps> = ({
               // 附加：将高级参数写入全局 edge
               // 直接访问全局管理器，确保独立于父层也能生效
               try {
-                const { diagramConfigManager } = require('../config/DiagramConfig');
                 diagramConfigManager.updateConfig({ edge: payload });
               } catch { }
             } catch { }

@@ -1,42 +1,29 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-
-interface Offset {
-    left: number;
-    bottom: number;
-}
+import {
+    readMinimapMinimized,
+    readMinimapOffset,
+    readMinimapSize,
+    writeMinimapMinimized,
+    writeMinimapOffset,
+    writeMinimapSize,
+    type MinimapOffset,
+    type MinimapSize,
+} from '../../../utils/minimapOverlayStorage';
 
 export function useMinimapOverlay(
-    defaultSize: 'small' | 'medium' | 'large' = 'large',
+    defaultSize: MinimapSize = 'large',
     containerRef: React.RefObject<HTMLDivElement | null>
 ) {
     const [isMinimized, setIsMinimized] = useState<boolean>(() => {
-        try {
-            return localStorage.getItem('designer.minimap.minimized') === 'true';
-        } catch {
-            return false;
-        }
+        return readMinimapMinimized();
     });
 
-    const [currentSize, setCurrentSize] = useState<'small' | 'medium' | 'large'>(() => {
-        try {
-            const saved = localStorage.getItem('designer.minimap.size');
-            return (saved === 'small' || saved === 'medium' || saved === 'large') ? saved : defaultSize;
-        } catch {
-            return defaultSize;
-        }
+    const [currentSize, setCurrentSize] = useState<MinimapSize>(() => {
+        return readMinimapSize(defaultSize);
     });
 
-    const [offset, setOffset] = useState<Offset>(() => {
-        try {
-            const saved = localStorage.getItem('designer.minimap.offset');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (typeof parsed.left === 'number' && typeof parsed.bottom === 'number') {
-                    return parsed;
-                }
-            }
-        } catch {}
-        return { bottom: 76, left: 24 };
+    const [offset, setOffset] = useState<MinimapOffset>(() => {
+        return readMinimapOffset();
     });
 
     const [isDragging, setIsDragging] = useState(false);
@@ -44,27 +31,21 @@ export function useMinimapOverlay(
     const dragStartRef = useRef({ x: 0, y: 0, startOffsetLeft: 0, startOffsetBottom: 0 });
 
     useEffect(() => {
-        try {
-            localStorage.setItem('designer.minimap.minimized', String(isMinimized));
-        } catch {}
+        writeMinimapMinimized(isMinimized);
     }, [isMinimized]);
 
     useEffect(() => {
-        try {
-            localStorage.setItem('designer.minimap.size', currentSize);
-        } catch {}
+        writeMinimapSize(currentSize);
     }, [currentSize]);
 
     useEffect(() => {
-        try {
-            localStorage.setItem('designer.minimap.offset', JSON.stringify(offset));
-        } catch {}
+        writeMinimapOffset(offset);
     }, [offset]);
 
     const toggleMinimize = useCallback(() => setIsMinimized(prev => !prev), []);
 
     const cycleSize = useCallback(() => {
-        const sizes: Array<'small' | 'medium' | 'large'> = ['small', 'medium', 'large'];
+        const sizes: MinimapSize[] = ['small', 'medium', 'large'];
         setCurrentSize(prev => sizes[(sizes.indexOf(prev) + 1) % sizes.length]);
     }, []);
 

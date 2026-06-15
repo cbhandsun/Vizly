@@ -31,14 +31,6 @@ export function useMinimapNavigation(
         animStartRef.current = null;
     }, []);
 
-    const smoothSetViewport = useCallback((target: { x: number; y: number; zoom: number }, factor: number = 0.35) => {
-        const current = reactFlowInstance.getViewport();
-        const x = lerp(current.x, target.x, factor);
-        const y = lerp(current.y, target.y, factor);
-        const zoom = lerp(current.zoom, target.zoom, factor);
-        reactFlowInstance.setViewport({ x, y, zoom });
-    }, [reactFlowInstance]);
-
     const animateViewportTo = useCallback((target: { x: number; y: number; zoom: number }, duration: number = 200) => {
         cancelViewportAnimation();
         const start = reactFlowInstance.getViewport();

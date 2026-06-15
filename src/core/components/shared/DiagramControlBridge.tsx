@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
 
 interface DiagramControlBridgeProps {
@@ -9,7 +9,22 @@ interface DiagramControlBridgeProps {
 const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }) => {
   const rf = useReactFlow();
   const markerRef = useRef<HTMLSpanElement | null>(null);
-  const [selfDiagramId, setSelfDiagramId] = useState<string | undefined>(diagramId);
+
+  const resolveSelfDiagramId = useCallback((): string | undefined => {
+    if (diagramId) return diagramId;
+    const el = markerRef.current;
+    let cur: HTMLElement | null = el?.parentElement ?? null;
+    let depth = 0;
+    while (cur && depth < 10) {
+      const idAttr = cur.id;
+      if (idAttr && idAttr.startsWith('diagram-')) {
+        return idAttr.replace('diagram-', '');
+      }
+      cur = cur.parentElement;
+      depth++;
+    }
+    return undefined;
+  }, [diagramId]);
 
   // 将React Flow实例暴露到window对象，方便调试
   useEffect(() => {
@@ -24,36 +39,15 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
   }, [rf]);
 
   useEffect(() => {
-    if (diagramId) {
-      setSelfDiagramId(diagramId);
-      return;
-    }
-    const el = markerRef.current;
-    let cur: HTMLElement | null = el?.parentElement ?? null;
-    let found: string | undefined;
-    let depth = 0;
-    while (cur && depth < 10) {
-      const idAttr = cur.id;
-      if (idAttr && idAttr.startsWith('diagram-')) {
-        found = idAttr.replace('diagram-', '');
-        break;
-      }
-      cur = cur.parentElement;
-      depth++;
-    }
-    setSelfDiagramId(found);
-  }, [diagramId]);
-
-  useEffect(() => {
     const onControl = (e: Event) => {
       const { action, diagramId: targetId } = (e as CustomEvent).detail || {};
-      const idToMatch = selfDiagramId ?? diagramId;
+      const idToMatch = resolveSelfDiagramId();
       if (!action) return;
       if (idToMatch && targetId !== idToMatch) return;
       if (!idToMatch && targetId) return;
 
       const resolveContainer = (): HTMLElement | null => {
-        const id = selfDiagramId ?? diagramId;
+        const id = resolveSelfDiagramId();
         if (id) {
           const byId = document.getElementById(`diagram-${id}`);
           if (byId) {
@@ -302,7 +296,7 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
     };
     window.addEventListener('diagramControl', onControl as EventListener);
     return () => window.removeEventListener('diagramControl', onControl as EventListener);
-  }, [diagramId, rf, selfDiagramId]);
+  }, [diagramId, rf, resolveSelfDiagramId]);
 
   return <span ref={markerRef} style={{ display: 'none' }} />;
 };

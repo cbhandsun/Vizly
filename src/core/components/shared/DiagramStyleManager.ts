@@ -1,5 +1,3 @@
-import { useSyncExternalStore } from 'react';
-
 export interface EdgeStyleToken {
   color: string;
   width: number;
