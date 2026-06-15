@@ -264,7 +264,7 @@ function runPhasesOnGroup(
     nudgeThreshold: number;
     maxSweeps: number;
   },
-  isHorizontal: boolean,
+  _isHorizontal: boolean,
 ): PhaseResult {
   // 构建 node rect 查找表
   const rects = buildNodeRects(groupNodes);
@@ -332,7 +332,7 @@ function applyChannelSpacing(
   layers: LayerInfo[],
   rectMap: Map<string, NodeRect>,
   opts: { channelWidth: number; maxExtraSpacing: number },
-  isHorizontal: boolean,
+  _isHorizontal: boolean,
 ): { nodes: Node[]; adjustments: number } {
   if (layers.length < 2) return { nodes, adjustments: 0 };
 
@@ -401,7 +401,7 @@ function applyCrossingMinimization(
   layers: LayerInfo[],
   rectMap: Map<string, NodeRect>,
   opts: { maxSweeps: number },
-  isHorizontal: boolean,
+  _isHorizontal: boolean,
 ): Node[] {
   if (layers.length < 2) return nodes;
 
@@ -484,7 +484,7 @@ function reorderLayer(
   adj: Map<string, string[]>,
   nodeLayer: Map<string, number>,
   nodeCoord: Map<string, number>,
-  isHorizontal: boolean,
+  _isHorizontal: boolean,
 ): void {
   const fixedSet = new Set(fixedLayer.nodeIds);
 
@@ -653,7 +653,7 @@ function makeLayer(index: number, rects: NodeRect[], isHorizontal: boolean): Lay
 }
 
 /** 计算两个 rectMap 状态下的边交叉数 */
-function countCrossings(edges: Edge[], rectMap: Map<string, NodeRect>, isHorizontal: boolean): number {
+function countCrossings(edges: Edge[], rectMap: Map<string, NodeRect>, _isHorizontal: boolean): number {
   let crossings = 0;
   const edgeList = edges.filter(e => rectMap.has(e.source) && rectMap.has(e.target));
 
@@ -780,7 +780,7 @@ function rectsOverlap(a: NodeRect, b: NodeRect, margin: number): boolean {
 function syncContainerNodes(
   refinedBusiness: Node[],
   containers: Node[],
-  originalNodes: Node[],
+  _originalNodes: Node[],
 ): Node[] {
   if (containers.length === 0) return refinedBusiness;
 

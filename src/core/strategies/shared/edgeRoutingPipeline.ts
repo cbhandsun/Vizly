@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 /**
  * @file 边路由管线
  * @description 从 DomainVerticalLayoutStrategy 提取的完整边路由管线。

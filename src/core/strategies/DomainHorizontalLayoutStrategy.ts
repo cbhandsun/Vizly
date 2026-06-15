@@ -1,4 +1,3 @@
-// @ts-nocheck
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import type { StandardNodeData } from '../models/DiagramModels';
 import type { LayoutOptions } from '../types/layout';

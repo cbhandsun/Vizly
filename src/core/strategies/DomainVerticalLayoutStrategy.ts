@@ -1,5 +1,3 @@
-// @ts-nocheck
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import type { StandardNodeData } from '../models/DiagramModels';
 import type { LayoutOptions } from '../types/layout';
@@ -8,11 +6,9 @@ import { LayeredConfigManager } from '../config/LayeredConfigManager';
 import { LayoutType } from '../types/layout';
 import { diagramConfigManager } from '../components/config/DiagramConfig';
 import { pushFreeNodesBelowSubGroupRow, resolveDomainContainerOverlaps, scatterNodesAtSamePoint } from '../utils/layoutUtils';
-import { decideEdgeRouting, separateParallelEdges, globalOptimizeEdgeRouting, bundleEdges, layerBasedEdgeRouting, optimizeEdgeLabelPositions, beautifyOrthogonalEdges, optimizeTreeBusRouting, assignGlobalPorts, distributePortConnections } from '../utils/HandlePicker';
 import { ILayoutStrategy } from './LayoutStrategyManager';
-import { stackSubGroupsVertically, applyDomainGrouping, applySubGrouping, assignChildrenToSubGroupsBySemantic, normalizeSubGroupDomainByChildren, enforceDomainContainerStrictContainment, recomputeSubGroupContainersBasic, purgeSubGroupChildrenBySemantic, resolveSubGroupOverlaps, resolveFreeNodeOverlapsInDomain, resolveSubGroupChildrenOverlapsStrict, expandSubGroupContainersBySemantic, enforceSubGroupStrictContainmentByChildren, finalizeSubGroupHeightsByProjectionPreserveAnchor, finalizeDomainWidthsByProjection, ensureMeasuredForNodes, normalizeMissingNodeSubDomainByDomain, finalizeSubGroupWidthsByProjectionPreserveAnchor, unifySubGroupWidthsByDomain, finalizeDomainHeightsByProjection, reflowSubGroupChildrenVertical, packSubGroupChildrenRigid, clampDomainHeightsToSubGroups, enforceSubGroupTitleClearance, reflowSubGroupChildrenGrid, unifySubGroupGapsInDomain, unifySubGroupHeightsByDomain, reflowSubGroupChildrenDagre, syncDagreChildPositions, centerSubGroupsInDomain } from '../utils/layoutUtils';
+import { applyDomainGrouping, applySubGrouping, assignChildrenToSubGroupsBySemantic, normalizeSubGroupDomainByChildren, enforceDomainContainerStrictContainment, recomputeSubGroupContainersBasic, purgeSubGroupChildrenBySemantic, resolveSubGroupOverlaps, resolveFreeNodeOverlapsInDomain, resolveSubGroupChildrenOverlapsStrict, expandSubGroupContainersBySemantic, enforceSubGroupStrictContainmentByChildren, finalizeSubGroupHeightsByProjectionPreserveAnchor, finalizeDomainWidthsByProjection, ensureMeasuredForNodes, normalizeMissingNodeSubDomainByDomain, finalizeSubGroupWidthsByProjectionPreserveAnchor, unifySubGroupWidthsByDomain, finalizeDomainHeightsByProjection, reflowSubGroupChildrenVertical, packSubGroupChildrenRigid, clampDomainHeightsToSubGroups, enforceSubGroupTitleClearance, reflowSubGroupChildrenGrid, unifySubGroupGapsInDomain, unifySubGroupHeightsByDomain, reflowSubGroupChildrenDagre, syncDagreChildPositions, centerSubGroupsInDomain } from '../utils/layoutUtils';
 import { auditAndFixSubGroupChildrenBindings, centerSubGroupChildrenHorizontally, centerSubGroupChildrenVertically, layoutSubGroupChildrenInRow, alignSubGroupGridRows, alignSubGroupStack } from '../utils/layoutUtils';
-import { routeEdgesWithELK } from '../utils/elkEdgeRouter';
 import { injectSemanticSubGroupsForMissingKeys, rebindChildrenNormalized } from './shared/semanticHelpers';
 import { ensureDomainContainment } from './shared/geometryGuard';
 import { runEdgeRoutingPipeline } from './shared/edgeRoutingPipeline';
@@ -966,7 +962,7 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
 
 
       const layoutHorizontal = (list: ReactFlowNode[], left: number, right: number, startY: number) => {
-        let x = left; const y = startY;
+        const y = startY;
         const SAFE_W = num((diagramConfigManager.getLayoutConfig() as any)?.NODE_MIN_WIDTH, 120);
         const SAFE_H = num((diagramConfigManager.getConfig() as any)?.node?.height, 80);
         const getW = (n: ReactFlowNode) => {
@@ -991,7 +987,7 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
         if (availW > totalW) {
           startX = left + Math.round((availW - totalW) / 2);
         }
-        x = startX;
+        let x = startX;
 
         for (const n of list) {
           const nh = getH(n);
@@ -1183,9 +1179,11 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
             const py = num(((sg as any)?.position?.y), 0);
             sgOldPositions.set(sg.id, { x: px, y: py });
           }
-          const rowRes = nodeLayoutName === 'vertical'
-            ? placeRowNoWrap(subGroupsOrdered as any, laneLeft, innerTop)
-            : placeRowWrap(subGroupsOrdered as any, laneLeft, laneRightLayout, innerTop);
+          if (nodeLayoutName === 'vertical') {
+            placeRowNoWrap(subGroupsOrdered as any, laneLeft, innerTop);
+          } else {
+            placeRowWrap(subGroupsOrdered as any, laneLeft, laneRightLayout, innerTop);
+          }
 
           // dagre 布局逻辑已移除，因为此块对 dagre 模式不可达
           // 原有逻辑的剩余部分保持
@@ -1304,7 +1302,6 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
             }
 
           }
-          cursorYGlobal = Math.max(cursorYGlobal, rowRes.endY + domainGapEff);
           {
             const padX = Math.max(12, hGapDet);
             const padY = Math.max(8, nodeV);
@@ -1682,16 +1679,12 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
             if (!children.length) continue;
             const sgX = num(((sg as any)?.position?.x), innerLeft - subPadH);
             const sgY = num(((sg as any)?.position?.y), innerTop - subTitleH - subTitleV - subPadTop);
-            const sgW = num((((sg as any)?.measured?.width ?? (sg as any)?.style?.width)), 480);
             const childLeft = sgX + subPadH;
-            let childRight = childLeft + Math.max(240, Math.round(sgW)) - subPadH;
             const startYChild = sgY + subTitleH + subTitleV + subPadTop;
             const childNodes = children.map(id => idMap.get(id)).filter((cn): cn is ReactFlowNode => !!cn);
-            {
-              const widthsSum = childNodes.reduce((sum, n) => sum + num(((n as any)?.measured?.width ?? (n as any)?.style?.width), 240), 0);
-              const gapsSum = Math.max(0, childNodes.length - 1) * nodeH;
-              childRight = childLeft + widthsSum + gapsSum;
-            }
+            const widthsSum = childNodes.reduce((sum, n) => sum + num(((n as any)?.measured?.width ?? (n as any)?.style?.width), 240), 0);
+            const gapsSum = Math.max(0, childNodes.length - 1) * nodeH;
+            const childRight = childLeft + widthsSum + gapsSum;
             /**
              * 函数级注释：终态阶段的 ELK 无边回退与防重叠
              * - 若子域内部局部边为空，ELK 可能造成同点重叠；此处回退为网格/横排以确保可视无重叠
@@ -3022,7 +3015,7 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
         // [FIX] Dagre 布局后强制刷新容器尺寸与垂直堆叠
         // 解决“域高度不足”与“子域间距异常”的核心修复
         {
-          const { recomputeSubGroupContainersBasic, stackSubGroupsVertically } = await import('../utils/layoutUtils');
+          const { recomputeSubGroupContainersBasic } = await import('../utils/layoutUtils');
           // 1. 根据 sync 后的子节点位置，重新计算子域容器的最小包围盒（measured.width/height）
           updatedNodes = recomputeSubGroupContainersBasic(updatedNodes) as any;
           // 2. Based on NEW horizontal layout, we MUST NOT stack vertically.
@@ -3073,7 +3066,8 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
           }
         }
       }   // 垂直布局：强力统一域宽并对齐
-      if (false && nodeLayoutName === 'vertical') {
+      const isLegacyVerticalWidthAlignEnabled = () => false;
+      if (isLegacyVerticalWidthAlignEnabled() && nodeLayoutName === 'vertical') {
         const domainContainers = updatedNodes.filter(n =>
           ['titleGroup', 'domain', 'group'].includes(String(n.type || '')) &&
           !(n.data as any)?.hidden

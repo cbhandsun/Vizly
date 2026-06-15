@@ -1,18 +1,5 @@
-import { Node, Edge } from '@xyflow/react';
+import type { Node, Edge } from '@xyflow/react';
 import { LayoutOptions } from '../types/layout';
-import { GridLayoutStrategy } from './nodeLayoutStrategy/GridLayoutStrategy';
-import { HorizontalLayoutStrategy } from './nodeLayoutStrategy/HorizontalLayoutStrategy';
-import { VerticalLayoutStrategy } from './nodeLayoutStrategy/VerticalLayoutStrategy';
-import { CenteredLayoutStrategy } from './nodeLayoutStrategy/CenteredLayoutStrategy';
-// 已移除：CytoscapeFcoseLayoutStrategy、CytoscapeConcentricLayoutStrategy、ElkNodeLayoutStrategy
-// Elk 节点策略已移除
-import { DomainVerticalLayoutStrategy } from './DomainVerticalLayoutStrategy';
-import { DomainHorizontalLayoutStrategy } from './DomainHorizontalLayoutStrategy';
-import { DomainElkLayoutStrategy } from './DomainElkLayoutStrategy';
-// DomainElkRadialLayoutStrategy 已移除
-import { DomainDagreLayoutStrategy } from './DomainDagreLayoutStrategy';
-import { DagreLayoutStrategy } from './nodeLayoutStrategy/DagreLayoutStrategy';
-// 已移除：DomainCytoscapeLayoutStrategy
 
 
 export interface ILayoutStrategy {
@@ -28,8 +15,95 @@ export interface ILayoutStrategy {
   getCategory(): 'hierarchy' | 'node';
 }
 
+type StrategyCategory = 'hierarchy' | 'node';
+type StrategyDescriptor = {
+  type: string;
+  name: string;
+  description: string;
+  category: StrategyCategory;
+  load: () => Promise<ILayoutStrategy>;
+};
+
+const createStrategySummary = (descriptor: StrategyDescriptor): ILayoutStrategy => ({
+  calculateLayout: () => {
+    throw new Error(`Strategy "${descriptor.name}" has not been loaded. Use getStrategyAsync() before calculating layout.`);
+  },
+  getName: () => descriptor.name,
+  getDescription: () => descriptor.description,
+  isApplicable: () => true,
+  getCategory: () => descriptor.category,
+});
+
+const BUILT_IN_STRATEGIES: StrategyDescriptor[] = [
+  {
+    type: 'GridLayout',
+    name: 'GridLayout',
+    description: '规则网格排列，按列数均匀分布节点',
+    category: 'node',
+    load: async () => new (await import('./nodeLayoutStrategy/GridLayoutStrategy')).GridLayoutStrategy(),
+  },
+  {
+    type: 'HorizontalLayout',
+    name: 'HorizontalLayout',
+    description: '沿水平轴等间距排列（支持居中/右对齐）',
+    category: 'node',
+    load: async () => new (await import('./nodeLayoutStrategy/HorizontalLayoutStrategy')).HorizontalLayoutStrategy(),
+  },
+  {
+    type: 'VerticalLayout',
+    name: 'VerticalLayout',
+    description: '沿垂直轴等间距堆叠（支持顶部/居中/底部对齐）',
+    category: 'node',
+    load: async () => new (await import('./nodeLayoutStrategy/VerticalLayoutStrategy')).VerticalLayoutStrategy(),
+  },
+  {
+    type: 'CenteredLayout',
+    name: 'CenteredLayout',
+    description: '单节点居中，多节点居中网格布局',
+    category: 'node',
+    load: async () => new (await import('./nodeLayoutStrategy/CenteredLayoutStrategy')).CenteredLayoutStrategy(),
+  },
+  {
+    type: 'DomainVerticalLayout',
+    name: 'DomainVerticalLayout',
+    description: '最小管线：域垂直、子域横排、节点横排，单次回收容器',
+    category: 'hierarchy',
+    load: async () => new (await import('./DomainVerticalLayoutStrategy')).DomainVerticalLayoutStrategy(),
+  },
+  {
+    type: 'DomainHorizontalLayout',
+    name: 'DomainHorizontalLayout',
+    description: '域横向并排；两阶段子域堆叠与刚体重排',
+    category: 'hierarchy',
+    load: async () => new (await import('./DomainHorizontalLayoutStrategy')).DomainHorizontalLayoutStrategy(),
+  },
+  {
+    type: 'DomainElkLayout',
+    name: 'DomainElkLayout',
+    description: 'ELK整体编排：仅节点分层（不处理域/子域容器）',
+    category: 'hierarchy',
+    load: async () => new (await import('./DomainElkLayoutStrategy')).DomainElkLayoutStrategy(),
+  },
+  {
+    type: 'DomainDagreLayout',
+    name: 'DomainDagreLayout',
+    description: 'Dagre分层布局：语义顺序 + 最小边交叉',
+    category: 'hierarchy',
+    load: async () => new (await import('./DomainDagreLayoutStrategy')).DomainDagreLayoutStrategy(),
+  },
+  {
+    type: 'DagreLayout',
+    name: 'DagreLayout',
+    description: 'Dagre 分层：语义顺序 + 边驱动分层',
+    category: 'node',
+    load: async () => new (await import('./nodeLayoutStrategy/DagreLayoutStrategy')).DagreLayoutStrategy(),
+  },
+];
+
 export class LayoutStrategyManager {
   private strategies: Map<string, ILayoutStrategy> = new Map();
+  private descriptors: Map<string, StrategyDescriptor> = new Map();
+  private summaries: Map<string, ILayoutStrategy> = new Map();
   public readonly id: string;
   private static sharedInstance: LayoutStrategyManager | null = null;
 
@@ -159,29 +233,12 @@ export class LayoutStrategyManager {
   constructor() {
     this.id = `manager-${Math.random().toString(36).substr(2, 9)}`;
 
-    // 自动注册内置策略，保证策略在任何导入路径下均可用
-    try {
-      this.register(new GridLayoutStrategy());
-      this.register(new HorizontalLayoutStrategy());
-      this.register(new VerticalLayoutStrategy());
-      this.register(new CenteredLayoutStrategy());
-      // 节点策略精简：移除 Cytoscape/Elk 的节点级策略
-      this.register(new DomainVerticalLayoutStrategy());
-      this.register(new DomainHorizontalLayoutStrategy());
-      // Elk 节点策略已移除
-      this.register(new DomainElkLayoutStrategy());
-      // DomainElkRadialLayoutStrategy 已移除
-      this.register(new DomainDagreLayoutStrategy());
-      // 注册 Dagre 节点布局策略
-      this.register(new DagreLayoutStrategy());
-      // 仅保留统一的域纵向策略作为域编排实现
-
-    } catch (e) {
-      console.warn('Auto-register layout strategies failed:', e);
+    for (const descriptor of BUILT_IN_STRATEGIES) {
+      this.descriptors.set(descriptor.type, descriptor);
+      this.summaries.set(descriptor.type, createStrategySummary(descriptor));
     }
 
-    // ⭐ 启动审计日志
-    console.info('[LayoutStrategy] Registered:', Array.from(this.strategies.keys()).join(', '));
+    console.info('[LayoutStrategy] Registered metadata:', Array.from(this.descriptors.keys()).join(', '));
   }
 
   /**
@@ -213,8 +270,21 @@ export class LayoutStrategyManager {
     return this.strategies.get(normalized) || this.strategies.get(name);
   }
 
+  async getStrategyAsync(name: string): Promise<ILayoutStrategy | undefined> {
+    const normalized = this.normalizeName(name);
+    const existing = this.strategies.get(normalized) || this.strategies.get(name);
+    if (existing) return existing;
+
+    const descriptor = this.descriptors.get(normalized) || this.descriptors.get(name);
+    if (!descriptor) return undefined;
+
+    const strategy = await descriptor.load();
+    this.register(strategy);
+    return strategy;
+  }
+
   getAvailableStrategies(): { type: string; strategy: ILayoutStrategy }[] {
-    return Array.from(this.strategies.entries()).map(([type, strategy]) => ({ type, strategy }));
+    return Array.from(this.summaries.entries()).map(([type, strategy]) => ({ type, strategy }));
   }
 
   /**

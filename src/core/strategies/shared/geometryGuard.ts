@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 /**
  * @file 最终几何包含保障
  * @description 管线末端的域容器溢出检测 + 自动扩展 + 域宽统一。

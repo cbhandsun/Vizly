@@ -1,11 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import type { LayoutOptions } from '../types/layout';
 import type { StandardNodeData } from '../models/DiagramModels';
 import dagre from 'dagre';
 import { ILayoutStrategy } from './LayoutStrategyManager';
-import { decideEdgeRouting, separateParallelEdges, globalOptimizeEdgeRouting, bundleEdges, layerBasedEdgeRouting, optimizeEdgeLabelPositions, beautifyOrthogonalEdges, optimizeTreeBusRouting, assignGlobalPorts } from '../utils/HandlePicker';
-import { routeEdgesWithELK } from '../utils/elkEdgeRouter';
+import { decideEdgeRouting, separateParallelEdges, assignGlobalPorts } from '../utils/HandlePicker';
 import { diagramConfigManager } from '../components/config/DiagramConfig';
 import {
     applyDomainGrouping,
@@ -312,12 +310,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             return ai - bi;
         });
 
-        // [DEBUG] 详细调试：输出布局模式选择原因
-        if (domains.length === 0 && subGroups.length === 0) {
-        } else if (domains.length === 0 && subGroups.length > 0) {
-        } else {
-        }
-
         // ============================================
         // 简化模式：没有域容器时，直接布局所有叶节点
         // ============================================
@@ -360,8 +352,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             const validEdges = edges.filter(e => {
                 const srcExists = visibleNodeIds.has(e.source);
                 const tgtExists = visibleNodeIds.has(e.target);
-                if (!srcExists || !tgtExists) {
-                }
                 return srcExists && tgtExists;
             });
 
@@ -1592,7 +1582,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // decideEdgeRouting 返回的 handle 已经是正确的全称格式，
         // 直接使用即可。
         // ═══════════════════════════════════════════════════════════════
-        let finalRoutedEdges = clonedEdges;
+        const finalRoutedEdges = clonedEdges;
 
         // Path 3 hierarchy conversion
         convertToHierarchicalFormat(updatedNodes, nodeToSubGroup);
@@ -2008,12 +1998,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 );
             }
 
-            // 调试：打印边路由决策
-            if (manyToOneTargetHandle[target.id] || oneToManySourceHandle[source.id]) {
-            }
-
-            if (edge.type !== routingResult.type) {
-            }
             edge.type = routingResult.type;
             edge.sourceHandle = expandHandle(routingResult.sourceHandle);
             edge.targetHandle = expandHandle(routingResult.targetHandle);

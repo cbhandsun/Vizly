@@ -37,8 +37,6 @@ export class DagreLayoutStrategy implements ILayoutStrategy {
     async calculateLayout(nodes: ReactFlowNode[], edges: Edge[], options: LayoutOptions): Promise<{ nodes: ReactFlowNode[]; edges: Edge[] }> {
         const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
         const layoutCfg: any = diagramConfigManager.getLayoutConfig() || {};
-        const cfgFull: any = diagramConfigManager.getConfig() || {};
-
         const hGap = num(layoutCfg?.NODE_H_GAP, 120);
         const vGap = num(layoutCfg?.NODE_V_GAP, 80);
 

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 /**
  * @file 语义管线共享辅助函数
  * @description 从 DomainVerticalLayoutStrategy / DomainHorizontalLayoutStrategy 中提取的

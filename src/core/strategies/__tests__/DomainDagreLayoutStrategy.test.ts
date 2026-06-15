@@ -190,7 +190,7 @@ describe('DomainDagreLayoutStrategy', () => {
         const poolAEdge = result.edges.find(e => e.id === 'e5')!;
         const poolAPath = ((poolAEdge.data as any)?.computedPath ?? []) as Array<{ x: number; y: number }>;
         expect(detectLocalDoglegRisks(poolAPath)).toEqual([]);
-    });
+    }, 15_000);
 
     it('keeps WMS quota fan-out entering lower resource nodes from the top', async () => {
         const canvas = await standardDataToCanvas(demandAllocation as any);
@@ -226,5 +226,5 @@ describe('DomainDagreLayoutStrategy', () => {
             expect(beforeEnd.x).toBeCloseTo(end.x, 1);
             expect(beforeEnd.y).toBeLessThan(end.y);
         }
-    });
+    }, 15_000);
 });

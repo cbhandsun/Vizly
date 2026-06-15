@@ -3,7 +3,7 @@ import type { StandardNodeData } from '../../models/DiagramModels';
 import { diagramConfigManager } from '../../components/config/DiagramConfig';
 import type { LayoutOptions } from '../../types/layout';
 import { ILayoutStrategy } from '../LayoutStrategyManager';
-import { calculateHorizontalLayout, applySubGrouping, assignChildrenToSubGroupsBySemantic, applyDomainGrouping, resolveSubGroupOverlaps, enforceDomainContainerStrictContainment, resolveDomainContainerOverlaps, scatterNodesAtSamePoint, resolveSubGroupChildrenOverlapsStrict, centerSubGroupChildrenHorizontally, recomputeSubGroupContainersBasic, resolveFreeNodeOverlapsInDomain, finalizeDomainWidthsByProjection, finalizeDomainHeightsByProjection, clampNodesToContainers, centerSubGroupsInDomain, ensureMeasuredForNodes } from '../../utils/layoutUtils';
+import { calculateHorizontalLayout, applySubGrouping, assignChildrenToSubGroupsBySemantic, applyDomainGrouping, resolveSubGroupOverlaps, enforceDomainContainerStrictContainment, resolveDomainContainerOverlaps, scatterNodesAtSamePoint, resolveSubGroupChildrenOverlapsStrict, recomputeSubGroupContainersBasic, resolveFreeNodeOverlapsInDomain, finalizeDomainWidthsByProjection, finalizeDomainHeightsByProjection, clampNodesToContainers, centerSubGroupsInDomain, ensureMeasuredForNodes } from '../../utils/layoutUtils';
 
 /**
  * 水平排列布局策略
@@ -22,7 +22,7 @@ export class HorizontalLayoutStrategy implements ILayoutStrategy {
   getDescription(): string { return '沿水平轴等间距排列（支持居中/右对齐）'; }
 
   /** 适用性检查：只要有节点即可 */
-  isApplicable(nodes: ReactFlowNode[], edges: Edge[]): boolean {
+  isApplicable(nodes: ReactFlowNode[], _edges: Edge[]): boolean {
     return Array.isArray(nodes) && nodes.length > 0;
   }
 
@@ -173,7 +173,6 @@ export class HorizontalLayoutStrategy implements ILayoutStrategy {
     const s = String(nodeLayoutRaw || '').toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
     const useElk = s.includes('elk') || String(((diagramConfigManager.getConfig() as any)?.diagram?.layout?.nodeStrategy || '')).toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '') === 'elk';
     let positions: { x: number; y: number }[];
-    const scopedEdges = (edges || []).filter(e => layoutCandidates.some(n => n.id === e.source) && layoutCandidates.some(n => n.id === e.target));
     if (useElk) {
       const left = Math.max(40, Number(((options as any)?.padding?.left)) || 40);
       const top = Math.max(40, Number(((options as any)?.padding?.top)) || 40);
@@ -186,26 +185,6 @@ export class HorizontalLayoutStrategy implements ILayoutStrategy {
         const elk = new ELK();
         const dirRaw = String(((options as any)?.direction || '')).toUpperCase();
         const elkDir = dirRaw === 'LR' ? 'RIGHT' : 'DOWN';
-        const normHandle = (h: any): 'NORTH'|'SOUTH'|'WEST'|'EAST'|null => {
-          const s = String(h || '').toLowerCase();
-          if (!s) return null;
-          if (s === 't' || s === 'top') return 'NORTH';
-          if (s === 'b' || s === 'bottom') return 'SOUTH';
-          if (s === 'l' || s === 'left') return 'WEST';
-          if (s === 'r' || s === 'right') return 'EAST';
-          return null;
-        };
-        const portSidesNeeded: Record<string, Set<string>> = {};
-        for (const e of (scopedEdges || [])) {
-          const sh = normHandle((e as any)?.sourceHandle);
-          const th = normHandle((e as any)?.targetHandle);
-          if (sh) { (portSidesNeeded[e.source] ||= new Set()).add(sh); }
-          if (th) { (portSidesNeeded[e.target] ||= new Set()).add(th); }
-        }
-        const buildPorts = (id: string) => {
-          const sides = Array.from(portSidesNeeded[id] || new Set(['NORTH','SOUTH','WEST','EAST']));
-          return sides.map((side) => ({ id: `${id}.${side.toLowerCase()}`, properties: { 'elk.port.side': side } }));
-        };
         const graph: any = {
           id: 'elk-hls',
           layoutOptions: {
