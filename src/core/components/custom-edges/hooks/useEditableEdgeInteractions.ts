@@ -38,7 +38,6 @@ export function useEditableEdgeInteractions({
 
     const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
     const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
-    const [hoveredBendPoint, setHoveredBendPoint] = useState<number | null>(null);
 
     const [draggingSegment, setDraggingSegment] = useState<{
         segIndex: number;
@@ -84,7 +83,9 @@ export function useEditableEdgeInteractions({
 
     const edgePath = pathResult.pathData;
     const bendPoints = pathResult.bendPoints;
-    const segments = pathResult.segments || [];
+    const segments = useMemo(() => {
+        return pathResult.segments || [];
+    }, [pathResult.segments]);
 
     const labelPos = useMemo(() => {
         if (segments.length === 0) {

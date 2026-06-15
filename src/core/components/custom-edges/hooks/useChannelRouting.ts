@@ -38,6 +38,8 @@ export function useChannelRouting({ edgeId, points, enabled = true }: UseChannel
     );
 
     return useMemo(() => {
+        void engineVersion;
+
         if (!enabled || !points || points.length < 2) {
             return null;
         }

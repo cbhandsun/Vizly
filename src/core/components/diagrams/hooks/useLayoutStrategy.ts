@@ -1,12 +1,11 @@
-import { useCallback, useState, useRef, MutableRefObject } from 'react';
+import { useCallback, useState, MutableRefObject } from 'react';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
-import { treeLayout, forceDirectedLayout, applyLayout } from '../../../utils/LayoutAlgorithms';
 import { animateLayoutTransition } from '../../../utils/animateLayoutTransition';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
-import { flushObstacles } from '../../custom-edges/ObstacleContext';
+import { flushObstacles } from '../../custom-edges/obstacleContext';
 import { buildChildrenMap, getDescendantIds } from './useCollapsibleGroups';
 import { dispatchDiagramControl } from '../../shared/diagramControl';
-import { refineLayout } from '../../../strategies/shared/LayoutRefinement';
+import { applyLayout, forceDirectedLayout, treeLayout } from '../../../utils/LayoutAlgorithms';
 
 
 interface UseLayoutStrategyParams {
@@ -28,7 +27,6 @@ interface UseLayoutStrategyParams {
  */
 function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], dir: 'TB' | 'LR'): Edge[] {
     const nodeIdSet = new Set(resultNodes.map(n => n.id));
-    const validHandles = new Set(['top', 'right', 'bottom', 'left']);
     const expandHandle = (h: string | null | undefined): string | null => {
         if (!h) return null;
         const s = h.toLowerCase();
@@ -234,6 +232,7 @@ export function useLayoutStrategy({
 
             if (strategyName === 'tree') {
                 // ── 扁平树形布局（对齐 SVG 版：不检测域） ──
+                const { refineLayout } = await import('../../../strategies/shared/LayoutRefinement');
                 const positions = treeLayout(layoutNodes, layoutEdges, { direction: dir });
                 const newNodes = applyLayout(layoutNodes, positions);
                 // [FIX] 保留非流程图节点
@@ -267,6 +266,7 @@ export function useLayoutStrategy({
                 });
             } else if (strategyName === 'force') {
                 // ── 扁平力导向布局（对齐 SVG 版：不检测域） ──
+                const { refineLayout } = await import('../../../strategies/shared/LayoutRefinement');
                 const positions = forceDirectedLayout(layoutNodes, layoutEdges);
                 const newNodes = applyLayout(layoutNodes, positions);
                 // [FIX] 保留非流程图节点

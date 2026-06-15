@@ -1,7 +1,7 @@
 // packages/core/src/components/custom-edges/hooks/useEdgeLabelInteractions.ts
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { EdgeProps } from '@xyflow/react';
-import { useEdgeUpdate } from '../../diagrams/EdgeUpdateContext';
+import { useEdgeUpdate } from '../../diagrams/useEdgeUpdate';
 
 /**
  * Interface returned by useEdgeLabelInteractions
@@ -48,7 +48,10 @@ export function useEdgeLabelInteractions(props: EdgeProps): UseEdgeLabelInteract
   // ---------- Label Drag State ----------
   const [isDraggingLabel, setIsDraggingLabel] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
-  const labelOffset = (props.data as any)?.labelOffset || { x: 0, y: 0 };
+  const rawLabelOffset = (props.data as any)?.labelOffset;
+  const labelOffset = useMemo(() => {
+    return rawLabelOffset || { x: 0, y: 0 };
+  }, [rawLabelOffset]);
 
   const handleLabelMouseDown = (e: React.MouseEvent) => {
     if (isEditing) return;

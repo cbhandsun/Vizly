@@ -1,11 +1,9 @@
-// @ts-nocheck
- 
 // src/components/custom-edges/useSmartEdgeContext.ts
 import { useMemo, useCallback, useRef } from 'react';
 import { useStore } from '@xyflow/react';
 import type { EdgeProps, Edge } from '@xyflow/react';
 import { Position } from '@xyflow/react';
-import { useSimpleNodeMap } from '../../hooks/useNodeMap';
+import { useSimpleNodeMap, type SimpleNodeData } from '../../hooks/useNodeMap';
 import { getConvergencePositions } from './convergencePositions';
 import { selectBestPortCombination } from '../../algorithms/smartEdgeUtils';
 import { diagramConfigManager } from '../config/DiagramConfig';
@@ -15,19 +13,110 @@ import type { CenteredCoords } from './hooks/useSmartPathWorker';
 
 // [FIX C-6] 模块级方向投票缓存：相同拓扑签名 → 复用计算结果，避免每条边重复 O(E) 计算。
 // 整个应用生命周期内 key 数量 << 20，不存在内存泄漏风险（每次签名变化 clear 一次）。
-const _directionVoteCache = new Map<string, 'LR' | 'RL' | 'TB' | 'BT'>();
+type LayoutDirection = 'LR' | 'RL' | 'TB' | 'BT';
+type Point = { x: number; y: number };
+type DirectionBucket = 'up' | 'down' | 'left' | 'right';
+
+type SmartNodeData = Record<string, unknown> & {
+    domain?: unknown;
+    subDomain?: unknown;
+};
+
+type SmartNode = {
+    id?: string;
+    type?: string;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    dragging?: boolean;
+    parentId?: string;
+    parentNode?: string;
+    position?: Point;
+    positionAbsolute?: Point;
+    computed?: { positionAbsolute?: Point };
+    internals?: { positionAbsolute?: Point };
+    measured?: { width?: number; height?: number };
+    data?: SmartNodeData;
+};
+
+type SmartEdgeConfig = {
+    bundleStrength: number;
+    maxBundleSize: number;
+    obstaclePadding: number;
+    labelCollisionOffset: number;
+    jitterThresholdMultiplier: number;
+    borderRadius: number;
+    sourceOffset: number;
+    targetOffset: number;
+    minLastSegment: number;
+    gridSize: number;
+    jumpRadius: number;
+    debug: boolean;
+    debugPortHeatmap: boolean;
+    strictOrthogonal: boolean;
+} & Record<string, unknown>;
+
+type SmartEdgeData = Record<string, unknown> & {
+    _draggingNodeIds?: unknown;
+    manualHandleSides?: unknown;
+    inferredSubDomainHandles?: unknown;
+    handleSelectionPolicy?: unknown;
+    auto?: unknown;
+    manualHandles?: unknown;
+    _manualHandles?: unknown;
+    runtimeHandleLock?: unknown;
+    _runtimeHandleLock?: unknown;
+    edgeConfig?: Partial<SmartEdgeConfig>;
+    borderRadius?: unknown;
+    layoutDirection?: unknown;
+};
+
+type ReactFlowStoreSnapshot = {
+    edges?: Edge[];
+    nodeLookup?: Map<string, SmartNode>;
+};
+
+type DiagramConfigSnapshot = {
+    edge?: { handleSelectionPolicy?: unknown };
+    layout?: { direction?: unknown };
+};
+
+type HandleFlagPair = { source: boolean; target: boolean };
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null;
+
+const isLayoutDirection = (value: unknown): value is LayoutDirection =>
+    value === 'LR' || value === 'RL' || value === 'TB' || value === 'BT';
+
+const getEdgeData = (data: unknown): SmartEdgeData =>
+    isRecord(data) ? data as SmartEdgeData : {};
+
+const getConfigSnapshot = (): DiagramConfigSnapshot => {
+    try {
+        const config = diagramConfigManager.getConfig();
+        return isRecord(config) ? config as DiagramConfigSnapshot : {};
+    } catch {
+        return {};
+    }
+};
+
+const readHandlePair = (value: unknown): HandleFlagPair => {
+    if (value === true) return { source: true, target: true };
+    if (isRecord(value)) {
+        return { source: Boolean(value.source), target: Boolean(value.target) };
+    }
+    return { source: false, target: false };
+};
+
+const _directionVoteCache = new Map<string, LayoutDirection>();
 
 // [P1-2] 模块级 multiEdgeInfo 缓存：
 // 原问题：每条边各自对 storeEdges 做 O(E) forEach，31 条边 = 31 次扫描。
 // 修复：用 (topologySig, source, target) 作为 key，相同拓扑下仅计算一次。
 // 当拓扑签名变化时自动失效（map 的所有 key 都包含旧签名，自然淘汰）。
 // 每个签名对应的 map size ≤ E（每条边一个 entry），无内存泄漏风险。
-type MultiEdgeInfoResult = {
-    isManyToOne: boolean; isOneToMany: boolean;
-    incomingCount: number; outgoingCount: number;
-    incomingIndex: number; outgoingIndex: number;
-    enableBus: boolean;
-};
 // key = `${source}:${target}` → per-edge outgoing/incoming hemisphere buckets.
 // The final list is selected per edge id so opposite hemispheres do not leak into
 // the same bus/trunk group.
@@ -40,7 +129,7 @@ let _multiEdgeListCacheTopoSig: number = -1;
  * Return type for useSmartEdgeContext hook
  */
 export interface SmartEdgeContextResult {
-    layoutDirection: 'LR' | 'RL' | 'TB' | 'BT';
+    layoutDirection: LayoutDirection;
     isExplicitLayoutDirection: boolean;
     multiEdgeInfo: {
         isManyToOne: boolean;
@@ -53,7 +142,7 @@ export interface SmartEdgeContextResult {
     };
     centeredCoords: CenteredCoords;
     fallbackPositions: { sourcePos: Position; targetPos: Position };
-    edgeConfig: any;
+    edgeConfig: SmartEdgeConfig;
     handleSelectionPolicy: string;
     respectSourceHandle: boolean;
     respectTargetHandle: boolean;
@@ -63,7 +152,7 @@ export interface SmartEdgeContextResult {
     targetHandleId?: string | null;
     // 🚀 [PERF] 暴露内部数据，避免边组件重复订阅
     storeEdges: Edge[];
-    simpleNodeMap: Map<string, any>;
+    simpleNodeMap: Map<string, SimpleNodeData>;
 }
 
 /**
@@ -81,14 +170,13 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         sourceHandleId: rawSourceHandleId,
         targetHandleId: rawTargetHandleId,
     } = props;
-
-    // [CLEANUP] Handle direction parsing now uses the canonical parseHandlePosition
-    // from handleUtils.ts — single source of truth for the entire codebase.
-    const parseHandleDirection = parseHandlePosition;
+    const edgeData = getEdgeData(props.data);
 
     // ---------- Hooks (Top Level) ----------
     const simpleNodeMap = useSimpleNodeMap();
-    const storeEdges: Edge[] = useStore(useCallback((s: any) => s.edges, []));
+    const storeEdges: Edge[] = useStore(useCallback((s: ReactFlowStoreSnapshot) => s.edges ?? [], []));
+    const storeEdgesRef = useRef(storeEdges);
+    storeEdgesRef.current = storeEdges;
 
     // 🚀 [PERF] 连接拓扑签名：仅在边的连接关系变化时才重算 multiEdgeInfo
     // storeEdges 引用在拖拽时因 _dragUpdate 频繁变化，但 multiEdgeInfo 只关心 id/source/target
@@ -96,7 +184,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
     //   但不产生中间字符串数组和超长拼接字符串，消除拖拽时的 GC 压力。
     const edgeTopologySig = useMemo(() => {
         let h = 5381;
-        for (const e of storeEdges as Edge[]) {
+        for (const e of storeEdges) {
             if (e.id) for (let i = 0; i < e.id.length; i++)     h = (h * 33) ^ e.id.charCodeAt(i);
             if (e.source) for (let i = 0; i < e.source.length; i++) h = (h * 33) ^ e.source.charCodeAt(i);
             if (e.target) for (let i = 0; i < e.target.length; i++) h = (h * 33) ^ e.target.charCodeAt(i);
@@ -105,9 +193,10 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
     }, [storeEdges]);
 
     const endpointFanCounts = useMemo(() => {
+        void edgeTopologySig;
         let outgoingFromSource = 0;
         let incomingToTarget = 0;
-        for (const e of storeEdges as Edge[]) {
+        for (const e of storeEdgesRef.current) {
             if (e.source === source) outgoingFromSource += 1;
             if (e.target === target) incomingToTarget += 1;
         }
@@ -118,7 +207,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
     // 🚀 [PERF] 使用 nodeLookup 精准订阅替代 useNodes() 全量订阅
     // useNodes() 每条边都订阅全量节点数组 → O(N×E) 重算
     // nodeLookup.get() 只获取需要的 2 个节点 → O(1)
-    const nodeLookup = useStore(useCallback((s: any) => s.nodeLookup, []));
+    const nodeLookup = useStore(useCallback((s: ReactFlowStoreSnapshot) => s.nodeLookup, []));
 
     // 精准获取 source/target 节点（InternalNodeBase 含 internals.positionAbsolute）
     const sourceNodeInternal = nodeLookup?.get(source);
@@ -126,10 +215,10 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
 
     // [FIX] 稳定化节点引用 —— 只在路由相关字段（位置/尺寸/拖拽）变化时创建新对象
     // 忽略 selected 等无关属性变化，避免触发 centeredCoords → Worker 不必要的重算
-    const sourceNodeRef = useRef<any>(undefined);
+    const sourceNodeRef = useRef<SmartNode | undefined>(undefined);
     const sourceNode = useMemo(() => {
         if (!sourceNodeInternal) { sourceNodeRef.current = undefined; return undefined; }
-        const n = sourceNodeInternal as any;
+        const n = sourceNodeInternal;
         const posAbs = n.internals?.positionAbsolute ?? n.positionAbsolute;
         const prev = sourceNodeRef.current;
         if (prev &&
@@ -146,10 +235,10 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         return result;
     }, [sourceNodeInternal]);
 
-    const targetNodeRef = useRef<any>(undefined);
+    const targetNodeRef = useRef<SmartNode | undefined>(undefined);
     const targetNode = useMemo(() => {
         if (!targetNodeInternal) { targetNodeRef.current = undefined; return undefined; }
-        const n = targetNodeInternal as any;
+        const n = targetNodeInternal;
         const posAbs = n.internals?.positionAbsolute ?? n.positionAbsolute;
         const prev = targetNodeRef.current;
         if (prev &&
@@ -168,7 +257,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
 
     // 🚀 [PERF] getAbsPos 直接使用 nodeLookup Map，无需每条边重建
     const getAbsPos = useMemo(() => {
-        const resolve = (nodeLike: any, visited?: Set<string>): { x: number; y: number } => {
+        const resolve = (nodeLike: SmartNode | SimpleNodeData, visited?: Set<string>): Point => {
             const abs = nodeLike?.internals?.positionAbsolute || nodeLike?.computed?.positionAbsolute || nodeLike?.positionAbsolute;
             if (abs) return abs;
             const base = nodeLike?.position || { x: nodeLike?.x ?? 0, y: nodeLike?.y ?? 0 };
@@ -195,7 +284,9 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
 
     // Detect dragging state from live node objects
     // [FIX] Priority to _draggingNodeIds from props.data which updates in real-time during drag
-    const draggingIds = (props.data as any)?._draggingNodeIds as string[] | undefined;
+    const draggingIds = Array.isArray(edgeData._draggingNodeIds)
+        ? edgeData._draggingNodeIds.filter((value): value is string => typeof value === 'string')
+        : undefined;
     const isSourceDragging = draggingIds?.includes(source);
     const isTargetDragging = draggingIds?.includes(target);
 
@@ -209,8 +300,8 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         const lowerTarget = String(rawTarget || '').toLowerCase();
         const isHorizontal = (handle: string) =>
             handle === 'left' || handle === 'right' || handle === 'l' || handle === 'r' || handle.includes('left') || handle.includes('right');
-        const manualSides = Array.isArray((props.data as any)?.manualHandleSides)
-            ? (props.data as any).manualHandleSides.map((side: any) => String(side).toLowerCase())
+        const manualSides = Array.isArray(edgeData.manualHandleSides)
+            ? edgeData.manualHandleSides.map((side) => String(side).toLowerCase())
             : [];
         if (!manualSides.includes('source') || !manualSides.includes('target')) {
             return { sourceHandleId: rawSource, targetHandleId: rawTarget };
@@ -243,7 +334,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             return { sourceHandleId: rawSource, targetHandleId: rawTarget };
         }
 
-        const isAutoSubDomainSideHandle = (props.data as any)?.inferredSubDomainHandles === true;
+        const isAutoSubDomainSideHandle = edgeData.inferredSubDomainHandles === true;
         const participatesInFan = endpointFanCounts.incomingToTarget > 1 || endpointFanCounts.outgoingFromSource > 1;
         if (isAutoSubDomainSideHandle && participatesInFan) {
             return { sourceHandleId: rawSource, targetHandleId: rawTarget };
@@ -251,58 +342,53 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
 
         const outerSide = dx >= 0 ? 'right' : 'left';
         return { sourceHandleId: outerSide, targetHandleId: outerSide };
-    }, [props.data, rawSourceHandleId, rawTargetHandleId, sourceNode, sourceX, sourceY, targetNode, targetX, targetY, endpointFanCounts]);
+    }, [edgeData, rawSourceHandleId, rawTargetHandleId, sourceNode, sourceX, sourceY, targetNode, targetX, targetY, endpointFanCounts]);
 
     const handleSelectionPolicy = useMemo(() => {
         const layered = (() => {
             try {
-                return LayeredConfigManager.getInstance().get<string>('diagram.edge.handleSelectionPolicy', undefined as any);
+                return LayeredConfigManager.getInstance().get<string | undefined>('diagram.edge.handleSelectionPolicy', undefined);
             } catch {
                 return undefined;
             }
         })();
         const fromCfg = (() => {
             try {
-                return (diagramConfigManager.getConfig() as any)?.edge?.handleSelectionPolicy;
+                return getConfigSnapshot().edge?.handleSelectionPolicy;
             } catch {
                 return undefined;
             }
         })();
-        const fromEdge = (props.data as any)?.handleSelectionPolicy;
+        const fromEdge = edgeData.handleSelectionPolicy;
         return String(fromEdge ?? layered ?? fromCfg ?? 'respect').toLowerCase();
-    }, [props.data]);
+    }, [edgeData]);
 
     // Handle Auto Flags
     const autoFlags = useMemo(() => {
-        const flags = (props.data as any)?.auto || [];
+        const flags = edgeData.auto;
         return {
             autoSource: Array.isArray(flags) && flags.includes('source'),
             autoTarget: Array.isArray(flags) && flags.includes('target'),
         };
-    }, [props.data]);
+    }, [edgeData]);
 
     const manualFlags = useMemo(() => {
-        const raw = (props.data as any)?.manualHandles ?? (props.data as any)?._manualHandles;
-        const bySide = (props.data as any)?.manualHandleSides;
+        const raw = edgeData.manualHandles ?? edgeData._manualHandles;
+        const bySide = edgeData.manualHandleSides;
         if (Array.isArray(bySide)) {
-            const list = bySide.map((x: any) => String(x).toLowerCase());
+            const list = bySide.map((x) => String(x).toLowerCase());
             return { manualSource: list.includes('source'), manualTarget: list.includes('target') };
         }
         if (raw === true) return { manualSource: true, manualTarget: true };
-        if (raw && typeof raw === 'object') {
-            return { manualSource: Boolean((raw as any).source), manualTarget: Boolean((raw as any).target) };
+        if (isRecord(raw)) {
+            return { manualSource: Boolean(raw.source), manualTarget: Boolean(raw.target) };
         }
         return { manualSource: false, manualTarget: false };
-    }, [props.data]);
+    }, [edgeData]);
 
     const runtimeHandleLock = useMemo(() => {
-        const raw = (props.data as any)?.runtimeHandleLock ?? (props.data as any)?._runtimeHandleLock;
-        if (raw === true) return { source: true, target: true };
-        if (raw && typeof raw === 'object') {
-            return { source: Boolean((raw as any).source), target: Boolean((raw as any).target) };
-        }
-        return { source: false, target: false };
-    }, [props.data]);
+        return readHandlePair(edgeData.runtimeHandleLock ?? edgeData._runtimeHandleLock);
+    }, [edgeData]);
 
     const respectSourceHandle = Boolean(sourceHandleId)
         && (runtimeHandleLock.source || (manualFlags.manualSource && !autoFlags.autoSource));
@@ -312,8 +398,8 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
 
     // ---------- 0️⃣ Edge configuration ----------
     const edgeConfig = useMemo(() => {
-        const strictOverride = (props.data as any)?.edgeConfig?.strictOrthogonal !== false;
-        const dataBorderRadius = Number((props.data as any)?.borderRadius);
+        const strictOverride = edgeData.edgeConfig?.strictOrthogonal !== false;
+        const dataBorderRadius = Number(edgeData.borderRadius);
         const defaultBorderRadius = Number.isFinite(dataBorderRadius)
             ? Math.max(0, dataBorderRadius)
             : 8;
@@ -334,28 +420,26 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             debugPortHeatmap: false,
             strictOrthogonal: strictOverride
         };
-        return { ...DEFAULT_EDGE_CONFIG, ...(props.data?.edgeConfig ?? {}) };
-    }, [props.data?.edgeConfig]);
+        return { ...DEFAULT_EDGE_CONFIG, ...(edgeData.edgeConfig ?? {}) };
+    }, [edgeData]);
 
     // ---------- 1️⃣ Layout direction inference ----------
     const isExplicitLayoutDirection = useMemo(() => {
         if (!respectSourceHandle || !respectTargetHandle) {
-            const edgeDir = (props.data as any)?.layoutDirection;
-            return edgeDir === 'RL' || edgeDir === 'TB' || edgeDir === 'BT' || edgeDir === 'LR';
+            return isLayoutDirection(edgeData.layoutDirection);
         }
         const sHandle = String(sourceHandleId || '').toLowerCase();
         const tHandle = String(targetHandleId || '').toLowerCase();
         if ((sHandle === 'r' && tHandle === 'l') || (sHandle === 'l' && tHandle === 'r')) return true;
         if ((sHandle === 'b' && tHandle === 't') || (sHandle === 't' && tHandle === 'b')) return true;
-        const edgeDir = (props.data as any)?.layoutDirection;
-        if (edgeDir === 'RL' || edgeDir === 'TB' || edgeDir === 'BT' || edgeDir === 'LR') return true;
+        if (isLayoutDirection(edgeData.layoutDirection)) return true;
         return false;
-    }, [sourceHandleId, targetHandleId, props.data, respectSourceHandle, respectTargetHandle]);
+    }, [sourceHandleId, targetHandleId, edgeData, respectSourceHandle, respectTargetHandle]);
 
-    const layoutDirection = useMemo((): 'LR' | 'RL' | 'TB' | 'BT' => {
+    const layoutDirection = useMemo((): LayoutDirection => {
         if (respectSourceHandle && respectTargetHandle) {
-            const sDir = parseHandleDirection(sourceHandleId);
-            const tDir = parseHandleDirection(targetHandleId);
+            const sDir = parseHandlePosition(sourceHandleId);
+            const tDir = parseHandlePosition(targetHandleId);
 
             if (sDir && tDir) {
                 if ((sDir === Position.Right && tDir === Position.Left) || (sDir === Position.Left && tDir === Position.Right)) {
@@ -395,18 +479,17 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             return dx > 0 ? 'LR' : 'RL';
         }
 
-        const edgeDir = (props.data as any)?.layoutDirection;
-        if (edgeDir === 'RL' || edgeDir === 'TB' || edgeDir === 'BT' || edgeDir === 'LR') {
-            return edgeDir;
+        if (isLayoutDirection(edgeData.layoutDirection)) {
+            return edgeData.layoutDirection;
         }
 
-        const globalDir = (diagramConfigManager.getConfig() as any)?.layout?.direction;
-        if (globalDir === 'LR' || globalDir === 'RL' || globalDir === 'TB' || globalDir === 'BT') {
+        const globalDir = getConfigSnapshot().layout?.direction;
+        if (isLayoutDirection(globalDir)) {
             return globalDir;
         }
 
         return 'LR';
-    }, [sourceHandleId, targetHandleId, props.data, source, target, sourceX, sourceY, targetX, targetY, simpleNodeMap, respectSourceHandle, respectTargetHandle, getAbsPos]);
+    }, [sourceHandleId, targetHandleId, edgeData, source, target, sourceX, sourceY, targetX, targetY, simpleNodeMap, respectSourceHandle, respectTargetHandle, getAbsPos]);
 
     // ---------- 1.2️⃣ Directionality (Reverse Check) ----------
     // [FIX] Use **global** layout direction as baseline for reverse detection,
@@ -415,11 +498,11 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
     // [FIX C-6] O(E²)→O(E)：全局方向投票不再依赖 storeEdges（每帧引用变化），
     // 改为仅依赖 edgeTopologySig（连接关系字符串签名），同一渲染批次内只计算一次。
     // 使用模块级缓存：相同签名复用上次结果，避免每条边组件重复投票。
-    const edgeLayoutDirectionOverride = (props.data as any)?.layoutDirection;
-    const globalBaseDirection = useMemo((): 'LR' | 'RL' | 'TB' | 'BT' => {
+    const edgeLayoutDirectionOverride = edgeData.layoutDirection;
+    const globalBaseDirection = useMemo((): LayoutDirection => {
         // Priority 1: Explicit edge-level override（每条边可独立覆盖）
         const edgeDir = edgeLayoutDirectionOverride;
-        if (edgeDir === 'LR' || edgeDir === 'RL' || edgeDir === 'TB' || edgeDir === 'BT') return edgeDir;
+        if (isLayoutDirection(edgeDir)) return edgeDir;
 
         // Priority 2: 基于拓扑签名缓存的多数投票
         // 签名相同 → 返回上次缓存结果，无需重新遍历所有边
@@ -427,9 +510,10 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         if (cached) return cached;
 
         let result: 'LR' | 'RL' | 'TB' | 'BT' = 'TB';
-        if (storeEdges && storeEdges.length > 0) {
+        const topologyEdges = storeEdgesRef.current;
+        if (topologyEdges.length > 0) {
             const votes = { TB: 0, BT: 0, LR: 0, RL: 0 };
-            for (const e of storeEdges) {
+            for (const e of topologyEdges) {
                 const sAbs = getAbsPos(e.source);
                 const tAbs = getAbsPos(e.target);
                 const dx = tAbs.x - sAbs.x;
@@ -444,15 +528,15 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             }
             let maxVotes = -1;
             for (const [dir, count] of Object.entries(votes)) {
-                if (count > maxVotes) { maxVotes = count; result = dir as any; }
+                if (count > maxVotes && isLayoutDirection(dir)) { maxVotes = count; result = dir; }
             }
         }
 
         // Priority 3: Global diagram config fallback
         if (result === 'TB') {
             try {
-                const globalDir = (diagramConfigManager.getConfig() as any)?.layout?.direction;
-                if (globalDir === 'LR' || globalDir === 'RL' || globalDir === 'TB' || globalDir === 'BT') {
+                const globalDir = getConfigSnapshot().layout?.direction;
+                if (isLayoutDirection(globalDir)) {
                     result = globalDir;
                 }
             } catch { /* keep TB */ }
@@ -472,18 +556,14 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         const refDir = globalBaseDirection;
         let geomReverse = false;
 
-        let dx = 0;
-        let dy = 0;
-
-        if (sourceNode && targetNode) {
+        const { dx, dy } = sourceNode && targetNode ? (() => {
             const sAbs = getAbsPos(source);
             const tAbs = getAbsPos(target);
-            dx = tAbs.x - sAbs.x;
-            dy = tAbs.y - sAbs.y;
-        } else {
-            dx = targetX - sourceX;
-            dy = targetY - sourceY;
-        }
+            return { dx: tAbs.x - sAbs.x, dy: tAbs.y - sAbs.y };
+        })() : {
+            dx: targetX - sourceX,
+            dy: targetY - sourceY,
+        };
 
         // [FIX] Industry Standard Projection Verification
         // An edge is only a Reverse Edge (U-Turn Feedback Loop) if its vector opposes the baseline direction
@@ -504,8 +584,8 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         // every same-side pair as a U-Turn feedback loop causes widespread bypass misfire.
         // Requirement: handle directions must CORROBORATE geomReverse, not override it.
         const result = geomReverse || (() => {
-            const sDir = parseHandleDirection(sourceHandleId);
-            const tDir = parseHandleDirection(targetHandleId);
+            const sDir = parseHandlePosition(sourceHandleId);
+            const tDir = parseHandlePosition(targetHandleId);
             if (sDir && tDir && sDir === tDir) {
                 const isHorizontal = sDir === Position.Left || sDir === Position.Right;
                 // Only treat same-side horizontal handles as reverse in LR/RL when geometry
@@ -555,7 +635,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
                 []
             );
 
-            const getCoord = (abs: { x: number; y: number }, n: any, p: Position) => {
+            const getCoord = (abs: Point, n: SmartNode | SimpleNodeData, p: Position) => {
                 const w = n.width || 0;
                 const h = n.height || 0;
                 const x = abs.x;
@@ -622,8 +702,9 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         if (!cached) {
             const sourceNodeStatic = simpleNodeMap.get(source);
             const targetNodeStatic = simpleNodeMap.get(target);
+            const topologyEdges = storeEdgesRef.current;
 
-            const classifyDirection = (from: any, to: any): string | null => {
+            const classifyDirection = (from: SmartNode | SimpleNodeData, to: SmartNode | SimpleNodeData): DirectionBucket | null => {
                 if (!from || !to) return null;
                 const fw = from.width || 0; const fh = from.height || 0;
                 const tw = to.width || 0;   const th = to.height || 0;
@@ -650,7 +731,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             const incomingBuckets: Record<string, string[]> = {};
 
             if (sourceNodeStatic) {
-                storeEdges.forEach((e) => {
+                topologyEdges.forEach((e) => {
                     if (e.source !== source) return;
                     const tNode = simpleNodeMap.get(e.target);
                     const dir = tNode ? classifyDirection(sourceNodeStatic, tNode) : null;
@@ -661,7 +742,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             }
 
             if (targetNodeStatic) {
-                storeEdges.forEach((e) => {
+                topologyEdges.forEach((e) => {
                     if (e.target !== target) return;
                     const sNode = simpleNodeMap.get(e.source);
                     const dir = sNode ? classifyDirection(sNode, targetNodeStatic) : null;
@@ -672,7 +753,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             }
 
             if (Object.keys(outgoingBuckets).length === 0) {
-                const allOutgoing = storeEdges.filter(e => e.source === source).map(e => e.id).sort();
+                const allOutgoing = topologyEdges.filter(e => e.source === source).map(e => e.id).sort();
                 if (allOutgoing.length > 1) outgoingBuckets.all = allOutgoing;
             } else {
                 Object.keys(outgoingBuckets).forEach((key) => {
@@ -681,7 +762,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             }
 
             if (Object.keys(incomingBuckets).length === 0) {
-                const allIncoming = storeEdges.filter(e => e.target === target).map(e => e.id).sort();
+                const allIncoming = topologyEdges.filter(e => e.target === target).map(e => e.id).sort();
                 if (allIncoming.length > 1) incomingBuckets.all = allIncoming;
             } else {
                 Object.keys(incomingBuckets).forEach((key) => {
@@ -743,7 +824,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
 
         // [FIX] Helper to calculate handle position
         const calcHandlePos = (
-            node: any,
+            node: SmartNode | undefined,
             defaultX: number,
             defaultY: number,
             handleId?: string | null,
@@ -762,8 +843,8 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             const h = node.height || node.measured?.height || 0;
 
             // Calculate offset based on handleId if available
-            let offsetX = 0;
-            let offsetY = 0;
+            let offsetX: number;
+            let offsetY: number;
 
             // Try to find handle in node internals if available
             // Note: We can't access node.internals directly here if it's not exposed
@@ -954,8 +1035,8 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
     // ---------- 4️⃣ Fallback positions ----------
     const fallbackPositions = useMemo(() => {
         // [FIX] Re-use the helper defined above
-        const handleSP = parseHandleDirection(sourceHandleId);
-        const handleTP = parseHandleDirection(targetHandleId);
+        const handleSP = parseHandlePosition(sourceHandleId);
+        const handleTP = parseHandlePosition(targetHandleId);
 
         // Use Smart Position if available and not overridden by handle/bus
         const smartSP = smartLayout ? smartLayout.sourcePos : undefined;
@@ -996,6 +1077,6 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         targetHandleId,
         // 🚀 [PERF] 暴露内部数据，避免 AdvancedSmartEdge 重复订阅
         storeEdges,
-        simpleNodeMap: simpleNodeMap as Map<string, any>,
+        simpleNodeMap,
     };
 }

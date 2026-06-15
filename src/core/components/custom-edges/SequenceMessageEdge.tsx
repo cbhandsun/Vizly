@@ -17,9 +17,9 @@ export const SequenceMessageEdge = ({
   
   const isSelf = Math.abs(sourceX - targetX) < 5;
   
-  let edgePath = '';
-  let labelX = 0;
-  let labelY = 0;
+  let edgePath: string;
+  let labelX: number;
+  let labelY: number;
 
   if (isSelf) {
       // UML 自调用 (Self-call) 循环路径: 向右延伸 40px 再绕回

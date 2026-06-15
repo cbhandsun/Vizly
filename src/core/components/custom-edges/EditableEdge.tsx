@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { EdgeProps, useViewport } from '@xyflow/react';
-import { useEdgeUpdate } from '../diagrams/EdgeUpdateContext';
+import { useEdgeUpdate } from '../diagrams/useEdgeUpdate';
 import { useEditableEdgeInteractions } from './hooks/useEditableEdgeInteractions';
 import { EditableEdgeGraphics } from './renderers/EditableEdgeGraphics';
 

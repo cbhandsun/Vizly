@@ -1,11 +1,14 @@
 // packages/core/src/components/custom-edges/renderers/AdvancedSmartEdgeGraphics.tsx
 import React, { memo, useMemo, useRef, useEffect } from 'react';
 import { BaseEdge, EdgeLabelRenderer, EdgeProps } from '@xyflow/react';
-import { Dropdown } from 'antd';
-import { getEdgeLabelStyleMenuItems } from '../../diagrams/EdgeLabelStyleMenu';
-import { useEdgeTheme } from '../../diagrams/EdgeUpdateContext';
+import { useEdgeTheme } from '../../diagrams/useEdgeUpdate';
+import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { UseSmartEdgeRoutingReturn } from '../hooks/useSmartEdgeRouting';
 import { UseEdgeLabelInteractionsReturn } from '../hooks/useEdgeLabelInteractions';
+
+const LazyEdgeLabelDropdown = React.lazy(() =>
+    import('./EdgeLabelDropdown').then((module) => ({ default: module.EdgeLabelDropdown }))
+);
 
 export interface AdvancedSmartEdgeGraphicsProps {
     props: EdgeProps;
@@ -33,6 +36,16 @@ const getPathEndpoints = (path: string): { source: { x: number; y: number }; tar
     }
 
     return source && target ? { source, target } : null;
+};
+
+const selectDebugEdge = (id: string) => {
+    window.dispatchEvent(new CustomEvent('vizly:selectDebugEdge', { detail: { edgeId: id } }));
+    const coord = EdgeRoutingCoordinator.getInstance() as unknown as {
+        setDebugEdge(id: string | null): void;
+        forceDebugReRoute(id: string | null): void;
+    };
+    coord.setDebugEdge(id);
+    coord.forceDebugReRoute(id);
 };
 
 const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: AdvancedSmartEdgeGraphicsProps) => {
@@ -130,15 +143,7 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
         if (e.altKey || (e.ctrlKey && !e.shiftKey && !e.metaKey)) {
             e.preventDefault();
             e.stopPropagation();
-            window.dispatchEvent(new CustomEvent('vizly:selectDebugEdge', { detail: { edgeId: id } }));
-            import('../../../services/EdgeRoutingCoordinator').then(({ EdgeRoutingCoordinator }) => {
-                const coord = EdgeRoutingCoordinator.getInstance() as unknown as {
-                    setDebugEdge(id: string | null): void;
-                    forceDebugReRoute(id: string | null): void;
-                };
-                coord.setDebugEdge(id);
-                coord.forceDebugReRoute(id);
-            }).catch(() => {});
+            selectDebugEdge(id);
         }
     };
 
@@ -152,15 +157,7 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
         const handler = (e: MouseEvent) => {
             if (e.altKey || (e.ctrlKey && !e.shiftKey && !e.metaKey)) {
                 e.stopPropagation();
-                window.dispatchEvent(new CustomEvent('vizly:selectDebugEdge', { detail: { edgeId: id } }));
-                import('../../../services/EdgeRoutingCoordinator').then(({ EdgeRoutingCoordinator }) => {
-                    const coord = EdgeRoutingCoordinator.getInstance() as unknown as {
-                        setDebugEdge(id: string | null): void;
-                        forceDebugReRoute(id: string | null): void;
-                    };
-                    coord.setDebugEdge(id);
-                    coord.forceDebugReRoute(id);
-                }).catch(() => {});
+                selectDebugEdge(id);
             }
         };
         el.addEventListener('click', handler, { capture: true });
@@ -256,33 +253,48 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
                                 onClick={(e) => e.stopPropagation()}
                             />
                         ) : (
-                            <Dropdown
-                                menu={{
-                                    items: getEdgeLabelStyleMenuItems({
-                                        edgeId: id,
-                                        currentStyle: currentLabelStyle,
-                                        onStyleChange: handleStyleChange,
-                                        onResetPosition: handleResetPosition
-                                    })
-                                }}
-                                trigger={['contextMenu']}
+                            <React.Suspense
+                                fallback={
+                                    <div
+                                        onDoubleClick={handleLabelDoubleClick}
+                                        onMouseDown={handleLabelMouseDown}
+                                        onContextMenu={handleLabelContextMenu}
+                                        style={{
+                                            cursor: isDraggingLabel ? 'grabbing' : 'grab',
+                                            pointerEvents: 'auto',
+                                            userSelect: 'none',
+                                            fontWeight: currentLabelStyle.fontWeight || 'normal',
+                                            color: currentLabelStyle.color || 'inherit',
+                                            fontSize: currentLabelStyle.fontSize ? `${currentLabelStyle.fontSize}px` : 'inherit'
+                                        }}
+                                    >
+                                        {resolvedLabelText}
+                                    </div>
+                                }
                             >
-                                <div
-                                    onDoubleClick={handleLabelDoubleClick}
-                                    onMouseDown={handleLabelMouseDown}
-                                    onContextMenu={handleLabelContextMenu}
-                                    style={{
-                                        cursor: isDraggingLabel ? 'grabbing' : 'grab',
-                                        pointerEvents: 'auto',
-                                        userSelect: 'none',
-                                        fontWeight: currentLabelStyle.fontWeight || 'normal',
-                                        color: currentLabelStyle.color || 'inherit',
-                                        fontSize: currentLabelStyle.fontSize ? `${currentLabelStyle.fontSize}px` : 'inherit'
-                                    }}
+                                <LazyEdgeLabelDropdown
+                                    edgeId={id}
+                                    currentStyle={currentLabelStyle}
+                                    onStyleChange={handleStyleChange}
+                                    onResetPosition={handleResetPosition}
                                 >
-                                    {resolvedLabelText}
-                                </div>
-                            </Dropdown>
+                                    <div
+                                        onDoubleClick={handleLabelDoubleClick}
+                                        onMouseDown={handleLabelMouseDown}
+                                        onContextMenu={handleLabelContextMenu}
+                                        style={{
+                                            cursor: isDraggingLabel ? 'grabbing' : 'grab',
+                                            pointerEvents: 'auto',
+                                            userSelect: 'none',
+                                            fontWeight: currentLabelStyle.fontWeight || 'normal',
+                                            color: currentLabelStyle.color || 'inherit',
+                                            fontSize: currentLabelStyle.fontSize ? `${currentLabelStyle.fontSize}px` : 'inherit'
+                                        }}
+                                    >
+                                        {resolvedLabelText}
+                                    </div>
+                                </LazyEdgeLabelDropdown>
+                            </React.Suspense>
                         )}
                     </div>
                 </EdgeLabelRenderer>

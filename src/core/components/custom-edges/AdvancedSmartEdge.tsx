@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/components/custom-edges/AdvancedSmartEdge.tsx
 import React, { memo } from 'react';
 import type { EdgeProps } from '@xyflow/react';

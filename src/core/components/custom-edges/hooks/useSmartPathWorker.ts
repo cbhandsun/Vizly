@@ -237,9 +237,7 @@ const useObstacles = (
     simpleNodeMap: Map<string, SimpleNode>,
     obstacles: ObstacleItem[],
     source: string,
-    target: string,
-    edgeConfig: SmartEdgeOptions,
-    isBus: boolean
+    target: string
 ): { obstacleRects: ObstacleRect[]; containerBounds: ObstacleRect[] } => {
     return useMemo(() => {
         const obstacleRects: ObstacleRect[] = [];
@@ -317,7 +315,7 @@ const useObstacles = (
         }
 
         return { obstacleRects, containerBounds };
-    }, [simpleNodeMap, obstacles, source, target, edgeConfig.obstaclePadding, isBus]);
+    }, [simpleNodeMap, obstacles, source, target]);
 };
 
 interface LastArgs {
@@ -360,6 +358,8 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
     const lastArgsRef = useRef<LastArgs | null>(null);
     const isMountedRef = useRef(true);
     const isHydratedRef = useRef(false); // [FIX] Track if current path is from hydration (placeholder)
+    const pathRef = useRef<string | null>(path);
+    const storeEdgesRef = useRef(storeEdges);
     const isBus = useMemo(() => {
         return !!(centeredCoords.effectiveIsOneToMany || centeredCoords.effectiveIsManyToOne || (multiEdgeInfo && (multiEdgeInfo.isOneToMany || multiEdgeInfo.isManyToOne)));
     }, [centeredCoords.effectiveIsOneToMany, centeredCoords.effectiveIsManyToOne, multiEdgeInfo]);
@@ -367,7 +367,11 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
     // [FIX] Stable signature for edgeData — only routing-relevant fields.
     // edgeData reference changes on every selection change (displayEdges .map()),
     // but routing only cares about _layoutEpoch and algorithm.
-    const edgeDataSig = `${edgeData?._layoutEpoch ?? 0}|${edgeData?.algorithm ?? ''}`;
+    const edgeLayoutEpoch = edgeData?._layoutEpoch ?? 0;
+    const edgeAlgorithm = edgeData?.algorithm;
+    const edgeBorderRadius = edgeData?.borderRadius as number | undefined;
+    const edgeLabelPosition = edgeData?.labelPosition;
+    const edgeDataSig = `${edgeLayoutEpoch}|${edgeAlgorithm ?? ''}`;
     const routingLabelSig = useMemo(() => {
         return storeEdges.map((edge) => {
             const data = (edge.data ?? {}) as Record<string, unknown>;
@@ -394,7 +398,8 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
     );
 
     // [P3.3] Pre-compute obstacles via memoized hook (only recalculates when topology changes)
-    const obstacleData = useObstacles(simpleNodeMap, obstacles as ObstacleItem[], source, target, edgeConfig, isBus);
+    const obstacleData = useObstacles(simpleNodeMap, obstacles as ObstacleItem[], source, target);
+    const { obstacleRects, containerBounds } = obstacleData;
 
     const elkPoints = useMemo(() => {
         return null;
@@ -409,6 +414,14 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
 
     // [REMOVED] Internal useStore for dragging. Passed via props now.
     // const nodesDragging = useStore((state: any) => state.nodesDragging);
+
+    useEffect(() => {
+        pathRef.current = path;
+    }, [path]);
+
+    useEffect(() => {
+        storeEdgesRef.current = storeEdges;
+    }, [storeEdges]);
 
     useEffect(() => {
         isMountedRef.current = true;
@@ -426,15 +439,16 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
         if (elkPoints) return;
         if (computedPoints && computedPoints.length > 1 && !nodesDragging) {
             const computedPath = pointsToOrthogonalPath(computedPoints);
-            setPath(computedPath);
-            setSmartPoints(computedPoints);
-            setIsLoading(false);
-            isHydratedRef.current = false;
-            lastFingerprintRef.current = '';
-            return;
+            const timer = setTimeout(() => {
+                if (!isMountedRef.current) return;
+                setPath(computedPath);
+                setSmartPoints(computedPoints);
+                setIsLoading(false);
+                isHydratedRef.current = false;
+                lastFingerprintRef.current = '';
+            }, 0);
+            return () => clearTimeout(timer);
         }
-
-        const layoutEpoch = edgeData?._layoutEpoch ?? 0;
 
         const currentArgs = {
             sx: centeredCoords.sourceX, sy: centeredCoords.sourceY,
@@ -447,7 +461,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
             rT: respectTargetHandle,
             ld: layoutDirection,
             isRev: isReverseEdge,
-            le: layoutEpoch,
+            le: edgeLayoutEpoch,
             rls: routingLabelSig
         };
 
@@ -483,7 +497,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
         // the setTimeout before it ran, the fingerprint was mutated but the path was never requested.
         // This leaves isLoading permanently locked at true and permanently falls back.
         if (!isLoading && !justStoppedDragging && !nodesDragging && lastFingerprintRef.current === fp && !isHydratedRef.current) {
-            if (edgeData?.algorithm !== 'fallback') {
+            if (edgeAlgorithm !== 'fallback') {
                 return;
             }
         }
@@ -553,8 +567,8 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
 
             // [P3.3] Use pre-built obstacles from useObstacles memo
             // Only inner bodies of source/target need to be added dynamically
-            const obstacleRects = [...obstacleData.obstacleRects];
-            const containerBounds = [...obstacleData.containerBounds];
+            const obstacleRectsForRequest = [...obstacleRects];
+            const containerBoundsForRequest = [...containerBounds];
 
             const getInnerBody = (n: SimpleNode) => {
                 if (!n) return null;
@@ -573,9 +587,9 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
             };
 
             const sBody = getInnerBody(sourceNode);
-            if (sBody) obstacleRects.push(sBody);
+            if (sBody) obstacleRectsForRequest.push(sBody);
             const tBody = getInnerBody(targetNode);
-            if (tBody) obstacleRects.push(tBody);
+            if (tBody) obstacleRectsForRequest.push(tBody);
 
             // [FIX] Use passed 'isReverseEdge' from Smart Context
             // This logic is now centralized in useSmartEdgeContext (Vector + Topology)
@@ -648,7 +662,8 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                     parentNode: n.parentNode,
                 };
             });
-            const edgesArr = storeEdges.map(e => ({
+            const currentStoreEdges = storeEdgesRef.current;
+            const edgesArr = currentStoreEdges.map(e => ({
                 id: e.id,
                 source: e.source,
                 target: e.target,
@@ -668,7 +683,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                     height,
                 };
             };
-            const routingLabels = storeEdges
+            const routingLabels = currentStoreEdges
                 .map(edge => {
                     const data = (edge.data ?? {}) as Record<string, unknown>;
                     const label = String(data.label ?? (edge as unknown as Record<string, unknown>).label ?? '');
@@ -716,9 +731,9 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
             const graphContext = {
                 nodes: nodesArr,
                 edges: edgesArr,
-                obstacles: obstacleRects,
+                obstacles: obstacleRectsForRequest,
                 routingLabels,
-                containerBounds: containerBounds,
+                containerBounds: containerBoundsForRequest,
                 layoutDirection,
                 graphVersion,
                 config: {
@@ -727,7 +742,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                     minLastSegment: edgeConfig.minLastSegment ?? 30,
                     borderRadius: edgeConfig.strictOrthogonal
                         ? 0
-                        : ((edgeData?.borderRadius as number) ?? edgeConfig.borderRadius ?? 4),
+                        : (edgeBorderRadius ?? edgeConfig.borderRadius ?? 4),
                     gridSize: edgeConfig.gridSize ?? 20,
                     jumpRadius: edgeConfig.jumpRadius ?? 10,
                     shouldSimplify
@@ -752,12 +767,12 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
             const cached = (!nodesDragging && isLayoutStable) ? coordinator.getCachedResult(routingRequest) : null;
             if (cached && isRoutingResultCompatibleWithHandles(cached, centeredCoords, respectSourceHandle, respectTargetHandle)) {
                 if (isMountedRef.current) {
-                    if (path !== cached.path) {
+                    if (pathRef.current !== cached.path) {
                         setPath(cached.path);
                     }
                     isHydratedRef.current = false;
-                    if (edgeData?.labelPosition) {
-                        setSmartLabelPos(edgeData.labelPosition);
+                    if (edgeLabelPosition) {
+                        setSmartLabelPos(edgeLabelPosition);
                     } else if (typeof cached.labelX === 'number' && typeof cached.labelY === 'number') {
                         setSmartLabelPos({ x: cached.labelX, y: cached.labelY });
                     }
@@ -799,7 +814,6 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                 if (!res || res.error || !res.path) {
                     console.warn(`[SmartWorker:${id}] Worker returned error or empty path:`, res?.error || 'Empty path');
                     // Fallback or retry logic could go here
-                } else {
                 }
 
                 if (isMountedRef.current) {
@@ -814,8 +828,8 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                     setPath(safePath);
 
                     isHydratedRef.current = false; // [FIX] Now we have the real path
-                    if (edgeData?.labelPosition) {
-                        setSmartLabelPos(edgeData.labelPosition);
+                    if (edgeLabelPosition) {
+                        setSmartLabelPos(edgeLabelPosition);
                     } else {
                         // [FIX] Use Worker's calculated label position directly.
                         // If fallback was used, calc simple center
@@ -862,8 +876,9 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
         centeredCoords, source, target, fallbackPositions, obstacles, simpleNodeMap,
         edgeConfig, layoutDirection, zoomLevel,
         respectSourceHandle, respectTargetHandle, sourceHandleId, targetHandleId,
-        id, edgeDataSig, multiEdgeInfo, isLayoutStable, nodesDragging, elkPoints, computedPoints,
-        isReverseEdge, isBus, graphVersion, routingLabelSig
+        id, edgeDataSig, edgeLayoutEpoch, edgeAlgorithm, edgeBorderRadius, edgeLabelPosition,
+        multiEdgeInfo, isLayoutStable, nodesDragging, elkPoints, computedPoints,
+        isReverseEdge, isBus, graphVersion, routingLabelSig, isLoading, obstacleRects, containerBounds
     ]);
 
     return { path, smartLabelPos, setPath, setSmartLabelPos, smartPoints, isLoading, workerUsedPositions };

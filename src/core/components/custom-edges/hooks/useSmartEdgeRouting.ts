@@ -5,7 +5,7 @@ import { Position, getSmoothStepPath } from '@xyflow/react';
 import { useStore } from '@xyflow/react';
 import { useSmartEdgeContext } from '../useSmartEdgeContext';
 import { useSmartPathWorker } from './useSmartPathWorker';
-import { useSharedObstacles, useObstaclesForEdge } from '../ObstacleContext';
+import { useSharedObstacles, useObstaclesForEdge } from '../obstacleContext';
 import { useLayoutStability } from '../../../context/LayoutStabilityContext';
 import { useChannelRouting } from './useChannelRouting';
 import { useLineJumps } from './useLineJumps';
@@ -1509,18 +1509,18 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       });
   }, [props.sourceX, props.sourceY, props.targetX, props.targetY, renderPositions.sourcePos, renderPositions.targetPos, structuralCornerRadius]);
 
-  const hasLoadedOnceRef = useRef(false);
-  const hasCacheOnMount = useRef(_getRenderedPathCache().has(id));
-  const [initialRevealReady, setInitialRevealReady] = useState(hasCacheOnMount.current);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [hasCacheOnMount] = useState(() => _getRenderedPathCache().has(id));
+  const [revealDelayState, setRevealDelayState] = useState({ id, ready: false });
+  const revealDelayReady = revealDelayState.id === id && revealDelayState.ready;
+  const initialRevealReady = hasCacheOnMount || nodesDragging || revealDelayReady;
   useEffect(() => {
-      if (hasCacheOnMount.current || nodesDragging) {
-          setInitialRevealReady(true);
+      if (hasCacheOnMount || nodesDragging) {
           return;
       }
-      setInitialRevealReady(false);
-      const timer = setTimeout(() => setInitialRevealReady(true), 1800);
+      const timer = setTimeout(() => setRevealDelayState({ id, ready: true }), 1800);
       return () => clearTimeout(timer);
-  }, [id, nodesDragging]);
+  }, [hasCacheOnMount, id, nodesDragging]);
   const isSharedTrunkEdge = !!(
       (multiEdgeInfo as any)?.isOneToMany ||
       (multiEdgeInfo as any)?.isManyToOne ||
@@ -1573,9 +1573,17 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
              Math.abs(lastPt.x - props.targetX) > 150 || 
              Math.abs(lastPt.y - props.targetY) > 150;
   }, [workerSmartPoints, workerPath, props.sourceX, props.sourceY, props.targetX, props.targetY, isLoading, nodesDragging, workerUsedPositions, centeredCoords, respectSourceHandle, respectTargetHandle]);
-  if (!isLoading && !isStale) {
-      hasLoadedOnceRef.current = true;
-  }
+  const loadedInCurrentRender = !isLoading && !isStale;
+  const hasLoadedCandidate = hasLoadedOnce || loadedInCurrentRender;
+  useEffect(() => {
+      if (loadedInCurrentRender && !hasLoadedOnce) {
+          const timer = setTimeout(() => {
+              setHasLoadedOnce(true);
+          }, 0);
+          return () => clearTimeout(timer);
+      }
+      return undefined;
+  }, [hasLoadedOnce, loadedInCurrentRender]);
 
   const canUseFreshWorkerPath = !nodesDragging && !isLoading && !isStale;
 
@@ -1607,7 +1615,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
           _setRenderedPathCacheValue(id, result);
       }
       return result;
-  }, [nodesDragging, channelPoints, renderCornerRadius, workerPath, _fallbackPath, isLoading, id, isStale, workerSmartPoints, props.sourceX, props.sourceY, props.targetX, props.targetY, edgeConfig.strictOrthogonal, canUseFreshWorkerPath]);
+  }, [nodesDragging, channelPoints, renderCornerRadius, workerPath, _fallbackPath, isLoading, id, isStale, workerSmartPoints, edgeConfig.strictOrthogonal, canUseFreshWorkerPath]);
 
   // 6. Line Jumps
   // [FIX-FILLET] Pass cornerRadius so jumpPath retains rounded corners.
@@ -1839,7 +1847,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
   const safeFinalPath = edgeConfig.strictOrthogonal && visualCornerRadius > 0
       ? (createFilletedPath(parseRenderedPathPoints(finalClearanceRepairedPath), visualCornerRadius) || finalClearanceRepairedPath)
       : finalClearanceRepairedPath;
-  const hasVisibleCandidate = (hasLoadedOnceRef.current || hasCacheOnMount.current) && initialRevealReady;
+  const hasVisibleCandidate = (hasLoadedCandidate || hasCacheOnMount) && initialRevealReady;
   const hasCachedVisiblePath = !!_getRenderedPathCache().get(id);
   const canKeepPreviousPathVisible = hasVisibleCandidate && hasCachedVisiblePath && (isLoading || isStale);
   const opacity = (nodesDragging || (hasVisibleCandidate && isLayoutStable && (canUseFreshWorkerPath || canKeepPreviousPathVisible))) ? 1 : 0;
@@ -1848,18 +1856,22 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
   const prevPathRef = useRef<string>(safeFinalPath);
   const [crossfadeOpacity, setCrossfadeOpacity] = useState(1);
   useEffect(() => {
-      if (nodesDragging || !hasLoadedOnceRef.current) {
+      if (nodesDragging || !hasLoadedCandidate) {
           prevPathRef.current = safeFinalPath;
           return;
       }
       if (prevPathRef.current !== safeFinalPath && prevPathRef.current.length > 10) {
-          setCrossfadeOpacity(0.3);
-          const timer = setTimeout(() => setCrossfadeOpacity(1), 50);
+          const fadeOutTimer = setTimeout(() => setCrossfadeOpacity(0.3), 0);
+          const fadeInTimer = setTimeout(() => setCrossfadeOpacity(1), 50);
           prevPathRef.current = safeFinalPath;
-          return () => clearTimeout(timer);
+          return () => {
+              clearTimeout(fadeOutTimer);
+              clearTimeout(fadeInTimer);
+          };
       }
       prevPathRef.current = safeFinalPath;
-  }, [safeFinalPath, nodesDragging]);
+      return undefined;
+  }, [safeFinalPath, nodesDragging, hasLoadedCandidate]);
 
   // 8. Final Label Position
   const finalLabelPos = (() => {

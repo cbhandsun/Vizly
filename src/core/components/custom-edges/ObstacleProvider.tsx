@@ -1,53 +1,24 @@
 /**
  * 共享障碍物计算上下文 (性能优化)
- * 
+ *
  * 目的：
  * - 将障碍物过滤计算从每条边独立计算提升到父组件共享
  * - 100 条边场景可减少 99% 重复计算
- * 
+ *
  * 使用方式：
  * 1. 在 React Flow 容器外层包裹 <ObstacleProvider>
  * 2. 边组件内使用 useSharedObstacles() 获取已计算的障碍物
  */
 
-import React, { createContext, useContext, useMemo, useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useStore } from '@xyflow/react';
 import { diagramConfigManager } from '../config/DiagramConfig';
-import { layoutOptimizer } from '../layout/LayoutOptimizer';
-
-// ==================== 类型定义 ====================
-
-interface NodeBBox {
-    id: string;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    type?: string;
-}
-
-interface ObstacleContextValue {
-    /** 所有业务节点的边界框（已过滤容器节点） */
-    businessNodes: NodeBBox[];
-    /** 节点 ID -> 节点的快速查找 Map */
-    nodeMap: Map<string, any>;
-    /** 原始签名（djb2 哈希数字），用于检测变化 */
-    signature: number;
-    /** 上下文是否就绪 */
-    ready: boolean;
-}
-
-const ObstacleContext = createContext<ObstacleContextValue>({
-    businessNodes: [],
-    nodeMap: new Map(),
-    signature: 0,
-    ready: false,
-});
+import { ObstacleContext } from './obstacleContext';
+import type { ObstacleContextValue, NodeBBox } from './obstacleContext';
 
 // ==================== 工具函数 ====================
 
 const CONTAINER_TYPES = new Set(['subGroup', 'titleGroup', 'group', 'swimlane', 'domain']);
-const BUSINESS_TYPES = new Set(['custom', 'default', 'input', 'output', 'flowchart']);
 const IGNORE_TYPES = new Set(['annotation', 'background']);
 
 /**
@@ -181,9 +152,6 @@ const filterBusinessNodes = (nodes: any[]): NodeBBox[] => {
     return result;
 };
 
-
-// ==================== Provider 组件 ====================
-
 interface ObstacleProviderProps {
     children: React.ReactNode;
     /** 防抖延迟（毫秒） */
@@ -201,13 +169,20 @@ export const ObstacleProvider: React.FC<ObstacleProviderProps> = ({
 
     // 防抖签名
     const [stableSignature, setStableSignature] = useState(rawSignature);
+    const [stableNodes, setStableNodes] = useState(nodes);
 
     // ⭐ 监听 'obstacle-flush' 事件：布局切换时立即刷新（跳过 debounce）
     const rawSignatureRef = React.useRef(rawSignature);
-    rawSignatureRef.current = rawSignature;
+    const latestNodesRef = React.useRef(nodes);
+    useEffect(() => {
+        rawSignatureRef.current = rawSignature;
+        latestNodesRef.current = nodes;
+    }, [nodes, rawSignature]);
+
     useEffect(() => {
         const handler = () => {
             setStableSignature(rawSignatureRef.current);
+            setStableNodes(latestNodesRef.current);
         };
         window.addEventListener('obstacle-flush', handler);
         return () => window.removeEventListener('obstacle-flush', handler);
@@ -226,30 +201,23 @@ export const ObstacleProvider: React.FC<ObstacleProviderProps> = ({
         // [FIX] 30ms ≈ 2 frames at 60fps. Reduces perceived latency during drag.
         // 80ms (5 frames) was too slow — edges visibly lagged behind node movement.
         const delay = Math.max(30, ms);
-        const timer = setTimeout(() => setStableSignature(rawSignature), delay);
+        const timer = setTimeout(() => {
+            setStableSignature(rawSignature);
+            setStableNodes(nodes);
+        }, delay);
         return () => clearTimeout(timer);
-    }, [rawSignature, debounceMs]);
-
-    // [FIX] Cache nodes in ref — the useMemo below must NOT depend on `nodes`
-    // because `nodes` reference changes on every selection change (React Flow
-    // creates a new array). We only need to recompute when `stableSignature`
-    // changes (i.e., node positions/sizes actually changed).
-    const nodesRef = React.useRef(nodes);
-    nodesRef.current = nodes;
+    }, [nodes, rawSignature, debounceMs]);
 
     // 基于稳定签名计算共享数据
     const value = useMemo<ObstacleContextValue>(() => {
-        // Read from ref to get latest nodes without adding as dependency
-        const currentNodes = nodesRef.current;
-
         // 构建节点 Map (O(1) 查找)
         const nodeMap = new Map<string, any>();
-        for (const n of currentNodes) {
+        for (const n of stableNodes) {
             if (n?.id) nodeMap.set(n.id, n);
         }
 
         // 过滤业务节点
-        const businessNodes = filterBusinessNodes(currentNodes);
+        const businessNodes = filterBusinessNodes(stableNodes);
 
         return {
             businessNodes,
@@ -257,11 +225,7 @@ export const ObstacleProvider: React.FC<ObstacleProviderProps> = ({
             signature: stableSignature,
             ready: true,
         };
-    // [FIX] Only depend on stableSignature — NOT on nodes.
-    // nodes reference changes on every selection, but stableSignature only
-    // changes when node positions/sizes actually change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [stableSignature]);
+    }, [stableNodes, stableSignature]);
 
     return (
         <ObstacleContext.Provider value={value}>
@@ -269,88 +233,3 @@ export const ObstacleProvider: React.FC<ObstacleProviderProps> = ({
         </ObstacleContext.Provider>
     );
 };
-
-// ==================== Hook ====================
-
-/**
- * 获取共享障碍物数据
- * 
- * @returns 包含业务节点边界框、节点 Map 和签名的对象
- * 
- * @example
- * const { businessNodes, nodeMap } = useSharedObstacles();
- * const sourceNode = nodeMap.get(sourceId); // O(1) 查找
- */
-export const useSharedObstacles = (): ObstacleContextValue => {
-    return useContext(ObstacleContext);
-};
-
-/**
- * 获取特定边的障碍物列表（排除源节点和目标节点）
- * 
- * @param sourceId 源节点 ID
- * @param targetId 目标节点 ID
- * @param options 可选配置
- * @returns 障碍物边界框数组
- */
-export const useObstaclesForEdge = (
-    sourceId: string,
-    targetId: string,
-    options?: {
-        ignoreNodeIds?: string[];
-        corridorPadding?: number;
-        sourceX?: number;
-        sourceY?: number;
-        targetX?: number;
-        targetY?: number;
-    }
-): NodeBBox[] => {
-    const { businessNodes, nodeMap } = useSharedObstacles();
-
-    return useMemo(() => {
-        const ignoreIds = new Set([sourceId, targetId, ...(options?.ignoreNodeIds || [])]);
-
-        let filtered = businessNodes.filter(n => !ignoreIds.has(n.id));
-
-        // 可选：走廊过滤（仅保留源-目标通道内的障碍物）
-        if (
-            typeof options?.corridorPadding === 'number' &&
-            typeof options?.sourceX === 'number' &&
-            typeof options?.targetX === 'number'
-        ) {
-            const pad = options.corridorPadding;
-            const sx = options.sourceX;
-            const sy = options.sourceY ?? 0;
-            const tx = options.targetX;
-            const ty = options.targetY ?? 0;
-
-            const minX = Math.min(sx, tx) - pad;
-            const maxX = Math.max(sx, tx) + pad;
-            const minY = Math.min(sy, ty) - pad;
-            const maxY = Math.max(sy, ty) + pad;
-
-            filtered = filtered.filter(n => {
-                const nx2 = n.x + n.width;
-                const ny2 = n.y + n.height;
-                return !(nx2 < minX || n.x > maxX || ny2 < minY || n.y > maxY);
-            });
-        }
-
-        return filtered;
-    }, [businessNodes, sourceId, targetId, options?.ignoreNodeIds, options?.corridorPadding, options?.sourceX, options?.sourceY, options?.targetX, options?.targetY]);
-};
-
-/**
- * 立即刷新障碍物计算，跳过 debounce。
- * 在布局切换后调用，确保边路径立即基于最新节点位置重新计算。
- * 
- * @example
- * // 在布局完成后调用
- * setNodes(layoutedNodes);
- * flushObstacles();
- */
-export const flushObstacles = (): void => {
-    window.dispatchEvent(new CustomEvent('obstacle-flush'));
-};
-
-export default ObstacleContext;

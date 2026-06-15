@@ -52,6 +52,8 @@ export function useLineJumps({ edgeId, sourceId, targetId, points, enabled = tru
 
     // 查询交叉点
     const result = useMemo(() => {
+        void engineVersion;
+
         if (!enabled || !renderJumps || !points || points.length < 2) {
             return { jumps: [], jumpPath: null };
         }

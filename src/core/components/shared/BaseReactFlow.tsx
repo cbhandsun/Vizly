@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useMemo, useRef, useLayoutEffect, useState, useEffect, useCallback } from 'react';
 import { ReactFlow, Background, BackgroundVariant, Controls, useReactFlow, ReactFlowProvider, EdgeLabelRenderer, useStore, useStoreApi, useUpdateNodeInternals, SelectionMode, ConnectionMode } from '@xyflow/react';
 import type {
@@ -24,7 +23,7 @@ import FixedMiniMap from './FixedMiniMap';
 
 import { AdvancedSmartStepEdge, AdvancedSmartBezierEdge, AdvancedSmartStraightEdge } from '../custom-edges/AdvancedSmartEdge';
 import { SmartOrthogonalEdge } from '../custom-edges/SmartOrthogonalEdge';
-import { ObstacleProvider } from '../custom-edges/ObstacleContext';
+import { ObstacleProvider } from '../custom-edges/ObstacleProvider';
 import { diagramConfigManager } from '../config/DiagramConfig';
 import { getLastViewport, setLastViewport, getUiScale } from './viewportStore';
 import { ElkEdge } from '../custom-edges/ElkEdge'; // 导入 ElkEdge
@@ -210,7 +209,6 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [hasInitialized, setHasInitialized] = useState(false);
-  const [initAttempts, setInitAttempts] = useState(0);
   const sharedTrunks = useSharedTrunks();
 
   // 全局滚轮灵敏度（函数级注释）：从配置系统读取，用于主画布自定义缩放
@@ -247,13 +245,9 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const prevContainer = useRef<any>(null);
   const cooldownUntil = useRef<number>(0);
   const lastZoomRef = useRef<number | null>(null);
-  const initAtRef = useRef<number>(Date.now());
+  const initAtRef = useRef<number>(0);
   // 跟踪上一次的触发key，用于区分被动更新与主动触发
   const lastFitTriggerKeyRef = useRef(fitTriggerKey);
-
-  const debugEnabled = useMemo(() => {
-    try { const v = localStorage.getItem('architecture-diagram-debug'); return v === '1' || v === 'true'; } catch { return false; }
-  }, []);
 
   const performanceConfig = useMemo(() => {
     try { return diagramConfigManager.getConfig()?.performance || { enableVirtualization: true, batchSize: 50, debounceMs: 100 }; } catch { return { enableVirtualization: true, batchSize: 50, debounceMs: 100 }; }
@@ -360,10 +354,10 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     const currentSig = nodes.map(n => n.id).sort().join('|');
     const prevSig = prevNodesSigRef.current;
     const nodesChanged = currentSig !== prevSig;
+    let resetTimer: ReturnType<typeof setTimeout> | null = null;
 
     if (nodesChanged && nodes.length > 0) {
-      setHasInitialized(false);
-      setInitAttempts(0);
+      resetTimer = setTimeout(() => setHasInitialized(false), 0);
       prevBBox.current = null;
       prevContainer.current = null;
       cooldownUntil.current = 0;
@@ -373,6 +367,9 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 
     prevNodesRef.current = [...nodes];
     prevNodesSigRef.current = currentSig;
+    return () => {
+      if (resetTimer) clearTimeout(resetTimer);
+    };
   }, [nodes]);
 
   // 执行fitWidthTop的核心逻辑 - 复用回到顶部的逻辑
@@ -565,7 +562,6 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 
       if (!hasInitialized) {
         setHasInitialized(true);
-        setInitAttempts(prev => prev + 1);
       }
 
       return true;
@@ -667,6 +663,38 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     } as EdgeTypes;
   }, [edgeTypes]);
 
+  const displayEdgeEpoch = useMemo(() => {
+    let hash = 2166136261;
+    const feed = (value: unknown) => {
+      const text = String(value ?? '');
+      for (let i = 0; i < text.length; i += 1) {
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+    };
+
+    nodes.forEach((node) => {
+      const pos = (node as any)?.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
+      const measured = (node as any).measured;
+      feed(node.id);
+      feed(Math.round(Number(pos.x || 0)));
+      feed(Math.round(Number(pos.y || 0)));
+      feed(Math.round(Number(measured?.width ?? node.width ?? (node.style as any)?.width ?? 0)));
+      feed(Math.round(Number(measured?.height ?? node.height ?? (node.style as any)?.height ?? 0)));
+    });
+
+    edges.forEach((edge) => {
+      feed(edge.id);
+      feed(edge.source);
+      feed(edge.target);
+      feed(edge.sourceHandle);
+      feed(edge.targetHandle);
+      feed(edge.type);
+    });
+
+    return hash >>> 0;
+  }, [nodes, edges]);
+
   const displayEdges = useMemo((): Edge[] => {
     const nodeById = new Map(nodes.map(n => [n.id, n]));
     const normalizeRuntimeHandles = (edge: Edge): Edge => {
@@ -694,7 +722,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           computedPath: undefined,
           elkPath: undefined,
           algorithm: undefined,
-          _layoutEpoch: Date.now(),
+          _layoutEpoch: displayEdgeEpoch,
         },
       };
     };
@@ -766,7 +794,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           computedPath: undefined,
           elkPath: undefined,
           algorithm: undefined,
-          _layoutEpoch: Date.now(),
+          _layoutEpoch: displayEdgeEpoch,
         },
       };
     };
@@ -799,7 +827,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           computedPath: undefined,
           elkPath: undefined,
           algorithm: undefined,
-          _layoutEpoch: Date.now(),
+          _layoutEpoch: displayEdgeEpoch,
         },
       };
     };
@@ -852,7 +880,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           computedPath: undefined,
           elkPath: undefined,
           algorithm: undefined,
-          _layoutEpoch: Date.now(),
+          _layoutEpoch: displayEdgeEpoch,
         },
       };
     };
@@ -928,7 +956,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       if (nextType === e.type && nextLabel === (e as any).label && e === rawEdge) return e;
       return { ...e, type: nextType as any, label: nextLabel } as Edge;
     });
-  }, [edges, nodes, enableSmartEdges, smartEdgePadding, isLargeGraph]);
+  }, [edges, nodes, enableSmartEdges, smartEdgePadding, isLargeGraph, displayEdgeEpoch]);
 
   const nodeInternalsRefreshKey = useMemo(() => {
     return nodes.map((node) => {
@@ -986,7 +1014,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       window.cancelAnimationFrame(raf);
       if (retryTimer) window.clearTimeout(retryTimer);
     };
-  }, [nodes.length, nodeInternalsRefreshKey, updateNodeInternals, rfStore]);
+  }, [nodes, nodes.length, nodeInternalsRefreshKey, updateNodeInternals, rfStore]);
 
   useEffect(() => {
     if (nodes.length === 0) return;
@@ -1014,7 +1042,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       window.cancelAnimationFrame(raf);
       for (const timer of timers) window.clearTimeout(timer);
     };
-  }, [nodes.length, rfStore, updateNodeInternals]);
+  }, [nodes, nodes.length, rfStore, updateNodeInternals]);
 
   /**
    * 函数级注释：导出期间隐藏背景网格
@@ -1107,11 +1135,17 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     const hasSize = (containerSize.width > 0 && containerSize.height > 0) || (liveWidth > 0 && liveHeight > 0);
     if (hasSize) {
       if (!isContainerReady) {
-        setIsContainerReady(true);
+        readyTimeoutRef.current = window.setTimeout(() => {
+          setIsContainerReady(true);
+          readyTimeoutRef.current = null;
+        }, 0);
       }
     } else {
       if (!isContainerReady) {
-        setIsContainerReady(false);
+        readyTimeoutRef.current = window.setTimeout(() => {
+          setIsContainerReady(false);
+          readyTimeoutRef.current = null;
+        }, 0);
       }
     }
   }, [containerSize.width, containerSize.height, isContainerReady]);
