@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
     buildPathfindingGrid,
     PathfindingGrid
@@ -52,6 +51,61 @@ const getNodeXY = (n: any): { x: number; y: number } => {
     };
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+};
+
+const hasString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
+
+const hasFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
+const isValidWorkerJob = (value: unknown): value is PathFindingJob => {
+    if (!isRecord(value)) return false;
+    return hasString(value.jobId)
+        && hasString(value.edgeId)
+        && hasString(value.source)
+        && hasString(value.target)
+        && hasFiniteNumber(value.sourceX)
+        && hasFiniteNumber(value.sourceY)
+        && hasFiniteNumber(value.targetX)
+        && hasFiniteNumber(value.targetY);
+};
+
+export const isValidBatchPathfindingWorkerMessage = (value: unknown): value is BatchPathFindingJob => {
+    if (!isRecord(value)) return false;
+    return value.mode === 'batch'
+        && hasString(value.jobId)
+        && isRecord(value.context)
+        && Array.isArray(value.tasks)
+        && value.tasks.length > 0
+        && value.tasks.every(isValidWorkerJob);
+};
+
+export const isValidSinglePathfindingWorkerMessage = (value: unknown): boolean => {
+    if (!isRecord(value)) return false;
+    const maybeRequest = value as { job?: unknown; graph?: unknown };
+    if (maybeRequest.job !== undefined || maybeRequest.graph !== undefined) {
+        return isValidWorkerJob(maybeRequest.job) && isRecord(maybeRequest.graph);
+    }
+    return isValidWorkerJob(value);
+};
+
+const postInvalidWorkerMessage = (jobId: string | undefined, error: string, batch = false): void => {
+    if (batch) {
+        self.postMessage({
+            type: 'BATCH_RESULT',
+            batchId: jobId ?? '',
+            error
+        });
+        return;
+    }
+
+    self.postMessage({
+        jobId: jobId ?? '',
+        error
+    });
+};
+
 /**
  * Core Pathfinding Execution Logic
  * Delegates to the modular EdgeRoutingWorker
@@ -71,12 +125,18 @@ export const executeEdgePathfinding = (context: PathfindingContext): any => {
  */
 self.onmessage = (e: MessageEvent) => {
     const data = e.data;
+    if (!isRecord(data)) {
+        postInvalidWorkerMessage(undefined, 'Invalid pathfinding worker message');
+        return;
+    }
 
     if (data.mode === 'batch') {
-        const { jobId: batchId, context, tasks } = data as BatchPathFindingJob;
-
-        if (context.config?.debug) {
+        if (!isValidBatchPathfindingWorkerMessage(data)) {
+            postInvalidWorkerMessage(hasString(data.jobId) ? data.jobId : undefined, 'Invalid batch pathfinding request', true);
+            return;
         }
+
+        const { jobId: batchId, context, tasks } = data as BatchPathFindingJob;
 
         // [P2-3] Build UnifiedRoutingConfig early for batch context
         const unifiedConfig: UnifiedRoutingConfig = {
@@ -92,7 +152,6 @@ self.onmessage = (e: MessageEvent) => {
         let spatialIndex: QuadTree;
         let visibilityGraphCache: any;
         let grid: PathfindingGrid;
-        let gridBounds: { startX: number; startY: number; endX: number; endY: number };
 
         const currentVersion = context.graphVersion;
         const baseGridSize = unifiedConfig.algorithm.gridSize || 20;
@@ -133,7 +192,6 @@ self.onmessage = (e: MessageEvent) => {
             spatialIndex = globalCache.spatialIndex!;
             visibilityGraphCache = globalCache.visibilityGraph;
             grid = globalCache.grid;
-            gridBounds = globalCache.gridBounds;
 
         } else {
             // Build New
@@ -173,7 +231,7 @@ self.onmessage = (e: MessageEvent) => {
                 : undefined;
 
             // Build Grid
-            gridBounds = { startX: minX - PADDING, startY: minY - PADDING, endX: maxX + PADDING, endY: maxY + PADDING };
+            const gridBounds = { startX: minX - PADDING, startY: minY - PADDING, endX: maxX + PADDING, endY: maxY + PADDING };
             // [I-9] Use effectiveGridSize (graph-extent adaptive) instead of raw targetGridSize
             grid = buildPathfindingGrid(spatialIndex, gridBounds, effectiveGridSize);
 
@@ -201,9 +259,6 @@ self.onmessage = (e: MessageEvent) => {
         // [INDUSTRY STANDARD] Trunk Routing:
         // By sorting "Central" edges first and passing their paths as "Guide Lines" to siblings,
         // we encourage the A* algorithm (with MERGE_PATH cost) to bundle edges together.
-
-        if (unifiedConfig.debug) {
-        }
 
         // A. Pre-process Priorities
         const outgoing = new Map<string, any[]>();
@@ -547,6 +602,11 @@ self.onmessage = (e: MessageEvent) => {
             });
         }
     } else {
+        if (!isValidSinglePathfindingWorkerMessage(data)) {
+            postInvalidWorkerMessage(hasString(data.jobId) ? data.jobId : undefined, 'Invalid pathfinding request');
+            return;
+        }
+
         // [P2-3] Legacy / Single Mode Handling
         // Detect if we're receiving a PathFindingRequest { job, graph } or legacy flat data
         const isNewRequest = (data as any).job && (data as any).graph;
