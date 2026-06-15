@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * 节点数据验证工具
  * 用于确保节点数据中的尺寸与位置是“可用的安全数值”，避免 NaN/Infinity 传播到视图与 MiniMap。

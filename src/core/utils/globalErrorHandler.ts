@@ -4,8 +4,19 @@
  */
 
 import { safeLog } from './consoleCleanup';
-import { errorNotification } from './errorNotification';
 import { errorLogger } from './errorLogger';
+import { redactSensitiveLogValue } from './logSecurity';
+
+const notifyDevelopmentError = async (message: string): Promise<void> => {
+    if (process.env.NODE_ENV !== 'development') return;
+
+    try {
+        const { errorNotification } = await import('./errorNotification');
+        errorNotification.toast(message);
+    } catch (error) {
+        safeLog.warn('Failed to show development error notification:', error);
+    }
+};
 
 /**
  * 初始化全局错误处理
@@ -29,16 +40,14 @@ export function initGlobalErrorHandling() {
             return;
         }
 
-        console.error('Unhandled promise rejection:', event.reason);
+        console.error('Unhandled promise rejection:', redactSensitiveLogValue(event.reason));
 
         errorLogger.log(error, {
             level: 'error',
             source: 'unhandledRejection',
         });
 
-        if (process.env.NODE_ENV === 'development') {
-            errorNotification.toast(`Promise错误: ${error.message}`);
-        }
+        void notifyDevelopmentError(`Promise错误: ${error.message}`);
 
         // 阻止默认的错误提示
         event.preventDefault();
@@ -84,16 +93,14 @@ export function initGlobalErrorHandling() {
             return;
         }
 
-        console.error('Global error:', error);
+        console.error('Global error:', redactSensitiveLogValue(error));
 
         errorLogger.log(error, {
             level: 'error',
             source: 'globalError',
         });
 
-        if (process.env.NODE_ENV === 'development') {
-            errorNotification.toast(`全局错误: ${error.message}`);
-        }
+        void notifyDevelopmentError(`全局错误: ${error.message}`);
     });
 
     // 在开发环境中，提供控制台命令查看错误日志

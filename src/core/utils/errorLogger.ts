@@ -3,6 +3,8 @@
  * 本地存储和管理错误日志
  */
 
+import { redactSensitiveLogValue, sanitizeUrlForLog } from './logSecurity';
+
 export interface ErrorLog {
     id: string;
     timestamp: number;
@@ -16,9 +18,79 @@ export interface ErrorLog {
     source?: string;
 }
 
+const MAX_ERROR_LOGS = 50;
+const MAX_ERROR_LOG_STRING_LENGTH = 4000;
+const MAX_ERROR_LOG_ID_LENGTH = 120;
+const MAX_ERROR_LOGS_JSON_LENGTH = 2 * 1024 * 1024;
+
+const ERROR_LOG_LEVELS = new Set<ErrorLog['level']>(['error', 'warning', 'info']);
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+};
+
+const cleanString = (value: unknown, maxLength: number, fallback = ''): string => {
+    return typeof value === 'string' ? value.slice(0, maxLength) : fallback;
+};
+
+const cleanOptionalString = (value: unknown, maxLength: number): string | undefined => {
+    const cleaned = cleanString(value, maxLength);
+    return cleaned ? cleaned : undefined;
+};
+
+const cleanTimestamp = (value: unknown): number => {
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : Date.now();
+};
+
+const cleanErrorLog = (value: unknown): ErrorLog | null => {
+    if (!isRecord(value)) return null;
+
+    const id = cleanString(value.id, MAX_ERROR_LOG_ID_LENGTH);
+    const message = cleanString(value.message, MAX_ERROR_LOG_STRING_LENGTH);
+    if (!id || !message) return null;
+
+    const level = ERROR_LOG_LEVELS.has(value.level as ErrorLog['level'])
+        ? value.level as ErrorLog['level']
+        : 'error';
+
+    const redacted = redactSensitiveLogValue({
+        id,
+        timestamp: cleanTimestamp(value.timestamp),
+        message,
+        stack: cleanOptionalString(value.stack, MAX_ERROR_LOG_STRING_LENGTH),
+        componentStack: cleanOptionalString(value.componentStack, MAX_ERROR_LOG_STRING_LENGTH),
+        userAgent: cleanString(value.userAgent, MAX_ERROR_LOG_STRING_LENGTH),
+        url: sanitizeUrlForLog(cleanString(value.url, MAX_ERROR_LOG_STRING_LENGTH)),
+        userId: cleanOptionalString(value.userId, MAX_ERROR_LOG_ID_LENGTH),
+        level,
+        source: cleanOptionalString(value.source, MAX_ERROR_LOG_ID_LENGTH),
+    }) as ErrorLog;
+
+    return {
+        ...redacted,
+        id: cleanString(redacted.id, MAX_ERROR_LOG_ID_LENGTH),
+        message: cleanString(redacted.message, MAX_ERROR_LOG_STRING_LENGTH),
+        stack: cleanOptionalString(redacted.stack, MAX_ERROR_LOG_STRING_LENGTH),
+        componentStack: cleanOptionalString(redacted.componentStack, MAX_ERROR_LOG_STRING_LENGTH),
+        userAgent: cleanString(redacted.userAgent, MAX_ERROR_LOG_STRING_LENGTH),
+        url: sanitizeUrlForLog(cleanString(redacted.url, MAX_ERROR_LOG_STRING_LENGTH)),
+        userId: cleanOptionalString(redacted.userId, MAX_ERROR_LOG_ID_LENGTH),
+        source: cleanOptionalString(redacted.source, MAX_ERROR_LOG_ID_LENGTH),
+    };
+};
+
+export const coerceErrorLogs = (value: unknown, maxLogs: number = MAX_ERROR_LOGS): ErrorLog[] => {
+    if (!Array.isArray(value)) return [];
+    const limit = Math.max(0, Math.min(maxLogs, MAX_ERROR_LOGS));
+    return value
+        .slice(-limit)
+        .map(cleanErrorLog)
+        .filter((log): log is ErrorLog => log !== null);
+};
+
 class ErrorLogger {
     private logs: ErrorLog[] = [];
-    private readonly maxLogs = 50;
+    private readonly maxLogs = MAX_ERROR_LOGS;
     private readonly storageKey = 'app_error_logs';
 
     constructor() {
@@ -45,17 +117,17 @@ class ErrorLogger {
             return 'ignored';
         }
 
-        const errorLog: ErrorLog = {
+        const errorLog = redactSensitiveLogValue({
             id: this.generateId(),
             timestamp: Date.now(),
             message,
             stack: typeof error === 'object' ? error.stack : undefined,
             componentStack: options?.componentStack,
             userAgent: navigator.userAgent,
-            url: window.location.href,
+            url: sanitizeUrlForLog(window.location.href),
             level: options?.level || 'error',
             source: options?.source,
-        };
+        }) as ErrorLog;
 
         this.logs.push(errorLog);
 
@@ -114,7 +186,7 @@ class ErrorLogger {
         this.logs = [];
         try {
             localStorage.removeItem(this.storageKey);
-        } catch (e) {
+        } catch (_e) {
             console.warn('Failed to clear error logs from localStorage');
         }
     }
@@ -133,10 +205,15 @@ class ErrorLogger {
         try {
             const stored = localStorage.getItem(this.storageKey);
             if (stored) {
-                this.logs = JSON.parse(stored);
+                if (stored.length > MAX_ERROR_LOGS_JSON_LENGTH) {
+                    this.logs = [];
+                    return;
+                }
+                this.logs = coerceErrorLogs(JSON.parse(stored), this.maxLogs);
             }
-        } catch (e) {
+        } catch (_e) {
             console.warn('Failed to load error logs from localStorage');
+            this.logs = [];
         }
     }
 
@@ -146,7 +223,7 @@ class ErrorLogger {
     private persist() {
         try {
             localStorage.setItem(this.storageKey, JSON.stringify(this.logs));
-        } catch (e) {
+        } catch (_e) {
             console.warn('Failed to persist error logs to localStorage');
         }
     }

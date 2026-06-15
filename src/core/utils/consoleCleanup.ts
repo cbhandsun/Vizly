@@ -168,7 +168,7 @@ cleanupConsole();
 let isDebugMode = false;
 try {
   isDebugMode = localStorage.getItem('__diagram_debug_mode__') === 'true';
-} catch (e) {
+} catch {
   // Ignore localStorage errors
 }
 
@@ -186,7 +186,7 @@ export const initDevConsoleFilters = () => {
         isDebugMode = !isDebugMode;
         try {
           localStorage.setItem('__diagram_debug_mode__', String(isDebugMode));
-        } catch (err) {}
+        } catch {}
         
         if (isDebugMode) {
           originalLog.call(console, '🚀 [DiagramView] Debug Mode ENABLED! (Logs will show now)');

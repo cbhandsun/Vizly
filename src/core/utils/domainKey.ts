@@ -163,16 +163,6 @@ const ALT_KEYS: Record<string, string[]> = {
   'be-corp': ['backend'],
 };
 
-// 提取候选域键（按优先级）
-/**
- * 函数级注释：域候选提取
- * 仅从 domainClass 中提取候选，不再考虑 label，避免误用节点文案。
- */
-const extractCandidate = (source: NodeDomainSource): string | undefined => {
-  // 仅使用唯一域类标识
-  return source.domainClass;
-};
-
 // 判断主题是否包含域键
 const hasDomainKey = (theme: Theme | null | undefined, key?: string): boolean => {
   if (!theme || !key) return false;

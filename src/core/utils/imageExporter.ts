@@ -1,4 +1,5 @@
 import { getNodesBounds } from '@xyflow/react';
+import { sanitizeDownloadFileName } from './downloadUtils';
 
 export interface ExportOptions {
     format: 'png' | 'svg' | 'pdf' | 'jpg' | 'json';
@@ -8,11 +9,90 @@ export interface ExportOptions {
     embedMetadata?: boolean;
 }
 
+const MAX_EXPORT_DIMENSION = 12_000;
+const MAX_EXPORT_AREA = 80_000_000;
+const MAX_EXPORT_PIXEL_RATIO = 4;
+const MAX_METADATA_BYTES = 512 * 1024;
+const MAX_IMAGE_DATA_URL_CHARS = 32 * 1024 * 1024;
+
+const EXPORT_IMAGE_DATA_URL_PATTERN = /^data:image\/(png|jpeg|jpg);base64,([a-z0-9+/=\s]+)$/i;
+const EXPORT_SVG_DATA_URL_PATTERN = /^data:image\/svg\+xml(?:;charset=[\w-]+)?,/i;
+
+const clampNumber = (value: unknown, min: number, max: number, fallback: number): number => {
+    return typeof value === 'number' && Number.isFinite(value)
+        ? Math.max(min, Math.min(max, value))
+        : fallback;
+};
+
+const escapeXmlText = (value: string): string => value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+export const isSafeImageExportDataUrl = (dataUrl: unknown): dataUrl is string => {
+    if (typeof dataUrl !== 'string' || dataUrl.length > MAX_IMAGE_DATA_URL_CHARS) return false;
+    return EXPORT_IMAGE_DATA_URL_PATTERN.test(dataUrl) || EXPORT_SVG_DATA_URL_PATTERN.test(dataUrl);
+};
+
+export const imageExportDataUrlToBlob = (dataUrl: string): Blob => {
+    if (!isSafeImageExportDataUrl(dataUrl)) {
+        throw new Error('Unsafe image export data URL');
+    }
+
+    const match = dataUrl.match(EXPORT_IMAGE_DATA_URL_PATTERN);
+    if (!match) {
+        throw new Error('Only base64 PNG/JPEG data URLs can be converted to Blob');
+    }
+
+    const mime = match[1].toLowerCase() === 'jpg' ? 'image/jpeg' : `image/${match[1].toLowerCase()}`;
+    const base64 = match[2].replace(/\s+/g, '');
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index++) {
+        bytes[index] = binary.charCodeAt(index);
+    }
+    return new Blob([bytes], { type: mime });
+};
+
+const assertExportBounds = (width: number, height: number, pixelRatio: number): void => {
+    if (
+        width <= 0 ||
+        height <= 0 ||
+        width > MAX_EXPORT_DIMENSION ||
+        height > MAX_EXPORT_DIMENSION ||
+        width * height * pixelRatio * pixelRatio > MAX_EXPORT_AREA
+    ) {
+        throw new Error('Export image dimensions are too large');
+    }
+};
+
+const downloadHref = (href: string, filename: string): void => {
+    if (!isSafeImageExportDataUrl(href) && !href.startsWith('blob:') && !href.startsWith('data:text/json;charset=utf-8,')) {
+        throw new Error('Unsafe export download URL');
+    }
+
+    const link = document.createElement('a');
+    try {
+        link.href = href;
+        link.download = sanitizeDownloadFileName(filename, 'vizly-diagram');
+        link.rel = 'noopener noreferrer';
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+    } finally {
+        link.remove();
+        if (href.startsWith('blob:')) {
+            window.setTimeout(() => URL.revokeObjectURL(href), 0);
+        }
+    }
+};
+
 export const downloadImage = async (
     nodes: { id: string; position?: { x: number; y: number }; measured?: { width: number; height: number }; [key: string]: unknown }[],
     options: ExportOptions = { format: 'png' }
 ) => {
-    const { format = 'png', pixelRatio = 1, includeBackground = true, embedMetadata = true } = options;
+    const { format = 'png', includeBackground = true, embedMetadata = true } = options;
+    const pixelRatio = clampNumber(options.pixelRatio, 0.5, MAX_EXPORT_PIXEL_RATIO, 1);
     // 1. Calculate Bounding Box
     // We want to export the VALID nodes only (not hidden ones if any)
     const bounds = getNodesBounds(nodes as any);
@@ -30,23 +110,20 @@ export const downloadImage = async (
         return;
     }
 
+    const exportWidth = bounds.width + 100;
+    const exportHeight = bounds.height + 100;
+    assertExportBounds(exportWidth, exportHeight, pixelRatio);
+
     const exportOptions = {
         backgroundColor: includeBackground ? '#fff' : 'transparent',
-        width: bounds.width + 100,
-        height: bounds.height + 100,
+        width: exportWidth,
+        height: exportHeight,
         pixelRatio,
         style: {
-            width: `${bounds.width + 100}px`,
-            height: `${bounds.height + 100}px`,
+            width: `${exportWidth}px`,
+            height: `${exportHeight}px`,
             transform: `translate(${-bounds.x + 50}px, ${-bounds.y + 50}px) scale(1)`,
         },
-    };
-
-    const download = (dataUrl: string, filename: string) => {
-        const a = document.createElement('a');
-        a.setAttribute('download', filename);
-        a.setAttribute('href', dataUrl);
-        a.click();
     };
 
     const filename = `vizly-diagram-${new Date().getTime()}`;
@@ -62,10 +139,15 @@ export const downloadImage = async (
             exportedAt: new Date().toISOString()
         });
 
+        if (new TextEncoder().encode(stateJson).byteLength > MAX_METADATA_BYTES) {
+            return dataUrl;
+        }
+
         if (format === 'svg') {
+            if (!isSafeImageExportDataUrl(dataUrl)) return dataUrl;
             // SVG: 插入 metadata 标签
             const decoded = decodeURIComponent(dataUrl.replace('data:image/svg+xml;charset=utf-8,', ''));
-            const metadataTag = `<metadata id="vizly-state">${stateJson}</metadata>`;
+            const metadataTag = `<metadata id="vizly-state">${escapeXmlText(stateJson)}</metadata>`;
             const updatedSvg = decoded.replace('</svg>', `${metadataTag}</svg>`);
             return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(updatedSvg)}`;
         }
@@ -73,8 +155,7 @@ export const downloadImage = async (
         if (format === 'png' || format === 'jpg') {
             // PNG/JPG: 在末尾追加数据
             try {
-                const response = await fetch(dataUrl);
-                const blob = await response.blob();
+                const blob = imageExportDataUrlToBlob(dataUrl);
                 const buffer = await blob.arrayBuffer();
                 
                 const metaMarkerStart = '\nVIZLY_META_START\n';
@@ -106,7 +187,7 @@ export const downloadImage = async (
             const { toPng } = await import('html-to-image');
             toPng(viewportElem, exportOptions).then(async (dataUrl: string) => {
                 const finalUrl = await injectMetadata(dataUrl, { nodes });
-                download(finalUrl, `${filename}.png`);
+                downloadHref(finalUrl, `${filename}.png`);
             });
             break;
         }
@@ -114,7 +195,7 @@ export const downloadImage = async (
             const { toJpeg } = await import('html-to-image');
             toJpeg(viewportElem, exportOptions).then(async (dataUrl: string) => {
                 const finalUrl = await injectMetadata(dataUrl, { nodes });
-                download(finalUrl, `${filename}.jpg`);
+                downloadHref(finalUrl, `${filename}.jpg`);
             });
             break;
         }
@@ -122,7 +203,7 @@ export const downloadImage = async (
             const { toSvg } = await import('html-to-image');
             toSvg(viewportElem, exportOptions).then(async (dataUrl: string) => {
                 const finalUrl = await injectMetadata(dataUrl, { nodes });
-                download(finalUrl, `${filename}.svg`);
+                downloadHref(finalUrl, `${filename}.svg`);
             });
             break;
         }
@@ -142,7 +223,7 @@ export const downloadImage = async (
         }
         case 'json': {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ nodes, timestamp: new Date() }));
-            download(dataStr, `${filename}.json`);
+            downloadHref(dataStr, `${filename}.json`);
             break;
         }
     }
@@ -151,7 +232,7 @@ export const downloadImage = async (
 /**
  * 拷贝图表到剪贴板 (Phase 10)
  */
-export const copyImageToClipboard = async (nodes: any[]) => {
+export const copyImageToClipboard = async (_nodes: any[]) => {
     const viewportElem = document.querySelector('.react-flow__viewport') as HTMLElement;
     if (!viewportElem) return;
 

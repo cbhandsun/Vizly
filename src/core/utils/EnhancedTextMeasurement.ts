@@ -3,6 +3,8 @@
  * 集成缓存机制、批量处理和性能优化
  */
 
+import { sanitizeMarkdownHtml } from './sanitizeHtml';
+
 interface TextMeasurementOptions {
   fontSize?: number;
   fontFamily?: string;
@@ -172,7 +174,7 @@ export class EnhancedTextMeasurement {
    */
   private parseHtmlContent(htmlContent: string): string[] {
     const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
+    tempDiv.innerHTML = sanitizeMarkdownHtml(htmlContent);
     
     const lines: string[] = [];
     let currentLine = '';
