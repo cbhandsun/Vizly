@@ -1,10 +1,17 @@
-// @ts-nocheck
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import Cascader from 'antd/es/cascader';
+import type { DefaultOptionType } from 'antd/es/cascader';
 import { SearchOutlined, ApartmentOutlined, CloudOutlined, DatabaseOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import { useDiagramStorage } from '../hooks/useDiagramStorage';
-
-export const CUSTOM_PRESETS_STORAGE_KEY = 'diagram-custom-presets';
+import { readCustomPresetMap } from '@/core/utils/customPresetStorage';
+import {
+  GENERAL_CATEGORIES,
+  coerceCascaderPath,
+  getRootGroupFromPath,
+  normalizeTemplateItem,
+  normalizeTemplateMenuId,
+  normalizeTemplateMenuText,
+} from './templateCascaderOptions';
 
 export interface TemplateCascaderMenuProps {
   value?: string[];
@@ -16,8 +23,11 @@ export interface TemplateCascaderMenuProps {
   children?: React.ReactNode;
 }
 
-// 被视为「通用」的 category 值
-const GENERAL_CATEGORIES = new Set(['general', '通用', 'general_template']);
+interface CascaderOption extends DefaultOptionType {
+  value: string;
+  label: React.ReactNode;
+  children?: CascaderOption[];
+}
 
 export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
   value,
@@ -29,55 +39,50 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
   children
 }) => {
   const { s3Diagrams, supabaseDiagrams, systemTemplates, fetchCloudList } = useDiagramStorage();
-
-  useEffect(() => {
-    fetchCloudList();
-  }, [fetchCloudList]);
+  const hasFetchedCloudListRef = React.useRef(false);
 
   const [cascaderKey, setCascaderKey] = React.useState(0);
 
   const cascaderOptions = useMemo(() => {
-    interface CascaderOption {
-      value: string;
-      label: string | React.ReactNode;
-      children?: CascaderOption[];
-    }
     const options: CascaderOption[] = [];
 
     // --- 1. 行业模板库 (System Templates from Supabase，按 category 分组) ---
     if (systemTemplates && systemTemplates.length > 0) {
+      const normalizedTemplates = systemTemplates
+        .map(normalizeTemplateItem)
+        .filter((item): item is { id: string; title: string; category: string } => !!item);
       // 行业模版：category 不是 general 的
-      const industryTemplates = systemTemplates.filter(t => !GENERAL_CATEGORIES.has(t.category));
+      const industryTemplates = normalizedTemplates.filter(t => !GENERAL_CATEGORIES.has(t.category));
       // 通用模版：category 是 general 的
-      const generalTemplates = systemTemplates.filter(t => GENERAL_CATEGORIES.has(t.category));
+      const generalTemplates = normalizedTemplates.filter(t => GENERAL_CATEGORIES.has(t.category));
 
-      if (industryTemplates.length > 0) {
-        // 按 category 分组
-        const byCategory: Record<string, any[]> = {};
-        industryTemplates.forEach(t => {
-          const cat = t.category || '其他行业';
-          if (!byCategory[cat]) byCategory[cat] = [];
-          byCategory[cat].push(t);
-        });
+      const systemChildren: CascaderOption[] = [];
+      const byCategory: Record<string, Array<{ id: string; title: string; category: string }>> = {};
+      industryTemplates.forEach(t => {
+        const cat = t.category;
+        if (!byCategory[cat]) byCategory[cat] = [];
+        byCategory[cat].push(t);
+      });
 
-        const industryChildren: CascaderOption[] = Object.entries(byCategory).map(([cat, items]) => ({
-          value: `industry-cat-${cat}`,
-          label: cat,
-          children: items.map(d => ({ value: d.id, label: d.title }))
-        }));
+      systemChildren.push(...Object.entries(byCategory).map(([cat, items]) => ({
+        value: `category:${cat}`,
+        label: cat,
+        children: items.map(d => ({ value: d.id, label: d.title }))
+      })));
 
-        options.push({
-          value: 'industry-templates',
-          label: <span><ApartmentOutlined style={{ marginRight: 8, color: '#eb2f96' }} />行业模板库</span>,
-          children: industryChildren
+      if (generalTemplates.length > 0) {
+        systemChildren.push({
+          value: 'category:general',
+          label: '通用模版',
+          children: generalTemplates.map(d => ({ value: d.id, label: d.title }))
         });
       }
 
-      if (generalTemplates.length > 0) {
+      if (systemChildren.length > 0) {
         options.push({
-          value: 'general-templates',
-          label: <span><ApartmentOutlined style={{ marginRight: 8, color: '#1677ff' }} />通用模版</span>,
-          children: generalTemplates.map(d => ({ value: d.id, label: d.title }))
+          value: 'system-templates',
+          label: <span><ApartmentOutlined style={{ marginRight: 8, color: '#eb2f96' }} />模板库</span>,
+          children: systemChildren
         });
       }
     }
@@ -87,7 +92,13 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       options.push({
         value: 's3',
         label: <span><CloudOutlined style={{ marginRight: 8, color: '#fa8c16' }} />S3 存储</span>,
-        children: s3Diagrams.map(d => ({ value: d.id, label: d.title || d.id }))
+        children: s3Diagrams
+          .map(d => {
+            const id = normalizeTemplateMenuId(d.id);
+            if (!id) return null;
+            return { value: id, label: normalizeTemplateMenuText(d.title, id) || id };
+          })
+          .filter((option): option is CascaderOption => !!option)
       });
     }
 
@@ -96,25 +107,35 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       options.push({
         value: 'supabase',
         label: <span><DatabaseOutlined style={{ marginRight: 8, color: '#3eaf7c' }} />个人云端图表</span>,
-        children: supabaseDiagrams.map(d => ({ value: d.id, label: d.title || d.id }))
+        children: supabaseDiagrams
+          .map(d => {
+            const id = normalizeTemplateMenuId(d.id);
+            if (!id) return null;
+            return { value: id, label: normalizeTemplateMenuText(d.title, id) || id };
+          })
+          .filter((option): option is CascaderOption => !!option)
       });
     }
 
     // --- 4. 本地自定义 (Custom saved presets in localStorage) ---
+    let customKeys: string[] = [];
     try {
-      const raw = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY);
-      if (raw) {
-        const customMap = JSON.parse(raw);
-        const customKeys = Object.keys(customMap);
-        if (customKeys.length > 0) {
-          options.push({
-            value: 'local-workspace',
-            label: <span><FolderOpenOutlined style={{ marginRight: 8, color: '#8c8c8c' }} />本地工作区</span>,
-            children: customKeys.map(k => ({ value: `custom:${k}`, label: k }))
-          });
-        }
-      }
+      customKeys = Object.keys(readCustomPresetMap());
     } catch { /* ignore */ }
+    const customOptions = customKeys
+      .map(k => {
+        const id = normalizeTemplateMenuId(k);
+        if (!id) return null;
+        return { value: `custom:${id}`, label: id };
+      })
+      .filter((option): option is CascaderOption => !!option);
+    if (customOptions.length > 0) {
+      options.push({
+        value: 'local-workspace',
+        label: <span><FolderOpenOutlined style={{ marginRight: 8, color: '#8c8c8c' }} />本地工作区</span>,
+        children: customOptions
+      });
+    }
 
     return options;
   }, [s3Diagrams, supabaseDiagrams, systemTemplates, templatesOnly]);
@@ -123,6 +144,10 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
     <Cascader
       key={cascaderKey}
       onOpenChange={(visible) => {
+        if (visible && !hasFetchedCloudListRef.current) {
+          hasFetchedCloudListRef.current = true;
+          void fetchCloudList();
+        }
         if (!visible) {
           setTimeout(() => setCascaderKey(k => k + 1), 300);
         }
@@ -130,19 +155,16 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       options={cascaderOptions}
       value={value}
       onChange={(val) => {
-        if (val && val.length > 0) {
-          const rootGroup = String(val[0]);
-          const key = String(val[val.length - 1]);
-          if (onChange) {
-            onChange(val as string[], key, rootGroup);
-          }
-        } else if (!val || val.length === 0) {
-          if (onChange) {
-            onChange([], '', '');
-          }
+        const path = coerceCascaderPath(val);
+        const rootGroup = getRootGroupFromPath(path);
+        const leafKey = path[path.length - 1] || '';
+        if (path.length > 0 && rootGroup) {
+          onChange?.(path, leafKey, rootGroup);
+        } else {
+          onChange?.([], '', '');
         }
       }}
-      displayRender={(labels, selectedOptions) => {
+      displayRender={(labels) => {
         if (!labels || labels.length === 0) return '';
         const lastLabel = labels[labels.length - 1];
         if (labels.length === 1) return lastLabel;

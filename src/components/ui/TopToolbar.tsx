@@ -1,11 +1,16 @@
-// @ts-nocheck
+import type React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Space, Divider, Select, theme, Tooltip } from 'antd';
-import { GlobalOutlined } from '@ant-design/icons';
+import { Button, Space, Divider, Select, theme } from 'antd';
+import { SearchOutlined } from '@ant-design/icons';
 import { EnhancedThemeSelector } from './EnhancedThemeSelector';
 import EnhancedStyleSwitcher from '../shared/EnhancedStyleSwitcher';
 import { LanguageSwitcher } from '../shared/LanguageSwitcher';
 import ExportTools from '../ExportTools';
+import {
+  getToolbarPopupContainer,
+  isToolbarEdgeMode,
+  type ToolbarEdgeMode,
+} from './topToolbarGuards';
 
 export interface TopToolbarProps {
   /**
@@ -19,11 +24,11 @@ export interface TopToolbarProps {
   /**
    * 当前连线模式（smart/advanced-smart/native），用于下拉选择器显示与联动
    */
-  edgeMode: 'advanced-smart' | 'native';
+  edgeMode: ToolbarEdgeMode;
   /**
    * 切换连线模式的回调（由外部图组件维护状态）
    */
-  onEdgeModeChange: (mode: 'advanced-smart' | 'native') => void;
+  onEdgeModeChange: (mode: ToolbarEdgeMode) => void;
   /**
    * 是否处于全屏；若外层维护全屏状态，可传入以同步图标展示
    */
@@ -82,13 +87,15 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
   onEdgeModeChange,
   isFullscreen,
   onToggleFullscreen,
-  _setIsCommandOpen,
+  setIsCommandOpen,
   showThemeSelector = true,
   showStyleSwitcher = true,
   showExport = true,
   leftChildren,
+  centerChildren,
   rightChildren,
   title,
+  hideCenterIsland = false,
 }) => {
   const { t } = useTranslation();
   const { token } = theme.useToken();
@@ -102,9 +109,11 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
         <Select
           size="small"
           value={edgeMode}
-          onChange={(value) => onEdgeModeChange(value as 'advanced-smart' | 'native')}
+          onChange={(value) => {
+            if (isToolbarEdgeMode(value)) onEdgeModeChange(value);
+          }}
           style={{ width: 120 }}
-          getPopupContainer={(trigger) => (document.fullscreenElement as HTMLElement) || trigger.parentElement || document.body}
+          getPopupContainer={getToolbarPopupContainer}
           options={[
             { value: 'advanced-smart', label: t('header.smart') },
             { value: 'native', label: t('header.native') },
@@ -153,6 +162,12 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
           {leftChildren}
         </Space>
 
+        {!hideCenterIsland && centerChildren && (
+          <Space size={8}>
+            {centerChildren}
+          </Space>
+        )}
+
         {/* 右侧功能区 */}
         <Space size={16} split={<Divider orientation="vertical" style={{ height: 16 }} />}>
           <Space size={12}>
@@ -160,6 +175,15 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
           </Space>
 
           <Space size={12}>
+            {setIsCommandOpen && (
+              <Button
+                size="small"
+                icon={<SearchOutlined />}
+                onClick={() => setIsCommandOpen(true)}
+              >
+                {t('common.search', 'Search')}
+              </Button>
+            )}
             {showExport && (
               <ExportTools
                 diagramId={diagramId}

@@ -1,13 +1,27 @@
-// @ts-nocheck
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Layout, theme, Button, ConfigProvider } from 'antd';
+import { Layout, Button, ConfigProvider } from 'antd';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { ModernTopToolbar } from '../ui/ModernTopToolbar';
-import { TopToolbarProps } from '../ui/TopToolbar';
+import type { TopToolbarProps } from '../ui/TopToolbar';
 import ModernDiagramMenu from '../ModernDiagramMenu';
 import { ModernFlowchartSidebar } from '@/core/components/diagrams/ModernFlowchartSidebar';
 import type { DiagramDefinition } from '@/core/types/diagram-components';
 import { diagramConfigManager } from '@/core/components/config/DiagramConfig';
+import {
+  readDesignerRightSidebarVisible,
+  readDesignerRightSidebarWidth,
+  readLayoutFlowSidebarWidth,
+  readLayoutMenuWidth,
+  writeLayoutFlowSidebarWidth,
+  writeLayoutMenuWidth,
+} from '@/core/utils/layoutStorage';
+import {
+  getLayoutPopupContainer,
+  getNextSidebarWidth,
+  getSidebarOffsets,
+  resolveUiScale,
+  type DragState,
+} from './diagramLayoutGuards';
 
 const { Header, Sider, Content } = Layout;
 
@@ -52,56 +66,41 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
   isPresentationMode = false,
   children
 }) => {
-  const { token } = theme.useToken();
-
   const uiScale = React.useMemo(() => {
     try {
-      const qs = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-      const urlScale = parseFloat(qs.get('uiScale') || '');
-      if (!isNaN(urlScale) && urlScale > 0.3 && urlScale <= 3) return urlScale;
-      return diagramConfigManager.getConfig().ui?.scale ?? 1.0;
+      return resolveUiScale(
+        typeof window !== 'undefined' ? window.location.search : '',
+        diagramConfigManager.getConfig().ui?.scale,
+      );
     } catch { return 1.0; }
   }, []);
 
   const [menuWidth, setMenuWidth] = useState<number>(() => {
-    try {
-      const raw = localStorage.getItem('layout.menuWidth');
-      const v = raw ? Number(raw) : 304;
-      return Number.isFinite(v) ? v : 304;
-    } catch {
-      return 304;
-    }
+    return readLayoutMenuWidth();
   });
   const [flowSidebarWidth, setFlowSidebarWidth] = useState<number>(() => {
-    try {
-      const raw = localStorage.getItem('layout.flowSidebarWidth');
-      const v = raw ? Number(raw) : 260;
-      return Number.isFinite(v) ? v : 260;
-    } catch {
-      return 260;
-    }
+    return readLayoutFlowSidebarWidth();
   });
+  const hasMenuProps = !!menuProps;
+  const menuIsCollapsed = menuProps?.isCollapsed ?? false;
 
   useEffect(() => {
-    try { localStorage.setItem('layout.menuWidth', String(menuWidth)); } catch { void 0; }
+    writeLayoutMenuWidth(menuWidth);
   }, [menuWidth]);
   useEffect(() => {
-    try { localStorage.setItem('layout.flowSidebarWidth', String(flowSidebarWidth)); } catch { void 0; }
+    writeLayoutFlowSidebarWidth(flowSidebarWidth);
   }, [flowSidebarWidth]);
 
-  const dragRef = useRef<null | { kind: 'menu' | 'flow'; startX: number; startWidth: number }>(null);
+  const dragRef = useRef<DragState | null>(null);
 
   const onDragMove = useCallback((ev: MouseEvent) => {
     const st = dragRef.current;
     if (!st) return;
-    const dx = ev.clientX - st.startX;
     if (st.kind === 'menu') {
-      const next = Math.max(220, Math.min(520, st.startWidth + dx));
-      setMenuWidth(next);
+      setMenuWidth(getNextSidebarWidth(st, ev.clientX));
       return;
     }
-    const next = Math.max(200, Math.min(520, st.startWidth + dx));
-    setFlowSidebarWidth(next);
+    setFlowSidebarWidth(getNextSidebarWidth(st, ev.clientX));
   }, []);
 
   const stopDrag = useCallback(() => {
@@ -150,34 +149,28 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
   }, [flowchartSidebarProps, flowSidebarWidth, onDragMove, showFlowchartSidebar, stopDrag]);
 
   useEffect(() => {
-    if (isPresentationMode || !showMenu || !menuProps) {
+    if (isPresentationMode || !showMenu || !hasMenuProps) {
       document.documentElement.style.setProperty('--left-sidebar-offset', '0px');
       document.documentElement.style.setProperty('--max-sidebar-offset', '0px');
       return;
     }
     
-    const isCollapsed = menuProps.isCollapsed;
-    const leftOffset = isCollapsed ? 64 + 16 : menuWidth + 16;
+    const rightSidebarVisible = readDesignerRightSidebarVisible();
+    const rightSidebarWidth = readDesignerRightSidebarWidth();
+    const { leftSidebarOffset, maxSidebarOffset } = getSidebarOffsets(
+      menuIsCollapsed,
+      menuWidth,
+      rightSidebarVisible,
+      rightSidebarWidth
+    );
     
-    const rightSidebarVisible = localStorage.getItem('designer.rightSidebar.visible') !== 'false';
-    const rightSidebarWidth = parseInt(localStorage.getItem('designer.rightSidebar.width') || '360', 10);
-    const rightOffset = rightSidebarVisible ? rightSidebarWidth + 16 : 0;
-    
-    const maxOffset = Math.max(leftOffset, rightOffset);
-    
-    document.documentElement.style.setProperty('--left-sidebar-offset', `${leftOffset}px`);
-    document.documentElement.style.setProperty('--max-sidebar-offset', `${maxOffset}px`);
-  }, [menuProps?.isCollapsed, menuWidth, showMenu, isPresentationMode]);
+    document.documentElement.style.setProperty('--left-sidebar-offset', `${leftSidebarOffset}px`);
+    document.documentElement.style.setProperty('--max-sidebar-offset', `${maxSidebarOffset}px`);
+  }, [menuIsCollapsed, menuWidth, showMenu, hasMenuProps, isPresentationMode]);
 
   return (
     <ConfigProvider
-      getPopupContainer={(node) => {
-        if (node) {
-          const layoutRoot = node.closest('#app-root-layout') as HTMLElement;
-          if (layoutRoot) return layoutRoot;
-        }
-        return document.getElementById('app-root-layout') || document.body;
-      }}
+      getPopupContainer={(node) => getLayoutPopupContainer(node)}
       theme={{
         token: {
           fontSize: Math.max(12, Math.floor(14 * uiScale)),

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   FaChevronRight,
@@ -21,10 +20,23 @@ import { MoreOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { DiagramDefinition } from '@/core/types/diagram-components';
 import { useConfigIntegration } from '@/core/hooks/useConfigIntegration';
-import { PanelZoomApi, usePanelZoom } from '@/core/hooks/usePanelZoom';
+import { usePanelZoom, type PanelZoomApi } from '@/core/hooks/usePanelZoom';
 import { AuthStatusCompact } from './auth/AuthStatus';
 import { useDiagramFilter } from '@/core/hooks/useDiagramFilter';
 import { useDiagramHostStorage } from '@/core/hooks/useDiagramHostStorage';
+import {
+  readCollapsedGroups,
+  readMenuScrollTop,
+  writeCollapsedGroups,
+  writeMenuScrollTop,
+} from '@/core/utils/diagramMenuStorage';
+import {
+  getDiagramDataSelector,
+  getDiagramIcon,
+  normalizeDiagramCategory,
+  normalizeDiagramId,
+  normalizeThemeId,
+} from './modernDiagramMenuGuards';
 
 interface ModernDiagramMenuProps {
   diagrams?: DiagramDefinition[];
@@ -113,12 +125,7 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
 
   // 分组折叠状态
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
-    try {
-      const raw = localStorage.getItem('diagramMenu.collapsedGroups');
-      const parsed = raw ? JSON.parse(raw) : null;
-      if (parsed && typeof parsed === 'object') return parsed;
-    } catch { void 0; }
-    return { debug: true };
+    return readCollapsedGroups({ debug: true });
   });
 
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -172,8 +179,9 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
   const allCategories = useMemo(() => {
     const cats = new Set<string>();
     diagrams.forEach(d => {
-      if (d.category && d.category !== 'debug' && (d.category as string) !== 'other') {
-        cats.add(d.category);
+      const category = normalizeDiagramCategory(d.category);
+      if (category !== 'debug' && category !== 'other') {
+        cats.add(category);
       }
     });
     return Array.from(cats);
@@ -197,7 +205,7 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
     if (searchTerm.trim()) {
       const catsToExpand = new Set<string>();
       filteredDiagrams.forEach(d => {
-        catsToExpand.add((d.category as string) || 'other');
+        catsToExpand.add(normalizeDiagramCategory(d.category));
       });
 
       if (catsToExpand.size > 0) {
@@ -222,7 +230,7 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
   const groupedDiagrams = useMemo(() => {
     const groups: Record<string, DiagramDefinition[]> = {};
     filteredDiagrams.forEach((d: DiagramDefinition) => {
-      const cat = d.category || 'other';
+      const cat = normalizeDiagramCategory(d.category);
       if (cat === 'debug') return; // 二次保险，排除测试项
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(d);
@@ -244,8 +252,8 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
   // Need to remove the old implementation of toggleFavorite.
 
   const handleSelect = (id: string) => {
-    const sid = String(id);
-    onSelectDiagram(sid);
+    const sid = normalizeDiagramId(id);
+    if (sid) onSelectDiagram(sid);
   };
 
   // Removed clearFavorites local function as it is imported from hook
@@ -257,7 +265,7 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
   }, [diagrams, favoriteIds]);
 
   const renderDiagramRow = (diagram: DiagramDefinition, size: 'md' | 'sm') => {
-    const IconComponent = diagram.icon || FaSitemap;
+    const IconComponent = getDiagramIcon(diagram);
     const displayName = diagram.titleKey ? t(diagram.titleKey) : diagram.name;
     const isSelected = diagram.id === selectedDiagram;
     const isFav = favoriteIds.includes(String(diagram.id));
@@ -273,7 +281,7 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
         key={diagram.id}
         title={displayName}
         onClick={() => handleSelect(diagram.id)}
-        data-diagram-id={diagram.id}
+        data-diagram-id={normalizeDiagramId(diagram.id) ?? undefined}
         className={itemClass}
         role="button"
         tabIndex={0}
@@ -294,7 +302,8 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              toggleFavorite(diagram.id);
+              const diagramId = normalizeDiagramId(diagram.id);
+              if (diagramId) toggleFavorite(diagramId);
             }}
           />
         </span>
@@ -310,22 +319,21 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
   };
 
   useEffect(() => {
-    try { localStorage.setItem('diagramMenu.collapsedGroups', JSON.stringify(collapsedGroups || {})); } catch { void 0; }
+    writeCollapsedGroups(collapsedGroups || {});
   }, [collapsedGroups]);
 
   useEffect(() => {
     try {
       const el = listRef.current;
       if (!el) return;
-      const raw = localStorage.getItem('diagramMenu.scrollTop');
-      const v = raw ? Number(raw) : NaN;
-      if (Number.isFinite(v) && v >= 0) el.scrollTop = v;
+      const scrollTop = readMenuScrollTop();
+      if (scrollTop !== null) el.scrollTop = scrollTop;
     } catch { void 0; }
   }, []);
 
   useEffect(() => {
     try {
-      const selectedCat = diagrams.find(d => d.id === selectedDiagram)?.category || 'other';
+      const selectedCat = normalizeDiagramCategory(diagrams.find(d => d.id === selectedDiagram)?.category);
       if (!didInitialEnsureVisibleRef.current && selectedCat && selectedCat !== 'other') {
         didInitialEnsureVisibleRef.current = true;
         if (collapsedGroups[selectedCat]) {
@@ -342,13 +350,15 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
       const el = listRef.current;
       if (!el) return;
       if (!selectedDiagram) return;
-      const target = el.querySelector(`[data-diagram-id="${CSS.escape(String(selectedDiagram))}"]`) as HTMLElement | null;
+      const selector = getDiagramDataSelector(selectedDiagram);
+      if (!selector) return;
+      const target = el.querySelector(selector);
       if (target) target.scrollIntoView({ block: 'nearest' });
     } catch { void 0; }
   }, [selectedDiagram]);
 
   const navigateToDocsPreview = () => {
-    window.open('/docs', '_blank');
+    window.open('/docs', '_blank', 'noopener,noreferrer');
   };
 
   const renderFilterContent = () => (
@@ -386,7 +396,10 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
             <AntButton
               key={themeId}
               type={currentTheme === themeId ? 'primary' : 'text'}
-              onClick={() => { tm.setTheme(themeId); }}
+              onClick={() => {
+                const normalizedThemeId = normalizeThemeId(themeId);
+                if (normalizedThemeId) tm.setTheme(normalizedThemeId);
+              }}
               className="text-left flex items-center gap-2 w-full px-2 py-1"
             >
               <span className="inline-block w-4 h-4 rounded-full border border-black/10 dark:border-white/10" style={{ backgroundColor: tm.getThemeColor(themeId, 'primary') || '#ccc' }} />
@@ -481,7 +494,7 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
         onScroll={(e) => {
           try {
             const el = e.currentTarget as HTMLDivElement;
-            localStorage.setItem('diagramMenu.scrollTop', String(el.scrollTop || 0));
+            writeMenuScrollTop(el.scrollTop || 0);
           } catch { void 0; }
         }}
       >
@@ -509,8 +522,9 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
 
           {Object.entries(groupedDiagrams).map(([cat, items]) => {
             const isCollapsed = collapsedGroups[cat];
-            const GroupIcon = categoryIcons[cat] || FaProjectDiagram;
-            const groupColor = categoryColors[cat] || 'var(--color-primary-500)';
+            const normalizedCat = normalizeDiagramCategory(cat);
+            const GroupIcon = categoryIcons[normalizedCat] || FaProjectDiagram;
+            const groupColor = categoryColors[normalizedCat] || 'var(--color-primary-500)';
             const isExpanded = !isCollapsed;
 
             return (
@@ -526,7 +540,7 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
                 >
                   <div className="flex items-center gap-2 flex-1">
                     <GroupIcon className={`text-[12px] transition-colors duration-200 ${isExpanded ? 'text-[var(--group-color)]' : 'text-slate-400'}`} aria-hidden="true" />
-                    <span className={`text-[13px] font-semibold transition-colors duration-200 ${isExpanded ? 'text-slate-700 dark:text-slate-200' : 'text-slate-600 dark:text-slate-400'}`}>{t(categoryLabelKeys[cat] || cat)}</span>
+                    <span className={`text-[13px] font-semibold transition-colors duration-200 ${isExpanded ? 'text-slate-700 dark:text-slate-200' : 'text-slate-600 dark:text-slate-400'}`}>{t(categoryLabelKeys[normalizedCat] || normalizedCat)}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] px-1.5 py-0.5 rounded-[10px] bg-black/5 dark:bg-white/10 text-slate-400 font-semibold">{items.length}</span>

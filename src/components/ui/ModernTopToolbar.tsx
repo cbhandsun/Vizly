@@ -1,20 +1,16 @@
-// @ts-nocheck
-import React, { useState, useMemo } from 'react';
-import { Button, Grid, Select, Typography, Space, Tooltip, Popover, theme, Dropdown } from 'antd';
-import { SearchOutlined, HomeOutlined, RightOutlined, MoreOutlined, CheckCircleOutlined, EllipsisOutlined } from '@ant-design/icons';
+import React, { useMemo } from 'react';
+import { Grid, Select, Tooltip, Popover } from 'antd';
+import { SearchOutlined, RightOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import ExportTools from '../ExportTools';
 import { EnhancedThemeSelector } from './EnhancedThemeSelector';
-import EnhancedStyleSwitcher from '../shared/EnhancedStyleSwitcher';
 import { LanguageSwitcher } from '../shared/LanguageSwitcher';
 import { AuthStatusCompact } from '../auth/AuthStatus';
 import { FaChevronDown, FaEllipsisV } from 'react-icons/fa';
-import { TopToolbarProps } from './TopToolbar';
-import { motion, AnimatePresence } from 'framer-motion';
+import type { TopToolbarProps } from './TopToolbar';
+import { getToolbarPopupContainer, isToolbarEdgeMode } from './topToolbarGuards';
 
 export type { TopToolbarProps };
-
-const { Text } = Typography;
 
 /**
  * ModernTopToolbar (Hyper-Glass V3.1 - Indestructible Layout)
@@ -43,7 +39,6 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   const screens = Grid.useBreakpoint();
   
   // Responsive flags
-  const _isCompact = !screens.xl; // < 1200px
   const isMobile = !screens.md;  // < 768px
   
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '');
@@ -61,8 +56,11 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
         <Select
           variant="filled"
           value={edgeMode}
-          onChange={(value) => { onEdgeModeChange(value as 'advanced-smart' | 'native'); }}
+          onChange={(value) => {
+            if (isToolbarEdgeMode(value)) onEdgeModeChange(value);
+          }}
           style={{ width: '100%', fontSize: '13px' }}
+          getPopupContainer={getToolbarPopupContainer}
           options={[
             { value: 'advanced-smart', label: t('header.smart') },
             { value: 'native', label: t('header.native') },

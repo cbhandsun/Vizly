@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Select, Switch } from 'antd';
@@ -7,25 +6,36 @@ import {
     Zap, 
     Layers, 
     Settings2, 
-    _LineChart, 
     Filter, 
     ChevronRight,
     Cpu,
-    Sparkles
+    Sparkles,
+    type LucideIcon
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import EnhancedStyleSwitcher from '@/components/shared/EnhancedStyleSwitcher';
 import { EnhancedThemeSelector } from './EnhancedThemeSelector';
-import { LayoutStrategyManager } from '@/core/strategies/LayoutStrategyManager';
+import { LayoutStrategyManager, type ILayoutStrategy } from '@/core/strategies/LayoutStrategyManager';
 import { LayeredConfigManager, ConfigLayer } from '@/core/config/LayeredConfigManager';
 import type { DiagramDefinition } from '@/core/types/diagram-components';
 import { ConfigurationPanel } from './ConfigurationPanel';
+import type { ToolbarEdgeMode } from './topToolbarGuards';
+import {
+    getEngineNodeLayout,
+    isAvailableStrategyType,
+    isCytoscapeStrategy,
+    isDiagramEdgeMode,
+    normalizeDiagramEdgeMode,
+    normalizeElkAlgorithm,
+    normalizeLayoutName,
+    parseLayoutPresetValue
+} from './diagramSettingsGuards';
 
 interface DiagramSettingsPanelProps {
     selectedDiagram?: DiagramDefinition;
     selectedDiagramId: string;
     edgeMode: string;
-    onEdgeModeChange: (val: 'advanced-smart' | 'native') => Promise<void>;
+    onEdgeModeChange: (val: ToolbarEdgeMode) => Promise<void>;
     layoutStrategy: string;
     onLayoutStrategyChange: (val: string) => Promise<void>;
     nodeLayoutStrategy: string;
@@ -38,9 +48,22 @@ interface DiagramSettingsPanelProps {
     onRefreshRequest: () => void;
 }
 
+interface SettingRowProps {
+    icon: LucideIcon;
+    label: React.ReactNode;
+    children: React.ReactNode;
+    description?: React.ReactNode;
+    disabled?: boolean;
+}
+
+interface StrategyOption {
+    type: string;
+    strategy: ILayoutStrategy;
+}
+
 export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
     selectedDiagram,
-    _selectedDiagramId,
+    selectedDiagramId: _selectedDiagramId,
     edgeMode,
     onEdgeModeChange,
     layoutStrategy,
@@ -64,19 +87,14 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
         const checkStrategies = async () => {
             const selectable = LayoutStrategyManager.getShared().isNodeLayoutExternallySelectable(layoutStrategy);
             const all = LayoutStrategyManager.getShared().getAvailableNodeStrategies();
-            const normLayout = String(layoutStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
+            const normLayout = normalizeLayoutName(layoutStrategy);
             const isDomainVert = (normLayout === 'domainvertical' || normLayout === 'domainverticallayout');
             const isDomainHoriz = (normLayout === 'domainhorizontal' || normLayout === 'domainhorizontallayout');
-
-            const isCytoscape = (s: any) => {
-                const name = String(s?.getName?.() ?? '').toLowerCase();
-                return name.includes('cytoscapefcose') || name.includes('cytoscapeconcentric');
-            };
 
             const allowed = (!selectable)
                 ? []
                 : (isDomainVert || isDomainHoriz)
-                    ? all.filter(({ strategy }) => !isCytoscape(strategy))
+                    ? all.filter(({ strategy }) => !isCytoscapeStrategy(strategy))
                     : all;
 
             if (allowed.length > 0) {
@@ -91,9 +109,9 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
         checkStrategies();
     }, [layoutStrategy, nodeLayoutStrategy, onNodeLayoutStrategyChange, onRefreshRequest]);
 
-    const renderStrategyOptionContent = (s: { getName?: () => string; getDescription?: () => string }) => {
-        const name = s?.getName?.() ?? '';
-        const desc = s?.getDescription?.() ?? name;
+    const renderStrategyOptionContent = (strategy: Pick<ILayoutStrategy, 'getName' | 'getDescription'>) => {
+        const name = strategy.getName();
+        const desc = strategy.getDescription() || name;
         return (
             <div title={desc} className="flex flex-col py-1">
                 <span className="font-semibold text-gray-800 dark:text-gray-100 text-[13px]">{name}</span>
@@ -102,24 +120,7 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
         );
     };
 
-    const getEngineNodeLayout = (nodeStrategy?: string) => {
-        const normalized = String(nodeStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
-        const map: Record<string, string> = {
-            dagrelayout: 'dagre',
-            dagre: 'dagre',
-            horizontallayout: 'horizontal',
-            horizontal: 'horizontal',
-            verticallayout: 'vertical',
-            vertical: 'vertical',
-            gridlayout: 'grid',
-            grid: 'grid',
-            centeredlayout: 'flow',
-            centered: 'flow'
-        };
-        return map[normalized];
-    };
-
-    const SettingRow = ({ icon: Icon, label, children, description, disabled = false }: any) => (
+    const SettingRow = ({ icon: Icon, label, children, description, disabled = false }: SettingRowProps) => (
         <div className={`group flex items-start justify-between gap-4 px-5 py-3.5 transition-all duration-300 ${disabled ? 'opacity-40 pointer-events-none' : 'hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'}`}>
             <div className="flex items-start gap-4 min-w-0 flex-1">
                 <div className="flex-shrink-0 mt-0 w-9 h-9 rounded-[6px] bg-black/[0.03] dark:bg-white/5 border border-black/[0.04] dark:border-white/[0.04] flex items-center justify-center group-hover:scale-105 group-hover:shadow-sm group-hover:bg-white dark:group-hover:bg-white/10 transition-all duration-300">
@@ -202,8 +203,10 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                         <Select
                             variant="borderless"
                             className="text-right font-bold text-indigo-600 dark:text-indigo-400 min-w-[140px]"
-                            value={(edgeMode as string) === 'smart' ? 'advanced-smart' : edgeMode}
-                            onChange={(val) => onEdgeModeChange(val as 'advanced-smart' | 'native')}
+                            value={normalizeDiagramEdgeMode(edgeMode)}
+                            onChange={(val) => {
+                                if (isDiagramEdgeMode(val)) void onEdgeModeChange(val);
+                            }}
                             popupMatchSelectWidth={false}
                         >
                             <Select.Option value="advanced-smart">{t('designer.settings.smart')}</Select.Option>
@@ -225,14 +228,16 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                             value={layoutStrategy}
                             disabled={!isLayoutSwitchSupported}
                             onChange={async (val) => {
-                                const next = val as string;
+                                const hierarchyStrategies = LayoutStrategyManager.getShared().getAvailableHierarchyStrategies();
+                                if (!isAvailableStrategyType(val, hierarchyStrategies)) return;
+                                const next = val;
                                 await onLayoutStrategyChange(next);
                                 let resolvedNodeLayout: string | undefined;
                                 try {
                                     const manager = LayoutStrategyManager.getShared();
                                     const autoNode = manager.getPreferredNodeStrategyForHierarchy(next);
                                     const selectable = manager.isNodeLayoutExternallySelectable(next);
-                                    const norm = String(next).trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
+                                    const norm = normalizeLayoutName(next);
 
                                     if (linkOrientationEnabled) {
                                         if (norm === 'domainhorizontallayout' || norm === 'domainhorizontal') {
@@ -256,8 +261,8 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                             popupMatchSelectWidth={false}
                             optionLabelProp="label"
                         >
-                            {LayoutStrategyManager.getShared().getAvailableHierarchyStrategies().map(({ type, strategy }: { type: string, strategy: any }) => (
-                                <Select.Option key={type} value={type} label={strategy.getName?.() ?? type}>
+                            {LayoutStrategyManager.getShared().getAvailableHierarchyStrategies().map(({ type, strategy }: StrategyOption) => (
+                                <Select.Option key={type} value={type} label={strategy.getName()}>
                                     {renderStrategyOptionContent(strategy)}
                                 </Select.Option>
                             ))}
@@ -276,15 +281,15 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                         description={t('designer.settings.nodeLayoutDesc', '子域内节点的排布微调')}
                     >
                         {(() => {
-                            const norm = String(layoutStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
+                            const norm = normalizeLayoutName(layoutStrategy);
                             const isDomainElk = norm === 'domainelk' || norm === 'domainelklayout';
                             if (isDomainElk) {
                                 return (
                                     <Select
                                         variant="borderless"
                                         className="text-right font-bold text-gray-700 dark:text-gray-300 min-w-[140px]"
-                                        value={elkAlgorithm}
-                                        onChange={(val) => onElkAlgorithmChange(String(val || 'layered'))}
+                                        value={normalizeElkAlgorithm(elkAlgorithm)}
+                                        onChange={(val) => void onElkAlgorithmChange(normalizeElkAlgorithm(val))}
                                         popupMatchSelectWidth={false}
                                         optionLabelProp="label"
                                     >
@@ -318,10 +323,11 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                         className="text-right font-bold text-gray-700 dark:text-gray-300 min-w-[140px]"
                                         value={currentPreset}
                                         onChange={(val) => {
-                                            const [cont, rank] = String(val).split('+');
+                                            const preset = parseLayoutPresetValue(val);
+                                            if (!preset) return;
                                             try {
-                                                layered.set('diagram.layout.CONTAINMENT_POLICY', cont, ConfigLayer.USER);
-                                                layered.set('diagram.layout.RANK_MODE', rank, ConfigLayer.USER);
+                                                layered.set('diagram.layout.CONTAINMENT_POLICY', preset.containment, ConfigLayer.USER);
+                                                layered.set('diagram.layout.RANK_MODE', preset.rank, ConfigLayer.USER);
                                                 onRefreshRequest();
                                             } catch { }
                                         }}
@@ -342,7 +348,15 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                     className="text-right font-bold text-gray-700 dark:text-gray-300 min-w-[140px]"
                                     value={nodeLayoutStrategy}
                                     onChange={async (val) => {
-                                        const nextNodeLayout = val as string;
+                                        const allNodeStrategies = LayoutStrategyManager.getShared().getAvailableNodeStrategies();
+                                        const norm = normalizeLayoutName(layoutStrategy);
+                                        const isDomainVert = (norm === 'domainvertical' || norm === 'domainverticallayout');
+                                        const isDomainHoriz = (norm === 'domainhorizontal' || norm === 'domainhorizontallayout');
+                                        const allowedNodeStrategies = (isDomainVert || isDomainHoriz)
+                                            ? allNodeStrategies.filter(({ strategy }) => !isCytoscapeStrategy(strategy))
+                                            : allNodeStrategies;
+                                        if (!isAvailableStrategyType(val, allowedNodeStrategies)) return;
+                                        const nextNodeLayout = val;
                                         await onNodeLayoutStrategyChange(nextNodeLayout);
                                         window.dispatchEvent(new CustomEvent('editor:command', {
                                             detail: {
@@ -359,17 +373,13 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                 >
                                     {(() => {
                                         const all = LayoutStrategyManager.getShared().getAvailableNodeStrategies();
-                                        const norm2 = String(layoutStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
+                                        const norm2 = normalizeLayoutName(layoutStrategy);
                                         const isDomainVert = (norm2 === 'domainvertical' || norm2 === 'domainverticallayout');
                                         const isDomainHoriz = (norm2 === 'domainhorizontal' || norm2 === 'domainhorizontallayout');
-                                        const isCytoscape = (s: any) => {
-                                            const name = String(s?.getName?.() ?? '').toLowerCase();
-                                            return name.includes('cytoscapefcose') || name.includes('cytoscapeconcentric');
-                                        };
                                         const allowed = (!selectable)
                                             ? []
                                             : (isDomainVert || isDomainHoriz)
-                                                ? all.filter(({ strategy }) => !isCytoscape(strategy))
+                                                ? all.filter(({ strategy }) => !isCytoscapeStrategy(strategy))
                                                 : all;
 
                                         const options: React.ReactNode[] = [];

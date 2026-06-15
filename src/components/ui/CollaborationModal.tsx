@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Input, Button, List, Typography, Badge, Avatar } from 'antd';
-import { CopyOutlined, TeamOutlined, CloudSyncOutlined } from '@ant-design/icons';
-import { useTranslation } from 'react-i18next';
+import { CopyOutlined, TeamOutlined } from '@ant-design/icons';
+import { buildCollaborationShareUrl } from './collaborationUrl';
 
 export interface CollaborationModalProps {
     open: boolean;
@@ -16,12 +16,11 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({
     activeUsers,
     roomName,
 }) => {
-    const { t } = useTranslation();
     const [copied, setCopied] = useState(false);
 
     // Build the shareable URL
-    const shareUrl = typeof window !== 'undefined' 
-        ? `${window.location.origin}${window.location.pathname}?diagram=${new URLSearchParams(window.location.search).get('diagram') || 'domain-model'}&room=${roomName}`
+    const shareUrl = typeof window !== 'undefined'
+        ? buildCollaborationShareUrl(window.location, roomName)
         : '';
 
     const handleCopy = () => {

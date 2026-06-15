@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * 增强版风格方案选择器
  * 采用弹出面板设计，支持分类展示、迷你预览和悬停预览功能
@@ -10,10 +9,15 @@ import { useTranslation } from 'react-i18next';
 import { FaPalette, FaCheck, FaTimes } from 'react-icons/fa';
 import {
     diagramStyleManager,
-    FlowStylePreset,
+    type FlowStylePreset,
 } from '@/core/components/shared/DiagramStyleManager';
 import { useDiagramStylePreset_v2 } from '@/core/hooks/useDiagramStylePreset_v2';
-import { theme } from 'antd';
+import {
+    getPreviewEdgeColor,
+    getSafePresetTranslationKey,
+    toBoundedNumber,
+    toSafeSvgIdPart,
+} from './enhancedStylePreviewSecurity';
 
 export interface EnhancedStyleSwitcherProps {
     size?: 'sm' | 'md';
@@ -35,11 +39,17 @@ const StylePreviewMini: React.FC<{ preset: FlowStylePreset; size?: 'sm' | 'md' }
     const nodeStyle = preset.node;
     const mainEdge = preset.edges.main;
     const statusEdge = preset.edges.status;
+    const mainEdgeColor = getPreviewEdgeColor(mainEdge.color, '#3E8EDE');
+    const statusEdgeColor = getPreviewEdgeColor(statusEdge.color, '#7E57C2');
+    const shadowId = `shadow-${toSafeSvgIdPart(preset.name)}`;
 
     const nodeWidth = size === 'sm' ? 10 : 28;
     const nodeHeight = size === 'sm' ? 8 : 20;
-    const nodeRadius = Math.min(nodeStyle.radius / (size === 'sm' ? 4 : 2), nodeHeight / 2);
-    const strokeWidth = Math.max(nodeStyle.borderWidth / (size === 'sm' ? 2.5 : 1.5), 0.5);
+    const nodeRadius = Math.min(toBoundedNumber(nodeStyle.radius, 8, 0, 48) / (size === 'sm' ? 4 : 2), nodeHeight / 2);
+    const strokeWidth = Math.max(toBoundedNumber(nodeStyle.borderWidth, 2, 0.5, 12) / (size === 'sm' ? 2.5 : 1.5), 0.5);
+    const mainEdgeWidth = toBoundedNumber(mainEdge.width, 2, 0.5, 12);
+    const statusEdgeWidth = toBoundedNumber(statusEdge.width, 2, 0.5, 12);
+    const accentAlpha = toBoundedNumber(nodeStyle.accentBar?.alpha, 0.85, 0, 1);
 
     return (
         <svg
@@ -49,7 +59,7 @@ const StylePreviewMini: React.FC<{ preset: FlowStylePreset; size?: 'sm' | 'md' }
             className="overflow-visible"
         >
             <defs>
-                <filter id={`shadow-${preset.name}`} x="-20%" y="-20%" width="140%" height="140%">
+                <filter id={shadowId} x="-20%" y="-20%" width="140%" height="140%">
                     <feGaussianBlur stdDeviation={nodeStyle.shadow === 'strong' ? 2 : 1} result="blur" />
                     <feOffset dx="0" dy="1" result="offsetBlur" />
                     <feComponentTransfer><feFuncA type="linear" slope={nodeStyle.shadow === 'none' ? 0 : 0.15} /></feComponentTransfer>
@@ -59,15 +69,15 @@ const StylePreviewMini: React.FC<{ preset: FlowStylePreset; size?: 'sm' | 'md' }
             
             <path
                 d={`M ${width * 0.2} ${height * 0.5} L ${width * 0.8} ${height * 0.5}`}
-                stroke={mainEdge.color}
-                strokeWidth={mainEdge.width / (size === 'sm' ? 2 : 1.5)}
+                stroke={mainEdgeColor}
+                strokeWidth={mainEdgeWidth / (size === 'sm' ? 2 : 1.5)}
                 strokeLinecap="round"
             />
             
             <path
                 d={`M ${width * 0.2} ${height * 0.5 - (size === 'sm' ? 4 : 10)} L ${width * 0.8} ${height * 0.5 - (size === 'sm' ? 4 : 10)}`}
-                stroke={statusEdge.color}
-                strokeWidth={statusEdge.width / (size === 'sm' ? 2.5 : 2)}
+                stroke={statusEdgeColor}
+                strokeWidth={statusEdgeWidth / (size === 'sm' ? 2.5 : 2)}
                 strokeDasharray={statusEdge.dash ? (size === 'sm' ? "2 2" : "3 2") : "none"}
                 opacity="0.5"
             />
@@ -75,10 +85,10 @@ const StylePreviewMini: React.FC<{ preset: FlowStylePreset; size?: 'sm' | 'md' }
             {[0.2, 0.8].map((pos, idx) => {
                 const x = width * pos - nodeWidth / 2;
                 const y = height * 0.5 - nodeHeight / 2;
-                const color = idx === 0 ? mainEdge.color : statusEdge.color;
+                const color = idx === 0 ? mainEdgeColor : statusEdgeColor;
                 
                 return (
-                    <g key={idx} filter={`url(#shadow-${preset.name})`}>
+                    <g key={idx} filter={`url(#${shadowId})`}>
                         <rect
                             x={x} y={y} width={nodeWidth} height={nodeHeight} rx={nodeRadius}
                             fill="white" stroke={color} strokeWidth={strokeWidth}
@@ -88,7 +98,7 @@ const StylePreviewMini: React.FC<{ preset: FlowStylePreset; size?: 'sm' | 'md' }
                                 x={x} y={y} 
                                 width={nodeStyle.accentBar.position === 'left' ? 3 : nodeWidth}
                                 height={nodeStyle.accentBar.position === 'left' ? nodeHeight : 3}
-                                rx={1} fill={color} opacity={nodeStyle.accentBar.alpha}
+                                rx={1} fill={color} opacity={accentAlpha}
                             />
                         )}
                     </g>
@@ -125,7 +135,7 @@ const PresetCard: React.FC<{
             <div className="flex-1 min-w-0 flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                     <span className="text-[16px] font-bold text-gray-900 dark:text-gray-100 tracking-tight truncate">
-                        {t(`style.preset.${preset.name}`)}
+                        {t(getSafePresetTranslationKey(preset))}
                     </span>
                     {isActive && <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center"><FaCheck className="text-white w-2 h-2" /></div>}
                 </div>
@@ -144,7 +154,7 @@ const PresetCard: React.FC<{
  * 增强版风格方案选择器组件
  */
 export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
-    _size = 'md',
+    size = 'md',
     className = '',
     style,
     borderless = false,
@@ -153,6 +163,7 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
     const currentPreset = useDiagramStylePreset_v2();
     const [isOpen, setIsOpen] = useState(false);
     const panelRef = useRef<HTMLDivElement>(null);
+    const buttonSizeClass = size === 'sm' ? 'h-8 px-2.5 text-[12px]' : 'h-10 px-3.5 text-[13px]';
 
     const categories = useMemo(() => {
         return diagramStyleManager.getCategories().map((cat) => ({
@@ -168,6 +179,7 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
     }, []);
 
     useEffect(() => {
+        if (typeof document === 'undefined') return undefined;
         const handleClickOutside = (e: MouseEvent) => {
             if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
                 setIsOpen(false);
@@ -177,11 +189,15 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isOpen]);
 
+    const portalTarget = typeof document === 'undefined'
+        ? null
+        : (document.getElementById('app-root-layout') || document.body);
+
     return (
         <>
             {/* 触发按钮 */}
             <button
-                className={`flex items-center justify-between gap-2.5 h-10 px-3.5 text-[13px] font-semibold transition-all rounded-xl ${
+                className={`flex items-center justify-between gap-2.5 ${buttonSizeClass} font-semibold transition-all rounded-xl ${
                     borderless 
                     ? 'bg-transparent border-none' 
                     : 'bg-white/60 dark:bg-white/5 border border-white/40 dark:border-white/10 hover:border-blue-400/50 hover:bg-white/80 shadow-sm backdrop-blur-md'
@@ -193,13 +209,13 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
                     <div className="flex-shrink-0 bg-gray-100/50 dark:bg-white/5 rounded-md p-0.5">
                         <StylePreviewMini preset={currentPreset} size="sm" />
                     </div>
-                    <span className="truncate">{t(`style.preset.${currentPreset.name}`)}</span>
+                    <span className="truncate">{t(getSafePresetTranslationKey(currentPreset))}</span>
                 </span>
                 <svg className="flex-shrink-0 text-gray-400 w-3.5 h-3.5 transition-transform duration-300" style={{ transform: isOpen ? 'rotate(180deg)' : 'none' }} viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </button>
 
             {/* 弹出面板 - Hyper-Glass V3 */}
-            {isOpen &&
+            {isOpen && portalTarget &&
                 createPortal(
                     <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 sm:p-8 bg-black/40 backdrop-blur-md animate-in fade-in duration-500" onClick={() => setIsOpen(false)}>
                         <div
@@ -251,7 +267,7 @@ export const EnhancedStyleSwitcher: React.FC<EnhancedStyleSwitcherProps> = ({
                             </div>
                         </div>
                     </div>,
-                    (document.getElementById('app-root-layout') || document.body)
+                    portalTarget
                 )}
         </>
     );

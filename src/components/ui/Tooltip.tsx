@@ -1,62 +1,68 @@
-// @ts-nocheck
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import {
+  calculateTooltipPosition,
+  normalizeTooltipDelay,
+  type TooltipPosition,
+} from './tooltipPosition';
 
 /**
  * Tooltip 组件
  */
-interface TooltipProps {
+export interface TooltipProps {
   content: React.ReactNode;
   children: React.ReactElement;
   delay?: number;
 }
 
+const getTooltipMountTarget = (): HTMLElement | null => {
+  if (typeof document === 'undefined') return null;
+  return (
+    (document.fullscreenElement as HTMLElement | null) ||
+    (document.querySelector('.modal-overlay.visible') as HTMLElement | null) ||
+    document.body
+  );
+};
+
 const Tooltip: React.FC<TooltipProps> = ({ content, children, delay = 0 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const triggerRef = useRef<HTMLElement>(null);
+  const [position, setPosition] = useState<TooltipPosition>({ x: 0, y: 0 });
+  const triggerRef = useRef<HTMLSpanElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const showTimer = useRef<NodeJS.Timeout | null>(null);
-  const hideTimer = useRef<NodeJS.Timeout | null>(null);
+  const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const safeDelay = normalizeTooltipDelay(delay);
 
   const clearTimers = () => {
-    if (showTimer.current) clearTimeout(showTimer.current);
-    if (hideTimer.current) clearTimeout(hideTimer.current);
+    if (showTimer.current) {
+      clearTimeout(showTimer.current);
+      showTimer.current = null;
+    }
+    if (hideTimer.current) {
+      clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    }
   };
 
   useEffect(() => {
     return () => clearTimers();
   }, []);
 
-  const calculatePosition = (target: HTMLElement) => {
+  const calculatePosition = (target: HTMLElement): TooltipPosition => {
     const rect = target.getBoundingClientRect();
-    let x = rect.right + 10;
-    let y = rect.top;
-
-    const viewportWidth = window.innerWidth;
-    const estimatedWidth = 250;
-
-    if (x + estimatedWidth > viewportWidth) {
-      const leftAttempt = rect.left - estimatedWidth - 10;
-      if (leftAttempt > 0) {
-        x = leftAttempt;
-      } else {
-        x = rect.left;
-        y = rect.bottom + 10;
-      }
-    }
-    return { x, y };
+    const viewportWidth = typeof window === 'undefined' ? 250 : window.innerWidth;
+    return calculateTooltipPosition(rect, viewportWidth);
   };
 
-  const handleMouseEnter = useCallback((e: React.MouseEvent) => {
+  const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLSpanElement>) => {
     if (hideTimer.current) {
       clearTimeout(hideTimer.current);
       hideTimer.current = null;
     }
     if (isVisible || showTimer.current) return;
 
-    const target = e.currentTarget as HTMLElement;
-    if (delay <= 0) {
+    const target = e.currentTarget;
+    if (safeDelay <= 0) {
       setPosition(calculatePosition(target));
       setIsVisible(true);
       return;
@@ -66,8 +72,8 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, delay = 0 }) => {
       setPosition(calculatePosition(target));
       setIsVisible(true);
       showTimer.current = null;
-    }, delay);
-  }, [delay, isVisible]);
+    }, safeDelay);
+  }, [isVisible, safeDelay]);
 
   const handleMouseLeave = useCallback(() => {
     if (showTimer.current) {
@@ -82,27 +88,23 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, delay = 0 }) => {
     }, 300);
   }, []);
 
-  const onTooltipMouseEnter = () => {
+  const onTooltipMouseEnter = useCallback(() => {
     if (hideTimer.current) {
       clearTimeout(hideTimer.current);
       hideTimer.current = null;
     }
-  };
+  }, []);
 
-  const onTooltipMouseLeave = () => {
+  const onTooltipMouseLeave = useCallback(() => {
     handleMouseLeave();
-  };
+  }, [handleMouseLeave]);
 
-  const mountTarget = (
-    (document.fullscreenElement as HTMLElement | null) ||
-    (document.querySelector('.modal-overlay.visible') as HTMLElement | null) ||
-    document.body
-  );
+  const mountTarget = getTooltipMountTarget();
 
   return (
     <>
       <span
-        ref={triggerRef as any}
+        ref={triggerRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         style={{ display: 'inline-block', verticalAlign: 'middle', cursor: 'default' }}
@@ -111,7 +113,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, delay = 0 }) => {
           {children}
         </span>
       </span>
-      {isVisible && createPortal(
+      {isVisible && mountTarget && createPortal(
         <div
           ref={tooltipRef}
           className={`fixed bg-[#333]/95 text-white py-2 px-3 rounded text-[13px] z-[999999] pointer-events-auto whitespace-pre-wrap max-w-[300px] shadow-lg leading-relaxed border border-white/15 transition-opacity duration-100 ${isVisible ? 'opacity-100 visible' : 'opacity-0 invisible'}`}
