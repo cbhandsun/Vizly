@@ -1,10 +1,10 @@
-import { useCallback, useRef } from 'react';
-import Button from 'antd/es/button';
 import React from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Node, Edge } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { NotificationInstance } from 'antd/es/notification/interface';
+import { parseClipboardJson } from '../../../utils/flowchartClipboard';
 
 /**
  * 🚀 P2 性能优化：从 FlowchartDesigner 提取的 Toast 包装层
@@ -40,7 +40,7 @@ interface UseToastActionsProps {
 
 export function useToastActions({
     messageApi,
-    _notificationApi,
+    notificationApi: _notificationApi,
     handleDelete,
     handleDuplicate,
     handleCopy,
@@ -98,13 +98,11 @@ export function useToastActions({
             messageApi.info(t('designer.flowchart.toast.nothingToPaste'));
             return;
         }
-        let nodesCount = 0;
-        let edgesCount = 0;
-        try {
-            const parsed = JSON.parse(raw) as { nodes?: unknown[]; edges?: unknown[] };
-            _nodesCount = Array.isArray(parsed.nodes) ? parsed.nodes.length : 0;
-            _edgesCount = Array.isArray(parsed.edges) ? parsed.edges.length : 0;
-        } catch { void 0; }
+        const parsed = parseClipboardJson(raw);
+        if (!parsed) {
+            messageApi.info(t('designer.flowchart.toast.nothingToPaste'));
+            return;
+        }
         handlePaste();
     }, [clipboardKey, handlePaste, messageApi, t]);
 
@@ -137,7 +135,7 @@ export function useToastActions({
         const counts = getDeleteCounts(targetId);
         if (counts.nodes + counts.edges === 0) return;
         handleDelete(targetId);
-    }, [getDeleteCounts, handleDelete, t]);
+    }, [getDeleteCounts, handleDelete]);
 
     const handleDuplicateWithToast = useCallback((targetId?: string) => {
         const count = targetId ? 1 : selectedNodes.length;

@@ -1,6 +1,12 @@
 import { useCallback } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import { fromMermaid } from '../../../utils/mermaidConverter';
+import {
+    coerceClipboardData,
+    isFlowchartClipboardTextWithinBounds,
+    parseClipboardJson,
+    type ClipboardData,
+} from '../../../utils/flowchartClipboard';
 
 interface UseClipboardProps {
     nodes: Node[];
@@ -11,11 +17,6 @@ interface UseClipboardProps {
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
     takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
     clipboardKey?: string;
-}
-
-interface ClipboardData {
-    nodes: Node[];
-    edges: Edge[];
 }
 
 const PASTE_OFFSET = 20;
@@ -64,21 +65,18 @@ export const useClipboard = ({
      */
     const parseClipboardText = useCallback((text: string): ClipboardData | null => {
         if (!text?.trim()) return null;
+        if (!isFlowchartClipboardTextWithinBounds(text)) return null;
 
         // 1. 尝试 JSON 解析（内部格式）
-        try {
-            const parsed = JSON.parse(text);
-            if (parsed?.nodes && Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
-                return parsed as ClipboardData;
-            }
-        } catch { /* not JSON */ }
+        const jsonData = parseClipboardJson(text);
+        if (jsonData) return jsonData;
 
         // 2. 尝试 Mermaid 解析
         const trimmed = text.trim();
         if (/^(flowchart|graph)\s+(TB|TD|LR|RL|BT)/i.test(trimmed) || trimmed.includes('-->') || trimmed.includes('---')) {
             try {
                 const result = fromMermaid(trimmed);
-                if (result.nodes.length > 0) return result;
+                return coerceClipboardData(result);
             } catch { /* not valid Mermaid */ }
         }
 

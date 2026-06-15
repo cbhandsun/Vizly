@@ -2,6 +2,9 @@ import { useCallback, useRef, useEffect } from 'react';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { readDomViewport } from '../../../utils/domViewport';
 import type { SnapDelta } from '../../../hooks/useSmartGuides';
+import type { ClipboardData } from '../../../utils/flowchartClipboard';
+import { parseDragNodeTemplate, parseReverseImportDiagramState } from '../../../utils/dragDropPayload';
+import { getFileSizeLimitError, REVERSE_IMPORT_IMAGE_MAX_BYTES } from '../../../utils/fileImportGuards';
 
 interface UseDiagramDragDropProps {
     nodes: Node[];
@@ -62,14 +65,20 @@ export const useDiagramDragDrop = ({
                 
                 if (isImage) {
                     try {
-                        let diagramState: any = null;
+                        const sizeError = getFileSizeLimitError(file, REVERSE_IMPORT_IMAGE_MAX_BYTES, 'reverse image');
+                        if (sizeError) {
+                            console.warn('[Reverse Import]', sizeError);
+                            return;
+                        }
+
+                        let safeDiagramState: ClipboardData | null = null;
 
                         if (file.type === 'image/svg+xml' || file.name.endsWith('.svg')) {
                             // 1. 从 SVG 解析 metadata
                             const text = await file.text();
                             const matches = text.match(/<metadata id="vizly-state">([\s\S]*?)<\/metadata>/);
                             if (matches && matches[1]) {
-                                diagramState = JSON.parse(decodeURIComponent(matches[1]));
+                                safeDiagramState = parseReverseImportDiagramState(matches[1], true);
                             }
                         } else {
                             // 2. 从 PNG/JPG 解析尾部二进制数据
@@ -86,16 +95,16 @@ export const useDiagramDragDrop = ({
                             
                             if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
                                 const rawJson = fullContent.substring(startIndex + startMarker.length, endIndex);
-                                diagramState = JSON.parse(rawJson);
+                                safeDiagramState = parseReverseImportDiagramState(rawJson);
                             }
                         }
 
-                        if (diagramState && diagramState.nodes && diagramState.edges) {
+                        if (safeDiagramState) {
                             takeSnapshot(nodesRef.current, edgesRef.current);
                             // 优雅地合并或替换
                             // 这里采用“智能提示/直接恢复”策略，Phase 10 默认为直接恢复
-                            setNodes(diagramState.nodes);
-                            setEdges(diagramState.edges);
+                            setNodes(safeDiagramState.nodes);
+                            setEdges(safeDiagramState.edges);
                             
                             // 自定义事件通知 UI 恢复成功
                             window.dispatchEvent(new CustomEvent('vizly:reverse-import-success', { 
@@ -116,8 +125,9 @@ export const useDiagramDragDrop = ({
             if (!typeData) return;
 
             try {
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                const { typeName, label, config, offsetX, offsetY } = JSON.parse(typeData);
+                const template = parseDragNodeTemplate(typeData);
+                if (!template) return;
+                const { typeName, label, config, offsetX, offsetY } = template;
 
                 // ═══════════════════════════════════════════════════════════════
                 // Counter-Zoom 已启用 (zoom: 1/uiScale)，
@@ -166,7 +176,7 @@ export const useDiagramDragDrop = ({
                 }
 
                 // 4. 新节点位置（直接贴合）
-                let position = {
+                const position = {
                     x: Math.round(flowX / 5) * 5, // 轻微网格吸附，防止非整数像素模糊
                     y: Math.round(flowY / 5) * 5,
                 };
@@ -291,7 +301,7 @@ export const useDiagramDragDrop = ({
         // [P-2] Use nodesRef/edgesRef instead of nodes/edges in deps.
         // nodes/edges in the dep array caused onDrop to rebuild on every node state change
         // (selection, drag, position), making the callback always fresh but expensively.
-        [reactFlowInstance, takeSnapshot, setNodes, activeLayerId]
+        [reactFlowInstance, takeSnapshot, setNodes, setEdges, activeLayerId]
     );
 
     const onNodeDragStart = useCallback((event: React.MouseEvent, node: Node) => {
@@ -690,7 +700,6 @@ export const useDiagramDragDrop = ({
                             absY += oldParentAbsY;
                         }
 
-                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
                         const { parentId: _p, extent: _e, ...rest } = n; // Remove parentId/extent
                         return {
                             ...rest,
