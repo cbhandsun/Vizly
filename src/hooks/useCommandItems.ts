@@ -128,7 +128,7 @@ export function useCommandItems(options: UseCommandItemsOptions): CommandItem[] 
                 title: t('designer.commandItems.docs', '文档 / Documentation'),
                 keywords: ['docs', '文档', 'help'],
                 onSelect: () => navigate('/docs'),
-                onAltSelect: () => window.open('/docs', '_blank')
+                onAltSelect: () => window.open('/docs', '_blank', 'noopener,noreferrer')
             },
             {
                 id: 'op:manage',
@@ -136,7 +136,7 @@ export function useCommandItems(options: UseCommandItemsOptions): CommandItem[] 
                 title: t('designer.commandItems.manage', '管理 / Management'),
                 keywords: ['manage', '管理', 'admin'],
                 onSelect: () => navigate('/manage'),
-                onAltSelect: () => window.open('/manage', '_blank')
+                onAltSelect: () => window.open('/manage', '_blank', 'noopener,noreferrer')
             },
             {
                 id: 'op:clearFavorites',

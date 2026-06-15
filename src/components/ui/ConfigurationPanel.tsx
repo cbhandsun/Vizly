@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * 配置面板组件
  * 提供简洁易用的配置管理界面，支持实时编辑和预览
@@ -7,11 +6,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { LayeredConfigManager, LayoutStrategyManager } from '@/core';
-import { FaTimes, FaUndo, FaCheck, FaExclamationTriangle, FaCog, FaQuestionCircle } from 'react-icons/fa';
-import Tooltip from './Tooltip';
-import { useConfigIntegration } from '@/core';
-import { safeLog } from '@/core';
+import { LayeredConfigManager } from '@/core/config/LayeredConfigManager';
+import { LayoutStrategyManager } from '@/core/strategies/LayoutStrategyManager';
+import { FaTimes, FaUndo, FaCheck, FaExclamationTriangle, FaCog } from 'react-icons/fa';
+import { useConfigIntegration } from '@/core/hooks/useConfigIntegration';
+import { safeLog } from '@/core/utils/consoleCleanup';
 
 export interface ConfigurationPanelProps {
   isOpen: boolean;
@@ -22,7 +21,7 @@ export interface ConfigurationPanelProps {
 
 interface ConfigItem {
   key: string;
-  value: any;
+  value: ConfigValue;
   type: 'number' | 'string' | 'boolean' | 'select';
   label?: string;
   description?: string;
@@ -33,22 +32,64 @@ interface ConfigItem {
   group?: string; // 添加分组字段
 }
 
+type ConfigValue = string | number | boolean;
+type ConfigValues = Record<string, ConfigValue>;
+type ConfigTab = 'basic' | 'nodes' | 'containers' | 'spacing' | 'edges' | 'layout' | 'performance';
+
+const INSTANT_CONFIG_KEYS = new Set<string>([
+  'diagram.layout.strategy',
+  'diagram.layout.ELK_ALGORITHM',
+  'diagram.layout.ELK_DIRECTION',
+  'diagram.layout.direction',
+]);
+
+const clampNumber = (value: number, min?: number, max?: number): number => {
+  let next = value;
+  if (typeof min === 'number') next = Math.max(min, next);
+  if (typeof max === 'number') next = Math.min(max, next);
+  return next;
+};
+
+const coerceTextConfigValue = (value: unknown): string => {
+  const text = String(value ?? '').trim().slice(0, 200);
+  return /[{};]|url\s*\(|expression\s*\(|javascript:/i.test(text) ? '' : text;
+};
+
+const coerceConfigValue = (item: ConfigItem, rawValue: unknown): ConfigValue => {
+  switch (item.type) {
+    case 'number': {
+      const numericValue = typeof rawValue === 'number' ? rawValue : Number(rawValue);
+      const fallback = typeof item.value === 'number' ? item.value : 0;
+      return clampNumber(Number.isFinite(numericValue) ? numericValue : fallback, item.min, item.max);
+    }
+    case 'boolean':
+      return Boolean(rawValue);
+    case 'select': {
+      const selected = String(rawValue ?? '');
+      return item.options?.includes(selected) ? selected : String(item.value);
+    }
+    case 'string':
+    default:
+      return coerceTextConfigValue(rawValue);
+  }
+};
+
 /**
  * 配置面板组件
  */
 export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
   isOpen,
   onClose,
-  _className = '',
-  _style,
+  className = '',
+  style,
 }) => {
   const { t } = useTranslation();
   const [state, actions] = useConfigIntegration();
-  const [editingValues, setEditingValues] = useState<Record<string, any>>({});
+  const [editingValues, setEditingValues] = useState<ConfigValues>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set());
   const [isAdvancedMode, setIsAdvancedMode] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'basic' | 'nodes' | 'containers' | 'spacing' | 'edges' | 'layout' | 'performance'>('basic');
+  const [activeTab, setActiveTab] = useState<ConfigTab>('basic');
 
   // 定义可编辑的配置项，按类别分组
   const configItemsByCategory: Record<string, ConfigItem[]> = useMemo(() => {
@@ -650,17 +691,17 @@ const configItems: ConfigItem[] = useMemo(() => [
   ...configItemsByCategory.performance
 ], [configItemsByCategory]);
 
-// 加载当前配置值 - 优化依赖以避免死循环
+// 加载当前配置值
 useEffect(() => {
   if (!state.isReady || !state.integration) return;
 
   const loadCurrentValues = async () => {
-    const currentValues: Record<string, any> = {};
+    const currentValues: ConfigValues = {};
 
     for (const item of configItems) {
       try {
-        const value = await actions.getConfig(item.key);
-        currentValues[item.key] = value !== undefined ? value : item.value;
+        const value = await actions.getConfig<unknown>(item.key);
+        currentValues[item.key] = value !== undefined ? coerceConfigValue(item, value) : item.value;
       } catch (error) {
         console.warn(`Failed to load config ${item.key}:`, error);
         currentValues[item.key] = item.value;
@@ -671,11 +712,11 @@ useEffect(() => {
   };
 
   loadCurrentValues();
-}, [state.isReady, state.integration]); // 移除actions和configItems依赖
+}, [actions, configItems, state.isReady, state.integration]);
 
 // 处理配置值变更
 // 处理配置值变更
-const getEngineNodeLayout = useCallback((nodeStrategy?: string) => {
+const getEngineNodeLayout = useCallback((nodeStrategy?: ConfigValue) => {
   const normalized = String(nodeStrategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
   const map: Record<string, string> = {
     dagrelayout: 'dagre',
@@ -692,9 +733,9 @@ const getEngineNodeLayout = useCallback((nodeStrategy?: string) => {
   return map[normalized];
 }, []);
 
-const requestLayoutApply = useCallback((values: Record<string, any>) => {
+const requestLayoutApply = useCallback((values: ConfigValues) => {
   const strategy = values['diagram.layout.strategy'];
-  if (!strategy || typeof window === 'undefined') return;
+  if (typeof strategy !== 'string' || !strategy || typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent('editor:command', {
     detail: {
       action: 'apply-layout',
@@ -705,47 +746,47 @@ const requestLayoutApply = useCallback((values: Record<string, any>) => {
   }));
 }, [getEngineNodeLayout]);
 
-const handleValueChange = useCallback(async (key: string, value: any) => {
-  safeLog.debug('[Config] handleValueChange:', key, value);
-
-  // 联动逻辑：当选择域水平/垂直布局时，默认将子域内部节点按纵向流程排列
-  if (key === 'diagram.layout.strategy' && (value === 'DomainHorizontalLayout' || value === 'DomainVerticalLayout')) {
-    safeLog.info('[Config] Auto-switching nodeStrategy to VerticalLayout');
-    setEditingValues(prev => ({
-      ...prev,
-      [key]: value,
-      'diagram.layout.nodeStrategy': 'VerticalLayout'
-    }));
-    // Auto-save for immediate feedback
-    await actions.setConfig(key, value);
-    await actions.setConfig('diagram.layout.nodeStrategy', 'VerticalLayout');
-    requestLayoutApply({
-      ...editingValues,
-      [key]: value,
-      'diagram.layout.nodeStrategy': 'VerticalLayout'
-    });
+const handleValueChange = useCallback(async (key: string, value: unknown) => {
+  const item = configItems.find(candidate => candidate.key === key);
+  if (!item) {
+    safeLog.warn('[Config] Ignoring unknown config key:', key);
     return;
   }
 
-  // List of keys that should trigger immediate update for better UX
-  const instantKeys = [
-    'diagram.layout.strategy',
-    'diagram.layout.ELK_ALGORITHM',
-    'diagram.layout.ELK_DIRECTION',
-    'diagram.layout.direction'
-  ];
+  const nextValue = coerceConfigValue(item, value);
+  safeLog.debug('[Config] handleValueChange:', key, nextValue);
+
+  // 联动逻辑：当选择域水平/垂直布局时，默认将子域内部节点按纵向流程排列
+  if (key === 'diagram.layout.strategy' && (nextValue === 'DomainHorizontalLayout' || nextValue === 'DomainVerticalLayout')) {
+    safeLog.info('[Config] Auto-switching nodeStrategy to VerticalLayout');
+    const nextValues: ConfigValues = {
+      ...editingValues,
+      [key]: nextValue,
+      'diagram.layout.nodeStrategy': 'VerticalLayout',
+    };
+    setEditingValues(prev => ({
+      ...prev,
+      [key]: nextValue,
+      'diagram.layout.nodeStrategy': 'VerticalLayout'
+    }));
+    // Auto-save for immediate feedback
+    await actions.setConfig(key, nextValue);
+    await actions.setConfig('diagram.layout.nodeStrategy', 'VerticalLayout');
+    requestLayoutApply(nextValues);
+    return;
+  }
 
   setEditingValues(prev => ({
     ...prev,
-    [key]: value
+    [key]: nextValue
   }));
 
-  if (instantKeys.includes(key)) {
-    await actions.setConfig(key, value);
+  if (INSTANT_CONFIG_KEYS.has(key)) {
+    await actions.setConfig(key, nextValue);
     if (key.startsWith('diagram.layout.')) {
       requestLayoutApply({
         ...editingValues,
-        [key]: value
+        [key]: nextValue
       });
     }
   } else {
@@ -756,15 +797,16 @@ const handleValueChange = useCallback(async (key: string, value: any) => {
       return next;
     });
   }
-}, [actions, editingValues, requestLayoutApply]);
+}, [actions, configItems, editingValues, requestLayoutApply]);
 
 // 保存所有更改
 const handleSaveChanges = useCallback(async () => {
   if (!state.isReady || !state.integration) return;
 
   try {
-    for (const [key, value] of Object.entries(editingValues)) {
-      await actions.setConfig(key, value);
+    for (const item of configItems) {
+      const value = editingValues[item.key] ?? item.value;
+      await actions.setConfig(item.key, coerceConfigValue(item, value));
     }
     if (
       changedKeys.has('diagram.layout.strategy') ||
@@ -778,11 +820,11 @@ const handleSaveChanges = useCallback(async () => {
   } catch (error) {
     console.error('保存配置失败:', error);
   }
-}, [editingValues, actions, state.integration, changedKeys, requestLayoutApply]);
+}, [actions, changedKeys, configItems, editingValues, requestLayoutApply, state.integration, state.isReady]);
 
 // 重置所有更改
 const handleResetChanges = useCallback(() => {
-  const resetValues: Record<string, any> = {};
+  const resetValues: ConfigValues = {};
   configItems.forEach(item => {
     resetValues[item.key] = item.value;
   });
@@ -794,6 +836,8 @@ const handleResetChanges = useCallback(() => {
 // 渲染配置项编辑器
 const renderConfigEditor = (item: ConfigItem) => {
   const currentValue = editingValues[item.key] ?? item.value;
+  const numericValue = typeof currentValue === 'number' ? currentValue : Number(item.value);
+  const stringValue = String(currentValue ?? '');
   const layeredStrategy = String(LayeredConfigManager.getInstance().get<string>('diagram.layout.strategy', '') || '');
   const currentLayoutStrategy = String(editingValues['diagram.layout.strategy'] || layeredStrategy || '');
   const nodeLayoutDisabled = item.key === 'diagram.layout.nodeStrategy' &&
@@ -811,11 +855,11 @@ const renderConfigEditor = (item: ConfigItem) => {
       return (
         <input
           type="number"
-          value={currentValue}
+          value={Number.isFinite(numericValue) ? numericValue : ''}
           min={item.min}
           max={item.max}
           step={item.step}
-          onChange={(e) => handleValueChange(item.key, Number(e.target.value))}
+          onChange={(e) => handleValueChange(item.key, e.target.value)}
           className="w-24 px-3 py-1.5 text-[13px] font-medium text-center transition-all bg-black/[0.04] dark:bg-white/10 border border-black/5 dark:border-white/5 rounded-[6px] text-gray-800 dark:text-gray-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.15] hover:border-black/10 dark:hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-black/50 focus:border-indigo-500"
           title={t(`config.${item.key}.label`)}
         />
@@ -838,7 +882,7 @@ const renderConfigEditor = (item: ConfigItem) => {
       return (
         <div className="flex flex-col items-end gap-1">
           <select
-            value={currentValue}
+            value={stringValue}
             onChange={(e) => handleValueChange(item.key, e.target.value)}
             className="w-48 px-3 py-1.5 text-[13px] font-medium transition-all bg-black/[0.04] dark:bg-white/10 border border-black/5 dark:border-white/5 rounded-[6px] text-gray-800 dark:text-gray-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.15] hover:border-black/10 dark:hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-black/50 focus:border-indigo-500 cursor-pointer disabled:opacity-50 appearance-none"
             style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%236b7280\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1em' }}
@@ -864,7 +908,7 @@ const renderConfigEditor = (item: ConfigItem) => {
       return (
         <input
           type="text"
-          value={currentValue}
+          value={stringValue}
           onChange={(e) => handleValueChange(item.key, e.target.value)}
           className="w-64 px-3 py-1.5 text-[13px] font-medium transition-all bg-black/[0.04] dark:bg-white/10 border border-black/5 dark:border-white/5 rounded-[6px] text-gray-800 dark:text-gray-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.15] hover:border-black/10 dark:hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white dark:focus:bg-black/50 focus:border-indigo-500"
           title={t(`config.${item.key}.label`)}
@@ -998,15 +1042,27 @@ const activeTabClass = "bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white
 const inactiveTabClass = "text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 font-medium rounded-[6px] border border-transparent";
 const actionBtnPrimary = "text-white bg-gradient-to-b from-gray-800 to-black hover:from-gray-700 hover:to-gray-900 dark:from-gray-200 dark:to-white dark:text-black dark:hover:from-white dark:hover:to-white shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] border-transparent";
 const actionBtnSecondary = "text-gray-700 dark:text-gray-200 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 border border-black/[0.08] dark:border-white/10 shadow-[0_1px_2px_rgba(0,0,0,0.05)]";
+const visibleTabs: Array<{ id: ConfigTab; label: string }> = isAdvancedMode ? [
+  { id: 'nodes', label: t('config.tabs.nodes') },
+  { id: 'containers', label: t('config.tabs.containers') },
+  { id: 'spacing', label: t('config.tabs.spacing') },
+  { id: 'edges', label: t('config.tabs.edges') },
+  { id: 'layout', label: t('config.tabs.layout') },
+  { id: 'performance', label: t('config.tabs.performance') },
+] : [
+  { id: 'basic', label: t('config.tabs.basic') },
+];
 
 // 修复（函数级注释）：确保配置面板在全屏下可见，portal 挂载到全屏元素
 return createPortal(
   <div className={`fixed inset-0 z-[5000] flex items-center justify-center bg-black/30 dark:bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} style={{ padding: 'var(--glass-padding-lg)' }} onClick={onClose}>
     {/* Vercel/Linear 风格设置面板 (Sidebar Master-Detail) */}
-    <div className={`relative flex w-full max-w-[900px] h-full max-h-[640px] border-none shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.45)] dark:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] transition-all duration-300 transform ${isOpen ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'} overflow-hidden`} 
-         style={{ 
-           borderRadius: 'calc(var(--glass-radius) * 1.6)'
-         }} 
+    <div
+         className={`relative flex w-full max-w-[900px] h-full max-h-[640px] border-none shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.45)] dark:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.72)] dark:bg-[rgba(28,28,41,0.65)] backdrop-blur-[24px] backdrop-saturate-[180%] transition-all duration-300 transform ${isOpen ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-8 opacity-0'} overflow-hidden ${className}`}
+         style={{
+           borderRadius: 'calc(var(--glass-radius) * 1.6)',
+           ...style,
+         }}
          onClick={(e) => e.stopPropagation()}>
       
       {/* 左侧导航栏 Sidebar */}
@@ -1021,19 +1077,10 @@ return createPortal(
         </div>
         
         <div className="flex-1 overflow-y-auto space-y-1 scrollbar-none" style={{ padding: 'var(--glass-padding-sm)' }}>
-          {(isAdvancedMode ? [
-            { id: 'nodes', label: t('config.tabs.nodes') },
-            { id: 'containers', label: t('config.tabs.containers') },
-            { id: 'spacing', label: t('config.tabs.spacing') },
-            { id: 'edges', label: t('config.tabs.edges') },
-            { id: 'layout', label: t('config.tabs.layout') },
-            { id: 'performance', label: t('config.tabs.performance') }
-          ] : [
-            { id: 'basic', label: t('config.tabs.basic') }
-          ]).map(tab => (
+          {visibleTabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id)}
               className={`w-full flex items-center px-3.5 py-2.5 text-[13px] rounded-[6px] transition-colors ${activeTab === tab.id ? activeTabClass : inactiveTabClass}`}
             >
               {tab.label}
@@ -1086,7 +1133,7 @@ return createPortal(
                 <button
                 className={`flex items-center justify-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors rounded-lg flex-1 sm:flex-none ${actionBtnSecondary}`}
                 onClick={async () => {
-                  const preset: Record<string, any> = {
+                  const preset: ConfigValues = {
                     'diagram.layout.ELK_NODE_SPACING': 36,
                     'diagram.layout.ELK_LAYER_SPACING': 64,
                     'diagram.layout.ELK_EDGE_ROUTING': 'ORTHOGONAL',
@@ -1113,7 +1160,7 @@ return createPortal(
               <button
                 className={`flex items-center justify-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors rounded-lg flex-1 sm:flex-none ${actionBtnSecondary}`}
                 onClick={async () => {
-                  const preset: Record<string, any> = {
+                  const preset: ConfigValues = {
                     'diagram.layout.ELK_NODE_SPACING': 56,
                     'diagram.layout.ELK_LAYER_SPACING': 96,
                     'diagram.layout.ELK_EDGE_ROUTING': 'POLYLINE',

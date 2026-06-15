@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Modal, Button, Space, message, Alert } from 'antd';
+import { Modal, Button, Space, Alert } from 'antd';
 import Editor from '@monaco-editor/react';
 import { MermaidParser } from '@/services/import/MermaidParser';
-import { useTranslation } from 'react-i18next';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 
 
@@ -22,7 +21,6 @@ const DEFAULT_MERMAID = `graph TD
     end`;
 
 export const MermaidImportModal: React.FC<MermaidImportModalProps> = ({ visible, onClose, onImport }) => {
-  const { t } = useTranslation();
   const [code, setCode] = useState(DEFAULT_MERMAID);
   const [error, setError] = useState<string | null>(null);
 

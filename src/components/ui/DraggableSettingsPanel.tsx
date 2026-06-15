@@ -1,6 +1,6 @@
 import React, { ReactNode, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { ConfigProvider, Button } from 'antd';
+import { ConfigProvider } from 'antd';
 import { MdDragIndicator } from 'react-icons/md';
 import { useDraggablePanel } from '../../hooks/useDraggablePanel';
 

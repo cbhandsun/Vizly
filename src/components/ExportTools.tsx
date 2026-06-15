@@ -1,24 +1,32 @@
-// @ts-nocheck
 import React, { useCallback, memo, useState, useEffect } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { createPortal } from 'react-dom';
 import { FaHome, FaRuler, FaExpand, FaCompress, FaFileImage, FaFilePdf, FaFileCode, FaFileVideo, FaDownload, FaSpinner, FaCloudUploadAlt, FaShareAlt, FaFolderOpen } from 'react-icons/fa';
-import { useDiagramControls } from '@/core';
+import { useDiagramControls } from '@/core/hooks/useDiagramControls';
 import { useTranslation } from 'react-i18next';
-import { unifiedStorage } from '../services/UnifiedStorageService';
-import { dataRegistry } from '../data/DataRegistry';
-import { App, Button, Dropdown, Tooltip, theme, Progress } from 'antd';
+import { Button, Dropdown, Tooltip, theme, Progress } from 'antd';
 import type { MenuProps } from 'antd';
-import { useAuth } from '@/context/AuthContext';
-import { useSubscription } from '@/context/SubscriptionContext';
-import { tryAttachDiagramSnapshot } from '@/core';
-import { invalidateRemoteDiagramPreview } from '@/core';
+import { useAuth } from '@/context/useAuth';
+import { useSubscription } from '@/context/useSubscription';
+import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
+import { invalidateRemoteDiagramPreview } from '@/core/utils/remoteDiagramPreview';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import { downloadFile } from '@/core/utils/downloadUtils';
+import { escapeMarkdownInlineText, escapeMarkdownTableCell, escapeMermaidLabel, toMermaidNodeId } from '@/core/utils/exportTextSecurity';
 
 const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
 const CloudStorageManagerModal = React.lazy(() => import('@/components/storage/CloudStorageManagerModal').then(async (m) => {
   return { default: m.CloudStorageManagerModal };
 }));
+const loadUnifiedStorage = async () => (await import('../services/UnifiedStorageService')).unifiedStorage;
+const loadDataService = async () => {
+  const { dataRegistry } = await import('../data/DataRegistry');
+  await dataRegistry.initialize();
+  return dataRegistry.getDataService();
+};
+
+const MARKDOWN_EXPORT_MAX_NODES = 1000;
+const MARKDOWN_EXPORT_MAX_EDGES = 2000;
 
 interface ExportToolsProps {
   diagramId: string;
@@ -46,7 +54,6 @@ const ExportTools: React.FC<ExportToolsProps> = ({
   enableMainFlowAnimation = true,
   onOpenInDesigner
 }) => {
-  const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const { user } = useAuth();
@@ -149,7 +156,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
   const handleExportGIF = () => wrapExport('gif', exportToGIF);
   
   const handleExportMarkdown = async () => {
-    const dataService = dataRegistry.getDataService();
+    const dataService = await loadDataService();
     let diagram = dataService.getDiagram(diagramId);
     
     // Fallback Bridge
@@ -163,12 +170,27 @@ const ExportTools: React.FC<ExportToolsProps> = ({
        return;
     }
 
-    const nodeDetails = (diagram.nodes || []).map(n => `| ${n.id} | ${n.data?.label || n.id} | ${n.data?.domainClass || n.type || 'N/A'} | ${n.data?.description || ''} |`).join('\n');
-    const edgeDetails = (diagram.edges || []).map(e => `- ${e.source} --> ${e.target}${e.label ? `: ${e.label}` : ''}`).join('\n');
+    const safeNodes = (diagram.nodes || []).slice(0, MARKDOWN_EXPORT_MAX_NODES);
+    const safeNodeIds = new Set(safeNodes.map(n => n.id));
+    const safeEdges = (diagram.edges || [])
+      .filter(e => safeNodeIds.has(e.source) && safeNodeIds.has(e.target))
+      .slice(0, MARKDOWN_EXPORT_MAX_EDGES);
 
-    const mermaid = `graph TD\n` + (diagram.edges || []).map(e => `  ${e.source.replace(/-/g, '_')}["${diagram.nodes.find(n => n.id === e.source)?.data?.label || e.source}"] -- ${e.label || ''} --> ${e.target.replace(/-/g, '_')}["${diagram.nodes.find(n => n.id === e.target)?.data?.label || e.target}"]`).join('\n');
+    const nodeDetails = safeNodes.map(n => `| ${escapeMarkdownTableCell(n.id)} | ${escapeMarkdownTableCell(n.data?.label || n.id)} | ${escapeMarkdownTableCell(n.data?.domainClass || n.type || 'N/A')} | ${escapeMarkdownTableCell(n.data?.description || '')} |`).join('\n');
+    const edgeDetails = safeEdges.map(e => `- ${escapeMarkdownTableCell(e.source)} --> ${escapeMarkdownTableCell(e.target)}${e.label ? `: ${escapeMarkdownTableCell(e.label)}` : ''}`).join('\n');
 
-    const content = `# Architecture Blueprint: ${diagramName || 'Untitled'}
+    const mermaid = `graph TD\n` + safeEdges.map(e => {
+      const sourceId = toMermaidNodeId(e.source);
+      const targetId = toMermaidNodeId(e.target);
+      const sourceLabel = escapeMermaidLabel(safeNodes.find(n => n.id === e.source)?.data?.label || e.source);
+      const targetLabel = escapeMermaidLabel(safeNodes.find(n => n.id === e.target)?.data?.label || e.target);
+      const edgeLabel = escapeMermaidLabel(e.label || '');
+      return edgeLabel
+        ? `  ${sourceId}["${sourceLabel}"] -->|"${edgeLabel}"| ${targetId}["${targetLabel}"]`
+        : `  ${sourceId}["${sourceLabel}"] --> ${targetId}["${targetLabel}"]`;
+    }).join('\n');
+
+    const content = `# Architecture Blueprint: ${escapeMarkdownInlineText(diagramName || 'Untitled')}
 
 ## 1. Overview
 This architectural blueprint was generated by Vizly AI Studio.
@@ -190,13 +212,7 @@ ${mermaid}
 *Generated by Vizly AI Studio - ${new Date().toLocaleString()}*
 `;
 
-    const blob = new Blob([content], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${diagramName || 'blueprint'}.md`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadFile(content, `${diagramName || 'blueprint'}.md`, 'text/markdown');
     appMessage.success('📄 文档已导出为 Markdown');
   };
 
@@ -207,6 +223,8 @@ ${mermaid}
       return undefined;
     }
 
+    const unifiedStorage = await loadUnifiedStorage();
+
     if (!unifiedStorage.isConfigured()) {
       appMessage.error(`${unifiedStorage.activeProvider.name} 未配置，无法保存`);
       return undefined;
@@ -214,7 +232,7 @@ ${mermaid}
 
     const hide = appMessage.loading(t('export.savingToCloud'), 0);
     try {
-      const dataService = dataRegistry.getDataService();
+      const dataService = await loadDataService();
       let diagram = dataService.getDiagram(diagramId);
 
       // Fallback: 当 dataService 中无图表数据时（FlowchartDesigner 场景），从 ReactFlow 实例构造
@@ -295,7 +313,7 @@ ${mermaid}
     } finally {
       hide();
     }
-  }, [diagramId, diagramName, t, user?.id, hasFeature, showUpgradeModal]);
+  }, [diagramId, diagramName, t, user?.id, hasFeature, showUpgradeModal, reactFlowInstance]);
 
   // 确保图表已保存到云端（供 ShareDialog 使用），返回云端 UUID
   const handleEnsureSaved = useCallback(async (): Promise<string | false> => {
@@ -477,19 +495,26 @@ ${mermaid}
         </Dropdown>
       </div>
 
-      <React.Suspense fallback={null}>
-        <ShareDialog
-          open={shareDialogOpen}
-          onClose={() => setShareDialogOpen(false)}
-          diagramId={diagramId}
-          onEnsureSaved={handleEnsureSaved}
-        />
-        <CloudStorageManagerModal
-          open={cloudManagerOpen}
-          onCancel={() => setCloudManagerOpen(false)}
-          onOpenInDesigner={onOpenInDesigner}
-        />
-      </React.Suspense>
+      {shareDialogOpen && (
+        <React.Suspense fallback={null}>
+          <ShareDialog
+            open={shareDialogOpen}
+            onClose={() => setShareDialogOpen(false)}
+            diagramId={diagramId}
+            onEnsureSaved={handleEnsureSaved}
+          />
+        </React.Suspense>
+      )}
+
+      {cloudManagerOpen && (
+        <React.Suspense fallback={null}>
+          <CloudStorageManagerModal
+            open={cloudManagerOpen}
+            onCancel={() => setCloudManagerOpen(false)}
+            onOpenInDesigner={onOpenInDesigner}
+          />
+        </React.Suspense>
+      )}
     </>
   );
 };
