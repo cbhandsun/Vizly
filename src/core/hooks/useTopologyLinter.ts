@@ -195,5 +195,5 @@ export function useTopologyLinter(nodes: Node[], edges: Edge[], options: Topolog
         });
 
         return { lintedNodes: nextNodes, lintedEdges: nextEdges, violations };
-    }, [nodes, edges, enabled, allRules]);
+    }, [debouncedNodes, debouncedEdges, enabled, allRules]);
 }

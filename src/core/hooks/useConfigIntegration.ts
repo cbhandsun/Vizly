@@ -1,16 +1,15 @@
-// @ts-nocheck
 /**
  * 配置集成 Hook
  * 为组件提供统一的配置和主题管理接口
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { ConfigIntegration, IntegrationOptions, createConfigIntegration } from '../config/ConfigIntegration';
-import { LayeredConfigManager, ConfigLayer } from '../config/LayeredConfigManager';
-import { EnhancedThemeManager } from '../themes/EnhancedThemeManager';
-import type { Theme } from '../themes/Theme';
-import { ThemePresetManager } from '../themes/ThemePresetManager';
-import { ThemePerformanceOptimizer } from '../themes/ThemePerformanceOptimizer';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { ConfigIntegration, createConfigIntegration } from '../config/ConfigIntegration';
+import type { IntegrationStatus } from '../config/ConfigIntegration';
+import { ConfigLayer } from '../config/LayeredConfigManager';
+import type { LayeredConfigChangeEvent } from '../config/LayeredConfigManager';
+import type { Theme } from '../themes/types/ThemeTypes';
+import type { PerformanceMetrics } from '../themes/ThemePerformanceOptimizer';
 import { diagramConfigManager } from '../components/config/DiagramConfig';
 
 export interface ConfigIntegrationOptions {
@@ -25,26 +24,22 @@ export interface ConfigIntegrationState {
   isReady: boolean;
   isLoading: boolean;
   error: string | null;
-  status: {
-    layeredConfigReady: boolean;
-    themeSystemReady: boolean;
-    validationReady: boolean;
-    performanceOptimizerReady: boolean;
-    migrationComplete: boolean;
-  };
+  status: Omit<IntegrationStatus, 'errors'>;
 }
+
+export type IntegratedConfigExport = Awaited<ReturnType<ConfigIntegration['exportIntegratedConfig']>>;
 
 export interface ConfigIntegrationActions {
   initialize: () => Promise<void>;
   reset: () => Promise<void>;
-  exportConfig: () => Promise<any>;
-  importConfig: (config: any) => Promise<void>;
-  setConfig: (key: string, value: any, layer?: ConfigLayer) => Promise<void>;
+  exportConfig: () => Promise<IntegratedConfigExport>;
+  importConfig: (config: unknown) => Promise<void>;
+  setConfig: <T = unknown>(key: string, value: T, layer?: ConfigLayer) => Promise<void>;
   removeConfig: (key: string, layer?: ConfigLayer) => Promise<void>;
-  getConfig: (key: string) => Promise<any>;
+  getConfig: <T = unknown>(key: string) => Promise<T>;
   setTheme: (themeId: string) => Promise<void>;
   getCurrentTheme: () => Theme | null;
-  getPerformanceMetrics: () => any;
+  getPerformanceMetrics: () => PerformanceMetrics | null;
 }
 
 /**
@@ -73,8 +68,17 @@ export function useConfigIntegration(
       migrationComplete: false,
     },
   });
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const initialize = useCallback(async () => {
+    if (!mountedRef.current) return;
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
@@ -88,21 +92,27 @@ export function useConfigIntegration(
 
       const status = integration.getStatus();
 
-      setState(prev => ({
-        ...prev,
-        integration,
-        isReady: integration.isReady(),
-        isLoading: false,
-        status,
-      }));
+      if (mountedRef.current) {
+        setState(prev => ({
+          ...prev,
+          integration,
+          isReady: integration.isReady(),
+          isLoading: false,
+          status,
+        }));
+      } else {
+        integration.dispose();
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('ConfigIntegration initialization failed:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: errorMessage,
-      }));
+      if (mountedRef.current) {
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: errorMessage,
+        }));
+      }
       console.error('Failed to initialize ConfigIntegration:', error);
     }
   }, [enableMigration, enableValidation, enablePerformanceOptimization]);
@@ -122,7 +132,7 @@ export function useConfigIntegration(
   }, [state.integration]);
 
   // 导出配置
-  const exportConfig = useCallback(async () => {
+  const exportConfig = useCallback(async (): Promise<IntegratedConfigExport> => {
     if (!state.integration) {
       throw new Error('ConfigIntegration not initialized');
     }
@@ -136,7 +146,7 @@ export function useConfigIntegration(
   }, [state.integration]);
 
   // 导入配置
-  const importConfig = useCallback(async (config: any) => {
+  const importConfig = useCallback(async (config: unknown) => {
     if (!state.integration) {
       throw new Error('ConfigIntegration not initialized');
     }
@@ -150,7 +160,7 @@ export function useConfigIntegration(
   }, [state.integration]);
 
   // 设置配置
-  const setConfig = useCallback(async (key: string, value: any, layer: ConfigLayer = ConfigLayer.USER) => {
+  const setConfig = useCallback(async <T,>(key: string, value: T, layer: ConfigLayer = ConfigLayer.USER) => {
     if (!state.integration) {
       throw new Error('ConfigIntegration not initialized');
     }
@@ -180,14 +190,14 @@ export function useConfigIntegration(
   }, [state.integration]);
 
   // 获取配置
-  const getConfig = useCallback(async (key: string) => {
+  const getConfig = useCallback(async <T,>(key: string): Promise<T> => {
     if (!state.integration) {
       throw new Error('ConfigIntegration not initialized');
     }
 
     try {
       const layeredConfig = state.integration.getLayeredConfigManager();
-      return await layeredConfig.getConfig(key);
+      return await layeredConfig.getConfig<T>(key);
     } catch (error) {
       console.error(`Failed to get config ${key}:`, error);
       throw error;
@@ -246,15 +256,17 @@ export function useConfigIntegration(
     }
   }, [state.integration]);
 
-  // 自动初始化 - 使用ref来避免死循环
-  const initializeRef = useRef(initialize);
-  initializeRef.current = initialize;
-
   useEffect(() => {
+    let cancelled = false;
     if (autoInitialize && !state.integration && !state.isLoading) {
-      initializeRef.current();
+      queueMicrotask(() => {
+        if (!cancelled) void initialize();
+      });
     }
-  }, [autoInitialize, state.integration, state.isLoading]);
+    return () => {
+      cancelled = true;
+    };
+  }, [autoInitialize, initialize, state.integration, state.isLoading]);
 
   // 清理资源
   useEffect(() => {
@@ -296,7 +308,7 @@ export function useSimpleConfigIntegration(
  * 配置值 Hook
  * 监听特定配置项的变化
  */
-export function useConfigValue<T = any>(
+export function useConfigValue<T = unknown>(
   key: string,
   defaultValue?: T,
   options: ConfigIntegrationOptions = {}
@@ -307,7 +319,7 @@ export function useConfigValue<T = any>(
   // 加载配置值
   useEffect(() => {
     if (state.isReady && state.integration) {
-      actions.getConfig(key).then(configValue => {
+      actions.getConfig<T>(key).then(configValue => {
         setValue(configValue !== undefined ? configValue : defaultValue);
       }).catch(error => {
         console.warn(`Failed to load config ${key}:`, error);
@@ -321,7 +333,7 @@ export function useConfigValue<T = any>(
     if (!state.integration) return;
 
     const layeredConfig = state.integration.getLayeredConfigManager();
-    const unsubscribe = layeredConfig.addListener(key, (event: any) => {
+    const unsubscribe = layeredConfig.addListener<T>(key, (event: LayeredConfigChangeEvent<T>) => {
       // Use effectiveValue to respect layer priority (e.g. session > user)
       const newValue = event.effectiveValue !== undefined ? event.effectiveValue : defaultValue;
       setValue(newValue);
@@ -351,10 +363,15 @@ export function useTheme(
 
   // 加载当前主题
   useEffect(() => {
+    let cancelled = false;
     if (state.isReady && state.integration) {
-      const currentTheme = actions.getCurrentTheme();
-      setTheme(currentTheme);
+      queueMicrotask(() => {
+        if (!cancelled) setTheme(actions.getCurrentTheme());
+      });
     }
+    return () => {
+      cancelled = true;
+    };
   }, [state.isReady, state.integration, actions]);
 
   // 监听主题变化
@@ -378,16 +395,16 @@ export function useTheme(
 export function usePerformanceMetrics(
   options: ConfigIntegrationOptions = {},
   intervalMs: number = 1000
-): any {
+): PerformanceMetrics | null {
   const [state, actions] = useConfigIntegration(options);
-  const [metrics, setMetrics] = useState<any>(null);
+  const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null);
 
   useEffect(() => {
     if (!state.isReady || !state.integration) return;
 
     const updateMetrics = () => {
       const currentMetrics = actions.getPerformanceMetrics();
-      setMetrics((prev: any) => {
+      setMetrics((prev) => {
         // 简单的浅比较以避免不必要的重渲染
         if (!prev && !currentMetrics) return null;
         if (prev && currentMetrics &&

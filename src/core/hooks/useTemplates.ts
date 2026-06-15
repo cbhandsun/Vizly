@@ -6,6 +6,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { cloneDeep } from 'lodash';
 import { DiagramTemplate, TemplateCategory, TemplateFilterOptions, SaveTemplateOptions } from '../types/Template';
+import { parseStoredTemplates, serializeStoredTemplates } from '../utils/templateUtils';
 
 const BUILT_IN_TEMPLATES: DiagramTemplate[] = [];
 
@@ -18,14 +19,7 @@ const MAX_CUSTOM_TEMPLATES = 50; // 限制最多50个自定义模板
 const loadFromStorage = (): DiagramTemplate[] => {
     try {
         const data = localStorage.getItem(STORAGE_KEY);
-        if (!data) return [];
-        const parsed = JSON.parse(data);
-        // 反序列化Date对象
-        return parsed.map((t: any) => ({
-            ...t,
-            createdAt: new Date(t.createdAt),
-            updatedAt: t.updatedAt ? new Date(t.updatedAt) : undefined
-        }));
+        return parseStoredTemplates(data);
     } catch (error) {
         console.error('[useTemplates] Failed to load custom templates:', error);
         return [];
@@ -34,7 +28,7 @@ const loadFromStorage = (): DiagramTemplate[] => {
 
 const saveToStorage = (templates: DiagramTemplate[]): boolean => {
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
+        localStorage.setItem(STORAGE_KEY, serializeStoredTemplates(templates));
         return true;
     } catch (error) {
         console.error('[useTemplates] Failed to save custom templates:', error);

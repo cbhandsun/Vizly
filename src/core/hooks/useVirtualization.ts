@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useRef } from 'react';
+import { useMemo, useCallback } from 'react';
 import { Node as ReactFlowNode, Edge as ReactFlowEdge, Viewport } from '@xyflow/react';
 
 /**
@@ -139,31 +139,19 @@ export const useVirtualization = (
         });
     }, [isNodeVisible, nodesMap]);
 
-    const hiddenStateRef = useRef(new Map<string, boolean>());
-
     // 虚拟化节点
     const virtualizedNodes = useMemo(() => {
         if (!shouldVirtualize) return nodes;
 
         return nodes.map(node => {
-            let shouldHide = false;
-
-            // 拖动时沿用上次的缓存可见度，而不是触发大规模回流
-            if (isDragging && hiddenStateRef.current.has(node.id)) {
-                 shouldHide = hiddenStateRef.current.get(node.id)!;
-            } else {
-                 const isGroupType = node.type === 'subGroup' || node.type === 'titleGroup';
-                 const visible = isGroupType ? isGroupNodeVisible(node) : isNodeVisible(node);
-                 shouldHide = !visible;
-                 hiddenStateRef.current.set(node.id, shouldHide);
-            }
+            const isGroupType = node.type === 'subGroup' || node.type === 'titleGroup';
+            const visible = isGroupType ? isGroupNodeVisible(node) : isNodeVisible(node);
+            const shouldHide = isDragging ? (node.hidden || false) : !visible;
 
             // P9: 短路复用 — hidden 值未变时返回原引用，避免下游 memo 链失效
             return shouldHide === (node.hidden || false) ? node : { ...node, hidden: shouldHide };
         });
     }, [nodes, shouldVirtualize, isNodeVisible, isGroupNodeVisible, isDragging]);
-
-    const edgeHiddenRef = useRef(new Map<string, boolean>());
 
     // 虚拟化边（隐藏两端节点都不可见的边）
     const virtualizedEdges = useMemo(() => {
@@ -177,14 +165,9 @@ export const useVirtualization = (
         );
 
         return edges.map(edge => {
-            let shouldHide = false;
-            // 短路 AABB 可见性提取
-            if (isDragging && edgeHiddenRef.current.has(edge.id)) {
-                 shouldHide = edgeHiddenRef.current.get(edge.id)!;
-            } else {
-                 shouldHide = !visibleNodeIds.has(edge.source) && !visibleNodeIds.has(edge.target);
-                 edgeHiddenRef.current.set(edge.id, shouldHide);
-            }
+            const shouldHide = isDragging
+                ? (edge.hidden || false)
+                : !visibleNodeIds.has(edge.source) && !visibleNodeIds.has(edge.target);
             
             // P9: 短路复用 — 避免无意义的对象展开
             return shouldHide === (edge.hidden || false) ? edge : { ...edge, hidden: shouldHide };

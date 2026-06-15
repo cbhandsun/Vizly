@@ -57,7 +57,7 @@ export function useInteractionPerformance() {
   const interactionStartTime = useRef<number>(0);
 
   // 开始交互计时
-  const startInteraction = useCallback((interactionType: string) => {
+  const startInteraction = useCallback((_interactionType: string) => {
     interactionStartTime.current = performance.now();
   }, []);
 
@@ -72,7 +72,7 @@ export function useInteractionPerformance() {
 
   // 记录点击事件性能
   const trackClick = useCallback((elementName: string) => {
-    return (event: React.MouseEvent) => {
+    return (_event: React.MouseEvent) => {
       const startTime = performance.now();
       
       // 使用requestAnimationFrame确保DOM更新完成后再计算
@@ -85,7 +85,7 @@ export function useInteractionPerformance() {
 
   // 记录输入事件性能
   const trackInput = useCallback((inputName: string) => {
-    return (event: React.ChangeEvent) => {
+    return (_event: React.ChangeEvent) => {
       const startTime = performance.now();
       
       requestAnimationFrame(() => {

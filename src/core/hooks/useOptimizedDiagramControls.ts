@@ -12,12 +12,13 @@ import {
   _exportElementToSvgDataUrl,
   exportFullDiagramByAdjustingViewportToPngDataUrl,
   exportFullDiagramByAdjustingViewportToSvgDataUrl,
-  buildExportFileName
+  buildExportFileName,
+  triggerDownload,
 } from '../components/shared/exportUtils';
 
 // 防抖函数类型
 type DebouncedFunction<T extends (...args: any[]) => any> = {
-  (...args: Parameters<T>): void;
+  callback: (...args: Parameters<T>) => void;
   cancel: () => void;
 };
 
@@ -30,7 +31,14 @@ function useDebounce<T extends (...args: any[]) => any>(
 ): DebouncedFunction<T> {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const debouncedFunction = useCallback((...args: Parameters<T>) => {
+  const cancel = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  const callback = useCallback((...args: Parameters<T>) => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
@@ -38,15 +46,9 @@ function useDebounce<T extends (...args: any[]) => any>(
     timeoutRef.current = setTimeout(() => {
       func(...args);
     }, delay);
-  }, [func, delay]) as DebouncedFunction<T>;
+  }, [delay, func]);
 
-  debouncedFunction.cancel = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-  }, []);
-
-  return debouncedFunction;
+  return useMemo(() => ({ callback, cancel }), [callback, cancel]);
 }
 
 /**
@@ -131,7 +133,7 @@ export const useOptimizedDiagramControls = (
   /**
    * 适应视图 - 使用防抖优化
    */
-  const handleFitDiagram = useDebounce(
+  const { callback: handleFitDiagram, cancel: cancelFitDiagram } = useDebounce(
     useCallback(() => {
       dispatchDiagramControl('fit', diagramId);
     }, [diagramId]),
@@ -151,7 +153,7 @@ export const useOptimizedDiagramControls = (
   /**
    * 切换全屏 - 使用防抖优化
    */
-  const handleToggleFullscreen = useDebounce(
+  const { callback: handleToggleFullscreen, cancel: cancelToggleFullscreen } = useDebounce(
     useCallback(() => {
       dispatchDiagramControl('fullscreen', diagramId);
     }, [diagramId]),
@@ -211,14 +213,7 @@ export const useOptimizedDiagramControls = (
         );
       });
 
-      // 下载文件
-      const link = document.createElement('a');
-      link.download = buildExportFileName(diagramId, 'png');
-      link.href = dataUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
+      triggerDownload(dataUrl, buildExportFileName(diagramId, 'png'));
 
       dispatchExportEvent('diagramExportComplete', { diagramId, type: 'png' });
     } catch (error) {
@@ -282,14 +277,7 @@ export const useOptimizedDiagramControls = (
         );
       });
 
-      // 下载文件
-      const link = document.createElement('a');
-      link.download = buildExportFileName(diagramId, 'svg');
-      link.href = svgDataUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
+      triggerDownload(svgDataUrl, buildExportFileName(diagramId, 'svg'));
 
       dispatchExportEvent('diagramExportComplete', { diagramId, type: 'svg' });
     } catch (error) {
@@ -424,10 +412,10 @@ export const useOptimizedDiagramControls = (
    * 清理函数
    */
   const cleanup = useCallback(() => {
-    handleFitDiagram.cancel();
-    handleToggleFullscreen.cancel();
+    cancelFitDiagram();
+    cancelToggleFullscreen();
     exportStateRef.current.isExporting = false;
-  }, [handleFitDiagram, handleToggleFullscreen]);
+  }, [cancelFitDiagram, cancelToggleFullscreen]);
 
   return {
     // 基础控制函数

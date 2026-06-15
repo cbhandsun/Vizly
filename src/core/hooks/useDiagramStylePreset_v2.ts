@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useSyncExternalStore } from 'react';
 import { diagramStyleManager, type FlowStylePreset } from '../components/shared/DiagramStyleManager';
 

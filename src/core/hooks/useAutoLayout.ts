@@ -1,10 +1,6 @@
 import { useCallback } from 'react';
-import { Node, Edge, useReactFlow, Position, ReactFlowInstance } from '@xyflow/react';
-import dagre from 'dagre';
-import ELK from 'elkjs/lib/elk.bundled.js';
-import { LayoutStrategyManager } from '../strategies/LayoutStrategyManager';
+import { Node, Edge, Position, ReactFlowInstance } from '@xyflow/react';
 import { animateLayoutTransition } from '../utils/animateLayoutTransition';
-import { refineLayout } from '../strategies/shared/LayoutRefinement';
 
 export type LayoutDirection = 'TB' | 'LR';
 export type LayoutAlgorithm = 'dagre' | 'elk';
@@ -25,19 +21,22 @@ export interface StrategyLayoutOptions {
     direction?: LayoutDirection;
 }
 
-const elk = new ELK();
-
 export const useAutoLayout = (instance: ReactFlowInstance | null) => {
     const layout = useCallback(async ({ direction, spacing = { x: 50, y: 50 }, algorithm = 'dagre' }: AutoLayoutOptions) => {
         if (!instance) {
             console.warn('AutoLayout: No ReactFlow instance provided');
             return;
         }
-        const { getNodes, getEdges, setNodes, setEdges, fitView } = instance;
+        const { getNodes, getEdges, setNodes, fitView } = instance;
         const nodes = getNodes();
         const edges = getEdges();
 
         if (algorithm === 'elk') {
+            const [{ default: ELK }, { refineLayout }] = await Promise.all([
+                import('elkjs/lib/elk.bundled.js'),
+                import('../strategies/shared/LayoutRefinement'),
+            ]);
+            const elk = new ELK();
             const elkOptions = {
                 'elk.algorithm': 'layered',
                 'elk.direction': direction === 'TB' ? 'DOWN' : 'RIGHT',
@@ -91,6 +90,10 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
             }
         } else {
             // DAGRE implementation
+            const [{ default: dagre }, { refineLayout }] = await Promise.all([
+                import('dagre'),
+                import('../strategies/shared/LayoutRefinement'),
+            ]);
             const dagreGraph = new dagre.graphlib.Graph();
             dagreGraph.setDefaultEdgeLabel(() => ({}));
 
@@ -191,6 +194,10 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
 
             if (options.strategyName === 'tree' || options.strategyName === 'force') {
                 // ── 树形 & 力导向：统一用 dagre 实现（已验证可工作） ──
+                const [{ default: dagre }, { refineLayout }] = await Promise.all([
+                    import('dagre'),
+                    import('../strategies/shared/LayoutRefinement'),
+                ]);
                 const dagreGraph = new dagre.graphlib.Graph();
                 dagreGraph.setDefaultEdgeLabel(() => ({}));
 
@@ -254,7 +261,8 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
                 })));
 
             } else {
-                // ── 域感知策略布局（使用静态导入的 LayoutStrategyManager） ──
+                // ── 域感知策略布局 ──
+                const { LayoutStrategyManager } = await import('../strategies/LayoutStrategyManager');
                 const manager = LayoutStrategyManager.getShared();
 
                 const strategyMap: Record<string, string> = {
@@ -263,7 +271,7 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
                     'domain-dagre': 'DomainDagreLayout',
                 };
                 const resolvedName = strategyMap[options.strategyName] || options.strategyName;
-                const strategy = manager.getStrategy(resolvedName);
+                const strategy = await manager.getStrategyAsync(resolvedName);
 
                 if (!strategy) {
                     console.error(`[AutoLayout] 布局策略 "${resolvedName}" 未找到`);

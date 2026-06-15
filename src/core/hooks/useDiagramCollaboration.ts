@@ -1,6 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import * as Y from 'yjs';
-import { Node, Edge, applyNodeChanges, applyEdgeChanges, XYPosition } from '@xyflow/react';
+import { Node, Edge, XYPosition } from '@xyflow/react';
 import { useDiagramStore, CommentThread } from '../store/useDiagramStore';
 import { collaborationService } from '../services/CollaborationService';
 
@@ -72,7 +71,7 @@ export function useDiagramCollaboration(diagramId: string, enabled: boolean = tr
             yComments.unobserve(observeHandler);
             collaborationService.destroy();
         };
-    }, [diagramId, enabled]);
+    }, [diagramId, enabled, setEdges, setNodes]);
 
     const comments = useDiagramStore(state => state.comments);
 

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import jsonpatch from 'fast-json-patch';
 
@@ -31,6 +31,7 @@ const MAX_HISTORY = 50;
  */
 export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) => {
     const [historyInfo, setHistoryInfo] = useState({ pastCount: 0, futureCount: 0 });
+    const [pastEntries, setPastEntries] = useState<HistoryEntry[]>([]);
 
     const baseStateRef = useRef<HistoryState | null>(null);
     const pastRef = useRef<HistoryEntry[]>([]);
@@ -43,6 +44,7 @@ export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) 
 
     const updateInfo = useCallback(() => {
         setHistoryInfo({ pastCount: pastRef.current.length, futureCount: futureRef.current.length });
+        setPastEntries([...pastRef.current]);
     }, []);
 
     const takeSnapshot = useCallback((nodes: Node[], edges: Edge[], label?: string) => {
@@ -107,7 +109,7 @@ export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) 
         return deepClone(rebuild);
     }, [updateInfo]);
 
-    const redo = useCallback((currentNodes: Node[], currentEdges: Edge[]) => {
+    const redo = useCallback((_currentNodes: Node[], _currentEdges: Edge[]) => {
         if (futureRef.current.length === 0 || !lastStateRef.current) return null;
 
         const nextEntry = futureRef.current.pop()!;
@@ -155,7 +157,7 @@ export const useDiagramHistory = (_initialNodes: Node[], _initialEdges: Edge[]) 
         redo,
         canUndo,
         canRedo,
-        pastEntries: useMemo(() => [...pastRef.current], [historyInfo]),
+        pastEntries,
         jumpTo,
         historyDeep: historyInfo.pastCount,
         getPreviousState: () => lastStateRef.current,
