@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Form, Input, Button, Card, Switch, Typography, Space, Select } from 'antd';
-import { appMessage as message, appModal } from '@/core';
+import { Form, Input, Button, Card, Switch, Typography, Space } from 'antd';
 import { SaveOutlined, ApiOutlined, CloudServerOutlined } from '@ant-design/icons';
 import { s3Storage as storageService, StorageConfig } from '../services/StorageService';
-import { appMessage } from '@/core/utils/antdStaticBridge';
+import { appMessage, appModal } from '@/core/utils/antdStaticBridge';
+import { redactSensitiveValue } from '@/services/storageSecurity';
 
 
 const { Title, Text, Paragraph } = Typography;
-const { Option } = Select;
 
 const StorageConfigPage: React.FC = () => {
     const { t } = useTranslation();
@@ -21,7 +20,7 @@ const StorageConfigPage: React.FC = () => {
     useEffect(() => {
         const config = storageService.getConfig();
         if (config) {
-            form.setFieldsValue(config);
+            form.setFieldsValue({ ...config, secretAccessKey: '' });
         }
     }, [form]);
 
@@ -30,7 +29,7 @@ const StorageConfigPage: React.FC = () => {
         try {
             storageService.saveConfig(values);
             appMessage.success(t('storageConfig.saveSuccess'));
-        } catch (error) {
+        } catch {
             appMessage.error(t('storageConfig.saveFail'));
         } finally {
             setLoading(false);
@@ -40,20 +39,19 @@ const StorageConfigPage: React.FC = () => {
     const handleTestConnection = async () => {
         setTesting(true);
         try {
-            // 临时保存当前表单的值到 service 以便测试
             const values = await form.validateFields();
-            storageService.saveConfig(values);
 
-            await storageService.testConnection();
+            await storageService.testConnection(values);
             appMessage.success(t('storageConfig.testSuccess'));
         } catch (error: any) {
-            console.error(error);
-            const errorDetails = JSON.stringify({
+            const redactedError = redactSensitiveValue({
                 name: error.name,
                 message: error.message,
                 metadata: error.$metadata,
                 stack: error.stack
-            }, null, 2);
+            });
+            console.error(redactedError);
+            const errorDetails = JSON.stringify(redactedError, null, 2);
 
             appModal.error({
                 title: t('storageConfig.testFail.title'),
@@ -144,7 +142,7 @@ const StorageConfigPage: React.FC = () => {
 
                 <Card
                     title={<span style={{ fontWeight: 700, letterSpacing: '-0.2px' }}>Connection Settings</span>}
-                    bordered={false}
+                    variant="borderless"
                     style={{
                         borderRadius: 12,
                         boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 16px 32px -8px rgba(0,0,0,0.05)',
@@ -197,7 +195,14 @@ const StorageConfigPage: React.FC = () => {
                         <Form.Item
                             name="secretAccessKey"
                             label="Secret Access Key"
-                            rules={[{ required: true, message: t('storageConfig.form.secretKeyRequired') }]}
+                            rules={[{
+                                validator: (_, value) => {
+                                    if (value || storageService.getConfig()?.secretAccessKey) {
+                                        return Promise.resolve();
+                                    }
+                                    return Promise.reject(new Error(t('storageConfig.form.secretKeyRequired')));
+                                }
+                            }]}
                         >
                             <Input.Password placeholder="Secret Key" />
                         </Form.Item>

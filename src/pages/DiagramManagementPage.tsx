@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { Button, Modal, Dropdown, MenuProps, Avatar, App } from 'antd';
+import App from 'antd/es/app';
+import Avatar from 'antd/es/avatar';
+import Dropdown from 'antd/es/dropdown';
+import type { MenuProps } from 'antd/es/menu';
+import { Clock } from 'lucide-react';
 import {
     CloudOutlined,
     LaptopOutlined,
@@ -12,7 +16,6 @@ import {
     MoreOutlined,
     BlockOutlined,
     DeploymentUnitOutlined,
-    ClockCircleOutlined,
     GatewayOutlined,
     _FolderOpenOutlined,
     PlusOutlined,
@@ -32,21 +35,39 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { dataRegistry } from '../data/DataRegistry';
 import { unifiedStorage } from '../services/UnifiedStorageService';
-import { shareService } from '../services/ShareService';
-import { DiagramMetadata } from '../services/storage/types';
-import { StandardDiagramData } from '@/core';
-import { useTranslation } from 'react-i18next';
-import { ManageStorageProvider } from '@/components/ui/ManageTopToolbar';
-import { useAuth } from '@/context/AuthContext';
-import { AuthModal } from '@/components/auth/AuthModal';
-import { coerceToStandardDiagramDataWithReport } from '@/core';
-import RemoteDiagramCover from '@/components/shared/RemoteDiagramCover';
+import type { DiagramMetadata } from '../services/storage/types';
+import type { StandardDiagramData } from '@/core/models/DiagramModels';
+import type { ManageStorageProvider } from '@/components/ui/ManageTopToolbar';
+import { useAuth } from '@/context/useAuth';
 // PRESET_MAP 已迁移到 Supabase system_templates，仅在 handleCreateTemplate 中保留最小依赖
-import { supabase } from '@/services/supabase';
 
 import './WorkspaceDashboard.css';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import { upsertDiagramConfigIndex } from '@/core/utils/diagramTypeStorage';
 
+const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
+    default: module.AuthModal,
+})));
+
+const RemoteDiagramCover = React.lazy(() => import('@/components/shared/RemoteDiagramCover'));
+
+let supabaseModulePromise: Promise<typeof import('@/services/supabase')> | null = null;
+let shareServiceModulePromise: Promise<typeof import('../services/ShareService')> | null = null;
+
+const loadSupabaseClient = async () => {
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        return null;
+    }
+    supabaseModulePromise ??= import('@/services/supabase');
+    const { supabase } = await supabaseModulePromise;
+    return supabase;
+};
+
+const loadShareService = async () => {
+    shareServiceModulePromise ??= import('../services/ShareService');
+    const { shareService } = await shareServiceModulePromise;
+    return shareService;
+};
 
 // --- Unified Data Types ---
 type DataSourceType = 'local' | 'supabase' | 's3' | 'template' | 'general_template';
@@ -64,14 +85,6 @@ interface UnifiedDiagramItem {
 }
 
 // --- Helpers ---
-function getGreeting(): { text: string; emoji: string } {
-    const h = new Date().getHours();
-    if (h < 6) return { text: 'Night owl mode', emoji: '🦉' };
-    if (h < 12) return { text: 'Good morning', emoji: '☀️' };
-    if (h < 18) return { text: 'Good afternoon', emoji: '🚀' };
-    return { text: 'Good evening', emoji: '🌙' };
-}
-
 function detectDiagramType(item: UnifiedDiagramItem): string {
     if (item.source !== 'local') return 'default';
     const raw = item.raw as StandardDiagramData;
@@ -96,17 +109,16 @@ function getNodeCount(item: UnifiedDiagramItem): number | null {
 const TYPE_ICON_MAP: Record<string, React.ReactNode> = {
     flowchart: <DeploymentUnitOutlined />,
     mindmap: <GatewayOutlined />,
-    timeline: <ClockCircleOutlined />,
+    timeline: <Clock size={18} strokeWidth={2} />,
     architecture: <BlockOutlined />,
     default: <ApartmentOutlined />,
 };
 
 const WorkspaceDashboardPage: React.FC = () => {
     const navigate = useNavigate();
-    const [searchParams, setSearchParams] = useSearchParams();
-    const { t } = useTranslation();
+    const [searchParams] = useSearchParams();
     const { user } = useAuth();
-    const { message, modal } = App.useApp();
+    const { modal } = App.useApp();
     
     // --- State ---
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -133,6 +145,25 @@ const WorkspaceDashboardPage: React.FC = () => {
         setCtxMenu({ x: e.clientX, y: e.clientY, item });
     }, []);
 
+    const openDiagramInNewTab = useCallback((item: UnifiedDiagramItem) => {
+        const rawId = item.id || (item.raw as { id?: unknown })?.id;
+        const diagramId = typeof rawId === 'string' ? rawId.trim() : String(rawId || '').trim();
+        if (!diagramId) {
+            appMessage.error('Unable to open diagram: missing diagram id.');
+            return;
+        }
+        window.open(`/?diagram=${encodeURIComponent(diagramId)}`, '_blank', 'noopener,noreferrer');
+    }, []);
+
+    const navigateToDiagram = useCallback((id: unknown) => {
+        const diagramId = typeof id === 'string' ? id.trim() : String(id || '').trim();
+        if (!diagramId) {
+            appMessage.error('Unable to open diagram: missing diagram id.');
+            return;
+        }
+        navigate(`/?diagram=${encodeURIComponent(diagramId)}`);
+    }, [navigate]);
+
     // Dismiss on click outside or Escape
     useEffect(() => {
         if (!ctxMenu) return;
@@ -147,12 +178,13 @@ const WorkspaceDashboardPage: React.FC = () => {
     }, [ctxMenu]);
 
     // --- Data Loading ---
-    const loadAllData = async () => {
+    const loadAllData = useCallback(async () => {
         setLoading(true);
         try {
             const newItems: UnifiedDiagramItem[] = [];
 
             // 1. Load Local
+            await dataRegistry.initialize();
             const localService = dataRegistry.getDataService();
             const localResult = localService.queryDiagrams({});
             localResult.data.forEach(d => {
@@ -167,7 +199,8 @@ const WorkspaceDashboardPage: React.FC = () => {
             });
 
             // 2. Load Cloud
-            if (cloudProvider !== 'supabase' || user) {
+            const cloudStorageProvider = unifiedStorage.getProvider(cloudProvider);
+            if (cloudStorageProvider.isConfigured() && (cloudProvider !== 'supabase' || user)) {
                 try {
                     const cloudResults = await unifiedStorage.listDiagrams();
                     cloudResults.forEach(d => {
@@ -188,6 +221,7 @@ const WorkspaceDashboardPage: React.FC = () => {
             // 3. Load Shared (Supabase)
             if (cloudProvider === 'supabase' && user) {
                 try {
+                    const shareService = await loadShareService();
                     const sharedResults = await shareService.listSharedWithMe();
                     sharedResults.forEach(d => {
                         if (!newItems.find(item => item.id === `supabase_${d.id}`)) {
@@ -206,32 +240,34 @@ const WorkspaceDashboardPage: React.FC = () => {
                 }
             }
 
-            // 4. 从 Supabase system_templates 加载所有模版
-            // category='general' → 通用模版 tab；其他 category（行业类）→ 行业模版 tab
-            if (supabase) {
-                try {
-                    const { data } = await supabase
-                        .from('system_templates')
-                        .select('id, title, category, tags, sort_order, thumbnail_url')
-                        .eq('is_active', true)
-                        .order('sort_order', { ascending: true })
-                        .order('created_at', { ascending: false });
+            // 4. 仅在用户进入模板视图时加载 Supabase system_templates，避免默认工作台首屏拉取云存储 SDK。
+            if (activeView === 'templates' || activeView === 'general_templates') {
+                const supabase = await loadSupabaseClient();
+                if (supabase) {
+                    try {
+                        const { data } = await supabase
+                            .from('system_templates')
+                            .select('id, title, category, tags, sort_order, thumbnail_url')
+                            .eq('is_active', true)
+                            .order('sort_order', { ascending: true })
+                            .order('created_at', { ascending: false });
 
-                    if (data) {
-                        data.forEach(t => {
-                            const isGeneral = t.category === 'general';
-                            newItems.push({
-                                id: `template_${t.id}`,
-                                title: t.title,
-                                updatedAt: 0,
-                                source: isGeneral ? 'general_template' : 'template',
-                                role: 'template',
-                                raw: { id: t.id, title: t.title, category: t.category, tags: t.tags, thumbnail_url: t.thumbnail_url } as any
+                        if (data) {
+                            data.forEach(t => {
+                                const isGeneral = t.category === 'general';
+                                newItems.push({
+                                    id: `template_${t.id}`,
+                                    title: t.title,
+                                    updatedAt: 0,
+                                    source: isGeneral ? 'general_template' : 'template',
+                                    role: 'template',
+                                    raw: { id: t.id, title: t.title, category: t.category, tags: t.tags, thumbnail_url: t.thumbnail_url } as any
+                                });
                             });
-                        });
+                        }
+                    } catch(e) {
+                        console.error("Templates fetch failed", e);
                     }
-                } catch(e) {
-                    console.error("Templates fetch failed", e);
                 }
             }
 
@@ -244,17 +280,17 @@ const WorkspaceDashboardPage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [activeView, cloudProvider, user]);
 
     useEffect(() => {
         loadAllData();
-    }, [cloudProvider, user?.id]);
+    }, [loadAllData]);
 
     // --- Actions ---
     const handleOpenDiagram = async (item: UnifiedDiagramItem) => {
         if (item.source === 'local') {
             const raw = item.raw as StandardDiagramData;
-            navigate(`/?diagram=${raw.id}`);
+            navigateToDiagram(raw.id);
             return;
         }
 
@@ -268,6 +304,7 @@ const WorkspaceDashboardPage: React.FC = () => {
             const rawObj = item.raw as any;
             const messageKey = appMessage.loading('正在加载模版...', 0);
             try {
+                const supabase = await loadSupabaseClient();
                 if (supabase) {
                     const { data, error } = await supabase
                         .from('system_templates')
@@ -275,32 +312,26 @@ const WorkspaceDashboardPage: React.FC = () => {
                         .eq('id', rawObj.id)
                         .single();
                     if (!error && data && data.content) {
-                        let parsedContent = data.content;
-                        if (typeof parsedContent === 'string') {
-                            try { parsedContent = JSON.parse(parsedContent); } catch (e) {
-                                console.error('Failed to parse template content', e);
-                            }
-                        }
-                        const baseData = {
-                            ...parsedContent,
-                            id: data.id,
-                            name: data.title || parsedContent.name,
-                            metadata: { ...(parsedContent.metadata || {}), title: data.title }
-                        };
-                        const { coerceToStandardDiagramData } = await import('@/core/utils/coerceDiagram');
-                        const normalized = coerceToStandardDiagramData(baseData, { id: data.id, title: data.title });
                         const localService = dataRegistry.getDataService();
-                        const cloned = JSON.parse(JSON.stringify(normalized));
-                        cloned.id = crypto.randomUUID();
-                        localService.registerDiagram(cloned);
+                        const clonedId = crypto.randomUUID();
+                        const cloned = localService.registerRemoteDiagram(data.content, {
+                            id: clonedId,
+                            title: data.title,
+                        }, true, {
+                            id: clonedId,
+                            name: data.title,
+                            metadata: { title: data.title },
+                        });
                         try {
-                            const configsRaw = localStorage.getItem('vizly_diagram_configs');
-                            const configs: Record<string, any> = configsRaw ? JSON.parse(configsRaw) : {};
-                            configs[cloned.id] = { id: cloned.id, type: cloned.type || 'flowchart', name: cloned.name, updatedAt: Date.now() };
-                            localStorage.setItem('vizly_diagram_configs', JSON.stringify(configs));
+                            upsertDiagramConfigIndex(localStorage, {
+                                id: cloned.id,
+                                type: cloned.type || 'flowchart',
+                                name: cloned.name,
+                                updatedAt: Date.now(),
+                            });
                         } catch { /* ignore */ }
-                        try { localStorage.removeItem(`flowchart-autosave-v2-${cloned.id}`); } catch (e) {}
-                        navigate(`/?diagram=${cloned.id}`);
+                        try { localStorage.removeItem(`flowchart-autosave-v2-${cloned.id}`); } catch (_e) {}
+                        navigateToDiagram(cloned.id);
                     } else {
                         appMessage.error('模版内容为空，请确认 Supabase 数据已迁移。');
                     }
@@ -320,20 +351,14 @@ const WorkspaceDashboardPage: React.FC = () => {
             const savedDiagram = await unifiedStorage.loadDiagram(rawObj.id);
             if (savedDiagram) {
                 const localService = dataRegistry.getDataService();
-                const report = coerceToStandardDiagramDataWithReport(savedDiagram.content, { id: savedDiagram.id, title: savedDiagram.title });
-                
-                if (report.issues.some(x => x.level === 'error')) {
-                    appMessage.error("Diagram format error. Cannot load.");
-                    return;
-                }
-                
-                const normalized: StandardDiagramData = {
-                    ...report.diagram,
+                const normalized = localService.registerRemoteDiagram(savedDiagram.content, {
                     id: savedDiagram.id,
-                    name: savedDiagram.title || report.diagram.name,
+                    title: savedDiagram.title,
+                }, true, {
+                    id: savedDiagram.id,
+                    name: savedDiagram.title,
                     metadata: {
-                        ...(report.diagram.metadata || {}),
-                        title: savedDiagram.title || report.diagram.metadata?.title,
+                        title: savedDiagram.title,
                         updatedAt: savedDiagram.updated_at,
                         cloud: {
                             provider: item.source,
@@ -343,21 +368,17 @@ const WorkspaceDashboardPage: React.FC = () => {
                         }
                     },
                     isReadonly: item.role === 'viewer'
-                };
-                localService.registerDiagram(normalized);
+                });
                 // 回写 type 索引，防止刷新后设计器无法识别图表类型
                 try {
-                    const configsRaw = localStorage.getItem('vizly_diagram_configs');
-                    const configs: Record<string, any> = configsRaw ? JSON.parse(configsRaw) : {};
-                    configs[savedDiagram.id] = {
+                    upsertDiagramConfigIndex(localStorage, {
                         id: savedDiagram.id,
                         type: normalized.type || 'flowchart',
                         name: normalized.name,
                         updatedAt: Date.now()
-                    };
-                    localStorage.setItem('vizly_diagram_configs', JSON.stringify(configs));
+                    });
                 } catch { /* ignore */ }
-                navigate(`/?diagram=${savedDiagram.id}`);
+                navigateToDiagram(savedDiagram.id);
             } else {
                 appMessage.error("Diagram not found in cloud storage.");
             }
@@ -388,7 +409,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                     }
                     appMessage.success('Deleted successfully');
                     loadAllData();
-                } catch (error) {
+                } catch (_error) {
                     appMessage.error("Failed to delete diagram.");
                 }
             }
@@ -479,82 +500,14 @@ const WorkspaceDashboardPage: React.FC = () => {
             // Persist diagram type index to localStorage so DiagramViewer
             // can resolve the correct plugin even after a page refresh.
             try {
-                const configsRaw = localStorage.getItem('vizly_diagram_configs');
-                const configs: Record<string, any> = configsRaw ? JSON.parse(configsRaw) : {};
-                configs[cloned.id] = { id: cloned.id, type: cloned.type, name: cloned.name, updatedAt: Date.now() };
-                localStorage.setItem('vizly_diagram_configs', JSON.stringify(configs));
+                upsertDiagramConfigIndex(localStorage, {
+                    id: cloned.id,
+                    type: cloned.type,
+                    name: cloned.name,
+                    updatedAt: Date.now(),
+                });
             } catch { /* ignore storage errors */ }
-            navigate(`/?diagram=${cloned.id}`);
-        }
-    };
-
-    const handleTemplateMenuChange = async (val: string[], leafKey: string, rootGroup: string) => {
-        if (!leafKey) return;
-
-        const seedAutoSaveAndNavigate = (normalized: any, id: string) => {
-            const localService = dataRegistry.getDataService();
-            const cloned = JSON.parse(JSON.stringify(normalized));
-            cloned.id = crypto.randomUUID(); // ensure fresh ID for new creations from template
-            localService.registerDiagram(cloned);
-            
-            try {
-                const configsRaw = localStorage.getItem('vizly_diagram_configs');
-                const configs: Record<string, any> = configsRaw ? JSON.parse(configsRaw) : {};
-                configs[cloned.id] = { id: cloned.id, type: cloned.type || 'flowchart', name: cloned.name, updatedAt: Date.now() };
-                localStorage.setItem('vizly_diagram_configs', JSON.stringify(configs));
-            } catch { /* ignore storage errors */ }
-            
-            try {
-                localStorage.removeItem(`flowchart-autosave-v2-${cloned.id}`);
-            } catch (e) {}
-
-            navigate(`/?diagram=${cloned.id}`);
-        };
-
-        if (rootGroup === 'system-templates' || rootGroup === 'industry-templates' || rootGroup === 'general-templates') {
-            const messageKey = appMessage.loading('正在加载模版...', 0);
-            try {
-                const { supabase } = await import('@/services/supabase');
-                if (supabase) {
-                    const { data, error } = await supabase.from('system_templates').select('content, title, id').eq('id', leafKey).single();
-                    if (!error && data && data.content) {
-                        let parsedContent = data.content;
-                        if (typeof parsedContent === 'string') {
-                            try {
-                                parsedContent = JSON.parse(parsedContent);
-                            } catch (e) {
-                                console.error('Failed to parse template content', e);
-                            }
-                        }
-                        const baseData = {
-                            ...parsedContent,
-                            id: data.id,
-                            name: data.title || parsedContent.name,
-                            metadata: { ...(parsedContent.metadata || {}), title: data.title }
-                        };
-                        const { coerceToStandardDiagramData } = await import('@/core/utils/coerceDiagram');
-                        const normalized = coerceToStandardDiagramData(baseData, { id: data.id, title: data.title });
-                        seedAutoSaveAndNavigate(normalized, data.id);
-                    } else {
-                        appMessage.error('模版内容为空');
-                    }
-                }
-            } catch (e: any) {
-                appMessage.error(`加载失败: ${e.message}`);
-            } finally {
-                messageKey();
-            }
-        } else if (rootGroup === 'local-workspace') {
-            const d = localStorage.getItem('diagram-custom-presets');
-            if (d) {
-                try {
-                    const maps = JSON.parse(d);
-                    const found = maps[leafKey];
-                    if (found) {
-                        seedAutoSaveAndNavigate(found, found.id || leafKey);
-                    }
-                } catch (e) { }
-            }
+            navigateToDiagram(cloned.id);
         }
     };
 
@@ -663,8 +616,7 @@ const WorkspaceDashboardPage: React.FC = () => {
         } else if (e.key === 'delete') {
             handleDeleteDiagram(e.domEvent, item);
         } else if (e.key === 'open_new') {
-            const rawId = (item.raw as any).id;
-            window.open(`/?diagram=${rawId}`, '_blank');
+            openDiagramInNewTab(item);
         }
     };
 
@@ -712,8 +664,6 @@ const WorkspaceDashboardPage: React.FC = () => {
     const localCount = useMemo(() => unifiedItems.filter(i => i.source === 'local').length, [unifiedItems]);
     const cloudCount = useMemo(() => unifiedItems.filter(i => i.source === 's3' || i.source === 'supabase').length, [unifiedItems]);
     const sharedCount = useMemo(() => unifiedItems.filter(i => i.role === 'viewer').length, [unifiedItems]);
-    const templatesCount = useMemo(() => unifiedItems.filter(i => i.source === 'template').length, [unifiedItems]);
-
     return (
         <div className="workspace-dashboard">
             {/* Global Top Navigation */}
@@ -822,7 +772,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                     <div className="workspace-matrix-header">
                         <div className="workspace-filter-tabs">
                             <div className={`filter-tab ${activeView === 'recent' ? 'active' : ''}`} onClick={() => setActiveView('recent')}>
-                                <ClockCircleOutlined /> Recent
+                                <Clock size={14} strokeWidth={2} /> Recent
                                 <span className="filter-tab-count">{unifiedItems.filter(i => i.source !== 'template' && i.source !== 'general_template').length}</span>
                             </div>
                             <div className={`filter-tab ${activeView === 'local' ? 'active' : ''}`} onClick={() => setActiveView('local')}>
@@ -1000,12 +950,14 @@ const WorkspaceDashboardPage: React.FC = () => {
                                                         );
                                                     })()
                                                 ) : (
-                                                    <RemoteDiagramCover 
-                                                        storageId={(item.raw as DiagramMetadata).id} 
-                                                        alt={item.title} 
-                                                        cacheBuster={item.updatedAt} 
-                                                        height={150}
-                                                    />
+                                                    <React.Suspense fallback={null}>
+                                                        <RemoteDiagramCover
+                                                            storageId={(item.raw as DiagramMetadata).id}
+                                                            alt={item.title}
+                                                            cacheBuster={item.updatedAt}
+                                                            height={150}
+                                                        />
+                                                    </React.Suspense>
                                                 )}
                                                 {/* 模版封面 hover 遮罩：显示「应用」按钮 */}
                                                 {isTemplate(item) && (
@@ -1054,8 +1006,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                         <EditOutlined /> Open
                     </button>
                     <button className="ctx-menu-item" onClick={() => {
-                        const rawId = (ctxMenu.item.raw as any).id;
-                        window.open(`/?diagram=${rawId}`, '_blank');
+                        openDiagramInNewTab(ctxMenu.item);
                         setCtxMenu(null);
                     }}>
                         <ExportOutlined /> Open in new tab
@@ -1071,7 +1022,11 @@ const WorkspaceDashboardPage: React.FC = () => {
                 </div>
             )}
 
-            <AuthModal open={isAuthModalOpen} onCancel={() => setIsAuthModalOpen(false)} />
+            {isAuthModalOpen && (
+                <React.Suspense fallback={null}>
+                    <AuthModal open={isAuthModalOpen} onCancel={() => setIsAuthModalOpen(false)} />
+                </React.Suspense>
+            )}
         </div>
     );
 };

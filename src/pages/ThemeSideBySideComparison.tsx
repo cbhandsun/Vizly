@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { themePresets } from '@/core';
-import type { ThemePreset, ThemeColor } from '@/core';
-import { parseColorToRgb, adjustSaturationAndLightness, toRgba } from '@/core';
-import { ThemeColorUtil } from '@/core';
+import { themePresets } from '@/core/themes/presets';
+import type { ThemePreset, ThemeColor } from '@/core/themes/types/ThemeTypes';
+import { parseColorToRgb, adjustSaturationAndLightness, toRgba } from '@/core/utils/colorUtils';
+import { ThemeColorUtil } from '@/core/themes/ThemeUtils';
 
 /**
  * 主题并排对比测试页面

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { themePresets } from '@/core';
-import type { ThemePreset } from '@/core';
-import { parseColorToRgb, adjustSaturationAndLightness, toRgba } from '@/core';
-import { ThemeColorUtil } from '@/core';
+import { themePresets } from '@/core/themes/presets';
+import type { ThemePreset } from '@/core/themes/types/ThemeTypes';
+import { parseColorToRgb, adjustSaturationAndLightness, toRgba } from '@/core/utils/colorUtils';
+import { ThemeColorUtil } from '@/core/themes/ThemeUtils';
 
 /**
  * 主题颜色对比测试页面
@@ -65,18 +65,6 @@ const ThemeColorComparison: React.FC = () => {
 
   const selectedPreset = getPresetById(currentThemeId);
   const theme = selectedPreset.theme;
-  
-  // 添加控制台日志来显示实际的颜色值
-  React.useEffect(() => {
-    
-    // 对比几个关键域的颜色差异
-    const sampleDomains = ['frontend', 'backend', 'middleware', 'database'];
-    sampleDomains.forEach(domain => {
-      const colors = theme.diagram?.domains?.[domain];
-      if (colors) {
-      }
-    });
-  }, [currentThemeId, selectedPreset.id, theme.diagram?.domains]);
   
   // 获取所有域的定义
   const domains = Object.keys(theme.diagram?.domains || {});
