@@ -3,21 +3,38 @@
  * 通过 URL query string 中的 token 参数加载并展示分享的图表
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Spin, Result, theme, Typography } from 'antd';
 import { useTranslation } from 'react-i18next';
-import { ReactFlowProvider } from '@xyflow/react';
-import { shareService } from '@/services/ShareService';
-import { dataService } from '@/services/DataService';
-import { FlowchartDesigner, UnifiedDesigner } from '@/core';
 
 const { Text } = Typography;
+
+const isLikelyShareToken = (token: string): boolean => /^[A-Za-z0-9_-]{16,128}$/.test(token);
+
+const SharedDiagramCanvas = React.lazy(async () => {
+    const [{ ReactFlowProvider }, { default: FlowchartDesigner }] = await Promise.all([
+        import('@xyflow/react'),
+        import('@/core/components/diagrams/FlowchartDesigner'),
+    ]);
+
+    return {
+        default: ({ diagramId }: { diagramId: string }) => (
+            <ReactFlowProvider>
+                <FlowchartDesigner
+                    pluginId="flowchart-designer"
+                    id={diagramId}
+                    isReadonly={true}
+                />
+            </ReactFlowProvider>
+        ),
+    };
+});
 
 type LoadState =
     | { status: 'loading' }
     | { status: 'error' }
-    | { status: 'success'; diagramData: any; title: string };
+    | { status: 'success'; title: string };
 
 const ShareViewPage: React.FC = () => {
     const { t } = useTranslation();
@@ -25,17 +42,21 @@ const ShareViewPage: React.FC = () => {
     const [searchParams] = useSearchParams();
     const shareToken = searchParams.get('token') || '';
     const [state, setState] = useState<LoadState>(() => {
-        if (!shareToken) return { status: 'error' };
+        if (!isLikelyShareToken(shareToken)) return { status: 'error' };
         return { status: 'loading' };
     });
 
     useEffect(() => {
-        if (!shareToken) return;
+        if (!isLikelyShareToken(shareToken)) {
+            setState({ status: 'error' });
+            return;
+        }
 
         let cancelled = false;
 
         (async () => {
             try {
+                const { shareService } = await import('@/services/ShareService');
                 const result = await shareService.getSharedDiagram(shareToken);
                 if (cancelled) return;
 
@@ -44,16 +65,27 @@ const ShareViewPage: React.FC = () => {
                     return;
                 }
 
-                const content = result.diagram.content;
-                const title = content?.name || content?.metadata?.title || result.diagram.title || 'Shared Diagram';
+                const rawContent = result.diagram.content;
+                if (!rawContent) {
+                    setState({ status: 'error' });
+                    return;
+                }
 
                 // 注册到 DataService 以便 GenericStandardDiagram 可以加载
                 const diagramId = `shared-${shareToken}`;
-                if (content) {
-                    dataService.registerDiagram({ ...content, id: diagramId });
-                }
+                const { dataService } = await import('@/services/DataService');
+                if (cancelled) return;
+                const contentForRegistration =
+                    typeof rawContent === 'object' && rawContent !== null && !Array.isArray(rawContent)
+                        ? { ...(rawContent as Record<string, unknown>), id: diagramId }
+                        : rawContent;
+                const content = dataService.registerRemoteDiagram(contentForRegistration, {
+                    id: diagramId,
+                    title: result.diagram.title || 'Shared Diagram',
+                });
+                const title = content.name || content.metadata?.title || result.diagram.title || 'Shared Diagram';
 
-                setState({ status: 'success', diagramData: content, title });
+                setState({ status: 'success', title });
             } catch {
                 if (!cancelled) setState({ status: 'error' });
             }
@@ -123,18 +155,9 @@ const ShareViewPage: React.FC = () => {
 
             {/* 图表区域 */}
             <div style={{ flex: 1, overflow: 'hidden' }}>
-                <ReactFlowProvider>
-                    <UnifiedDesigner 
-                        pluginId="flowchart-designer"
-                        id={diagramId}
-                        isReadonly={true}
-                    >
-                        <FlowchartDesigner
-                            id={diagramId}
-                            isReadonly={true}
-                        />
-                    </UnifiedDesigner>
-                </ReactFlowProvider>
+                <Suspense fallback={null}>
+                    <SharedDiagramCanvas diagramId={diagramId} />
+                </Suspense>
             </div>
         </div>
     );
