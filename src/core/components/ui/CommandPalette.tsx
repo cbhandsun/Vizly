@@ -10,6 +10,11 @@ import Button from 'antd/es/button';
 import { useTranslation } from 'react-i18next';
 
 import { CommandItem } from '../../types/plugin';
+import {
+  bumpCommandUsage,
+  bumpRecentCommandId,
+  readCommandUsage,
+} from './commandPaletteStorage';
 
 interface CommandPaletteProps {
   open: boolean;
@@ -20,8 +25,6 @@ interface CommandPaletteProps {
 
 const GROUP_WEIGHT: Record<CommandGroup, number> = { favorites: 240, recent: 200, actions: 120, diagrams: 10 };
 const GROUP_ORDER: CommandGroup[] = ['favorites', 'recent', 'actions', 'diagrams'];
-const USAGE_STORAGE_KEY = 'commandPalette.usage';
-const RECENT_STORAGE_KEY = 'commandPalette.recent';
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, items, ...props }) => {
   const { t } = useTranslation();
@@ -83,14 +86,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
       return 1200 - Math.min(900, gaps);
     };
 
-    const usage: Record<string, number> = (() => {
-      try {
-        const raw = localStorage.getItem(USAGE_STORAGE_KEY);
-        const parsed: unknown = raw ? JSON.parse(raw) : {};
-        if (parsed && typeof parsed === 'object') return parsed as Record<string, number>;
-      } catch { void 0; }
-      return {};
-    })();
+    const usage = readCommandUsage();
 
     return items
       .map((it) => {
@@ -171,27 +167,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, i
   };
 
   const bumpUsage = useCallback((id: string) => {
-    try {
-      const raw = localStorage.getItem(USAGE_STORAGE_KEY);
-      const parsed: unknown = raw ? JSON.parse(raw) : {};
-      const next: Record<string, number> = (parsed && typeof parsed === 'object')
-        ? { ...(parsed as Record<string, number>) }
-        : {};
-      const prev = Math.max(0, Number(next[id] || 0) || 0);
-      next[id] = prev + 1;
-      localStorage.setItem(USAGE_STORAGE_KEY, JSON.stringify(next));
-    } catch { void 0; }
+    bumpCommandUsage(id);
   }, []);
 
   const bumpRecent = useCallback((id: string) => {
-    try {
-      const raw = localStorage.getItem(RECENT_STORAGE_KEY);
-      const parsed: unknown = raw ? JSON.parse(raw) : [];
-      const prev = Array.isArray(parsed) ? parsed.map(String) : [];
-      const next = [String(id), ...prev.filter(x => x !== String(id))].slice(0, 20);
-      localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(next));
-      window.dispatchEvent(new CustomEvent('commandPaletteRecentChanged'));
-    } catch { void 0; }
+    bumpRecentCommandId(id);
+    window.dispatchEvent(new CustomEvent('commandPaletteRecentChanged'));
   }, []);
 
   const runItem = useCallback((it: CommandItem, alt: boolean) => {

@@ -1,4 +1,5 @@
-import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
+import { A11yContext } from './A11yAnnouncerContext';
 
 /**
  * A11yAnnouncer — Screen Reader 公告组件
@@ -11,18 +12,6 @@ import React, { createContext, useCallback, useContext, useRef, useState } from 
  * 2. 在任意组件中 const { announce } = useA11yAnnounce();
  * 3. announce('已复制 3 个节点');
  */
-
-interface A11yContextValue {
-    announce: (message: string, priority?: 'polite' | 'assertive') => void;
-}
-
-const A11yContext = createContext<A11yContextValue>({
-    announce: () => { /* noop */ },
-});
-
-export function useA11yAnnounce() {
-    return useContext(A11yContext);
-}
 
 export const A11yAnnouncerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [politeMessage, setPoliteMessage] = useState('');
