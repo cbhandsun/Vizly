@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
-import { Modal, Form, Input, Button, message, Tabs, Typography } from 'antd';
+import { Modal, Form, Input, Button, Tabs, Typography } from 'antd';
 import { UserOutlined, MailOutlined, LockOutlined, KeyOutlined } from '@ant-design/icons';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/context/useAuth';
 import { useTranslation } from 'react-i18next';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 

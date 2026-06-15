@@ -1,25 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Select, Dropdown, theme } from 'antd';
+import { Select, Dropdown } from 'antd';
 import { GlobalOutlined } from '@ant-design/icons';
-import { LayeredConfigManager, ConfigLayer } from '@/core';
+import { LayeredConfigManager, ConfigLayer } from '@/core/config/LayeredConfigManager';
 
 export const LanguageSwitcher: React.FC<{ variant?: 'select' | 'icon', className?: string }> = ({ variant = 'select', className }) => {
     const { i18n } = useTranslation();
-    const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
-    const { token } = theme.useToken();
-
-    // Sync state when language changes (e.g. from detection)
-    useEffect(() => {
-        setCurrentLanguage(i18n.language);
-        const handleLanguageChanged = (lng: string) => {
-            setCurrentLanguage(lng);
-        };
-        i18n.on('languageChanged', handleLanguageChanged);
-        return () => {
-            i18n.off('languageChanged', handleLanguageChanged);
-        };
-    }, [i18n]);
+    const currentLanguage = i18n.resolvedLanguage || i18n.language;
 
     // Listen to LayeredConfigManager for cloud sync updates
     useEffect(() => {

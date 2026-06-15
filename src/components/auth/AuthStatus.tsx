@@ -2,11 +2,12 @@
 import React, { useState } from 'react';
 import { Button, Avatar, Dropdown, MenuProps, Tooltip } from 'antd';
 import { UserOutlined, LoginOutlined, LogoutOutlined, CloudOutlined, LockOutlined } from '@ant-design/icons';
-import { useAuth } from '@/context/AuthContext';
-import { AuthModal } from './AuthModal';
+import { useAuth } from '@/context/useAuth';
 import { SetPasswordModal } from './SetPasswordModal';
 const CloudStorageManagerModal = React.lazy(() => import('../storage/CloudStorageManagerModal').then(m => ({ default: m.CloudStorageManagerModal })));
 import { useTranslation } from 'react-i18next';
+
+const AuthModal = React.lazy(() => import('./AuthModal').then(m => ({ default: m.AuthModal })));
 
 export const AuthStatus: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
     const { t } = useTranslation();
@@ -98,20 +99,26 @@ export const AuthStatus: React.FC<{ compact?: boolean }> = ({ compact = false })
     return (
         <>
             {trigger}
-            <AuthModal
-                open={isModalOpen}
-                onCancel={() => setIsModalOpen(false)}
-            />
+            {isModalOpen && (
+                <React.Suspense fallback={null}>
+                    <AuthModal
+                        open={isModalOpen}
+                        onCancel={() => setIsModalOpen(false)}
+                    />
+                </React.Suspense>
+            )}
             <SetPasswordModal
                 open={isSetPasswordModalOpen}
                 onCancel={() => setIsSetPasswordModalOpen(false)}
             />
-            <React.Suspense fallback={null}>
-                <CloudStorageManagerModal
-                    open={isCloudModalOpen}
-                    onCancel={() => setIsCloudModalOpen(false)}
-                />
-            </React.Suspense>
+            {isCloudModalOpen && (
+                <React.Suspense fallback={null}>
+                    <CloudStorageManagerModal
+                        open={isCloudModalOpen}
+                        onCancel={() => setIsCloudModalOpen(false)}
+                    />
+                </React.Suspense>
+            )}
         </>
     );
 };

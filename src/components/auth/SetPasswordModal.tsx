@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Form, Input, Button, message } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/context/useAuth';
 import { useTranslation } from 'react-i18next';
 
 interface SetPasswordModalProps {

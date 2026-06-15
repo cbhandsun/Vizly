@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { theme, Spin, Image } from 'antd';
 import { PictureOutlined } from '@ant-design/icons';
-import { fetchRemoteDiagramPreview, type RemoteDiagramPreview } from '@/core';
+import { fetchRemoteDiagramPreview, type RemoteDiagramPreview } from '@/core/utils/remoteDiagramPreview';
 
 export const RemoteDiagramCover: React.FC<{
   storageId: string;

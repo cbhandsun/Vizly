@@ -1,37 +1,38 @@
-// @ts-nocheck
 /**
  * 3D图表懒加载组件
  * 只在需要时加载Three.js相关库，减少初始bundle体积
  */
 
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, type ComponentType, type ReactNode } from 'react';
 import { Spin } from 'antd';
 import { Warehouse3DProvider } from '../warehouse-3d/WarehouseContext';
+import type { DiagramComponentProps } from '@/core/types/diagram-components';
+import type { SceneProps } from '../warehouse-3d/Scene';
+
+const WarehouseSceneLoadError: ComponentType<SceneProps> = () => (
+    <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+        3D仓库视图组件加载失败，请检查配置。
+    </div>
+);
 
 // 懒加载3D仓库场景组件
-const WarehouseScene = lazy(() =>
+const WarehouseScene = lazy<ComponentType<SceneProps>>(() =>
     import('@/components/warehouse-3d/Scene')
         .catch(() =>
             Promise.resolve({
-                default: () => (
-                    <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
-                        3D仓库视图组件加载失败，请检查配置。
-                    </div>
-                )
+                default: WarehouseSceneLoadError
             })
         )
 );
 
-interface Lazy3DViewerProps {
-    id?: string;
-    title?: string;
-    [key: string]: any;
-    loading?: React.ReactNode;
+interface Lazy3DViewerProps extends DiagramComponentProps {
+    loading?: ReactNode;
+    onReady?: () => void;
 }
 
 export const Lazy3DViewer: React.FC<Lazy3DViewerProps> = ({
     loading,
-    ...props
+    onReady,
 }) => {
     const defaultLoading = (
         <div style={{
@@ -52,8 +53,7 @@ export const Lazy3DViewer: React.FC<Lazy3DViewerProps> = ({
         <Suspense fallback={loading || defaultLoading}>
             <Warehouse3DProvider>
                 <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-                    {/* @ts-expect-error - WarehouseScene expects specific props from context, but we spread generic props here */}
-                    <WarehouseScene {...props} />
+                    <WarehouseScene onReady={onReady} />
                 </div>
             </Warehouse3DProvider>
         </Suspense>
