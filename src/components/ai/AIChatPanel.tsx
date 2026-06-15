@@ -31,16 +31,14 @@ import {
     _RightOutlined,
     SendOutlined,
     SettingOutlined,
+    StopOutlined,
     _ThunderboltOutlined,
     _UserOutlined,
     RobotOutlined
 } from '@ant-design/icons';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { getAIConfig, getAIConfigKey } from './AIConfigModal';
+import { getAIConfig, loadCloudAIConfig, persistAIConfig } from './aiConfigStorage';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '@/context/AuthContext';
-import { unifiedStorage } from '@/services/UnifiedStorageService';
+import { useAuth } from '@/context/useAuth';
 import { PluginRegistry } from '@/core/services/PluginRegistry';
 import { aiConversationService, Conversation, Message } from '@/services/ai/AIConversationService';
 import { dataRegistry } from '@/data/DataRegistry';
@@ -56,6 +54,12 @@ import Tooltip from 'antd/es/tooltip';
 import Popconfirm from 'antd/es/popconfirm';
 import {   } from '@xyflow/react';
 import { extractJson } from './useAIChatStreaming';
+import { parseAIStreamDelta } from './aiStreamParsing';
+import { sanitizeAIProviderError } from '@/services/ai/errorSecurity';
+import { formatAIProviderRequestError, requestAIChatCompletion, resolveAIProviderEndpoint } from '@/services/ai/aiProviderClient';
+import { getAICommandIds } from './aiCommandPolicy';
+import { getAIDiagramTitle, parseAIDiagramJson, registerAIDiagramLocally, serializeAIDiagram, upsertDiagramConfigIndex } from './aiDiagramImport';
+import { extractValidatedAICommands } from './aiCommandExtraction';
 import { 
      
     AIChatPanelProps
@@ -64,6 +68,10 @@ import ShortcutsGuide from './ShortcutsGuide';
 import './AIChatPanel.css';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 
+
+
+const MarkdownMessage = React.lazy(() => import('./MarkdownMessage'));
+const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
 
 
 
@@ -90,6 +98,10 @@ const _TypingIndicator: React.FC = () => (
 const _HISTORY_STORAGE_KEY = 'AIChatPanel.history';
 const _CUSTOM_PRESETS_STORAGE_KEY = 'DiagramView.CustomPresets';
 
+const isAbortError = (error: unknown): boolean => {
+    return error instanceof DOMException && error.name === 'AbortError';
+};
+
 // --- Message Item Component (with Memo) ---
 interface MessageItemProps {
     item: Message;
@@ -97,7 +109,6 @@ interface MessageItemProps {
     onPreviewJson?: (json: string) => void;
     onApplyJson?: (json: string) => void;
     handleSaveDiagramTo?: (json: string, target: 'local' | 's3' | 'supabase') => void;
-    unifiedStorage: any;
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({ 
@@ -105,8 +116,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
     t, 
     onPreviewJson, 
     onApplyJson, 
-    handleSaveDiagramTo,
-    _unifiedStorage
+    handleSaveDiagramTo
 }) => {
     const isAi = item.role === 'assistant';
 
@@ -134,9 +144,9 @@ const MessageItem: React.FC<MessageItemProps> = ({
                     )}
                     
                     <div className="ai-markdown-content">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {item.content}
-                        </ReactMarkdown>
+                        <React.Suspense fallback={<span className="ai-markdown-fallback">{item.content}</span>}>
+                            <MarkdownMessage content={item.content} />
+                        </React.Suspense>
                     </div>
 
                     {item.content && item.content.includes('正在为您准备快捷键指南...') && (
@@ -242,6 +252,14 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     const [isListening, setIsListening] = useState(false); // Voice UI Feedback state
 
     const [aiConfig, setAiConfig] = useState(() => getAIConfig(user?.id));
+    const activeRequestControllerRef = useRef<AbortController | null>(null);
+
+    useEffect(() => {
+        return () => {
+            activeRequestControllerRef.current?.abort(new DOMException('AI chat panel unmounted', 'AbortError'));
+            activeRequestControllerRef.current = null;
+        };
+    }, []);
 
     useEffect(() => {
         setAiConfig(getAIConfig(user?.id));
@@ -251,6 +269,25 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         return () => {
             window.removeEventListener('storage', handleConfigChange);
             window.removeEventListener('aiConfigChanged', handleConfigChange);
+        };
+    }, [user?.id]);
+
+    useEffect(() => {
+        if (!user?.id) return;
+
+        let cancelled = false;
+        loadCloudAIConfig(user.id)
+            .then((cloudConfig) => {
+                if (!cancelled && cloudConfig) {
+                    setAiConfig(cloudConfig);
+                }
+            })
+            .catch(err => {
+                console.error('AIChatPanel: Failed to load cloud AI config', err);
+            });
+
+        return () => {
+            cancelled = true;
         };
     }, [user?.id]);
 
@@ -282,7 +319,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                 if (aiConfig.activeModelKey !== fallback.value) {
                     const newConfig = { ...aiConfig, activeModelKey: fallback.value };
                     setAiConfig(newConfig);
-                    localStorage.setItem(getAIConfigKey(user?.id), JSON.stringify(newConfig));
+                    persistAIConfig(user?.id, newConfig);
                 }
             }
         }
@@ -304,7 +341,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     const handleModelChange = (val: string) => {
         const newConfig = { ...aiConfig, activeModelKey: val };
         setAiConfig(newConfig);
-        localStorage.setItem(getAIConfigKey(user?.id), JSON.stringify(newConfig));
+        persistAIConfig(user?.id, newConfig);
         appMessage.success(t('aiChat.autoSwitched', { name: availableModels.find(m => m.value === val)?.label || val }));
     };
 
@@ -316,8 +353,11 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     const inputRef = useRef<any>(null);
 
     // Get current active conversation
-    const activeConversation = conversations.find(c => c.id === activeId) || null;
-    const messages = activeConversation?.messages || [];
+    const activeConversation = useMemo(
+        () => conversations.find(c => c.id === activeId) || null,
+        [activeId, conversations]
+    );
+    const messages = useMemo(() => activeConversation?.messages || [], [activeConversation]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -357,16 +397,8 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         }
     }, [user?.id]);
 
-    useEffect(() => {
-        if (!user?.id && conversations.length === 0) {
-            handleNewChat();
-        } else if (!activeId && conversations.length > 0) {
-            setActiveId(conversations[0].id);
-        }
-    }, [activeId, conversations.length, user?.id]);
-
     // --- Actions ---
-    const handleNewChat = () => {
+    const handleNewChat = useCallback(() => {
         const welcomeMsg: Message = {
             id: generateId(),
             role: 'assistant',
@@ -375,7 +407,15 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         const newConv = aiConversationService.createConversation(welcomeMsg);
         setConversations(aiConversationService.getConversations());
         setActiveId(newConv.id);
-    };
+    }, [t]);
+
+    useEffect(() => {
+        if (!user?.id && conversations.length === 0) {
+            handleNewChat();
+        } else if (!activeId && conversations.length > 0) {
+            setActiveId(conversations[0].id);
+        }
+    }, [activeId, conversations, handleNewChat, user?.id]);
 
     const handleSwitchChat = (id: string) => {
         setActiveId(id);
@@ -428,16 +468,14 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     const processCommands = async (content: string) => {
         if (!canvasOps) return;
 
-        const commandRegex = /\[COMMAND:\s*({[\s\S]*?})\s*\]/g;
-        let match;
-        let executedCount = 0;
+        const extraction = extractValidatedAICommands(content);
+        extraction.rejected.slice(0, 3).forEach(({ action, reason }) => {
+            console.warn('[AI Pilot] Blocked autonomous command:', action, reason);
+            appMessage.warning(`AI 指令 "${action}" 已被拦截：${reason}`);
+        });
 
-        while ((match = commandRegex.exec(content)) !== null) {
+        for (const cmd of extraction.commands) {
             try {
-                const cmdJson = match[1];
-                const cmd = JSON.parse(cmdJson);
-                
-                
                 // [GAP-10] 首选：尝试通过插件分发器执行 (Architecture First)
                 if (pluginId) {
                     const ctx = pluginId === 'flowchart' ? ((window as any).__flowContextBridge) : (diagramNodesRef ? {
@@ -452,14 +490,12 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                     if (ctx) {
                         const handled = await PluginRegistry.getInstance().executeAIAction(pluginId, cmd.action, cmd, ctx as any);
                         if (handled) {
-                            executedCount++;
                             continue; 
                         }
                     }
                 }
 
                 // 次选：回退到通用内置指令处理
-                executedCount++;
                 switch (cmd.action) {
                     case 'addNode':
                         if (canvasOps.onAddNode) {
@@ -516,8 +552,10 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                         }
                         break;
                     case 'animatePath':
-                        if (canvasOps.onAnimatePath && cmd.ids) {
-                            canvasOps.onAnimatePath(cmd.ids, { duration: cmd.duration, loop: cmd.loop });
+                        if (canvasOps.onAnimatePath) {
+                            const ids = getAICommandIds(cmd);
+                            const options = cmd.params?.options || {};
+                            if (ids) canvasOps.onAnimatePath(ids, { duration: cmd.duration ?? options.duration, loop: cmd.loop ?? options.loop });
                         }
                         break;
                     default:
@@ -527,11 +565,8 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                 // [Phase 15] 为连续指令增加微小延迟，确保 React Flow 状态稳定同步
                 await new Promise(resolve => setTimeout(resolve, 100));
             } catch (e) {
-                console.error('[AI Pilot] Command execution error:', e, match[1]);
+                console.error('[AI Pilot] Command execution error:', e, cmd);
             }
-        }
-
-        if (executedCount > 0) {
         }
     };
 
@@ -802,8 +837,13 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         }
     };
 
+    const handleStopGeneration = () => {
+        activeRequestControllerRef.current?.abort(new DOMException('用户已停止生成', 'AbortError'));
+    };
+
     // --- Streaming Send Message ---
     const handleSendMessage = async () => {
+        if (loading) return;
         if (!inputValue.trim()) return;
 
         // Check for local slash commands
@@ -813,7 +853,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
             return;
         }
 
-        const config = getAIConfig(user?.id);
+        let config = getAIConfig(user?.id);
         const parts = (config.activeModelKey || '').split(':');
         let pId = parts[0];
         const mIdParts = parts.slice(1);
@@ -838,8 +878,9 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
 
                         // 自动保存这个选择
                         const newActiveModelKey = `${pId}:${mId}`;
-                        config.activeModelKey = newActiveModelKey;
-                        localStorage.setItem(getAIConfigKey(user?.id), JSON.stringify(config));
+                        const newConfig = { ...config, activeModelKey: newActiveModelKey };
+                        persistAIConfig(user?.id, newConfig);
+                        config = newConfig;
 
                         appMessage.info(t('aiChat.autoSwitched', { name: `${provider.name} - ${enabledModel.name}` }));
                         break;
@@ -857,6 +898,14 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
 
         if (!activeProvider.apiKey) {
             appMessage.warning(`请先在 AI 设置中配置 ${activeProvider.name} 的 API Key`);
+            onOpenConfig();
+            return;
+        }
+
+        try {
+            resolveAIProviderEndpoint(activeProvider, '/chat/completions');
+        } catch {
+            appMessage.warning(`${activeProvider.name} 的 Base URL 必须使用 HTTPS，或本机 HTTP localhost/127.0.0.1。`);
             onOpenConfig();
             return;
         }
@@ -881,114 +930,105 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         setInputValue('');
         setShowCommands(false);
         setLoading(true);
+        const requestController = new AbortController();
+        activeRequestControllerRef.current = requestController;
+        let accumulatedContent = '';
+        let accumulatedReasoning = '';
 
         try {
             const contextPrompt = pluginId === 'mindmap' ? MINDMAP_SYSTEM_PROMPT : (config.systemPrompt || DIAGRAM_SYSTEM_PROMPT);
-            const response = await fetch(`${activeProvider.baseUrl.replace(/\/$/, '')}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(activeProvider.apiKey ? { 'Authorization': `Bearer ${activeProvider.apiKey}` } : {})
-                },
-                body: JSON.stringify({
-                    model: activeModel.id,
-                    messages: [
-                        { 
-                            role: 'system', 
-                            content: contextPrompt + (pluginId ? `\n\n[当前图表模式: ${pluginId}]` : '')
-                        },
-                        ...messages.map(m => ({ role: m.role, content: m.content })),
-                        { 
-                            role: 'user', 
-                            content: enhanceWithSlashCommand(newUserMsg.content) 
-                                + buildDiagramContext(diagramNodesRef?.current || [], diagramEdgesRef?.current || []) 
-                                + (newUserMsg.content.trim().startsWith('/analyze') 
-                                    ? (canvasOps?.onAnalyze ? `\n\n[实时图表巡检报告]\n${canvasOps.onAnalyze().summary}` : buildAnalysisContext(diagramNodesRef?.current || [], diagramEdgesRef?.current || [])) 
-                                    : '') 
-                        }
-                    ],
-                    stream: true // Enable streaming
-                })
-            });
-
-            if (!response.ok) {
-                const errText = await response.text();
-                if (errText.trim().startsWith('<')) {
-                    throw new Error(`API 返回了 HTML 错误页 (${response.status})。请检查 Base URL。`);
-                }
-                throw new Error(`API Error: ${response.status} - ${errText}`);
-            }
+            const response = await requestAIChatCompletion(activeProvider, {
+                model: activeModel.id,
+                messages: [
+                    {
+                        role: 'system',
+                        content: contextPrompt + (pluginId ? `\n\n[当前图表模式: ${pluginId}]` : '')
+                    },
+                    ...messages.map(m => ({ role: m.role, content: m.content })),
+                    {
+                        role: 'user',
+                        content: enhanceWithSlashCommand(newUserMsg.content)
+                            + buildDiagramContext(diagramNodesRef?.current || [], diagramEdgesRef?.current || [])
+                            + (newUserMsg.content.trim().startsWith('/analyze')
+                                ? (canvasOps?.onAnalyze ? `\n\n[实时图表巡检报告]\n${canvasOps.onAnalyze().summary}` : buildAnalysisContext(diagramNodesRef?.current || [], diagramEdgesRef?.current || []))
+                                : '')
+                    }
+                ],
+                stream: true
+            }, { signal: requestController.signal, timeoutMs: 120_000 });
 
             // Handle streaming response
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
-            let accumulatedContent = '';
-            let accumulatedReasoning = '';
             let lastUpdateTimestamp = Date.now();
             const THROTTLE_MS = 60; // 约 16fps，保证视觉流畅且不阻塞进程
 
             if (reader) {
                 let buffer = '';
+                const cancelReader = () => {
+                    void reader.cancel().catch(() => {});
+                };
+                requestController.signal.addEventListener('abort', cancelReader, { once: true });
 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
+                try {
+                    while (true) {
+                        if (requestController.signal.aborted) {
+                            throw requestController.signal.reason;
+                        }
 
-                    const chunk = decoder.decode(value, { stream: true });
-                    buffer += chunk;
+                        const { done, value } = await reader.read();
+                        if (done) break;
 
-                    const lines = buffer.split('\n');
-                    // 保留最后一行（可能是不完整的）在 buffer 中
-                    buffer = lines.pop() || '';
+                        const chunk = decoder.decode(value, { stream: true });
+                        buffer += chunk;
 
-                    for (const line of lines) {
-                        const trimmedLine = line.trim();
-                        if (trimmedLine.startsWith('data: ')) {
-                            const data = trimmedLine.slice(6);
-                            if (data === '[DONE]') continue;
+                        const lines = buffer.split('\n');
+                        // 保留最后一行（可能是不完整的）在 buffer 中
+                        buffer = lines.pop() || '';
 
-                            try {
-                                const parsed = JSON.parse(data);
-                                const delta = parsed.choices?.[0]?.delta;
-                                if (!delta) continue;
+                        for (const line of lines) {
+                            const trimmedLine = line.trim();
+                            if (trimmedLine.startsWith('data: ')) {
+                                const data = trimmedLine.slice(6);
+                                if (data === '[DONE]') continue;
 
-                                // 处理思考过程
-                                if (delta.reasoning_content) {
-                                    accumulatedReasoning += delta.reasoning_content;
-                                }
+                                const delta = parseAIStreamDelta(data);
+                                if (delta) {
+                                    if (delta.reasoningContent) accumulatedReasoning += delta.reasoningContent;
+                                    if (delta.content) accumulatedContent += delta.content;
 
-                                // 处理正文
-                                if (delta.content) {
-                                    accumulatedContent += delta.content;
-                                }
-
-                                // Update UI State (Throttled)
-                                if (activeId) {
-                                    const now = Date.now();
-                                    if (now - lastUpdateTimestamp > THROTTLE_MS) {
-                                        const convs = [...aiConversationService.getConversations()];
-                                        const cIdx = convs.findIndex(c => c.id === activeId);
-                                        if (cIdx !== -1) {
-                                            const partialJson = extractJson(accumulatedContent, true);
-                                            convs[cIdx].messages = convs[cIdx].messages.map(m =>
-                                                m.id === aiMsgId ? { 
-                                                    ...m, 
-                                                    content: accumulatedContent, 
-                                                    reasoningContent: accumulatedReasoning,
-                                                    hasJson: !!partialJson,
-                                                    jsonContent: partialJson || undefined 
-                                                } : m
-                                            );
-                                            setConversations(convs);
+                                    // Update UI State (Throttled)
+                                    if (activeId) {
+                                        const now = Date.now();
+                                        if (now - lastUpdateTimestamp > THROTTLE_MS) {
+                                            const convs = [...aiConversationService.getConversations()];
+                                            const cIdx = convs.findIndex(c => c.id === activeId);
+                                            if (cIdx !== -1) {
+                                                const partialJson = extractJson(accumulatedContent, true);
+                                                convs[cIdx].messages = convs[cIdx].messages.map(m =>
+                                                    m.id === aiMsgId ? {
+                                                        ...m,
+                                                        content: accumulatedContent,
+                                                        reasoningContent: accumulatedReasoning,
+                                                        hasJson: !!partialJson,
+                                                        jsonContent: partialJson || undefined
+                                                    } : m
+                                                );
+                                                setConversations(convs);
+                                            }
+                                            lastUpdateTimestamp = now;
                                         }
-                                        lastUpdateTimestamp = now;
                                     }
                                 }
-                            } catch (e) {
-                                // Ignore incomplete JSON due to fragmentation
                             }
                         }
                     }
+                } finally {
+                    requestController.signal.removeEventListener('abort', cancelReader);
+                }
+
+                if (requestController.signal.aborted) {
+                    throw requestController.signal.reason;
                 }
             }
 
@@ -1009,16 +1049,46 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
             }
 
         } catch (error: any) {
-            appMessage.error(t('aiChat.requestFailed', { error: error.message }));
+            if (isAbortError(error)) {
+                if (activeId) {
+                    const jsonContent = extractJson(accumulatedContent);
+                    const convs = [...aiConversationService.getConversations()];
+                    const cIdx = convs.findIndex(c => c.id === activeId);
+                    if (cIdx !== -1) {
+                        convs[cIdx].messages = convs[cIdx].messages.map(m =>
+                            m.id === aiMsgId
+                                ? {
+                                    ...m,
+                                    content: accumulatedContent || '已停止生成',
+                                    reasoningContent: accumulatedReasoning || undefined,
+                                    isStreaming: false,
+                                    hasJson: !!jsonContent,
+                                    jsonContent: jsonContent || undefined
+                                }
+                                : m
+                        );
+                        aiConversationService.updateConversation(activeId, { messages: convs[cIdx].messages });
+                        setConversations(convs);
+                    }
+                }
+                return;
+            }
+
+            const safeError = formatAIProviderRequestError(error);
+            appMessage.error(t('aiChat.requestFailed', { error: safeError }));
             if (activeId) {
                 const convs = [...aiConversationService.getConversations()];
                 const cIdx = convs.findIndex(c => c.id === activeId);
                 if (cIdx !== -1) {
                     convs[cIdx].messages = convs[cIdx].messages.map(m =>
-                        m.id === aiMsgId ? { ...m, content: t('aiChat.requestError', { error: error.message }), isStreaming: false } : m
+                        m.id === aiMsgId ? { ...m, content: t('aiChat.requestError', { error: safeError }), isStreaming: false } : m
                     );
                     setConversations(convs);
                 }
+            }
+        } finally {
+            if (activeRequestControllerRef.current === requestController) {
+                activeRequestControllerRef.current = null;
             }
             setLoading(false);
         }
@@ -1033,14 +1103,17 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
     // --- Multi-Target Save Handler (Step 1: Open Modal) ---
     const handleSaveDiagramTo = (jsonContent: string, target: 'local' | 's3' | 'supabase') => {
         try {
-            const obj = JSON.parse(jsonContent);
-            if (!obj) throw new Error('Invalid JSON');
-            const initialTitle = obj.metadata?.title || `ai-generated-${Date.now()}`;
+            const fallbackTitle = `ai-generated-${Date.now()}`;
+            const obj = parseAIDiagramJson(jsonContent, {
+                id: `ai-${Date.now()}`,
+                title: fallbackTitle,
+            });
+            const initialTitle = getAIDiagramTitle(obj, fallbackTitle);
             setSaveTitle(initialTitle);
-            setSaveJson(jsonContent);
+            setSaveJson(serializeAIDiagram(obj));
             setSaveTarget(target);
             setSaveModalVisible(true);
-        } catch (e: any) {
+        } catch (_e: any) {
             appMessage.error(t('aiChat.invalidDiagram'));
         }
     };
@@ -1051,7 +1124,10 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         setSaveModalVisible(false);
 
         try {
-            const obj = JSON.parse(saveJson);
+            const obj = parseAIDiagramJson(saveJson, {
+                id: `ai-${Date.now()}`,
+                title: saveTitle.trim() || `ai-generated-${Date.now()}`,
+            });
             const target = saveTarget;
             const targetLabel = target === 'local' ? t('storage.manager.local') : (target === 's3' ? 'S3' : 'Supabase');
             const hide = appMessage.loading(t('aiChat.status.savingTo', { target: targetLabel }), 0);
@@ -1064,20 +1140,16 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
 
                 if (target === 'local') {
                     const localService = dataRegistry.getDataService();
-                    // Ensure the object has a valid ID for standard diagram data
-                    if (!obj.id) obj.id = crypto.randomUUID();
-                    localService.registerDiagram(obj);
+                    const registered = registerAIDiagramLocally(localService, obj, title);
                     
                     // Persist to vizly_diagram_configs to make it appear in the dashboard immediately
                     try {
-                        const configsRaw = localStorage.getItem('vizly_diagram_configs');
-                        const configs: Record<string, any> = configsRaw ? JSON.parse(configsRaw) : {};
-                        configs[obj.id] = { id: obj.id, type: obj.type || 'flowchart', name: obj.metadata.title, updatedAt: Date.now() };
-                        localStorage.setItem('vizly_diagram_configs', JSON.stringify(configs));
+                        upsertDiagramConfigIndex(localStorage, registered, title);
                     } catch { /* ignore storage errors */ }
                     
                     appMessage.success(t('aiChat.status.saveSuccess', { target: targetLabel, title: title }));
                 } else {
+                    const unifiedStorage = await loadUnifiedStorage();
                     const provider = unifiedStorage.getProvider(target);
                     if (!provider.isConfigured()) {
                         throw new Error(`${provider.name} 未配置，请先在配置面板中设置`);
@@ -1115,7 +1187,7 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
                 hide();
             }
         } catch (error: any) {
-            const errMsg = error.message || String(error);
+            const errMsg = sanitizeAIProviderError(error);
             appMessage.error(t('aiChat.status.saveFailed', { error: errMsg }));
         }
     };
@@ -1242,7 +1314,6 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
                         onPreviewJson={onPreviewJson}
                         onApplyJson={onApplyJson}
                         handleSaveDiagramTo={handleSaveDiagramTo}
-                        unifiedStorage={unifiedStorage}
                     />
                 ))}
                 <div ref={messagesEndRef} />
@@ -1293,12 +1364,13 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
                                 title="Voice (Beta)"
                             />
                             <Button
-                                type="primary"
+                                type={loading ? 'default' : 'primary'}
+                                danger={loading}
                                 shape="circle"
-                                icon={<SendOutlined />}
-                                onClick={handleSendMessage}
-                                loading={loading}
-                                disabled={!inputValue.trim()}
+                                icon={loading ? <StopOutlined /> : <SendOutlined />}
+                                onClick={loading ? handleStopGeneration : handleSendMessage}
+                                disabled={!loading && !inputValue.trim()}
+                                title={loading ? '停止生成' : '发送'}
                                 className="ai-chat-send-btn"
                             />
                         </Space>

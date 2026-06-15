@@ -18,8 +18,93 @@ export interface Conversation {
     updatedAt: number;
 }
 
+export interface DeleteConversationResult {
+    localDeleted: boolean;
+    cloudDeleted: boolean | null;
+}
+
 const _CONVERSATIONS_STORAGE_KEY = 'AIChatPanel.conversations';
 const _ACTIVE_CONVERSATION_ID_KEY = 'AIChatPanel.activeId';
+const MAX_CONVERSATIONS = 25;
+const MAX_MESSAGES_PER_CONVERSATION = 40;
+const MAX_TITLE_LENGTH = 120;
+const MAX_CONTENT_LENGTH = 4000;
+const MAX_JSON_CONTENT_LENGTH = 12000;
+const MAX_ID_LENGTH = 160;
+
+const isSafeId = (value: unknown): value is string =>
+    typeof value === 'string' && value.trim().length > 0 && value.length <= MAX_ID_LENGTH;
+
+const clampText = (value: unknown, maxLength: number): string =>
+    typeof value === 'string' ? value.slice(0, maxLength) : '';
+
+const toTimestamp = (value: unknown, fallback: number): number =>
+    typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+
+const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
+    Boolean(value && typeof value === 'object' && !Array.isArray(value));
+
+const coerceMessage = (value: unknown): Message | null => {
+    if (!isPlainRecord(value)) return null;
+    const raw = value as Record<string, unknown>;
+    if (!isSafeId(raw.id)) return null;
+    if (raw.role !== 'user' && raw.role !== 'assistant' && raw.role !== 'system') return null;
+
+    return {
+        id: raw.id.trim(),
+        role: raw.role,
+        content: clampText(raw.content, MAX_CONTENT_LENGTH),
+        reasoningContent: typeof raw.reasoningContent === 'string'
+            ? raw.reasoningContent.slice(0, MAX_CONTENT_LENGTH)
+            : undefined,
+        hasJson: typeof raw.hasJson === 'boolean' ? raw.hasJson : undefined,
+        jsonContent: typeof raw.jsonContent === 'string'
+            ? raw.jsonContent.slice(0, MAX_JSON_CONTENT_LENGTH)
+            : undefined,
+        isStreaming: false,
+    };
+};
+
+const coerceConversation = (value: unknown): Conversation | null => {
+    if (!isPlainRecord(value)) return null;
+    const raw = value as Record<string, unknown>;
+    if (!isSafeId(raw.id)) return null;
+    const now = Date.now();
+    const createdAt = toTimestamp(raw.createdAt, now);
+    const updatedAt = toTimestamp(raw.updatedAt, createdAt);
+    const messages = Array.isArray(raw.messages)
+        ? raw.messages
+            .slice(-MAX_MESSAGES_PER_CONVERSATION)
+            .map(coerceMessage)
+            .filter((message): message is Message => Boolean(message))
+        : [];
+
+    return {
+        id: raw.id.trim(),
+        title: clampText(raw.title, MAX_TITLE_LENGTH) || '新对话',
+        messages,
+        createdAt,
+        updatedAt,
+    };
+};
+
+const coerceConversations = (value: unknown): Conversation[] => {
+    if (!Array.isArray(value)) return [];
+    const seen = new Set<string>();
+    return [...value]
+        .sort((a, b) => {
+            const aUpdated = toTimestamp(isPlainRecord(a) ? a.updatedAt : undefined, 0);
+            const bUpdated = toTimestamp(isPlainRecord(b) ? b.updatedAt : undefined, 0);
+            return bUpdated - aUpdated;
+        })
+        .slice(0, MAX_CONVERSATIONS)
+        .map(coerceConversation)
+        .filter((conversation): conversation is Conversation => {
+            if (!conversation || seen.has(conversation.id)) return false;
+            seen.add(conversation.id);
+            return true;
+        });
+};
 
 class AIConversationService {
     private currentUserId: string | null = null;
@@ -41,15 +126,15 @@ class AIConversationService {
             if (error) throw error;
 
             if (data) {
-                const cloudConvs: Conversation[] = data.map(item => ({
+                const cloudConvs = coerceConversations(data.map(item => ({
                     id: item.id,
                     title: item.title,
                     messages: item.messages,
                     createdAt: new Date(item.created_at).getTime(),
                     updatedAt: new Date(item.updated_at).getTime(),
-                }));
+                })));
                 // 合并本地与云端逻辑（简单点直接以云端为准，或者合并最新）
-                this.saveConversations(cloudConvs, false); // 不再触发向上同步，防止死循环
+                this.saveConversations(cloudConvs);
                 return cloudConvs;
             }
         } catch (e) {
@@ -60,6 +145,8 @@ class AIConversationService {
 
     async syncToCloud(conv: Conversation) {
         if (!this.currentUserId || !supabase) return;
+        const safeConversation = coerceConversation(conv);
+        if (!safeConversation) return;
 
         try {
             const { error } = await supabase
@@ -68,11 +155,11 @@ class AIConversationService {
                     // [M-2] Always pass conv.id so upsert+onConflict can match the existing row.
                     // Previous logic (id: includes('conv_') ? undefined : id) passed undefined for local IDs,
                     // causing every sync to INSERT a new row instead of updating the existing one.
-                    id: conv.id,
+                    id: safeConversation.id,
                     user_id: this.currentUserId,
-                    title: conv.title,
-                    messages: conv.messages,
-                    updated_at: new Date(conv.updatedAt).toISOString()
+                    title: safeConversation.title,
+                    messages: safeConversation.messages,
+                    updated_at: new Date(safeConversation.updatedAt).toISOString()
                 }, { onConflict: 'id' });
 
             if (error) throw error;
@@ -95,7 +182,7 @@ class AIConversationService {
             if (saved) {
                 const parsed = JSON.parse(saved);
                 // Guard against corrupted or migrated data (e.g., a non-array was serialised)
-                if (Array.isArray(parsed)) return parsed as Conversation[];
+                if (Array.isArray(parsed)) return coerceConversations(parsed);
                 console.warn('AIConversationService: stored conversations is not an array, resetting.');
             }
         } catch (e) {
@@ -104,9 +191,9 @@ class AIConversationService {
         return [];
     }
 
-    saveConversations(conversations: Conversation[], syncCloud: boolean = true) {
+    saveConversations(conversations: Conversation[]) {
         try {
-            localStorage.setItem(this.getStorageKey(), JSON.stringify(conversations));
+            localStorage.setItem(this.getStorageKey(), JSON.stringify(coerceConversations(conversations)));
             // 如果需要，这里可以限制并发或进行全量同步，但通常 upsert 单条更好
         } catch (e) {
             console.error('Failed to save conversations', e);
@@ -114,12 +201,14 @@ class AIConversationService {
     }
 
     getActiveConversationId(): string | null {
-        return localStorage.getItem(this.getActiveIdKey());
+        const id = localStorage.getItem(this.getActiveIdKey());
+        if (!isSafeId(id)) return null;
+        return id.trim();
     }
 
     setActiveConversationId(id: string | null) {
-        if (id) {
-            localStorage.setItem(this.getActiveIdKey(), id);
+        if (isSafeId(id)) {
+            localStorage.setItem(this.getActiveIdKey(), id.trim());
         } else {
             localStorage.removeItem(this.getActiveIdKey());
         }
@@ -130,7 +219,7 @@ class AIConversationService {
         const conversation: Conversation = {
             id,
             title: initialMessage ? this.generateTitle(initialMessage.content) : '新对话',
-            messages: initialMessage ? [initialMessage] : [],
+            messages: initialMessage ? coerceConversations([{ id, title: '新对话', messages: [initialMessage], createdAt: Date.now(), updatedAt: Date.now() }])[0]?.messages ?? [] : [],
             createdAt: Date.now(),
             updatedAt: Date.now(),
         };
@@ -143,28 +232,51 @@ class AIConversationService {
     }
 
     updateConversation(id: string, updates: Partial<Conversation>) {
+        if (!isSafeId(id)) return;
         const convs = this.getConversations();
         const index = convs.findIndex(c => c.id === id);
         if (index !== -1) {
-            const updatedConv = { ...convs[index], ...updates, updatedAt: Date.now() };
+            const updatedConv = coerceConversation({ ...convs[index], ...updates, id, updatedAt: Date.now() });
+            if (!updatedConv) return;
             convs[index] = updatedConv;
             this.saveConversations(convs);
             this.syncToCloud(updatedConv); // 更新时同步
         }
     }
 
-    async deleteConversation(id: string) {
+    async deleteConversation(id: string): Promise<DeleteConversationResult> {
+        if (!isSafeId(id)) return { localDeleted: false, cloudDeleted: null };
         const convs = this.getConversations();
         const filtered = convs.filter(c => c.id !== id);
+        const localDeleted = filtered.length !== convs.length;
         this.saveConversations(filtered);
 
+        let cloudDeleted: boolean | null = null;
         if (this.currentUserId && supabase) {
-            await supabase.from('ai_conversations').delete().eq('id', id);
+            try {
+                const { data, error } = await supabase
+                    .from('ai_conversations')
+                    .delete()
+                    .eq('id', id)
+                    .eq('user_id', this.currentUserId)
+                    .select('id');
+
+                if (error) throw error;
+                cloudDeleted = Array.isArray(data) && data.length === 1;
+                if (!cloudDeleted) {
+                    console.warn('AIConversationService: cloud conversation delete affected no rows.');
+                }
+            } catch (error) {
+                cloudDeleted = false;
+                console.error('AIConversationService: failed to delete cloud conversation', error);
+            }
         }
 
         if (this.getActiveConversationId() === id) {
             this.setActiveConversationId(filtered.length > 0 ? filtered[0].id : null);
         }
+
+        return { localDeleted, cloudDeleted };
     }
 
     generateTitle(content: string): string {

@@ -467,6 +467,11 @@
     border-radius: 6px;
 }
 
+.ai-markdown-fallback {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 .ai-markdown-content pre {
     overflow-x: auto;
     white-space: pre-wrap;

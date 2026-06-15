@@ -1,12 +1,23 @@
+export const AI_STREAM_JSON_MAX_CHARS = 5 * 1024 * 1024;
+
+const hasDiagramJsonShape = (value: unknown): boolean => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const record = value as Record<string, unknown>;
+    return Array.isArray(record.nodes) || Array.isArray(record.edges);
+};
+
 export const extractJson = (content: string, isStreaming: boolean = false): string | null => {
+    if (content.length > AI_STREAM_JSON_MAX_CHARS) return null;
+
     // 尝试匹配完整包裹的 ```json 块
     const jsonMatch = content.match(/```json\n([\s\S]*?)(?:\n```|$)/);
-    let rawStr = jsonMatch ? jsonMatch[1] : content;
+    const rawStr = jsonMatch ? jsonMatch[1] : content;
+    if (rawStr.length > AI_STREAM_JSON_MAX_CHARS) return null;
 
     // 如果不是在流传输中或者本来就能 parse，直接过
     try {
         const potentialJson = JSON.parse(rawStr);
-        if (potentialJson && (potentialJson.nodes || potentialJson.edges)) {
+        if (hasDiagramJsonShape(potentialJson)) {
             return rawStr;
         }
     } catch { }
@@ -55,10 +66,11 @@ export const extractJson = (content: string, isStreaming: boolean = false): stri
             for (let i = stack.length - 1; i >= 0; i--) {
                 patchedStr += stack[i] === '{' ? '}' : ']';
             }
+            if (patchedStr.length > AI_STREAM_JSON_MAX_CHARS) return null;
 
             // 尝试解析补全后的字符串
             const parsed = JSON.parse(patchedStr);
-            if (parsed && (Array.isArray(parsed.nodes) || Array.isArray(parsed.edges))) {
+            if (hasDiagramJsonShape(parsed)) {
                 return patchedStr;
             }
         } catch {
@@ -68,8 +80,9 @@ export const extractJson = (content: string, isStreaming: boolean = false): stri
                 if (lastBraceIdx !== -1) {
                     const trimStr = rawStr.substring(0, lastBraceIdx + 1);
                     const patched = trimStr + ']}';
+                    if (patched.length > AI_STREAM_JSON_MAX_CHARS) return null;
                     const parsed = JSON.parse(patched);
-                    if (parsed && Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
+                    if (hasDiagramJsonShape(parsed) && Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
                         return patched;
                     }
                 }
