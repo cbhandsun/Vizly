@@ -1,22 +1,11 @@
-// @ts-nocheck
-
-import { LayoutType, AlignmentType, LayoutOptions } from '../../types/layout';
-import { GroupNodeData, StandardNodeData } from '../../models/DiagramModels';
-import { Edge, Node as ReactFlowNode, XYPosition } from '@xyflow/react';
-import { Position, Rectangle } from '../../types/common';
+import type { Edge, Node as ReactFlowNode, XYPosition } from '@xyflow/react';
 import { diagramConfigManager } from '../../components/config/DiagramConfig';
-import { deriveDomainClassFromDomain } from '../domainKey';
-import { LayoutOptimizer } from '../../components/layout/LayoutOptimizer';
-import { forceSimulation, forceCollide, forceX, forceY } from 'd3-force';
-import dagre from 'dagre';
-import { safeLog } from '../consoleCleanup';
+import { calculateBoundingBox, countRectOverlaps } from './geometryUtils';
 
 /**
  * @file 统一布局工具函数
  * @description 整合所有图表的布局计算逻辑，避免重复代码
  */
-
-import { calculateBoundingBox, countRectOverlaps } from './geometryUtils';
 
 /**
  * 应用域分组（支持白名单）
@@ -766,8 +755,6 @@ export const clampNodesToContainers = (
   const ensureTitleClearanceGlobal = !!layoutCfg?.ENSURE_SUB_GROUP_TITLE_CLEARANCE;
   const titleClearance = num(layoutCfg?.SUB_GROUP_TITLE_CLEARANCE, subPad.top);
   updated.filter(n => String(n.type || '') === 'subGroup').forEach(sg => {
-    const sgChildren = Array.isArray((sg as any)?.data?.children) ? ((sg as any).data.children as string[]) : [];
-
     // dagre 模式检测：检查子域自身的 __dagreSized 标记
     const dagreSized = (sg.data as any)?.__dagreSized;
     if (dagreSized && typeof dagreSized.h === 'number' && dagreSized.h > 0) {

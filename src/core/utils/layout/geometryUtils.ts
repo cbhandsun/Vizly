@@ -1,16 +1,7 @@
-// @ts-nocheck
-
-import { LayoutType, AlignmentType, LayoutOptions } from '../../types/layout';
-import { GroupNodeData, StandardNodeData } from '../../models/DiagramModels';
-import { Edge, Node as ReactFlowNode, XYPosition } from '@xyflow/react';
+import { Node as ReactFlowNode } from '@xyflow/react';
 import { Position, Rectangle } from '../../types/common';
 import { diagramConfigManager } from '../../components/config/DiagramConfig';
-import { LayeredConfigManager } from '../../config/LayeredConfigManager';
-import { deriveDomainClassFromDomain } from '../domainKey';
 import { LayoutOptimizer } from '../../components/layout/LayoutOptimizer';
-import { forceSimulation, forceCollide, forceX, forceY } from 'd3-force';
-import dagre from 'dagre';
-import { safeLog } from '../consoleCleanup';
 
 /**
  * @file 统一布局工具函数

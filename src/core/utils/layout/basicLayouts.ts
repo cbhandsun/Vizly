@@ -1,16 +1,6 @@
-// @ts-nocheck
-
 import { LayoutType, AlignmentType, LayoutOptions } from '../../types/layout';
-import { GroupNodeData, StandardNodeData } from '../../models/DiagramModels';
-import { Edge, Node as ReactFlowNode, XYPosition } from '@xyflow/react';
-import { Position, Rectangle } from '../../types/common';
-import { diagramConfigManager } from '../../components/config/DiagramConfig';
-import { LayeredConfigManager } from '../../config/LayeredConfigManager';
-import { deriveDomainClassFromDomain } from '../domainKey';
-import { LayoutOptimizer } from '../../components/layout/LayoutOptimizer';
-import { forceSimulation, forceCollide, forceX, forceY } from 'd3-force';
-import dagre from 'dagre';
-import { safeLog } from '../consoleCleanup';
+import { Edge, Node as ReactFlowNode } from '@xyflow/react';
+import { Position } from '../../types/common';
 
 /**
  * @file 统一布局工具函数
@@ -26,7 +16,7 @@ import { calculateHierarchicalLayout } from './hierarchicalLayout';
  * @returns 每个元素的位置数组
  */
 export function calculateGridLayout(
-  items: any[],
+  items: unknown[],
   options: LayoutOptions
 ): Position[] {
   const {
@@ -56,7 +46,7 @@ export function calculateGridLayout(
 
 // 水平布局计算
 export function calculateHorizontalLayout(
-  items: any[],
+  items: unknown[],
   options: LayoutOptions
 ): Position[] {
   const {
@@ -98,7 +88,7 @@ export function calculateHorizontalLayout(
 
 // 垂直布局计算
 export function calculateVerticalLayout(
-  items: any[],
+  items: unknown[],
   options: LayoutOptions
 ): Position[] {
   const {
@@ -140,7 +130,7 @@ export function calculateVerticalLayout(
 
 // 居中布局计算
 export function calculateCenteredLayout(
-  items: any[],
+  items: unknown[],
   options: LayoutOptions
 ): Position[] {
   const {
@@ -193,7 +183,7 @@ export function calculateCenteredLayout(
 
 // 甯冨眬璁＄畻涓诲嚱鏁?
 export function calculateLayout(
-  items: any[],
+  items: unknown[],
   options: LayoutOptions
 ): Position[] {
   switch (options.type) {
@@ -207,8 +197,12 @@ export function calculateLayout(
       return calculateCenteredLayout(items, options);
     case LayoutType.HIERARCHICAL: {
       // 娉ㄦ剰锛氳繖閲岀殑 items 搴旇鍖呭惈 nodes 鍜?edges
-      const reactFlowNodes = items.filter(item => 'position' in item) as ReactFlowNode[];
-      const edges = items.filter(item => 'source' in item && 'target' in item) as Edge[];
+      const reactFlowNodes = items.filter((item): item is ReactFlowNode => (
+        typeof item === 'object' && item !== null && 'position' in item
+      ));
+      const edges = items.filter((item): item is Edge => (
+        typeof item === 'object' && item !== null && 'source' in item && 'target' in item
+      ));
       const { positions } = calculateHierarchicalLayout(reactFlowNodes, edges, options);
       return positions;
     }

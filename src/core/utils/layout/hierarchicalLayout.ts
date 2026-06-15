@@ -1,16 +1,6 @@
-// @ts-nocheck
-
-import { LayoutType, AlignmentType, LayoutOptions } from '../../types/layout';
-import { GroupNodeData, StandardNodeData } from '../../models/DiagramModels';
-import { Edge, Node as ReactFlowNode, XYPosition } from '@xyflow/react';
-import { Position, Rectangle } from '../../types/common';
-import { diagramConfigManager } from '../../components/config/DiagramConfig';
-import { LayeredConfigManager } from '../../config/LayeredConfigManager';
-import { deriveDomainClassFromDomain } from '../domainKey';
-import { LayoutOptimizer } from '../../components/layout/LayoutOptimizer';
-import { forceSimulation, forceCollide, forceX, forceY } from 'd3-force';
-import dagre from 'dagre';
-import { safeLog } from '../consoleCleanup';
+import { LayoutOptions } from '../../types/layout';
+import { Edge, Node as ReactFlowNode } from '@xyflow/react';
+import { Position } from '../../types/common';
 
 /**
  * @file 统一布局工具函数
@@ -44,7 +34,7 @@ export function calculateHierarchicalLayout(
    *   4) 若边数量密集且扇出/扇入显著（一对多/多对一）则倾向 LR，便于水平层容纳更多节点。
    */
   const decideDirection = (levels: string[][]): 'TB' | 'BT' | 'LR' | 'RL' => {
-    return decideHierDirectionByFan(nodes, edges, { ...options, levels } as any);
+    return decideHierDirectionByFan(nodes, edges, { ...options, levels });
   };
 
   // 构建层次结构
@@ -155,7 +145,7 @@ export function decideHierDirectionByFan(
   edges: Edge[],
   options: LayoutOptions & { levels?: string[][] }
 ): 'TB' | 'BT' | 'LR' | 'RL' {
-  const explicit = options.direction as any;
+  const explicit = options.direction;
   if (explicit === 'TB' || explicit === 'BT' || explicit === 'LR' || explicit === 'RL') return explicit;
   if (!options.autoDirection) return 'TB';
   const { spacing = { horizontal: 200, vertical: 150 }, padding = { top: 100, right: 50, bottom: 50, left: 50 }, itemSize = { width: 280, height: 120 } } = options;
@@ -166,7 +156,7 @@ export function decideHierDirectionByFan(
   const levelCount = levels.length;
   const avgPerLevel = levelCount ? (nodes.length / levelCount) : nodes.length;
   const edgeCount = edges.length;
-  const h: any = (options as any).autoDirectionHeuristics || {};
+  const h = options.autoDirectionHeuristics || {};
   const thrLR = typeof h.aspectThresholdLR === 'number' ? h.aspectThresholdLR : 1.2;
   const thrTB = typeof h.aspectThresholdTB === 'number' ? h.aspectThresholdTB : 0.8;
   const minLvlTB = typeof h.minLevelCountTB === 'number' ? h.minLevelCountTB : 3;

@@ -1,13 +1,6 @@
-// @ts-nocheck
-
-import { LayoutType, AlignmentType, LayoutOptions } from '../../types/layout';
-import { GroupNodeData, StandardNodeData } from '../../models/DiagramModels';
-import { Edge, Node as ReactFlowNode, XYPosition } from '@xyflow/react';
-import { Position, Rectangle } from '../../types/common';
+import type { Edge, Node as ReactFlowNode, XYPosition } from '@xyflow/react';
 import { diagramConfigManager } from '../../components/config/DiagramConfig';
 import { LayeredConfigManager } from '../../config/LayeredConfigManager';
-import { deriveDomainClassFromDomain } from '../domainKey';
-import { LayoutOptimizer } from '../../components/layout/LayoutOptimizer';
 import { forceSimulation, forceCollide, forceX, forceY } from 'd3-force';
 import dagre from 'dagre';
 import { safeLog } from '../consoleCleanup';
@@ -326,7 +319,6 @@ export const rankSnapDomainFreeNodes = (
   const V_GAP = num(layoutCfg?.NODE_V_GAP, 80);
   const DOMAIN_PAD_H = num(cfgFull?.domain?.padding?.horizontal, 24);
   const updated = nodes.map(n => ({ ...n }));
-  const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
   const isGroupType = (t: any) => new Set(['subGroup', 'titleGroup', 'group', 'domain']).has(String(t || ''));
   const getW = (n: ReactFlowNode) => num((((n as any)?.measured?.width ?? (n as any)?.style?.width ?? (n as any)?.width)), num(layoutCfg?.NODE_MIN_WIDTH, 120));
   const getH = (n: ReactFlowNode) => num((((n as any)?.measured?.height ?? (n as any)?.style?.height ?? (n as any)?.height)), num(cfgFull?.node?.height, 80));
@@ -1872,7 +1864,7 @@ export const recomputeSubGroupContainersBasic = (
       if (!placed) rows.push([n]);
     }
     // 每行按 x 升序，计算行宽（含节点间水平间距）与行高（最大高度）
-    let maxRowWidth = 0; let totalRowsHeight = 0; const rowHeights: number[] = [];
+    let maxRowWidth = 0; const rowHeights: number[] = [];
     let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
     for (const row of rows) {
       const r = row.slice().sort((a, b) => getX(a) - getX(b));
@@ -1886,7 +1878,7 @@ export const recomputeSubGroupContainersBasic = (
         maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + h);
       }
       maxRowWidth = Math.max(maxRowWidth, sumW);
-      totalRowsHeight += maxH; rowHeights.push(maxH);
+      rowHeights.push(maxH);
     }
     // 行间垂直留白：动态按行基准高度与配置 vGap 组合确定
     const avgRowH = rowHeights.length ? Math.round(rowHeights.reduce((s, h) => s + h, 0) / rowHeights.length) : num((cfgFull?.node as any)?.height, 80);
@@ -1899,9 +1891,6 @@ export const recomputeSubGroupContainersBasic = (
     const finalSafeTotalH = Math.max(0, Math.min(Math.floor(padH * 0.25), Math.floor(hGap * 0.1), 10));
     const safeLeftH = Math.floor(finalSafeTotalH / 2);
     const safeRightH = finalSafeTotalH - safeLeftH;
-    let finalBottomSafe = Math.max(4, Math.floor(vGap * 0.1));
-    finalBottomSafe = Math.max(finalBottomSafe, Math.floor(padBottom * (childNodes.length <= 4 ? 0.4 : 0.7)));
-    finalBottomSafe = Math.min(finalBottomSafe, Math.floor(contentH * 0.08));
     const newW = Math.max(0, contentW + padH * 2 + safeLeftH + safeRightH);
     const minHConfig = num(cfgLayout?.SUB_GROUP_MIN_HEIGHT, 200);
     const newH = Math.max(minHConfig, contentH + padTop + padBottom);
@@ -2194,22 +2183,8 @@ export const packSubGroupsVerticallySymmetric = (
   nodes: ReactFlowNode[],
   gapVOverride?: number
 ): ReactFlowNode[] => {
-  const cfgFull = diagramConfigManager.getConfig() as any;
-  const layoutCfg = diagramConfigManager.getLayoutConfig() as any;
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-  const updated = nodes.map(n => ({ ...n }));
-  const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
-  const _padH = num(cfgFull?.domain?.padding?.horizontal, 24);
-  const _titleH = num(cfgFull?.domain?.title?.height, 40);
-  const titleV = num(cfgFull?.domain?.title?.padding?.vertical, 12);
-  const titleSafe = num(cfgFull?.domain?.title?.safeGap, 16);
-  const _bottomSafe = num((cfgFull?.domain as any)?.bottomSafeGap ?? (cfgFull?.domain as any)?.padding?.bottom ?? (titleV + titleSafe), titleV + titleSafe);
-  const subPadTop = num(((cfgFull?.subDomain || {}) as any)?.padding?.top, num(layoutCfg?.SUB_GROUP_PADDING?.V_TOP, 28));
-  const subTitleH = num(((cfgFull?.subDomain || {}) as any)?.title?.height, 28);
-  const subTitleV = num(((cfgFull?.subDomain || {}) as any)?.title?.padding?.vertical, 8);
-  const _vGap = (typeof gapVOverride === 'number' && isFinite(gapVOverride)) ? gapVOverride : num(layoutCfg?.NODE_V_GAP, 80);
-
   // 已回滚：不再执行垂直对称打包，返回原节点集合
+  void gapVOverride;
   return nodes.map(n => ({ ...n }));
 };
 
@@ -2338,7 +2313,6 @@ export const resolveFreeNodeOverlapsInDomain = (
   const vGap = (typeof gapVOverride === 'number' && isFinite(gapVOverride)) ? gapVOverride : num(cfg?.NODE_V_GAP, 80);
   const hGap = (typeof gapHOverride === 'number' && isFinite(gapHOverride)) ? gapHOverride : num(cfg?.NODE_H_GAP, 120);
   const updated = nodes.map(n => ({ ...n }));
-  const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
   const EXCLUDE = new Set(['subGroup', 'titleGroup', 'group', 'domain']);
   const getRect = (n: ReactFlowNode) => {
     const w = num((n as any)?.measured?.width ?? (n.style as any)?.width ?? (n as any)?.width, 0);
@@ -2347,10 +2321,6 @@ export const resolveFreeNodeOverlapsInDomain = (
     const y = num(n.position?.y, 0);
     return { x, y, w, h };
   };
-  const intersects = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => {
-    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-  };
-
   const domainsSet = new Set<string>();
   for (const n of updated) {
     const d = String((((n as any)?.data && (n as any).data.domain) || '')).trim();
@@ -2459,9 +2429,6 @@ export const resolveSubGroupChildrenOverlapsStrict = (
     const x = num(n.position?.x, 0);
     const y = num(n.position?.y, 0);
     return { x, y, w, h };
-  };
-  const intersects = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => {
-    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
   };
   const subGroups = updated.filter(n => String(n.type || '') === 'subGroup');
   for (const sg of subGroups) {
@@ -2685,21 +2652,6 @@ export const leftAlignSubGroupChildrenHorizontally = (
     const innerLeft = num(pos.x, 0) + SUB_H;
     const innerRight = num(pos.x, 0) + sizeW - SUB_H;
     const _innerTop = num(pos.y, 0) + TOP_PAD;
-    let domainCenterX: number | null = null;
-    try {
-      const dKey = String((((sg as any)?.data?.domain || ''))).trim();
-      const tg = updated.find(n => String(n.type || '') === 'titleGroup' && String(((n.data as any)?.domain || '')) === dKey);
-      if (tg) {
-        const tgX = num(((tg as any)?.position?.x), 0);
-        const tW = num((((tg as any)?.measured?.width ?? (tg as any)?.style?.width)), 0);
-        const domainPadHLocal = num(((diagramConfigManager.getConfig() as any)?.domain?.padding?.horizontal), 24);
-        const innerLeftDom = tgX + domainPadHLocal;
-        const domainInnerW = Math.max(1, tW - domainPadHLocal * 2);
-        _domainCenterX = innerLeftDom + domainInnerW / 2;
-      }
-    } catch {
-      // ignore
-    }
     const children = Array.isArray((sg.data as any)?.children) ? ((sg.data as any).children as string[]) : [];
     const childNodes = children
       .map(id => idMap.get(id))
@@ -3452,7 +3404,7 @@ export const reflowSubGroupChildrenDagre = (
 
   // 如果没有任何节点，重置边界
   if (positions.length === 0) {
-    minX = 0; minY = 0; maxX = 0; maxY = 0;
+    minX = 0; minY = 0;
   }
 
   // 内容区偏移（使内容相对于子域内容区起点）
@@ -4329,7 +4281,6 @@ export const equalizeSubGroupMarginsByProjection = (
   const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
   const padH = num(cfgFull?.domain?.padding?.horizontal, 24);
   const _sideSafe = Math.max(0, num(cfgFull?.domain?.sideSafeGap, 8));
-  const subPadHDefault = Math.max(16, Math.floor(padH * 0.8));
   const tgs = updated.filter(n => String(n.type || '') === 'titleGroup');
   for (const tg of tgs) {
     const dId = String((((tg as any).data?.domain || '')));
@@ -4342,7 +4293,6 @@ export const equalizeSubGroupMarginsByProjection = (
     for (let i = 0; i < updated.length; i++) {
       const sg = updated[i];
       if (!sgs.some(n => n.id === sg.id)) continue;
-      const subPadH = num((((cfgFull?.subDomain || {}) as any)?.padding?.horizontal), subPadHDefault);
       const x = num(((sg as any)?.position?.x), innerLeft);
       // 严格嵌套模式：不再偏移 subPadH
       const w = num((((sg as any)?.measured?.width ?? (sg as any)?.style?.width)), 0);
@@ -4383,18 +4333,6 @@ export const equalizeSubGroupMarginsByProjection = (
 export const equalizeSubGroupVerticalMarginsByProjection = (
   nodes: ReactFlowNode[]
 ): ReactFlowNode[] => {
-  const cfgFull = diagramConfigManager.getConfig() as any;
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-  const updated = nodes.map(n => ({ ...n }));
-  const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
-  const _padH = num(cfgFull?.domain?.padding?.horizontal, 24);
-  const _titleH = num(cfgFull?.domain?.title?.height, 40);
-  const titleV = num(cfgFull?.domain?.title?.padding?.vertical, 12);
-  const titleSafe = num(cfgFull?.domain?.title?.safeGap, 16);
-  const _bottomSafe = num((cfgFull?.domain as any)?.bottomSafeGap ?? (cfgFull?.domain as any)?.padding?.bottom ?? (titleV + titleSafe), titleV + titleSafe);
-  const _subPadTopDefault = 28;
-  const _subTitleHDefault = 28;
-  const _subTitleVDefault = 8;
   // 宸插洖鎾わ細涓嶅啀杩涜涓婁笅鐣欑櫧鎶曞奖鏍℃锛岀洿鎺ヨ繑鍥炲師鑺傜偣闆嗗悎
   return nodes.map(n => ({ ...n }));
 };
@@ -4429,23 +4367,7 @@ export const enforceSubGroupChildrenLayoutStrict = (
   const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
   const getW = (n: ReactFlowNode) => num((((n as any)?.measured?.width ?? (n as any)?.style?.width ?? (n as any)?.width)), num(cfgLayout?.NODE_MIN_WIDTH, 120));
   const getH = (n: ReactFlowNode) => num((((n as any)?.measured?.height ?? (n as any)?.style?.height ?? (n as any)?.height)), num(cfgFull?.node?.height, 80));
-  const domainPadH = num(cfgFull?.domain?.padding?.horizontal, 24);
-  const sideSafe = Math.max(0, num(cfgFull?.domain?.sideSafeGap, 8));
   const SUB_BOTTOM = num((cfgFull?.subDomain?.padding?.bottom ?? cfgFull?.subGroup?.padding?.bottom ?? cfgLayout?.SUB_GROUP_PADDING?.V_BOTTOM), 28);
-  const findDomainInnerWidth = (sg: ReactFlowNode): number | null => {
-    try {
-      const dKey = String((((sg as any)?.data?.domain || ''))).trim();
-      if (!dKey) return null;
-      const tg = updated.find(n => String(n.type || '') === 'titleGroup' && String(((n.data as any)?.domain || '')) === dKey);
-      if (!tg) return null;
-      const tgX = num(((tg as any)?.position?.x), 0);
-      const tgW = num((((tg as any)?.measured?.width ?? (tg as any)?.style?.width)), 0);
-      if (!(tgW > 0)) return null;
-      const innerLeft = tgX + domainPadH + sideSafe;
-      const innerRight = tgX + tgW - domainPadH - sideSafe;
-      return Math.max(1, innerRight - innerLeft);
-    } catch { return null; }
-  };
   for (let i = 0; i < updated.length; i++) {
     const sg = updated[i];
     if (String(sg.type || '') !== 'subGroup') continue;

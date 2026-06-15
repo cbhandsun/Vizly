@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => {
@@ -57,7 +56,6 @@ import {
   enforceSubGroupTitleClearance,
   expandSubGroupContainersBySemantic,
   expandSubGroupsToDomainWidth,
-  fitSubGroupsToDomainSymmetric,
   finalizeSubGroupHeightsByProjection,
   finalizeSubGroupHeightsByProjectionPreserveAnchor,
   finalizeSubGroupWidthsByProjectionPreserveAnchor,
@@ -83,8 +81,6 @@ import {
   stackSubGroupsVertically,
   strengthenDomainsAggressive,
   strengthenSubGroupsInDomainWithGridStrict,
-  unifySubGroupGapsInDomain,
-  unifySubGroupHeightsByDomain,
   unifySubGroupLeftAnchors,
   writeSubGroupChildrenRelativeOffsets,
 } from '../subGroupLayout';
