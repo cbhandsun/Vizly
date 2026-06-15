@@ -11,7 +11,7 @@
     "verify": "npm run check:artifacts && npm run check:secrets && npm run typecheck && npm run lint && npm run build && npm run check:bundle",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:ci": "npm run check:test-ci-coverage && npm run test:ci:node && npm run test:ci:dom-base && npm run test:ci:context && npm run test:ci:ui && npm run test:ci:core-components && npm run test:ci:mindmap && npm run test:ci:routing",
+    "test:ci": "npm run check:test-ci-coverage && node scripts/run-test-ci.mjs",
     "test:ci:node": "vitest run --maxWorkers=2 --environment=node supabase/__tests__ src/core/algorithms/__tests__ src/core/workers/preprocessing/__tests__ src/core/workers/postprocessing/__tests__",
     "test:ci:dom-base": "npm run test:ci:dom-utils && npm run test:ci:dom-services && npm run test:ci:dom-workers",
     "test:ci:dom-utils": "npm run test:ci:dom-utils-security && npm run test:ci:dom-utils-storage && npm run test:ci:dom-utils-import && npm run test:ci:dom-utils-layout && npm run test:ci:dom-utils-misc && npm run test:ci:dom-utils-app",
