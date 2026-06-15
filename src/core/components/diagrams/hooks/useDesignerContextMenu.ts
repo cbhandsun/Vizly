@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import { ContextMenuProps } from '../DiagramContextMenu';
-import { useDiagramStore, ContextMenuState } from '../../../store/useDiagramStore';
+import { useDiagramStore } from '../../../store/useDiagramStore';
 
 interface UseDesignerContextMenuOptions {
     reactFlowWrapper: React.RefObject<HTMLDivElement | null>;
@@ -36,7 +36,7 @@ export function useDesignerContextMenu({
             type: args.type,
             targetId: args.targetId,
         });
-    }, [reactFlowWrapper]);
+    }, [reactFlowWrapper, setContextMenu]);
 
     const onNodeContextMenu = useCallback(
         (event: React.MouseEvent, node: Node) => {
@@ -79,7 +79,7 @@ export function useDesignerContextMenu({
         [openContextMenu]
     );
 
-    const onPaneClick = useCallback(() => setContextMenu(null), []);
+    const onPaneClick = useCallback(() => setContextMenu(null), [setContextMenu]);
 
     return {
         onNodeContextMenu,

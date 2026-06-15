@@ -1,6 +1,5 @@
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
-    Node,
     Edge,
     NodeChange,
     EdgeChange,
@@ -14,23 +13,6 @@ import { useDiagramHistory } from '../../../hooks/useDiagramHistory';
 import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v2';
 import { useDiagramStore } from '../../../store/useDiagramStore';
 
-// Initial Toggle State
-const INITIAL_NODES: Node[] = [
-    {
-        id: 'start-1',
-        type: 'flowchart',
-        data: {
-            label: '开始',
-            shape: 'pill',
-            description: '开始',
-            icon: 'play',
-            theme: { main: '#4CAF50', border: '#43a047', text: '#fff' }
-        },
-        position: { x: 260, y: 160 }, // Shifted down and right to clear Floating Islands
-        style: { width: 120, height: 60, boxShadow: '0 4px 12px rgba(76, 175, 80, 0.15)' },
-    },
-];
-
 export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advanced-smart') => {
     const nodes = useDiagramStore(state => state.nodes);
     const edges = useDiagramStore(state => state.edges);
@@ -42,9 +24,12 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
 
     // 🚀 Ref 模式：避免回调捕获旧值
     const nodesRef = useRef(nodes);
-    nodesRef.current = nodes;
     const edgesRef = useRef(edges);
-    edgesRef.current = edges;
+
+    useEffect(() => {
+        nodesRef.current = nodes;
+        edgesRef.current = edges;
+    }, [nodes, edges]);
 
     // History
     const { takeSnapshot, undo, redo, canUndo, canRedo, pastEntries, jumpTo, getPreviousState } = useDiagramHistory(nodes, edges);
@@ -110,7 +95,7 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
 
             setNodes((nds) => applyNodeChanges(changes, nds));
         },
-        [takeSnapshot],
+        [setEdges, setNodes, takeSnapshot],
     );
 
     const onEdgesChange = useCallback(
@@ -121,7 +106,7 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
             }
             setEdges((eds) => applyEdgeChanges(changes, eds));
         },
-        [takeSnapshot],
+        [setEdges, takeSnapshot],
     );
 
     const onConnect = useCallback(
@@ -176,18 +161,18 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
                 },
             }, eds));
         },
-        [takeSnapshot, preset, edgeMode], // 🚀 移除 nodes, edges 依赖, 增加 edgeMode 避免切换后依然用旧值
+        [edgeMode, preset, setEdges, takeSnapshot],
     );
 
     const handleUndo = useCallback(() => {
         const prevState = undo(nodesRef.current, edgesRef.current); // 🚀 ref
         if (prevState) { setNodes(prevState.nodes); setEdges(prevState.edges); }
-    }, [undo]);
+    }, [setEdges, setNodes, undo]);
 
     const handleRedo = useCallback(() => {
         const nextState = redo(nodesRef.current, edgesRef.current); // 🚀 ref
         if (nextState) { setNodes(nextState.nodes); setEdges(nextState.edges); }
-    }, [redo]);
+    }, [redo, setEdges, setNodes]);
 
     return {
         nodes,

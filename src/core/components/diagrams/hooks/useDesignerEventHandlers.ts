@@ -1,5 +1,5 @@
-import React, { useCallback, useRef, useEffect, useState } from 'react';
-import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { Node, Edge } from '@xyflow/react';
 import { useDesignerContextMenu } from './useDesignerContextMenu';
 import { useClipboard } from './useClipboard';
 import { useToastActions } from './useToastActions';
@@ -152,7 +152,9 @@ export function useDesignerEventHandlers({
     });
 
     const isDraggingRef = useRef(isDragging);
-    isDraggingRef.current = isDragging;
+    useEffect(() => {
+        isDraggingRef.current = isDragging;
+    }, [isDragging]);
 
     useKeyboardShortcuts({
         onDelete: () => handleDeleteWithToast(),

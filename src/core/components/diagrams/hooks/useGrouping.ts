@@ -122,7 +122,6 @@ export const useGrouping = ({
                             y: n.position.y + parentGroup.position.y
                         };
 
-                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
                         const { parentId: _pid, extent: _ext, ...rest } = n;
 
                         if (newParentId) {

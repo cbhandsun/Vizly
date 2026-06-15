@@ -1,9 +1,10 @@
 import { useEffect, useCallback, useLayoutEffect } from 'react';
-import { Node, Edge, XYPosition } from '@xyflow/react';
+import { Node, Edge } from '@xyflow/react';
 import { autoMindMapLayout, calculateSummaryGeometry, calculateSubtreeBounds } from '../../../utils/LayoutAlgorithms';
 import { useRef } from 'react';
 import { parseIndentedText } from '../../../utils/textTreeParser';
 import { appMessage } from '../../../utils/antdStaticBridge';
+import { downloadFile } from '../../../utils/downloadUtils';
 
 // XMind-inspired premium palette: vibrant yet harmonious branch colors
 export const PALETTE = ['#e85d4a', '#f0872a', '#c27af5', '#2dd4bf', '#3b82f6', '#f59e0b', '#10b981'];
@@ -53,13 +54,7 @@ export function exportMindMapToMarkdown(nodes: Node[], edges: Edge[]): string {
 
 /** Triggers a browser file download with the given text content */
 function downloadTextFile(filename: string, content: string, mimeType = 'text/plain') {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadFile(content, filename, mimeType);
 }
 
 export function useMindMapOrchestrator(
@@ -300,7 +295,7 @@ export function useMindMapOrchestrator(
             const updatedNodes = nextNodes.map(n => {
                 let nChanged = false;
                 let nextPos = { ...n.position };
-                let nextData = { ...n.data };
+                const nextData = { ...n.data };
                 let nextHidden = n.hidden;
 
                 // Position & Layout
@@ -368,7 +363,6 @@ export function useMindMapOrchestrator(
 
             // 3. Add new boundaries
             if (boundariesToAdd.length > 0) {
-                changed = true;
                 return [...updatedNodes, ...boundariesToAdd];
             }
 
@@ -390,7 +384,7 @@ export function useMindMapOrchestrator(
         const newChildId = `mindmap-node-${Date.now()}`;
 
         // 3. Determine Color (Inherit or Assign new)
-        let branchColor = undefined;
+        let branchColor: string | undefined;
         if (depth === 0) {
             // It's a new root branch
             const siblingCount = edges.filter(ed => ed.source === parentId).length;
@@ -459,7 +453,7 @@ export function useMindMapOrchestrator(
 
             return nextEdges;
         });
-    }, [nodes, edges, setNodes, setEdges, takeSnapshot]);
+    }, [edges, nodes, setEdges, setNodes, takeSnapshot]);
 
     useEffect(() => {
         window.addEventListener('mindmap:quickadd', handleQuickAdd);
@@ -518,7 +512,7 @@ export function useMindMapOrchestrator(
 
         window.addEventListener('mindmap:shortcut-trigger', handleShortcutTrigger);
         return () => window.removeEventListener('mindmap:shortcut-trigger', handleShortcutTrigger);
-    }, [nodes, edges]);
+    }, [edges, nodes, setEdges, setNodes, takeSnapshot]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -749,7 +743,7 @@ export function useMindMapOrchestrator(
 
         window.addEventListener('keydown', handleKeyDown, { capture: true });
         return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-    }, [nodes, edges]);
+    }, [edges, nodes, setEdges, setNodes, takeSnapshot]);
 
     useEffect(() => {
         const handlePaste = (e: ClipboardEvent) => {
@@ -861,7 +855,7 @@ export function useMindMapOrchestrator(
 
         window.addEventListener('paste', handlePaste, { capture: true });
         return () => window.removeEventListener('paste', handlePaste, { capture: true });
-    }, [nodes, edges, setNodes, setEdges, takeSnapshot]);
+    }, [edges, nodes, setEdges, setNodes, takeSnapshot]);
 
     const handleToggleCollapse = useCallback((e: Event) => {
         const detail = (e as CustomEvent).detail;
@@ -963,7 +957,7 @@ export function useMindMapOrchestrator(
 
 
 
-    }, [nodes, edges, setNodes, takeSnapshot]);
+    }, [edges, setNodes, takeSnapshot]);
 
     useEffect(() => {
         window.addEventListener('mindmap:toggle-collapse', handleToggleCollapse);
@@ -1054,7 +1048,7 @@ export function useMindMapOrchestrator(
         // Filter out the old structural connection to nodeId (keep relationship edges intact)
         const filteredEdges = edges.filter(edge => edge.target !== nodeId || edge.type === 'relationshipEdge');
         
-        let newEdges = [...filteredEdges];
+        const newEdges = [...filteredEdges];
         
         // Determine insertion index based on sibling's edge location
         let insertIndex = -1;
@@ -1180,7 +1174,7 @@ export function useMindMapOrchestrator(
         setNodes(positionedNodes);
         setEdges(fullyRoutedEdges);
 
-    }, [nodes, edges, setNodes, setEdges, takeSnapshot]);
+    }, [edges, nodes, setEdges, setNodes, takeSnapshot]);
 
     useEffect(() => {
         window.addEventListener('mindmap:reparent', handleReparent);
@@ -1317,7 +1311,7 @@ export function useMindMapOrchestrator(
 
             return nextEdges;
         });
-    }, [nodes, edges, setNodes, setEdges, takeSnapshot]);
+    }, [nodes, setEdges, setNodes, takeSnapshot]);
 
     useEffect(() => {
         window.addEventListener('mindmap:smart-delete', handleSmartDelete);

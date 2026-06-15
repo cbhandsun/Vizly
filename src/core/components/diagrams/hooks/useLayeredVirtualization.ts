@@ -18,7 +18,7 @@ export function useLayeredVirtualization({
     edges,
     virtualizedNodes,
     edgesWithCollapseState,
-    layers,
+    layers: _layers,
     getLayer,
     _isDragging,
     onNodesChange,
@@ -92,7 +92,7 @@ export function useLayeredVirtualization({
                 }
             };
         });
-    }, [virtualizedNodes, layers, getLayer]);
+    }, [virtualizedNodes, getLayer]);
 
     // 过滤可见 edges
     const visibleEdges = useMemo(() => {
@@ -113,7 +113,7 @@ export function useLayeredVirtualization({
                 hidden: nextHidden
             };
         });
-    }, [edgesWithCollapseState, layers, getLayer]);
+    }, [edgesWithCollapseState, getLayer]);
 
     // 锁定拦截
     const nodesRef = useRef(nodes);

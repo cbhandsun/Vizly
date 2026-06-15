@@ -1,6 +1,5 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { Node, Connection, OnConnectStart, OnConnectEnd, ReactFlowInstance } from '@xyflow/react';
-import { readDomViewport } from '../../../utils/domViewport';
 
 /**
  * Hook for managing connection microinteractions and animations
@@ -185,7 +184,7 @@ export const useConnectionMicrointeractions = ({
                 setConnectPreview(null);
             }
         }
-    }, [domRemoveClasses, domAddClasses]);
+    }, [domRemoveClasses, domAddClasses, reactFlowInstance]);
 
     useEffect(() => {
         if (!isConnecting) return;
@@ -293,7 +292,7 @@ export const useConnectionMicrointeractions = ({
                 edgeAnimationTimerRef.current = null;
             }, 1000);
         }, 50);
-    }, [onConnect, setEdges, domBatchRemoveClasses]);
+    }, [onConnect, setEdges, domBatchRemoveClasses, domSetConnectHighlight]);
 
     const enhancedOnConnectEnd: OnConnectEnd = useCallback((event, connectionState) => {
         const preview = connectPreviewRef.current;
@@ -340,7 +339,7 @@ export const useConnectionMicrointeractions = ({
                 document.body.classList.remove('performance-mode');
             }
         }
-    }, [enhancedOnConnect, onConnectEnd, domBatchRemoveClasses]);
+    }, [enhancedOnConnect, onConnectEnd, domBatchRemoveClasses, domSetConnectHighlight]);
 
     return {
         isConnecting,

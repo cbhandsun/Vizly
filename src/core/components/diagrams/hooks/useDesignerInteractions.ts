@@ -1,6 +1,5 @@
-import { useCallback, useRef, useState, useMemo } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { Node, Edge, Connection, reconnectEdge, SelectionMode, MarkerType } from '@xyflow/react';
-import { useLayerManagement } from './useLayerManagement';
 import { useLayeredVirtualization } from './useLayeredVirtualization';
 import { useDesignerEdgeCallbacks } from './useDesignerEdgeCallbacks';
 import { useDiagramDragDrop } from './useDiagramDragDrop';
@@ -50,6 +49,8 @@ export interface UseDesignerInteractionsProps {
     getLayer: any;
     setLayerColor: any;
 }
+
+const ANNOTATION_COLORS = ['#facc15', '#f87171', '#60a5fa', '#34d399', '#c084fc', '#fb923c'];
 
 export function useDesignerInteractions({
     nodes, edges, setNodes, setEdges,
@@ -116,8 +117,6 @@ export function useDesignerInteractions({
     const removeComment = useDiagramStore(state => state.removeComment);
     const _setIsCommentMode = useDiagramStore(state => state.setIsCommentMode);
     
-    const ANNOTATION_COLORS = ['#facc15', '#f87171', '#60a5fa', '#34d399', '#c084fc', '#fb923c'];
-
     const getEdgeDefaults = useCallback(() => {
         const edgeToken = preset.edges.main;
         return {
@@ -159,16 +158,18 @@ export function useDesignerInteractions({
 
     const reconnectNodesRef = useRef(nodes);
     const reconnectEdgesRef = useRef(edges);
-    reconnectNodesRef.current = nodes;
-    reconnectEdgesRef.current = edges;
+    useEffect(() => {
+        reconnectNodesRef.current = nodes;
+        reconnectEdgesRef.current = edges;
+    }, [nodes, edges]);
 
     const handleReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
         takeSnapshot(reconnectNodesRef.current, reconnectEdgesRef.current);
         setEdges((eds: any) => reconnectEdge(oldEdge, newConnection, eds));
     }, [setEdges, takeSnapshot]);
 
-    const handleReconnectStart = useCallback((_event: any, edge: Edge, handleType: 'source' | 'target') => {}, []);
-    const handleReconnectEnd = useCallback((_event: any, edge: Edge) => {}, []);
+    const handleReconnectStart = useCallback((_event: any, _edge: Edge, _handleType: 'source' | 'target') => {}, []);
+    const handleReconnectEnd = useCallback((_event: any, _edge: Edge) => {}, []);
 
     const { onDragOver, onDrop, onNodeDragStart, onNodeDrag, onNodeDragStop: originalOnNodeDragStop } = useDiagramDragDrop({
         nodes, edges, setNodes, setEdges, takeSnapshot, reactFlowInstance, setIsDragging, onSmartNodeDrag, clearGuides,

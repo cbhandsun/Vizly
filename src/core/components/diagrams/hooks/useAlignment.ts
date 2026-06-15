@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Node } from '@xyflow/react';
 
 interface UseAlignmentProps {
@@ -7,7 +7,7 @@ interface UseAlignmentProps {
 }
 
 export const useAlignment = ({ selectedNodes: _selectedNodes, onUpdateNodes }: UseAlignmentProps) => {
-    const selectedNodes = _selectedNodes || [];
+    const selectedNodes = useMemo(() => _selectedNodes || [], [_selectedNodes]);
     const canAlign = selectedNodes.length > 1;
     const canDistribute = selectedNodes.length > 2;
 

@@ -104,10 +104,18 @@ export const useCollapsibleGroups = ({
 
     // 1. 动态过滤出当前需要在此刻画图板上渲染的结点
     // 逻辑：如果某节点的任一祖先节点是 collapsed 状态，则该节点应当被隐藏
-    const visibleNodes = useMemo(() => {
+    const visibleNodes = (() => {
         const collapsedGroups = nodes.filter(n => n.data?.collapsed);
         if (collapsedGroups.length === 0) {
-            return nodes.map(n => ({...n, hidden: false}));
+            if (!nodes.some(n => n.hidden || n.data?.hidden)) return nodes;
+            return nodes.map(n => {
+                if (!n.hidden && !n.data?.hidden) return n;
+                return {
+                    ...n,
+                    hidden: false,
+                    data: n.data?.hidden ? { ...n.data, hidden: false } : n.data,
+                };
+            });
         }
 
         const childrenMap = buildChildrenMap(nodes);
@@ -119,15 +127,19 @@ export const useCollapsibleGroups = ({
         // 打上 hidden 标记而不是真实从数据中删除
         // 从而完美兼容 React Flow 渲染
         return nodes.map(n => {
+            const shouldHide = hiddenNodeIds.has(n.id);
+            const dataHidden = !!n.data?.hidden;
+            if (shouldHide === !!n.hidden && shouldHide === dataHidden) return n;
+
             if (hiddenNodeIds.has(n.id)) {
                 return { ...n, hidden: true, data: { ...n.data, hidden: true } };
             }
-            if (n.data?.hidden) {
+            if (dataHidden) {
                 return { ...n, hidden: false, data: { ...n.data, hidden: false } };
             }
-            return { ...n, hidden: false };
+            return n.hidden ? { ...n, hidden: false } : n;
         });
-    }, [nodes]);
+    })();
 
     // 2. 边缘路由劫持
     const visibleEdges = useMemo(() => {

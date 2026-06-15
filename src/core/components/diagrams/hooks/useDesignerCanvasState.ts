@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { MarkerType } from '@xyflow/react';
-import { useTranslation } from 'react-i18next';
-import { message } from 'antd';
 import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v2';
 import { diagramStyleManager } from '../../shared/DiagramStyleManager';
 import { useTheme } from '../../../themes/useCoreTheme';
@@ -35,13 +33,15 @@ export function useDesignerCanvasState({
     onOpenSettings,
     onSyncPush,
 }: UseDesignerCanvasStateProps) {
-    const { t } = useTranslation();
     const preset = useDiagramStylePreset_v2();
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
     const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
 
     const [internalReadonly, setInternalReadonly] = useState(externalReadonly);
-    useEffect(() => setInternalReadonly(externalReadonly), [externalReadonly]);
+    useEffect(() => {
+        const timer = window.setTimeout(() => setInternalReadonly(externalReadonly), 0);
+        return () => window.clearTimeout(timer);
+    }, [externalReadonly]);
     const isReadonly = internalReadonly;
 
     const handleReadonlyChange = useCallback((val: boolean) => {
@@ -50,13 +50,22 @@ export function useDesignerCanvasState({
     }, [onReadonlyChange]);
 
     const [internalEdgeMode, setInternalEdgeMode] = useState<'advanced-smart' | 'native'>(externalEdgeMode);
-    useEffect(() => setInternalEdgeMode(externalEdgeMode), [externalEdgeMode]);
+    useEffect(() => {
+        const timer = window.setTimeout(() => setInternalEdgeMode(externalEdgeMode), 0);
+        return () => window.clearTimeout(timer);
+    }, [externalEdgeMode]);
     const edgeMode = internalEdgeMode;
 
     const [internalShowOnlyMainFlow, setInternalShowOnlyMainFlow] = useState(externalShowOnlyMainFlow);
     const [internalHighlightMainFlow, setInternalHighlightMainFlow] = useState(externalHighlightMainFlow);
-    useEffect(() => setInternalShowOnlyMainFlow(externalShowOnlyMainFlow), [externalShowOnlyMainFlow]);
-    useEffect(() => setInternalHighlightMainFlow(externalHighlightMainFlow), [externalHighlightMainFlow]);
+    useEffect(() => {
+        const timer = window.setTimeout(() => setInternalShowOnlyMainFlow(externalShowOnlyMainFlow), 0);
+        return () => window.clearTimeout(timer);
+    }, [externalShowOnlyMainFlow]);
+    useEffect(() => {
+        const timer = window.setTimeout(() => setInternalHighlightMainFlow(externalHighlightMainFlow), 0);
+        return () => window.clearTimeout(timer);
+    }, [externalHighlightMainFlow]);
     const showOnlyMainFlow = internalShowOnlyMainFlow;
     const highlightMainFlow = internalHighlightMainFlow;
 
