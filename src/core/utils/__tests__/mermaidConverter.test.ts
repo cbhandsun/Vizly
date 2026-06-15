@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { toMermaid, fromMermaid } from '../mermaidConverter';
-import { Node, Edge, MarkerType } from '@xyflow/react';
+import {
+    toMermaid,
+    fromMermaid,
+    MERMAID_CONVERTER_MAX_CHARS,
+    MERMAID_CONVERTER_MAX_EDGES,
+    MERMAID_CONVERTER_MAX_LABEL_CHARS,
+    MERMAID_CONVERTER_MAX_NODES,
+    MERMAID_EXPORT_MAX_EDGES,
+    MERMAID_EXPORT_MAX_NODES,
+} from '../mermaidConverter';
+import { Node, Edge } from '@xyflow/react';
 
 describe('mermaidConverter', () => {
     describe('toMermaid', () => {
@@ -45,6 +54,49 @@ describe('mermaidConverter', () => {
             const result = toMermaid(nodes, []);
             expect(result).toContain('style A fill:#ff0000,stroke:#ff0000,color:#ffffff');
             expect(result).toContain('style G fill:#00ff0015,stroke:#00ff00,stroke-width:2px');
+        });
+
+        it('should escape exported Mermaid labels and reject unsafe style colors', () => {
+            const nodes: Node[] = [
+                {
+                    id: 'A bad/id',
+                    data: {
+                        label: 'A "quoted"\n```mermaid\nX-->Y',
+                        theme: { main: '#ff0000\nB-->C', text: '#ffffff' },
+                    },
+                    position: { x: 0, y: 0 },
+                },
+                { id: 'B', data: { label: 'Target' }, position: { x: 100, y: 0 } },
+            ];
+            const edges: Edge[] = [
+                { id: 'e1', source: 'A bad/id', target: 'B', label: 'edge\n```' },
+            ];
+
+            const result = toMermaid(nodes, edges);
+
+            expect(result).toContain('A_bad_id["A \\"quoted\\" \\`\\`\\`mermaid X-->Y"]');
+            expect(result).toContain('A_bad_id -->|"edge \\`\\`\\`"| B');
+            expect(result).not.toContain('#ff0000\nB-->C');
+            expect(result).not.toContain('\nX-->Y');
+        });
+
+        it('should bound exported Mermaid nodes and edges', () => {
+            const nodes: Node[] = Array.from({ length: MERMAID_EXPORT_MAX_NODES + 50 }, (_, index) => ({
+                id: `N${index}`,
+                data: { label: `Node ${index}` },
+                position: { x: 0, y: 0 },
+            }));
+            const edges: Edge[] = Array.from({ length: MERMAID_EXPORT_MAX_EDGES + 50 }, (_, index) => ({
+                id: `E${index}`,
+                source: `N${index % MERMAID_EXPORT_MAX_NODES}`,
+                target: `N${(index + 1) % MERMAID_EXPORT_MAX_NODES}`,
+            }));
+
+            const result = toMermaid(nodes, edges);
+
+            expect(result).toContain(`N${MERMAID_EXPORT_MAX_NODES - 1}["Node ${MERMAID_EXPORT_MAX_NODES - 1}"]`);
+            expect(result).not.toContain(`N${MERMAID_EXPORT_MAX_NODES}["Node ${MERMAID_EXPORT_MAX_NODES}"]`);
+            expect((result.match(/-->/g) || []).length).toBe(MERMAID_EXPORT_MAX_EDGES);
         });
     });
 
@@ -99,6 +151,29 @@ describe('mermaidConverter', () => {
             expect(nodeA?.data.theme.main).toBe('#ff0000');
             expect(nodeA?.data.theme.border).toBe('#000000');
             expect(nodeA?.data.theme.text).toBe('#ffffff');
+        });
+
+        it('should reject oversized Mermaid imports', () => {
+            expect(() => fromMermaid('x'.repeat(MERMAID_CONVERTER_MAX_CHARS + 1))).toThrow('too large');
+        });
+
+        it('should bound imported nodes and edges before returning React Flow data', () => {
+            const lines = ['flowchart TD'];
+            for (let i = 0; i < MERMAID_CONVERTER_MAX_EDGES + 50; i += 1) {
+                lines.push(`N${i}[Node ${i}] --> N${i + 1}[Node ${i + 1}]`);
+            }
+
+            const { nodes, edges } = fromMermaid(lines.join('\n'));
+
+            expect(nodes.length).toBeLessThanOrEqual(MERMAID_CONVERTER_MAX_NODES);
+            expect(edges.length).toBeLessThanOrEqual(MERMAID_CONVERTER_MAX_EDGES);
+        });
+
+        it('should truncate oversized imported labels', () => {
+            const longLabel = 'x'.repeat(MERMAID_CONVERTER_MAX_LABEL_CHARS + 100);
+            const { nodes } = fromMermaid(`flowchart TD\nA[${longLabel}]`);
+
+            expect(nodes.find(n => n.id === 'A')?.data.label).toHaveLength(MERMAID_CONVERTER_MAX_LABEL_CHARS);
         });
     });
 });

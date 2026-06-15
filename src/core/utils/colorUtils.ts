@@ -46,13 +46,14 @@ export function hslToRgb({ h, s, l }: HSL): RGB {
   const c = (1 - Math.abs(2 * l - 1)) * s;
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
   const m = l - c / 2;
-  let rp = 0, gp = 0, bp = 0;
-  if (0 <= h && h < 60) { rp = c; gp = x; bp = 0; }
-  else if (60 <= h && h < 120) { rp = x; gp = c; bp = 0; }
-  else if (120 <= h && h < 180) { rp = 0; gp = c; bp = x; }
-  else if (180 <= h && h < 240) { rp = 0; gp = x; bp = c; }
-  else if (240 <= h && h < 300) { rp = x; gp = 0; bp = c; }
-  else { rp = c; gp = 0; bp = x; }
+  const [rp, gp, bp] = (() => {
+    if (0 <= h && h < 60) return [c, x, 0];
+    if (60 <= h && h < 120) return [x, c, 0];
+    if (120 <= h && h < 180) return [0, c, x];
+    if (180 <= h && h < 240) return [0, x, c];
+    if (240 <= h && h < 300) return [x, 0, c];
+    return [c, 0, x];
+  })();
   return { r: Math.round((rp + m) * 255), g: Math.round((gp + m) * 255), b: Math.round((bp + m) * 255) };
 }
 

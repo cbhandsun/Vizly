@@ -198,7 +198,7 @@ export function symmetricMindMapLayout(
         }
     } else {
         // Build parentSet from childrenMap if not provided
-        for (const [parent, kids] of childrenMap.entries()) {
+        for (const [, kids] of childrenMap.entries()) {
             for (const kid of kids) parentSet.add(kid);
         }
     }
@@ -342,7 +342,7 @@ export function directionalMindMapLayout(
             parentSet.add(e.target);
         }
     } else {
-        for (const [parent, kids] of childrenMap.entries()) {
+        for (const [, kids] of childrenMap.entries()) {
             for (const kid of kids) parentSet.add(kid);
         }
     }
@@ -383,7 +383,7 @@ export function directionalMindMapLayout(
         
         let childY = y;
         for (const child of tree.children) {
-            let nextX = direction === 'R' 
+            const nextX = direction === 'R' 
                 ? tree.x + tree.width + levelSpacing 
                 : tree.x - levelSpacing;
             
@@ -405,13 +405,11 @@ export function directionalMindMapLayout(
         tree.y = rootY;
         positions.set(tree.id, { x: tree.x, y: tree.y });
 
-        let childY = rootY + tree.height / 2 - tree.subtreeHeight / 2;
-        
         const childrenHeightSum = tree.children.reduce((s, c) => s + c.subtreeHeight, 0) + Math.max(0, tree.children.length - 1) * nodeSpacing;
-        childY = rootY + tree.height / 2 - childrenHeightSum / 2;
+        let childY = rootY + tree.height / 2 - childrenHeightSum / 2;
 
         for (const child of tree.children) {
-            let nextX = direction === 'R' 
+            const nextX = direction === 'R' 
                 ? tree.x + tree.width + levelSpacing 
                 : tree.x - levelSpacing;
             layoutSubtree(child, nextX, childY);
@@ -475,7 +473,7 @@ export function treeMapLayout(
             parentSet.add(e.target);
         }
     } else {
-        for (const [parent, kids] of childrenMap.entries()) {
+        for (const [, kids] of childrenMap.entries()) {
             for (const kid of kids) parentSet.add(kid);
         }
     }
@@ -562,7 +560,7 @@ export function fishboneLayout(
             parentSet.add(e.target);
         }
     } else {
-        for (const [parent, kids] of childrenMap.entries()) {
+        for (const [, kids] of childrenMap.entries()) {
             for (const kid of kids) parentSet.add(kid);
         }
     }
@@ -572,7 +570,7 @@ export function fishboneLayout(
     
     // 1. Root (Effect) at the right
     const root = roots[0];
-    const { width: rw, height: rh } = getSize(root);
+    const { height: rh } = getSize(root);
     
     const spineX = 1200;
     const spineY = 400;
@@ -601,9 +599,6 @@ export function fishboneLayout(
         const layoutSubCauses = (id: string, startX: number, startY: number, dir: 'up' | 'down') => {
             const subIds = childrenMap.get(id) || [];
             subIds.forEach((sid, sIdx) => {
-                const sn = nodeMap.get(sid);
-                const { width: sw, height: sh } = sn ? getSize(sn) : { width: 120, height: 35 };
-                
                 // Staggered horizontal layout
                 const subX = startX - (sIdx + 1) * 90;
                 const subY = startY; 

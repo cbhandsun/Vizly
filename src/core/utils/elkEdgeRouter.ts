@@ -9,7 +9,7 @@
  * - 智能端口分布（防止多条边汇聚成一点）
  */
 
-import ELK, { type ElkNode, type ElkExtendedEdge, type ElkPort } from 'elkjs';
+import type { ElkNode, ElkExtendedEdge, ElkPort } from 'elkjs';
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import { parseHandleDirection } from '../algorithms/simpleFallbackPath';
 
@@ -40,6 +40,7 @@ export async function routeEdgesWithELK(
         _bendMinimization = true
     } = options;
 
+    const { default: ELK } = await import('elkjs');
     const elk = new ELK();
 
     // 构建节点 ID 到节点信息的映射

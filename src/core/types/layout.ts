@@ -2,7 +2,7 @@
  * 布局相关类型定义
  */
 
-import { Position, Size, DiagramConfig } from './common';
+import { Position, Size } from './common';
 import { NodeData } from './common';
 
 // 布局类型枚举

@@ -1,4 +1,5 @@
 import { Node, Edge, MarkerType } from '@xyflow/react';
+import { escapeMermaidLabel, toMermaidNodeId, toSafeMermaidColor } from './exportTextSecurity';
 
 /**
  * mermaidConverter — 双向转换 React Flow ↔ Mermaid flowchart 语法
@@ -26,14 +27,8 @@ const SHAPE_TO_MERMAID: Record<string, [string, string]> = {
     'cylindrical': ['[(', ')]'],
 };
 
-function sanitizeId(id: string): string {
-    return id.replace(/[^a-zA-Z0-9_]/g, '_');
-}
-
-function escapeLabel(label: string): string {
-    if (!label) return '""';
-    return `"${label.replace(/"/g, '#quot;')}"`;
-}
+export const MERMAID_EXPORT_MAX_NODES = 1_000;
+export const MERMAID_EXPORT_MAX_EDGES = 2_000;
 
 function getNodeShape(node: Node): [string, string] {
     const shape = (node.data as any)?.shape as string | undefined;
@@ -59,10 +54,15 @@ export function toMermaid(
 ): string {
     const direction = options.direction ?? 'TD';
     const lines: string[] = [`flowchart ${direction}`];
+    const safeNodes = nodes.slice(0, MERMAID_EXPORT_MAX_NODES);
+    const nodeIds = new Set(safeNodes.map(node => node.id));
+    const safeEdges = edges
+        .filter(edge => nodeIds.has(edge.source) && nodeIds.has(edge.target))
+        .slice(0, MERMAID_EXPORT_MAX_EDGES);
 
     // Map children by parentId
     const childrenByParent = new Map<string, Node[]>();
-    nodes.forEach(n => {
+    safeNodes.forEach(n => {
         const pId = (n as any).parentId;
         if (pId) {
             const list = childrenByParent.get(pId) || [];
@@ -79,9 +79,9 @@ export function toMermaid(
         const subLines: string[] = [];
         
         if (containerTypes.has(node.type || '')) {
-            const mId = sanitizeId(node.id);
+            const mId = toMermaidNodeId(node.id);
             const label = (node.data as any)?.description || (node.data as any)?.label || node.id;
-            subLines.push(`${spaces}subgraph ${mId}[${escapeLabel(label)}]`);
+            subLines.push(`${spaces}subgraph ${mId}["${escapeMermaidLabel(label)}"]`);
             
             const children = childrenByParent.get(node.id) || [];
             children.forEach(child => {
@@ -91,12 +91,12 @@ export function toMermaid(
             subLines.push(`${spaces}end`);
 
             // Apply style if available
-            const color = (node.data as any)?.themeColor || (node.data as any)?.theme?.main;
+            const color = toSafeMermaidColor((node.data as any)?.themeColor || (node.data as any)?.theme?.main);
             if (color) {
                 subLines.push(`${spaces}style ${mId} fill:${color}15,stroke:${color},stroke-width:2px`);
             }
         } else {
-            const mId = sanitizeId(node.id);
+            const mId = toMermaidNodeId(node.id);
             let label = (node.data as any)?.description || (node.data as any)?.label || node.id;
             
             // 特殊处理 IconNode
@@ -106,11 +106,11 @@ export function toMermaid(
             }
 
             const [open, close] = getNodeShape(node);
-            subLines.push(`${spaces}${mId}${open}${escapeLabel(String(label))}${close}`);
+            subLines.push(`${spaces}${mId}${open}"${escapeMermaidLabel(String(label))}"${close}`);
             
             // Node style
-            const color = (node.data as any)?.theme?.main || (node.data as any)?.color;
-            const textColor = (node.data as any)?.theme?.text;
+            const color = toSafeMermaidColor((node.data as any)?.theme?.main || (node.data as any)?.color);
+            const textColor = toSafeMermaidColor((node.data as any)?.theme?.text);
             if (color) {
                 subLines.push(`${spaces}style ${mId} fill:${color},stroke:${color},color:${textColor || '#fff'}`);
             }
@@ -119,26 +119,27 @@ export function toMermaid(
     };
 
     // Render top-level nodes (no parentId)
-    const topLevelNodes = nodes.filter(n => !(n as any).parentId);
+    const topLevelNodes = safeNodes.filter(n => !(n as any).parentId);
     topLevelNodes.forEach(n => {
         lines.push(...renderNodeOrGroup(n));
     });
 
     // Render edges
-    edges.forEach((e, idx) => {
-        const srcId = sanitizeId(e.source);
-        const tgtId = sanitizeId(e.target);
+    safeEdges.forEach((e, idx) => {
+        const srcId = toMermaidNodeId(e.source);
+        const tgtId = toMermaidNodeId(e.target);
         const arrow = getEdgeStyleMarker(e);
         const label = (e.data as any)?.label || e.label;
         
         const edgeLine = label 
-            ? `    ${srcId} ${arrow}|${escapeLabel(String(label))}| ${tgtId}`
+            ? `    ${srcId} ${arrow}|"${escapeMermaidLabel(String(label))}"| ${tgtId}`
             : `    ${srcId} ${arrow} ${tgtId}`;
         lines.push(edgeLine);
 
         // Edge style (colors)
-        if (e.style?.stroke) {
-            lines.push(`    linkStyle ${idx} stroke:${e.style.stroke},stroke-width:2px`);
+        const stroke = toSafeMermaidColor(e.style?.stroke);
+        if (stroke) {
+            lines.push(`    linkStyle ${idx} stroke:${stroke},stroke-width:2px`);
         }
     });
 
@@ -151,6 +152,37 @@ interface ParsedGraph {
     nodes: Node[];
     edges: Edge[];
 }
+
+export const MERMAID_CONVERTER_MAX_CHARS = 2 * 1024 * 1024;
+export const MERMAID_CONVERTER_MAX_LINES = 5_000;
+export const MERMAID_CONVERTER_MAX_LINE_CHARS = 10_000;
+export const MERMAID_CONVERTER_MAX_NODES = 1_000;
+export const MERMAID_CONVERTER_MAX_EDGES = 2_000;
+export const MERMAID_CONVERTER_MAX_ID_CHARS = 256;
+export const MERMAID_CONVERTER_MAX_LABEL_CHARS = 1_000;
+
+const truncateText = (value: string, maxChars: number): string => value.slice(0, maxChars);
+
+const sanitizeMermaidId = (value: string): string =>
+    truncateText(String(value || '').trim(), MERMAID_CONVERTER_MAX_ID_CHARS);
+
+const sanitizeMermaidLabel = (value: string): string =>
+    truncateText(String(value || '').trim(), MERMAID_CONVERTER_MAX_LABEL_CHARS);
+
+const prepareMermaidImport = (code: string): string[] => {
+    if (typeof code !== 'string') {
+        throw new Error('Mermaid input must be text.');
+    }
+    if (code.length > MERMAID_CONVERTER_MAX_CHARS) {
+        throw new Error('Mermaid input is too large.');
+    }
+
+    return code
+        .split('\n')
+        .slice(0, MERMAID_CONVERTER_MAX_LINES)
+        .map(line => line.trim().slice(0, MERMAID_CONVERTER_MAX_LINE_CHARS))
+        .filter(line => line && !line.startsWith('%%'));
+};
 
 const BRACKET_TO_SHAPE: [RegExp, string][] = [
     [/^\(\((.+)\)\)$/, 'circle'],
@@ -167,18 +199,18 @@ function parseNodeDef(text: string): { id: string; label: string; shape: string 
     const idMatch = text.match(/^([a-zA-Z0-9_]+)([[({<>].*)/);
     if (!idMatch) return null;
 
-    const id = idMatch[1];
+    const id = sanitizeMermaidId(idMatch[1]);
     const bracketPart = idMatch[2];
 
     for (const [regex, shape] of BRACKET_TO_SHAPE) {
         const m = bracketPart.match(regex);
         if (m) {
-            const rawLabel = m[1].replace(/^"|"$/g, '').replace(/#quot;/g, '"');
+            const rawLabel = sanitizeMermaidLabel(m[1].replace(/^"|"$/g, '').replace(/#quot;/g, '"'));
             return { id, label: rawLabel, shape };
         }
     }
 
-    return { id, label: bracketPart, shape: 'rectangle' };
+    return { id, label: sanitizeMermaidLabel(bracketPart), shape: 'rectangle' };
 }
 
 function parseEdgeLine(line: string): { source: string; target: string; label?: string; style: Partial<Edge> } | null {
@@ -198,13 +230,13 @@ function parseEdgeLine(line: string): { source: string; target: string; label?: 
     let targetPart = rightPartFull;
     const labelMatch = rightPartFull.match(/^\|"?([^|"]+)"?\|\s*(.*)$/);
     if (labelMatch) {
-        edgeLabel = labelMatch[1].replace(/#quot;/g, '"');
+        edgeLabel = sanitizeMermaidLabel(labelMatch[1].replace(/#quot;/g, '"'));
         targetPart = labelMatch[2].trim();
     }
 
     // 从左右部分提取 Node ID 和信息
-    const sourceInfo = parseNodeDef(leftPart) || { id: leftPart.match(/^([a-zA-Z0-9_]+)/)?.[1] || leftPart, label: "", shape: "rectangle" };
-    const targetInfo = parseNodeDef(targetPart) || { id: targetPart.match(/^([a-zA-Z0-9_]+)/)?.[1] || targetPart, label: "", shape: "rectangle" };
+    const sourceInfo = parseNodeDef(leftPart) || { id: sanitizeMermaidId(leftPart.match(/^([a-zA-Z0-9_]+)/)?.[1] || leftPart), label: "", shape: "rectangle" };
+    const targetInfo = parseNodeDef(targetPart) || { id: sanitizeMermaidId(targetPart.match(/^([a-zA-Z0-9_]+)/)?.[1] || targetPart), label: "", shape: "rectangle" };
 
     const source = sourceInfo.id;
     const target = targetInfo.id;
@@ -236,7 +268,7 @@ function parseEdgeLine(line: string): { source: string; target: string; label?: 
 }
 
 export function fromMermaid(code: string): ParsedGraph {
-    const lines = code.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('%%'));
+    const lines = prepareMermaidImport(code);
 
     const headerIdx = lines.findIndex(l => /^(flowchart|graph)\s+(TB|TD|LR|RL|BT)/i.test(l));
     const bodyLines = headerIdx >= 0 ? lines.slice(headerIdx + 1) : lines;
@@ -247,12 +279,15 @@ export function fromMermaid(code: string): ParsedGraph {
     let currentSubgraph: string | null = null;
 
     bodyLines.forEach(line => {
+        if (nodeMap.size >= MERMAID_CONVERTER_MAX_NODES && edges.length >= MERMAID_CONVERTER_MAX_EDGES) return;
         // subgraph start
         const subMatch = line.match(/^subgraph\s+([a-zA-Z0-9_]+)(?:\[(.+)\])?/);
         if (subMatch) {
-            const sgId = subMatch[1];
-            const sgLabel = subMatch[2]?.replace(/^"|"$/g, '') || sgId;
-            nodeMap.set(sgId, { label: sgLabel, shape: 'group', parentId: currentSubgraph || undefined });
+            const sgId = sanitizeMermaidId(subMatch[1]);
+            const sgLabel = sanitizeMermaidLabel(subMatch[2]?.replace(/^"|"$/g, '') || sgId);
+            if (nodeMap.size < MERMAID_CONVERTER_MAX_NODES) {
+                nodeMap.set(sgId, { label: sgLabel, shape: 'group', parentId: currentSubgraph || undefined });
+            }
             subgraphStack.push(sgId);
             currentSubgraph = sgId;
             return;
@@ -278,7 +313,7 @@ export function fromMermaid(code: string): ParsedGraph {
             const existing = nodeMap.get(id);
             if (existing) {
                 existing.styles = styles;
-            } else {
+            } else if (nodeMap.size < MERMAID_CONVERTER_MAX_NODES) {
                 nodeMap.set(id, { label: id, shape: 'rectangle', styles, parentId: currentSubgraph || undefined });
             }
             return;
@@ -289,10 +324,13 @@ export function fromMermaid(code: string): ParsedGraph {
         if (edge) {
             // Auto-register nodes from edge if not yet seen or if more info provided
             const registerNode = (id: string, info?: any) => {
+                if (!id) return;
                 const existing = nodeMap.get(id);
                 if (info && info.label) {
-                    nodeMap.set(id, { ...info, parentId: currentSubgraph || undefined });
-                } else if (!existing) {
+                    if (existing || nodeMap.size < MERMAID_CONVERTER_MAX_NODES) {
+                        nodeMap.set(id, { ...info, parentId: currentSubgraph || undefined });
+                    }
+                } else if (!existing && nodeMap.size < MERMAID_CONVERTER_MAX_NODES) {
                     nodeMap.set(id, { label: id, shape: 'rectangle', parentId: currentSubgraph || undefined });
                 }
             };
@@ -300,21 +338,23 @@ export function fromMermaid(code: string): ParsedGraph {
             registerNode(edge.source, edge._sourceNode);
             registerNode(edge.target, edge._targetNode);
 
-            edges.push({
-                id: `e-${edge.source}-${edge.target}-${edges.length}`,
-                source: edge.source,
-                target: edge.target,
-                label: edge.label,
-                data: { label: edge.label },
-                type: 'smart-step',
-                ...edge.style,
-            } as Edge);
+            if (edges.length < MERMAID_CONVERTER_MAX_EDGES && nodeMap.has(edge.source) && nodeMap.has(edge.target)) {
+                edges.push({
+                    id: `e-${edge.source}-${edge.target}-${edges.length}`,
+                    source: edge.source,
+                    target: edge.target,
+                    label: edge.label,
+                    data: { label: edge.label },
+                    type: 'smart-step',
+                    ...edge.style,
+                } as Edge);
+            }
             return;
         }
 
         // Node
         const nodeDef = parseNodeDef(line);
-        if (nodeDef) {
+        if (nodeDef && nodeMap.size < MERMAID_CONVERTER_MAX_NODES) {
             nodeMap.set(nodeDef.id, { ...nodeDef, parentId: currentSubgraph || undefined });
             return;
         }

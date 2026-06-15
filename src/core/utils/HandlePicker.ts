@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * HandlePicker Compatibility Layer
  * 本文件作为旧版 HandlePicker.ts 的替代品，负责将调用转发给新的路由系统。
@@ -187,38 +186,39 @@ export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record
         const tgt = nodeMap.get(edge.target);
         if (!src || !tgt) continue;
 
-        let sHandle = 'bottom';
-        let tHandle = 'top';
-
         // Source Side Decision
         const srcOut = outEdges.get(edge.source) || [];
         // 如果是 1-to-N Hub (出度 > 1)，仅对相同流动方向的分支目标进行重心方向聚合
-        if (srcOut.length > 1) {
+        const sHandle = (() => {
+          if (srcOut.length > 1) {
             const tgtSign = getSideSign(src, tgt);
             const targets = srcOut
                 .map(e => nodeMap.get(e.target))
                 .filter(Boolean)
                 .filter(t => getSideSign(src, t) === tgtSign);
-            sHandle = getDominantSide(src, targets);
-        } else {
+            return getDominantSide(src, targets);
+          }
+
             // 单独连接，退化为两点判定 (与之前逻辑一致)
-            sHandle = getDominantSide(src, [tgt]);
-        }
+          return getDominantSide(src, [tgt]);
+        })();
 
         // Target Side Decision
         const tgtIn = inEdges.get(edge.target) || [];
         // 如果是 N-to-1 Hub (入度 > 1)，仅对相同流动方向的来源节点进行重心方向聚合
-        if (tgtIn.length > 1) {
+        const tHandle = (() => {
+          if (tgtIn.length > 1) {
             const srcSign = getSideSign(tgt, src);
             const sources = tgtIn
                 .map(e => nodeMap.get(e.source))
                 .filter(Boolean)
                 .filter(s => getSideSign(tgt, s) === srcSign);
-            tHandle = getDominantSide(tgt, sources);
-        } else {
+            return getDominantSide(tgt, sources);
+          }
+
             // 单独连接，退化为两点判定
-            tHandle = getDominantSide(tgt, [src]);
-        }
+          return getDominantSide(tgt, [src]);
+        })();
 
         edgeDecisions[edge.id] = { sHandle, tHandle };
     }
