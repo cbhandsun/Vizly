@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * 增强版主题选择器
  * 支持新的主题系统功能，包括预设、自定义主题、性能优化等
@@ -7,16 +6,20 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { THEME_JSON_IMPORT_MAX_BYTES, getFileSizeLimitError } from '../../core/utils/fileImportGuards';
 import { theme } from 'antd';
-import { FaPalette, FaCog, FaDownload, FaUpload, FaPlus, FaTrash, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaPalette, FaCog, FaDownload, FaUpload, FaPlus, FaTrash, FaCheck, FaTimes } from 'react-icons/fa';
 
 import { useConfigIntegration } from '@/core/hooks/useConfigIntegration';
 import { useTheme } from '@/core/themes/useCoreTheme';
 import { useDraggablePanel } from '../../hooks/useDraggablePanel';
 import type { Theme, ThemeMode } from '@/core/themes/types/ThemeTypes';
-import type { ThemePreset, PresetCategory } from '@/core/themes/ThemePresetManager';
+import type { ThemePreset } from '@/core/themes/ThemePresetManager';
 
 import { getCachedThemePreset } from '@/core/themes/ThemePresetLoader';
+import { parseThemeImportJson } from '@/core/themes/themeImportSecurity';
+import { renderSafeThemePreviewGradient } from '@/core/themes/themePreviewSecurity';
+import { downloadFile } from '@/core/utils/downloadUtils';
 
 export interface EnhancedThemeSelectorProps {
   className?: string;
@@ -37,6 +40,12 @@ interface CustomThemeForm {
   mode: ThemeMode;
   baseTheme: string;
 }
+
+type ThemePreviewItem = Partial<Theme> & {
+  id?: string;
+  baseTheme?: string;
+  theme?: Theme | null;
+};
 
 /**
  * 增强版主题选择器组件
@@ -88,8 +97,8 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         const availableBuiltInIds = themeManager.getAvailablePresetIds().filter(id => !id.startsWith('custom-'));
         await themeManager.preloadThemes(availableBuiltInIds);
 
-        const allPresets = await presetManager.getAllPresets();
-        const allCustomThemes = await themeManager.getCustomThemes();
+        const allPresets = presetManager.getAllPresets();
+        const allCustomThemes = themeManager.getCustomThemes();
 
         const cache: Record<string, Theme> = {};
         for (const id of availableBuiltInIds) {
@@ -215,15 +224,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
     try {
       const config = await actions.exportConfig();
       const dataStr = JSON.stringify(config, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-
-      const url = URL.createObjectURL(dataBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `theme-config-${new Date().toISOString().split('T')[0]}.json`;
-      link.click();
-
-      URL.revokeObjectURL(url);
+      downloadFile(dataStr, `theme-config-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
     } catch (error) {
       console.error('Failed to export themes:', error);
     }
@@ -233,11 +234,17 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
   const handleImportThemes = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const sizeError = getFileSizeLimitError(file, THEME_JSON_IMPORT_MAX_BYTES, 'theme JSON');
+    if (sizeError) {
+      console.warn('Failed to import themes:', sizeError);
+      event.target.value = '';
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        const config = JSON.parse(e.target?.result as string);
+        const config = parseThemeImportJson(String(e.target?.result || ''));
         await actions.importConfig(config);
 
         // 重新加载数据
@@ -253,24 +260,28 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         }
       } catch (error) {
         console.error('Failed to import themes:', error);
+      } finally {
+        event.target.value = '';
       }
     };
     reader.readAsText(file);
   }, [actions, state.integration]);
 
-  const getGradientBackground = (item: any) => {
+  const getGradientBackground = (item: ThemePreviewItem) => {
     const themeManager = state.integration?.getThemeManager();
     const themeData = item.theme || item;
-    let colors: string[] = [];
+    let colors: unknown[] = [];
     
     if (themeData?.palette) {
-        const getCol = (c: any, sub: string = 'main') => typeof c === 'string' ? c : c?.[sub] || c?.main;
+        const getCol = (c: unknown, sub: keyof Theme['palette']['primary'] = 'main') => (
+          typeof c === 'string' ? c : typeof c === 'object' && c !== null ? (c as Partial<Theme['palette']['primary']>)[sub] || (c as Partial<Theme['palette']['primary']>).main : undefined
+        );
         colors = [
             getCol(themeData.palette.primary, 'light'),
             getCol(themeData.palette.primary, 'main'),
             getCol(themeData.palette.secondary, 'main'),
             getCol(themeData.palette.secondary, 'light') || getCol(themeData.palette.primary, 'dark')
-        ].filter(Boolean) as string[];
+        ];
     } else if (themeManager) {
         let themeId = item.id;
         if (themeId && !themeManager.hasTheme?.(themeId) && item.baseTheme) {
@@ -284,10 +295,10 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         }
     }
     
-    if (colors.length === 0) colors = [token.colorPrimary || '#1677ff', token.colorFillSecondary || '#f0f0f0'];
-    if (colors.length === 1) colors.push(colors[0]);
-    
-    return `linear-gradient(135deg, ${colors.join(', ')})`;
+    return renderSafeThemePreviewGradient(colors, [
+      token.colorPrimary || '#1677ff',
+      token.colorFillSecondary || '#f0f0f0',
+    ]);
   };
 
   // 渲染主题列表

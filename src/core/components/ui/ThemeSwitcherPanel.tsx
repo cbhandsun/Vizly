@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { theme } from 'antd';
 import { FaPalette, FaCheck } from 'react-icons/fa';
-import { useConfigIntegration, useTheme, ThemePreset } from '@/core';
+import { useConfigIntegration } from '@/core/hooks/useConfigIntegration';
+import { useTheme } from '@/core/themes/useCoreTheme';
+import type { ThemePreset } from '@/core/themes/types/ThemeTypes';
 
 interface ThemeSwitcherPanelProps {
     className?: string;
@@ -10,7 +12,7 @@ interface ThemeSwitcherPanelProps {
 }
 
 export const ThemeSwitcherPanel: React.FC<ThemeSwitcherPanelProps> = ({ className = '', style }) => {
-    const { t } = useTranslation();
+    useTranslation();
     const { token } = theme.useToken();
     const [state] = useConfigIntegration();
     const [currentTheme, setTheme] = useTheme();

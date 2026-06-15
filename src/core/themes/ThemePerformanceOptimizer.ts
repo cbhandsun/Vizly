@@ -605,15 +605,12 @@ export class ThemePerformanceOptimizer {
   /**
    * 内存优化策略
    */
-  private async applyMemoryStrategy(context: OptimizationContext): Promise<void> {
+  private async applyMemoryStrategy(_context: OptimizationContext): Promise<void> {
     // 限制缓存大小
     const maxCacheSize = 50;
     if (this.cache.size > maxCacheSize) {
       this.cleanupCache(maxCacheSize * 0.8); // 清理到80%
     }
-
-    // 清理批量更新管理器
-    this.batchManager.clear();
 
     // 触发垃圾回收（如果可用）
     if ('gc' in window && typeof (window as any).gc === 'function') {
@@ -659,8 +656,9 @@ export class ThemePerformanceOptimizer {
    * 清理缓存
    */
   private cleanupCache(maxSize?: number): void {
-    const targetSize = maxSize || Math.floor(this.cache.size * 0.8);
-    
+    const configuredMax = Math.max(1, Math.floor(this.options.maxCacheSize || 50));
+    const targetSize = Math.max(1, Math.floor(maxSize ?? configuredMax));
+
     if (this.cache.size <= targetSize) return;
 
     // 按最后访问时间排序，删除最久未使用的条目

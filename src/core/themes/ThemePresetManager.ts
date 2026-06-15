@@ -1,24 +1,25 @@
-// @ts-nocheck
 /**
  * 主题预设管理器
  * 提供主题预设的创建、管理、导入导出功能
  */
 
-import { 
-  Theme, 
-  ThemePreset, 
-  ThemeColor, 
+import type {
+  Theme,
+  ThemePreset,
+  ThemeColor,
   ThemePalette,
   ThemeTypography,
   ThemeSpacing,
   ThemeBorderRadius,
   ThemeShadow,
-  ThemeAnimation,
-  _ThemeTransition,
-  _ThemePerformanceOptions
+  ThemeAnimation
 } from './types/ThemeTypes';
-import { ThemeMode } from './types/ThemeTypes';
 import { LayeredConfigManager, ConfigLayer } from '../config/LayeredConfigManager';
+import {
+  coerceThemePackageImport,
+  coerceThemePresetImport,
+  parseThemeImportJson,
+} from './themeImportSecurity';
 // import { wmsProfessionalThemePreset } from './WmsProfessionalTheme';
 
 // 重新导出ThemePreset以便其他模块使用
@@ -64,8 +65,54 @@ export interface ThemePackage {
   author?: string;
   presets: ThemePreset[];
   createdAt: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
+
+type ThemePresetCategory = ThemePreset['category'];
+type ThemePresetMetadata = {
+  name?: string;
+  description?: string;
+  category?: string;
+  tags?: string[];
+  author?: string;
+};
+type ThemePackageInfo = {
+  name: string;
+  description?: string;
+  author?: string;
+  metadata?: Record<string, unknown>;
+};
+
+const MAX_PRESET_METADATA_TEXT = 240;
+const MAX_PRESET_TAGS = 16;
+const MAX_PRESET_TAG_LENGTH = 40;
+const VALID_THEME_PRESET_CATEGORIES = new Set<ThemePresetCategory>(['built-in', 'preset', 'custom', 'community']);
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
+const coerceOptionalText = (value: unknown, maxLength = MAX_PRESET_METADATA_TEXT): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, maxLength) : undefined;
+};
+
+const coerceTags = (tags: unknown): string[] => (
+  Array.isArray(tags)
+    ? tags
+        .filter((tag): tag is string => typeof tag === 'string')
+        .map(tag => tag.trim().slice(0, MAX_PRESET_TAG_LENGTH))
+        .filter(Boolean)
+        .slice(0, MAX_PRESET_TAGS)
+    : []
+);
+
+const coercePresetCategory = (category: unknown, fallback: ThemePresetCategory = 'custom'): ThemePresetCategory => (
+  typeof category === 'string' && VALID_THEME_PRESET_CATEGORIES.has(category as ThemePresetCategory)
+    ? category as ThemePresetCategory
+    : fallback
+);
 
 // 预设分类定义
 const DEFAULT_CATEGORIES: PresetCategory[] = [
@@ -77,39 +124,25 @@ const DEFAULT_CATEGORIES: PresetCategory[] = [
     order: 1
   },
   {
-    id: 'professional',
-    name: '专业主题',
-    description: '适合商务和专业场景的主题',
+    id: 'preset',
+    name: '系统预设',
+    description: '系统提供的主题预设',
     icon: '💼',
     order: 2
-  },
-  {
-    id: 'creative',
-    name: '创意主题',
-    description: '富有创意和个性的主题设计',
-    icon: '🎨',
-    order: 3
-  },
-  {
-    id: 'accessibility',
-    name: '无障碍主题',
-    description: '针对可访问性优化的主题',
-    icon: '♿',
-    order: 4
   },
   {
     id: 'community',
     name: '社区主题',
     description: '来自社区贡献的主题',
-    icon: '👥',
-    order: 5
+    icon: '🎨',
+    order: 3
   },
   {
     id: 'custom',
     name: '自定义主题',
     description: '用户创建的自定义主题',
-    icon: '⚙️',
-    order: 6
+    icon: '♿',
+    order: 4
   }
 ];
 
@@ -368,9 +401,15 @@ export class ThemePresetManager {
    */
   private loadPresets(): void {
     try {
-      const savedPresets = this.configManager.get('theme.presets', {});
+      const savedPresets = this.configManager.get<unknown>('theme.presets', {});
+      if (!isRecord(savedPresets)) return;
       Object.entries(savedPresets).forEach(([id, preset]) => {
-        this.presets.set(id, preset as ThemePreset);
+        try {
+          const safePreset = coerceThemePresetImport(preset, id, coercePresetCategory(isRecord(preset) ? preset.category : undefined));
+          this.presets.set(id, safePreset);
+        } catch (error) {
+          console.warn(`Ignored invalid saved theme preset "${id}":`, error);
+        }
       });
     } catch (error) {
       console.warn('Failed to load theme presets:', error);
@@ -390,20 +429,15 @@ export class ThemePresetManager {
    */
   createPreset(
     theme: Theme,
-    metadata: {
-      name?: string;
-      description?: string;
-      category?: string;
-      tags?: string[];
-      author?: string;
-    } = {}
+    metadata: ThemePresetMetadata = {}
   ): ThemePreset {
+    const name = coerceOptionalText(metadata.name) || theme.name;
     const preset: ThemePreset = {
       id: theme.id,
-      name: metadata.name || theme.name,
-      description: metadata.description || '',
-      category: (metadata.category as any) || 'custom',
-      tags: metadata.tags || [],
+      name,
+      description: coerceOptionalText(metadata.description) || '',
+      category: coercePresetCategory(metadata.category),
+      tags: coerceTags(metadata.tags),
       theme
     };
 
@@ -419,13 +453,7 @@ export class ThemePresetManager {
   createPresetFromTemplate(
     templateId: string,
     baseTheme: Theme,
-    metadata: {
-      name?: string;
-      description?: string;
-      category?: string;
-      tags?: string[];
-      author?: string;
-    } = {}
+    metadata: ThemePresetMetadata = {}
   ): ThemePreset | null {
     const template = this.templates.get(templateId);
     if (!template) {
@@ -442,12 +470,12 @@ export class ThemePresetManager {
     // 生成唯一ID
     const uniqueId = this.generateUniqueId(template.name);
     customizedTheme.id = uniqueId;
-    customizedTheme.name = metadata.name || template.name;
+    customizedTheme.name = coerceOptionalText(metadata.name) || template.name;
 
     return this.createPreset(customizedTheme, {
       ...metadata,
-      description: metadata.description || template.description || '',
-      tags: [...(metadata.tags || []), 'template', templateId]
+      description: coerceOptionalText(metadata.description) || template.description || '',
+      tags: [...coerceTags(metadata.tags), 'template', templateId]
     });
   }
 
@@ -456,7 +484,7 @@ export class ThemePresetManager {
    */
   private applyThemeCustomizations(
     baseTheme: Theme,
-    customizations: any
+    customizations: ThemeTemplate['customizations']
   ): Theme {
     return {
       ...baseTheme,
@@ -593,17 +621,15 @@ export class ThemePresetManager {
    * 排序预设
    */
   sortPresets(presets: ThemePreset[], options: PresetSortOptions): ThemePreset[] {
-    return presets.sort((a: any, b: any) => {
-      let aValue: any = a[options.field];
-      let bValue: any = b[options.field];
-
-      // 处理日期类型
-      if (aValue instanceof Date) aValue = aValue.getTime();
-      if (bValue instanceof Date) bValue = bValue.getTime();
-
-      // 处理字符串类型
-      if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-      if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+    return presets.sort((a, b) => {
+      const normalizeSortValue = (preset: ThemePreset): string | number => {
+        const value = preset[options.field as keyof ThemePreset];
+        if (typeof value === 'string') return value.toLowerCase();
+        if (typeof value === 'number') return value;
+        return '';
+      };
+      const aValue = normalizeSortValue(a);
+      const bValue = normalizeSortValue(b);
 
       let result = 0;
       if (aValue < bValue) result = -1;
@@ -630,7 +656,7 @@ export class ThemePresetManager {
   /**
    * 导出预设
    */
-  exportPreset(id: string, options: PresetExportOptions = {
+  exportPreset(id: string, _options: PresetExportOptions = {
     includePreview: true,
     includeMetadata: true,
     format: 'json'
@@ -638,7 +664,7 @@ export class ThemePresetManager {
     const preset = this.presets.get(id);
     if (!preset) return null;
 
-    const exportData: any = {
+    const exportData = {
       version: '1.0',
       preset: { ...preset }
     };
@@ -653,13 +679,8 @@ export class ThemePresetManager {
    */
   exportThemePackage(
     presetIds: string[],
-    packageInfo: {
-      name: string;
-      description?: string;
-      author?: string;
-      metadata?: Record<string, any>;
-    },
-    options: PresetExportOptions = {
+    packageInfo: ThemePackageInfo,
+    _options: PresetExportOptions = {
       includePreview: true,
       includeMetadata: true,
       format: 'theme-pack'
@@ -673,9 +694,9 @@ export class ThemePresetManager {
 
     const themePackage: ThemePackage = {
       version: '1.0',
-      name: packageInfo.name,
-      description: packageInfo.description,
-      author: packageInfo.author,
+      name: coerceOptionalText(packageInfo.name) || 'Theme Package',
+      description: coerceOptionalText(packageInfo.description),
+      author: coerceOptionalText(packageInfo.author),
       presets: presets.map(preset => ({ ...preset })),
       createdAt: new Date().toISOString(),
       metadata: packageInfo.metadata
@@ -687,19 +708,20 @@ export class ThemePresetManager {
   /**
    * 导入预设
    */
-  importPreset(data: string): PresetImportResult {
+  importPreset(data: string | unknown): PresetImportResult {
     try {
-      const parsed = JSON.parse(data);
+      const parsed = typeof data === 'string' ? parseThemeImportJson(data) : data;
       
       // 检查是否是主题包
-      if (parsed.presets && Array.isArray(parsed.presets)) {
-        return this.importThemePackage(data);
+      if (isRecord(parsed) && Array.isArray(parsed.presets)) {
+        return this.importThemePackage(parsed);
       }
 
       // 单个预设导入
-      const preset = parsed.preset as ThemePreset;
+      if (!isRecord(parsed)) throw new Error('无效的预设数据格式');
+      const preset = coerceThemePresetImport(parsed.preset, undefined, 'custom');
       
-      if (!preset || !preset.id || !preset.name || !preset.theme) {
+      if (!preset) {
         return {
           success: false,
           error: '无效的预设数据格式'
@@ -708,16 +730,8 @@ export class ThemePresetManager {
 
       // 生成唯一ID
       const uniqueId = this.generateUniqueId(preset.name);
-      const importedPreset: ThemePreset = {
-        ...preset,
-        id: uniqueId,
-        theme: {
-          ...preset.theme,
-          id: uniqueId
-        },
-        category: 'custom', // 导入的预设默认为自定义分类
-        createdAt: new Date().toISOString()
-      };
+      const importedPreset = coerceThemePresetImport(preset, uniqueId, 'custom');
+      importedPreset.createdAt = new Date().toISOString();
 
       this.presets.set(uniqueId, importedPreset);
       this.savePresets();
@@ -737,33 +751,26 @@ export class ThemePresetManager {
   /**
    * 导入主题包
    */
-  importThemePackage(data: string): PresetImportResult {
+  importThemePackage(data: string | unknown): PresetImportResult {
     try {
-      const themePackage = JSON.parse(data) as ThemePackage;
+      const themePackage = typeof data === 'string' ? parseThemeImportJson(data) : data;
       
-      if (!themePackage.presets || !Array.isArray(themePackage.presets)) {
+      if (!isRecord(themePackage) || !Array.isArray(themePackage.presets)) {
         return {
           success: false,
           error: '无效的主题包格式'
         };
       }
 
+      const safePresets = coerceThemePackageImport(themePackage, 'community');
       const importedPresets: ThemePreset[] = [];
       const warnings: string[] = [];
 
-      themePackage.presets.forEach(preset => {
+      safePresets.forEach(preset => {
         try {
           const uniqueId = this.generateUniqueId(preset.name);
-          const importedPreset: ThemePreset = {
-            ...preset,
-            id: uniqueId,
-            theme: {
-              ...preset.theme,
-              id: uniqueId
-            },
-            category: 'community', // 主题包中的预设默认为社区分类
-            createdAt: new Date().toISOString()
-          };
+          const importedPreset = coerceThemePresetImport(preset, uniqueId, 'community');
+          importedPreset.createdAt = new Date().toISOString();
 
           this.presets.set(uniqueId, importedPreset);
           importedPresets.push(importedPreset);

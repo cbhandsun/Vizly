@@ -330,7 +330,7 @@ export class EnhancedThemeManager {
   /**
    * 应用主题过渡动画
    */
-  private async applyThemeTransition(oldTheme: Theme, newTheme: Theme): Promise<void> {
+  private async applyThemeTransition(_oldTheme: Theme, _newTheme: Theme): Promise<void> {
     return new Promise((resolve) => {
       const duration = this.config.transition.duration;
 
@@ -493,9 +493,6 @@ export class EnhancedThemeManager {
    * 触发事件
    */
   private emitEvent(event: ThemeManagerEvent): void {
-    if (this.config.debug) {
-    }
-
     this.listeners.forEach(listener => {
       try {
         listener(event);
@@ -682,7 +679,7 @@ export class EnhancedThemeManager {
   /**
    * 获取边颜色（兼容性方法）
    */
-  getEdgeColor(themeId: string, edgeType: string): string | undefined {
+  getEdgeColor(themeId: string, _edgeType: string): string | undefined {
     const theme =
       (this.currentThemeId === themeId ? this.currentTheme : undefined) ||
       this.themeCache.get(themeId) ||
