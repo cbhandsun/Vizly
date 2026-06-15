@@ -1,6 +1,14 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Node, Edge } from '@xyflow/react';
-import { appMessage as message } from '../../../utils/antdStaticBridge';
+import { appMessage } from '../../../utils/antdStaticBridge';
+import {
+    AUTOSAVE_PREFIX,
+    createAutoSavePayload,
+    parseAutoSavePayload,
+    refreshAutoSaveAccess,
+    shouldCollectAutoSave,
+    type AutoSavePayload,
+} from '../../../utils/autoSaveStorage';
 
 export interface AutoSaveState {
     lastSaved: number | null;
@@ -17,9 +25,6 @@ export interface AutoSaveOptions {
     onSaveError?: (error: Error) => void;
 }
 
-const AUTOSAVE_PREFIX = 'flowchart-autosave-v2-';
-const AUTOSAVE_GC_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-
 /** GC: remove autosave entries not accessed in 7 days */
 function gcAutosaveEntries() {
     try {
@@ -29,9 +34,8 @@ function gcAutosaveEntries() {
             const key = localStorage.key(i);
             if (!key?.startsWith(AUTOSAVE_PREFIX)) continue;
             try {
-                const data = JSON.parse(localStorage.getItem(key) || '{}');
-                const lastAccess = data.lastAccessedAt ?? data.timestamp ?? 0;
-                if (now - lastAccess > AUTOSAVE_GC_TTL_MS) {
+                const payload = parseAutoSavePayload(localStorage.getItem(key));
+                if (shouldCollectAutoSave(payload, now)) {
                     toRemove.push(key);
                 }
             } catch { /* ignore parse errors */ }
@@ -65,13 +69,18 @@ export const useAutoSave = (
     // Track content hash + timestamp + dirty flag
     const lastSavedContentRef = useRef<string>('');
     const retryCountRef = useRef(0);
+    const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const saveRef = useRef<(() => Promise<void>) | null>(null);
     const MAX_RETRIES = 3;
 
     // Use refs so the save callback inside setInterval always sees latest nodes/edges
     const nodesRef = useRef(nodes);
     const edgesRef = useRef(edges);
-    nodesRef.current = nodes;
-    edgesRef.current = edges;
+
+    useEffect(() => {
+        nodesRef.current = nodes;
+        edgesRef.current = edges;
+    }, [nodes, edges]);
 
     // GC: run once on mount to clean up stale entries older than 7 days
     useEffect(() => {
@@ -92,14 +101,21 @@ export const useAutoSave = (
             setSaveState(prev => ({ ...prev, saving: true, error: null }));
 
             const now = Date.now();
-            const data = {
+            const data = createAutoSavePayload({
                 diagramId,
                 nodes: currentNodes,
                 edges: currentEdges,
                 timestamp: now,
-                lastAccessedAt: now,
-                version: '1.0'
-            };
+            });
+
+            if (!data) {
+                setSaveState(prev => ({
+                    ...prev,
+                    saving: false,
+                    error: 'Invalid auto-save payload',
+                }));
+                return;
+            }
 
             localStorage.setItem(storageKey, JSON.stringify(data));
 
@@ -121,13 +137,25 @@ export const useAutoSave = (
             if (retryCountRef.current < MAX_RETRIES) {
                 retryCountRef.current++;
                 const retryDelay = Math.pow(2, retryCountRef.current - 1) * 1000;
-                setTimeout(() => save(), retryDelay);
+                retryTimerRef.current = setTimeout(() => {
+                    saveRef.current?.();
+                }, retryDelay);
             } else {
                 onSaveError?.(error as Error);
                 appMessage.error(`Auto-save failed: ${errorMsg}`);
             }
         }
     }, [storageKey, diagramId, onSaveSuccess, onSaveError]);
+
+    useEffect(() => {
+        saveRef.current = save;
+        return () => {
+            if (retryTimerRef.current) {
+                clearTimeout(retryTimerRef.current);
+                retryTimerRef.current = null;
+            }
+        };
+    }, [save]);
 
     // Periodic auto-save timer
     useEffect(() => {
@@ -153,14 +181,13 @@ export const useAutoSave = (
             const contentKey = JSON.stringify({ nodes: currentNodes, edges: currentEdges });
             if (contentKey === lastSavedContentRef.current) return; // 无变化无需写入
             try {
-                const data = {
+                const data = createAutoSavePayload({
                     diagramId,
                     nodes: currentNodes,
                     edges: currentEdges,
                     timestamp: Date.now(),
-                    lastAccessedAt: Date.now(),
-                    version: '1.0'
-                };
+                });
+                if (!data) return;
                 localStorage.setItem(storageKey, JSON.stringify(data));
                 lastSavedContentRef.current = contentKey;
             } catch { /* 存储满时静默失败 */ }
@@ -175,16 +202,20 @@ export const useAutoSave = (
     }, [save]);
 
     // Load saved data, also refreshes lastAccessedAt to prevent GC expiry
-    const loadSaved = useCallback((): { diagramId?: string; nodes: Node[]; edges: Edge[]; isFreshSeed?: boolean; timestamp?: number } | null => {
+    const loadSaved = useCallback((): Pick<AutoSavePayload, 'diagramId' | 'nodes' | 'edges' | 'isFreshSeed' | 'timestamp'> | null => {
         try {
             const saved = localStorage.getItem(storageKey);
             if (!saved) return null;
 
-            const data = JSON.parse(saved);
+            const data = parseAutoSavePayload(saved);
+            if (!data) {
+                localStorage.removeItem(storageKey);
+                return null;
+            }
 
             // Refresh access time to prevent premature GC
             try {
-                localStorage.setItem(storageKey, JSON.stringify({ ...data, lastAccessedAt: Date.now() }));
+                localStorage.setItem(storageKey, JSON.stringify(refreshAutoSaveAccess(data)));
             } catch { /* ignore */ }
 
             return {
