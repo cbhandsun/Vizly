@@ -5,8 +5,13 @@ import { useTheme } from '../../../themes/useCoreTheme';
 
 const HEADER_HEIGHT = 52;
 
+const isInRange = (value: dayjs.Dayjs, start: dayjs.Dayjs, end: dayjs.Dayjs) => {
+    const time = value.valueOf();
+    return time >= start.valueOf() && time < end.valueOf();
+};
+
 export default function ProTimelineAxis() {
-    const { panX, panY, pixelsPerDay, xToDate, dateToX, viewMode } = useProTimelineEngine();
+    const { panX, panY, xToDate, dateToX, viewMode } = useProTimelineEngine();
     const [theme] = useTheme();
     
     // Virtualize rendering window
@@ -89,7 +94,7 @@ export default function ProTimelineAxis() {
                 const nextW = cursorW.add(7, 'day');
                 const x1 = dateToX(cursorW.format('YYYY-MM-DD'));
                 const x2 = dateToX(nextW.format('YYYY-MM-DD'));
-                const isToday = dayjs().isBetween(cursorW, nextW, 'day', '[)');
+                const isToday = isInRange(dayjs(), cursorW, nextW);
 
                 dArr.push({
                     x: x1, w: x2 - x1,
@@ -152,7 +157,7 @@ export default function ProTimelineAxis() {
                 const x1 = dateToX(cursorQ.format('YYYY-MM-DD'));
                 const x2 = dateToX(nextQ.format('YYYY-MM-DD'));
                 const qNum = Math.floor(cursorQ.month() / 3) + 1;
-                const isToday = dayjs().isBetween(cursorQ, nextQ, 'day', '[)');
+                const isToday = isInRange(dayjs(), cursorQ, nextQ);
 
                 dArr.push({
                     x: x1, w: x2 - x1,
@@ -165,7 +170,7 @@ export default function ProTimelineAxis() {
         }
 
         return { days: dArr, months: mArr };
-    }, [windowStartPx, windowEndPx, viewMode, pixelsPerDay, xToDate, dateToX]);
+    }, [windowStartPx, windowEndPx, viewMode, xToDate, dateToX]);
 
     return (
         <div style={{

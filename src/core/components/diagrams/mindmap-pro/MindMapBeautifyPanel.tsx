@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { PluginContext } from '../../../types/plugin';
-import { Node, Edge } from '@xyflow/react';
-import { Select, Form, Divider, Input, Tooltip } from 'antd';
-import { LinkOutlined, CheckCircleFilled, SmileOutlined } from '@ant-design/icons';
+import type { Node, Edge } from '@xyflow/react';
+import { Select, Divider, Input, Tooltip } from 'antd';
+import { LinkOutlined, CheckCircleFilled } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { PALETTE } from '../hooks/useMindMapOrchestrator';
 
@@ -216,7 +216,7 @@ const ProgressPicker: React.FC<{ value: number; onChange: (v: number) => void }>
     );
 };
 
-export const MindMapBeautifyPanel: React.FC<{ ctx: PluginContext, selectedNodes: Node[], selectedEdges: Edge[] }> = ({ ctx, selectedNodes, selectedEdges }) => {
+export const MindMapBeautifyPanel: React.FC<{ ctx: PluginContext, selectedNodes: Node[], selectedEdges: Edge[] }> = ({ ctx, selectedNodes, selectedEdges: _selectedEdges }) => {
     const { getNodes, updateNodesBatch } = ctx;
     const { t } = useTranslation();
 

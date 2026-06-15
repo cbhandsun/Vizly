@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { ProGanttTask, getWorkDays, addWorkDays, getWorkDaysSigned, useProTimelineEngine } from '../../../hooks/useProTimelineEngine';
-import { Dropdown, MenuProps, Select, Tooltip } from 'antd';
+import { Dropdown, Select, Tooltip } from 'antd';
 import { CaretRightOutlined, CaretDownOutlined, CalendarOutlined, FlagFilled, ClockCircleOutlined, FolderOpenOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useTheme } from '../../../themes/useCoreTheme';
+import { todayDateOnly } from '../../../utils/dateOnly';
 
 export interface ProTaskListPanelProps {
     tasks: ProGanttTask[];
@@ -23,12 +24,6 @@ export interface ProTaskListPanelProps {
 
 const ROW_HEIGHT = 42;
 const HEADER_HEIGHT = 52;
-
-const STATUS_COLORS = (theme: any) => ({
-    done:    { bg: '#f6ffed', text: theme?.palette?.success?.main || '#52c41a', label: '已完成' },
-    active:  { bg: '#e6f7ff', text: theme?.palette?.primary?.main || '#1890ff', label: '进行中' },
-    pending: { bg: '#fff7e6', text: theme?.palette?.warning?.main || '#fa8c16', label: '待开始' },
-});
 
 const getTypeIcons = (theme: any): Record<string, React.ReactNode> => ({
     phase:     <CalendarOutlined style={{ fontSize: 13, color: theme?.palette?.success?.main || '#52c41a' }} />,
@@ -131,7 +126,7 @@ export default function ProTaskListPanel({
                 } else if (field === 'duration') {
                     const num = parseInt(editValue, 10);
                     if (!isNaN(num) && num >= 0) {
-                        const start = task.startDate || new Date().toISOString().split('T')[0];
+                        const start = task.startDate || todayDateOnly();
                         const newEnd = addWorkDays(start, num);
                         onTaskUpdate?.(id, { startDate: start, endDate: newEnd });
                     }
@@ -454,7 +449,7 @@ export default function ProTaskListPanel({
                                     e.stopPropagation();
                                     if (!hasChildren) {
                                         setEditingCell({ id: task.id, field: 'startDate' });
-                                        setEditValue(task.startDate || new Date().toISOString().split('T')[0]);
+                                        setEditValue(task.startDate || todayDateOnly());
                                     }
                                 }}
                             >

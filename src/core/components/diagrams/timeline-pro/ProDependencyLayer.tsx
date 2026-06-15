@@ -54,7 +54,7 @@ export default function ProDependencyLayer({ tasks, hoveredTaskId, onDeleteDepen
             // Smooth cubic bezier curve
             let d: string;
             const dx = x2 - x1;
-            let midX = (x1 + x2) / 2;
+            const midX = (x1 + x2) / 2;
             let midY = (y1 + y2) / 2;
             
             if (dx > 20) {

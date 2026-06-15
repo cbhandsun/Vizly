@@ -218,7 +218,7 @@ export default function ProTaskLayer({
         setDragDeltaX(0);
         setDragDeltaY(0);
         setDragDeltaW(0);
-    }, [dragState, dragDeltaX, dragDeltaY, dragDeltaW, dragProgress, snapX, xToDate, pixelsPerDay, onTaskDragEnd, onTaskUpdate, onTaskConnect]);
+    }, [dragState, dragDeltaX, dragDeltaW, dragProgress, snapX, xToDate, pixelsPerDay, onTaskDragEnd, onTaskUpdate, onTaskConnect]);
 
     const handleTaskMouseEnter = useCallback((e: React.MouseEvent, task: ProGanttTask) => {
         if (dragState) {

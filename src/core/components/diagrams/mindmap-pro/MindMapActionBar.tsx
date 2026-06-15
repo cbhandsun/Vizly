@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useReactFlow, Node, Edge, useStore } from '@xyflow/react';
+import { useReactFlow, useStore } from '@xyflow/react';
 import { Popover } from 'antd';
 import { 
   SisternodeOutlined, 
@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons';
 import { MindMapBeautifyPanel } from './MindMapBeautifyPanel';
 import { exportMindMapToMarkdown } from '../hooks/useMindMapOrchestrator';
+import { downloadFile } from '../../../utils/downloadUtils';
 import {
   ToolbarContainer,
   ToolbarButton,
@@ -22,7 +23,7 @@ import {
 
 export const MindMapActionBar: React.FC = () => {
   const { t } = useTranslation();
-  const { getNodes, getEdges, setNodes, setEdges } = useReactFlow();
+  const { getNodes, getEdges, setNodes } = useReactFlow();
 
   // Create mock context to pass to Beautify panel without needing the global plugin context
   // updateNodesBatch(ids, partialData): partialData is merged into node.data for ALL ids
@@ -126,12 +127,7 @@ export const MindMapActionBar: React.FC = () => {
       const md = exportMindMapToMarkdown(nodes, edges);
       if (!md) return;
       const rootLabel = nodes.find(n => n.type === 'mindmap' && n.data?.depth === 0)?.data?.label as string || 'mindmap';
-      const safeFilename = rootLabel.replace(/[^a-zA-Z0-9一-龥]/g, '_').substring(0, 40);
-      const blob = new Blob([md], { type: 'text/markdown' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `${safeFilename}.md`; a.click();
-      URL.revokeObjectURL(url);
+      downloadFile(md, `${rootLabel}.md`, 'text/markdown');
   }, [getNodes, getEdges]);
 
   // Delete selected node(s) — route through smart-delete to get takeSnapshot + child-grafting

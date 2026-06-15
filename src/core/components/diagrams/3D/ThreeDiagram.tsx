@@ -13,7 +13,7 @@ interface ThreeDiagramProps {
     [key: string]: any;
 }
 
-const ThreeDiagram: React.FC<ThreeDiagramProps> = ({ id, title, ...props }) => {
+const ThreeDiagram: React.FC<ThreeDiagramProps> = () => {
     return (
         <Result
             status="info"

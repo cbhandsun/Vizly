@@ -3,8 +3,6 @@ import { useReactFlow } from '@xyflow/react';
 import { useMindMapOrchestrator } from '../hooks/useMindMapOrchestrator';
 
 export const MindMapCanvasContext: React.FC = () => {
-    const { getNodes, getEdges, setNodes, setEdges } = useReactFlow();
-    
     // We proxy takeSnapshot to the globally registered handler in FlowchartDesigner
     const takeSnapshot = useCallback(() => {
         window.dispatchEvent(new CustomEvent('diagram:save-snapshot'));

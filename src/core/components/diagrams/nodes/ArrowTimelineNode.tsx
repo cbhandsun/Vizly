@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 import { useTheme } from '../../../themes/useCoreTheme';
-import { Button, Tooltip, Divider, Popover, InputNumber, ColorPicker, Input, Space } from 'antd';
-import { PlusOutlined, MinusOutlined, SwapOutlined, DatabaseOutlined, ExpandAltOutlined, AppstoreOutlined, MoreOutlined, DeleteOutlined, CopyOutlined, LockOutlined, UnlockOutlined, EllipsisOutlined } from '@ant-design/icons';
+import { Button, Tooltip, Divider, Popover, InputNumber, ColorPicker, Input } from 'antd';
+import { PlusOutlined, SwapOutlined, DatabaseOutlined, ExpandAltOutlined, AppstoreOutlined, DeleteOutlined, EllipsisOutlined } from '@ant-design/icons';
 
 export interface ArrowTimelineEvent {
     date: string;
@@ -139,18 +139,15 @@ function ArrowTimelineNode({ id, data, selected, isDragging }: { id: string, dat
                         const w = isLast ? SEGMENT_WIDTH + ARROW_TIP_WIDTH : SEGMENT_WIDTH;
                         const x = i * SEGMENT_WIDTH;
                         
-                        let path = '';
                         // Fix for stroke overlapping causing distinct "box" shadows:
                         // Move x by 1px to perfectly overlap without edge conflict,
                         // and extend w slightly to cover any sub-pixel gaps.
                         const startX = i === 0 ? x : x - 1; 
                         
-                        if (isLast) {
-                            path = `M ${startX} ${BAR_Y} L ${x + SEGMENT_WIDTH} ${BAR_Y} L ${x + w} ${BAR_Y + BAR_HEIGHT/2} L ${x + SEGMENT_WIDTH} ${BAR_Y + BAR_HEIGHT} L ${startX} ${BAR_Y + BAR_HEIGHT} Z`;
-                        } else {
+                        const path = isLast
+                            ? `M ${startX} ${BAR_Y} L ${x + SEGMENT_WIDTH} ${BAR_Y} L ${x + w} ${BAR_Y + BAR_HEIGHT/2} L ${x + SEGMENT_WIDTH} ${BAR_Y + BAR_HEIGHT} L ${startX} ${BAR_Y + BAR_HEIGHT} Z`
                             // Non-last segments extend right by 1px to tuck Under the next segment
-                            path = `M ${startX} ${BAR_Y} L ${x + w + 1} ${BAR_Y} L ${x + w + 1} ${BAR_Y + BAR_HEIGHT} L ${startX} ${BAR_Y + BAR_HEIGHT} Z`;
-                        }
+                            : `M ${startX} ${BAR_Y} L ${x + w + 1} ${BAR_Y} L ${x + w + 1} ${BAR_Y + BAR_HEIGHT} L ${startX} ${BAR_Y + BAR_HEIGHT} Z`;
                         
                         const glowFill = isDark ? `${evt.color}2A` : `${evt.color}10`;
                         
@@ -177,9 +174,9 @@ function ArrowTimelineNode({ id, data, selected, isDragging }: { id: string, dat
             {/* Alternating Labels */}
             {events.map((evt, i) => {
                 const isTop = i % 2 === 0;
-                let xCenter = 0;
-                let topComponent = null;
-                let bottomComponent = null;
+                let xCenter: number;
+                let topComponent: React.ReactNode = null;
+                let bottomComponent: React.ReactNode = null;
                 
                 // --- Reusable text renderers ---
                 const renderDate = () => (

@@ -16,11 +16,11 @@ import ProTaskLayer from './ProTaskLayer';
 import ProDependencyLayer from './ProDependencyLayer';
 import ProTaskListPanel from './ProTaskListPanel';
 import { ProResourceDrawer } from './ProResourceDrawer';
-import dayjs from 'dayjs';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { appMessage } from '../../../utils/antdStaticBridge';
+import { addDaysToDateOnly, parseDateOnlyTime, todayDateOnly } from '../../../utils/dateOnly';
 
-import { ZoomInOutlined, ZoomOutOutlined, CameraOutlined, DeleteOutlined, BranchesOutlined, HistoryOutlined, TeamOutlined } from '@ant-design/icons';
+import { ZoomInOutlined, ZoomOutOutlined, CameraOutlined, DeleteOutlined, TeamOutlined } from '@ant-design/icons';
 import { Button, Tooltip, Segmented, Switch } from 'antd';
 
 const ROW_HEIGHT = 42;
@@ -152,7 +152,7 @@ export default function ProTimelineCanvas() {
   
   // 1D-Packing & Hierarchical Rollup
   const packedTasks = useMemo(() => {
-     let computed = calculateSwimlanes(tasks);
+     const computed = calculateSwimlanes(tasks);
      return computed.map(t => ({
          ...t,
          _computed: {
@@ -204,9 +204,7 @@ export default function ProTimelineCanvas() {
          const realX = (offsetX - panX) / zoomLevel;
          const startD = xToDate(realX);
          
-         const d = new Date(startD);
-         d.setDate(d.getDate() + 1);
-         const endD = d.toISOString().split('T')[0];
+         const endD = addDaysToDateOnly(startD, 1);
 
          const newId = `tl-event-${Date.now()}`;
          const newNode = {
@@ -293,17 +291,15 @@ export default function ProTimelineCanvas() {
                   if (isMilestone || isCurrMilestone) {
                       return adjustToWorkDay(currEnd, 'forward');
                   } else {
-                      const d = new Date(currEnd);
-                      d.setDate(d.getDate() + 1);
-                      return adjustToWorkDay(d.toISOString().split('T')[0], 'forward');
+                      return adjustToWorkDay(addDaysToDateOnly(currEnd, 1), 'forward');
                   }
               })();
 
-              const currentTgtStartValue = dayjs(tStartStr).valueOf();
-              const minTgtStartValue = dayjs(minStart).valueOf();
+              const currentTgtStartValue = parseDateOnlyTime(tStartStr);
+              const minTgtStartValue = parseDateOnlyTime(minStart);
 
               // 如果后继任务的当前开始日期比 minStart 还要早，说明被“顶”到了，需要发生向后避让
-              if (currentTgtStartValue < minTgtStartValue) {
+              if (currentTgtStartValue !== null && minTgtStartValue !== null && currentTgtStartValue < minTgtStartValue) {
                   const duration = getWorkDays(tStartStr, tEndStr);
                   const newTgtStart = minStart;
                   const newTgtEnd = addWorkDays(newTgtStart, duration);
@@ -330,8 +326,8 @@ export default function ProTimelineCanvas() {
       const oldEndDate = (node.data.endDate as string) || oldStartDate;
 
       const isMove = newStartDate !== oldStartDate;
-      let finalStart = newStartDate;
-      let finalEnd = newEndDate;
+      let finalStart: string;
+      let finalEnd: string;
 
       if (isMove) {
           const duration = getWorkDays(oldStartDate, oldEndDate);
@@ -395,9 +391,9 @@ export default function ProTimelineCanvas() {
         const tDateStr = targetNode.data?.date;
 
         if (sDateStr && tDateStr) {
-            const sTime = dayjs(sDateStr as string).valueOf();
-            const tTime = dayjs(tDateStr as string).valueOf();
-            if (sTime > tTime) {
+            const sTime = parseDateOnlyTime(sDateStr);
+            const tTime = parseDateOnlyTime(tDateStr);
+            if (sTime !== null && tTime !== null && sTime > tTime) {
                 appMessage.warning('依赖校验失败：前置任务的结束时间不能晚于后置任务的开始时间！');
                 return;
             }
@@ -467,7 +463,7 @@ export default function ProTimelineCanvas() {
     const handleTaskAdd = useCallback((parentId: string | null, type: 'phase' | 'milestone') => {
         const newId = `tl-new-${Date.now()}`;
         const parentTask = parentId ? nodes.find(n => n.id === parentId) : null;
-        let startD = new Date().toISOString().split('T')[0];
+        let startD = todayDateOnly();
         
         if (parentTask && parentTask.data.date) {
             startD = parentTask.data.date as string;
@@ -476,9 +472,7 @@ export default function ProTimelineCanvas() {
         const isMilestone = type === 'milestone';
         let endD = startD;
         if (!isMilestone) {
-            const d = new Date(startD);
-            d.setDate(d.getDate() + 1);
-            endD = d.toISOString().split('T')[0];
+            endD = addDaysToDateOnly(startD, 1);
         }
 
         const newNode = {
@@ -511,7 +505,7 @@ export default function ProTimelineCanvas() {
          setPan(-packedTasks[0]._computed!.x + 80, 0);
          initPanRef.current = true;
      }
-  }, [packedTasks.length, setPan]);
+  }, [packedTasks, packedTasks.length, setPan]);
 
   // (weekendColumns CSS O(1) fallback handled in canvas render)
 
@@ -647,7 +641,8 @@ export default function ProTimelineCanvas() {
             <div style={{ position: 'absolute', left: panX, top: panY, width: 0, height: 0 }}>
                {/* Animated Today Marker */}
                {(() => {
-                   const todayX = dateToX(new Date().toISOString().split('T')[0]);
+                   const today = todayDateOnly();
+                   const todayX = dateToX(today);
                    return (
                        <>
                            <div style={{
@@ -673,7 +668,7 @@ export default function ProTimelineCanvas() {
                                zIndex: 15, pointerEvents: 'none',
                                boxShadow: `0 2px 8px ${todayBaseColor}4D`,
                                letterSpacing: '1px',
-                           }}>{dayjs().format('MM/DD')} 今天</div>
+                           }}>{today.slice(5).replace('-', '/')} 今天</div>
                        </>
                    );
                })()}
