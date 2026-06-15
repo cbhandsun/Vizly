@@ -3,13 +3,34 @@ import { Node, Edge } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import { useAutoSave } from './useAutoSave';
 import { PluginRegistry } from '../../../services/PluginRegistry';
-import { LayoutOptimizer } from '../../layout/LayoutOptimizer';
 import { analyzeDiagram } from '@/utils/diagramAnalyzer';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
+import { isStandardPresetId } from '@/data/standardized/presetMetadata';
 import { loadStandardPresetById } from '@/data/standardized/presetLoader';
 import { cancelLayoutTransition, suspendLayoutTransitions } from '../../../utils/animateLayoutTransition';
 import { expandHandle } from '../../../routing/utils/handleUtils';
+import { parseAutoSavePayload } from '../../../utils/autoSaveStorage';
 
+const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
+
+const getPluginEmptyState = (pluginId: string) => {
+    const plugin = PluginRegistry.getInstance().getPlugin(pluginId);
+    return plugin?.getEmptyState();
+};
+
+const stripHtml = (value: string) => value ? value.replace(/<[^>]*>?/gm, '') : '';
+
+const clearFreshSeedFlagInStorage = (storageKey: string) => {
+    try {
+        const parsed = parseAutoSavePayload(localStorage.getItem(storageKey));
+        if (!parsed?.isFreshSeed) return;
+        const next = { ...parsed };
+        delete next.isFreshSeed;
+        localStorage.setItem(storageKey, JSON.stringify(next));
+    } catch {
+        // Storage access may fail in private/blocked contexts.
+    }
+};
 
 export interface UseDesignerSystemSyncProps {
     id?: string;
@@ -84,6 +105,50 @@ const mergePresetExplicitEdgeHandles = (saved: any, preset: any) => {
     return { ...saved, edges };
 };
 
+const recalculateAutosaveNodeSizes = async (nodes: Node[]) => {
+    const containerTypes = new Set(['titleGroup', 'subGroup', 'swimlane', 'group']);
+    const toFiniteNumber = (value: unknown) => {
+        const parsed = typeof value === 'string' ? parseFloat(value) : Number(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const hasUsableSize = (node: Node) => {
+        if (containerTypes.has(node.type || '')) return true;
+        const width = toFiniteNumber(node.width || (node as any).measured?.width || (node.style as any)?.width);
+        const height = toFiniteNumber(node.height || (node as any).measured?.height || (node.style as any)?.height);
+        return width > 0 && height > 0;
+    };
+
+    if (nodes.every(hasUsableSize)) return nodes;
+
+    const { LayoutOptimizer } = await import('../../layout/LayoutOptimizer');
+    const layoutOptimizer = LayoutOptimizer.getInstance();
+
+    return nodes.map((node: Node) => {
+        if (containerTypes.has(node.type || '')) return node;
+
+        const desc = String(node.data?.description || node.data?.label || '');
+        if (!desc) return node;
+
+        const calculatedWidth = layoutOptimizer.calculateNodeWidth(desc);
+        const calculatedHeight = layoutOptimizer.calculateNodeHeight(desc);
+        const contentWidth = Math.max(
+            calculatedWidth,
+            toFiniteNumber(node.width || (node as any).measured?.width || (node.style as any)?.width)
+        );
+        const contentHeight = Math.max(
+            calculatedHeight,
+            toFiniteNumber(node.height || (node as any).measured?.height || (node.style as any)?.height)
+        );
+        return {
+            ...node,
+            width: contentWidth,
+            height: contentHeight,
+            style: { ...node.style, width: contentWidth, height: contentHeight },
+            measured: { ...(node as any).measured, width: contentWidth, height: contentHeight },
+        };
+    });
+};
+
 export function useDesignerSystemSync({
     id, diagramIdForExport, nodes, edges, setNodes, setEdges,
     reactFlowInstance, isDragging, pluginId, messageApi
@@ -98,54 +163,149 @@ export function useDesignerSystemSync({
     useEffect(() => { reactFlowRef.current = reactFlowInstance; }, [reactFlowInstance]);
 
     useEffect(() => {
-        import('../designerUtils').then(async ({ canvasToStandardData }) => {
-            if (!(window as any).__flowDataBridge) {
-                (window as any).__flowDataBridge = {};
-            }
-            // 通过 ref 读取最新的 nodes/edges，避免闭包损坏
-            let standardData = canvasToStandardData(nodesRef.current, edgesRef.current, diagramIdForExport);
-            
-            // 尝试从 DataRegistry 中恢复 Layout/Metadata 配置，防止在同步时丢失
-            try {
-                const { dataRegistry } = await import('@/data/DataRegistry');
-                const localSvc = dataRegistry.getDataService();
-                const existing = localSvc.getDiagram(diagramIdForExport || id || '');
-                if (existing) {
-                    standardData = {
-                        ...existing,
-                        nodes: standardData.nodes,
-                        edges: standardData.edges,
-                        groups: standardData.groups
-                    } as any;
+        if (!(window as any).__flowDataBridge) {
+            (window as any).__flowDataBridge = {};
+        }
+
+        const toStandardNodes = () => {
+            const standardNodes: any[] = [];
+            const groups: any[] = [];
+            nodesRef.current.forEach((node: any) => {
+                const nodeData = node.data || {};
+                const rawLabel = nodeData.label as string || '';
+                const description = (nodeData.description as string) || `<b>${rawLabel}</b>`;
+                const canvasMetadata = {
+                    canvasPosition: node.position,
+                    width: node.measured?.width ?? node.width ?? 100,
+                    height: node.measured?.height ?? node.height ?? 50,
+                    parentId: node.parentId,
+                    shape: nodeData.shape,
+                    icon: nodeData.icon,
+                    style: node.style,
+                    theme: nodeData.theme,
+                    sequence: nodeData.sequence || '1',
+                };
+                const baseNode = {
+                    id: node.id,
+                    description,
+                    domain: nodeData.domain || nodeData.domainClass || '业务域',
+                    subDomain: nodeData.subDomain || undefined,
+                    domainClass: nodeData.domainClass || 'core',
+                    type: 'custom',
+                    metadata: canvasMetadata,
+                };
+
+                if (node.type === 'titleGroup' || node.type === 'subGroup') {
+                    groups.push({
+                        ...baseNode,
+                        type: 'group',
+                        label: rawLabel || stripHtml(description),
+                        isGroup: true,
+                        measured: { width: canvasMetadata.width, height: canvasMetadata.height },
+                        position: node.position,
+                        themeColor: nodeData.themeColor,
+                        data: nodeData,
+                    });
+                } else {
+                    standardNodes.push(baseNode);
                 }
-            } catch (e) {
-                // Ignore silent fail
-            }
+            });
+            return { standardNodes, groups };
+        };
+
+        const toStandardEdges = () => edgesRef.current.map((edge: any) => ({
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            type: (edge.type === 'smart-step' || edge.type === 'smart') ? 'main' : edge.type || 'main',
+            label: edge.label || edge.data?.label,
+            markerEnd: edge.markerEnd,
+            style: edge.style,
+            metadata: {
+                sourceHandle: edge.sourceHandle,
+                targetHandle: edge.targetHandle,
+                autoHandles: edge.data?.auto,
+                manualHandles: Boolean(edge.data?.manualHandles),
+                manualHandleSides: edge.data?.manualHandleSides,
+            },
+        }));
+
+        const standardData: any = {
+            id: `diagram-${Date.now()}`,
+            name: diagramIdForExport,
+            type: 'architecture',
+            version: '1.0.0',
+            metadata: {
+                title: diagramIdForExport,
+                createdAt: new Date().toISOString(),
+                author: 'User (Manual)',
+                tags: ['manual-export'],
+            },
+            layout: {
+                type: 'custom',
+                direction: 'LR',
+                autoDirection: true,
+                fitDomainContent: true,
+                spacing: { horizontal: 50, vertical: 50 },
+                padding: { horizontal: 20, vertical: 20, top: 20, bottom: 20, left: 20, right: 20 },
+            },
+            theme: {
+                name: 'manual',
+                displayName: 'Manual Theme',
+                domains: {},
+                isCustom: true,
+            },
+        };
+
+        Object.defineProperties(standardData, {
+            nodes: {
+                enumerable: true,
+                get: () => toStandardNodes().standardNodes,
+            },
+            groups: {
+                enumerable: true,
+                get: () => toStandardNodes().groups,
+            },
+            edges: {
+                enumerable: true,
+                get: () => toStandardEdges(),
+            },
+        });
             
             // 附加 importData 特权方法供外部组件（如 AI 对话面板）应用生成的 JSON数据
             Object.defineProperty(standardData, 'importData', {
                 enumerable: false, // Prevents serialization issues in JSON.stringify
-                value: async (newData: any, options?: { keepHistory?: boolean }) => {
+                value: async (newData: any, _options?: { keepHistory?: boolean }) => {
                     try {
+                        const { coerceStandardDiagramImport } = await import('@/core/utils/diagramJsonImport');
+                        const safeData = coerceStandardDiagramImport(newData, {
+                            id: diagramIdForExport,
+                            title: diagramIdForExport,
+                        });
                         const { standardDataToCanvas } = await import('../designerUtils');
-                        const { nodes: newNodes, edges: newEdges } = await standardDataToCanvas(newData);
+                        const { nodes: newNodes, edges: newEdges } = await standardDataToCanvas(safeData);
                         
                         // 写回 DataRegistry 中
                         try {
                             const { dataRegistry } = await import('@/data/DataRegistry');
                             const localSvc = dataRegistry.getDataService();
-                            localSvc.registerDiagram(newData);
-                        } catch(e) { }
+                            localSvc.registerRemoteDiagram(safeData, {
+                                id: diagramIdForExport,
+                                title: diagramIdForExport,
+                            }, true, {
+                                id: diagramIdForExport,
+                            });
+                        } catch(_e) { }
 
                         setNodes(newNodes);
                         setEdges(newEdges);
                         
                         // 强制延迟执行一次路由与 Layout
-                        if (reactFlowInstance) {
+                        if (reactFlowRef.current) {
                             setTimeout(() => {
                                 // 触发全局重新布局，确保无位置的节点能正确展开，解决零维度问题
                                 window.dispatchEvent(new CustomEvent('diagramControl', { detail: { action: 'layout' } }));
-                                reactFlowInstance.fitView({ padding: 0.2, duration: 400, minZoom: 0.55 });
+                                reactFlowRef.current?.fitView({ padding: 0.2, duration: 400, minZoom: 0.55 });
                             }, 50);
                         }
                     } catch(err) {
@@ -206,7 +366,7 @@ export function useDesignerSystemSync({
                     };
 
                     setNodes((nds: any) => {
-                        let nextNodes = [...nds, newNode];
+                        const nextNodes = [...nds, newNode];
                         
                         // Phase 5: 自动调整父容器尺寸
                         if (parentId) {
@@ -268,6 +428,9 @@ export function useDesignerSystemSync({
             Object.defineProperty(standardData, 'updateNode', {
                 enumerable: false,
                 value: async (id: string, data: any) => {
+                    const layoutOptimizer = data.label
+                        ? (await import('../../layout/LayoutOptimizer')).LayoutOptimizer.getInstance()
+                        : null;
                     setNodes((nds: any) => nds.map((n: any) => {
                         if (n.id === id) {
                             const newData = { ...n.data, ...data };
@@ -278,8 +441,8 @@ export function useDesignerSystemSync({
                             // Re-calculate width if label changed
                             let width = n.width;
                             let style = n.style;
-                            if (data.label) {
-                                const width_val = LayoutOptimizer.getInstance().calculateNodeWidth(data.label);
+                            if (data.label && layoutOptimizer) {
+                                const width_val = layoutOptimizer.calculateNodeWidth(data.label);
                                 width = width_val;
                                 style = { ...style, width: width_val };
                             }
@@ -395,7 +558,6 @@ export function useDesignerSystemSync({
             });
 
             (window as any).__flowDataBridge[diagramIdForExport] = standardData;
-        });
         return () => {
             delete (window as any).__flowDataBridge?.[diagramIdForExport];
         };
@@ -432,7 +594,7 @@ export function useDesignerSystemSync({
 
     const [autosaveEnabled, setAutosaveEnabled] = useState(false);
 
-    const { saveState, loadSaved, clearSaved, saveNow } = useAutoSave(nodes, edges, {
+    const { loadSaved, clearSaved, saveNow } = useAutoSave(nodes, edges, {
         interval: 60000,
         storageKey: `flowchart-autosave-v2-${id || 'default'}`,
         enabled: autosaveEnabled,
@@ -483,6 +645,11 @@ export function useDesignerSystemSync({
 
     useEffect(() => {
         let cancelled = false;
+        if (!isStandardPresetId(id)) {
+            setPresetLookup({ id, ready: true, preset: null });
+            return () => { cancelled = true; };
+        }
+
         setPresetLookup({ id, ready: false, preset: null });
 
         void loadStandardPresetById(id).then((preset) => {
@@ -550,15 +717,7 @@ export function useDesignerSystemSync({
                 
                 // If the isFreshSeed flag is stale (crash remnant), strip it from storage
                 if (saved.isFreshSeed && !isFreshAndValid) {
-                    try {
-                        const storageKey = `flowchart-autosave-v2-${id || 'default'}`;
-                        const raw = localStorage.getItem(storageKey);
-                        if (raw) {
-                            const parsed = JSON.parse(raw);
-                            delete parsed.isFreshSeed;
-                            localStorage.setItem(storageKey, JSON.stringify(parsed));
-                        }
-                    } catch { /* ignore */ }
+                    clearFreshSeedFlagInStorage(`flowchart-autosave-v2-${id || 'default'}`);
                     saved = { ...saved, isFreshSeed: false };
                 }
                 
@@ -568,66 +727,30 @@ export function useDesignerSystemSync({
 
         if (shouldLoadAutosave && saved) {
             hasRestoredAutoSave.current = true;
-            const layoutOptimizer = LayoutOptimizer.getInstance();
-            const containerTypes = new Set(['titleGroup', 'subGroup', 'swimlane', 'group']);
-            const toFiniteNumber = (value: unknown) => {
-                const parsed = typeof value === 'string' ? parseFloat(value) : Number(value);
-                return Number.isFinite(parsed) ? parsed : 0;
-            };
+            void recalculateAutosaveNodeSizes(saved.nodes).then((recalculatedNodes) => {
+                cancelLayoutTransition(setNodes);
+                setNodes(recalculatedNodes);
+                setEdges(saved.edges);
+                needsInitialFitView.current = true;
 
-            const recalculatedNodes = saved.nodes.map((node: Node) => {
-                if (containerTypes.has(node.type || '')) return node;
+                // [COLD-START FIX] 冻结路由器，阻止在节点尺寸未稳定前触发大量 A* 计算。
+                // 根据 CDP 调试，34节点图加载时出现 A* openSet exhausted (iterations=23892)，
+                // 原因是节点 measured 不稳定，Worker 被反复触发，导致 1-2 秒连线白屏。
+                // freeze() 后所有 route() 请求会被积压在 latestRequests 里，
+                // 等 unfreeze() 调用后一次性批量计算。
+                EdgeRoutingCoordinator.getInstance().freeze();
 
-                const desc = String(node.data?.description || node.data?.label || '');
-                if (!desc) return node;
-
-                const calculatedWidth = layoutOptimizer.calculateNodeWidth(desc);
-                const calculatedHeight = layoutOptimizer.calculateNodeHeight(desc);
-                const contentWidth = Math.max(
-                    calculatedWidth,
-                    toFiniteNumber(node.width || (node as any).measured?.width || (node.style as any)?.width)
-                );
-                const contentHeight = Math.max(
-                    calculatedHeight,
-                    toFiniteNumber(node.height || (node as any).measured?.height || (node.style as any)?.height)
-                );
-                return {
-                    ...node,
-                    width: contentWidth,
-                    height: contentHeight,
-                    style: { ...node.style, width: contentWidth, height: contentHeight },
-                    measured: { ...(node as any).measured, width: contentWidth, height: contentHeight },
-                };
+                // ★ After consuming the fresh seed, clear the isFreshSeed flag from localStorage
+                // so that subsequent autosave cycles are no longer blocked by the guard.
+                if (saved.isFreshSeed) {
+                    messageApi?.success('加载模板成功');
+                    clearFreshSeedFlagInStorage(`flowchart-autosave-v2-${id || 'default'}`);
+                } else {
+                    messageApi?.info('已恢复上次编辑内容');
+                }
+            }).catch((error) => {
+                console.error('[DesignerSystemSync] autosave size recalculation failed:', error);
             });
-
-            cancelLayoutTransition(setNodes);
-            setNodes(recalculatedNodes);
-            setEdges(saved.edges);
-            needsInitialFitView.current = true;
-
-            // [COLD-START FIX] 冻结路由器，阻止在节点尺寸未稳定前触发大量 A* 计算。
-            // 根据 CDP 调试，34节点图加载时出现 A* openSet exhausted (iterations=23892)，
-            // 原因是节点 measured 不稳定，Worker 被反复触发，导致 1-2 秒连线白屏。
-            // freeze() 后所有 route() 请求会被积压在 latestRequests 里，
-            // 等 unfreeze() 调用后一次性批量计算。
-            EdgeRoutingCoordinator.getInstance().freeze();
-
-            // ★ After consuming the fresh seed, clear the isFreshSeed flag from localStorage
-            // so that subsequent autosave cycles are no longer blocked by the guard.
-            if (saved.isFreshSeed) {
-                messageApi?.success('加载模板成功');
-                try {
-                    const storageKey = `flowchart-autosave-v2-${id || 'default'}`;
-                    const raw = localStorage.getItem(storageKey);
-                    if (raw) {
-                        const parsed = JSON.parse(raw);
-                        delete parsed.isFreshSeed;
-                        localStorage.setItem(storageKey, JSON.stringify(parsed));
-                    }
-                } catch { /* ignore */ }
-            } else {
-                messageApi?.info('已恢复上次编辑内容');
-            }
         } else {
             hasRestoredAutoSave.current = true;
             
@@ -643,9 +766,17 @@ export function useDesignerSystemSync({
                         needsInitialFitView.current = true;
                     }).catch(e => console.error('[DesignerSystemSync] standardDataToCanvas error:', e));
                 }).catch(e => console.error('[DesignerSystemSync] Import designerUtils failed:', e));
+            } else if (PLUGIN_EMPTY_CANVAS_IDS.has(String(id || ''))) {
+                const emptyState = getPluginEmptyState(pluginId);
+                if (emptyState) {
+                    setNodes(emptyState.nodes);
+                    setEdges(emptyState.edges);
+                    needsInitialFitView.current = true;
+                }
             } else {
                 // Try DataRegistry for imported/general templates before falling back to empty state
-                import('@/data/DataRegistry').then(({ dataRegistry }) => {
+                import('@/data/DataRegistry').then(async ({ dataRegistry }) => {
+                    await dataRegistry.initialize();
                     const localSvc = dataRegistry.getDataService();
                     const existing = localSvc.getDiagram(id || '');
                     if (existing) {
@@ -659,9 +790,8 @@ export function useDesignerSystemSync({
                         });
                     } else {
                         // Normal plugin fallback empty state
-                        const plugin = PluginRegistry.getInstance().getPlugin(pluginId);
-                        if (plugin) {
-                            const emptyState = plugin.getEmptyState();
+                        const emptyState = getPluginEmptyState(pluginId);
+                        if (emptyState) {
                             setNodes(emptyState.nodes);
                             setEdges(emptyState.edges);
                             // ALWAYS trigger initial viewport adjustment, even for empty canvases
@@ -671,7 +801,7 @@ export function useDesignerSystemSync({
                 }).catch(e => console.error('[DesignerSystemSync] import DataRegistry failed:', e));
             }
         }
-    }, [loadSaved, clearSaved, setNodes, setEdges, pluginId, id, presetLookup]);
+    }, [loadSaved, clearSaved, setNodes, setEdges, pluginId, id, presetLookup, messageApi]);
 
     // Deferred view adjustment: waits for reactFlowInstance to become available
     useEffect(() => {
