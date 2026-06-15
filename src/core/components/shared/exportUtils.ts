@@ -1,4 +1,66 @@
 
+import { sanitizeDownloadFileName } from '../../utils/downloadUtils';
+
+const MAX_EXPORT_SIDE_PX = 12_000;
+const MAX_RASTER_EXPORT_PIXELS = 36_000_000;
+const MAX_GIF_EXPORT_PIXELS = 14_000_000;
+const MAX_GIF_FRAMES = 24;
+const MAX_EXPORT_DATA_URL_CHARS = 64 * 1024 * 1024;
+
+const SAFE_EXPORT_DATA_URL_PATTERNS = [
+  /^data:image\/(?:png|gif);base64,[a-z0-9+/=\s]+$/i,
+  /^data:image\/svg\+xml(?:;charset=[\w-]+)?[,;]/i,
+];
+
+export interface NormalizedExportBounds {
+  width: number;
+  height: number;
+  pixelRatio: number;
+}
+
+export const normalizeExportPixelRatio = (pixelRatio: number, maxPixelRatio = 3): number => {
+  if (!Number.isFinite(pixelRatio) || pixelRatio <= 0) return 1;
+  return Math.min(maxPixelRatio, Math.max(0.5, pixelRatio));
+};
+
+export const normalizeRasterExportBounds = (
+  width: number,
+  height: number,
+  pixelRatio: number,
+  maxPixels = MAX_RASTER_EXPORT_PIXELS
+): NormalizedExportBounds => {
+  const safeWidth = Math.ceil(width);
+  const safeHeight = Math.ceil(height);
+  if (!Number.isFinite(safeWidth) || !Number.isFinite(safeHeight) || safeWidth <= 0 || safeHeight <= 0) {
+    throw new Error('Invalid export dimensions');
+  }
+  if (safeWidth > MAX_EXPORT_SIDE_PX || safeHeight > MAX_EXPORT_SIDE_PX) {
+    throw new Error(`Export dimensions exceed ${MAX_EXPORT_SIDE_PX}px limit`);
+  }
+
+  const normalizedRatio = normalizeExportPixelRatio(pixelRatio);
+  const rawPixels = safeWidth * safeHeight * normalizedRatio * normalizedRatio;
+  if (rawPixels <= maxPixels) {
+    return { width: safeWidth, height: safeHeight, pixelRatio: normalizedRatio };
+  }
+
+  const reducedRatio = Math.max(0.5, Math.sqrt(maxPixels / (safeWidth * safeHeight)));
+  if (safeWidth * safeHeight * reducedRatio * reducedRatio > maxPixels) {
+    throw new Error(`Export area exceeds ${maxPixels} pixel limit`);
+  }
+  return { width: safeWidth, height: safeHeight, pixelRatio: Math.min(normalizedRatio, reducedRatio) };
+};
+
+export const normalizeGifFrameCount = (totalFrames: number): number => {
+  if (!Number.isFinite(totalFrames) || totalFrames <= 0) return 1;
+  return Math.min(MAX_GIF_FRAMES, Math.max(1, Math.floor(totalFrames)));
+};
+
+export const isSafeExportDataUrl = (href: unknown): href is string => {
+  return typeof href === 'string' &&
+    href.length <= MAX_EXPORT_DATA_URL_CHARS &&
+    SAFE_EXPORT_DATA_URL_PATTERNS.some(pattern => pattern.test(href));
+};
 
 /**
  * 计算当前 React Flow 图的内容包围盒（基于节点位置与尺寸）。
@@ -77,32 +139,6 @@ function parseTranslateFromTransform(transform: string | null | undefined): { x:
     if (isFinite(x) && isFinite(y)) return { x, y };
   }
   return { x: 0, y: 0 };
-}
-
-/**
- * 解析 transform 字符串中的缩放值（支持 matrix 与 scale）。
- * @param transform CSS transform 字符串
- * @returns 缩放比例（未解析到时返回 1）
- */
-function parseScaleFromTransform(transform: string | null | undefined): number {
-  const t = (transform || '').trim();
-  if (!t || t === 'none') return 1;
-  const m = t.match(/matrix\(([^)]+)\)/);
-  if (m) {
-    const parts = m[1].split(/[,\s]+/).map(Number);
-    if (parts.length >= 6 && parts.every(n => !isNaN(n))) {
-      const a = parts[0];
-      const d = parts[3];
-      const scale = isFinite(a) ? a : (isFinite(d) ? d : 1);
-      return scale || 1;
-    }
-  }
-  const s = t.match(/scale\(\s*([-\d.]+)\s*\)/);
-  if (s) {
-    const scale = parseFloat(s[1]);
-    return isFinite(scale) ? scale : 1;
-  }
-  return 1;
 }
 
 /**
@@ -213,10 +249,11 @@ export const temporarilyHideElements = async <T>(selectors: string[], fn: () => 
  * @param pixelRatio - 像素比（默认 2，建议 3 用于高清）
  */
 export const exportElementToPngDataUrl = async (element: HTMLElement, paddingPx = 40, pixelRatio: number = 2) => {
+  const safePixelRatio = normalizeExportPixelRatio(pixelRatio);
   return (await import('html-to-image')).toPng(element, {
     backgroundColor: '#ffffff',
     quality: 1.0,
-    pixelRatio,
+    pixelRatio: safePixelRatio,
     cacheBust: true,
     style: { padding: `${paddingPx}px`, backgroundColor: '#ffffff', overflow: 'visible' }
   });
@@ -245,7 +282,7 @@ export const exportElementToSvgDataUrl = async (element: HTMLElement, paddingPx 
  * @param ext - 文件扩展名（png/svg/pdf/gif）
  */
 export const buildExportFileName = (diagramId: string | undefined, ext: 'png' | 'pdf' | 'svg' | 'gif') => {
-  const base = diagramId && diagramId.trim() ? diagramId.trim() : 'diagram';
+  const base = sanitizeDownloadFileName(diagramId && diagramId.trim() ? diagramId.trim() : 'diagram', 'diagram', 80);
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
   return `${base}_${ts}.${ext}`;
 };
@@ -254,12 +291,20 @@ export const buildExportFileName = (diagramId: string | undefined, ext: 'png' | 
  * 触发基于 Data URL 的浏览器下载
  */
 export const triggerDownload = (dataUrl: string, fileName: string) => {
+  if (!isSafeExportDataUrl(dataUrl)) {
+    throw new Error('Unsafe export data URL');
+  }
   const link = document.createElement('a');
   link.href = dataUrl;
-  link.download = fileName;
+  link.download = sanitizeDownloadFileName(fileName);
+  link.rel = 'noopener noreferrer';
+  link.style.display = 'none';
   document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  try {
+    link.click();
+  } finally {
+    link.remove();
+  }
 };
 
 /**
@@ -304,12 +349,13 @@ export async function exportFullDiagramToPngDataUrl(diagramId: string, paddingPx
   const headerOffset = computeHeaderOffset(diagramElement);
 
   // 创建离屏容器，尺寸按整图内容 + 边距 + 头部偏移
+  const bounds = normalizeRasterExportBounds(width + paddingPx * 2, height + paddingPx * 2 + headerOffset, pixelRatio);
   const offscreen = document.createElement('div');
   offscreen.style.position = 'fixed';
   offscreen.style.left = '-10000px';
   offscreen.style.top = '-10000px';
-  const exportWidth = Math.ceil(width + paddingPx * 2);
-  const exportHeight = Math.ceil(height + paddingPx * 2 + headerOffset);
+  const exportWidth = bounds.width;
+  const exportHeight = bounds.height;
   offscreen.style.width = `${exportWidth}px`;
   offscreen.style.height = `${exportHeight}px`;
   offscreen.style.background = '#ffffff';
@@ -381,7 +427,7 @@ export async function exportFullDiagramToPngDataUrl(diagramId: string, paddingPx
     const dataUrl = await (await import('html-to-image')).toPng(target, {
       backgroundColor: '#ffffff',
       quality: 1.0,
-      pixelRatio,
+      pixelRatio: bounds.pixelRatio,
       cacheBust: true,
       width: exportWidth,
       height: exportHeight,
@@ -432,8 +478,10 @@ export async function exportGifFrameWithAnimationClone(
 
   const { minX, minY, width, height } = bbox;
   const headerOffset = computeHeaderOffset(diagramElement);
-  const exportWidth = Math.ceil(width + paddingPx * 2);
-  const exportHeight = Math.ceil(height + paddingPx * 2 + headerOffset);
+  const safeTotalFrames = normalizeGifFrameCount(totalFrames);
+  const bounds = normalizeRasterExportBounds(width + paddingPx * 2, height + paddingPx * 2 + headerOffset, pixelRatio, MAX_GIF_EXPORT_PIXELS);
+  const exportWidth = bounds.width;
+  const exportHeight = bounds.height;
 
   // 离屏容器
   const offscreen = document.createElement('div');
@@ -527,7 +575,7 @@ export async function exportGifFrameWithAnimationClone(
     // 计算无缝循环的虚线周期（dash 周期 = 所有段长度之和）
     const dashPeriod = dashArray.reduce((sum, v) => sum + v, 0) || 9;
     // 为保证首尾无缝，使用 (totalFrames - 1) 作为分母，使最后一帧恰好位于整周期位置
-    const framesDenom = (totalFrames > 1) ? (totalFrames - 1) : 1;
+    const framesDenom = (safeTotalFrames > 1) ? (safeTotalFrames - 1) : 1;
     // 在一个 GIF 中走过的周期数（可调速）。选择 6 周期以匹配 CSS 视觉速度（约 20px/s）
     const cycles = 6;
     const progress = frameIndex / framesDenom;
@@ -550,7 +598,7 @@ export async function exportGifFrameWithAnimationClone(
     return await (await import('html-to-image')).toPng(target, {
       backgroundColor: '#ffffff',
       quality: 1.0,
-      pixelRatio,
+      pixelRatio: bounds.pixelRatio,
       cacheBust: true,
       width: exportWidth,
       height: exportHeight,
@@ -588,8 +636,10 @@ export async function exportGifFramesWithAnimationCloneBatch(
 
   const { minX, minY, width, height } = bbox;
   const headerOffset = computeHeaderOffset(diagramElement);
-  const exportWidth = Math.ceil(width + paddingPx * 2);
-  const exportHeight = Math.ceil(height + paddingPx * 2 + headerOffset);
+  const safeTotalFrames = normalizeGifFrameCount(totalFrames);
+  const bounds = normalizeRasterExportBounds(width + paddingPx * 2, height + paddingPx * 2 + headerOffset, pixelRatio, MAX_GIF_EXPORT_PIXELS);
+  const exportWidth = bounds.width;
+  const exportHeight = bounds.height;
 
   // 离屏容器
   const offscreen = document.createElement('div');
@@ -683,10 +733,10 @@ export async function exportGifFramesWithAnimationCloneBatch(
     });
 
     const frames: string[] = [];
-    const framesDenom = (totalFrames > 1) ? (totalFrames - 1) : 1;
+    const framesDenom = (safeTotalFrames > 1) ? (safeTotalFrames - 1) : 1;
     const cycles = 6;
 
-    for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
+    for (let frameIndex = 0; frameIndex < safeTotalFrames; frameIndex++) {
       const progress = frameIndex / framesDenom;
       // 更新每条路径偏移与基础样式
       pathMeta.forEach(({ path, stroke, strokeWidth, dashArray, dashPeriod }) => {
@@ -705,7 +755,7 @@ export async function exportGifFramesWithAnimationCloneBatch(
       const dataUrl = await (await import('html-to-image')).toPng(target, {
         backgroundColor: '#ffffff',
         quality: 1.0,
-        pixelRatio,
+        pixelRatio: bounds.pixelRatio,
         cacheBust: false,
         width: exportWidth,
         height: exportHeight,
@@ -714,7 +764,7 @@ export async function exportGifFramesWithAnimationCloneBatch(
       frames.push(dataUrl);
       // 逐帧进度回调，便于外部更新进度条
       if (onProgress) {
-        try { onProgress(frameIndex + 1, totalFrames); } catch (_) { }
+        try { onProgress(frameIndex + 1, safeTotalFrames); } catch (_) { }
       }
       // 让浏览器有机会刷新 UI（避免长任务阻塞进度条）
       await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -742,13 +792,14 @@ export async function exportFullDiagramToSvgDataUrl(diagramId: string, paddingPx
 
   const { minX, minY, width, height } = bbox;
   const headerOffset = computeHeaderOffset(diagramElement);
+  const bounds = normalizeRasterExportBounds(width + paddingPx * 2, height + paddingPx * 2 + headerOffset, 1);
 
   const offscreen = document.createElement('div');
   offscreen.style.position = 'fixed';
   offscreen.style.left = '-10000px';
   offscreen.style.top = '-10000px';
-  const exportWidth = Math.ceil(width + paddingPx * 2);
-  const exportHeight = Math.ceil(height + paddingPx * 2 + headerOffset);
+  const exportWidth = bounds.width;
+  const exportHeight = bounds.height;
   offscreen.style.width = `${exportWidth}px`;
   offscreen.style.height = `${exportHeight}px`;
   offscreen.style.background = '#ffffff';
@@ -862,8 +913,9 @@ export async function exportFullDiagramByAdjustingViewportToPngDataUrl(
     svgOverflow: rendererSvg?.style.overflow
   };
 
-  const exportWidth = Math.ceil(bbox.width + paddingPx * 2);
-  const exportHeight = Math.ceil(bbox.height + paddingPx * 2 + headerOffset);
+  const bounds = normalizeRasterExportBounds(bbox.width + paddingPx * 2, bbox.height + paddingPx * 2 + headerOffset, pixelRatio);
+  const exportWidth = bounds.width;
+  const exportHeight = bounds.height;
 
   // Resize Root
   root.style.width = `${exportWidth}px`;
@@ -901,7 +953,7 @@ export async function exportFullDiagramByAdjustingViewportToPngDataUrl(
     return await (await import('html-to-image')).toPng(root, {
       backgroundColor: '#ffffff',
       quality: 1.0,
-      pixelRatio,
+      pixelRatio: bounds.pixelRatio,
       cacheBust: true,
       width: exportWidth,
       height: exportHeight,
@@ -964,8 +1016,9 @@ export async function exportFullDiagramByAdjustingViewportToSvgDataUrl(
   const prevSvgHeight = rendererSvg?.getAttribute('height') || null;
   const prevSvgOverflow = rendererSvg ? (rendererSvg.style as any).overflow : undefined;
 
-  const exportWidth = Math.ceil(bbox.width + paddingPx * 2);
-  const exportHeight = Math.ceil(bbox.height + paddingPx * 2);
+  const bounds = normalizeRasterExportBounds(bbox.width + paddingPx * 2, bbox.height + paddingPx * 2, 1);
+  const exportWidth = bounds.width;
+  const exportHeight = bounds.height;
 
   root.style.width = `${exportWidth}px`;
   root.style.height = `${exportHeight}px`;
