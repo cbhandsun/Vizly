@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { MermaidParser } from './MermaidParser';
+import {
+  MermaidParser,
+  MERMAID_PARSER_MAX_CHARS,
+  MERMAID_PARSER_MAX_EDGES,
+  MERMAID_PARSER_MAX_LABEL_CHARS,
+  MERMAID_PARSER_MAX_NODES,
+} from './MermaidParser';
 
 describe('MermaidParser', () => {
   const parser = MermaidParser.getInstance();
@@ -83,5 +89,54 @@ describe('MermaidParser', () => {
     expect(nodes.length).toBe(6);
     expect(edges.length).toBe(4);
     expect(edges.find(e => e.source === 'E' && e.target === 'F')?.animated).toBe(true);
+  });
+
+  it('应该拒绝超大的 Mermaid 输入', () => {
+    expect(() => parser.parse('x'.repeat(MERMAID_PARSER_MAX_CHARS + 1))).toThrow('too large');
+  });
+
+  it('应该限制 flowchart 导入生成的节点和连线数量', () => {
+    const lines = ['graph TD'];
+    for (let i = 0; i < MERMAID_PARSER_MAX_EDGES + 50; i += 1) {
+      lines.push(`N${i}[Node ${i}] --> N${i + 1}[Node ${i + 1}]`);
+    }
+
+    const { nodes, edges } = parser.parse(lines.join('\n'));
+
+    expect(nodes.length).toBeLessThanOrEqual(MERMAID_PARSER_MAX_NODES);
+    expect(edges.length).toBeLessThanOrEqual(MERMAID_PARSER_MAX_EDGES);
+  });
+
+  it('应该截断过长的节点标签', () => {
+    const longLabel = 'x'.repeat(MERMAID_PARSER_MAX_LABEL_CHARS + 100);
+    const { nodes } = parser.parse(`graph TD\nA[${longLabel}]`);
+
+    expect(nodes.find(n => n.id === 'A')?.data.label).toHaveLength(MERMAID_PARSER_MAX_LABEL_CHARS);
+  });
+
+  it('应该拒绝危险的原型污染节点 ID', () => {
+    const { nodes, edges } = parser.parse(`
+      graph TD
+      __proto__[Unsafe] --> Safe[Safe]
+      Safe --> constructor[Unsafe Edge Target]
+    `);
+
+    expect(nodes.map(node => node.id)).toEqual(expect.arrayContaining(['node-0', 'Safe', 'node-2']));
+    expect(nodes.map(node => node.id)).not.toContain('__proto__');
+    expect(nodes.map(node => node.id)).not.toContain('constructor');
+    expect(edges.every(edge => edge.source !== '__proto__' && edge.target !== 'constructor')).toBe(true);
+  });
+
+  it('应该限制 mindmap 导入规模并保留缩进层级', () => {
+    const lines = ['mindmap', '  root((Root))'];
+    for (let i = 0; i < MERMAID_PARSER_MAX_NODES + 50; i += 1) {
+      lines.push(`    Child ${i}`);
+    }
+
+    const { nodes, edges } = parser.parse(lines.join('\n'));
+
+    expect(nodes.length).toBeLessThanOrEqual(MERMAID_PARSER_MAX_NODES);
+    expect(edges.length).toBeLessThanOrEqual(MERMAID_PARSER_MAX_EDGES);
+    expect(edges[0]?.source).toBe('mm-import-1');
   });
 });

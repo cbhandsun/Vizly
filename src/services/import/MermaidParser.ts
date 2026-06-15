@@ -2,6 +2,14 @@ import { Node, Edge } from '@xyflow/react';
 
 // Default branch color palette for auto-assigned mindmap branch colors
 const MINDMAP_PALETTE = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
+export const MERMAID_PARSER_MAX_CHARS = 2 * 1024 * 1024;
+export const MERMAID_PARSER_MAX_LINES = 5_000;
+export const MERMAID_PARSER_MAX_LINE_CHARS = 10_000;
+export const MERMAID_PARSER_MAX_NODES = 1_000;
+export const MERMAID_PARSER_MAX_EDGES = 2_000;
+export const MERMAID_PARSER_MAX_ID_CHARS = 256;
+export const MERMAID_PARSER_MAX_LABEL_CHARS = 1_000;
+const BLOCKED_MERMAID_IDS = new Set(['__proto__', 'prototype', 'constructor']);
 
 /**
  * Mermaid 语法解析引擎 (Phase 6: Lightweight Parser)
@@ -22,7 +30,7 @@ export class MermaidParser {
   }
 
   public parse(input: string): { nodes: Node[]; edges: Edge[] } {
-    const trimmed = input.trim();
+    const trimmed = this.prepareInput(input);
     // Auto-detect Mermaid mindmap syntax
     if (/^mindmap\b/i.test(trimmed)) {
       return this.parseMindmap(trimmed);
@@ -33,7 +41,7 @@ export class MermaidParser {
   // ─── Flowchart / Architecture Diagram Parser ───────────────────────────────
 
   private parseFlowchart(input: string): { nodes: Node[]; edges: Edge[] } {
-    const lines = input.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('%%'));
+    const lines = this.getSafeLines(input);
     const nodes: Map<string, Node> = new Map();
     const edges: Edge[] = [];
     let currentParentId: string | undefined = undefined;
@@ -53,21 +61,21 @@ export class MermaidParser {
       kafka: 'messageQueue',
     };
 
-    lines.forEach(line => {
+    for (const line of lines) {
       const trimmedLine = line.trim();
-      if (trimmedLine.match(/^(graph|flowchart)\s+(TD|LR|TB|BT|RL)/i)) return;
+      if (trimmedLine.match(/^(graph|flowchart)\s+(TD|LR|TB|BT|RL)/i)) continue;
 
       const subgraphMatch = trimmedLine.match(/subgraph\s+([^\s[({]+)(?:\s+\[(.+?)\])?/i);
       if (subgraphMatch) {
-        const id = subgraphMatch[1];
-        const label = subgraphMatch[2] || id;
+        const id = this.sanitizeId(subgraphMatch[1], `group-${nodes.size}`);
+        const label = this.sanitizeLabel(subgraphMatch[2] || id);
         this.ensureNodeExists(nodes, id, undefined, {}, label, 'group');
         currentParentId = id;
-        return;
+        continue;
       }
       if (trimmedLine === 'end') {
         currentParentId = undefined;
-        return;
+        continue;
       }
 
       // Extract explicit node definitions e.g. A[Label] or B((Circle))
@@ -100,7 +108,7 @@ export class MermaidParser {
         const label = match[3] || '';
         const targetId = this.extractId(match[4]);
 
-        if (sourceId && targetId) {
+        if (sourceId && targetId && edges.length < MERMAID_PARSER_MAX_EDGES) {
           this.ensureNodeExists(nodes, sourceId, currentParentId, ARCH_KEYWORDS);
           this.ensureNodeExists(nodes, targetId, currentParentId, ARCH_KEYWORDS);
           edges.push({
@@ -126,7 +134,7 @@ export class MermaidParser {
           }
         }
       }
-    });
+    }
 
     const resultNodes = Array.from(nodes.values()).map((n, idx) => ({
       ...n,
@@ -153,7 +161,7 @@ export class MermaidParser {
    *   {{text}} — hexagon  >text] — flag    plain text — no shape
    */
   private parseMindmap(input: string): { nodes: Node[]; edges: Edge[] } {
-    const rawLines = input.split('\n');
+    const rawLines = this.getSafeLines(input, true);
     // Skip the "mindmap" header line itself
     const contentLines = rawLines.slice(1).filter(l => l.trimStart() !== '');
 
@@ -165,6 +173,7 @@ export class MermaidParser {
     let nodeCounter = 0;
 
     for (const line of contentLines) {
+      if (nodes.length >= MERMAID_PARSER_MAX_NODES) break;
       const stripped = line.trimStart();
       if (!stripped || stripped.startsWith('%%')) continue;
 
@@ -175,7 +184,7 @@ export class MermaidParser {
         stack.pop();
       }
 
-      const label = this.extractMindmapLabel(stripped);
+      const label = this.sanitizeLabel(this.extractMindmapLabel(stripped));
       const id = `mm-import-${++nodeCounter}`;
       const depth = stack.length; // root = 0, first-level branches = 1, etc.
 
@@ -206,7 +215,7 @@ export class MermaidParser {
       });
 
       // Link to parent
-      if (stack.length > 0) {
+      if (stack.length > 0 && edges.length < MERMAID_PARSER_MAX_EDGES) {
         const parentId = stack[stack.length - 1].id;
         edges.push({
           id: `mm-e-${parentId}-${id}`,
@@ -249,9 +258,37 @@ export class MermaidParser {
 
   // ─── Shared Helpers ────────────────────────────────────────────────────────
 
+  private prepareInput(input: string): string {
+    if (typeof input !== 'string') {
+      throw new Error('Mermaid input must be text.');
+    }
+    if (input.length > MERMAID_PARSER_MAX_CHARS) {
+      throw new Error('Mermaid input is too large.');
+    }
+    return input.trim();
+  }
+
+  private getSafeLines(input: string, preserveIndent = false): string[] {
+    return input
+      .split('\n')
+      .slice(0, MERMAID_PARSER_MAX_LINES)
+      .map(l => (preserveIndent ? l.slice(0, MERMAID_PARSER_MAX_LINE_CHARS) : l.trim().slice(0, MERMAID_PARSER_MAX_LINE_CHARS)))
+      .filter(l => l && !l.startsWith('%%'));
+  }
+
+  private sanitizeLabel(value: string): string {
+    return String(value || '').trim().slice(0, MERMAID_PARSER_MAX_LABEL_CHARS);
+  }
+
+  private sanitizeId(value: string, fallback: string): string {
+    const id = String(value || '').trim().slice(0, MERMAID_PARSER_MAX_ID_CHARS);
+    if (!id || BLOCKED_MERMAID_IDS.has(id)) return fallback;
+    return id;
+  }
+
   private extractId(text: string): string {
     const match = text.match(/^([^\s\->([{|}]+)/);
-    return match ? match[1] : text.trim();
+    return this.sanitizeId(match ? match[1] : text.trim(), '');
   }
 
   private ensureNodeExists(
@@ -263,10 +300,12 @@ export class MermaidParser {
     type: string = 'architectureNode',
     rawShape?: string,
   ) {
+    if (nodes.size >= MERMAID_PARSER_MAX_NODES && !nodes.has(id)) return;
+    id = this.sanitizeId(id, `node-${nodes.size}`);
     if (nodes.has(id)) {
       const existing = nodes.get(id)!;
       if (label && (!existing.data.label || existing.data.label === id)) {
-        existing.data.label = label;
+        existing.data.label = this.sanitizeLabel(label);
       }
       if (parentId && !existing.parentId) existing.parentId = parentId;
       if (rawShape && existing.data.shape === 'rectangle') {
@@ -275,7 +314,7 @@ export class MermaidParser {
       return;
     }
 
-    const finalLabel = label || id;
+    const finalLabel = this.sanitizeLabel(label || id);
     let archType: string | undefined = undefined;
 
     if (type === 'architectureNode') {
