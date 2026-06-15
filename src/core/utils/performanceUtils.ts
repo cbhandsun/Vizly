@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * 性能监控工具
  * 提供组件渲染性能监控和优化建议

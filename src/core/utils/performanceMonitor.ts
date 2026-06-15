@@ -1,10 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * 性能监控和错误追踪工具
  * 提供应用性能监控、错误收集和分析功能
  */
 
 import { safeLog } from './consoleCleanup';
+import { redactSensitiveLogValue, sanitizeUrlForLog } from './logSecurity';
 
 // 性能日志记录函数
 const perfLog = {
@@ -21,6 +21,12 @@ const perfLog = {
     }
   },
   log: (...args: any[]) => console.log(...args),
+};
+
+const currentLogUrl = (): string => sanitizeUrlForLog(window.location.href);
+
+const sanitizeReportData = <T extends Record<string, any>>(report: T): T => {
+  return redactSensitiveLogValue(report) as T;
 };
 
 // 性能指标接口
@@ -167,7 +173,7 @@ class PerformanceMonitor {
       lineno: event.lineno,
       colno: event.colno,
       userAgent: navigator.userAgent,
-      url: window.location.href,
+      url: currentLogUrl(),
       userId: this.userId,
       sessionId: this.sessionId
     };
@@ -186,7 +192,7 @@ class PerformanceMonitor {
       message: event.reason?.message || String(event.reason),
       stack: event.reason?.stack,
       userAgent: navigator.userAgent,
-      url: window.location.href,
+      url: currentLogUrl(),
       userId: this.userId,
       sessionId: this.sessionId
     };
@@ -204,15 +210,15 @@ class PerformanceMonitor {
         id: this.generateErrorId(),
         timestamp: Date.now(),
         type: 'resource',
-        message: `Resource load failed: ${(target as any).src || (target as any).href}`,
+        message: `Resource load failed: ${sanitizeUrlForLog((target as any).src || (target as any).href)}`,
         userAgent: navigator.userAgent,
-        url: window.location.href,
+        url: currentLogUrl(),
         userId: this.userId,
         sessionId: this.sessionId,
         additionalData: {
           tagName: target.tagName,
-          src: (target as any).src,
-          href: (target as any).href
+          src: sanitizeUrlForLog((target as any).src),
+          href: sanitizeUrlForLog((target as any).href)
         }
       };
 
@@ -345,10 +351,10 @@ class PerformanceMonitor {
       message: error.message,
       stack: error.stack,
       userAgent: navigator.userAgent,
-      url: window.location.href,
+      url: currentLogUrl(),
       userId: this.userId,
       sessionId: this.sessionId,
-      additionalData
+      additionalData: additionalData ? sanitizeReportData(additionalData) : undefined
     };
 
     this.addErrorReport(errorReport);
@@ -358,7 +364,7 @@ class PerformanceMonitor {
    * 添加错误报告
    */
   private addErrorReport(errorReport: ErrorReport): void {
-    this.errorQueue.push(errorReport);
+    this.errorQueue.push(sanitizeReportData(errorReport));
 
     if (this.errorQueue.length > this.maxQueueSize) {
       this.errorQueue.shift();
@@ -379,13 +385,13 @@ class PerformanceMonitor {
       timestamp: Date.now(),
       metrics,
       userAgent: navigator.userAgent,
-      url: window.location.href,
+      url: currentLogUrl(),
       userId: this.userId,
       sessionId: this.sessionId,
       ...additionalData
     };
 
-    this.performanceQueue.push(report);
+    this.performanceQueue.push(sanitizeReportData(report));
 
     if (this.performanceQueue.length > this.maxQueueSize) {
       this.performanceQueue.shift();
