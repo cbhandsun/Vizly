@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { Instances, Instance } from '@react-three/drei';
 import { WAREHOUSE } from './constants';
-import { useWarehouse3D } from './WarehouseContext';
+import { useWarehouse3D } from './useWarehouse3D';
 
 // --- Shared Optimization Helpers ---
 const tempObject = new THREE.Object3D();
@@ -15,8 +15,14 @@ const PALETTES = {
     MANUAL: ["#e67e22", "#f39c12", "#e17055", "#fdcb6e", "#fab1a0"]
 };
 
-const getThemeColor = (palette: keyof typeof PALETTES) => {
-    return PALETTES[palette][Math.floor(Math.random() * PALETTES[palette].length)];
+const deterministicUnit = (seed: number): number => {
+    const value = Math.sin(seed * 12.9898) * 43758.5453;
+    return value - Math.floor(value);
+};
+
+const getThemeColor = (palette: keyof typeof PALETTES, index = 0) => {
+    const colors = PALETTES[palette];
+    return colors[index % colors.length];
 };
 
 // --- Static Structure ---
@@ -98,11 +104,11 @@ const AnimatedPackages: React.FC = () => {
         const sArray = new Float32Array(packageCount * 3);
         for (let i = 0; i < packageCount; i++) {
             const theme = i % 15 < 5 ? 'CARDBOARD' : (i % 15 < 10 ? 'AUTOMATED' : 'MANUAL');
-            tempColor.set(getThemeColor(theme));
+            tempColor.set(getThemeColor(theme, i));
             tempColor.toArray(cArray, i * 3);
-            sArray[i * 3] = 1.3 + Math.random() * 0.2;
-            sArray[i * 3 + 1] = 0.8 + Math.random() * 0.4;
-            sArray[i * 3 + 2] = 1.3 + Math.random() * 0.2;
+            sArray[i * 3] = 1.3 + deterministicUnit(i + 1) * 0.2;
+            sArray[i * 3 + 1] = 0.8 + deterministicUnit(i + 101) * 0.4;
+            sArray[i * 3 + 2] = 1.3 + deterministicUnit(i + 201) * 0.2;
         }
         return { colors: cArray, initialScales: sArray };
     }, []);
@@ -115,7 +121,9 @@ const AnimatedPackages: React.FC = () => {
 
         for (let i = 0; i < packageCount; i++) {
             const t = (time * speed + i * (pathPeriod / packageCount)) % pathPeriod;
-            let x = 0, z = 0, rotation = 0;
+            let x: number;
+            let z: number;
+            let rotation: number;
             if (t < 100) { x = 7; z = 50 - t; rotation = 0; }
             else if (t < 122) { const turnT = (t - 100) / 22; const angle = turnT * Math.PI; x = Math.cos(angle) * 7; z = -50 - Math.sin(angle) * 7; rotation = angle; }
             else if (t < 222) { const segT = t - 122; x = -7; z = -50 + segT; rotation = Math.PI; }
@@ -153,11 +161,11 @@ const SorterPackages: React.FC = () => {
         const palettes: (keyof typeof PALETTES)[] = ['CARDBOARD', 'AUTOMATED', 'MANUAL'];
         for (let i = 0; i < totalCount; i++) {
             const theme = palettes[i % 3];
-            tempColor.set(getThemeColor(theme));
+            tempColor.set(getThemeColor(theme, i));
             tempColor.toArray(cArray, i * 3);
         }
         return { colors: cArray };
-    }, []);
+    }, [totalCount]);
 
     useFrame(({ clock }) => {
         if (!meshRef.current || !showFlow) return;
@@ -208,7 +216,7 @@ const RetrievalPackages: React.FC = () => {
     const { colors } = useMemo(() => {
         const cArray = new Float32Array(count * 3);
         for (let i = 0; i < count; i++) {
-            tempColor.set(getThemeColor('AUTOMATED'));
+            tempColor.set(getThemeColor('AUTOMATED', i));
             tempColor.toArray(cArray, i * 3);
         }
         return { colors: cArray };
@@ -268,7 +276,7 @@ const InboundPackages: React.FC = () => {
     const { colors } = useMemo(() => {
         const cArray = new Float32Array(count * 3);
         for (let i = 0; i < count; i++) {
-            tempColor.set(getThemeColor('MANUAL'));
+            tempColor.set(getThemeColor('MANUAL', i));
             tempColor.toArray(cArray, i * 3);
         }
         return { colors: cArray };
@@ -330,7 +338,7 @@ const PalletStacks: React.FC = () => {
                         <mesh position={[0, 0.7, 0]}><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color={color1} /></mesh>
                         <group position={[1.5, 0, 0.5]}>
                             <mesh position={[0, 0.1, 0]}><boxGeometry args={[1.2, 0.2, 1.2]} /><meshStandardMaterial color="#A0522D" /></mesh>
-                            <mesh position={[0, 0.7, 0]}><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color={Math.random() > 0.5 ? color2 : color3} /></mesh>
+                            <mesh position={[0, 0.7, 0]}><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color={i % 2 === 0 ? color2 : color3} /></mesh>
                         </group>
                     </group>
                 );

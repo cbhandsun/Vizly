@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Instances, Instance } from '@react-three/drei';
 import { WAREHOUSE } from './constants';
-import { useWarehouse3D } from './WarehouseContext';
+import { useWarehouse3D } from './useWarehouse3D';
 
 const StructuralElements: React.FC = () => {
     const { showRealism } = useWarehouse3D();

@@ -1,9 +1,9 @@
-// @ts-nocheck
 import React, { useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Instances, Instance } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { WAREHOUSE } from './constants';
+import { createAsrsLayout, getAsrsDimensions, getRandomCraneTarget, type CraneTarget } from './asrsLayout';
 
 // --- Shared Geometries (Optimization) ---
 const mastGeo = new THREE.BoxGeometry(0.2, 25, 0.4);
@@ -13,35 +13,23 @@ const carriageGeo = new THREE.BoxGeometry(0.8, 0.2, 1.2);
 const rackGeoBase = new THREE.BoxGeometry(1, 25, 110);
 const boxGeoBase = new THREE.BoxGeometry(1, 1, 1);
 const floorGeoBase = new THREE.BoxGeometry(1.5, 0.1, 110);
-
-// --- Types ---
-interface AsrsBox {
-    position: [number, number, number];
-    scale: [number, number, number];
-    color: THREE.Color;
-}
-
-interface AsrsRack {
-    position: [number, number, number];
-}
-
-interface AsrsData {
-    rackInstances: AsrsRack[];
-    boxInstances: AsrsBox[];
-}
+const rackMaterial = new THREE.MeshStandardMaterial({ color: '#2c3e50' });
+const boxMaterial = new THREE.MeshStandardMaterial({ color: '#ffffff' });
+const floorMaterial = new THREE.MeshStandardMaterial({ color: '#111' });
 
 // --- Animated Crane Component ---
-const AnimatedCrane: React.FC<{ aisleX: number, depth: number, height: number }> = ({ aisleX, depth, height }) => {
+const AnimatedCrane: React.FC<{ aisleX: number; depth: number; height: number }> = ({ aisleX, depth, height }) => {
     const craneGroupRef = useRef<THREE.Group>(null);
     const carriageRef = useRef<THREE.Mesh>(null);
-    const [target, setTarget] = useState({ z: 0, y: 5, wait: 0 });
+    const [target, setTarget] = useState<CraneTarget>({ z: 0, y: 5, wait: 0 });
 
     useFrame((_, delta) => {
         if (!craneGroupRef.current || !carriageRef.current) return;
+        const safeDelta = Number.isFinite(delta) && delta > 0 ? delta : 0;
 
         const currentZ = craneGroupRef.current.position.z;
         const diffZ = target.z - currentZ;
-        const speedZ = 12 * delta;
+        const speedZ = 12 * safeDelta;
 
         if (Math.abs(diffZ) > 0.1) {
             craneGroupRef.current.position.z += Math.sign(diffZ) * Math.min(Math.abs(diffZ), speedZ);
@@ -49,7 +37,7 @@ const AnimatedCrane: React.FC<{ aisleX: number, depth: number, height: number }>
 
         const currentY = carriageRef.current.position.y;
         const diffY = target.y - currentY;
-        const speedY = 6 * delta;
+        const speedY = 6 * safeDelta;
 
         if (Math.abs(diffY) > 0.1) {
             carriageRef.current.position.y += Math.sign(diffY) * Math.min(Math.abs(diffY), speedY);
@@ -58,9 +46,7 @@ const AnimatedCrane: React.FC<{ aisleX: number, depth: number, height: number }>
         if (Math.abs(diffZ) < 0.2 && Math.abs(diffY) < 0.2) {
             if (target.wait > 0) {
                 if (Math.random() < 0.02) {
-                    const newZ = (Math.random() - 0.5) * (depth - 4);
-                    const newY = Math.random() * (height - 4) + 2;
-                    setTarget({ z: newZ, y: newY, wait: 1 });
+                    setTarget(getRandomCraneTarget(depth, height));
                 }
             } else {
                 setTarget(prev => ({ ...prev, wait: 1 }));
@@ -87,37 +73,11 @@ const AnimatedCrane: React.FC<{ aisleX: number, depth: number, height: number }>
 };
 
 const AsrsSystem: React.FC = () => {
-    const width = WAREHOUSE.ASRS_X[1] - WAREHOUSE.ASRS_X[0];
-    const depth = 110;
-    const height = 25;
-
-    const { rackInstances, boxInstances, floorXPositions } = useMemo(() => {
-        const racks: AsrsRack[] = [];
-        const boxes: AsrsBox[] = [];
-        const floors: number[] = [];
-
-        for (let i = 0; i < 12; i++) {
-            const aisleX = (i - 6) * (width / 13) + 2;
-            floors.push(aisleX);
-            racks.push({ position: [aisleX - 1.5, height / 2, 0] });
-            racks.push({ position: [aisleX + 1.5, height / 2, 0] });
-
-            const addBoxes = (offsetX: number) => {
-                for (let b = 0; b < 40; b++) {
-                    if (Math.random() > 0.3) {
-                        boxes.push({
-                            position: [aisleX + offsetX, Math.random() * height * 0.9 + 1, (Math.random() - 0.5) * depth * 0.9],
-                            scale: [0.8, 0.8, 1.0],
-                            color: new THREE.Color().setHSL(Math.random(), 0.6, 0.3)
-                        });
-                    }
-                }
-            };
-            addBoxes(-1.1);
-            addBoxes(1.1);
-        }
-        return { rackInstances: racks, boxInstances: boxes, floorXPositions: floors };
-    }, [width, height, depth]);
+    const { width, depth, height } = getAsrsDimensions(WAREHOUSE.ASRS_X);
+    const { rackInstances, boxInstances, floorXPositions } = useMemo(
+        () => createAsrsLayout(width, depth, height),
+        [width, depth, height]
+    );
 
     return (
         <group position={[(WAREHOUSE.ASRS_X[0] + WAREHOUSE.ASRS_X[1]) / 2, 0, -5]}>
@@ -132,15 +92,15 @@ const AsrsSystem: React.FC = () => {
             </mesh>
 
             {/* Optimized Static Infrastructure */}
-            <Instances range={50} geometry={rackGeoBase} material={new THREE.MeshStandardMaterial({ color: "#2c3e50" })} castShadow>
+            <Instances range={50} geometry={rackGeoBase} material={rackMaterial} castShadow>
                 {rackInstances.map((d, i) => <Instance key={i} position={d.position} />)}
             </Instances>
 
-            <Instances range={2000} geometry={boxGeoBase} material={new THREE.MeshStandardMaterial({ color: "#ffffff" })} castShadow>
+            <Instances range={2000} geometry={boxGeoBase} material={boxMaterial} castShadow>
                 {boxInstances.map((d, i) => <Instance key={i} position={d.position} scale={d.scale} color={d.color} />)}
             </Instances>
 
-            <Instances range={12} geometry={floorGeoBase} material={new THREE.MeshStandardMaterial({ color: "#111" })}>
+            <Instances range={12} geometry={floorGeoBase} material={floorMaterial}>
                 {floorXPositions.map((x, i) => <Instance key={i} position={[x, 0.1, 0]} />)}
             </Instances>
 

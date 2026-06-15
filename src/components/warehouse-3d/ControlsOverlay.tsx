@@ -1,5 +1,5 @@
 import React from 'react';
-import { useWarehouse3D } from './WarehouseContext';
+import { useWarehouse3D } from './useWarehouse3D';
 import { SyncOutlined, TagOutlined, RightCircleOutlined, ExpandOutlined } from '@ant-design/icons';
 
 const ControlsOverlay: React.FC = () => {

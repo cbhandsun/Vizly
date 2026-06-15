@@ -1,13 +1,18 @@
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useState } from 'react';
 import Scene from '@/components/warehouse-3d/Scene';
 import { Warehouse3DProvider } from '@/components/warehouse-3d/WarehouseContext';
 import ControlsOverlay from '@/components/warehouse-3d/ControlsOverlay';
 
 const Warehouse3DPage: React.FC = () => {
+    const [sceneReady, setSceneReady] = useState(false);
+
     return (
         <Warehouse3DProvider>
-            <div className="relative w-full h-screen bg-slate-900 overflow-hidden font-sans">
+            <div
+                className="relative w-full h-screen bg-slate-900 overflow-hidden font-sans"
+                data-smoke-ready={sceneReady ? 'warehouse-3d' : undefined}
+            >
                 {/* Background mesh/glow effects */}
                 <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-900/80 to-slate-900"></div>
                 
@@ -17,7 +22,7 @@ const Warehouse3DPage: React.FC = () => {
                         <div className="text-lg font-medium tracking-wide">Loading 3D Environment...</div>
                     </div>
                 }>
-                    <Scene />
+                    <Scene onReady={() => setSceneReady(true)} />
                 </Suspense>
                 
                 {/* Modern Floating Header Panel */}

@@ -1,7 +1,6 @@
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { WAREHOUSE } from './constants';
 
 const FlowArrow: React.FC<{ position: [number, number, number], rotation?: [number, number, number] }> = ({ position, rotation = [0, 0, 0] }) => {
     const meshRef = useRef<THREE.Mesh>(null);
@@ -21,7 +20,7 @@ const FlowArrow: React.FC<{ position: [number, number, number], rotation?: [numb
     );
 };
 
-import { useWarehouse3D } from './WarehouseContext';
+import { useWarehouse3D } from './useWarehouse3D';
 
 const LogisticsFlow: React.FC = () => {
     const { showFlow } = useWarehouse3D();

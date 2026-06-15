@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Html } from '@react-three/drei';
-import { WAREHOUSE } from './constants';
-import { useWarehouse3D } from './WarehouseContext';
+import { useWarehouse3D } from './useWarehouse3D';
 
 const ToggleButton: React.FC<{ label: string, active: boolean, onClick: () => void, color?: string }> = ({ label, active, onClick, color = "#3498db" }) => (
     <div

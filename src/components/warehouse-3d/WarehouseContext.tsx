@@ -1,19 +1,5 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
-
-interface Warehouse3DContextType {
-    autoRotate: boolean;
-    setAutoRotate: (v: boolean) => void;
-    showLabels: boolean;
-    setShowLabels: (v: boolean) => void;
-    showFlow: boolean;
-    setShowFlow: (v: boolean) => void;
-    showRealism: boolean;
-    setShowRealism: (v: boolean) => void;
-    resetViewTrigger: number;
-    triggerResetView: () => void;
-}
-
-const Warehouse3DContext = createContext<Warehouse3DContextType | undefined>(undefined);
+import React, { useState, useMemo } from 'react';
+import { Warehouse3DContext } from './WarehouseContextValue';
 
 export const Warehouse3DProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [autoRotate, setAutoRotate] = useState(false);
@@ -37,10 +23,4 @@ export const Warehouse3DProvider: React.FC<{ children: React.ReactNode }> = ({ c
             {children}
         </Warehouse3DContext.Provider>
     );
-};
-
-export const useWarehouse3D = () => {
-    const context = useContext(Warehouse3DContext);
-    if (!context) throw new Error("useWarehouse3D must be used within Warehouse3DProvider");
-    return context;
 };

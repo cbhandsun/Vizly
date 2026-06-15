@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text } from '@react-three/drei';
 import { WAREHOUSE } from './constants';
-import { useWarehouse3D } from './WarehouseContext';
+import { useWarehouse3D } from './useWarehouse3D';
 
 const FloatingLabel: React.FC<{ position: [number, number, number], text: string, color?: string }> = ({ position, text, color = WAREHOUSE.COLORS.ZONE_LABELS }) => {
     return (

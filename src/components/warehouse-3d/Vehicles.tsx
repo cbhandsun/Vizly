@@ -1,9 +1,7 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Instances, Instance } from '@react-three/drei';
-import { WAREHOUSE } from './constants';
-import { useWarehouse3D } from './WarehouseContext';
+import { useWarehouse3D } from './useWarehouse3D';
 
 // --- Shared Geometries (Optimization: Create once) ---
 const chassisGeo = new THREE.BoxGeometry(1.5, 0.8, 2.5);
@@ -80,10 +78,11 @@ const ForkliftModel: React.FC<{ color?: string, hasLoad?: boolean }> = ({ color 
 const AnimatedVehicle: React.FC<{
     path: [number, number, number][],
     speed?: number,
-    color?: string
-}> = ({ path, speed = 5, color }) => {
+    color?: string,
+    initialOffset?: number
+}> = ({ path, speed = 5, color, initialOffset = 0 }) => {
     const groupRef = useRef<THREE.Group>(null);
-    const progress = useRef(Math.random() * path.length);
+    const progress = useRef(initialOffset * path.length);
 
     useFrame((_, delta) => {
         if (!groupRef.current) return;
@@ -124,11 +123,11 @@ const Vehicles: React.FC = () => {
 
     return (
         <group>
-            <AnimatedVehicle path={receivingPath} speed={6} color="#e67e22" />
-            <AnimatedVehicle path={receivingPath} speed={6} color="#f39c12" />
-            <AnimatedVehicle path={replenishmentPath} speed={8} color="#f1c40f" />
-            <AnimatedVehicle path={replenishmentPath} speed={8} color="#f1c40f" />
-            <AnimatedVehicle path={shippingPath} speed={7} color="#d35400" />
+            <AnimatedVehicle path={receivingPath} speed={6} color="#e67e22" initialOffset={0} />
+            <AnimatedVehicle path={receivingPath} speed={6} color="#f39c12" initialOffset={0.45} />
+            <AnimatedVehicle path={replenishmentPath} speed={8} color="#f1c40f" initialOffset={0.15} />
+            <AnimatedVehicle path={replenishmentPath} speed={8} color="#f1c40f" initialOffset={0.65} />
+            <AnimatedVehicle path={shippingPath} speed={7} color="#d35400" initialOffset={0.25} />
         </group>
     );
 };

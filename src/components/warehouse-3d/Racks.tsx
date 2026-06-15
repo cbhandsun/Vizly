@@ -24,6 +24,11 @@ const beamMatMZ = new THREE.MeshStandardMaterial({ color: WAREHOUSE.COLORS.RACKS
 const palletMat = new THREE.MeshStandardMaterial({ color: "#8d6e63" });
 const boxMat = new THREE.MeshStandardMaterial({ color: "#e67e22" });
 
+const deterministicUnit = (seed: number): number => {
+    const value = Math.sin(seed * 12.9898) * 43758.5453;
+    return value - Math.floor(value);
+};
+
 const Racks: React.FC = () => {
 
     // Configuration for High Bay Racks
@@ -66,20 +71,21 @@ const Racks: React.FC = () => {
                 // Items
                 for (let xIdx = 0; xIdx < numSlots; xIdx++) {
                     const x = startX + xIdx * 2 + 1;
-                    if (Math.random() > 0.1) {
+                    const seed = i * 10000 + sIdx * 1000 + xIdx;
+                    if (deterministicUnit(seed + 1) > 0.1) {
                         instances.push({
                             type: 'pallet',
                             position: [x, y - 0.5 + 0.1, rackZ],
                             scale: [1, 1, 1]
                         });
-                        const boxW = 1.2 + Math.random() * 0.2;
-                        const boxH = 0.8 + Math.random() * 0.4;
-                        const boxD = 1.2 + Math.random() * 0.2;
+                        const boxW = 1.2 + deterministicUnit(seed + 2) * 0.2;
+                        const boxH = 0.8 + deterministicUnit(seed + 3) * 0.4;
+                        const boxD = 1.2 + deterministicUnit(seed + 4) * 0.2;
                         instances.push({
                             type: 'box',
                             position: [x, y - 0.5 + 0.15 + boxH / 2, rackZ],
                             scale: [boxW, boxH, boxD],
-                            color: new THREE.Color().setHSL(Math.random(), 0.6, 0.5)
+                            color: new THREE.Color().setHSL(deterministicUnit(seed + 5), 0.6, 0.5)
                         });
                     }
                 }
@@ -126,20 +132,21 @@ const Racks: React.FC = () => {
                     // Items
                     for (let xIdx = 0; xIdx < numSlots; xIdx++) {
                         const x = block.startX + xIdx * 2 + 1;
-                        if (Math.random() > 0.1) {
+                        const seed = block.startX * 100 + i * 10000 + sIdx * 1000 + xIdx;
+                        if (deterministicUnit(seed + 1) > 0.1) {
                             instances.push({
                                 type: 'pallet',
                                 position: [x, y - 0.5 + 0.1, rackZ],
                                 scale: [1, 1, 1]
                             });
-                            const boxW = 1.2 + Math.random() * 0.2;
-                            const boxH = 0.8 + Math.random() * 0.4;
-                            const boxD = 1.2 + Math.random() * 0.2;
+                            const boxW = 1.2 + deterministicUnit(seed + 2) * 0.2;
+                            const boxH = 0.8 + deterministicUnit(seed + 3) * 0.4;
+                            const boxD = 1.2 + deterministicUnit(seed + 4) * 0.2;
                             instances.push({
                                 type: 'box',
                                 position: [x, y - 0.5 + 0.15 + boxH / 2, rackZ],
                                 scale: [boxW, boxH, boxD],
-                                color: new THREE.Color().setHSL(Math.random(), 0.6, 0.5)
+                                color: new THREE.Color().setHSL(deterministicUnit(seed + 5), 0.6, 0.5)
                             });
                         }
                     }

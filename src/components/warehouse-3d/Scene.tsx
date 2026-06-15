@@ -1,17 +1,22 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import {
     OrbitControls, _Environment, PerspectiveCamera, ContactShadows, Sky,
     AdaptiveDpr, AdaptiveEvents, Bvh
 } from '@react-three/drei';
-import WarehouseModel from './WarehouseModel';
 
-import { useWarehouse3D } from './WarehouseContext';
+import { useWarehouse3D } from './useWarehouse3D';
 import { useRef, useEffect } from 'react';
 
-const Scene: React.FC = () => {
+const WarehouseModel = lazy(() => import('./WarehouseModel'));
+
+export interface SceneProps {
+    onReady?: () => void;
+}
+
+const Scene: React.FC<SceneProps> = ({ onReady }) => {
     const { autoRotate, resetViewTrigger } = useWarehouse3D();
-    const controlsRef = useRef<any>(null);
+    const controlsRef = useRef<{ reset: () => void } | null>(null);
 
     useEffect(() => {
         if (controlsRef.current) {
@@ -22,9 +27,11 @@ const Scene: React.FC = () => {
     return (
         <Canvas
             shadows
-            dpr={[1, 2]}
+            dpr={1}
+            onCreated={onReady}
             gl={{
                 antialias: true,
+                powerPreference: 'high-performance',
                 logarithmicDepthBuffer: true, // Industry best practice for large scale scenes to prevent z-fighting
             }}
         >
@@ -37,7 +44,7 @@ const Scene: React.FC = () => {
                 minDistance={30}
                 maxDistance={600}
                 enableDamping
-                autoRotate={false} // Disable auto-rotate to keep the requested angle steady
+                autoRotate={autoRotate}
                 autoRotateSpeed={0.5}
             />
 
@@ -47,7 +54,7 @@ const Scene: React.FC = () => {
                 position={[150, 200, 100]}
                 intensity={1.5}
                 castShadow
-                shadow-mapSize={[2048, 2048]}
+                shadow-mapSize={[1024, 1024]}
                 shadow-bias={-0.001}
                 shadow-normalBias={0.04} // Helps with shadow acne on curved surfaces
             >
@@ -56,7 +63,7 @@ const Scene: React.FC = () => {
 
             {/* Atmospheric Effects */}
             {/* Lift shadows purely slightly above floor (Best practice: prevent coincident geometry) */}
-            <ContactShadows position={[0, 0.02, 0]} resolution={1024} scale={500} blur={2} opacity={0.6} far={20} color="#1a1a1a" frames={1} />
+            <ContactShadows position={[0, 0.02, 0]} resolution={512} scale={500} blur={2} opacity={0.55} far={20} color="#1a1a1a" frames={1} />
             {/* <Environment preset="warehouse" /> */}
             <Sky distance={450000} sunPosition={[0, 1, -1]} inclination={0} azimuth={0.25} />
 
@@ -64,9 +71,11 @@ const Scene: React.FC = () => {
 
             {/* The Actual Content */}
             {/* Optimized Raycasting */}
-            <Bvh firstHitOnly>
-                <WarehouseModel />
-            </Bvh>
+            <Suspense fallback={null}>
+                <Bvh firstHitOnly>
+                    <WarehouseModel />
+                </Bvh>
+            </Suspense>
 
             {/* Performance Adaptivity */}
             <AdaptiveDpr pixelated />
