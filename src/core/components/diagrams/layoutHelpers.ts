@@ -2,7 +2,7 @@ import { type Node } from '@xyflow/react';
 import { type Theme } from '../../themes/EnhancedThemeManager';
 import { getDomainMain, getDomainTheme, hexToRgba } from '../shared/layoutUtils';
 import { MasterDataType, DomainData } from '../../types'; // Correctly import DomainData
-import { useLayout, type LayoutUtils, type DynamicConfig } from '../layout/useLayout';
+import { type LayoutUtils, type DynamicConfig } from '../layout/useLayout';
 
 // 此处定义了从 ArchitectureDiagramRefactored.tsx 中提取的布局辅助函数
 

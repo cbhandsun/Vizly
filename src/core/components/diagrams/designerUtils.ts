@@ -1,14 +1,17 @@
 
 import { Node, Edge, MarkerType, Position } from '@xyflow/react';
-import { StandardDiagramData, StandardNodeData, StandardEdgeData, GroupNodeData, DiagramType } from '../../models/DiagramModels';
-import dagre from 'dagre';
-import { DomainDagreLayoutStrategy } from '../../strategies/DomainDagreLayoutStrategy';
-import { DomainVerticalLayoutStrategy } from '../../strategies/DomainVerticalLayoutStrategy';
-import { DomainHorizontalLayoutStrategy } from '../../strategies/DomainHorizontalLayoutStrategy';
+import { StandardDiagramData, StandardNodeData, StandardEdgeData, GroupNodeData } from '../../models/DiagramModels';
 import { getThemeManager } from '../../themes';
-import { LayoutOptimizer } from '../layout/LayoutOptimizer';
+import { downloadFile } from '../../utils/downloadUtils';
 import { validateAndFixNodes } from '../../utils/nodeValidation';
 import { expandHandle } from '../../routing/utils/handleUtils';
+
+const resolveRestorableThemeId = (themeId?: string): string | undefined => {
+    if (!themeId || themeId === 'manual') return undefined;
+    const themeManager = getThemeManager();
+    const availableThemeIds = new Set(themeManager.getAvailableThemeIds?.() || []);
+    return availableThemeIds.has(themeId) ? themeId : undefined;
+};
 
 /**
  * Converts React Flow canvas data into the application's StandardDiagramData format.
@@ -22,9 +25,6 @@ export const canvasToStandardData = (
 
     const groups: GroupNodeData[] = [];
     const standardNodes: StandardNodeData[] = [];
-
-    // Helper to strip HTML for label usage if needed, though guide says use description
-    const stripHtml = (html: string) => html ? html.replace(/<[^>]*>?/gm, '') : '';
 
     nodes.forEach(node => {
         const isGroup = node.type === 'titleGroup' || node.type === 'subGroup';
@@ -230,14 +230,16 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
     // -------------------------------------
 
     // 尝试恢复保存的主题
-    const savedThemeId = data.metadata?.themeId || data.theme?.name;
-    if (savedThemeId && savedThemeId !== 'manual') {
+    const savedThemeId = resolveRestorableThemeId(data.metadata?.themeId || data.theme?.name);
+    if (savedThemeId) {
         getThemeManager().setTheme(savedThemeId).catch(console.warn);
         window.dispatchEvent(new CustomEvent('diagram-global-theme-changed', { detail: savedThemeId }));
     }
 
     let nodes: Node[] = [];
     const edges: Edge[] = [];
+    const { LayoutOptimizer } = await import('../layout/LayoutOptimizer');
+    const optimizer = LayoutOptimizer.getInstance();
 
     // ═══ 检测是否有已保存坐标 ═══
     const hasCanvasPositions = Array.isArray(data.nodes) &&
@@ -278,7 +280,6 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
         const titleMatch = description.match(/<b>(.*?)<\/b>/);
         const label = titleMatch ? titleMatch[1] : description.replace(/<[^>]*>?/gm, '').substring(0, 20);
 
-        const optimizer = LayoutOptimizer.getInstance();
         const toFiniteNumber = (value: unknown) => {
             const parsed = typeof value === 'string' ? parseFloat(value) : Number(value);
             return Number.isFinite(parsed) ? parsed : 0;
@@ -467,13 +468,15 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
             // ═══ 有多域 → 按标准数据 layout.type 选择域策略；未声明时保持 DomainDagre 兼容默认 ═══
             try {
                 const layoutType = String((data.layout as any)?.type || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
-                const strategy = layoutType === 'domainvertical' || layoutType === 'domainverticallayout'
-                    ? new DomainVerticalLayoutStrategy()
-                    : layoutType === 'domainhorizontal' || layoutType === 'domainhorizontallayout'
-                        ? new DomainHorizontalLayoutStrategy()
-                        : new DomainDagreLayoutStrategy();
+                const usesVerticalStrategy = layoutType === 'domainvertical' || layoutType === 'domainverticallayout';
+                const usesHorizontalStrategy = layoutType === 'domainhorizontal' || layoutType === 'domainhorizontallayout';
+                const strategy = usesVerticalStrategy
+                    ? new (await import('../../strategies/DomainVerticalLayoutStrategy')).DomainVerticalLayoutStrategy()
+                    : usesHorizontalStrategy
+                        ? new (await import('../../strategies/DomainHorizontalLayoutStrategy')).DomainHorizontalLayoutStrategy()
+                        : new (await import('../../strategies/DomainDagreLayoutStrategy')).DomainDagreLayoutStrategy();
                 const nodeLayout = (data.layout as any)?.nodeLayout
-                    ?? ((strategy instanceof DomainVerticalLayoutStrategy || strategy instanceof DomainHorizontalLayoutStrategy) ? 'vertical' : undefined);
+                    ?? ((usesVerticalStrategy || usesHorizontalStrategy) ? 'vertical' : undefined);
                 const result = await strategy.calculateLayout(nodes, edges, {
                     type: strategy.getName() as any,
                     direction: direction as 'TB' | 'LR',
@@ -499,6 +502,7 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
         }
 
         // ═══ 无多域 → 扁平 Dagre 布局 ═══
+        const dagre = (await import('dagre')).default;
         const dagreGraph = new dagre.graphlib.Graph();
         dagreGraph.setDefaultEdgeLabel(() => ({}));
         dagreGraph.setGraph({
@@ -542,16 +546,5 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
  */
 export const downloadJson = (data: object, filename: string) => {
     const jsonStr = JSON.stringify(data, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }, 100);
+    downloadFile(jsonStr, filename, 'application/json');
 };

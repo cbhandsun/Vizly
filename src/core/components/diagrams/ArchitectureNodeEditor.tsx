@@ -2,12 +2,11 @@ import React from 'react';
 import { Node } from '@xyflow/react';
 import { ArchitectureNodeData } from '../custom-nodes/ArchitectureNode';
 import { NodeDataUpdate } from '../../types/diagram-updates';
-import { Form, Select, Typography, Input, Card, Tag, Badge, Space } from 'antd';
-import { CloudServerOutlined, DashboardOutlined, SafetyCertificateOutlined, SearchOutlined } from '@ant-design/icons';
+import { Form, Select, Typography, Input, Card, Badge, Space, Button } from 'antd';
+import { DashboardOutlined, SafetyCertificateOutlined, SearchOutlined } from '@ant-design/icons';
 import { Icon } from '@iconify/react';
 
 const { Text } = Typography;
-const { TextArea } = Input;
 
 interface ArchitectureNodeEditorProps {
     selectedNodes: Node[];

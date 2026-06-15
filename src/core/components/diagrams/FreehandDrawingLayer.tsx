@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { getStroke } from 'perfect-freehand';
 
 interface DrawingOptions {

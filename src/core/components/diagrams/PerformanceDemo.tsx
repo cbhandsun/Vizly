@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     ReactFlow,
     useNodesState,
@@ -70,7 +70,7 @@ export const PerformanceDemo: React.FC = () => {
         const { nodes: n, edges: e } = generateGraph(15, 0.3); // ~15 nodes, ~60 edges
         setNodes(n);
         setEdges(e);
-    }, []);
+    }, [setEdges, setNodes]);
 
     const handleForceRelayout = () => {
         // Just trigger a re-render/update

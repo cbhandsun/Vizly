@@ -1,7 +1,6 @@
 import React from 'react';
 import { useDiagramStore } from '../../store/useDiagramStore';
 import { DiagramContextMenu } from './DiagramContextMenu';
-import { useReactFlow } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 
 import { DiagramTypePlugin, PluginContext } from '../../types/plugin';
@@ -33,7 +32,7 @@ export const ContextMenuLayer: React.FC<ContextMenuLayerProps> = ({ onAction, ac
     }
 
     return activePlugin.contributeContextMenu(targetElement, pluginCtx) || [];
-  }, [activePlugin, pluginCtx, contextMenu?.type, contextMenu?.targetId, nodes]);
+  }, [activePlugin, pluginCtx, contextMenu, nodes]);
 
   if (!contextMenu) return null;
 

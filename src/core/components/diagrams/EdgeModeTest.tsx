@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import BaseDiagramComponent from './base/BaseDiagramComponent';

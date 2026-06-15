@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useViewport, useNodes, useEdges } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { FaArrowRight, FaExpand, FaKeyboard, FaTh, FaThumbtack } from 'react-icons/fa';
-import { Tooltip, Button, Divider, Switch } from 'antd';
+import { Tooltip, Button, Divider } from 'antd';
 
 interface DiagramStatusBarProps {
     autoRoutingEnabled: boolean;

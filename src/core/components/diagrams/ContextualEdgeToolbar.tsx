@@ -61,7 +61,10 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
 
     // 同步外部 edge.label 变更
     useEffect(() => {
-        setLabelText(edge.label as string || '');
+        const timer = window.setTimeout(() => {
+            setLabelText(edge.label as string || '');
+        }, 0);
+        return () => window.clearTimeout(timer);
     }, [edge.label]);
 
     const toggleAnimation = () => {

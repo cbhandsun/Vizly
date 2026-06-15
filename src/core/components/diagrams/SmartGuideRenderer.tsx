@@ -46,7 +46,6 @@ export const SmartGuideRenderer: React.FC<SmartGuideRendererProps> = React.memo(
                 {guides.map((guide, index) => {
                     // ===== Spacing Guide（等距标注）=====
                     if (guide.type === 'spacing' && guide.spacingSegments) {
-                        const isHorizontal = guide.spacingSegments[0]?.start !== undefined;
                         return (
                             <React.Fragment key={`spacing-${index}`}>
                                 {guide.spacingSegments.map((seg, si) => {

@@ -4,7 +4,6 @@ import { useDiagramStore } from '../../store/useDiagramStore';
 import { FloatingContextToolbar } from './FloatingContextToolbar';
 import { ContextualEdgeToolbar } from './ContextualEdgeToolbar';
 import { NodeDataUpdate, EdgeDataUpdate } from '../../types/diagram-updates';
-import { readDomViewport } from '../../utils/domViewport';
 
 interface HoverToolbarsOverlayProps {
     quickAddMenuVisible: boolean;
@@ -159,9 +158,8 @@ const IsolatedEdgeToolbar: React.FC<{ edge: any, onUpdateEdge: (id: string, upda
         const mx = (sx + tx) / 2;
         const my = (sy + ty) / 2;
 
-        const vp = readDomViewport();
-        const screenX = mx * vp.zoom + vp.x;
-        const screenY = my * vp.zoom + vp.y;
+        const screenX = mx * viewport.zoom + viewport.x;
+        const screenY = my * viewport.zoom + viewport.y;
 
         return { x: screenX, y: screenY };
     }, [edge, viewport, nodes]);

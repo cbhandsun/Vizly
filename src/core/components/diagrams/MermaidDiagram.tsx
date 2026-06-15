@@ -13,7 +13,7 @@ export interface MermaidDiagramProps {
     [key: string]: any;
 }
 
-const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ id, title }) => {
+const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ id: _id, title: _title }) => {
     return (
         <Result
             status="info"

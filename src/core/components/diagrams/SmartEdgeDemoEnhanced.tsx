@@ -21,7 +21,7 @@ const initialEdges = [
 ];
 
 export default function SmartEdgeDemoEnhanced() {
-    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+    const [nodes, _setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
     const onConnect = (params: any) => setEdges((eds) => addEdge({ ...params, type: 'advanced-smart' }, eds));
