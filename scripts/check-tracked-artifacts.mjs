@@ -18,6 +18,8 @@ const forbiddenTrackedFiles = new Set([
   'fix_css.cjs',
 ]);
 
+const trackedTemporaryFilePattern = /(^|\/)(?:[^/]+(?:_temp(?:_[^/]*)?|\.tmp|\.bak|\.old|\.orig|\.rej)|.*~)$/i;
+
 const output = execFileSync('git', ['ls-files', ...trackedArtifactPrefixes], {
   encoding: 'utf8',
   stdio: ['ignore', 'pipe', 'pipe'],
@@ -38,7 +40,11 @@ const trackedForbiddenFiles = allTrackedOutput
   .map(line => line.trim())
   .filter(Boolean)
   .filter(file => existsSync(file))
-  .filter(file => forbiddenTrackedFiles.has(file) || /(^|\/)(rewrite|replace|recovered|_inject_debug|fix_css)\.(py|cjs|tsx?)$/i.test(file));
+  .filter(file =>
+    forbiddenTrackedFiles.has(file)
+    || /(^|\/)(rewrite|replace|recovered|_inject_debug|fix_css)\.(py|cjs|tsx?)$/i.test(file)
+    || trackedTemporaryFilePattern.test(file)
+  );
 
 const failures = [...trackedArtifacts, ...trackedForbiddenFiles];
 
