@@ -102,7 +102,12 @@ const StorageConfigPage: React.FC = () => {
     };
 
     return (
-        <div style={{ minHeight: '100vh', background: 'var(--vz-dashboard-bg, #fcfcfc)' }}>
+        <div style={{
+            height: '100vh',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            background: 'var(--vz-dashboard-bg, #fcfcfc)'
+        }}>
             {/* Consistent Header */}
             <header className="workspace-global-header" style={{ marginBottom: 0 }}>
                 <div className="workspace-header-brand" onClick={() => navigate('/manage')}>
@@ -131,7 +136,7 @@ const StorageConfigPage: React.FC = () => {
                 </div>
             </header>
 
-            <div style={{ padding: '48px 24px', maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ padding: '48px 24px 72px', maxWidth: '800px', margin: '0 auto' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%' }}>
                 <div>
                     <Title level={2}><CloudServerOutlined /> {t('storageConfig.pageTitle')}</Title>
