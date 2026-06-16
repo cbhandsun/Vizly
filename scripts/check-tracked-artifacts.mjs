@@ -10,6 +10,7 @@ const trackedArtifactPrefixes = [
 ];
 
 const forbiddenTrackedFiles = new Set([
+  'scripts/apply_flowchart_ui.cjs',
   'src/core/components/diagrams/rewrite.py',
   'replace.py',
   'update_pills.py',
