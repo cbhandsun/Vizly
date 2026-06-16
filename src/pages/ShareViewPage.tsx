@@ -12,6 +12,10 @@ const { Text } = Typography;
 
 const isLikelyShareToken = (token: string): boolean => /^[A-Za-z0-9_-]{16,128}$/.test(token);
 
+const getShareTokenFromSearchParams = (searchParams: URLSearchParams): string => (
+    searchParams.get('token') || new URLSearchParams(window.location.search).get('token') || ''
+);
+
 const SharedDiagramCanvas = React.lazy(async () => {
     const [{ ReactFlowProvider }, { default: FlowchartDesigner }] = await Promise.all([
         import('@xyflow/react'),
@@ -40,7 +44,7 @@ const ShareViewPage: React.FC = () => {
     const { t } = useTranslation();
     const { token: antToken } = theme.useToken();
     const [searchParams] = useSearchParams();
-    const shareToken = searchParams.get('token') || '';
+    const shareToken = getShareTokenFromSearchParams(searchParams);
     const [state, setState] = useState<LoadState>(() => {
         if (!isLikelyShareToken(shareToken)) return { status: 'error' };
         return { status: 'loading' };

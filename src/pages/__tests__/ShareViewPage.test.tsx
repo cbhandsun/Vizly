@@ -147,6 +147,37 @@ describe('ShareViewPage', () => {
         expect(screen.getAllByTestId('flowchart-designer')).toHaveLength(1);
     });
 
+    it('loads direct-path share links that put token in the browser search string', async () => {
+        const token = 'directsharetoken1';
+        const content = {
+            id: 'original-id',
+            name: 'Direct Shared Flow',
+            nodes: [],
+            edges: [],
+        };
+        window.history.replaceState({}, '', `/shared?token=${token}`);
+        getSharedDiagramMock.mockResolvedValueOnce({
+            share: { id: 'share-id' },
+            diagram: {
+                title: 'Direct fallback title',
+                content,
+            },
+        });
+
+        renderSharePage('/shared');
+
+        await screen.findByText('Direct Shared Flow');
+        expect(getSharedDiagramMock).toHaveBeenCalledWith(token);
+        expect(registerRemoteDiagramMock).toHaveBeenCalledWith({
+            ...content,
+            id: `shared-${token}`,
+        }, {
+            id: `shared-${token}`,
+            title: 'Direct fallback title',
+        });
+        expect(await screen.findByTestId('flowchart-designer')).toHaveAttribute('data-id', `shared-${token}`);
+    });
+
     it('routes unsafe shared content through the remote registration guard', async () => {
         const token = 'abcdefghijklmnop';
         const unsafeContent = {
