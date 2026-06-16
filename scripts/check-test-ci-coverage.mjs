@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const projectRoot = process.cwd();
 const packageJson = JSON.parse(readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
+const runTestCiSource = readFileSync(path.join(projectRoot, 'scripts/run-test-ci.mjs'), 'utf8');
 const testFilePattern = /__tests__[\\/].*\.test\.(ts|tsx)$/;
 const searchRoots = ['src', 'supabase'];
 
@@ -30,9 +31,28 @@ const allTests = searchRoots
   .filter((file) => testFilePattern.test(file))
   .sort();
 
-const ciShardScripts = Object.entries(packageJson.scripts ?? {})
-  .filter(([name, command]) => name.startsWith('test:ci:') && typeof command === 'string')
-  .map(([, command]) => command);
+const parseRunnerShardNames = () => {
+  const match = runTestCiSource.match(/const\s+shardNames\s*=\s*\[([\s\S]*?)\];/);
+  if (!match) {
+    throw new Error('Unable to locate shardNames in scripts/run-test-ci.mjs');
+  }
+
+  return [...match[1].matchAll(/['"`]([^'"`]+)['"`]/g)]
+    .map((entry) => entry[1])
+    .filter(Boolean);
+};
+
+const packageScripts = packageJson.scripts ?? {};
+const runnerShardNames = parseRunnerShardNames();
+const missingRunnerScripts = runnerShardNames.filter((name) => typeof packageScripts[name] !== 'string');
+const directVitestShardNames = Object.entries(packageScripts)
+  .filter(([name, command]) => name.startsWith('test:ci:') && typeof command === 'string' && /\bvitest\s+run\b/.test(command))
+  .map(([name]) => name);
+const vitestShardsMissingFromRunner = directVitestShardNames.filter((name) => !runnerShardNames.includes(name));
+
+const ciShardScripts = runnerShardNames
+  .map((name) => packageScripts[name])
+  .filter((command) => typeof command === 'string');
 
 const extractVitestPaths = (command) => {
   const tokens = command.split(/\s+/).filter(Boolean);
@@ -62,11 +82,30 @@ const ciPaths = ciShardScripts.flatMap(extractVitestPaths);
 const uncovered = allTests.filter((file) => !ciPaths.some((ciPath) => file === ciPath || file.startsWith(`${ciPath}/`)));
 const missingDeclaredPaths = ciPaths.filter((ciPath) => !existsSync(path.join(projectRoot, ciPath)));
 
-if (uncovered.length > 0 || missingDeclaredPaths.length > 0) {
+if (
+  uncovered.length > 0
+  || missingDeclaredPaths.length > 0
+  || missingRunnerScripts.length > 0
+  || vitestShardsMissingFromRunner.length > 0
+) {
   if (uncovered.length > 0) {
     console.error('Test files missing from test:ci shards:');
     for (const file of uncovered) {
       console.error(`- ${file}`);
+    }
+  }
+
+  if (missingRunnerScripts.length > 0) {
+    console.error('scripts/run-test-ci.mjs references missing package scripts:');
+    for (const name of missingRunnerScripts) {
+      console.error(`- ${name}`);
+    }
+  }
+
+  if (vitestShardsMissingFromRunner.length > 0) {
+    console.error('vitest test:ci shards are not executed by scripts/run-test-ci.mjs:');
+    for (const name of vitestShardsMissingFromRunner) {
+      console.error(`- ${name}`);
     }
   }
 
