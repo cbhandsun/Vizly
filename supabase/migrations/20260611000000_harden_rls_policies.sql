@@ -277,7 +277,14 @@ BEGIN
       SECURITY DEFINER
       SET search_path = public
       AS $sql$
-        SELECT to_jsonb(s) AS share, to_jsonb(d) AS diagram
+        SELECT
+          to_jsonb(s) AS share,
+          jsonb_build_object(
+            'id', d.id,
+            'title', d.title,
+            'content', d.content,
+            'updated_at', d.updated_at
+          ) AS diagram
         FROM public.shared_diagrams s
         JOIN public.diagrams d ON d.id::text = s.diagram_id::text
         WHERE s.share_token = p_share_token

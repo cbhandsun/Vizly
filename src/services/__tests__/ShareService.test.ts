@@ -58,6 +58,8 @@ describe('ShareService', () => {
                     diagram: {
                         id: '11111111-1111-4111-8111-111111111111',
                         title: 'Shared fallback',
+                        user_id: '33333333-3333-4333-8333-333333333333',
+                        secret_note: 'internal only',
                         content: {
                             id: 'raw-id',
                             name: 'Shared Flow',
@@ -83,6 +85,8 @@ describe('ShareService', () => {
         });
         expect(Object.hasOwn(result?.diagram.content ?? {}, 'constructor')).toBe(false);
         expect(Object.hasOwn(result?.diagram.content ?? {}, 'nested')).toBe(false);
+        expect(result?.diagram).not.toHaveProperty('user_id');
+        expect(result?.diagram).not.toHaveProperty('secret_note');
         expect(Object.prototype).not.toHaveProperty('polluted');
     });
 

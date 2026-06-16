@@ -71,11 +71,16 @@ function coerceSharedDiagram(diagram: any): any | null {
     if (!diagram || !diagram.content) return null;
 
     try {
+        const id = String(diagram.id || 'shared-diagram');
+        const title = typeof diagram.title === 'string' ? diagram.title : 'Shared Diagram';
+        const updatedAt = typeof diagram.updated_at === 'string' ? diagram.updated_at : undefined;
         return {
-            ...diagram,
+            id,
+            title,
+            ...(updatedAt ? { updated_at: updatedAt } : {}),
             content: coerceRemoteDiagramContent(diagram.content, {
-                id: String(diagram.id || 'shared-diagram'),
-                title: typeof diagram.title === 'string' ? diagram.title : 'Shared Diagram',
+                id,
+                title,
             }),
         };
     } catch {

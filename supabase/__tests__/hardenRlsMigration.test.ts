@@ -58,6 +58,17 @@ describe('harden RLS migration', () => {
     expect(policyMatch?.[0]).toContain('d.user_id::text = auth.uid()::text');
   });
 
+  it('does not expose entire diagram rows through anonymous share-token RPC responses', () => {
+    const functionMatch = migration.match(
+      /CREATE OR REPLACE FUNCTION public\.get_shared_diagram_by_token\(p_share_token text\)[\s\S]*?LIMIT 1[\s\S]*?\$sql\$;/
+    );
+
+    expect(functionMatch?.[0]).toContain('jsonb_build_object');
+    expect(functionMatch?.[0]).toContain("'content', d.content");
+    expect(functionMatch?.[0]).not.toContain('to_jsonb(d)');
+    expect(functionMatch?.[0]).not.toContain("'user_id', d.user_id");
+  });
+
   it('limits collaborator email listing to diagram owners', () => {
     const functionMatch = migration.match(
       /CREATE OR REPLACE FUNCTION public\.get_diagram_collaborators\(p_diagram_id uuid\)[\s\S]*?ORDER BY[\s\S]*?\$sql\$;/
