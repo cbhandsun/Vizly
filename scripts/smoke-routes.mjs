@@ -127,6 +127,33 @@ const routes = [
     })()`,
   },
   {
+    name: 'management-templates',
+    url: `${BASE_URL}/?view=templates`,
+    timeoutMs: 30000,
+    expression: `(() => {
+      const body = document.body?.textContent || '';
+      const activeTab = document.querySelector('.filter-tab.active')?.textContent || '';
+      return {
+        href: location.href,
+        title: document.title,
+        readyState: document.readyState,
+        hasRoot: Boolean(document.getElementById('root')),
+        activeTab,
+        appFallback: body.includes('加载应用'),
+        pageFallback: body.includes('加载图表管理') || body.includes('加载图表'),
+        errorBoundary: body.includes('页面出现错误'),
+        bodyText: body.slice(0, 240),
+        rootText: (document.getElementById('root')?.textContent || '').slice(0, 240),
+        ready: Boolean(document.getElementById('root')) &&
+          activeTab.includes('行业模板库') &&
+          !body.includes('加载应用') &&
+          !body.includes('加载图表管理') &&
+          !body.includes('页面出现错误') &&
+          (body.includes('行业模板库') || body.includes('No diagrams')),
+      };
+    })()`,
+  },
+  {
     name: 'default-diagram',
     url: `${BASE_URL}/?diagram=flowchart`,
     timeoutMs: 35000,
@@ -382,6 +409,7 @@ const selectedRoutes = ROUTE_FILTERS.length > 0
 
 const defaultRouteBudgets = {
   management: { criticalAssets: 45, criticalDecodedKB: 2050, readyMs: 6000 },
+  'management-templates': { criticalAssets: 45, criticalDecodedKB: 2150, readyMs: 6500 },
   'default-diagram': { criticalAssets: 92, criticalDecodedKB: 3900, readyMs: 4500 },
   'wms-process-large-diagram': { criticalAssets: 105, criticalDecodedKB: 4700, readyMs: 6500 },
   'storage-config': { criticalAssets: 40, criticalDecodedKB: 2700, readyMs: 3000 },

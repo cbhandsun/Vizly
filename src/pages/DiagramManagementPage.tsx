@@ -76,6 +76,14 @@ type FilterViewType = 'recent' | 'local' | 'cloud' | 'shared' | 'templates' | 'g
 type ViewMode = 'grid' | 'list';
 type SortKey = 'updated' | 'name' | 'type';
 
+const FILTER_VIEW_TYPES = new Set<FilterViewType>(['recent', 'local', 'cloud', 'shared', 'templates', 'general_templates']);
+
+const coerceFilterView = (value: unknown): FilterViewType => (
+    typeof value === 'string' && FILTER_VIEW_TYPES.has(value as FilterViewType)
+        ? value as FilterViewType
+        : 'recent'
+);
+
 interface UnifiedDiagramItem {
     id: string;
     title: string;
@@ -120,10 +128,11 @@ const WorkspaceDashboardPage: React.FC = () => {
     const [searchParams] = useSearchParams();
     const { user } = useAuth();
     const { modal } = App.useApp();
+    const initialView = coerceFilterView(searchParams.get('view') || new URLSearchParams(window.location.search).get('view'));
     
     // --- State ---
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-    const [activeView, setActiveView] = useState<FilterViewType>('recent');
+    const [activeView, setActiveView] = useState<FilterViewType>(initialView);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
