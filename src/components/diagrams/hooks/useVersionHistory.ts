@@ -127,10 +127,13 @@ export function useVersionHistory(diagramId: string) {
                     return false;
                 }
                 // If it exposes actions directly
-                setNodes(snapshot.nodes);
-                setEdges(snapshot.edges);
+                if (typeof bridge.replaceCanvasSnapshot === 'function') {
+                    bridge.replaceCanvasSnapshot(snapshot);
+                } else {
+                    setNodes(snapshot.nodes);
+                    setEdges(snapshot.edges);
+                }
                 
-                // Keep the bridge intact, overwrite internal values if necessary!
                 appMessage.success(`已恢复至快照: ${fullVersion.message || fullVersion.id.substring(0, 8)}`);
                 previewBaseRef.current = null;
                 setPreviewVersion(null);

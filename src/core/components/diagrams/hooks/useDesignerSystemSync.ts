@@ -314,6 +314,18 @@ export function useDesignerSystemSync({
                 }
             });
 
+            Object.defineProperty(standardData, 'replaceCanvasSnapshot', {
+                enumerable: false,
+                value: (snapshot: { nodes?: Node[]; edges?: Edge[] }) => {
+                    const nextNodes = Array.isArray(snapshot?.nodes) ? snapshot.nodes : [];
+                    const nextEdges = Array.isArray(snapshot?.edges) ? snapshot.edges : [];
+                    nodesRef.current = nextNodes;
+                    edgesRef.current = nextEdges;
+                    setNodes(nextNodes);
+                    setEdges(nextEdges);
+                }
+            });
+
             // --- 扩展原子化操作 API (Phase 3: AI Design Pilot) ---
             Object.defineProperty(standardData, 'addNode', {
                 enumerable: false,

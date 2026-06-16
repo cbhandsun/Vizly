@@ -95,7 +95,18 @@ describe('useVersionHistory', () => {
     it('does not restore the preview base after confirming a version restore', async () => {
         const setNodes = vi.fn();
         const setEdges = vi.fn();
-        (window as any).__flowDataBridge = { 'diagram-1': { id: 'diagram-1' } };
+        const bridge = {
+            id: 'diagram-1',
+            nodes: originalNodes,
+            edges: originalEdges,
+            replaceCanvasSnapshot: vi.fn((snapshot: { nodes: Node[]; edges: Edge[] }) => {
+                bridge.nodes = snapshot.nodes;
+                bridge.edges = snapshot.edges;
+                setNodes(snapshot.nodes);
+                setEdges(snapshot.edges);
+            }),
+        };
+        (window as any).__flowDataBridge = { 'diagram-1': bridge };
         const { result } = renderHook(() => useVersionHistory('diagram-1'));
 
         await waitFor(() => expect(storageMocks.listVersions).toHaveBeenCalledWith('diagram-1'));
@@ -111,6 +122,9 @@ describe('useVersionHistory', () => {
         });
 
         expect(restored).toBe(true);
+        expect(bridge.replaceCanvasSnapshot).toHaveBeenCalledWith({ nodes: previewNodes, edges: previewEdges });
+        expect(bridge.nodes).toEqual(previewNodes);
+        expect(bridge.edges).toEqual(previewEdges);
         expect(setNodes).toHaveBeenLastCalledWith(previewNodes);
         expect(setEdges).toHaveBeenLastCalledWith(previewEdges);
         expect(result.current.exitPreview()).toBeNull();
