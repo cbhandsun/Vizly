@@ -105,6 +105,52 @@ describe('ShareService', () => {
         await expect(shareService.getSharedDiagram('safe-token-123456')).resolves.toBeNull();
     });
 
+    it('rejects RPC share rows that do not match the requested active token', async () => {
+        const baseShare = {
+            id: '44444444-4444-4444-8444-444444444444',
+            diagram_id: '11111111-1111-4111-8111-111111111111',
+            share_token: 'safe-token-123456',
+            created_by: '22222222-2222-4222-8222-222222222222',
+            expires_at: null,
+            is_active: true,
+            created_at: '2026-06-13T00:00:00.000Z',
+        };
+        const diagram = {
+            id: '11111111-1111-4111-8111-111111111111',
+            title: 'Shared fallback',
+            content: {
+                id: 'raw-id',
+                name: 'Shared Flow',
+                nodes: [{ id: 'n1', description: 'Node 1', domain: 'Core' }],
+                edges: [],
+            },
+        };
+        mockSupabase.rpc
+            .mockReturnValueOnce({
+                maybeSingle: vi.fn(() => Promise.resolve({
+                    data: { share: { ...baseShare, share_token: 'other-token-123456' }, diagram },
+                    error: null,
+                })),
+            })
+            .mockReturnValueOnce({
+                maybeSingle: vi.fn(() => Promise.resolve({
+                    data: { share: { ...baseShare, is_active: false }, diagram },
+                    error: null,
+                })),
+            })
+            .mockReturnValueOnce({
+                maybeSingle: vi.fn(() => Promise.resolve({
+                    data: { share: { ...baseShare, expires_at: '2000-01-01T00:00:00.000Z' }, diagram },
+                    error: null,
+                })),
+            });
+        const { shareService } = await import('../ShareService');
+
+        await expect(shareService.getSharedDiagram('safe-token-123456')).resolves.toBeNull();
+        await expect(shareService.getSharedDiagram('safe-token-123456')).resolves.toBeNull();
+        await expect(shareService.getSharedDiagram('safe-token-123456')).resolves.toBeNull();
+    });
+
     it('builds hash-router share URLs and rejects invalid tokens', async () => {
         window.history.replaceState({}, '', '/vizly/workbench?draft=1#old');
         const { shareService } = await import('../ShareService');

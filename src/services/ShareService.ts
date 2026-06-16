@@ -83,6 +83,45 @@ function coerceSharedDiagram(diagram: any): any | null {
     }
 }
 
+function coerceShareRecord(value: unknown, expectedToken?: string): ShareRecord | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const row = value as Record<string, unknown>;
+    const id = typeof row.id === 'string' ? row.id.trim() : '';
+    const diagramId = typeof row.diagram_id === 'string' ? row.diagram_id.trim() : '';
+    const shareToken = typeof row.share_token === 'string' ? row.share_token.trim() : '';
+    const createdBy = row.created_by === null
+        ? null
+        : typeof row.created_by === 'string'
+            ? row.created_by.trim()
+            : '';
+    const expiresAt = row.expires_at === null
+        ? null
+        : typeof row.expires_at === 'string'
+            ? row.expires_at
+            : '';
+    const createdAt = typeof row.created_at === 'string' ? row.created_at : '';
+
+    if (!isValidUuid(id) || !isValidUuid(diagramId)) return null;
+    if (!isValidShareToken(shareToken) || (expectedToken && shareToken !== expectedToken)) return null;
+    if (createdBy !== null && !isValidUuid(createdBy)) return null;
+    if (row.is_active !== true) return null;
+    if (!createdAt || Number.isNaN(new Date(createdAt).getTime())) return null;
+    if (expiresAt !== null) {
+        const expiresAtDate = new Date(expiresAt);
+        if (Number.isNaN(expiresAtDate.getTime()) || expiresAtDate <= new Date()) return null;
+    }
+
+    return {
+        id,
+        diagram_id: diagramId,
+        share_token: shareToken,
+        created_by: createdBy,
+        expires_at: expiresAt,
+        is_active: true,
+        created_at: createdAt,
+    };
+}
+
 function coerceCollaboratorRecord(value: unknown): CollaboratorRecord | null {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const row = value as Record<string, unknown>;
@@ -199,11 +238,14 @@ class ShareService {
             .maybeSingle();
 
         if (!rpcError && rpcRow?.share && rpcRow?.diagram) {
+            const share = coerceShareRecord(rpcRow.share, normalizedToken);
+            if (!share) return null;
+
             const diagram = coerceSharedDiagram(rpcRow.diagram);
             if (!diagram) return null;
 
             return {
-                share: rpcRow.share as ShareRecord,
+                share,
                 diagram,
             };
         }
@@ -222,16 +264,14 @@ class ShareService {
 
         if (shareError || !share) return null;
 
-        // 检查过期
-        if (share.expires_at && new Date(share.expires_at) < new Date()) {
-            return null;
-        }
+        const safeShare = coerceShareRecord(share, normalizedToken);
+        if (!safeShare) return null;
 
         // 2. 加载图表内容
         const { data: diagram, error: diagramError } = await supabase!
             .from('diagrams')
             .select('*')
-            .eq('id', share.diagram_id)
+            .eq('id', safeShare.diagram_id)
             .single();
 
         if (diagramError || !diagram) return null;
@@ -239,7 +279,7 @@ class ShareService {
         const safeDiagram = coerceSharedDiagram(diagram);
         if (!safeDiagram) return null;
 
-        return { share: share as ShareRecord, diagram: safeDiagram };
+        return { share: safeShare, diagram: safeDiagram };
     }
 
     /**
