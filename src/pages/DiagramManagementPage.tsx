@@ -44,6 +44,7 @@ import { useAuth } from '@/context/useAuth';
 import './WorkspaceDashboard.css';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { upsertDiagramConfigIndex } from '@/core/utils/diagramTypeStorage';
+import { coerceRemoteTemplateMetadata } from '@/core/utils/remoteTemplateMetadata';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
@@ -261,7 +262,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                                     updatedAt: 0,
                                     source: isGeneral ? 'general_template' : 'template',
                                     role: 'template',
-                                    raw: { id: t.id, title: t.title, category: t.category, tags: t.tags, thumbnail_url: t.thumbnail_url } as any
+                                    raw: coerceRemoteTemplateMetadata(t) as any
                                 });
                             });
                         }
