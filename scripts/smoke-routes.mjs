@@ -26,6 +26,30 @@ const USE_EXISTING_SERVER = Boolean(process.env.SMOKE_BASE_URL);
 const SERVER_MODE = process.env.SMOKE_SERVER || 'preview';
 const PRINT_REPORT = process.env.SMOKE_REPORT === '1';
 const CHECK_BUDGET = process.env.SMOKE_BUDGET === '1';
+const parseOptionalViewportEnv = (name) => {
+  const rawValue = process.env[name];
+  if (!rawValue) return undefined;
+
+  const parsedValue = Number(rawValue);
+  if (!Number.isInteger(parsedValue) || parsedValue < 100 || parsedValue > 10000) {
+    throw new Error(`Invalid viewport pixel env value for ${name}: ${rawValue}`);
+  }
+
+  return parsedValue;
+};
+const VIEWPORT_WIDTH = parseOptionalViewportEnv('SMOKE_VIEWPORT_WIDTH');
+const VIEWPORT_HEIGHT = parseOptionalViewportEnv('SMOKE_VIEWPORT_HEIGHT');
+const VIEWPORT_SCALE = Number(process.env.SMOKE_VIEWPORT_SCALE || '1');
+if (!Number.isFinite(VIEWPORT_SCALE) || VIEWPORT_SCALE <= 0 || VIEWPORT_SCALE > 10) {
+  throw new Error(`Invalid positive viewport scale env value for SMOKE_VIEWPORT_SCALE: ${process.env.SMOKE_VIEWPORT_SCALE}`);
+}
+const VIEWPORT = VIEWPORT_WIDTH || VIEWPORT_HEIGHT
+  ? {
+      width: VIEWPORT_WIDTH ?? 1280,
+      height: VIEWPORT_HEIGHT ?? 720,
+      scale: VIEWPORT_SCALE,
+    }
+  : null;
 const parseSmokeRepeat = () => {
   const rawValue = process.env.SMOKE_REPEAT;
   if (!rawValue) return 1;
@@ -548,7 +572,7 @@ const startAppServer = async () => {
 
 const launchBrowser = async (browserPath) => {
   log(`Launching browser: ${browserPath}`);
-  const child = spawn(browserPath, [
+  const browserArgs = [
     '--headless=new',
     '--disable-gpu',
     '--disable-gpu-sandbox',
@@ -566,8 +590,10 @@ const launchBrowser = async (browserPath) => {
     '--remote-allow-origins=*',
     `--remote-debugging-port=${DEBUG_PORT}`,
     `--user-data-dir=${browserProfileDir}`,
+    ...(VIEWPORT ? [`--window-size=${VIEWPORT.width},${VIEWPORT.height}`] : []),
     'about:blank',
-  ], {
+  ];
+  const child = spawn(browserPath, browserArgs, {
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   });
@@ -655,6 +681,18 @@ class CdpSession {
       this.send('Log.enable'),
       this.send('Network.enable'),
     ]);
+    if (VIEWPORT) {
+      await this.send('Emulation.setDeviceMetricsOverride', {
+        width: VIEWPORT.width,
+        height: VIEWPORT.height,
+        deviceScaleFactor: VIEWPORT.scale,
+        mobile: VIEWPORT.width <= 600,
+      });
+      await this.send('Emulation.setVisibleSize', {
+        width: VIEWPORT.width,
+        height: VIEWPORT.height,
+      }).catch(() => {});
+    }
     await this.send('Page.bringToFront').catch(() => {});
   }
 
@@ -831,6 +869,23 @@ const waitForRouteState = async (session, route) => {
     logs: session.logs.slice(-20),
     networkIssues: session.networkIssues.slice(-20),
   });
+};
+
+const assertViewportState = async (session, routeName) => {
+  if (!VIEWPORT) return null;
+
+  const viewportState = await session.evaluate(`(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+    devicePixelRatio: window.devicePixelRatio,
+  }))()`);
+  if (viewportState.width !== VIEWPORT.width || viewportState.height !== VIEWPORT.height) {
+    fail(`Viewport smoke mismatch on ${routeName}`, {
+      expected: VIEWPORT,
+      actual: viewportState,
+    });
+  }
+  return viewportState;
 };
 
 const getUnexpectedLogs = (logs) => logs.filter((entry) => {
@@ -1224,6 +1279,7 @@ const runRouteSample = async (route, sampleIndex = 0) => {
     await session.navigate(route.url);
     log(`Waiting for route readiness: ${route.name}${sampleSuffix}`);
     const state = await waitForRouteState(session, route);
+    const viewportState = await assertViewportState(session, route.name);
     const assetReport = attachInitiators(session, await getRouteAssetReport(session, state.readyAt));
     const routeLogs = session.logs;
     const routeNetworkIssues = session.networkIssues;
@@ -1235,7 +1291,7 @@ const runRouteSample = async (route, sampleIndex = 0) => {
       fail(`Unexpected network issue on ${route.name}`, routeNetworkIssues);
     }
     log(`✓ ${route.name}${sampleSuffix}: ${state.href}`);
-    return { name: route.name, state, warnings: routeLogs.length, assetReport };
+    return { name: route.name, state, viewportState, warnings: routeLogs.length, assetReport };
   } finally {
     session.close();
   }
