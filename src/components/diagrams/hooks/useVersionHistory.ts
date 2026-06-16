@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 import { DiagramVersion } from '@/services/storage/types';
@@ -12,6 +12,7 @@ export function useVersionHistory(diagramId: string) {
     const [versions, setVersions] = useState<DiagramVersion[]>([]);
     const [loading, setLoading] = useState(false);
     const [previewVersion, setPreviewVersion] = useState<DiagramVersion | null>(null);
+    const previewBaseRef = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
 
     const loadVersions = useCallback(async () => {
         if (!diagramId) return;
@@ -65,15 +66,41 @@ export function useVersionHistory(diagramId: string) {
         }
     }, [diagramId]);
 
-    const enterPreview = useCallback(async (versionId: string) => {
+    const enterPreview = useCallback(async (
+        versionId: string,
+        setNodes: Dispatch<SetStateAction<Node[]>>,
+        setEdges: Dispatch<SetStateAction<Edge[]>>,
+        currentNodes: Node[],
+        currentEdges: Edge[]
+    ) => {
         const fullVersion = await loadVersionData(versionId);
-        if (fullVersion) {
-            setPreviewVersion(fullVersion);
+        if (!fullVersion || !fullVersion.snapshotData) {
+            appMessage.error("无法预览：快照数据缺失");
+            return false;
         }
+
+        const snapshot = coerceClipboardData(fullVersion.snapshotData);
+        if (!snapshot) {
+            appMessage.error("无法预览：快照结构无效");
+            return false;
+        }
+
+        previewBaseRef.current ??= { nodes: currentNodes, edges: currentEdges };
+        setNodes(snapshot.nodes);
+        setEdges(snapshot.edges);
+        setPreviewVersion(fullVersion);
+        return true;
     }, [loadVersionData]);
 
     const exitPreview = useCallback(() => {
+        const previewBase = previewBaseRef.current;
+        if (previewBase) {
+            previewBaseRef.current = null;
+            setPreviewVersion(null);
+            return previewBase;
+        }
         setPreviewVersion(null);
+        return null;
     }, []);
 
     const restoreVersion = useCallback(async (
@@ -105,6 +132,7 @@ export function useVersionHistory(diagramId: string) {
                 
                 // Keep the bridge intact, overwrite internal values if necessary!
                 appMessage.success(`已恢复至快照: ${fullVersion.message || fullVersion.id.substring(0, 8)}`);
+                previewBaseRef.current = null;
                 setPreviewVersion(null);
                 return true;
             }

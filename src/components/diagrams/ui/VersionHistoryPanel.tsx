@@ -18,7 +18,7 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
     isOpen,
     onClose
 }) => {
-    const { setNodes, setEdges } = useReactFlow();
+    const { setNodes, setEdges, getNodes, getEdges } = useReactFlow();
     const {
         versions,
         loading,
@@ -51,7 +51,11 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
             title="版本历史 (Version History)"
             placement="right"
             onClose={() => {
-                exitPreview();
+                const previewBase = exitPreview();
+                if (previewBase) {
+                    setNodes(previewBase.nodes);
+                    setEdges(previewBase.edges);
+                }
                 onClose();
             }}
             open={isOpen}
@@ -98,7 +102,16 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                         <EyeOutlined style={{ color: '#1677ff' }} />
                         <Text strong style={{ color: '#1677ff', fontSize: 13 }}>正在预览: {previewVersion.message}</Text>
                     </Space>
-                    <Button size="small" onClick={exitPreview}>退出预览</Button>
+                    <Button
+                        size="small"
+                        onClick={() => {
+                            const previewBase = exitPreview();
+                            if (previewBase) {
+                                setNodes(previewBase.nodes);
+                                setEdges(previewBase.edges);
+                            }
+                        }}
+                    >退出预览</Button>
                 </div>
             )}
 
@@ -134,8 +147,15 @@ export const VersionHistoryPanel: React.FC<VersionHistoryPanelProps> = ({
                                 transition: 'all 0.2s'
                             }}
                             onClick={() => {
-                                if (isPreviewing) exitPreview();
-                                else enterPreview(item.id);
+                                if (isPreviewing) {
+                                    const previewBase = exitPreview();
+                                    if (previewBase) {
+                                        setNodes(previewBase.nodes);
+                                        setEdges(previewBase.edges);
+                                    }
+                                } else {
+                                    enterPreview(item.id, setNodes, setEdges, getNodes(), getEdges());
+                                }
                             }}
                         >
                             <List.Item.Meta
