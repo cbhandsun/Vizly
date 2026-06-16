@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatFileSize, getFileSizeLimitError, getImageFileImportError, REVERSE_IMPORT_IMAGE_MAX_BYTES } from '../fileImportGuards';
+import {
+    formatFileSize,
+    getFileSizeLimitError,
+    getImageFileImportError,
+    getReverseImportImageFileError,
+    REVERSE_IMPORT_IMAGE_MAX_BYTES,
+} from '../fileImportGuards';
 
 describe('fileImportGuards', () => {
     it('formats byte, kilobyte, and megabyte sizes', () => {
@@ -29,5 +35,16 @@ describe('fileImportGuards', () => {
             .toContain('not a supported image type');
         expect(getImageFileImportError({ name: 'missing-extension', size: 1024, type: 'image/png' }))
             .toContain('not a supported image type');
+    });
+
+    it('applies the same image type guard to reverse image imports', () => {
+        expect(getReverseImportImageFileError({ name: 'diagram.png', size: REVERSE_IMPORT_IMAGE_MAX_BYTES, type: 'image/png' }))
+            .toBeNull();
+        expect(getReverseImportImageFileError({ name: 'diagram.svg', size: 1024, type: 'image/svg+xml' }))
+            .toContain('not a supported image type');
+        expect(getReverseImportImageFileError({ name: 'diagram.png', size: 1024, type: 'text/html' }))
+            .toContain('not a supported image type');
+        expect(getReverseImportImageFileError({ name: 'huge.png', size: REVERSE_IMPORT_IMAGE_MAX_BYTES + 1, type: 'image/png' }))
+            .toContain('too large');
     });
 });

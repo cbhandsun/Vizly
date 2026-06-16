@@ -4,7 +4,7 @@ import { readDomViewport } from '../../../utils/domViewport';
 import type { SnapDelta } from '../../../hooks/useSmartGuides';
 import type { ClipboardData } from '../../../utils/flowchartClipboard';
 import { parseDragNodeTemplate, parseReverseImportDiagramState } from '../../../utils/dragDropPayload';
-import { getFileSizeLimitError, REVERSE_IMPORT_IMAGE_MAX_BYTES } from '../../../utils/fileImportGuards';
+import { getReverseImportImageFileError } from '../../../utils/fileImportGuards';
 
 interface UseDiagramDragDropProps {
     nodes: Node[];
@@ -61,42 +61,33 @@ export const useDiagramDragDrop = ({
             const files = Array.from(event.dataTransfer.files);
             if (files.length > 0) {
                 const file = files[0];
-                const isImage = file.type.startsWith('image/') || file.name.endsWith('.svg');
+                const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(file.name);
                 
                 if (isImage) {
                     try {
-                        const sizeError = getFileSizeLimitError(file, REVERSE_IMPORT_IMAGE_MAX_BYTES, 'reverse image');
-                        if (sizeError) {
-                            console.warn('[Reverse Import]', sizeError);
+                        const importError = getReverseImportImageFileError(file);
+                        if (importError) {
+                            console.warn('[Reverse Import]', importError);
                             return;
                         }
 
                         let safeDiagramState: ClipboardData | null = null;
 
-                        if (file.type === 'image/svg+xml' || file.name.endsWith('.svg')) {
-                            // 1. 从 SVG 解析 metadata
-                            const text = await file.text();
-                            const matches = text.match(/<metadata id="vizly-state">([\s\S]*?)<\/metadata>/);
-                            if (matches && matches[1]) {
-                                safeDiagramState = parseReverseImportDiagramState(matches[1], true);
-                            }
-                        } else {
-                            // 2. 从 PNG/JPG 解析尾部二进制数据
-                            const buffer = await file.arrayBuffer();
-                            const uint8 = new Uint8Array(buffer);
-                            const textDecoder = new TextDecoder();
-                            const fullContent = textDecoder.decode(uint8);
-                            
-                            const startMarker = 'VIZLY_META_START';
-                            const endMarker = 'VIZLY_META_END';
-                            
-                            const startIndex = fullContent.lastIndexOf(startMarker);
-                            const endIndex = fullContent.lastIndexOf(endMarker);
-                            
-                            if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-                                const rawJson = fullContent.substring(startIndex + startMarker.length, endIndex);
-                                safeDiagramState = parseReverseImportDiagramState(rawJson);
-                            }
+                        // 从 PNG/JPG/WebP/GIF/AVIF 尾部元数据解析图表状态；SVG 被文件守卫拒绝。
+                        const buffer = await file.arrayBuffer();
+                        const uint8 = new Uint8Array(buffer);
+                        const textDecoder = new TextDecoder();
+                        const fullContent = textDecoder.decode(uint8);
+
+                        const startMarker = 'VIZLY_META_START';
+                        const endMarker = 'VIZLY_META_END';
+
+                        const startIndex = fullContent.lastIndexOf(startMarker);
+                        const endIndex = fullContent.lastIndexOf(endMarker);
+
+                        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+                            const rawJson = fullContent.substring(startIndex + startMarker.length, endIndex);
+                            safeDiagramState = parseReverseImportDiagramState(rawJson);
                         }
 
                         if (safeDiagramState) {

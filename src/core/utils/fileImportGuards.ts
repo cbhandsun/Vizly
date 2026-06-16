@@ -54,3 +54,7 @@ export const getImageFileImportError = (
 
     return null;
 };
+
+export const getReverseImportImageFileError = (
+    file: Pick<File, 'name' | 'size' | 'type'>
+): string | null => getImageFileImportError(file, REVERSE_IMPORT_IMAGE_MAX_BYTES);
