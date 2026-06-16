@@ -42,6 +42,8 @@
     "check:test-ci-coverage": "node scripts/check-test-ci-coverage.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "smoke:routes": "node scripts/smoke-routes.mjs",
+    "smoke:routes:budget": "node scripts/smoke-routes.mjs",
+    "smoke:routes:mobile": "node scripts/smoke-routes.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -24,8 +24,11 @@ const HAS_EXPLICIT_DEBUG_PORT = Boolean(process.env.SMOKE_DEBUG_PORT);
 const BASE_URL = process.env.SMOKE_BASE_URL || `http://${HOST}:${APP_PORT}`;
 const USE_EXISTING_SERVER = Boolean(process.env.SMOKE_BASE_URL);
 const SERVER_MODE = process.env.SMOKE_SERVER || 'preview';
+const LIFECYCLE_EVENT = process.env.npm_lifecycle_event || '';
+const IS_BUDGET_SMOKE_SCRIPT = LIFECYCLE_EVENT === 'smoke:routes:budget';
+const IS_MOBILE_SMOKE_SCRIPT = LIFECYCLE_EVENT === 'smoke:routes:mobile';
 const PRINT_REPORT = process.env.SMOKE_REPORT === '1';
-const CHECK_BUDGET = process.env.SMOKE_BUDGET === '1';
+const CHECK_BUDGET = process.env.SMOKE_BUDGET === '1' || IS_BUDGET_SMOKE_SCRIPT || IS_MOBILE_SMOKE_SCRIPT;
 const parseOptionalViewportEnv = (name) => {
   const rawValue = process.env[name];
   if (!rawValue) return undefined;
@@ -37,8 +40,8 @@ const parseOptionalViewportEnv = (name) => {
 
   return parsedValue;
 };
-const VIEWPORT_WIDTH = parseOptionalViewportEnv('SMOKE_VIEWPORT_WIDTH');
-const VIEWPORT_HEIGHT = parseOptionalViewportEnv('SMOKE_VIEWPORT_HEIGHT');
+const VIEWPORT_WIDTH = parseOptionalViewportEnv('SMOKE_VIEWPORT_WIDTH') ?? (IS_MOBILE_SMOKE_SCRIPT ? 390 : undefined);
+const VIEWPORT_HEIGHT = parseOptionalViewportEnv('SMOKE_VIEWPORT_HEIGHT') ?? (IS_MOBILE_SMOKE_SCRIPT ? 844 : undefined);
 const VIEWPORT_SCALE = Number(process.env.SMOKE_VIEWPORT_SCALE || '1');
 if (!Number.isFinite(VIEWPORT_SCALE) || VIEWPORT_SCALE <= 0 || VIEWPORT_SCALE > 10) {
   throw new Error(`Invalid positive viewport scale env value for SMOKE_VIEWPORT_SCALE: ${process.env.SMOKE_VIEWPORT_SCALE}`);

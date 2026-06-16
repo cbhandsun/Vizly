@@ -35,3 +35,9 @@ jobs:
 
       - name: Run CI test shards
         run: npm run test:ci
+
+      - name: Run route smoke checks
+        run: npm run smoke:routes:budget
+
+      - name: Run mobile viewport route smoke checks
+        run: npm run smoke:routes:mobile
