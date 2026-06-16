@@ -34,11 +34,13 @@ const secretPatterns = [
   { name: 'Bearer token', pattern: /\bBearer\s+[A-Za-z0-9._~+/=-]{32,}\b/i },
   {
     name: 'secret assignment',
-    pattern: /\b(?:api[_-]?key|access[_-]?key|secret[_-]?key|private[_-]?key|auth[_-]?token|refresh[_-]?token|client[_-]?secret)\b\s*[:=]\s*['"`][^'"`\s]{20,}['"`]/i,
+    pattern: /\b(?:[a-z0-9]+[_-])*(?:api[_-]?key|access[_-]?key|secret[_-]?key|private[_-]?key|auth[_-]?token|refresh[_-]?token|client[_-]?secret)\b\s*[:=]\s*['"`][^'"`\s]{20,}['"`]/i,
   },
 ];
 
 const hasTextExtension = (file) => {
+  if (/(^|\/)\.env(?:\.|$)/i.test(file)) return true;
+
   const dotIndex = file.lastIndexOf('.');
   if (dotIndex === -1) return false;
   return textExtensions.has(file.slice(dotIndex).toLowerCase());
