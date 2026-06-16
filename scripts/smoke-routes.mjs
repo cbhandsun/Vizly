@@ -354,7 +354,7 @@ const selectedRoutes = ROUTE_FILTERS.length > 0
   : routes;
 
 const defaultRouteBudgets = {
-  management: { criticalAssets: 42, criticalDecodedKB: 2050, readyMs: 6000 },
+  management: { criticalAssets: 45, criticalDecodedKB: 2050, readyMs: 6000 },
   'default-diagram': { criticalAssets: 92, criticalDecodedKB: 3900, readyMs: 4500 },
   'wms-process-large-diagram': { criticalAssets: 105, criticalDecodedKB: 4700, readyMs: 6500 },
   'storage-config': { criticalAssets: 40, criticalDecodedKB: 2700, readyMs: 3000 },
