@@ -21,6 +21,7 @@ const forbiddenTrackedFiles = new Set([
 
 const trackedTemporaryFilePattern = /(^|\/)(?:[^/]+(?:_temp(?:_[^/]*)?|\.tmp|\.bak|\.old|\.orig|\.rej)|.*~)$/i;
 const trackedEnvFilePattern = /(^|\/)\.env(?:\.(?!example(?:\.|$)|sample(?:\.|$)|template(?:\.|$))[^/]*)?$/i;
+const trackedOneOffTestDataPattern = /^(?:src|scripts)\/(?!.*\/__tests__\/).*\/__test[_-][^/]+\.(?:js|cjs|mjs|ts|tsx)$/i;
 
 const output = execFileSync('git', ['ls-files', ...trackedArtifactPrefixes], {
   encoding: 'utf8',
@@ -47,6 +48,7 @@ const trackedForbiddenFiles = allTrackedOutput
     || /(^|\/)(rewrite|replace|recovered|_inject_debug|fix_css)\.(py|cjs|tsx?)$/i.test(file)
     || trackedTemporaryFilePattern.test(file)
     || trackedEnvFilePattern.test(file)
+    || trackedOneOffTestDataPattern.test(file)
   );
 
 const failures = [...trackedArtifacts, ...trackedForbiddenFiles];
