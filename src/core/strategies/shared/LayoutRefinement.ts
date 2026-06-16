@@ -15,6 +15,7 @@
  */
 
 import type { Node, Edge } from '@xyflow/react';
+import { safeLog } from '../../utils/consoleCleanup';
 
 // ═══════════════════════════════════════════════════════════════
 // 公开接口
@@ -220,7 +221,7 @@ export function refineLayout(
     groupCount,
   };
 
-  console.log(
+  safeLog.debug(
     `[LayoutRefinement] ${groupCount > 0 ? `${groupCount} groups | ` : ''}` +
     `${totalLayers} layers | ` +
     `channel: +${totalChannelSpacing} | ` +

@@ -7,6 +7,7 @@ import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import { DataService } from '../services/DataService';
 import { localDB } from '../services/IndexedDBStorage';
 import { parseRemoteDiagramContent } from '../services/remoteDiagramContent';
+import { safeLog } from '../core/utils/consoleCleanup';
 
 // 导入标准化数据
 import enterpriseArchitectureData from './standardized/ArchitectureStandardData.json';
@@ -190,7 +191,7 @@ export class DataRegistry {
                       console.warn('[DataRegistry] Skipped invalid remote template content.');
                   }
               }
-              console.log(`[DataRegistry] Loaded ${data.length} remote templates from cloud.`);
+              safeLog.debug(`[DataRegistry] Loaded ${data.length} remote templates from cloud.`);
               return true;
           }
           return false;

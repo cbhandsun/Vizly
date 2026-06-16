@@ -15,6 +15,7 @@
  */
 
 import type { Point } from '../types/routing';
+import { safeLog } from '../utils/consoleCleanup';
 
 /**
  * 边段表示
@@ -288,8 +289,7 @@ export class LPNudge {
      */
     private log(message: string, ...args: unknown[]): void {
         if (this.config.debug) {
-            // [FIX T-1] 补上实际的日志输出，原先函数体为空导致 debug 模式完全无日志
-            console.log(`[LPNudge] ${message}`, ...args);
+            safeLog.debug(`[LPNudge] ${message}`, ...args);
         }
     }
 

@@ -3,6 +3,7 @@ import { DiagramMetadata } from '@/services/storage/types';
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import { dataService } from '@/services/DataService';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import { safeLog } from '@/core/utils/consoleCleanup';
 import { parseRemoteDiagramContent } from '@/services/remoteDiagramContent';
 
 export interface SystemTemplateMetadata {
@@ -58,7 +59,7 @@ export function useDiagramStorage() {
         if (error) {
           console.error('Error fetching system templates:', error);
         } else if (data) {
-          console.log('Fetched system templates:', data);
+          safeLog.debug('Fetched system templates:', data);
           setSystemTemplates(data as SystemTemplateMetadata[]);
         }
       } catch (err) {
