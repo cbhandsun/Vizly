@@ -54,6 +54,7 @@ export const ProResourceDrawer: React.FC<ProResourceDrawerProps> = ({
     const cardBg = isDark ? '#1f1f1f' : '#ffffff';
     const subTextColor = isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(0, 0, 0, 0.45)';
     const primaryTextColor = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.85)';
+    const focusHoverBg = isDark ? 'rgba(24, 144, 255, 0.15)' : 'rgba(24, 144, 255, 0.05)';
 
     // 基于名字生成好看的首字母头像渐变色背景
     const getAvatarBg = (name: string) => {
@@ -345,6 +346,12 @@ export const ProResourceDrawer: React.FC<ProResourceDrawerProps> = ({
                                                                                     <div 
                                                                                         key={tid}
                                                                                         onClick={() => handleFocusTask(task)}
+                                                                                        onMouseEnter={(event) => {
+                                                                                            event.currentTarget.style.background = focusHoverBg;
+                                                                                        }}
+                                                                                        onMouseLeave={(event) => {
+                                                                                            event.currentTarget.style.background = 'transparent';
+                                                                                        }}
                                                                                         style={{ 
                                                                                             display: 'flex', 
                                                                                             justifyContent: 'space-between', 
@@ -356,7 +363,6 @@ export const ProResourceDrawer: React.FC<ProResourceDrawerProps> = ({
                                                                                             background: 'transparent',
                                                                                             transition: 'all 0.12s'
                                                                                         }}
-                                                                                        className="focus-hover-item"
                                                                                     >
                                                                                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>• {task.name}</span>
                                                                                         <EyeOutlined style={{ fontSize: 10 }} />
@@ -453,13 +459,6 @@ export const ProResourceDrawer: React.FC<ProResourceDrawerProps> = ({
                     </>
                 )}
             </div>
-            
-            {/* CSS hover styles for focus items */}
-            <style dangerouslySetInnerHTML={{ __html: `
-                .focus-hover-item:hover {
-                    background: ${isDark ? 'rgba(24, 144, 255, 0.15)' : 'rgba(24, 144, 255, 0.05)'} !important;
-                }
-            `}} />
         </Drawer>
     );
 };
