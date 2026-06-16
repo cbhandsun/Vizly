@@ -132,6 +132,38 @@ describe('DataService', () => {
     expect(service.getDiagram(id)).toBe(registered);
   });
 
+  it('ignores structural remote registration overrides after content coercion', () => {
+    const id = `remote-override-structural-${Date.now()}`;
+    const registered = service.registerRemoteDiagram({
+      id,
+      name: 'Remote Source Name',
+      type: 'flowchart',
+      version: '1.0.0',
+      nodes: [{
+        id: 'node-1',
+        description: 'Node 1',
+        domain: 'ops',
+      }],
+      edges: [],
+    }, {
+      id,
+      title: 'Fallback Title',
+    }, false, {
+      nodes: 'not-an-array',
+      edges: [{ id: 'bad-edge', source: 'missing', target: 'missing' }],
+      layout: 'not-a-layout',
+      metadata: 'not-metadata',
+    } as any);
+    touchedIds.add(id);
+
+    expect(registered.nodes).toHaveLength(1);
+    expect(registered.nodes[0].id).toBe('node-1');
+    expect(registered.edges).toEqual([]);
+    expect(registered.layout).toEqual(expect.objectContaining({ type: 'custom' }));
+    expect(registered.metadata).toBeUndefined();
+    expect(service.getDiagram(id)).toBe(registered);
+  });
+
   it('coerces remote storage content before registering loaded diagrams', async () => {
     vi.mocked(unifiedStorage.loadDiagram).mockResolvedValueOnce({
       id: 'remote-diagram',

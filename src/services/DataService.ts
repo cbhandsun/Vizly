@@ -36,6 +36,36 @@ const stripUnsafeDiagramKeys = <T>(value: T, depth = 0): T => {
   return out as T;
 };
 
+type RemoteDiagramRegistrationOverrides = Partial<Pick<StandardDiagramData, 'id' | 'name' | 'metadata' | 'isReadonly'>>;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+const applyRemoteDiagramRegistrationOverrides = (
+  parsed: StandardDiagramData,
+  overrides: RemoteDiagramRegistrationOverrides = {}
+): StandardDiagramData => {
+  const diagram = { ...parsed };
+
+  if (typeof overrides.id === 'string' && overrides.id.trim()) {
+    diagram.id = overrides.id;
+  }
+  if (typeof overrides.name === 'string' && overrides.name.trim()) {
+    diagram.name = overrides.name;
+  }
+  if (typeof overrides.isReadonly === 'boolean') {
+    diagram.isReadonly = overrides.isReadonly;
+  }
+  if (isRecord(overrides.metadata)) {
+    diagram.metadata = {
+      ...(parsed.metadata || {}),
+      ...overrides.metadata,
+    };
+  }
+
+  return diagram;
+};
+
 // === 缓存管理器实现 ===
 
 class MemoryCacheManager implements CacheManager {
@@ -210,17 +240,10 @@ export class DataService {
     content: unknown,
     fallback: { id: string; title: string },
     persistToIndexedDB: boolean = true,
-    overrides: Partial<StandardDiagramData> = {}
+    overrides: RemoteDiagramRegistrationOverrides = {}
   ): StandardDiagramData {
     const parsed = parseRemoteDiagramContent(content, fallback) as StandardDiagramData;
-    const diagram = {
-      ...parsed,
-      ...overrides,
-      metadata: {
-        ...(parsed.metadata || {}),
-        ...(overrides.metadata || {}),
-      },
-    } as StandardDiagramData;
+    const diagram = applyRemoteDiagramRegistrationOverrides(parsed, overrides);
     this.registerDiagram(diagram, persistToIndexedDB);
     const registered = this.getDiagram(diagram.id);
     if (!registered) {
