@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     AIProviderHttpError,
     AIProviderInvalidResponseError,
+    AIProviderResponseTooLargeError,
     AIProviderTimeoutError,
     createAIProviderHeaders,
     formatAIProviderRequestError,
@@ -97,6 +98,41 @@ describe('aiProviderClient', () => {
         } catch (error) {
             expect(error).toBeInstanceOf(AIProviderInvalidResponseError);
             expect(formatAIProviderRequestError(error)).toContain('不是 JSON');
+        }
+    });
+
+    it('rejects oversized successful provider JSON responses before parsing', async () => {
+        vi.spyOn(globalThis, 'fetch')
+            .mockResolvedValueOnce(new Response('{"data":[]}', {
+                status: 200,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': String(1024 * 1024 + 1),
+                },
+            }))
+            .mockResolvedValueOnce(new Response(`{"data":"${'x'.repeat(1024 * 1024)}"}`, {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            }));
+
+        await expect(requestAIModels(provider)).rejects.toBeInstanceOf(AIProviderResponseTooLargeError);
+        await expect(requestAIModels(provider)).rejects.toBeInstanceOf(AIProviderResponseTooLargeError);
+    });
+
+    it('caps oversized provider error responses before formatting them for the UI', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
+            `failed ${'x'.repeat(20 * 1024)} Authorization: Bearer leaked-token`,
+            { status: 502, headers: { 'Content-Type': 'text/plain' } }
+        ));
+
+        try {
+            await requestAIModels(provider);
+            throw new Error('request should fail');
+        } catch (error) {
+            expect(error).toBeInstanceOf(AIProviderHttpError);
+            const formatted = formatAIProviderRequestError(error, 240);
+            expect(formatted).toContain('错误响应过大');
+            expect(formatted).not.toContain('leaked-token');
         }
     });
 

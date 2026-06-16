@@ -17,6 +17,8 @@ export interface AIProviderRequestOptions {
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_AI_MODELS = 200;
 const MAX_AI_MODEL_ID_LENGTH = 160;
+const MAX_AI_JSON_RESPONSE_CHARS = 1024 * 1024;
+const MAX_AI_ERROR_RESPONSE_CHARS = 16 * 1024;
 const MODEL_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,159}$/;
 
 export class AIProviderHttpError extends Error {
@@ -48,6 +50,16 @@ export class AIProviderInvalidResponseError extends Error {
     }
 }
 
+export class AIProviderResponseTooLargeError extends Error {
+    maxChars: number;
+
+    constructor(maxChars: number) {
+        super(`AI Provider response exceeded ${maxChars} characters`);
+        this.name = 'AIProviderResponseTooLargeError';
+        this.maxChars = maxChars;
+    }
+}
+
 export function resolveAIProviderEndpoint(
     provider: AIProviderRequestConfig,
     path: AIProviderRequestPath
@@ -69,10 +81,58 @@ export function createAIProviderHeaders(
     };
 }
 
+async function readResponseTextWithLimit(response: Response, maxChars: number): Promise<string> {
+    const contentLength = Number(response.headers.get('Content-Length') || '0');
+    if (Number.isFinite(contentLength) && contentLength > maxChars) {
+        throw new AIProviderResponseTooLargeError(maxChars);
+    }
+
+    if (!response.body) {
+        const text = await response.text();
+        if (text.length > maxChars) {
+            throw new AIProviderResponseTooLargeError(maxChars);
+        }
+        return text;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let text = '';
+
+    try {
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            text += decoder.decode(value, { stream: true });
+            if (text.length > maxChars) {
+                throw new AIProviderResponseTooLargeError(maxChars);
+            }
+        }
+        text += decoder.decode();
+        if (text.length > maxChars) {
+            throw new AIProviderResponseTooLargeError(maxChars);
+        }
+        return text;
+    } finally {
+        reader.releaseLock();
+    }
+}
+
 export async function assertAIProviderResponseOk(response: Response): Promise<void> {
     if (response.ok) return;
 
-    const errText = await response.text();
+    let errText: string;
+    try {
+        errText = await readResponseTextWithLimit(response, MAX_AI_ERROR_RESPONSE_CHARS);
+    } catch (error) {
+        if (error instanceof AIProviderResponseTooLargeError) {
+            throw new AIProviderHttpError(
+                response.status,
+                `API 错误响应过大 (${response.status})。请检查 Base URL 或代理服务。`
+            );
+        }
+        throw error;
+    }
     if (errText.trim().startsWith('<')) {
         throw new AIProviderHttpError(
             response.status,
@@ -86,7 +146,7 @@ export async function assertAIProviderResponseOk(response: Response): Promise<vo
 
 async function readAIProviderJson(response: Response): Promise<unknown> {
     const contentType = response.headers.get('Content-Type') || '';
-    const rawText = await response.text();
+    const rawText = await readResponseTextWithLimit(response, MAX_AI_JSON_RESPONSE_CHARS);
     const trimmed = rawText.trim();
 
     if (trimmed.startsWith('<')) {
