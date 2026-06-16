@@ -8,11 +8,11 @@ Run the core local gate before handing off changes:
 npm run verify
 ```
 
-This checks that generated artifacts are not tracked, scans tracked text files for common secret patterns, then runs TypeScript, ESLint, the production build, and bundle budgets.
+This checks that generated artifacts are not tracked, scans tracked text files for common secret patterns, runs the dependency advisory check, then runs TypeScript, ESLint, the production build, and bundle budgets.
 
 Bundle budget limits can be adjusted with `BUNDLE_MAX_JS_CHUNK_KB`, `BUNDLE_MAX_JS_GZIP_CHUNK_KB`, `BUNDLE_MAX_CSS_CHUNK_KB`, `BUNDLE_MAX_CSS_GZIP_CHUNK_KB`, and `BUNDLE_MAX_TOTAL_JS_KB`.
 
-Run the dependency advisory check separately when reviewing dependency changes:
+You can also run the dependency advisory check by itself when reviewing dependency changes:
 
 ```powershell
 npm run check:audit
