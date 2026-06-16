@@ -22,6 +22,7 @@ const forbiddenTrackedFiles = new Set([
 const trackedTemporaryFilePattern = /(^|\/)(?:[^/]+(?:_temp(?:_[^/]*)?|\.tmp|\.bak|\.old|\.orig|\.rej)|.*~)$/i;
 const trackedEnvFilePattern = /(^|\/)\.env(?:\.(?!example(?:\.|$)|sample(?:\.|$)|template(?:\.|$))[^/]*)?$/i;
 const trackedOneOffTestDataPattern = /^(?:src|scripts)\/(?!.*\/__tests__\/).*\/__test[_-][^/]+\.(?:js|cjs|mjs|ts|tsx)$/i;
+const trackedRootDebugArtifactPattern = /^(?:build_log|gitlog|(?:current-)?eslint-errors(?:-utf8)?|final-eslint-warnings)\.txt$|^(?:current_page|screenshot\d*)\.png$/i;
 
 const output = execFileSync('git', ['ls-files', ...trackedArtifactPrefixes], {
   encoding: 'utf8',
@@ -49,6 +50,7 @@ const trackedForbiddenFiles = allTrackedOutput
     || trackedTemporaryFilePattern.test(file)
     || trackedEnvFilePattern.test(file)
     || trackedOneOffTestDataPattern.test(file)
+    || trackedRootDebugArtifactPattern.test(file)
   );
 
 const failures = [...trackedArtifacts, ...trackedForbiddenFiles];
