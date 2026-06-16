@@ -32,6 +32,17 @@ const parseConcurrency = () => {
   return value;
 };
 
+const parseShardTimeoutMs = () => {
+  const raw = process.env.TEST_CI_SHARD_TIMEOUT_MS;
+  if (!raw) return 180_000;
+
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`Invalid TEST_CI_SHARD_TIMEOUT_MS value: ${raw}`);
+  }
+  return value;
+};
+
 const commandForScript = (name) => {
   if (process.platform === 'win32') {
     return {
@@ -46,7 +57,32 @@ const commandForScript = (name) => {
   };
 };
 
+const killProcessTree = (pid) => new Promise((resolve) => {
+  if (!pid) {
+    resolve();
+    return;
+  }
+
+  if (process.platform !== 'win32') {
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {
+      // The process may already have exited.
+    }
+    resolve();
+    return;
+  }
+
+  const killer = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', 'taskkill', '/pid', String(pid), '/t', '/f'], {
+    stdio: 'ignore',
+    windowsHide: true,
+  });
+  killer.on('error', resolve);
+  killer.on('exit', resolve);
+});
+
 const concurrency = parseConcurrency();
+const shardTimeoutMs = parseShardTimeoutMs();
 const pending = [...shardNames];
 const failures = [];
 let running = 0;
@@ -73,20 +109,42 @@ const runShard = (name) => new Promise((resolve) => {
     return;
   }
 
-  child.on('error', (error) => {
-    failures.push({ name, error });
-    resolve();
-  });
+  let settled = false;
+  let timedOut = false;
+  const finish = ({ code, signal, error }) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timeout);
 
-  child.on('exit', (code, signal) => {
     const seconds = Math.round((Date.now() - startedAt) / 100) / 10;
-    if (code === 0) {
+    if (error) {
+      failures.push({ name, error });
+      log(`[${name}] failed in ${seconds}s (${error.message})`);
+    } else if (timedOut) {
+      failures.push({ name, timedOut: true });
+      log(`[${name}] timed out in ${seconds}s`);
+    } else if (code === 0) {
       log(`[${name}] passed in ${seconds}s`);
     } else {
       failures.push({ name, code, signal });
       log(`[${name}] failed in ${seconds}s${signal ? ` (${signal})` : ''}`);
     }
     resolve();
+  };
+
+  const timeout = setTimeout(async () => {
+    timedOut = true;
+    log(`[${name}] exceeded ${shardTimeoutMs}ms timeout; terminating process tree`);
+    await killProcessTree(child.pid);
+    finish({ code: null, signal: 'TIMEOUT' });
+  }, shardTimeoutMs);
+
+  child.on('error', (error) => {
+    finish({ error });
+  });
+
+  child.on('exit', (code, signal) => {
+    finish({ code, signal });
   });
 });
 
@@ -110,13 +168,17 @@ const schedule = async () => {
   }
 };
 
-log(`Running ${shardNames.length} test:ci shards with concurrency ${concurrency}.`);
+log(`Running ${shardNames.length} test:ci shards with concurrency ${concurrency}, shard timeout ${shardTimeoutMs}ms.`);
 await schedule();
 
 if (failures.length > 0) {
   console.error(`\n${failures.length} test:ci shard${failures.length === 1 ? '' : 's'} failed:`);
   for (const failure of failures) {
     const detail = failure.error?.message ?? failure.signal ?? `exit ${failure.code}`;
+    if (failure.timedOut) {
+      console.error(`- ${failure.name}: timed out after ${shardTimeoutMs}ms`);
+      continue;
+    }
     console.error(`- ${failure.name}: ${detail}`);
   }
   process.exit(1);
