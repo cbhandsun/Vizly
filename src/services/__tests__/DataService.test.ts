@@ -208,4 +208,18 @@ describe('DataService', () => {
     await expect(service.loadFromStorage('bad-diagram')).rejects.toThrow('Remote diagram is invalid');
     expect(service.getDiagram('bad-diagram')).toBeNull();
   });
+
+  it('redacts remote storage load errors before logging them', async () => {
+    const failure = new Error('Authorization: Bearer sk-live-secret');
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(unifiedStorage.loadDiagram).mockRejectedValueOnce(failure);
+
+    await expect(service.loadFromStorage('secret-diagram')).rejects.toThrow('Authorization: Bearer sk-live-secret');
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load from storage:', expect.anything());
+    expect(JSON.stringify(consoleErrorSpy.mock.calls[0]?.[1])).toContain('[redacted]');
+    expect(JSON.stringify(consoleErrorSpy.mock.calls[0]?.[1])).not.toContain('sk-live-secret');
+
+    consoleErrorSpy.mockRestore();
+  });
 });

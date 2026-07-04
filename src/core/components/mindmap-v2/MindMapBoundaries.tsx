@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMindElixir } from './MindElixirContext';
+import { logMindmapBoundariesWalkFailure } from './mindmapPanelLogging';
 
 interface BoundaryBox {
     id: string;
@@ -74,7 +75,7 @@ export default function MindMapBoundaries() {
                 walk(data.nodeData);
                 setBoundaries(boxes);
             } catch (err) {
-                console.error('[MindMapBoundaries] Walk error', err);
+                logMindmapBoundariesWalkFailure(err);
             }
         };
 

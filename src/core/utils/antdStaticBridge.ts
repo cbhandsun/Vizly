@@ -23,6 +23,8 @@
 import type { MessageInstance } from 'antd/es/message/interface';
 import type { ModalStaticFunctions } from 'antd/es/modal/confirm';
 import type { NotificationInstance } from 'antd/es/notification/interface';
+import { safeLog } from './consoleCleanup';
+import { redactSensitiveLogValue } from './logSecurity';
 
 // 模块级存储，在 Bridge 组件挂载后填充
 let _message: MessageInstance | null = null;
@@ -44,10 +46,13 @@ export function registerAntdApi(
 }
 
 // ── Proxy 导出 ──────────────────────────────────────────────
-// 使用 Proxy 确保即使在 Bridge 尚未挂载时调用也不会崩溃（降级为 console.warn）
+// 使用 Proxy 确保即使在 Bridge 尚未挂载时调用也不会崩溃（降级为 safeLog.warn）
 
 const createFallback = (name: string) => (...args: unknown[]) => {
-  console.warn(`[antdStaticBridge] ${name} 尚未初始化，调用被忽略。参数:`, args);
+  safeLog.warn(
+    `[antdStaticBridge] ${name} 尚未初始化，调用被忽略。参数:`,
+    redactSensitiveLogValue(args)
+  );
 };
 
 /**

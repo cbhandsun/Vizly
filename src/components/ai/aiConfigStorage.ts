@@ -1,5 +1,6 @@
 import { CryptoService } from '@/core/utils/CryptoService';
 import { normalizeProviderBaseUrl } from '@/services/ai/providerSecurity';
+import { logAIConfigStorageFailure } from './aiLogging';
 
 export interface AIModel {
     id: string;
@@ -203,7 +204,8 @@ export const parseStoredAIConfig = (raw: string | null | undefined): unknown | n
 
     try {
         return JSON.parse(raw);
-    } catch {
+    } catch (error) {
+        logAIConfigStorageFailure('parseStoredAIConfig', error);
         return null;
     }
 };
@@ -238,7 +240,11 @@ export const persistAIConfig = (userId: string | null | undefined, config: AICon
     const normalized = coerceAIConfig(config);
     setRuntimeAIConfig(userId, normalized);
     const localConfig = userId ? stripAIConfigSecrets(normalized) : normalized;
-    localStorage.setItem(getAIConfigKey(userId), JSON.stringify(localConfig));
+    try {
+        localStorage.setItem(getAIConfigKey(userId), JSON.stringify(localConfig));
+    } catch (error) {
+        logAIConfigStorageFailure('persistAIConfig', error);
+    }
 };
 
 export const getAIConfig = (userId?: string | null): AIConfigState => {
@@ -253,13 +259,23 @@ export const getAIConfig = (userId?: string | null): AIConfigState => {
         const runtimeConfig = runtimeAIConfigs.get(keyToUse);
         if (runtimeConfig) return cloneAIConfig(runtimeConfig);
 
-        const parsed = parseStoredAIConfig(localStorage.getItem(keyToUse));
+        let parsed: unknown | null = null;
+        try {
+            parsed = parseStoredAIConfig(localStorage.getItem(keyToUse));
+        } catch (error) {
+            logAIConfigStorageFailure('getAIConfig.readScopedConfig', error);
+        }
         if (parsed) {
             const normalized = coerceAIConfig(parsed);
             if (normalized.providers.length > 0) return normalized;
         }
 
-        const v1 = parseStoredAIConfig(localStorage.getItem('DiagramView.AIConfig'));
+        let v1: unknown | null = null;
+        try {
+            v1 = parseStoredAIConfig(localStorage.getItem('DiagramView.AIConfig'));
+        } catch (error) {
+            logAIConfigStorageFailure('getAIConfig.readLegacyConfig', error);
+        }
         if (isRecord(v1)) {
             const providers = DEFAULT_PROVIDERS.map(provider => ({
                 ...provider,
@@ -276,8 +292,8 @@ export const getAIConfig = (userId?: string | null): AIConfigState => {
                 providers
             });
         }
-    } catch {
-        // Fall through to defaults if storage is unavailable or corrupt.
+    } catch (error) {
+        logAIConfigStorageFailure('getAIConfig', error);
     }
 
     return getDefaultAIConfig();

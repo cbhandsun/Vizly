@@ -2,11 +2,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Conversation, Message } from '../AIConversationService';
 
 const mockSupabaseState = vi.hoisted(() => ({ value: null as any }));
+const safeLogState = vi.hoisted(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    log: vi.fn(),
+}));
 
 vi.mock('../../supabase', () => ({
     get supabase() {
         return mockSupabaseState.value;
     },
+}));
+
+vi.mock('@/core/utils/consoleCleanup', () => ({
+    safeLog: safeLogState,
 }));
 
 const importFreshService = async () => {
@@ -20,6 +31,7 @@ describe('AIConversationService', () => {
     beforeEach(async () => {
         localStorage.clear();
         mockSupabaseState.value = null;
+        Object.values(safeLogState).forEach(mock => mock.mockReset());
         module = await importFreshService();
         module.aiConversationService.setUserId(null);
     });
@@ -94,12 +106,98 @@ describe('AIConversationService', () => {
     it('rejects malformed stored data and unsafe active ids', () => {
         localStorage.setItem('AIChatPanel.conversations_anonymous', JSON.stringify({ not: 'an array' }));
         expect(module.aiConversationService.getConversations()).toEqual([]);
+        expect(safeLogState.warn).toHaveBeenCalledWith('AIConversationService: stored conversations is not an array, resetting.');
 
         module.aiConversationService.setActiveConversationId(' active-id ');
         expect(module.aiConversationService.getActiveConversationId()).toBe('active-id');
 
         module.aiConversationService.setActiveConversationId('x'.repeat(161));
         expect(module.aiConversationService.getActiveConversationId()).toBeNull();
+    });
+
+    it('clears malformed local snapshot data and active id when conversations JSON is broken', () => {
+        localStorage.setItem('AIChatPanel.activeId_anonymous', 'old-active-id');
+        localStorage.setItem('AIChatPanel.conversations_anonymous', '{bad-json');
+
+        expect(module.aiConversationService.getConversations()).toEqual([]);
+        expect(module.aiConversationService.getActiveConversationId()).toBeNull();
+        expect(localStorage.getItem('AIChatPanel.conversations_anonymous')).toBeNull();
+        expect(localStorage.getItem('AIChatPanel.activeId_anonymous')).toBeNull();
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[AIConversationService.getConversations] Failed to read "AIChatPanel.conversations_anonymous":',
+            expect.anything()
+        );
+    });
+
+    it('logs and falls back when local conversation storage read fails', () => {
+        vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+            if (key === 'AIChatPanel.conversations_anonymous') {
+                throw new Error('Authorization: Bearer conversation-read-secret');
+            }
+            return null;
+        });
+
+        expect(module.aiConversationService.getConversations()).toEqual([]);
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[AIConversationService.getConversations] Failed to read "AIChatPanel.conversations_anonymous":',
+            expect.anything()
+        );
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('conversation-read-secret');
+    });
+
+    it('logs and keeps going when local conversation storage writes fail', () => {
+        vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string) => {
+            if (key === 'AIChatPanel.conversations_anonymous' || key === 'AIChatPanel.activeId_anonymous') {
+                throw new Error('cookie=conversation-write-secret');
+            }
+        });
+
+        expect(() => module.aiConversationService.saveConversations([makeConversation('conv-1')])).not.toThrow();
+        expect(() => module.aiConversationService.setActiveConversationId('conv-1')).not.toThrow();
+
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[AIConversationService.saveConversations] Failed to write "AIChatPanel.conversations_anonymous":',
+            expect.anything()
+        );
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[AIConversationService.setActiveConversationId] Failed to write "AIChatPanel.activeId_anonymous":',
+            expect.anything()
+        );
+        const warnPayload = JSON.stringify(safeLogState.warn.mock.calls);
+        expect(warnPayload).toContain('[redacted]');
+        expect(warnPayload).not.toContain('conversation-write-secret');
+    });
+
+    it('rejects oversized stored conversations by early return', () => {
+        localStorage.setItem(
+            'AIChatPanel.conversations_anonymous',
+            `{"conversations":"${'x'.repeat(3 * 1024 * 1024)}"}`
+        );
+
+        expect(module.aiConversationService.getConversations()).toEqual([]);
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[AIConversationService.getConversations] Failed to read "AIChatPanel.conversations_anonymous":',
+            expect.anything()
+        );
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('is too large.');
+    });
+
+    it('logs and falls back when active conversation id read fails', () => {
+        vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+            if (key === 'AIChatPanel.activeId_anonymous') {
+                throw new Error('token=active-id-secret');
+            }
+            return null;
+        });
+
+        expect(module.aiConversationService.getActiveConversationId()).toBeNull();
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[AIConversationService.getActiveConversationId] Failed to read "AIChatPanel.activeId_anonymous":',
+            expect.anything()
+        );
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('active-id-secret');
     });
 
     it('normalizes new and updated conversations without accepting invalid updates', () => {
@@ -163,7 +261,6 @@ describe('AIConversationService', () => {
         mockSupabaseState.value = {
             from: vi.fn(() => query),
         };
-        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         module = await importFreshService();
         module.aiConversationService.setUserId('user-1');
         module.aiConversationService.saveConversations([makeConversation('conv-1')]);
@@ -172,7 +269,30 @@ describe('AIConversationService', () => {
             localDeleted: true,
             cloudDeleted: false,
         });
-        expect(warnSpy).toHaveBeenCalledWith('AIConversationService: cloud conversation delete affected no rows.');
+        expect(safeLogState.warn).toHaveBeenCalledWith('AIConversationService: cloud conversation delete affected no rows.');
         expect(module.aiConversationService.getConversations()).toEqual([]);
+    });
+
+    it('redacts cloud sync errors before logging and falls back to local conversations', async () => {
+        const failure = new Error('Authorization: Bearer sk-live-secret');
+        mockSupabaseState.value = {
+            from: vi.fn(() => ({
+                select: vi.fn(() => ({
+                    eq: vi.fn(() => ({
+                        order: vi.fn(() => Promise.reject(failure)),
+                    })),
+                })),
+            })),
+        };
+        module = await importFreshService();
+        module.aiConversationService.setUserId('user-1');
+        module.aiConversationService.saveConversations([makeConversation('local-1')]);
+
+        await expect(module.aiConversationService.syncFromCloud()).resolves.toEqual([
+            expect.objectContaining({ id: 'local-1' }),
+        ]);
+        expect(safeLogState.error).toHaveBeenCalledWith('Failed to sync from cloud', expect.anything());
+        expect(JSON.stringify(safeLogState.error.mock.calls[0]?.[1])).toContain('[redacted]');
+        expect(JSON.stringify(safeLogState.error.mock.calls[0]?.[1])).not.toContain('sk-live-secret');
     });
 });

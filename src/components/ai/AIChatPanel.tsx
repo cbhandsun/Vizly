@@ -53,17 +53,41 @@ import List from 'antd/es/list';
 import Tooltip from 'antd/es/tooltip';
 import Popconfirm from 'antd/es/popconfirm';
 import {   } from '@xyflow/react';
-import { extractJson } from './useAIChatStreaming';
 import { parseAIStreamDelta } from './aiStreamParsing';
 import { sanitizeAIProviderError } from '@/services/ai/errorSecurity';
 import { formatAIProviderRequestError, requestAIChatCompletion, resolveAIProviderEndpoint } from '@/services/ai/aiProviderClient';
 import { getAICommandIds } from './aiCommandPolicy';
 import { getAIDiagramTitle, parseAIDiagramJson, registerAIDiagramLocally, serializeAIDiagram, upsertDiagramConfigIndex } from './aiDiagramImport';
 import { extractValidatedAICommands } from './aiCommandExtraction';
+import {
+    buildAIChatConversationUpdate,
+    createAIChatPendingMessageState,
+} from './aiChatConversationState';
+import {
+    resolveAIChatActiveModelSelection,
+    validateAIChatRequestSelection,
+} from './aiChatRequestConfig';
+import {
+    buildAIChatRequestMessages,
+    consumeAIChatStream,
+} from './aiChatRequestFlow';
+import {
+    executeAIChatDiagramSave,
+    prepareAIChatDiagramSave,
+} from './aiChatSave';
 import { 
      
     AIChatPanelProps
 } from './types';
+import {
+    logAIChatCancelFailure,
+    logAIChatCloudConfigLoadFailure,
+    logAIChatEndpointValidationFailure,
+    logAIChatInvalidDiagramSavePayload,
+    logAIChatLocalIndexPersistFailure,
+    logAICommandExecutionError,
+    logBlockedAutonomousCommand,
+} from './aiLogging';
 import ShortcutsGuide from './ShortcutsGuide';
 import './AIChatPanel.css';
 import { appMessage } from '@/core/utils/antdStaticBridge';
@@ -283,7 +307,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                 }
             })
             .catch(err => {
-                console.error('AIChatPanel: Failed to load cloud AI config', err);
+                logAIChatCloudConfigLoadFailure(err);
             });
 
         return () => {
@@ -470,7 +494,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
 
         const extraction = extractValidatedAICommands(content);
         extraction.rejected.slice(0, 3).forEach(({ action, reason }) => {
-            console.warn('[AI Pilot] Blocked autonomous command:', action, reason);
+            logBlockedAutonomousCommand(action, reason);
             appMessage.warning(`AI 指令 "${action}" 已被拦截：${reason}`);
         });
 
@@ -565,7 +589,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                 // [Phase 15] 为连续指令增加微小延迟，确保 React Flow 状态稳定同步
                 await new Promise(resolve => setTimeout(resolve, 100));
             } catch (e) {
-                console.error('[AI Pilot] Command execution error:', e, cmd);
+                logAICommandExecutionError(e, cmd);
             }
         }
     };
@@ -854,68 +878,36 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         }
 
         let config = getAIConfig(user?.id);
-        const parts = (config.activeModelKey || '').split(':');
-        let pId = parts[0];
-        const mIdParts = parts.slice(1);
-        let mId = mIdParts.join(':'); // 支持模型ID中包含冒号的情况
-        let activeProvider = config.providers.find(p => p.id === pId);
-        let activeModel = activeProvider?.models.find(m => m.id === mId);
+        const modelSelection = resolveAIChatActiveModelSelection(config);
+        const activeProvider = modelSelection.provider;
+        const activeModel = modelSelection.model;
 
-        // 调试日志
+        if (modelSelection.autoSwitched && activeProvider && activeModel) {
+            persistAIConfig(user?.id, modelSelection.nextConfig);
+            config = modelSelection.nextConfig;
+            appMessage.info(t('aiChat.autoSwitched', { name: `${activeProvider.name} - ${activeModel.name}` }));
+        }
 
-        // 如果当前选择的模型不可用（如被删除或禁用），尝试自动回退到第一个可用的模型
-        if (!activeProvider || !activeModel) {
-
-            // 查找第一个可用的 provider 和 model
-            for (const provider of config.providers) {
-                if (provider.enabled) {
-                    const enabledModel = provider.models.find(m => m.enabled);
-                    if (enabledModel) {
-                        activeProvider = provider;
-                        activeModel = enabledModel;
-                        pId = provider.id;
-                        mId = enabledModel.id;
-
-                        // 自动保存这个选择
-                        const newActiveModelKey = `${pId}:${mId}`;
-                        const newConfig = { ...config, activeModelKey: newActiveModelKey };
-                        persistAIConfig(user?.id, newConfig);
-                        config = newConfig;
-
-                        appMessage.info(t('aiChat.autoSwitched', { name: `${provider.name} - ${enabledModel.name}` }));
-                        break;
-                    }
-                }
+        const validation = validateAIChatRequestSelection(modelSelection, (provider) => {
+            resolveAIProviderEndpoint(provider, '/chat/completions');
+        });
+        if (!validation.ok) {
+            if (validation.reason === 'missing-model') {
+                appMessage.warning('没有找到可用的模型，请先在设置中启用模型');
+            } else if (validation.reason === 'missing-api-key' && activeProvider) {
+                appMessage.warning(`请先在 AI 设置中配置 ${activeProvider.name} 的 API Key`);
+            } else if (validation.reason === 'invalid-endpoint' && activeProvider) {
+                logAIChatEndpointValidationFailure(activeProvider.name, new Error('invalid-endpoint'));
+                appMessage.warning(`${activeProvider.name} 的 Base URL 必须使用 HTTPS，或本机 HTTP localhost/127.0.0.1。`);
             }
-        }
-
-        // 再次检查
-        if (!activeProvider || !activeModel) {
-            appMessage.warning('没有找到可用的模型，请先在设置中启用模型');
             onOpenConfig();
             return;
         }
 
-        if (!activeProvider.apiKey) {
-            appMessage.warning(`请先在 AI 设置中配置 ${activeProvider.name} 的 API Key`);
-            onOpenConfig();
-            return;
-        }
-
-        try {
-            resolveAIProviderEndpoint(activeProvider, '/chat/completions');
-        } catch {
-            appMessage.warning(`${activeProvider.name} 的 Base URL 必须使用 HTTPS，或本机 HTTP localhost/127.0.0.1。`);
-            onOpenConfig();
-            return;
-        }
-
-        const newUserMsg: Message = { id: generateId(), role: 'user', content: inputValue };
-        const aiMsgId = generateId();
-
-        let updatedMessages = [...messages, newUserMsg];
-        const newAiMsg: Message = { id: aiMsgId, role: 'assistant', content: '', isStreaming: true };
-        updatedMessages = [...updatedMessages, newAiMsg];
+        const pendingMessageState = createAIChatPendingMessageState(messages, inputValue, generateId);
+        const newUserMsg = pendingMessageState.newUserMessage;
+        const aiMsgId = pendingMessageState.newAssistantMessage.id;
+        const updatedMessages = pendingMessageState.updatedMessages;
 
         if (activeId) {
             // Update title if it's the first real message
@@ -937,136 +929,101 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
 
         try {
             const contextPrompt = pluginId === 'mindmap' ? MINDMAP_SYSTEM_PROMPT : (config.systemPrompt || DIAGRAM_SYSTEM_PROMPT);
+            const requestMessages = buildAIChatRequestMessages({
+                systemPrompt: contextPrompt,
+                pluginId,
+                historyMessages: messages,
+                userContent: enhanceWithSlashCommand(newUserMsg.content)
+                    + buildDiagramContext(diagramNodesRef?.current || [], diagramEdgesRef?.current || [])
+                    + (newUserMsg.content.trim().startsWith('/analyze')
+                        ? (canvasOps?.onAnalyze ? `\n\n[实时图表巡检报告]\n${canvasOps.onAnalyze().summary}` : buildAnalysisContext(diagramNodesRef?.current || [], diagramEdgesRef?.current || []))
+                        : ''),
+            });
             const response = await requestAIChatCompletion(activeProvider, {
                 model: activeModel.id,
-                messages: [
-                    {
-                        role: 'system',
-                        content: contextPrompt + (pluginId ? `\n\n[当前图表模式: ${pluginId}]` : '')
-                    },
-                    ...messages.map(m => ({ role: m.role, content: m.content })),
-                    {
-                        role: 'user',
-                        content: enhanceWithSlashCommand(newUserMsg.content)
-                            + buildDiagramContext(diagramNodesRef?.current || [], diagramEdgesRef?.current || [])
-                            + (newUserMsg.content.trim().startsWith('/analyze')
-                                ? (canvasOps?.onAnalyze ? `\n\n[实时图表巡检报告]\n${canvasOps.onAnalyze().summary}` : buildAnalysisContext(diagramNodesRef?.current || [], diagramEdgesRef?.current || []))
-                                : '')
-                    }
-                ],
+                messages: requestMessages,
                 stream: true
             }, { signal: requestController.signal, timeoutMs: 120_000 });
 
             // Handle streaming response
             const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
             let lastUpdateTimestamp = Date.now();
             const THROTTLE_MS = 60; // 约 16fps，保证视觉流畅且不阻塞进程
 
             if (reader) {
-                let buffer = '';
                 const cancelReader = () => {
-                    void reader.cancel().catch(() => {});
+                    void reader.cancel().catch((error) => {
+                        logAIChatCancelFailure(error);
+                    });
                 };
-                requestController.signal.addEventListener('abort', cancelReader, { once: true });
+                const streamState = await consumeAIChatStream({
+                    reader,
+                    signal: requestController.signal,
+                    parseDelta: parseAIStreamDelta,
+                    onAbortReader: cancelReader,
+                    onDelta: (state) => {
+                        accumulatedContent = state.content;
+                        accumulatedReasoning = state.reasoningContent;
 
-                try {
-                    while (true) {
-                        if (requestController.signal.aborted) {
-                            throw requestController.signal.reason;
+                        if (!activeId) return;
+
+                        const now = Date.now();
+                        if (now - lastUpdateTimestamp <= THROTTLE_MS) return;
+
+                        const convs = [...aiConversationService.getConversations()];
+                        const cIdx = convs.findIndex(c => c.id === activeId);
+                        if (cIdx !== -1) {
+                            convs[cIdx].messages = buildAIChatConversationUpdate(
+                                convs[cIdx],
+                                aiMsgId,
+                                state,
+                                { isStreaming: true }
+                            ).messages || convs[cIdx].messages;
+                            setConversations(convs);
                         }
-
-                        const { done, value } = await reader.read();
-                        if (done) break;
-
-                        const chunk = decoder.decode(value, { stream: true });
-                        buffer += chunk;
-
-                        const lines = buffer.split('\n');
-                        // 保留最后一行（可能是不完整的）在 buffer 中
-                        buffer = lines.pop() || '';
-
-                        for (const line of lines) {
-                            const trimmedLine = line.trim();
-                            if (trimmedLine.startsWith('data: ')) {
-                                const data = trimmedLine.slice(6);
-                                if (data === '[DONE]') continue;
-
-                                const delta = parseAIStreamDelta(data);
-                                if (delta) {
-                                    if (delta.reasoningContent) accumulatedReasoning += delta.reasoningContent;
-                                    if (delta.content) accumulatedContent += delta.content;
-
-                                    // Update UI State (Throttled)
-                                    if (activeId) {
-                                        const now = Date.now();
-                                        if (now - lastUpdateTimestamp > THROTTLE_MS) {
-                                            const convs = [...aiConversationService.getConversations()];
-                                            const cIdx = convs.findIndex(c => c.id === activeId);
-                                            if (cIdx !== -1) {
-                                                const partialJson = extractJson(accumulatedContent, true);
-                                                convs[cIdx].messages = convs[cIdx].messages.map(m =>
-                                                    m.id === aiMsgId ? {
-                                                        ...m,
-                                                        content: accumulatedContent,
-                                                        reasoningContent: accumulatedReasoning,
-                                                        hasJson: !!partialJson,
-                                                        jsonContent: partialJson || undefined
-                                                    } : m
-                                                );
-                                                setConversations(convs);
-                                            }
-                                            lastUpdateTimestamp = now;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } finally {
-                    requestController.signal.removeEventListener('abort', cancelReader);
-                }
-
-                if (requestController.signal.aborted) {
-                    throw requestController.signal.reason;
-                }
+                        lastUpdateTimestamp = now;
+                    },
+                });
+                accumulatedContent = streamState.content;
+                accumulatedReasoning = streamState.reasoningContent;
             }
 
             // Finalize message
-            const jsonContent = extractJson(accumulatedContent);
-            
             // Phase 3: 执行原子化指令
             await processCommands(accumulatedContent);
 
             if (activeId) {
-                const finalMessages = (aiConversationService.getConversations().find(c => c.id === activeId)?.messages || []).map(m =>
-                    m.id === aiMsgId
-                        ? { ...m, content: accumulatedContent || (accumulatedReasoning ? '' : '（无内容）'), reasoningContent: accumulatedReasoning || undefined, isStreaming: false, hasJson: !!jsonContent, jsonContent: jsonContent || undefined }
-                        : m
-                );
-                aiConversationService.updateConversation(activeId, { messages: finalMessages });
+                const activeConversation = aiConversationService.getConversations().find(c => c.id === activeId);
+                if (activeConversation) {
+                    aiConversationService.updateConversation(activeId, buildAIChatConversationUpdate(
+                        activeConversation,
+                        aiMsgId,
+                        {
+                            content: accumulatedContent,
+                            reasoningContent: accumulatedReasoning,
+                        }
+                    ));
+                }
                 setConversations(aiConversationService.getConversations());
             }
 
         } catch (error: any) {
             if (isAbortError(error)) {
                 if (activeId) {
-                    const jsonContent = extractJson(accumulatedContent);
                     const convs = [...aiConversationService.getConversations()];
                     const cIdx = convs.findIndex(c => c.id === activeId);
                     if (cIdx !== -1) {
-                        convs[cIdx].messages = convs[cIdx].messages.map(m =>
-                            m.id === aiMsgId
-                                ? {
-                                    ...m,
-                                    content: accumulatedContent || '已停止生成',
-                                    reasoningContent: accumulatedReasoning || undefined,
-                                    isStreaming: false,
-                                    hasJson: !!jsonContent,
-                                    jsonContent: jsonContent || undefined
-                                }
-                                : m
-                        );
+                        convs[cIdx].messages = buildAIChatConversationUpdate(
+                            convs[cIdx],
+                            aiMsgId,
+                            {
+                                content: accumulatedContent,
+                                reasoningContent: accumulatedReasoning,
+                            },
+                            {
+                                fallbackContent: '已停止生成',
+                            }
+                        ).messages || convs[cIdx].messages;
                         aiConversationService.updateConversation(activeId, { messages: convs[cIdx].messages });
                         setConversations(convs);
                     }
@@ -1080,9 +1037,17 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
                 const convs = [...aiConversationService.getConversations()];
                 const cIdx = convs.findIndex(c => c.id === activeId);
                 if (cIdx !== -1) {
-                    convs[cIdx].messages = convs[cIdx].messages.map(m =>
-                        m.id === aiMsgId ? { ...m, content: t('aiChat.requestError', { error: safeError }), isStreaming: false } : m
-                    );
+                    convs[cIdx].messages = buildAIChatConversationUpdate(
+                        convs[cIdx],
+                        aiMsgId,
+                        {
+                            content: '',
+                            reasoningContent: '',
+                        },
+                        {
+                            fallbackContent: t('aiChat.requestError', { error: safeError }),
+                        }
+                    ).messages || convs[cIdx].messages;
                     setConversations(convs);
                 }
             }
@@ -1103,17 +1068,19 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
     // --- Multi-Target Save Handler (Step 1: Open Modal) ---
     const handleSaveDiagramTo = (jsonContent: string, target: 'local' | 's3' | 'supabase') => {
         try {
-            const fallbackTitle = `ai-generated-${Date.now()}`;
-            const obj = parseAIDiagramJson(jsonContent, {
-                id: `ai-${Date.now()}`,
-                title: fallbackTitle,
+            const preparedSave = prepareAIChatDiagramSave({
+                jsonContent,
+                target,
+                parseDiagram: parseAIDiagramJson,
+                getDiagramTitle: getAIDiagramTitle,
+                serializeDiagram: serializeAIDiagram,
             });
-            const initialTitle = getAIDiagramTitle(obj, fallbackTitle);
-            setSaveTitle(initialTitle);
-            setSaveJson(serializeAIDiagram(obj));
-            setSaveTarget(target);
+            setSaveTitle(preparedSave.saveTitle);
+            setSaveJson(preparedSave.saveJson);
+            setSaveTarget(preparedSave.saveTarget);
             setSaveModalVisible(true);
-        } catch (_e: any) {
+        } catch (error: any) {
+            logAIChatInvalidDiagramSavePayload(error);
             appMessage.error(t('aiChat.invalidDiagram'));
         }
     };
@@ -1124,65 +1091,30 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         setSaveModalVisible(false);
 
         try {
-            const obj = parseAIDiagramJson(saveJson, {
-                id: `ai-${Date.now()}`,
-                title: saveTitle.trim() || `ai-generated-${Date.now()}`,
-            });
             const target = saveTarget;
             const targetLabel = target === 'local' ? t('storage.manager.local') : (target === 's3' ? 'S3' : 'Supabase');
             const hide = appMessage.loading(t('aiChat.status.savingTo', { target: targetLabel }), 0);
 
             try {
-                // [FIX] Update Title
-                const title = saveTitle.trim() || `ai-generated-${Date.now()}`;
-                obj.metadata = obj.metadata || {};
-                obj.metadata.title = title;
-
-                if (target === 'local') {
-                    const localService = dataRegistry.getDataService();
-                    const registered = registerAIDiagramLocally(localService, obj, title);
-                    
-                    // Persist to vizly_diagram_configs to make it appear in the dashboard immediately
-                    try {
-                        upsertDiagramConfigIndex(localStorage, registered, title);
-                    } catch { /* ignore storage errors */ }
-                    
-                    appMessage.success(t('aiChat.status.saveSuccess', { target: targetLabel, title: title }));
-                } else {
-                    const unifiedStorage = await loadUnifiedStorage();
-                    const provider = unifiedStorage.getProvider(target);
-                    if (!provider.isConfigured()) {
-                        throw new Error(`${provider.name} 未配置，请先在配置面板中设置`);
-                    }
-
-                    // [FIX] ID Generation Logic
-                    // 1. If Supabase, MUST be UUID. If current ID is invalid/missing, regenerate.
-                    // 2. If S3, can be string.
-                    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-                    let finalId = obj.id;
-
-                    if (target === 'supabase') {
-                        if (!finalId || !uuidRegex.test(finalId)) {
-                            // Force regenerate UUID if missing or invalid (e.g. preset name)
-                            finalId = crypto.randomUUID();
+                const result = await executeAIChatDiagramSave({
+                    jsonContent: saveJson,
+                    target,
+                    title: saveTitle,
+                    userId: user?.id,
+                    localStorage,
+                    parseDiagram: parseAIDiagramJson,
+                    getLocalDataService: () => dataRegistry.getDataService(),
+                    registerLocalDiagram: registerAIDiagramLocally,
+                    persistLocalIndex: (storage, diagram, title) => {
+                        try {
+                            upsertDiagramConfigIndex(storage, diagram, title);
+                        } catch (error) {
+                            logAIChatLocalIndexPersistFailure(error);
                         }
-                    } else {
-                        // S3 or others
-                        if (!finalId) finalId = `${target}-${Date.now()}`;
-                    }
-
-                    // Update object ID
-                    obj.id = finalId;
-
-                    await provider.saveDiagram({
-                        id: finalId,
-                        title: title,
-                        content: obj,
-                        user_id: user?.id || 'anonymous',
-                        updated_at: new Date().toISOString()
-                    });
-                    appMessage.success(t('aiChat.status.saveSuccess', { target: targetLabel, title: title }));
-                }
+                    },
+                    loadUnifiedStorage,
+                });
+                appMessage.success(t('aiChat.status.saveSuccess', { target: targetLabel, title: result.title }));
             } finally {
                 hide();
             }

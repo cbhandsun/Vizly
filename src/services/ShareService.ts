@@ -5,6 +5,8 @@
 
 import { supabase } from './supabase';
 import { coerceRemoteDiagramContent } from './remoteDiagramContent';
+import { safeLog } from '@/core/utils/consoleCleanup';
+import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
 
 // === 类型定义 ===
 
@@ -39,6 +41,12 @@ export interface SharedWithMeRecord {
     title: string;
     updatedAt: Date;
     role: 'viewer' | 'editor' | 'owner';
+}
+
+export interface AddCollaboratorResult {
+    success: boolean;
+    user_id?: string;
+    error?: string;
 }
 
 // === Token 生成 ===
@@ -179,6 +187,31 @@ function coerceSharedWithMeRecord(value: unknown): SharedWithMeRecord | null {
     return { id, title, updatedAt, role };
 }
 
+function coerceAddCollaboratorResult(value: unknown): AddCollaboratorResult | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const row = value as Record<string, unknown>;
+    if (row.success !== true && row.success !== false) return null;
+
+    const userId = typeof row.user_id === 'string' && isValidUuid(row.user_id.trim())
+        ? row.user_id.trim()
+        : undefined;
+    const error = typeof row.error === 'string' && row.error.trim()
+        ? row.error.trim().slice(0, 500)
+        : undefined;
+
+    if (row.success === true) {
+        return {
+            success: true,
+            ...(userId ? { user_id: userId } : {}),
+        };
+    }
+
+    return {
+        success: false,
+        error: error || 'Failed to add collaborator',
+    };
+}
+
 // === 分享服务 ===
 
 class ShareService {
@@ -225,7 +258,12 @@ class ShareService {
             .single();
 
         if (error) throw error;
-        return data as ShareRecord;
+
+        const share = coerceShareRecord(data);
+        if (!share) {
+            throw new Error('Share link creation returned an invalid share record.');
+        }
+        return share;
     }
 
     /**
@@ -307,7 +345,9 @@ class ShareService {
             .order('created_at', { ascending: false });
 
         if (error) throw error;
-        return (data || []) as ShareRecord[];
+        return (Array.isArray(data) ? data : [])
+            .map(record => coerceShareRecord(record))
+            .filter((record): record is ShareRecord => record !== null);
     }
 
     /**
@@ -367,7 +407,7 @@ class ShareService {
     /**
      * 通过邮箱添加协作者（调用 RPC）
      */
-    async addCollaborator(diagramId: string, email: string, role: 'viewer' | 'editor' = 'viewer'): Promise<{ success: boolean; user_id?: string; error?: string }> {
+    async addCollaborator(diagramId: string, email: string, role: 'viewer' | 'editor' = 'viewer'): Promise<AddCollaboratorResult> {
         if (!isValidUuid(diagramId)) {
             throw new Error('Collaborators require a saved cloud diagram id.');
         }
@@ -386,11 +426,15 @@ class ShareService {
         });
 
         if (error) {
-            console.error('RPC Error:', error);
+            safeLog.error('RPC Error:', redactSensitiveLogValue(error));
             throw new Error(error.message);
         }
 
-        return data as any;
+        const result = coerceAddCollaboratorResult(data);
+        if (!result) {
+            throw new Error('Add collaborator returned an invalid response.');
+        }
+        return result;
     }
 
     /**
@@ -405,7 +449,7 @@ class ShareService {
         });
 
         if (error) {
-            console.error('RPC Error:', error);
+            safeLog.error('RPC Error:', redactSensitiveLogValue(error));
             throw new Error(error.message);
         }
 

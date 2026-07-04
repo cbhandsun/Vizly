@@ -1,5 +1,8 @@
 export type Viewport = { x: number; y: number; zoom: number };
 
+import { getQueryParamFromSearch, getWindowSearchString } from '../../utils/inputBoundary';
+import { logViewportStoreFailure } from './viewportLogging';
+
 let lastViewport: Viewport | null = null;
 
 type ViewportListener = (vp: Viewport) => void;
@@ -8,7 +11,8 @@ const listeners = new Set<ViewportListener>();
 export const getLastViewport = (): Viewport | null => {
   try {
     return lastViewport;
-  } catch {
+  } catch (error) {
+    logViewportStoreFailure('getLastViewport', error);
     return null;
   }
 };
@@ -19,12 +23,15 @@ export const subscribeViewport = (listener: ViewportListener) => {
     listeners.add(listener);
     // 立即推送当前视口（若存在），使订阅方初始渲染一致
     if (lastViewport) {
-      try { listener(lastViewport); } catch { }
+      try { listener(lastViewport); } catch (error) {
+        logViewportStoreFailure('notifyInitialListener', error);
+      }
     }
     return () => {
       listeners.delete(listener);
     };
-  } catch {
+  } catch (error) {
+    logViewportStoreFailure('subscribeViewport', error);
     return () => { };
   }
 };
@@ -34,9 +41,13 @@ export const setLastViewport = (vp: Viewport) => {
     lastViewport = vp;
     // 通知所有订阅者
     listeners.forEach((fn) => {
-      try { fn(vp); } catch { }
+      try { fn(vp); } catch (error) {
+        logViewportStoreFailure('notifyListener', error);
+      }
     });
-  } catch { }
+  } catch (error) {
+    logViewportStoreFailure('setLastViewport', error);
+  }
 };
 
 /**
@@ -45,8 +56,7 @@ export const setLastViewport = (vp: Viewport) => {
  */
 export const getUiScale = (): number => {
   try {
-    const qs = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-    const urlScale = parseFloat(qs.get('uiScale') || '');
+    const urlScale = parseFloat(getQueryParamFromSearch(getWindowSearchString(), 'uiScale') || '');
     if (!isNaN(urlScale) && urlScale > 0.3 && urlScale <= 3) return urlScale;
     // 动态导入避免循环依赖：直接读取 DOM 上的实际 zoom 值
     const rootLayout = document.getElementById('app-root-layout');
@@ -55,7 +65,10 @@ export const getUiScale = (): number => {
       if (!isNaN(computedZoom) && computedZoom > 0.3 && computedZoom <= 3) return computedZoom;
     }
     return 1.0;
-  } catch { return 1.0; }
+  } catch (error) {
+    logViewportStoreFailure('getUiScale', error);
+    return 1.0;
+  }
 };
 
 /**
@@ -94,7 +107,8 @@ export const screenToFlowPositionCssZoomAware = (
       x: (relLogX - viewport.x) / viewport.zoom,
       y: (relLogY - viewport.y) / viewport.zoom,
     };
-  } catch {
+  } catch (error) {
+    logViewportStoreFailure('screenToFlowPositionCssZoomAware', error);
     return { x: clientX, y: clientY };
   }
 };

@@ -9,6 +9,7 @@ import { selectBestPortCombination } from '../../algorithms/smartEdgeUtils';
 import { diagramConfigManager } from '../config/DiagramConfig';
 import { LayeredConfigManager } from '../../config/LayeredConfigManager';
 import { parseHandlePosition } from '../../routing/utils/handleUtils';
+import { safeLog } from '../../utils/consoleCleanup';
 import type { CenteredCoords } from './hooks/useSmartPathWorker';
 
 // [FIX C-6] 模块级方向投票缓存：相同拓扑签名 → 复用计算结果，避免每条边重复 O(E) 计算。
@@ -601,7 +602,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             // [FIX] Only log in development — avoids console flooding in production
             // (this runs inside useMemo, firing on every drag frame for each reverse edge)
             if (import.meta.env.DEV) {
-                console.log(`[ReverseEdge] ${source}→${target} isReverse=TRUE  dx=${Math.round(dx)} dy=${Math.round(dy)} refDir=${refDir} geomReverse=${geomReverse} sHandle=${sourceHandleId} tHandle=${targetHandleId}`);
+                safeLog.debug(`[ReverseEdge] ${source}→${target} isReverse=TRUE  dx=${Math.round(dx)} dy=${Math.round(dy)} refDir=${refDir} geomReverse=${geomReverse} sHandle=${sourceHandleId} tHandle=${targetHandleId}`);
             }
         }
 

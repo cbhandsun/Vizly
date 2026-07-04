@@ -1,0 +1,42 @@
+import { safeLog } from '@/core/utils/consoleCleanup';
+import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
+
+export const logConnectionMicrointeractionFailure = (operation: string, error: unknown): void => {
+  safeLog.warn(`[useConnectionMicrointeractions] ${operation} failed:`, redactSensitiveLogValue(error));
+};
+
+export const logDiagramDragDropImportRejected = (reason: unknown): void => {
+  safeLog.warn('[useDiagramDragDrop] reverse import rejected:', redactSensitiveLogValue(reason));
+};
+
+export const logDiagramDragDropReverseImportFailure = (error: unknown): void => {
+  safeLog.error('[useDiagramDragDrop] reverse import failed:', redactSensitiveLogValue(error));
+};
+
+export const logDiagramDragDropFailure = (error: unknown): void => {
+  safeLog.error('[useDiagramDragDrop] drop failed:', redactSensitiveLogValue(error));
+};
+
+export const logLayoutOrphanEdgeDropped = (details: {
+  edgeId: string;
+  hasSource: boolean;
+  hasTarget: boolean;
+}): void => {
+  safeLog.warn('[useLayoutStrategy] Dropping orphan edge after layout sanitation:', details);
+};
+
+export const logLayoutNoLayoutableNodes = (): void => {
+  safeLog.warn('[useLayoutStrategy] No layoutable nodes available; skipping layout.');
+};
+
+export const logLayoutStrategyFailure = (strategyName: string, error: unknown): void => {
+  safeLog.error(`[useLayoutStrategy] Layout failed (${strategyName}):`, redactSensitiveLogValue(error));
+};
+
+export const logSmartRoutingConfigLayerSyncFailure = (error: unknown): void => {
+  safeLog.warn('[useSmartRoutingConfig] Layered config sync failed:', redactSensitiveLogValue(error));
+};
+
+export const logSmartRoutingConfigSyncFailure = (error: unknown): void => {
+  safeLog.warn('[useSmartRoutingConfig] Config sync failed:', redactSensitiveLogValue(error));
+};

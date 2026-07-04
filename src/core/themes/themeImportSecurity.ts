@@ -180,7 +180,11 @@ export const parseThemeImportJson = (content: string): unknown => {
   if (content.length > THEME_IMPORT_MAX_CHARS) {
     throw new Error(`Theme import JSON is too large. Limit is ${THEME_IMPORT_MAX_CHARS} characters.`);
   }
-  return JSON.parse(content);
+  try {
+    return JSON.parse(content);
+  } catch {
+    throw new Error('Theme import JSON is invalid.');
+  }
 };
 
 export const coerceThemeImport = (value: unknown, fallbackId?: string): Theme => {

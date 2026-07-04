@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { WheelEvent as ReactWheelEvent } from 'react';
+import { logPanelZoomStorageReadFailure, logPanelZoomStorageWriteFailure } from './panelZoomLogging';
 
 interface PanelZoomOptions {
   storageKey: string;
@@ -21,7 +22,8 @@ export const usePanelZoom = ({
       const raw = localStorage.getItem(storageKey);
       const parsed = raw ? Number(raw) : defaultScale;
       return clamp(Number.isFinite(parsed) ? parsed : defaultScale, minScale, maxScale);
-    } catch {
+    } catch (error) {
+      logPanelZoomStorageReadFailure(storageKey, error);
       return defaultScale;
     }
   });
@@ -29,8 +31,8 @@ export const usePanelZoom = ({
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, String(scale));
-    } catch {
-      void 0;
+    } catch (error) {
+      logPanelZoomStorageWriteFailure(storageKey, error);
     }
   }, [scale, storageKey]);
 

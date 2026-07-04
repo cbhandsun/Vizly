@@ -1,0 +1,118 @@
+import { describe, expect, it, vi } from 'vitest';
+
+import {
+  createDiagramViewerGlobalKeydownHandler,
+  resolveDiagramViewerKeyboardActions,
+} from '../diagramViewerKeyboard';
+
+describe('diagramViewerKeyboard', () => {
+  it('resolves keyboard actions for global shortcuts', () => {
+    expect(resolveDiagramViewerKeyboardActions({
+      event: {
+        key: 'L',
+        ctrlKey: true,
+        metaKey: false,
+        shiftKey: true,
+        altKey: false,
+      } as KeyboardEvent,
+      isPresentationMode: false,
+      isFullscreenActive: false,
+    })).toEqual(['smartLayout']);
+
+    expect(resolveDiagramViewerKeyboardActions({
+      event: {
+        key: 'Escape',
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      isPresentationMode: true,
+      isFullscreenActive: true,
+    })).toEqual(['exitFullscreen', 'exitPresentation']);
+  });
+
+  it('executes resolved actions in order and prevents default where needed', () => {
+    const exitFullscreen = vi.fn();
+    const toggleDebugPanel = vi.fn();
+    const openCommandPalette = vi.fn();
+    const openSettings = vi.fn();
+    const triggerEditorCommand = vi.fn();
+    const triggerAi = vi.fn();
+    const triggerTheme = vi.fn();
+    const exitPresentation = vi.fn();
+    const onFullscreenExitFailure = vi.fn();
+
+    const handler = createDiagramViewerGlobalKeydownHandler({
+      isPresentationMode: true,
+      isFullscreenActive: () => true,
+      exitFullscreen,
+      onFullscreenExitFailure,
+      toggleDebugPanel,
+      openCommandPalette,
+      openSettings,
+      triggerEditorCommand,
+      triggerAi,
+      triggerTheme,
+      exitPresentation,
+    });
+
+    const preventDefault = vi.fn();
+    handler({
+      key: 'Escape',
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+      preventDefault,
+    } as unknown as KeyboardEvent);
+
+    expect(preventDefault).toHaveBeenCalled();
+    expect(exitFullscreen).toHaveBeenCalledTimes(1);
+    expect(exitPresentation).toHaveBeenCalledTimes(1);
+
+    const addNodePreventDefault = vi.fn();
+    handler({
+      key: 'N',
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: true,
+      preventDefault: addNodePreventDefault,
+    } as unknown as KeyboardEvent);
+
+    expect(addNodePreventDefault).toHaveBeenCalled();
+    expect(triggerEditorCommand).toHaveBeenCalledWith('add-node');
+  });
+
+  it('logs fullscreen exit failures without breaking later handlers', () => {
+    const triggerTheme = vi.fn();
+    const onFullscreenExitFailure = vi.fn();
+    const handler = createDiagramViewerGlobalKeydownHandler({
+      isPresentationMode: false,
+      isFullscreenActive: () => true,
+      exitFullscreen: () => {
+        throw new Error('boom');
+      },
+      onFullscreenExitFailure,
+      toggleDebugPanel: vi.fn(),
+      openCommandPalette: vi.fn(),
+      openSettings: vi.fn(),
+      triggerEditorCommand: vi.fn(),
+      triggerAi: vi.fn(),
+      triggerTheme,
+      exitPresentation: vi.fn(),
+    });
+
+    handler({
+      key: 'Escape',
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+      preventDefault: vi.fn(),
+    } as unknown as KeyboardEvent);
+
+    expect(onFullscreenExitFailure).toHaveBeenCalledTimes(1);
+  });
+});

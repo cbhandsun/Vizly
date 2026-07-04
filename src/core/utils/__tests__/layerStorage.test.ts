@@ -11,10 +11,23 @@ import {
     writeLayers,
 } from '../layerStorage';
 
+const safeLogState = vi.hoisted(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    log: vi.fn(),
+}));
+
+vi.mock('../consoleCleanup', () => ({
+    safeLog: safeLogState,
+}));
+
 describe('layerStorage', () => {
     beforeEach(() => {
         localStorage.clear();
         vi.restoreAllMocks();
+        Object.values(safeLogState).forEach((mock) => mock.mockReset());
     });
 
     it('coerces layer arrays to safe, deduped, sequential configs', () => {
@@ -45,6 +58,10 @@ describe('layerStorage', () => {
 
         localStorage.setItem(FLOWCHART_LAYERS_STORAGE_KEY, '{bad');
         expect(readLayers()).toEqual([DEFAULT_LAYER]);
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[layerStorage] Failed to read "flowchart.layers":',
+            expect.anything()
+        );
 
         localStorage.setItem(FLOWCHART_LAYERS_STORAGE_KEY, JSON.stringify([{ id: '<bad>', name: 'bad' }]));
         expect(readLayers()).toEqual([DEFAULT_LAYER]);
@@ -70,5 +87,14 @@ describe('layerStorage', () => {
 
         localStorage.setItem(FLOWCHART_ACTIVE_LAYER_STORAGE_KEY, 'missing');
         expect(readActiveLayerId(layers)).toBe(DEFAULT_LAYER.id);
+    });
+
+    it('falls back when layer payload is oversized', () => {
+        localStorage.setItem(FLOWCHART_LAYERS_STORAGE_KEY, 'x'.repeat(2 * 1024 * 1024 + 1));
+        expect(readLayers()).toEqual([DEFAULT_LAYER]);
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[layerStorage] Failed to read "flowchart.layers":',
+            expect.anything()
+        );
     });
 });

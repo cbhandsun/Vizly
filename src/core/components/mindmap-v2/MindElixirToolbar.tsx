@@ -65,6 +65,17 @@ import { parseDiagramJson } from '../../utils/diagramJsonImport';
 import { downloadBlob } from '../../utils/downloadUtils';
 import { cleanAndValidateTree, cleanMindMapData } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
+import {
+    logMindmapToolbarAddRootChildFailure,
+    logMindmapToolbarArrowFailure,
+    logMindmapToolbarAutoArrangeFailure,
+    logMindmapToolbarExportFailure,
+    logMindmapToolbarFocusModeFailure,
+    logMindmapToolbarImportFailure,
+    logMindmapToolbarImportRejected,
+    logMindmapToolbarStatsUpdateFailure,
+    logMindmapToolbarSummaryFailure,
+} from './mindmapToolbarLogging';
 
 
 const DIRECTION_OPTIONS = [
@@ -212,7 +223,7 @@ const MindElixirToolbar: React.FC = () => {
                 obj: nodeData,
             });
         } catch (e) {
-            console.warn('[MindMap] auto arrange failed:', e);
+            logMindmapToolbarAutoArrangeFailure(e);
         }
     }, [mind]);
 
@@ -234,7 +245,7 @@ const MindElixirToolbar: React.FC = () => {
                 mind.addChild(rootTpc, cleanMindMapChildNode());
             }
         } catch (e) {
-            console.warn('[Toolbar] addRootChild failed:', e);
+            logMindmapToolbarAddRootChildFailure(e);
         }
     }, [mind]);
 
@@ -245,7 +256,7 @@ const MindElixirToolbar: React.FC = () => {
             const blob = mind.exportSvg();
             downloadBlob(blob, 'mindmap.svg', 'mindmap.svg');
         } catch (e) {
-            console.error('SVG export failed:', e);
+            logMindmapToolbarExportFailure('SVG', e);
         }
     }, [mind]);
 
@@ -256,7 +267,7 @@ const MindElixirToolbar: React.FC = () => {
             if (!blob) return;
             downloadBlob(blob, 'mindmap.png', 'mindmap.png');
         } catch (e) {
-            console.error('PNG export failed:', e);
+            logMindmapToolbarExportFailure('PNG', e);
         }
     }, [mind]);
 
@@ -265,7 +276,7 @@ const MindElixirToolbar: React.FC = () => {
         try {
             const md = nodeObjToMarkdown(mind.getData().nodeData);
             downloadText('mindmap.md', md, 'text/markdown');
-        } catch (e) { console.error('Markdown export failed:', e); }
+        } catch (e) { logMindmapToolbarExportFailure('Markdown', e); }
     }, [mind]);
 
     const handleExportOpml = useCallback(() => {
@@ -273,7 +284,7 @@ const MindElixirToolbar: React.FC = () => {
         try {
             const opml = nodeObjToOpml(mind.getData().nodeData);
             downloadText('mindmap.opml', opml, 'application/xml');
-        } catch (e) { console.error('OPML export failed:', e); }
+        } catch (e) { logMindmapToolbarExportFailure('OPML', e); }
     }, [mind]);
 
     const handleExportJson = useCallback(() => {
@@ -282,7 +293,7 @@ const MindElixirToolbar: React.FC = () => {
             const data = mind.getData();
             const json = JSON.stringify(data, null, 2);
             downloadText('mindmap.json', json, 'application/json');
-        } catch (e) { console.error('JSON export failed:', e); }
+        } catch (e) { logMindmapToolbarExportFailure('JSON', e); }
     }, [mind]);
 
     const handleExportFlowchart = useCallback(() => {
@@ -291,7 +302,7 @@ const MindElixirToolbar: React.FC = () => {
             const data = mind.getData();
             const json = nodeObjToFlowchartJson(data.nodeData);
             downloadText('mindmap_to_flowchart.vizly', json, 'application/json');
-        } catch (e) { console.error('Flowchart export failed:', e); }
+        } catch (e) { logMindmapToolbarExportFailure('Flowchart', e); }
     }, [mind]);
 
     const handleExportPitchMarkdown = useCallback(() => {
@@ -300,7 +311,7 @@ const MindElixirToolbar: React.FC = () => {
             const data = mind.getData();
             const md = nodeObjToPitchMarkdown(data.nodeData);
             downloadText('mindmap_pitch.md', md, 'text/markdown;charset=utf-8');
-        } catch (e) { console.error('Pitch export failed:', e); }
+        } catch (e) { logMindmapToolbarExportFailure('Pitch markdown', e); }
     }, [mind]);
 
     const handleExportXmind = useCallback(async () => {
@@ -309,7 +320,7 @@ const MindElixirToolbar: React.FC = () => {
             const data = mind.getData();
             const title = data.nodeData?.topic ?? 'mindmap';
             await exportXmind(data.nodeData, title);
-        } catch (e) { console.error('XMind export failed:', e); }
+        } catch (e) { logMindmapToolbarExportFailure('XMind', e); }
     }, [mind]);
 
     const handleExportPdf = useCallback(() => {
@@ -395,7 +406,7 @@ const MindElixirToolbar: React.FC = () => {
                     _isFocused = true;
                 }
             }
-        } catch (e) { console.warn('[Toolbar] focusMode:', e); }
+        } catch (e) { logMindmapToolbarFocusModeFailure(e); }
     }, [mind]);
 
     // ── 自动节点编号 ─────────────────────────────────────────────────────────────
@@ -432,7 +443,7 @@ const MindElixirToolbar: React.FC = () => {
         if (!mind) return;
         try {
             mind.createSummary();
-        } catch (e) { console.warn('[Summary]', e); }
+        } catch (e) { logMindmapToolbarSummaryFailure(e); }
     }, [mind]);
 
     const arrowFromRef = useRef<import('mind-elixir').Topic | null>(null);
@@ -482,7 +493,7 @@ const MindElixirToolbar: React.FC = () => {
                                 }
                             }
                         }
-                    } catch (e) { console.warn('[Arrow]', e); }
+                    } catch (e) { logMindmapToolbarArrowFailure(e); }
                     arrowFromRef.current = null;
                     setArrowMode(false);
                     mind.bus.removeListener('selectNodes', handler as any);
@@ -519,7 +530,7 @@ const MindElixirToolbar: React.FC = () => {
         if (!file || !mind) return;
         const sizeError = getFileSizeLimitError(file, MINDMAP_TEXT_IMPORT_MAX_BYTES, 'mind map JSON');
         if (sizeError) {
-            console.warn('[Import JSON]', sizeError);
+            logMindmapToolbarImportRejected('JSON', sizeError);
             e.target.value = '';
             return;
         }
@@ -532,7 +543,7 @@ const MindElixirToolbar: React.FC = () => {
                 mind.refresh(data);
                 mind.toCenter();
                 (mind as any).clearHistory?.();
-            } catch (err) { console.error('[Import JSON]', err); }
+            } catch (err) { logMindmapToolbarImportFailure('JSON', err); }
         };
         reader.readAsText(file);
         e.target.value = '';
@@ -543,7 +554,7 @@ const MindElixirToolbar: React.FC = () => {
         if (!file || !mind) return;
         const sizeError = getFileSizeLimitError(file, MINDMAP_TEXT_IMPORT_MAX_BYTES, 'Markdown');
         if (sizeError) {
-            console.warn('[Import MD]', sizeError);
+            logMindmapToolbarImportRejected('Markdown', sizeError);
             e.target.value = '';
             return;
         }
@@ -552,7 +563,7 @@ const MindElixirToolbar: React.FC = () => {
             try {
                 const md = ev.target?.result as string;
                 loadAndRefresh(cleanAndValidateTree(markdownToNodeObj(md), true));
-            } catch (err) { console.error('[Import MD]', err); }
+            } catch (err) { logMindmapToolbarImportFailure('Markdown', err); }
         };
         reader.readAsText(file);
         e.target.value = '';
@@ -563,7 +574,7 @@ const MindElixirToolbar: React.FC = () => {
         if (!file || !mind) return;
         const sizeError = getFileSizeLimitError(file, MINDMAP_TEXT_IMPORT_MAX_BYTES, 'OPML');
         if (sizeError) {
-            console.warn('[Import OPML]', sizeError);
+            logMindmapToolbarImportRejected('OPML', sizeError);
             e.target.value = '';
             return;
         }
@@ -572,7 +583,7 @@ const MindElixirToolbar: React.FC = () => {
             try {
                 const xml = ev.target?.result as string;
                 loadAndRefresh(cleanAndValidateTree(opmlToNodeObj(xml), true));
-            } catch (err) { console.error('[Import OPML]', err); }
+            } catch (err) { logMindmapToolbarImportFailure('OPML', err); }
         };
         reader.readAsText(file);
         e.target.value = '';
@@ -589,7 +600,9 @@ const MindElixirToolbar: React.FC = () => {
                     nodes: countNodes(data.nodeData),
                     depth: getTreeDepth(data.nodeData),
                 });
-            } catch {}
+            } catch (error) {
+                logMindmapToolbarStatsUpdateFailure(error);
+            }
         };
         update();
         mind.bus.addListener('operation', update);

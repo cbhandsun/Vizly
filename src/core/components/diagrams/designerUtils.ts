@@ -5,6 +5,11 @@ import { getThemeManager } from '../../themes';
 import { downloadFile } from '../../utils/downloadUtils';
 import { validateAndFixNodes } from '../../utils/nodeValidation';
 import { expandHandle } from '../../routing/utils/handleUtils';
+import {
+    logDesignerUtilsDomainLayoutFailure,
+    logDesignerUtilsMigrationFailure,
+    logDesignerUtilsThemeRestoreFailure,
+} from './designerUtilsLogging';
 
 const resolveRestorableThemeId = (themeId?: string): string | undefined => {
     if (!themeId || themeId === 'manual') return undefined;
@@ -223,7 +228,7 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
                 data = (await plugin.migrate(data, data.version)) as StandardDiagramData;
                 data.version = plugin.version; // Mark as migrated
             } catch (err) {
-                console.error(`[Plugin Migration Pipeline] Diagram migration failed for ${targetPluginId}:`, err);
+                logDesignerUtilsMigrationFailure(targetPluginId, err);
             }
         }
     }
@@ -232,7 +237,9 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
     // 尝试恢复保存的主题
     const savedThemeId = resolveRestorableThemeId(data.metadata?.themeId || data.theme?.name);
     if (savedThemeId) {
-        getThemeManager().setTheme(savedThemeId).catch(console.warn);
+        getThemeManager().setTheme(savedThemeId).catch((error) => {
+            logDesignerUtilsThemeRestoreFailure(savedThemeId, error);
+        });
         window.dispatchEvent(new CustomEvent('diagram-global-theme-changed', { detail: savedThemeId }));
     }
 
@@ -496,7 +503,7 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
                     edges: (result.edges && result.edges.length > 0) ? result.edges : edges
                 };
             } catch (err) {
-                console.error('[standardDataToCanvas] 域布局失败，回退到扁平 dagre:', err);
+                logDesignerUtilsDomainLayoutFailure(err);
                 // 回退到下面的扁平 dagre
             }
         }

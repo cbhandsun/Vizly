@@ -3,6 +3,17 @@ import type { StorageConfig } from '../StorageService';
 
 const sendMock = vi.fn();
 const commandPayloads: unknown[] = [];
+const safeLogState = vi.hoisted(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    log: vi.fn(),
+}));
+
+vi.mock('@/core/utils/consoleCleanup', () => ({
+    safeLog: safeLogState,
+}));
 
 vi.mock('@aws-sdk/client-s3', () => ({
     S3Client: class {
@@ -50,6 +61,8 @@ describe('S3StorageProvider', () => {
         sessionStorage.clear();
         sendMock.mockReset();
         commandPayloads.length = 0;
+        Object.values(safeLogState).forEach(mock => mock.mockReset());
+        vi.restoreAllMocks();
         vi.resetModules();
     });
 
@@ -78,6 +91,29 @@ describe('S3StorageProvider', () => {
         expect(persisted.secretAccessKey).toBe('');
         expect(sessionStorage.getItem('diagram_storage_config_secret')).toBe('super-secret');
         expect(s3Storage.getConfig()?.secretAccessKey).toBe('super-secret');
+    });
+
+    it('drops oversized persisted S3 config on load', async () => {
+        localStorage.setItem('diagram_storage_config', JSON.stringify({
+            endpoint: 'https://s3.amazonaws.com',
+            accessKeyId: 'AKIA_TEST',
+            secretAccessKey: 'super-secret',
+            bucket: 'vizly-diagrams',
+            region: 'us-east-1',
+            padding: 'x'.repeat(3 * 1024 * 1024),
+        }));
+        sessionStorage.setItem('diagram_storage_config_secret', 'stale-secret');
+
+        const { s3Storage } = await loadStorageService();
+
+        expect(s3Storage.isConfigured()).toBe(false);
+        expect(s3Storage.getConfig()).toBeNull();
+        expect(localStorage.getItem('diagram_storage_config')).toBeNull();
+        expect(sessionStorage.getItem('diagram_storage_config_secret')).toBeNull();
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[S3StorageProvider.loadConfig] Failed to read "diagram_storage_config":',
+            expect.anything()
+        );
     });
 
     it('reuses the session S3 secret when saving non-secret config changes', async () => {
@@ -125,6 +161,24 @@ describe('S3StorageProvider', () => {
         expect(s3Storage.getConfig()).toBeNull();
         expect(localStorage.getItem('diagram_storage_config')).toBeNull();
         expect(sessionStorage.getItem('diagram_storage_config_secret')).toBeNull();
+    });
+
+    it('clears persisted config when stored JSON is malformed', async () => {
+        localStorage.setItem('diagram_storage_config', '{bad-json');
+        sessionStorage.setItem('diagram_storage_config_secret', 'stale-secret');
+
+        const { s3Storage } = await loadStorageService();
+
+        expect(s3Storage.isConfigured()).toBe(false);
+        expect(s3Storage.getConfig()).toBeNull();
+        expect(localStorage.getItem('diagram_storage_config')).toBeNull();
+        expect(sessionStorage.getItem('diagram_storage_config_secret')).toBeNull();
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[S3StorageProvider.loadConfig] Failed to read "diagram_storage_config":',
+            expect.anything()
+        );
+        expect(safeLogState.error).toHaveBeenCalledWith('Failed to load storage config', expect.anything());
+        expect(safeLogState.warn.mock.calls[0][0]).toBe('[S3StorageProvider.loadConfig] Failed to read "diagram_storage_config":');
     });
 
     it('loads remote S3 diagram JSON through bounded normalization', async () => {
@@ -194,15 +248,12 @@ describe('S3StorageProvider', () => {
     it('propagates S3 delete failures instead of reporting false success', async () => {
         const failure = new Error('delete failed');
         sendMock.mockRejectedValueOnce(failure);
-        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
         const { s3Storage } = await loadStorageService();
         s3Storage.saveConfig(config);
 
         await expect(s3Storage.deleteDiagram('remote.json')).rejects.toThrow('delete failed');
-        expect(consoleErrorSpy).toHaveBeenCalledWith('Delete diagram failed:', expect.anything());
-
-        consoleErrorSpy.mockRestore();
+        expect(safeLogState.error).toHaveBeenCalledWith('Delete diagram failed:', expect.anything());
     });
 
     it('redacts S3 connection errors before logging diagnostics', async () => {
@@ -211,30 +262,21 @@ describe('S3StorageProvider', () => {
             secretAccessKey: 'super-secret',
         };
         sendMock.mockRejectedValueOnce(failure);
-        const consoleGroupSpy = vi.spyOn(console, 'group').mockImplementation(() => {});
-        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const consoleGroupEndSpy = vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
 
         const { s3Storage } = await loadStorageService();
         s3Storage.saveConfig(config);
 
         await expect(s3Storage.testConnection()).rejects.toBe(failure);
-        const loggedPayload = consoleErrorSpy.mock.calls[0]?.[1];
+        expect(safeLogState.error).toHaveBeenCalledWith('S3 Connection Test Failed', expect.anything());
+        const loggedPayload = safeLogState.error.mock.calls[0]?.[1];
         expect(JSON.stringify(loggedPayload)).not.toContain('super-secret');
         expect(JSON.stringify(loggedPayload)).not.toContain('abcdef1234');
         expect(JSON.stringify(loggedPayload)).toContain('[redacted]');
-
-        consoleGroupSpy.mockRestore();
-        consoleErrorSpy.mockRestore();
-        consoleGroupEndSpy.mockRestore();
     });
 
     it('tests ad-hoc S3 config without persisting failed connection settings', async () => {
         const failure = new Error('connection failed');
         sendMock.mockRejectedValueOnce(failure);
-        const consoleGroupSpy = vi.spyOn(console, 'group').mockImplementation(() => {});
-        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const consoleGroupEndSpy = vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
 
         const { s3Storage } = await loadStorageService();
 
@@ -243,9 +285,78 @@ describe('S3StorageProvider', () => {
         expect(localStorage.getItem('diagram_storage_config')).toBeNull();
         expect(sessionStorage.getItem('diagram_storage_config_secret')).toBeNull();
         expect(s3Storage.getConfig()).toBeNull();
+    });
 
-        consoleGroupSpy.mockRestore();
-        consoleErrorSpy.mockRestore();
-        consoleGroupEndSpy.mockRestore();
+    it('redacts storage bootstrap errors before logging them', async () => {
+        const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+            if (key === 'diagram_storage_config') {
+                throw new Error('Authorization: Bearer sk-live-secret');
+            }
+            return null;
+        });
+
+        await loadStorageService();
+
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[S3StorageProvider.loadConfig] Failed to read "diagram_storage_config":',
+            expect.anything()
+        );
+        expect(safeLogState.error).toHaveBeenCalledWith('Failed to load storage config', expect.anything());
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('sk-live-secret');
+
+        getItemSpy.mockRestore();
+    });
+
+    it('keeps runtime config when session secret persistence fails', async () => {
+        const originalSetItem = Storage.prototype.setItem;
+        const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
+            if (key === 'diagram_storage_config_secret') {
+                throw new Error('secret=session-write-secret');
+            }
+
+            return originalSetItem.call(this, key, value);
+        });
+
+        const { s3Storage } = await loadStorageService();
+        s3Storage.saveConfig(config);
+
+        expect(s3Storage.getConfig()?.secretAccessKey).toBe('super-secret');
+        expect(localStorage.getItem('diagram_storage_config')).toContain('"secretAccessKey":""');
+        expect(sessionStorage.getItem('diagram_storage_config_secret')).toBeNull();
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[S3StorageProvider.saveConfig] Failed to write "diagram_storage_config_secret":',
+            expect.anything()
+        );
+        expect(JSON.stringify(safeLogState.warn.mock.calls)).toContain('[redacted]');
+        expect(JSON.stringify(safeLogState.warn.mock.calls)).not.toContain('session-write-secret');
+
+        setItemSpy.mockRestore();
+    });
+
+    it('keeps runtime config when local config persistence fails', async () => {
+        const originalSetItem = Storage.prototype.setItem;
+        const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
+            if (key === 'diagram_storage_config') {
+                throw new Error('token=local-write-secret');
+            }
+
+            return originalSetItem.call(this, key, value);
+        });
+
+        const { s3Storage } = await loadStorageService();
+        s3Storage.saveConfig(config);
+
+        expect(s3Storage.getConfig()?.secretAccessKey).toBe('super-secret');
+        expect(sessionStorage.getItem('diagram_storage_config_secret')).toBe('super-secret');
+        expect(localStorage.getItem('diagram_storage_config')).toBeNull();
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[S3StorageProvider.saveConfig] Failed to write "diagram_storage_config":',
+            expect.anything()
+        );
+        expect(JSON.stringify(safeLogState.warn.mock.calls)).toContain('[redacted]');
+        expect(JSON.stringify(safeLogState.warn.mock.calls)).not.toContain('local-write-secret');
+
+        setItemSpy.mockRestore();
     });
 });

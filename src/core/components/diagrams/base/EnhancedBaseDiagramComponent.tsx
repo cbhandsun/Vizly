@@ -18,6 +18,12 @@ import { ConfigIntegration } from '../../../config/ConfigIntegration';
 import { validateConfigValue } from '../../../config/ConfigValidation';
 import { Theme } from '../../../themes/types/ThemeTypes';
 import { ThemePerformanceOptimizer } from '../../../themes/ThemePerformanceOptimizer';
+import {
+  logEnhancedBaseDiagramConfigLoadFailure,
+  logEnhancedBaseDiagramInvalidConfig,
+  logEnhancedBaseDiagramPerformanceMetrics,
+  logEnhancedBaseDiagramThemeLoadFailure,
+} from './enhancedBaseDiagramLogging';
 
 /**
  * 增强版基础架构图组件配置接口
@@ -139,7 +145,7 @@ function useEnhancedConfig(
           ...customConfig,
         });
       } catch (error) {
-        console.warn('Failed to load enhanced config, using defaults:', error);
+        logEnhancedBaseDiagramConfigLoadFailure(error);
         setConfig(defaultConfig);
       }
     };
@@ -195,7 +201,7 @@ function useEnhancedTheme(
 
         setCurrentTheme(theme || null);
       } catch (error) {
-        console.warn('Failed to load theme, using fallback:', error);
+        logEnhancedBaseDiagramThemeLoadFailure(error);
         const fallbackTheme = themeManager.getCurrentTheme();
         setCurrentTheme(fallbackTheme || null);
       }
@@ -298,7 +304,7 @@ export const EnhancedBaseDiagramComponent: React.FC<EnhancedBaseDiagramProps> = 
   useEffect(() => {
     if (performanceOptimizer && config.PERFORMANCE_OPTIMIZATION) {
       const metrics = performanceOptimizer.getMetrics();
-      console.debug('Diagram performance metrics:', metrics);
+      logEnhancedBaseDiagramPerformanceMetrics(metrics);
     }
   }, [performanceOptimizer, config.PERFORMANCE_OPTIMIZATION]);
 
@@ -310,7 +316,7 @@ export const EnhancedBaseDiagramComponent: React.FC<EnhancedBaseDiagramProps> = 
         // 使用validateConfigValue函数进行验证
         const result = validateConfigValue('diagram.config', config);
         if (!result.isValid) {
-          console.warn('Invalid diagram configuration detected:', config, result.error);
+          logEnhancedBaseDiagramInvalidConfig(config, result.error);
         }
       }
     }

@@ -1,5 +1,6 @@
 
 import { sanitizeDownloadFileName } from '../../utils/downloadUtils';
+import { logDiagramExportProgressCallbackFailure } from '../../hooks/diagramExportLogging';
 
 const MAX_EXPORT_SIDE_PX = 12_000;
 const MAX_RASTER_EXPORT_PIXELS = 36_000_000;
@@ -764,7 +765,7 @@ export async function exportGifFramesWithAnimationCloneBatch(
       frames.push(dataUrl);
       // 逐帧进度回调，便于外部更新进度条
       if (onProgress) {
-        try { onProgress(frameIndex + 1, safeTotalFrames); } catch (_) { }
+        try { onProgress(frameIndex + 1, safeTotalFrames); } catch (error) { logDiagramExportProgressCallbackFailure(error); }
       }
       // 让浏览器有机会刷新 UI（避免长任务阻塞进度条）
       await new Promise<void>(resolve => setTimeout(resolve, 0));

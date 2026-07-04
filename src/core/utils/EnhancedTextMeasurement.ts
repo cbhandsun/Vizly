@@ -3,6 +3,8 @@
  * 集成缓存机制、批量处理和性能优化
  */
 
+import { safeLog } from './consoleCleanup';
+import { redactSensitiveLogValue } from './logSecurity';
 import { sanitizeMarkdownHtml } from './sanitizeHtml';
 
 interface TextMeasurementOptions {
@@ -266,7 +268,7 @@ export class EnhancedTextMeasurement {
       // 确保返回值是有效数字
       return (typeof width === 'number' && !isNaN(width) && isFinite(width)) ? width : 0;
     } catch (error) {
-      console.warn('Canvas measureText failed, using estimation:', error);
+      safeLog.warn('Canvas measureText failed, using estimation:', redactSensitiveLogValue(error));
       return this.estimateTextWidth(text, this.defaultOptions.fontSize);
     }
   }
@@ -362,7 +364,7 @@ export class EnhancedTextMeasurement {
       
     } catch (error) {
       // Canvas不可用时使用估算方法
-      console.warn('Canvas测量失败，使用估算方法:', error);
+      safeLog.warn('Canvas测量失败，使用估算方法:', redactSensitiveLogValue(error));
       result = this.estimateNodeContent(content, opts);
     }
     

@@ -5,6 +5,10 @@
 
 import { enhancedTextMeasurement } from '../../utils/EnhancedTextMeasurement';
 import { diagramConfigManager } from '../config/DiagramConfig';
+import {
+  logLayoutOptimizerNodeHeightFallback,
+  logLayoutOptimizerNodeWidthFallback,
+} from './layoutOptimizerLogging';
 
 interface CachedMeasurement {
   width: number;
@@ -233,7 +237,7 @@ export class LayoutOptimizer {
         ? Math.max(minWidth, rawWidth)
         : Math.max(minWidth, Math.min(rawWidth, hardMaxWidth));
     } catch (error) {
-      console.warn('Node width calculation failed, fallback:', error);
+      logLayoutOptimizerNodeWidthFallback(error);
       const cleanText = description.replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, ' ');
       const estimated = cleanText.length * fontSize * 0.6 + Math.max(paddingH, FLOWCHART_RENDER_PADDING_H) * 2 + FLOWCHART_WIDTH_SAFETY;
       totalWidth = Math.max(minWidth, Math.min(estimated, hardMaxWidth));
@@ -489,7 +493,7 @@ export class LayoutOptimizer {
       return Math.max(60, height); // 最小高度60px
 
     } catch (error) {
-      console.warn('节点高度计算失败，使用默认值:', error);
+      logLayoutOptimizerNodeHeightFallback(error);
       return 60;
     }
   }

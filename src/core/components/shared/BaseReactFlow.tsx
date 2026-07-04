@@ -34,7 +34,68 @@ import { CanvasRefEdge } from '../edges/CanvasRefEdge';
 import EditableEdge from '../custom-edges/EditableEdge'; // ⭐ Waypoint编辑Edge
 import { useSharedTrunks } from '../custom-edges/hooks/useSharedTrunks';
 import { SharedTrunkLayer } from '../custom-edges/renderers/SharedTrunkLayer';
-import { expandHandle } from '../../routing/utils/handleUtils';
+import {
+  areBaseReactFlowHandlesMeasured,
+  refreshBaseReactFlowNodeInternals,
+  scheduleBaseReactFlowMountedDomRefresh,
+  scheduleBaseReactFlowNodeInternalsRetry,
+} from './baseReactFlowNodeInternals';
+import {
+  createBaseReactFlowExportStateHandlers,
+  restoreBaseReactFlowViewportOnInit,
+  syncBaseReactFlowZoomClass,
+} from './baseReactFlowViewport';
+import {
+  hasBaseReactFlowRenderableSize,
+  scheduleBaseReactFlowContainerReadyUpdate,
+} from './baseReactFlowContainerReady';
+import {
+  computeBaseReactFlowFitViewport,
+  computeBaseReactFlowNodeBounds,
+  expandBaseReactFlowBoundsForEdges,
+  shouldSkipBaseReactFlowMinorResize,
+} from './baseReactFlowFitWidthTop';
+import { resolveBaseReactFlowFitSchedule } from './baseReactFlowFitSchedule';
+import {
+  computeBaseReactFlowDisplayEdgeEpoch,
+  createBaseReactFlowDisplayEdges,
+} from './baseReactFlowDisplayEdges';
+import {
+  bindBaseReactFlowWheelHandler,
+  createBaseReactFlowWheelHandler,
+} from './baseReactFlowWheel';
+import {
+  computeBaseReactFlowAlignGuideLine,
+  computeBaseReactFlowRightEdgeGuideLines,
+  readBaseReactFlowAlignGuideEnabled,
+  readBaseReactFlowRightEdgeGuideFlags,
+} from './baseReactFlowOverlayGuides';
+import {
+  computeBaseReactFlowNodeStructureSignature,
+  scheduleBaseReactFlowInitializationReset,
+  shouldResetBaseReactFlowInitialization,
+} from './baseReactFlowInitialization';
+import { createBaseReactFlowMergedEdgeTypes } from './baseReactFlowEdgeTypes';
+import {
+  readBaseReactFlowFitRatio,
+  readBaseReactFlowMaxFitZoom,
+} from './baseReactFlowFitConfig';
+import {
+  computeBaseReactFlowIsLargeGraph,
+  createBaseReactFlowDefaultEdgeOptions,
+  createBaseReactFlowProOptions,
+  detectBaseReactFlowTouchDevice,
+  readBaseReactFlowPerformanceConfig,
+  readBaseReactFlowZoomSensitivity,
+  resolveBaseReactFlowInteractionFlags,
+} from './baseReactFlowRuntimeConfig';
+import {
+  logBaseReactFlowConfigReadFailure,
+  logBaseReactFlowEventBindingFailure,
+  logBaseReactFlowFitWidthTopFailure,
+  logBaseReactFlowOverlayFlagReadFailure,
+} from './baseReactFlowLogging';
+import { getWindowSearchString } from '../../utils/inputBoundary';
 
 
 interface BaseReactFlowProps {
@@ -213,14 +274,17 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 
   // 全局滚轮灵敏度（函数级注释）：从配置系统读取，用于主画布自定义缩放
   const globalSensitivity = useMemo(() => {
-    try {
-      const cfg = diagramConfigManager.getConfig();
-      return cfg.canvas?.zoom?.sensitivity ?? 1;
-    } catch { return 1; }
+    return readBaseReactFlowZoomSensitivity({
+      readConfig: () => diagramConfigManager.getConfig(),
+      onReadFailure: (error) => logBaseReactFlowConfigReadFailure('canvas.zoom.sensitivity', error),
+    });
   }, []);
   // Mobile detection
   const isTouchDevice = useMemo(() => {
-    return typeof window !== 'undefined' && (('ontouchstart' in window) || (navigator.maxTouchPoints > 0));
+    return typeof window !== 'undefined' && detectBaseReactFlowTouchDevice({
+      hasTouchStart: 'ontouchstart' in window,
+      maxTouchPoints: navigator.maxTouchPoints,
+    });
   }, []);
 
   const [isMobileScreen, setIsMobileScreen] = useState(false);
@@ -231,8 +295,16 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const effectivePreventScrolling = preventScrolling !== undefined ? preventScrolling : (isTouchDevice || isMobileScreen);
-  const effectivePanOnScroll = panOnScroll || (isTouchDevice && !panOnDrag);
+  const {
+    effectivePreventScrolling,
+    effectivePanOnScroll,
+  } = resolveBaseReactFlowInteractionFlags({
+    preventScrolling,
+    panOnScroll,
+    panOnDrag,
+    isTouchDevice,
+    isMobileScreen,
+  });
 
   // 新增：容器就绪防抖状态
   const [isContainerReady, setIsContainerReady] = useState(false);
@@ -250,14 +322,19 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const lastFitTriggerKeyRef = useRef(fitTriggerKey);
 
   const performanceConfig = useMemo(() => {
-    try { return diagramConfigManager.getConfig()?.performance || { enableVirtualization: true, batchSize: 50, debounceMs: 100 }; } catch { return { enableVirtualization: true, batchSize: 50, debounceMs: 100 }; }
+    return readBaseReactFlowPerformanceConfig({
+      readConfig: () => diagramConfigManager.getConfig(),
+      onReadFailure: (error) => logBaseReactFlowConfigReadFailure('performance', error),
+    });
   }, []);
 
   const isLargeGraph = useMemo(() => {
-    const n = nodes.length;
-    const e = edges.length;
-    return performanceConfig.enableVirtualization && (n + e) >= Math.max(120, performanceConfig.batchSize * 3);
-  }, [nodes.length, edges.length, performanceConfig.enableVirtualization, performanceConfig.batchSize]);
+    return computeBaseReactFlowIsLargeGraph({
+      nodeCount: nodes.length,
+      edgeCount: edges.length,
+      performanceConfig,
+    });
+  }, [nodes.length, edges.length, performanceConfig]);
 
   /**
    * 启用 React Flow 虚拟化选项（函数级注释）
@@ -265,19 +342,16 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
    * 行为：在所有场景开启 `onlyRenderVisibleElements`，与自定义滚轮缩放兼容。
    */
   const proOptions = useMemo(() => ({
-    onlyRenderVisibleElements: isLargeGraph,
-    hideAttribution: true,
+    ...createBaseReactFlowProOptions({
+      isLargeGraph,
+    }),
   }), [isLargeGraph]);
 
   // 稳定 defaultEdgeOptions 引用，避免 StoreUpdater 每帧 setState 导致无限循环
   const defaultEdgeOptions = useMemo(() => ({
-    type: 'advanced-smart-step',
-    // 恢复正常箭头大小，移除之前的过度补偿
-    markerEnd: { type: 'arrowclosed' as const, width: 10, height: 10 },
-    style: {
-      strokeOpacity: 0.98,
-      filter: isLargeGraph ? 'none' : 'drop-shadow(0 0 0.6px rgba(0,0,0,0.35))'
-    }
+    ...createBaseReactFlowDefaultEdgeOptions({
+      isLargeGraph,
+    }),
   }), [isLargeGraph]);
 
   // 稳定 ReactFlow style prop 引用
@@ -310,59 +384,49 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     const pane: HTMLElement | null = (containerRef.current.querySelector?.('.react-flow__pane') as HTMLElement | null) || containerRef.current;
     if (!pane) return;
 
-    const wheelHandler = (ev: WheelEvent) => {
-      if (preventScrolling) {
-        if (ev.cancelable) ev.preventDefault();
-        ev.stopPropagation();
-      }
+    const wheelHandler = createBaseReactFlowWheelHandler({
+      preventScrolling: effectivePreventScrolling,
+      minZoom,
+      maxZoom,
+      sensitivity: globalSensitivity,
+      pane,
+      rfInstance,
+    });
 
-      const minZoomCfg = minZoom;
-      const maxZoomCfg = maxZoom;
-      const sensitivity = globalSensitivity;
-
-      const viewport = rfInstance.getViewport();
-      const rect = pane.getBoundingClientRect();
-      const screenX = ev.clientX - rect.left;
-      const screenY = ev.clientY - rect.top;
-      // 屏幕坐标→世界坐标（逆变换）
-      const anchorWorldX = (screenX - viewport.x) / viewport.zoom;
-      const anchorWorldY = (screenY - viewport.y) / viewport.zoom;
-      // 指数缩放 + 灵敏度
-      const normalizedDelta = Math.max(-80, Math.min(80, ev.deltaY));
-      const direction = -normalizedDelta; // 向上放大
-      const zoomFactor = Math.exp(direction * (0.0025 * sensitivity));
-      const targetZoom = Math.max(minZoomCfg, Math.min(maxZoomCfg, viewport.zoom * zoomFactor));
-      // 计算新视口，使锚点保持在光标位置
-      const targetX = screenX - anchorWorldX * targetZoom;
-      const targetY = screenY - anchorWorldY * targetZoom;
-      rfInstance.setViewport({ x: targetX, y: targetY, zoom: targetZoom });
-    };
-
-    try {
-      pane.addEventListener('wheel', wheelHandler, { passive: false });
-    } catch {
-      pane.addEventListener('wheel', wheelHandler as any);
-    }
+    const unbind = bindBaseReactFlowWheelHandler({
+      pane,
+      wheelHandler: wheelHandler as EventListener,
+      onPassiveBindFailure: (error) => logBaseReactFlowEventBindingFailure('bindWheelHandlerPassive', error),
+    });
 
     return () => {
-      try { pane.removeEventListener('wheel', wheelHandler); } catch { void 0; }
+      try {
+        unbind();
+      } catch (error) {
+        logBaseReactFlowEventBindingFailure('unbindWheelHandler', error);
+      }
     };
-  }, [zoomOnScroll, rfInstance, globalSensitivity, preventScrolling, minZoom, maxZoom]);
+  }, [zoomOnScroll, rfInstance, globalSensitivity, effectivePreventScrolling, minZoom, maxZoom]);
 
   // 监听节点变化，重置初始化状态（仅在节点集合结构变化时重置）
   useEffect(() => {
-    const currentSig = nodes.map(n => n.id).sort().join('|');
+    const currentSig = computeBaseReactFlowNodeStructureSignature(nodes);
     const prevSig = prevNodesSigRef.current;
-    const nodesChanged = currentSig !== prevSig;
     let resetTimer: ReturnType<typeof setTimeout> | null = null;
 
-    if (nodesChanged && nodes.length > 0) {
-      resetTimer = setTimeout(() => setHasInitialized(false), 0);
-      prevBBox.current = null;
-      prevContainer.current = null;
-      cooldownUntil.current = 0;
-      lastZoomRef.current = null;
-      initAtRef.current = Date.now();
+    if (shouldResetBaseReactFlowInitialization({
+      currentSignature: currentSig,
+      previousSignature: prevSig,
+      nodeCount: nodes.length,
+    })) {
+      resetTimer = scheduleBaseReactFlowInitializationReset({
+        setHasInitialized,
+        prevBBoxRef: prevBBox,
+        prevContainerRef: prevContainer,
+        cooldownUntilRef: cooldownUntil,
+        lastZoomRef,
+        initAtRef,
+      });
     }
 
     prevNodesRef.current = [...nodes];
@@ -395,19 +459,12 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 
     // 轻微尺寸变动跳过：当已初始化且容器尺寸仅发生微小变化时不触发适配，避免抖动
     // 若强制触发 (force=true) 则跳过此优化
-    if (!force && hasInitialized && prevContainer.current) {
-      const dw = Math.abs(containerSize.width - prevContainer.current.width);
-      const dh = Math.abs(containerSize.height - prevContainer.current.height);
-      // 自适应“微小尺寸变动跳过”阈值（函数级注释）
-      // - 基于容器宽度与节点数量动态计算阈值，范围约 4–10px
-      // - 小图更灵敏，大图更保守，降低不必要的重算
-      const nodeFactor = Math.min(6, Math.round((nodes.length || 0) / 200));
-      const baseThreshold = Math.min(10, Math.max(4, Math.round(containerSize.width * 0.004)));
-      const threshold = baseThreshold + nodeFactor;
-      const minorDelta = dw <= threshold && dh <= threshold;
-      if (minorDelta) {
+    if (!force && hasInitialized && shouldSkipBaseReactFlowMinorResize({
+      currentSize: containerSize,
+      previousSize: prevContainer.current,
+      nodeCount: nodes.length || 0,
+    })) {
         return false;
-      }
     }
 
     try {
@@ -416,143 +473,54 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         return false;
       }
 
-      // 复用回到顶部的核心逻辑：计算内容包围盒
-      let minX = Number.POSITIVE_INFINITY;
-      let minY = Number.POSITIVE_INFINITY;
-      let maxX = Number.NEGATIVE_INFINITY;
-      let maxY = Number.NEGATIVE_INFINITY;
+      const nodeBounds = computeBaseReactFlowNodeBounds(currentNodes);
+      if (!nodeBounds) {
+        return false;
+      }
 
-      currentNodes.forEach((n) => {
-        // 添加 NaN 检查和默认值处理，并优先使用 measured 尺寸
-        const w = (typeof n.measured?.width === 'number' && isFinite(n.measured.width))
-          ? n.measured.width
-          : (typeof n.width === 'number' && !isNaN(n.width) && isFinite(n.width))
-            ? n.width
-            : (typeof n.style?.width === 'number' && !isNaN(n.style.width) && isFinite(n.style.width))
-              ? n.style.width
-              : 220;
-        const h = (typeof n.measured?.height === 'number' && isFinite(n.measured.height))
-          ? n.measured.height
-          : (typeof n.height === 'number' && !isNaN(n.height) && isFinite(n.height))
-            ? n.height
-            : (typeof n.style?.height === 'number' && !isNaN(n.style.height) && isFinite(n.style.height))
-              ? n.style.height
-              : 120;
-        
-        // 考虑嵌套节点的绝对坐标
-        const abs = (n as any).positionAbsolute ?? (n as any).computed?.positionAbsolute;
-        let xVal = abs?.x;
-        let yVal = abs?.y;
-        if (typeof xVal !== 'number' || isNaN(xVal) || !isFinite(xVal) || typeof yVal !== 'number' || isNaN(yVal) || !isFinite(yVal)) {
-          let x = n.position?.x ?? 0;
-          let y = n.position?.y ?? 0;
-          let curr = n;
-          while (curr.parentId) {
-            const parent = currentNodes.find(pn => pn.id === curr.parentId);
-            if (!parent) break;
-            x += parent.position?.x ?? 0;
-            y += parent.position?.y ?? 0;
-            curr = parent;
-          }
-          xVal = x;
-          yVal = y;
-        }
-        
-        const x1 = xVal;
-        const y1 = yVal;
-        const x2 = x1 + w;
-        const y2 = y1 + h;
-        if (x1 < minX) minX = x1;
-        if (y1 < minY) minY = y1;
-        if (x2 > maxX) maxX = x2;
-        if (y2 > maxY) maxY = y2;
-      });
-
-      // 新增：考虑连线的外扩范围（线宽/标签/智能绕行可能的抬高）
       const currentEdges = rfInstance.getEdges();
-      let maxStrokeWidth = 0;
-      let hasEdgeLabel = false;
-      let hasSmartEdge = false;
-      currentEdges.forEach(e => {
-        const sw = (typeof e.style?.strokeWidth === 'number' && isFinite(e.style.strokeWidth)) ? Number(e.style.strokeWidth) : 2;
-        if (sw > maxStrokeWidth) maxStrokeWidth = sw;
-        const label = (e as any)?.data?.label ?? (e as any)?.label;
-        if (label) hasEdgeLabel = true;
-        const pathType: string = (e.data && typeof e.data === 'object' && (e.data as any).pathType || (e as any).pathType || e.type || '').toString().toLowerCase();
-        if (typeof pathType === 'string' && pathType.includes('smart')) hasSmartEdge = true;
+      const expandedBounds = expandBaseReactFlowBoundsForEdges({
+        bounds: nodeBounds,
+        edges: currentEdges,
       });
-      const edgeMargin = Math.max(0, Math.ceil(maxStrokeWidth) + 4);
-      const smartExtraY = hasSmartEdge ? 24 : 0;
-      const labelExtraY = hasEdgeLabel ? 24 : 0;
-      const labelExtraX = hasEdgeLabel ? 16 : 0;
-
-      const minXBound = minX - (edgeMargin + labelExtraX);
-      const maxXBound = maxX + (edgeMargin + labelExtraX);
-      const minYBound = minY - (edgeMargin + smartExtraY + labelExtraY);
-      const maxYBound = maxY + (edgeMargin + labelExtraY);
-
-      // 确保边界框计算结果是有效数字
-      const bboxWidth = (isFinite(maxXBound) && isFinite(minXBound)) ? Math.max(1, maxXBound - minXBound) : 1;
-      const bboxHeight = (isFinite(maxYBound) && isFinite(minYBound)) ? Math.max(1, maxYBound - minYBound) : 1;
 
       // 复用回到顶部的缩放和位置计算逻辑
       const padding = Math.max(0, fitPadding ?? 16); // 使用传入的 fitPadding
-      const SAFE_TOP = 64; // Vizly Top Control Island Safe Zone
-      const SAFE_LEFT = 56; // Vizly Left Tool Island Safe Zone
-
-      // 容器可用宽度需要减去左侧安全区
-      const containerWidth = Math.max(1, containerSize.width - SAFE_LEFT - padding * 2);
 
       // 获取全局配置的适配比例，优先从 URL 读取 fitRatio 参数方便调试
-      const fitRatio = (() => {
-        try {
-          const qs = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-          const urlRatio = parseFloat(qs.get('fitRatio') || '');
-          if (!isNaN(urlRatio) && urlRatio > 0 && urlRatio <= 2) return urlRatio;
-
-          return diagramConfigManager.getConfig().canvas.zoom.fitRatio ?? 0.85;
-        }
-        catch { return 0.85; }
-      })();
+      const fitRatio = readBaseReactFlowFitRatio({
+        search: getWindowSearchString(),
+        readConfig: () => diagramConfigManager.getConfig(),
+        onReadFailure: (error) => logBaseReactFlowConfigReadFailure('canvas.zoom.fitRatio', error),
+      });
 
       // 获取自适应专用的最大放大系数（防止初始化或全景缩放时，小数量节点被放大成了“巨无霸”）
       // 限制最大自适应缩放为 1.0，以保证小图表字号与UI体系协调
-      const maxFitZoom = (() => {
-        try {
-          return diagramConfigManager.getConfig().canvas.zoom.maxFitZoom ?? 1.0;
-        } catch { return 1.0; }
-      })();
+      const maxFitZoom = readBaseReactFlowMaxFitZoom({
+        readConfig: () => diagramConfigManager.getConfig(),
+        onReadFailure: (error) => logBaseReactFlowConfigReadFailure('canvas.zoom.maxFitZoom', error),
+      });
 
-      // 允许向下收缩以确保完整放入首屏，避免宽图/横向布局在初始化或切换时被截断
-      const MIN_FIT_ZOOM = 0.45;
-
-      // 计算按宽度适配的缩放比，并顶端对齐
-      // 应用 fitRatio 调整目标宽度，实现"留白"效果（解决 100% 撑满过于拥挤的问题）
-      let zoom = Math.max(MIN_FIT_ZOOM, Math.min(maxFitZoom, (containerWidth * fitRatio) / bboxWidth));
-      // 双次保障最终的安全边界
-      zoom = Math.min(zoom, maxZoom);
-      zoom = Math.max(zoom, minZoom);
-
-      // 避免"降缩"：允许重新定位但保持上一次缩放
-      // 若 forced=true 或容器变窄（可能由侧边栏打开导致），则跳过此保护，允许缩小以适配
-      const isContainerShrinking = prevContainer.current && containerSize.width < prevContainer.current.width * 0.98;
-
-      if (!force && !isContainerShrinking && hasInitialized && lastZoomRef.current && zoom < lastZoomRef.current * 0.95) {
-        zoom = lastZoomRef.current;
-      }
-
-      // X/Y 计算必须结合 Safe Zone，确保内容完美地避让玻璃 UI 浮岛
-      // 修正：如果图表实际宽度小于容器可用宽度，则水平居中；若超出，则靠左对齐（自适应从左侧起步）
-      const extraCenterX = Math.max(0, (containerWidth - bboxWidth * zoom) / 2);
-      const x = SAFE_LEFT + padding + extraCenterX - (minXBound * zoom);
-      const y = SAFE_TOP + padding - (minYBound * zoom);
+      const { x, y, zoom } = computeBaseReactFlowFitViewport({
+        bounds: expandedBounds,
+        containerSize,
+        fitPadding: padding,
+        fitRatio,
+        maxFitZoom,
+        minZoom,
+        maxZoom,
+        hasInitialized,
+        lastZoom: lastZoomRef.current,
+        force,
+        previousContainer: prevContainer.current,
+      });
 
       // 应用视口变换
       rfInstance.setViewport({ x, y, zoom }, { duration: hasInitialized ? 300 : 0 });
 
       // 更新记录
       lastZoomRef.current = zoom;
-      prevBBox.current = { minX: minXBound, minY: minYBound, maxX: maxXBound, maxY: maxYBound, contentWidth: bboxWidth, contentHeight: bboxHeight };
+      prevBBox.current = expandedBounds;
       prevContainer.current = { ...containerSize };
 
       // 设置冷却期，避免频繁调用（自适应）
@@ -566,7 +534,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 
       return true;
     } catch (error) {
-      console.error('PerformFitWidthTop error:', error);
+      logBaseReactFlowFitWidthTopFailure(error);
       return false;
     }
   }, [rfInstance, containerSize, nodes, maxZoom, minZoom, hasInitialized, fitPadding]);
@@ -584,50 +552,40 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
    * 4. 兼容 fitMode='fitAll'，虽然主要针对 fitWidthTop。
    */
   useEffect(() => {
-    // 前置检查
-    if (!rfInstance || nodes.length === 0 || fitMode === 'none') return;
+    const schedulePlan = resolveBaseReactFlowFitSchedule({
+      fitMode,
+      hasInstance: Boolean(rfInstance),
+      nodeCount: nodes.length,
+      fitTriggerKey,
+      lastFitTriggerKey: lastFitTriggerKeyRef.current,
+      pinFit,
+      hasInitialized,
+      containerSize,
+      previousContainer: prevContainer.current,
+      defaultDebounceMs: performanceConfig?.debounceMs ?? 100,
+    });
 
-    // 判定触发类型
-    const isTriggerKeyChanged = fitTriggerKey !== lastFitTriggerKeyRef.current;
-
-    // 如果是被动更新，且 pinFit=false，且已初始化，且容器尺寸变化不显著 -> 跳过
-    if (!isTriggerKeyChanged && !pinFit && hasInitialized && prevContainer.current) {
-      const dw = Math.abs(containerSize.width - prevContainer.current.width);
-      const dh = Math.abs(containerSize.height - prevContainer.current.height);
-      const significantDelta = dw > 6 || dh > 6;
-      if (!significantDelta) return;
-    }
-
-    // 计算防抖时间
-    let debounceTime = performanceConfig?.debounceMs ?? 100;
-    if (!hasInitialized) {
-      // 初始化阶段给予更多缓冲
-      debounceTime = 200;
-    } else if (isTriggerKeyChanged) {
-      // 主动触发，响应稍快但仍需防抖以等待布局稳定
-      debounceTime = Math.min(debounceTime, 100);
-    }
+    if (!schedulePlan.shouldSchedule) return;
 
     const timeoutId = setTimeout(() => {
       if (fitMode === 'fitWidthTop') {
-        performFitWidthTop(isTriggerKeyChanged);
+        performFitWidthTop(schedulePlan.isTriggerKeyChanged);
       } else if (fitMode === 'fitAll' && pinFit) {
         rfInstance.fitView({ padding: fitPadding });
       }
 
       // 更新状态
-      if (isTriggerKeyChanged) {
+      if (schedulePlan.isTriggerKeyChanged) {
         lastFitTriggerKeyRef.current = fitTriggerKey;
       }
-    }, debounceTime);
+    }, schedulePlan.debounceTime);
 
     return () => clearTimeout(timeoutId);
   }, [
     fitMode,
     rfInstance,
     nodes.length,
-    containerSize.width,
-    containerSize.height,
+    containerSize,
     fitTriggerKey,
     pinFit,
     hasInitialized,
@@ -638,323 +596,36 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 
   // 合并边类型：为了防止已有数据中携带有 'smart' 类字段直接被隐形消失，必须始终将组件挂载！
   const mergedEdgeTypes = useMemo((): EdgeTypes => {
-    // 始终提供渲染器供历史或默认线段调用，至于线是否进行路网避障，由组件内部的路径算法去判断参数执行。
-    const smartEdges: Partial<EdgeTypes> = {
-      'advanced-smart': AdvancedSmartStepEdge,
-      'advanced-smart-step': AdvancedSmartStepEdge,
-      'advanced-smart-bezier': AdvancedSmartBezierEdge,
-      'advanced-smart-straight': AdvancedSmartStraightEdge,
-      'smart': AdvancedSmartStepEdge,
-      'smart-step': AdvancedSmartStepEdge,
-      'smart-bezier': AdvancedSmartBezierEdge,
-      'smart-straight': AdvancedSmartStraightEdge,
-      'smart-orthogonal': SmartOrthogonalEdge,
-    };
-
-    return {
-      elk: ElkEdge,
-      ...smartEdges,
-      // 稳定路径边（使用预计算的路径点，避免 React Flow 自动计算）
-      stablePath: StablePathEdge,
-      'canvas-ref': CanvasRefEdge,
-      // Waypoint可编辑edge
-      editable: EditableEdge,
-      ...(edgeTypes || {}),
-    } as EdgeTypes;
+    return createBaseReactFlowMergedEdgeTypes({
+      edgeTypes,
+      components: {
+        advancedSmartStepEdge: AdvancedSmartStepEdge,
+        advancedSmartBezierEdge: AdvancedSmartBezierEdge,
+        advancedSmartStraightEdge: AdvancedSmartStraightEdge,
+        smartOrthogonalEdge: SmartOrthogonalEdge,
+        elkEdge: ElkEdge,
+        stablePathEdge: StablePathEdge,
+        canvasRefEdge: CanvasRefEdge,
+        editableEdge: EditableEdge,
+      },
+    });
   }, [edgeTypes]);
 
   const displayEdgeEpoch = useMemo(() => {
-    let hash = 2166136261;
-    const feed = (value: unknown) => {
-      const text = String(value ?? '');
-      for (let i = 0; i < text.length; i += 1) {
-        hash ^= text.charCodeAt(i);
-        hash = Math.imul(hash, 16777619);
-      }
-    };
-
-    nodes.forEach((node) => {
-      const pos = (node as any)?.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-      const measured = (node as any).measured;
-      feed(node.id);
-      feed(Math.round(Number(pos.x || 0)));
-      feed(Math.round(Number(pos.y || 0)));
-      feed(Math.round(Number(measured?.width ?? node.width ?? (node.style as any)?.width ?? 0)));
-      feed(Math.round(Number(measured?.height ?? node.height ?? (node.style as any)?.height ?? 0)));
+    return computeBaseReactFlowDisplayEdgeEpoch({
+      nodes,
+      edges,
     });
-
-    edges.forEach((edge) => {
-      feed(edge.id);
-      feed(edge.source);
-      feed(edge.target);
-      feed(edge.sourceHandle);
-      feed(edge.targetHandle);
-      feed(edge.type);
-    });
-
-    return hash >>> 0;
   }, [nodes, edges]);
 
   const displayEdges = useMemo((): Edge[] => {
-    const nodeById = new Map(nodes.map(n => [n.id, n]));
-    const normalizeRuntimeHandles = (edge: Edge): Edge => {
-      const sourceHandle = edge.sourceHandle ? expandHandle(String(edge.sourceHandle)) : edge.sourceHandle;
-      const targetHandle = edge.targetHandle ? expandHandle(String(edge.targetHandle)) : edge.targetHandle;
-      if (sourceHandle === edge.sourceHandle && targetHandle === edge.targetHandle) return edge;
-      return { ...edge, sourceHandle, targetHandle };
-    };
-    const normalizeTreeBusHandles = (edge: Edge): Edge => {
-      const data = ((edge.data || {}) as Record<string, any>);
-      if (!data.isTreeBus && !data.treeRouting) return edge;
-      const treeRouting = data.treeRouting && typeof data.treeRouting === 'object' ? data.treeRouting : {};
-      const sourceHandle = expandHandle(String(treeRouting.effectiveSourceHandle || edge.sourceHandle || ''));
-      const targetHandle = expandHandle(String(treeRouting.effectiveTargetHandle || edge.targetHandle || ''));
-      if (!sourceHandle && !targetHandle) return edge;
-      const nextSource = sourceHandle || edge.sourceHandle;
-      const nextTarget = targetHandle || edge.targetHandle;
-      if (nextSource === edge.sourceHandle && nextTarget === edge.targetHandle) return edge;
-      return {
-        ...edge,
-        sourceHandle: nextSource,
-        targetHandle: nextTarget,
-        data: {
-          ...data,
-          computedPath: undefined,
-          elkPath: undefined,
-          algorithm: undefined,
-          _layoutEpoch: displayEdgeEpoch,
-        },
-      };
-    };
-    const isVerticalHandle = (handle?: string | null) => {
-      const s = String(handle || '').toLowerCase();
-      return s === 'top' || s === 'bottom' || s === 't' || s === 'b';
-    };
-    const getNodeX = (node: Node | undefined) => {
-      const pos = (node as any)?.positionAbsolute ?? node?.position ?? { x: 0 };
-      return Number(pos.x || 0);
-    };
-    const getNodeRect = (node: Node | undefined) => {
-      if (!node) return null;
-      const pos = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-      const width = (node as any).measured?.width ?? node.width ?? (node.style as any)?.width ?? 0;
-      const height = (node as any).measured?.height ?? node.height ?? (node.style as any)?.height ?? 0;
-      return {
-        x: Number(pos.x || 0),
-        y: Number(pos.y || 0),
-        width: Number(width || 0),
-        height: Number(height || 0),
-      };
-    };
-    const anchorForHandle = (
-      rect: { x: number; y: number; width: number; height: number },
-      handle?: string | null
-    ) => {
-      const h = (expandHandle(String(handle || '')) || '').toLowerCase();
-      if (h === 'left') return { x: rect.x, y: rect.y + rect.height / 2 };
-      if (h === 'right') return { x: rect.x + rect.width, y: rect.y + rect.height / 2 };
-      if (h === 'top') return { x: rect.x + rect.width / 2, y: rect.y };
-      if (h === 'bottom') return { x: rect.x + rect.width / 2, y: rect.y + rect.height };
-      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-    };
-    const isNearPoint = (
-      a: { x: number; y: number },
-      b: { x: number; y: number },
-      tolerance = 80
-    ) => Math.abs(a.x - b.x) <= tolerance && Math.abs(a.y - b.y) <= tolerance;
-    const normalizeStaleComputedPath = (edge: Edge): Edge => {
-      const data = ((edge.data || {}) as Record<string, any>);
-      const path = data.computedPath;
-      if (!Array.isArray(path) || path.length < 2) return edge;
-
-      const sourceRect = getNodeRect(nodeById.get(edge.source));
-      const targetRect = getNodeRect(nodeById.get(edge.target));
-      if (!sourceRect || !targetRect || !sourceRect.width || !sourceRect.height || !targetRect.width || !targetRect.height) {
-        return edge;
-      }
-
-      const first = path[0];
-      const last = path[path.length - 1];
-      if (!first || !last || !Number.isFinite(Number(first.x)) || !Number.isFinite(Number(first.y))
-        || !Number.isFinite(Number(last.x)) || !Number.isFinite(Number(last.y))) {
-        return {
-          ...edge,
-          data: { ...data, computedPath: undefined, elkPath: undefined, algorithm: undefined },
-        };
-      }
-
-      const sourceAnchor = anchorForHandle(sourceRect, edge.sourceHandle);
-      const targetAnchor = anchorForHandle(targetRect, edge.targetHandle);
-      if (isNearPoint(first, sourceAnchor) && isNearPoint(last, targetAnchor)) return edge;
-
-      return {
-        ...edge,
-        data: {
-          ...data,
-          computedPath: undefined,
-          elkPath: undefined,
-          algorithm: undefined,
-          _layoutEpoch: displayEdgeEpoch,
-        },
-      };
-    };
-    const hasLockedComputedPath = (edge: Edge): boolean => {
-      const data = ((edge.data || {}) as Record<string, any>);
-      return (data.layoutPathLocked === true || data._layoutPathLocked === true)
-        && Array.isArray(data.computedPath)
-        && data.computedPath.length >= 2;
-    };
-    const normalizeCrossContainerManualHandles = (edge: Edge): Edge => {
-      if (hasLockedComputedPath(edge)) return edge;
-      const data = ((edge.data || {}) as Record<string, any>);
-      const manualSides = Array.isArray(data.manualHandleSides)
-        ? data.manualHandleSides.map((side: any) => String(side).toLowerCase())
-        : [];
-      if (!manualSides.includes('source') || !manualSides.includes('target')) return edge;
-      if (!isVerticalHandle(edge.sourceHandle) || !isVerticalHandle(edge.targetHandle)) return edge;
-      const sourceNode = nodeById.get(edge.source);
-      const targetNode = nodeById.get(edge.target);
-      const dx = getNodeX(targetNode) - getNodeX(sourceNode);
-      if (Math.abs(dx) < 80) return edge;
-      const nextHandles = dx >= 0
-        ? { sourceHandle: 'right', targetHandle: 'left' }
-        : { sourceHandle: 'left', targetHandle: 'right' };
-      return {
-        ...edge,
-        ...nextHandles,
-        data: {
-          ...data,
-          computedPath: undefined,
-          elkPath: undefined,
-          algorithm: undefined,
-          _layoutEpoch: displayEdgeEpoch,
-        },
-      };
-    };
-    const normalizeAutoReverseSideHandles = (edge: Edge): Edge => {
-      if (hasLockedComputedPath(edge)) return edge;
-      const data = ((edge.data || {}) as Record<string, any>);
-      if (data.isTreeBus || data.treeRouting) return edge;
-      const autoSides = Array.isArray(data.auto)
-        ? data.auto.map((side: any) => String(side).toLowerCase())
-        : [];
-      const manualSides = Array.isArray(data.manualHandleSides)
-        ? data.manualHandleSides.map((side: any) => String(side).toLowerCase())
-        : [];
-      const autoSource = autoSides.includes('source') || data.autoSource === true;
-      const autoTarget = autoSides.includes('target') || data.autoTarget === true;
-      if (!autoSource || !autoTarget || manualSides.includes('source') || manualSides.includes('target')) return edge;
-
-      const sourceNode = nodeById.get(edge.source);
-      const targetNode = nodeById.get(edge.target);
-      if (!sourceNode || !targetNode) return edge;
-
-      const sourcePos = (sourceNode as any).positionAbsolute ?? sourceNode.position ?? { x: 0, y: 0 };
-      const targetPos = (targetNode as any).positionAbsolute ?? targetNode.position ?? { x: 0, y: 0 };
-      const sourceW = (sourceNode as any).measured?.width ?? sourceNode.width ?? (sourceNode.style as any)?.width ?? 0;
-      const sourceH = (sourceNode as any).measured?.height ?? sourceNode.height ?? (sourceNode.style as any)?.height ?? 0;
-      const targetW = (targetNode as any).measured?.width ?? targetNode.width ?? (targetNode.style as any)?.width ?? 0;
-      const targetH = (targetNode as any).measured?.height ?? targetNode.height ?? (targetNode.style as any)?.height ?? 0;
-      const dx = (Number(targetPos.x || 0) + Number(targetW || 0) / 2) - (Number(sourcePos.x || 0) + Number(sourceW || 0) / 2);
-      const dy = (Number(targetPos.y || 0) + Number(targetH || 0) / 2) - (Number(sourcePos.y || 0) + Number(sourceH || 0) / 2);
-      const layoutDir = String(data.layoutDirection || (sourceNode.data as any)?.layoutDirection || 'TB').toUpperCase();
-      const isVerticalReverseWithSideRoom =
-        ((layoutDir.includes('TB') && dy < 0) || (layoutDir.includes('BT') && dy > 0))
-        && Math.abs(dx) > Math.abs(dy) * 0.35;
-      if (!isVerticalReverseWithSideRoom) return edge;
-
-      const nextHandles = dx >= 0
-        ? { sourceHandle: 'right', targetHandle: 'left' }
-        : { sourceHandle: 'left', targetHandle: 'right' };
-      if (edge.sourceHandle === nextHandles.sourceHandle && edge.targetHandle === nextHandles.targetHandle) return edge;
-      return {
-        ...edge,
-        ...nextHandles,
-        data: {
-          ...data,
-          runtimeHandleLock: {
-            ...(data.runtimeHandleLock && typeof data.runtimeHandleLock === 'object' ? data.runtimeHandleLock : {}),
-            source: true,
-            target: true,
-          },
-          computedPath: undefined,
-          elkPath: undefined,
-          algorithm: undefined,
-          _layoutEpoch: displayEdgeEpoch,
-        },
-      };
-    };
-
-    // P2: Canvas Hybrid Rendering Mode for Large Graphs
-    if (isLargeGraph) {
-      return edges.map(rawEdge => {
-        const e = normalizeStaleComputedPath(normalizeRuntimeHandles(normalizeAutoReverseSideHandles(normalizeTreeBusHandles(normalizeCrossContainerManualHandles(rawEdge)))));
-        return {
-          ...e,
-          type: 'canvas-ref',
-          data: {
-            ...((e.data || {}) as Record<string, unknown>),
-            originalType: e.type || 'default'
-          }
-        };
-      });
-    }
-
-    if (enableSmartEdges) {
-      if (typeof smartEdgePadding !== 'number' || !isFinite(smartEdgePadding)) return edges;
-
-      return edges.map((rawEdge) => {
-        const e = normalizeStaleComputedPath(normalizeRuntimeHandles(normalizeAutoReverseSideHandles(normalizeTreeBusHandles(normalizeCrossContainerManualHandles(rawEdge)))));
-        const type = String(e.type || '');
-        const lower = type.toLowerCase();
-
-        // [FIX] Force ALL edges to use 'advanced-smart-step' when smart edges are enabled.
-        // Previously, only edges with 'smart' in their type name were processed, leaving
-        // default/undefined/smoothstep edges to use React Flow's built-in renderer.
-        // We preserve explicitly registered special edges (editable, domain, etc.)
-        const preserveTypes = ['mindmapedge', 'editable', 'domain', 'stablepath', 'elk', 'canvas-ref'];
-        const targetType = (lower.includes('smart') || preserveTypes.includes(lower)) ? e.type : 'advanced-smart-step';
-
-        const data = (e as any).data;
-        const dataObj = (data && typeof data === 'object') ? data : {};
-        const edgeConfig = (dataObj as any).edgeConfig;
-        const edgeCfgObj = (edgeConfig && typeof edgeConfig === 'object') ? edgeConfig : {};
-
-        const nextLabel = (e as any).label ?? (dataObj as any).label;
-        const hasDataPad = (dataObj as any).obstaclePadding !== undefined && (dataObj as any).obstaclePadding !== null;
-        const hasCfgPad = (edgeCfgObj as any).obstaclePadding !== undefined && (edgeCfgObj as any).obstaclePadding !== null;
-
-        const needsPadPatch = !(hasDataPad && hasCfgPad);
-        const dataWithPad = needsPadPatch ? {
-          ...dataObj,
-          obstaclePadding: hasDataPad ? (dataObj as any).obstaclePadding : smartEdgePadding,
-          edgeConfig: {
-            ...edgeCfgObj,
-            obstaclePadding: hasCfgPad ? (edgeCfgObj as any).obstaclePadding : smartEdgePadding,
-          },
-        } : dataObj;
-
-        const needsLabelPatch = typeof nextLabel !== 'undefined' && ((e as any).label !== nextLabel || (dataWithPad as any).label !== nextLabel);
-        const needsTypePatch = targetType !== e.type;
-        if (!needsPadPatch && !needsLabelPatch && !needsTypePatch && e === rawEdge) return e;
-
-        const finalData = needsLabelPatch ? { ...dataWithPad, label: nextLabel } : dataWithPad;
-        return { ...e, type: targetType, data: finalData, label: nextLabel } as Edge;
-      });
-    }
-    return edges.map((rawEdge) => {
-      const e = normalizeStaleComputedPath(normalizeRuntimeHandles(normalizeAutoReverseSideHandles(normalizeTreeBusHandles(normalizeCrossContainerManualHandles(rawEdge)))));
-      const type = String(e.type || '');
-      const lower = type.toLowerCase();
-      const nextType = (() => {
-        if (lower === 'advanced-smart-step' || lower === 'smart-step') return 'step';
-        if (lower === 'advanced-smart-straight' || lower === 'smart-straight') return 'straight';
-        if (lower === 'advanced-smart-bezier' || lower === 'smart-bezier' || lower === 'advanced-smart' || lower === 'smart') return 'bezier';
-        return e.type;
-      })();
-      const nextLabel = (e as any).label ?? ((e.data && typeof e.data === 'object') ? (e.data as any).label : undefined);
-      if (nextType === e.type && nextLabel === (e as any).label && e === rawEdge) return e;
-      return { ...e, type: nextType as any, label: nextLabel } as Edge;
+    return createBaseReactFlowDisplayEdges({
+      edges,
+      nodes,
+      enableSmartEdges,
+      smartEdgePadding,
+      isLargeGraph,
+      displayEdgeEpoch,
     });
   }, [edges, nodes, enableSmartEdges, smartEdgePadding, isLargeGraph, displayEdgeEpoch]);
 
@@ -970,78 +641,41 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   useEffect(() => {
     if (nodes.length === 0) return;
     const nodeIds = nodes.map(node => node.id);
-    const getNodeElement = (id: string) => {
-      const safeId = String(id).replace(/"/g, '\\"');
-      return containerRef.current?.querySelector(`.react-flow__node[data-id="${safeId}"]`) as HTMLElement | null;
-    };
     const refresh = () => {
-      const state = rfStore.getState() as any;
-      const internalsMap = new Map<string, { id: string; nodeElement: HTMLElement; force: boolean }>();
-      for (const id of nodeIds) {
-        const nodeElement = getNodeElement(id);
-        if (nodeElement) internalsMap.set(id, { id, nodeElement, force: true });
-      }
-      if (internalsMap.size > 0 && typeof state.updateNodeInternals === 'function') {
-        state.updateNodeInternals(internalsMap, { triggerFitView: false });
-        return;
-      }
-      updateNodeInternals(nodeIds);
-    };
-    const allRenderableHandlesMeasured = () => {
-      const state = rfStore.getState() as any;
-      const nodeLookup = state.nodeLookup as Map<string, any> | undefined;
-      if (!nodeLookup) return false;
-      return nodeIds.every((id) => {
-        const element = getNodeElement(id);
-        if (!element || !element.querySelector('.react-flow__handle')) return true;
-        const bounds = nodeLookup.get(id)?.internals?.handleBounds;
-        return Boolean((bounds?.source?.length || 0) + (bounds?.target?.length || 0));
+      refreshBaseReactFlowNodeInternals({
+        container: containerRef.current,
+        nodeIds,
+        rfStore,
+        updateNodeInternals,
       });
     };
-    let retryTimer: number | undefined;
-    let attempts = 0;
-    const retryUntilMeasured = () => {
-      refresh();
-      retryTimer = window.setTimeout(() => {
-        attempts += 1;
-        if (!allRenderableHandlesMeasured() && attempts < 8) {
-          retryUntilMeasured();
-        }
-      }, attempts < 3 ? 120 : 280);
+    const allRenderableHandlesMeasured = () => {
+      return areBaseReactFlowHandlesMeasured({
+        container: containerRef.current,
+        nodeIds,
+        rfStore,
+      });
     };
-    const raf = window.requestAnimationFrame(retryUntilMeasured);
-    return () => {
-      window.cancelAnimationFrame(raf);
-      if (retryTimer) window.clearTimeout(retryTimer);
-    };
+    return scheduleBaseReactFlowNodeInternalsRetry({
+      refresh,
+      areHandlesMeasured: allRenderableHandlesMeasured,
+    });
   }, [nodes, nodes.length, nodeInternalsRefreshKey, updateNodeInternals, rfStore]);
 
   useEffect(() => {
     if (nodes.length === 0) return;
-    let cancelled = false;
     const nodeIds = nodes.map(node => node.id);
     const refreshFromMountedDom = () => {
-      if (cancelled) return;
-      const state = rfStore.getState() as any;
-      const internalsMap = new Map<string, { id: string; nodeElement: HTMLElement; force: boolean }>();
-      for (const id of nodeIds) {
-        const safeId = String(id).replace(/"/g, '\\"');
-        const nodeElement = containerRef.current?.querySelector(`.react-flow__node[data-id="${safeId}"]`) as HTMLElement | null;
-        if (nodeElement) internalsMap.set(id, { id, nodeElement, force: true });
-      }
-      if (internalsMap.size > 0 && typeof state.updateNodeInternals === 'function') {
-        state.updateNodeInternals(internalsMap, { triggerFitView: false });
-      } else {
-        updateNodeInternals(nodeIds);
-      }
+      refreshBaseReactFlowNodeInternals({
+        container: containerRef.current,
+        nodeIds,
+        rfStore,
+        updateNodeInternals,
+      });
     };
-    const raf = window.requestAnimationFrame(refreshFromMountedDom);
-    const timers = [240, 720, 1440, 2400].map((delay) => window.setTimeout(refreshFromMountedDom, delay));
-    return () => {
-      cancelled = true;
-      window.cancelAnimationFrame(raf);
-      for (const timer of timers) window.clearTimeout(timer);
-    };
+    return scheduleBaseReactFlowMountedDomRefresh({
+      refresh: refreshFromMountedDom,
+    });
   }, [nodes, nodes.length, rfStore, updateNodeInternals]);
 
   /**
@@ -1051,12 +685,9 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
    */
   const [hideBackgroundDuringExport, setHideBackgroundDuringExport] = useState(false);
   useEffect(() => {
-    const onStart = () => {
-      setHideBackgroundDuringExport(true);
-    };
-    const onStop = () => {
-      setHideBackgroundDuringExport(false);
-    };
+    const { onStart, onStop } = createBaseReactFlowExportStateHandlers({
+      setHidden: setHideBackgroundDuringExport,
+    });
     window.addEventListener('diagramExportStart', onStart as any);
     window.addEventListener('diagramExportComplete', onStop as any);
     window.addEventListener('diagramExportError', onStop as any);
@@ -1071,13 +702,11 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 
   // 处理初始化
   const handleInit = useCallback((instance: ReactFlowInstance<any, any>) => {
-
-
-    // 恢复上次的视口状态
-    const lastViewport = getLastViewport();
-    if (lastViewport && fitMode === 'none') {
-      instance.setViewport(lastViewport);
-    }
+    restoreBaseReactFlowViewportOnInit({
+      instance,
+      fitMode,
+      lastViewport: getLastViewport(),
+    });
 
     if (onInit) {
       onInit(instance);
@@ -1097,17 +726,10 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     setLastViewport(viewport);
 
     // Semantic Zoom Feature: 动态追加 CSS 类名以进行子树 DOM 降级
-    if (containerRef.current) {
-      if (viewport.zoom < 0.4) {
-        if (!containerRef.current.classList.contains('diagram-zoomed-out')) {
-          containerRef.current.classList.add('diagram-zoomed-out');
-        }
-      } else {
-        if (containerRef.current.classList.contains('diagram-zoomed-out')) {
-          containerRef.current.classList.remove('diagram-zoomed-out');
-        }
-      }
-    }
+    syncBaseReactFlowZoomClass({
+      container: containerRef.current,
+      viewport,
+    });
 
     if (onViewportChange) {
       onViewportChange(viewport);
@@ -1130,25 +752,18 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       readyTimeoutRef.current = null;
     }
     const liveRect = containerRef.current?.getBoundingClientRect();
-    const liveWidth = liveRect?.width ?? 0;
-    const liveHeight = liveRect?.height ?? 0;
-    const hasSize = (containerSize.width > 0 && containerSize.height > 0) || (liveWidth > 0 && liveHeight > 0);
-    if (hasSize) {
-      if (!isContainerReady) {
-        readyTimeoutRef.current = window.setTimeout(() => {
-          setIsContainerReady(true);
-          readyTimeoutRef.current = null;
-        }, 0);
-      }
-    } else {
-      if (!isContainerReady) {
-        readyTimeoutRef.current = window.setTimeout(() => {
-          setIsContainerReady(false);
-          readyTimeoutRef.current = null;
-        }, 0);
-      }
-    }
-  }, [containerSize.width, containerSize.height, isContainerReady]);
+    readyTimeoutRef.current = scheduleBaseReactFlowContainerReadyUpdate({
+      hasRenderableSize: hasBaseReactFlowRenderableSize({
+        containerSize,
+        liveRect,
+      }),
+      isContainerReady,
+      setIsContainerReady: (ready) => {
+        setIsContainerReady(ready);
+        readyTimeoutRef.current = null;
+      },
+    });
+  }, [containerSize, isContainerReady]);
 
   useEffect(() => {
     updateContainerReady();
@@ -1157,7 +772,11 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         clearTimeout(readyTimeoutRef.current);
         readyTimeoutRef.current = null;
       }
-      try { enhancedTextMeasurement.dispose?.(); } catch { void 0; }
+      try {
+        enhancedTextMeasurement.dispose?.();
+      } catch (error) {
+        logBaseReactFlowEventBindingFailure('disposeEnhancedTextMeasurement', error);
+      }
     };
   }, [updateContainerReady]);
 
@@ -1303,32 +922,17 @@ const AlignGuide: React.FC = () => {
   const nodesStore = useStore((s: any) => s.nodes) as any[];
 
   const guideEnabled = useMemo(() => {
-    try {
-      const qs = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-      const fromUrl = qs.get('alignGuide') === '1';
-      const fromStorage = typeof window !== 'undefined' && localStorage.getItem('diagram-align-guide') === 'true';
-      return !!(fromUrl || fromStorage);
-    } catch { return false; }
+    return readBaseReactFlowAlignGuideEnabled({
+      getSearch: () => getWindowSearchString(),
+      getStorageItem: (key) => (typeof window !== 'undefined' ? localStorage.getItem(key) : null),
+      onReadFailure: (scope, error) => logBaseReactFlowOverlayFlagReadFailure(scope, error),
+    });
   }, []);
 
   if (!guideEnabled || !Array.isArray(nodesStore) || nodesStore.length === 0) return null;
 
-  let minX = Infinity; let minY = Infinity; let maxY = -Infinity;
-  for (const n of nodesStore) {
-    const tp = String(n.type || '');
-    const x = (typeof n.position?.x === 'number' && isFinite(n.position.x)) ? n.position.x : 0;
-    const y = (typeof n.position?.y === 'number' && isFinite(n.position.y)) ? n.position.y : 0;
-    const h = (typeof n.measured?.height === 'number' && isFinite(n.measured.height))
-      ? n.measured.height
-      : (typeof n.style?.height === 'number' && isFinite(n.style.height))
-        ? n.style.height
-        : 120;
-    if (tp === 'titleGroup') minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    maxY = Math.max(maxY, y + h);
-  }
-  if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxY)) return null;
-  const height = Math.max(20, Math.round(maxY - minY));
+  const guideLine = computeBaseReactFlowAlignGuideLine(nodesStore);
+  if (!guideLine) return null;
 
   return (
     <EdgeLabelRenderer>
@@ -1336,9 +940,9 @@ const AlignGuide: React.FC = () => {
         key="align-guide-boundary"
         style={{
           position: 'absolute',
-          transform: `translate(${Math.round(minX)}px, ${Math.round(minY)}px)`,
+          transform: `translate(${guideLine.x}px, ${guideLine.y}px)`,
           width: 0,
-          height,
+          height: guideLine.height,
           borderLeft: '2px dashed #ef4444',
           boxShadow: '0 0 0 1px rgba(239,68,68,0.12)',
           pointerEvents: 'none',
@@ -1360,81 +964,44 @@ const RightEdgeGuides: React.FC = () => {
   const nodesStore = useStore((s: any) => s.nodes) as any[];
 
   const flags = useMemo(() => {
-    try {
-      const qs = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-      const rightLine = qs.get('alignGuideRight') === '1' || (typeof window !== 'undefined' && localStorage.getItem('diagram-align-guide-right') === 'true');
-      const contentLine = qs.get('alignContentMax') === '1' || (typeof window !== 'undefined' && localStorage.getItem('diagram-align-content-max') === 'true');
-      return { rightLine, contentLine };
-    } catch { return { rightLine: false, contentLine: false }; }
+    return readBaseReactFlowRightEdgeGuideFlags({
+      getSearch: () => getWindowSearchString(),
+      getStorageItem: (key) => (typeof window !== 'undefined' ? localStorage.getItem(key) : null),
+      onReadFailure: (scope, error) => logBaseReactFlowOverlayFlagReadFailure(scope, error),
+    });
   }, []);
 
   if ((!flags.rightLine && !flags.contentLine) || !Array.isArray(nodesStore) || nodesStore.length === 0) return null;
 
-  const titleGroups = nodesStore.filter((n: any) => String(n.type || '') === 'titleGroup');
-  const overlays: React.ReactElement[] = [];
-  for (const tg of titleGroups) {
-    const x = (typeof tg.position?.x === 'number' && isFinite(tg.position.x)) ? tg.position.x : 0;
-    const y = (typeof tg.position?.y === 'number' && isFinite(tg.position.y)) ? tg.position.y : 0;
-    const w = (tg.measured?.width ?? tg.style?.width ?? 0) as number;
-    const h = (tg.measured?.height ?? tg.style?.height ?? 0) as number;
-    const rightX = Math.round(x + Math.max(0, w));
-    let minY = Infinity; let maxY = -Infinity; let contentMaxX = -Infinity;
-    const dId = String(((tg.data || {}) as any)?.domain || '');
-    for (const n of nodesStore) {
-      const tp = String(n.type || '');
-      const belongs = String((((n.data || {}) as any)?.domain || '')) === dId;
-      if (!belongs || tp === 'titleGroup') continue;
-      const nx = (typeof n.position?.x === 'number' && isFinite(n.position.x)) ? n.position.x : 0;
-      const ny = (typeof n.position?.y === 'number' && isFinite(n.position.y)) ? n.position.y : 0;
-      const nw = (n.measured?.width ?? n.style?.width ?? 0) as number;
-      const nh = (n.measured?.height ?? n.style?.height ?? 0) as number;
-      minY = Math.min(minY, ny);
-      maxY = Math.max(maxY, ny + nh);
-      contentMaxX = Math.max(contentMaxX, nx + nw);
-    }
-    const height = isFinite(minY) && isFinite(maxY) ? Math.max(20, Math.round(maxY - minY)) : Math.max(20, Math.round(h));
-    if (flags.rightLine) {
-      overlays.push(
-        <EdgeLabelRenderer key={`edge-right-${tg.id}`}>
+  const overlays = computeBaseReactFlowRightEdgeGuideLines({
+    nodes: nodesStore,
+    flags,
+  });
+
+  return (
+    <>
+      {overlays.map((overlay) => (
+        <EdgeLabelRenderer key={overlay.key}>
           <div
             style={{
               position: 'absolute',
-              transform: `translate(${rightX}px, ${Math.round(isFinite(minY) ? minY : y)}px)`,
+              transform: `translate(${overlay.x}px, ${overlay.y}px)`,
               width: 0,
-              height,
-              borderLeft: '2px dashed #60a5fa',
-              boxShadow: '0 0 0 1px rgba(96,165,250,0.12)',
+              height: overlay.height,
+              borderLeft: overlay.kind === 'right' ? '2px dashed #60a5fa' : '2px dashed #f59e0b',
+              boxShadow: overlay.kind === 'right'
+                ? '0 0 0 1px rgba(96,165,250,0.12)'
+                : '0 0 0 1px rgba(245,158,11,0.12)',
               pointerEvents: 'none',
               zIndex: 4,
             }}
-            aria-label="domain-right-guide"
-            title="域右缘参考线"
+            aria-label={overlay.kind === 'right' ? 'domain-right-guide' : 'domain-content-max-guide'}
+            title={overlay.kind === 'right' ? '域右缘参考线' : '内容最大右缘参考线'}
           />
         </EdgeLabelRenderer>
-      );
-    }
-    if (flags.contentLine && isFinite(contentMaxX) && contentMaxX > 0) {
-      overlays.push(
-        <EdgeLabelRenderer key={`edge-content-${tg.id}`}>
-          <div
-            style={{
-              position: 'absolute',
-              transform: `translate(${Math.round(contentMaxX)}px, ${Math.round(isFinite(minY) ? minY : y)}px)`,
-              width: 0,
-              height,
-              borderLeft: '2px dashed #f59e0b',
-              boxShadow: '0 0 0 1px rgba(245,158,11,0.12)',
-              pointerEvents: 'none',
-              zIndex: 4,
-            }}
-            aria-label="domain-content-max-guide"
-            title="内容最大右缘参考线"
-          />
-        </EdgeLabelRenderer>
-      );
-    }
-  }
-  return <>{overlays}</>;
+      ))}
+    </>
+  );
 };
 
 /**

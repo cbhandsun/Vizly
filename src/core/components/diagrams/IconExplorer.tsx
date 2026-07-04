@@ -5,6 +5,7 @@ import { Icon } from '@iconify/react';
 import { PluginContext } from '../../types/plugin';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { buildIconifySearchUrl, isSafeIconifyIconName, parseIconifySearchResponse } from '@/core/utils/iconifySecurity';
+import { logDiagramIconExplorerFetchFailure } from '../shared/iconSearchLogging';
 
 
 const { Text } = Typography;
@@ -49,7 +50,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx: _ctx }) => {
                 const data = parseIconifySearchResponse(await response.json(), 100);
                 setResults(data.icons);
             } catch (error) {
-                console.error('Failed to fetch icons:', error);
+                logDiagramIconExplorerFetchFailure(error);
                 appMessage.error('搜索图标失败，请检查网络连接');
             } finally {
                 setLoading(false);

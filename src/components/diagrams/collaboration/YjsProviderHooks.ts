@@ -7,9 +7,10 @@ import {
     normalizeCollaborationServerUrl,
     normalizeCollaborationToken,
 } from './collaborationSecurity';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from '@/core/utils/uiStorageLogging';
 
-const STORAGE_KEY_NAME = 'vizly_collaborator_name';
-const STORAGE_KEY_COLOR = 'vizly_collaborator_color';
+export const STORAGE_KEY_NAME = 'vizly_collaborator_name';
+export const STORAGE_KEY_COLOR = 'vizly_collaborator_color';
 const COLLABORATOR_COLORS = ['#f43f5e', '#f97316', '#eab308', '#10b981', '#0ea5e9', '#6366f1', '#d946ef'];
 
 interface CollaboratorIdentity {
@@ -27,13 +28,14 @@ const getRandomIndex = (max: number): number => {
     return Math.floor(Math.random() * max);
 };
 
-const readStoredCollaboratorIdentity = (): CollaboratorIdentity | null => {
+export const readStoredCollaboratorIdentity = (): CollaboratorIdentity | null => {
     if (typeof sessionStorage === 'undefined') return null;
     try {
         const name = sessionStorage.getItem(STORAGE_KEY_NAME);
         const color = sessionStorage.getItem(STORAGE_KEY_COLOR);
         return name && color ? { name, color } : null;
-    } catch {
+    } catch (error) {
+        logUiStorageReadFailure('YjsProviderHooks.readStoredCollaboratorIdentity', STORAGE_KEY_NAME, error);
         return null;
     }
 };
@@ -43,12 +45,13 @@ const createCollaboratorIdentity = (): CollaboratorIdentity => ({
     color: COLLABORATOR_COLORS[getRandomIndex(COLLABORATOR_COLORS.length)] || COLLABORATOR_COLORS[0],
 });
 
-const persistCollaboratorIdentity = (identity: CollaboratorIdentity): void => {
+export const persistCollaboratorIdentity = (identity: CollaboratorIdentity): void => {
     if (typeof sessionStorage === 'undefined') return;
     try {
         sessionStorage.setItem(STORAGE_KEY_NAME, identity.name);
         sessionStorage.setItem(STORAGE_KEY_COLOR, identity.color);
-    } catch {
+    } catch (error) {
+        logUiStorageWriteFailure('YjsProviderHooks.persistCollaboratorIdentity', STORAGE_KEY_NAME, error);
         // Storage can be unavailable in private/embedded contexts; collaboration still works for this session.
     }
 };

@@ -27,6 +27,7 @@ import {
 } from '../utils/layoutUtils'
 import { decideEdgeRouting, separateParallelEdges, globalOptimizeEdgeRouting, distributePortConnections, bundleEdges, layerBasedEdgeRouting, optimizeEdgeLabelPositions, beautifyOrthogonalEdges, optimizeTreeBusRouting } from '../utils/HandlePicker'
 import { expandHandle } from '../routing/utils/handleUtils'
+import { logDomainElkContainerUpdateFailure } from './layoutLogging';
 
 /**
  * 域级 ELK 整体布局策略
@@ -246,7 +247,7 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
       updatedNodes = finalizeDomainHeightsByProjection(updatedNodes) as any;
 
     } catch (err) {
-      console.warn('[DomainElkLayout] Container update failed:', err);
+      logDomainElkContainerUpdateFailure(err);
     }
     // 统一智能连线决策：赋予 ELK 布局下连线端口选择的智能
     const edgeIdMap = new Map<string, ReactFlowNode>(updatedNodes.map(n => [n.id, n] as const))

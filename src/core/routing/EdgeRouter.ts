@@ -4,6 +4,7 @@ import { costEvaluator } from './core/CostEvaluator';
 import * as pathFinder from '../algorithms/pathfinding';
 import { calculateAdaptiveGridSize } from '../workers/core/GraphBuilder'; // [P1]
 import { expandHandle, normalizeHandle, isHorizontalHandle, isVerticalHandle } from './utils/handleUtils';
+import { logEdgeRouterFatalError } from '../utils/routingLogging';
 
 import type {
     NodeGeometry,
@@ -244,7 +245,7 @@ export class EdgeRouter {
                 algorithm: 'modular'
             };
         } catch (error) {
-            console.error('[EdgeRouter] Fatal Error:', error);
+            logEdgeRouterFatalError(error);
             // Fallback to straight line to prevent missing lines
             return {
                 type: 'advanced-smart-straight' as any,

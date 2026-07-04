@@ -9,6 +9,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { PluginContext } from '../../types/plugin';
 import { ShapePreview } from './ShapePreview';
+import { logFlowchartShapesDragPreviewFailure } from './flowchartShapesLogging';
 
 const { Text } = Typography;
 type NodeConfig = Record<string, unknown>;
@@ -162,7 +163,9 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                 event.dataTransfer.setDragImage(canvas, W / 2, H / 2);
             }
             requestAnimationFrame(() => canvas.remove());
-        } catch {}
+        } catch (error) {
+            logFlowchartShapesDragPreviewFailure(label, error);
+        }
     };
     
     const renderDraggableItem = (label: string, icon: React.ReactNode, type: string, typeName: string, config: NodeConfig) => {

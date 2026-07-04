@@ -4,6 +4,7 @@
  */
 
 import { Theme, ThemePerformanceOptions } from './types/ThemeTypes';
+import { logThemeOptimizationStrategyFailure } from './themePerformanceLogging';
 
 export interface PerformanceMetrics {
   themeLoadTime: number;
@@ -488,7 +489,7 @@ export class ThemePerformanceOptimizer {
       try {
         await strategy.apply(context);
       } catch (error) {
-        console.warn(`Optimization strategy '${strategy.id}' failed:`, error);
+        logThemeOptimizationStrategyFailure(strategy.id, error);
       }
     }
 

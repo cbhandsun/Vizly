@@ -7,10 +7,23 @@ import {
     writeNodeTemplates,
 } from '../nodeTemplateStorage';
 
+const safeLogState = vi.hoisted(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    log: vi.fn(),
+}));
+
+vi.mock('../consoleCleanup', () => ({
+    safeLog: safeLogState,
+}));
+
 describe('nodeTemplateStorage', () => {
     beforeEach(() => {
         localStorage.clear();
         vi.restoreAllMocks();
+        Object.values(safeLogState).forEach((mock) => mock.mockReset());
     });
 
     it('coerces valid single-node templates and strips unsafe data keys', () => {
@@ -88,6 +101,10 @@ describe('nodeTemplateStorage', () => {
     it('reads malformed storage as empty and writes normalized templates', () => {
         localStorage.setItem(NODE_TEMPLATES_STORAGE_KEY, '{broken');
         expect(readNodeTemplates()).toEqual([]);
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[nodeTemplateStorage] Failed to read "diagram-node-templates":',
+            expect.anything()
+        );
 
         const written = writeNodeTemplates([
             { id: 'tpl-1', name: 'One', category: 'A', nodeType: 'flowchart', data: {}, createdAt: 1 },
@@ -97,5 +114,14 @@ describe('nodeTemplateStorage', () => {
         expect(written).toHaveLength(1);
         expect(JSON.parse(localStorage.getItem(NODE_TEMPLATES_STORAGE_KEY) || '[]')).toEqual(written);
         expect(readNodeTemplates()).toEqual(written);
+    });
+
+    it('ignores oversized template payloads', () => {
+        localStorage.setItem(NODE_TEMPLATES_STORAGE_KEY, 'x'.repeat(2 * 1024 * 1024 + 1));
+        expect(readNodeTemplates()).toEqual([]);
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[nodeTemplateStorage] Failed to read "diagram-node-templates":',
+            expect.anything()
+        );
     });
 });

@@ -22,6 +22,8 @@ import {
   resolveUiScale,
   type DragState,
 } from './diagramLayoutGuards';
+import { logDiagramLayoutFailure } from './diagramLayoutLogging';
+import { getWindowSearchString } from '@/core/utils/inputBoundary';
 
 const { Header, Sider, Content } = Layout;
 
@@ -69,10 +71,13 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
   const uiScale = React.useMemo(() => {
     try {
       return resolveUiScale(
-        typeof window !== 'undefined' ? window.location.search : '',
+        getWindowSearchString(),
         diagramConfigManager.getConfig().ui?.scale,
       );
-    } catch { return 1.0; }
+    } catch (error) {
+      logDiagramLayoutFailure('resolveUiScale', error);
+      return 1.0;
+    }
   }, []);
 
   const [menuWidth, setMenuWidth] = useState<number>(() => {
@@ -112,8 +117,16 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
 
   useEffect(() => {
     return () => {
-      try { window.removeEventListener('mousemove', onDragMove); } catch { void 0; }
-      try { window.removeEventListener('mouseup', stopDrag); } catch { void 0; }
+      try {
+        window.removeEventListener('mousemove', onDragMove);
+      } catch (error) {
+        logDiagramLayoutFailure('removeMousemoveListener', error);
+      }
+      try {
+        window.removeEventListener('mouseup', stopDrag);
+      } catch (error) {
+        logDiagramLayoutFailure('removeMouseupListener', error);
+      }
     };
   }, [onDragMove, stopDrag]);
 
@@ -128,7 +141,8 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
     window.addEventListener('mousemove', onDragMove);
     try {
       window.addEventListener('mouseup', stopDrag, { once: true });
-    } catch {
+    } catch (error) {
+      logDiagramLayoutFailure('addMouseupListenerWithOnceForMenu', error);
       window.addEventListener('mouseup', stopDrag);
     }
   }, [menuProps, menuWidth, onDragMove, stopDrag]);
@@ -143,7 +157,8 @@ export const DiagramLayout: React.FC<DiagramLayoutProps> = ({
     window.addEventListener('mousemove', onDragMove);
     try {
       window.addEventListener('mouseup', stopDrag, { once: true });
-    } catch {
+    } catch (error) {
+      logDiagramLayoutFailure('addMouseupListenerWithOnceForFlowSidebar', error);
       window.addEventListener('mouseup', stopDrag);
     }
   }, [flowchartSidebarProps, flowSidebarWidth, onDragMove, showFlowchartSidebar, stopDrag]);

@@ -7,14 +7,9 @@ import React, { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Spin, Result, theme, Typography } from 'antd';
 import { useTranslation } from 'react-i18next';
+import { coerceShareToken, getQueryOrHashParamFromLocation } from '@/core/utils/inputBoundary';
 
 const { Text } = Typography;
-
-const isLikelyShareToken = (token: string): boolean => /^[A-Za-z0-9_-]{16,128}$/.test(token);
-
-const getShareTokenFromSearchParams = (searchParams: URLSearchParams): string => (
-    searchParams.get('token') || new URLSearchParams(window.location.search).get('token') || ''
-);
 
 const SharedDiagramCanvas = React.lazy(async () => {
     const [{ ReactFlowProvider }, { default: FlowchartDesigner }] = await Promise.all([
@@ -44,14 +39,18 @@ const ShareViewPage: React.FC = () => {
     const { t } = useTranslation();
     const { token: antToken } = theme.useToken();
     const [searchParams] = useSearchParams();
-    const shareToken = getShareTokenFromSearchParams(searchParams);
+    const shareToken = coerceShareToken(
+        searchParams.get('token') ||
+        getQueryOrHashParamFromLocation(typeof window === 'undefined' ? undefined : window.location, 'token') ||
+        ''
+    ) || '';
     const [state, setState] = useState<LoadState>(() => {
-        if (!isLikelyShareToken(shareToken)) return { status: 'error' };
+        if (!shareToken) return { status: 'error' };
         return { status: 'loading' };
     });
 
     useEffect(() => {
-        if (!isLikelyShareToken(shareToken)) {
+        if (!shareToken) {
             setState({ status: 'error' });
             return;
         }

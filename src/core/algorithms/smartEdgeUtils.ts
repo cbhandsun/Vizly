@@ -3347,9 +3347,9 @@ export function createFilletedPath(
         const l1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
         const l2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
 
-        // 2. Determine safe radius
-        // Cannot exceed half the length of the shortest entering/exiting segment
-        const r = Math.min(cornerRadius, l1 / 2, l2 / 2);
+        // 2. Determine safe radius.
+        // Keep neighboring fillets from consuming a short bridge into a zero-length rendered line.
+        const r = Math.min(cornerRadius, l1 / 3, l2 / 3);
 
         // 3. Identify Start/End of Curve
         // Start: Move back 'r' from pCurr along v1

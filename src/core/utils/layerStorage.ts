@@ -1,5 +1,5 @@
 import type { LayerConfig } from '../components/diagrams/hooks/useLayerManagement';
-import { safeJsonParse } from './jsonUtils';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from './uiStorageLogging';
 
 export const FLOWCHART_LAYERS_STORAGE_KEY = 'flowchart.layers';
 export const FLOWCHART_ACTIVE_LAYER_STORAGE_KEY = 'flowchart.activeLayerId';
@@ -15,6 +15,7 @@ export const DEFAULT_LAYER: LayerConfig = {
 const MAX_LAYERS = 50;
 const MAX_LAYER_ID_LENGTH = 80;
 const MAX_LAYER_NAME_LENGTH = 80;
+const MAX_LAYER_STORAGE_JSON_LENGTH = 2 * 1024 * 1024;
 const SAFE_LAYER_ID = /^[\w:-]+$/u;
 const SAFE_COLOR = /^#[0-9a-fA-F]{6}$/u;
 
@@ -84,10 +85,26 @@ export const coerceActiveLayerId = (value: unknown, layers: LayerConfig[]): stri
     return DEFAULT_LAYER.id;
 };
 
+const parseStoredLayers = (raw: string | null): unknown => {
+    if (!raw) return [];
+    if (raw.length > MAX_LAYER_STORAGE_JSON_LENGTH) {
+        logUiStorageReadFailure('layerStorage', FLOWCHART_LAYERS_STORAGE_KEY, new Error('Layer storage JSON is too large.'));
+        return [];
+    }
+
+    try {
+        return JSON.parse(raw) as unknown;
+    } catch (error) {
+        logUiStorageReadFailure('layerStorage', FLOWCHART_LAYERS_STORAGE_KEY, error);
+        return [];
+    }
+};
+
 export const readLayers = (): LayerConfig[] => {
     try {
-        return coerceLayers(safeJsonParse<unknown>(localStorage.getItem(FLOWCHART_LAYERS_STORAGE_KEY), []));
-    } catch {
+        return coerceLayers(parseStoredLayers(localStorage.getItem(FLOWCHART_LAYERS_STORAGE_KEY)));
+    } catch (error) {
+        logUiStorageReadFailure('layerStorage', FLOWCHART_LAYERS_STORAGE_KEY, error);
         return [{ ...DEFAULT_LAYER }];
     }
 };
@@ -96,8 +113,8 @@ export const writeLayers = (layers: LayerConfig[]): LayerConfig[] => {
     const normalized = coerceLayers(layers);
     try {
         localStorage.setItem(FLOWCHART_LAYERS_STORAGE_KEY, JSON.stringify(normalized));
-    } catch {
-        void 0;
+    } catch (error) {
+        logUiStorageWriteFailure('layerStorage', FLOWCHART_LAYERS_STORAGE_KEY, error);
     }
     return normalized;
 };
@@ -105,7 +122,8 @@ export const writeLayers = (layers: LayerConfig[]): LayerConfig[] => {
 export const readActiveLayerId = (layers: LayerConfig[]): string => {
     try {
         return coerceActiveLayerId(localStorage.getItem(FLOWCHART_ACTIVE_LAYER_STORAGE_KEY), layers);
-    } catch {
+    } catch (error) {
+        logUiStorageReadFailure('layerStorage', FLOWCHART_ACTIVE_LAYER_STORAGE_KEY, error);
         return DEFAULT_LAYER.id;
     }
 };
@@ -114,8 +132,8 @@ export const writeActiveLayerId = (activeLayerId: string, layers: LayerConfig[])
     const normalized = coerceActiveLayerId(activeLayerId, layers);
     try {
         localStorage.setItem(FLOWCHART_ACTIVE_LAYER_STORAGE_KEY, normalized);
-    } catch {
-        void 0;
+    } catch (error) {
+        logUiStorageWriteFailure('layerStorage', FLOWCHART_ACTIVE_LAYER_STORAGE_KEY, error);
     }
     return normalized;
 };

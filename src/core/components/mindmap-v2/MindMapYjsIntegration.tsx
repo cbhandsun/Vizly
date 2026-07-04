@@ -4,6 +4,12 @@ import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { collaborationService } from '../../services/CollaborationService';
 import type { MindElixirInstance } from 'mind-elixir';
 import { parseRemoteMindMapYjsData, serializeLocalMindMapYjsData } from './mindmapYjsSecurity';
+import {
+    logMindmapYjsCleanupFailure,
+    logMindmapYjsInitialSyncParseFailure,
+    logMindmapYjsLocalSerializeFailure,
+    logMindmapYjsRemoteSyncParseFailure,
+} from './mindmapPanelLogging';
 
 export default function MindMapYjsIntegration() {
     const [instance, setInstance] = useState<MindElixirInstance | null>(getMindElixirInstance());
@@ -32,7 +38,7 @@ export default function MindMapYjsIntegration() {
                 const data = parseRemoteMindMapYjsData(remoteData);
                 instance.refresh(data);
             } catch (e) {
-                console.error('[MindMap Yjs] Initial sync parse error:', e);
+                logMindmapYjsInitialSyncParseFailure(e);
             }
             isRemoteUpdating.current = false;
         } else {
@@ -50,7 +56,7 @@ export default function MindMapYjsIntegration() {
                     yMap.set('nodeData', currentData);
                 }
             } catch (e) {
-                console.error('[MindMap Yjs] Failed to serialize local operation:', e);
+                logMindmapYjsLocalSerializeFailure(e);
             }
         };
 
@@ -72,7 +78,7 @@ export default function MindMapYjsIntegration() {
                             // Refresh redraws the map with new data
                             instance.refresh(data);
                         } catch (e) {
-                            console.error('[MindMap Yjs] Remote sync parse error:', e);
+                            logMindmapYjsRemoteSyncParseFailure(e);
                         }
                         isRemoteUpdating.current = false;
                     }
@@ -88,7 +94,9 @@ export default function MindMapYjsIntegration() {
                 if (typeof instance.bus.removeListener === 'function') {
                     instance.bus.removeListener('operation', handleLocalOperation);
                 }
-            } catch (_e) {}
+            } catch (error) {
+                logMindmapYjsCleanupFailure(error);
+            }
             yMap.unobserve(handleRemoteChange);
         };
     }, [instance]);

@@ -9,6 +9,16 @@ import { subscribeOutline } from './mindmapOutlineStore';
 import { nodeObjToMarkdown, downloadText, findNodeById } from './migrate';
 import { cleanMindMapData, cleanMindMapTopic } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
+import {
+    logMindmapOutlineAddFailure,
+    logMindmapOutlineDeleteFailure,
+    logMindmapOutlineEditFailure,
+    logMindmapOutlineExportFailure,
+    logMindmapOutlineInvalidDrop,
+    logMindmapOutlineRefreshFailure,
+    logMindmapOutlineSelectFailure,
+    logMindmapOutlineUpdateFailure,
+} from './mindmapPanelLogging';
 
 // ─── Flatten tree → array ─────────────────────────────────────────────────────
 interface FlatNode {
@@ -76,7 +86,9 @@ const MindMapOutlinePanel: React.FC = () => {
             const data = mind?.getData();
             if (!data) return;
             setNodes(flattenTree(data.nodeData));
-        } catch {}
+        } catch (error) {
+            logMindmapOutlineRefreshFailure(error);
+        }
     }, [mind]);
 
     useEffect(() => {
@@ -108,7 +120,7 @@ const MindMapOutlinePanel: React.FC = () => {
                 setTimeout(refresh, 80);
             }
         } catch (e) {
-            console.error('[Outline updateTreeAndSave] error:', e);
+            logMindmapOutlineUpdateFailure(e);
         }
     }, [mind, refresh]);
 
@@ -117,7 +129,9 @@ const MindMapOutlinePanel: React.FC = () => {
         try {
             const tpc = mind.findEle(id);
             if (tpc) { mind.selectNode(tpc); mind.toCenter(); }
-        } catch {}
+        } catch (error) {
+            logMindmapOutlineSelectFailure(error);
+        }
         setActiveId(id);
     }, [mind]);
 
@@ -233,7 +247,7 @@ const MindMapOutlinePanel: React.FC = () => {
             const filename = `${data.nodeData.topic || 'mindmap'}_outline.md`;
             downloadText(filename, mdText, 'text/markdown;charset=utf-8');
         } catch (e) {
-            console.error('[Outline Export] error:', e);
+            logMindmapOutlineExportFailure(e);
         }
     }, [mind]);
 
@@ -287,7 +301,7 @@ const MindMapOutlinePanel: React.FC = () => {
             // Target cannot be a descendant of dragNode (no cycles)
             const targetIsDescendant = findNodeById(dragNode, targetId);
             if (targetIsDescendant) {
-                console.warn('[Outline DragDrop] Cannot drop node into its own descendant.');
+                logMindmapOutlineInvalidDrop();
                 return false;
             }
 
@@ -346,7 +360,7 @@ const MindMapOutlinePanel: React.FC = () => {
                 refresh();
             }
         } catch (e) {
-            console.error('[Outline Edit] error:', e);
+            logMindmapOutlineEditFailure(e);
         }
     }, [editTopicValue, mind, refresh]);
 
@@ -360,7 +374,7 @@ const MindMapOutlinePanel: React.FC = () => {
                 setTimeout(refresh, 100);
             }
         } catch (e) {
-            console.error('[Outline Add] error:', e);
+            logMindmapOutlineAddFailure(e);
         }
     }, [mind, refresh]);
 
@@ -376,7 +390,7 @@ const MindMapOutlinePanel: React.FC = () => {
                 setTimeout(refresh, 100);
             }
         } catch (e) {
-            console.error('[Outline Delete] error:', e);
+            logMindmapOutlineDeleteFailure(e);
         }
     }, [mind, refresh]);
 

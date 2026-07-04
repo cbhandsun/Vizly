@@ -4,6 +4,7 @@ import { Icon } from '@iconify/react';
 import { FaSearch } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { buildIconifySearchUrl, isSafeIconifyIconName, parseIconifySearchResponse } from '../../utils/iconifySecurity';
+import { logSharedIconExplorerSearchFailure } from './iconSearchLogging';
 
 const { Text } = Typography;
 
@@ -51,7 +52,7 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({
       setIcons(data.icons);
       setTotal(data.total);
     } catch (error) {
-      console.error('Failed to search icons:', error);
+      logSharedIconExplorerSearchFailure(error);
     } finally {
       setLoading(false);
     }

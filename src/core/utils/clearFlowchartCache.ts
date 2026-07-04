@@ -1,3 +1,5 @@
+import { logFlowchartCacheClearFailure } from './flowchartCacheLogging';
+
 const LOCAL_UI_CACHE_KEYS = [
     'commandPalette.recent',
     'diagramMenu.collapsedGroups',
@@ -47,16 +49,16 @@ export const clearFlowchartCache = (diagramId?: string | null) => {
     for (const key of localStorageKeys) {
         try {
             localStorage.removeItem(key);
-        } catch {
-            void 0;
+        } catch (error) {
+            logFlowchartCacheClearFailure('localStorage', key, error);
         }
     }
 
     for (const key of sessionStorageKeys) {
         try {
             sessionStorage.removeItem(key);
-        } catch {
-            void 0;
+        } catch (error) {
+            logFlowchartCacheClearFailure('sessionStorage', key, error);
         }
     }
 };

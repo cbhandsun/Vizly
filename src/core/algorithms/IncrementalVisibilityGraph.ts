@@ -20,6 +20,11 @@ import type { Point, Rectangle } from './geometryUtils';
 import { getRectCorners, distance } from './geometryUtils';
 import { isVisible, type VisibilityGraph } from './visibilityGraph';
 import type { SpatialIndex } from './SpatialIndex';
+import {
+    logIncrementalVisibilityGraphObstacleExists,
+    logIncrementalVisibilityGraphObstacleMissing,
+    logIncrementalVisibilityGraphObstacleMissingAdd,
+} from '../utils/routingLogging';
 
 export interface ObstacleChange {
     type: 'add' | 'remove' | 'update';
@@ -106,7 +111,7 @@ export class IncrementalVisibilityGraph {
      */
     addObstacle(id: string, obstacle: Rectangle): void {
         if (this.obstacles.has(id)) {
-            console.warn(`[IncrementalVG] Obstacle ${id} already exists. Use updateObstacle instead.`);
+            logIncrementalVisibilityGraphObstacleExists(id);
             return;
         }
 
@@ -134,7 +139,7 @@ export class IncrementalVisibilityGraph {
     removeObstacle(id: string): void {
         const vertexIndices = this.obstacleToVertices.get(id);
         if (!vertexIndices) {
-            console.warn(`[IncrementalVG] Obstacle ${id} not found.`);
+            logIncrementalVisibilityGraphObstacleMissing(id);
             return;
         }
 
@@ -172,7 +177,7 @@ export class IncrementalVisibilityGraph {
      */
     updateObstacle(id: string, newObstacle: Rectangle): void {
         if (!this.obstacles.has(id)) {
-            console.warn(`[IncrementalVG] Obstacle ${id} not found. Adding it.`);
+            logIncrementalVisibilityGraphObstacleMissingAdd(id);
             this.addObstacle(id, newObstacle);
             return;
         }

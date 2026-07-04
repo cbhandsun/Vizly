@@ -22,7 +22,11 @@ export const parseDiagramJson = (content: string): unknown => {
     if (content.length > DIAGRAM_JSON_IMPORT_MAX_CHARS) {
         throw new Error('Diagram JSON is too large.');
     }
-    return JSON.parse(content);
+    try {
+        return JSON.parse(content);
+    } catch (_error) {
+        throw new Error('Diagram JSON is invalid.');
+    }
 };
 
 export const isLikelyStandardDiagramData = (value: unknown): boolean => {

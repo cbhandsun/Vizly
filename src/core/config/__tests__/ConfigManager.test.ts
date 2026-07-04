@@ -1,6 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfigDefinition, ConfigManager as ConfigManagerType } from '../ConfigManager';
 
+const safeLogState = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  log: vi.fn(),
+}));
+
+vi.mock('../../utils/consoleCleanup', () => ({
+  safeLog: safeLogState,
+}));
+
 const importFreshConfigManager = async () => {
   vi.resetModules();
   return import('../ConfigManager');
@@ -17,6 +29,7 @@ describe('ConfigManager', () => {
   });
 
   afterEach(() => {
+    Object.values(safeLogState).forEach(mock => mock.mockReset());
     vi.restoreAllMocks();
     vi.resetModules();
     localStorage.clear();
@@ -47,6 +60,27 @@ describe('ConfigManager', () => {
     expect(localStorage.getItem('config_theme.customThemes')).toBeNull();
   });
 
+  it('logs and falls back when persisted config storage read throws', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+      if (key === 'config_theme.mode') {
+        throw new Error('Authorization: Bearer config-read-secret');
+      }
+      return null;
+    });
+
+    module = await importFreshConfigManager();
+    manager = module.ConfigManager.getInstance();
+
+    expect(manager.get('theme.mode')).toBe('light');
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[ConfigManager.loadPersistedConfigs] Failed to read "config_theme.mode":',
+      expect.anything()
+    );
+    const payload = JSON.stringify(safeLogState.warn.mock.calls);
+    expect(payload).toContain('[redacted]');
+    expect(payload).not.toContain('config-read-secret');
+  });
+
   it('gets fallbacks, throws for missing config without fallback, and validates set values', () => {
     expect(manager.get('missing.key', 'fallback')).toBe('fallback');
     expect(() => manager.get('missing.key')).toThrow('配置项不存在: missing.key');
@@ -56,6 +90,25 @@ describe('ConfigManager', () => {
     expect(localStorage.getItem('config_theme.primaryColor')).toBe(JSON.stringify('#00ffaa'));
 
     expect(() => manager.set('theme.primaryColor', 'blue')).toThrow('配置值验证失败: theme.primaryColor');
+  });
+
+  it('logs and keeps runtime value when config persistence write fails', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string) => {
+      if (key === 'config_theme.primaryColor') {
+        throw new Error('token=config-write-secret');
+      }
+    });
+
+    manager.set('theme.primaryColor', '#00ffaa', module.ConfigSource.USER_OVERRIDE);
+
+    expect(manager.get('theme.primaryColor')).toBe('#00ffaa');
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[ConfigManager.persistConfig] Failed to write "config_theme.primaryColor":',
+      expect.anything()
+    );
+    const payload = JSON.stringify(safeLogState.warn.mock.calls);
+    expect(payload).toContain('[redacted]');
+    expect(payload).not.toContain('config-write-secret');
   });
 
   it('notifies listeners, removes listeners, and isolates listener failures', () => {

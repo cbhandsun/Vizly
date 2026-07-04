@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     coerceDiagramConfigIndex,
     getDiagramDocTypeFromStorage,
@@ -6,11 +6,28 @@ import {
     upsertDiagramConfigIndex,
 } from '../diagramTypeStorage';
 
+const safeLogState = vi.hoisted(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    log: vi.fn(),
+}));
+
+vi.mock('../consoleCleanup', () => ({
+    safeLog: safeLogState,
+}));
+
 const makeStorage = (entries: Record<string, string | null>) => ({
     getItem: (key: string) => entries[key] ?? null,
 } as Storage);
 
 describe('getDiagramDocTypeFromStorage', () => {
+    afterEach(() => {
+        Object.values(safeLogState).forEach((mock) => mock.mockReset());
+        vi.restoreAllMocks();
+    });
+
     it('reads type from legacy diagram array storage', () => {
         const storage = makeStorage({
             vizly_diagrams: JSON.stringify([{ id: 'a', type: 'mindmap' }]),
@@ -37,6 +54,10 @@ describe('getDiagramDocTypeFromStorage', () => {
         });
 
         expect(getDiagramDocTypeFromStorage(storage, 'a')).toBeUndefined();
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[diagramTypeStorage] Failed to read "vizly_diagrams":',
+            expect.anything()
+        );
     });
 });
 
@@ -92,6 +113,10 @@ describe('diagram config index storage', () => {
                 updatedAt: 123,
             },
         });
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[diagramTypeStorage] Failed to read "vizly_diagram_configs":',
+            expect.anything()
+        );
     });
 
     it('keeps only recent bounded config entries', () => {
@@ -106,5 +131,45 @@ describe('diagram config index storage', () => {
         expect(configs['diagram-0']).toBeUndefined();
         expect(configs['diagram-5']).toBeDefined();
         expect(configs['diagram-1004']).toBeDefined();
+    });
+
+    it('falls back to empty diagram config index when storage payload is oversized', () => {
+        localStorage.setItem('vizly_diagram_configs', '{'.repeat(2 * 1024 * 1024 + 1));
+
+        expect(readDiagramConfigIndex(localStorage)).toEqual({});
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[diagramTypeStorage] Failed to read "vizly_diagram_configs":',
+            expect.anything()
+        );
+    });
+
+    it('handles storage read/write failures without throwing', () => {
+        const throwingStorage = {
+            getItem: () => {
+                throw new Error('storage unavailable');
+            },
+            setItem: () => {
+                throw new Error('storage blocked');
+            },
+        } as unknown as Storage;
+
+        expect(readDiagramConfigIndex(throwingStorage)).toEqual({});
+        expect(getDiagramDocTypeFromStorage(throwingStorage, 'diagram-a')).toBeUndefined();
+        expect(() => upsertDiagramConfigIndex(throwingStorage, {
+            id: 'diagram-a',
+            type: 'flowchart',
+        })).not.toThrow();
+    });
+
+    it('logs the autosave key when autosave JSON is malformed', () => {
+        const storage = makeStorage({
+            'flowchart-autosave-v2-diagram-a': '{broken',
+        });
+
+        expect(getDiagramDocTypeFromStorage(storage, 'diagram-a')).toBeUndefined();
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[diagramTypeStorage] Failed to read "flowchart-autosave-v2-diagram-a":',
+            expect.anything()
+        );
     });
 });

@@ -3,6 +3,8 @@
  * Uses AES-GCM for encryption/decryption
  * Protects cloud-synced secrets with a per-user local secret.
  */
+import { safeLog } from './consoleCleanup';
+import { redactSensitiveLogValue } from './logSecurity';
 
 const LOCAL_SECRET_PREFIX = 'DiagramView.CryptoSecret.v2';
 
@@ -140,7 +142,7 @@ export class CryptoService {
 
             return `ENC2:${ivStr}:${dataStr}`;
         } catch (e) {
-            console.error('Encryption failed', e);
+            safeLog.error('Encryption failed', redactSensitiveLogValue(e));
             throw new Error('Failed to encrypt data', { cause: e });
         }
     }
@@ -169,7 +171,10 @@ export class CryptoService {
             const decoder = new TextDecoder();
             return decoder.decode(decrypted);
         } catch (e) {
-            console.warn('Decryption failed (likely missing local secret, wrong user, or corrupt data)', e);
+            safeLog.warn(
+                'Decryption failed (likely missing local secret, wrong user, or corrupt data)',
+                redactSensitiveLogValue(e)
+            );
             return '';
         }
     }

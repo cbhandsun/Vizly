@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { coerceStandardDiagramImport, parseDiagramJson } from '@/core/utils/diagramJsonImport';
 import { downloadFile } from '@/core/utils/downloadUtils';
+import { logJsonEditorExistingDiagramMergeFailure } from './diagramImportLogging';
 
 
 const LazyMonacoEditor = React.lazy(() => import('../lazy/LazyMonacoEditor'));
@@ -74,7 +75,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                                 } as any;
                             }
                         } catch (e) {
-                            console.warn('Failed to fetch existing diagram data to merge for JSON editor', e);
+                            logJsonEditorExistingDiagramMergeFailure(e);
                         }
                     }
                     setJsonContent(JSON.stringify(fullData, null, 2));

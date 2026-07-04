@@ -19,6 +19,13 @@ import { RoutingStrategySelector, RoutingAlgorithm } from './RoutingStrategySele
 import { VisibilityGraphCache } from './VisibilityGraphCache';
 import { SpatialIndex } from './SpatialIndex';
 import type { Position } from '@xyflow/react';
+import {
+    logPathfindingFallbackLShape,
+    logPathfindingIterationLimit,
+    logPathfindingMassiveGrid,
+    logPathfindingOpenSetExhausted,
+    logPathfindingWalkableEndpointFailure,
+} from '../utils/routingLogging';
 
 /**
  * [P1-1] Pathfinding configuration
@@ -345,6 +352,7 @@ export function generateSimplePath(
         maxSegments?: number;    // 允许的最大段数: 2=直线, 3=L型, 4=Z型(默认4)
         sourcePos?: Position;
         targetPos?: Position;
+        allowLineCrossings?: boolean;
     }
 ): Point[] | null {
     // 合并默认选项
@@ -352,6 +360,7 @@ export function generateSimplePath(
         enableBuffer: true,
         bufferDistance: 5,  // [FIX] Reduced from 15 to 5. 15px buffer in dense diagrams causes bypass failure in 20px corridors.
         maxSegments: 4,
+        allowLineCrossings: false,
         ...options
     };
 
@@ -388,8 +397,8 @@ export function generateSimplePath(
         }
     };
 
-    // Run passes: strict first, then relaxed (allowing crossings)
-    for (const allowCrossings of [false, true]) {
+    const lineCrossingPasses = opts.allowLineCrossings ? [false, true] : [false];
+    for (const allowCrossings of lineCrossingPasses) {
         // 1. 直线检查 (水平或垂直对齐)
         if (Math.abs(start.x - end.x) < 0.1 || Math.abs(start.y - end.y) < 0.1) {
             if (checkPath([start, end], allowCrossings)) {
@@ -571,12 +580,8 @@ const COSTS = {
     BUFFER_ZONE_FAR: 10, // 
     DIRECTION_CHANGE: 1000, // [FIX] Increased massively from 400 to 1000. Forcing straight lines over almost everything.
     LINE_OCCUPIED: 10,
-    // [FIX] LINE_CROSS drastically reduced from 50000 to 300.
-    // 50000 caused massive visual detours (looping entirely around the graph components)
-    // just to avoid crossing a line. We have LineJumpEngine which cleanly renders jumps
-    // over overlapping lines. A penalty of 300 is enough to discourage crossing if a 
-    // short detour (< 30 grid units) exists, but permits intersections over ridiculous detours.
-    LINE_CROSS: 300, 
+    // Expensive but traversable last-resort lanes for existing routed edges.
+    LINE_CROSS: 2500,
     OBSTACLE: 10000000,
     CONTAINER_BORDER: 400
 };
@@ -653,7 +658,7 @@ export function buildPathfindingGrid(
     const maxIndex = cols * rows;
 
     if (maxIndex > 2000000) {
-        console.warn(`[Pathfinding] Grid massive: ${cols}x${rows} = ${maxIndex}. Memory impact high.`);
+        logPathfindingMassiveGrid(cols, rows, maxIndex);
     }
 
     const costs = new Int32Array(maxIndex).fill(COSTS.NORMAL);
@@ -1195,7 +1200,21 @@ export function findPath(
     }
 
     if (validStartIdx === -1 || validEndIdx === -1) {
-        console.warn(`[A*] Failed to find walkable start/end. start=(${Math.round(start.x)},${Math.round(start.y)}) end=(${Math.round(end.x)},${Math.round(end.y)}) gridBounds=[${minX},${minY}]-[${maxX},${maxY}] startIdx=${startIdx} endIdx=${endIdx} validS=${validStartIdx} validE=${validEndIdx} obstacles=${obstacleList.length} grid=${cols}x${rows}`);
+        logPathfindingWalkableEndpointFailure({
+            start,
+            end,
+            minX,
+            minY,
+            maxX,
+            maxY,
+            startIdx,
+            endIdx,
+            validStartIdx,
+            validEndIdx,
+            obstacleCount: obstacleList.length,
+            cols,
+            rows,
+        });
         if (returnNullOnFail) return null;
         return [start, { x: end.x, y: start.y }, end];
     }
@@ -1242,7 +1261,7 @@ export function findPath(
 
     while (openSet.size() > 0) {
         if (++iterations > MAX_ITERATIONS) {
-            console.warn(`[A*] Aborted: Exceeded max iterations (${MAX_ITERATIONS}). Falling back.`);
+            logPathfindingIterationLimit(MAX_ITERATIONS);
             break;
         }
 
@@ -1373,7 +1392,7 @@ export function findPath(
 
 
             restoreSavedCells();
-            const optimized = optimizePath(result, obstacles);
+            const optimized = optimizePath(result, obstacles, [], lineObstacles);
 
             // [FIX-detour-cap] libavoid 风格：绕行上限检查
             // 如果 A* 结果路径长度 > 曼哈顿距离 × DETOUR_RATIO，降级为简单 L/Z 型路径
@@ -1534,13 +1553,26 @@ export function findPath(
     }
 
     if (returnNullOnFail) {
-        console.warn(`[A*] openSet exhausted. iterations=${iterations} start=(${Math.round(start.x)},${Math.round(start.y)}) end=(${Math.round(end.x)},${Math.round(end.y)}) grid=${cols}x${rows} obstacles=${obstacleList.length}`);
+        logPathfindingOpenSetExhausted({
+            iterations,
+            start,
+            end,
+            cols,
+            rows,
+            obstacleCount: obstacleList.length,
+        });
         restoreSavedCells();
         return null;
     }
 
     // Default Fallback (Naive L-Shape) when A* fails completely
-    console.warn(`[A*] Fallback L-shape. iterations=${iterations} start=(${Math.round(start.x)},${Math.round(start.y)}) end=(${Math.round(end.x)},${Math.round(end.y)}) grid=${cols}x${rows}`);
+    logPathfindingFallbackLShape({
+        iterations,
+        start,
+        end,
+        cols,
+        rows,
+    });
     restoreSavedCells();
     return [start, { x: end.x, y: start.y }, end];
 }
@@ -1555,7 +1587,8 @@ export function findPath(
 function optimizePath(
     rawPath: Point[],
     obstacles: Rectangle[] | SpatialIndex,
-    extraObstacles: Rectangle[] = [] // [NEW] Support for soft borders/containers
+    extraObstacles: Rectangle[] = [], // [NEW] Support for soft borders/containers
+    lineObstacles: LineObstacle[] = []
 ): Point[] {
     const path = simplifyPath(rawPath);
     if (path.length <= 2) return path;
@@ -1563,7 +1596,7 @@ function optimizePath(
     // Helper to verify if a candidate sub-path is collision-free
     const checkClear = (pts: Point[]) => {
         // Use 15px padding for smoothing to ensure we don't graze obstacles too tightly
-        if (isPathBlocked(pts, obstacles, 15)) return false;
+        if (isPathBlocked(pts, obstacles, 15, lineObstacles)) return false;
         if (extraObstacles.length > 0 && isPathBlocked(pts, extraObstacles, 0)) return false;
         return true;
     };

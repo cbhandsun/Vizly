@@ -1,7 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { normalizeSupabaseUrl } from '@/services/runtimeEnv';
+import { getWindowHashString } from '@/core/utils/inputBoundary';
 import { AuthContext } from './AuthContextValue';
+import {
+    logAuthInitializationFailure,
+    logAuthRuntimeStateClearFailure,
+    logCloudAdapterConfigurationFailure,
+} from './authLogging';
 
 const noSupabaseError = { error: { message: 'Supabase is not configured', name: 'AuthError', status: 0 } as unknown as AuthError };
 
@@ -26,7 +32,7 @@ const getSupabaseAuthStorageKey = () => {
 const hasSupabaseAuthSessionHint = () => {
     if (!hasSupabaseEnv() || typeof window === 'undefined') return false;
 
-    const hash = window.location.hash;
+    const hash = getWindowHashString();
     if (hash.includes('access_token=') || hash.includes('refresh_token=') || hash.includes('type=recovery')) {
         return true;
     }
@@ -90,7 +96,7 @@ const clearSensitiveRuntimeState = async (
             CryptoService.clearKeyCache();
         }
     } catch (error) {
-        console.error('Failed to clear auth-sensitive runtime state:', error);
+        logAuthRuntimeStateClearFailure(error);
     }
 };
 
@@ -117,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
         if (session?.user) {
             void configureCloudAdapter(session).catch((error) => {
-                console.error('Failed to configure cloud adapter:', error);
+                logCloudAdapterConfigurationFailure(error);
             });
         }
     }, []);
@@ -159,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
 
         void initializeAuth().catch((error) => {
-            console.error('Auth initialization failed:', error);
+            logAuthInitializationFailure(error);
             if (!cancelled) setLoading(false);
         });
 

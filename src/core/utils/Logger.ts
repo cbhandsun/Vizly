@@ -2,7 +2,9 @@
  * 统一日志系统
  */
 
-import { normalizeRemoteLogEndpoint, sanitizeLogEntry } from './logSecurity';
+import { normalizeRemoteLogEndpoint, redactSensitiveLogValue, sanitizeLogEntry } from './logSecurity';
+import { safeLog } from './consoleCleanup';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from './uiStorageLogging';
 
 const MAX_STORED_LOG_ENTRIES = 1000;
 const MAX_LOG_STRING_LENGTH = 4000;
@@ -243,7 +245,8 @@ export class LocalStorageAppender implements LogAppender {
 
       localStorage.setItem(this.storageKey, JSON.stringify(existingLogs));
     } catch (error) {
-      console.warn('本地存储日志失败:', error);
+      logUiStorageWriteFailure('Logger.LocalStorageAppender.append', this.storageKey, error);
+      safeLog.warn('本地存储日志失败:', redactSensitiveLogValue(error));
     }
   }
 
@@ -252,7 +255,8 @@ export class LocalStorageAppender implements LogAppender {
       const stored = localStorage.getItem(this.storageKey);
       if (stored && stored.length > MAX_STORED_LOGS_JSON_LENGTH) return [];
       return stored ? coerceStoredLogEntries(JSON.parse(stored), this.maxEntries) : [];
-    } catch {
+    } catch (error) {
+      logUiStorageReadFailure('Logger.LocalStorageAppender.getLogs', this.storageKey, error);
       return [];
     }
   }
@@ -333,7 +337,7 @@ export class RemoteAppender implements LogAppender {
         body: JSON.stringify({ logs: logsToSend })
       });
     } catch (error) {
-      console.warn('远程日志发送失败:', error);
+      safeLog.warn('远程日志发送失败:', redactSensitiveLogValue(error));
       // 将失败的日志重新加入批次
       this.batch.unshift(...logsToSend);
     }
@@ -428,7 +432,7 @@ export class Logger {
       return;
     }
 
-    const entry: LogEntry = {
+    const entry: LogEntry = sanitizeLogEntry({
       id: this.generateLogId(),
       timestamp: Date.now(),
       level,
@@ -439,14 +443,14 @@ export class Logger {
       userId: this.config.defaultUserId,
       sessionId: this.config.defaultSessionId,
       tags
-    };
+    });
 
     // 输出到所有输出器
     this.appenders.forEach(appender => {
       try {
         appender.append(entry);
       } catch (error) {
-        console.error(`日志输出器 ${appender.name} 执行失败:`, error);
+        safeLog.error(`日志输出器 ${appender.name} 执行失败:`, redactSensitiveLogValue(error));
       }
     });
   }

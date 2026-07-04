@@ -2,18 +2,9 @@ import {
     normalizeCollaborationDiagramId,
     normalizeCollaborationRoomName,
 } from '../diagrams/collaboration/collaborationSecurity';
+import { coerceDiagramId, getQueryOrHashParamFromLocation } from '@/core/utils/inputBoundary';
 
 type LocationLike = Pick<Location, 'origin' | 'pathname' | 'search' | 'hash'>;
-
-const getParamFromSearchOrHash = (location: LocationLike, name: string): string | null => {
-    const directValue = new URLSearchParams(location.search).get(name);
-    if (directValue) return directValue;
-
-    const hashQueryStart = location.hash.indexOf('?');
-    if (hashQueryStart < 0) return null;
-
-    return new URLSearchParams(location.hash.slice(hashQueryStart + 1)).get(name);
-};
 
 export const buildCollaborationShareUrl = (
     location: LocationLike,
@@ -22,7 +13,7 @@ export const buildCollaborationShareUrl = (
 ): string => {
     const url = new URL(location.pathname || '/', location.origin);
     const diagram = normalizeCollaborationDiagramId(
-        getParamFromSearchOrHash(location, 'diagram'),
+        coerceDiagramId(getQueryOrHashParamFromLocation(location, 'diagram') || fallbackDiagram, fallbackDiagram),
         fallbackDiagram
     );
 

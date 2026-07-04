@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getThemeManager } from './index';
+import { logUseCoreThemeSetFailure } from './themeLogging';
 import type { Theme } from './types/ThemeTypes';
 
 const FALLBACK_THEME_ID = 'light';
@@ -48,7 +49,7 @@ export function useTheme(_options: any = {}): [Theme | null, (themeId: string) =
         try {
             await getThemeManager().setTheme(resolveCoreThemeId(themeId));
         } catch (e) {
-            console.error("Failed to set core theme:", e);
+            logUseCoreThemeSetFailure(e);
         }
     }, []);
 

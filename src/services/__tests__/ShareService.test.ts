@@ -173,6 +173,59 @@ describe('ShareService', () => {
         expect(mockSupabase.rpc).not.toHaveBeenCalled();
     });
 
+    it('redacts collaborator RPC failures before logging them', async () => {
+        const failure = {
+            message: 'Authorization: Bearer sk-live-secret',
+            code: '42501',
+        };
+        mockSupabase.rpc.mockResolvedValue({
+            data: null,
+            error: failure,
+        });
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { shareService } = await import('../ShareService');
+
+        await expect(
+            shareService.addCollaborator('11111111-1111-4111-8111-111111111111', 'user@example.com', 'viewer')
+        ).rejects.toThrow('Authorization: Bearer sk-live-secret');
+
+        expect(consoleErrorSpy).toHaveBeenCalledWith('RPC Error:', expect.anything());
+        expect(JSON.stringify(consoleErrorSpy.mock.calls[0]?.[1])).toContain('[redacted]');
+        expect(JSON.stringify(consoleErrorSpy.mock.calls[0]?.[1])).not.toContain('sk-live-secret');
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('rejects malformed add-collaborator RPC responses', async () => {
+        mockSupabase.rpc.mockResolvedValue({
+            data: { ok: true, user_id: '22222222-2222-4222-8222-222222222222' },
+            error: null,
+        });
+        const { shareService } = await import('../ShareService');
+
+        await expect(
+            shareService.addCollaborator('11111111-1111-4111-8111-111111111111', 'user@example.com', 'viewer')
+        ).rejects.toThrow('invalid response');
+    });
+
+    it('coerces add-collaborator RPC responses', async () => {
+        mockSupabase.rpc.mockResolvedValue({
+            data: {
+                success: true,
+                user_id: '22222222-2222-4222-8222-222222222222',
+                ignored: 'server-internal',
+            },
+            error: null,
+        });
+        const { shareService } = await import('../ShareService');
+
+        await expect(
+            shareService.addCollaborator('11111111-1111-4111-8111-111111111111', 'user@example.com', 'viewer')
+        ).resolves.toEqual({
+            success: true,
+            user_id: '22222222-2222-4222-8222-222222222222',
+        });
+    });
+
     it('surfaces collaborator removal RPC failures', async () => {
         mockSupabase.rpc.mockResolvedValue({
             data: { success: false, error: 'Only the diagram owner can manage collaborators' },
@@ -264,6 +317,28 @@ describe('ShareService', () => {
                 email: 'user@example.com',
             },
         ]);
+    });
+
+    it('redacts collaborator listing RPC failures before logging them', async () => {
+        const failure = {
+            message: 'Authorization: Bearer sk-live-secret',
+            code: '42501',
+        };
+        mockSupabase.rpc.mockResolvedValue({
+            data: null,
+            error: failure,
+        });
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { shareService } = await import('../ShareService');
+
+        await expect(
+            shareService.listCollaborators('11111111-1111-4111-8111-111111111111')
+        ).rejects.toThrow('Authorization: Bearer sk-live-secret');
+
+        expect(consoleErrorSpy).toHaveBeenCalledWith('RPC Error:', expect.anything());
+        expect(JSON.stringify(consoleErrorSpy.mock.calls[0]?.[1])).toContain('[redacted]');
+        expect(JSON.stringify(consoleErrorSpy.mock.calls[0]?.[1])).not.toContain('sk-live-secret');
+        consoleErrorSpy.mockRestore();
     });
 
     it('requires authentication before listing diagrams shared with the current user', async () => {
@@ -409,6 +484,106 @@ describe('ShareService', () => {
             diagram_id: '11111111-1111-4111-8111-111111111111',
             created_by: '22222222-2222-4222-8222-222222222222',
         }));
+    });
+
+    it('rejects invalid share records returned after creating a share link', async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+            data: { user: { id: '22222222-2222-4222-8222-222222222222' } },
+            error: null,
+        });
+        const diagramQuery = createQueryMock({
+            data: {
+                id: '11111111-1111-4111-8111-111111111111',
+                user_id: '22222222-2222-4222-8222-222222222222',
+            },
+            error: null,
+        });
+        const shareQuery = createQueryMock({
+            data: {
+                id: 'bad-share-id',
+                diagram_id: '11111111-1111-4111-8111-111111111111',
+                share_token: 'safe-token-123456',
+                created_by: '22222222-2222-4222-8222-222222222222',
+                expires_at: null,
+                is_active: true,
+                created_at: '2026-06-13T00:00:00.000Z',
+            },
+            error: null,
+        });
+        mockSupabase.from
+            .mockReturnValueOnce(diagramQuery)
+            .mockReturnValueOnce(shareQuery);
+        const { shareService } = await import('../ShareService');
+
+        await expect(
+            shareService.createShareLink({
+                diagramId: '11111111-1111-4111-8111-111111111111',
+                userId: '22222222-2222-4222-8222-222222222222',
+            })
+        ).rejects.toThrow('invalid share record');
+    });
+
+    it('filters malformed rows when listing shares for a diagram', async () => {
+        mockSupabase.auth.getUser.mockResolvedValue({
+            data: { user: { id: '22222222-2222-4222-8222-222222222222' } },
+            error: null,
+        });
+        const diagramQuery = createQueryMock({
+            data: {
+                id: '11111111-1111-4111-8111-111111111111',
+                user_id: '22222222-2222-4222-8222-222222222222',
+            },
+            error: null,
+        });
+        const sharesQuery = createQueryMock();
+        sharesQuery.order.mockResolvedValueOnce({
+            data: [
+                {
+                    id: '44444444-4444-4444-8444-444444444444',
+                    diagram_id: '11111111-1111-4111-8111-111111111111',
+                    share_token: 'safe-token-123456',
+                    created_by: '22222222-2222-4222-8222-222222222222',
+                    expires_at: null,
+                    is_active: true,
+                    created_at: '2026-06-13T00:00:00.000Z',
+                },
+                {
+                    id: '55555555-5555-4555-8555-555555555555',
+                    diagram_id: '11111111-1111-4111-8111-111111111111',
+                    share_token: 'expired-token-123456',
+                    created_by: '22222222-2222-4222-8222-222222222222',
+                    expires_at: '2000-01-01T00:00:00.000Z',
+                    is_active: true,
+                    created_at: '2026-06-13T00:00:00.000Z',
+                },
+                {
+                    id: 'bad-id',
+                    diagram_id: '11111111-1111-4111-8111-111111111111',
+                    share_token: 'safe-token-abcdef',
+                    created_by: '22222222-2222-4222-8222-222222222222',
+                    expires_at: null,
+                    is_active: true,
+                    created_at: '2026-06-13T00:00:00.000Z',
+                },
+            ],
+            error: null,
+        });
+        mockSupabase.from
+            .mockReturnValueOnce(diagramQuery)
+            .mockReturnValueOnce(sharesQuery);
+        const { shareService } = await import('../ShareService');
+
+        await expect(shareService.listSharesForDiagram('11111111-1111-4111-8111-111111111111')).resolves.toEqual([
+            {
+                id: '44444444-4444-4444-8444-444444444444',
+                diagram_id: '11111111-1111-4111-8111-111111111111',
+                share_token: 'safe-token-123456',
+                created_by: '22222222-2222-4222-8222-222222222222',
+                expires_at: null,
+                is_active: true,
+                created_at: '2026-06-13T00:00:00.000Z',
+            },
+        ]);
     });
 
     it('throws when revoking a share updates no rows', async () => {

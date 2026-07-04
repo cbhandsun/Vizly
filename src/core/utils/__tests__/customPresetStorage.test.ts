@@ -9,6 +9,18 @@ import {
     writeCustomPresetMap,
 } from '../customPresetStorage';
 
+const safeLogState = vi.hoisted(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    log: vi.fn(),
+}));
+
+vi.mock('../consoleCleanup', () => ({
+    safeLog: safeLogState,
+}));
+
 const makePreset = (id: string) => ({
     id,
     name: id,
@@ -22,6 +34,7 @@ describe('customPresetStorage', () => {
     beforeEach(() => {
         localStorage.clear();
         vi.restoreAllMocks();
+        Object.values(safeLogState).forEach((mock) => mock.mockReset());
     });
 
     it('normalizes custom-prefixed lookup keys', () => {
@@ -51,12 +64,25 @@ describe('customPresetStorage', () => {
     it('reads malformed storage as empty and supports custom-prefixed lookup', () => {
         localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, '{broken');
         expect(readCustomPresetMap()).toEqual({});
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[customPresetStorage] Failed to read "diagram-custom-presets":',
+            expect.anything()
+        );
 
         localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify({
             Workspace: makePreset('workspace-id'),
         }));
 
         expect(getCustomPreset('custom:Workspace')?.id).toBe('workspace-id');
+    });
+
+    it('falls back to empty map when storage payload is oversized', () => {
+        localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, '{'.repeat(2 * 1024 * 1024 + 1));
+        expect(readCustomPresetMap()).toEqual({});
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[customPresetStorage] Failed to read "diagram-custom-presets":',
+            expect.anything()
+        );
     });
 
     it('writes and appends normalized presets', () => {

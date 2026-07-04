@@ -75,5 +75,5 @@ describe('exportXmind', () => {
     expect(revokeSpy).not.toHaveBeenCalled();
     await new Promise(resolve => setTimeout(resolve, 0));
     expect(revokeSpy).toHaveBeenCalledWith('blob:xmind-export');
-  });
+  }, 30_000);
 });

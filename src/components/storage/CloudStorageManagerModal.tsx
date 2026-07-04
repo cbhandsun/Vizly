@@ -20,6 +20,13 @@ import { coerceToStandardDiagramDataWithReport } from '@/core/utils/coerceDiagra
 import RemoteDiagramCover from '@/components/shared/RemoteDiagramCover';
 import { shareService } from '@/services/ShareService';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import {
+    logCloudStorageManagerBatchDeleteFailure,
+    logCloudStorageManagerDeleteFailure,
+    logCloudStorageManagerListFailure,
+    logCloudStorageManagerOpenFailure,
+    logCloudStorageManagerSharedLoadFailure,
+} from '@/components/diagrams/hooks/diagramStorageLogging';
 
 
 const { Text } = Typography;
@@ -63,7 +70,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
             const items = await shareService.listSharedWithMe();
             setSharedDiagrams(items);
         } catch (error) {
-            console.error('Failed to load shared diagrams', error);
+            logCloudStorageManagerSharedLoadFailure(error);
             setSharedDiagrams([]);
         } finally {
             setSharedLoading(false);
@@ -84,7 +91,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
             const items = await unifiedStorage.listDiagrams();
             setCloudDiagrams(items);
         } catch (error) {
-            console.error("Failed to list diagrams", error);
+            logCloudStorageManagerListFailure(error);
             appMessage.error(t('storage.manager.loadFailed'));
             setCloudDiagrams([]);
         } finally {
@@ -170,7 +177,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                 appMessage.error(t('storage.manager.noContent'));
             }
         } catch (error) {
-            console.error(error);
+            logCloudStorageManagerOpenFailure(error);
             appMessage.error(error instanceof Error ? error.message : t('common.error'));
         } finally {
             hide();
@@ -182,7 +189,8 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
             await unifiedStorage.deleteDiagram(id);
             appMessage.success(t('storage.manager.deleted'));
             void loadCloudDiagrams();
-        } catch (_e) {
+        } catch (error) {
+            logCloudStorageManagerDeleteFailure(error);
             appMessage.error(t('storage.manager.deleteFailed'));
         }
     };
@@ -222,7 +230,8 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                 try {
                     await unifiedStorage.deleteDiagram(id);
                     success++;
-                } catch {
+                } catch (error) {
+                    logCloudStorageManagerBatchDeleteFailure(id, error);
                     failed++;
                 }
             }));

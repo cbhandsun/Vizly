@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
+import { logDiagramControlBridgeFailure } from './diagramControlLogging';
 
 interface DiagramControlBridgeProps {
   diagramId?: string;
@@ -183,12 +184,17 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
               const xc = OVERALL_SAFE_LEFT + pad + Math.max(0, (aw - bboxWidth * z) / 2) - (minX * z);
               const yc = OVERALL_SAFE_TOP + pad + Math.max(0, (ah - bboxHeight * z) / 2) - (minY * z);
               rf.setViewport({ x: xc, y: yc, zoom: z });
-            } catch { }
+            } catch (error) {
+              logDiagramControlBridgeFailure('fitRefine', error);
+            }
           }, 250);
-        } catch {
+        } catch (error) {
+          logDiagramControlBridgeFailure('fitFallback', error);
           try {
             rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: 0.45, maxZoom: 1.0 });
-          } catch { }
+          } catch (fallbackError) {
+            logDiagramControlBridgeFailure('fitFallback', fallbackError);
+          }
         }
         return;
       }
@@ -202,7 +208,9 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           } else {
             document.exitFullscreen?.();
           }
-        } catch { }
+        } catch (error) {
+          logDiagramControlBridgeFailure('fullscreen', error);
+        }
         return;
       }
 
@@ -288,7 +296,8 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           const y = OVERALL_SAFE_TOP + padding - (minY * zoom);
 
           rf.setViewport({ x, y, zoom });
-        } catch {
+        } catch (error) {
+          logDiagramControlBridgeFailure('top', error);
           rf.fitView({ padding: 0.1, includeHiddenNodes: false, duration: 400, minZoom: 0.45, maxZoom: 1.15 });
         }
         return;

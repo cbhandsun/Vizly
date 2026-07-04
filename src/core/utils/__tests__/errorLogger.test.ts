@@ -1,6 +1,22 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const safeLogState = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  log: vi.fn(),
+}));
+
+vi.mock('../consoleCleanup', () => ({
+  safeLog: safeLogState,
+}));
 
 describe('errorLogger', () => {
+  beforeEach(() => {
+    Object.values(safeLogState).forEach(mock => mock.mockReset());
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     vi.resetModules();
@@ -105,5 +121,64 @@ describe('errorLogger', () => {
     expect(errorLogger.getLogs()).toEqual([]);
     expect(() => errorLogger.log('still works')).not.toThrow();
     expect(errorLogger.getLogs()).toHaveLength(1);
+  });
+
+  it('redacts storage persistence failures before warning', async () => {
+    vi.stubGlobal('process', { env: { NODE_ENV: 'production' } });
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('token=sk-live-secret');
+    });
+
+    const { errorLogger } = await import('../errorLogger');
+    errorLogger.log('persist me');
+
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[ErrorLogger.persist] Failed to write "app_error_logs":',
+      expect.anything()
+    );
+    expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
+    expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('sk-live-secret');
+    setItemSpy.mockRestore();
+  });
+
+  it('falls back to empty logs when storage reads throw and logs a redacted warning', async () => {
+    vi.stubGlobal('process', { env: { NODE_ENV: 'production' } });
+    const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('Authorization: Bearer storage-secret');
+    });
+
+    const { errorLogger } = await import('../errorLogger');
+
+    expect(errorLogger.getLogs()).toEqual([]);
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[ErrorLogger.loadFromStorage] Failed to read "app_error_logs":',
+      expect.anything()
+    );
+    expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
+    expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('storage-secret');
+
+    getItemSpy.mockRestore();
+  });
+
+  it('clears in-memory logs even when storage removal throws and logs a redacted warning', async () => {
+    vi.stubGlobal('process', { env: { NODE_ENV: 'production' } });
+
+    const { errorLogger } = await import('../errorLogger');
+    errorLogger.log('persist me first');
+
+    const removeItemSpy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('token=remove-secret');
+    });
+
+    expect(() => errorLogger.clear()).not.toThrow();
+    expect(errorLogger.getLogs()).toEqual([]);
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[ErrorLogger.clear] Failed to write "app_error_logs":',
+      expect.anything()
+    );
+    expect(JSON.stringify(safeLogState.warn.mock.calls.at(-1)?.[1])).toContain('[redacted]');
+    expect(JSON.stringify(safeLogState.warn.mock.calls.at(-1)?.[1])).not.toContain('remove-secret');
+
+    removeItemSpy.mockRestore();
   });
 });

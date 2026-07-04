@@ -3,48 +3,64 @@ import App from 'antd/es/app';
 import Avatar from 'antd/es/avatar';
 import Dropdown from 'antd/es/dropdown';
 import type { MenuProps } from 'antd/es/menu';
-import { Clock } from 'lucide-react';
+import { coerceDiagramId, getQueryOrHashParamFromLocation, type LocationLike } from '@/core/utils/inputBoundary';
 import {
-    CloudOutlined,
-    LaptopOutlined,
-    DeleteOutlined,
-    ApiOutlined,
-    SearchOutlined,
-    UserOutlined,
-    SettingOutlined,
-    ShareAltOutlined,
-    MoreOutlined,
-    BlockOutlined,
-    DeploymentUnitOutlined,
-    GatewayOutlined,
-    _FolderOpenOutlined,
-    PlusOutlined,
-    ApartmentOutlined,
-    NodeIndexOutlined,
-    _ThunderboltOutlined,
-    EditOutlined,
-    ExportOutlined,
-    BgColorsOutlined,
-    GlobalOutlined,
-    AppstoreOutlined,
-    UnorderedListOutlined,
-    SortAscendingOutlined,
-    DownOutlined,
-    CopyOutlined
-} from '@ant-design/icons';
+    ArrowUpAZ,
+    Blocks,
+    Boxes,
+    Building2,
+    ChevronDown,
+    Cloud,
+    Clock,
+    Copy,
+    Database,
+    Ellipsis,
+    ExternalLink,
+    Globe,
+    Laptop,
+    LayoutGrid,
+    List,
+    Palette,
+    Pencil,
+    Plus,
+    Search,
+    Settings,
+    Share2,
+    Trash2,
+    User,
+    Waypoints,
+    Workflow,
+} from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { dataRegistry } from '../data/DataRegistry';
-import { unifiedStorage } from '../services/UnifiedStorageService';
 import type { DiagramMetadata } from '../services/storage/types';
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import type { ManageStorageProvider } from '@/components/ui/ManageTopToolbar';
 import { useAuth } from '@/context/useAuth';
+import {
+    coerceFilterView,
+    createTemplateSeed,
+    detectDiagramType,
+    filterAndSortItems,
+    getNodeCount,
+    isTemplateItem,
+    loadDataRegistry,
+    loadSupabaseClient,
+    loadUnifiedStorage,
+    loadWorkspaceItems,
+    readStoredCloudProvider,
+    type FilterViewType,
+    type SortKey,
+    type TemplateKey,
+    type UnifiedDiagramItem,
+    type ViewMode,
+} from './diagramManagementPage.helpers';
 // PRESET_MAP 已迁移到 Supabase system_templates，仅在 handleCreateTemplate 中保留最小依赖
 
 import './WorkspaceDashboard.css';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { upsertDiagramConfigIndex } from '@/core/utils/diagramTypeStorage';
-import { coerceRemoteTemplateMetadata } from '@/core/utils/remoteTemplateMetadata';
+import { safeLog } from '@/core/utils/consoleCleanup';
+import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
@@ -52,83 +68,21 @@ const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(mo
 
 const RemoteDiagramCover = React.lazy(() => import('@/components/shared/RemoteDiagramCover'));
 
-let supabaseModulePromise: Promise<typeof import('@/services/supabase')> | null = null;
-let shareServiceModulePromise: Promise<typeof import('../services/ShareService')> | null = null;
-
-const loadSupabaseClient = async () => {
-    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        return null;
-    }
-    supabaseModulePromise ??= import('@/services/supabase');
-    const { supabase } = await supabaseModulePromise;
-    return supabase;
-};
-
-const loadShareService = async () => {
-    shareServiceModulePromise ??= import('../services/ShareService');
-    const { shareService } = await shareServiceModulePromise;
-    return shareService;
-};
-
-// --- Unified Data Types ---
-type DataSourceType = 'local' | 'supabase' | 's3' | 'template' | 'general_template';
-type FilterViewType = 'recent' | 'local' | 'cloud' | 'shared' | 'templates' | 'general_templates';
-type ViewMode = 'grid' | 'list';
-type SortKey = 'updated' | 'name' | 'type';
-
-const FILTER_VIEW_TYPES = new Set<FilterViewType>(['recent', 'local', 'cloud', 'shared', 'templates', 'general_templates']);
-
-const coerceFilterView = (value: unknown): FilterViewType => (
-    typeof value === 'string' && FILTER_VIEW_TYPES.has(value as FilterViewType)
-        ? value as FilterViewType
-        : 'recent'
-);
-
-interface UnifiedDiagramItem {
-    id: string;
-    title: string;
-    updatedAt: number;
-    source: DataSourceType;
-    role: string;
-    raw: StandardDiagramData | DiagramMetadata; 
-}
-
-// --- Helpers ---
-function detectDiagramType(item: UnifiedDiagramItem): string {
-    if (item.source !== 'local') return 'default';
-    const raw = item.raw as StandardDiagramData;
-    const t = ((raw.metadata as any)?.type || raw.type || '').toLowerCase();
-    if (t.includes('mind')) return 'mindmap';
-    if (t.includes('time') || t.includes('gantt')) return 'timeline';
-    if (t.includes('arch') || t.includes('infra') || t.includes('system')) return 'architecture';
-    // Check title for hints
-    const title = (item.title || '').toLowerCase();
-    if (title.includes('架构') || title.includes('architecture')) return 'architecture';
-    if (title.includes('脑图') || title.includes('mind')) return 'mindmap';
-    if (title.includes('时间') || title.includes('甘特') || title.includes('timeline')) return 'timeline';
-    return 'flowchart';
-}
-
-function getNodeCount(item: UnifiedDiagramItem): number | null {
-    if (item.source !== 'local') return null;
-    const raw = item.raw as StandardDiagramData;
-    return raw.nodes?.length || null;
-}
-
 const TYPE_ICON_MAP: Record<string, React.ReactNode> = {
-    flowchart: <DeploymentUnitOutlined />,
-    mindmap: <GatewayOutlined />,
+    flowchart: <Workflow size={18} strokeWidth={2} />,
+    mindmap: <Waypoints size={18} strokeWidth={2} />,
     timeline: <Clock size={18} strokeWidth={2} />,
-    architecture: <BlockOutlined />,
-    default: <ApartmentOutlined />,
+    architecture: <Blocks size={18} strokeWidth={2} />,
+    default: <Building2 size={18} strokeWidth={2} />,
 };
 
 const WorkspaceDashboardPage: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+    const browserLocation = typeof window === 'undefined' ? null : window.location as LocationLike;
     const { user } = useAuth();
     const { modal } = App.useApp();
-    const initialView = coerceFilterView(searchParams.get('view') || new URLSearchParams(window.location.search).get('view'));
+    const initialView = coerceFilterView(searchParams.get('view') || getQueryOrHashParamFromLocation(browserLocation, 'view'));
     
     // --- State ---
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -142,7 +96,7 @@ const WorkspaceDashboardPage: React.FC = () => {
     const [cloudProvider, setCloudProvider] = useState<ManageStorageProvider>(() => {
         const p = searchParams.get('provider');
         if (p === 's3' || p === 'supabase') return p;
-        return unifiedStorage.currentProviderId;
+        return readStoredCloudProvider();
     });
 
     // --- Context Menu State (Phase 1.3) ---
@@ -157,7 +111,7 @@ const WorkspaceDashboardPage: React.FC = () => {
 
     const openDiagramInNewTab = useCallback((item: UnifiedDiagramItem) => {
         const rawId = item.id || (item.raw as { id?: unknown })?.id;
-        const diagramId = typeof rawId === 'string' ? rawId.trim() : String(rawId || '').trim();
+        const diagramId = coerceDiagramId(rawId);
         if (!diagramId) {
             appMessage.error('Unable to open diagram: missing diagram id.');
             return;
@@ -166,7 +120,7 @@ const WorkspaceDashboardPage: React.FC = () => {
     }, []);
 
     const navigateToDiagram = useCallback((id: unknown) => {
-        const diagramId = typeof id === 'string' ? id.trim() : String(id || '').trim();
+        const diagramId = coerceDiagramId(id);
         if (!diagramId) {
             appMessage.error('Unable to open diagram: missing diagram id.');
             return;
@@ -191,101 +145,10 @@ const WorkspaceDashboardPage: React.FC = () => {
     const loadAllData = useCallback(async () => {
         setLoading(true);
         try {
-            const newItems: UnifiedDiagramItem[] = [];
-
-            // 1. Load Local
-            await dataRegistry.initialize();
-            const localService = dataRegistry.getDataService();
-            const localResult = localService.queryDiagrams({});
-            localResult.data.forEach(d => {
-                newItems.push({
-                    id: `local_${d.id}`,
-                    title: d.name || d.metadata?.title || 'Untitled',
-                    updatedAt: new Date(d.metadata?.updatedAt || Date.now()).getTime(),
-                    source: 'local',
-                    role: 'owner',
-                    raw: d
-                });
-            });
-
-            // 2. Load Cloud
-            const cloudStorageProvider = unifiedStorage.getProvider(cloudProvider);
-            if (cloudStorageProvider.isConfigured() && (cloudProvider !== 'supabase' || user)) {
-                try {
-                    const cloudResults = await unifiedStorage.listDiagrams();
-                    cloudResults.forEach(d => {
-                        newItems.push({
-                            id: `${cloudProvider}_${d.id}`,
-                            title: d.title || 'Untitled',
-                            updatedAt: d.updatedAt?.getTime() || 0,
-                            source: cloudProvider,
-                            role: d.role || 'owner',
-                            raw: d
-                        });
-                    });
-                } catch (e) {
-                    console.error("Cloud fetch failed", e);
-                }
-            }
-
-            // 3. Load Shared (Supabase)
-            if (cloudProvider === 'supabase' && user) {
-                try {
-                    const shareService = await loadShareService();
-                    const sharedResults = await shareService.listSharedWithMe();
-                    sharedResults.forEach(d => {
-                        if (!newItems.find(item => item.id === `supabase_${d.id}`)) {
-                            newItems.push({
-                                id: `supabase_shared_${d.id}`,
-                                title: d.title || 'Untitled',
-                                updatedAt: d.updatedAt?.getTime() || 0,
-                                source: 'supabase',
-                                role: 'viewer',
-                                raw: d
-                            });
-                        }
-                    });
-                } catch (e) {
-                    console.error("Shared fetch failed", e);
-                }
-            }
-
-            // 4. 仅在用户进入模板视图时加载 Supabase system_templates，避免默认工作台首屏拉取云存储 SDK。
-            if (activeView === 'templates' || activeView === 'general_templates') {
-                const supabase = await loadSupabaseClient();
-                if (supabase) {
-                    try {
-                        const { data } = await supabase
-                            .from('system_templates')
-                            .select('id, title, category, tags, sort_order, thumbnail_url')
-                            .eq('is_active', true)
-                            .order('sort_order', { ascending: true })
-                            .order('created_at', { ascending: false });
-
-                        if (data) {
-                            data.forEach(t => {
-                                const isGeneral = t.category === 'general';
-                                newItems.push({
-                                    id: `template_${t.id}`,
-                                    title: t.title,
-                                    updatedAt: 0,
-                                    source: isGeneral ? 'general_template' : 'template',
-                                    role: 'template',
-                                    raw: coerceRemoteTemplateMetadata(t) as any
-                                });
-                            });
-                        }
-                    } catch(e) {
-                        console.error("Templates fetch failed", e);
-                    }
-                }
-            }
-
-            // Sort by most recent
-            newItems.sort((a, b) => b.updatedAt - a.updatedAt);
-            setUnifiedItems(newItems);
+            const nextItems = await loadWorkspaceItems(activeView, cloudProvider, user);
+            setUnifiedItems(nextItems);
         } catch (error) {
-            console.error("Failed to load dashboard data", error);
+            safeLog.error('Failed to load dashboard data', redactSensitiveLogValue(error));
             appMessage.error("Failed to load workspace data");
         } finally {
             setLoading(false);
@@ -322,6 +185,8 @@ const WorkspaceDashboardPage: React.FC = () => {
                         .eq('id', rawObj.id)
                         .single();
                     if (!error && data && data.content) {
+                        const dataRegistry = await loadDataRegistry();
+                        await dataRegistry.initialize();
                         const localService = dataRegistry.getDataService();
                         const clonedId = crypto.randomUUID();
                         const cloned = localService.registerRemoteDiagram(data.content, {
@@ -357,6 +222,11 @@ const WorkspaceDashboardPage: React.FC = () => {
 
         const hide = appMessage.loading("Loading diagram from cloud...", 0);
         try {
+            const [unifiedStorage, dataRegistry] = await Promise.all([
+                loadUnifiedStorage(),
+                loadDataRegistry(),
+            ]);
+            await dataRegistry.initialize();
             const rawObj = item.raw as DiagramMetadata;
             const savedDiagram = await unifiedStorage.loadDiagram(rawObj.id);
             if (savedDiagram) {
@@ -410,10 +280,13 @@ const WorkspaceDashboardPage: React.FC = () => {
             onOk: async () => {
                 try {
                     if (item.source === 'local') {
+                        const dataRegistry = await loadDataRegistry();
+                        await dataRegistry.initialize();
                         const localService = dataRegistry.getDataService();
                         const rawObj = item.raw as StandardDiagramData;
                         localService.deleteDiagram(rawObj.id);
                     } else {
+                        const unifiedStorage = await loadUnifiedStorage();
                         const rawObj = item.raw as DiagramMetadata;
                         await unifiedStorage.deleteDiagram(rawObj.id);
                     }
@@ -427,74 +300,12 @@ const WorkspaceDashboardPage: React.FC = () => {
     };
 
     // Advanced Creation Router mapping to correct domains
-    const handleCreateTemplate = (templateKey: 'flowchart' | 'architecture' | 'mindmap' | 'timeline' | 'blank') => {
-        let templateData: StandardDiagramData | null = null;
-        
-        // 使用内联骨架数据，不依赖本地 JSON 文件打包
-        if (templateKey === 'flowchart') {
-            templateData = {
-                id: crypto.randomUUID(), name: 'New Flowchart', type: 'flowchart', version: '2.0',
-                nodes: [], edges: [],
-                layout: { type: 'custom', direction: 'TB', spacing: { horizontal: 80, vertical: 60 }, padding: { horizontal: 24, vertical: 16 } },
-                theme: { name: 'light', displayName: 'Light Theme', domains: {} }
-            };
-        } else if (templateKey === 'architecture') {
-            templateData = {
-                id: crypto.randomUUID(), name: 'New Architecture Diagram', type: 'architecture', version: '2.0',
-                nodes: [], edges: [],
-                layout: { type: 'custom', direction: 'LR', spacing: { horizontal: 120, vertical: 80 }, padding: { horizontal: 24, vertical: 16 } },
-                theme: { name: 'light', displayName: 'Light Theme', domains: {} }
-            };
-        } else if (templateKey === 'mindmap') {
-            templateData = {
-                id: crypto.randomUUID(),
-                name: 'Mind Map Pro',
-                type: 'mindmap',
-                version: '2.0',
-                nodes: [{ 
-                    id: 'root', 
-                    type: 'mindmap', 
-                    domain: 'mindmap',
-                    description: 'Central Idea',
-                    position: { x: 0, y: 0 }, 
-                    data: { label: 'Central Idea', direction: 'LR' } 
-                }],
-                edges: [],
-                layout: { type: 'custom', direction: 'LR', spacing: { horizontal: 50, vertical: 20 }, padding: { horizontal: 20, vertical: 20 } },
-                theme: { name: 'light', displayName: 'Light Theme', domains: {} }
-            };
-        } else if (templateKey === 'timeline') {
-            templateData = {
-                id: crypto.randomUUID(),
-                name: 'Project Timeline',
-                type: 'timeline',
-                version: '2.0',
-                nodes: [{ 
-                    id: 'root', 
-                    type: 'timeline', 
-                    domain: 'timeline',
-                    description: 'Project Launch',
-                    position: { x: 0, y: 0 }, 
-                    data: { label: 'Project Launch', type: 'gantt' } 
-                }],
-                edges: [],
-                layout: { type: 'custom', direction: 'LR', spacing: { horizontal: 50, vertical: 20 }, padding: { horizontal: 20, vertical: 20 } },
-                theme: { name: 'light', displayName: 'Light Theme', domains: {} }
-            };
-        } else if (templateKey === 'blank') {
-             templateData = {
-                id: crypto.randomUUID(),
-                name: 'Blank Canvas',
-                type: 'flowchart',
-                version: '2.0',
-                nodes: [],
-                edges: [],
-                layout: { type: 'custom', direction: 'TB', spacing: { horizontal: 50, vertical: 50 }, padding: { horizontal: 20, vertical: 20 } },
-                theme: { name: 'light', displayName: 'Light Theme', domains: {} }
-            };
-        }
+    const handleCreateTemplate = async (templateKey: TemplateKey) => {
+        const templateData = createTemplateSeed(templateKey);
 
         if (templateData) {
+            const dataRegistry = await loadDataRegistry();
+            await dataRegistry.initialize();
             const localService = dataRegistry.getDataService();
             const cloned = JSON.parse(JSON.stringify(templateData));
             cloned.id = crypto.randomUUID(); // ensure fresh ID
@@ -522,58 +333,19 @@ const WorkspaceDashboardPage: React.FC = () => {
     };
 
     // --- Computed Views ---
-    const filteredItems = useMemo(() => {
-        let viewFiltered = unifiedItems;
-        switch (activeView) {
-            case 'recent':
-                viewFiltered = unifiedItems.filter(i => i.source !== 'template' && i.source !== 'general_template').slice(0, 30);
-                break;
-            case 'local':
-                viewFiltered = unifiedItems.filter(i => i.source === 'local');
-                break;
-            case 'cloud':
-                viewFiltered = unifiedItems.filter(i => i.source === 's3' || i.source === 'supabase');
-                break;
-            case 'shared':
-                viewFiltered = unifiedItems.filter(i => i.role === 'viewer');
-                break;
-            case 'templates':
-                viewFiltered = unifiedItems.filter(i => i.source === 'template');
-                break;
-            case 'general_templates':
-                viewFiltered = unifiedItems.filter(i => i.source === 'general_template');
-                break;
-        }
-
-        if (searchTerm.trim()) {
-            const term = searchTerm.toLowerCase();
-            viewFiltered = viewFiltered.filter(i => (i.title || '').toLowerCase().includes(term));
-        }
-
-        // Apply sorting
-        const sorted = [...viewFiltered];
-        switch (sortKey) {
-            case 'name':
-                sorted.sort((a, b) => a.title.localeCompare(b.title));
-                break;
-            case 'type':
-                sorted.sort((a, b) => detectDiagramType(a).localeCompare(detectDiagramType(b)));
-                break;
-            case 'updated':
-            default:
-                sorted.sort((a, b) => b.updatedAt - a.updatedAt);
-                break;
-        }
-        return sorted;
-    }, [unifiedItems, activeView, searchTerm, sortKey]);
+    const filteredItems = useMemo(
+        () => filterAndSortItems(unifiedItems, activeView, searchTerm, sortKey),
+        [unifiedItems, activeView, searchTerm, sortKey]
+    );
 
     // --- Settings Menu ---
     const settingsMenu: MenuProps['items'] = [
         {
             key: 's3',
             label: 'Use S3 Cloud Storage',
-            icon: <CloudOutlined />,
-            onClick: () => {
+            icon: <Cloud size={16} strokeWidth={2} />,
+            onClick: async () => {
+                const unifiedStorage = await loadUnifiedStorage();
                 unifiedStorage.setProvider('s3');
                 setCloudProvider('s3');
                 appMessage.info('Switched purely to S3 Backend');
@@ -582,8 +354,9 @@ const WorkspaceDashboardPage: React.FC = () => {
         {
             key: 'supabase',
             label: 'Use Supabase (Social)',
-            icon: <ApiOutlined />,
-            onClick: () => {
+            icon: <Database size={16} strokeWidth={2} />,
+            onClick: async () => {
+                const unifiedStorage = await loadUnifiedStorage();
                 unifiedStorage.setProvider('supabase');
                 setCloudProvider('supabase');
                 appMessage.info('Switched purely to Supabase');
@@ -593,28 +366,25 @@ const WorkspaceDashboardPage: React.FC = () => {
         {
             key: 'login',
             label: user ? `Logged in as ${user.email}` : 'Login via Supabase',
-            icon: <UserOutlined />,
+            icon: <User size={16} strokeWidth={2} />,
             onClick: () => !user && setIsAuthModalOpen(true)
         }
     ];
 
-    const isTemplate = (item: UnifiedDiagramItem) =>
-        item.source === 'template' || item.source === 'general_template';
-
     const getCardMenu = (item: UnifiedDiagramItem): MenuProps['items'] => {
         // 模版专用菜单
-        if (isTemplate(item)) {
+        if (isTemplateItem(item)) {
             return [
-                { key: 'apply_template', label: '🚀 应用此模版', icon: <CopyOutlined /> },
+                { key: 'apply_template', label: '🚀 应用此模版', icon: <Copy size={16} strokeWidth={2} /> },
             ];
         }
         // 普通图表菜单
         const items: MenuProps['items'] = [
-            { key: 'open_new', label: 'Open in new tab', icon: <ShareAltOutlined /> }
+            { key: 'open_new', label: 'Open in new tab', icon: <Share2 size={16} strokeWidth={2} /> }
         ];
         if (item.role === 'owner') {
             items.push({ type: 'divider' });
-            items.push({ key: 'delete', danger: true, label: 'Delete', icon: <DeleteOutlined /> });
+            items.push({ key: 'delete', danger: true, label: 'Delete', icon: <Trash2 size={16} strokeWidth={2} /> });
         }
         return items;
     };
@@ -656,7 +426,7 @@ const WorkspaceDashboardPage: React.FC = () => {
     const CustomEmptyState = () => (
         <div className="workspace-empty-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 24px', textAlign: 'center' }}>
             <div className="workspace-empty-art" style={{ width: 48, height: 48, border: '1px dashed var(--vz-border)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                <PlusOutlined style={{ color: 'var(--vz-text-secondary)', fontSize: 16 }} />
+                <Plus size={16} strokeWidth={2} style={{ color: 'var(--vz-text-secondary)' }} />
             </div>
             <div className="workspace-empty-title" style={{ fontSize: 15, fontWeight: 600, color: 'var(--vz-text-primary)', marginBottom: 4 }}>
                 No diagrams
@@ -665,7 +435,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                 Get started by creating a new document or pressing Ctrl+K.
             </div>
             <button className="create-btn-primary" onClick={() => handleCreateTemplate('blank')}>
-                <PlusOutlined className="plus-icon" /> New Diagram
+                <Plus className="plus-icon" size={16} strokeWidth={2} /> New Diagram
             </button>
         </div>
     );
@@ -699,7 +469,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                 
                 <div className="workspace-header-search-container">
                     <div className="workspace-search">
-                        <SearchOutlined style={{ color: 'var(--vz-brand-from)', opacity: 0.7 }}/>
+                        <Search size={16} strokeWidth={2} style={{ color: 'var(--vz-brand-from)', opacity: 0.7 }}/>
                         <input 
                             placeholder="Find your ideas..." 
                             value={searchTerm}
@@ -719,7 +489,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                         aria-label="Toggle theme"
                         title="Toggle theme"
                     >
-                        <BgColorsOutlined />
+                        <Palette size={16} strokeWidth={2} />
                     </button>
                     <Dropdown
                         menu={{
@@ -732,12 +502,12 @@ const WorkspaceDashboardPage: React.FC = () => {
                         placement="bottomRight"
                     >
                         <button className="workspace-icon-btn" aria-label="Language" title="Language">
-                            <GlobalOutlined />
+                            <Globe size={16} strokeWidth={2} />
                         </button>
                     </Dropdown>
                     <Dropdown menu={{ items: settingsMenu }} trigger={['click']} placement="bottomRight">
                         <button className="workspace-settings-trigger" aria-label="Settings">
-                            {user ? <Avatar size={24} src={user.user_metadata?.avatar_url} icon={<UserOutlined />} /> : <SettingOutlined />}
+                            {user ? <Avatar size={24} src={user.user_metadata?.avatar_url} icon={<User size={14} strokeWidth={2} />} /> : <Settings size={16} strokeWidth={2} />}
                         </button>
                     </Dropdown>
                 </div>
@@ -768,8 +538,8 @@ const WorkspaceDashboardPage: React.FC = () => {
                                 placement="bottomRight"
                             >
                                 <button className="create-btn-primary" onClick={() => handleCreateTemplate('blank')}>
-                                    <PlusOutlined className="plus-icon" />
-                                    New Diagram <DownOutlined style={{ fontSize: '10px', marginLeft: '4px' }} />
+                                    <Plus className="plus-icon" size={16} strokeWidth={2} />
+                                    New Diagram <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: '4px' }} />
                                 </button>
                             </Dropdown>
                         </div>
@@ -786,23 +556,23 @@ const WorkspaceDashboardPage: React.FC = () => {
                                 <span className="filter-tab-count">{unifiedItems.filter(i => i.source !== 'template' && i.source !== 'general_template').length}</span>
                             </div>
                             <div className={`filter-tab ${activeView === 'local' ? 'active' : ''}`} onClick={() => setActiveView('local')}>
-                                <LaptopOutlined /> Local
+                                <Laptop size={14} strokeWidth={2} /> Local
                                 <span className="filter-tab-count">{localCount}</span>
                             </div>
                             <div className={`filter-tab ${activeView === 'cloud' ? 'active' : ''}`} onClick={() => setActiveView('cloud')}>
-                                <CloudOutlined /> Cloud
+                                <Cloud size={14} strokeWidth={2} /> Cloud
                                 <span className="filter-tab-count">{cloudCount}</span>
                             </div>
                             <div className={`filter-tab ${activeView === 'shared' ? 'active' : ''}`} onClick={() => setActiveView('shared')}>
-                                <ShareAltOutlined /> Shared
+                                <Share2 size={14} strokeWidth={2} /> Shared
                                 <span className="filter-tab-count">{sharedCount}</span>
                             </div>
                             <div className={`filter-tab ${activeView === 'templates' ? 'active' : ''}`} onClick={() => setActiveView('templates')}>
-                                <AppstoreOutlined /> 行业模板库
+                                <LayoutGrid size={14} strokeWidth={2} /> 行业模板库
                                 <span className="filter-tab-count">{unifiedItems.filter(i => i.source === 'template').length}</span>
                             </div>
                             <div className={`filter-tab ${activeView === 'general_templates' ? 'active' : ''}`} onClick={() => setActiveView('general_templates')}>
-                                <BlockOutlined /> 通用模版
+                                <Blocks size={14} strokeWidth={2} /> 通用模版
                                 <span className="filter-tab-count">{unifiedItems.filter(i => i.source === 'general_template').length}</span>
                             </div>
                         </div>
@@ -820,7 +590,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                                 trigger={['click']}
                             >
                                 <button className="workspace-icon-btn" title="Sort by">
-                                    <SortAscendingOutlined />
+                                    <ArrowUpAZ size={16} strokeWidth={2} />
                                 </button>
                             </Dropdown>
                             <div className="view-toggle">
@@ -829,14 +599,14 @@ const WorkspaceDashboardPage: React.FC = () => {
                                     onClick={() => setViewMode('grid')}
                                     title="Grid view"
                                 >
-                                    <AppstoreOutlined />
+                                    <LayoutGrid size={16} strokeWidth={2} />
                                 </button>
                                 <button
                                     className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
                                     onClick={() => setViewMode('list')}
                                     title="List view"
                                 >
-                                    <UnorderedListOutlined />
+                                    <List size={16} strokeWidth={2} />
                                 </button>
                             </div>
                         </div>
@@ -865,7 +635,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                                             <span className={`type-badge ${diagramType}`}>{diagramType}</span>
                                             <span className="list-row-time">{formatTimeAgo(item.updatedAt)}</span>
                                             {nodeCount != null && (
-                                                <span className="node-count-chip"><NodeIndexOutlined /> {nodeCount}</span>
+                                                <span className="node-count-chip"><Boxes size={14} strokeWidth={2} /> {nodeCount}</span>
                                             )}
                                             <div className="diagram-card-actions" style={{ position: 'relative', opacity: 1 }}>
                                                 <Dropdown
@@ -874,7 +644,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                                                     placement="bottomRight"
                                                 >
                                                     <button className="action-btn-glass" onClick={e => e.stopPropagation()}>
-                                                        <MoreOutlined />
+                                                        <Ellipsis size={16} strokeWidth={2} />
                                                     </button>
                                                 </Dropdown>
                                             </div>
@@ -884,18 +654,18 @@ const WorkspaceDashboardPage: React.FC = () => {
 
                                 return (
                                     <div className="diagram-card" key={item.id}
-                                        onClick={() => !isTemplate(item) && handleOpenDiagram(item)}
-                                        style={{ cursor: isTemplate(item) ? 'default' : 'pointer' }}
+                                        onClick={() => !isTemplateItem(item) && handleOpenDiagram(item)}
+                                        style={{ cursor: isTemplateItem(item) ? 'default' : 'pointer' }}
                                         onContextMenu={(e) => handleContextMenu(e, item)}
                                     >
                                         {/* Source badge */}
                                         {item.source !== 'local' && (
                                             <div className={`source-badge ${item.source}`}>
-                                                {isTemplate(item)
-                                                    ? <><AppstoreOutlined /> TEMPLATE</>
+                                                {isTemplateItem(item)
+                                                    ? <><LayoutGrid size={14} strokeWidth={2} /> TEMPLATE</>
                                                     : item.source === 's3'
-                                                        ? <><CloudOutlined /> S3</>
-                                                        : <><ApiOutlined /> CLOUD</>
+                                                        ? <><Cloud size={14} strokeWidth={2} /> S3</>
+                                                        : <><Database size={14} strokeWidth={2} /> CLOUD</>
                                                 }
                                             </div>
                                         )}
@@ -907,7 +677,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                                                 placement="bottomRight"
                                             >
                                                 <button className="action-btn-glass" onClick={e => e.stopPropagation()}>
-                                                    <MoreOutlined />
+                                                    <Ellipsis size={16} strokeWidth={2} />
                                                 </button>
                                             </Dropdown>
                                         </div>
@@ -970,10 +740,10 @@ const WorkspaceDashboardPage: React.FC = () => {
                                                     </React.Suspense>
                                                 )}
                                                 {/* 模版封面 hover 遮罩：显示「应用」按钮 */}
-                                                {isTemplate(item) && (
+                                                {isTemplateItem(item) && (
                                                     <div className="template-apply-overlay" onClick={() => handleOpenDiagram(item)}>
                                                         <button className="template-apply-btn">
-                                                            <CopyOutlined /> 应用模版
+                                                            <Copy size={16} strokeWidth={2} /> 应用模版
                                                         </button>
                                                     </div>
                                                 )}
@@ -990,7 +760,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                                                 </div>
                                                 {nodeCount != null && (
                                                     <span className="node-count-chip">
-                                                        <NodeIndexOutlined /> {nodeCount}
+                                                        <Boxes size={14} strokeWidth={2} /> {nodeCount}
                                                     </span>
                                                 )}
                                                 {item.role === 'viewer' && <span style={{ color: '#8b5cf6', fontWeight: 600, fontSize: 11 }}>Shared</span>}
@@ -1013,19 +783,19 @@ const WorkspaceDashboardPage: React.FC = () => {
                     onClick={e => e.stopPropagation()}
                 >
                     <button className="ctx-menu-item" onClick={() => { handleOpenDiagram(ctxMenu.item); setCtxMenu(null); }}>
-                        <EditOutlined /> Open
+                        <Pencil size={14} strokeWidth={2} /> Open
                     </button>
                     <button className="ctx-menu-item" onClick={() => {
                         openDiagramInNewTab(ctxMenu.item);
                         setCtxMenu(null);
                     }}>
-                        <ExportOutlined /> Open in new tab
+                        <ExternalLink size={14} strokeWidth={2} /> Open in new tab
                     </button>
                     {ctxMenu.item.role === 'owner' && (
                         <>
                             <div className="ctx-menu-divider" />
                             <button className="ctx-menu-item danger" onClick={(e) => { handleDeleteDiagram(e as any, ctxMenu.item); setCtxMenu(null); }}>
-                                <DeleteOutlined /> Delete
+                                <Trash2 size={14} strokeWidth={2} /> Delete
                             </button>
                         </>
                     )}

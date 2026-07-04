@@ -7,6 +7,7 @@ import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import WebSocket from 'ws';
+import { resolveRouteBudget, shouldRetryEvaluateAfterTimeout } from './smokeRouteBudgetUtils.mjs';
 
 const HOST = '127.0.0.1';
 const parsePortEnv = (name, defaultValue) => {
@@ -407,20 +408,6 @@ const selectedRoutes = ROUTE_FILTERS.length > 0
   ? routes.filter((route) => ROUTE_FILTERS.includes(route.name))
   : routes;
 
-const defaultRouteBudgets = {
-  management: { criticalAssets: 45, criticalDecodedKB: 2050, readyMs: 6000 },
-  'management-templates': { criticalAssets: 46, criticalDecodedKB: 2150, readyMs: 6500 },
-  'default-diagram': { criticalAssets: 92, criticalDecodedKB: 3900, readyMs: 4500 },
-  'wms-process-large-diagram': { criticalAssets: 105, criticalDecodedKB: 4700, readyMs: 6500 },
-  'storage-config': { criticalAssets: 40, criticalDecodedKB: 2700, readyMs: 3000 },
-  'shared-missing-token': { criticalAssets: 35, criticalDecodedKB: 2200, readyMs: 3000 },
-  'theme-colors': { criticalAssets: 40, criticalDecodedKB: 1200, readyMs: 2500 },
-  'theme-side-by-side': { criticalAssets: 40, criticalDecodedKB: 1200, readyMs: 2500 },
-  'docs-preview': { criticalAssets: 30, criticalDecodedKB: 1100, readyMs: 2500 },
-  'warehouse-3d': { criticalAssets: 46, criticalDecodedKB: 2800, readyMs: 4000 },
-  'unified-designer': { criticalAssets: 100, criticalDecodedKB: 3800, readyMs: 3500 },
-};
-
 const log = (message) => {
   process.stdout.write(`${message}\n`);
 };
@@ -677,6 +664,7 @@ class CdpSession {
     this.eventWaiters = new Map();
     this.logs = [];
     this.networkIssues = [];
+    this.pendingLogEnrichments = [];
     this.requests = new Map();
   }
 
@@ -712,6 +700,50 @@ class CdpSession {
       this.send('Log.enable'),
       this.send('Network.enable'),
     ]);
+    await this.send('Runtime.evaluate', {
+      expression: `
+        (function () {
+          if (window.__smokeErrorCaptureInstalled) return;
+          window.__smokeErrorCaptureInstalled = true;
+          window.__smokeErrorCapture = [];
+          window.__smokeErrorCaptureLimit = 50;
+
+          const record = (entry) => {
+            window.__smokeErrorCapture.push({
+              ...entry,
+              at: Date.now(),
+            });
+            if (window.__smokeErrorCapture.length > window.__smokeErrorCaptureLimit) {
+              window.__smokeErrorCapture.shift();
+            }
+          };
+
+          window.addEventListener('error', (event) => {
+            const err = event?.error;
+            record({
+              type: 'error',
+              message: err?.message || String(event?.message || 'unknown error'),
+              stack: err?.stack || null,
+              filename: event?.filename || null,
+              lineno: event?.lineno || null,
+              colno: event?.colno || null,
+              source: event?.type || 'window',
+            });
+          });
+
+          window.addEventListener('unhandledrejection', (event) => {
+            const reason = event?.reason;
+            record({
+              type: 'unhandledrejection',
+              message: reason?.message || String(reason || 'unknown rejection'),
+              stack: reason?.stack || null,
+              source: 'unhandledrejection',
+            });
+          });
+        })();
+      `,
+      awaitPromise: true,
+    }).catch(() => {});
     if (VIEWPORT) {
       await this.send('Emulation.setDeviceMetricsOverride', {
         width: VIEWPORT.width,
@@ -753,13 +785,78 @@ class CdpSession {
       if (waiters.length === 0) this.eventWaiters.delete(message.method);
     }
 
+    const describeConsoleArg = (arg) => {
+      if (!arg) return '';
+      if (arg.value !== undefined) return String(arg.value);
+      if (arg.description) return String(arg.description);
+      if (arg.preview?.description) return String(arg.preview.description);
+      if (arg.type === 'object' && arg.className) return `[${arg.className}]`;
+      return '';
+    };
+
     if (message.method === 'Runtime.consoleAPICalled') {
       const { type, args = [] } = message.params;
       if (['warning', 'warn', 'error'].includes(type)) {
-        this.logs.push({
+        const formattedArgs = args.map((arg) => describeConsoleArg(arg)).filter(Boolean);
+        const includeRaw = process.env.SMOKE_LOG_RAW === '1';
+        const logEntry = {
           level: type === 'warning' ? 'warn' : type,
-          message: args.map((arg) => arg.value ?? arg.description ?? '').join(' '),
-        });
+          message: formattedArgs.length ? formattedArgs.join(' ') : `[${type}]`,
+          ...(includeRaw ? {
+            rawArgs: args.map((arg) => ({
+              type: arg.type,
+              objectId: arg.objectId,
+              value: arg.value,
+              description: arg.description,
+              className: arg.className,
+              preview: arg.preview
+                ? {
+                    type: arg.preview.type,
+                    subtype: arg.preview.subtype,
+                    description: arg.preview.description,
+                    overflow: arg.preview.overflow,
+                    properties: (arg.preview.properties || []).map((property) => ({
+                      name: property.name,
+                      type: property.type,
+                      value: property.value ? String(property.value.value ?? property.value.description ?? '') : undefined,
+                    })),
+                }
+                : undefined,
+            })),
+          } : {}),
+        };
+        const entryIndex = this.logs.push(logEntry) - 1;
+        const enrichObjectArg = async (arg, rawArg) => {
+          if (!arg.objectId || !includeRaw) return;
+          try {
+            const objectProperties = await this.send('Runtime.getProperties', {
+              objectId: arg.objectId,
+              ownProperties: true,
+            }, 2000);
+            const properties = objectProperties?.result || [];
+            const getValue = (name) => {
+              const matched = properties.find((property) => property.name === name);
+              const rawValue = matched?.value;
+              if (!rawValue) return undefined;
+              return rawValue.unserializableValue ?? rawValue.value ?? rawValue.description;
+            };
+            const objectSnapshot = {
+              name: getValue('name') ?? null,
+              message: getValue('message') ?? null,
+              stack: getValue('stack') ?? null,
+            };
+            if (!rawArg.rawSnapshot) {
+              rawArg.rawSnapshot = objectSnapshot;
+            }
+          } catch {
+            // Keep best-effort enrichment.
+          }
+        };
+
+        if (includeRaw) {
+          this.pendingLogEnrichments.push(...logEntry.rawArgs.map((rawArg, rawArgIndex) => enrichObjectArg(args[rawArgIndex], rawArg)));
+        }
+        this.logs[entryIndex] = logEntry;
       }
     }
 
@@ -774,9 +871,17 @@ class CdpSession {
     }
 
     if (message.method === 'Runtime.exceptionThrown') {
+      const { exceptionDetails } = message.params || {};
+      const text = exceptionDetails?.text
+        || exceptionDetails?.exception?.description
+        || exceptionDetails?.exception?.value
+        || 'Unhandled browser exception';
+      const stack = exceptionDetails?.exception?.stackTrace?.callFrames
+        ?.map((frame) => `${frame.functionName || '<anonymous>'}@${frame.url}:${frame.lineNumber}:${frame.columnNumber}`)
+        .join('\n');
       this.logs.push({
         level: 'error',
-        message: message.params.exceptionDetails?.text || 'Unhandled browser exception',
+        message: stack ? `${text}\n${stack}` : text,
       });
     }
 
@@ -861,12 +966,23 @@ class CdpSession {
   }
 
   async evaluate(expression) {
-    const result = await this.send('Runtime.evaluate', {
+    const evaluateOnce = () => this.send('Runtime.evaluate', {
       expression,
       awaitPromise: true,
       returnByValue: true,
       timeout: 10000,
     });
+
+    let result;
+    try {
+      result = await evaluateOnce();
+    } catch (error) {
+      if (!shouldRetryEvaluateAfterTimeout(error, { isMobile: IS_MOBILE_SMOKE_SCRIPT })) {
+        throw error;
+      }
+      await delay(250);
+      result = await evaluateOnce();
+    }
 
     if (result.exceptionDetails) {
       fail('Route evaluation threw in the browser', result.exceptionDetails);
@@ -884,6 +1000,8 @@ class CdpSession {
 const waitForRouteState = async (session, route) => {
   const deadline = Date.now() + route.timeoutMs;
   let state;
+  let errorLoggerSnapshot;
+  let rawErrorCapture;
 
   while (Date.now() < deadline) {
     state = await session.evaluate(route.expression);
@@ -895,10 +1013,38 @@ const waitForRouteState = async (session, route) => {
     await delay(500);
   }
 
+  if (!errorLoggerSnapshot) {
+    try {
+      errorLoggerSnapshot = await session.evaluate(`
+        typeof window.__errorLogger?.getLogs === 'function'
+          ? window.__errorLogger.getLogs().slice(-20)
+          : null
+      `);
+    } catch {
+      errorLoggerSnapshot = null;
+    }
+  }
+  if (!rawErrorCapture) {
+    try {
+      rawErrorCapture = await session.evaluate('window.__smokeErrorCapture?.slice(-20) || null');
+    } catch {
+      rawErrorCapture = null;
+    }
+  }
+  if (session.pendingLogEnrichments.length > 0) {
+    try {
+      await Promise.allSettled(session.pendingLogEnrichments);
+    } catch {
+      // ignore best-effort enrichment failures
+    }
+  }
+
   fail(`Route smoke failed for ${route.name}`, {
     state,
     logs: session.logs.slice(-20),
     networkIssues: session.networkIssues.slice(-20),
+    errorLogger: errorLoggerSnapshot,
+    rawErrorCapture,
   });
 };
 
@@ -1087,40 +1233,20 @@ const printRouteReports = (results) => {
   }
 };
 
-const parsePositiveNumberEnv = (name) => {
-  const raw = process.env[name];
-  if (!raw) return undefined;
-  const value = Number(raw);
-  if (!Number.isFinite(value) || value <= 0) {
-    fail(`Invalid positive numeric env value for ${name}: ${raw}`);
-  }
-  return value;
-};
-
-const routeBudgetEnvPrefix = (routeName) => `SMOKE_BUDGET_${routeName.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}`;
-
-const resolveRouteBudget = (routeName) => {
-  const routeBudget = defaultRouteBudgets[routeName] || {};
-  const routePrefix = routeBudgetEnvPrefix(routeName);
-  return {
-    criticalAssets: parsePositiveNumberEnv(`${routePrefix}_CRITICAL_ASSETS`)
-      ?? parsePositiveNumberEnv('SMOKE_MAX_CRITICAL_ASSETS')
-      ?? routeBudget.criticalAssets,
-    criticalDecodedKB: parsePositiveNumberEnv(`${routePrefix}_CRITICAL_DECODED_KB`)
-      ?? parsePositiveNumberEnv('SMOKE_MAX_CRITICAL_DECODED_KB')
-      ?? routeBudget.criticalDecodedKB,
-    readyMs: parsePositiveNumberEnv(`${routePrefix}_READY_MS`)
-      ?? parsePositiveNumberEnv('SMOKE_MAX_READY_MS')
-      ?? routeBudget.readyMs,
-  };
-};
-
 const collectBudgetViolations = (results) => {
   if (!CHECK_BUDGET) return [];
 
   const violations = [];
   for (const result of results) {
-    const budget = resolveRouteBudget(result.name);
+    let budget;
+    try {
+      budget = resolveRouteBudget(result.name, {
+        env: process.env,
+        isMobile: IS_MOBILE_SMOKE_SCRIPT,
+      });
+    } catch (error) {
+      fail(error instanceof Error ? error.message : 'Failed to resolve route budget');
+    }
     const report = result.assetReport;
     const checks = [
       {
@@ -1166,7 +1292,10 @@ const printBudgetSummary = (results) => {
 
   log('\nRoute asset budget summary:');
   for (const result of results) {
-    const budget = resolveRouteBudget(result.name);
+    const budget = resolveRouteBudget(result.name, {
+      env: process.env,
+      isMobile: IS_MOBILE_SMOKE_SCRIPT,
+    });
     const report = result.assetReport;
     const sampleSummary = result.sampleCount > 1 && result.worstReport
       ? `, samples ${result.sampleCount}, worst ready ${result.worstReport.readyAt} ms`

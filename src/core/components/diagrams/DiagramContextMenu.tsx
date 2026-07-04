@@ -29,6 +29,7 @@ import {
 } from 'react-icons/md';
 import { FaRulerCombined } from 'react-icons/fa';
 import { Node, Edge } from '@xyflow/react';
+import { logDiagramContextMenuFailure } from './diagramContextMenuLogging';
 
 export interface ContextMenuProps {
   id: string;
@@ -70,7 +71,8 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
     const canPaste = (() => {
       try {
         return !!localStorage.getItem('flowchart-clipboard');
-      } catch {
+      } catch (error) {
+        logDiagramContextMenuFailure('checkClipboardAvailability', error);
         return false;
       }
     })();

@@ -2,6 +2,10 @@ import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectC
 import { IStorageProvider, DiagramMetadata, SavedDiagram } from './storage/types';
 import { coerceS3StorageConfig, redactSensitiveValue } from './storageSecurity';
 import { parseRemoteDiagramJson } from './remoteDiagramContent';
+import { safeLog } from '@/core/utils/consoleCleanup';
+import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from '@/core/utils/uiStorageLogging';
+import { safeJsonParseWithLimit } from '@/core/utils/jsonUtils';
 
 export interface StorageConfig {
     endpoint: string;
@@ -21,6 +25,7 @@ export interface StorageItem {
 
 const STORAGE_CONFIG_KEY = 'diagram_storage_config';
 const STORAGE_SECRET_SESSION_KEY = `${STORAGE_CONFIG_KEY}_secret`;
+const MAX_S3_STORAGE_CONFIG_JSON_CHARS = 2 * 1024 * 1024;
 
 const stripSecret = (config: StorageConfig): StorageConfig => ({
     ...config,
@@ -53,44 +58,116 @@ export class S3StorageProvider implements IStorageProvider {
         return !!this.client && !!this.config;
     }
 
+    private readPersistedConfig(): string | null {
+        try {
+            return localStorage.getItem(STORAGE_CONFIG_KEY);
+        } catch (error) {
+            logUiStorageReadFailure('S3StorageProvider.loadConfig', STORAGE_CONFIG_KEY, error);
+            throw error;
+        }
+    }
+
+    private readPersistedSessionSecret(): string {
+        try {
+            return sessionStorage.getItem(STORAGE_SECRET_SESSION_KEY) || '';
+        } catch (error) {
+            logUiStorageReadFailure('S3StorageProvider.readSessionSecret', STORAGE_SECRET_SESSION_KEY, error);
+            return '';
+        }
+    }
+
+    private persistSessionSecret(secretAccessKey: string, source: string): void {
+        try {
+            sessionStorage.setItem(STORAGE_SECRET_SESSION_KEY, secretAccessKey);
+        } catch (error) {
+            logUiStorageWriteFailure(source, STORAGE_SECRET_SESSION_KEY, error);
+        }
+    }
+
+    private persistSanitizedConfig(config: StorageConfig, source: string): void {
+        try {
+            localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(stripSecret(config)));
+        } catch (error) {
+            logUiStorageWriteFailure(source, STORAGE_CONFIG_KEY, error);
+        }
+    }
+
+    private clearPersistedConfig(): void {
+        try {
+            localStorage.removeItem(STORAGE_CONFIG_KEY);
+        } catch (error) {
+            logUiStorageWriteFailure('S3StorageProvider.clearPersistedConfig', STORAGE_CONFIG_KEY, error);
+        }
+
+        try {
+            sessionStorage.removeItem(STORAGE_SECRET_SESSION_KEY);
+        } catch (error) {
+            logUiStorageWriteFailure('S3StorageProvider.clearPersistedConfig', STORAGE_SECRET_SESSION_KEY, error);
+        }
+    }
+
+    private clearCachedSessionSecret(): void {
+        try {
+            sessionStorage.removeItem(STORAGE_SECRET_SESSION_KEY);
+        } catch (error) {
+            logUiStorageWriteFailure('S3StorageProvider.clearPersistedConfig', STORAGE_SECRET_SESSION_KEY, error);
+        }
+    }
+
     private loadConfig() {
         try {
-            const stored = localStorage.getItem(STORAGE_CONFIG_KEY);
+            const stored = this.readPersistedConfig();
             if (stored) {
-                const parsed = JSON.parse(stored);
-                const sessionSecret = sessionStorage.getItem(STORAGE_SECRET_SESSION_KEY) || '';
+                let readFailure: unknown = null;
+                const parsed = safeJsonParseWithLimit<unknown>(stored, null, {
+                    maxLength: MAX_S3_STORAGE_CONFIG_JSON_CHARS,
+                    onFailure: (error) => {
+                        readFailure = error;
+                        logUiStorageReadFailure('S3StorageProvider.loadConfig', STORAGE_CONFIG_KEY, error);
+                    },
+                    buildOversizeError: () => new Error('S3 storage config JSON is too large.'),
+                });
+                if (!parsed) {
+                    this.clearPersistedConfig();
+                    if (readFailure) {
+                        safeLog.error('Failed to load storage config', redactSensitiveLogValue(readFailure));
+                    }
+                    return;
+                }
+                const sessionSecret = this.readPersistedSessionSecret();
                 const safeConfig = coerceS3StorageConfig(parsed, sessionSecret);
                 if (!safeConfig) {
-                    localStorage.removeItem(STORAGE_CONFIG_KEY);
-                    sessionStorage.removeItem(STORAGE_SECRET_SESSION_KEY);
+                    this.clearPersistedConfig();
                     return;
                 }
 
                 if (safeConfig.secretAccessKey && !sessionSecret) {
-                    sessionStorage.setItem(STORAGE_SECRET_SESSION_KEY, safeConfig.secretAccessKey);
+                    this.persistSessionSecret(safeConfig.secretAccessKey, 'S3StorageProvider.loadConfig');
                 }
 
                 this.config = safeConfig;
                 if (parsed.secretAccessKey) {
-                    localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(stripSecret(this.config)));
+                    this.persistSanitizedConfig(this.config, 'S3StorageProvider.loadConfig');
                 }
                 this.initializeClient();
             }
         } catch (e) {
-            console.error("Failed to load storage config", e);
+            logUiStorageReadFailure('S3StorageProvider.loadConfig', STORAGE_CONFIG_KEY, e);
+            this.clearPersistedConfig();
+            safeLog.error('Failed to load storage config', redactSensitiveLogValue(e));
         }
     }
 
     saveConfig(config: StorageConfig) {
-        const existingSecret = sessionStorage.getItem(STORAGE_SECRET_SESSION_KEY) || '';
+        const existingSecret = this.readPersistedSessionSecret();
         const safeConfig = coerceS3StorageConfig(config, config.secretAccessKey || existingSecret);
         if (!safeConfig) {
             throw new Error('S3 configuration is invalid. Endpoint must use HTTPS or local HTTP, and bucket, region, access key, and secret are required.');
         }
 
         this.config = safeConfig;
-        sessionStorage.setItem(STORAGE_SECRET_SESSION_KEY, this.config.secretAccessKey);
-        localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(stripSecret(this.config)));
+        this.persistSessionSecret(this.config.secretAccessKey, 'S3StorageProvider.saveConfig');
+        this.persistSanitizedConfig(this.config, 'S3StorageProvider.saveConfig');
         this.initializeClient();
     }
 
@@ -144,7 +221,7 @@ export class S3StorageProvider implements IStorageProvider {
                     size: item.Size
                 }));
         } catch (error) {
-            console.error("List diagrams failed:", error);
+            safeLog.error('List diagrams failed:', redactSensitiveLogValue(error));
             throw error;
         }
     }
@@ -181,7 +258,7 @@ export class S3StorageProvider implements IStorageProvider {
                 user_id: 's3-user' // S3 doesn't have inherent user concept here
             };
         } catch (error) {
-            console.error("Load diagram failed:", error);
+            safeLog.error('Load diagram failed:', redactSensitiveLogValue(error));
             throw error;
         }
     }
@@ -215,7 +292,7 @@ export class S3StorageProvider implements IStorageProvider {
                 id: key
             };
         } catch (error) {
-            console.error("Save diagram failed:", error);
+            safeLog.error('Save diagram failed:', redactSensitiveLogValue(error));
             throw error;
         }
     }
@@ -232,7 +309,7 @@ export class S3StorageProvider implements IStorageProvider {
             });
             await this.client.send(command);
         } catch (error) {
-            console.error("Delete diagram failed:", redactSensitiveValue(error));
+            safeLog.error('Delete diagram failed:', redactSensitiveValue(error));
             throw error;
         }
     }
@@ -240,7 +317,7 @@ export class S3StorageProvider implements IStorageProvider {
     // === Operations (Legacy / specific) ===
 
     async testConnection(config?: StorageConfig): Promise<boolean> {
-        const existingSecret = sessionStorage.getItem(STORAGE_SECRET_SESSION_KEY) || '';
+        const existingSecret = this.readPersistedSessionSecret();
         const configToTest = config
             ? coerceS3StorageConfig(config, config.secretAccessKey || existingSecret)
             : this.config;
@@ -262,9 +339,7 @@ export class S3StorageProvider implements IStorageProvider {
             await client.send(command);
             return true;
         } catch (error: any) {
-            console.group("S3 Connection Test Failed");
-            console.error("Original Error:", redactSensitiveValue(error));
-            console.groupEnd();
+            safeLog.error('S3 Connection Test Failed', redactSensitiveLogValue(error));
             throw error;
         }
     }

@@ -3,7 +3,13 @@ import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import { LayoutType } from '../../types/layout';
 import DomainDagreLayoutStrategy from '../DomainDagreLayoutStrategy';
 import demandAllocation from '../../../data/standardized/DeamndAllocation.json';
+import logisticsStandardData from '../../../data/standardized/LogisticsStandardData.json';
+import transportDrivenStandardData from '../../../data/standardized/TransportDrivenStandardData.json';
 import { standardDataToCanvas } from '../../components/diagrams/designerUtils';
+import {
+    computeBaseReactFlowDisplayEdgeEpoch,
+    createBaseReactFlowDisplayEdges,
+} from '../../components/shared/baseReactFlowDisplayEdges';
 import { detectLocalDoglegRisks } from '../../algorithms/localDoglegQuality';
 
 vi.hoisted(() => {
@@ -227,4 +233,252 @@ describe('DomainDagreLayoutStrategy', () => {
             expect(beforeEnd.y).toBeLessThan(end.y);
         }
     }, 15_000);
+
+    it('separates Logistics TMS support and yard lanes after dagre routing', async () => {
+        const canvas = await standardDataToCanvas(logisticsStandardData as any);
+        const presetLayout = (logisticsStandardData as any).layout;
+
+        const result = await new DomainDagreLayoutStrategy().calculateLayout(canvas.nodes, canvas.edges, {
+            type: LayoutType.DAGRE,
+            direction: 'TB',
+            nodeLayout: 'dagre',
+            generateDomainGroups: true,
+            generateSubDomainGroups: true,
+            domainSubGroupDirection: 'LR',
+            subDomainNodeDirection: 'TB',
+            domainOrder: presetLayout.domainOrder,
+            subDomainOrder: presetLayout.subDomainOrder,
+        } as any);
+
+        const tmsBms = pathFor(result.edges, 'edge-tms-bms');
+        const tmsYms = pathFor(result.edges, 'edge-tms-yms');
+        const tmsVisibility = pathFor(result.edges, 'edge-tms-visibility');
+        const wmsVisibility = pathFor(result.edges, 'edge-wms-visibility');
+
+        expect(maxParallelOverlap(tmsBms, tmsYms)).toBeLessThan(24);
+        expect(maxParallelOverlap(tmsVisibility, wmsVisibility)).toBeLessThan(96);
+    }, 15_000);
+
+    it('keeps Logistics explicit hub lanes displayable after standard conversion', async () => {
+        const canvas = await standardDataToCanvas(logisticsStandardData as any);
+        const displayEdges = createBaseReactFlowDisplayEdges({
+            edges: canvas.edges,
+            nodes: canvas.nodes,
+            enableSmartEdges: true,
+            smartEdgePadding: 20,
+            isLargeGraph: false,
+            displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({
+                nodes: canvas.nodes,
+                edges: canvas.edges,
+            }),
+        });
+        const displayById = new Map(displayEdges.map(edge => [edge.id, edge]));
+
+        for (const edgeId of ['edge-loms-customs', 'edge-loms-visibility', 'edge-tms-bms', 'edge-wms-visibility']) {
+            const edge = canvas.edges.find(item => item.id === edgeId);
+            expect(edge, edgeId).toBeTruthy();
+            expect(pathFor(canvas.edges, edgeId).length, edgeId).toBeGreaterThanOrEqual(2);
+            expect((edge?.data as any)?.layoutPathLocked, edgeId).toBe(true);
+            expect(displayById.get(edgeId)?.type, edgeId).toBe('stablePath');
+        }
+
+        const displayTmsBms = pathFor(displayEdges, 'edge-tms-bms');
+        expect(axisOf(displayTmsBms[displayTmsBms.length - 2], displayTmsBms[displayTmsBms.length - 1])).toBe('v');
+        expect(nonOrthogonalSegments(displayEdges)).toEqual([]);
+        expect(shortEndpointStubs(displayEdges, 48)).toEqual([]);
+        expect(unrelatedStrictCrossings(displayEdges)).toEqual([]);
+    }, 15_000);
+
+    it('separates opposite-role Transport hub lanes after dagre routing', async () => {
+        const canvas = await standardDataToCanvas(transportDrivenStandardData as any);
+        const presetLayout = (transportDrivenStandardData as any).layout;
+
+        const result = await new DomainDagreLayoutStrategy().calculateLayout(canvas.nodes, canvas.edges, {
+            type: LayoutType.DAGRE,
+            direction: 'TB',
+            nodeLayout: 'dagre',
+            generateDomainGroups: true,
+            generateSubDomainGroups: true,
+            domainSubGroupDirection: 'LR',
+            subDomainNodeDirection: 'TB',
+            domainOrder: presetLayout.domainOrder,
+            subDomainOrder: presetLayout.subDomainOrder,
+        } as any);
+
+        const inbound = pathFor(result.edges, 'edge-oms-wms-inbound');
+        const status = pathFor(result.edges, 'edge-wms-oms-status');
+        const masterDataTms = pathFor(result.edges, 'edge-master-data-tms');
+        const masterDataOms = pathFor(result.edges, 'edge-master-data-oms');
+        const tmsOmsStatus = pathFor(result.edges, 'edge-tms-oms-status');
+        const tmsExecution = pathFor(result.edges, 'edge-tms-planning-execution');
+        const masterDataWms = pathFor(result.edges, 'edge-master-data-wms');
+        const wmsExecution = pathFor(result.edges, 'edge-wms-inbound-outbound');
+
+        expect(maxParallelOverlap(inbound, status)).toBeLessThan(24);
+        expect(maxParallelOverlap(masterDataTms, tmsExecution)).toBeLessThan(24);
+        expect(maxParallelOverlap(masterDataWms, wmsExecution)).toBeLessThan(24);
+        expect(maxParallelOverlap(masterDataOms, tmsOmsStatus)).toBeLessThan(96);
+    }, 15_000);
+
+    it('keeps Transport opposite-role repaired lanes displayable after standard conversion', async () => {
+        const canvas = await standardDataToCanvas(transportDrivenStandardData as any);
+        const inbound = pathFor(canvas.edges, 'edge-oms-wms-inbound');
+        const status = pathFor(canvas.edges, 'edge-wms-oms-status');
+        const masterDataTms = pathFor(canvas.edges, 'edge-master-data-tms');
+        const masterDataOms = pathFor(canvas.edges, 'edge-master-data-oms');
+        const tmsOmsStatus = pathFor(canvas.edges, 'edge-tms-oms-status');
+        const tmsExecution = pathFor(canvas.edges, 'edge-tms-planning-execution');
+        const masterDataWms = pathFor(canvas.edges, 'edge-master-data-wms');
+        const wmsExecution = pathFor(canvas.edges, 'edge-wms-inbound-outbound');
+
+        expect(inbound.length).toBeGreaterThanOrEqual(2);
+        expect(status.length).toBeGreaterThanOrEqual(2);
+        expect(maxParallelOverlap(inbound, status)).toBeLessThan(24);
+        expect(maxParallelOverlap(masterDataTms, tmsExecution)).toBeLessThan(24);
+        expect(maxParallelOverlap(masterDataWms, wmsExecution)).toBeLessThan(24);
+        expect(maxParallelOverlap(masterDataOms, tmsOmsStatus)).toBeLessThan(96);
+        expect(masterDataWms[1].x).toBeCloseTo(masterDataWms[0].x, 1);
+        expect(masterDataWms[1].y).toBeGreaterThan(masterDataWms[0].y);
+
+        expect((canvas.edges.find(edge => edge.id === 'edge-oms-wms-inbound')?.data as any)).toEqual(expect.objectContaining({
+            layoutPathLocked: true,
+        }));
+
+        const displayEdges = createBaseReactFlowDisplayEdges({
+            edges: canvas.edges,
+            nodes: canvas.nodes,
+            enableSmartEdges: true,
+            smartEdgePadding: 20,
+            isLargeGraph: false,
+            displayEdgeEpoch: computeBaseReactFlowDisplayEdgeEpoch({
+                nodes: canvas.nodes,
+                edges: canvas.edges,
+            }),
+        });
+        const displayById = new Map(displayEdges.map(edge => [edge.id, edge]));
+
+        expect(displayById.get('edge-oms-wms-inbound')?.type).toBe('stablePath');
+        expect(displayById.get('edge-wms-oms-status')?.type).toBe('stablePath');
+        expect(pathFor(canvas.edges, 'edge-master-data-tms').length).toBeGreaterThanOrEqual(2);
+    }, 15_000);
 });
+
+function pathFor(edges: Edge[], edgeId: string): Array<{ x: number; y: number }> {
+    const edge = edges.find(e => e.id === edgeId);
+    return (((edge?.data as any)?.computedPath ?? []) as Array<{ x: number; y: number }>);
+}
+
+function maxParallelOverlap(a: Array<{ x: number; y: number }>, b: Array<{ x: number; y: number }>): number {
+    let maxOverlap = 0;
+    for (let i = 0; i < a.length - 1; i++) {
+        for (let j = 0; j < b.length - 1; j++) {
+            maxOverlap = Math.max(maxOverlap, segmentOverlap(a[i], a[i + 1], b[j], b[j + 1]));
+        }
+    }
+    return maxOverlap;
+}
+
+function axisOf(
+    a: { x: number; y: number },
+    b: { x: number; y: number },
+): 'h' | 'v' | null {
+    if (Math.abs(a.y - b.y) < 1 && Math.abs(a.x - b.x) > 1) return 'h';
+    if (Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) > 1) return 'v';
+    return null;
+}
+
+function shortEndpointStubs(edges: Edge[], minLength: number): Array<{ edgeId: string; first: number; last: number }> {
+    return edges.flatMap(edge => {
+        const path = pathFor(edges, edge.id || '');
+        if (path.length < 2) return [];
+        const first = segmentLength(path[0], path[1]);
+        const last = segmentLength(path[path.length - 2], path[path.length - 1]);
+        return first < minLength || last < minLength ? [{ edgeId: edge.id || '', first, last }] : [];
+    });
+}
+
+function nonOrthogonalSegments(edges: Edge[]): Array<{ edgeId: string; segment: number }> {
+    return edges.flatMap(edge => {
+        const path = pathFor(edges, edge.id || '');
+        const issues: Array<{ edgeId: string; segment: number }> = [];
+        for (let i = 0; i < path.length - 1; i++) {
+            if (!axisOf(path[i], path[i + 1])) {
+                issues.push({ edgeId: edge.id || '', segment: i });
+            }
+        }
+        return issues;
+    });
+}
+
+function unrelatedStrictCrossings(
+    edges: Edge[],
+): Array<{ edgeIds: [string, string]; point: { x: number; y: number } }> {
+    const crossings: Array<{ edgeIds: [string, string]; point: { x: number; y: number } }> = [];
+    for (let i = 0; i < edges.length; i++) {
+        for (let j = i + 1; j < edges.length; j++) {
+            const first = edges[i];
+            const second = edges[j];
+            if (first.source === second.source || first.target === second.target) continue;
+
+            const firstPath = pathFor(edges, first.id || '');
+            const secondPath = pathFor(edges, second.id || '');
+            for (let a = 0; a < firstPath.length - 1; a++) {
+                for (let b = 0; b < secondPath.length - 1; b++) {
+                    const point = strictCrossingPoint(firstPath[a], firstPath[a + 1], secondPath[b], secondPath[b + 1]);
+                    if (point) crossings.push({ edgeIds: [first.id || '', second.id || ''], point });
+                }
+            }
+        }
+    }
+    return crossings;
+}
+
+function strictCrossingPoint(
+    a1: { x: number; y: number },
+    a2: { x: number; y: number },
+    b1: { x: number; y: number },
+    b2: { x: number; y: number },
+): { x: number; y: number } | null {
+    const aAxis = axisOf(a1, a2);
+    const bAxis = axisOf(b1, b2);
+    if (!aAxis || !bAxis || aAxis === bAxis) return null;
+
+    const h1 = aAxis === 'h' ? a1 : b1;
+    const h2 = aAxis === 'h' ? a2 : b2;
+    const v1 = aAxis === 'v' ? a1 : b1;
+    const v2 = aAxis === 'v' ? a2 : b2;
+    const x = v1.x;
+    const y = h1.y;
+    if (
+        x > Math.min(h1.x, h2.x) + 1
+        && x < Math.max(h1.x, h2.x) - 1
+        && y > Math.min(v1.y, v2.y) + 1
+        && y < Math.max(v1.y, v2.y) - 1
+    ) {
+        return { x, y };
+    }
+    return null;
+}
+
+function segmentLength(a: { x: number; y: number }, b: { x: number; y: number }): number {
+    return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
+
+function segmentOverlap(
+    a1: { x: number; y: number },
+    a2: { x: number; y: number },
+    b1: { x: number; y: number },
+    b2: { x: number; y: number }
+): number {
+    const aVertical = Math.abs(a1.x - a2.x) < 1;
+    const bVertical = Math.abs(b1.x - b2.x) < 1;
+    if (aVertical !== bVertical) return 0;
+    if (aVertical) {
+        if (Math.abs(a1.x - b1.x) > 1) return 0;
+        return Math.max(0, Math.min(Math.max(a1.y, a2.y), Math.max(b1.y, b2.y))
+            - Math.max(Math.min(a1.y, a2.y), Math.min(b1.y, b2.y)));
+    }
+    if (Math.abs(a1.y - b1.y) > 1) return 0;
+    return Math.max(0, Math.min(Math.max(a1.x, a2.x), Math.max(b1.x, b2.x))
+        - Math.max(Math.min(a1.x, a2.x), Math.min(b1.x, b2.x)));
+}

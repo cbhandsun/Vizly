@@ -1,7 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import { PluginRegistry } from '../../services/PluginRegistry';
-import { DiagramTypePlugin, PluginContext } from '../../types/plugin';
+import { DiagramTypePlugin, PluginContext, SidebarPanel } from '../../types/plugin';
+import {
+  logUnifiedDesignerInitialDataFallback,
+  logUnifiedDesignerUnsupportedAction,
+} from '../shared/componentFallbackLogging';
+import { resolveUnifiedDesignerCanvasState } from './unifiedDesignerState';
 
 export interface UnifiedDesignerProps {
   /** 插件 ID。如果不传，则使用默认插件 */
@@ -16,7 +21,7 @@ export interface UnifiedDesignerProps {
 
 export const UnifiedDesigner: React.FC<UnifiedDesignerProps> = ({
   pluginId,
-  _initialData,
+  initialData,
   className,
   style,
 }) => {
@@ -25,9 +30,28 @@ export const UnifiedDesigner: React.FC<UnifiedDesignerProps> = ({
     return pluginId ? pluginRegistry.getPlugin(pluginId) : pluginRegistry.getDefaultPlugin();
   }, [pluginId, pluginRegistry]);
 
+  const resolveCanvasState = React.useCallback(() => {
+    if (!plugin) {
+      return { nodes: [], edges: [] };
+    }
+
+    try {
+      return resolveUnifiedDesignerCanvasState(plugin, initialData);
+    } catch (error) {
+      logUnifiedDesignerInitialDataFallback(plugin.id, error);
+      return resolveUnifiedDesignerCanvasState(plugin);
+    }
+  }, [initialData, plugin]);
+
   // 基础画布状态集中管理
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
+  const [nodes, setNodes] = useState<Node[]>(() => resolveCanvasState().nodes);
+  const [edges, setEdges] = useState<Edge[]>(() => resolveCanvasState().edges);
+
+  React.useEffect(() => {
+    const nextState = resolveCanvasState();
+    setNodes(nextState.nodes);
+    setEdges(nextState.edges);
+  }, [resolveCanvasState]);
 
   const nodesRef = React.useRef(nodes);
   const edgesRef = React.useRef(edges);
@@ -38,14 +62,22 @@ export const UnifiedDesigner: React.FC<UnifiedDesignerProps> = ({
 
   // 插件状态沙箱
   const [pluginStates, setPluginStates] = useState<Record<string, any>>({});
-  const getPluginState = React.useCallback(<T,>() => pluginStates[pluginId || ''] as T | undefined, [pluginStates, pluginId]);
+  const activePluginStateKey = plugin?.id || pluginId || '__default__';
+  const getPluginState = React.useCallback(<T,>() => pluginStates[activePluginStateKey] as T | undefined, [pluginStates, activePluginStateKey]);
   const setPluginState = React.useCallback(<T,>(patch: Partial<T> | ((prev: T) => T)) => {
       setPluginStates(prev => {
-          const current = (prev[pluginId || ''] || {}) as T;
+          const current = (prev[activePluginStateKey] || {}) as T;
           const updated = typeof patch === 'function' ? (patch as any)(current) : { ...current, ...patch };
-          return { ...prev, [pluginId || '']: updated };
+          return { ...prev, [activePluginStateKey]: updated };
       });
-  }, [pluginId]);
+  }, [activePluginStateKey]);
+
+  const unsupportedAction = React.useCallback(
+    (method: 'updateNodesBatch' | 'updateEdgesBatch' | 'takeSnapshot' | 'addNode') => {
+      logUnifiedDesignerUnsupportedAction(method, plugin?.id);
+    },
+    [plugin?.id]
+  );
 
   // 组装透传给各插件面板的统一上下文
   const pluginCtx = useMemo<PluginContext>(() => ({
@@ -53,15 +85,24 @@ export const UnifiedDesigner: React.FC<UnifiedDesignerProps> = ({
     getEdges: () => edgesRef.current,
     get nodes() { return nodesRef.current; },
     get edges() { return edgesRef.current; },
-    updateNodesBatch: () => { console.warn('UnifiedDesigner: updateNodesBatch not implemented'); },
-    updateEdgesBatch: () => { console.warn('UnifiedDesigner: updateEdgesBatch not implemented'); },
-    takeSnapshot: () => {},
+    updateNodesBatch: () => { unsupportedAction('updateNodesBatch'); },
+    updateEdgesBatch: () => { unsupportedAction('updateEdgesBatch'); },
+    takeSnapshot: () => { unsupportedAction('takeSnapshot'); },
     setNodes,
     setEdges,
+    addNode: () => {
+      unsupportedAction('addNode');
+      return '';
+    },
     getPluginState,
     setPluginState,
     // TODO: 之后在内部真正实例化 ReactFlow 时放入 reactFlowInstance
-  }), [setNodes, setEdges, getPluginState, setPluginState]);
+  }), [setNodes, setEdges, getPluginState, setPluginState, unsupportedAction]);
+
+  const sidebarPanels = useMemo<SidebarPanel[]>(
+    () => (plugin?.contributeSidebarPanels ? plugin.contributeSidebarPanels(pluginCtx) : []),
+    [plugin, pluginCtx]
+  );
 
   if (!plugin) {
     return (
@@ -81,21 +122,30 @@ export const UnifiedDesigner: React.FC<UnifiedDesignerProps> = ({
       </div>
       <div className="unified-body" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <div className="unified-sidebar-left" style={{ width: 240, borderRight: '1px solid #e8e8e8', padding: 8 }}>
-          {/* 左侧边面板通过 contributeSidebarPanels 挂载 */}
-          Left Sidebar Placeholder
+          <div style={{ fontWeight: 600, marginBottom: 12 }}>Plugin Shell</div>
+          <div style={{ fontSize: 12, color: '#666', lineHeight: 1.6 }}>
+            <div>ID: {plugin.id}</div>
+            <div>Nodes: {nodes.length}</div>
+            <div>Edges: {edges.length}</div>
+            <div>Panels: {sidebarPanels.length}</div>
+          </div>
         </div>
         <div className="unified-canvas" style={{ flex: 1, background: '#fafafa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-           {/* 未来将接入 <FlowchartCanvasShell> 等抽象壳 */}
-           Canvas Placeholder for {plugin.name}
+          <div style={{ textAlign: 'center', color: '#666', padding: 24 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>{plugin.name}</div>
+            <div>Standalone shell loaded.</div>
+            <div>Interactive canvas runtime is not mounted in this component.</div>
+          </div>
         </div>
         <div className="unified-sidebar-right" style={{ width: 300, borderLeft: '1px solid #e8e8e8' }}>
-          {/* 如果有右侧面板，可以展示 */}
-          {plugin.contributeSidebarPanels && plugin.contributeSidebarPanels(pluginCtx).map(panel => (
-            <div key={panel.id} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          {sidebarPanels.length === 0 ? (
+            <div style={{ padding: 16, color: '#999' }}>No plugin sidebar panels.</div>
+          ) : sidebarPanels.map(panel => (
+            <div key={panel.id} style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid #f0f0f0' }}>
               <div style={{ padding: '8px 16px', borderBottom: '1px solid #e8e8e8', fontWeight: 'bold' }}>
                 {panel.icon} <span style={{ marginLeft: 8 }}>{panel.title}</span>
               </div>
-              <div style={{ flex: 1, overflow: 'auto' }}>
+              <div style={{ overflow: 'auto', maxHeight: 320 }}>
                 {panel.content}
               </div>
             </div>

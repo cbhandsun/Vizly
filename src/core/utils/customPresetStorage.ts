@@ -1,6 +1,6 @@
 import type { StandardDiagramData } from '../models/DiagramModels';
 import { coerceToStandardDiagramData } from './coerceDiagram';
-import { safeJsonParse } from './jsonUtils';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from './uiStorageLogging';
 
 export const CUSTOM_PRESETS_STORAGE_KEY = 'diagram-custom-presets';
 
@@ -11,6 +11,7 @@ const MAX_STRING_LENGTH = 4_000;
 const MAX_OBJECT_KEYS = 120;
 const MAX_ARRAY_ITEMS = 2_000;
 const MAX_DEPTH = 8;
+const MAX_CUSTOM_PRESETS_JSON_LENGTH = 2 * 1024 * 1024;
 const BLOCKED_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -106,10 +107,26 @@ export const coerceCustomPresetMap = (value: unknown): Record<string, StandardDi
     return result;
 };
 
+const parseStoredCustomPresets = (raw: string | null): unknown => {
+    if (!raw) return {};
+    if (raw.length > MAX_CUSTOM_PRESETS_JSON_LENGTH) {
+        logUiStorageReadFailure('customPresetStorage', CUSTOM_PRESETS_STORAGE_KEY, new Error('Custom presets JSON is too large.'));
+        return {};
+    }
+
+    try {
+        return JSON.parse(raw) as unknown;
+    } catch (error) {
+        logUiStorageReadFailure('customPresetStorage', CUSTOM_PRESETS_STORAGE_KEY, error);
+        return {};
+    }
+};
+
 export const readCustomPresetMap = (storage: Pick<Storage, 'getItem'> = localStorage): Record<string, StandardDiagramData> => {
     try {
-        return coerceCustomPresetMap(safeJsonParse<unknown>(storage.getItem(CUSTOM_PRESETS_STORAGE_KEY), {}));
-    } catch {
+        return coerceCustomPresetMap(parseStoredCustomPresets(storage.getItem(CUSTOM_PRESETS_STORAGE_KEY)));
+    } catch (error) {
+        logUiStorageReadFailure('customPresetStorage', CUSTOM_PRESETS_STORAGE_KEY, error);
         return {};
     }
 };
@@ -121,8 +138,8 @@ export const writeCustomPresetMap = (
     const normalized = coerceCustomPresetMap(presets);
     try {
         storage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(normalized));
-    } catch {
-        void 0;
+    } catch (error) {
+        logUiStorageWriteFailure('customPresetStorage', CUSTOM_PRESETS_STORAGE_KEY, error);
     }
     return normalized;
 };

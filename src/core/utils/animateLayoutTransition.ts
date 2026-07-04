@@ -1,4 +1,5 @@
 import { Node } from '@xyflow/react';
+import { safeLog } from './consoleCleanup';
 
 /**
  * 缓动函数：ease-out cubic
@@ -91,7 +92,7 @@ export function animateLayoutTransition(
     const targetNodeMap = new Map<string, Node>();
     for (const node of targetNodes) {
         if (!node.position) {
-            console.warn(`[animateLayoutTransition] Target node ${node.id} is missing position, falling back.`);
+            safeLog.warn(`[animateLayoutTransition] Target node ${node.id} is missing position, falling back.`);
             node.position = { x: 0, y: 0 };
         }
         targetMap.set(node.id, { x: node.position.x, y: node.position.y });

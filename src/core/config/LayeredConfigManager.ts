@@ -5,11 +5,15 @@
 
 import { logger } from '../utils/Logger';
 import { ErrorType, ErrorSeverity, createError } from '../utils/ErrorHandler';
+import { safeLog } from '../utils/consoleCleanup';
+import { redactSensitiveLogValue } from '../utils/logSecurity';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from '../utils/uiStorageLogging';
 
 const isPlainConfigObject = (value: unknown): value is Record<string, any> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
 const MAX_PERSISTED_LAYER_CONFIG_CHARS = 256 * 1024;
+const MAX_LAYERED_CONFIG_IMPORT_JSON_LENGTH = 2 * 1024 * 1024;
 
 // 配置层级枚举
 export interface CloudStorageAdapter {
@@ -328,7 +332,7 @@ export class LayeredConfigManager {
       this.syncWithCloud();
 
     } catch (error) {
-      console.error('LayeredConfigManager: Failed to load persisted configs:', error);
+      safeLog.error('LayeredConfigManager: Failed to load persisted configs:', redactSensitiveLogValue(error));
       this.configLogger.error('加载持久化配置失败', { error });
     }
   }
@@ -351,7 +355,7 @@ export class LayeredConfigManager {
         }
       });
     } catch (e) {
-      console.error('LayeredConfigManager: Cloud sync failed', e);
+      safeLog.error('LayeredConfigManager: Cloud sync failed', redactSensitiveLogValue(e));
     }
   }
 
@@ -716,6 +720,7 @@ export class LayeredConfigManager {
       } catch {
         void 0;
       }
+      logUiStorageReadFailure('LayeredConfigManager.readPersistedLayerData', key, error);
       this.configLogger.warn('移除损坏的持久化配置层', { key, error });
       return null;
     }
@@ -765,6 +770,7 @@ export class LayeredConfigManager {
    * 持久化配置层
    */
   private persistLayer(layer: ConfigLayer): void {
+    let storageKey: string | null = null;
     try {
       const layerData = this.layers.get(layer);
       if (!layerData) return;
@@ -781,24 +787,28 @@ export class LayeredConfigManager {
         case ConfigLayer.GLOBAL:
         case ConfigLayer.USER:
           if (hasLocalStorage) {
-            const key = `layered-config-${layer}`;
-            localStorage.setItem(key, JSON.stringify(data));
+            storageKey = `layered-config-${layer}`;
+            localStorage.setItem(storageKey, JSON.stringify(data));
 
-                        // Async sync to cloud via adapter
+            // Async sync to cloud via adapter
             if (this.cloudAdapter) {
-              this.cloudAdapter.saveConfig(key, data).catch(err => {
-                console.error('Cloud save failed for layer', layer, err);
+              this.cloudAdapter.saveConfig(storageKey, data).catch(err => {
+                safeLog.error('Cloud save failed for layer', layer, redactSensitiveLogValue(err));
               });
             }
           }
           break;
         case ConfigLayer.SESSION:
           if (hasSessionStorage) {
-            sessionStorage.setItem(`layered-config-${layer}`, JSON.stringify(data));
+            storageKey = `layered-config-${layer}`;
+            sessionStorage.setItem(storageKey, JSON.stringify(data));
           }
           break;
       }
     } catch (error) {
+      if (storageKey) {
+        logUiStorageWriteFailure('LayeredConfigManager.persistLayer', storageKey, error);
+      }
       this.configLogger.error(`持久化配置层失败 ${layer}:`, { error });
     }
   }
@@ -871,6 +881,10 @@ export class LayeredConfigManager {
    */
   public importConfig(configJson: string, targetLayer: ConfigLayer = ConfigLayer.USER): void {
     try {
+      if (configJson.length > MAX_LAYERED_CONFIG_IMPORT_JSON_LENGTH) {
+        throw new Error('Layered config JSON is too large.');
+      }
+
       const data = JSON.parse(configJson);
 
       if (!isPlainConfigObject(data)) {

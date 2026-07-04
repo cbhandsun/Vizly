@@ -11,10 +11,20 @@ const shardNames = [
   'test:ci:dom-services',
   'test:ci:dom-workers',
   'test:ci:context',
-  'test:ci:ui',
-  'test:ci:core-components-a',
+  'test:ci:ui-app',
+  'test:ci:ui-components-diagram',
+  'test:ci:ui-components-support',
+  'test:ci:ui-components-primitives',
+  'test:ci:ui-components-warehouse',
+  'test:ci:ui-diagrams',
+  'test:ci:core-components-shared-flow',
+  'test:ci:core-components-shared-misc',
+  'test:ci:core-components-ui',
+  'test:ci:core-hooks',
   'test:ci:core-components-b',
   'test:ci:core-components-c',
+  'test:ci:core-components-extra',
+  'test:ci:data-main',
   'test:ci:mindmap',
   'test:ci:routing-core',
   'test:ci:routing-services',
@@ -23,7 +33,7 @@ const shardNames = [
 
 const parseConcurrency = () => {
   const raw = process.env.TEST_CI_CONCURRENCY;
-  if (!raw) return 3;
+  if (!raw) return 2;
 
   const value = Number(raw);
   if (!Number.isInteger(value) || value < 1) {
@@ -34,7 +44,7 @@ const parseConcurrency = () => {
 
 const parseShardTimeoutMs = () => {
   const raw = process.env.TEST_CI_SHARD_TIMEOUT_MS;
-  if (!raw) return 180_000;
+  if (!raw) return 900_000;
 
   const value = Number(raw);
   if (!Number.isInteger(value) || value < 1) {

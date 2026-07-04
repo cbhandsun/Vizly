@@ -11,6 +11,8 @@ import { useSubscription } from '@/context/useSubscription';
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
 import { invalidateRemoteDiagramPreview } from '@/core/utils/remoteDiagramPreview';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import { getFlowDataBridge } from '@/core/utils/flowDataBridge';
+import { logCloudSaveEnsureFailure, logCloudSaveFailure } from '@/components/diagrams/hooks/diagramStorageLogging';
 import { downloadFile } from '@/core/utils/downloadUtils';
 import { escapeMarkdownInlineText, escapeMarkdownTableCell, escapeMermaidLabel, toMermaidNodeId } from '@/core/utils/exportTextSecurity';
 
@@ -58,9 +60,18 @@ const ExportTools: React.FC<ExportToolsProps> = ({
   const { token } = theme.useToken();
   const { user } = useAuth();
   const { hasFeature, showUpgradeModal } = useSubscription();
-  const { handleFitDiagram, handleBackToTop, handleToggleFullscreen: handleFs, exportToPNG, exportToPDF, exportToSVG, exportToGIF } = useDiagramControls(diagramId, enableMainFlowAnimation);
   // 用于 fallback：当 dataService 无数据时从 ReactFlow 获取当前节点/边
   const reactFlowInstance = useReactFlow();
+  const getReactFlowSnapshot = useCallback(() => ({
+    nodes: reactFlowInstance.getNodes(),
+    edges: reactFlowInstance.getEdges(),
+    viewport: reactFlowInstance.getViewport(),
+  }), [reactFlowInstance]);
+  const { handleFitDiagram, handleBackToTop, handleToggleFullscreen: handleFs, exportToPNG, exportToPDF, exportToSVG, exportToGIF } = useDiagramControls(
+    diagramId,
+    enableMainFlowAnimation,
+    { getReactFlowSnapshot },
+  );
   const [isExporting, setIsExporting] = useState(false);
   const [exportType, setExportType] = useState<'png' | 'pdf' | 'svg' | 'gif' | null>(null);
   const [exportProgress, setExportProgress] = useState<number>(0);
@@ -161,7 +172,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
     
     // Fallback Bridge
     if (!diagram || !diagram.nodes || diagram.nodes.length === 0) {
-      const bridgeData = (window as any).__flowDataBridge?.[diagramId];
+      const bridgeData = getFlowDataBridge(diagramId);
       if (bridgeData) diagram = bridgeData;
     }
 
@@ -253,7 +264,7 @@ ${mermaid}
       // Fallback 2: 全局数据桥接（当 ExportTools 在 ReactFlowProvider 外部时，如 FlowchartDesigner 场景）
       // 桥接数据已是 StandardDiagramData 格式（由 canvasToStandardData 转换）
       if (!diagram || !diagram.nodes || diagram.nodes.length === 0) {
-        const bridgeData = (window as any).__flowDataBridge?.[diagramId];
+        const bridgeData = getFlowDataBridge(diagramId);
         if (bridgeData && bridgeData.nodes?.length > 0) {
           diagram = {
             ...bridgeData,
@@ -294,7 +305,7 @@ ${mermaid}
       // ⭐ 回写 cloud 信息，使下次保存复用同一 ID（更新而非新增）
       const cloudInfo = { provider: provider.id, id: finalId, title: finalTitle, openedAt: new Date().toISOString() };
       // 回写到桥接数据（FlowchartDesigner 场景）
-      const bridge = (window as any).__flowDataBridge?.[diagramId];
+      const bridge = getFlowDataBridge(diagramId);
       if (bridge) {
         bridge.metadata = { ...(bridge.metadata || {}), cloud: cloudInfo };
       }
@@ -307,7 +318,7 @@ ${mermaid}
       appMessage.success(t('export.cloudSaveSuccess'));
       return finalId;
     } catch (error) {
-      console.error('Cloud save failed', error);
+      logCloudSaveFailure('ExportTools', error);
       appMessage.error(t('export.cloudSaveFailed'));
       return undefined;
     } finally {
@@ -320,10 +331,11 @@ ${mermaid}
     try {
       const cloudId = await handleSaveToCloud();
       return cloudId || false;
-    } catch {
+    } catch (error) {
+      logCloudSaveEnsureFailure(diagramId, error);
       return false;
     }
-  }, [handleSaveToCloud]);
+  }, [diagramId, handleSaveToCloud]);
 
   const items: MenuProps['items'] = [
     {

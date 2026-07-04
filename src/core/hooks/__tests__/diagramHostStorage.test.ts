@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     DIAGRAM_FAVORITES_STORAGE_KEY,
     DIAGRAM_RECENT_STORAGE_KEY,
@@ -15,9 +15,22 @@ import {
     writeSelectedDiagramId,
 } from '../diagramHostStorage';
 
+const safeLogState = vi.hoisted(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    log: vi.fn(),
+}));
+
+vi.mock('@/core/utils/consoleCleanup', () => ({
+    safeLog: safeLogState,
+}));
+
 describe('diagramHostStorage', () => {
     beforeEach(() => {
         localStorage.clear();
+        Object.values(safeLogState).forEach(mock => mock.mockReset());
     });
 
     it('validates diagram ids', () => {
@@ -54,6 +67,10 @@ describe('diagramHostStorage', () => {
     it('handles recent diagram ids safely', () => {
         localStorage.setItem(DIAGRAM_RECENT_STORAGE_KEY, '{broken');
         expect(readRecentDiagramIds()).toEqual([]);
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[diagramHostStorage] Failed to read "diagramMenu.recent":',
+            expect.anything()
+        );
 
         writeRecentDiagramIds(['a', 'bad id', 'a', ...Array.from({ length: 20 }, (_, index) => `r-${index}`)]);
         expect(readRecentDiagramIds()).toHaveLength(12);
@@ -74,5 +91,25 @@ describe('diagramHostStorage', () => {
         const many = writeFavoriteDiagramIds(Array.from({ length: 90 }, (_, index) => `fav-${index}`));
         expect(many).toHaveLength(80);
         expect(readFavoriteDiagramIds()).toHaveLength(80);
+    });
+
+    it('falls back to empty list when stored JSON is oversized', () => {
+        localStorage.setItem(DIAGRAM_RECENT_STORAGE_KEY, '{'.repeat(2 * 1024 * 1024 + 1));
+
+        expect(readRecentDiagramIds()).toEqual([]);
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[diagramHostStorage] Failed to read "diagramMenu.recent":',
+            expect.anything()
+        );
+    });
+
+    it('logs the concrete favorites key when persisted JSON is malformed', () => {
+        localStorage.setItem(DIAGRAM_FAVORITES_STORAGE_KEY, '{broken');
+
+        expect(readFavoriteDiagramIds()).toEqual([]);
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[diagramHostStorage] Failed to read "diagramMenu.favorites":',
+            expect.anything()
+        );
     });
 });

@@ -6,6 +6,10 @@
  */
 import { diagramConfigManager, type EdgeConfig, type DiagramConfig } from '../../config/DiagramConfig';
 import { LayeredConfigManager, ConfigLayer } from '../../../config/LayeredConfigManager';
+import {
+    logSmartRoutingConfigLayerSyncFailure,
+    logSmartRoutingConfigSyncFailure,
+} from './diagramInteractionLogging';
 
 // ─── 类型定义 ───────────────────────────────────────────────────
 
@@ -47,10 +51,10 @@ export function syncAutoPathSelection(enabled: boolean): void {
                 const layered = LayeredConfigManager.getInstance();
                 layered.set('diagram.edge.autoPathType', enabled, ConfigLayer.USER);
             } catch (e) {
-                console.warn('Layered config sync failed', e);
+                logSmartRoutingConfigLayerSyncFailure(e);
             }
         }
-    } catch (e) { console.warn('Config sync failed', e); }
+    } catch (e) { logSmartRoutingConfigSyncFailure(e); }
 }
 
 /**

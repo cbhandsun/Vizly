@@ -1,5 +1,6 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { Node, Connection, OnConnectStart, OnConnectEnd, ReactFlowInstance } from '@xyflow/react';
+import { logConnectionMicrointeractionFailure } from './diagramInteractionLogging';
 
 /**
  * Hook for managing connection microinteractions and animations
@@ -53,7 +54,7 @@ export const useConnectionMicrointeractions = ({
             const el = document.querySelector(`[data-id="${nodeId}"]`);
             if (el) el.classList.remove(...classes);
         } catch (e) {
-            console.warn('[Vizly] domRemoveClasses failed:', e);
+            logConnectionMicrointeractionFailure('domRemoveClasses', e);
         }
     }, []);
 
@@ -63,7 +64,7 @@ export const useConnectionMicrointeractions = ({
             const el = document.querySelector(`[data-id="${nodeId}"]`);
             if (el) el.classList.add(...classes);
         } catch (e) {
-            console.warn('[Vizly] domAddClasses failed:', e);
+            logConnectionMicrointeractionFailure('domAddClasses', e);
         }
     }, []);
 
@@ -76,7 +77,7 @@ export const useConnectionMicrointeractions = ({
                 nodes.forEach(el => el.classList.add(className));
             }
         } catch (e) {
-            console.warn('[Vizly] domBatchAddClass failed:', e);
+            logConnectionMicrointeractionFailure('domBatchAddClass', e);
         }
     }, []);
 
@@ -94,7 +95,7 @@ export const useConnectionMicrointeractions = ({
                 }
             });
         } catch (e) {
-            console.warn('[Vizly] domSetConnectHighlight failed:', e);
+            logConnectionMicrointeractionFailure('domSetConnectHighlight', e);
         }
     }, []);
 
@@ -106,7 +107,7 @@ export const useConnectionMicrointeractions = ({
                 nodes.forEach(el => el.classList.remove(...classes));
             }
         } catch (e) {
-            console.warn('[Vizly] domBatchRemoveClasses failed:', e);
+            logConnectionMicrointeractionFailure('domBatchRemoveClasses', e);
         }
     }, []);
 

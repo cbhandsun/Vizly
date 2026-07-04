@@ -4,7 +4,14 @@ import type { Edge, Node } from '@xyflow/react';
 import { DiagramVersion } from '@/services/storage/types';
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import { getFlowDataBridge } from '@/core/utils/flowDataBridge';
 import { coerceClipboardData } from '@/core/utils/flowchartClipboard';
+import {
+    logVersionHistoryLoadFailure,
+    logVersionHistoryPayloadLoadFailure,
+    logVersionHistoryRestoreFailure,
+    logVersionHistorySaveFailure,
+} from './diagramStorageLogging';
 
 const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
 
@@ -22,7 +29,7 @@ export function useVersionHistory(diagramId: string) {
             const data = await unifiedStorage.listVersions(diagramId);
             setVersions(data);
         } catch (error) {
-            console.error("Failed to load versions:", error);
+            logVersionHistoryLoadFailure(error);
             appMessage.error("加载历史版本失败");
         } finally {
             setLoading(false);
@@ -34,7 +41,7 @@ export function useVersionHistory(diagramId: string) {
 
         try {
             const unifiedStorage = await loadUnifiedStorage();
-            const bridge = (window as any).__flowDataBridge?.[diagramId];
+            const bridge = getFlowDataBridge(diagramId);
             if (!bridge) {
                 appMessage.error('无法提取当前图表数据');
                 return;
@@ -50,7 +57,7 @@ export function useVersionHistory(diagramId: string) {
             appMessage.success("已保存快照");
             
         } catch (error) {
-            console.error("Failed to save version:", error);
+            logVersionHistorySaveFailure(error);
             appMessage.error("保存版本失败");
         }
     }, [diagramId]);
@@ -60,7 +67,7 @@ export function useVersionHistory(diagramId: string) {
             const unifiedStorage = await loadUnifiedStorage();
             return await unifiedStorage.loadVersion(diagramId, versionId);
         } catch (e) {
-            console.error("Failed to load version payload:", e);
+            logVersionHistoryPayloadLoadFailure(e);
             appMessage.error("加载快照详细数据失败");
             return null;
         }
@@ -119,7 +126,7 @@ export function useVersionHistory(diagramId: string) {
 
         try {
             // Restore functionality using the active bridge
-            const bridge = (window as any).__flowDataBridge?.[diagramId];
+            const bridge = getFlowDataBridge(diagramId);
             if (bridge) {
                 const snapshot = coerceClipboardData(fullVersion.snapshotData);
                 if (!snapshot) {
@@ -140,7 +147,7 @@ export function useVersionHistory(diagramId: string) {
                 return true;
             }
         } catch (e) {
-            console.error(e);
+            logVersionHistoryRestoreFailure(e);
             appMessage.error("恢复出错");
         }
         return false;

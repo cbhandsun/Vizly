@@ -1,3 +1,5 @@
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from './uiStorageLogging';
+
 export const LAYOUT_MENU_WIDTH_STORAGE_KEY = 'layout.menuWidth';
 export const LAYOUT_FLOW_SIDEBAR_WIDTH_STORAGE_KEY = 'layout.flowSidebarWidth';
 export const DESIGNER_RIGHT_SIDEBAR_WIDTH_STORAGE_KEY = 'designer.rightSidebar.width';
@@ -28,7 +30,8 @@ export const coerceBoundedInteger = (
 const readBoundedInteger = (key: string, fallback: number, min: number, max: number): number => {
     try {
         return coerceBoundedInteger(localStorage.getItem(key), fallback, min, max);
-    } catch {
+    } catch (error) {
+        logUiStorageReadFailure('layoutStorage', key, error);
         return fallback;
     }
 };
@@ -37,8 +40,8 @@ const writeBoundedInteger = (key: string, value: number, fallback: number, min: 
     const normalized = coerceBoundedInteger(value, fallback, min, max);
     try {
         localStorage.setItem(key, String(normalized));
-    } catch {
-        void 0;
+    } catch (error) {
+        logUiStorageWriteFailure('layoutStorage', key, error);
     }
     return normalized;
 };
@@ -64,7 +67,8 @@ export const writeDesignerRightSidebarWidth = (value: number): number =>
 export const readDesignerRightSidebarCollapsed = (): boolean => {
     try {
         return localStorage.getItem(DESIGNER_RIGHT_SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true';
-    } catch {
+    } catch (error) {
+        logUiStorageReadFailure('layoutStorage', DESIGNER_RIGHT_SIDEBAR_COLLAPSED_STORAGE_KEY, error);
         return false;
     }
 };
@@ -72,15 +76,16 @@ export const readDesignerRightSidebarCollapsed = (): boolean => {
 export const writeDesignerRightSidebarCollapsed = (value: boolean): void => {
     try {
         localStorage.setItem(DESIGNER_RIGHT_SIDEBAR_COLLAPSED_STORAGE_KEY, String(value));
-    } catch {
-        void 0;
+    } catch (error) {
+        logUiStorageWriteFailure('layoutStorage', DESIGNER_RIGHT_SIDEBAR_COLLAPSED_STORAGE_KEY, error);
     }
 };
 
 export const readDesignerRightSidebarVisible = (): boolean => {
     try {
         return localStorage.getItem(DESIGNER_RIGHT_SIDEBAR_VISIBLE_STORAGE_KEY) !== 'false';
-    } catch {
+    } catch (error) {
+        logUiStorageReadFailure('layoutStorage', DESIGNER_RIGHT_SIDEBAR_VISIBLE_STORAGE_KEY, error);
         return true;
     }
 };

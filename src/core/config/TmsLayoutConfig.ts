@@ -3,6 +3,9 @@
  * 统一管理TMS架构图的布局参数和样式配置
  */
 
+import { safeLog } from '../utils/consoleCleanup';
+import { redactSensitiveLogValue } from '../utils/logSecurity';
+
 export interface TmsLayoutConfig {
   // 主线流程配置
   MAIN_FLOW: {
@@ -55,6 +58,8 @@ const cloneConfig = (config: TmsLayoutConfig): TmsLayoutConfig => ({
   SUPPORT: { ...config.SUPPORT },
   EXTERNAL: { ...config.EXTERNAL }
 });
+
+const MAX_TMS_LAYOUT_CONFIG_JSON_LENGTH = 2 * 1024 * 1024;
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -154,11 +159,14 @@ export class TmsLayoutConfigManager {
    */
   public importConfig(configJson: string): boolean {
     try {
+      if (configJson.length > MAX_TMS_LAYOUT_CONFIG_JSON_LENGTH) {
+        throw new Error('TMS layout config JSON is too large.');
+      }
       const importedConfig = coerceCompleteConfig(JSON.parse(configJson));
       this.config = importedConfig;
       return true;
     } catch (error) {
-      console.error('Failed to import TMS layout config:', error);
+      safeLog.error('Failed to import TMS layout config:', redactSensitiveLogValue(error));
       return false;
     }
   }

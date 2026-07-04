@@ -1,4 +1,8 @@
 import { supabase } from '../supabase';
+import { safeLog } from '@/core/utils/consoleCleanup';
+import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from '@/core/utils/uiStorageLogging';
+import { safeJsonParseWithLimit } from '@/core/utils/jsonUtils';
 
 export interface Message {
     id: string;
@@ -31,6 +35,7 @@ const MAX_TITLE_LENGTH = 120;
 const MAX_CONTENT_LENGTH = 4000;
 const MAX_JSON_CONTENT_LENGTH = 12000;
 const MAX_ID_LENGTH = 160;
+const MAX_CONVERSATIONS_JSON_CHARS = 2 * 1024 * 1024;
 
 const isSafeId = (value: unknown): value is string =>
     typeof value === 'string' && value.trim().length > 0 && value.length <= MAX_ID_LENGTH;
@@ -138,7 +143,7 @@ class AIConversationService {
                 return cloudConvs;
             }
         } catch (e) {
-            console.error('Failed to sync from cloud', e);
+            safeLog.error('Failed to sync from cloud', redactSensitiveLogValue(e));
         }
         return this.getConversations();
     }
@@ -164,7 +169,7 @@ class AIConversationService {
 
             if (error) throw error;
         } catch (e) {
-            console.error('Failed to sync to cloud', e);
+            safeLog.error('Failed to sync to cloud', redactSensitiveLogValue(e));
         }
     }
 
@@ -176,17 +181,50 @@ class AIConversationService {
         return this.currentUserId ? `AIChatPanel.activeId_${this.currentUserId}` : 'AIChatPanel.activeId_anonymous';
     }
 
+    private clearConversationsCache(): void {
+        try {
+            localStorage.removeItem(this.getStorageKey());
+        } catch (error) {
+            logUiStorageWriteFailure('AIConversationService.clearConversationsCache', this.getStorageKey(), error);
+        }
+
+        try {
+            localStorage.removeItem(this.getActiveIdKey());
+        } catch (error) {
+            logUiStorageWriteFailure('AIConversationService.clearConversationsCache', this.getActiveIdKey(), error);
+        }
+    }
+
     getConversations(): Conversation[] {
         try {
             const saved = localStorage.getItem(this.getStorageKey());
             if (saved) {
-                const parsed = JSON.parse(saved);
+                let readFailure: unknown = null;
+                const parsed = safeJsonParseWithLimit<unknown>(saved, null, {
+                    maxLength: MAX_CONVERSATIONS_JSON_CHARS,
+                    onFailure: (error) => {
+                        readFailure = error;
+                        logUiStorageReadFailure('AIConversationService.getConversations', this.getStorageKey(), error);
+                    },
+                    buildOversizeError: () => new Error('AI conversation JSON is too large.'),
+                });
+                if (parsed === null) {
+                    this.clearConversationsCache();
+                    if (readFailure) {
+                        safeLog.error('Failed to load conversations', redactSensitiveLogValue(readFailure));
+                    }
+                    return [];
+                }
                 // Guard against corrupted or migrated data (e.g., a non-array was serialised)
                 if (Array.isArray(parsed)) return coerceConversations(parsed);
-                console.warn('AIConversationService: stored conversations is not an array, resetting.');
+
+                this.clearConversationsCache();
+                safeLog.warn('AIConversationService: stored conversations is not an array, resetting.');
             }
         } catch (e) {
-            console.error('Failed to load conversations', e);
+            logUiStorageReadFailure('AIConversationService.getConversations', this.getStorageKey(), e);
+            this.clearConversationsCache();
+            safeLog.error('Failed to load conversations', redactSensitiveLogValue(e));
         }
         return [];
     }
@@ -196,21 +234,33 @@ class AIConversationService {
             localStorage.setItem(this.getStorageKey(), JSON.stringify(coerceConversations(conversations)));
             // 如果需要，这里可以限制并发或进行全量同步，但通常 upsert 单条更好
         } catch (e) {
-            console.error('Failed to save conversations', e);
+            logUiStorageWriteFailure('AIConversationService.saveConversations', this.getStorageKey(), e);
+            safeLog.error('Failed to save conversations', redactSensitiveLogValue(e));
         }
     }
 
     getActiveConversationId(): string | null {
-        const id = localStorage.getItem(this.getActiveIdKey());
-        if (!isSafeId(id)) return null;
-        return id.trim();
+        try {
+            const id = localStorage.getItem(this.getActiveIdKey());
+            if (!isSafeId(id)) return null;
+            return id.trim();
+        } catch (error) {
+            logUiStorageReadFailure('AIConversationService.getActiveConversationId', this.getActiveIdKey(), error);
+            safeLog.error('Failed to load active conversation id', redactSensitiveLogValue(error));
+            return null;
+        }
     }
 
     setActiveConversationId(id: string | null) {
-        if (isSafeId(id)) {
-            localStorage.setItem(this.getActiveIdKey(), id.trim());
-        } else {
-            localStorage.removeItem(this.getActiveIdKey());
+        try {
+            if (isSafeId(id)) {
+                localStorage.setItem(this.getActiveIdKey(), id.trim());
+            } else {
+                localStorage.removeItem(this.getActiveIdKey());
+            }
+        } catch (error) {
+            logUiStorageWriteFailure('AIConversationService.setActiveConversationId', this.getActiveIdKey(), error);
+            safeLog.error('Failed to save active conversation id', redactSensitiveLogValue(error));
         }
     }
 
@@ -264,11 +314,11 @@ class AIConversationService {
                 if (error) throw error;
                 cloudDeleted = Array.isArray(data) && data.length === 1;
                 if (!cloudDeleted) {
-                    console.warn('AIConversationService: cloud conversation delete affected no rows.');
+                    safeLog.warn('AIConversationService: cloud conversation delete affected no rows.');
                 }
             } catch (error) {
                 cloudDeleted = false;
-                console.error('AIConversationService: failed to delete cloud conversation', error);
+                safeLog.error('AIConversationService: failed to delete cloud conversation', redactSensitiveLogValue(error));
             }
         }
 

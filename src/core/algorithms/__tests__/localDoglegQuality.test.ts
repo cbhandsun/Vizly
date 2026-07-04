@@ -39,4 +39,23 @@ describe('localDoglegQuality', () => {
 
     expect(risks.some(risk => risk.rule === 'aligned-local-dogleg')).toBe(false);
   });
+
+  it('detects a short return notch on an otherwise straight lane', () => {
+    const risks = detectLocalDoglegRisks([
+      { x: 0, y: 0 },
+      { x: 80, y: 0 },
+      { x: 80, y: 28 },
+      { x: 120, y: 28 },
+      { x: 120, y: 0 },
+      { x: 200, y: 0 },
+    ]);
+
+    expect(risks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rule: 'local-micro-dogleg',
+        type: 'H-V-H',
+        depth: 28,
+      }),
+    ]));
+  });
 });

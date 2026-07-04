@@ -12,6 +12,7 @@ import {
     HistoryRecord
 } from './mindmapHistoryStore';
 import { Popconfirm, message } from 'antd';
+import { logMindmapHistoryRestoreFailure } from './mindmapPanelLogging';
 
 const MindMapHistoryPanel: React.FC = () => {
     const [open, setOpen] = useState(false);
@@ -51,7 +52,7 @@ const MindMapHistoryPanel: React.FC = () => {
 
             message.success(`已恢复至 ${record.time} 的历史版本`);
         } catch (e) {
-            console.error('[History Restore] failed:', e);
+            logMindmapHistoryRestoreFailure(e);
             message.error('版本恢复失败，快照数据已损坏');
         }
     }, [mind]);

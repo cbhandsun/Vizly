@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import type { Theme } from '../../themes/types/ThemeTypes';
 import { getThemeManager } from '../../themes';
 import { EdgeThemeContext, EdgeUpdateContext } from './edgeUpdateContextState';
+import { logEdgeUpdateContextFailure } from './edgeUpdateLogging';
 
 export interface Waypoint {
     x: number;
@@ -44,7 +45,8 @@ export const EdgeUpdateProvider: React.FC<{
         try {
             const tm = getThemeManager();
             return tm.getCurrentTheme?.() || null;
-        } catch {
+        } catch (error) {
+            logEdgeUpdateContextFailure('getCurrentTheme', error);
             return null;
         }
     });
@@ -56,7 +58,8 @@ export const EdgeUpdateProvider: React.FC<{
             unsubscribe = tm.addThemeChangeListener((theme: Theme | null) => {
                 setCurrentTheme(theme || null);
             });
-        } catch {
+        } catch (error) {
+            logEdgeUpdateContextFailure('subscribeThemeChange', error);
             unsubscribe = undefined;
         }
         return () => {

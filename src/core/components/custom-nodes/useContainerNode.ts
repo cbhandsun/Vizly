@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useReactFlow, useStore } from '@xyflow/react';
 import { getDescendantIds } from '../diagrams/hooks/useCollapsibleGroups';
+import { getQueryOrHashParamFromLocation } from '../../utils/inputBoundary';
 
 /**
  * useContainerNode — 容器类节点（TitleGroup/SubGroup）的公共逻辑
@@ -114,8 +115,10 @@ export function useContainerNode({
   // ─── 调试开关 ──────────────────────────────────────
   const debugEnabled = ((): boolean => {
     try {
-      const qs = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-      const fromUrl = qs.get('themeDebug') === '1';
+      const fromUrl = getQueryOrHashParamFromLocation(
+        typeof window === 'undefined' ? undefined : window.location,
+        'themeDebug'
+      ) === '1';
       const fromStorage = typeof window !== 'undefined' && localStorage.getItem('diagram-theme-debug') === 'true';
       return !!(fromUrl || fromStorage);
     } catch {

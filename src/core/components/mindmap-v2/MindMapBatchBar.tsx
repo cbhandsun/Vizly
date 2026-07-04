@@ -15,6 +15,7 @@ import { Popover, Tooltip, Popconfirm } from 'antd';
 import { getMindElixirInstance } from './mindElixirStore';
 import type { NodeObj, Topic } from 'mind-elixir';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
+import { logMindMapBatchActionFailure } from './mindmapBatchLogging';
 
 // ─── Quick palette for batch colour ──────────────────────────────────────────
 const BATCH_COLORS = [
@@ -66,7 +67,11 @@ const MindMapBatchBar: React.FC = () => {
         batch.nodeEls.forEach(el => {
             const obj = batch.nodeObjs.find(o => o.id === (el as HTMLElement).dataset?.nodeid);
             if (obj) {
-                try { mind.reshapeNode(el, { ...obj, ...cleanMindMapNodePatch({ branchColor: color }) }); } catch {}
+                try {
+                    mind.reshapeNode(el, { ...obj, ...cleanMindMapNodePatch({ branchColor: color }) });
+                } catch (error) {
+                    logMindMapBatchActionFailure('reshapeNode', error);
+                }
             }
         });
         setColorOpen(false);
@@ -75,13 +80,21 @@ const MindMapBatchBar: React.FC = () => {
     const handleBatchExpand = useCallback((expand: boolean) => {
         if (!mind) return;
         batch.nodeEls.forEach(el => {
-            try { mind.expandNode(el, expand); } catch {}
+            try {
+                mind.expandNode(el, expand);
+            } catch (error) {
+                logMindMapBatchActionFailure('expandNode', error);
+            }
         });
     }, [mind, batch]);
 
     const handleBatchDelete = useCallback(() => {
         if (!mind) return;
-        try { mind.removeNodes(batch.nodeEls); } catch {}
+        try {
+            mind.removeNodes(batch.nodeEls);
+        } catch (error) {
+            logMindMapBatchActionFailure('removeNodes', error);
+        }
         setBatch(EMPTY);
     }, [mind, batch]);
 

@@ -6,6 +6,10 @@ import { useTranslation } from 'react-i18next';
 import { shareService, ShareRecord, CollaboratorRecord } from '@/services/ShareService';
 import { useAuth } from '@/context/useAuth';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import {
+    logShareDialogLoadFailure,
+    logShareDialogMutationFailure,
+} from '@/components/shareDialogLogging';
 
 
 const { Text } = Typography;
@@ -78,7 +82,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         try {
             const list = await shareService.listSharesForDiagram(effectiveId);
             setShares(list);
-        } catch { } finally { setLoadingLink(false); }
+        } catch (error) {
+            logShareDialogLoadFailure('shares', error);
+        } finally { setLoadingLink(false); }
     }, [open, effectiveId]);
 
     const loadCollaborators = useCallback(async () => {
@@ -87,7 +93,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
         try {
             const list = await shareService.listCollaborators(effectiveId);
             setCollaborators(list);
-        } catch { } finally { setLoadingCollabs(false); }
+        } catch (error) {
+            logShareDialogLoadFailure('collaborators', error);
+        } finally { setLoadingCollabs(false); }
     }, [open, effectiveId]);
 
     useEffect(() => {
@@ -131,7 +139,10 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             await shareService.revokeShare(shareId);
             appMessage.success(t('share.revoked'));
             setShares(prev => prev.filter(s => s.id !== shareId));
-        } catch { appMessage.error('Failed to revoke'); }
+        } catch (error) {
+            logShareDialogMutationFailure('revokeShare', error);
+            appMessage.error('Failed to revoke');
+        }
     }, [t]);
 
     // ===== Invite Tab Actions =====
@@ -170,7 +181,10 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
             await shareService.removeCollaborator(effectiveId, targetUserId);
             appMessage.success(t('share.removeSuccess'));
             setCollaborators(prev => prev.filter(c => c.user_id !== targetUserId));
-        } catch { appMessage.error('Failed to remove collaborator'); }
+        } catch (error) {
+            logShareDialogMutationFailure('removeCollaborator', error);
+            appMessage.error('Failed to remove collaborator');
+        }
     }, [effectiveId, t]);
 
     // 输入框动态边框色

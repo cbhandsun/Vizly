@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { safeLog } from './consoleCleanup';
 
 // 性能监控接口
 interface PerformanceMetrics {
@@ -54,7 +55,7 @@ export const usePerformanceMonitor = (
 
       // 性能警告
       if (renderTime > 16) { // 超过一帧时间
-        console.warn(`🐌 ${componentName} 渲染耗时 ${renderTime.toFixed(2)}ms，可能影响用户体验`);
+        safeLog.warn(`🐌 ${componentName} 渲染耗时 ${renderTime.toFixed(2)}ms，可能影响用户体验`);
       }
     };
   });
@@ -87,7 +88,7 @@ export const useMemoryMonitor = (enabled: boolean = process.env.NODE_ENV === 'de
     const interval = setInterval(() => {
       const memory = checkMemory();
       if (memory && memory.usage > 80) {
-        console.warn(`🚨 内存使用率过高: ${memory.usage}% (${memory.used}MB/${memory.limit}MB)`);
+        safeLog.warn(`🚨 内存使用率过高: ${memory.usage}% (${memory.used}MB/${memory.limit}MB)`);
       }
     }, 10000); // 每10秒检查一次
 

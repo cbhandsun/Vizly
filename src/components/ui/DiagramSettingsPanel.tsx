@@ -30,6 +30,7 @@ import {
     normalizeLayoutName,
     parseLayoutPresetValue
 } from './diagramSettingsGuards';
+import { logDiagramSettingsLayoutSyncFailure } from '@/components/diagramSettingsLogging';
 
 interface DiagramSettingsPanelProps {
     selectedDiagram?: DiagramDefinition;
@@ -253,7 +254,9 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                         await onNodeLayoutStrategyChange(autoNode);
                                         resolvedNodeLayout = getEngineNodeLayout(autoNode);
                                     }
-                                } catch { }
+                                } catch (error) {
+                                    logDiagramSettingsLayoutSyncFailure('resolveNodeLayoutForHierarchy', error);
+                                }
                                 window.dispatchEvent(new CustomEvent('editor:command', {
                                     detail: { action: 'apply-layout', strategy: next, nodeLayout: resolvedNodeLayout }
                                 }));
@@ -329,7 +332,9 @@ export const DiagramSettingsPanel: React.FC<DiagramSettingsPanelProps> = ({
                                                 layered.set('diagram.layout.CONTAINMENT_POLICY', preset.containment, ConfigLayer.USER);
                                                 layered.set('diagram.layout.RANK_MODE', preset.rank, ConfigLayer.USER);
                                                 onRefreshRequest();
-                                            } catch { }
+                                            } catch (error) {
+                                                logDiagramSettingsLayoutSyncFailure('applyCompoundLayoutPreset', error);
+                                            }
                                         }}
                                         popupMatchSelectWidth={false}
                                         optionLabelProp="label"

@@ -1,10 +1,11 @@
 import { useContext } from 'react';
 import { AuthContext } from './AuthContextValue';
+import { logAuthProviderFallbackContext } from './authLogging';
 
 export function useAuth() {
     const context = useContext(AuthContext);
     if (context === undefined) {
-        console.warn('[HMR Warning] useAuth was called outside of an AuthProvider. Returning temporary fallback context.');
+        logAuthProviderFallbackContext();
         const dummyResult = async () => ({ data: { user: null, session: null }, error: null });
         return {
             user: null,

@@ -5,12 +5,19 @@ import {
   buildExportFileName,
   exportFullDiagramToPngDataUrl,
   exportFullDiagramByAdjustingViewportToPngDataUrl,
-  exportFullDiagramByAdjustingViewportToSvgDataUrl,
   exportGifFrameWithAnimationClone,
   exportGifFramesWithAnimationCloneBatch,
   isSafeExportDataUrl,
   triggerDownload,
 } from '../components/shared/exportUtils';
+import { safeLog } from '../utils/consoleCleanup';
+import { redactSensitiveLogValue } from '../utils/logSecurity';
+import {
+  buildRenderSceneFromGlobalReactFlow,
+  buildRenderSceneFromReactFlowSnapshot,
+  type ReactFlowRenderSnapshot,
+} from '../rendering/reactFlowScene';
+import { exportRenderSceneToSvgDataUrl } from '../export/svgExport';
 
 export { isSafeExportDataUrl } from '../components/shared/exportUtils';
 
@@ -33,6 +40,7 @@ interface ExportActionContext {
   enableMainFlowAnimation?: boolean;
   dispatchExportEvent: DispatchExportEvent;
   yieldToPaint: () => Promise<void>;
+  getReactFlowSnapshot?: () => ReactFlowRenderSnapshot | null | undefined;
 }
 
 interface GifCreateResult {
@@ -114,7 +122,7 @@ export const exportDiagramToPNG = async ({
     downloadDataUrl(dataUrl, buildExportFileName(diagramId, 'png'));
     dispatchExportEvent('diagramExportComplete', { diagramId, type: 'png' });
   } catch (error) {
-    console.error('导出PNG失败:', error);
+    safeLog.error('导出PNG失败:', redactSensitiveLogValue(error));
     dispatchExportEvent('diagramExportError', { diagramId, type: 'png', error: serializeExportError(error) });
     alert('导出PNG失败，请稍后重试');
   }
@@ -169,7 +177,7 @@ export const exportDiagramToPDF = async ({
     pdf.save(buildExportFileName(diagramId, 'pdf'));
     dispatchExportEvent('diagramExportComplete', { diagramId, type: 'pdf' });
   } catch (error) {
-    console.error('导出PDF失败:', error);
+    safeLog.error('导出PDF失败:', redactSensitiveLogValue(error));
     dispatchExportEvent('diagramExportError', { diagramId, type: 'pdf', error: serializeExportError(error) });
     alert('导出PDF失败，请稍后重试');
   }
@@ -179,6 +187,7 @@ export const exportDiagramToSVG = async ({
   diagramId,
   dispatchExportEvent,
   yieldToPaint,
+  getReactFlowSnapshot,
 }: ExportActionContext) => {
   try {
     dispatchExportEvent('diagramExportStart', { diagramId, type: 'svg' });
@@ -190,14 +199,18 @@ export const exportDiagramToSVG = async ({
       return;
     }
 
-    const svgDataUrl = await temporarilyHideElements(CONTROLS_TO_HIDE, async () =>
-      exportFullDiagramByAdjustingViewportToSvgDataUrl(diagramId, 40)
-    );
+    const svgDataUrl = await temporarilyHideElements(CONTROLS_TO_HIDE, async () => {
+      const snapshot = getReactFlowSnapshot?.();
+      const scene = snapshot
+        ? buildRenderSceneFromReactFlowSnapshot(snapshot, { padding: 40 })
+        : buildRenderSceneFromGlobalReactFlow({ padding: 40 });
+      return exportRenderSceneToSvgDataUrl(scene, { title: diagramId });
+    });
 
     downloadDataUrl(svgDataUrl, buildExportFileName(diagramId, 'svg'));
     dispatchExportEvent('diagramExportComplete', { diagramId, type: 'svg' });
   } catch (error) {
-    console.error('导出SVG失败:', error);
+    safeLog.error('导出SVG失败:', redactSensitiveLogValue(error));
     dispatchExportEvent('diagramExportError', { diagramId, type: 'svg', error: serializeExportError(error) });
     alert('导出SVG失败，请稍后重试');
   }
@@ -223,7 +236,7 @@ const waitForExportFonts = async (diagramId: string) => {
       await new Promise(resolve => setTimeout(resolve, 100));
       return;
     } catch (error) {
-      console.warn('字体加载API不可用，使用回退方案:', error);
+      safeLog.warn('字体加载API不可用，使用回退方案:', redactSensitiveLogValue(error));
     }
   }
 
@@ -283,7 +296,7 @@ export const exportDiagramToGIF = async ({
           }
         );
       } catch (e) {
-        console.warn('批量离屏克隆方案失败，回退到逐帧克隆方案：', e);
+        safeLog.warn('批量离屏克隆方案失败，回退到逐帧克隆方案：', redactSensitiveLogValue(e));
         const capturedFrames: string[] = [];
         for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
           let frame: string;
@@ -337,7 +350,7 @@ export const exportDiagramToGIF = async ({
           },
         }, (obj: GifCreateResult) => {
           if (obj.error || !obj.image) {
-            console.warn(`GIF 创建失败（第${attempt}次）：`, obj.errorMsg || obj.errorCode);
+            safeLog.warn(`GIF 创建失败（第${attempt}次）：`, obj.errorMsg || obj.errorCode);
             if (attempt === 1) {
               const fallbackScale = Math.min(1, fallbackMaxSide / Math.max(targetWidth, targetHeight));
               const fallbackW = Math.max(1, Math.round(targetWidth * fallbackScale));
@@ -370,7 +383,7 @@ export const exportDiagramToGIF = async ({
           }
         };
         img.onerror = () => {
-          console.warn(`帧 ${index} 加载失败`);
+          safeLog.warn(`帧 ${index} 加载失败`);
           imagesLoaded++;
           if (imagesLoaded === safeFrames.length && loadedImages.length > 0) {
             encodeGif(targetWidth, targetHeight, 1, 900);
@@ -380,7 +393,7 @@ export const exportDiagramToGIF = async ({
       });
     });
   } catch (error) {
-    console.error('导出GIF失败:', error);
+    safeLog.error('导出GIF失败:', redactSensitiveLogValue(error));
     dispatchExportEvent('diagramExportError', { diagramId, type: 'gif', error: serializeExportError(error) });
     alert('导出GIF失败，请稍后重试');
   }

@@ -14,7 +14,11 @@ import {
     centerSubGroupsInDomain
 } from '../utils/layoutUtils';
 import { expandHandle, normalizeHandle } from '../routing/utils/handleUtils';
-
+import { logDomainDagreMissingNodeHandle } from './layoutLogging';
+import { repairSharedTrunkAwareCrossings } from './shared/edgeRoutingPipeline';
+import { lockComputedPathOnEdge, resolveRoutingResultPath } from './shared/edgeFallbackPath';
+import { repairEndpointOrthogonalPaths } from './shared/edgeEndpointPathRepair';
+import { separateDetachedParallelOverlaps } from './shared/edgeDetachedOverlapRepair';
 /**
  * 域级 Dagre 布局策略
  * 
@@ -62,8 +66,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
         const cfg: any = diagramConfigManager.getConfig() || {};
         const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-
-        // [DEBUG] 确认代码执行
 
         // 配置参数
         const domainGap = num(cfg?.domain?.gap, 80);
@@ -1230,7 +1232,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 if (!edge.targetHandle) {
                     edge.targetHandle = (dir === 'LR' || dir === 'RL') ? 'left' : 'top';
                 }
-                console.warn(`[DomainDagre] ⚠️ 边 ${edge.id || edge.source + '->' + edge.target} 的 source/target 不在 idMap 中 (source=${!!source}, target=${!!target})，使用默认 handle`);
+                logDomainDagreMissingNodeHandle(String(edge.id || `${edge.source}->${edge.target}`), !!source, !!target);
                 return;
             }
 
@@ -1360,7 +1362,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     targetHandle: explicitTargetHandle,
                     autoSource: false,
                     autoTarget: false,
-                    computedPath: [] as Array<{ x: number; y: number }>,
+                    computedPath: undefined as Array<{ x: number; y: number }> | undefined,
                 }
                 : decideEdgeRouting(
                     source,
@@ -1382,24 +1384,18 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             if (routingResult.autoTarget) autoList.push('target');
             (edge.data as any).auto = autoList;
 
-            // [FIX] 将 A* 计算的障碍物避让路径存储到 edge.data，供边渲染器使用
-            if (routingResult.computedPath && routingResult.computedPath.length >= 2) {
-                (edge.data as any).computedPath = routingResult.computedPath;
-                (edge.data as any).layoutPathLocked = true;
-                (edge.data as any).runtimeHandleLock = {
-                    ...(((edge.data as any).runtimeHandleLock && typeof (edge.data as any).runtimeHandleLock === 'object')
-                        ? (edge.data as any).runtimeHandleLock
-                        : {}),
-                    source: true,
-                    target: true,
-                };
-                // 使用 advanced-smart-step 边类型，它会优先读取 computedPath
-                edge.type = 'advanced-smart-step';
-            }
+            const computedPathForEdge = resolveRoutingResultPath({
+                routingResult,
+                source,
+                target,
+                nodeById: idMap,
+            });
+
+            lockComputedPathOnEdge(edge, computedPathForEdge);
 
             // P1: 记录此边的完整计算路径
-            if (routingResult.computedPath && routingResult.computedPath.length >= 2) {
-                routedPaths.push({ points: routingResult.computedPath });
+            if (computedPathForEdge.length >= 2) {
+                routedPaths.push({ points: computedPathForEdge });
             } else {
                 // Fallback: 使用起点终点
                 const sPos = (source as any).positionAbsolute ?? (source as any).position ?? { x: 0, y: 0 };
@@ -1433,7 +1429,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             nodeUsage[target.id][edge.targetHandle] =
                 (nodeUsage[target.id][edge.targetHandle] || 0) + 1;
         });
-
 
         // ═══════════════════════════════════════════════════════════════
         // [FIX] Port Ordering: Avoid unnecessary crossings for same-side edges
@@ -1572,7 +1567,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             reorderPortAnchors(targetGroups, 'target');
         }
 
-
         // ═══════════════════════════════════════════════════════════════
         // [FIX] 禁用 P4-P8 后处理管道（对齐 DiagramView-SVG 设计）
         // 根因：P7 beautifyOrthogonalEdges / P8 optimizeTreeBusRouting
@@ -1582,9 +1576,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // decideEdgeRouting 返回的 handle 已经是正确的全称格式，
         // 直接使用即可。
         // ═══════════════════════════════════════════════════════════════
-        const finalRoutedEdges = clonedEdges;
-
-        // Path 3 hierarchy conversion
+        const finalRoutedEdges = separateDetachedParallelOverlaps(repairEndpointOrthogonalPaths(repairEndpointOrthogonalPaths(separateDetachedParallelOverlaps(repairSharedTrunkAwareCrossings(clonedEdges, updatedNodes), updatedNodes), updatedNodes), updatedNodes), updatedNodes, 24);
         convertToHierarchicalFormat(updatedNodes, nodeToSubGroup);
         sortHierarchicalNodes(updatedNodes);
 
@@ -1959,7 +1951,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 && manualSides.includes('source')
                 && manualSides.includes('target');
 
-
             let routingResult;
             if (preserveManualHandles) {
                 routingResult = {
@@ -1968,6 +1959,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     targetHandle: edge.targetHandle,
                     autoSource: false,
                     autoTarget: false,
+                    computedPath: undefined as Array<{ x: number; y: number }> | undefined,
                 };
             } else if (unifiedSourceHandle || unifiedTargetHandle) {
                 let sourceHandle: string;
@@ -1985,6 +1977,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     type: 'advanced-smart-step' as const,
                     sourceHandle,
                     targetHandle,
+                    computedPath: undefined as Array<{ x: number; y: number }> | undefined,
                 };
             } else {
                 // 无统一端口约束，使用完整的智能路由
@@ -2009,6 +2002,12 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             if (routingResult.autoTarget) autoList.push('target');
             (edge.data as any).auto = autoList;
 
+            lockComputedPathOnEdge(edge, resolveRoutingResultPath({
+                routingResult,
+                source,
+                target,
+                nodeById: idMap,
+            }));
             if (!nodeUsage[source.id]) nodeUsage[source.id] = {};
             nodeUsage[source.id][edge.sourceHandle] =
                 (nodeUsage[source.id][edge.sourceHandle] || 0) + 1;
@@ -2017,6 +2016,8 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             nodeUsage[target.id][edge.targetHandle] =
                 (nodeUsage[target.id][edge.targetHandle] || 0) + 1;
         });
+        separateDetachedParallelOverlaps(repairEndpointOrthogonalPaths(repairEndpointOrthogonalPaths(separateDetachedParallelOverlaps(repairSharedTrunkAwareCrossings(edges, nodes), nodes), nodes), nodes), nodes, 24)
+            .forEach((edge, index) => { edges[index] = edge; });
     }
 }
 

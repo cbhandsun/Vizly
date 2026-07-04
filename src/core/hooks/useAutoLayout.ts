@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
 import { Node, Edge, Position, ReactFlowInstance } from '@xyflow/react';
 import { animateLayoutTransition } from '../utils/animateLayoutTransition';
+import { safeLog } from '../utils/consoleCleanup';
+import { redactSensitiveLogValue } from '../utils/logSecurity';
 
 export type LayoutDirection = 'TB' | 'LR';
 export type LayoutAlgorithm = 'dagre' | 'elk';
@@ -24,7 +26,7 @@ export interface StrategyLayoutOptions {
 export const useAutoLayout = (instance: ReactFlowInstance | null) => {
     const layout = useCallback(async ({ direction, spacing = { x: 50, y: 50 }, algorithm = 'dagre' }: AutoLayoutOptions) => {
         if (!instance) {
-            console.warn('AutoLayout: No ReactFlow instance provided');
+            safeLog.warn('AutoLayout: No ReactFlow instance provided');
             return;
         }
         const { getNodes, getEdges, setNodes, fitView } = instance;
@@ -86,7 +88,7 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
                 });
                 await animateLayoutTransition(setNodes, refinedNodes);
             } catch (err) {
-                console.error('ELK Layout Failed:', err);
+                safeLog.error('ELK Layout Failed:', redactSensitiveLogValue(err));
             }
         } else {
             // DAGRE implementation
@@ -159,7 +161,7 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
      */
     const layoutWithStrategy = useCallback(async (options: StrategyLayoutOptions) => {
         if (!instance) {
-            console.warn('[AutoLayout] No ReactFlow instance');
+            safeLog.warn('[AutoLayout] No ReactFlow instance');
             return;
         }
 
@@ -188,7 +190,7 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
 
 
             if (nodes.length === 0) {
-                console.warn('[AutoLayout] 没有可布局的节点');
+                safeLog.warn('[AutoLayout] 没有可布局的节点');
                 return;
             }
 
@@ -274,7 +276,7 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
                 const strategy = await manager.getStrategyAsync(resolvedName);
 
                 if (!strategy) {
-                    console.error(`[AutoLayout] 布局策略 "${resolvedName}" 未找到`);
+                    safeLog.error(`[AutoLayout] 布局策略 "${resolvedName}" 未找到`);
                     return;
                 }
 
@@ -296,7 +298,7 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
                     setEdges(result.edges);
                     await animateLayoutTransition(setNodes, result.nodes);
                 } else {
-                    console.warn('[AutoLayout][domain] 策略返回 0 个节点，布局未应用');
+                    safeLog.warn('[AutoLayout][domain] 策略返回 0 个节点，布局未应用');
                 }
             }
 
@@ -306,7 +308,7 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
             });
 
         } catch (err) {
-            console.error(`[AutoLayout] 布局失败 (${options.strategyName}):`, err);
+            safeLog.error(`[AutoLayout] 布局失败 (${options.strategyName}):`, redactSensitiveLogValue(err));
         }
     }, [instance]);
 

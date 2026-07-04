@@ -5,8 +5,6 @@ import { LayoutType } from '../types/layout';
 import { diagramConfigManager } from '../components/config/DiagramConfig';
 import { LayeredConfigManager } from '../config/LayeredConfigManager';
 import { ILayoutStrategy } from './LayoutStrategyManager';
-import { decideEdgeRouting, separateParallelEdges, globalOptimizeEdgeRouting, distributePortConnections, bundleEdges, layerBasedEdgeRouting, optimizeEdgeLabelPositions, beautifyOrthogonalEdges, optimizeTreeBusRouting } from '../utils/HandlePicker';
-import { expandHandle } from '../routing/utils/handleUtils';
 import {
   applyDomainGrouping,
   applySubGrouping,
@@ -44,6 +42,8 @@ import {
   ensureMeasuredForNodes,
   reflowSubGroupChildrenDagre
 } from '../utils/layoutUtils';
+import { logLayoutDiagnosticsSummary, logSubGroupDebugSample } from './layoutLogging';
+import { runEdgeRoutingPipeline } from './shared/edgeRoutingPipeline';
 
 /**
  * 域水平布局策略
@@ -166,7 +166,7 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
           const orphan = biz.filter(n => !sgChildren.has(n.id)).map(n => n.id);
           summary.push({ domain: d, subGroups: sgList.length, biz: biz.length, orphanCount: orphan.length });
         }
-        console.warn('[LayoutDiagnostics] Summary', summary);
+        logLayoutDiagnosticsSummary(summary);
       } catch {
         // ignore
       }
@@ -671,7 +671,7 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
           size: { w: num((((sg as any)?.style?.width ?? (sg as any)?.measured?.width)), 0), h: num((((sg as any)?.style?.height ?? (sg as any)?.measured?.height)), 0) },
           childrenCount: Array.isArray(((sg as any).data || {}).children) ? (((sg as any).data || {}).children as string[]).length : 0,
         }));
-        console.info('[SubGroupDebug] sample', out);
+        logSubGroupDebugSample(out);
       }
     }
     // 域尺寸计算时机调整：推迟到子域纵向堆叠与统一后
@@ -874,174 +874,8 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
       return { nodes: updatedNodes, edges: processedEdges } as any;
     }
 
-    /**
-     * 函数级注释：边配置处理（启用容器透明 + 统一智能连线决策）
-     * - 调用 decideEdgeRouting 赋予横向布局统一的端口选择智能
-     * - 传入 layoutDirection: 'LR' (横向布局特征)
-     */
-    const edgeIdMap = new Map<string, ReactFlowNode>(updatedNodes.map(n => [n.id, n] as const));
-    const cfgEdge = (diagramConfigManager.getConfig() as any)?.edge || {};
-
-    // [FIX] 在边路由前主动计算 positionAbsolute（对齐 DomainVerticalLayoutStrategy）
-    // 初始布局时 React Flow 还没有计算这个值，导致 decideEdgeRouting 使用错误坐标
-    for (const node of updatedNodes) {
-      let x = (node.position as any)?.x ?? 0;
-      let y = (node.position as any)?.y ?? 0;
-      let current: ReactFlowNode = node;
-      let depth = 0;
-      while ((current as any).parentId && depth < 20) {
-        const parent = edgeIdMap.get((current as any).parentId);
-        if (!parent) break;
-        x += (parent.position as any)?.x ?? 0;
-        y += (parent.position as any)?.y ?? 0;
-        current = parent;
-        depth++;
-      }
-      (node as any).positionAbsolute = { x, y };
-    }
-
-    // P1: Edge-Edge Avoidance - 收集已路由边的路径
-    const routedPaths: Array<{ points: Array<{ x: number; y: number }> }> = [];
-
-
-    const processedEdges = edges.map(edge => {
-      // 1. 保留原有属性
-      const edgeType = String(edge.type || '').toLowerCase();
-      // 如果已经是 smart 类型，保持；否则默认 smart-step
-      const baseType = edgeType.includes('smart') ? edge.type : 'smart-step';
-
-      // 2. 准备连线数据容器
-      const newData = {
-        ...(edge.data || {}),
-        intraContainerNoObstacle: true,
-        obstacleScope: 'corridor',
-        obstaclePadding: 16,
-        pathOptions: {
-          ...(edge.data?.pathOptions || {}),
-          gridRatio: 1.04,
-          borderRadius: 4 // [FIX] Hyper-Glass V3: 4px sharp corners
-        }
-      };
-
-      // 3. 调用统一智能决策 (decideEdgeRouting)
-      const srcNode = edgeIdMap.get(edge.source);
-      const tgtNode = edgeIdMap.get(edge.target);
-
-      // 默认结果
-      let finalType = baseType;
-      let finalSourceHandle = edge.sourceHandle;
-      let finalTargetHandle = edge.targetHandle;
-
-      if (srcNode && tgtNode) {
-        const routingConfig = {
-          mode: 'advanced-smart' as const,
-          globalPath: (cfgEdge.pathType || 'step') as string,
-          autoPathSelection: true,
-          layoutDirection: 'LR', // 横向布局主要流向为 LR
-          directionalHandlePolicy: 'force' as const, // 强制遵循方向以保证横向层级清晰
-          angleToleranceDeg: Number(cfgEdge.angleToleranceDeg ?? 36),
-          routedPaths, // P1: 传入已路由路径
-        };
-
-        const choice = decideEdgeRouting(srcNode, tgtNode, updatedNodes, routingConfig);
-        finalType = choice.type;
-        finalSourceHandle = choice.sourceHandle;
-        finalTargetHandle = choice.targetHandle;
-
-        // P1: 记录此边的完整计算路径
-        if (choice.computedPath && choice.computedPath.length >= 2) {
-          routedPaths.push({ points: choice.computedPath });
-        } else {
-          // Fallback: 使用起点终点
-          const sPos = (srcNode as any).positionAbsolute ?? (srcNode as any).position ?? { x: 0, y: 0 };
-          const tPos = (tgtNode as any).positionAbsolute ?? (tgtNode as any).position ?? { x: 0, y: 0 };
-          const sW = (srcNode as any)?.measured?.width ?? 100;
-          const sH = (srcNode as any)?.measured?.height ?? 50;
-          const tW = (tgtNode as any)?.measured?.width ?? 100;
-          const tH = (tgtNode as any)?.measured?.height ?? 50;
-
-          const handleToAnchor = (pos: any, w: number, h: number, handle: string | null | undefined) => {
-            switch (handle) {
-              case 'l': case 'left': return { x: pos.x, y: pos.y + h / 2 };
-              case 'r': case 'right': return { x: pos.x + w, y: pos.y + h / 2 };
-              case 't': case 'top': return { x: pos.x + w / 2, y: pos.y };
-              case 'b': case 'bottom': return { x: pos.x + w / 2, y: pos.y + h };
-              default: return { x: pos.x + w / 2, y: pos.y + h / 2 };
-            }
-          };
-
-          const startPt = handleToAnchor(sPos, sW, sH, finalSourceHandle);
-          const endPt = handleToAnchor(tPos, tW, tH, finalTargetHandle);
-          routedPaths.push({ points: [startPt, endPt] });
-        }
-      }
-
-      return {
-        ...edge,
-        type: finalType,
-        sourceHandle: finalSourceHandle ? expandHandle(String(finalSourceHandle)) : finalSourceHandle, // 应用智能选择的 Handle
-        targetHandle: finalTargetHandle ? expandHandle(String(finalTargetHandle)) : finalTargetHandle,
-        data: newData
-      };
-    });
-
-    // P2: 全局路由优化（默认启用以支持 Bus 效果）
-    const enableGlobalOptimization = (diagramConfigManager.getConfig() as any)?.edge?.globalOptimization ?? true;
-    let optimizedEdges = processedEdges;
-    if (enableGlobalOptimization && processedEdges.length > 1) {
-      optimizedEdges = globalOptimizeEdgeRouting(
-        processedEdges,
-        updatedNodes,
-        { mode: 'advanced-smart', layoutDirection: 'LR', directionalHandlePolicy: 'force', topK: 4 },
-        3
-      );
-    }
-
-    // 4. 并行边分离：避免同节点对的多边堆叠
-    const finalEdges = separateParallelEdges(optimizedEdges, 12);
-
-    // P3: 动态多端口分布
-    const distributedEdges = distributePortConnections(finalEdges, updatedNodes, 16);
-
-    // P4: 高级边捆绑（默认启用）
-    const bundlingEnabled = (diagramConfigManager.getConfig() as any)?.edge?.bundling ?? true;
-    const bundledEdges = bundleEdges(distributedEdges, updatedNodes, {
-      enabled: bundlingEnabled,
-      layoutDirection: 'LR',
-      regionSize: 200,
-      minBundleSize: 2,
-      bundleSpacing: 8
-    });
-
-    // P5: 分层边路由 (长边控制点)
-    const layeredEdges = layerBasedEdgeRouting(bundledEdges, updatedNodes, {
-      enabled: true,
-      layerThreshold: 400,
-      layoutDirection: 'LR'
-    });
-
-
-
-    // P7: 正交边美化
-    const beautifiedEdges = beautifyOrthogonalEdges(layeredEdges, updatedNodes, {
-      enabled: true,
-      minSegmentLength: 20
-    });
-
-    // P8: 树状总线路由 (模拟电路板)
-    const treeEdges = optimizeTreeBusRouting(beautifiedEdges, updatedNodes, {
-      enabled: true,
-      minBusSize: 2,
-      layoutDirection: 'LR'
-    });
-
-    // P6: 边标签智能避让
-    const labeledEdges = optimizeEdgeLabelPositions(treeEdges, updatedNodes, {
-      enabled: true,
-      labelPadding: 8
-    });
-
-    return { nodes: updatedNodes, edges: labeledEdges };
+    const routedEdges = await runEdgeRoutingPipeline(updatedNodes, edges, { layoutDirection: 'LR' });
+    return { nodes: updatedNodes, edges: routedEdges };
   }
 }
 

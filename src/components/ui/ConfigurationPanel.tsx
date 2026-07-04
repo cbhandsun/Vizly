@@ -6,6 +6,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import {
+  logConfigurationPanelConfigLoadFailure,
+  logConfigurationPanelSaveFailure,
+} from '@/components/configurationLogging';
 import { LayeredConfigManager } from '@/core/config/LayeredConfigManager';
 import { LayoutStrategyManager } from '@/core/strategies/LayoutStrategyManager';
 import { FaTimes, FaUndo, FaCheck, FaExclamationTriangle, FaCog } from 'react-icons/fa';
@@ -703,7 +707,7 @@ useEffect(() => {
         const value = await actions.getConfig<unknown>(item.key);
         currentValues[item.key] = value !== undefined ? coerceConfigValue(item, value) : item.value;
       } catch (error) {
-        console.warn(`Failed to load config ${item.key}:`, error);
+        logConfigurationPanelConfigLoadFailure(item.key, error);
         currentValues[item.key] = item.value;
       }
     }
@@ -818,7 +822,7 @@ const handleSaveChanges = useCallback(async () => {
     setHasChanges(false);
     setChangedKeys(new Set());
   } catch (error) {
-    console.error('保存配置失败:', error);
+    logConfigurationPanelSaveFailure(error);
   }
 }, [actions, changedKeys, configItems, editingValues, requestLayoutApply, state.integration, state.isReady]);
 

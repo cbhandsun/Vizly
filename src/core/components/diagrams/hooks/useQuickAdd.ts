@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Node, Edge, ReactFlowInstance, OnConnectEnd, MarkerType } from '@xyflow/react';
 import { QuickConnectOption } from '../QuickConnectMenu';
-import { readDomViewport } from '../../../utils/domViewport';
+import { projectFlowPositionToScreenPosition } from '../../../utils/domViewport';
 
 export const useQuickAdd = (
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>,
@@ -44,11 +44,10 @@ export const useQuickAdd = (
     const closeMenu = useCallback(() => setMenuState(null), []);
 
     const openQuickAddMenu = useCallback((flowX: number, flowY: number) => {
-        const vp = readDomViewport();
-        const container = document.querySelector('.react-flow') as HTMLElement | null;
-        const bcr = container?.getBoundingClientRect();
-        const screenX = bcr ? flowX * vp.zoom + vp.x + bcr.left : flowX;
-        const screenY = bcr ? flowY * vp.zoom + vp.y + bcr.top : flowY;
+        const { x: screenX, y: screenY } = projectFlowPositionToScreenPosition({
+            flowX,
+            flowY,
+        });
         setMenuState({ visible: true, clientX: screenX, clientY: screenY, flowX, flowY, sourceNodeId: '', sourceHandleId: null });
     }, []);
 

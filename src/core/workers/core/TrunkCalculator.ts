@@ -7,6 +7,7 @@
 
 import { Point, Rectangle } from '../../algorithms/geometryUtils';
 import { UnifiedRoutingConfig } from '../../types/routing';
+import { logTrunkSuggestedPortInvariant } from '../../utils/routingLogging';
 
 export interface TrunkResult {
     trunkPoint: Point;
@@ -393,7 +394,7 @@ export class TrunkCalculator {
             }
 
             if (config.debug && !suggestedPort!) {
-                console.error('[TrunkCalculator] suggestedPort was never assigned for horizontal trunk!', { isManyToOne, isTop });
+                logTrunkSuggestedPortInvariant({ isManyToOne, isTop });
             }
 
             // [FIX-peer-penetration] Ensure axis doesn't penetrate any peer node (Y direction).

@@ -9,6 +9,7 @@ import './main.css'; // 保留您项目全局的基础CSS
 // 导入console清理工具，在生产环境中自动清理console输出
 import { initDevConsoleFilters } from '@/core/utils/consoleCleanup';
 import { performanceMonitor } from '@/core/utils/performanceMonitor';
+import { logDataRegistryBootstrapFailure } from '@/main/appBootstrapLogging';
 // 导入全局错误处理
 import { initGlobalErrorHandling } from '@/core/utils/globalErrorHandler';
 
@@ -36,7 +37,7 @@ const initializeDataRegistryAfterPaint = () => {
     import('./data/DataRegistry')
       .then(({ initializeDataRegistry }) => initializeDataRegistry())
       .catch((error) => {
-        console.error('❌ 数据注册中心初始化失败:', error);
+        logDataRegistryBootstrapFailure(error);
       });
   };
 

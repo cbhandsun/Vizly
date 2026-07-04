@@ -33,6 +33,17 @@ import {
 import { ConfigManager, ConfigSource } from '../config/ConfigManager';
 import { validateTheme, themeToCSSVariables, applyCSSVariables, removeCSSVariables } from './ThemeUtils';
 import { pickReadableTextColor } from '../utils/colorUtils';
+import {
+  logThemeManagerCustomThemesLoadFailure,
+  logThemeManagerCustomThemesSaveFailure,
+  logThemeManagerEmbeddedThemeLoadFailure,
+  logThemeManagerFallbackFailure,
+  logThemeManagerFallbackToBuiltIn,
+  logThemeManagerInitializationFailure,
+  logThemeManagerListenerFailure,
+  logThemeManagerLoadFailure,
+  logThemeManagerPreloadFailure,
+} from './themeLogging';
 
 /**
  * 主题管理器事件类型
@@ -127,7 +138,7 @@ export class EnhancedThemeManager {
       this.preloadOtherThemes();
 
     } catch (error) {
-      console.error('🎨 EnhancedThemeManager - 初始化失败:', error);
+      logThemeManagerInitializationFailure(error);
 
       // 回退到内置主题
       await this.fallbackToBuiltInTheme();
@@ -160,7 +171,7 @@ export class EnhancedThemeManager {
       await this.applyTheme(theme, themeId);
       return theme;
     } catch (error) {
-      console.warn(`🎨 EnhancedThemeManager - 主题加载失败: ${themeId}`, error);
+      logThemeManagerLoadFailure(themeId, error);
       throw error;
     } finally {
       this.isLoading = false;
@@ -247,7 +258,7 @@ export class EnhancedThemeManager {
           }
         }
       } catch (embErr) {
-        console.warn(`[EnhancedThemeManager] 尝试从数据中心加载内嵌主题失败:`, embErr);
+        logThemeManagerEmbeddedThemeLoadFailure(embErr);
       }
 
       throw new Error(`主题 "${themeId}" 不存在`);
@@ -497,7 +508,7 @@ export class EnhancedThemeManager {
       try {
         listener(event);
       } catch (error) {
-        console.error('🎨 EnhancedThemeManager - 事件监听器执行失败:', error);
+        logThemeManagerListenerFailure(error);
       }
     });
   }
@@ -526,13 +537,13 @@ export class EnhancedThemeManager {
    * 回退到内置主题
    */
   private async fallbackToBuiltInTheme(): Promise<void> {
-    console.warn('🎨 EnhancedThemeManager - 回退到内置主题');
+    logThemeManagerFallbackToBuiltIn();
 
     try {
       const fallbackId = this.config.fallbackThemeId;
       await this.setTheme(fallbackId);
     } catch (error) {
-      console.error('🎨 EnhancedThemeManager - 回退主题加载失败:', error);
+      logThemeManagerFallbackFailure(error);
     }
   }
 
@@ -550,7 +561,7 @@ export class EnhancedThemeManager {
         });
       }
     } catch (error) {
-      console.warn('🎨 EnhancedThemeManager - 加载自定义主题失败:', error);
+      logThemeManagerCustomThemesLoadFailure(error);
     }
   }
 
@@ -562,7 +573,7 @@ export class EnhancedThemeManager {
       const themesArray = Array.from(this.customThemes.values());
       this.configManager.set('theme.customThemes', themesArray, ConfigSource.USER_OVERRIDE);
     } catch (error) {
-      console.warn('🎨 EnhancedThemeManager - 保存自定义主题失败:', error);
+      logThemeManagerCustomThemesSaveFailure(error);
     }
   }
 
@@ -599,7 +610,7 @@ export class EnhancedThemeManager {
             this.themeCache.set(themeId, preset.theme);
           }
         } catch (error) {
-          console.warn(`🎨 EnhancedThemeManager - 预加载主题失败: ${themeId}`, error);
+          logThemeManagerPreloadFailure(themeId, error);
         }
       }
     });

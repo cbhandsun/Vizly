@@ -16,6 +16,7 @@ import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 import { cleanMindMapData, cleanMindMapTopic } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import { PlusOutlined, LoadingOutlined } from '@ant-design/icons';
+import { logMindMapFloatingActionFailure } from './mindmapFloatingLogging';
 import styles from './FloatingBar.module.css';
 
 // ─── Colour palette for quick branch color ─────────────────────────────────
@@ -65,7 +66,10 @@ const MindMapFloatingBar: React.FC = () => {
                     y: rect.top - 8,        // 8px above the node
                     nodeId: node.id,
                 });
-            } catch { setPos(null); }
+            } catch (error) {
+                logMindMapFloatingActionFailure('selectPosition', error);
+                setPos(null);
+            }
         };
 
         const onDeselect = () => {
@@ -114,9 +118,17 @@ const MindMapFloatingBar: React.FC = () => {
 
     if (!pos || !mind) return null;
 
-    const getTpc = () => { try { return mind.findEle(pos.nodeId); } catch { return null; } };
+    const getTpc = () => {
+        try { return mind.findEle(pos.nodeId); } catch (error) {
+            logMindMapFloatingActionFailure('findSelectedTopic', error);
+            return null;
+        }
+    };
     const getObj = (): NodeObj | null => {
-        try { return findNodeById(mind.getData().nodeData, pos.nodeId); } catch { return null; }
+        try { return findNodeById(mind.getData().nodeData, pos.nodeId); } catch (error) {
+            logMindMapFloatingActionFailure('findSelectedNode', error);
+            return null;
+        }
     };
     const reshapeNodePatch = (tpc: unknown, baseObj: NodeObj | null | undefined, patch: Partial<NodeObj> & Record<string, unknown>) => {
         if (!baseObj) return;
@@ -167,7 +179,9 @@ const MindMapFloatingBar: React.FC = () => {
             if (!tpcEl) return;
             mind.selectNode(tpcEl as any);
             await mind.addChild(tpcEl as any, cleanMindMapChildNode({ label: topic }, mind.generateNewObj?.().id ?? `n_${Date.now()}`));
-        } catch {}
+        } catch (error) {
+            logMindMapFloatingActionFailure('applySuggestion', error);
+        }
     };
 
     const handleAISummarize = async () => {
@@ -373,7 +387,14 @@ const MindMapFloatingBar: React.FC = () => {
             {/* Duplicate — not for root */}
             {!isRoot && (
                 <Btn icon="📋" tip="复制为同级 (Ctrl+D)"
-                    onClick={() => act(() => { try { const tpc = getTpc(); if (tpc) mind.copyNode(tpc, tpc); } catch {} })} />
+                    onClick={() => act(() => {
+                        try {
+                            const tpc = getTpc();
+                            if (tpc) mind.copyNode(tpc, tpc);
+                        } catch (error) {
+                            logMindMapFloatingActionFailure('duplicateNode', error);
+                        }
+                    })} />
             )}
 
             <Div />
@@ -411,7 +432,9 @@ const MindMapFloatingBar: React.FC = () => {
                                             const obj2 = getObj();
                                             reshapeNodePatch(tpc, obj2, { branchColor: c === 'transparent' ? undefined : c });
                                         }
-                                    } catch {}
+                                    } catch (error) {
+                                        logMindMapFloatingActionFailure('setBranchColor', error);
+                                    }
                                     setColorOpen(false);
                                 }}
                                 style={{
@@ -453,7 +476,9 @@ const MindMapFloatingBar: React.FC = () => {
                                         try {
                                             const tpc = getTpc();
                                             if (tpc) reshapeNodePatch(tpc, obj, { shapeClass: key || undefined });
-                                        } catch {}
+                                        } catch (error) {
+                                            logMindMapFloatingActionFailure('setShapeClass', error);
+                                        }
                                         setShapeOpen(false);
                                     }}
                                 >
@@ -498,15 +523,25 @@ const MindMapFloatingBar: React.FC = () => {
                             <button
                                 className={styles.noteBtnClear}
                                 onClick={() => {
-                                    try { const tpc = getTpc(); if (tpc) reshapeNodePatch(tpc, obj, { note: undefined }); }
-                                    catch {} setNoteOpen(false);
+                                    try {
+                                        const tpc = getTpc();
+                                        if (tpc) reshapeNodePatch(tpc, obj, { note: undefined });
+                                    } catch (error) {
+                                        logMindMapFloatingActionFailure('clearNote', error);
+                                    }
+                                    setNoteOpen(false);
                                 }}
                             >清除</button>
                             <button
                                 className={styles.noteBtnSave}
                                 onClick={() => {
-                                    try { const tpc = getTpc(); if (tpc) reshapeNodePatch(tpc, obj, { note: noteText || undefined }); }
-                                    catch {} setNoteOpen(false);
+                                    try {
+                                        const tpc = getTpc();
+                                        if (tpc) reshapeNodePatch(tpc, obj, { note: noteText || undefined });
+                                    } catch (error) {
+                                        logMindMapFloatingActionFailure('saveNote', error);
+                                    }
+                                    setNoteOpen(false);
                                 }}
                             >保存</button>
                         </div>

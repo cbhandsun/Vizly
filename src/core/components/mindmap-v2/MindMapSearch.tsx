@@ -14,6 +14,7 @@ import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance } from './mindElixirStore';
 import { findNodeById } from './migrate';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
+import { logMindmapSearchFailure } from './mindmapInteractionLogging';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function collectAllNodes(root: NodeObj): NodeObj[] {
@@ -67,7 +68,10 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
         try {
             const all = collectAllNodes(mind.getData().nodeData);
             return all.filter(n => n.topic.toLowerCase().includes(query.toLowerCase())).map(n => n.id);
-        } catch { return []; }
+        } catch (error) {
+            logMindmapSearchFailure('collectMatches', error);
+            return [];
+        }
     }, [mind, query]);
 
     // Sync highlights
@@ -76,7 +80,12 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
         clearSearchHighlights();
         if (!mind || matchIds.length === 0) return;
         matchIds.forEach(id => {
-            try { const el = mind.findEle(id); if (el) el.classList.add('search-match'); } catch {}
+            try {
+                const el = mind.findEle(id);
+                if (el) el.classList.add('search-match');
+            } catch (error) {
+                logMindmapSearchFailure('highlightMatch', error);
+            }
         });
         const currentId = matchIds[Math.min(matchIdx, matchIds.length - 1)];
         if (currentId) {
@@ -88,7 +97,9 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
                     mind.scrollIntoView(el);
                     mind.selectNode(el);
                 }
-            } catch {}
+            } catch (error) {
+                logMindmapSearchFailure('activateMatch', error);
+            }
         }
     }, [mind, matchIds, matchIdx]);
 
@@ -156,7 +167,9 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
             setReplaceCount(1);
             // Move to next after replacing
             setTimeout(() => goNext(), 60);
-        } catch {}
+        } catch (error) {
+            logMindmapSearchFailure('replaceOne', error);
+        }
     }, [mind, matchIds, matchIdx, query, replaceText, goNext]);
 
     const doReplaceAll = useCallback(() => {
@@ -174,7 +187,9 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
                     mind.reshapeNode(tpc as any, { ...obj, ...cleanMindMapNodePatch({ topic: newTopic }) });
                     count++;
                 }
-            } catch {}
+            } catch (error) {
+                logMindmapSearchFailure('replaceAll', error);
+            }
         }
         setReplaceCount(count);
         setMatchIdx(0);

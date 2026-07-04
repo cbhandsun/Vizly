@@ -3,6 +3,12 @@ import type { MutableRefObject } from 'react';
 import { Edge, Position } from '@xyflow/react';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { setRenderedPathCacheValue } from '../../../routing/renderedPathCache';
+import {
+    logSmartPathWorkerEmptyResult,
+    logSmartPathWorkerFallback,
+    logSmartPathWorkerFailure,
+    logSmartPathWorkerMissingNode,
+} from './smartPathWorkerLogging';
 // import WorkerPool from '../../../workers/WorkerPool'; // Replaced by Coordinator
 
 // Define types locally to avoid circular deps
@@ -559,7 +565,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                 // [FIX] 节点在 simpleNodeMap 中找不到（常见于 HMR 热重载或首帧渲染）
                 // 不能设 isLoading=false！那会导致 fingerprint 匹配后永远停在直线。
                 // 正确做法：清除 fingerprint 强制下一帧重试，保持 loading 状态显示 fallback。
-                console.warn(`[SmartWorker:${id}] Node not found in simpleNodeMap — retrying next frame. source=${source} target=${target} mapSize=${simpleNodeMap.size}`);
+                logSmartPathWorkerMissingNode({ edgeId: id, source, target, mapSize: simpleNodeMap.size });
                 lastFingerprintRef.current = ''; // 清除指纹，强制下帧重算
                 // 保持 isLoading=true，下帧自然重试（不 setIsLoading(false)）
                 return;
@@ -812,7 +818,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
 
                 // [DEBUG] Worker Result Check
                 if (!res || res.error || !res.path) {
-                    console.warn(`[SmartWorker:${id}] Worker returned error or empty path:`, res?.error || 'Empty path');
+                    logSmartPathWorkerEmptyResult(id, res?.error || 'Empty path');
                     // Fallback or retry logic could go here
                 }
 
@@ -821,7 +827,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                     // [DEBUG] Log if fallback is triggered
                     const useFallback = !res || !res.path || res.error;
                     if (useFallback) {
-                        console.warn(`[SmartWorker:${id}] Using Fallback Path! Reason: ${res?.error ? res.error : 'Empty Path'}`);
+                        logSmartPathWorkerFallback(id, res?.error ? res.error : 'Empty Path');
                     }
 
                     const safePath = res?.path || `M ${centeredCoords.sourceX} ${centeredCoords.sourceY} L ${centeredCoords.targetX} ${centeredCoords.targetY}`;
@@ -853,7 +859,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                 setIsLoading(false);
             }).catch(err => {
                 if (!isMountedRef.current) return;
-                console.error(`[useSmartPathWorker] Worker Failed for ${id}:`, err);
+                logSmartPathWorkerFailure(id, err);
                 setIsLoading(false);
             });
 

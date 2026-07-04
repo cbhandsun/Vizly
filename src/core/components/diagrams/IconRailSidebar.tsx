@@ -9,6 +9,11 @@ import { Node } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { FlowchartNodeData } from '../custom-nodes/FlowchartNode';
 import { usePanelZoom } from '../../hooks/usePanelZoom';
+import {
+    clampIconRailDrawerWidth,
+    persistIconRailDrawerWidth,
+    readIconRailDrawerWidth,
+} from './iconRailSidebarStorage';
 import type { NodeTemplate } from './hooks/useNodeTemplates';
 import type { LayerConfig } from './hooks/useLayerManagement';
 import {
@@ -162,16 +167,11 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
     };
 
     // Drawer 可拖拽宽度
-    const [drawerWidth, setDrawerWidth] = useState<number>(() => {
-        try {
-            const v = Number(localStorage.getItem('designer.sidebar.drawerWidth'));
-            return Number.isFinite(v) && v >= 240 && v <= 400 ? v : 280;
-        } catch { return 280; }
-    });
+    const [drawerWidth, setDrawerWidth] = useState<number>(() => readIconRailDrawerWidth());
     const drawerDragRef = useRef<{ startX: number; startW: number } | null>(null);
 
     useEffect(() => {
-        try { localStorage.setItem('designer.sidebar.drawerWidth', String(drawerWidth)); } catch { void 0; }
+        persistIconRailDrawerWidth(drawerWidth);
         onDrawerWidthChange?.(drawerWidth);
     }, [drawerWidth, onDrawerWidthChange]);
 
@@ -180,7 +180,7 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
         const onMove = (e: MouseEvent) => {
             if (!drawerDragRef.current) return;
             const dx = e.clientX - drawerDragRef.current.startX;
-            setDrawerWidth(Math.max(240, Math.min(400, drawerDragRef.current.startW + dx)));
+            setDrawerWidth(clampIconRailDrawerWidth(drawerDragRef.current.startW + dx));
         };
         const onUp = () => { drawerDragRef.current = null; document.body.style.cursor = ''; document.body.style.userSelect = ''; };
         window.addEventListener('mousemove', onMove);

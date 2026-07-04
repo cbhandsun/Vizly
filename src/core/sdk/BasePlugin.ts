@@ -12,6 +12,7 @@ import {
 
 import { coerceToStandardDiagramData } from '../utils/coerceDiagram';
 import { diagramStyleManager } from '../components/shared/DiagramStyleManager';
+import { logBasePluginStandardDataCoercionFailure } from './basePluginLogging';
 
 const standardDataToReactFlowLightweight = (standardData: any): { nodes: Node[]; edges: Edge[] } => {
   const nodes = (standardData.nodes || []).map((nodeData: any, index: number) => {
@@ -157,7 +158,7 @@ export abstract class BaseDiagramPlugin implements DiagramTypePlugin {
         return standardDataToReactFlowLightweight(standardData);
       }
     } catch (e) {
-      console.warn(`[${this.id}] Standard data coercion failed, falling back to raw:`, e);
+      logBasePluginStandardDataCoercionFailure(this.id, e);
     }
 
     // 3. 兜底解析

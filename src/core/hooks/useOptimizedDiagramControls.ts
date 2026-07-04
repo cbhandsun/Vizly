@@ -11,10 +11,18 @@ import {
   _exportElementToPngDataUrl,
   _exportElementToSvgDataUrl,
   exportFullDiagramByAdjustingViewportToPngDataUrl,
-  exportFullDiagramByAdjustingViewportToSvgDataUrl,
   buildExportFileName,
   triggerDownload,
 } from '../components/shared/exportUtils';
+import { safeLog } from '../utils/consoleCleanup';
+import { redactSensitiveLogValue } from '../utils/logSecurity';
+import { logDiagramExportEventDispatchFailure } from './diagramExportLogging';
+import {
+  buildRenderSceneFromGlobalReactFlow,
+  buildRenderSceneFromReactFlowSnapshot,
+  type ReactFlowRenderSnapshot,
+} from '../rendering/reactFlowScene';
+import { exportRenderSceneToSvgDataUrl } from '../export/svgExport';
 
 // 防抖函数类型
 type DebouncedFunction<T extends (...args: any[]) => any> = {
@@ -90,7 +98,18 @@ interface ExportConfig {
   includeBackground?: boolean;
   /** 导出缩放比例 */
   scale?: number;
+  getReactFlowSnapshot?: () => ReactFlowRenderSnapshot | null | undefined;
 }
+
+const serializeExportError = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+};
 
 /**
  * 优化版图表控制 Hook
@@ -107,8 +126,8 @@ export const useOptimizedDiagramControls = (
   const dispatchExportEvent = (name: string, detail: any) => {
     try {
       window.dispatchEvent(new CustomEvent(name, { detail }));
-    } catch (_) {
-      // 忽略事件派发异常，避免影响导出流程
+    } catch (error) {
+      logDiagramExportEventDispatchFailure('useOptimizedDiagramControls', name, error);
     }
   };
   // 导出状态缓存
@@ -166,14 +185,14 @@ export const useOptimizedDiagramControls = (
   const exportToPNG = useCallback(async (): Promise<void> => {
     // 防止重复导出
     if (exportStateRef.current.isExporting) {
-      console.warn('导出正在进行中，请稍候...');
+      safeLog.warn('导出正在进行中，请稍候...');
       return;
     }
 
     // 限制导出频率（最少间隔2秒）
     const now = Date.now();
     if (now - exportStateRef.current.lastExportTime < 2000) {
-      console.warn('导出过于频繁，请稍候再试');
+      safeLog.warn('导出过于频繁，请稍候再试');
       return;
     }
 
@@ -217,8 +236,8 @@ export const useOptimizedDiagramControls = (
 
       dispatchExportEvent('diagramExportComplete', { diagramId, type: 'png' });
     } catch (error) {
-      console.error('PNG导出失败:', error);
-      dispatchExportEvent('diagramExportError', { diagramId, type: 'png', error });
+      safeLog.error('PNG导出失败:', redactSensitiveLogValue(error));
+      dispatchExportEvent('diagramExportError', { diagramId, type: 'png', error: serializeExportError(error) });
       alert(`导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
     } finally {
       exportStateRef.current.isExporting = false;
@@ -231,14 +250,14 @@ export const useOptimizedDiagramControls = (
   const exportToSVG = useCallback(async (): Promise<void> => {
     // 防止重复导出
     if (exportStateRef.current.isExporting) {
-      console.warn('导出正在进行中，请稍候...');
+      safeLog.warn('导出正在进行中，请稍候...');
       return;
     }
 
     // 限制导出频率（最少间隔2秒）
     const now = Date.now();
     if (now - exportStateRef.current.lastExportTime < 2000) {
-      console.warn('导出过于频繁，请稍候再试');
+      safeLog.warn('导出过于频繁，请稍候再试');
       return;
     }
 
@@ -269,20 +288,20 @@ export const useOptimizedDiagramControls = (
         '.menu-toggle-btn'
       ];
 
-      // 导出SVG
       const svgDataUrl = await temporarilyHideElements(elementsToHideSelectors, async () => {
-        return exportFullDiagramByAdjustingViewportToSvgDataUrl(
-          diagramId,
-          exportConfig.margin
-        );
+        const snapshot = exportConfig.getReactFlowSnapshot?.();
+        const scene = snapshot
+          ? buildRenderSceneFromReactFlowSnapshot(snapshot, { padding: exportConfig.margin })
+          : buildRenderSceneFromGlobalReactFlow({ padding: exportConfig.margin });
+        return exportRenderSceneToSvgDataUrl(scene, { title: diagramId });
       });
 
       triggerDownload(svgDataUrl, buildExportFileName(diagramId, 'svg'));
 
       dispatchExportEvent('diagramExportComplete', { diagramId, type: 'svg' });
     } catch (error) {
-      console.error('SVG导出失败:', error);
-      dispatchExportEvent('diagramExportError', { diagramId, type: 'svg', error });
+      safeLog.error('SVG导出失败:', redactSensitiveLogValue(error));
+      dispatchExportEvent('diagramExportError', { diagramId, type: 'svg', error: serializeExportError(error) });
       alert(`导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
     } finally {
       exportStateRef.current.isExporting = false;
@@ -295,14 +314,14 @@ export const useOptimizedDiagramControls = (
   const exportToPDF = useCallback(async (): Promise<void> => {
     // 防止重复导出
     if (exportStateRef.current.isExporting) {
-      console.warn('导出正在进行中，请稍候...');
+      safeLog.warn('导出正在进行中，请稍候...');
       return;
     }
 
     // 限制导出频率
     const now = Date.now();
     if (now - exportStateRef.current.lastExportTime < 2000) {
-      console.warn('导出过于频繁，请稍候再试');
+      safeLog.warn('导出过于频繁，请稍候再试');
       return;
     }
 
@@ -385,15 +404,15 @@ export const useOptimizedDiagramControls = (
 
       img.onerror = () => {
         const err = new Error('图片加载失败');
-        dispatchExportEvent('diagramExportError', { diagramId, type: 'pdf', error: err });
+        dispatchExportEvent('diagramExportError', { diagramId, type: 'pdf', error: serializeExportError(err) });
         throw err;
       };
 
       img.src = dataUrl;
 
     } catch (error) {
-      console.error('PDF导出失败:', error);
-      dispatchExportEvent('diagramExportError', { diagramId, type: 'pdf', error });
+      safeLog.error('PDF导出失败:', redactSensitiveLogValue(error));
+      dispatchExportEvent('diagramExportError', { diagramId, type: 'pdf', error: serializeExportError(error) });
       alert(`导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
     } finally {
       exportStateRef.current.isExporting = false;

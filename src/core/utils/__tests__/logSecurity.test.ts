@@ -1,4 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const safeLogState = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  log: vi.fn(),
+}));
+
+vi.mock('../consoleCleanup', () => ({
+  safeLog: safeLogState,
+}));
+
 import { DiagramError, ErrorHandler, ErrorSeverity, ErrorType } from '../ErrorHandler';
 import { LogLevel, LogType, RemoteAppender, type LogEntry } from '../Logger';
 import {
@@ -22,6 +35,7 @@ const createLogEntry = (data?: Record<string, unknown>): LogEntry => ({
 
 describe('logSecurity', () => {
   afterEach(() => {
+    Object.values(safeLogState).forEach(mock => mock.mockReset());
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -93,6 +107,13 @@ describe('logSecurity', () => {
     expect(JSON.stringify(payload)).not.toContain('super-secret-token');
   });
 
+  it('redacts authentication metadata fields in log entries', () => {
+    const sanitized = sanitizeLogEntry(createLogEntry({ requestId: 'req-1' }));
+
+    expect(sanitized.userId).toBe('[redacted]');
+    expect(sanitized.sessionId).toBe('[redacted]');
+  });
+
   it('rejects unsafe remote appender endpoints', () => {
     expect(() => new RemoteAppender('http://example.com/logs')).toThrow('Remote log endpoint must use HTTPS');
     expect(() => new RemoteAppender('file:///tmp/logs')).toThrow('Remote log endpoint must use HTTPS');
@@ -100,7 +121,6 @@ describe('logSecurity', () => {
 
   it('redacts ErrorHandler remote payloads and skips invalid endpoints', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
-    const warnMock = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     vi.stubGlobal('fetch', fetchMock);
 
     const handler = ErrorHandler.getInstance();
@@ -133,12 +153,68 @@ describe('logSecurity', () => {
     handler.updateConfig({ remoteLogEndpoint: 'http://example.com/errors' });
     handler.handleError(new Error('unsafe endpoint test'));
 
-    await vi.waitFor(() => expect(warnMock).toHaveBeenCalledWith('远程日志端点无效，已跳过发送'));
+    await vi.waitFor(() => expect(safeLogState.warn).toHaveBeenCalledWith('远程日志端点无效，已跳过发送'));
     expect(fetchMock).not.toHaveBeenCalled();
 
     handler.updateConfig({
       enableRemoteLog: false,
       remoteLogEndpoint: undefined,
+      showUserNotification: true,
+      enableErrorRecovery: true,
+    });
+  });
+
+  it('redacts ErrorHandler console payloads and listener failures', () => {
+    const handler = ErrorHandler.getInstance();
+    handler.clearErrorCache();
+    handler.updateConfig({
+      enableConsoleLog: true,
+      enableRemoteLog: false,
+      showUserNotification: false,
+      enableErrorRecovery: false,
+    });
+
+    const listener = vi.fn(() => {
+      throw new Error('listener failed with Authorization: Bearer secret-token');
+    });
+    handler.addErrorListener(listener);
+
+    handler.handleError(new DiagramError(
+      'request failed with token=live-token',
+      ErrorType.NETWORK,
+      ErrorSeverity.HIGH,
+      { data: { apiKey: 'test-api-key-placeholder-0001', requestId: 'req-1' } }
+    ));
+
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      expect.stringContaining('NETWORK'),
+      expect.objectContaining({
+        message: 'request failed with token=[redacted]',
+        context: expect.objectContaining({
+          data: expect.objectContaining({
+            apiKey: '[redacted]',
+            requestId: 'req-1',
+          }),
+        }),
+      })
+    );
+
+    expect(safeLogState.error).toHaveBeenCalledWith(
+      '错误监听器执行失败:',
+      expect.objectContaining({
+        message: 'listener failed with Authorization: [redacted]',
+      })
+    );
+
+    const warningPayload = JSON.stringify(safeLogState.warn.mock.calls);
+    const errorPayload = JSON.stringify(safeLogState.error.mock.calls);
+    expect(warningPayload).not.toContain('live-token');
+    expect(warningPayload).not.toContain('test-api-key-placeholder-0001');
+    expect(errorPayload).not.toContain('secret-token');
+
+    handler.removeErrorListener(listener);
+    handler.updateConfig({
+      enableConsoleLog: true,
       showUserNotification: true,
       enableErrorRecovery: true,
     });

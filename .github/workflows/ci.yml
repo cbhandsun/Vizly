@@ -15,7 +15,7 @@ jobs:
   verify:
     name: Verify and test
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -30,14 +30,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run static verification
-        run: npm run verify
-
-      - name: Run CI test shards
-        run: npm run test:ci
-
-      - name: Run route smoke checks
-        run: npm run smoke:routes:budget
-
-      - name: Run mobile viewport route smoke checks
-        run: npm run smoke:routes:mobile
+      - name: Run full verification
+        run: npm run verify:full

@@ -12,6 +12,7 @@ import {
 } from '../../algorithms/pathfinding';
 import { UnifiedRoutingConfig } from '../../types/routing';
 import { SpatialIndex } from '../../algorithms/SpatialIndex';
+import { logAStarGridFailure } from '../../utils/routingLogging';
 
 export interface PathfinderOptions {
     grid: PathfindingGrid;
@@ -77,7 +78,7 @@ export class AStarPathfinder {
             // [P6] 仅在 debug 模式打印错误：A* 边界情况（start==end、网格为空）会抛出，
             // 生产环境的 console.error 在 DevTools 开启时有显著开销。
             if (this.config.debug) {
-                console.error('[AStarPathfinder] Grid A* failed:', error);
+                logAStarGridFailure(error);
             }
             return null;
         }

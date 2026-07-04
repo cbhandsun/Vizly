@@ -1,4 +1,4 @@
-import { safeJsonParse } from './jsonUtils';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from './uiStorageLogging';
 
 type StorageReader = Pick<Storage, 'getItem'>;
 type StorageWriter = Pick<Storage, 'getItem' | 'setItem'>;
@@ -15,6 +15,7 @@ const MAX_CONFIG_INDEX_ENTRIES = 1000;
 const MAX_CONFIG_ID_LENGTH = 160;
 const MAX_CONFIG_TYPE_LENGTH = 80;
 const MAX_CONFIG_NAME_LENGTH = 240;
+const MAX_DIAGRAM_TYPE_STORAGE_JSON_LENGTH = 2 * 1024 * 1024;
 
 const getRecord = (value: unknown): Record<string, unknown> =>
     value && typeof value === 'object' && !Array.isArray(value)
@@ -39,6 +40,20 @@ const cleanUpdatedAt = (value: unknown): number | undefined => (
         : undefined
 );
 
+const parseStoredJson = <T>(raw: string | null, fallback: T, key: string): T => {
+    if (!raw) return fallback;
+    if (raw.length > MAX_DIAGRAM_TYPE_STORAGE_JSON_LENGTH) {
+        logUiStorageReadFailure('diagramTypeStorage', key, new Error('Diagram type storage JSON is too large.'));
+        return fallback;
+    }
+    try {
+        return JSON.parse(raw) as T;
+    } catch (error) {
+        logUiStorageReadFailure('diagramTypeStorage', key, error);
+        return fallback;
+    }
+};
+
 export const coerceDiagramConfigIndex = (value: unknown): Record<string, DiagramConfigIndexEntry> => {
     const raw = getRecord(value);
     const entries: Array<[string, DiagramConfigIndexEntry]> = [];
@@ -62,9 +77,16 @@ export const coerceDiagramConfigIndex = (value: unknown): Record<string, Diagram
 
 export const readDiagramConfigIndex = (
     storage: StorageReader
-): Record<string, DiagramConfigIndexEntry> => (
-    coerceDiagramConfigIndex(safeJsonParse<unknown>(storage.getItem(DIAGRAM_CONFIG_INDEX_KEY), {}))
-);
+): Record<string, DiagramConfigIndexEntry> => {
+    try {
+        return coerceDiagramConfigIndex(
+            parseStoredJson<unknown>(storage.getItem(DIAGRAM_CONFIG_INDEX_KEY), {}, DIAGRAM_CONFIG_INDEX_KEY)
+        );
+    } catch (error) {
+        logUiStorageReadFailure('diagramTypeStorage', DIAGRAM_CONFIG_INDEX_KEY, error);
+        return {};
+    }
+};
 
 export const upsertDiagramConfigIndex = (
     storage: StorageWriter,
@@ -81,7 +103,11 @@ export const upsertDiagramConfigIndex = (
         name: cleanString(entry.name, MAX_CONFIG_NAME_LENGTH),
         updatedAt: cleanUpdatedAt(entry.updatedAt) ?? Date.now(),
     };
-    storage.setItem(DIAGRAM_CONFIG_INDEX_KEY, JSON.stringify(configs));
+    try {
+        storage.setItem(DIAGRAM_CONFIG_INDEX_KEY, JSON.stringify(configs));
+    } catch (error) {
+        logUiStorageWriteFailure('diagramTypeStorage', DIAGRAM_CONFIG_INDEX_KEY, error);
+    }
 };
 
 export const getDiagramDocTypeFromStorage = (
@@ -90,7 +116,12 @@ export const getDiagramDocTypeFromStorage = (
 ): string | undefined => {
     if (!selectedDiagramId) return undefined;
 
-    const diagrams = safeJsonParse<unknown>(storage.getItem('vizly_diagrams'), []);
+    let diagrams: unknown = [];
+    try {
+        diagrams = parseStoredJson<unknown>(storage.getItem('vizly_diagrams'), [], 'vizly_diagrams');
+    } catch (error) {
+        logUiStorageReadFailure('diagramTypeStorage', 'vizly_diagrams', error);
+    }
     if (Array.isArray(diagrams)) {
         const found = diagrams.find((diagram) => getStringProp(diagram, 'id') === selectedDiagramId);
         const type = getStringProp(found, 'type');
@@ -101,10 +132,16 @@ export const getDiagramDocTypeFromStorage = (
     const configType = getStringProp(configs[selectedDiagramId], 'type');
     if (configType) return configType;
 
-    const autosave = getRecord(safeJsonParse<unknown>(
-        storage.getItem(`flowchart-autosave-v2-${selectedDiagramId}`),
-        {}
-    ));
+    let autosave: Record<string, unknown> = {};
+    try {
+        autosave = getRecord(parseStoredJson<unknown>(
+            storage.getItem(`flowchart-autosave-v2-${selectedDiagramId}`),
+            {},
+            `flowchart-autosave-v2-${selectedDiagramId}`
+        ));
+    } catch (error) {
+        logUiStorageReadFailure('diagramTypeStorage', `flowchart-autosave-v2-${selectedDiagramId}`, error);
+    }
     const autosaveType = getStringProp(autosave.metadata, 'type');
     if (autosaveType) return autosaveType;
 

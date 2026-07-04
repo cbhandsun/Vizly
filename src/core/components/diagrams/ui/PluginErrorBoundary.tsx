@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { WarningOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Button, Tooltip } from 'antd';
+import { logPluginBoundaryError } from '../../../../utils/errorBoundaryLogging';
 
 interface Props {
   pluginId: string;
@@ -24,7 +25,7 @@ export class PluginErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error(`[PluginErrorBoundary] Error in plugin "${this.props.pluginId}" UI area "${this.props.uiArea || 'unknown'}":`, error, errorInfo);
+    logPluginBoundaryError(this.props.pluginId, this.props.uiArea, error, errorInfo);
   }
 
   handleRetry = () => {

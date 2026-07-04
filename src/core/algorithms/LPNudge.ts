@@ -16,6 +16,7 @@
 
 import type { Point } from '../types/routing';
 import { safeLog } from '../utils/consoleCleanup';
+import { logLPNudgeOptimizeFailure } from '../utils/routingLogging';
 
 /**
  * 边段表示
@@ -438,7 +439,7 @@ export function optimizePaths(
     try {
         result = nudge.optimize(segments);
     } catch(e) {
-        console.error("LPNudge optimize failed", e);
+        logLPNudgeOptimizeFailure(e);
         return paths;
     }
 

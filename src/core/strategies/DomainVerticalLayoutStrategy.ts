@@ -12,6 +12,7 @@ import { auditAndFixSubGroupChildrenBindings, centerSubGroupChildrenHorizontally
 import { injectSemanticSubGroupsForMissingKeys, rebindChildrenNormalized } from './shared/semanticHelpers';
 import { ensureDomainContainment } from './shared/geometryGuard';
 import { runEdgeRoutingPipeline } from './shared/edgeRoutingPipeline';
+import { safeLog } from '../utils/consoleCleanup';
 
 
 /**
@@ -469,7 +470,7 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
 
       // 检测是否所有域容器都隐藏（或没有域容器）
       const allDomainsHidden = tgs.length === 0 || tgs.every(tg => !!((tg as any)?.data?.hidden));
-      console.debug(`[DOMAIN-HIDDEN-CHECK] tgs.length=${tgs.length}, allDomainsHidden=${allDomainsHidden}`);
+      safeLog.debug(`[DOMAIN-HIDDEN-CHECK] tgs.length=${tgs.length}, allDomainsHidden=${allDomainsHidden}`);
 
       if (allDomainsHidden) {
         // 所有域隐藏时：对所有子域进行全局紧凑垂直堆叠

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { safeJsonParse } from '../../../utils/jsonUtils';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from '../../../utils/uiStorageLogging';
+import { safeJsonParseWithLimit } from '../../../utils/jsonUtils';
 
 export interface Annotation {
     id: string;
@@ -21,6 +22,7 @@ const MAX_ANNOTATIONS = 500;
 const MAX_ANNOTATION_TEXT_LENGTH = 4000;
 const MAX_ANNOTATION_ID_LENGTH = 120;
 const MAX_COORDINATE_ABS = 1_000_000;
+const MAX_ANNOTATIONS_JSON_LENGTH = 2 * 1024 * 1024;
 
 const ANNOTATION_COLORS = [
     '#facc15', // yellow (default)
@@ -79,11 +81,22 @@ export function coerceAnnotations(value: unknown): Annotation[] {
     return annotations;
 }
 
+const parseStoredAnnotations = (raw: string | null): unknown => {
+    return safeJsonParseWithLimit<unknown>(raw, [], {
+        maxLength: MAX_ANNOTATIONS_JSON_LENGTH,
+        onFailure: (error) => {
+            logUiStorageReadFailure('useAnnotations.loadAnnotations', STORAGE_KEY, error);
+        },
+        buildOversizeError: () => new Error('Annotations JSON is too large.'),
+    });
+};
+
 const loadAnnotations = (): Annotation[] => {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        return coerceAnnotations(safeJsonParse<unknown>(raw, []));
-    } catch {
+        return coerceAnnotations(parseStoredAnnotations(raw));
+    } catch (error) {
+        logUiStorageReadFailure('useAnnotations.loadAnnotations', STORAGE_KEY, error);
         return [];
     }
 };
@@ -99,7 +112,11 @@ export const useAnnotations = () => {
 
     // 持久化
     useEffect(() => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(annotations));
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(annotations));
+        } catch (error) {
+            logUiStorageWriteFailure('useAnnotations.persistAnnotations', STORAGE_KEY, error);
+        }
     }, [annotations]);
 
     const addAnnotation = useCallback((x: number, y: number, text: string = '', color?: string) => {

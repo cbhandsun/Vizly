@@ -57,12 +57,16 @@ interface ParsedPathPoint {
 interface Segment {
     a: ParsedPathPoint;
     b: ParsedPathPoint;
+    edgeId: string;
+    segmentIndex: number;
+    pointCount: number;
 }
 
 type EndpointSide = 'top' | 'right' | 'bottom' | 'left';
 
 const EPS = 1;
 const NODE_NEAR_PATH_WARNING_DISTANCE = 16;
+const PARALLEL_OVERLAP_ERROR_LENGTH = 24;
 const CONTAINER_TYPES = new Set(['group', 'subGroup', 'titleGroup', 'domain', 'subDomain', 'swimlane']);
 
 export function parseRenderedSvgPath(path: string): ParsedPathPoint[] {
@@ -119,14 +123,14 @@ export function parseRenderedSvgPath(path: string): ParsedPathPoint[] {
     return points;
 }
 
-const structuralSegments = (points: ParsedPathPoint[]): Segment[] => {
+const structuralSegments = (edgeId: string, points: ParsedPathPoint[]): Segment[] => {
     const segments: Segment[] = [];
     for (let i = 0; i < points.length - 1; i++) {
         const a = points[i];
         const b = points[i + 1];
         if (b.command === 'A' || b.command === 'C' || b.command === 'Q') continue;
         if (Math.abs(a.x - b.x) <= EPS && Math.abs(a.y - b.y) <= EPS) continue;
-        segments.push({ a, b });
+        segments.push({ a, b, edgeId, segmentIndex: i, pointCount: points.length });
     }
     return segments;
 };
@@ -201,6 +205,39 @@ const segmentsStrictlyCross = (first: Segment, second: Segment): boolean => {
         && y < Math.max(vA.y, vB.y) - 2;
 };
 
+const parallelOverlapLength = (first: Segment, second: Segment): number => {
+    const firstHorizontal = Math.abs(first.a.y - first.b.y) <= EPS;
+    const firstVertical = Math.abs(first.a.x - first.b.x) <= EPS;
+    const secondHorizontal = Math.abs(second.a.y - second.b.y) <= EPS;
+    const secondVertical = Math.abs(second.a.x - second.b.x) <= EPS;
+    if ((!firstHorizontal && !firstVertical) || (!secondHorizontal && !secondVertical) || firstHorizontal !== secondHorizontal) return 0;
+    if (firstHorizontal && Math.abs(first.a.y - second.a.y) > 2) return 0;
+    if (firstVertical && Math.abs(first.a.x - second.a.x) > 2) return 0;
+
+    return firstHorizontal
+        ? Math.min(Math.max(first.a.x, first.b.x), Math.max(second.a.x, second.b.x))
+            - Math.max(Math.min(first.a.x, first.b.x), Math.min(second.a.x, second.b.x))
+        : Math.min(Math.max(first.a.y, first.b.y), Math.max(second.a.y, second.b.y))
+            - Math.max(Math.min(first.a.y, first.b.y), Math.min(second.a.y, second.b.y));
+};
+
+const isProtectedRenderedSharedTrunk = (
+    first: Segment,
+    firstEdge: RenderedAuditEdge,
+    second: Segment,
+    secondEdge: RenderedAuditEdge,
+): boolean => {
+    if (firstEdge.source === secondEdge.source && first.segmentIndex === 0 && second.segmentIndex === 0) {
+        return true;
+    }
+    if (firstEdge.target === secondEdge.target
+        && first.segmentIndex >= first.pointCount - 3
+        && second.segmentIndex >= second.pointCount - 3) {
+        return true;
+    }
+    return false;
+};
+
 const distanceToSegment = (point: { x: number; y: number }, segment: Segment): number => {
     if (Math.abs(segment.a.x - segment.b.x) <= EPS) {
         const y = Math.max(Math.min(segment.a.y, segment.b.y), Math.min(Math.max(segment.a.y, segment.b.y), point.y));
@@ -267,7 +304,7 @@ export function auditRenderedEdgeRouting(edges: RenderedAuditEdge[], nodes: Rend
     const nodeById = new Map(nodes.map(node => [node.id, node]));
     const parsedEdges = edges.map(edge => {
         const points = parseRenderedSvgPath(edge.path);
-        return { edge, points, segments: structuralSegments(points) };
+        return { edge, points, segments: structuralSegments(edge.id, points) };
     });
     const errors: RenderedAuditFinding[] = [];
     const warnings: RenderedAuditFinding[] = [];
@@ -387,6 +424,18 @@ export function auditRenderedEdgeRouting(edges: RenderedAuditEdge[], nodes: Rend
                         pushError({
                             rule: 'edge-crossing',
                             reason: 'Two rendered structural segments strictly cross.',
+                            relatedEdgeIds: [parsedEdges[i].edge.id, parsedEdges[j].edge.id],
+                        });
+                        continue;
+                    }
+
+                    const overlap = parallelOverlapLength(first, second);
+                    if (overlap >= PARALLEL_OVERLAP_ERROR_LENGTH
+                        && !isProtectedRenderedSharedTrunk(first, parsedEdges[i].edge, second, parsedEdges[j].edge)) {
+                        pushError({
+                            rule: 'edge-parallel-overlap',
+                            reason: 'Two rendered structural segments share a non-protected lane long enough to obscure flow direction.',
+                            measuredValue: Number(overlap.toFixed(2)),
                             relatedEdgeIds: [parsedEdges[i].edge.id, parsedEdges[j].edge.id],
                         });
                     }

@@ -179,5 +179,71 @@ export function detectLocalDoglegRisks(
         }
     }
 
+    for (let i = 0; i + 4 < points.length; i++) {
+        const a = points[i];
+        const b = points[i + 1];
+        const c = points[i + 2];
+        const d = points[i + 3];
+        const e = points[i + 4];
+
+        const horizontalEntry = Math.abs(a.y - b.y) <= config.axisTolerance;
+        const verticalOut = Math.abs(b.x - c.x) <= config.axisTolerance;
+        const horizontalBridge = Math.abs(c.y - d.y) <= config.axisTolerance;
+        const verticalBack = Math.abs(d.x - e.x) <= config.axisTolerance;
+        if (horizontalEntry && verticalOut && horizontalBridge && verticalBack && Math.abs(a.y - e.y) <= config.axisTolerance) {
+            const returnsToMainAxis = Math.sign(c.y - b.y) === -Math.sign(e.y - d.y);
+            const depth = Math.max(Math.abs(c.y - b.y), Math.abs(e.y - d.y));
+            const detourLength = Math.abs(b.x - a.x)
+                + Math.abs(c.y - b.y)
+                + Math.abs(d.x - c.x)
+                + Math.abs(e.y - d.y);
+            const directLength = Math.abs(e.x - a.x);
+            const extraLength = detourLength - directLength;
+            if (
+                returnsToMainAxis
+                && depth >= config.minDepth
+                && depth <= config.maxDepth
+                && extraLength >= config.minExtraLength
+            ) {
+                risks.push({
+                    index: i,
+                    rule: 'local-micro-dogleg',
+                    type: 'H-V-H',
+                    depth: Number(depth.toFixed(2)),
+                    extraLength: Number(extraLength.toFixed(2)),
+                });
+            }
+        }
+
+        const verticalEntry = Math.abs(a.x - b.x) <= config.axisTolerance;
+        const horizontalOut = Math.abs(b.y - c.y) <= config.axisTolerance;
+        const verticalBridge = Math.abs(c.x - d.x) <= config.axisTolerance;
+        const horizontalBack = Math.abs(d.y - e.y) <= config.axisTolerance;
+        if (verticalEntry && horizontalOut && verticalBridge && horizontalBack && Math.abs(a.x - e.x) <= config.axisTolerance) {
+            const returnsToMainAxis = Math.sign(c.x - b.x) === -Math.sign(e.x - d.x);
+            const depth = Math.max(Math.abs(c.x - b.x), Math.abs(e.x - d.x));
+            const detourLength = Math.abs(b.y - a.y)
+                + Math.abs(c.x - b.x)
+                + Math.abs(d.y - c.y)
+                + Math.abs(e.x - d.x);
+            const directLength = Math.abs(e.y - a.y);
+            const extraLength = detourLength - directLength;
+            if (
+                returnsToMainAxis
+                && depth >= config.minDepth
+                && depth <= config.maxDepth
+                && extraLength >= config.minExtraLength
+            ) {
+                risks.push({
+                    index: i,
+                    rule: 'local-micro-dogleg',
+                    type: 'V-H-V',
+                    depth: Number(depth.toFixed(2)),
+                    extraLength: Number(extraLength.toFixed(2)),
+                });
+            }
+        }
+    }
+
     return risks;
 }

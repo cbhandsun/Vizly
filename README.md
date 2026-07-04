@@ -8,7 +8,19 @@ Run the core local gate before handing off changes:
 npm run verify
 ```
 
-This checks that generated artifacts are not tracked, scans tracked text files for common secret patterns, blocks unsafe style injection sinks, runs the dependency advisory check, then runs TypeScript, ESLint, the production build, and bundle budgets.
+This runs the static gate and the stable CI test shards. The static gate checks that generated artifacts are not tracked, scans tracked text files for common secret patterns, blocks unsafe DOM HTML sinks, enforces the source-size baseline, runs the dependency advisory check, then runs TypeScript, ESLint, the production build, and bundle budgets.
+
+For a faster static-only pass while iterating locally:
+
+```powershell
+npm run verify:static
+```
+
+For the full release-style gate, including route smoke checks for desktop and mobile viewports:
+
+```powershell
+npm run verify:full
+```
 
 Bundle budget limits can be adjusted with `BUNDLE_MAX_JS_CHUNK_KB`, `BUNDLE_MAX_JS_GZIP_CHUNK_KB`, `BUNDLE_MAX_CSS_CHUNK_KB`, `BUNDLE_MAX_CSS_GZIP_CHUNK_KB`, and `BUNDLE_MAX_TOTAL_JS_KB`.
 
@@ -28,7 +40,7 @@ npm run test:ci
 
 This first checks that every `src/**/__tests__/*.test.ts(x)` and `supabase/**/__tests__/*.test.ts(x)` file is assigned to a CI shard, then runs split Vitest shards for node-only logic, jsdom/browser APIs, UI guards, core components, mind map behavior, and routing/layout internals.
 
-`npm run test:all:lowcpu` runs the full Vitest suite with reduced worker concurrency. It is intentionally separate from `npm run verify` because the full suite is currently too slow for the default local gate.
+`npm run test:all:lowcpu` runs the full Vitest suite with reduced worker concurrency. It is intentionally separate from `npm run verify`; `verify` uses the curated CI shards above.
 
 ## Route Smoke Checks
 

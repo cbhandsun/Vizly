@@ -4,6 +4,10 @@ import { theme } from 'antd';
 import { FaPalette, FaCheck } from 'react-icons/fa';
 import { useConfigIntegration } from '@/core/hooks/useConfigIntegration';
 import { useTheme } from '@/core/themes/useCoreTheme';
+import {
+    logThemeSwitcherPanelApplyPresetFailure,
+    logThemeSwitcherPanelLoadFailure,
+} from '@/core/themes/themeLogging';
 import type { ThemePreset } from '@/core/themes/types/ThemeTypes';
 
 interface ThemeSwitcherPanelProps {
@@ -29,7 +33,7 @@ export const ThemeSwitcherPanel: React.FC<ThemeSwitcherPanelProps> = ({ classNam
                 const allPresets = await presetManager.getAllPresets();
                 setPresets(allPresets);
             } catch (error) {
-                console.error('Failed to load theme data:', error);
+                logThemeSwitcherPanelLoadFailure(error);
             }
         };
         
@@ -49,7 +53,7 @@ export const ThemeSwitcherPanel: React.FC<ThemeSwitcherPanelProps> = ({ classNam
             // Broadcast global event
             window.dispatchEvent(new CustomEvent('diagram-global-theme-changed', { detail: preset.id }));
         } catch (error) {
-            console.error('Failed to apply preset:', error);
+            logThemeSwitcherPanelApplyPresetFailure(error);
         }
     };
 

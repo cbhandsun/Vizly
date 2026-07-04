@@ -16,6 +16,10 @@ describe('themeImportSecurity', () => {
     expect(() => parseThemeImportJson('x'.repeat(THEME_IMPORT_MAX_CHARS + 1))).toThrow('too large');
   });
 
+  it('rejects malformed theme JSON', () => {
+    expect(() => parseThemeImportJson('{invalid-json')).toThrow('Theme import JSON is invalid');
+  });
+
   it('coerces a valid theme preset and forces imported category', () => {
     const preset = coerceThemePresetImport(clone(lightThemePreset), 'imported-light', 'custom');
 

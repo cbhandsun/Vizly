@@ -1,10 +1,15 @@
 import { useCallback, useRef, useEffect } from 'react';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
-import { readDomViewport } from '../../../utils/domViewport';
+import { projectScreenPositionToFlowPosition, readDomViewport } from '../../../utils/domViewport';
 import type { SnapDelta } from '../../../hooks/useSmartGuides';
 import type { ClipboardData } from '../../../utils/flowchartClipboard';
 import { parseDragNodeTemplate, parseReverseImportDiagramState } from '../../../utils/dragDropPayload';
 import { getReverseImportImageFileError } from '../../../utils/fileImportGuards';
+import {
+    logDiagramDragDropFailure,
+    logDiagramDragDropImportRejected,
+    logDiagramDragDropReverseImportFailure,
+} from './diagramInteractionLogging';
 
 interface UseDiagramDragDropProps {
     nodes: Node[];
@@ -67,7 +72,7 @@ export const useDiagramDragDrop = ({
                     try {
                         const importError = getReverseImportImageFileError(file);
                         if (importError) {
-                            console.warn('[Reverse Import]', importError);
+                            logDiagramDragDropImportRejected(importError);
                             return;
                         }
 
@@ -104,7 +109,7 @@ export const useDiagramDragDrop = ({
                             return;
                         }
                     } catch (err) {
-                        console.error('Reverse Import failed:', err);
+                        logDiagramDragDropReverseImportFailure(err);
                     }
                 }
             }
@@ -129,13 +134,7 @@ export const useDiagramDragDrop = ({
                 // 1. 从 DOM 读取真实的 viewport transform（绕过 getViewport() 陈旧值 bug）
                 const { x: vpX, y: vpY, zoom: vpZoom } = readDomViewport();
 
-                // 2. 获取 .react-flow 容器的 BCR
-                const rfContainer = document.querySelector('.react-flow') as HTMLElement | null;
-                const bcr = rfContainer?.getBoundingClientRect();
-                const bcrLeft = bcr?.left ?? 0;
-                const bcrTop = bcr?.top ?? 0;
-
-                // 3. ✨ 核心体验修复：智能计算释放幽灵坐标 (对齐释放时光标与中心点)
+                // 2. ✨ 核心体验修复：智能计算释放幽灵坐标 (对齐释放时光标与中心点)
                 let finalOffsetX = offsetX || 0;
                 let finalOffsetY = offsetY || 0;
                 
@@ -160,13 +159,16 @@ export const useDiagramDragDrop = ({
                     flowY = projected.y;
                 } else {
                     // 退级方案
-                    const flowXFallback = (ghostLeftScreenX - bcrLeft - vpX) / vpZoom;
-                    const flowYFallback = (ghostTopScreenY - bcrTop - vpY) / vpZoom;
+                    const { x: flowXFallback, y: flowYFallback } = projectScreenPositionToFlowPosition({
+                        screenX: ghostLeftScreenX,
+                        screenY: ghostTopScreenY,
+                        viewport: { x: vpX, y: vpY, zoom: vpZoom },
+                    });
                     flowX = flowXFallback;
                     flowY = flowYFallback;
                 }
 
-                // 4. 新节点位置（直接贴合）
+                // 3. 新节点位置（直接贴合）
                 const position = {
                     x: Math.round(flowX / 5) * 5, // 轻微网格吸附，防止非整数像素模糊
                     y: Math.round(flowY / 5) * 5,
@@ -286,7 +288,7 @@ export const useDiagramDragDrop = ({
 
                 setNodes((nds) => nds.concat(newNode));
             } catch (err) {
-                console.error('Drop failed', err);
+                logDiagramDragDropFailure(err);
             }
         },
         // [P-2] Use nodesRef/edgesRef instead of nodes/edges in deps.

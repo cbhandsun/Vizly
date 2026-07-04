@@ -1,6 +1,8 @@
 
 import React, { Suspense } from 'react';
 import { useLocation } from 'react-router-dom';
+import { coerceSafeStringParam, getQueryOrHashParamFromLocation, type LocationLike, coerceDiagramId } from '@/core/utils/inputBoundary';
+
 type LazyPageModule = { default: React.ComponentType };
 
 const withAntdRoute = (loadPage: () => Promise<LazyPageModule>) => React.lazy(async () => {
@@ -34,19 +36,32 @@ const renderRoute = (fallback: string, RouteComponent: React.ComponentType) => (
   </Suspense>
 );
 
+const allowedTestModes = new Set(['colors', 'sidebyside', 'docs', '3d', 'unified']);
+
 const AppRoutes = () => {
   // 根据路径或查询参数决定显示哪个组件
   const location = useLocation();
-  const urlParams = new URLSearchParams(location.search || window.location.search);
-  const testMode = urlParams.get('test');
+  const browserLocation = typeof window === 'undefined' ? null : window.location;
+  const testModeRaw = coerceSafeStringParam(
+    getQueryOrHashParamFromLocation(location as LocationLike, 'test') ||
+    getQueryOrHashParamFromLocation(browserLocation, 'test'),
+    '',
+    64
+  );
+  const testMode = allowedTestModes.has(testModeRaw) ? testModeRaw : '';
+  const diagramFromRoute = coerceDiagramId(
+    getQueryOrHashParamFromLocation(location as LocationLike, 'diagram') ||
+    getQueryOrHashParamFromLocation(browserLocation, 'diagram')
+  );
   
   // 兼容 HashRouter 和 直接输入的 pathname
   // 如果 HashRouter 有明确的目标且不是单纯的根路径，优先使用它
   let path = location.pathname;
-  if (path === '/' && window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
+  const browserPathname = browserLocation ? browserLocation.pathname : '';
+  if (path === '/' && browserPathname && browserPathname !== '/' && browserPathname !== '/index.html') {
     // 只有在没有 diagram 参数且没有特定的 test mode 的情况才 fallback 到 window.location.pathname
-    if (!urlParams.has('diagram') && !testMode) {
-      path = window.location.pathname;
+    if (!diagramFromRoute && !testMode) {
+      path = browserPathname;
     }
   }
 
@@ -75,7 +90,7 @@ const AppRoutes = () => {
     return renderRoute('加载分享页面...', ShareViewPage);
   }
 
-  const isHomeEmpty = (path === '/' || path === '') && !urlParams.has('diagram') && !testMode;
+  const isHomeEmpty = (path === '/' || path === '') && !diagramFromRoute && !testMode;
 
   if (path.startsWith('/manage') || isHomeEmpty) {
     return renderRoute('加载图表管理...', DiagramManagementPage);

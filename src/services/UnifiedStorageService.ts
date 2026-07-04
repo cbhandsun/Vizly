@@ -1,27 +1,63 @@
 import type { IStorageProvider, DiagramMetadata, SavedDiagram, DiagramVersion } from './storage/types';
 import { localVersionDB } from './IndexedDBStorage';
 import { coerceS3StorageConfig } from './storageSecurity';
+import { safeLog } from '@/core/utils/consoleCleanup';
+import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from '@/core/utils/uiStorageLogging';
+import { safeJsonParseWithLimit } from '@/core/utils/jsonUtils';
 
 export type StorageProviderType = 'supabase' | 's3';
 
 const STORAGE_PROVIDER_KEY = 'DiagramView.StorageProvider';
 const S3_CONFIG_KEY = 'diagram_storage_config';
 const S3_SECRET_SESSION_KEY = `${S3_CONFIG_KEY}_secret`;
+const MAX_S3_STORAGE_CONFIG_JSON_CHARS = 2 * 1024 * 1024;
 
 const isSupabaseConfigured = () => {
     return Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
+};
+
+const clearPersistedS3Config = () => {
+    try {
+        localStorage.removeItem(S3_CONFIG_KEY);
+    } catch (error) {
+        logUiStorageWriteFailure('UnifiedStorageService.clearS3Config', S3_CONFIG_KEY, error);
+    }
+
+    try {
+        sessionStorage.removeItem(S3_SECRET_SESSION_KEY);
+    } catch (error) {
+        logUiStorageWriteFailure('UnifiedStorageService.clearS3Config', S3_SECRET_SESSION_KEY, error);
+    }
 };
 
 const isS3Configured = () => {
     try {
         const raw = localStorage.getItem(S3_CONFIG_KEY);
         if (!raw) return false;
+        const parsed = safeJsonParseWithLimit<unknown>(raw, null, {
+            maxLength: MAX_S3_STORAGE_CONFIG_JSON_CHARS,
+            onFailure: (error) => {
+                logUiStorageReadFailure('UnifiedStorageService.isS3Configured', S3_CONFIG_KEY, error);
+            },
+            buildOversizeError: () => new Error('S3 storage config JSON is too large.'),
+        });
+        if (!parsed) {
+            clearPersistedS3Config();
+            return false;
+        }
         const config = coerceS3StorageConfig(
-            JSON.parse(raw),
+            parsed,
             sessionStorage.getItem(S3_SECRET_SESSION_KEY) || ''
         );
-        return Boolean(config);
-    } catch {
+        if (!config) {
+            clearPersistedS3Config();
+            return false;
+        }
+        return true;
+    } catch (error) {
+        logUiStorageReadFailure('UnifiedStorageService.isS3Configured', S3_CONFIG_KEY, error);
+        clearPersistedS3Config();
         return false;
     }
 };
@@ -121,13 +157,18 @@ export class UnifiedStorageService implements IStorageProvider {
                 this._currentProviderId = stored;
             }
         } catch (e) {
-            console.error('Failed to load storage preference', e);
+            logUiStorageReadFailure('UnifiedStorageService.loadProviderPreference', STORAGE_PROVIDER_KEY, e);
+            safeLog.error('Failed to load storage preference', redactSensitiveLogValue(e));
         }
     }
 
     setProvider(id: StorageProviderType) {
         this._currentProviderId = id;
-        localStorage.setItem(STORAGE_PROVIDER_KEY, id);
+        try {
+            localStorage.setItem(STORAGE_PROVIDER_KEY, id);
+        } catch (error) {
+            logUiStorageWriteFailure('UnifiedStorageService.setProvider', STORAGE_PROVIDER_KEY, error);
+        }
         // Force reload or event trigger might be needed for UI to refresh list
         window.dispatchEvent(new Event('storage-provider-changed'));
     }
@@ -165,7 +206,7 @@ export class UnifiedStorageService implements IStorageProvider {
                 return await this.activeProvider.saveVersion(diagramId, data, message);
             }
         } catch (e) {
-            console.warn("Active provider saveVersion failed, falling back to local db", e);
+            safeLog.warn('Active provider saveVersion failed, falling back to local db', redactSensitiveLogValue(e));
         }
         // Fallback or missing provider support
         return localVersionDB.saveVersion(diagramId, data, message);
@@ -177,7 +218,7 @@ export class UnifiedStorageService implements IStorageProvider {
                 return await this.activeProvider.listVersions(diagramId);
             }
         } catch (e) {
-            console.warn("Active provider listVersions failed, falling back to local db", e);
+            safeLog.warn('Active provider listVersions failed, falling back to local db', redactSensitiveLogValue(e));
         }
         return localVersionDB.listVersions(diagramId);
     }
@@ -191,7 +232,7 @@ export class UnifiedStorageService implements IStorageProvider {
                 if (ver) return ver;
             }
         } catch (e) {
-            console.warn("Active provider loadVersion failed, falling back to local db", e);
+            safeLog.warn('Active provider loadVersion failed, falling back to local db', redactSensitiveLogValue(e));
         }
         // Fallback to local
         return localVersionDB.loadVersion(diagramId, versionId);

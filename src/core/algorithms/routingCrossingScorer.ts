@@ -29,6 +29,8 @@ export interface RoutingCrossingScorerOptions {
 
 interface OrthogonalSegment {
     edgeId: string;
+    segmentIndex: number;
+    pointCount: number;
     a: Point;
     b: Point;
     isHorizontal: boolean;
@@ -102,9 +104,14 @@ export class RoutingCrossingScorer {
                     continue;
                 }
 
-                // Same-buddy collinear overlap is the intentional shared trunk. Only
-                // perpendicular same-buddy crossings are visual defects.
-                if (sameBuddy) continue;
+                // Same-buddy collinear overlap is intentional only while it remains
+                // a short source/target junction. Long shared trunks obscure flow.
+                if (
+                    sameBuddy
+                    && this.isProtectedSharedTrunkOverlap(s1, s2)
+                ) {
+                    continue;
+                }
 
                 const overlapUnits = RoutingCrossingScorer.parallelOverlapUnits(
                     s1,
@@ -285,7 +292,7 @@ export class RoutingCrossingScorer {
                 const isHorizontal = Math.abs(a.y - b.y) < 1.5;
                 const isVertical = Math.abs(a.x - b.x) < 1.5;
                 if ((!isHorizontal && !isVertical) || RoutingCrossingScorer.manhattanDistance(a, b) < 8) continue;
-                segments.push({ edgeId, a, b, isHorizontal, isVertical });
+                segments.push({ edgeId, segmentIndex: i, pointCount: points.length, a, b, isHorizontal, isVertical });
             }
         }
         return segments;
@@ -297,6 +304,23 @@ export class RoutingCrossingScorer {
         if (!groupsA || !groupsB) return false;
         for (const group of groupsA) {
             if (groupsB.has(group)) return true;
+        }
+        return false;
+    }
+
+    private isProtectedSharedTrunkOverlap(a: OrthogonalSegment, b: OrthogonalSegment): boolean {
+        const groupsA = this.buddyGroupByEdgeId.get(a.edgeId);
+        const groupsB = this.buddyGroupByEdgeId.get(b.edgeId);
+        if (!groupsA || !groupsB) return false;
+
+        for (const group of groupsA) {
+            if (!groupsB.has(group)) continue;
+            if (group.startsWith('o2m:') && a.segmentIndex === 0 && b.segmentIndex === 0) return true;
+            if (group.startsWith('m2o:')
+                && a.segmentIndex >= a.pointCount - 3
+                && b.segmentIndex >= b.pointCount - 3) {
+                return true;
+            }
         }
         return false;
     }
@@ -328,18 +352,21 @@ export class RoutingCrossingScorer {
     }
 
     private static parallelOverlapUnits(s1: OrthogonalSegment, s2: OrthogonalSegment, minLength: number): number {
+        const overlap = RoutingCrossingScorer.parallelOverlapLength(s1, s2);
+        if (overlap < minLength) return 0;
+        return Math.max(1, Math.round(overlap / minLength));
+    }
+
+    private static parallelOverlapLength(s1: OrthogonalSegment, s2: OrthogonalSegment): number {
         if (s1.isHorizontal !== s2.isHorizontal) return 0;
         const EPS = 2;
         if (s1.isHorizontal && Math.abs(s1.a.y - s2.a.y) > EPS) return 0;
         if (!s1.isHorizontal && Math.abs(s1.a.x - s2.a.x) > EPS) return 0;
-        const overlap = s1.isHorizontal
-            ? Math.min(Math.max(s1.a.x, s1.b.x), Math.max(s2.a.x, s2.b.x))
-                - Math.max(Math.min(s1.a.x, s1.b.x), Math.min(s2.a.x, s2.b.x))
-            : Math.min(Math.max(s1.a.y, s1.b.y), Math.max(s2.a.y, s2.b.y))
-                - Math.max(Math.min(s1.a.y, s1.b.y), Math.min(s2.a.y, s2.b.y));
-
-        if (overlap < minLength) return 0;
-        return Math.max(1, Math.round(overlap / minLength));
+        return s1.isHorizontal
+            ? Math.max(0, Math.min(Math.max(s1.a.x, s1.b.x), Math.max(s2.a.x, s2.b.x))
+                - Math.max(Math.min(s1.a.x, s1.b.x), Math.min(s2.a.x, s2.b.x)))
+            : Math.max(0, Math.min(Math.max(s1.a.y, s1.b.y), Math.max(s2.a.y, s2.b.y))
+                - Math.max(Math.min(s1.a.y, s1.b.y), Math.min(s2.a.y, s2.b.y)));
     }
 
     private static pointsNear(a: Point, b: Point, tolerance: number): boolean {

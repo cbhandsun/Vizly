@@ -1,5 +1,8 @@
 import { DiagramTypePlugin, PluginContext } from '../types';
-import { safeJsonParse } from '../utils/jsonUtils';
+import { safeLog } from '../utils/consoleCleanup';
+import { redactSensitiveLogValue } from '../utils/logSecurity';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from '../utils/uiStorageLogging';
+import { safeJsonParseWithLimit } from '../utils/jsonUtils';
 
 export class PluginRegistry {
   private static instance: PluginRegistry;
@@ -12,6 +15,7 @@ export class PluginRegistry {
   private readonly MAX_PLUGIN_ID_LENGTH = 80;
   private readonly SAFE_PLUGIN_ID_PATTERN = /^[A-Za-z0-9_.:-]+$/;
   private readonly BLOCKED_PLUGIN_IDS = new Set(['__proto__', 'prototype', 'constructor']);
+  private readonly MAX_STATUS_JSON_LENGTH = 128 * 1024;
 
   private constructor() {}
 
@@ -28,12 +32,12 @@ export class PluginRegistry {
 
   public register(plugin: DiagramTypePlugin, isDefault: boolean = false): void {
     if (!this.isSafePluginId(plugin.id)) {
-      console.warn(`[PluginRegistry] Rejected plugin with unsafe id: ${plugin.id}`);
+      safeLog.warn('[PluginRegistry] Rejected plugin with unsafe id:', redactSensitiveLogValue(plugin.id));
       return;
     }
 
     if (this.plugins.has(plugin.id)) {
-      console.warn(`[PluginRegistry] Plugin with id ${plugin.id} is already registered. Overwriting.`);
+      safeLog.warn('[PluginRegistry] Plugin with id is already registered. Overwriting.', plugin.id);
     }
     this.plugins.set(plugin.id, plugin);
     
@@ -64,11 +68,24 @@ export class PluginRegistry {
     const statusObj = Object.fromEntries(
       Array.from(this.activeStatus).filter(([id, active]) => this.isSafePluginId(id) && typeof active === 'boolean')
     );
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(statusObj));
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(statusObj));
+    } catch (error) {
+      logUiStorageWriteFailure('PluginRegistry.saveStatus', this.STORAGE_KEY, error);
+    }
   }
 
   private loadStatus(): Record<string, boolean> {
-    const saved = safeJsonParse<unknown>(localStorage.getItem(this.STORAGE_KEY), {});
+    const raw = (() => {
+      try {
+        return localStorage.getItem(this.STORAGE_KEY);
+      } catch (error) {
+        logUiStorageReadFailure('PluginRegistry.loadStatus', this.STORAGE_KEY, error);
+        return null;
+      }
+    })();
+
+    const saved = this.parseStoredStatus(raw);
     if (!saved || typeof saved !== 'object' || Array.isArray(saved)) {
       return {};
     }
@@ -78,6 +95,16 @@ export class PluginRegistry {
         this.isSafePluginId(entry[0]) && typeof entry[1] === 'boolean'
       ))
     );
+  }
+
+  private parseStoredStatus(raw: string | null): unknown {
+    return safeJsonParseWithLimit<unknown>(raw, {}, {
+      maxLength: this.MAX_STATUS_JSON_LENGTH,
+      onFailure: (error) => {
+        logUiStorageReadFailure('PluginRegistry.loadStatus', this.STORAGE_KEY, error);
+      },
+      buildOversizeError: () => new Error('Plugin status JSON is too large.'),
+    });
   }
 
   public getPlugin(id: string): DiagramTypePlugin | undefined {
@@ -109,18 +136,18 @@ export class PluginRegistry {
    */
   public async executeAIAction(pluginId: string, action: string, params: any, ctx: PluginContext): Promise<boolean> {
     if (!this.isSafeAIToken(pluginId) || !this.isSafeAIToken(action)) {
-      console.warn(`[PluginRegistry] Rejected unsafe AI action target: ${pluginId}:${action}`);
+      safeLog.warn('[PluginRegistry] Rejected unsafe AI action target:', redactSensitiveLogValue({ pluginId, action }));
       return false;
     }
 
     const plugin = this.getPlugin(pluginId);
     if (!plugin) {
-      console.warn(`[PluginRegistry] Plugin ${pluginId} not found, skipping AI action: ${action}`);
+      safeLog.warn(`[PluginRegistry] Plugin ${pluginId} not found, skipping AI action: ${action}`);
       return false;
     }
 
     if (!this.isPluginActive(pluginId)) {
-      console.warn(`[PluginRegistry] Plugin ${pluginId} is disabled, skipping AI action: ${action}`);
+      safeLog.warn(`[PluginRegistry] Plugin ${pluginId} is disabled, skipping AI action: ${action}`);
       return false;
     }
 
@@ -131,7 +158,10 @@ export class PluginRegistry {
     try {
       return await plugin.onAIAction(action, params, ctx);
     } catch (error) {
-      console.error(`[PluginRegistry] Error executing AI action "${action}" in plugin "${pluginId}":`, error);
+      safeLog.error(
+        `[PluginRegistry] Error executing AI action "${action}" in plugin "${pluginId}":`,
+        redactSensitiveLogValue(error)
+      );
       return false;
     }
   }

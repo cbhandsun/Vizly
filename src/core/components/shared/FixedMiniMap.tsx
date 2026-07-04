@@ -14,6 +14,7 @@ import { safeNumber } from './hooks/useMinimapMath';
 import { useMinimapOverlay } from './hooks/useMinimapOverlay';
 import { useMinimapNavigation } from './hooks/useMinimapNavigation';
 import type { Theme } from '../../themes/types/ThemeTypes';
+import { logFixedMiniMapFailure } from './fixedMiniMapLogging';
 
 interface FixedMiniMapProps {
   style?: React.CSSProperties;
@@ -188,11 +189,16 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
     const wheelHandler = (ev: WheelEvent) => nav.handleMiniMapWheel(ev);
     try {
       el.addEventListener('wheel', wheelHandler, { passive: false });
-    } catch {
+    } catch (error) {
+      logFixedMiniMapFailure('bindWheelHandlerPassive', error);
       el.addEventListener('wheel', wheelHandler);
     }
     return () => {
-      try { el.removeEventListener('wheel', wheelHandler); } catch { return; }
+      try {
+        el.removeEventListener('wheel', wheelHandler);
+      } catch (error) {
+        logFixedMiniMapFailure('unbindWheelHandler', error);
+      }
     };
   }, [minimapElement, zoomable, nav]);
 

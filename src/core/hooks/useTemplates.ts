@@ -6,7 +6,9 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { cloneDeep } from 'lodash';
 import { DiagramTemplate, TemplateCategory, TemplateFilterOptions, SaveTemplateOptions } from '../types/Template';
+import { safeLog } from '../utils/consoleCleanup';
 import { parseStoredTemplates, serializeStoredTemplates } from '../utils/templateUtils';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from '../utils/uiStorageLogging';
 
 const BUILT_IN_TEMPLATES: DiagramTemplate[] = [];
 
@@ -21,7 +23,7 @@ const loadFromStorage = (): DiagramTemplate[] => {
         const data = localStorage.getItem(STORAGE_KEY);
         return parseStoredTemplates(data);
     } catch (error) {
-        console.error('[useTemplates] Failed to load custom templates:', error);
+        logUiStorageReadFailure('useTemplates.loadFromStorage', STORAGE_KEY, error);
         return [];
     }
 };
@@ -31,7 +33,7 @@ const saveToStorage = (templates: DiagramTemplate[]): boolean => {
         localStorage.setItem(STORAGE_KEY, serializeStoredTemplates(templates));
         return true;
     } catch (error) {
-        console.error('[useTemplates] Failed to save custom templates:', error);
+        logUiStorageWriteFailure('useTemplates.saveToStorage', STORAGE_KEY, error);
         return false;
     }
 };
@@ -94,7 +96,7 @@ export const useTemplates = () => {
     const createFromTemplate = useCallback((templateId: string) => {
         const template = allTemplates.find(t => t.id === templateId);
         if (!template) {
-            console.warn(`[useTemplates] Template not found: ${templateId}`);
+            safeLog.warn(`[useTemplates] Template not found: ${templateId}`);
             return null;
         }
 
@@ -132,7 +134,7 @@ export const useTemplates = () => {
     ): DiagramTemplate | null => {
         // 检查数量限制
         if (customTemplates.length >= MAX_CUSTOM_TEMPLATES) {
-            console.error(`[useTemplates] Maximum ${MAX_CUSTOM_TEMPLATES} custom templates reached`);
+            safeLog.error(`[useTemplates] Maximum ${MAX_CUSTOM_TEMPLATES} custom templates reached`);
             return null;
         }
 
@@ -169,12 +171,12 @@ export const useTemplates = () => {
     const deleteTemplate = useCallback((templateId: string): boolean => {
         const template = customTemplates.find(t => t.id === templateId);
         if (!template) {
-            console.warn(`[useTemplates] Template not found: ${templateId}`);
+            safeLog.warn(`[useTemplates] Template not found: ${templateId}`);
             return false;
         }
 
         if (template.isBuiltIn) {
-            console.error('[useTemplates] Cannot delete built-in template');
+            safeLog.error('[useTemplates] Cannot delete built-in template');
             return false;
         }
 

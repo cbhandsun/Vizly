@@ -268,6 +268,18 @@ describe('smartEdgeUtils geometry primitives', () => {
     expect(path).not.toContain('A 5.999999999999999');
   });
 
+  it('does not let adjacent fillets consume a short orthogonal bridge', () => {
+    const path = createFilletedPath([
+      { x: 252, y: 1199 },
+      { x: 252, y: 1295 },
+      { x: 247, y: 1295 },
+      { x: 242, y: 1300 },
+      { x: 242, y: 1357 },
+    ], 8);
+
+    expect(path).not.toMatch(/A [^ ]+ [^ ]+ 0 0 [01] ([\\d.]+) ([\\d.]+) L \\1 \\2 A/);
+  });
+
   it('straightens aligned local doglegs when the direct corridor is clear', () => {
     expect(straightenAlignedLocalDogleg([
       { x: 249, y: 1850 },

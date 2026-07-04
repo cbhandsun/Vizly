@@ -1,5 +1,5 @@
 import type { NodeTemplate } from '../components/diagrams/hooks/useNodeTemplates';
-import { safeJsonParse } from './jsonUtils';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from './uiStorageLogging';
 
 export const NODE_TEMPLATES_STORAGE_KEY = 'diagram-node-templates';
 
@@ -14,6 +14,7 @@ const MAX_OBJECT_KEYS = 80;
 const MAX_ARRAY_ITEMS = 80;
 const MAX_DEPTH = 5;
 const MAX_TEMPLATE_SCAN = MAX_TEMPLATES * 2;
+const MAX_NODE_TEMPLATE_STORAGE_JSON_LENGTH = 2 * 1024 * 1024;
 const SAFE_ID = /^[\w:./-]+$/u;
 const SAFE_NODE_TYPE = /^[A-Za-z][\w:-]*$/u;
 const BLOCKED_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
@@ -161,10 +162,26 @@ export const coerceNodeTemplates = (value: unknown): NodeTemplate[] => {
     return templates;
 };
 
+const parseStoredNodeTemplates = (raw: string | null): unknown => {
+    if (!raw) return [];
+    if (raw.length > MAX_NODE_TEMPLATE_STORAGE_JSON_LENGTH) {
+        logUiStorageReadFailure('nodeTemplateStorage', NODE_TEMPLATES_STORAGE_KEY, new Error('Node template storage JSON is too large.'));
+        return [];
+    }
+
+    try {
+        return JSON.parse(raw) as unknown;
+    } catch (error) {
+        logUiStorageReadFailure('nodeTemplateStorage', NODE_TEMPLATES_STORAGE_KEY, error);
+        return [];
+    }
+};
+
 export const readNodeTemplates = (): NodeTemplate[] => {
     try {
-        return coerceNodeTemplates(safeJsonParse<unknown>(localStorage.getItem(NODE_TEMPLATES_STORAGE_KEY), []));
-    } catch {
+        return coerceNodeTemplates(parseStoredNodeTemplates(localStorage.getItem(NODE_TEMPLATES_STORAGE_KEY)));
+    } catch (error) {
+        logUiStorageReadFailure('nodeTemplateStorage', NODE_TEMPLATES_STORAGE_KEY, error);
         return [];
     }
 };
@@ -173,8 +190,8 @@ export const writeNodeTemplates = (templates: NodeTemplate[]): NodeTemplate[] =>
     const normalized = coerceNodeTemplates(templates);
     try {
         localStorage.setItem(NODE_TEMPLATES_STORAGE_KEY, JSON.stringify(normalized));
-    } catch {
-        void 0;
+    } catch (error) {
+        logUiStorageWriteFailure('nodeTemplateStorage', NODE_TEMPLATES_STORAGE_KEY, error);
     }
     return normalized;
 };

@@ -3,6 +3,9 @@
  */
 
 import { DiagramTemplate, TemplateCategory } from '../types/Template';
+import { safeLog } from './consoleCleanup';
+import { redactSensitiveLogValue } from './logSecurity';
+import { logUiStorageReadFailure } from './uiStorageLogging';
 
 const TEMPLATE_CATEGORIES = new Set<string>(Object.values(TemplateCategory));
 const MAX_TEMPLATE_STRING_LENGTH = 4000;
@@ -15,6 +18,7 @@ const MAX_STORED_TEMPLATES_JSON_LENGTH = 2 * 1024 * 1024;
 const MAX_THUMBNAIL_NODES = 500;
 const MAX_THUMBNAIL_EDGES = 1000;
 const MAX_COORDINATE_ABS = 1_000_000;
+const TEMPLATE_STORAGE_KEY = 'diagram-custom-templates';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
     return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -100,7 +104,8 @@ export const parseStoredTemplates = (raw: string | null | undefined): DiagramTem
             .slice(0, MAX_STORED_TEMPLATES)
             .map(coerceStoredTemplate)
             .filter((template): template is DiagramTemplate => Boolean(template));
-    } catch {
+    } catch (error) {
+        logUiStorageReadFailure('templateUtils.parseStoredTemplates', TEMPLATE_STORAGE_KEY, error);
         return [];
     }
 };
@@ -192,7 +197,7 @@ export const generateTemplateThumbnail = async (
         const encoded = btoa(unescape(encodeURIComponent(svg)));
         return `data:image/svg+xml;base64,${encoded}`;
     } catch (error) {
-        console.error('[templateUtils] Failed to generate thumbnail:', error);
+        safeLog.error('[templateUtils] Failed to generate thumbnail:', redactSensitiveLogValue(error));
         return null;
     }
 };
@@ -219,7 +224,7 @@ export const importTemplateFromJSON = (json: string): DiagramTemplate | null => 
         }
         return template;
     } catch (error) {
-        console.error('[templateUtils] Failed to import template:', error);
+        safeLog.error('[templateUtils] Failed to import template:', redactSensitiveLogValue(error));
         return null;
     }
 };

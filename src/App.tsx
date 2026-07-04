@@ -1,6 +1,7 @@
 import React from 'react';
 import { ErrorBoundary } from '@/core/components/shared/ErrorBoundary';
 import { AppProviders, AppRoutes } from '@/app/index';
+import { logAppBoundaryError } from '@/core/utils/errorBoundaryLogging';
 
 /**
  * 主应用组件
@@ -15,11 +16,7 @@ const App: React.FC = () => {
       enableReporting={true}
       maxRetries={3}
       onError={(error, _errorInfo, errorDetails) => {
-        // 全局错误处理逻辑 - 生产环境中应使用专业的错误报告服务
-        if (process.env.NODE_ENV === 'development') {
-          console.error('应用程序错误:', error);
-          console.error('错误详情:', errorDetails);
-        }
+        logAppBoundaryError(error, errorDetails);
       }}
     >
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-900 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] transition-colors duration-300">

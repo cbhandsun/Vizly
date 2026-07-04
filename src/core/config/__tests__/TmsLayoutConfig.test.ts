@@ -1,10 +1,24 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_TMS_LAYOUT_CONFIG, TmsLayoutConfigManager } from '../TmsLayoutConfig';
+
+const safeLogState = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  log: vi.fn(),
+}));
+
+vi.mock('../../utils/consoleCleanup', () => ({
+  safeLog: safeLogState,
+}));
 
 describe('TmsLayoutConfigManager', () => {
   let manager: TmsLayoutConfigManager;
 
   beforeEach(() => {
+    Object.values(safeLogState).forEach(mock => mock.mockReset());
+    vi.restoreAllMocks();
     manager = TmsLayoutConfigManager.getInstance();
     manager.resetToDefault();
   });
@@ -72,5 +86,26 @@ describe('TmsLayoutConfigManager', () => {
 
     expect(manager.importConfig(JSON.stringify(['MAIN_FLOW']))).toBe(false);
     expect(manager.importConfig('{broken')).toBe(false);
+  });
+
+  it('redacts sensitive parser failures before logging', () => {
+    vi.spyOn(JSON, 'parse').mockImplementation(() => {
+      throw new Error('Authorization: Bearer tms-secret');
+    });
+
+    expect(manager.importConfig('{}')).toBe(false);
+
+    const payload = JSON.stringify(safeLogState.error.mock.calls);
+    expect(payload).toContain('Failed to import TMS layout config:');
+    expect(payload).toContain('[redacted]');
+    expect(payload).not.toContain('tms-secret');
+  });
+
+  it('rejects oversized JSON payloads', () => {
+    expect(manager.importConfig('x'.repeat(2 * 1024 * 1024 + 1))).toBe(false);
+    expect(safeLogState.error).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to import TMS layout config:'),
+      expect.anything()
+    );
   });
 });

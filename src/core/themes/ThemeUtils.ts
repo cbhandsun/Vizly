@@ -4,6 +4,10 @@
  */
 
 import { Theme, ThemeColor } from './types/ThemeTypes';
+import {
+  logThemeValidationMissingField,
+  logThemeValidationMissingPaletteColor,
+} from './themeInfrastructureLogging';
 
 /**
  * 解析主题域键
@@ -244,7 +248,7 @@ export function validateTheme(theme: any): theme is Theme {
   const requiredFields = ['id', 'name', 'mode', 'palette', 'typography', 'spacing', 'borderRadius', 'shadow', 'animation', 'diagram'];
   for (const field of requiredFields) {
     if (!(field in theme)) {
-      console.error(`主题缺少必需字段: ${field}`);
+      logThemeValidationMissingField(field);
       return false;
     }
   }
@@ -253,7 +257,7 @@ export function validateTheme(theme: any): theme is Theme {
   const requiredColors = ['primary', 'secondary', 'success', 'warning', 'error', 'info', 'neutral'];
   for (const color of requiredColors) {
     if (!(color in theme.palette)) {
-      console.error(`主题调色板缺少必需颜色: ${color}`);
+      logThemeValidationMissingPaletteColor(color);
       return false;
     }
   }

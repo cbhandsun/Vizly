@@ -9,6 +9,12 @@ import { THEMES } from './flowStyles';
 import { resolveThemeDomainKey as resolveDomainKeyUnified, getDomainTheme as getDomainThemeUnified } from '../../utils/domainKey';
 import type { Theme } from '../../themes/types/ThemeTypes';
 import type { EdgeStyleToken, FlowStylePreset } from './DiagramStyleManager';
+import {
+  logDomainThemeFallback,
+  logHexParseFailure,
+  logInvalidHexColor,
+  logInvalidHexFormat,
+} from './layoutUtilsLogging';
 
 export interface DomainThemeToken {
   main: string;
@@ -38,7 +44,7 @@ export interface FlowStyleMaps {
 export function hexToRgba(hex: string, alpha: number = 1): string {
   // 参数验证：确保hex是有效的字符串
   if (!hex || typeof hex !== 'string') {
-    console.warn(`hexToRgba: Invalid hex color '${hex}', using default gray`);
+    logInvalidHexColor(hex);
     return `rgba(128, 128, 128, ${alpha})`;
   }
   
@@ -47,7 +53,7 @@ export function hexToRgba(hex: string, alpha: number = 1): string {
   
   // 验证hex格式
   if (!/^#([A-Fa-f0-9]{3}){1,2}$/.test(normalizedHex)) {
-    console.warn(`hexToRgba: Invalid hex format '${hex}', using default gray`);
+    logInvalidHexFormat(hex);
     return `rgba(128, 128, 128, ${alpha})`;
   }
   
@@ -63,7 +69,7 @@ export function hexToRgba(hex: string, alpha: number = 1): string {
   
   // 验证解析结果
   if (isNaN(r) || isNaN(g) || isNaN(b)) {
-    console.warn(`hexToRgba: Failed to parse hex color '${hex}', using default gray`);
+    logHexParseFailure(hex);
     return `rgba(128, 128, 128, ${alpha})`;
   }
   
@@ -80,7 +86,7 @@ export function hexToRgba(hex: string, alpha: number = 1): string {
 export function getDomainTheme(domain: string, theme: Theme | null): DomainThemeToken {
   // 空主题兜底
   if (!theme) {
-    console.warn(`getDomainTheme: theme is undefined for domain '${domain}', using default theme`);
+    logDomainThemeFallback(domain);
     return { main: '#999999', light: '#F7F7F7', border: '#999999', text: '#333333', background: '#FFFFFF' };
   }
 

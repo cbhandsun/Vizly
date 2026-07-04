@@ -1,10 +1,24 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const safeLogState = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  log: vi.fn(),
+}));
+
+vi.mock('../consoleCleanup', () => ({
+  safeLog: safeLogState,
+}));
+
 import { CryptoService } from '../CryptoService';
 
 describe('CryptoService', () => {
   afterEach(() => {
     CryptoService.clearKeyCache();
     localStorage.clear();
+    Object.values(safeLogState).forEach(mock => mock.mockReset());
     vi.restoreAllMocks();
   });
 
@@ -47,6 +61,38 @@ describe('CryptoService', () => {
     const legacyEncrypted = await createLegacyEncryptedPayload('legacy-secret', 'user-1');
 
     await expect(CryptoService.decrypt(legacyEncrypted, 'user-1')).resolves.toBe('legacy-secret');
+  });
+
+  it('redacts encryption failures before logging them', async () => {
+    const encryptSpy = vi.spyOn(window.crypto.subtle, 'encrypt').mockRejectedValueOnce(
+      new Error('Authorization: Bearer sk-live-secret')
+    );
+
+    await expect(CryptoService.encrypt('secret', 'user-1')).rejects.toThrow('Failed to encrypt data');
+
+    expect(safeLogState.error).toHaveBeenCalledWith('Encryption failed', expect.anything());
+    expect(JSON.stringify(safeLogState.error.mock.calls[0]?.[1])).toContain('[redacted]');
+    expect(JSON.stringify(safeLogState.error.mock.calls[0]?.[1])).not.toContain('sk-live-secret');
+
+    encryptSpy.mockRestore();
+  });
+
+  it('redacts decryption failures before warning and returns an empty string', async () => {
+    const encrypted = await CryptoService.encrypt('secret', 'user-1');
+    const decryptSpy = vi.spyOn(window.crypto.subtle, 'decrypt').mockRejectedValueOnce(
+      new Error('Authorization: Bearer sk-live-secret')
+    );
+
+    await expect(CryptoService.decrypt(encrypted, 'user-1')).resolves.toBe('');
+
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      'Decryption failed (likely missing local secret, wrong user, or corrupt data)',
+      expect.anything()
+    );
+    expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
+    expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('sk-live-secret');
+
+    decryptSpy.mockRestore();
   });
 });
 

@@ -43,6 +43,11 @@ import { QuadTree, SpatialIndex } from '../../algorithms/SpatialIndex';
 import { getNodePosition, getPortOffsetPoint, makePathOrthogonal } from '../../algorithms/smartEdgeUtils';
 import { generateSimplePath } from '../../algorithms/pathfinding';
 import { analyzeGeometry, getPortRulesForGeometry, portCombinationToString } from '../../algorithms/geometry-classifier';
+import {
+    logRoutingWorkerDebug,
+    logRoutingWorkerPathfindingFallback,
+    logRoutingWorkerVisibilityGraphAbort,
+} from '../../utils/routingLogging';
 
 /**
  * [S5-P1] Returns the geometrically opposite port side.
@@ -777,7 +782,7 @@ export class EdgeRoutingWorker {
                 // Diagonal edge — let geometry-classifier port rules handle port selection.
                 // The preferred ports (e.g. R→L for diagonal-ne) produce clean L-shapes.
                 // [A1] debug log 已改为 config.debug 条件保护，删除生产环境每条边级的 console.log
-                if (config.debug) console.log(`[Worker] ${job.source}→${job.target}: diagonal reverse edge (ratio=${dominantRatio.toFixed(2)}<1.8), skipping U-Turn bypass.`);
+                if (config.debug) logRoutingWorkerDebug(`[Worker] ${job.source}→${job.target}: diagonal reverse edge (ratio=${dominantRatio.toFixed(2)}<1.8), skipping U-Turn bypass.`);
             } else if (absDx > absDy) {
                 // Dominant horizontal → bypass via Top or Bottom (perpendicular)
                 // [FIX-pathlen] Score = obstacle_weight + estimated_detour_length.
@@ -1180,7 +1185,7 @@ export class EdgeRoutingWorker {
                     const branchTargetY = Math.max(trunkYMin, Math.min(trunkYMax, endWithOffset.y));
                     trunkStart = { x: trunkAxis, y: branchSourceY };
                     trunkEnd = { x: trunkAxis, y: branchTargetY };
-                    if (shouldLogRouteDebug) console.log(`[TRUNK-DBG] ${job.edgeId} VERTICAL axis=${trunkAxis} busSrc=(${job.busTrunkSource.x.toFixed(1)},${job.busTrunkSource.y.toFixed(1)}) busTgt=(${job.busTrunkTarget.x.toFixed(1)},${job.busTrunkTarget.y.toFixed(1)}) trunkStart=(${trunkStart.x.toFixed(1)},${trunkStart.y.toFixed(1)}) trunkEnd=(${trunkEnd.x.toFixed(1)},${trunkEnd.y.toFixed(1)}) startOff=(${startWithOffset.x.toFixed(1)},${startWithOffset.y.toFixed(1)}) endOff=(${endWithOffset.x.toFixed(1)},${endWithOffset.y.toFixed(1)})`);
+                    if (shouldLogRouteDebug) logRoutingWorkerDebug(`[TRUNK-DBG] ${job.edgeId} VERTICAL axis=${trunkAxis} busSrc=(${job.busTrunkSource.x.toFixed(1)},${job.busTrunkSource.y.toFixed(1)}) busTgt=(${job.busTrunkTarget.x.toFixed(1)},${job.busTrunkTarget.y.toFixed(1)}) trunkStart=(${trunkStart.x.toFixed(1)},${trunkStart.y.toFixed(1)}) trunkEnd=(${trunkEnd.x.toFixed(1)},${trunkEnd.y.toFixed(1)}) startOff=(${startWithOffset.x.toFixed(1)},${startWithOffset.y.toFixed(1)}) endOff=(${endWithOffset.x.toFixed(1)},${endWithOffset.y.toFixed(1)})`);
                 } else {
                     // Horizontal trunk: trunk axis is a Y value.
                     // [FIX-shared-trunk] The horizontal segment must span the FULL group range
@@ -1200,7 +1205,7 @@ export class EdgeRoutingWorker {
                     // trunkEnd   = point on trunk for this edge's TARGET branch
                     trunkStart = { x: branchSourceX, y: trunkAxis };
                     trunkEnd   = { x: branchTargetX, y: trunkAxis };
-                    if (shouldLogRouteDebug) console.log(`[TRUNK-DBG] ${job.edgeId} HORIZONTAL axis=${trunkAxis} busSrc=(${job.busTrunkSource.x.toFixed(1)},${job.busTrunkSource.y.toFixed(1)}) busTgt=(${job.busTrunkTarget.x.toFixed(1)},${job.busTrunkTarget.y.toFixed(1)}) trunkStart=(${trunkStart.x.toFixed(1)},${trunkStart.y.toFixed(1)}) trunkEnd=(${trunkEnd.x.toFixed(1)},${trunkEnd.y.toFixed(1)})`);
+                    if (shouldLogRouteDebug) logRoutingWorkerDebug(`[TRUNK-DBG] ${job.edgeId} HORIZONTAL axis=${trunkAxis} busSrc=(${job.busTrunkSource.x.toFixed(1)},${job.busTrunkSource.y.toFixed(1)}) busTgt=(${job.busTrunkTarget.x.toFixed(1)},${job.busTrunkTarget.y.toFixed(1)}) trunkStart=(${trunkStart.x.toFixed(1)},${trunkStart.y.toFixed(1)}) trunkEnd=(${trunkEnd.x.toFixed(1)},${trunkEnd.y.toFixed(1)})`);
                 } // end horizontal trunk branch
 
                 // [FIX] Detour Guard: Skip trunk routing when the precomputed trunk
@@ -1635,11 +1640,11 @@ export class EdgeRoutingWorker {
                     if (!isBlocked && analyzer.intersectsAnyObstacle(trunkStart, trunkEnd, trunkObstacles, dynamicPadding)) isBlocked = true;
                     if (!isBlocked && analyzer.intersectsAnyObstacle(trunkEnd, endWithOffset, trunkObstacles, dynamicPadding)) isBlocked = true;
 
-                    if (shouldLogRouteDebug) console.log(`[TRUNK-DBG] ${job.edgeId} isBlocked=${isBlocked} dynamicPadding=${dynamicPadding.toFixed(1)} isSharedGlobal=${isSharedGlobalTrunk}`);
+                    if (shouldLogRouteDebug) logRoutingWorkerDebug(`[TRUNK-DBG] ${job.edgeId} isBlocked=${isBlocked} dynamicPadding=${dynamicPadding.toFixed(1)} isSharedGlobal=${isSharedGlobalTrunk}`);
                     if (!isBlocked) {
                         pathPoints = waypoints;
                         strategyName = hasPrecomputedTrunk ? 'Global Trunk Direct' : 'Local Trunk Direct';
-                        if (shouldLogRouteDebug) console.log(`[TRUNK-DBG] ${job.edgeId} → ${strategyName}`);
+                        if (shouldLogRouteDebug) logRoutingWorkerDebug(`[TRUNK-DBG] ${job.edgeId} → ${strategyName}`);
                     }
                     // [FIX] We do NOT invalidate trunkStart here anymore. 
                     // If it is blocked, we let it fall through to the Trunk A* fallback segment
@@ -1763,7 +1768,7 @@ export class EdgeRoutingWorker {
                                     convSeg[convSeg.length - 1] = { x: trunkEnd.x, y: trunkEnd.y };
                                     pathPoints = [startPt, ...convSeg, endPt];
                                     strategyName = 'Global Trunk Convergence';
-                                    if (shouldLogRouteDebug) console.log(`[TRUNK-DBG] ${job.edgeId} → ${strategyName}`);
+                                    if (shouldLogRouteDebug) logRoutingWorkerDebug(`[TRUNK-DBG] ${job.edgeId} → ${strategyName}`);
                                 }
                                 // If convergence A* also fails → fall through to standard A*/VG routing
                             }
@@ -1959,7 +1964,7 @@ export class EdgeRoutingWorker {
                     
                     if (!testOrtho) {
                         if (shouldCollectDebugData) {
-                            console.warn(`[Worker] Visibility Graph path aborted: Cannot be orthogonalized safely. Falling back to Grid A*.`);
+                            logRoutingWorkerVisibilityGraphAbort();
                         }
                         pathPoints = null; // Abort VG
                     } else {
@@ -2009,7 +2014,7 @@ export class EdgeRoutingWorker {
 
         if (!pathPoints) {
             // [FALLBACK] Ensure visual continuity even if A* / VG fails
-            console.warn(`[Worker] Pathfinding failed for ${job.edgeId}, falling back to simple path.`);
+            logRoutingWorkerPathfindingFallback(job.edgeId);
 
             // Try generating a simple path with obstacle awareness
             // [FIX] Use routingObstacles which is already filtered to exclude source/target

@@ -1,4 +1,4 @@
-import { safeJsonParse } from './jsonUtils';
+import { logDiagramMenuStorageFailure } from './diagramMenuLogging';
 
 export const DIAGRAM_MENU_COLLAPSED_GROUPS_KEY = 'diagramMenu.collapsedGroups';
 export const DIAGRAM_MENU_SCROLL_TOP_KEY = 'diagramMenu.scrollTop';
@@ -6,6 +6,7 @@ export const DIAGRAM_MENU_SCROLL_TOP_KEY = 'diagramMenu.scrollTop';
 const MAX_GROUP_KEY_LENGTH = 80;
 const MAX_GROUP_COUNT = 100;
 const MAX_SCROLL_TOP = 1_000_000;
+const MAX_DIAGRAM_MENU_JSON_LENGTH = 2 * 1024 * 1024;
 const SAFE_GROUP_KEY = /^[\w:./ -]+$/u;
 
 export const coerceCollapsedGroups = (value: unknown): Record<string, boolean> => {
@@ -27,12 +28,31 @@ export const coerceCollapsedGroups = (value: unknown): Record<string, boolean> =
     return groups;
 };
 
+const parseStoredJson = <T>(raw: string | null, fallback: T, action: 'readCollapsedGroups'): T => {
+    if (!raw) return fallback;
+    if (raw.length > MAX_DIAGRAM_MENU_JSON_LENGTH) {
+        logDiagramMenuStorageFailure(action, new Error('Diagram menu storage JSON is too large.'));
+        return fallback;
+    }
+    try {
+        return JSON.parse(raw) as T;
+    } catch (error) {
+        logDiagramMenuStorageFailure(action, error);
+        return fallback;
+    }
+};
+
 export const readCollapsedGroups = (fallback: Record<string, boolean> = {}): Record<string, boolean> => {
     try {
-        const parsed = safeJsonParse<unknown>(localStorage.getItem(DIAGRAM_MENU_COLLAPSED_GROUPS_KEY), null);
+        const parsed = parseStoredJson<unknown>(
+            localStorage.getItem(DIAGRAM_MENU_COLLAPSED_GROUPS_KEY),
+            null,
+            'readCollapsedGroups'
+        );
         const groups = coerceCollapsedGroups(parsed);
         return Object.keys(groups).length > 0 ? groups : { ...fallback };
-    } catch {
+    } catch (error) {
+        logDiagramMenuStorageFailure('readCollapsedGroups', error);
         return { ...fallback };
     }
 };
@@ -41,8 +61,8 @@ export const writeCollapsedGroups = (groups: Record<string, boolean>): Record<st
     const normalized = coerceCollapsedGroups(groups);
     try {
         localStorage.setItem(DIAGRAM_MENU_COLLAPSED_GROUPS_KEY, JSON.stringify(normalized));
-    } catch {
-        void 0;
+    } catch (error) {
+        logDiagramMenuStorageFailure('writeCollapsedGroups', error);
     }
     return normalized;
 };
@@ -56,7 +76,8 @@ export const coerceMenuScrollTop = (value: unknown): number | null => {
 export const readMenuScrollTop = (): number | null => {
     try {
         return coerceMenuScrollTop(localStorage.getItem(DIAGRAM_MENU_SCROLL_TOP_KEY));
-    } catch {
+    } catch (error) {
+        logDiagramMenuStorageFailure('readMenuScrollTop', error);
         return null;
     }
 };
@@ -67,8 +88,8 @@ export const writeMenuScrollTop = (scrollTop: number): number | null => {
 
     try {
         localStorage.setItem(DIAGRAM_MENU_SCROLL_TOP_KEY, String(normalized));
-    } catch {
-        void 0;
+    } catch (error) {
+        logDiagramMenuStorageFailure('writeMenuScrollTop', error);
     }
     return normalized;
 };

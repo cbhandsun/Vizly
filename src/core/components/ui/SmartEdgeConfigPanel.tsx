@@ -1,5 +1,6 @@
 import React from 'react';
 import { diagramConfigManager } from '../config/DiagramConfig';
+import { logSmartEdgeConfigSyncFailure } from './smartEdgeConfigLogging';
 
 export interface SmartEdgeSettings {
   edgeMode: 'native' | 'advanced-smart';
@@ -228,13 +229,21 @@ const SmartEdgeConfigPanel: React.FC<SmartEdgeConfigPanelProps> = ({
               };
               // 使用 window 事件传达更新意图或直接回调到父层由其写入，这里复用 onApplyGlobal 语义进行边分支更新
               // 实际更新在父层完成功能更明确；如未提供父层处理，则尝试直接全局更新
-              (onApplyGlobal as any)?.(value.edgeMode, value.pathType, value.smoothFallback);
+              try {
+                (onApplyGlobal as any)?.(value.edgeMode, value.pathType, value.smoothFallback);
+              } catch (error) {
+                logSmartEdgeConfigSyncFailure('applyGlobal', error);
+              }
               // 附加：将高级参数写入全局 edge
               // 直接访问全局管理器，确保独立于父层也能生效
               try {
                 diagramConfigManager.updateConfig({ edge: payload });
-              } catch { }
-            } catch { }
+              } catch (error) {
+                logSmartEdgeConfigSyncFailure('updateAdvancedConfig', error);
+              }
+            } catch (error) {
+              logSmartEdgeConfigSyncFailure('buildAdvancedPayload', error);
+            }
           }}
           style={{
             padding: '6px 12px',

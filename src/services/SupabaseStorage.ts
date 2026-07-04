@@ -1,11 +1,30 @@
 import { supabase } from './supabase';
-import { IStorageProvider, DiagramMetadata, SavedDiagram } from './storage/types';
+import { IStorageProvider, DiagramMetadata, SavedDiagram, DiagramVersion } from './storage/types';
 import { coerceRemoteDiagramContent } from './remoteDiagramContent';
 import { coerceCloudConfigRows, coerceCloudConfigValue, normalizeCloudConfigKey } from './cloudConfigSecurity';
 import { coerceVersionMessage, coerceVersionSnapshotData } from './versionSnapshotSecurity';
 
 // Backward compatibility export (type mostly)
 export type { SavedDiagram };
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+);
+
+const coerceString = (value: unknown): string | null => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed || null;
+};
+
+const coerceTimestamp = (value: unknown): { iso: string; ms: number } | null => {
+    if (typeof value !== 'string' && typeof value !== 'number') return null;
+    const ms = new Date(value).getTime();
+    if (!Number.isFinite(ms)) return null;
+    return { iso: new Date(ms).toISOString(), ms };
+};
 
 export class SupabaseStorageProvider implements IStorageProvider {
     name = 'Supabase Cloud';
@@ -50,7 +69,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
             .single();
 
         if (error) throw error;
-        return this.normalizeSavedDiagram(data as SavedDiagram);
+        return this.normalizeSavedDiagram(data);
     }
 
     async listDiagrams(): Promise<DiagramMetadata[]> {
@@ -61,12 +80,9 @@ export class SupabaseStorageProvider implements IStorageProvider {
 
         if (error) throw error;
 
-        return (data || []).map(item => ({
-            id: item.id,
-            title: item.title,
-            updatedAt: new Date(item.updated_at),
-            userId: item.user_id
-        }));
+        return (Array.isArray(data) ? data : [])
+            .map(item => this.coerceDiagramMetadata(item))
+            .filter((item): item is DiagramMetadata => item !== null);
     }
 
     async loadDiagram(id: string): Promise<SavedDiagram> {
@@ -77,7 +93,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
             .single();
 
         if (error) throw error;
-        return this.normalizeSavedDiagram(data as SavedDiagram);
+        return this.normalizeSavedDiagram(data);
     }
 
     async deleteDiagram(id: string): Promise<void> {
@@ -98,8 +114,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
     // === Version History (GAP-05) ===
     async saveVersion(diagramId: string, data: any, message?: string) {
         // Prevent UUID errors for string-based standard template IDs
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(diagramId)) {
+        if (!UUID_REGEX.test(diagramId)) {
              throw new Error("Version history requires a saved Cloud Diagram (UUID format required).");
         }
 
@@ -123,20 +138,12 @@ export class SupabaseStorageProvider implements IStorageProvider {
             .select()
             .single();
         if (error) throw error;
-        return {
-            id: dbData.id,
-            diagramId: dbData.diagram_id,
-            snapshotData: coerceVersionSnapshotData(dbData.snapshot_data),
-            authorId: dbData.author_id,
-            createdAt: new Date(dbData.created_at).getTime(),
-            message: coerceVersionMessage(dbData.message)
-        };
+        return this.coerceDiagramVersion(dbData, { includeSnapshot: true, requireSnapshot: true });
     }
 
     async listVersions(diagramId: string) {
         // Prevent UUID errors for string-based standard template IDs
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(diagramId)) {
+        if (!UUID_REGEX.test(diagramId)) {
              return [];
         }
 
@@ -147,20 +154,14 @@ export class SupabaseStorageProvider implements IStorageProvider {
             .order('created_at', { ascending: false });
 
         if (error) throw error;
-        return (data || []).map(item => ({
-            id: item.id,
-            diagramId: item.diagram_id,
-            snapshotData: null, // Don't load snapshot data in list for performance
-            authorId: item.author_id,
-            createdAt: new Date(item.created_at).getTime(),
-            message: coerceVersionMessage(item.message)
-        }));
+        return (Array.isArray(data) ? data : [])
+            .map(item => this.coerceDiagramVersion(item, { includeSnapshot: false, requireSnapshot: false }))
+            .filter((item): item is DiagramVersion => item !== null);
     }
 
     async loadVersion(diagramId: string, versionId: string) {
         // Prevent UUID errors
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(diagramId) || !uuidRegex.test(versionId)) {
+        if (!UUID_REGEX.test(diagramId) || !UUID_REGEX.test(versionId)) {
              return null;
         }
 
@@ -176,14 +177,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
             throw error;
         }
 
-        return {
-            id: data.id,
-            diagramId: data.diagram_id,
-            snapshotData: coerceVersionSnapshotData(data.snapshot_data),
-            authorId: data.author_id,
-            createdAt: new Date(data.created_at).getTime(),
-            message: coerceVersionMessage(data.message)
-        };
+        return this.coerceDiagramVersion(data, { includeSnapshot: true, requireSnapshot: true });
     }
 
     // === Config specific to Supabase user configs ===
@@ -205,7 +199,15 @@ export class SupabaseStorageProvider implements IStorageProvider {
             .single();
 
         if (error) throw error;
-        return data;
+        const savedKey = isRecord(data) ? normalizeCloudConfigKey(data.key) : null;
+        if (savedKey !== normalizedKey) {
+            throw new Error('Supabase returned an invalid cloud config row.');
+        }
+        return {
+            ...data,
+            key: normalizedKey,
+            value: coerceCloudConfigValue(normalizedKey, data.value),
+        };
     }
 
     async loadConfig(key: string) {
@@ -236,20 +238,68 @@ export class SupabaseStorageProvider implements IStorageProvider {
         return coerceCloudConfigRows(data || []);
     }
 
-    private normalizeSavedDiagram(diagram: SavedDiagram): SavedDiagram {
-        const title = typeof diagram.title === 'string' && diagram.title.trim()
-            ? diagram.title.trim()
-            : String(diagram.id || 'Untitled');
-        const id = String(diagram.id || title);
+    private coerceDiagramMetadata(value: unknown): DiagramMetadata | null {
+        if (!isRecord(value)) return null;
+        const id = coerceString(value.id);
+        if (!id) return null;
+        const timestamp = coerceTimestamp(value.updated_at);
+        if (!timestamp) return null;
+        const title = coerceString(value.title) || id;
+        const userId = coerceString(value.user_id) || undefined;
+
+        return {
+            id,
+            title,
+            updatedAt: new Date(timestamp.ms),
+            userId,
+        };
+    }
+
+    private coerceDiagramVersion(
+        value: unknown,
+        options: { includeSnapshot: boolean; requireSnapshot: boolean }
+    ): DiagramVersion | null {
+        if (!isRecord(value)) return null;
+        const id = coerceString(value.id);
+        const diagramId = coerceString(value.diagram_id);
+        const timestamp = coerceTimestamp(value.created_at);
+        if (!id || !diagramId || !UUID_REGEX.test(id) || !UUID_REGEX.test(diagramId) || !timestamp) {
+            return null;
+        }
+
+        const snapshotData = options.includeSnapshot
+            ? coerceVersionSnapshotData(value.snapshot_data)
+            : null;
+        if (options.requireSnapshot && !snapshotData) return null;
+
+        return {
+            id,
+            diagramId,
+            snapshotData,
+            authorId: coerceString(value.author_id) || undefined,
+            createdAt: timestamp.ms,
+            message: coerceVersionMessage(value.message),
+        };
+    }
+
+    private normalizeSavedDiagram(diagram: unknown): SavedDiagram {
+        if (!isRecord(diagram)) {
+            throw new Error('Supabase returned an invalid diagram row.');
+        }
+        const rawId = coerceString(diagram.id);
+        const rawTitle = coerceString(diagram.title);
+        const title = rawTitle || rawId || 'Untitled';
+        const id = rawId || title;
         const content = coerceRemoteDiagramContent(diagram.content, { id, title });
+        const timestamp = coerceTimestamp(diagram.updated_at);
 
         return {
             ...diagram,
             id,
             title: content.title || content.metadata?.title || content.name || title,
             content,
-            updated_at: diagram.updated_at || new Date().toISOString(),
-            user_id: diagram.user_id || 'anonymous',
+            updated_at: timestamp?.iso || new Date().toISOString(),
+            user_id: coerceString(diagram.user_id) || 'anonymous',
         };
     }
 }

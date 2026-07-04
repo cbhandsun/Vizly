@@ -11,6 +11,7 @@ import MindElixir from 'mind-elixir';
 import { getMindElixirInstance } from './mindElixirStore';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { templateToNodeObj, type TemplateNode } from './mindmapTemplateModel';
+import { logMindmapTemplateInsertFailure } from './mindmapPanelLogging';
 
 
 // ─── Template definitions ─────────────────────────────────────────────────────
@@ -163,7 +164,7 @@ const MindMapTemplates: React.FC = () => {
                 appMessage.success(`已插入 ${children.length} 个子节点`);
             } catch (e) {
                 appMessage.error('插入失败');
-                console.error('[Template insert]', e);
+                logMindmapTemplateInsertFailure(e);
             }
         }
     }, [mind]);

@@ -4,6 +4,7 @@ import { FaSearch } from 'react-icons/fa';
 import { Icon } from '@iconify/react';
 import { useTranslation } from 'react-i18next';
 import { buildIconifySearchUrl, isSafeIconifyIconName, parseIconifySearchResponse } from '../../utils/iconifySecurity';
+import { logIconLibraryPanelSearchFailure } from '../shared/iconSearchLogging';
 
 
 interface IconResult {
@@ -68,7 +69,7 @@ export const IconLibraryPanel: React.FC = () => {
                     setIcons([]);
                 }
             } catch (err: any) {
-                console.error("Icon search error:", err);
+                logIconLibraryPanelSearchFailure(err);
                 setError(err.message || "Failed to load icons");
                 setIcons([]);
             } finally {

@@ -5,6 +5,7 @@ import { useEdgeTheme } from '../../diagrams/useEdgeUpdate';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { UseSmartEdgeRoutingReturn } from '../hooks/useSmartEdgeRouting';
 import { UseEdgeLabelInteractionsReturn } from '../hooks/useEdgeLabelInteractions';
+import { createRenderEdgeGeometryFromEdgeProps, getPathEndpoints } from '../../../rendering/edgeGeometry';
 
 const LazyEdgeLabelDropdown = React.lazy(() =>
     import('./EdgeLabelDropdown').then((module) => ({ default: module.EdgeLabelDropdown }))
@@ -15,28 +16,6 @@ export interface AdvancedSmartEdgeGraphicsProps {
     router: UseSmartEdgeRoutingReturn;
     labelManager: UseEdgeLabelInteractionsReturn;
 }
-
-const NUMBER_RE = /-?\d*\.?\d+(?:[eE][-+]?\d+)?/g;
-const PATH_COMMAND_RE = /([MLACQST])([^MLACQST]*)/gi;
-
-const getPathEndpoints = (path: string): { source: { x: number; y: number }; target: { x: number; y: number } } | null => {
-    if (!path) return null;
-
-    let source: { x: number; y: number } | null = null;
-    let target: { x: number; y: number } | null = null;
-    const matches = path.matchAll(PATH_COMMAND_RE);
-    for (const match of matches) {
-        const nums = [...match[2].matchAll(NUMBER_RE)].map(num => Number(num[0]));
-        if (nums.length < 2 || nums.some(num => !Number.isFinite(num))) continue;
-
-        const firstPair = { x: nums[0], y: nums[1] };
-        const lastPair = { x: nums[nums.length - 2], y: nums[nums.length - 1] };
-        if (!source) source = firstPair;
-        target = lastPair;
-    }
-
-    return source && target ? { source, target } : null;
-};
 
 const selectDebugEdge = (id: string) => {
     window.dispatchEvent(new CustomEvent('vizly:selectDebugEdge', { detail: { edgeId: id } }));
@@ -70,7 +49,11 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
 
     const edgeData = props.data as Record<string, any> | undefined;
     const currentTheme = useEdgeTheme();
-    const visiblePathEndpoints = useMemo(() => getPathEndpoints(safeFinalPath), [safeFinalPath]);
+    const renderEdge = useMemo(
+        () => createRenderEdgeGeometryFromEdgeProps(props, safeFinalPath, workerSmartPoints),
+        [props, safeFinalPath, workerSmartPoints]
+    );
+    const visiblePathEndpoints = useMemo(() => getPathEndpoints(renderEdge.path), [renderEdge.path]);
     // [PERF] 消除双订阅：移除第二次 useSmartEdgeContext 调用
     // simpleNodeMap 仅在 debug heatmap 时使用，通过 router 传入
     // 这避免了每条边对 nodeLookup 进行两次订阅，显著减少拖动时的重算量
@@ -174,7 +157,7 @@ const InnerAdvancedSmartEdgeGraphics = ({ props, router, labelManager }: Advance
 
             <BaseEdge {...({
                 id,
-                path: safeFinalPath,
+                path: renderEdge.path,
                 markerStart: markerStart as any,
                 markerEnd: markerEnd as any,
                 // dragOverlayStyle 只在渲染时合并，不污染 edge.style 持久化数据

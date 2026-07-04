@@ -42,6 +42,12 @@ import {
     type AIModel,
     type AIProviderConfig,
 } from './aiConfigStorage';
+import {
+    logAIConfigCloudSaveFailure,
+    logAIConfigEndpointValidationFailure,
+    logAIConfigModalCloudLoadFailure,
+    logAIConfigRequestFailure,
+} from './aiLogging';
 
 const { Text, Title, Paragraph } = Typography;
 const loadStorageService = async () => (await import('@/services/SupabaseStorage')).storageService;
@@ -77,7 +83,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                         window.dispatchEvent(new Event('aiConfigChanged'));
                     }
                 }).catch(err => {
-                    console.error('AIConfigModal: Failed to load cloud config', err);
+                    logAIConfigModalCloudLoadFailure(err);
                 });
             }
         }
@@ -110,7 +116,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 await storageService.saveConfig('ai_config', cloudConfig, user.id);
                 appMessage.success(t('aiConfig.saveSuccessCloud'));
             } catch (err) {
-                console.error('Cloud save failed', err);
+                logAIConfigCloudSaveFailure(err);
                 appMessage.warning(t('aiConfig.cloudSyncFail'));
             }
         } else {
@@ -266,7 +272,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
         }
         try {
             resolveAIProviderEndpoint(provider, '/chat/completions');
-        } catch {
+        } catch (error) {
+            logAIConfigEndpointValidationFailure(provider.name, 'testConnection', error);
             appMessage.warning(`${provider.name} 的 Base URL 必须使用 HTTPS，或本机 HTTP localhost/127.0.0.1。`);
             return;
         }
@@ -278,6 +285,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             }, { timeoutMs: 30_000 });
             appMessage.success(t('aiConfig.testSuccess'));
         } catch (error: any) {
+            logAIConfigRequestFailure('testConnection', provider.name, error);
             appMessage.error(t('aiConfig.testError', { message: formatAIProviderRequestError(error, 100) }));
         } finally {
             setIsTesting(false);
@@ -346,7 +354,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
         }
         try {
             resolveAIProviderEndpoint(provider, '/models');
-        } catch {
+        } catch (error) {
+            logAIConfigEndpointValidationFailure(provider.name, 'fetchModels', error);
             appMessage.warning(`${provider.name} 的 Base URL 必须使用 HTTPS，或本机 HTTP localhost/127.0.0.1。`);
             return;
         }
@@ -385,6 +394,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 appMessage.error(t('aiConfig.fetchModelsInvalidData'));
             }
         } catch (error: any) {
+            logAIConfigRequestFailure('fetchModels', provider.name, error);
             appMessage.error(t('aiConfig.testError', { message: formatAIProviderRequestError(error, 100) }));
         } finally {
             setIsFetchingModels(false);

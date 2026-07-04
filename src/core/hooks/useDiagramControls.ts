@@ -1,15 +1,25 @@
 import { useCallback } from 'react';
 import { dispatchDiagramControl } from '../components/shared/diagramControl';
 import type { DiagramExportEventDetail, DiagramExportEventName } from './diagramExportActions';
+import { logDiagramExportEventDispatchFailure } from './diagramExportLogging';
+import type { ReactFlowRenderSnapshot } from '../rendering/reactFlowScene';
 
 type ExportActionName = 'exportDiagramToPNG' | 'exportDiagramToPDF' | 'exportDiagramToSVG' | 'exportDiagramToGIF';
 
-export const useDiagramControls = (diagramId: string, enableMainFlowAnimation: boolean = true) => {
+export interface DiagramControlsOptions {
+  getReactFlowSnapshot?: () => ReactFlowRenderSnapshot | null | undefined;
+}
+
+export const useDiagramControls = (
+  diagramId: string,
+  enableMainFlowAnimation: boolean = true,
+  options: DiagramControlsOptions = {},
+) => {
   const dispatchExportEvent = useCallback((name: DiagramExportEventName, detail: DiagramExportEventDetail) => {
     try {
       window.dispatchEvent(new CustomEvent(name, { detail }));
-    } catch {
-      // Ignore event dispatch errors so export flows can continue.
+    } catch (error) {
+      logDiagramExportEventDispatchFailure('useDiagramControls', name, error);
     }
   }, []);
 
@@ -24,8 +34,9 @@ export const useDiagramControls = (diagramId: string, enableMainFlowAnimation: b
       enableMainFlowAnimation,
       dispatchExportEvent,
       yieldToPaint,
+      getReactFlowSnapshot: options.getReactFlowSnapshot,
     });
-  }, [diagramId, dispatchExportEvent, enableMainFlowAnimation, yieldToPaint]);
+  }, [diagramId, dispatchExportEvent, enableMainFlowAnimation, options.getReactFlowSnapshot, yieldToPaint]);
 
   const handleFitDiagram = useCallback(() => {
     dispatchDiagramControl('fit', diagramId);

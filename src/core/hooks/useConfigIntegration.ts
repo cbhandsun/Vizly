@@ -11,6 +11,8 @@ import type { LayeredConfigChangeEvent } from '../config/LayeredConfigManager';
 import type { Theme } from '../themes/types/ThemeTypes';
 import type { PerformanceMetrics } from '../themes/ThemePerformanceOptimizer';
 import { diagramConfigManager } from '../components/config/DiagramConfig';
+import { safeLog } from '../utils/consoleCleanup';
+import { redactSensitiveLogValue } from '../utils/logSecurity';
 
 export interface ConfigIntegrationOptions {
   enableMigration?: boolean;
@@ -105,7 +107,7 @@ export function useConfigIntegration(
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('ConfigIntegration initialization failed:', error);
+      safeLog.error('ConfigIntegration initialization failed:', redactSensitiveLogValue(error));
       if (mountedRef.current) {
         setState(prev => ({
           ...prev,
@@ -113,7 +115,7 @@ export function useConfigIntegration(
           error: errorMessage,
         }));
       }
-      console.error('Failed to initialize ConfigIntegration:', error);
+      safeLog.error('Failed to initialize ConfigIntegration:', redactSensitiveLogValue(error));
     }
   }, [enableMigration, enableValidation, enablePerformanceOptimization]);
 
@@ -126,7 +128,7 @@ export function useConfigIntegration(
     try {
       await state.integration.resetToDefaults();
     } catch (error) {
-      console.error('Failed to reset configuration:', error);
+      safeLog.error('Failed to reset configuration:', redactSensitiveLogValue(error));
       throw error;
     }
   }, [state.integration]);
@@ -140,7 +142,7 @@ export function useConfigIntegration(
     try {
       return await state.integration.exportIntegratedConfig();
     } catch (error) {
-      console.error('Failed to export configuration:', error);
+      safeLog.error('Failed to export configuration:', redactSensitiveLogValue(error));
       throw error;
     }
   }, [state.integration]);
@@ -154,7 +156,7 @@ export function useConfigIntegration(
     try {
       await state.integration.importIntegratedConfig(config);
     } catch (error) {
-      console.error('Failed to import configuration:', error);
+      safeLog.error('Failed to import configuration:', redactSensitiveLogValue(error));
       throw error;
     }
   }, [state.integration]);
@@ -169,7 +171,7 @@ export function useConfigIntegration(
       const layeredConfig = state.integration.getLayeredConfigManager();
       await layeredConfig.setConfig(key, value, layer);
     } catch (error) {
-      console.error(`Failed to set config ${key}:`, error);
+      safeLog.error(`Failed to set config ${key}:`, redactSensitiveLogValue(error));
       throw error;
     }
   }, [state.integration]);
@@ -184,7 +186,7 @@ export function useConfigIntegration(
       const layeredConfig = state.integration.getLayeredConfigManager();
       await layeredConfig.remove(key, layer);
     } catch (error) {
-      console.error(`Failed to remove config ${key}:`, error);
+      safeLog.error(`Failed to remove config ${key}:`, redactSensitiveLogValue(error));
       throw error;
     }
   }, [state.integration]);
@@ -199,7 +201,7 @@ export function useConfigIntegration(
       const layeredConfig = state.integration.getLayeredConfigManager();
       return await layeredConfig.getConfig<T>(key);
     } catch (error) {
-      console.error(`Failed to get config ${key}:`, error);
+      safeLog.error(`Failed to get config ${key}:`, redactSensitiveLogValue(error));
       throw error;
     }
   }, [state.integration]);
@@ -221,7 +223,7 @@ export function useConfigIntegration(
       const themeManager = state.integration.getThemeManager();
       await themeManager.setTheme(themeId);
     } catch (error) {
-      console.error(`Failed to set theme ${themeId}:`, error);
+      safeLog.error(`Failed to set theme ${themeId}:`, redactSensitiveLogValue(error));
       throw error;
     }
   }, [state.integration]);
@@ -236,7 +238,7 @@ export function useConfigIntegration(
       const themeManager = state.integration.getThemeManager();
       return themeManager.getCurrentTheme() ?? null;
     } catch (error) {
-      console.error('Failed to get current theme:', error);
+      safeLog.error('Failed to get current theme:', redactSensitiveLogValue(error));
       return null;
     }
   }, [state.integration]);
@@ -251,7 +253,7 @@ export function useConfigIntegration(
       const optimizer = state.integration.getPerformanceOptimizer();
       return optimizer ? optimizer.getMetrics() : null;
     } catch (error) {
-      console.error('Failed to get performance metrics:', error);
+      safeLog.error('Failed to get performance metrics:', redactSensitiveLogValue(error));
       return null;
     }
   }, [state.integration]);
@@ -322,7 +324,7 @@ export function useConfigValue<T = unknown>(
       actions.getConfig<T>(key).then(configValue => {
         setValue(configValue !== undefined ? configValue : defaultValue);
       }).catch(error => {
-        console.warn(`Failed to load config ${key}:`, error);
+        safeLog.warn(`Failed to load config ${key}:`, redactSensitiveLogValue(error));
         setValue(defaultValue);
       });
     }

@@ -21,6 +21,7 @@ import type { Rectangle } from './geometryUtils';
 import type { VisibilityGraph } from './visibilityGraph';
 import { buildVisibilityGraph } from './visibilityGraph';
 import type { SpatialIndex } from './SpatialIndex';
+import { logVisibilityGraphCachePrebuildDisabled } from '../utils/routingLogging';
 
 export interface CacheEntry {
     graph: VisibilityGraph;
@@ -211,7 +212,7 @@ export class VisibilityGraphCache {
      */
     async prebuildGraphs(obstacleConfigs: Rectangle[][]): Promise<void> {
         if (!this.config.enablePrebuild) {
-            console.warn('[VGCache] Prebuild disabled in config');
+            logVisibilityGraphCachePrebuildDisabled();
             return;
         }
 

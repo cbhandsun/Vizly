@@ -97,12 +97,12 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
             >
                 {(() => {
                     const raw = data.description || data.label || '';
-                    const safeRaw = sanitizeInlineHtml(raw);
+                    const safeContentHtml = sanitizeInlineHtml(raw);
 
                     if (data.isEditing) {
                         return (
                             <EditableLabel
-                                value={safeRaw}
+                                value={safeContentHtml}
                                 onChange={(val) => {
                                     handleUpdateData({ label: val, description: undefined, isEditing: false });
                                 }}
@@ -133,11 +133,11 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                         );
                     }
 
-                    const lines = safeRaw.includes('<br')
-                        ? safeRaw.split(/<br\s*\/?>/i)
-                        : safeRaw.split('\n');
-                    const titleLine = lines[0]?.trim() || '';
-                    const bodyLines = lines.slice(1).filter((l: string) => l.trim());
+                    const safeContentLines = safeContentHtml.includes('<br')
+                        ? safeContentHtml.split(/<br\s*\/?>/i)
+                        : safeContentHtml.split('\n');
+                    const safeTitleLineHtml = safeContentLines[0]?.trim() || '';
+                    const safeBodyLinesHtml = safeContentLines.slice(1).filter((line: string) => line.trim());
 
                     return (
                         <div
@@ -148,15 +148,15 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                             style={{ cursor: 'text', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', width: '100%', textAlign: data.textAlign || 'center' }}
                             title="Double click to edit"
                         >
-                            {titleLine && (
+                            {safeTitleLineHtml && (
                                 <div className="flowchart-node-title">
-                                    <span dangerouslySetInnerHTML={{ __html: titleLine }} style={{ pointerEvents: 'none' }} />
+                                    <span dangerouslySetInnerHTML={{ __html: safeTitleLineHtml }} style={{ pointerEvents: 'none' }} />
                                 </div>
                             )}
-                            {bodyLines.length > 0 && (
+                            {safeBodyLinesHtml.length > 0 && (
                                 <div className="flowchart-node-body">
-                                    {bodyLines.map((line: string, i: number) => (
-                                        <div key={i} className="flowchart-node-body-line" dangerouslySetInnerHTML={{ __html: line }} style={{ pointerEvents: 'none' }} />
+                                    {safeBodyLinesHtml.map((safeLineHtml: string, i: number) => (
+                                        <div key={i} className="flowchart-node-body-line" dangerouslySetInnerHTML={{ __html: safeLineHtml }} style={{ pointerEvents: 'none' }} />
                                     ))}
                                 </div>
                             )}

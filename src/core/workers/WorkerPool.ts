@@ -16,6 +16,13 @@
 import { PathFindingJob, PathFindingResult, PathFindingRequest, SharedGraphContext } from '../types/routing';
 import PathfindingWorker from './pathfinding.worker?worker&inline';
 import { serializeObstacles } from './core/BinarySerializer';
+import {
+    logWorkerPoolInitWorkerError,
+    logWorkerPoolInitializationFailure,
+    logWorkerPoolMalformedMessage,
+    logWorkerPoolRuntimeError,
+    logWorkerPoolUnknownJobMessage,
+} from '../utils/routingLogging';
 
 // [NEW] Interfaces
 interface PendingRequest {
@@ -124,7 +131,7 @@ class WorkerPool {
                 };
 
                 worker.onerror = (err) => {
-                    console.error(`Worker [initPool] error:`, err);
+                    logWorkerPoolInitWorkerError(err);
                     // 拒绝所有待处理的任务
                     for (const job of poolWorker.jobs.values()) {
                         for (const sub of job.subJobs.values()) {
@@ -140,7 +147,7 @@ class WorkerPool {
 
             this.initialized = true;
         } catch (e) {
-            console.error('Failed to initialize worker pool:', e);
+            logWorkerPoolInitializationFailure(e);
         }
     }
 
@@ -186,7 +193,7 @@ class WorkerPool {
     private handleWorkerMessage(poolWorker: PoolWorker, e: MessageEvent): void {
         const data = e.data;
         if (!this.isWorkerMessagePayload(data)) {
-            console.warn('[WorkerPool] Ignoring malformed worker message');
+            logWorkerPoolMalformedMessage();
             return;
         }
 
@@ -241,7 +248,7 @@ class WorkerPool {
         }
 
         if (!handled) {
-            console.warn('[WorkerPool] Ignoring worker message for unknown job');
+            logWorkerPoolUnknownJobMessage();
             return;
         }
 
@@ -278,7 +285,7 @@ class WorkerPool {
             };
 
             worker.onerror = (err) => {
-                console.error(`Worker ${workerIndex} error:`, err);
+                logWorkerPoolRuntimeError(workerIndex, err);
                 for (const job of poolWorker.jobs.values()) {
                     for (const sub of job.subJobs.values()) {
                         sub.reject(err);

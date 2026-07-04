@@ -4,6 +4,11 @@ import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import { dataService } from '@/services/DataService';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { safeLog } from '@/core/utils/consoleCleanup';
+import {
+  logDiagramStorageCloudListFailure,
+  logDiagramStorageTemplateFetchException,
+  logDiagramStorageTemplateFetchFailure,
+} from './diagramStorageLogging';
 import { parseRemoteDiagramContent } from '@/services/remoteDiagramContent';
 
 export interface SystemTemplateMetadata {
@@ -35,7 +40,9 @@ export function useDiagramStorage() {
         const items = await s3Provider.listDiagrams();
         setS3Diagrams(items || []);
       }
-    } catch { void 0; }
+    } catch (error) {
+      logDiagramStorageCloudListFailure('s3', error);
+    }
 
     // Fetch from Supabase
     try {
@@ -44,7 +51,9 @@ export function useDiagramStorage() {
         const items = await sbProvider.listDiagrams();
         setSupabaseDiagrams(items || []);
       }
-    } catch { void 0; }
+    } catch (error) {
+      logDiagramStorageCloudListFailure('supabase', error);
+    }
 
     // Fetch generic system templates from Supabase
     if (supabase) {
@@ -57,13 +66,13 @@ export function useDiagramStorage() {
           .order('created_at', { ascending: false });
         
         if (error) {
-          console.error('Error fetching system templates:', error);
+          logDiagramStorageTemplateFetchFailure(error);
         } else if (data) {
           safeLog.debug('Fetched system templates:', data);
           setSystemTemplates(data as SystemTemplateMetadata[]);
         }
       } catch (err) {
-        console.error('Exception fetching system templates:', err);
+        logDiagramStorageTemplateFetchException(err);
       }
     }
   }, []);

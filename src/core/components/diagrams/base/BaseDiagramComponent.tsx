@@ -9,12 +9,14 @@ import SubGroupNode from '../../custom-nodes/SubGroupNode';
 import StickyNoteNode from '../../custom-nodes/StickyNoteNode';
 import AdvancedCustomEdge from '../../custom-nodes/CustomEdge';
 import { AdvancedSmartStepEdge, AdvancedSmartBezierEdge, AdvancedSmartStraightEdge } from '../../custom-edges/AdvancedSmartEdge';
+import { StablePathEdge } from '../../custom-edges/StablePathEdge';
 import { validateAndFixNodes } from '../../../utils/nodeValidation';
 import { ILayoutStrategy } from '../../../strategies/LayoutStrategyManager';
 import { LayeredConfigManager } from '../../../config/LayeredConfigManager';
 import { diagramConfigManager } from '../../config/DiagramConfig';
 import { LayoutStabilityContext } from '../../../context/LayoutStabilityContext';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
+import { createBaseDiagramDisplayEdges } from './baseDiagramDisplayEdges';
 
 // Domain Hooks
 import { useDiagramStability, calcNodeSignature, calcEdgeSignature } from './hooks/useDiagramStability';
@@ -331,7 +333,13 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
     'advanced-smart-step': AdvancedSmartStepEdge,
     'advanced-smart-bezier': AdvancedSmartBezierEdge,
     'advanced-smart-straight': AdvancedSmartStraightEdge,
+    stablePath: StablePathEdge,
   }), []);
+
+  const displayEdges = useMemo(
+    () => createBaseDiagramDisplayEdges(rfEdges),
+    [rfEdges]
+  );
 
   if (!theme) return <div>Loading theme...</div>;
 
@@ -397,7 +405,7 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
             {...props}
             disableZoomCompensation={props.disableZoomCompensation}
             nodes={themedNodes}
-            edges={rfEdges.map(edge => ({
+            edges={displayEdges.map(edge => ({
               ...edge,
               data: {
                 ...edge.data,

@@ -3,6 +3,10 @@
  * 统一管理布局、样式和行为配置
  */
 
+import { safeLog } from '../../utils/consoleCleanup';
+import { redactSensitiveLogValue } from '../../utils/logSecurity';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from '../../utils/uiStorageLogging';
+
 const DIAGRAM_CONFIG_STORAGE_KEY = 'architecture-diagram-config';
 const MAX_STORED_DIAGRAM_CONFIG_CHARS = 512 * 1024;
 const MAX_IMPORTED_DIAGRAM_CONFIG_CHARS = 1024 * 1024;
@@ -818,7 +822,7 @@ export class DiagramConfigManager {
       try {
         listener(this.config);
       } catch (error) {
-        console.error('配置变更监听器执行失败:', error);
+        safeLog.error('配置变更监听器执行失败:', redactSensitiveLogValue(error));
       }
     });
   }
@@ -843,12 +847,13 @@ export class DiagramConfigManager {
 
       const serialized = JSON.stringify(configToSave);
       if (serialized.length > MAX_STORED_DIAGRAM_CONFIG_CHARS) {
-        console.warn('图表配置超过本地存储大小限制，跳过保存');
+        safeLog.warn('图表配置超过本地存储大小限制，跳过保存');
         return;
       }
       localStorage.setItem(DIAGRAM_CONFIG_STORAGE_KEY, serialized);
     } catch (error) {
-      console.warn('无法保存配置到本地存储:', error);
+      logUiStorageWriteFailure('DiagramConfigManager.saveConfigToStorage', DIAGRAM_CONFIG_STORAGE_KEY, error);
+      safeLog.warn('无法保存配置到本地存储:', redactSensitiveLogValue(error));
     }
   }
 
@@ -873,8 +878,9 @@ export class DiagramConfigManager {
         // 载入后已通过 updateConfig 规范化并保存
       }
     } catch (error) {
+      logUiStorageReadFailure('DiagramConfigManager.loadConfigFromStorage', DIAGRAM_CONFIG_STORAGE_KEY, error);
       localStorage.removeItem(DIAGRAM_CONFIG_STORAGE_KEY);
-      console.warn('无法从本地存储加载配置:', error);
+      safeLog.warn('无法从本地存储加载配置:', redactSensitiveLogValue(error));
     }
   }
 
@@ -929,7 +935,7 @@ export class DiagramConfigManager {
       this.updateConfig(importedConfig);
       return true;
     } catch (error) {
-      console.error('配置导入失败:', error);
+      safeLog.error('配置导入失败:', redactSensitiveLogValue(error));
       return false;
     }
   }

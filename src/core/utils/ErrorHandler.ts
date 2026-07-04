@@ -2,6 +2,7 @@
  * 统一错误处理系统
  */
 
+import { safeLog } from './consoleCleanup';
 import { normalizeRemoteLogEndpoint, redactSensitiveLogValue } from './logSecurity';
 
 // 错误类型枚举
@@ -268,15 +269,24 @@ export class ErrorHandler {
    * 控制台日志
    */
   private logToConsole(error: DiagramError): void {
-    const logMethod = error.severity === ErrorSeverity.CRITICAL ? 'error' : 
-                     error.severity === ErrorSeverity.HIGH ? 'warn' : 'log';
-    
-    console[logMethod](`[${error.code}] ${error.type}:`, {
+    const logPayload = redactSensitiveLogValue({
       message: error.message,
       severity: error.severity,
       context: error.context,
       stack: error.stack
     });
+
+    if (error.severity === ErrorSeverity.CRITICAL) {
+      safeLog.error(`[${error.code}] ${error.type}:`, logPayload);
+      return;
+    }
+
+    if (error.severity === ErrorSeverity.HIGH) {
+      safeLog.warn(`[${error.code}] ${error.type}:`, logPayload);
+      return;
+    }
+
+    safeLog.info(`[${error.code}] ${error.type}:`, logPayload);
   }
 
   /**
@@ -287,7 +297,7 @@ export class ErrorHandler {
       if (!this.config.remoteLogEndpoint) return;
       const endpoint = normalizeRemoteLogEndpoint(this.config.remoteLogEndpoint);
       if (!endpoint) {
-        console.warn('远程日志端点无效，已跳过发送');
+        safeLog.warn('远程日志端点无效，已跳过发送');
         return;
       }
 
@@ -299,7 +309,7 @@ export class ErrorHandler {
         body: JSON.stringify(redactSensitiveLogValue(error.toJSON()))
       });
     } catch (logError) {
-      console.warn('远程日志发送失败:', logError);
+      safeLog.warn('远程日志发送失败:', redactSensitiveLogValue(logError));
     }
   }
 
@@ -316,7 +326,7 @@ export class ErrorHandler {
     if (error.severity === ErrorSeverity.CRITICAL) {
       alert(`严重错误: ${message}`);
     } else {
-      console.warn(`用户通知: ${message}`);
+      safeLog.warn('用户通知:', redactSensitiveLogValue(message));
     }
   }
 
@@ -328,7 +338,7 @@ export class ErrorHandler {
       try {
         listener(error);
       } catch (listenerError) {
-        console.error('错误监听器执行失败:', listenerError);
+        safeLog.error('错误监听器执行失败:', redactSensitiveLogValue(listenerError));
       }
     });
   }

@@ -1,5 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const safeLogState = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  log: vi.fn(),
+}));
+
+vi.mock('../../consoleCleanup', () => ({
+  safeLog: safeLogState,
+}));
+
 vi.hoisted(() => {
   Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
     writable: true,
@@ -72,6 +84,7 @@ import {
   resolveAllNodeOverlapsGlobal,
   resolveFreeNodeOverlapsInDomain,
   reflowSubGroupChildrenVertical,
+  syncDagreChildPositions,
   resolveSubGroupOverlaps,
   resolveSubGroupChildrenOverlapsStrict,
   scaleDomainContentToFitWidth,
@@ -312,6 +325,20 @@ describe('subGroup layout helpers', () => {
     expect(a.position.x).toBe(220);
     expect(a.position.y).toBe(180);
     expect(b.position.y).toBe(245);
+  });
+
+  it('warns via safeLog when synced Dagre children approach the subgroup title boundary', () => {
+    const result = syncDagreChildPositions([
+      sg(['a'], 300, 220),
+      child('a', 0, 0, { __dagreRel: { x: 10, y: 0 } }),
+    ] as never) as any[];
+
+    const syncedChild = byId(result, 'a');
+    expect(syncedChild.position.x).toBe(130);
+    expect(syncedChild.position.y).toBe(184);
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[DAGRE-SYNC-ALERT] Child a is very close to innerTop (184). Overlap risk!'
+    );
   });
 
   it('centers and left-aligns subgroup children within the actual subgroup width', () => {

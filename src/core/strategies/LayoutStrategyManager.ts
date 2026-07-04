@@ -1,5 +1,6 @@
 import type { Node, Edge } from '@xyflow/react';
 import { LayoutOptions } from '../types/layout';
+import { logRegisteredLayoutStrategyMetadata } from './layoutLogging';
 
 
 export interface ILayoutStrategy {
@@ -238,7 +239,7 @@ export class LayoutStrategyManager {
       this.summaries.set(descriptor.type, createStrategySummary(descriptor));
     }
 
-    console.info('[LayoutStrategy] Registered metadata:', Array.from(this.descriptors.keys()).join(', '));
+    logRegisteredLayoutStrategyMetadata(Array.from(this.descriptors.keys()));
   }
 
   /**

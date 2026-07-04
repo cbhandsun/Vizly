@@ -19,6 +19,13 @@ import {
     createFilletedPath
 } from '../algorithms/smartEdgeUtils';
 import { separateParallelPaths, bundleEdges, DEFAULT_CHANNEL_CONFIG } from '../algorithms/edgeChannelRouting';
+import {
+    logPathfindingWorkerCriticalFailure,
+    logPathfindingWorkerMissingMetadata,
+    logPathfindingWorkerPostingError,
+    logPathfindingWorkerSerializationFailure,
+    logPathfindingWorkerTaskExecutionFailure,
+} from '../utils/routingLogging';
 
 
 import type { LineObstacle } from '../types/routing';
@@ -409,7 +416,7 @@ self.onmessage = (e: MessageEvent) => {
                     }
                 });
             } catch (err: any) {
-                console.error(`[Worker] Task execution failed for edge ${task.edgeId}:`, err);
+                logPathfindingWorkerTaskExecutionFailure(task.edgeId, err);
                 // Provide a safe fallback result so the batch doesn't crash completely
                 const sx = Number.isFinite(task.sourceX) ? task.sourceX! : 0;
                 const sy = Number.isFinite(task.sourceY) ? task.sourceY! : 0;
@@ -491,7 +498,7 @@ self.onmessage = (e: MessageEvent) => {
 
             // [FIX] Ensure Metadata exists
             if (!result.metadata) {
-                console.warn(`[Worker] Result for ${task.edgeId} missing metadata! Attaching default.`);
+                logPathfindingWorkerMissingMetadata(task.edgeId);
                 result.metadata = { strategy: (result as any).debugInfo?.algorithmDebug?.strategy || 'Recovered' };
             }
 
@@ -594,7 +601,7 @@ self.onmessage = (e: MessageEvent) => {
             });
     
         } catch (err: any) {
-            console.error('[DEBUG-WORKER] Return serialization failed:', err);
+            logPathfindingWorkerSerializationFailure(err);
             self.postMessage({
                 type: 'BATCH_RESULT',
                 batchId,
@@ -702,13 +709,13 @@ self.onmessage = (e: MessageEvent) => {
 
             // Post back flattened result as before
             if (result.error) {
-                console.error('[Worker] Posting ERROR:', result.error);
+                logPathfindingWorkerPostingError(result.error);
                 self.postMessage({ jobId: result.jobId, error: result.error });
             } else {
                 self.postMessage(result);
             }
         } catch (err: any) {
-            console.error('[Worker] CRITICAL FAILURE:', err);
+            logPathfindingWorkerCriticalFailure(err);
             self.postMessage({ jobId: job.edgeId, error: err.message });
         }
     }

@@ -4,6 +4,13 @@
  */
 
 import { ThemePreset } from './types/ThemeTypes';
+import {
+  logThemePresetDataInvalid,
+  logThemePresetLoadFailure,
+  logThemePresetMissing,
+  logThemePresetModuleFormatInvalid,
+  logThemePresetPreloadFailure,
+} from './themeInfrastructureLogging';
 
 // 主题预设映射表
 const THEME_PRESET_MAP = {
@@ -43,7 +50,7 @@ export async function loadThemePreset(themeId: string): Promise<ThemePreset | nu
     // 获取加载函数
     const loader = THEME_PRESET_MAP[themeId as keyof typeof THEME_PRESET_MAP];
     if (!loader) {
-      console.warn(`主题预设 "${themeId}" 不存在`);
+      logThemePresetMissing(themeId);
       return null;
     }
 
@@ -88,7 +95,7 @@ export async function loadThemePreset(themeId: string): Promise<ThemePreset | nu
       );
 
       if (!presetExport) {
-        console.error(`主题预设 "${themeId}" 模块格式不正确`);
+        logThemePresetModuleFormatInvalid(themeId);
         return null;
       }
 
@@ -97,7 +104,7 @@ export async function loadThemePreset(themeId: string): Promise<ThemePreset | nu
 
     // 验证主题预设
     if (!themePreset || !themePreset.id || !themePreset.theme) {
-      console.error(`主题预设 "${themeId}" 数据格式无效`);
+      logThemePresetDataInvalid(themeId);
       return null;
     }
 
@@ -107,7 +114,7 @@ export async function loadThemePreset(themeId: string): Promise<ThemePreset | nu
     return themePreset;
 
   } catch (error) {
-    console.error(`加载主题预设 "${themeId}" 失败:`, error);
+    logThemePresetLoadFailure(themeId, error);
     return null;
   }
 }
@@ -144,7 +151,7 @@ export function preloadThemePreset(themeId: string): void {
       // 预加载完成
     }
   }).catch(error => {
-    console.warn(`主题预设 "${themeId}" 预加载失败:`, error);
+    logThemePresetPreloadFailure(themeId, error);
   });
 }
 

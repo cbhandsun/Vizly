@@ -1,5 +1,6 @@
 import React, { ReactNode, ErrorInfo } from 'react';
 import { Result } from 'antd';
+import { logUiBoundaryError } from '@/core/utils/errorBoundaryLogging';
 
 interface ErrorBoundaryState {
     hasError: boolean;
@@ -21,9 +22,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     }
 
     public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        if (process.env.NODE_ENV === 'development') {
-            console.error("Uncaught error:", error, errorInfo);
-        }
+        logUiBoundaryError(error, errorInfo);
     }
 
     public render() {

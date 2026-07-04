@@ -4,7 +4,7 @@ import path from 'node:path';
 const projectRoot = process.cwd();
 const packageJson = JSON.parse(readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
 const runTestCiSource = readFileSync(path.join(projectRoot, 'scripts/run-test-ci.mjs'), 'utf8');
-const testFilePattern = /__tests__[\\/].*\.test\.(ts|tsx)$/;
+const testFilePattern = /\.test\.(ts|tsx)$/;
 const searchRoots = ['src', 'supabase'];
 
 const normalizePath = (value) => value.replace(/\\/g, '/').replace(/\/+$/, '');

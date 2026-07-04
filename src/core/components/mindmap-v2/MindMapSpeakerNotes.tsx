@@ -4,6 +4,7 @@ import { getMindElixirInstance, getPresentationState, subscribePresentation } fr
 import { generateSpeakerNotes } from './mindmapAIService';
 import { mergeSpeakerNotesIntoNodeNote } from './mindmapSpeakerNotesSecurity';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
+import { logMindmapSpeakerNotesSaveFailure } from './mindmapPanelLogging';
 import { Spin, Button, Select, Tooltip, message } from 'antd';
 import { CopyOutlined, ReloadOutlined, SaveOutlined, MessageOutlined, SoundOutlined } from '@ant-design/icons';
 
@@ -136,7 +137,7 @@ export const MindMapSpeakerNotes: React.FC = () => {
             setCurrentNode({ ...currentNode, ...cleanPatch });
             message.success('已保存到当前节点备注');
         } catch (err) {
-            console.error('[SpeakerNotes] save failed:', err);
+            logMindmapSpeakerNotesSaveFailure(err);
             message.error('保存失败，请重试');
         }
     };

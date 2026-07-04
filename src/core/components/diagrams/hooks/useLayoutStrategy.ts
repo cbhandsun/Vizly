@@ -6,6 +6,13 @@ import { flushObstacles } from '../../custom-edges/obstacleContext';
 import { buildChildrenMap, getDescendantIds } from './useCollapsibleGroups';
 import { dispatchDiagramControl } from '../../shared/diagramControl';
 import { applyLayout, forceDirectedLayout, treeLayout } from '../../../utils/LayoutAlgorithms';
+import { coerceDiagramId, getQueryOrHashParamFromLocation } from '../../../utils/inputBoundary';
+import { refreshDomainLayoutEdgeForRender } from './layoutEdgeRefresh';
+import {
+    logLayoutNoLayoutableNodes,
+    logLayoutOrphanEdgeDropped,
+    logLayoutStrategyFailure,
+} from './diagramInteractionLogging';
 
 
 interface UseLayoutStrategyParams {
@@ -105,7 +112,14 @@ function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], dir: 'TB'
     const sanitized = resultEdges
         .filter(e => {
             const ok = nodeIdSet.has(e.source) && nodeIdSet.has(e.target);
-            if (!ok) { _orphan++; console.warn(`[Layout] ⚠️ 移除孤立边: ${e.id}, src=${nodeIdSet.has(e.source)}, tgt=${nodeIdSet.has(e.target)}`); }
+            if (!ok) {
+                _orphan++;
+                logLayoutOrphanEdgeDropped({
+                    edgeId: e.id,
+                    hasSource: nodeIdSet.has(e.source),
+                    hasTarget: nodeIdSet.has(e.target),
+                });
+            }
             return ok;
         })
         .map(e => {
@@ -228,7 +242,7 @@ export function useLayoutStrategy({
             }));
             const nodeIdSet = new Set(layoutNodes.map(n => n.id));
             const layoutEdges = allEdges.filter(e => nodeIdSet.has(e.source) && nodeIdSet.has(e.target));
-            if (layoutNodes.length === 0) { console.warn('[Layout] 没有可布局的节点'); return; }
+            if (layoutNodes.length === 0) { logLayoutNoLayoutableNodes(); return; }
 
             if (strategyName === 'tree') {
                 // ── 扁平树形布局（对齐 SVG 版：不检测域） ──
@@ -314,11 +328,15 @@ export function useLayoutStrategy({
                 let domainOrder: string[] | undefined;
                 let subDomainOrder: Record<string, string[]> | undefined;
                 try {
-                    const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
-                    const diagramId = hashParams.get('diagram') || '';
-                    if (diagramId) {
+                    const currentDiagramId = coerceDiagramId(
+                        diagramId || getQueryOrHashParamFromLocation(
+                            typeof window === 'undefined' ? undefined : window.location,
+                            'diagram'
+                        ) || ''
+                    );
+                    if (currentDiagramId) {
                         const { PRESET_MAP } = await import('@/data/standardized');
-                        const preset = PRESET_MAP[diagramId];
+                        const preset = PRESET_MAP[currentDiagramId];
                         if (preset) {
                             // 优先显式配置
                             domainOrder = (preset as any).layout?.domainOrder;
@@ -404,18 +422,9 @@ export function useLayoutStrategy({
                         requestAnimationFrame(() => {
                             requestAnimationFrame(() => {
                                 EdgeRoutingCoordinator.getInstance().forceClearAllCaches();
-                                // Touch edges to force re-render with fresh positionAbsolute
-                                setEdges(prev => prev.map(e => ({
-                                    ...e,
-                                    data: {
-                                        ...e.data,
-                                        waypoints: [],
-                                        computedPath: undefined,
-                                        elkPath: undefined,
-                                        algorithm: undefined,
-                                        _layoutEpoch: Date.now(),
-                                    }
-                                })));
+                                // Touch edges to force re-render with fresh positionAbsolute.
+                                const layoutEpoch = Date.now();
+                                setEdges(prev => prev.map(e => refreshDomainLayoutEdgeForRender(e, layoutEpoch)));
                                 flushObstacles();
                                 resolve();
                             });
@@ -424,9 +433,9 @@ export function useLayoutStrategy({
                 }
             }
         } catch (err) {
-            console.error(`[Layout] ❌ 布局异常 (${strategyName}):`, err);
+            logLayoutStrategyFailure(strategyName, err);
         }
-    }, [setNodes, setEdges, takeSnapshot, nodesRef, edgesRef, twoStepFitView]);
+    }, [diagramId, setNodes, setEdges, takeSnapshot, nodesRef, edgesRef, twoStepFitView]);
 
     return {
         handleStrategyLayout,

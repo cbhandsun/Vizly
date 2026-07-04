@@ -9,6 +9,12 @@ import {
   ThemeTransition, 
   ThemePerformanceOptions 
 } from './types/ThemeTypes';
+import {
+  logThemeManagerConfigInvalidMaxCacheSize,
+  logThemeManagerConfigInvalidPreloadDelay,
+  logThemeManagerConfigMissingKey,
+  logThemeManagerConfigValidationFallback,
+} from './themeInfrastructureLogging';
 
 /**
  * 主题管理器配置接口
@@ -121,7 +127,7 @@ export class ThemeManagerConfigUtil {
     
     for (const key of requiredKeys) {
       if (this.config[key] === undefined || this.config[key] === null) {
-        console.error(`主题管理器配置缺少必需项: ${key}`);
+        logThemeManagerConfigMissingKey(String(key));
         return false;
       }
     }
@@ -129,12 +135,12 @@ export class ThemeManagerConfigUtil {
     // 验证性能选项
     const { performance } = this.config;
     if (performance.preloadDelay < 0) {
-      console.error('性能选项 preloadDelay 不能为负数');
+      logThemeManagerConfigInvalidPreloadDelay();
       return false;
     }
     
     if (performance.maxCacheSize <= 0) {
-      console.error('性能选项 maxCacheSize 必须为正数');
+      logThemeManagerConfigInvalidMaxCacheSize();
       return false;
     }
     
@@ -171,7 +177,7 @@ export function createThemeManagerConfig(
   const configUtil = new ThemeManagerConfigUtil(config);
   
   if (!configUtil.validate()) {
-    console.warn('主题管理器配置验证失败，使用默认配置');
+    logThemeManagerConfigValidationFallback();
     configUtil.reset();
   }
   

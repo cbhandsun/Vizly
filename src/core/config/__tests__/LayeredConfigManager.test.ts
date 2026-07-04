@@ -1,6 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LayeredConfigManager as LayeredConfigManagerType } from '../LayeredConfigManager';
 
+const safeLogState = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  log: vi.fn(),
+}));
+
+vi.mock('../../utils/consoleCleanup', () => ({
+  safeLog: safeLogState,
+}));
+
 const importFreshLayeredConfigManager = async () => {
   vi.resetModules();
   return import('../LayeredConfigManager');
@@ -18,6 +30,7 @@ describe('LayeredConfigManager', () => {
   });
 
   afterEach(() => {
+    Object.values(safeLogState).forEach(mock => mock.mockReset());
     vi.restoreAllMocks();
     vi.resetModules();
     localStorage.clear();
@@ -42,6 +55,10 @@ describe('LayeredConfigManager', () => {
 
     expect(() => manager.importConfig(JSON.stringify({ 'unknown.key': true }))).toThrow('导入配置失败');
     expect(() => manager.importConfig(JSON.stringify(['diagram.node.width', 300]))).toThrow('导入配置失败');
+  });
+
+  it('rejects oversized config imports', () => {
+    expect(() => manager.importConfig('x'.repeat(2 * 1024 * 1024 + 1))).toThrow('导入配置失败');
   });
 
   it('imports layered config after all layers validate', () => {
@@ -119,6 +136,10 @@ describe('LayeredConfigManager', () => {
     expect(localStorage.getItem('layered-config-global')).toBeNull();
     expect(manager.get('diagram.node.width')).toBe(321);
     expect(manager.get('diagram.node.height')).toBe(123);
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[LayeredConfigManager.readPersistedLayerData] Failed to read "layered-config-global":',
+      expect.anything()
+    );
   });
 
   it('removes oversized persisted layers before parsing', async () => {
@@ -153,5 +174,66 @@ describe('LayeredConfigManager', () => {
     expect(manager.get('diagram.node.width')).toBe(277);
     expect(manager.get('diagram.node.height')).toBe(60);
     expect(manager.getLayer(module.ConfigLayer.USER)).not.toHaveProperty('unknown.key');
+  });
+
+  it('redacts cloud sync failures before logging', async () => {
+    (manager as any).cloudAdapter = {
+      syncWithCloud: vi.fn(async () => {
+        throw new Error('Authorization: Bearer cloud-secret');
+      }),
+      saveConfig: vi.fn(),
+    };
+
+    await manager.syncWithCloud();
+
+    const payload = JSON.stringify(safeLogState.error.mock.calls);
+    expect(payload).toContain('LayeredConfigManager: Cloud sync failed');
+    expect(payload).toContain('[redacted]');
+    expect(payload).not.toContain('cloud-secret');
+  });
+
+  it('falls back cleanly when persisted layer storage reads throw', async () => {
+    const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+      if (key === 'layered-config-user') {
+        throw new Error('Authorization: Bearer layered-secret');
+      }
+
+      return null;
+    });
+
+    module = await importFreshLayeredConfigManager();
+    manager = module.LayeredConfigManager.getInstance();
+
+    expect(manager.getLayer(module.ConfigLayer.USER)).toEqual({});
+    expect(manager.get('diagram.node.width')).toBe(200);
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[LayeredConfigManager.readPersistedLayerData] Failed to read "layered-config-user":',
+      expect.anything()
+    );
+    expect(JSON.stringify(safeLogState.warn.mock.calls)).toContain('[redacted]');
+    expect(JSON.stringify(safeLogState.warn.mock.calls)).not.toContain('layered-secret');
+
+    getItemSpy.mockRestore();
+  });
+
+  it('keeps runtime config when layer persistence writes fail', () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string) => {
+      if (key === 'layered-config-user') {
+        throw new Error('token=write-secret');
+      }
+    });
+
+    manager.set('diagram.node.width', 275, module.ConfigLayer.USER);
+
+    expect(manager.get('diagram.node.width')).toBe(275);
+    expect(localStorage.getItem('layered-config-user')).toBeNull();
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[LayeredConfigManager.persistLayer] Failed to write "layered-config-user":',
+      expect.anything()
+    );
+    expect(JSON.stringify(safeLogState.warn.mock.calls)).toContain('[redacted]');
+    expect(JSON.stringify(safeLogState.warn.mock.calls)).not.toContain('write-secret');
+
+    setItemSpy.mockRestore();
   });
 });

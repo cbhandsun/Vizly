@@ -1,4 +1,15 @@
 import { useState, useCallback, useEffect, RefObject } from 'react';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from '../utils/uiStorageLogging';
+
+const MENU_COLLAPSE_STORAGE_KEY = 'singleMenuCollapsed';
+
+const persistMenuCollapseState = (collapsed: boolean): void => {
+  try {
+    localStorage.setItem(MENU_COLLAPSE_STORAGE_KEY, String(collapsed));
+  } catch (error) {
+    logUiStorageWriteFailure('useUIState.persistMenuCollapseState', MENU_COLLAPSE_STORAGE_KEY, error);
+  }
+};
 
 export const useUIState = (panelRef: RefObject<{ collapse?: () => void; expand?: () => void } | null>) => {
   const [isMenuCollapsed, setIsMenuCollapsed] = useState(false);
@@ -20,11 +31,7 @@ export const useUIState = (panelRef: RefObject<{ collapse?: () => void; expand?:
       panelRef.current?.expand?.();
     }
     
-    try {
-      localStorage.setItem('singleMenuCollapsed', String(newCollapsed));
-    } catch (error) {
-      console.warn(error);
-    }
+    persistMenuCollapseState(newCollapsed);
     
     setTimeout(() => setIsTransitioning(false), 300);
   }, [isMenuCollapsed, panelRef]);
@@ -52,7 +59,7 @@ export const useUIState = (panelRef: RefObject<{ collapse?: () => void; expand?:
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('singleMenuCollapsed');
+      const stored = localStorage.getItem(MENU_COLLAPSE_STORAGE_KEY);
       if (stored === 'true') {
         requestAnimationFrame(() => {
           setIsMenuCollapsed(true);
@@ -60,7 +67,7 @@ export const useUIState = (panelRef: RefObject<{ collapse?: () => void; expand?:
         });
       }
     } catch (error) {
-      console.warn(error);
+      logUiStorageReadFailure('useUIState.restoreMenuCollapseState', MENU_COLLAPSE_STORAGE_KEY, error);
     }
   }, [panelRef]);
 
@@ -72,11 +79,7 @@ export const useUIState = (panelRef: RefObject<{ collapse?: () => void; expand?:
     handleToggleFullscreen,
     setCollapsed: (collapsed: boolean) => {
       setIsMenuCollapsed(collapsed);
-      try {
-        localStorage.setItem('singleMenuCollapsed', String(collapsed));
-      } catch (error) {
-        console.warn(error);
-      }
+      persistMenuCollapseState(collapsed);
     }
   };
 };

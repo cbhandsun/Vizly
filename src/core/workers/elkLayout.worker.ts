@@ -1,5 +1,6 @@
 import ELK from 'elkjs/lib/elk-api';
 import elkWorkerUrl from 'elkjs/lib/elk-worker.min.js?url';
+import { logElkLayoutWorkerFailure } from '../utils/routingLogging';
 
 const elk = new ELK({
   workerUrl: elkWorkerUrl
@@ -99,7 +100,7 @@ self.onmessage = async (event) => {
       error: null
     });
   } catch (error) {
-    console.error(`[Worker] Layout failed for ${id}:`, error);
+    logElkLayoutWorkerFailure(id, error);
     self.postMessage({
       id,
       result: null,

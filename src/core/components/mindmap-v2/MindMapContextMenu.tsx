@@ -10,6 +10,7 @@ import { findNodeById } from './migrate';
 import { toSafeExternalUrl } from '../../utils/sanitizeHtml';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
+import { logMindmapContextMenuFailure } from './mindmapInteractionLogging';
 
 interface CtxPos { visible: boolean; x: number; y: number; nodeId: string | null; }
 interface Props extends CtxPos { onClose: () => void; }
@@ -62,9 +63,19 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
 
     if (!visible || !nodeId || !mind) return null;
 
-    const getTpc = () => { try { return mind.findEle(nodeId); } catch { return null; } };
+    const getTpc = () => {
+        try { return mind.findEle(nodeId); } catch (error) {
+            logMindmapContextMenuFailure('findTopicElement', error);
+            return null;
+        }
+    };
     // ✅ Using our own DFS instead of mind-elixir's getObjById (which doesn't exist in v5)
-    const getObj = () => { try { return findNodeById(mind.getData().nodeData, nodeId); } catch { return null; } };
+    const getObj = () => {
+        try { return findNodeById(mind.getData().nodeData, nodeId); } catch (error) {
+            logMindmapContextMenuFailure('findNodeObject', error);
+            return null;
+        }
+    };
     const obj = getObj();
     const isRoot = nodeId === mind.getData()?.nodeData?.id;
     const isExpanded = obj?.expanded !== false;
@@ -130,7 +141,12 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
                         onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.insertSibling('after', tpc, cleanMindMapChildNode()); })} />
                     <Item icon="📋" label="复制为同级" kbd="Ctrl+D"
                         onClick={() => act(() => {
-                            try { const tpc = getTpc(); if (tpc) mind.copyNode(tpc, tpc); } catch {}
+                            try {
+                                const tpc = getTpc();
+                                if (tpc) mind.copyNode(tpc, tpc);
+                            } catch (error) {
+                                logMindmapContextMenuFailure('copyNode', error);
+                            }
                         })} />
                 </>
             )}
@@ -152,7 +168,13 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
                     onClick={() => act(() => { const tpc = getTpc(); if (tpc) mind.expandNode(tpc, !isExpanded); })} />
             )}
             <Item icon="⌥" label="创建汇总括号"
-                onClick={() => act(() => { try { mind.createSummary(); } catch {} })} />
+                onClick={() => act(() => {
+                    try {
+                        mind.createSummary();
+                    } catch (error) {
+                        logMindmapContextMenuFailure('createSummary', error);
+                    }
+                })} />
 
             {DIVIDER}
 
@@ -179,7 +201,9 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
                                     if (!tpc || !obj) { onClose(); return; }
                                     try {
                                         mind.reshapeNode(tpc, { ...obj, ...cleanMindMapNodePatch({ shapeClass: key || undefined }) });
-                                    } catch {}
+                                    } catch (error) {
+                                        logMindmapContextMenuFailure('setShapeClass', error);
+                                    }
                                     onClose();
                                 }}
                                 style={{

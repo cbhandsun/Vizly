@@ -6,6 +6,14 @@
  *
  * 使用场景：所有读取 localStorage / sessionStorage / 网络响应的 JSON.parse 调用。
  */
+import { safeLog } from './consoleCleanup';
+import { redactSensitiveLogValue } from './logSecurity';
+
+type SafeJsonParseWithLimitOptions = {
+    maxLength?: number;
+    onFailure?: (error: unknown) => void;
+    buildOversizeError?: () => Error;
+};
 
 /**
  * 安全解析 JSON 字符串为任意类型。
@@ -23,7 +31,37 @@ export function safeJsonParse<T>(raw: string | null | undefined, fallback: T): T
         return parsed as T;
     } catch (e) {
         if (process.env.NODE_ENV !== 'production') {
-            console.warn('[safeJsonParse] Failed to parse JSON, returning fallback.', e);
+            safeLog.warn('[safeJsonParse] Failed to parse JSON, returning fallback.', redactSensitiveLogValue(e));
+        }
+        return fallback;
+    }
+}
+
+export function safeJsonParseWithLimit<T>(
+    raw: string | null | undefined,
+    fallback: T,
+    options: SafeJsonParseWithLimitOptions = {}
+): T {
+    if (!raw) return fallback;
+
+    const { maxLength, onFailure, buildOversizeError } = options;
+    if (typeof maxLength === 'number' && maxLength > 0 && raw.length > maxLength) {
+        const error = buildOversizeError?.() ?? new Error('JSON payload is too large.');
+        if (onFailure) {
+            onFailure(error);
+        } else if (process.env.NODE_ENV !== 'production') {
+            safeLog.warn('[safeJsonParseWithLimit] JSON exceeded max length, returning fallback.', redactSensitiveLogValue(error));
+        }
+        return fallback;
+    }
+
+    try {
+        return JSON.parse(raw) as T;
+    } catch (error) {
+        if (onFailure) {
+            onFailure(error);
+        } else if (process.env.NODE_ENV !== 'production') {
+            safeLog.warn('[safeJsonParseWithLimit] Failed to parse JSON, returning fallback.', redactSensitiveLogValue(error));
         }
         return fallback;
     }
@@ -41,11 +79,11 @@ export function safeJsonParseArray<T>(raw: string | null | undefined): T[] {
     try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) return parsed as T[];
-        console.warn('[safeJsonParseArray] Expected Array but got:', typeof parsed);
+        safeLog.warn('[safeJsonParseArray] Expected Array but got:', typeof parsed);
         return [];
     } catch (e) {
         if (process.env.NODE_ENV !== 'production') {
-            console.warn('[safeJsonParseArray] Failed to parse JSON, returning [].', e);
+            safeLog.warn('[safeJsonParseArray] Failed to parse JSON, returning [].', redactSensitiveLogValue(e));
         }
         return [];
     }

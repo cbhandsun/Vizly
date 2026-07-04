@@ -4,6 +4,7 @@ import { Icon } from '@iconify/react';
 import {
     ArrowUpOutlined, ArrowDownOutlined, MinusOutlined, ExclamationCircleOutlined
 } from '@ant-design/icons';
+import { logArchitectureNodeMissingData } from '../shared/componentFallbackLogging';
 
 // ====== 数据定义 ======
 export type ArchitectureNodeType =
@@ -249,7 +250,7 @@ const ArchitectureNode: React.FC<NodeProps<Node<ArchitectureNodeData>>> = ({ dat
 
     // 🛡️ 防御性编程：防止外部传入无效数据导致白屏 (GAP-01)
     if (!data) {
-        console.warn('ArchitectureNode rendered without data');
+        logArchitectureNodeMissingData();
         return <div style={{width: 130, height: 80, background: '#fafafa', border: '1px solid #d9d9d9', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>Invalid Node</div>;
     }
 

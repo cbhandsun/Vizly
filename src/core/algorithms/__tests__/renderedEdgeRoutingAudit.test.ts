@@ -60,6 +60,59 @@ describe('auditRenderedEdgeRouting', () => {
     ]));
   });
 
+  it('reports non-protected shared rendered lanes', () => {
+    const result = auditRenderedEdgeRouting([
+      {
+        id: 'edge-a',
+        source: 'source-a',
+        target: 'target-a',
+        path: 'M 100 50 L 240 50',
+      },
+      {
+        id: 'edge-b',
+        source: 'source-b',
+        target: 'target-b',
+        path: 'M 120 50 L 260 50',
+      },
+    ], [
+      { id: 'source-a', x: 0, y: 0, width: 100, height: 100 },
+      { id: 'source-b', x: 20, y: 100, width: 100, height: 100 },
+      { id: 'target-a', x: 240, y: 0, width: 100, height: 100 },
+      { id: 'target-b', x: 260, y: 100, width: 100, height: 100 },
+    ]);
+
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rule: 'edge-parallel-overlap',
+        relatedEdgeIds: ['edge-a', 'edge-b'],
+        measuredValue: 120,
+      }),
+    ]));
+  });
+
+  it('does not report the first source trunk overlap for same-source edges', () => {
+    const result = auditRenderedEdgeRouting([
+      {
+        id: 'edge-left',
+        source: 'hub',
+        target: 'target-left',
+        path: 'M 100 50 L 180 50 L 180 20 L 220 20',
+      },
+      {
+        id: 'edge-right',
+        source: 'hub',
+        target: 'target-right',
+        path: 'M 100 50 L 180 50 L 180 80 L 220 80',
+      },
+    ], [
+      { id: 'hub', x: 0, y: 0, width: 100, height: 100 },
+      { id: 'target-left', x: 220, y: -30, width: 100, height: 100 },
+      { id: 'target-right', x: 220, y: 50, width: 100, height: 100 },
+    ]);
+
+    expect(result.errors.some(error => error.rule === 'edge-parallel-overlap')).toBe(false);
+  });
+
   it('reports close visual passes near unrelated business nodes', () => {
     const result = auditRenderedEdgeRouting([
       {

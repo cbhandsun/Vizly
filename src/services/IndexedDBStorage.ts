@@ -5,6 +5,8 @@ import {
     coerceVersionSnapshotData,
     isSafeVersionId,
 } from './versionSnapshotSecurity';
+import { safeLog } from '@/core/utils/consoleCleanup';
+import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
 
 const DB_NAME = 'VizlyLocalDB';
 const DB_VERSION = 2;
@@ -40,8 +42,9 @@ export class LocalDB {
             };
 
             request.onerror = (event) => {
-                console.error("IndexedDB initialization error:", event);
-                reject((event.target as IDBOpenDBRequest).error);
+                const error = (event.target as IDBOpenDBRequest).error;
+                safeLog.error('IndexedDB initialization error:', redactSensitiveLogValue(error ?? event));
+                reject(error);
             };
         });
 

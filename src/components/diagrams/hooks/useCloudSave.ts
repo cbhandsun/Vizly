@@ -3,6 +3,8 @@ import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
 import { invalidateRemoteDiagramPreview } from '@/core/utils/remoteDiagramPreview';
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import { getFlowDataBridge } from '@/core/utils/flowDataBridge';
+import { logCloudSaveEnsureFailure, logCloudSaveFailure } from './diagramStorageLogging';
 
 const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
 
@@ -23,7 +25,7 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
         const hide = appMessage.loading('正在保存到云端...', 0);
         try {
             // 从桥接数据中读取（FlowchartDesigner 的 useEffect 会持续更新此数据）
-            const bridge = (window as any).__flowDataBridge?.[diagramId];
+            const bridge = getFlowDataBridge(diagramId);
             if (!bridge || !bridge.nodes || bridge.nodes.length === 0) {
                 appMessage.error('未找到图表数据');
                 return;
@@ -67,7 +69,7 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
 
             appMessage.success('已保存到云端');
         } catch (error) {
-            console.error('Cloud save failed:', error);
+            logCloudSaveFailure('useCloudSave', error);
             appMessage.error('保存到云端失败');
         } finally {
             hide();
@@ -86,9 +88,10 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
     const ensureSaved = useCallback(async (): Promise<string | false> => {
         try {
             await saveToCloud();
-            const bridge = (window as any).__flowDataBridge?.[diagramId];
+            const bridge = getFlowDataBridge(diagramId);
             return bridge?.metadata?.cloud?.id || false;
-        } catch {
+        } catch (error) {
+            logCloudSaveEnsureFailure(diagramId, error);
             return false;
         }
     }, [saveToCloud, diagramId]);

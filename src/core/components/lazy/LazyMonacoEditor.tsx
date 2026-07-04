@@ -6,6 +6,7 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
 import { Spin } from 'antd';
 import { loader } from '@monaco-editor/react';
+import { logLazyMonacoCdnRaceFailure } from '../shared/componentFallbackLogging';
 
 // 移除全量本地引用，使得打包彻底瘦身 4MB！
 // import * as monaco from 'monaco-editor';
@@ -74,7 +75,7 @@ export const LazyMonacoEditor: React.FC<LazyMonacoEditorProps> = ({
                 );
                 loader.config({ paths: { vs: isAllowedMonacoCdn(fastest) ? fastest : CDNS[2] } });
             } catch (_e) {
-                console.warn('[LazyMonacoEditor] CDN race failed, falling back to jsdelivr.');
+                logLazyMonacoCdnRaceFailure();
                 loader.config({ paths: { vs: CDNS[2] } }); // 故障兜底
             } finally {
                 cdnInitialized = true;

@@ -28,6 +28,25 @@ import { refineManyToOneFanIn, type ManyToOneFanInGroup } from '../algorithms/ma
 import { repairHardObstacleViolations } from '../algorithms/hardObstaclePathRepair';
 import { repairEdgeCrossingViolations } from '../algorithms/edgeCrossingRepair';
 import { clearRenderedPathCache } from '../routing/renderedPathCache';
+import { buildRoutedLabelObstacle, getGraphEdgeLabelText } from './edgeRoutingLabels';
+import { buildEdgeRoutingCandidateAxes } from './edgeRoutingCandidateAxes';
+import { detectChangedEdgeRoutingNodes, type EdgeRoutingSnapshotNode } from './edgeRoutingNodeChangeDetection';
+import { collectHardNodeObstacleRects, collectSoftNodeObstacleRects, type EdgeRoutingObstacleNode } from './edgeRoutingNodeObstacles';
+import { routeJobsWithParallelFallback, routeSerialFallbackJobs } from './edgeRoutingParallel';
+import { createEdgeRoutingObstacleCollector } from './edgeRoutingObstacles';
+import { scheduleEdgeRoutingBatch } from './edgeRoutingScheduling';
+import {
+    logEdgeRoutingCoordinatorBatchRoutingFailure,
+    logEdgeRoutingCoordinatorCachesCleared,
+    logEdgeRoutingCoordinatorDebugToolsReady,
+    logEdgeRoutingCoordinatorGlobalNudgeFailure,
+    logEdgeRoutingCoordinatorMissingResult,
+    logEdgeRoutingCoordinatorNoLatestRequest,
+    logEdgeRoutingCoordinatorParallelFallback,
+    logEdgeRoutingCoordinatorParallelIncomplete,
+    logEdgeRoutingCoordinatorParallelPoolInitFailure,
+    logEdgeRoutingCoordinatorSerialRoutingFailure,
+} from '../utils/routingLogging';
 
 /**
  * [P0-2] Main coordination service for edge routing.
@@ -239,20 +258,19 @@ export class EdgeRoutingCoordinator {
      * Call this after manually marking edges as dirty.
      */
     public scheduleBatchRouting(): void {
-        // [COLD-START] 鍐荤粨鏈熼棿鎸傝捣鎵€鏈夎皟搴︼紝绛?unfreeze() 缁熶竴瑙﹀彂
-        if (this.isFrozen) return;
-
-        // [FIX C-1] 鏍囧噯闃叉姈锛氭瘡娆¤皟鐢ㄥ厛娓呴櫎鏃ц鏃跺櫒鍐嶉噸鏂拌缃€?
-        // [H-10] 鎷栨嫿涓彁鍗囧幓鎶栧埌 60ms锛屽噺灏?~75% 鐨勮矾鐢辫Е鍙戞鏁帮紝
-        //        閲婃斁 Worker pool 缁欎氦浜掑搷搴斾娇鐢ㄣ€傛嫋鎷界粨鏉熷悗鎭㈠ 16ms銆?
-        if (this.pendingTimeout) {
-            clearTimeout(this.pendingTimeout);
-        }
-        const delay = this.isDragging ? 60 : 16;
-        this.pendingTimeout = setTimeout(() => {
-            this.pendingTimeout = null;
-            this.triggerBatchRouting();
-        }, delay);
+        scheduleEdgeRoutingBatch({
+            isFrozen: this.isFrozen,
+            isDragging: this.isDragging,
+            pendingTimeout: this.pendingTimeout,
+            clearTimer: (handle) => clearTimeout(handle as Parameters<typeof clearTimeout>[0]),
+            scheduleTimer: (callback, delayMs) => setTimeout(callback, delayMs),
+            setPendingTimeout: (handle) => {
+                this.pendingTimeout = handle;
+            },
+            triggerBatchRouting: () => {
+                void this.triggerBatchRouting();
+            },
+        });
     }
 
     private constructor() {
@@ -284,7 +302,7 @@ export class EdgeRoutingCoordinator {
             this.parallelPool = new PathfindingWorkerPool();
             this.useParallelRouting = true;
         } catch (error) {
-            console.warn('[EdgeRoutingCoordinator] Failed to initialize parallel pool:', error);
+            logEdgeRoutingCoordinatorParallelPoolInitFailure(error);
             this.useParallelRouting = false;
         }
     }
@@ -401,7 +419,7 @@ export class EdgeRoutingCoordinator {
         this.allEdges.forEach(edge => this.dirtyEdges.add(edge.id));
         this.scheduleBatchRouting();
 
-        console.info('[EdgeRoutingCoordinator] All caches cleared. Edges will re-route.');
+        logEdgeRoutingCoordinatorCachesCleared();
     }
 
     private nodeParentMap: Map<string, string | undefined> = new Map();
@@ -423,7 +441,7 @@ export class EdgeRoutingCoordinator {
 
         const entry = this.latestRequests.get(targetId);
         if (!entry) {
-            console.warn('[EdgeRoutingCoordinator] forceDebugReRoute: no latest request for edge', targetId);
+            logEdgeRoutingCoordinatorNoLatestRequest(targetId);
             return;
         }
 
@@ -537,36 +555,14 @@ export class EdgeRoutingCoordinator {
         jobs: PathFindingJob[],
         graph: SharedGraphContext
     ): Promise<PathFindingResult[]> {
-        // [FIX] Ensure Bus Indices are assigned even in serial fallback
-        // This is critical because if parallel routing fails or is disabled,
-        // we still need the trunk geometry for proper bus routing.
-        this.assignBusIndices(jobs, graph);
-        this.assignSameSidePortSeparation(jobs, graph); // [FIX] In/Out port zone separation
-        this.assignGlobalChannels(jobs);
-
-        const results: PathFindingResult[] = [];
-
-        for (const job of jobs) {
-            try {
-                const result = await this.workerPool.calculatePath(job, graph as any);
-                results.push(result);
-            } catch (err) {
-                console.error(`[Coordinator] Serial routing failed for ${job.edgeId}:`, err);
-                // [FIX] Return fallback path instead of empty string to ensure visibility
-            const fallbackPath = `M ${job.sourceX} ${job.sourceY} L ${job.targetX} ${job.targetY}`;
-                results.push({
-                    jobId: job.jobId,
-                    edgeId: job.edgeId,
-                    path: fallbackPath,
-                    points: [{ x: job.sourceX, y: job.sourceY }, { x: job.targetX, y: job.targetY }],
-                    labelX: (job.sourceX + job.targetX) / 2,
-                    labelY: (job.sourceY + job.targetY) / 2,
-                    error: String(err)
-                });
-            }
-        }
-
-        return results;
+        return routeSerialFallbackJobs({
+            jobs,
+            graph,
+            assignBusIndices: this.assignBusIndices.bind(this),
+            assignSameSidePortSeparation: this.assignSameSidePortSeparation.bind(this),
+            assignGlobalChannels: this.assignGlobalChannels.bind(this),
+            calculatePath: (job, currentGraph) => this.workerPool.calculatePath(job, currentGraph as any),
+        });
     }
 
     /**
@@ -759,7 +755,7 @@ export class EdgeRoutingCoordinator {
         try {
             await this.batchRouteDirtyEdges();
         } catch (err: any) {
-            console.error('[EdgeRoutingCoordinator] batchRouteDirtyEdges failed:', err);
+            logEdgeRoutingCoordinatorBatchRoutingFailure(err);
             // [FIX] Ensure pending resolvers are cleared to avoid deadlocks
             for (const [edgeId, pending] of this.pendingResolvers.entries()) {
                 const entry = this.latestRequests.get(edgeId);
@@ -927,7 +923,7 @@ export class EdgeRoutingCoordinator {
                 const result = results[index];
 
                 if (!result) {
-                    console.error(`[Coordinator] Missing result for edge ${req.edgeId} at index ${index}`);
+                    logEdgeRoutingCoordinatorMissingResult(req.edgeId, index);
                     const pending = this.pendingResolvers.get(req.edgeId);
                     if (pending) {
                         const sx = req.job.sourceX ?? 0;
@@ -1245,175 +1241,53 @@ export class EdgeRoutingCoordinator {
 
     private collectSoftRoutingObstacles(graph: SharedGraphContext, excludedEdgeIds: Set<string> = new Set()): Rectangle[] {
         const soft: Rectangle[] = [];
-        const pushRect = (rect: (Partial<Rectangle> & { edgeId?: string; ownerId?: string }) | undefined) => {
-            if (!rect) return;
-            const ownerId = rect.edgeId ?? rect.ownerId;
-            if (ownerId && excludedEdgeIds.has(ownerId)) return;
-            const x = Number(rect.x);
-            const y = Number(rect.y);
-            const width = Number(rect.width);
-            const height = Number(rect.height);
-            if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) return;
-            if (width <= 1 || height <= 1) return;
-            soft.push({ x, y, width, height });
-        };
+        const pushRect = createEdgeRoutingObstacleCollector(soft, { excludedOwnerIds: excludedEdgeIds });
 
         (graph.softObstacles ?? []).forEach(pushRect);
         (graph.routingLabels ?? []).forEach(pushRect);
         this.routedLabelObstacles.forEach(pushRect);
 
-        const nodes = (graph.nodes ?? []) as Array<{
-            id?: string;
-            type?: string;
-            data?: Record<string, unknown>;
-            position?: { x?: number; y?: number };
-            positionAbsolute?: { x?: number; y?: number };
-            computed?: { positionAbsolute?: { x?: number; y?: number } };
-            measured?: { width?: number; height?: number };
-            width?: number;
-            height?: number;
-        }>;
-        const titleLikeTypes = new Set(['group', 'subGroup', 'titleGroup', 'domain', 'subDomain', 'swimlane']);
-
-        nodes.forEach(node => {
-            const type = node.type ?? '';
-            const hasVisibleTitle = titleLikeTypes.has(type)
-                || typeof node.data?.label === 'string'
-                || typeof node.data?.title === 'string'
-                || typeof node.data?.name === 'string';
-            if (!hasVisibleTitle) return;
-
-            const pos = node.computed?.positionAbsolute ?? node.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-            const width = node.measured?.width ?? node.width ?? 0;
-            const height = node.measured?.height ?? node.height ?? 0;
-            if (!width || !height) return;
-
-            const titleHeight = Math.min(44, Math.max(24, height * 0.18));
-            pushRect({
-                x: (pos.x ?? 0) + 8,
-                y: (pos.y ?? 0) + 6,
-                width: Math.max(0, width - 16),
-                height: titleHeight,
-            });
-
-            if (titleLikeTypes.has(type)) {
-                const x = pos.x ?? 0;
-                const y = pos.y ?? 0;
-                const border = 8;
-                pushRect({ x: x - border / 2, y, width: border, height });
-                pushRect({ x: x + width - border / 2, y, width: border, height });
-                pushRect({ x, y: y - border / 2, width, height: border });
-                pushRect({ x, y: y + height - border / 2, width, height: border });
-            }
-        });
+        const nodes = (graph.nodes ?? []) as EdgeRoutingObstacleNode[];
+        collectSoftNodeObstacleRects(nodes).forEach(pushRect);
 
         return soft;
     }
 
     private collectHardRoutingObstacles(graph: SharedGraphContext): Rectangle[] {
         const hard: Rectangle[] = [];
-        const seen = new Set<string>();
-        const pushRect = (rect: Partial<Rectangle> | undefined) => {
-            if (!rect) return;
-            const x = Number(rect.x);
-            const y = Number(rect.y);
-            const width = Number(rect.width);
-            const height = Number(rect.height);
-            if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) return;
-            if (width <= 1 || height <= 1) return;
-            const key = `${Math.round(x * 10) / 10}:${Math.round(y * 10) / 10}:${Math.round(width * 10) / 10}:${Math.round(height * 10) / 10}`;
-            if (seen.has(key)) return;
-            seen.add(key);
-            hard.push({ x, y, width, height });
-        };
+        const pushRect = createEdgeRoutingObstacleCollector(hard, { dedupe: true });
 
         (graph.obstacles ?? []).forEach(pushRect);
 
-        const nodes = (graph.nodes ?? []) as Array<{
-            type?: string;
-            position?: { x?: number; y?: number };
-            positionAbsolute?: { x?: number; y?: number };
-            computed?: { positionAbsolute?: { x?: number; y?: number } };
-            measured?: { width?: number; height?: number };
-            width?: number;
-            height?: number;
-        }>;
-        const containerTypes = new Set(['group', 'subGroup', 'titleGroup', 'domain', 'subDomain', 'swimlane']);
-        nodes.forEach(node => {
-            if (containerTypes.has(String(node.type ?? ''))) return;
-            const pos = node.computed?.positionAbsolute ?? node.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-            pushRect({
-                x: pos.x,
-                y: pos.y,
-                width: node.measured?.width ?? node.width,
-                height: node.measured?.height ?? node.height,
-            });
-        });
+        const nodes = (graph.nodes ?? []) as EdgeRoutingObstacleNode[];
+        collectHardNodeObstacleRects(nodes).forEach(pushRect);
 
         return hard;
     }
 
     private updateRoutedLabelObstacle(edgeId: string, result: PathFindingResult, graph: SharedGraphContext): void {
-        const labelText = this.getGraphEdgeLabel(edgeId, graph);
-        if (!labelText) {
-            this.routedLabelObstacles.delete(edgeId);
-            return;
-        }
-
-        const x = Number(result.labelX);
-        const y = Number(result.labelY);
-        if (!Number.isFinite(x) || !Number.isFinite(y)) {
-            this.routedLabelObstacles.delete(edgeId);
-            return;
-        }
-
-        const width = Math.max(36, Math.min(220, labelText.length * 8 + 22));
-        const height = 26;
-        this.routedLabelObstacles.set(edgeId, {
+        const labelObstacle = buildRoutedLabelObstacle(
             edgeId,
-            ownerId: edgeId,
-            x: x - width / 2,
-            y: y - height / 2,
-            width,
-            height,
-        });
-    }
+            getGraphEdgeLabelText(edgeId, graph),
+            result
+        );
+        if (!labelObstacle) {
+            this.routedLabelObstacles.delete(edgeId);
+            return;
+        }
 
-    private getGraphEdgeLabel(edgeId: string, graph: SharedGraphContext): string {
-        const edge = (graph.edges ?? []).find((e: any) => e?.id === edgeId) as any;
-        const raw = edge?.label ?? edge?.data?.label;
-        return typeof raw === 'string' ? raw.replace(/<[^>]+>/g, '').trim() : '';
+        this.routedLabelObstacles.set(edgeId, labelObstacle);
     }
 
     private buildWaypointCandidateAxes(
         graph: SharedGraphContext,
         assignedJobs?: PathFindingJob[]
     ): { horizontal: number[]; vertical: number[] } {
-        const horizontal = new Set<number>();
-        const vertical = new Set<number>();
-        const addRectAxes = (rect: Rectangle, margin: number) => {
-            horizontal.add(Math.round(rect.y - margin));
-            horizontal.add(Math.round(rect.y + rect.height + margin));
-            vertical.add(Math.round(rect.x - margin));
-            vertical.add(Math.round(rect.x + rect.width + margin));
-        };
-
-        (graph.obstacles ?? []).forEach(rect => addRectAxes(rect, 8));
-        this.collectSoftRoutingObstacles(graph).forEach(rect => addRectAxes(rect, 6));
-
-        (assignedJobs ?? []).forEach(job => {
-            if (!job.busTrunkSource || !job.busTrunkTarget) return;
-            if (Math.abs(job.busTrunkSource.x - job.busTrunkTarget.x) < 1.0) {
-                vertical.add(Math.round(job.busTrunkSource.x));
-            } else if (Math.abs(job.busTrunkSource.y - job.busTrunkTarget.y) < 1.0) {
-                horizontal.add(Math.round(job.busTrunkSource.y));
-            }
+        return buildEdgeRoutingCandidateAxes({
+            hardObstacles: graph.obstacles ?? [],
+            softObstacles: this.collectSoftRoutingObstacles(graph),
+            assignedJobs,
         });
-
-        return {
-            horizontal: [...horizontal].slice(0, 240),
-            vertical: [...vertical].slice(0, 240),
-        };
     }
 
     /**
@@ -1441,32 +1315,10 @@ export class EdgeRoutingCoordinator {
      * 鍚屾椂鏇存柊蹇収浠ュ涓嬫瀵规瘮銆?
      */
     private identifyChangedNodes(allNodes: any[], _allEdges: Edge[]): string[] {
-        const MOVE_THRESHOLD = 2; // px锛屽皬浜庢鍊艰涓烘槸鏁板€煎櫔澹?
-            const changedIds: string[] = [];
-
-        for (const node of allNodes) {
-            const id: string = node.id;
-            const posAbs = node.positionAbsolute || node.computed?.positionAbsolute || node.position;
-            if (!posAbs) continue;
-            const x = posAbs.x ?? 0;
-            const y = posAbs.y ?? 0;
-
-            const prev = this._nodePositionSnapshot.get(id);
-            if (!prev || Math.abs(x - prev.x) > MOVE_THRESHOLD || Math.abs(y - prev.y) > MOVE_THRESHOLD) {
-                changedIds.push(id);
-                this._nodePositionSnapshot.set(id, { x, y });
-            }
-        }
-
-        // 娓呯悊宸插垹闄ょ殑鑺傜偣蹇収锛堥槻鍐呭瓨娉勬紡锛?
-        if (this._nodePositionSnapshot.size > allNodes.length + 50) {
-            const aliveIds = new Set(allNodes.map((n: any) => n.id));
-            for (const id of this._nodePositionSnapshot.keys()) {
-                if (!aliveIds.has(id)) this._nodePositionSnapshot.delete(id);
-            }
-        }
-
-        return changedIds;
+        return detectChangedEdgeRoutingNodes(
+            allNodes as EdgeRoutingSnapshotNode[],
+            this._nodePositionSnapshot
+        );
     }
 
 
@@ -1479,40 +1331,17 @@ export class EdgeRoutingCoordinator {
         graph: SharedGraphContext,
         _onProgress?: (completed: number, total: number) => void
     ): Promise<PathFindingResult[]> {
-        // [SYNC] Populate allEdges to enable Nudge context for this batch
-        if (this.allEdges.length === 0 && jobs.length > 0) {
-            // Map PathFindingJob to the minimal Edge-like structure needed for nudge context.
-            this.allEdges = jobs.map(job => ({
-                id: job.edgeId,
-                source: job.source,
-                target: job.target,
-                data: {}
-            })) as Edge[];
-        }
-        if (!this.useParallelRouting || !this.parallelPool) {
-            // console.warn('[P0 Parallel] Pool not available, falling back to serial routing');
-            return this.routeSerialFallback(jobs, graph);
-        }
-
-        //
-        try {
-            // NOTE: assignBusIndices is already called in batchRouteDirtyEdges BEFORE
-            // assignSameSidePortSeparation. Calling it again here would overwrite
-            // the incomingCount/outgoingCount values set by port separation logic.
-
-            // Use calculatePaths (alias for routeBatch) compatibility
-            const results = await this.parallelPool.calculatePaths(jobs, graph);
-
-            if (!results || results.length !== jobs.length) {
-                console.error(`[EdgeRoutingCoordinator] Parallel routing returned incomplete results. Expected ${jobs.length}, got ${results?.length}`);
-            }
-
-
-            return results;
-        } catch (error) {
-            console.error('[P0 Parallel] Failed, falling back to serial:', error);
-            return this.routeSerialFallback(jobs, graph);
-        }
+        return routeJobsWithParallelFallback({
+            jobs,
+            graph,
+            useParallelRouting: this.useParallelRouting,
+            parallelPool: this.parallelPool,
+            runSerialFallback: () => this.routeSerialFallback(jobs, graph),
+            allEdges: this.allEdges,
+            setAllEdges: (edges) => {
+                this.allEdges = edges;
+            },
+        });
     }
 
     /**
@@ -2630,7 +2459,7 @@ export class EdgeRoutingCoordinator {
                 }
             }
         } catch (err) {
-            console.error('[GlobalNudge] Channel routing failed, falling back to original paths:', err);
+            logEdgeRoutingCoordinatorGlobalNudgeFailure(err);
         }
     }
 
@@ -2721,7 +2550,7 @@ export class EdgeRoutingCoordinator {
         this.dirtyEdges.clear();
         this.allEdges.forEach(edge => this.dirtyEdges.add(edge.id));
         this.workerPool.markDirty();
-        console.info(`[EdgeRoutingCoordinator] All caches cleared. graphVersion=${this.graphVersion}`);
+        logEdgeRoutingCoordinatorCachesCleared(this.graphVersion);
     }
 
     /**
@@ -3215,6 +3044,6 @@ if (typeof window !== 'undefined' && import.meta.env.DEV) {
         /** Get Coordinator instance */
         coordinator: () => EdgeRoutingCoordinator.getInstance(),
     };
-    console.info('[Vizly Dev] Routing debug tools available: window.__vizly_routing__.clearCache()');
+    logEdgeRoutingCoordinatorDebugToolsReady();
 }
 

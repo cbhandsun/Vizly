@@ -29,12 +29,10 @@ import { ContextMenuLayer } from './ContextMenuLayer';
 import { useComponentPerformance, useInteractionPerformance } from '../../hooks/usePerformanceMonitor';
 import { LayoutStabilityContext } from '../../context/LayoutStabilityContext';
 import { EdgeUpdateProvider } from './EdgeUpdateContext';
-import { useDiagramControls } from '../../hooks/useDiagramControls';
 import { useResponsive } from '../../../hooks/useResponsive';
 import { useDiagramCollaboration } from '../../hooks/useDiagramCollaboration';
 import { useTopologyLinter } from '../../hooks/useTopologyLinter';
 import { downloadFile } from '../../utils/downloadUtils';
-import { readDomViewport } from '../../utils/domViewport';
 import { DiagramIntelligenceService } from '../../services/DiagramIntelligenceService';
 import { useDiagramStore, useDiagramStore as useDiagramStoreStatic } from '../../store/useDiagramStore';
 import './FlowchartDesigner.css';
@@ -52,7 +50,6 @@ import { useTheme } from '../../themes/useCoreTheme';
 import { generateSlides } from '../../hooks/usePresentationSlides';
 import { diffDiagrams, DiffResult } from '../../utils/diagramDiff';
 import { CanvasRuler, RulerCorner } from './CanvasRuler';
-import { toMermaid, fromMermaid } from '../../utils/mermaidConverter';
 import { UnifiedDesignerShell } from './UnifiedDesignerShell';
 import { FlowchartOnboardingHint } from './FlowchartOnboardingHint';
 import { FlowchartEmptyState } from './FlowchartEmptyState';
@@ -61,6 +58,7 @@ import { FlowchartCanvasShell } from './FlowchartCanvasShell';
 import { RemoteCursors } from './ui/RemoteCursors';
 import { useDesignerBatchUpdates } from './hooks/useDesignerBatchUpdates';
 import { useAutoRouting } from './hooks/useAutoRouting';
+import { useFlowchartExportControls } from './hooks/useFlowchartExportControls';
 import { DesignerRightSidebar } from './DesignerRightSidebar';
 import { useDesignerCommands } from './hooks/useDesignerCommands';
 import { DesignerHeaderLayer } from './ui/DesignerHeaderLayer';
@@ -73,18 +71,43 @@ import ERDatabaseNode from '../custom-nodes/ERDatabaseNode';
 // useLayerManagement already imported above
 import { MobileBottomDock } from '../layout/MobileBottomDock';
 import { appMessage, appModal } from '@/core/utils/antdStaticBridge';
+import { logDiagramGlobalThemeSyncFailure } from './diagramThemeLogging';
 import {
-    FLOWCHART_JSON_IMPORT_MAX_BYTES,
-    FLOWCHART_TEXT_IMPORT_MAX_BYTES,
-    getFileSizeLimitError,
-} from '@/core/utils/fileImportGuards';
+    persistFlowchartOnboardingDismissed,
+    readFlowchartOnboardingDismissed,
+} from './flowchartOnboardingStorage';
 import {
-    coerceReactFlowImport,
-    coerceStandardDiagramImport,
-    getDiagramImportKind,
-    isLikelyStandardDiagramData,
-    parseDiagramJson,
-} from '@/core/utils/diagramJsonImport';
+    createFlowchartFocusEntityEventHandler,
+    focusFlowchartNode,
+} from './flowchartFocusEntity';
+import {
+    createFlowchartDesignerCommandEventHandler,
+    createFlowchartSummaryEventHandler,
+} from './flowchartDesignerEventHandlers';
+import {
+    buildFlowchartClearCanvasConfirm,
+    clearFlowchartCanvas,
+} from './flowchartClearCanvas';
+import {
+    createFlowchartReverseImportSuccessHandler,
+    createFlowchartSnapshotEventHandler,
+} from './flowchartExternalEvents';
+import {
+    addFlowchartMindMapNode,
+    addFlowchartStickyNote,
+    applyFlowchartTemplate,
+    copyFlowchartAsMermaid,
+    exportFlowchartAsMermaid,
+} from './flowchartDesignerCanvasActions';
+import { createFlowchartImportHandler } from './flowchartImportHandler';
+import { buildFlowchartEdgeInsertionPlan } from './flowchartEdgeInsertion';
+import { runFlowchartSavePipeline } from './flowchartSavePipeline';
+import {
+    replaceFlowchartNodeLabel,
+    replaceFlowchartNodeLabels,
+} from './flowchartSearchReplace';
+import { scheduleFlowchartInitialFit } from './flowchartInitialFit';
+import { runFlowchartSmartOptimize } from './flowchartSmartOptimize';
 
 // useMindMapOrchestrator decoupled
 
@@ -235,7 +258,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
 
     // ?图片导出支持 (PNG/SVG/PDF/GIF)
     const diagramIdForExport = id || 'flowchart-designer';
-    const { exportToPNG, exportToSVG, exportToPDF, exportToGIF } = useDiagramControls(diagramIdForExport, false);
+    const { exportToPNG, exportToSVG, exportToPDF, exportToGIF } = useFlowchartExportControls(diagramIdForExport, reactFlowInstance);
 
     // ?统一主题控制：响?ConfigIntegration 的全局主题切换
     const [theme, setTheme] = useTheme({ autoInitialize: true });
@@ -245,7 +268,9 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         const handleGlobalThemeChanged = (e: any) => {
             const newThemeId = e.detail;
             if (newThemeId && newThemeId !== theme?.id) {
-                setTheme(newThemeId).catch(console.warn);
+                setTheme(newThemeId).catch((error) => {
+                    logDiagramGlobalThemeSyncFailure('FlowchartDesigner', newThemeId, error);
+                });
             }
         };
         window.addEventListener('diagram-global-theme-changed', handleGlobalThemeChanged);
@@ -276,12 +301,14 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     const [isContextToolbarHidden] = useState(false);
     const handleBeforeUpdate = useCallback(() => {}, []);
     const handleFocusNode = useCallback((nodeId: string) => {
-        if (!reactFlowInstance) return;
-        const node = nodesRef.current.find(n => n.id === nodeId);
-        if (node) {
-            reactFlowInstance.setCenter(node.position.x + (node.measured?.width || 100) / 2, node.position.y + (node.measured?.height || 50) / 2, { duration: 800, zoom: 1.2 });
-            setSelectedNodes(nodesRef.current.filter(n => n.id === nodeId));
-        }
+        focusFlowchartNode({
+            reactFlowInstance,
+            nodes: nodesRef.current,
+            nodeId,
+            setSelectedNodes,
+            duration: 800,
+            zoom: 1.2,
+        });
     }, [reactFlowInstance, setSelectedNodes]);
 
     const handlePresentationFocus = useCallback((ids: string[]) => {
@@ -352,7 +379,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
 
     const [onboardingDismissed, setOnboardingDismissed] = useState(true);
     useEffect(() => {
-        try { if (!localStorage.getItem('designer.flowchart.onboarding.dismissed')) setOnboardingDismissed(false); } catch { void 0; }
+        setOnboardingDismissed(readFlowchartOnboardingDismissed());
     }, []);
 
     const [showGrid, setShowGrid] = useState(true);
@@ -587,15 +614,21 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     });
     // ?Reordered to avoid TDZ (Temporal Dead Zone) for handleFitView and messageApi
     useEffect(() => {
-        const handleSnap = () => takeSnapshot(nodesRef.current, edgesRef.current);
+        const handleSnap = createFlowchartSnapshotEventHandler({
+            getNodes: () => nodesRef.current,
+            getEdges: () => edgesRef.current,
+            takeSnapshot,
+        });
         window.addEventListener('diagram:save-snapshot', handleSnap);
         
-        const handleImportSuccess = (e: any) => {
-            const { filename } = e.detail;
-            if (messageApi) messageApi.success(t('designer.flowchart.import.reverseSuccess', { filename }));
-            // 自动居中显示恢复的内?
-            if (handleFitView) setTimeout(() => handleFitView(), 300);
-        };
+        const handleImportSuccess = createFlowchartReverseImportSuccessHandler({
+            notifySuccess: (filename) => {
+                if (messageApi) messageApi.success(t('designer.flowchart.import.reverseSuccess', { filename }));
+            },
+            scheduleFitView: () => {
+                if (handleFitView) setTimeout(() => handleFitView(), 300);
+            },
+        });
         window.addEventListener('vizly:reverse-import-success', handleImportSuccess);
 
         return () => {
@@ -692,8 +725,12 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
 
     const handleSmartOptimize = useCallback(async () => {
         const intelligence = DiagramIntelligenceService.getInstance();
-        takeSnapshot(nodesRef.current, edgesRef.current);
-        const result = await intelligence.optimize(nodesRef.current, edgesRef.current);
+        const result = await runFlowchartSmartOptimize({
+            nodes: nodesRef.current,
+            edges: edgesRef.current,
+            takeSnapshot,
+            optimize: intelligence.optimize.bind(intelligence),
+        });
         
         setNodes(result.nodes);
         setEdges(result.edges);
@@ -704,50 +741,17 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     // Gap 6: 双击连线，在中点插入新节点，将边一分为二
     const handleEdgeDoubleClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
         if (isReadonly) return;
-        const srcNode = nodesRef.current.find(n => n.id === edge.source);
-        const tgtNode = nodesRef.current.find(n => n.id === edge.target);
-        if (!srcNode || !tgtNode) return;
-
-        const sx = srcNode.position.x + (srcNode.measured?.width ?? 160) / 2;
-        const sy = srcNode.position.y + (srcNode.measured?.height ?? 60) / 2;
-        const tx = tgtNode.position.x + (tgtNode.measured?.width ?? 160) / 2;
-        const ty = tgtNode.position.y + (tgtNode.measured?.height ?? 60) / 2;
-        const mx = (sx + tx) / 2 - 60; // 节点宽度 120/2 偏移
-        const my = (sy + ty) / 2 - 20; // 节点高度 40/2 偏移
+        const insertionPlan = buildFlowchartEdgeInsertionPlan({
+            edge,
+            nodes: nodesRef.current,
+            label: t('designer.flowchart.newNode'),
+        });
+        if (!insertionPlan) return;
 
         takeSnapshot(nodesRef.current, edgesRef.current);
 
-        const newNodeId = `inserted-${Date.now()}_${Math.random().toString(36).substring(2,9)}`;
-        const newNode: Node = {
-            id: newNodeId,
-            type: 'custom',
-            position: { x: mx, y: my },
-            data: { label: t('designer.flowchart.newNode'), shape: 'roundedRect' },
-        };
-
-        // 两条新连线继承原连线的视觉样式
-        const baseEdgeProps = {
-            type: edge.type,
-            style: edge.style,
-            markerEnd: edge.markerEnd,
-            markerStart: edge.markerStart,
-            animated: edge.animated,
-        };
-        const edgeA: Edge = {
-            ...baseEdgeProps,
-            id: `${edge.source}-${newNodeId}-${Date.now()}_${Math.random().toString(36).substring(2,9)}`,
-            source: edge.source,
-            target: newNodeId,
-        };
-        const edgeB: Edge = {
-            ...baseEdgeProps,
-            id: `${newNodeId}-${edge.target}-${Date.now()}_${Math.random().toString(36).substring(2,9)}`,
-            source: newNodeId,
-            target: edge.target,
-        };
-
-        setNodes(ns => [...ns, newNode]);
-        setEdges(es => [...es.filter(e => e.id !== edge.id), edgeA, edgeB]);
+        setNodes(ns => [...ns, insertionPlan.node]);
+        setEdges(es => [...es.filter(e => e.id !== edge.id), ...insertionPlan.replacementEdges]);
         appMessage.success(t('designer.flowchart.edgeNodeInserted'));
     }, [isReadonly, setNodes, setEdges, takeSnapshot, t]);
 
@@ -763,276 +767,122 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     // handleFocusNode moved to line 278 to avoid TDZ error in handlePresentationFocus
 
     useEffect(() => {
-        const handleFocusEntity = (e: CustomEvent) => {
-            if (!reactFlowInstance) return;
-            const { edgeId, nodeId } = e.detail;
-            if (nodeId) {
-                const node = nodesRef.current.find((n: Node) => n.id === nodeId);
-                if (node) {
-                    const currentZoom = reactFlowInstance.getZoom();
-                    const targetZoom = e.detail.preserveZoom ? currentZoom : (e.detail.zoom || 1.2);
-                    reactFlowInstance.setCenter(node.position.x + (node.measured?.width || 100) / 2, node.position.y + (node.measured?.height || 50) / 2, { duration: 600, zoom: targetZoom });
-                    setSelectedNodes(nodesRef.current.filter(n => n.id === nodeId));
-                    setSelectedEdges([]);
-                }
-            } else if (edgeId) {
-                const edge = edgesRef.current.find((e: Edge) => e.id === edgeId);
-                if (edge) {
-                    const sourceNode = nodesRef.current.find((n: Node) => n.id === edge.source);
-                    const targetNode = nodesRef.current.find((n: Node) => n.id === edge.target);
-                    if (sourceNode && targetNode) {
-                        const midX = (sourceNode.position.x + targetNode.position.x) / 2;
-                        const midY = (sourceNode.position.y + targetNode.position.y) / 2;
-                        const currentZoom = reactFlowInstance.getZoom();
-                        const targetZoom = e.detail.preserveZoom ? currentZoom : (e.detail.zoom || 1.2);
-                        reactFlowInstance.setCenter(midX, midY, { duration: 600, zoom: targetZoom });
-                        setSelectedEdges(edgesRef.current.filter(e => e.id === edgeId));
-                        setSelectedNodes([]);
-                    }
-                }
-            }
-        };
+        const handleFocusEntity = createFlowchartFocusEntityEventHandler({
+            reactFlowInstance,
+            nodes: nodesRef.current,
+            edges: edgesRef.current,
+            setSelectedNodes,
+            setSelectedEdges,
+        });
         window.addEventListener('editor:focus-entity', handleFocusEntity as EventListener);
         return () => window.removeEventListener('editor:focus-entity', handleFocusEntity as EventListener);
     }, [reactFlowInstance, setSelectedNodes, setSelectedEdges]);
 
     const handleExport = useCallback(() => setJsonEditorVisible(true), []);
+    const handleClearCanvasCommand = useCallback(() => {
+        appModal.confirm(buildFlowchartClearCanvasConfirm({
+            title: t('designer.flowchart.clearCanvas.title'),
+            content: t('designer.flowchart.clearCanvas.content'),
+            okText: t('designer.flowchart.clearCanvas.ok'),
+            cancelText: t('designer.flowchart.clearCanvas.cancel'),
+            onConfirm: () => {
+                clearFlowchartCanvas({
+                    setNodes,
+                    setEdges,
+                    takeSnapshot,
+                });
+            },
+        }));
+    }, [setNodes, setEdges, takeSnapshot, t]);
 
     useEffect(() => {
-        const handleCommand = (e: CustomEvent) => {
-            const { action } = e.detail;
-            if (action === 'smart-layout') {
-                handleSmartLayout();
-            } else if (action === 'apply-layout') {
-                // 从设置面板切换布局策略时触发：将 UI 策略名映射到引擎策略名
-                const uiName = String(e.detail.strategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
-                const nodeLayout = e.detail.nodeLayout as string | undefined;
-                const rawDirection = String(e.detail.direction || '').toUpperCase();
-                const direction = (rawDirection === 'LR' || rawDirection === 'RL') ? 'LR' : 'TB';
-                const map: Record<string, string> = {
-                    domainverticallayout: 'domain-vertical',
-                    domainvertical: 'domain-vertical',
-                    domainhorizontallayout: 'domain-horizontal',
-                    domainhorizontal: 'domain-horizontal',
-                    domainelklayout: 'domain-elk',
-                    domainelk: 'domain-elk',
-                    domaindagrelayout: 'dagre',
-                    domaindagre: 'dagre',
-                    dagre: 'dagre',
-                    elk: 'domain-elk',
-                };
-                const engineName = map[uiName] || 'domain-vertical';
-                handleStrategyLayout(engineName, nodeLayout, direction);
-            } else if (action === 'export-png') {
-                const downloadBtn = document.querySelector('[data-id="toolbar-export-btn"]') as HTMLButtonElement;
-                if(downloadBtn) downloadBtn.click();
-                else handleExport();
-            } else if (action === 'toggle-ai-chat') {
-                setAiChatVisible(true);
-                setActiveRightTab('ai');
-            } else if (action === 'add-node') {
-                // Determine center of current viewport to place the node
-                if (!reactFlowInstance) return;
-                const { x, y, zoom } = reactFlowInstance.getViewport();
-                // We fake a generic position if possible, or use standard top-left
-                const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
-                const windowHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
-                const rx = (windowWidth / 2 - x) / zoom;
-                const ry = (windowHeight / 2 - y) / zoom;
-                
-                // Let's use the first available node type in the active plugin, or fallback to 'custom'
-                const nodeType = activePlugin?.getNodeTypes ? Object.keys(activePlugin.getNodeTypes())[0] : 'custom';
-                
-                const newId = `node_${Date.now()}_${Math.random().toString(36).substring(2,9)}`;
-                setNodes(nds => [...nds, {
-                    id: newId,
-                    type: nodeType || 'custom',
-                    position: { x: rx, y: ry },
-                    data: { label: 'New Node' },
-                    selected: true
-                } as Node]);
-            } else if (action === 'clear-canvas') {
-                appModal.confirm({
-                    title: t('designer.flowchart.clearCanvas.title'),
-                    content: t('designer.flowchart.clearCanvas.content'),
-                    okText: t('designer.flowchart.clearCanvas.ok'),
-                    cancelText: t('designer.flowchart.clearCanvas.cancel'),
-                    onOk: () => {
-                        setNodes([]);
-                        setEdges([]);
-                        takeSnapshot([], []);
-                    }
-                });
-            }
-        };
+        const handleCommand = createFlowchartDesignerCommandEventHandler({
+            handleSmartLayout,
+            handleStrategyLayout,
+            handleExport,
+            setAiChatVisible,
+            setActiveRightTab,
+            reactFlowInstance,
+            activePlugin,
+            setNodes,
+            newNodeLabel: t('designer.flowchart.newNode'),
+            confirmClearCanvas: handleClearCanvasCommand,
+        });
         window.addEventListener('editor:command', handleCommand as EventListener);
         return () => window.removeEventListener('editor:command', handleCommand as EventListener);
-    }, [handleSmartLayout, handleStrategyLayout, handleExport, setNodes, setEdges, takeSnapshot, reactFlowInstance, activePlugin, t]);
+    }, [handleSmartLayout, handleStrategyLayout, handleExport, reactFlowInstance, activePlugin, setNodes, setAiChatVisible, setActiveRightTab, t, handleClearCanvasCommand]);
 
-    const handleAddSummary = useCallback((e: CustomEvent) => {
-        const { sourceIds } = e.detail;
-        if (!sourceIds || sourceIds.length === 0) return;
-        
-        takeSnapshot(nodesRef.current, edgesRef.current);
-
-        // Compute center of selected nodes
-        let totalX = 0;
-        let totalY = 0;
-        let count = 0;
-        sourceIds.forEach((id: string) => {
-            const n = nodesRef.current.find(node => node.id === id);
-            if (n) {
-                totalX += n.position.x;
-                totalY += n.position.y;
-                count++;
-            }
-        });
-        const avgX = count > 0 ? totalX / count : 0;
-        const avgY = count > 0 ? totalY / count : 0;
-        
-        const newId = `node_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        const summaryNode: Node = {
-            id: newId,
-            type: 'mindmap',
-            position: { x: avgX + 300, y: avgY }, // Initially place it to the right, orchestrator will sync it
-            data: {
-                label: t('designer.flowchart.summaryLabel'),
-                isSummary: true,
-                summaryTargets: sourceIds,
-                direction: 'L'
-            }
-        };
-        setNodes(nds => [...nds, summaryNode]);
-
-        // Auto-select the newly added summary node
-        setTimeout(() => {
-            setNodes(nds => nds.map(n => ({...n, selected: n.id === newId})));
-        }, 50);
-    }, [setNodes, takeSnapshot, t]);
+    const handleAddSummary = useMemo(() => createFlowchartSummaryEventHandler({
+        nodesRef,
+        edgesRef,
+        label: t('designer.flowchart.summaryLabel'),
+        takeSnapshot,
+        setNodes,
+    }), [nodesRef, edgesRef, t, takeSnapshot, setNodes]);
 
     useEffect(() => {
         window.addEventListener('editor:add-summary-node', handleAddSummary as EventListener);
         return () => window.removeEventListener('editor:add-summary-node', handleAddSummary as EventListener);
     }, [handleAddSummary]);
 
-    const handleImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        const importKind = getDiagramImportKind(file.name);
-        if (!importKind) {
-            messageApi.error(t('designer.flowchart.import.invalidFormat'));
-            event.target.value = '';
-            return;
-        }
-        const isJsonImport = importKind === 'json';
-        const sizeError = getFileSizeLimitError(
-            file,
-            isJsonImport ? FLOWCHART_JSON_IMPORT_MAX_BYTES : FLOWCHART_TEXT_IMPORT_MAX_BYTES,
-            isJsonImport ? 'JSON' : 'text'
-        );
-        if (sizeError) {
-            messageApi.error(sizeError);
-            event.target.value = '';
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const content = e.target?.result as string;
-            if (importKind === 'json') {
-                try {
-                    const data = parseDiagramJson(content);
-                    // ?检测是否为 StandardDiagramData 格式（和示例文件/云端文件一致的结构?
-                    // 特征：顶层有 type/layout/version 等字段，nodes 内含 description/domain 而非 position
-                    const isStandardData = isLikelyStandardDiagramData(data);
-
-                    if (isStandardData || (activePlugin && activePlugin.parseData)) {
-                        const currentId = businessData?.id || id || `imported_${Date.now()}_${Math.random().toString(36).substring(2,9)}`;
-                        const safeData = coerceStandardDiagramImport(data, {
-                            id: currentId,
-                            title: typeof (data as any)?.name === 'string' ? (data as any).name : 'Imported Diagram',
-                        });
-                        // 【标准化适配】优先交由活跃插件解析数?
-                        const parsed = activePlugin ? activePlugin.parseData(safeData) : null;
-                        
-                        if (parsed && parsed.nodes && parsed.nodes.length > 0) {
-                            setNodes(parsed.nodes);
-                            setEdges(parsed.edges || []);
-                            messageApi.success(t('designer.flowchart.import.standardSuccess', { count: parsed.nodes.length }));
-                            setTimeout(() => handleFitView(), 500);
-                            return;
-                        }
-
-                        // 如果插件解析失败，回退到全局重载模式
-                        const { dataRegistry } = await import('@/data/DataRegistry');
-                        const localSvc = dataRegistry.getDataService();
-                        const normalized = {
-                            ...safeData,
-                            id: currentId,
-                            metadata: {
-                                ...(safeData.metadata || {}),
-                                openedAt: new Date().toISOString()
-                            }
-                        };
-                        localSvc.registerRemoteDiagram(normalized, {
-                            id: currentId,
-                            title: normalized.name || normalized.metadata?.title || currentId,
-                        }, true, {
-                            id: currentId,
-                            metadata: normalized.metadata,
-                        });
-                        messageApi.success(t('designer.flowchart.import.reloading'));
-                        setTimeout(() => {
-                            window.location.href = `/?diagram=${encodeURIComponent(currentId)}`;
-                        }, 500);
-                    } else if (data.nodes && data.edges) {
-                        const canvas = coerceReactFlowImport(data);
-                        setNodes(canvas.nodes);
-                        setEdges(canvas.edges);
-                        messageApi.info(t('designer.flowchart.import.rfSuccess', { nodes: canvas.nodes.length, edges: canvas.edges.length }));
-                        setTimeout(() => handleFitView(), 500);
-                    } else { throw new Error(t('designer.flowchart.import.invalidFormat')); }
-                } catch (err: any) { messageApi.error(t('designer.flowchart.import.jsonFailed', { message: err.message })); }
-            } else if (importKind === 'mermaid') {
-                try {
-                     const { nodes: newNodes, edges: newEdges } = await fromMermaid(content);
-                     setNodes(newNodes); setEdges(newEdges);
-                     messageApi.info(t('designer.flowchart.import.mermaidSuccess'));
-                     setTimeout(() => {
-                         messageApi.info(t('designer.flowchart.import.mermaidLayout'));
-                     }, 500);
-                } catch { messageApi.error(t('designer.flowchart.import.mermaidFailed')); }
-            }
-        };
-        reader.onerror = () => {
-            messageApi.error(t('designer.flowchart.import.invalidFormat'));
-        };
-        reader.readAsText(file);
-        event.target.value = '';
-    }, [setNodes, setEdges, handleFitView, messageApi, activePlugin, businessData?.id, id, t]);
+    const handleImport = useMemo(() => createFlowchartImportHandler({
+        t,
+        messageApi,
+        activePlugin,
+        businessDataId: businessData?.id,
+        diagramId: id,
+        setNodes,
+        setEdges,
+        fitView: handleFitView,
+        registerStandardReload: async ({ normalized, currentId: reloadId, title }) => {
+            const { dataRegistry } = await import('@/data/DataRegistry');
+            const localSvc = dataRegistry.getDataService();
+            localSvc.registerRemoteDiagram(normalized, {
+                id: reloadId,
+                title,
+            }, true, {
+                id: reloadId,
+                metadata: normalized.metadata,
+            });
+        },
+    }), [t, messageApi, activePlugin, businessData?.id, id, setNodes, setEdges, handleFitView]);
 
     const handleExportMermaid = useCallback(async () => {
         try {
-            const m = await toMermaid(nodesRef.current, edgesRef.current);
-            downloadFile(m, `flowchart-${Date.now()}.mmd`, 'text/markdown');
+            await exportFlowchartAsMermaid({
+                nodes: nodesRef.current,
+                edges: edgesRef.current,
+                downloadFile,
+            });
         } catch(e:any) { appMessage.error(e.message); }
     }, []);
 
     const handleCopyAsMermaid = useCallback(async () => {
          try {
-             const m = await toMermaid(nodesRef.current, edgesRef.current);
-             if (navigator.clipboard) {
-                 await navigator.clipboard.writeText(m);
-                 appMessage.success(t('designer.flowchart.mermaidCopied'));
-             }
+             if (!navigator.clipboard) return;
+             await copyFlowchartAsMermaid({
+                 nodes: nodesRef.current,
+                 edges: edgesRef.current,
+                 writeText: (content) => navigator.clipboard.writeText(content),
+             });
+             appMessage.success(t('designer.flowchart.mermaidCopied'));
          } catch(e:any) { appMessage.error(e.message); }
     }, [t]);
 
     const handleUseTemplate = useCallback((tpl: any) => {
         if (!reactFlowInstance) return;
         takeSnapshot(nodesRef.current, edgesRef.current);
-        const { nodes: newN, edges: newE } = createFromTemplate(tpl, viewport.x, viewport.y, viewport.zoom);
-        setNodes(nds => [...nds, ...newN]);
-        setEdges(eds => [...eds, ...newE]);
+        applyFlowchartTemplate({
+            template: tpl,
+            viewport,
+            createFromTemplate,
+            appendNodes: (nextNodes) => {
+                setNodes((nodes) => [...nodes, ...nextNodes]);
+            },
+            appendEdges: (nextEdges) => {
+                setEdges((edges) => [...edges, ...nextEdges]);
+            },
+        });
         appMessage.success(t('designer.flowchart.templateApplied'));
     }, [reactFlowInstance, takeSnapshot, createFromTemplate, viewport, setNodes, setEdges, t]);
     
@@ -1111,18 +961,11 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
 
     // Phase 2：查找替换回调 — 通过 ref 读取最新数据，支持撤销
     const handleSearchReplaceNode = useCallback((nodeId: string, newLabel: string) => {
-        setNodes(nds => nds.map(n => {
-            if (n.id !== nodeId) return n;
-            return { ...n, data: { ...n.data, label: newLabel } };
-        }));
+        setNodes((nds) => replaceFlowchartNodeLabel(nds, nodeId, newLabel));
     }, [setNodes]);
 
     const handleSearchReplaceAll = useCallback((matchIds: string[], newLabel: string) => {
-        const idSet = new Set(matchIds);
-        setNodes(nds => nds.map(n => {
-            if (!idSet.has(n.id)) return n;
-            return { ...n, data: { ...n.data, label: newLabel } };
-        }));
+        setNodes((nds) => replaceFlowchartNodeLabels(nds, matchIds, newLabel));
     }, [setNodes]);
 
     const handleBeforeReplace = useCallback(() => {
@@ -1132,61 +975,29 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     // 🚀 P2 性能优化：稳定的 onInit 回调，避?CanvasShell memo 失效
     const handleReactFlowInit = useCallback((instance: ReactFlowInstance<any, any>) => {
         setReactFlowInstance(instance as unknown as ReactFlowInstance);
-        // 初始化后延迟 dispatch 'fit'，执行工业标准真理居中，等待节点测量完成
-        setTimeout(() => {
-            const currentNodes = instance.getNodes();
-            if (currentNodes.length > 0) {
-                dispatchDiagramControl('fit', id);
-            }
-        }, 250);
+        scheduleFlowchartInitialFit({
+            reactFlowInstance: instance,
+            dispatchFit: () => dispatchDiagramControl('fit', id),
+        });
     }, [id]);
 
     const handleAddStickyNote = useCallback(() => {
         if (!reactFlowInstance) return;
         takeSnapshot(nodesRef.current, edgesRef.current);
-        const vp = readDomViewport();
-        const container = document.querySelector('.react-flow') as HTMLElement | null;
-        const cw = container ? container.getBoundingClientRect().width : window.innerWidth;
-        const ch = container ? container.getBoundingClientRect().height : window.innerHeight;
-        
-        // Random slight offset for consecutive additions
-        const offset = Math.floor(Math.random() * 40) - 20;
-
-        const centerX = (cw / 2 - vp.x) / vp.zoom + offset;
-        const centerY = (ch / 2 - vp.y) / vp.zoom + offset;
-        
-        const newNode: Node = {
-            id: `sticky-${Date.now()}_${Math.random().toString(36).substring(2,9)}`,
-            type: 'sticky-note',
-            position: { x: centerX - 100, y: centerY - 100 },
-            data: { label: '', noteColor: 'yellow', layer: activeLayerId, isEditing: true },
-            style: { width: 200, height: 200 },
-            zIndex: 1000, // Post-its should always float above normal diagrams
-        };
-        
-        setNodes((nds) => [...nds, newNode]);
+        addFlowchartStickyNote({
+            layer: activeLayerId,
+            setNodes,
+        });
     }, [reactFlowInstance, setNodes, takeSnapshot, activeLayerId]);
 
     const handleAddMindMap = useCallback(() => {
         if (!reactFlowInstance) return;
         takeSnapshot(nodesRef.current, edgesRef.current);
-        const vp = readDomViewport();
-        const container = document.querySelector('.react-flow') as HTMLElement | null;
-        const cw = container ? container.getBoundingClientRect().width : window.innerWidth;
-        const ch = container ? container.getBoundingClientRect().height : window.innerHeight;
-        
-        const centerX = (cw / 2 - vp.x) / vp.zoom;
-        const centerY = (ch / 2 - vp.y) / vp.zoom;
-        
-        const newNode: Node = {
-            id: `mindmap-${Date.now()}_${Math.random().toString(36).substring(2,9)}`,
-            type: 'mindmap',
-            position: { x: centerX - 60, y: centerY - 20 },
-            data: { label: t('designer.flowchart.mindMapCenter'), layer: activeLayerId, isEditing: true },
-            style: { width: 120, height: 40 },
-        };
-        
-        setNodes((nds) => [...nds, newNode]);
+        addFlowchartMindMapNode({
+            layer: activeLayerId,
+            label: t('designer.flowchart.mindMapCenter'),
+            setNodes,
+        });
     }, [reactFlowInstance, setNodes, takeSnapshot, activeLayerId, t]);
 
     const onPaneMouseMove = useCallback((event: React.MouseEvent) => {
@@ -1208,21 +1019,23 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     }), [handleLabelOffsetChange, handleLabelStyleChange, handleWaypointsChange, handleEdgeLabelChange]);
 
     const handleWrappedCloudSave = useCallback(async () => {
-        if (activePlugin?.onDataSync) {
-            activePlugin.onDataSync(nodesRef.current, edgesRef.current, false, pluginCtx);
-        }
-        if (onCloudSave) {
-            await onCloudSave();
-        }
+        await runFlowchartSavePipeline({
+            activePlugin,
+            pluginCtx,
+            nodes: nodesRef.current,
+            edges: edgesRef.current,
+            saveAction: onCloudSave,
+        });
     }, [activePlugin, pluginCtx, onCloudSave]);
 
     const handleWrappedDirectSave = useCallback(async () => {
-        if (activePlugin?.onDataSync) {
-            activePlugin.onDataSync(nodesRef.current, edgesRef.current, false, pluginCtx);
-        }
-        if (onDirectSave) {
-            await onDirectSave();
-        }
+        await runFlowchartSavePipeline({
+            activePlugin,
+            pluginCtx,
+            nodes: nodesRef.current,
+            edges: edgesRef.current,
+            saveAction: onDirectSave,
+        });
     }, [activePlugin, pluginCtx, onDirectSave]);
 
     return (
@@ -1302,7 +1115,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                             onOpenCommandPalette={() => setCommandPaletteVisible(true)}
                             onDismiss={() => {
                                 setOnboardingDismissed(true);
-                                try { localStorage.setItem('designer.flowchart.onboarding.dismissed', '1'); } catch { void 0; }
+                                persistFlowchartOnboardingDismissed();
                             }}
                         />
                         <FlowchartEmptyState 

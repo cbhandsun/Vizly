@@ -17,6 +17,8 @@ import type {
 } from '@/core/models/DiagramModels';
 import { localDB } from './IndexedDBStorage';
 import { parseRemoteDiagramContent } from './remoteDiagramContent';
+import { safeLog } from '@/core/utils/consoleCleanup';
+import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
 
 const UNSAFE_DIAGRAM_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
@@ -221,7 +223,7 @@ export class DataService {
     const safeDiagram = stripUnsafeDiagramKeys(diagram);
 
     if (!DataValidator.validateDiagramData(safeDiagram)) {
-      console.warn(`[DataService] Diagram "${safeDiagram.id}" did not pass strict validation, registering with lenient mode.`);
+      safeLog.warn(`[DataService] Diagram "${safeDiagram.id}" did not pass strict validation, registering with lenient mode.`);
     }
 
     this.dataRegistry.set(safeDiagram.id, safeDiagram);
@@ -231,7 +233,7 @@ export class DataService {
     if (persistToIndexedDB) {
       // Fire and forget, don't block the UI
       localDB.saveDiagram(safeDiagram).catch(err => {
-          console.error('[DataService] Failed to persist diagram to IndexedDB', err);
+          safeLog.error('[DataService] Failed to persist diagram to IndexedDB', redactSensitiveLogValue(err));
       });
     }
   }
@@ -274,7 +276,7 @@ export class DataService {
     
     if (removeFromIndexedDB) {
         localDB.deleteDiagram(id).catch(err => {
-            console.error('[DataService] Failed to delete diagram from IndexedDB', err);
+            safeLog.error('[DataService] Failed to delete diagram from IndexedDB', redactSensitiveLogValue(err));
         });
     }
   }
@@ -462,10 +464,10 @@ export class DataService {
       if (diagramContent && DataValidator.validateDiagramData(diagramContent)) {
         return diagramContent;
       }
-      console.error('Loaded data is not a valid diagram');
+      safeLog.error('Loaded data is not a valid diagram');
       return null;
     } catch (error) {
-      console.error('Failed to load from storage:', error);
+      safeLog.error('Failed to load from storage:', redactSensitiveLogValue(error));
       throw error;
     }
   }

@@ -37,6 +37,7 @@ import {
   normalizeDiagramId,
   normalizeThemeId,
 } from './modernDiagramMenuGuards';
+import { logModernDiagramMenuFailure } from '@/core/utils/diagramMenuLogging';
 
 interface ModernDiagramMenuProps {
   diagrams?: DiagramDefinition[];
@@ -328,7 +329,9 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
       if (!el) return;
       const scrollTop = readMenuScrollTop();
       if (scrollTop !== null) el.scrollTop = scrollTop;
-    } catch { void 0; }
+    } catch (error) {
+      logModernDiagramMenuFailure('restoreScrollTop', error);
+    }
   }, []);
 
   useEffect(() => {
@@ -342,7 +345,9 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
           });
         }
       }
-    } catch { void 0; }
+    } catch (error) {
+      logModernDiagramMenuFailure('expandSelectedCategory', error);
+    }
   }, [diagrams, selectedDiagram, collapsedGroups]);
 
   useEffect(() => {
@@ -354,7 +359,9 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
       if (!selector) return;
       const target = el.querySelector(selector);
       if (target) target.scrollIntoView({ block: 'nearest' });
-    } catch { void 0; }
+    } catch (error) {
+      logModernDiagramMenuFailure('ensureSelectedVisible', error);
+    }
   }, [selectedDiagram]);
 
   const navigateToDocsPreview = () => {
@@ -495,7 +502,9 @@ const ModernDiagramMenu: React.FC<ModernDiagramMenuProps> = ({
           try {
             const el = e.currentTarget as HTMLDivElement;
             writeMenuScrollTop(el.scrollTop || 0);
-          } catch { void 0; }
+          } catch (error) {
+            logModernDiagramMenuFailure('persistScrollTop', error);
+          }
         }}
       >
         <div style={{ zoom: menuZoom.scale } as React.CSSProperties}>

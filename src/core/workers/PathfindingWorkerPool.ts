@@ -7,6 +7,13 @@
 
 import type { PathFindingJob, PathFindingResult, SharedGraphContext } from '../types/routing';
 import PathfindingWorker from './pathfinding.worker?worker&inline';
+import {
+    logPathfindingWorkerBatchTimeout,
+    logPathfindingWorkerCreateError,
+    logPathfindingWorkerExecutionError,
+    logPathfindingWorkerPostMessageError,
+    logPathfindingWorkerStartupError,
+} from '../utils/routingLogging';
 
 export interface WorkerTask {
     job: PathFindingJob;
@@ -83,12 +90,16 @@ export class PathfindingWorkerPool {
                 const worker = new PathfindingWorker();
                 // [FIX] Catch startup crashes. If worker dies on load, it won't trigger later event listeners.
                 worker.addEventListener('error', (e: ErrorEvent) => {
-                    console.error(`[WorkerPool] Worker ${i} startup error:`, e.message, e.filename, e.lineno);
+                    logPathfindingWorkerStartupError(i, {
+                        message: e.message,
+                        filename: e.filename,
+                        lineno: e.lineno,
+                    });
                 });
                 this.workers.push(worker);
                 this.availableWorkers.add(i);
             } catch (error) {
-                console.error(`Failed to create worker ${i}:`, error);
+                logPathfindingWorkerCreateError(i, error);
             }
         }
 
@@ -262,7 +273,7 @@ export class PathfindingWorkerPool {
         return new Promise((resolve, reject) => {
             // [FIX] Fallback timeout to prevent indefinite hanging if worker silently dies
             const timeoutId = setTimeout(() => {
-                console.warn(`[WorkerPool] Worker ${workerIndex} batch execution timed out after ${WORKER_TASK_TIMEOUT_MS / 1000}s; falling back to serial routing for ${payload.jobs.length} job(s).`);
+                logPathfindingWorkerBatchTimeout(workerIndex, WORKER_TASK_TIMEOUT_MS, payload.jobs.length);
                 worker.removeEventListener('message', messageHandler);
                 worker.removeEventListener('error', errorHandler);
                 this.releaseWorker(workerIndex);
@@ -289,7 +300,7 @@ export class PathfindingWorkerPool {
 
             const errorHandler = (error: ErrorEvent) => {
                 clearTimeout(timeoutId);
-                console.error('[DEBUG-WORKER-POOL] Worker Execution Error:', error.message);
+                logPathfindingWorkerExecutionError({ message: error.message });
                 worker.removeEventListener('message', messageHandler);
                 worker.removeEventListener('error', errorHandler);
                 this.releaseWorker(workerIndex);
@@ -307,7 +318,7 @@ export class PathfindingWorkerPool {
                     context: payload.graph
                 });
             } catch (error: any) {
-                console.error('[WorkerPool] postMessage Error:', error.message);
+                logPathfindingWorkerPostMessageError({ message: error.message });
                 worker.removeEventListener('message', messageHandler);
                 worker.removeEventListener('error', errorHandler);
                 this.releaseWorker(workerIndex);

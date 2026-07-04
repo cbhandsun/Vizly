@@ -4,6 +4,7 @@ import { getDomainTheme, resolveThemeDomainKey } from '../../../utils/domainKey'
 import { ensureReadableText } from '../../../utils/colorUtils';
 import { diagramConfigManager } from '../../config/DiagramConfig';
 import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v2';
+import { getQueryOrHashParamFromLocation } from '../../../utils/inputBoundary';
 
 const DEFAULT_FONT_STACK = '"Microsoft YaHei", "PingFang SC", "Helvetica Neue", Helvetica, Arial, sans-serif';
 
@@ -142,9 +143,11 @@ export const useCustomNodeStyleResolution = ({
     // Debug checks
     const debugEnabled = useMemo(() => {
         try {
-            const search = typeof window !== 'undefined' ? window.location.search : '';
-            const qs = new URLSearchParams(search);
-            return qs.get('themeDebug') === '1' || 
+            const fromUrl = getQueryOrHashParamFromLocation(
+                typeof window === 'undefined' ? undefined : window.location,
+                'themeDebug'
+            ) === '1';
+            return fromUrl ||
                    (typeof window !== 'undefined' && localStorage.getItem('diagram-theme-debug') === 'true');
         } catch {
             return false;

@@ -34,6 +34,13 @@ import {
     cleanMindMapTopic,
 } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
+import {
+    logMindmapPropertyAiAddChildFailure,
+    logMindmapPropertyImageUploadRejected,
+    logMindmapPropertyQuickActionFailure,
+    logMindmapPropertyReshapeFailure,
+    logMindmapPropertySetTopicFailure,
+} from './mindmapPanelLogging';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -191,7 +198,7 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
             const tpcEl = mind.findEle(node.id);
             const cleanPatch = cleanMindMapNodePatch(patch as Partial<NodeObj> & Record<string, unknown>);
             if (tpcEl) mind.reshapeNode(tpcEl, { ...node, ...cleanPatch } as NodeObj);
-        } catch (e) { console.warn('[Panel] reshapeNode:', e); }
+        } catch (e) { logMindmapPropertyReshapeFailure(e); }
     }, [mind, node]);
 
     const saveImageUrl = useCallback(() => {
@@ -213,7 +220,7 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
         try {
             const tpcEl = mind.findEle(node.id);
             if (tpcEl) mind.setNodeTopic(tpcEl, cleanTopic);
-        } catch (e) { console.warn('[Panel] setNodeTopic:', e); }
+        } catch (e) { logMindmapPropertySetTopicFailure(e); }
     }, [mind, node.id, topic]);
 
     const handleIconToggle = useCallback((emoji: string) => {
@@ -317,7 +324,7 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
             if (!tpcEl) return;
             mind.selectNode(tpcEl);
             await mind.addChild(tpcEl, cleanMindMapChildNode({ label: topic }, mind.generateNewObj?.().id ?? `n_${Date.now()}`));
-        } catch (e) { console.warn('[AI Expand] addChild:', e); }
+        } catch (e) { logMindmapPropertyAiAddChildFailure(e); }
 
     }, [mind, node]);
 
@@ -330,21 +337,49 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                 <Space size={2}>
                     <Tooltip title="添加子节点 (Tab)">
                         <Button size="small" type="text" icon={<PlusOutlined />}
-                            onClick={() => { try { const el = mind?.findEle(node.id); if (el) { mind!.selectNode(el); mind!.addChild(el, cleanMindMapChildNode()); } } catch {} }} />
+                            onClick={() => {
+                                try {
+                                    const el = mind?.findEle(node.id);
+                                    if (el) { mind!.selectNode(el); mind!.addChild(el, cleanMindMapChildNode()); }
+                                } catch (error) {
+                                    logMindmapPropertyQuickActionFailure('addChild', error);
+                                }
+                            }} />
                     </Tooltip>
                     {!isRoot && <Tooltip title="添加兄弟节点 (Enter)">
                         <Button size="small" type="text" icon={<PlusOutlined rotate={90} />}
-                            onClick={() => { try { const el = mind?.findEle(node.id); if (el) { mind!.selectNode(el); mind!.insertSibling('after', el, cleanMindMapChildNode()); } } catch {} }} />
+                            onClick={() => {
+                                try {
+                                    const el = mind?.findEle(node.id);
+                                    if (el) { mind!.selectNode(el); mind!.insertSibling('after', el, cleanMindMapChildNode()); }
+                                } catch (error) {
+                                    logMindmapPropertyQuickActionFailure('addSibling', error);
+                                }
+                            }} />
                     </Tooltip>}
                     {!isRoot && <Tooltip title="删除节点 (Delete)">
                         <Button size="small" type="text" danger icon={<DeleteOutlined />}
-                            onClick={() => { try { const el = mind?.findEle(node.id); if (el) { mind!.selectNode(el); mind!.removeNodes([el]); } } catch {} }} />
+                            onClick={() => {
+                                try {
+                                    const el = mind?.findEle(node.id);
+                                    if (el) { mind!.selectNode(el); mind!.removeNodes([el]); }
+                                } catch (error) {
+                                    logMindmapPropertyQuickActionFailure('removeNode', error);
+                                }
+                            }} />
                     </Tooltip>}
                 </Space>
             </div>
 
             <Button size="small" type="dashed" icon={<EditOutlined />}
-                onClick={() => { try { const el = mind?.findEle(node.id); if (el) mind?.beginEdit(el); } catch {} }}
+                onClick={() => {
+                    try {
+                        const el = mind?.findEle(node.id);
+                        if (el) mind?.beginEdit(el);
+                    } catch (error) {
+                        logMindmapPropertyQuickActionFailure('beginEdit', error);
+                    }
+                }}
                 style={{ width: '100%', marginBottom: 8 }}>
                 双击画布编辑文字 (F2)
             </Button>
@@ -643,7 +678,7 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                                 if (!file) return;
                                 const importError = getImageFileImportError(file, IMAGE_DATA_URL_IMPORT_MAX_BYTES);
                                 if (importError) {
-                                    console.warn('[Image Upload]', importError);
+                                    logMindmapPropertyImageUploadRejected(importError);
                                     e.target.value = '';
                                     return;
                                 }

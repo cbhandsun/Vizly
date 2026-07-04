@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   COMMAND_PALETTE_RECENT_STORAGE_KEY,
   COMMAND_PALETTE_USAGE_STORAGE_KEY,
@@ -11,9 +11,22 @@ import {
   readRecentCommandIds,
 } from '../commandPaletteStorage';
 
+const safeLogState = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  log: vi.fn(),
+}));
+
+vi.mock('@/core/utils/consoleCleanup', () => ({
+  safeLog: safeLogState,
+}));
+
 describe('commandPaletteStorage', () => {
   beforeEach(() => {
     localStorage.clear();
+    Object.values(safeLogState).forEach((mock) => mock.mockReset());
   });
 
   it('validates command ids', () => {
@@ -44,6 +57,10 @@ describe('commandPaletteStorage', () => {
   it('reads and bumps usage safely from localStorage', () => {
     localStorage.setItem(COMMAND_PALETTE_USAGE_STORAGE_KEY, '{broken');
     expect(readCommandUsage()).toEqual({});
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[commandPaletteStorage.readCommandUsage] Failed to read "commandPalette.usage":',
+      expect.anything()
+    );
 
     bumpCommandUsage('op:run');
     bumpCommandUsage('op:run');
@@ -70,5 +87,19 @@ describe('commandPaletteStorage', () => {
   it('handles malformed recent storage', () => {
     localStorage.setItem(COMMAND_PALETTE_RECENT_STORAGE_KEY, '{broken');
     expect(readRecentCommandIds()).toEqual([]);
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[commandPaletteStorage.readRecentCommandIds] Failed to read "commandPalette.recent":',
+      expect.anything()
+    );
+  });
+
+  it('ignores oversized recent JSON payloads', () => {
+    localStorage.setItem(COMMAND_PALETTE_RECENT_STORAGE_KEY, 'x'.repeat(2 * 1024 * 1024 + 1));
+    expect(readRecentCommandIds()).toEqual([]);
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[commandPaletteStorage.readRecentCommandIds] Failed to read "commandPalette.recent":',
+      expect.anything()
+    );
+    expect(safeLogState.warn.mock.calls[0]?.[1]).toBeDefined();
   });
 });

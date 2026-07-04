@@ -1,3 +1,6 @@
+import { logDiagramHostStorageReadFailure, logDiagramHostStorageWriteFailure } from './diagramHostStorageLogging';
+import { safeJsonParseWithLimit } from '@/core/utils/jsonUtils';
+
 export const DIAGRAM_SELECTED_STORAGE_KEY = 'diagramMenu.selectedDiagramId';
 export const DIAGRAM_RECENT_STORAGE_KEY = 'diagramMenu.recent';
 export const DIAGRAM_FAVORITES_STORAGE_KEY = 'diagramMenu.favorites';
@@ -5,6 +8,7 @@ export const DIAGRAM_FAVORITES_STORAGE_KEY = 'diagramMenu.favorites';
 const MAX_DIAGRAM_ID_LENGTH = 180;
 const MAX_RECENT_DIAGRAMS = 12;
 const MAX_FAVORITE_DIAGRAMS = 80;
+const MAX_HOST_STORAGE_JSON_LENGTH = 2 * 1024 * 1024;
 
 export const isSafeDiagramId = (value: unknown): value is string => {
     if (typeof value !== 'string') return false;
@@ -12,13 +16,14 @@ export const isSafeDiagramId = (value: unknown): value is string => {
     return id.length > 0 && id.length <= MAX_DIAGRAM_ID_LENGTH && /^[\w:./-]+$/u.test(id);
 };
 
-const parseJson = (value: string | null): unknown => {
-    if (!value) return null;
-    try {
-        return JSON.parse(value);
-    } catch {
-        return null;
-    }
+const parseJson = (value: string | null, key: string): unknown => {
+    return safeJsonParseWithLimit<unknown>(value, null, {
+        maxLength: MAX_HOST_STORAGE_JSON_LENGTH,
+        onFailure: (error) => {
+            logDiagramHostStorageReadFailure(key, error);
+        },
+        buildOversizeError: () => new Error('Diagram host storage JSON is too large.'),
+    });
 };
 
 export const coerceDiagramIdList = (value: unknown, maxEntries: number): string[] => {
@@ -42,7 +47,8 @@ export const readSelectedDiagramId = (fallback: string): string => {
     try {
         const saved = localStorage.getItem(DIAGRAM_SELECTED_STORAGE_KEY);
         return isSafeDiagramId(saved) ? saved.trim() : fallback;
-    } catch {
+    } catch (error) {
+        logDiagramHostStorageReadFailure(DIAGRAM_SELECTED_STORAGE_KEY, error);
         return fallback;
     }
 };
@@ -52,16 +58,17 @@ export const writeSelectedDiagramId = (id: string): string | null => {
     const normalizedId = id.trim();
     try {
         localStorage.setItem(DIAGRAM_SELECTED_STORAGE_KEY, normalizedId);
-    } catch {
-        void 0;
+    } catch (error) {
+        logDiagramHostStorageWriteFailure(DIAGRAM_SELECTED_STORAGE_KEY, error);
     }
     return normalizedId;
 };
 
 export const readRecentDiagramIds = (): string[] => {
     try {
-        return coerceDiagramIdList(parseJson(localStorage.getItem(DIAGRAM_RECENT_STORAGE_KEY)), MAX_RECENT_DIAGRAMS);
-    } catch {
+        return coerceDiagramIdList(parseJson(localStorage.getItem(DIAGRAM_RECENT_STORAGE_KEY), DIAGRAM_RECENT_STORAGE_KEY), MAX_RECENT_DIAGRAMS);
+    } catch (error) {
+        logDiagramHostStorageReadFailure(DIAGRAM_RECENT_STORAGE_KEY, error);
         return [];
     }
 };
@@ -70,8 +77,8 @@ export const writeRecentDiagramIds = (ids: unknown): string[] => {
     const normalized = coerceDiagramIdList(ids, MAX_RECENT_DIAGRAMS);
     try {
         localStorage.setItem(DIAGRAM_RECENT_STORAGE_KEY, JSON.stringify(normalized));
-    } catch {
-        void 0;
+    } catch (error) {
+        logDiagramHostStorageWriteFailure(DIAGRAM_RECENT_STORAGE_KEY, error);
     }
     return normalized;
 };
@@ -84,8 +91,9 @@ export const addRecentDiagramId = (id: string, previous: readonly string[] = rea
 
 export const readFavoriteDiagramIds = (): string[] => {
     try {
-        return coerceDiagramIdList(parseJson(localStorage.getItem(DIAGRAM_FAVORITES_STORAGE_KEY)), MAX_FAVORITE_DIAGRAMS);
-    } catch {
+        return coerceDiagramIdList(parseJson(localStorage.getItem(DIAGRAM_FAVORITES_STORAGE_KEY), DIAGRAM_FAVORITES_STORAGE_KEY), MAX_FAVORITE_DIAGRAMS);
+    } catch (error) {
+        logDiagramHostStorageReadFailure(DIAGRAM_FAVORITES_STORAGE_KEY, error);
         return [];
     }
 };
@@ -94,8 +102,8 @@ export const writeFavoriteDiagramIds = (ids: unknown): string[] => {
     const normalized = coerceDiagramIdList(ids, MAX_FAVORITE_DIAGRAMS);
     try {
         localStorage.setItem(DIAGRAM_FAVORITES_STORAGE_KEY, JSON.stringify(normalized));
-    } catch {
-        void 0;
+    } catch (error) {
+        logDiagramHostStorageWriteFailure(DIAGRAM_FAVORITES_STORAGE_KEY, error);
     }
     return normalized;
 };

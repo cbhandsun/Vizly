@@ -1,4 +1,16 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const safeLogState = vi.hoisted(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    log: vi.fn(),
+}));
+
+vi.mock('@/core/utils/consoleCleanup', () => ({
+    safeLog: safeLogState,
+}));
 import {
     AI_CONFIG_KEY,
     clearRuntimeAIConfig,
@@ -28,6 +40,7 @@ describe('AI config storage isolation', () => {
         localStorage.clear();
         clearRuntimeAIConfig();
         delete (window as any).__currentUserId;
+        Object.values(safeLogState).forEach(mock => mock.mockReset());
     });
 
     it('does not load another user-scoped config when no current user is known', () => {
@@ -137,5 +150,61 @@ describe('AI config storage isolation', () => {
 
         expect(getAIConfig('user-a').activeModelKey).toBe('gemini:gemini-2.0-flash-exp');
         expect(parseStoredAIConfig('x'.repeat(2 * 1024 * 1024 + 1))).toBeNull();
+    });
+
+    it('logs and keeps runtime config when persisting AI config fails', () => {
+        vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+            throw new Error('Authorization: Bearer ai-config-write-secret');
+        });
+
+        expect(() => persistAIConfig('user-a', makeConfig('sk-runtime-secret'))).not.toThrow();
+        expect(getAIConfig('user-a').providers[0].apiKey).toBe('sk-runtime-secret');
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[aiConfigStorage] persistAIConfig failed:',
+            expect.anything()
+        );
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('ai-config-write-secret');
+    });
+
+    it('logs and falls back when scoped AI config storage read throws', () => {
+        vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+            if (key === getAIConfigKey('user-a')) {
+                throw new Error('token=scoped-ai-config-secret');
+            }
+            return null;
+        });
+
+        const config = getAIConfig('user-a');
+
+        expect(config.activeModelKey).toBe('gemini:gemini-2.0-flash-exp');
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[aiConfigStorage] getAIConfig.readScopedConfig failed:',
+            expect.anything()
+        );
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('scoped-ai-config-secret');
+    });
+
+    it('logs and falls back when legacy AI config storage read throws', () => {
+        vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+            if (key === getAIConfigKey('user-a')) {
+                return null;
+            }
+            if (key === 'DiagramView.AIConfig') {
+                throw new Error('cookie=legacy-ai-config-secret');
+            }
+            return null;
+        });
+
+        const config = getAIConfig('user-a');
+
+        expect(config.activeModelKey).toBe('gemini:gemini-2.0-flash-exp');
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[aiConfigStorage] getAIConfig.readLegacyConfig failed:',
+            expect.anything()
+        );
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
+        expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('legacy-ai-config-secret');
     });
 });

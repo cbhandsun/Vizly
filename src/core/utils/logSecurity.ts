@@ -67,6 +67,8 @@ export const sanitizeLogEntry = (entry: LogEntry): LogEntry => ({
   ...entry,
   message: redactSensitiveString(entry.message),
   data: entry.data ? redactSensitiveLogValue(entry.data) as Record<string, unknown> : undefined,
+  userId: entry.userId ? REDACTED : entry.userId,
+  sessionId: entry.sessionId ? REDACTED : entry.sessionId,
 });
 
 const redactValue = (value: unknown, seen: WeakSet<object>, depth: number): unknown => {

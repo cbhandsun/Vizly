@@ -13,6 +13,9 @@ import { ThemePresetManager } from '../themes/ThemePresetManager';
 import { ThemePerformanceOptimizer } from '../themes/ThemePerformanceOptimizer';
 import { coerceThemeImport } from '../themes/themeImportSecurity';
 import type { Theme, ThemePerformanceOptions, ThemePreset } from '../themes/types/ThemeTypes';
+import { safeLog } from '../utils/consoleCleanup';
+import { redactSensitiveLogValue } from '../utils/logSecurity';
+import { safeJsonParse } from '../utils/jsonUtils';
 
 export interface IntegrationOptions {
   enableMigration: boolean;
@@ -55,6 +58,18 @@ export interface IntegratedConfigExport {
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 );
+
+const extractPresetListFromExport = (presetsJson: string | null): ThemePreset[] => {
+  const parsedPresets = safeJsonParse<unknown>(presetsJson, null);
+  if (!isRecord(parsedPresets) || !Array.isArray(parsedPresets.presets)) {
+    if (presetsJson) {
+      safeLog.warn('导出主题预设包解析失败，返回空预设列表');
+    }
+    return [];
+  }
+
+  return parsedPresets.presets as ThemePreset[];
+};
 
 // 配置迁移器
 class ConfigMigrator {
@@ -306,7 +321,7 @@ class ConfigSynchronizer {
     try {
       await this.themeManager.setTheme(themeId);
     } catch (error) {
-      console.error('Failed to sync theme:', error);
+      safeLog.error('Failed to sync theme:', redactSensitiveLogValue(error));
     }
   }
 }
@@ -365,7 +380,7 @@ export class ConfigIntegration {
         const currentId = currentTheme?.id || 'light';
         await this.themeManager.setTheme(currentId);
       } catch (e) {
-        console.warn('Failed to enable domain augmentation, continuing:', e);
+        safeLog.warn('Failed to enable domain augmentation, continuing:', redactSensitiveLogValue(e));
       }
 
       this.presetManager = new ThemePresetManager(this.layeredConfig);
@@ -394,7 +409,7 @@ export class ConfigIntegration {
           this.performanceOptimizer = new ThemePerformanceOptimizer(finalPerformanceOptions);
           this.status.performanceOptimizerReady = true;
         } catch (error) {
-          console.warn('Performance optimizer initialization failed, continuing without it:', error);
+          safeLog.warn('Performance optimizer initialization failed, continuing without it:', redactSensitiveLogValue(error));
           this.status.performanceOptimizerReady = true; // 设置为true以避免阻塞
         }
       } else {
@@ -419,7 +434,7 @@ export class ConfigIntegration {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.status.errors.push(errorMessage);
-      console.error('ConfigIntegration initialization failed:', error);
+      safeLog.error('ConfigIntegration initialization failed:', redactSensitiveLogValue(error));
     }
   }
 
@@ -434,12 +449,12 @@ export class ConfigIntegration {
         this.status.migrationComplete = true;
       } else {
         this.status.errors.push(...migrationResult.errors.map(e => e.error));
-        console.warn('Configuration migration completed with errors:', migrationResult);
+        safeLog.warn('Configuration migration completed with errors:', redactSensitiveLogValue(migrationResult));
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.status.errors.push(`Migration failed: ${errorMessage}`);
-      console.error('Configuration migration failed:', error);
+      safeLog.error('Configuration migration failed:', redactSensitiveLogValue(error));
     }
   }
 
@@ -506,7 +521,7 @@ export class ConfigIntegration {
       try {
         await this.initializationPromise;
       } catch (error) {
-        console.error('Initialization failed:', error);
+        safeLog.error('Initialization failed:', redactSensitiveLogValue(error));
         return false;
       }
     }
@@ -531,10 +546,7 @@ export class ConfigIntegration {
       this.presetManager.getAllPresets().map(p => p.id),
       { name: 'All Presets' }
     );
-    const parsedPresets = presetsJson ? JSON.parse(presetsJson) : null;
-    const presets = isRecord(parsedPresets) && Array.isArray(parsedPresets.presets)
-      ? parsedPresets.presets as ThemePreset[]
-      : [];
+    const presets = extractPresetListFromExport(presetsJson);
 
     return {
       layeredConfig,
@@ -583,7 +595,7 @@ export class ConfigIntegration {
         });
       }
     } catch (error) {
-      console.error('Failed to import integrated configuration:', error);
+      safeLog.error('Failed to import integrated configuration:', redactSensitiveLogValue(error));
       throw error;
     }
   }
@@ -597,7 +609,7 @@ export class ConfigIntegration {
       // 重置主题到默认值
       this.themeManager.setTheme('light');
     } catch (error) {
-      console.error('Failed to reset configuration:', error);
+      safeLog.error('Failed to reset configuration:', redactSensitiveLogValue(error));
       throw error;
     }
   }

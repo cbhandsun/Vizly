@@ -20,6 +20,7 @@
 
 import type { Node, Edge } from '@xyflow/react';
 import type { Position } from '../types/common';
+import { logLayoutCacheKeyCreationFailure } from './layoutCacheLogging';
 
 // ==================== 类型定义 ====================
 
@@ -114,7 +115,8 @@ export class LayoutCacheManager {
 
             // 组合生成键
             return `layout:${this.simpleHash(nodesSig)}:${this.simpleHash(edgesSig)}:${this.simpleHash(optionsSig)}`;
-        } catch {
+        } catch (error) {
+            logLayoutCacheKeyCreationFailure('createKey', error);
             return `layout:${Date.now()}:${Math.random()}`;
         }
     }
@@ -135,7 +137,8 @@ export class LayoutCacheManager {
             const optsSig = options ? JSON.stringify(options) : '';
 
             return `struct:${layoutType}:${this.simpleHash(nodeIds)}:${this.simpleHash(edgeSig)}:${this.simpleHash(optsSig)}`;
-        } catch {
+        } catch (error) {
+            logLayoutCacheKeyCreationFailure('createStructureKey', error);
             return `struct:${layoutType}:${Date.now()}`;
         }
     }

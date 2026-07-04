@@ -286,6 +286,58 @@ describe('SupabaseStorageProvider', () => {
         expect(Object.hasOwn(saved.content.nodes[0], 'constructor')).toBe(false);
     });
 
+    it('filters malformed Supabase diagram metadata rows', async () => {
+        const table = createTableMock({
+            data: [
+                {
+                    id: 'diagram-1',
+                    title: 'Diagram',
+                    updated_at: '2026-06-11T00:00:00.000Z',
+                    user_id: '11111111-1111-4111-8111-111111111111',
+                },
+                {
+                    id: '',
+                    title: 'Missing id',
+                    updated_at: '2026-06-11T00:00:00.000Z',
+                    user_id: '11111111-1111-4111-8111-111111111111',
+                },
+                {
+                    id: 'bad-date',
+                    title: 'Bad Date',
+                    updated_at: 'not-a-date',
+                    user_id: '11111111-1111-4111-8111-111111111111',
+                },
+                null,
+            ],
+            error: null,
+        });
+        mockSupabase.from.mockReturnValue(table);
+        const { SupabaseStorageProvider } = await import('../SupabaseStorage');
+        const provider = new SupabaseStorageProvider();
+
+        const diagrams = await provider.listDiagrams();
+
+        expect(diagrams).toHaveLength(1);
+        expect(diagrams[0]).toEqual({
+            id: 'diagram-1',
+            title: 'Diagram',
+            updatedAt: new Date('2026-06-11T00:00:00.000Z'),
+            userId: '11111111-1111-4111-8111-111111111111',
+        });
+    });
+
+    it('rejects malformed Supabase diagram rows on load', async () => {
+        const table = createTableMock({
+            data: null,
+            error: null,
+        });
+        mockSupabase.from.mockReturnValue(table);
+        const { SupabaseStorageProvider } = await import('../SupabaseStorage');
+        const provider = new SupabaseStorageProvider();
+
+        await expect(provider.loadDiagram('diagram-1')).rejects.toThrow('invalid diagram row');
+    });
+
     it('rejects invalid Supabase diagram content on load', async () => {
         const table = createTableMock({
             data: {
@@ -446,5 +498,70 @@ describe('SupabaseStorageProvider', () => {
         );
 
         expect(version?.snapshotData.nodes[0].data).toEqual({ label: 'Node', nested: { ok: true } });
+    });
+
+    it('filters malformed Supabase version list rows', async () => {
+        const table = createTableMock({
+            data: [
+                {
+                    id: '22222222-2222-4222-8222-222222222222',
+                    diagram_id: '11111111-1111-4111-8111-111111111111',
+                    author_id: '11111111-1111-4111-8111-111111111111',
+                    created_at: '2026-06-11T00:00:00.000Z',
+                    message: 'Loaded',
+                },
+                {
+                    id: 'not-a-uuid',
+                    diagram_id: '11111111-1111-4111-8111-111111111111',
+                    author_id: '11111111-1111-4111-8111-111111111111',
+                    created_at: '2026-06-11T00:00:00.000Z',
+                    message: 'Bad',
+                },
+                {
+                    id: '33333333-3333-4333-8333-333333333333',
+                    diagram_id: '11111111-1111-4111-8111-111111111111',
+                    author_id: '11111111-1111-4111-8111-111111111111',
+                    created_at: 'not-a-date',
+                    message: 'Bad date',
+                },
+            ],
+            error: null,
+        });
+        mockSupabase.from.mockReturnValue(table);
+        const { SupabaseStorageProvider } = await import('../SupabaseStorage');
+        const provider = new SupabaseStorageProvider();
+
+        const versions = await provider.listVersions('11111111-1111-4111-8111-111111111111');
+
+        expect(versions).toEqual([{
+            id: '22222222-2222-4222-8222-222222222222',
+            diagramId: '11111111-1111-4111-8111-111111111111',
+            snapshotData: null,
+            authorId: '11111111-1111-4111-8111-111111111111',
+            createdAt: new Date('2026-06-11T00:00:00.000Z').getTime(),
+            message: 'Loaded',
+        }]);
+    });
+
+    it('returns null for malformed loaded Supabase version rows', async () => {
+        const table = createTableMock({
+            data: {
+                id: 'not-a-uuid',
+                diagram_id: '11111111-1111-4111-8111-111111111111',
+                snapshot_data: JSON.parse(JSON.stringify(makeVersionSnapshot())),
+                author_id: '11111111-1111-4111-8111-111111111111',
+                created_at: '2026-06-11T00:00:00.000Z',
+                message: 'Loaded',
+            },
+            error: null,
+        });
+        mockSupabase.from.mockReturnValue(table);
+        const { SupabaseStorageProvider } = await import('../SupabaseStorage');
+        const provider = new SupabaseStorageProvider();
+
+        await expect(provider.loadVersion(
+            '11111111-1111-4111-8111-111111111111',
+            '22222222-2222-4222-8222-222222222222'
+        )).resolves.toBeNull();
     });
 });

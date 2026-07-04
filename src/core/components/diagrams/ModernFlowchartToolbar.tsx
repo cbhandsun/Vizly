@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { Tooltip, Button, Dropdown, MenuProps, Popover, Grid } from 'antd';
 import { appModal } from '../../utils/antdStaticBridge';
 import { clearFlowchartCache } from '../../utils/clearFlowchartCache';
+import { coerceDiagramId, getQueryOrHashParamFromLocation } from '../../utils/inputBoundary';
 
 interface FlowchartToolbarProps {
     canUndo: boolean;
@@ -358,11 +359,9 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
                     okButtonProps: { danger: true },
                     onOk: () => {
                         // 1. 先读取当前选中的图表 ID（localStorage 清空前）
-                        // [FIX] Hash 路由下参数在 hash 里，不在 search 里
-                        const hashQuery = window.location.hash.split('?')[1] || '';
-                        const urlParams = new URLSearchParams(hashQuery || window.location.search);
-                        const diagramIdFromUrl = urlParams.get('diagram');
-                        const diagramId = diagramIdFromUrl
+                        const diagramId = coerceDiagramId(
+                            getQueryOrHashParamFromLocation(window.location, 'diagram')
+                        )
                             || localStorage.getItem('diagramMenu.selectedDiagramId');
 
                         // 2. 只清理流程图设计器缓存，避免误删 AI 配置、存储密钥和其他图的自动保存

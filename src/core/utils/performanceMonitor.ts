@@ -17,10 +17,10 @@ const perfLog = {
       }
       safeLog.info(`Performance: ${name}`);
     } catch (error) {
-      console.warn(`Failed to measure ${name}:`, error);
+      safeLog.warn(`Failed to measure ${name}:`, redactSensitiveLogValue(error));
     }
   },
-  log: (...args: any[]) => console.log(...args),
+  log: (...args: any[]) => safeLog.info(...args),
 };
 
 const currentLogUrl = (): string => sanitizeUrlForLog(window.location.href);
@@ -248,7 +248,7 @@ class PerformanceMonitor {
 
       this.addPerformanceReport(metrics);
     } catch (error) {
-      safeLog.error('Failed to collect page performance metrics:', error);
+      safeLog.error('Failed to collect page performance metrics:', redactSensitiveLogValue(error));
     }
   }
 
@@ -286,7 +286,7 @@ class PerformanceMonitor {
       });
       clsObserver.observe({ entryTypes: ['layout-shift'] });
     } catch (error) {
-      safeLog.error('Failed to observe web vitals:', error);
+      safeLog.error('Failed to observe web vitals:', redactSensitiveLogValue(error));
     }
   }
 
@@ -309,7 +309,7 @@ class PerformanceMonitor {
 
       this.addPerformanceReport(metrics);
     } catch (error) {
-      safeLog.error('Failed to collect runtime performance metrics:', error);
+      safeLog.error('Failed to collect runtime performance metrics:', redactSensitiveLogValue(error));
     }
   }
 
@@ -415,7 +415,7 @@ class PerformanceMonitor {
     try {
       // 这里可以集成实际的错误报告服务，如Sentry、LogRocket等
       if (process.env.NODE_ENV === 'development') {
-        console.error('Error Report:', errorReport);
+        safeLog.error('Error Report:', sanitizeReportData(errorReport));
       }
 
       // 示例：发送到后端API
@@ -425,7 +425,7 @@ class PerformanceMonitor {
       //   body: JSON.stringify(errorReport)
       // });
     } catch (error) {
-      safeLog.error('Failed to send error report:', error);
+      safeLog.error('Failed to send error report:', redactSensitiveLogValue(error));
     }
   }
 
@@ -435,7 +435,7 @@ class PerformanceMonitor {
   private async sendPerformanceReport(report: PerformanceReport): Promise<void> {
     try {
       if (process.env.NODE_ENV === 'development') {
-        perfLog.log('Performance Report:', report);
+        perfLog.log('Performance Report:', sanitizeReportData(report));
       }
 
       // 示例：发送到后端API
@@ -445,7 +445,7 @@ class PerformanceMonitor {
       //   body: JSON.stringify(report)
       // });
     } catch (error) {
-      safeLog.error('Failed to send performance report:', error);
+      safeLog.error('Failed to send performance report:', redactSensitiveLogValue(error));
     }
   }
 

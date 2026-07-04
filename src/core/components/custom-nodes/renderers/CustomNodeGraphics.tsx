@@ -122,7 +122,7 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
     };
 
     const renderContent = (content: string) => {
-        const safeContent = sanitizeInlineHtml(content);
+        const safeContentHtml = sanitizeInlineHtml(content);
 
         if (isEditing) {
             return (
@@ -151,24 +151,24 @@ const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
             );
         }
 
-        if (!safeContent) return null;
+        if (!safeContentHtml) return null;
 
         // 使用结构化排版（标题 + 描述体）
-        const { title, body } = parseNodeContent(safeContent);
+        const { title, body } = parseNodeContent(safeContentHtml);
 
         // 是否有 HTML 内容（旧格式兼容）
-        const hasHtml = safeContent.includes('<br>') || safeContent.includes('<b>') || safeContent.includes('<strong>');
+        const hasHtml = safeContentHtml.includes('<br>') || safeContentHtml.includes('<b>') || safeContentHtml.includes('<strong>');
 
         if (hasHtml) {
             // 旧格式：HTML 直接渲染，保持兼容
-            const lines = safeContent.split(/<br\s*\/?>/i);
+            const safeLinesHtml = safeContentHtml.split(/<br\s*\/?>/i);
             return (
                 <div style={contentStyle} onDoubleClick={handleDoubleClick}>
 
                     <div style={textContainerStyle}>
-                        {lines.map((line, index) => (
-                            <div key={index} style={getLineStyle(line)}>
-                                <span dangerouslySetInnerHTML={{ __html: line }} />
+                        {safeLinesHtml.map((safeLineHtml, index) => (
+                            <div key={index} style={getLineStyle(safeLineHtml)}>
+                                <span dangerouslySetInnerHTML={{ __html: safeLineHtml }} />
                             </div>
                         ))}
                     </div>

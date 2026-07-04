@@ -113,13 +113,13 @@ const SubGroupNode = ({ id, data, zIndex, selected, isConnectable }: NodeProps<N
    * 仅使用 data.description；若包含简单 HTML 标签（如 <b>/<br/>），使用 innerHTML 渲染。
    */
   const getTitleContent = () => {
-    const text = typeof description === 'string' && description.trim().length > 0
+    const safeTitleHtml = typeof description === 'string' && description.trim().length > 0
       ? sanitizeInlineHtml(description)
       : '';
-    const hasHtml = /<[^>]+>/.test(text);
+    const hasHtml = /<[^>]+>/.test(safeTitleHtml);
     return hasHtml
-      ? <span dangerouslySetInnerHTML={{ __html: text }} />
-      : <span>{text}</span>;
+      ? <span dangerouslySetInnerHTML={{ __html: safeTitleHtml }} />
+      : <span>{safeTitleHtml}</span>;
   };
 
   return (

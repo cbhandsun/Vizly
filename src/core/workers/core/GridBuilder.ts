@@ -9,6 +9,7 @@ import type { Rectangle } from '../../algorithms/geometryUtils';
 import type { PathfindingGrid } from '../../algorithms/pathfinding';
 import type { SpatialIndex } from '../../algorithms/SpatialIndex';
 import type { UnifiedRoutingConfig } from '../../types/routing';
+import { logGridBuilderMassiveGrid } from '../../utils/routingLogging';
 
 export class GridBuilder {
     private config: UnifiedRoutingConfig;
@@ -88,7 +89,7 @@ export class GridBuilder {
         const maxIndex = cols * rows;
 
         if (maxIndex > 2000000) {
-            console.warn(`[GridBuilder] Grid massive: ${cols}x${rows} = ${maxIndex}. Memory impact high.`);
+            logGridBuilderMassiveGrid(cols, rows, maxIndex);
         }
 
         const costs = new Int32Array(maxIndex).fill(this.config.costs.normal);

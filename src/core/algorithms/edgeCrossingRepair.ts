@@ -10,11 +10,13 @@ export interface EdgeCrossingRepairOptions {
     maxIterations?: number;
     mutableEdgeIds?: Set<string>;
     allowObstacleHitIfImprovesCrossing?: boolean;
+    preserveEndpointDirections?: boolean;
 }
 
 interface SegmentRef {
     edgeId: string;
     segIdx: number;
+    pointCount: number;
     a: Point;
     b: Point;
     h: boolean;
@@ -29,8 +31,13 @@ interface CrossingHit {
     sameBuddy: boolean;
 }
 
-const EPS = 1.5;
+interface ParallelOverlapHit {
+    a: SegmentRef;
+    b: SegmentRef;
+    overlapLength: number;
+}
 
+const EPS = 1.5;
 export function repairEdgeCrossingViolations(
     edgePaths: Map<string, Point[]>,
     options: EdgeCrossingRepairOptions = {}
@@ -54,7 +61,6 @@ export function repairEdgeCrossingViolations(
 
     for (let iteration = 0; iteration < (options.maxIterations ?? 4); iteration++) {
         const crossings = findRepairableCrossings(result, buddyGroupByEdgeId);
-        if (crossings.length === 0) break;
 
         let repaired: { edgeId: string; points: Point[]; score: ReturnType<RoutingCrossingScorer['score']>; length: number } | null = null;
         for (const crossing of crossings) {
@@ -68,9 +74,30 @@ export function repairEdgeCrossingViolations(
                 buddyTypesByEdgeId,
                 spacing,
                 options.mutableEdgeIds,
-                options.allowObstacleHitIfImprovesCrossing
+                options.allowObstacleHitIfImprovesCrossing,
+                options.preserveEndpointDirections
             );
             if (repaired) break;
+        }
+
+        if (!repaired) {
+            const overlaps = findRepairableParallelOverlaps(result, buddyGroupByEdgeId, Math.max(24, spacing * 3));
+            for (const overlap of overlaps) {
+                repaired = chooseBestParallelOverlapRepair(
+                    overlap,
+                    result,
+                    currentScore,
+                    scorer,
+                    obstacles,
+                    options.ignoredRectsByEdge,
+                    buddyTypesByEdgeId,
+                    spacing,
+                    options.mutableEdgeIds,
+                    options.allowObstacleHitIfImprovesCrossing,
+                    options.preserveEndpointDirections
+                );
+                if (repaired) break;
+            }
         }
         if (!repaired) break;
 
@@ -91,14 +118,15 @@ function chooseBestCrossingRepair(
     buddyTypesByEdgeId: Map<string, Set<BuddyGroup['type']>>,
     spacing: number,
     mutableEdgeIds: Set<string> | undefined,
-    allowObstacleHitIfImprovesCrossing: boolean | undefined
+    allowObstacleHitIfImprovesCrossing: boolean | undefined,
+    preserveEndpointDirectionsOption: boolean | undefined
 ): { edgeId: string; points: Point[]; score: ReturnType<RoutingCrossingScorer['score']>; length: number } | null {
     const candidates = [
-        ...buildSharedTrunkJunctionCandidates(crossing, allPaths, buddyTypesByEdgeId, mutableEdgeIds),
-        ...buildDetourCandidates(crossing.h, crossing.v, allPaths, buddyTypesByEdgeId, spacing, mutableEdgeIds),
-        ...buildDetourCandidates(crossing.v, crossing.h, allPaths, buddyTypesByEdgeId, spacing, mutableEdgeIds),
-        ...buildShiftCandidates(crossing.h, crossing.v, allPaths, buddyTypesByEdgeId, spacing, mutableEdgeIds),
-        ...buildShiftCandidates(crossing.v, crossing.h, allPaths, buddyTypesByEdgeId, spacing, mutableEdgeIds),
+        ...buildSharedTrunkJunctionCandidates(crossing, allPaths, buddyTypesByEdgeId, mutableEdgeIds, preserveEndpointDirectionsOption),
+        ...buildDetourCandidates(crossing.h, crossing.v, allPaths, buddyTypesByEdgeId, spacing, mutableEdgeIds, preserveEndpointDirectionsOption),
+        ...buildDetourCandidates(crossing.v, crossing.h, allPaths, buddyTypesByEdgeId, spacing, mutableEdgeIds, preserveEndpointDirectionsOption),
+        ...buildShiftCandidates(crossing.h, crossing.v, allPaths, buddyTypesByEdgeId, spacing, mutableEdgeIds, preserveEndpointDirectionsOption),
+        ...buildShiftCandidates(crossing.v, crossing.h, allPaths, buddyTypesByEdgeId, spacing, mutableEdgeIds, preserveEndpointDirectionsOption),
     ];
 
     let best: { edgeId: string; points: Point[]; score: ReturnType<RoutingCrossingScorer['score']>; length: number; obstacleHits: number } | null = null;
@@ -117,6 +145,43 @@ function chooseBestCrossingRepair(
             !best ||
             isCandidatePreferred(score, obstacleHits, length, best.score, best.obstacleHits, best.length, scorer)
         ) {
+            best = { edgeId: candidate.edgeId, points: candidate.points, score, length, obstacleHits };
+        }
+    }
+    return best;
+}
+
+function chooseBestParallelOverlapRepair(
+    overlap: ParallelOverlapHit,
+    allPaths: Map<string, Point[]>,
+    currentScore: ReturnType<RoutingCrossingScorer['score']>,
+    scorer: RoutingCrossingScorer,
+    obstacles: Rectangle[],
+    ignoredRectsByEdge: Map<string, Rectangle[]> | undefined,
+    buddyTypesByEdgeId: Map<string, Set<BuddyGroup['type']>>,
+    spacing: number,
+    mutableEdgeIds: Set<string> | undefined,
+    allowObstacleHitIfImprovesCrossing: boolean | undefined,
+    preserveEndpointDirectionsOption: boolean | undefined
+): { edgeId: string; points: Point[]; score: ReturnType<RoutingCrossingScorer['score']>; length: number } | null {
+    const candidates = [
+        ...buildParallelOverlapShiftCandidates(overlap.a, allPaths, buddyTypesByEdgeId, spacing, mutableEdgeIds, preserveEndpointDirectionsOption),
+        ...buildParallelOverlapShiftCandidates(overlap.b, allPaths, buddyTypesByEdgeId, spacing, mutableEdgeIds, preserveEndpointDirectionsOption),
+    ];
+
+    let best: { edgeId: string; points: Point[]; score: ReturnType<RoutingCrossingScorer['score']>; length: number; obstacleHits: number } | null = null;
+    for (const candidate of candidates) {
+        const ignored = ignoredRectsByEdge?.get(candidate.edgeId) ?? [];
+        const obstacleHits = countPathObstacleHits(candidate.points, obstacles, ignored);
+        if (!allowObstacleHitIfImprovesCrossing && obstacleHits > 0) continue;
+
+        const trial = new Map(allPaths);
+        trial.set(candidate.edgeId, candidate.points);
+        const score = scorer.score(trial);
+        if (!scorer.isBetter(score, currentScore)) continue;
+
+        const length = RoutingCrossingScorer.pathLength(candidate.points);
+        if (!best || isCandidatePreferred(score, obstacleHits, length, best.score, best.obstacleHits, best.length, scorer)) {
             best = { edgeId: candidate.edgeId, points: candidate.points, score, length, obstacleHits };
         }
     }
@@ -150,7 +215,8 @@ function buildSharedTrunkJunctionCandidates(
     crossing: CrossingHit,
     allPaths: Map<string, Point[]>,
     buddyTypesByEdgeId: Map<string, Set<BuddyGroup['type']>>,
-    mutableEdgeIds: Set<string> | undefined
+    mutableEdgeIds: Set<string> | undefined,
+    preserveEndpointDirectionsOption: boolean | undefined
 ): Array<{ edgeId: string; points: Point[] }> {
     if (!crossing.sameBuddy) return [];
 
@@ -163,6 +229,7 @@ function buildSharedTrunkJunctionCandidates(
         if (!isOrthogonal(simplified)) return;
         if (!samePoint(simplified[0], original[0])) return;
         if (!samePoint(simplified[simplified.length - 1], original[original.length - 1])) return;
+        if (preserveEndpointDirectionsOption && !preservesEndpointDirections(simplified, original)) return;
         candidates.push({ edgeId, points: simplified });
     };
     const addCandidate = (segment: SegmentRef, mode: BuddyGroup['type']) => {
@@ -241,7 +308,8 @@ function buildShiftCandidates(
     allPaths: Map<string, Point[]>,
     buddyTypesByEdgeId: Map<string, Set<BuddyGroup['type']>>,
     spacing: number,
-    mutableEdgeIds: Set<string> | undefined
+    mutableEdgeIds: Set<string> | undefined,
+    preserveEndpointDirectionsOption: boolean | undefined
 ): Array<{ edgeId: string; points: Point[] }> {
     if (mutableEdgeIds && !mutableEdgeIds.has(moving.edgeId)) return [];
     const points = allPaths.get(moving.edgeId);
@@ -273,6 +341,7 @@ function buildShiftCandidates(
         if (!isOrthogonal(simplified)) continue;
         if (!samePoint(simplified[0], points[0])) continue;
         if (!samePoint(simplified[simplified.length - 1], points[points.length - 1])) continue;
+        if (preserveEndpointDirectionsOption && !preservesEndpointDirections(simplified, points)) continue;
         if (!preservesProtectedJunctions(simplified, points, buddyTypes)) continue;
         candidates.push({ edgeId: moving.edgeId, points: simplified });
     }
@@ -286,7 +355,8 @@ function buildDetourCandidates(
     allPaths: Map<string, Point[]>,
     buddyTypesByEdgeId: Map<string, Set<BuddyGroup['type']>>,
     spacing: number,
-    mutableEdgeIds: Set<string> | undefined
+    mutableEdgeIds: Set<string> | undefined,
+    preserveEndpointDirectionsOption: boolean | undefined
 ): Array<{ edgeId: string; points: Point[] }> {
     if (mutableEdgeIds && !mutableEdgeIds.has(moving.edgeId)) return [];
     const points = allPaths.get(moving.edgeId);
@@ -301,6 +371,7 @@ function buildDetourCandidates(
         if (!isOrthogonal(simplified)) return;
         if (!samePoint(simplified[0], points[0])) return;
         if (!samePoint(simplified[simplified.length - 1], points[points.length - 1])) return;
+        if (preserveEndpointDirectionsOption && !preservesEndpointDirections(simplified, points)) return;
         if (!preservesProtectedJunctions(simplified, points, buddyTypes)) return;
         candidates.push({ edgeId: moving.edgeId, points: simplified });
     };
@@ -406,6 +477,116 @@ function buildDetourCandidates(
     return candidates;
 }
 
+function buildParallelOverlapShiftCandidates(
+    moving: SegmentRef,
+    allPaths: Map<string, Point[]>,
+    buddyTypesByEdgeId: Map<string, Set<BuddyGroup['type']>>,
+    spacing: number,
+    mutableEdgeIds: Set<string> | undefined,
+    preserveEndpointDirectionsOption: boolean | undefined
+): Array<{ edgeId: string; points: Point[] }> {
+    if (mutableEdgeIds && !mutableEdgeIds.has(moving.edgeId)) return [];
+    const points = allPaths.get(moving.edgeId);
+    if (!points || points.length < 2) return [];
+    const buddyTypes = buddyTypesByEdgeId.get(moving.edgeId);
+    const protectedEndpointOnly = touchesProtectedJunction(moving, points.length, buddyTypes)
+        && !canShiftProtectedBranchSegment(moving, points.length, buddyTypes);
+
+    const candidates: Array<{ edgeId: string; points: Point[] }> = [];
+    if (!protectedEndpointOnly && points.length >= 3) {
+        for (const delta of parallelOverlapOffsets(spacing)) {
+            const candidate = points.map(point => ({ ...point }));
+            if (moving.h) {
+                candidate[moving.segIdx].y += delta;
+                candidate[moving.segIdx + 1].y += delta;
+            } else {
+                candidate[moving.segIdx].x += delta;
+                candidate[moving.segIdx + 1].x += delta;
+            }
+            const simplified = RoutingCrossingScorer.simplifyOrthogonalPoints(candidate);
+            if (simplified.length < 2) continue;
+            if (!isOrthogonal(simplified)) continue;
+            if (!samePoint(simplified[0], points[0])) continue;
+            if (!samePoint(simplified[simplified.length - 1], points[points.length - 1])) continue;
+            if (preserveEndpointDirectionsOption && !preservesEndpointDirections(simplified, points)) continue;
+            if (!preservesProtectedJunctions(simplified, points, buddyTypes)) continue;
+            candidates.push({ edgeId: moving.edgeId, points: simplified });
+        }
+    }
+    candidates.push(...buildParallelOverlapDoglegCandidates(
+        moving,
+        points,
+        buddyTypes,
+        spacing,
+        preserveEndpointDirectionsOption,
+        protectedEndpointOnly,
+    ));
+    return candidates;
+}
+
+function buildParallelOverlapDoglegCandidates(
+    moving: SegmentRef,
+    points: Point[],
+    buddyTypes: Set<BuddyGroup['type']> | undefined,
+    spacing: number,
+    preserveEndpointDirectionsOption: boolean | undefined,
+    allowProtectedEndpointDogleg: boolean,
+): Array<{ edgeId: string; points: Point[] }> {
+    const candidates: Array<{ edgeId: string; points: Point[] }> = [];
+    const segmentLength = Math.abs(moving.a.x - moving.b.x) + Math.abs(moving.a.y - moving.b.y);
+    const stub = Math.max(8, Math.min(spacing * 1.5, 36, segmentLength / 5));
+    if (segmentLength < stub * 2 + spacing) return candidates;
+
+    for (const delta of parallelOverlapOffsets(spacing)) {
+        const replacement = buildDoglegReplacement(moving.a, moving.b, delta, stub);
+        if (replacement.length === 0) continue;
+
+        const candidate = [
+            ...points.slice(0, moving.segIdx).map(point => ({ ...point })),
+            ...replacement,
+            ...points.slice(moving.segIdx + 2).map(point => ({ ...point })),
+        ];
+        const simplified = RoutingCrossingScorer.simplifyOrthogonalPoints(candidate);
+        if (simplified.length < 2) continue;
+        if (!isOrthogonal(simplified)) continue;
+        if (!samePoint(simplified[0], points[0])) continue;
+        if (!samePoint(simplified[simplified.length - 1], points[points.length - 1])) continue;
+        if (preserveEndpointDirectionsOption && !preservesEndpointDirections(simplified, points)) continue;
+        if (allowProtectedEndpointDogleg && !preservesEndpointDirections(simplified, points)) continue;
+        if (!allowProtectedEndpointDogleg && !preservesProtectedJunctions(simplified, points, buddyTypes)) continue;
+        candidates.push({ edgeId: moving.edgeId, points: simplified });
+    }
+
+    return candidates;
+}
+
+function parallelOverlapOffsets(spacing: number): number[] {
+    return [1, -1, 2, -2, 3, -3, 4, -4, 6, -6, 8, -8, 12, -12, 16, -16]
+        .map(step => Math.round(step * spacing));
+}
+
+function buildDoglegReplacement(a: Point, b: Point, delta: number, stub: number): Point[] {
+    if (Math.abs(a.y - b.y) < EPS) {
+        const direction = Math.sign(b.x - a.x);
+        if (direction === 0) return [];
+        const first = { x: a.x + direction * stub, y: a.y };
+        const second = { x: first.x, y: a.y + delta };
+        const third = { x: b.x - direction * stub, y: a.y + delta };
+        const fourth = { x: third.x, y: b.y };
+        return [{ ...a }, first, second, third, fourth, { ...b }];
+    }
+    if (Math.abs(a.x - b.x) < EPS) {
+        const direction = Math.sign(b.y - a.y);
+        if (direction === 0) return [];
+        const first = { x: a.x, y: a.y + direction * stub };
+        const second = { x: a.x + delta, y: first.y };
+        const third = { x: a.x + delta, y: b.y - direction * stub };
+        const fourth = { x: b.x, y: third.y };
+        return [{ ...a }, first, second, third, fourth, { ...b }];
+    }
+    return [];
+}
+
 function axisValues(min: number, max: number, spacing: number): number[] {
     const values: number[] = [];
     for (let step = 1; step <= 16; step++) {
@@ -449,6 +630,38 @@ function findRepairableCrossings(
     return hits;
 }
 
+function findRepairableParallelOverlaps(
+    paths: Map<string, Point[]>,
+    buddyGroupByEdgeId: Map<string, Set<string>>,
+    minLength: number
+): ParallelOverlapHit[] {
+    const hits: ParallelOverlapHit[] = [];
+    const segments = extractSegments(paths);
+    for (let i = 0; i < segments.length; i++) {
+        for (let j = i + 1; j < segments.length; j++) {
+            const a = segments[i];
+            const b = segments[j];
+            if (a.edgeId === b.edgeId) continue;
+            if (a.h !== b.h) continue;
+            if (a.h && Math.abs(a.a.y - b.a.y) > EPS) continue;
+            if (a.v && Math.abs(a.a.x - b.a.x) > EPS) continue;
+
+            const overlapLength = a.h
+                ? Math.min(Math.max(a.a.x, a.b.x), Math.max(b.a.x, b.b.x))
+                    - Math.max(Math.min(a.a.x, a.b.x), Math.min(b.a.x, b.b.x))
+                : Math.min(Math.max(a.a.y, a.b.y), Math.max(b.a.y, b.b.y))
+                    - Math.max(Math.min(a.a.y, a.b.y), Math.min(b.a.y, b.b.y));
+
+            if (isProtectedSharedTrunkOverlap(a, b, buddyGroupByEdgeId)) {
+                continue;
+            }
+            if (overlapLength >= minLength) hits.push({ a, b, overlapLength });
+        }
+    }
+    hits.sort((a, b) => b.overlapLength - a.overlapLength);
+    return hits;
+}
+
 function extractSegments(paths: Map<string, Point[]>): SegmentRef[] {
     const segments: SegmentRef[] = [];
     for (const [edgeId, points] of paths) {
@@ -458,10 +671,31 @@ function extractSegments(paths: Map<string, Point[]>): SegmentRef[] {
             const h = Math.abs(a.y - b.y) < EPS;
             const v = Math.abs(a.x - b.x) < EPS;
             if ((!h && !v) || Math.abs(a.x - b.x) + Math.abs(a.y - b.y) < 8) continue;
-            segments.push({ edgeId, segIdx: i, a, b, h, v });
+            segments.push({ edgeId, segIdx: i, pointCount: points.length, a, b, h, v });
         }
     }
     return segments;
+}
+
+function isProtectedSharedTrunkOverlap(
+    a: SegmentRef,
+    b: SegmentRef,
+    lookup: Map<string, Set<string>>
+): boolean {
+    const groupsA = lookup.get(a.edgeId);
+    const groupsB = lookup.get(b.edgeId);
+    if (!groupsA || !groupsB) return false;
+
+    for (const group of groupsA) {
+        if (!groupsB.has(group)) continue;
+        if (group.startsWith('o2m:') && a.segIdx === 0 && b.segIdx === 0) return true;
+        if (group.startsWith('m2o:')
+            && a.segIdx >= a.pointCount - 3
+            && b.segIdx >= b.pointCount - 3) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function touchesProtectedJunction(segment: SegmentRef, pointCount: number, types: Set<BuddyGroup['type']> | undefined): boolean {
@@ -484,6 +718,7 @@ function canShiftProtectedBranchSegment(
 
 function preservesProtectedJunctions(candidate: Point[], original: Point[], types: Set<BuddyGroup['type']> | undefined): boolean {
     if (!types) return true;
+    if (types.has('o2m') && types.has('m2o')) return preservesBridgeEndpointLanes(candidate, original);
     if (types.has('o2m') && original.length > 2 && !samePoint(candidate[1], original[1])) {
         if (!preservesOrExtendsSourceTrunk(candidate, original)) return false;
     }
@@ -491,6 +726,48 @@ function preservesProtectedJunctions(candidate: Point[], original: Point[], type
         if (!preservesOrExtendsTargetTrunk(candidate, original)) return false;
     }
     return true;
+}
+
+function preservesBridgeEndpointLanes(candidate: Point[], original: Point[]): boolean {
+    if (candidate.length < 2 || original.length < 2) return false;
+    if (!samePoint(candidate[0], original[0]) || !samePoint(candidate[candidate.length - 1], original[original.length - 1])) return false;
+    return preservesSameEndpointLane(candidate[0], candidate[1], original[0], original[1])
+        && preservesSameEndpointLane(candidate[candidate.length - 1], candidate[candidate.length - 2], original[original.length - 1], original[original.length - 2]);
+}
+
+function preservesSameEndpointLane(anchor: Point, next: Point, originalAnchor: Point, originalNext: Point): boolean {
+    if (!samePoint(anchor, originalAnchor)) return false;
+    const axis = axisOf(originalAnchor, originalNext);
+    if (!axis || axisOf(anchor, next) !== axis) return false;
+    const originalDelta = axis === 'h' ? originalNext.x - originalAnchor.x : originalNext.y - originalAnchor.y;
+    const candidateDelta = axis === 'h' ? next.x - anchor.x : next.y - anchor.y;
+    return Math.sign(originalDelta) === Math.sign(candidateDelta) && Math.abs(candidateDelta) > EPS;
+}
+
+function preservesEndpointDirections(candidate: Point[], original: Point[]): boolean {
+    const originalStart = endpointDirection(original, 'start');
+    const originalEnd = endpointDirection(original, 'end');
+    const candidateStart = endpointDirection(candidate, 'start');
+    const candidateEnd = endpointDirection(candidate, 'end');
+    if (originalStart && candidateStart !== originalStart) return false;
+    if (originalEnd && candidateEnd !== originalEnd) return false;
+    return true;
+}
+
+function endpointDirection(points: Point[], side: 'start' | 'end'): 'L' | 'R' | 'U' | 'D' | null {
+    const start = side === 'start' ? 0 : points.length - 2;
+    const end = side === 'start' ? points.length - 1 : -1;
+    const step = side === 'start' ? 1 : -1;
+    for (let i = start; i !== end; i += step) {
+        const a = points[i];
+        const b = points[i + 1];
+        if (!a || !b) continue;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        if (Math.abs(dx) >= Math.abs(dy) && Math.abs(dx) > EPS) return dx > 0 ? 'R' : 'L';
+        if (Math.abs(dy) > EPS) return dy > 0 ? 'D' : 'U';
+    }
+    return null;
 }
 
 function preservesOrExtendsSourceTrunk(candidate: Point[], original: Point[]): boolean {

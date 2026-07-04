@@ -23,7 +23,29 @@ import { routeEdgesWithELK } from '../../utils/elkEdgeRouter';
 import { expandHandle } from '../../routing/utils/handleUtils';
 import { repairEdgeCrossingViolations } from '../../algorithms/edgeCrossingRepair';
 import { repairHardObstacleViolations } from '../../algorithms/hardObstaclePathRepair';
-import type { BuddyGroup } from '../../algorithms/globalChannelRouting';
+import { logElkEdgeRouterFallback } from '../layoutLogging';
+import {
+  buildEdgeTopologyStats,
+  buildPipelineBuddyGroups,
+  edgeTopologyPriority,
+} from './edgeRoutingTopology';
+import {
+  countUnrelatedObstacleHits,
+  generateWaypointCandidates,
+  pathHasNodeRoutingRisk,
+  preservesSharedTrunk,
+} from './edgeWaypointCandidateRepair';
+import { repairSameNodeInOutCrossings } from './edgeSameNodeRoleRepair';
+import { repairEndpointLaneCrossings } from './edgeEndpointLaneNudgeRepair';
+import { repairEndpointOrthogonalPaths } from './edgeEndpointPathRepair';
+import { separateDetachedParallelOverlaps } from './edgeDetachedOverlapRepair';
+import { refineGlobalEdgeWaypoints } from './edgeGlobalWaypointRefinement';
+import { repairLocalDoglegArtifacts } from './edgeLocalDoglegRepair';
+import { repairReverseFlowBypassCrossings } from './edgeReverseFlowBypassRepair';
+import {
+  synthesizeSharedEndpointTrunks,
+  synthesizeSharedTargetTrunks,
+} from './edgeSharedTrunkSynthesis';
 
 const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
 type Point = { x: number; y: number };
@@ -200,6 +222,29 @@ function withComputedPath(edge: Edge, path: Point[], flags: Record<string, unkno
   return { ...edge, data };
 }
 
+function lockComputedPathsForDisplay(edges: Edge[]): Edge[] {
+  return edges.map(edge => {
+    const path = getEdgePath(edge);
+    if (path.length < 2) return edge;
+    return {
+      ...edge,
+      type: edge.type || 'advanced-smart-step',
+      data: {
+        ...(edge.data || {}),
+        computedPath: path,
+        layoutPathLocked: true,
+        runtimeHandleLock: {
+          ...((((edge.data as any)?.runtimeHandleLock) && typeof (edge.data as any).runtimeHandleLock === 'object')
+            ? (edge.data as any).runtimeHandleLock
+            : {}),
+          source: true,
+          target: true,
+        },
+      },
+    };
+  });
+}
+
 function sanitizeComputedPaths(edges: Edge[]): Edge[] {
   return edges.map(edge => {
     const path = getEdgePath(edge);
@@ -210,42 +255,18 @@ function sanitizeComputedPaths(edges: Edge[]): Edge[] {
   });
 }
 
-function buildPipelineBuddyGroups(edges: Edge[]): BuddyGroup[] {
-  const bySource = new Map<string, Set<string>>();
-  const byTarget = new Map<string, Set<string>>();
-  for (const edge of edges) {
-    if (!edge.id) continue;
-    if (edge.source) {
-      if (!bySource.has(edge.source)) bySource.set(edge.source, new Set());
-      bySource.get(edge.source)!.add(edge.id);
-    }
-    if (edge.target) {
-      if (!byTarget.has(edge.target)) byTarget.set(edge.target, new Set());
-      byTarget.get(edge.target)!.add(edge.id);
-    }
-  }
-
-  const groups: BuddyGroup[] = [];
-  for (const edgeIds of bySource.values()) {
-    if (edgeIds.size >= 2) groups.push({ type: 'o2m', edgeIds });
-  }
-  for (const edgeIds of byTarget.values()) {
-    if (edgeIds.size >= 2) groups.push({ type: 'm2o', edgeIds });
-  }
-  return groups;
-}
-
-function repairSharedTrunkAwareCrossings(edges: Edge[], nodes: ReactFlowNode[]): Edge[] {
+export function repairSharedTrunkAwareCrossings(edges: Edge[], nodes: ReactFlowNode[]): Edge[] {
+  const inputEdges = repairSameNodeInOutCrossings(edges, nodes);
   const edgePaths = new Map<string, Point[]>();
-  for (const edge of edges) {
+  for (const edge of inputEdges) {
     const path = compactPath(getEdgePath(edge));
     if (edge.id && path.length >= 2) edgePaths.set(edge.id, path);
   }
-  if (edgePaths.size < 2) return edges;
+  if (edgePaths.size < 2) return inputEdges;
 
   const obstaclesByNode = getRoutingObstacles(nodes);
   const ignoredRectsByEdge = new Map<string, Rect[]>();
-  for (const edge of edges) {
+  for (const edge of inputEdges) {
     const ignored = [obstaclesByNode.get(edge.source), obstaclesByNode.get(edge.target)]
       .filter((rect): rect is Rect => !!rect);
     if (ignored.length > 0) ignoredRectsByEdge.set(edge.id, ignored);
@@ -256,15 +277,49 @@ function repairSharedTrunkAwareCrossings(edges: Edge[], nodes: ReactFlowNode[]):
     maxIterations: 8,
     buddyGroups: buildPipelineBuddyGroups(edges),
     obstacles: Array.from(obstaclesByNode.values()),
-    ignoredRectsByEdge,
+    ignoredRectsByEdge, preserveEndpointDirections: true,
   });
+  const edgesById = new Map(inputEdges.map(edge => [edge.id, edge] as const));
+  const repairedPaths = new Map(edgePaths);
+  for (const [edgeId, path] of repaired) {
+    if (path) repairedPaths.set(edgeId, path);
+  }
 
-  return edges.map(edge => {
+  return inputEdges.map(edge => {
     const path = repaired.get(edge.id);
     const original = edgePaths.get(edge.id);
     if (!path || !original || pathEquals(path, original)) return edge;
+    const originalAgainstRepaired = new Map(repairedPaths);
+    originalAgainstRepaired.set(edge.id, original);
+    if (
+      strictCrossingCountForEdgePath(path, edge, repairedPaths, edgesById)
+      > strictCrossingCountForEdgePath(original, edge, originalAgainstRepaired, edgesById)
+    ) {
+      return edge;
+    }
     return withComputedPath(edge, path, { crossingOptimized: true, sharedTrunkAware: true });
   });
+}
+
+function strictCrossingCountForEdgePath(
+  path: Point[],
+  edge: Edge,
+  paths: Map<string, Point[]>,
+  edgesById: Map<string, Edge>,
+): number {
+  const segments = toSegments(path);
+  let crossings = 0;
+  for (const [otherId, otherPath] of paths) {
+    if (otherId === edge.id) continue;
+    const other = edgesById.get(otherId);
+    if (!other || other.source === edge.source || other.target === edge.target) continue;
+    for (const first of segments) {
+      for (const second of toSegments(otherPath)) {
+        crossings += segmentRelation(first, second).crossings;
+      }
+    }
+  }
+  return crossings;
 }
 
 function repairSharedTrunkAwareObstacles(
@@ -568,150 +623,12 @@ function scoreVisualSoftConstraints(
   return score;
 }
 
-function edgeHasBuddyType(edgeId: string, groups: BuddyGroup[], type: BuddyGroup['type']): boolean {
-  return groups.some(group => group.type === type && group.edgeIds.has(edgeId));
-}
-
-function preservesSharedTrunk(candidate: Point[], original: Point[], edgeId: string, groups: BuddyGroup[]): boolean {
-  if (original.length < 3 || candidate.length < 3) return true;
-
-  if (edgeHasBuddyType(edgeId, groups, 'o2m')) {
-    if (!pointNear(candidate[0], original[0], 1)) return false;
-    const originalAxis = axisOf(original[0], original[1]);
-    const candidateAxis = axisOf(candidate[0], candidate[1]);
-    if (!originalAxis || originalAxis !== candidateAxis) return false;
-    const originalDelta = originalAxis === 'h' ? original[1].x - original[0].x : original[1].y - original[0].y;
-    const candidateDelta = originalAxis === 'h' ? candidate[1].x - candidate[0].x : candidate[1].y - candidate[0].y;
-    if (Math.sign(originalDelta) !== Math.sign(candidateDelta)) return false;
-    if (Math.abs(candidateDelta) + 1 < Math.abs(originalDelta)) return false;
-  }
-
-  if (edgeHasBuddyType(edgeId, groups, 'm2o')) {
-    const originalEnd = original[original.length - 1];
-    const candidateEnd = candidate[candidate.length - 1];
-    if (!pointNear(candidateEnd, originalEnd, 1)) return false;
-    const originalJoin = original[original.length - 2];
-    const candidateJoin = candidate[candidate.length - 2];
-    const originalAxis = axisOf(originalEnd, originalJoin);
-    const candidateAxis = axisOf(candidateEnd, candidateJoin);
-    if (!originalAxis || originalAxis !== candidateAxis) return false;
-    const originalDelta = originalAxis === 'h' ? originalJoin.x - originalEnd.x : originalJoin.y - originalEnd.y;
-    const candidateDelta = originalAxis === 'h' ? candidateJoin.x - candidateEnd.x : candidateJoin.y - candidateEnd.y;
-    if (Math.sign(originalDelta) !== Math.sign(candidateDelta)) return false;
-    if (Math.abs(candidateDelta) + 1 < Math.abs(originalDelta)) return false;
-  }
-
-  return true;
-}
-
 function pathLength(points: Point[]): number {
   let total = 0;
   for (let i = 0; i < points.length - 1; i++) {
     total += Math.abs(points[i + 1].x - points[i].x) + Math.abs(points[i + 1].y - points[i].y);
   }
   return total;
-}
-
-function generateWaypointCandidates(basePath: Point[], layoutDirection: string): Point[][] {
-  const base = compactPath(basePath);
-  if (base.length < 2) return [base];
-
-  const candidates: Point[][] = [base];
-  const start = base[0];
-  const end = base[base.length - 1];
-  const offsets = [-240, -180, -120, -84, -56, -28, 28, 56, 84, 120, 180, 240];
-  const isHorizontalLayout = String(layoutDirection).toUpperCase().includes('LR');
-  const internal = base.slice(1, -1);
-
-  const xLanes = new Set<number>([
-    ...internal.map(p => Math.round(p.x)),
-    Math.round((start.x + end.x) / 2),
-    ...offsets.map(o => Math.round(start.x + o)),
-    ...offsets.map(o => Math.round(end.x + o)),
-  ]);
-  const yLanes = new Set<number>([
-    ...internal.map(p => Math.round(p.y)),
-    Math.round((start.y + end.y) / 2),
-    ...offsets.map(o => Math.round(start.y + o)),
-    ...offsets.map(o => Math.round(end.y + o)),
-  ]);
-
-  candidates.push(compactPath([start, { x: start.x, y: end.y }, end]));
-  candidates.push(compactPath([start, { x: end.x, y: start.y }, end]));
-
-  if (base.length >= 4) {
-    const sourceExit = base[1];
-    const targetEntry = base[base.length - 2];
-    for (const y of yLanes) {
-      if (Math.abs(y - sourceExit.y) < 8 || Math.abs(y - targetEntry.y) < 8) continue;
-      candidates.push(compactPath([
-        start,
-        sourceExit,
-        { x: sourceExit.x, y },
-        { x: targetEntry.x, y },
-        targetEntry,
-        end,
-      ]));
-    }
-    for (const x of xLanes) {
-      if (Math.abs(x - sourceExit.x) < 8 || Math.abs(x - targetEntry.x) < 8) continue;
-      candidates.push(compactPath([
-        start,
-        sourceExit,
-        { x, y: sourceExit.y },
-        { x, y: targetEntry.y },
-        targetEntry,
-        end,
-      ]));
-    }
-  }
-
-  for (const x of xLanes) {
-    if (Math.abs(x - start.x) < 8 || Math.abs(x - end.x) < 8) continue;
-    candidates.push(compactPath([start, { x, y: start.y }, { x, y: end.y }, end]));
-  }
-  for (const y of yLanes) {
-    if (Math.abs(y - start.y) < 8 || Math.abs(y - end.y) < 8) continue;
-    candidates.push(compactPath([start, { x: start.x, y }, { x: end.x, y }, end]));
-  }
-
-  for (let i = 1; i < base.length - 2; i++) {
-    const a = base[i];
-    const b = base[i + 1];
-    const vertical = Math.abs(a.x - b.x) < 0.5;
-    const horizontal = Math.abs(a.y - b.y) < 0.5;
-    if (!vertical && !horizontal) continue;
-    for (const delta of [-42, -24, 24, 42]) {
-      const shifted = base.map(p => ({ ...p }));
-      if (vertical) {
-        shifted[i].x += delta;
-        shifted[i + 1].x += delta;
-      } else {
-        shifted[i].y += delta;
-        shifted[i + 1].y += delta;
-      }
-      candidates.push(compactPath(shifted));
-    }
-  }
-
-  const seen = new Set<string>();
-  return candidates
-    .map(compactPath)
-    .filter(path => {
-      if (path.length < 2) return false;
-      const key = path.map(p => `${Math.round(p.x)},${Math.round(p.y)}`).join('|');
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .sort((a, b) => {
-      if (a === base) return -1;
-      if (b === base) return 1;
-      return isHorizontalLayout
-        ? Math.abs((a[1]?.y ?? start.y) - start.y) - Math.abs((b[1]?.y ?? start.y) - start.y)
-        : Math.abs((a[1]?.x ?? start.x) - start.x) - Math.abs((b[1]?.x ?? start.x) - start.x);
-    })
-    .slice(0, 140);
 }
 
 function scorePathCandidate(
@@ -746,18 +663,12 @@ function scorePathCandidate(
     }
   }
 
-  let obstacleHits = 0;
-  for (const [nodeId, rect] of obstacles) {
-    if (nodeId === edge.source || nodeId === edge.target) continue;
-    for (const segment of segments) {
-      if (segmentIntersectsRect(segment, rect, 12)) obstacleHits++;
-    }
-  }
+  const obstacleHits = countUnrelatedObstacleHits(path, edge, obstacles);
 
   const length = pathLength(path);
   const bends = Math.max(0, path.length - 2);
   const detour = Math.max(0, length - baseLength);
-  return obstacleHits * 20000
+  return obstacleHits * 120000
     + crossingsAccepted * 2600
     + crossingsAll * 360
     + overlap * 12
@@ -767,135 +678,11 @@ function scorePathCandidate(
     + detour * 0.08;
 }
 
-function pathsStrictlyCross(a: Point[], b: Point[]): boolean {
-  const aSegments = toSegments(a);
-  const bSegments = toSegments(b);
-  for (const segA of aSegments) {
-    for (const segB of bSegments) {
-      if (segmentRelation(segA, segB).crossings > 0) return true;
-    }
-  }
-  return false;
-}
-
-function hasAnyStrictCrossing(path: Point[], otherPaths: Point[][]): boolean {
-  return otherPaths.some(other => pathsStrictlyCross(path, other));
-}
-
-function pathIntersectsAnyRect(path: Point[], rects: Rect[]): boolean {
-  return toSegments(path).some(segment => rects.some(rect => segmentIntersectsRect(segment, rect, 0)));
-}
-
-function generatePreservedEndpointCorridorCandidates(path: Point[], nodeRect?: Rect): Point[][] {
-  const base = compactPath(path);
-  if (base.length < 4) return [];
-  const start = base[0];
-  const sourceExit = base[1];
-  const targetEntry = base[base.length - 2];
-  const end = base[base.length - 1];
-  const yValues = new Set<number>([
-    Math.round(sourceExit.y - 96),
-    Math.round(sourceExit.y - 56),
-    Math.round(sourceExit.y + 56),
-    Math.round(sourceExit.y + 96),
-    Math.round(targetEntry.y - 96),
-    Math.round(targetEntry.y + 96),
-  ]);
-  const xValues = new Set<number>([
-    Math.round(sourceExit.x - 96),
-    Math.round(sourceExit.x - 56),
-    Math.round(sourceExit.x + 56),
-    Math.round(sourceExit.x + 96),
-    Math.round(targetEntry.x - 96),
-    Math.round(targetEntry.x + 96),
-  ]);
-  if (nodeRect) {
-    yValues.add(Math.round(nodeRect.y - 24));
-    yValues.add(Math.round(nodeRect.y + nodeRect.height + 24));
-    xValues.add(Math.round(nodeRect.x - 24));
-    xValues.add(Math.round(nodeRect.x + nodeRect.width + 24));
-  }
-
-  const candidates: Point[][] = [];
-  for (const y of yValues) {
-    if (Math.abs(y - sourceExit.y) < 8 || Math.abs(y - targetEntry.y) < 8) continue;
-    candidates.push(compactPath([
-      start,
-      sourceExit,
-      { x: sourceExit.x, y },
-      { x: targetEntry.x, y },
-      targetEntry,
-      end,
-    ]));
-  }
-  for (const x of xValues) {
-    if (Math.abs(x - sourceExit.x) < 8 || Math.abs(x - targetEntry.x) < 8) continue;
-    candidates.push(compactPath([
-      start,
-      sourceExit,
-      { x, y: sourceExit.y },
-      { x, y: targetEntry.y },
-      targetEntry,
-      end,
-    ]));
-  }
-
-  return candidates;
-}
-
-function repairSameNodeInOutCrossings(edges: Edge[], nodes: ReactFlowNode[]): Edge[] {
-  const paths = new Map<string, Point[]>();
-  for (const edge of edges) {
-    const path = compactPath(getEdgePath(edge));
-    if (path.length >= 2) paths.set(edge.id, path);
-  }
-  if (paths.size < 2) return edges;
-
-  const obstacles = getRoutingObstacles(nodes);
-  const nodeRects = new Map<string, Rect>();
-  for (const node of nodes) {
-    const rect = getNodeRect(node);
-    if (rect) nodeRects.set(node.id, rect);
-  }
-
-  const repaired = new Map(paths);
-  for (const incoming of edges) {
-    const incomingPath = repaired.get(incoming.id);
-    if (!incomingPath) continue;
-    for (const outgoing of edges) {
-      if (incoming.id === outgoing.id || incoming.target !== outgoing.source) continue;
-      const outgoingPath = repaired.get(outgoing.id);
-      if (!outgoingPath || !pathsStrictlyCross(incomingPath, outgoingPath)) continue;
-
-      const ignored = new Set([outgoing.source, outgoing.target]);
-      const obstacleRects = Array.from(obstacles.entries())
-        .filter(([nodeId]) => !ignored.has(nodeId))
-        .map(([, rect]) => rect);
-      const otherPaths = Array.from(repaired.entries())
-        .filter(([edgeId]) => edgeId !== outgoing.id)
-        .map(([, path]) => path);
-
-      const candidates = generatePreservedEndpointCorridorCandidates(outgoingPath, nodeRects.get(outgoing.source))
-        .filter(candidate => !pathIntersectsAnyRect(candidate, obstacleRects))
-        .filter(candidate => !hasAnyStrictCrossing(candidate, otherPaths))
-        .sort((a, b) => pathLength(a) - pathLength(b));
-
-      if (candidates[0]) repaired.set(outgoing.id, candidates[0]);
-    }
-  }
-
-  return edges.map(edge => {
-    const path = repaired.get(edge.id);
-    const original = paths.get(edge.id);
-    if (!path || !original || pathEquals(path, original)) return edge;
-    return withComputedPath(edge, path, { sameNodeInOutCrossingRepaired: true });
-  });
-}
-
 export function reduceEdgeCrossingsWithWaypoints(
   edges: Edge[],
   nodes: ReactFlowNode[],
   layoutDirection: string,
+  options: { onlyNodeRiskEdges?: boolean } = {},
 ): Edge[] {
   if (edges.length < 1) return edges;
   const obstacles = getRoutingObstacles(nodes);
@@ -906,29 +693,45 @@ export function reduceEdgeCrossingsWithWaypoints(
   }
   if (originalPathsById.size < 1) return edges;
   const buddyGroups = buildPipelineBuddyGroups(edges);
+  const topologyStats = buildEdgeTopologyStats(edges);
 
   const edgeOrder = edges
     .map((edge, index) => ({ edge, index, path: originalPathsById.get(edge.id) }))
     .filter((entry): entry is { edge: Edge; index: number; path: Point[] } => !!entry.path)
-    .sort((a, b) => pathLength(a.path) - pathLength(b.path));
+    .sort((a, b) => {
+      const topologyDelta = edgeTopologyPriority(a.edge, topologyStats) - edgeTopologyPriority(b.edge, topologyStats);
+      if (topologyDelta !== 0) return topologyDelta;
+      if (edgeTopologyPriority(a.edge, topologyStats) === 0) return pathLength(b.path) - pathLength(a.path);
+      return pathLength(a.path) - pathLength(b.path);
+    });
 
   const acceptedPaths: Point[][] = [];
   const chosenPaths = new Map<string, Point[]>();
 
   for (const { edge, path } of edgeOrder) {
+    if (options.onlyNodeRiskEdges && !pathHasNodeRoutingRisk(path, nodes, edge)) {
+      chosenPaths.set(edge.id, path);
+      acceptedPaths.push(path);
+      continue;
+    }
+
     const others = Array.from(originalPathsById.entries())
       .filter(([id]) => id !== edge.id)
       .map(([, p]) => p);
     const baseLength = pathLength(path);
-    const candidates = generateWaypointCandidates(path, layoutDirection);
+    const candidates = generateWaypointCandidates(path, layoutDirection, nodes, edge);
     let bestPath = path;
     let bestScore = scorePathCandidate(path, acceptedPaths, others, edge, nodes, obstacles, baseLength);
+    let bestObstacleHits = countUnrelatedObstacleHits(path, edge, obstacles);
     for (const candidate of candidates.slice(1)) {
-      if (!preservesSharedTrunk(candidate, path, edge.id, buddyGroups)) continue;
+      if (!preservesSharedTrunk(candidate, path, edge, buddyGroups, obstacles)) continue;
+      const candidateObstacleHits = countUnrelatedObstacleHits(candidate, edge, obstacles);
+      if (candidateObstacleHits > bestObstacleHits) continue;
       const score = scorePathCandidate(candidate, acceptedPaths, others, edge, nodes, obstacles, baseLength);
       if (score < bestScore - 5) {
         bestScore = score;
         bestPath = candidate;
+        bestObstacleHits = candidateObstacleHits;
       }
     }
     chosenPaths.set(edge.id, bestPath);
@@ -1076,8 +879,9 @@ export async function runEdgeRoutingPipeline(
   // 2. 全局端口分配
   const routedPaths: Array<{ points: Array<{ x: number; y: number }> }> = [];
   const globalPorts = assignGlobalPorts(nodes, edges, { ...cfgEdge, layoutDirection });
+  const topologyStats = buildEdgeTopologyStats(edges);
 
-  // 3. 边排序：短边先处理，长边后处理
+  // 3. 边排序：桥接边先占位，其余短边先处理、长边后处理
   const edgesWithDistance = edges.map((edge, originalIndex) => {
     const srcNode = nodeMap.get(edge.source);
     const tgtNode = nodeMap.get(edge.target);
@@ -1095,10 +899,13 @@ export async function runEdgeRoutingPipeline(
       const tgtCy = tgtPos.y + tH / 2;
       distance = Math.sqrt((tgtCx - srcCx) ** 2 + (tgtCy - srcCy) ** 2);
     }
-    return { edge, originalIndex, distance };
+    return { edge, originalIndex, distance, topologyPriority: edgeTopologyPriority(edge, topologyStats) };
   });
 
-  edgesWithDistance.sort((a, b) => a.distance - b.distance);
+  edgesWithDistance.sort((a, b) => {
+    if (a.topologyPriority !== b.topologyPriority) return a.topologyPriority - b.topologyPriority;
+    return a.distance - b.distance;
+  });
 
   // 4. 第一轮路由
   const sortedResults: Array<{ result: any; originalIndex: number }> = [];
@@ -1114,7 +921,8 @@ export async function runEdgeRoutingPipeline(
   }
 
   // 5. 第二轮：重新优化长边（前5条最长的边）
-  const longEdgeIndices = edgesWithDistance
+  const longEdgeIndices = [...edgesWithDistance]
+    .sort((a, b) => a.distance - b.distance)
     .slice(-Math.min(5, Math.ceil(edges.length / 4)))
     .map(item => item.originalIndex);
 
@@ -1195,6 +1003,10 @@ export async function runEdgeRoutingPipeline(
   finalEdges = repairSharedTrunkAwareObstacles(finalEdges, nodes, 18);
   finalEdges = repairSharedTrunkAwareCrossings(finalEdges, nodes);
   finalEdges = sanitizeComputedPaths(finalEdges);
+  finalEdges = separateDetachedParallelOverlaps(finalEdges, nodes);
+  finalEdges = sanitizeComputedPaths(finalEdges);
+  finalEdges = repairSharedTrunkAwareObstacles(finalEdges, nodes, 18);
+  finalEdges = sanitizeComputedPaths(finalEdges);
 
   // P9: 边标签智能避让
   finalEdges = optimizeEdgeLabelPositions(finalEdges, nodes, {
@@ -1227,7 +1039,7 @@ export async function runEdgeRoutingPipeline(
         });
       }
     } catch (err) {
-      console.warn('[ELK Edge Router] Failed, falling back to default routing:', err);
+      logElkEdgeRouterFallback(err);
     }
   }
 
@@ -1239,5 +1051,35 @@ export async function runEdgeRoutingPipeline(
     targetHandle: edge.targetHandle ? expandHandle(String(edge.targetHandle)) : edge.targetHandle,
   }));
 
+  finalEdges = separateDetachedParallelOverlaps(
+    repairLocalDoglegArtifacts(
+      synthesizeSharedEndpointTrunks(repairEndpointOrthogonalPaths(repairEndpointOrthogonalPaths(finalEdges, nodes), nodes)),
+      nodes,
+    ),
+    nodes,
+    24,
+  );
+  finalEdges = synthesizeSharedEndpointTrunks(finalEdges);
+  finalEdges = repairEndpointOrthogonalPaths(repairEndpointOrthogonalPaths(finalEdges, nodes), nodes);
+  finalEdges = synthesizeSharedTargetTrunks(finalEdges);
+  finalEdges = repairEndpointOrthogonalPaths(repairEndpointOrthogonalPaths(finalEdges, nodes), nodes);
+  finalEdges = repairSameNodeInOutCrossings(finalEdges, nodes);
+  finalEdges = repairEndpointOrthogonalPaths(finalEdges, nodes);
+  finalEdges = repairReverseFlowBypassCrossings(finalEdges, nodes);
+  finalEdges = repairEndpointOrthogonalPaths(finalEdges, nodes);
+  finalEdges = repairSharedTrunkAwareCrossings(finalEdges, nodes);
+  finalEdges = repairEndpointOrthogonalPaths(finalEdges, nodes);
+  finalEdges = repairReverseFlowBypassCrossings(finalEdges, nodes);
+  finalEdges = repairEndpointOrthogonalPaths(finalEdges, nodes);
+  finalEdges = repairSharedTrunkAwareCrossings(finalEdges, nodes);
+  finalEdges = repairEndpointOrthogonalPaths(finalEdges, nodes);
+  finalEdges = repairEndpointLaneCrossings(finalEdges, nodes);
+  finalEdges = refineGlobalEdgeWaypoints(finalEdges, nodes);
+  finalEdges = repairEndpointOrthogonalPaths(finalEdges, nodes);
+  finalEdges = refineGlobalEdgeWaypoints(finalEdges, nodes);
+  finalEdges = repairLocalDoglegArtifacts(finalEdges, nodes);
+  finalEdges = refineGlobalEdgeWaypoints(finalEdges, nodes);
+  finalEdges = repairLocalDoglegArtifacts(finalEdges, nodes);
+  finalEdges = lockComputedPathsForDisplay(finalEdges);
   return finalEdges;
 }

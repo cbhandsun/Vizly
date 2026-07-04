@@ -14,7 +14,7 @@ const notifyDevelopmentError = async (message: string): Promise<void> => {
         const { errorNotification } = await import('./errorNotification');
         errorNotification.toast(message);
     } catch (error) {
-        safeLog.warn('Failed to show development error notification:', error);
+        safeLog.warn('Failed to show development error notification:', redactSensitiveLogValue(error));
     }
 };
 
@@ -40,7 +40,7 @@ export function initGlobalErrorHandling() {
             return;
         }
 
-        console.error('Unhandled promise rejection:', redactSensitiveLogValue(event.reason));
+        safeLog.error('Unhandled promise rejection:', redactSensitiveLogValue(event.reason));
 
         errorLogger.log(error, {
             level: 'error',
@@ -72,7 +72,7 @@ export function initGlobalErrorHandling() {
         // 当 Worker 内部通过 throw new Event('error') 或者通过 postMessage 传递非 Error 对象导致的错误
         if (event.error && (event.error instanceof Event || (typeof event.error === 'object' && event.error.type === 'error' && event.error.target))) {
             if (process.env.NODE_ENV === 'development') {
-                console.warn('Suppressed generic Worker error:', event.error);
+                safeLog.warn('Suppressed generic Worker error:', redactSensitiveLogValue(event.error));
             }
             return;
         }
@@ -93,7 +93,7 @@ export function initGlobalErrorHandling() {
             return;
         }
 
-        console.error('Global error:', redactSensitiveLogValue(error));
+        safeLog.error('Global error:', redactSensitiveLogValue(error));
 
         errorLogger.log(error, {
             level: 'error',

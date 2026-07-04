@@ -1,4 +1,15 @@
-import { unifiedStorage } from '@/services/UnifiedStorageService';
+import {
+  logRemoteDiagramPreviewFetchFailure,
+  logRemoteDiagramPreviewInvalidationFailure,
+} from './remoteDiagramPreviewLogging';
+
+let unifiedStorageModulePromise: Promise<typeof import('@/services/UnifiedStorageService')> | null = null;
+
+const loadUnifiedStorage = async () => {
+  unifiedStorageModulePromise ??= import('@/services/UnifiedStorageService');
+  const { unifiedStorage } = await unifiedStorageModulePromise;
+  return unifiedStorage;
+};
 
 export type RemoteDiagramPreview = {
   mime: string;
@@ -54,8 +65,8 @@ export const invalidateRemoteDiagramPreview = (storageId: string) => {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('remoteDiagramPreviewInvalidated', { detail: { id: key } }));
     }
-  } catch {
-    void 0;
+  } catch (error) {
+    logRemoteDiagramPreviewInvalidationFailure(key, error);
   }
 };
 
@@ -68,11 +79,13 @@ export const fetchRemoteDiagramPreview = async (storageId: string): Promise<Remo
 
   const p = (async () => {
     try {
+      const unifiedStorage = await loadUnifiedStorage();
       const saved = await unifiedStorage.loadDiagram(key);
       const preview = coerceRemoteDiagramPreview((saved as { content?: { metadata?: { preview?: unknown } } } | null)?.content?.metadata?.preview);
       cache.set(key, preview);
       return preview;
-    } catch {
+    } catch (error) {
+      logRemoteDiagramPreviewFetchFailure(key, error);
       cache.set(key, null);
       return null;
     } finally {

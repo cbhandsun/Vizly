@@ -10,6 +10,19 @@ import { loadStandardPresetById } from '@/data/standardized/presetLoader';
 import { cancelLayoutTransition, suspendLayoutTransitions } from '../../../utils/animateLayoutTransition';
 import { expandHandle } from '../../../routing/utils/handleUtils';
 import { parseAutoSavePayload } from '../../../utils/autoSaveStorage';
+import { readReactFlowCanvasSize } from '../../../utils/domViewport';
+import {
+    logDesignerSystemSyncAutoSaveFailure,
+    logDesignerSystemSyncAutosaveRecalculationFailure,
+    logDesignerSystemSyncDataRegistryImportFailure,
+    logDesignerSystemSyncDataRegistryWriteFailure,
+    logDesignerSystemSyncDesignerUtilsImportFailure,
+    logDesignerSystemSyncFreshSeedClearFailure,
+    logDesignerSystemSyncImportDataFailure,
+    logDesignerSystemSyncPresetLoadFailure,
+    logDesignerSystemSyncStaleAutosaveDetected,
+    logDesignerSystemSyncStandardDataToCanvasFailure,
+} from './designerSystemSyncLogging';
 
 const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
 
@@ -27,8 +40,8 @@ const clearFreshSeedFlagInStorage = (storageKey: string) => {
         const next = { ...parsed };
         delete next.isFreshSeed;
         localStorage.setItem(storageKey, JSON.stringify(next));
-    } catch {
-        // Storage access may fail in private/blocked contexts.
+    } catch (error) {
+        logDesignerSystemSyncFreshSeedClearFailure(storageKey, error);
     }
 };
 
@@ -295,7 +308,9 @@ export function useDesignerSystemSync({
                             }, true, {
                                 id: diagramIdForExport,
                             });
-                        } catch(_e) { }
+                        } catch (error) {
+                            logDesignerSystemSyncDataRegistryWriteFailure(diagramIdForExport, error);
+                        }
 
                         setNodes(newNodes);
                         setEdges(newEdges);
@@ -309,7 +324,7 @@ export function useDesignerSystemSync({
                             }, 50);
                         }
                     } catch(err) {
-                        console.error('importData 失败', err);
+                        logDesignerSystemSyncImportDataFailure(err);
                     }
                 }
             });
@@ -612,7 +627,7 @@ export function useDesignerSystemSync({
         enabled: autosaveEnabled,
         diagramId: id,
         onSaveSuccess: undefined,
-        onSaveError: (error) => console.error('Auto-save failed:', error)
+        onSaveError: (error) => logDesignerSystemSyncAutoSaveFailure(error)
     });
 
     // [FIX-AUTOSAVE] 节点/边变化后 3 秒防抖保存（补充 beforeunload 之前的兜底）。
@@ -667,7 +682,7 @@ export function useDesignerSystemSync({
         void loadStandardPresetById(id).then((preset) => {
             if (!cancelled) setPresetLookup({ id, ready: true, preset });
         }).catch((error) => {
-            console.error('[DesignerSystemSync] load standard preset failed:', error);
+            logDesignerSystemSyncPresetLoadFailure(error);
             if (!cancelled) setPresetLookup({ id, ready: true, preset: null });
         });
 
@@ -707,7 +722,7 @@ export function useDesignerSystemSync({
         if (saved) {
             if (saved.diagramId && saved.diagramId !== id) {
                 // Check for stale autosave leaking across diagrams
-                console.warn(`[DesignerSystemSync] Stale autosave detected! Expected ${id}, got ${saved.diagramId}. Clearing.`);
+                logDesignerSystemSyncStaleAutosaveDetected(id, saved.diagramId);
                 clearSaved();
             } else {
                 // Guard against corrupted autosave that contains RAW Standard Nodes instead of Canvas Nodes.
@@ -761,7 +776,7 @@ export function useDesignerSystemSync({
                     messageApi?.info('已恢复上次编辑内容');
                 }
             }).catch((error) => {
-                console.error('[DesignerSystemSync] autosave size recalculation failed:', error);
+                logDesignerSystemSyncAutosaveRecalculationFailure(error);
             });
         } else {
             hasRestoredAutoSave.current = true;
@@ -776,8 +791,8 @@ export function useDesignerSystemSync({
                         setNodes(newNodes);
                         setEdges(newEdges);
                         needsInitialFitView.current = true;
-                    }).catch(e => console.error('[DesignerSystemSync] standardDataToCanvas error:', e));
-                }).catch(e => console.error('[DesignerSystemSync] Import designerUtils failed:', e));
+                    }).catch(e => logDesignerSystemSyncStandardDataToCanvasFailure('preset', e));
+                }).catch(e => logDesignerSystemSyncDesignerUtilsImportFailure(e));
             } else if (PLUGIN_EMPTY_CANVAS_IDS.has(String(id || ''))) {
                 const emptyState = getPluginEmptyState(pluginId);
                 if (emptyState) {
@@ -798,7 +813,7 @@ export function useDesignerSystemSync({
                                 setNodes(newNodes);
                                 setEdges(newEdges);
                                 needsInitialFitView.current = true;
-                            }).catch(e => console.error('[DesignerSystemSync] standardDataToCanvas error (registry):', e));
+                            }).catch(e => logDesignerSystemSyncStandardDataToCanvasFailure('registry', e));
                         });
                     } else {
                         // Normal plugin fallback empty state
@@ -810,7 +825,7 @@ export function useDesignerSystemSync({
                             needsInitialFitView.current = true;
                         }
                     }
-                }).catch(e => console.error('[DesignerSystemSync] import DataRegistry failed:', e));
+                }).catch(e => logDesignerSystemSyncDataRegistryImportFailure(e));
             }
         }
     }, [loadSaved, clearSaved, setNodes, setEdges, pluginId, id, presetLookup, messageApi]);
@@ -835,9 +850,7 @@ export function useDesignerSystemSync({
                     window.dispatchEvent(new CustomEvent('diagramControl', { detail: { action: 'fit' } }));
                 } else {
                     // 节点尚未测量完毕，先把视口大致定到中心，稍后重试
-                    const container = document.querySelector('.react-flow') as HTMLElement | null;
-                    const cw = container ? container.clientWidth : window.innerWidth;
-                    const ch = container ? container.clientHeight : window.innerHeight;
+                    const { width: cw, height: ch } = readReactFlowCanvasSize();
                     reactFlowInstance.setViewport({ x: cw / 2 - 100, y: ch / 2 - 100, zoom: 1 });
                     setTimeout(() => {
                         // 350ms 后 RF 应已完成测量，解冻并 fit

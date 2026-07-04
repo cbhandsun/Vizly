@@ -9,6 +9,13 @@ import {
     shouldCollectAutoSave,
     type AutoSavePayload,
 } from '../../../utils/autoSaveStorage';
+import {
+    logAutoSaveAccessRefreshFailure,
+    logAutoSaveBeforeUnloadSaveFailure,
+    logAutoSaveGcEntryParseFailure,
+    logAutoSaveGcFailure,
+    logAutoSaveLoadFailure,
+} from '../diagramImportLogging';
 
 export interface AutoSaveState {
     lastSaved: number | null;
@@ -38,12 +45,16 @@ function gcAutosaveEntries() {
                 if (shouldCollectAutoSave(payload, now)) {
                     toRemove.push(key);
                 }
-            } catch { /* ignore parse errors */ }
+            } catch (error) {
+                logAutoSaveGcEntryParseFailure(key, error);
+            }
         }
         toRemove.forEach(key => {
             localStorage.removeItem(key);
         });
-    } catch { /* ignore */ }
+    } catch (error) {
+        logAutoSaveGcFailure(error);
+    }
 }
 
 export const useAutoSave = (
@@ -190,7 +201,9 @@ export const useAutoSave = (
                 if (!data) return;
                 localStorage.setItem(storageKey, JSON.stringify(data));
                 lastSavedContentRef.current = contentKey;
-            } catch { /* 存储满时静默失败 */ }
+            } catch (error) {
+                logAutoSaveBeforeUnloadSaveFailure(storageKey, error);
+            }
         };
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -216,7 +229,9 @@ export const useAutoSave = (
             // Refresh access time to prevent premature GC
             try {
                 localStorage.setItem(storageKey, JSON.stringify(refreshAutoSaveAccess(data)));
-            } catch { /* ignore */ }
+            } catch (error) {
+                logAutoSaveAccessRefreshFailure(storageKey, error);
+            }
 
             return {
                 diagramId: data.diagramId,
@@ -226,7 +241,7 @@ export const useAutoSave = (
                 timestamp: data.timestamp   // required for isFreshSeed TTL check
             };
         } catch (error) {
-            console.error('Failed to load auto-saved data:', error);
+            logAutoSaveLoadFailure(error);
             return null;
         }
     }, [storageKey]);

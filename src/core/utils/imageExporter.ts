@@ -1,5 +1,7 @@
 import { getNodesBounds } from '@xyflow/react';
 import { sanitizeDownloadFileName } from './downloadUtils';
+import { safeLog } from './consoleCleanup';
+import { redactSensitiveLogValue } from './logSecurity';
 
 export interface ExportOptions {
     format: 'png' | 'svg' | 'pdf' | 'jpg' | 'json';
@@ -106,7 +108,7 @@ export const downloadImage = async (
     const viewportElem = document.querySelector('.react-flow__viewport') as HTMLElement;
 
     if (!viewportElem) {
-        console.error('React Flow Viewport not found');
+        safeLog.error('React Flow Viewport not found');
         return;
     }
 
@@ -174,7 +176,7 @@ export const downloadImage = async (
                 const finalBlob = new Blob([finalBuffer], { type: blob.type });
                 return URL.createObjectURL(finalBlob);
             } catch (err) {
-                console.warn('Metadata injection failed:', err);
+                safeLog.warn('Metadata injection failed:', redactSensitiveLogValue(err));
                 return dataUrl;
             }
         }
@@ -246,7 +248,7 @@ export const copyImageToClipboard = async (_nodes: any[]) => {
             return true;
         }
     } catch (err) {
-        console.error('Failed to copy image:', err);
+        safeLog.error('Failed to copy image:', redactSensitiveLogValue(err));
     }
     return false;
 };

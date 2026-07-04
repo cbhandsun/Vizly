@@ -2,6 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemePerformanceOptimizer } from '../ThemePerformanceOptimizer';
 import type { Theme, ThemePerformanceOptions } from '../types/ThemeTypes';
 
+const safeLogState = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  log: vi.fn(),
+}));
+
+vi.mock('@/core/utils/consoleCleanup', () => ({
+  safeLog: safeLogState,
+}));
+
 const color = (main: string) => ({
   main,
   light: `${main}11`,
@@ -98,6 +110,7 @@ describe('ThemePerformanceOptimizer', () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    Object.values(safeLogState).forEach(mock => mock.mockReset());
     document.documentElement.removeAttribute('style');
     delete (window as unknown as { gc?: () => void }).gc;
   });
@@ -226,7 +239,6 @@ describe('ThemePerformanceOptimizer', () => {
   });
 
   it('warns and continues when an optimization strategy fails', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const optimizer = new ThemePerformanceOptimizer(options({
       cacheThemes: true,
       batchUpdates: false,
@@ -241,13 +253,17 @@ describe('ThemePerformanceOptimizer', () => {
     await expect(optimizer.optimizeThemeSwitch(brokenTheme)).resolves.toEqual(expect.objectContaining({
       totalSwitchTime: expect.any(Number),
     }));
-    expect(warn).toHaveBeenCalledWith(
-      "Optimization strategy 'preload' failed:",
-      expect.any(TypeError)
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[ThemePerformanceOptimizer] Optimization strategy "preload" failed:',
+      expect.objectContaining({
+        name: 'TypeError',
+      })
     );
-    expect(warn).toHaveBeenCalledWith(
-      "Optimization strategy 'cache' failed:",
-      expect.any(TypeError)
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[ThemePerformanceOptimizer] Optimization strategy "cache" failed:',
+      expect.objectContaining({
+        name: 'TypeError',
+      })
     );
   });
 

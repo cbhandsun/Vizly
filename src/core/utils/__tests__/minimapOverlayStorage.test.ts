@@ -12,10 +12,23 @@ import {
     writeMinimapSize,
 } from '../minimapOverlayStorage';
 
+const safeLogState = vi.hoisted(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    log: vi.fn(),
+}));
+
+vi.mock('../consoleCleanup', () => ({
+    safeLog: safeLogState,
+}));
+
 describe('minimapOverlayStorage', () => {
     beforeEach(() => {
         localStorage.clear();
         vi.restoreAllMocks();
+        Object.values(safeLogState).forEach((mock) => mock.mockReset());
     });
 
     it('coerces offsets to finite bounded integers', () => {
@@ -41,9 +54,22 @@ describe('minimapOverlayStorage', () => {
     it('reads malformed offsets with fallback', () => {
         localStorage.setItem(MINIMAP_OFFSET_STORAGE_KEY, '{broken');
         expect(readMinimapOffset({ left: 3, bottom: 4 })).toEqual({ left: 3, bottom: 4 });
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[minimapOverlayStorage] Failed to read "designer.minimap.offset":',
+            expect.anything()
+        );
 
         localStorage.setItem(MINIMAP_OFFSET_STORAGE_KEY, JSON.stringify({ left: 10, bottom: '20' }));
         expect(readMinimapOffset({ left: 3, bottom: 4 })).toEqual({ left: 3, bottom: 4 });
+    });
+
+    it('ignores oversized minimap offset payload', () => {
+        localStorage.setItem(MINIMAP_OFFSET_STORAGE_KEY, 'x'.repeat(2 * 1024 * 1024 + 1));
+        expect(readMinimapOffset({ left: 3, bottom: 4 })).toEqual({ left: 3, bottom: 4 });
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[minimapOverlayStorage] Failed to read "designer.minimap.offset":',
+            expect.anything()
+        );
     });
 
     it('writes normalized minimap state', () => {

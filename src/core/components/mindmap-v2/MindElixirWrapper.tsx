@@ -50,6 +50,21 @@ import { cleanMindMapBridgeNode, cleanMindMapChildNode } from './mindmapBridgeSe
 import { parseMindElixirClipboardNodes } from './mindmapClipboardSecurity';
 import { createSafeMindMapV2Payload } from './mindmapPersistenceSecurity';
 import { getSafeMindMapShortcutAction } from './mindmapKeyboardSecurity';
+import {
+    logMindmapWrapperAiBridgeFailure,
+    logMindmapWrapperClipboardPayloadBlocked,
+    logMindmapWrapperCollapsedBadgeFailure,
+    logMindmapWrapperCopyTopicFailure,
+    logMindmapWrapperDragImportFailure,
+    logMindmapWrapperDragImportRejected,
+    logMindmapWrapperHistoryRecordFailure,
+    logMindmapWrapperHyperlinkOpenFailure,
+    logMindmapWrapperNotePreviewFailure,
+    logMindmapWrapperSafePasteFailure,
+    logMindmapWrapperSafeShortcutFailure,
+    logMindmapWrapperSaveFailure,
+    logMindmapWrapperShapeSyncFailure,
+} from './mindmapWrapperLogging';
 
 // ─── Default data shown for a fresh mindmap ──────────────────────────────────
 const DEFAULT_DATA: MindElixirData = {
@@ -472,7 +487,7 @@ function saveData(ctx: PluginContext, mind: MindElixirInstance): void {
             ];
         });
     } catch (e) {
-        console.warn('[MindElixirWrapper] saveData failed:', e);
+        logMindmapWrapperSaveFailure(e);
     }
 }
 
@@ -562,7 +577,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
     }, [ctx]);
 
     const [ctxMenu, setCtxMenu] = useState<CtxPos>({ visible: false, x: 0, y: 0, nodeId: null });
-    const [notePreview, setNotePreview] = useState<{ html: string; x: number; y: number } | null>(null);
+    const [notePreview, setNotePreview] = useState<{ safeHtml: string; x: number; y: number } | null>(null);
 
     useEffect(() => {
         // Inject gradient CSS fix once globally
@@ -650,7 +665,9 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     const safeUrl = toSafeExternalUrl(obj.hyperLink);
                     if (safeUrl) window.open(safeUrl, '_blank', 'noopener,noreferrer');
                 }
-            } catch {}
+            } catch (error) {
+                logMindmapWrapperHyperlinkOpenFailure(error);
+            }
         };
         mind.container.addEventListener('click', handleHyperLinkClick);
 
@@ -682,7 +699,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                 const nodeData = mind.getData().nodeData;
                 addHistoryRecord(desc, nodeData);
             } catch (err) {
-                console.error('[History record failed]', err);
+                logMindmapWrapperHistoryRecordFailure(err);
             }
         };
         mind.bus.addListener('operation', onOperation);
@@ -695,7 +712,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             } catch (err) {
                 event.preventDefault();
                 event.stopImmediatePropagation();
-                console.warn('[MindElixirWrapper] blocked unsafe clipboard payload:', err);
+                logMindmapWrapperClipboardPayloadBlocked(err);
                 return;
             }
             if (!nodes) return;
@@ -706,7 +723,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             try {
                 mind.copyNodes(nodes.map(nodeObj => ({ nodeObj })) as any, target);
             } catch (err) {
-                console.warn('[MindElixirWrapper] safe paste failed:', err);
+                logMindmapWrapperSafePasteFailure(err);
             }
         };
         mind.container.addEventListener('paste', handleSafeMindElixirPaste, true);
@@ -739,7 +756,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     mind.addChild(tpc, cleanMindMapChildNode());
                 }
             } catch (err) {
-                console.warn('[MindElixirWrapper] safe shortcut failed:', err);
+                logMindmapWrapperSafeShortcutFailure(err);
             }
         };
         mind.container.addEventListener('keydown', handleSafeNodeShortcut, true);
@@ -762,12 +779,16 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                                 badge.textContent = String(node.children.length);
                                 tpc.appendChild(badge);
                             }
-                        } catch {}
+                        } catch (error) {
+                            logMindmapWrapperCollapsedBadgeFailure(error);
+                        }
                     }
                     (node.children ?? []).forEach(walkNodes);
                 }
                 walkNodes(data.nodeData);
-            } catch {}
+            } catch (error) {
+                logMindmapWrapperCollapsedBadgeFailure(error);
+            }
         };
 
         mind.bus.addListener('operation', updateBadgesFromData);
@@ -789,11 +810,15 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                             if (node.note) wrapper.setAttribute('data-note', '1');
                             else wrapper.removeAttribute('data-note');
                         }
-                    } catch {}
+                    } catch (error) {
+                        logMindmapWrapperShapeSyncFailure(error);
+                    }
                     (node.children ?? []).forEach(walk);
                 };
                 walk(mind.getData().nodeData);
-            } catch {}
+            } catch (error) {
+                logMindmapWrapperShapeSyncFailure(error);
+            }
         };
         mind.bus.addListener('operation', applyShapes);
         setTimeout(applyShapes, 400);
@@ -820,9 +845,13 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     if (!nodeId) return;
                     const obj = findNodeById(mind.getData().nodeData, nodeId);
                     if (obj?.topic) {
-                        navigator.clipboard.writeText(obj.topic).catch(() => {});
+                        navigator.clipboard.writeText(obj.topic).catch((error) => {
+                            logMindmapWrapperCopyTopicFailure(error);
+                        });
                     }
-                } catch {}
+                } catch (error) {
+                    logMindmapWrapperCopyTopicFailure(error);
+                }
                 return;
             }
         };
@@ -857,11 +886,13 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             try {
                 const node = findNodeById(mind.getData().nodeData, nodeId);
                 if (node?.note) {
-                    const html = sanitizeMarkdownHtml(marked.parse(node.note) as string);
+                    const safeHtml = sanitizeMarkdownHtml(marked.parse(node.note) as string);
                     const rect = wrapper.getBoundingClientRect();
-                    setNotePreview({ html, x: rect.left, y: rect.top });
+                    setNotePreview({ safeHtml, x: rect.left, y: rect.top });
                 }
-            } catch {}
+            } catch (error) {
+                logMindmapWrapperNotePreviewFailure(error);
+            }
         };
         const handleNoteOut = (e: MouseEvent) => {
             const related = e.relatedTarget as HTMLElement | null;
@@ -931,7 +962,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     mindRef.current.refresh(safeData);
                     saveData(ctx, mindRef.current);
                 } catch (err) {
-                    console.error('[AI Bridge] importData failed:', err);
+                    logMindmapWrapperAiBridgeFailure('importData', err);
                 }
             },
             addNode: async (args: { label: string; shape?: string }) => {
@@ -946,7 +977,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                         return newId;
                     }
                 } catch (err) {
-                    console.error('[AI Bridge] addNode failed:', err);
+                    logMindmapWrapperAiBridgeFailure('addNode', err);
                 }
             },
             addChild: async (args: { parentId: string; label: string; side?: 'left' | 'right' }) => {
@@ -960,7 +991,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                         return newId;
                     }
                 } catch (err) {
-                    console.error('[AI Bridge] addChild failed:', err);
+                    logMindmapWrapperAiBridgeFailure('addChild', err);
                 }
             },
             deleteNodes: async (ids: string[]) => {
@@ -972,7 +1003,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                         saveData(ctx, mindRef.current);
                     }
                 } catch (err) {
-                    console.error('[AI Bridge] deleteNodes failed:', err);
+                    logMindmapWrapperAiBridgeFailure('deleteNodes', err);
                 }
             },
             collapse: async (id: string, collapsed: boolean) => {
@@ -984,7 +1015,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                         saveData(ctx, mindRef.current);
                     }
                 } catch (err) {
-                    console.error('[AI Bridge] collapse failed:', err);
+                    logMindmapWrapperAiBridgeFailure('collapse', err);
                 }
             }
         };
@@ -1022,7 +1053,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         if (!file) return;
         const sizeError = getFileSizeLimitError(file, MINDMAP_TEXT_IMPORT_MAX_BYTES, 'mind map');
         if (sizeError) {
-            console.warn('[Drag Import]', sizeError);
+            logMindmapWrapperDragImportRejected(sizeError);
             return;
         }
         const reader = new FileReader();
@@ -1039,7 +1070,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                 mind.toCenter();
                 mind.clearHistory?.();
             } catch (err) {
-                console.error('[Drag Import]', err);
+                logMindmapWrapperDragImportFailure(err);
             }
         };
         reader.readAsText(file);
@@ -1154,7 +1185,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                         pointerEvents: 'none',
                         animation: 'noteTooltipIn 0.14s ease',
                     }}
-                    dangerouslySetInnerHTML={{ __html: notePreview.html }}
+                    dangerouslySetInnerHTML={{ __html: notePreview.safeHtml }}
                 />
             )}
         </MindElixirContext.Provider>

@@ -7,6 +7,12 @@ import {
     parseClipboardJson,
     type ClipboardData,
 } from '../../../utils/flowchartClipboard';
+import {
+    logClipboardReadFailure,
+    logClipboardStorageReadFailure,
+    logClipboardSystemWriteFailure,
+    logClipboardWriteFailure,
+} from './clipboardLogging';
 
 interface UseClipboardProps {
     nodes: Node[];
@@ -54,9 +60,13 @@ export const useClipboard = ({
             // 同时写入系统剪贴板（跨应用支持）
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(JSON.stringify(clipboardData, null, 2))
-                    .catch(() => { /* silent fail */ });
+                    .catch((error) => {
+                        logClipboardSystemWriteFailure(error);
+                    });
             }
-        } catch { /* silent fail */ }
+        } catch (error) {
+            logClipboardWriteFailure(error);
+        }
     }, [selectedNodes, selectedEdges, clipboardKey]);
 
     /**
@@ -91,7 +101,9 @@ export const useClipboard = ({
             try {
                 const text = await navigator.clipboard.readText();
                 clipboardData = parseClipboardText(text);
-            } catch { /* clipboard access denied, fallback */ }
+            } catch (error) {
+                logClipboardReadFailure(error);
+            }
         }
 
         // 2. 备选：从 localStorage 读取
@@ -99,7 +111,9 @@ export const useClipboard = ({
             try {
                 const saved = localStorage.getItem(clipboardKey);
                 if (saved) clipboardData = parseClipboardText(saved);
-            } catch { /* silent */ }
+            } catch (error) {
+                logClipboardStorageReadFailure(error);
+            }
         }
 
         if (!clipboardData || clipboardData.nodes.length === 0) return;

@@ -5,6 +5,7 @@
 import { DiagramConfig, SpacingConfig } from '../types/common';
 import { logger } from '../utils/Logger';
 import { ErrorType, ErrorSeverity, createError } from '../utils/ErrorHandler';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from '../utils/uiStorageLogging';
 
 const isPlainConfigObject = (value: unknown): value is Record<string, any> =>
   Boolean(
@@ -335,6 +336,7 @@ export class ConfigManager {
           }
         } catch (error) {
           const storageKey = definition.storageKey || key;
+          logUiStorageReadFailure('ConfigManager.loadPersistedConfigs', `config_${storageKey}`, error);
           localStorage.removeItem(`config_${storageKey}`);
           this.configLogger.warn(`加载配置失败: ${key}`, { error });
         }
@@ -392,6 +394,8 @@ export class ConfigManager {
       localStorage.setItem(`config_${storageKey}`, JSON.stringify(value));
       this.configLogger.debug(`持久化配置: ${key}`, { value });
     } catch (error) {
+      const storageKey = definition.storageKey || key;
+      logUiStorageWriteFailure('ConfigManager.persistConfig', `config_${storageKey}`, error);
       this.configLogger.error(`持久化配置失败: ${key}`, { error, value });
     }
   }

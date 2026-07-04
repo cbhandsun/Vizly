@@ -13,6 +13,7 @@ import {
   enforceSubGroupTitleClearance,
 } from '../utils/layoutUtils';
 import ElkWorker from '../workers/elkLayout.worker?worker';
+import { logLayoutWorkerTimeout, logWorkerLayoutFailure } from './layoutLogging';
 
 export interface ElkLayoutResult {
   nodes: ReactFlowNode[];
@@ -115,7 +116,7 @@ export abstract class AbstractElkLayoutStrategy implements ILayoutStrategy {
           worker.removeEventListener('message', handleMessage);
 
           if (error) {
-            console.error(`[${this.getName()}] Worker Layout Failed:`, error);
+            logWorkerLayoutFailure(this.getName(), error);
             resolve({ nodes: updatedNodes, edges });
           } else {
 
@@ -162,7 +163,7 @@ export abstract class AbstractElkLayoutStrategy implements ILayoutStrategy {
       // 超时保护 (30秒)
       setTimeout(() => {
         worker.removeEventListener('message', handleMessage);
-        console.warn(`[${this.getName()}] Layout worker timed out`);
+        logLayoutWorkerTimeout(this.getName());
         resolve({ nodes: updatedNodes, edges });
       }, 30000);
     });

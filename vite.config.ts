@@ -347,6 +347,7 @@ export default defineConfig({
   },
   build: {
     modulePreload: false,
+    reportCompressedSize: false,
     // Heavy optional engines (ELK/Three) are isolated into lazy vendor chunks.
     // Keep warnings for chunks that exceed those known upper bounds.
     chunkSizeWarningLimit: 1500,

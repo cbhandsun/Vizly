@@ -10,10 +10,23 @@ import {
     writeMenuScrollTop,
 } from '../diagramMenuStorage';
 
+const safeLogState = vi.hoisted(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    log: vi.fn(),
+}));
+
+vi.mock('../consoleCleanup', () => ({
+    safeLog: safeLogState,
+}));
+
 describe('diagramMenuStorage', () => {
     beforeEach(() => {
         localStorage.clear();
         vi.restoreAllMocks();
+        Object.values(safeLogState).forEach((mock) => mock.mockReset());
     });
 
     it('coerces collapsed groups to safe boolean records', () => {
@@ -36,6 +49,10 @@ describe('diagramMenuStorage', () => {
 
         localStorage.setItem(DIAGRAM_MENU_COLLAPSED_GROUPS_KEY, '{bad');
         expect(readCollapsedGroups({ debug: true })).toEqual({ debug: true });
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[diagramMenuStorage.readCollapsedGroups] Failed to read "diagramMenu.collapsedGroups":',
+            expect.anything()
+        );
 
         localStorage.setItem(DIAGRAM_MENU_COLLAPSED_GROUPS_KEY, JSON.stringify({ debug: 'true' }));
         expect(readCollapsedGroups({ debug: true })).toEqual({ debug: true });
@@ -66,5 +83,14 @@ describe('diagramMenuStorage', () => {
 
         localStorage.setItem(DIAGRAM_MENU_SCROLL_TOP_KEY, 'bad');
         expect(readMenuScrollTop()).toBeNull();
+    });
+
+    it('ignores oversized collapsed groups payloads', () => {
+        localStorage.setItem(DIAGRAM_MENU_COLLAPSED_GROUPS_KEY, 'x'.repeat(2 * 1024 * 1024 + 1));
+        expect(readCollapsedGroups({ debug: true })).toEqual({ debug: true });
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[diagramMenuStorage.readCollapsedGroups] Failed to read "diagramMenu.collapsedGroups":',
+            expect.anything()
+        );
     });
 });

@@ -1,0 +1,61 @@
+export interface FlowDataBridgeCloudMetadata {
+    provider?: string;
+    id?: string;
+    title?: string;
+    openedAt?: string;
+}
+
+export interface FlowDataBridgeMetadata {
+    title?: string;
+    cloud?: FlowDataBridgeCloudMetadata;
+    [key: string]: unknown;
+}
+
+export interface FlowDataBridgeEntry extends Record<string, unknown> {
+    id?: string;
+    name?: string;
+    nodes?: unknown[];
+    edges?: unknown[];
+    metadata?: FlowDataBridgeMetadata;
+    addNode?: (payload: unknown) => unknown;
+    connectNodes?: (payload: unknown) => unknown;
+    replaceCanvasSnapshot?: (snapshot: unknown) => unknown;
+}
+
+type FlowDataBridgeRegistry = Record<string, FlowDataBridgeEntry | undefined>;
+
+declare global {
+    interface Window {
+        __flowDataBridge?: FlowDataBridgeRegistry;
+    }
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
+export const getFlowDataBridgeRegistry = (): FlowDataBridgeRegistry | undefined => {
+    if (typeof window === 'undefined') return undefined;
+    return isRecord(window.__flowDataBridge) ? window.__flowDataBridge : undefined;
+};
+
+export const getFlowDataBridge = (diagramId: string): FlowDataBridgeEntry | undefined => {
+    if (!diagramId) return undefined;
+    return getFlowDataBridgeRegistry()?.[diagramId];
+};
+
+export const getFlowDataBridgeNodes = (diagramId: string): unknown[] => {
+    const nodes = getFlowDataBridge(diagramId)?.nodes;
+    return Array.isArray(nodes) ? nodes : [];
+};
+
+export const getFlowDataBridgeEdges = (diagramId: string): unknown[] => {
+    const edges = getFlowDataBridge(diagramId)?.edges;
+    return Array.isArray(edges) ? edges : [];
+};
+
+export const removeFlowDataBridge = (diagramId: string): void => {
+    const registry = getFlowDataBridgeRegistry();
+    if (!registry || !diagramId) return;
+    delete registry[diagramId];
+};

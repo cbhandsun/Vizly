@@ -6,6 +6,7 @@ import { SaveOutlined, ApiOutlined, CloudServerOutlined } from '@ant-design/icon
 import { s3Storage as storageService, StorageConfig } from '../services/StorageService';
 import { appMessage, appModal } from '@/core/utils/antdStaticBridge';
 import { redactSensitiveValue } from '@/services/storageSecurity';
+import { safeLog } from '@/core/utils/consoleCleanup';
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -50,7 +51,7 @@ const StorageConfigPage: React.FC = () => {
                 metadata: error.$metadata,
                 stack: error.stack
             });
-            console.error(redactedError);
+            safeLog.error('S3 connection test failed', redactedError);
             const errorDetails = JSON.stringify(redactedError, null, 2);
 
             appModal.error({

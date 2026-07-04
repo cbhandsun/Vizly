@@ -2,6 +2,10 @@ import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Select, Dropdown } from 'antd';
 import { GlobalOutlined } from '@ant-design/icons';
+import {
+    logLanguageSwitcherConfigManagerInitFailure,
+    logLanguageSwitcherConfigSyncFailure,
+} from '@/components/configurationLogging';
 import { LayeredConfigManager, ConfigLayer } from '@/core/config/LayeredConfigManager';
 
 export const LanguageSwitcher: React.FC<{ variant?: 'select' | 'icon', className?: string }> = ({ variant = 'select', className }) => {
@@ -30,7 +34,7 @@ export const LanguageSwitcher: React.FC<{ variant?: 'select' | 'icon', className
                 configManager.removeListener('i18n.language', handleConfigChange);
             };
         } catch (e) {
-            console.warn('ConfigManager init failed in LanguageSwitcher', e);
+            logLanguageSwitcherConfigManagerInitFailure(e);
         }
     }, [i18n]);
 
@@ -39,7 +43,7 @@ export const LanguageSwitcher: React.FC<{ variant?: 'select' | 'icon', className
         try {
             LayeredConfigManager.getInstance().set('i18n.language', value, ConfigLayer.USER);
         } catch (e) {
-            console.warn('Failed to sync language to config', e);
+            logLanguageSwitcherConfigSyncFailure(e);
         }
     };
 

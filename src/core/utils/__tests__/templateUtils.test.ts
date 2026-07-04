@@ -1,4 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const safeLogState = vi.hoisted(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    log: vi.fn(),
+}));
+
+vi.mock('../consoleCleanup', () => ({
+    safeLog: safeLogState,
+}));
+
 import {
     coerceStoredTemplate,
     generateTemplateThumbnail,
@@ -24,6 +37,10 @@ const validTemplate = {
 };
 
 describe('templateUtils', () => {
+    beforeEach(() => {
+        Object.values(safeLogState).forEach(mock => mock.mockReset());
+    });
+
     it('validates template shape and rejects invalid categories', () => {
         expect(validateTemplate(validTemplate)).toBe(true);
         expect(validateTemplate({ ...validTemplate, category: 'unknown' })).toBe(false);
@@ -55,6 +72,10 @@ describe('templateUtils', () => {
         expect(parseStoredTemplates('{broken')).toEqual([]);
         expect(parseStoredTemplates(JSON.stringify({ id: 'not-array' }))).toEqual([]);
         expect(parseStoredTemplates(null)).toEqual([]);
+        expect(safeLogState.warn).toHaveBeenCalledWith(
+            '[templateUtils.parseStoredTemplates] Failed to read "diagram-custom-templates":',
+            expect.anything()
+        );
     });
 
     it('bounds stored template parsing and serialization', () => {
@@ -132,5 +153,44 @@ describe('templateUtils', () => {
                 edges: [],
             },
         }))).toBeNull();
+    });
+
+    it('redacts thumbnail generation failures before logging them', async () => {
+        const encodeSpy = vi.spyOn(window, 'btoa').mockImplementation(() => {
+            throw new Error('token=sk-live-secret');
+        });
+
+        await expect(generateTemplateThumbnail([
+            {
+                id: 'a',
+                position: { x: 0, y: 0 },
+                width: 100,
+                height: 50,
+                data: { label: 'Node A' },
+            },
+        ], [])).resolves.toBeNull();
+
+        expect(safeLogState.error).toHaveBeenCalledWith(
+            '[templateUtils] Failed to generate thumbnail:',
+            expect.anything()
+        );
+        expect(JSON.stringify(safeLogState.error.mock.calls[0]?.[1])).toContain('[redacted]');
+        expect(JSON.stringify(safeLogState.error.mock.calls[0]?.[1])).not.toContain('sk-live-secret');
+        encodeSpy.mockRestore();
+    });
+
+    it('redacts import failures before logging them', () => {
+        const parseSpy = vi.spyOn(JSON, 'parse').mockImplementationOnce(() => {
+            throw new Error('Authorization: Bearer sk-live-secret');
+        });
+
+        expect(importTemplateFromJSON('{"bad":true}')).toBeNull();
+        expect(safeLogState.error).toHaveBeenCalledWith(
+            '[templateUtils] Failed to import template:',
+            expect.anything()
+        );
+        expect(JSON.stringify(safeLogState.error.mock.calls[0]?.[1])).toContain('[redacted]');
+        expect(JSON.stringify(safeLogState.error.mock.calls[0]?.[1])).not.toContain('sk-live-secret');
+        parseSpy.mockRestore();
     });
 });

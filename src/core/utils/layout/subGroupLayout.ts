@@ -3607,7 +3607,7 @@ export const syncDagreChildPositions = (
         };
         // [DEBUG]
         if (Math.abs(newY - innerTop) < 10) {
-          console.warn(`[DAGRE-SYNC-ALERT] Child ${child.id} is very close to innerTop (${innerTop}). Overlap risk!`);
+          safeLog.warn(`[DAGRE-SYNC-ALERT] Child ${child.id} is very close to innerTop (${innerTop}). Overlap risk!`);
         }
       }
     }

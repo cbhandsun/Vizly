@@ -1,4 +1,4 @@
-import { safeJsonParse } from './jsonUtils';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from './uiStorageLogging';
 
 export type MinimapSize = 'small' | 'medium' | 'large';
 
@@ -13,6 +13,7 @@ export const MINIMAP_OFFSET_STORAGE_KEY = 'designer.minimap.offset';
 
 const DEFAULT_OFFSET: MinimapOffset = { bottom: 76, left: 24 };
 const MAX_OFFSET = 1_000_000;
+const MAX_MINIMAP_OFFSET_JSON_LENGTH = 2 * 1024 * 1024;
 
 export const isMinimapSize = (value: unknown): value is MinimapSize =>
     value === 'small' || value === 'medium' || value === 'large';
@@ -35,10 +36,25 @@ export const coerceMinimapOffset = (value: unknown, fallback: MinimapOffset = DE
     return { left, bottom };
 };
 
+const parseStoredOffset = (raw: string | null): unknown => {
+    if (!raw) return null;
+    if (raw.length > MAX_MINIMAP_OFFSET_JSON_LENGTH) {
+        logUiStorageReadFailure('minimapOverlayStorage', MINIMAP_OFFSET_STORAGE_KEY, new Error('Minimap offset storage JSON is too large.'));
+        return null;
+    }
+    try {
+        return JSON.parse(raw);
+    } catch (error) {
+        logUiStorageReadFailure('minimapOverlayStorage', MINIMAP_OFFSET_STORAGE_KEY, error);
+        return null;
+    }
+};
+
 export const readMinimapMinimized = (): boolean => {
     try {
         return localStorage.getItem(MINIMAP_MINIMIZED_STORAGE_KEY) === 'true';
-    } catch {
+    } catch (error) {
+        logUiStorageReadFailure('minimapOverlayStorage', MINIMAP_MINIMIZED_STORAGE_KEY, error);
         return false;
     }
 };
@@ -46,8 +62,8 @@ export const readMinimapMinimized = (): boolean => {
 export const writeMinimapMinimized = (value: boolean): void => {
     try {
         localStorage.setItem(MINIMAP_MINIMIZED_STORAGE_KEY, String(value));
-    } catch {
-        void 0;
+    } catch (error) {
+        logUiStorageWriteFailure('minimapOverlayStorage', MINIMAP_MINIMIZED_STORAGE_KEY, error);
     }
 };
 
@@ -55,7 +71,8 @@ export const readMinimapSize = (fallback: MinimapSize): MinimapSize => {
     try {
         const saved = localStorage.getItem(MINIMAP_SIZE_STORAGE_KEY);
         return isMinimapSize(saved) ? saved : fallback;
-    } catch {
+    } catch (error) {
+        logUiStorageReadFailure('minimapOverlayStorage', MINIMAP_SIZE_STORAGE_KEY, error);
         return fallback;
     }
 };
@@ -63,16 +80,17 @@ export const readMinimapSize = (fallback: MinimapSize): MinimapSize => {
 export const writeMinimapSize = (value: MinimapSize): void => {
     try {
         localStorage.setItem(MINIMAP_SIZE_STORAGE_KEY, value);
-    } catch {
-        void 0;
+    } catch (error) {
+        logUiStorageWriteFailure('minimapOverlayStorage', MINIMAP_SIZE_STORAGE_KEY, error);
     }
 };
 
 export const readMinimapOffset = (fallback: MinimapOffset = DEFAULT_OFFSET): MinimapOffset => {
     try {
-        const parsed = safeJsonParse<unknown>(localStorage.getItem(MINIMAP_OFFSET_STORAGE_KEY), null);
+        const parsed = parseStoredOffset(localStorage.getItem(MINIMAP_OFFSET_STORAGE_KEY));
         return coerceMinimapOffset(parsed, fallback);
-    } catch {
+    } catch (error) {
+        logUiStorageReadFailure('minimapOverlayStorage', MINIMAP_OFFSET_STORAGE_KEY, error);
         return { ...fallback };
     }
 };
@@ -81,8 +99,8 @@ export const writeMinimapOffset = (value: MinimapOffset): MinimapOffset => {
     const normalized = coerceMinimapOffset(value);
     try {
         localStorage.setItem(MINIMAP_OFFSET_STORAGE_KEY, JSON.stringify(normalized));
-    } catch {
-        void 0;
+    } catch (error) {
+        logUiStorageWriteFailure('minimapOverlayStorage', MINIMAP_OFFSET_STORAGE_KEY, error);
     }
     return normalized;
 };

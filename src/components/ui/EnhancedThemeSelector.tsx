@@ -18,6 +18,17 @@ import type { ThemePreset } from '@/core/themes/ThemePresetManager';
 
 import { getCachedThemePreset } from '@/core/themes/ThemePresetLoader';
 import { parseThemeImportJson } from '@/core/themes/themeImportSecurity';
+import {
+  logThemeSelectorApplyPresetFailure,
+  logThemeSelectorChangeFailure,
+  logThemeSelectorCreateCustomThemeFailure,
+  logThemeSelectorDeleteCustomThemeFailure,
+  logThemeSelectorExportFailure,
+  logThemeSelectorImportFailure,
+  logThemeSelectorImportRejected,
+  logThemeSelectorLoadFailure,
+  logThemeSelectorMissingBaseTheme,
+} from '@/core/themes/themeLogging';
 import { renderSafeThemePreviewGradient } from '@/core/themes/themePreviewSecurity';
 import { downloadFile } from '@/core/utils/downloadUtils';
 
@@ -110,7 +121,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         setPresets(allPresets);
         setCustomThemes(allCustomThemes);
       } catch (error) {
-        console.error('Failed to load theme data:', error);
+        logThemeSelectorLoadFailure(error);
       }
     };
 
@@ -140,7 +151,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         onThemeChange(newTheme);
       }
     } catch (error) {
-      console.error('Failed to change theme:', error);
+      logThemeSelectorChangeFailure(error);
     }
   }, [setTheme, state.integration, onThemeChange]);
 
@@ -160,7 +171,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         onThemeChange(theme);
       }
     } catch (error) {
-      console.error('Failed to apply preset:', error);
+      logThemeSelectorApplyPresetFailure(error);
     }
   }, [state.integration, onThemeChange, setTheme]);
 
@@ -172,13 +183,13 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
       const themeManager = state.integration.getThemeManager();
       const baseThemePromise = themeManager.getTheme(customThemeForm.baseTheme);
       if (!baseThemePromise) {
-        console.error('无法获取基础主题');
+        logThemeSelectorMissingBaseTheme(customThemeForm.baseTheme);
         return;
       }
 
       const baseTheme = await baseThemePromise;
       if (!baseTheme) {
-        console.error('无法获取基础主题');
+        logThemeSelectorMissingBaseTheme(customThemeForm.baseTheme);
         return;
       }
 
@@ -202,7 +213,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
         baseTheme: 'light',
       });
     } catch (error) {
-      console.error('Failed to create custom theme:', error);
+      logThemeSelectorCreateCustomThemeFailure(error);
     }
   }, [state.integration, customThemeForm]);
 
@@ -215,7 +226,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
       await themeManager.removeCustomTheme(themeId);
       setCustomThemes(prev => prev.filter(theme => theme.id !== themeId));
     } catch (error) {
-      console.error('Failed to delete custom theme:', error);
+      logThemeSelectorDeleteCustomThemeFailure(error);
     }
   }, [state.integration]);
 
@@ -226,7 +237,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
       const dataStr = JSON.stringify(config, null, 2);
       downloadFile(dataStr, `theme-config-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
     } catch (error) {
-      console.error('Failed to export themes:', error);
+      logThemeSelectorExportFailure(error);
     }
   }, [actions]);
 
@@ -236,7 +247,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
     if (!file) return;
     const sizeError = getFileSizeLimitError(file, THEME_JSON_IMPORT_MAX_BYTES, 'theme JSON');
     if (sizeError) {
-      console.warn('Failed to import themes:', sizeError);
+      logThemeSelectorImportRejected(sizeError);
       event.target.value = '';
       return;
     }
@@ -259,7 +270,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
           setCustomThemes(allCustomThemes);
         }
       } catch (error) {
-        console.error('Failed to import themes:', error);
+        logThemeSelectorImportFailure(error);
       } finally {
         event.target.value = '';
       }

@@ -6,6 +6,7 @@ import { useTheme } from '../../../themes/useCoreTheme';
 import { useFlowchartState } from './useFlowchartState';
 import { subscribeViewport } from '../../shared/viewportStore';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import { logDiagramGlobalThemeSyncFailure } from '../diagramThemeLogging';
 
 
 export interface UseDesignerCanvasStateProps {
@@ -101,7 +102,9 @@ export function useDesignerCanvasState({
         const handleGlobalThemeChanged = (e: any) => {
             const newThemeId = e.detail;
             if (newThemeId && newThemeId !== theme?.id) {
-                setTheme(newThemeId).catch(console.warn);
+                setTheme(newThemeId).catch((error) => {
+                    logDiagramGlobalThemeSyncFailure('useDesignerCanvasState', newThemeId, error);
+                });
             }
         };
         window.addEventListener('diagram-global-theme-changed', handleGlobalThemeChanged);

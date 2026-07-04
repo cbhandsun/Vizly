@@ -12,6 +12,8 @@
 import type { ElkNode, ElkExtendedEdge, ElkPort } from 'elkjs';
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import { parseHandleDirection } from '../algorithms/simpleFallbackPath';
+import { safeLog } from './consoleCleanup';
+import { redactSensitiveLogValue } from './logSecurity';
 
 interface Point {
     x: number;
@@ -220,7 +222,7 @@ export async function routeEdgesWithELK(
 
         return edgePaths;
     } catch (error) {
-        console.error('[ELK Edge Router] Layout failed:', error);
+        safeLog.error('[ELK Edge Router] Layout failed:', redactSensitiveLogValue(error));
         return new Map();
     }
 }

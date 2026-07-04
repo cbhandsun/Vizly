@@ -12,6 +12,7 @@ import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import type { NodeObj } from 'mind-elixir';
 import { generateMindMapFromPrompt } from './mindmapAIService';
 import { cleanMindMapData } from './mindmapTreeSanitizer';
+import { logMindmapEmptyGuideCheckFailure } from './mindmapPanelLogging';
 
 function countNodes(node: NodeObj): number {
     return 1 + (node.children ?? []).reduce((acc, c) => acc + countNodes(c), 0);
@@ -43,7 +44,9 @@ const MindMapEmptyGuide: React.FC = () => {
             if (!data) return;
             const n = countNodes(data.nodeData);
             setIsEmpty(n <= 1);
-        } catch {}
+        } catch (error) {
+            logMindmapEmptyGuideCheckFailure(error);
+        }
     }, [mind]);
 
     const handleAIGenerate = async () => {

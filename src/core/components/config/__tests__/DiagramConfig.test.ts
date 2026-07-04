@@ -3,6 +3,18 @@ import type { DiagramConfig } from '../DiagramConfig';
 
 const STORAGE_KEY = 'architecture-diagram-config';
 
+const safeLogState = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  log: vi.fn(),
+}));
+
+vi.mock('../../../utils/consoleCleanup', () => ({
+  safeLog: safeLogState,
+}));
+
 const importFreshDiagramConfig = async () => {
   vi.resetModules();
   return import('../DiagramConfig');
@@ -11,6 +23,7 @@ const importFreshDiagramConfig = async () => {
 describe('DiagramConfigManager', () => {
   beforeEach(() => {
     localStorage.clear();
+    Object.values(safeLogState).forEach(mock => mock.mockReset());
     vi.restoreAllMocks();
   });
 
@@ -37,6 +50,10 @@ describe('DiagramConfigManager', () => {
     localStorage.setItem(STORAGE_KEY, '{broken');
     manager.loadConfigFromStorage();
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[DiagramConfigManager.loadConfigFromStorage] Failed to read "architecture-diagram-config":',
+      expect.anything()
+    );
   });
 
   it('removes oversized persisted config instead of parsing it on startup', async () => {
@@ -98,7 +115,6 @@ describe('DiagramConfigManager', () => {
   it('skips persisting sanitized configs that exceed the storage limit', async () => {
     const { DiagramConfigManager } = await importFreshDiagramConfig();
     const manager = new DiagramConfigManager();
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     manager.updateConfig({
       edge: {
@@ -110,6 +126,41 @@ describe('DiagramConfigManager', () => {
 
     expect(manager.getConfig().edge.handleWeights?.large).toHaveLength(1000);
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
-    expect(warnSpy).toHaveBeenCalledWith('图表配置超过本地存储大小限制，跳过保存');
+    expect(safeLogState.warn).toHaveBeenCalledWith('图表配置超过本地存储大小限制，跳过保存');
+  });
+
+  it('redacts listener failures before logging', async () => {
+    const { DiagramConfigManager } = await importFreshDiagramConfig();
+    const manager = new DiagramConfigManager();
+
+    manager.addConfigChangeListener(() => {
+      throw new Error('api_key=diagram-secret');
+    });
+
+    manager.updateConfig({ node: { width: 220 } } as unknown as Partial<DiagramConfig>);
+
+    const payload = JSON.stringify(safeLogState.error.mock.calls);
+    expect(payload).toContain('配置变更监听器执行失败:');
+    expect(payload).toContain('[redacted]');
+    expect(payload).not.toContain('diagram-secret');
+  });
+
+  it('redacts local storage write failures before warning', async () => {
+    const { DiagramConfigManager } = await importFreshDiagramConfig();
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('Authorization: Bearer diagram-config-secret');
+    });
+    const manager = new DiagramConfigManager();
+
+    manager.updateConfig({ node: { height: 120 } } as any);
+
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[DiagramConfigManager.saveConfigToStorage] Failed to write "architecture-diagram-config":',
+      expect.anything()
+    );
+    const payload = JSON.stringify(safeLogState.warn.mock.calls);
+    expect(payload).toContain('[redacted]');
+    expect(payload).not.toContain('diagram-config-secret');
+    setItemSpy.mockRestore();
   });
 });

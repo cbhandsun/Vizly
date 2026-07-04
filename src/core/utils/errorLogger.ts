@@ -4,6 +4,8 @@
  */
 
 import { redactSensitiveLogValue, sanitizeUrlForLog } from './logSecurity';
+import { safeLog } from './consoleCleanup';
+import { logUiStorageReadFailure, logUiStorageWriteFailure } from './uiStorageLogging';
 
 export interface ErrorLog {
     id: string;
@@ -141,7 +143,7 @@ class ErrorLogger {
 
         // 在开发环境打印
         if (process.env.NODE_ENV === 'development') {
-            console.error('[ErrorLogger]', errorLog);
+            safeLog.error('[ErrorLogger]', errorLog);
         }
 
         return errorLog.id;
@@ -186,8 +188,8 @@ class ErrorLogger {
         this.logs = [];
         try {
             localStorage.removeItem(this.storageKey);
-        } catch (_e) {
-            console.warn('Failed to clear error logs from localStorage');
+        } catch (error) {
+            logUiStorageWriteFailure('ErrorLogger.clear', this.storageKey, error);
         }
     }
 
@@ -211,8 +213,8 @@ class ErrorLogger {
                 }
                 this.logs = coerceErrorLogs(JSON.parse(stored), this.maxLogs);
             }
-        } catch (_e) {
-            console.warn('Failed to load error logs from localStorage');
+        } catch (error) {
+            logUiStorageReadFailure('ErrorLogger.loadFromStorage', this.storageKey, error);
             this.logs = [];
         }
     }
@@ -223,8 +225,8 @@ class ErrorLogger {
     private persist() {
         try {
             localStorage.setItem(this.storageKey, JSON.stringify(this.logs));
-        } catch (_e) {
-            console.warn('Failed to persist error logs to localStorage');
+        } catch (error) {
+            logUiStorageWriteFailure('ErrorLogger.persist', this.storageKey, error);
         }
     }
 

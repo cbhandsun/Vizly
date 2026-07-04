@@ -20,6 +20,14 @@ import {
   coerceThemePresetImport,
   parseThemeImportJson,
 } from './themeImportSecurity';
+import {
+  logThemePresetManagerCannotDeleteBuiltIn,
+  logThemePresetManagerCannotUpdateBuiltIn,
+  logThemePresetManagerInvalidSavedPreset,
+  logThemePresetManagerLoadFailure,
+  logThemePresetManagerPresetMissing,
+  logThemePresetManagerTemplateMissing,
+} from './themeInfrastructureLogging';
 // import { wmsProfessionalThemePreset } from './WmsProfessionalTheme';
 
 // 重新导出ThemePreset以便其他模块使用
@@ -408,11 +416,11 @@ export class ThemePresetManager {
           const safePreset = coerceThemePresetImport(preset, id, coercePresetCategory(isRecord(preset) ? preset.category : undefined));
           this.presets.set(id, safePreset);
         } catch (error) {
-          console.warn(`Ignored invalid saved theme preset "${id}":`, error);
+          logThemePresetManagerInvalidSavedPreset(id, error);
         }
       });
     } catch (error) {
-      console.warn('Failed to load theme presets:', error);
+      logThemePresetManagerLoadFailure(error);
     }
   }
 
@@ -457,7 +465,7 @@ export class ThemePresetManager {
   ): ThemePreset | null {
     const template = this.templates.get(templateId);
     if (!template) {
-      console.warn(`Template '${templateId}' not found`);
+      logThemePresetManagerTemplateMissing(templateId);
       return null;
     }
 
@@ -541,7 +549,7 @@ export class ThemePresetManager {
 
     // 不允许更新内置预设
     if (preset.category === 'built-in') {
-      console.warn('Cannot update built-in preset');
+      logThemePresetManagerCannotUpdateBuiltIn();
       return false;
     }
 
@@ -565,7 +573,7 @@ export class ThemePresetManager {
 
     // 不允许删除内置预设
     if (preset.category === 'built-in') {
-      console.warn('Cannot delete built-in preset');
+      logThemePresetManagerCannotDeleteBuiltIn();
       return false;
     }
 
@@ -802,7 +810,7 @@ export class ThemePresetManager {
   applyPreset(id: string): Theme | null {
     const preset = this.presets.get(id);
     if (!preset) {
-      console.warn(`Preset '${id}' not found`);
+      logThemePresetManagerPresetMissing(id);
       return null;
     }
 

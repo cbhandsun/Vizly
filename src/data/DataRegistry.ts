@@ -8,6 +8,15 @@ import { DataService } from '../services/DataService';
 import { localDB } from '../services/IndexedDBStorage';
 import { parseRemoteDiagramContent } from '../services/remoteDiagramContent';
 import { safeLog } from '../core/utils/consoleCleanup';
+import {
+  logDataRegistryInitializationFailure,
+  logDiagramMissingEdges,
+  logDiagramMissingNodes,
+  logInvalidLocalDiagram,
+  logInvalidRemoteTemplateContent,
+  logLocalDiagramLoadFailure,
+  logRemoteTemplateFetchFailure,
+} from './dataRegistryLogging';
 
 // 导入标准化数据
 import enterpriseArchitectureData from './standardized/ArchitectureStandardData.json';
@@ -114,7 +123,7 @@ export class DataRegistry {
 
       this.initialized = true;
     } catch (error) {
-      console.error('❌ 数据注册中心初始化失败:', error);
+      logDataRegistryInitializationFailure(error);
       throw error;
     }
   }
@@ -187,16 +196,16 @@ export class DataRegistry {
                           title: row.title || row.id || 'Remote Template',
                       }) as StandardDiagramData;
                       this.dataService.registerDiagram(diagram, false);
-                  } catch (_templateError) {
-                      console.warn('[DataRegistry] Skipped invalid remote template content.');
+                  } catch (templateError) {
+                      logInvalidRemoteTemplateContent(templateError);
                   }
               }
               safeLog.debug(`[DataRegistry] Loaded ${data.length} remote templates from cloud.`);
               return true;
           }
           return false;
-      } catch (_err) {
-          console.warn('[DataRegistry] Failed to fetch remote templates, falling back to local static JSONs.');
+      } catch (error) {
+          logRemoteTemplateFetchFailure(error);
           return false;
       }
   }
@@ -213,12 +222,12 @@ export class DataRegistry {
                   const normalizedDiagram = normalizeLocalDiagramForRegistry(diagram, builtIn);
                   // 注册到内存，但不重复写入 IndexedDB
                   this.dataService.registerDiagram(normalizedDiagram, false);
-              } catch (_diagramError) {
-                  console.warn('[DataRegistry] Skipped invalid local diagram from IndexedDB.');
+              } catch (diagramError) {
+                  logInvalidLocalDiagram(diagramError);
               }
           }
       } catch (err) {
-          console.error('Failed to load local diagrams from IndexedDB', err);
+          logLocalDiagramLoadFailure(err);
       }
   }
 
@@ -235,11 +244,11 @@ export class DataRegistry {
     // 验证每个图表的数据完整性
     for (const diagram of allDiagrams.data) {
       if (!diagram.nodes || diagram.nodes.length === 0) {
-        console.warn(`⚠️ 图表 ${diagram.name} 没有节点数据`);
+        logDiagramMissingNodes(diagram.name);
       }
       
       if (!diagram.edges || diagram.edges.length === 0) {
-        console.warn(`⚠️ 图表 ${diagram.name} 没有连线数据`);
+        logDiagramMissingEdges(diagram.name);
       }
     }
 

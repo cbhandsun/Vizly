@@ -19,6 +19,7 @@ import {
     type TaskStatus,
 } from './mindmapTaskModel';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
+import { logMindmapKanbanRefreshFailure } from './mindmapPanelLogging';
 
 interface KanbanTask {
     id: string;
@@ -79,7 +80,7 @@ export const MindMapTaskKanban: React.FC = () => {
             const leafTasks = extractTasksFromTree(data.nodeData);
             setTasks(leafTasks);
         } catch (err) {
-            console.error('[Kanban Refresh Error]', err);
+            logMindmapKanbanRefreshFailure(err);
         }
     }, [mind, extractTasksFromTree]);
 

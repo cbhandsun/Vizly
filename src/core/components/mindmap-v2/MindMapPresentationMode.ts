@@ -13,6 +13,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { NodeObj } from 'mind-elixir';
 import type { MindElixirInstance } from 'mind-elixir';
+import {
+    logMindmapPresentationFullscreenFailure,
+    logMindmapPresentationNavigateFailure,
+} from './mindmapPanelLogging';
 
 // ─── DFS 遍历节点 ─────────────────────────────────────────────────────────────
 function flattenNodesDFS(node: NodeObj, result: string[] = []): string[] {
@@ -175,7 +179,7 @@ export function usePresentationMode(
             showPresentationHUD(obj?.topic ?? id, idx, ids.length);
             onNodeFocusRef.current?.(obj ?? null);
         } catch (e) {
-            console.warn('[Presentation] navigate error:', e);
+            logMindmapPresentationNavigateFailure(e);
         }
     }, [mind]);
 
@@ -188,7 +192,9 @@ export function usePresentationMode(
 
         // Exit fullscreen
         if (document.fullscreenElement) {
-            document.exitFullscreen().catch(() => {});
+            document.exitFullscreen().catch((error) => {
+                logMindmapPresentationFullscreenFailure('exit', error);
+            });
         }
 
         removeHUD();
@@ -216,7 +222,9 @@ export function usePresentationMode(
         // Enter fullscreen
         const container = getContainer();
         container?.classList.add('me-presenting');
-        container?.requestFullscreen?.().catch(() => {});
+        container?.requestFullscreen?.().catch((error) => {
+            logMindmapPresentationFullscreenFailure('enter', error);
+        });
 
         // Navigate to first node
         navigateTo(0, ids, data.nodeData);

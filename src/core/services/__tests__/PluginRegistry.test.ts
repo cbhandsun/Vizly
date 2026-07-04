@@ -2,6 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PluginRegistry } from '../PluginRegistry';
 import type { DiagramTypePlugin, PluginContext } from '../../types';
 
+const safeLogState = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  log: vi.fn(),
+}));
+
+vi.mock('../../utils/consoleCleanup', () => ({
+  safeLog: safeLogState,
+}));
+
 const plugin = (id: string, onAIAction?: DiagramTypePlugin['onAIAction']): DiagramTypePlugin => ({
   id,
   name: id,
@@ -19,6 +31,7 @@ describe('PluginRegistry', () => {
   beforeEach(() => {
     resetSingleton();
     localStorage.clear();
+    Object.values(safeLogState).forEach(mock => mock.mockReset());
   });
 
   afterEach(() => {
@@ -72,6 +85,43 @@ describe('PluginRegistry', () => {
     registry.register(plugin('flow'));
 
     expect(registry.isPluginActive('flow')).toBe(true);
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[PluginRegistry.loadStatus] Failed to read "vizly_plugin_status":',
+      expect.anything()
+    );
+  });
+
+  it('falls back to defaults when persisted status payload is oversized', () => {
+    localStorage.setItem('vizly_plugin_status', '{'.repeat(128 * 1024 + 1));
+    const registry = PluginRegistry.getInstance();
+
+    registry.register(plugin('flow'));
+
+    expect(registry.isPluginActive('flow')).toBe(true);
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[PluginRegistry.loadStatus] Failed to read "vizly_plugin_status":',
+      expect.anything()
+    );
+  });
+
+  it('logs and falls back when persisted plugin status read throws', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+      if (key === 'vizly_plugin_status') {
+        throw new Error('Authorization: Bearer plugin-status-read-secret');
+      }
+      return null;
+    });
+
+    const registry = PluginRegistry.getInstance();
+    registry.register(plugin('flow'));
+
+    expect(registry.isPluginActive('flow')).toBe(true);
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[PluginRegistry.loadStatus] Failed to read "vizly_plugin_status":',
+      expect.anything()
+    );
+    expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
+    expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('plugin-status-read-secret');
   });
 
   it('ignores wrong-shaped or non-boolean persisted status values', () => {
@@ -97,7 +147,6 @@ describe('PluginRegistry', () => {
 
   it('rejects unsafe plugin ids before registration or status persistence', () => {
     const registry = PluginRegistry.getInstance();
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const listener = vi.fn();
     window.addEventListener('vizly:plugin-status-change', listener);
 
@@ -113,9 +162,29 @@ describe('PluginRegistry', () => {
     expect(registry.getPlugin('safe-plugin')).toBeDefined();
     expect(listener).toHaveBeenCalledTimes(1);
     expect(JSON.parse(localStorage.getItem('vizly_plugin_status') ?? '{}')).toEqual({ 'safe-plugin': false });
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Rejected plugin with unsafe id'));
+    expect(safeLogState.warn).toHaveBeenCalledWith('[PluginRegistry] Rejected plugin with unsafe id:', 'bad<script>');
 
     window.removeEventListener('vizly:plugin-status-change', listener);
+  });
+
+  it('logs and keeps in-memory plugin status when persistence write fails', () => {
+    const registry = PluginRegistry.getInstance();
+    registry.register(plugin('safe-plugin'));
+
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string) => {
+      if (key === 'vizly_plugin_status') {
+        throw new Error('token=plugin-status-write-secret');
+      }
+    });
+
+    expect(() => registry.setPluginActive('safe-plugin', false)).not.toThrow();
+    expect(registry.isPluginActive('safe-plugin')).toBe(false);
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[PluginRegistry.saveStatus] Failed to write "vizly_plugin_status":',
+      expect.anything()
+    );
+    expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).toContain('[redacted]');
+    expect(JSON.stringify(safeLogState.warn.mock.calls[0]?.[1])).not.toContain('plugin-status-write-secret');
   });
 
   it('unregisters plugins and promotes the next plugin as default', () => {
@@ -136,29 +205,29 @@ describe('PluginRegistry', () => {
 
   it('executes plugin AI actions and handles missing or throwing handlers', async () => {
     const registry = PluginRegistry.getInstance();
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const ctx = {} as PluginContext;
 
     registry.register(plugin('ai', vi.fn().mockResolvedValue(true)));
     registry.register(plugin('plain'));
-    registry.register(plugin('throwing', vi.fn().mockRejectedValue(new Error('boom'))));
+    registry.register(plugin('throwing', vi.fn().mockRejectedValue(new Error('Authorization: Bearer plugin-secret'))));
 
     await expect(registry.executeAIAction('ai', 'create', { id: 1 }, ctx)).resolves.toBe(true);
     await expect(registry.executeAIAction('plain', 'create', {}, ctx)).resolves.toBe(false);
     await expect(registry.executeAIAction('missing', 'create', {}, ctx)).resolves.toBe(false);
     await expect(registry.executeAIAction('throwing', 'create', {}, ctx)).resolves.toBe(false);
 
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Plugin missing not found'));
-    expect(errorSpy).toHaveBeenCalledWith(
+    expect(safeLogState.warn).toHaveBeenCalledWith(expect.stringContaining('Plugin missing not found'));
+    expect(safeLogState.error).toHaveBeenCalledWith(
       expect.stringContaining('Error executing AI action "create"'),
-      expect.any(Error)
+      expect.anything()
     );
+    const payload = JSON.stringify(safeLogState.error.mock.calls);
+    expect(payload).toContain('[redacted]');
+    expect(payload).not.toContain('plugin-secret');
   });
 
   it('does not execute AI actions for disabled plugins', async () => {
     const registry = PluginRegistry.getInstance();
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const aiHandler = vi.fn().mockResolvedValue(true);
 
     registry.register(plugin('ai', aiHandler));
@@ -167,12 +236,11 @@ describe('PluginRegistry', () => {
     await expect(registry.executeAIAction('ai', 'create', {}, {} as PluginContext)).resolves.toBe(false);
 
     expect(aiHandler).not.toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Plugin ai is disabled'));
+    expect(safeLogState.warn).toHaveBeenCalledWith(expect.stringContaining('Plugin ai is disabled'));
   });
 
   it('rejects unsafe AI action targets before plugin dispatch', async () => {
     const registry = PluginRegistry.getInstance();
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const aiHandler = vi.fn().mockResolvedValue(true);
 
     registry.register(plugin('ai', aiHandler));
@@ -181,6 +249,19 @@ describe('PluginRegistry', () => {
     await expect(registry.executeAIAction('ai', 'create;delete', {}, {} as PluginContext)).resolves.toBe(false);
 
     expect(aiHandler).not.toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Rejected unsafe AI action target'));
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[PluginRegistry] Rejected unsafe AI action target:',
+      expect.objectContaining({
+        pluginId: 'ai<script>',
+        action: 'create',
+      })
+    );
+    expect(safeLogState.warn).toHaveBeenCalledWith(
+      '[PluginRegistry] Rejected unsafe AI action target:',
+      expect.objectContaining({
+        pluginId: 'ai',
+        action: 'create;delete',
+      })
+    );
   });
 });

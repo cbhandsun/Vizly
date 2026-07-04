@@ -18,3 +18,54 @@ export function readDomViewport(): { x: number; y: number; zoom: number } {
         zoom: sc ? parseFloat(sc[1]) : 1,
     };
 }
+
+export function readReactFlowContainerRect(): { left: number; top: number; width: number; height: number } {
+    const container = document.querySelector('.react-flow') as HTMLElement | null;
+    const rect = container?.getBoundingClientRect();
+
+    return {
+        left: rect?.left ?? 0,
+        top: rect?.top ?? 0,
+        width: rect?.width ?? container?.clientWidth ?? window.innerWidth,
+        height: rect?.height ?? container?.clientHeight ?? window.innerHeight,
+    };
+}
+
+export function readReactFlowCanvasSize(): { width: number; height: number } {
+    const { width, height } = readReactFlowContainerRect();
+    return { width, height };
+}
+
+export function projectFlowPositionToScreenPosition({
+    flowX,
+    flowY,
+    viewport = readDomViewport(),
+    containerRect = readReactFlowContainerRect(),
+}: {
+    flowX: number;
+    flowY: number;
+    viewport?: { x: number; y: number; zoom: number };
+    containerRect?: { left: number; top: number };
+}): { x: number; y: number } {
+    return {
+        x: flowX * viewport.zoom + viewport.x + containerRect.left,
+        y: flowY * viewport.zoom + viewport.y + containerRect.top,
+    };
+}
+
+export function projectScreenPositionToFlowPosition({
+    screenX,
+    screenY,
+    viewport = readDomViewport(),
+    containerRect = readReactFlowContainerRect(),
+}: {
+    screenX: number;
+    screenY: number;
+    viewport?: { x: number; y: number; zoom: number };
+    containerRect?: { left: number; top: number };
+}): { x: number; y: number } {
+    return {
+        x: (screenX - containerRect.left - viewport.x) / viewport.zoom,
+        y: (screenY - containerRect.top - viewport.y) / viewport.zoom,
+    };
+}
