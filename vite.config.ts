@@ -5,9 +5,17 @@ import tailwindcss from '@tailwindcss/vite'
 import { dirname, resolve } from 'path'
 import { realpathSync } from 'fs'
 import { fileURLToPath } from 'url'
+import { jspdfRasterOnlyPlugin } from './vite-plugins/jspdfRasterOnly'
+import { sharedModuleWorkersPlugin } from './vite-plugins/sharedModuleWorkers'
+import {
+  matchesAppSafeLoggingModule,
+  matchesThemePresetModule,
+} from './vite-plugins/buildChunkGroups'
+import { createDisplayRoutingChunkClassifier } from './vite-plugins/displayRoutingChunkClassifier'
 
 const projectRoot = dirname(fileURLToPath(import.meta.url))
 const projectRealRoot = realpathSync(projectRoot)
+const displayRoutingChunks = createDisplayRoutingChunkClassifier(matchesAppSafeLoggingModule)
 
 const vendorChunkRules: Array<[string, string[]]> = [
   ['vendor-react', ['react', 'react-dom', 'react-router', 'react-router-dom', 'react-error-boundary']],
@@ -306,6 +314,9 @@ const getManualChunkName = (id: string) => {
 export default defineConfig({
   root: projectRoot,
   plugins: [
+    jspdfRasterOnlyPlugin(),
+    sharedModuleWorkersPlugin(projectRoot),
+    displayRoutingChunks.plugin,
     react(),
     tailwindcss(),
   ],
@@ -356,6 +367,12 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             {
+              name: 'app-safe-logging',
+              test: matchesAppSafeLoggingModule,
+              priority: 120,
+              minSize: 0,
+            },
+            {
               name: 'vendor-preload-runtime',
               test: (id) => {
                 const normalizedId = id.replace(/\\/g, '/');
@@ -368,6 +385,18 @@ export default defineConfig({
               name: 'vendor-react',
               test: matchesReactVendorPackage,
               priority: 90,
+              minSize: 0,
+            },
+            {
+              name: 'display-routing-shared',
+              test: displayRoutingChunks.matchesSharedModule,
+              priority: 80,
+              minSize: 0,
+            },
+            {
+              name: 'theme-presets',
+              test: matchesThemePresetModule,
+              priority: 70,
               minSize: 0,
             },
             {

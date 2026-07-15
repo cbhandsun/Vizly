@@ -645,6 +645,70 @@ describe('synthesizeSharedEndpointTrunks', () => {
     expect(path.length).toBeLessThanOrEqual(4);
   });
 
+  it('does not detach a reverse feedback edge by changing source-authored exact terminals', () => {
+    const originalPath = [
+      { x: 701, y: 2638 },
+      { x: 701, y: 2692 },
+      { x: 521, y: 2692 },
+      { x: 521, y: 1748 },
+      { x: 701, y: 1748 },
+      { x: 701, y: 1844 },
+    ];
+    const edge: Edge = {
+      id: 'manual-feedback',
+      source: 'tms-execution',
+      target: 'wms-outbound',
+      sourceHandle: 'source-bottom-port-1',
+      targetHandle: 'target-top-port-1',
+      data: {
+        manualHandles: { source: true, target: true },
+        computedPath: originalPath,
+      },
+    };
+    const [result] = synthesizeSharedTargetTrunks([edge], {
+      nodes: [
+        node('wms-outbound', 600, 1844, 220, 158),
+        node('tms-execution', 600, 2480, 220, 158),
+      ],
+    });
+
+    expect(result.sourceHandle).toBe('source-bottom-port-1');
+    expect(result.targetHandle).toBe('target-top-port-1');
+    expect((result.data as any).computedPath).toEqual(originalPath);
+    expect((result.data as any).targetHemisphereBacktrackRepaired).toBeUndefined();
+  });
+
+  it('allows the same hemisphere repair to refine router-owned runtime terminals', () => {
+    const edge: Edge = {
+      id: 'runtime-feedback',
+      source: 'tms-execution',
+      target: 'wms-outbound',
+      sourceHandle: 'source-bottom-runtime',
+      targetHandle: 'target-top-runtime',
+      data: {
+        runtimeHandleLock: { source: true, target: true },
+        computedPath: [
+          { x: 701, y: 2638 },
+          { x: 701, y: 2692 },
+          { x: 521, y: 2692 },
+          { x: 521, y: 1748 },
+          { x: 701, y: 1748 },
+          { x: 701, y: 1844 },
+        ],
+      },
+    };
+    const [result] = synthesizeSharedTargetTrunks([edge], {
+      nodes: [
+        node('wms-outbound', 600, 1844, 220, 158),
+        node('tms-execution', 600, 2480, 220, 158),
+      ],
+    });
+
+    expect(result.sourceHandle).toBe('top');
+    expect(result.targetHandle).toBe('bottom');
+    expect((result.data as any).targetHemisphereBacktrackRepaired).toBe(true);
+  });
+
   it('does not leave a tangential boundary tail after target trunk synthesis', () => {
     const edges: Edge[] = [
       {

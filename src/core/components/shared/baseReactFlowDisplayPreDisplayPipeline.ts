@@ -1,7 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
 
-import { normalizeHandle } from '../../routing/utils/handleUtils';
-import { computeBaseReactFlowDisplayOutputRouteSignature } from './baseReactFlowDisplayCache';
 import { repairPairedTerminalApproachStrictCrossing } from './baseReactFlowPairedTerminalApproachRepair';
 import {
   buildFacingPortPathCandidates,
@@ -72,9 +70,7 @@ import {
   displayPointsCoincide,
   extractDisplaySegments,
   findDisplayStrictCrossingHits,
-  fullDisplayPortSide,
   getDisplayComputedPath,
-  getDisplayNodeRect,
   NEAR_PARALLEL_LANE_TOLERANCE,
   OBSTACLE_REPAIR_NODE_PADDING,
   oppositeDisplayPortSide,
@@ -84,8 +80,6 @@ import {
   segmentDisplayLength,
   shiftDisplayInternalSegment,
   sortedUniqueNumbers,
-  withDisplayComputedPath,
-  type DisplayPoint,
   type DisplayRect,
   type DisplaySegment,
 } from './baseReactFlowDisplayGeometry';
@@ -163,10 +157,8 @@ import {
   DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS,
   finalizeDisplayEdgesForRenderMode,
 } from './baseReactFlowDisplayRenderPipeline';
-import {
-  displayHardQualityGatesAreClean,
-  getDisplayHardQualityGateReport,
-} from './baseReactFlowDisplayQualityGates';
+import { displayHardQualityGatesAreClean } from './baseReactFlowDisplayQualityGates';
+import { createBaseDisplayHardGateMemo } from './baseReactFlowDisplayHardGateMemo';
 import {
   createBaseReactFlowInteractiveDisplayEdges,
   createFastDisplayQualityEdges,
@@ -231,29 +223,10 @@ export const createBaseReactFlowPreDisplayFinalEdges = (args: {
   const nodeById = new Map(args.nodes.map(node => [node.id, node]));
   const repairNodes = withDisplayAbsolutePositions(args.nodes, nodeById);
   const terminalValidationSnapshot = createDisplayTerminalValidationSnapshot(repairNodes);
-  const hardQualityReportByRoute = new Map<string, BaseDisplayBoundedCandidateReport>();
-  const getRouteHardQualityGateReport: typeof getDisplayHardQualityGateReport = (
-    edges,
-    nodes,
-    candidate,
-  ) => {
-    // A route signature keeps this memo safe even when a repair mutates an array in place.
-    // Computing it is O(E * P), while the exact hard gate contains pairwise O(E^2) work.
-    const routeSignature = computeBaseReactFlowDisplayOutputRouteSignature(edges);
-    const cacheKey = routeSignature ? `${candidate}:${routeSignature}` : null;
-    if (cacheKey) {
-      const cached = hardQualityReportByRoute.get(cacheKey);
-      if (cached) return cached;
-    }
-    const report = getDisplayHardQualityGateReport(
-      edges,
-      nodes,
-      candidate,
-      terminalValidationSnapshot,
-    );
-    if (cacheKey) hardQualityReportByRoute.set(cacheKey, report);
-    return report;
-  };
+  const { getReport: getRouteHardQualityGateReport } = createBaseDisplayHardGateMemo(
+    repairNodes,
+    terminalValidationSnapshot,
+  );
   const routeTerminalsAreAttached = (edges: Edge[]): boolean => (
     getDisplayTerminalValidationReport(edges, terminalValidationSnapshot).allAttached
   );
@@ -375,6 +348,24 @@ export const createBaseReactFlowPreDisplayFinalEdges = (args: {
   if (terminalOverlapInternalStrictReport.hardClean) {
     args.onBoundedCandidate?.(terminalOverlapInternalStrictReport);
     return terminalOverlapInternalAnchored;
+  }
+  if (displayReportOnlyNeedsTerminalAnchoring(terminalOverlapInternalStrictReport)) {
+    const terminalOverlapAxisAnchored = repairAxisMismatchedTerminalsWithBoundedPortRoles(
+      terminalOverlapInternalAnchored,
+      repairNodes,
+      Math.min(192, Math.max(64, terminalOverlapInternalAnchored.length * 4)),
+    );
+    if (terminalOverlapAxisAnchored !== terminalOverlapInternalAnchored) {
+      const terminalOverlapAxisReport = getRouteHardQualityGateReport(
+        terminalOverlapAxisAnchored,
+        repairNodes,
+        'terminal-lane',
+      );
+      if (terminalOverlapAxisReport.hardClean) {
+        args.onBoundedCandidate?.(terminalOverlapAxisReport);
+        return terminalOverlapAxisAnchored;
+      }
+    }
   }
   // This stage is only an early-exit attempt. On larger diagrams a failed
   // attempt is discarded before the comprehensive obstacle pass, so avoid

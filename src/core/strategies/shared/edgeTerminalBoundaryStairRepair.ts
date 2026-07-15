@@ -1,5 +1,9 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
+import {
+  edgeTerminalSideCanSwitch,
+  resolveEdgeTerminalHandleForSide,
+} from '../../routing/utils/edgeTerminalPolicy';
 import { normalizeHandle } from '../../routing/utils/handleUtils';
 
 import {
@@ -102,12 +106,16 @@ function repairInwardEndpointTraversals(
 
   const repaired = withComputedPath(edge, path);
   const data = (repaired.data || {}) as Record<string, any>;
-  const nextSourceHandle = sourceSide ?? String(repaired.sourceHandle ?? '');
-  const nextTargetHandle = targetSide ?? String(repaired.targetHandle ?? '');
+  const nextSourceHandle = sourceSide && edgeTerminalSideCanSwitch(edge, 'source', sourceSide)
+    ? resolveEdgeTerminalHandleForSide(edge, 'source', sourceSide)
+    : repaired.sourceHandle;
+  const nextTargetHandle = targetSide && edgeTerminalSideCanSwitch(edge, 'target', targetSide)
+    ? resolveEdgeTerminalHandleForSide(edge, 'target', targetSide)
+    : repaired.targetHandle;
   return {
     ...repaired,
-    sourceHandle: nextSourceHandle || repaired.sourceHandle,
-    targetHandle: nextTargetHandle || repaired.targetHandle,
+    sourceHandle: nextSourceHandle,
+    targetHandle: nextTargetHandle,
     data: {
       ...data,
       terminalInteriorTraversalRepaired: true,
@@ -121,8 +129,8 @@ function repairInwardEndpointTraversals(
       treeRouting: data.treeRouting && Array.isArray(data.treeRouting.points)
         ? {
           ...data.treeRouting,
-          effectiveSourceHandle: nextSourceHandle || data.treeRouting.effectiveSourceHandle,
-          effectiveTargetHandle: nextTargetHandle || data.treeRouting.effectiveTargetHandle,
+          effectiveSourceHandle: nextSourceHandle ?? data.treeRouting.effectiveSourceHandle,
+          effectiveTargetHandle: nextTargetHandle ?? data.treeRouting.effectiveTargetHandle,
           points: path,
         }
         : data.treeRouting,

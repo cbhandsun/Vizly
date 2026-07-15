@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   calculateEdgePathQualityScore,
@@ -21,6 +21,12 @@ import {
   edgeRoutingQualityIntentToken,
   parseEdgeRoutingQualityIntent,
 } from '../../../strategies/shared/edgeRoutingQualityIntent';
+import {
+  canSkipLargeDetachedOverlapRepair,
+  hasSharedTargetEntryStrictCrossing,
+  repairSharedTargetEntryStrictCrossingsIfNeeded,
+  separateLargeDetachedParallelOverlapsIfNeeded,
+} from '../baseReactFlowDisplayFullRouteQualityPhase';
 
 const edge = (path: Array<{ x: number; y: number }>): Edge => ({
   id: 'edge',
@@ -72,6 +78,119 @@ describe('baseReactFlowDisplayEvaluation', () => {
     expect(chooseFinalObstacleAwarePolishCandidate([], baseline, baseline, baseline)).toBe(baseline);
     expect(chooseFinalTerminalTransactionCandidate([], baseline, baseline, baseline)).toBe(baseline);
     expect(chooseDisplayStrictPolishCandidate([], baseline, baseline, baseline)).toBe(baseline);
+  });
+
+  it('short-circuits only exact no-op full-route quality repair families', () => {
+    const cleanEdges: Edge[] = Array.from({ length: 25 }, (_, index) => ({
+      ...edge([
+        { x: 0, y: index * 40 },
+        { x: 100, y: index * 40 },
+      ]),
+      id: `clean-${index}`,
+      source: `source-${index}`,
+      target: `target-${index}`,
+    }));
+    const cleanQuality = calculateEdgePathQualityScore(cleanEdges);
+    const detachedRepair = vi.fn(() => [...cleanEdges]);
+
+    expect(cleanQuality.strictCrossings).toBe(0);
+    const targetRepair = vi.fn(() => [...cleanEdges]);
+    expect(hasSharedTargetEntryStrictCrossing(cleanEdges)).toBe(false);
+    expect(repairSharedTargetEntryStrictCrossingsIfNeeded(cleanEdges, targetRepair)).toBe(cleanEdges);
+    expect(targetRepair).not.toHaveBeenCalled();
+    expect(canSkipLargeDetachedOverlapRepair(24, cleanQuality)).toBe(false);
+    expect(canSkipLargeDetachedOverlapRepair(25, cleanQuality)).toBe(true);
+    expect(separateLargeDetachedParallelOverlapsIfNeeded(
+      cleanEdges,
+      [],
+      16,
+      {},
+      detachedRepair,
+    )).toBe(cleanEdges);
+    expect(detachedRepair).not.toHaveBeenCalled();
+
+    const unrelatedStrictEdges: Edge[] = [
+      {
+        ...edge([{ x: 50, y: 0 }, { x: 50, y: 100 }]),
+        id: 'vertical',
+        source: 'vertical-source',
+        target: 'vertical-target',
+      },
+      {
+        ...edge([{ x: 0, y: 50 }, { x: 100, y: 50 }]),
+        id: 'horizontal',
+        source: 'horizontal-source',
+        target: 'horizontal-target',
+      },
+    ];
+    expect(hasSharedTargetEntryStrictCrossing(unrelatedStrictEdges)).toBe(false);
+    expect(repairSharedTargetEntryStrictCrossingsIfNeeded(
+      unrelatedStrictEdges,
+      targetRepair,
+    )).toBe(unrelatedStrictEdges);
+    expect(targetRepair).not.toHaveBeenCalled();
+
+    const strictEdges: Edge[] = [
+      {
+        ...edge([
+          { x: 50, y: 0 },
+          { x: 50, y: 100 },
+          { x: 80, y: 100 },
+          { x: 80, y: 150 },
+        ]),
+        id: 'shared-vertical',
+        source: 'vertical-source',
+        target: 'shared-target',
+      },
+      {
+        ...edge([
+          { x: 0, y: 0.75 },
+          { x: 100, y: 0.75 },
+          { x: 100, y: 160 },
+          { x: 80, y: 160 },
+        ]),
+        id: 'shared-horizontal',
+        source: 'horizontal-source',
+        target: 'shared-target',
+      },
+    ];
+    expect(calculateEdgePathQualityScore(strictEdges).strictCrossings).toBe(0);
+    expect(hasSharedTargetEntryStrictCrossing(strictEdges)).toBe(true);
+    const delegatedTarget = [...strictEdges];
+    targetRepair.mockReturnValue(delegatedTarget);
+    expect(repairSharedTargetEntryStrictCrossingsIfNeeded(strictEdges, targetRepair)).toBe(
+      delegatedTarget,
+    );
+    expect(targetRepair).toHaveBeenCalledOnce();
+
+    const hardOverlapEdges: Edge[] = [
+      {
+        ...edge([{ x: 0, y: 0 }, { x: 100, y: 0 }]),
+        id: 'forward',
+        source: 'forward-source',
+        target: 'forward-target',
+      },
+      {
+        ...edge([{ x: 100, y: 0 }, { x: 0, y: 0 }]),
+        id: 'reverse',
+        source: 'reverse-source',
+        target: 'reverse-target',
+      },
+      ...cleanEdges.slice(2),
+    ];
+    const hardOverlapQuality = calculateEdgePathQualityScore(hardOverlapEdges);
+    expect(hardOverlapQuality.reverseOverlap).toBeGreaterThan(0);
+    expect(canSkipLargeDetachedOverlapRepair(25, hardOverlapQuality)).toBe(false);
+    const delegatedDetached = [...hardOverlapEdges];
+    detachedRepair.mockReturnValue(delegatedDetached);
+    expect(separateLargeDetachedParallelOverlapsIfNeeded(
+      hardOverlapEdges,
+      [],
+      16,
+      {},
+      detachedRepair,
+    )).toBe(delegatedDetached);
+    expect(detachedRepair).toHaveBeenCalledOnce();
   });
 
   it('reuses baseline obstacle hits while preserving in-place mutation invalidation', () => {

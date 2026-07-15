@@ -1,5 +1,9 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import {
+  edgeTerminalSideCanSwitch,
+  resolveEdgeTerminalHandleForSide,
+} from '../../routing/utils/edgeTerminalPolicy';
+import {
   buildHemisphereTargetCandidatePaths,
   compactPath,
   EPS,
@@ -1044,6 +1048,10 @@ function repairOppositeHemisphereTargetBacktracks(
     if (!firstStepBacktracksFromTarget(path, sourceRect, targetRect)) continue;
 
     const sourceSide = oppositeSide(expectedTargetSide);
+    if (
+      !edgeTerminalSideCanSwitch(edge, 'source', sourceSide)
+      || !edgeTerminalSideCanSwitch(edge, 'target', expectedTargetSide)
+    ) continue;
     const candidates = buildHemisphereTargetCandidatePaths(
       path,
       sourceRect,
@@ -1079,8 +1087,8 @@ function repairOppositeHemisphereTargetBacktracks(
     const repairedEdge = withComputedPath(edge, bestPath);
     nextEdges[index] = {
       ...repairedEdge,
-      sourceHandle: sourceSide,
-      targetHandle: expectedTargetSide,
+      sourceHandle: resolveEdgeTerminalHandleForSide(edge, 'source', sourceSide),
+      targetHandle: resolveEdgeTerminalHandleForSide(edge, 'target', expectedTargetSide),
       data: {
         ...(repairedEdge.data || {}),
         targetHemisphereBacktrackRepaired: true,

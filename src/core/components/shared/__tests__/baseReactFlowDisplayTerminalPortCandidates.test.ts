@@ -2,6 +2,7 @@ import type { Edge } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildDeclaredTerminalAxisStubCandidates,
   buildCrossingCompanionOuterPortVariants,
   displayTerminalRoleNeedsDeclaredAxisRepair,
   displayTerminalSideCanSwitch,
@@ -37,6 +38,16 @@ describe('baseReactFlowDisplayTerminalPortCandidates', () => {
       'target',
       'left',
     )).toBe(false);
+    expect(displayTerminalSideCanSwitch(
+      edge({ runtimeHandleLock: { source: true } }),
+      'source',
+      'top',
+    )).toBe(true);
+    expect(displayTerminalSideCanSwitch(
+      edge({ manualHandles: { source: true } }),
+      'source',
+      'top',
+    )).toBe(false);
   });
 
   it('bridges a computed path and keeps tree-routing metadata synchronized', () => {
@@ -63,6 +74,44 @@ describe('baseReactFlowDisplayTerminalPortCandidates', () => {
     expect((bridged.data as any).terminalPortBridgeRepaired).toBe(true);
   });
 
+  it('preserves exact compound handle ids during a same-side geometry repair', () => {
+    const source: Edge = {
+      ...edge({
+        manualHandles: { source: true, target: true },
+        treeRouting: { points: [] },
+      }),
+      sourceHandle: 'source-right-port-1',
+      targetHandle: 'target-left-port-1',
+    };
+    const path = [{ x: 100, y: 50 }, { x: 300, y: 50 }];
+    const bridged = withDisplayPortBridge(source, path, 'right', 'left');
+
+    expect(bridged.sourceHandle).toBe('source-right-port-1');
+    expect(bridged.targetHandle).toBe('target-left-port-1');
+    expect((bridged.data as any).treeRouting).toMatchObject({
+      effectiveSourceHandle: 'source-right-port-1',
+      effectiveTargetHandle: 'target-left-port-1',
+      points: path,
+    });
+  });
+
+  it('allows router-owned compound runtime handles to adopt a new side', () => {
+    const source: Edge = {
+      ...edge({ runtimeHandleLock: { source: true, target: true } }),
+      sourceHandle: 'source-right-runtime',
+      targetHandle: 'target-left-runtime',
+    };
+    const bridged = withDisplayPortBridge(
+      source,
+      [{ x: 50, y: 100 }, { x: 50, y: 300 }],
+      'bottom',
+      'top',
+    );
+
+    expect(bridged.sourceHandle).toBe('bottom');
+    expect(bridged.targetHandle).toBe('top');
+  });
+
   it('detects a declared-side axis mismatch at a terminal', () => {
     const rect = { x: 0, y: 0, width: 100, height: 100 };
     expect(displayTerminalRoleNeedsDeclaredAxisRepair(
@@ -77,6 +126,54 @@ describe('baseReactFlowDisplayTerminalPortCandidates', () => {
       'source',
       rect,
     )).toBe(true);
+  });
+
+  it('preserves a terminal tangent while adding an outward declared-axis stub', () => {
+    const rect = { x: 2651.2, y: 1204.5, width: 144, height: 96 };
+    const path = [
+      { x: 2795, y: 1301 },
+      { x: 2795, y: 1373 },
+      { x: 2827, y: 1373 },
+      { x: 2827, y: 1706 },
+      { x: 3135, y: 1706 },
+    ];
+
+    const candidates = buildDeclaredTerminalAxisStubCandidates(
+      path,
+      'source',
+      rect,
+      'right',
+      48,
+      3,
+    );
+
+    expect(candidates[0]).toEqual([
+      { x: 2795.2, y: 1301 },
+      { x: 2843.2, y: 1301 },
+      { x: 2843.2, y: 1706 },
+      { x: 3135, y: 1706 },
+    ]);
+    expect(candidates).toHaveLength(3);
+    expect(candidates.every(candidate => candidate[candidate.length - 1].x === 3135)).toBe(true);
+  });
+
+  it('orders left-target axis stubs from the nearest outward lane', () => {
+    const candidates = buildDeclaredTerminalAxisStubCandidates(
+      [
+        { x: 100, y: 50 },
+        { x: 300, y: 50 },
+        { x: 300, y: 100 },
+      ],
+      'target',
+      { x: 300, y: 50, width: 100, height: 100 },
+      'left',
+      48,
+      3,
+    );
+
+    expect(candidates.map(candidate => candidate[candidate.length - 2].x))
+      .toEqual([252, 228, 204]);
+    expect(candidates.every(candidate => candidate.at(-1)?.x === 300)).toBe(true);
   });
 
   it('builds bounded outer-port variants around a perpendicular crossing', () => {

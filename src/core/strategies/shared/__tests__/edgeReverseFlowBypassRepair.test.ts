@@ -24,9 +24,12 @@ describe('repairReverseFlowBypassCrossings', () => {
         id: 'edge-under-test',
         source: 'tms',
         target: 'downstream',
-        sourceHandle: 'top',
+        sourceHandle: 'source-top-runtime-port-1',
         targetHandle: 'bottom',
-        data: { computedPath: compactTopPath },
+        data: {
+          computedPath: compactTopPath,
+          runtimeHandleLock: { source: true },
+        },
       },
       {
         id: 'same-source-bottom-branch',
@@ -81,6 +84,69 @@ describe('repairReverseFlowBypassCrossings', () => {
     const direct = Math.abs(repairedPath.at(-1)!.x - repairedPath[0].x)
       + Math.abs(repairedPath.at(-1)!.y - repairedPath[0].y);
     expect(length / direct).toBeLessThanOrEqual(1.2);
+  });
+
+  it('does not switch or canonicalize a source-authored side handle', () => {
+    const compactTopPath = [
+      { x: 1323, y: 962 },
+      { x: 1323, y: 873 },
+      { x: 2418, y: 873 },
+      { x: 2418, y: 238 },
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'edge-under-test',
+        source: 'tms',
+        target: 'downstream',
+        sourceHandle: 'source-top-side-port-1',
+        targetHandle: 'bottom',
+        data: {
+          computedPath: compactTopPath,
+          manualHandleSides: ['source'],
+        },
+      },
+      {
+        id: 'same-source-bottom-branch',
+        source: 'tms',
+        target: 'visibility',
+        data: {
+          computedPath: [
+            { x: 1323, y: 1198 },
+            { x: 1323, y: 1921 },
+            { x: 1789, y: 1921 },
+            { x: 1789, y: 1922 },
+          ],
+        },
+      },
+      {
+        id: 'unrelated-reverse-route',
+        source: 'reverse-source',
+        target: 'reverse-target',
+        data: { computedPath: [...compactTopPath].reverse() },
+      },
+      {
+        id: 'unrelated-crossing-route',
+        source: 'crossing-source',
+        target: 'crossing-target',
+        data: {
+          computedPath: [
+            { x: 1600, y: 800 },
+            { x: 1600, y: 930 },
+          ],
+        },
+      },
+    ];
+
+    const result = repairReverseFlowBypassCrossings(edges, [
+      node('tms', 1113, 962, 420, 236),
+      node('downstream', 2250, 119, 336, 119),
+      node('right-top-corridor-blocker', 1400, 840, 80, 60),
+      node('left-top-corridor-blocker', 1200, 840, 80, 60),
+    ]);
+
+    expect(result[0].sourceHandle).toBe('source-top-side-port-1');
+    expect((result[0].data as any).computedPath).toEqual(compactTopPath);
+    expect((result[0].data as any).reverseFlowBypassRepaired).toBeUndefined();
   });
 
   it('keeps top exits when fixing only opposite overlap would create a large backtrack', () => {
@@ -151,10 +217,10 @@ describe('repairReverseFlowBypassCrossings', () => {
         id: 'edge-tms-carrier',
         source: 'tms',
         target: 'carrier',
-        sourceHandle: 'top',
+        sourceHandle: 'source-top-manual-port-1',
         targetHandle: 'bottom',
         data: {
-          sourcePortPolicy: 'strong',
+          manualHandles: { source: true },
           computedPath: [
             { x: 900, y: 811 },
             { x: 900, y: 722 },
@@ -192,7 +258,7 @@ describe('repairReverseFlowBypassCrossings', () => {
     const carrier = result.find(edge => edge.id === 'edge-tms-carrier')!;
     const path = (carrier.data as any).computedPath as Array<{ x: number; y: number }>;
 
-    expect(carrier.sourceHandle).toBe('top');
+    expect(carrier.sourceHandle).toBe('source-top-manual-port-1');
     expect((carrier.data as any).reverseFlowBypassRepaired).toBe(true);
     expect(path[0]).toEqual({ x: 900, y: 811 });
     expect(path[1].y).toBeLessThan(path[0].y);

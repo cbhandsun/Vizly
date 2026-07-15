@@ -16,6 +16,7 @@ import wmsStandardData from '../../../../data/standardized/WmsStandardData.json'
 import { withDisplayAbsolutePositions } from '../../../components/shared/baseReactFlowDisplayEdgeCore';
 import { standardDataToCanvas } from '../../../components/diagrams/designerUtils';
 import { repairSharedEndpointPortOrderCrossings } from '../edgeSharedEndpointPortOrderRepair';
+import { terminalSideIsFixed, withPath } from '../edgeSharedEndpointPortOrderGeometry';
 import { calculateEdgePathQualityScore } from '../edgeStrictCrossingGuard';
 
 const node = (id: string, x: number, y: number, width: number, height: number): Node => ({
@@ -27,6 +28,32 @@ const node = (id: string, x: number, y: number, width: number, height: number): 
 });
 
 describe('repairSharedEndpointPortOrderCrossings', () => {
+  it('centralizes fixed and runtime terminal ownership when materializing a port side', () => {
+    const manual: Edge = {
+      id: 'manual',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'source-right-port-1',
+      data: { _manualHandles: { source: true } },
+    };
+    const runtime: Edge = {
+      id: 'runtime',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'source-top-runtime',
+      data: { runtimeHandleLock: { source: true } },
+    };
+
+    expect(terminalSideIsFixed(manual, 'source')).toBe(true);
+    expect(withPath(manual, [{ x: 0, y: 0 }, { x: 0, y: 20 }], 'source', 'left').sourceHandle)
+      .toBe('source-right-port-1');
+    expect(terminalSideIsFixed(runtime, 'source')).toBe(false);
+    expect(withPath(runtime, [{ x: 0, y: 0 }, { x: 20, y: 0 }], 'source', 'left').sourceHandle)
+      .toBe('left');
+    expect(withPath(runtime, [{ x: 0, y: 0 }, { x: 0, y: 20 }], 'source', 'top').sourceHandle)
+      .toBe('source-top-runtime');
+  });
+
   it('moves a bent source port to the corridor side of a same-side target trunk', () => {
     const edges: Edge[] = [
       {

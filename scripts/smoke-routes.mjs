@@ -7,7 +7,11 @@ import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import WebSocket from 'ws';
-import { resolveRouteBudget, shouldRetryEvaluateAfterTimeout } from './smokeRouteBudgetUtils.mjs';
+import {
+  isFinalWmsDisplayRoutingReady,
+  resolveRouteBudget,
+  shouldRetryEvaluateAfterTimeout,
+} from './smokeRouteBudgetUtils.mjs';
 
 const HOST = '127.0.0.1';
 const parsePortEnv = (name, defaultValue) => {
@@ -201,6 +205,8 @@ const routes = [
       const parallelStats = optimizationStats?.parallel || null;
       const workerHealthy = !parallelStats ||
         (parallelStats.activeWorkers === 0 && parallelStats.queuedTasks === 0);
+      const displayRouting = window.__vizlyBaseReactFlowDisplayRouting;
+      const displayRoutingReady = (${isFinalWmsDisplayRoutingReady.toString()})(displayRouting);
       return {
         href: location.href,
         title: document.title,
@@ -214,6 +220,16 @@ const routes = [
         bridgeEdgeCount,
         parallelStats,
         workerHealthy,
+        displayRouting: displayRouting && {
+          stage: displayRouting.stage,
+          workerStartCount: displayRouting.workerStartCount,
+          workerAbortCount: displayRouting.workerAbortCount,
+          workerResolution: displayRouting.workerResolution,
+          routeMs: displayRouting.routeMs,
+          finalAppliedAt: displayRouting.finalAppliedAt,
+          outputRouteSignature: displayRouting.outputRouteSignature,
+        },
+        displayRoutingReady,
         appFallback: body.includes('加载应用'),
         pageFallback: body.includes('加载图表'),
         errorBoundary: body.includes('页面出现错误'),
@@ -224,6 +240,7 @@ const routes = [
           renderedNodeCount >= 20 &&
           renderedEdgeCount >= 35 &&
           workerHealthy &&
+          displayRoutingReady &&
           !body.includes('加载图表') &&
           !body.includes('页面出现错误'),
       };

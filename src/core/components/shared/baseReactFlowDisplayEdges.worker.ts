@@ -1,5 +1,3 @@
-import type { Edge, Node } from '@xyflow/react';
-
 import {
   withDisplayAbsolutePositions,
 } from './baseReactFlowDisplayEdgeCore';
@@ -10,38 +8,63 @@ import {
 } from './baseReactFlowDisplayFinalizer';
 import { createBaseReactFlowFullRouteEdges } from './baseReactFlowDisplayFullRoutePipeline';
 import type { BaseDisplayBoundedCandidateReport } from './baseReactFlowDisplayEvaluation';
+import { repairBaseReactFlowMeasuredDisplayEdgesWithReport } from './baseReactFlowDisplayMeasuredRepair';
 import { baseReactFlowDisplayHardQualityIsClean } from './baseReactFlowDisplayQualityGates';
 import { createBaseReactFlowInteractiveDisplayEdges } from './baseReactFlowDisplayQualitySeedPipeline';
 import { createBaseReactFlowPreDisplayFinalEdges } from './baseReactFlowDisplayPreDisplayPipeline';
-import type { DisplayQualityMode } from './baseReactFlowDisplayWorkerClient';
-
-export type DisplayEdgesWorkerRequest = {
-  requestId: string;
-  edges: Edge[];
-  nodes: Node[];
-  enableSmartEdges: boolean;
-  smartEdgePadding: number;
-  isLargeGraph: boolean;
-  displayEdgeEpoch: number;
-  qualityMode?: DisplayQualityMode;
-};
-
-export type DisplayEdgesWorkerResponse = {
-  requestId: string;
-  edges?: Edge[];
-  hardClean?: boolean;
-  error?: string;
-  boundedCandidate?: BaseDisplayBoundedCandidateReport;
-};
+import {
+  parseDisplayEdgesWorkerRequest,
+  readDisplayEdgesWorkerRequestId,
+  type DisplayEdgesWorkerRequest,
+  type DisplayEdgesWorkerResponse,
+} from './baseReactFlowDisplayWorkerProtocol';
 
 const postDisplayEdgesResponse = (response: DisplayEdgesWorkerResponse): void => {
   (self as any).postMessage(response);
 };
 
+const doesDisplayCandidateMatchSourceGraph = (
+  sourceEdges: DisplayEdgesWorkerRequest['edges'],
+  candidateEdges: DisplayEdgesWorkerRequest['edges'],
+): boolean => (
+  sourceEdges.length === candidateEdges.length
+  && sourceEdges.every((edge, index) => {
+    const candidate = candidateEdges[index];
+    return candidate?.id === edge.id
+      && candidate.source === edge.source
+      && candidate.target === edge.target;
+  })
+);
+
 export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
   request: DisplayEdgesWorkerRequest,
   onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void,
 ): DisplayEdgesWorkerResponse => {
+  if (request.operation === 'repair') {
+    const repaired = repairBaseReactFlowMeasuredDisplayEdgesWithReport(
+      request.edges,
+      request.nodes,
+    );
+    return {
+      requestId: request.requestId,
+      edges: repaired.edges,
+      hardClean: repaired.report.hardClean,
+      routeResolution: 'repair',
+    };
+  }
+  if (
+    request.operation === 'validate-or-route'
+    && request.candidateEdges
+    && doesDisplayCandidateMatchSourceGraph(request.edges, request.candidateEdges)
+    && baseReactFlowDisplayHardQualityIsClean(request.candidateEdges, request.nodes)
+  ) {
+    return {
+      requestId: request.requestId,
+      edges: request.candidateEdges,
+      hardClean: true,
+      routeResolution: 'validated-candidate',
+    };
+  }
   const commonInput = {
     edges: request.edges,
     nodes: request.nodes,
@@ -56,6 +79,7 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       requestId: request.requestId,
       edges,
       hardClean: baseReactFlowDisplayHardQualityIsClean(edges, request.nodes),
+      routeResolution: 'full-route',
     };
   }
 
@@ -96,7 +120,22 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
     requestId: request.requestId,
     edges: finalized.edges,
     hardClean: finalized.report.hardClean,
+    routeResolution: 'full-route',
   };
+};
+
+export const handleBaseReactFlowDisplayWorkerMessage = (
+  value: unknown,
+  onBoundedCandidate?: (report: BaseDisplayBoundedCandidateReport) => void,
+): DisplayEdgesWorkerResponse => {
+  const request = parseDisplayEdgesWorkerRequest(value);
+  if (!request) {
+    return {
+      requestId: readDisplayEdgesWorkerRequestId(value) ?? 'invalid-request',
+      error: 'display-edge-worker-invalid-request',
+    };
+  }
+  return computeBaseReactFlowDisplayEdgesWorkerResponse(request, onBoundedCandidate);
 };
 
 const isDisplayEdgesWorkerScope = typeof self !== 'undefined'
@@ -104,21 +143,21 @@ const isDisplayEdgesWorkerScope = typeof self !== 'undefined'
   && typeof (self as any).document === 'undefined';
 
 if (isDisplayEdgesWorkerScope) {
-  (self as any).onmessage = (event: MessageEvent<DisplayEdgesWorkerRequest>) => {
-    const request = event.data;
+  (self as any).onmessage = (event: MessageEvent<unknown>) => {
+    const requestId = readDisplayEdgesWorkerRequestId(event.data) ?? 'invalid-request';
     try {
-      const response = computeBaseReactFlowDisplayEdgesWorkerResponse(
-        request,
+      const response = handleBaseReactFlowDisplayWorkerMessage(
+        event.data,
         (boundedCandidate) => {
           if (!boundedCandidate.hardClean) {
-            postDisplayEdgesResponse({ requestId: request.requestId, boundedCandidate });
+            postDisplayEdgesResponse({ requestId, boundedCandidate });
           }
         },
       );
       postDisplayEdgesResponse(response);
     } catch {
       postDisplayEdgesResponse({
-        requestId: request.requestId,
+        requestId,
         error: 'display-edge-worker-failed',
       });
     }

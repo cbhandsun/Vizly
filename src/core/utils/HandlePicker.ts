@@ -14,7 +14,7 @@ import {
     CostContext
 } from '../routing';
 
-import { EdgeType } from '../factories/EdgeFactory';
+import { EdgeType } from '../types/edgeType';
 import { diagramConfigManager } from '../components/config/DiagramConfig';
 import { analyzeGeometry } from '../algorithms/geometry-classifier';
 

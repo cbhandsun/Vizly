@@ -6,18 +6,6 @@ vi.mock('../../../components/config/DiagramConfig', () => ({
   },
 }));
 
-vi.mock('../../../factories/EdgeFactory', () => ({
-  EdgeType: {
-    STEP: 'step',
-    STRAIGHT: 'straight',
-    SMOOTHSTEP: 'smoothstep',
-    BEZIER: 'bezier',
-    ADVANCED_SMART_STEP: 'advanced-smart-step',
-    ADVANCED_SMART_STRAIGHT: 'advanced-smart-straight',
-    ADVANCED_SMART_BEZIER: 'advanced-smart-bezier',
-  },
-}));
-
 import {
   beautifyOrthogonalEdges,
   bundleEdges,

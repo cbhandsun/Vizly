@@ -21,6 +21,7 @@ const shardNames = [
   'test:ci:core-components-shared-flow-hub-port-role',
   'test:ci:core-components-shared-flow-measured-outcome',
   'test:ci:core-components-shared-flow-routing-quality',
+  'test:ci:core-components-shared-worker-boundary',
   'test:ci:core-components-shared-misc',
   'test:ci:core-components-ui',
   'test:ci:core-hooks',

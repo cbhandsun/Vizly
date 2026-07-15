@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import { EDGE_ROUTING_CACHE_VERSION } from '../../routing/routingVersion';
 import { edgeRoutingQualityIntentToken } from '../../strategies/shared/edgeRoutingQualityIntent';
+import { visitBaseReactFlowDisplayInputIdentity } from './baseReactFlowDisplayInputIdentity';
 
 const BASE_DISPLAY_FINALIZED_SIGNATURE = '__baseDisplayFinalizedSignature';
 export const BASE_DISPLAY_ROUTING_VERSION = EDGE_ROUTING_CACHE_VERSION;
@@ -58,7 +59,7 @@ const isValidDisplayCacheInputSignature = (value: unknown): value is string => (
   && value.length <= BASE_DISPLAY_CACHE_MAX_SIGNATURE_CHARS
 );
 
-const isValidDisplayOutputRouteSignature = (value: unknown): value is string => (
+export const isBaseReactFlowDisplayOutputRouteSignature = (value: unknown): value is string => (
   typeof value === 'string'
   && /^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/.test(value)
 );
@@ -168,7 +169,7 @@ export const baseReactFlowDisplayOutputRouteSignatureMatches = (
   edges: Edge[],
   expectedSignature: unknown,
 ): boolean => (
-  isValidDisplayOutputRouteSignature(expectedSignature)
+  isBaseReactFlowDisplayOutputRouteSignature(expectedSignature)
   && computeBaseReactFlowDisplayOutputRouteSignature(edges) === expectedSignature
 );
 
@@ -261,8 +262,30 @@ export const computeBaseDisplayInputSignature = ({
     feed(data.manualHandles === true);
     feed(manualHandles.source);
     feed(manualHandles.target);
+    const legacyManualHandles = data.manualHandles == null ? data._manualHandles : undefined;
+    const legacyManualHandleRecord = (
+      legacyManualHandles
+      && typeof legacyManualHandles === 'object'
+      && !Array.isArray(legacyManualHandles)
+    ) ? legacyManualHandles as Record<string, unknown> : {};
+    if (
+      legacyManualHandles === true
+      || Boolean(legacyManualHandleRecord.source)
+      || Boolean(legacyManualHandleRecord.target)
+    ) {
+      feed('_manualHandles');
+      feed(legacyManualHandles === true);
+      feed(legacyManualHandleRecord.source);
+      feed(legacyManualHandleRecord.target);
+    }
+    if (Array.isArray(data.manualHandlePositions) && data.manualHandlePositions.length > 0) {
+      feed('manualHandlePositions');
+      feed(data.manualHandlePositions.map(String).join(','));
+    }
     feed(data.sourceHandleLocked);
     feed(data.targetHandleLocked);
+    if (data.sourceHandlePositionLocked === true) feed('sourceHandlePositionLocked:true');
+    if (data.targetHandlePositionLocked === true) feed('targetHandlePositionLocked:true');
     feed(data.sourcePortPolicy);
     feed(data.targetPortPolicy);
     feed(data.sourcePortConstraint);
@@ -272,6 +295,25 @@ export const computeBaseDisplayInputSignature = ({
       : {};
     feed(runtimeHandleLock.source);
     feed(runtimeHandleLock.target);
+    if (data.runtimeHandleLock === true) feed('runtimeHandleLock:true');
+    const legacyRuntimeHandleLock = data.runtimeHandleLock == null
+      ? data._runtimeHandleLock
+      : undefined;
+    const legacyRuntimeHandleLockRecord = (
+      legacyRuntimeHandleLock
+      && typeof legacyRuntimeHandleLock === 'object'
+      && !Array.isArray(legacyRuntimeHandleLock)
+    ) ? legacyRuntimeHandleLock as Record<string, unknown> : {};
+    if (
+      legacyRuntimeHandleLock === true
+      || Boolean(legacyRuntimeHandleLockRecord.source)
+      || Boolean(legacyRuntimeHandleLockRecord.target)
+    ) {
+      feed('_runtimeHandleLock');
+      feed(legacyRuntimeHandleLock === true);
+      feed(legacyRuntimeHandleLockRecord.source);
+      feed(legacyRuntimeHandleLockRecord.target);
+    }
     const treeRouting = (data.treeRouting && typeof data.treeRouting === 'object')
       ? data.treeRouting as Record<string, unknown>
       : {};
@@ -282,32 +324,7 @@ export const computeBaseDisplayInputSignature = ({
   return String(hash >>> 0);
 };
 
-const feedComputedPath = (
-  feed: (value: unknown) => void,
-  path: unknown,
-): void => {
-  if (!Array.isArray(path)) {
-    feed('no-path');
-    return;
-  }
-  feed(path.length);
-  for (const point of path) {
-    if (!isFinitePoint(point)) {
-      feed('invalid-point');
-      continue;
-    }
-    feed(Math.round(point.x));
-    feed(Math.round(point.y));
-  }
-};
-
-export const computeBaseReactFlowDisplayCacheSignature = ({
-  nodes,
-  edges,
-  enableSmartEdges,
-  smartEdgePadding,
-  isLargeGraph,
-}: {
+export const computeBaseReactFlowDisplayCacheSignature = (input: {
   nodes: Node[];
   edges: Edge[];
   enableSmartEdges: boolean;
@@ -322,87 +339,7 @@ export const computeBaseReactFlowDisplayCacheSignature = ({
       hash = Math.imul(hash, 16777619);
     }
   };
-  const feedGeometry = (value: unknown) => {
-    const numeric = Number(value);
-    feed(Number.isFinite(numeric) ? Math.round(numeric * 1_000) / 1_000 : 'invalid-geometry');
-  };
-
-  feed(BASE_DISPLAY_CACHE_VERSION);
-  feed(enableSmartEdges);
-  feed(Number.isFinite(smartEdgePadding) ? Math.round(smartEdgePadding) : 'invalid-padding');
-  feed(isLargeGraph);
-  nodes.forEach((node) => {
-    const pos = (node as any)?.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-    const measured = (node as any).measured;
-    const data = (node.data && typeof node.data === 'object')
-      ? node.data as Record<string, unknown>
-      : {};
-    feed(node.id);
-    feed(node.type);
-    feed((node as any).parentId);
-    feed(Boolean((node as any).positionAbsolute));
-    feed(data.layoutDirection);
-    feedGeometry(pos.x ?? 0);
-    feedGeometry(pos.y ?? 0);
-    feedGeometry(measured?.width ?? node.width ?? (node.style as any)?.width ?? 0);
-    feedGeometry(measured?.height ?? node.height ?? (node.style as any)?.height ?? 0);
-  });
-  edges.forEach((edge) => {
-    const data = (edge.data && typeof edge.data === 'object') ? edge.data as Record<string, unknown> : {};
-    feed(edge.id);
-    feed(edge.source);
-    feed(edge.target);
-    feed(edge.sourceHandle);
-    feed(edge.targetHandle);
-    feed(edge.type);
-    feed((edge as any).label);
-    feed(data.label);
-    feed(data.layoutDirection);
-    feed(data.layoutPathLocked);
-    feed(data._layoutPathLocked);
-    feed(data.autoSource);
-    feed(data.autoTarget);
-    feed(Array.isArray(data.auto) ? data.auto.map(String).join(',') : data.auto);
-    feed(Array.isArray(data.manualHandleSides) ? data.manualHandleSides.map(String).join(',') : data.manualHandleSides);
-    feed(Array.isArray(data.manualHandlePositions)
-      ? data.manualHandlePositions.map(String).join(',')
-      : data.manualHandlePositions);
-    const manualHandles = (data.manualHandles && typeof data.manualHandles === 'object')
-      ? data.manualHandles as Record<string, unknown>
-      : {};
-    feed(data.manualHandles === true);
-    feed(manualHandles.source);
-    feed(manualHandles.target);
-    feed(data.sourceHandleLocked);
-    feed(data.targetHandleLocked);
-    feed(data.sourceHandlePositionLocked);
-    feed(data.targetHandlePositionLocked);
-    feed(data.sourcePortPolicy);
-    feed(data.targetPortPolicy);
-    feed(data.sourcePortConstraint);
-    feed(data.targetPortConstraint);
-    feed(data.obstaclePadding);
-    const edgeConfig = (data.edgeConfig && typeof data.edgeConfig === 'object')
-      ? data.edgeConfig as Record<string, unknown>
-      : {};
-    feed(edgeConfig.obstaclePadding);
-    const runtimeHandleLock = (data.runtimeHandleLock && typeof data.runtimeHandleLock === 'object')
-      ? data.runtimeHandleLock as Record<string, unknown>
-      : {};
-    feed(runtimeHandleLock.source);
-    feed(runtimeHandleLock.target);
-    feed(data.isTreeBus);
-    feed(data.sharedTrunkAware);
-    feed(data.sharedTrunkSynthesized);
-    const treeRouting = (data.treeRouting && typeof data.treeRouting === 'object')
-      ? data.treeRouting as Record<string, unknown>
-      : {};
-    feed(treeRouting.effectiveSourceHandle);
-    feed(treeRouting.effectiveTargetHandle);
-    feedComputedPath(feed, data.computedPath);
-    feedComputedPath(feed, data.elkPath);
-    feedComputedPath(feed, treeRouting.points);
-  });
+  visitBaseReactFlowDisplayInputIdentity(input, feed);
 
   return String(hash >>> 0);
 };
@@ -583,7 +520,7 @@ export const readBaseReactFlowDisplayEdgesCacheEntry = (
   if (!isValidDisplayCacheInputSignature(signature)) return null;
   const memoryHit = displayEdgesMemoryCache.get(signature);
   if (memoryHit) {
-    if (!memoryHit.hardClean || !isValidDisplayOutputRouteSignature(memoryHit.outputRouteSignature)) {
+    if (!memoryHit.hardClean || !isBaseReactFlowDisplayOutputRouteSignature(memoryHit.outputRouteSignature)) {
       displayEdgesMemoryCache.delete(signature);
       return null;
     }
@@ -607,7 +544,7 @@ export const readBaseReactFlowDisplayEdgesCacheEntry = (
       throw new Error('Stale edge display cache');
     }
     if (record.hardClean !== true) throw new Error('Unverified edge display cache');
-    if (!isValidDisplayOutputRouteSignature(record.outputRouteSignature)) {
+    if (!isBaseReactFlowDisplayOutputRouteSignature(record.outputRouteSignature)) {
       throw new Error('Unsigned edge display cache');
     }
     if (!Array.isArray(record.edges) || record.edges.length > BASE_DISPLAY_CACHE_MAX_EDGES) {
@@ -658,7 +595,7 @@ export const writeBaseReactFlowDisplayEdgesCache = (
   const safeEdges = edges.map(sanitizeCachedDisplayEdge);
   if (safeEdges.some((edge) => edge == null)) return;
   const outputRouteSignature = options.outputRouteSignature;
-  if (!isValidDisplayOutputRouteSignature(outputRouteSignature)) return;
+  if (!isBaseReactFlowDisplayOutputRouteSignature(outputRouteSignature)) return;
   const payload = JSON.stringify({
     version: BASE_DISPLAY_CACHE_VERSION,
     signature,

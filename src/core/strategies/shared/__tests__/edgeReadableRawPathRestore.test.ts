@@ -36,8 +36,8 @@ describe('restoreReadableRawLockedPaths', () => {
         id: 'edge-tms-carrier',
         source: 'tms',
         target: 'carrier-portal',
-        sourceHandle: 'bottom',
-        targetHandle: 'bottom',
+        sourceHandle: 'source-bottom-runtime-port-1',
+        targetHandle: 'target-bottom-runtime-port-1',
         data: {
           computedPath: [
             { x: 1323, y: 1198 },
@@ -68,8 +68,6 @@ describe('restoreReadableRawLockedPaths', () => {
       currentEdges[0],
       {
         ...currentEdges[1],
-        sourceHandle: undefined,
-        targetHandle: undefined,
         data: {
           computedPath: [
             { x: 1227, y: 961 },
@@ -80,6 +78,7 @@ describe('restoreReadableRawLockedPaths', () => {
             { x: 1769, y: 278 },
           ],
           layoutPathLocked: true,
+          runtimeHandleLock: { source: true, target: true },
         },
       },
       currentEdges[2],
@@ -113,9 +112,50 @@ describe('restoreReadableRawLockedPaths', () => {
     expect(quality.detourPenalty).toBeLessThan(baseline.detourPenalty);
     expect((restored[1].data as any).readableRawPathRestored).toBe(true);
     expect(restored[1].sourceHandle).toBe('right');
+    expect(restored[1].targetHandle).toBe('target-bottom-runtime-port-1');
     expect(restoredPath.length).toBeLessThanOrEqual(5);
     expect(restoredPath[0].x).toBe(1533);
     expect(restoredPath[restoredPath.length - 1]).toEqual({ x: 1769, y: 278 });
+  });
+
+  it.each([
+    ['exact handle', { manualHandles: { source: true, target: true } }],
+    ['side handles', { manualHandleSides: ['source', 'target'] }],
+  ])('restores a same-side raw path without canonicalizing source-authored %s', (_name, lockData) => {
+    const graphNodes = [
+      node('source', 0, 0, 100, 60),
+      node('target', 500, 0, 100, 60),
+    ];
+    const currentPath = [
+      { x: 100, y: 30 },
+      { x: 148, y: 30 },
+      { x: 148, y: 200 },
+      { x: 452, y: 200 },
+      { x: 452, y: 30 },
+      { x: 500, y: 30 },
+    ];
+    const rawPath = [
+      { x: 100, y: 30 },
+      { x: 500, y: 30 },
+    ];
+    const currentEdge: Edge = {
+      id: 'source-target',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'source-right-port-1',
+      targetHandle: 'target-left-port-1',
+      data: { ...lockData, computedPath: currentPath },
+    };
+    const rawEdge: Edge = {
+      ...currentEdge,
+      data: { ...lockData, computedPath: rawPath, layoutPathLocked: true },
+    };
+
+    const [restored] = restoreReadableRawLockedPaths([currentEdge], [rawEdge], graphNodes);
+
+    expect((restored.data as any).computedPath).toEqual(rawPath);
+    expect(restored.sourceHandle).toBe('source-right-port-1');
+    expect(restored.targetHandle).toBe('target-left-port-1');
   });
 
   it('rejects a shorter raw path that crosses an unrelated node', () => {

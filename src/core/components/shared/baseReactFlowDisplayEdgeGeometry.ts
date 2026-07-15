@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
-import { expandHandle } from '../../routing/utils/handleUtils';
+import { normalizeHandle } from '../../routing/utils/handleUtils';
 import { isFinitePoint } from './baseReactFlowDisplayCache';
 
 export type NodeRect = {
@@ -13,8 +13,8 @@ export type NodeRect = {
 export type AnchorSide = 'left' | 'right' | 'top' | 'bottom';
 
 export const isVerticalHandle = (handle?: string | null) => {
-  const s = String(handle || '').toLowerCase();
-  return s === 'top' || s === 'bottom' || s === 't' || s === 'b';
+  const side = normalizeHandle(handle);
+  return side === 't' || side === 'b';
 };
 
 export const getNodeX = (node: Node | undefined) => {
@@ -63,17 +63,20 @@ export const getNodeRect = (node: Node | undefined, nodeById?: Map<string, Node>
 };
 
 export const anchorForHandle = (rect: NodeRect, handle?: string | null) => {
-  const h = (expandHandle(String(handle || '')) || '').toLowerCase();
-  if (h === 'left') return { x: rect.x, y: rect.y + rect.height / 2 };
-  if (h === 'right') return { x: rect.x + rect.width, y: rect.y + rect.height / 2 };
-  if (h === 'top') return { x: rect.x + rect.width / 2, y: rect.y };
-  if (h === 'bottom') return { x: rect.x + rect.width / 2, y: rect.y + rect.height };
+  const side = normalizeHandle(handle);
+  if (side === 'l') return { x: rect.x, y: rect.y + rect.height / 2 };
+  if (side === 'r') return { x: rect.x + rect.width, y: rect.y + rect.height / 2 };
+  if (side === 't') return { x: rect.x + rect.width / 2, y: rect.y };
+  if (side === 'b') return { x: rect.x + rect.width / 2, y: rect.y + rect.height };
   return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
 };
 
 export const sideForHandle = (handle?: string | null): AnchorSide | null => {
-  const h = (expandHandle(String(handle || '')) || '').toLowerCase();
-  if (h === 'left' || h === 'right' || h === 'top' || h === 'bottom') return h as AnchorSide;
+  const side = normalizeHandle(handle);
+  if (side === 'l') return 'left';
+  if (side === 'r') return 'right';
+  if (side === 't') return 'top';
+  if (side === 'b') return 'bottom';
   return null;
 };
 

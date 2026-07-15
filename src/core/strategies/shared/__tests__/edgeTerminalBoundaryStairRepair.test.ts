@@ -210,6 +210,52 @@ describe('repairTerminalBoundaryStairs', () => {
     expect(countEndpointNodeTraversalHits((repaired.data as any).computedPath, repaired, obstacles)).toBe(0);
   });
 
+  it('keeps source-authored exact terminals immutable during interior traversal repair', () => {
+    const originalPath = [{ x: 50, y: 0 }, { x: 50, y: 400 }];
+    const edge: Edge = {
+      id: 'manual-direct-inward',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'source-top-port-1',
+      targetHandle: 'target-bottom-port-1',
+      data: {
+        _manualHandles: { source: true, target: true },
+        computedPath: originalPath,
+      },
+    };
+
+    const [result] = repairTerminalBoundaryStairs([edge], [
+      node('source', 0, 0, 100, 100),
+      node('target', 0, 300, 100, 100),
+    ]);
+
+    expect(result.sourceHandle).toBe('source-top-port-1');
+    expect(result.targetHandle).toBe('target-bottom-port-1');
+    expect((result.data as any).computedPath).toEqual(originalPath);
+  });
+
+  it('allows interior traversal repair to refine router-owned runtime terminals', () => {
+    const edge: Edge = {
+      id: 'runtime-direct-inward',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'source-top-runtime',
+      targetHandle: 'target-bottom-runtime',
+      data: {
+        runtimeHandleLock: { source: true, target: true },
+        computedPath: [{ x: 50, y: 0 }, { x: 50, y: 400 }],
+      },
+    };
+
+    const [result] = repairTerminalBoundaryStairs([edge], [
+      node('source', 0, 0, 100, 100),
+      node('target', 0, 300, 100, 100),
+    ]);
+
+    expect(result.sourceHandle).toBe('bottom');
+    expect(result.targetHandle).toBe('top');
+  });
+
   it('uses the geometric exit side when a same-side outward lane would cross another edge', () => {
     const feedback: Edge = {
       id: 'feedback',

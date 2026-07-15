@@ -4,25 +4,11 @@ import { diagramConfigManager } from '../components/config/DiagramConfig';
 import { getConfigIntegration } from '../config/ConfigIntegration';
 import { resolveThemeDomainKey } from '../utils/domainKey';
 import { diagramStyleManager } from '../components/shared/DiagramStyleManager';
+import { EdgeType } from '../types/edgeType';
 
-/**
- * 边缘类型枚举
- */
-export enum EdgeType {
-  DEFAULT = 'default',
-  STRAIGHT = 'straight',
-  STEP = 'step',
-  SMOOTHSTEP = 'smoothstep',
-  BEZIER = 'bezier',
-  SMART_BEZIER = 'smart-bezier',
-  SMART_STRAIGHT = 'smart-straight',
-  SMART_STEP = 'smart-step',
-  ADVANCED_SMART_STEP = 'advanced-smart-step',
-  ADVANCED_SMART_BEZIER = 'advanced-smart-bezier',
-  ADVANCED_SMART_STRAIGHT = 'advanced-smart-straight',
-  ADVANCED_CUSTOM = 'advancedCustomEdge',
-  ELK = 'elk' // 添加 ELK 类型
-}
+// Compatibility export: callers historically imported EdgeType from the
+// factory. The canonical definition now lives in a worker-safe module.
+export { EdgeType } from '../types/edgeType';
 
 /**
  * 边缘样式类型枚举

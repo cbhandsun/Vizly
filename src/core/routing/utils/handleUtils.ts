@@ -12,7 +12,14 @@
  *   替代 useSmartEdgeContext 和 calcHandlePos 中的内联重复实现。
  */
 
-import { Position } from '@xyflow/react';
+import type { Position } from '@xyflow/react';
+
+const HANDLE_POSITIONS = {
+    Top: 'top' as Position,
+    Bottom: 'bottom' as Position,
+    Left: 'left' as Position,
+    Right: 'right' as Position,
+} as const;
 
 /**
  * Canonical Handle ID → Position parser.
@@ -27,15 +34,15 @@ export function parseHandlePosition(handleId?: string | null): Position | undefi
     if (!handleId) return undefined;
     const s = handleId.toLowerCase();
     // Priority 1: exact match
-    if (s === 'top' || s === 't') return Position.Top;
-    if (s === 'bottom' || s === 'b') return Position.Bottom;
-    if (s === 'left' || s === 'l') return Position.Left;
-    if (s === 'right' || s === 'r') return Position.Right;
+    if (s === 'top' || s === 't') return HANDLE_POSITIONS.Top;
+    if (s === 'bottom' || s === 'b') return HANDLE_POSITIONS.Bottom;
+    if (s === 'left' || s === 'l') return HANDLE_POSITIONS.Left;
+    if (s === 'right' || s === 'r') return HANDLE_POSITIONS.Right;
     // Priority 2: substring includes (catches 'source-right', 't-right', 'col-0-left', etc.)
-    if (s.includes('right')) return Position.Right;
-    if (s.includes('left')) return Position.Left;
-    if (s.includes('bottom')) return Position.Bottom;
-    if (s.includes('top')) return Position.Top;
+    if (s.includes('right')) return HANDLE_POSITIONS.Right;
+    if (s.includes('left')) return HANDLE_POSITIONS.Left;
+    if (s.includes('bottom')) return HANDLE_POSITIONS.Bottom;
+    if (s.includes('top')) return HANDLE_POSITIONS.Top;
     return undefined;
 }
 

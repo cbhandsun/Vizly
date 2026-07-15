@@ -1,5 +1,9 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
+import {
+  edgeTerminalPositionIsFixed,
+  edgeTerminalSideIsFixed,
+} from '../../routing/utils/edgeTerminalPolicy';
 import { normalizeHandle } from '../../routing/utils/handleUtils';
 
 export type Point = { x: number; y: number };
@@ -103,36 +107,11 @@ export function pathEquals(first: Point[], second: Point[]): boolean {
 }
 
 export function terminalPositionIsFixed(edge: Edge, role: TerminalRole): boolean {
-  const data = (edge.data || {}) as Record<string, any>;
-  const manualPositions = Array.isArray(data.manualHandlePositions)
-    ? data.manualHandlePositions.map((value: unknown) => String(value).toLowerCase())
-    : [];
-  if (manualPositions.includes(role) || data[`${role}HandlePositionLocked`] === true) return true;
-  const policy = String(
-    data[`${role}PortPolicy`]
-      ?? data[`${role}PortConstraint`]
-      ?? '',
-  ).toLowerCase();
-  return policy === 'fixed-pos' || policy === 'fixed_pos';
+  return edgeTerminalPositionIsFixed(edge, role);
 }
 
 export function terminalSideIsFixed(edge: Edge, role: TerminalRole): boolean {
-  const data = (edge.data || {}) as Record<string, any>;
-  const manualSides = Array.isArray(data.manualHandleSides)
-    ? data.manualHandleSides.map((value: unknown) => String(value).toLowerCase())
-    : [];
-  const manualHandles = data.manualHandles;
-  const policy = String(
-    data[`${role}PortPolicy`]
-      ?? data[`${role}PortConstraint`]
-      ?? '',
-  ).toLowerCase();
-  return data.manualHandles === true
-    || (manualHandles && typeof manualHandles === 'object' && manualHandles[role] === true)
-    || manualSides.includes(role)
-    || data[`${role}HandleLocked`] === true
-    || terminalPositionIsFixed(edge, role)
-    || ['strong', 'fixed', 'fixed-side', 'fixed_side'].includes(policy);
+  return edgeTerminalSideIsFixed(edge, role);
 }
 
 export function terminalBoundarySide(

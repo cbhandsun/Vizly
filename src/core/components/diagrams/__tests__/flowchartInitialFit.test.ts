@@ -1,4 +1,4 @@
-import type { Node, ReactFlowInstance } from '@xyflow/react';
+import type { Edge, Node, ReactFlowInstance } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import flowchartDesignerSource from '../FlowchartDesigner.tsx?raw';
@@ -23,7 +23,7 @@ describe('flowchartInitialFit', () => {
           data: { label: 'Node 1' },
         },
       ] satisfies Node[]),
-    } as Pick<ReactFlowInstance<Node, unknown>, 'getNodes'>;
+    } as Pick<ReactFlowInstance<Node, Edge>, 'getNodes'>;
 
     scheduleFlowchartInitialFit({
       reactFlowInstance,
@@ -43,7 +43,7 @@ describe('flowchartInitialFit', () => {
     const dispatchFit = vi.fn();
     const reactFlowInstance = {
       getNodes: vi.fn(() => [] satisfies Node[]),
-    } as Pick<ReactFlowInstance<Node, unknown>, 'getNodes'>;
+    } as Pick<ReactFlowInstance<Node, Edge>, 'getNodes'>;
 
     scheduleFlowchartInitialFit({
       reactFlowInstance,
@@ -77,7 +77,7 @@ describe('flowchartInitialFit', () => {
           data: { label: 'Node 1' },
         },
       ] satisfies Node[]),
-    } as Pick<ReactFlowInstance<Node, unknown>, 'getNodes'>;
+    } as Pick<ReactFlowInstance<Node, Edge>, 'getNodes'>;
 
     expect(() => scheduleFlowchartInitialFit({
       reactFlowInstance,

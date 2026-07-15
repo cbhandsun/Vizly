@@ -20,7 +20,7 @@ const node = (
   y: number,
   width: number,
   height: number,
-): Node => ({
+): Node & { positionAbsolute: Point } => ({
   id,
   position: { x, y },
   positionAbsolute: { x, y },

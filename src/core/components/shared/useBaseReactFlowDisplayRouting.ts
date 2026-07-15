@@ -1,20 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 import {
+  BASE_DISPLAY_ROUTING_VERSION,
   computeBaseReactFlowDisplayEdgeEpoch,
   computeBaseReactFlowDisplayCacheSignature,
-  computeBaseReactFlowEndpointGeometryKey,
   computeBaseReactFlowDisplayOutputRouteSignature,
   readBaseReactFlowDisplayEdgesCacheEntry,
   writeBaseReactFlowDisplayEdgesCache,
 } from './baseReactFlowDisplayEdgeCore';
-import { repairBaseReactFlowMeasuredDisplayEdges } from './baseReactFlowDisplayEdges';
 import {
   computeBaseReactFlowDisplayEdgesInWorker,
-  createBaseReactFlowDisplayEdgePatches,
-  mergeBaseReactFlowDisplayEdgePatches,
-  mergeTrustedBaseReactFlowDisplayCacheEntry,
   prewarmBaseReactFlowDisplayWorker,
+  repairBaseReactFlowDisplayEdgesInWorker,
   resolveBaseReactFlowDisplayedEdges,
   resolveBaseReactFlowDisplayQualityPolicy,
   scheduleBaseReactFlowDisplayCacheWrite,
@@ -23,6 +20,16 @@ import {
   type DisplayRoutingInput,
   updateDisplayRoutingDebugState,
 } from './baseReactFlowDisplayWorkerClient';
+import {
+  createBaseReactFlowDisplayEdgePatches,
+  doBaseReactFlowDisplayRoutesMatchExactly,
+  mergeBaseReactFlowDisplayEdgePatches,
+  mergeBaseReactFlowDisplayRoutingTransactions,
+  mergeTrustedBaseReactFlowDisplayCacheEntry,
+  resolveBaseReactFlowDisplayCacheReplaySignature,
+} from './baseReactFlowDisplayRoutingTransaction';
+import { resolveBaseReactFlowDisplayCandidate } from './baseReactFlowDisplayCandidateResolver';
+import { computeBaseReactFlowDisplayGeometryDigest } from './baseReactFlowDisplayInputIdentity';
 import { logBaseReactFlowEventBindingFailure } from './baseReactFlowLogging';
 
 export type UseBaseReactFlowDisplayRoutingOptions = {
@@ -77,6 +84,16 @@ export const useBaseReactFlowDisplayRouting = ({
     });
   }, [edges, routingNodes, enableSmartEdges, smartEdgePadding, isLargeGraph]);
 
+  const inputGeometryDigest = useMemo(() => (
+    computeBaseReactFlowDisplayGeometryDigest({
+      nodes: routingNodes,
+      edges,
+      enableSmartEdges,
+      smartEdgePadding,
+      isLargeGraph,
+    })
+  ), [edges, routingNodes, enableSmartEdges, smartEdgePadding, isLargeGraph]);
+
   const displayQualityPolicy = useMemo(() => (
     resolveBaseReactFlowDisplayQualityPolicy({
       nodeCount: routingNodes.length,
@@ -96,8 +113,8 @@ export const useBaseReactFlowDisplayRouting = ({
       : null
   ), [displayEdgeCacheSignature, routingGeometryReady]);
 
-  const safeCachedFinalDisplayEdges = useMemo(() => {
-    if (!cachedFinalDisplayEntry) return null;
+  const cachedDisplayCandidateEdges = useMemo(() => {
+    if (!cachedFinalDisplayEntry || cachedFinalDisplayEntry.hardClean !== true) return null;
     return mergeTrustedBaseReactFlowDisplayCacheEntry(edges, cachedFinalDisplayEntry);
   }, [cachedFinalDisplayEntry, edges]);
 
@@ -106,6 +123,7 @@ export const useBaseReactFlowDisplayRouting = ({
   useEffect(() => {
     displayRoutingInputRef.current = {
       cacheSignature: displayEdgeCacheSignature,
+      inputGeometryDigest,
       edges,
       nodes: routingNodes,
       enableSmartEdges,
@@ -115,6 +133,7 @@ export const useBaseReactFlowDisplayRouting = ({
     };
   }, [
     displayEdgeCacheSignature,
+    inputGeometryDigest,
     edges,
     routingNodes,
     enableSmartEdges,
@@ -131,6 +150,10 @@ export const useBaseReactFlowDisplayRouting = ({
     updateDisplayRoutingDebugState({
       stage: 'effect-enter',
       signature: displayEdgeCacheSignature,
+      inputGeometryDigest,
+      outputRouteSignature: undefined,
+      routingVersion: BASE_DISPLAY_ROUTING_VERSION,
+      workerResolution: undefined,
       nodeCount,
       edgeCount,
     });
@@ -163,20 +186,18 @@ export const useBaseReactFlowDisplayRouting = ({
       });
       return undefined;
     }
+    const displayWorkerQualityMode = displayQualityPolicy.mode;
 
-    if (safeCachedFinalDisplayEdges) {
-      const cacheHitAt = Date.now();
+    if (cachedDisplayCandidateEdges) {
       updateDisplayRoutingDebugState({
-        stage: 'cache-hit',
+        stage: 'cache-candidate-pending',
         signature: displayEdgeCacheSignature,
         nodeCount,
         edgeCount,
-        cacheHitAt,
-        routeMs: 0,
+        cacheHitAt: Date.now(),
         workerStartCount: displayEdgeWorkerStartCountRef.current,
         workerAbortCount: displayEdgeWorkerAbortCountRef.current,
       });
-      return undefined;
     }
 
     if (!isContainerReady) {
@@ -209,11 +230,14 @@ export const useBaseReactFlowDisplayRouting = ({
       workerStartCount: displayEdgeWorkerStartCountRef.current,
       workerAbortCount: displayEdgeWorkerAbortCountRef.current,
     });
-    const cancelSchedule = scheduleBaseReactFlowDisplayQuality(() => {
+    const cancelSchedule = scheduleBaseReactFlowDisplayQuality(async () => {
       if (cancelled) return;
-      const activeRoutingInput = displayRoutingInputRef.current;
+      let activeRoutingInput = displayRoutingInputRef.current;
       if (!activeRoutingInput) return;
-      if (activeRoutingInput.cacheSignature !== displayEdgeCacheSignature) {
+      if (
+        activeRoutingInput.cacheSignature !== displayEdgeCacheSignature
+        || activeRoutingInput.inputGeometryDigest !== inputGeometryDigest
+      ) {
         updateDisplayRoutingDebugState({
           stage: 'skip-stale-schedule',
           signature: displayEdgeCacheSignature,
@@ -222,6 +246,48 @@ export const useBaseReactFlowDisplayRouting = ({
         });
         return;
       }
+      if (!cachedDisplayCandidateEdges) {
+        updateDisplayRoutingDebugState({
+          stage: 'precompiled-candidate-loading',
+          signature: displayEdgeCacheSignature,
+          nodeCount,
+          edgeCount,
+        });
+      }
+      const candidateResolution = await resolveBaseReactFlowDisplayCandidate({
+        input: {
+          inputSignature: displayEdgeCacheSignature,
+          inputGeometryDigest,
+          nodes: activeRoutingInput.nodes,
+          edges: activeRoutingInput.edges,
+          enableSmartEdges: activeRoutingInput.enableSmartEdges,
+          smartEdgePadding: activeRoutingInput.smartEdgePadding,
+          isLargeGraph: activeRoutingInput.isLargeGraph,
+        },
+        persistentCandidateEdges: cachedDisplayCandidateEdges,
+        signal: workerAbortController.signal,
+        isCurrent: () => (
+          !cancelled
+          && displayRoutingInputRef.current?.cacheSignature === displayEdgeCacheSignature
+          && displayRoutingInputRef.current?.inputGeometryDigest === inputGeometryDigest
+        ),
+      });
+      if (!candidateResolution) return;
+      activeRoutingInput = displayRoutingInputRef.current;
+      if (
+        !activeRoutingInput
+        || activeRoutingInput.cacheSignature !== displayEdgeCacheSignature
+        || activeRoutingInput.inputGeometryDigest !== inputGeometryDigest
+        || workerAbortController.signal.aborted
+      ) return;
+      updateDisplayRoutingDebugState({
+        stage: candidateResolution.source === 'miss'
+          ? 'precompiled-candidate-miss'
+          : `${candidateResolution.source}-candidate-ready`,
+        signature: displayEdgeCacheSignature,
+        nodeCount,
+        edgeCount,
+      });
       const requestId = `${displayEdgeCacheSignature}:${displayEdgeWorkerRequestSeqRef.current += 1}`;
       workerStartedAt = Date.now();
       displayEdgeWorkerStartCountRef.current += 1;
@@ -244,18 +310,25 @@ export const useBaseReactFlowDisplayRouting = ({
         smartEdgePadding: activeRoutingInput.smartEdgePadding,
         isLargeGraph: activeRoutingInput.isLargeGraph,
         displayEdgeEpoch: activeRoutingInput.displayEdgeEpoch,
-        qualityMode: displayQualityPolicy.mode,
+        cachedCandidateEdges: candidateResolution.candidateEdges,
+        candidateSource: candidateResolution.source === 'miss'
+          ? undefined
+          : candidateResolution.source,
+        qualityMode: displayWorkerQualityMode,
         timeoutMs: displayQualityPolicy.timeoutMs,
         signal: workerAbortController.signal,
-      }).then((workerResult) => {
+      }).then(async (workerResult) => {
         if (cancelled) return;
-        workerCompleted = true;
-        const finalEdges = workerResult.edges;
-        const routingPatches = createBaseReactFlowDisplayEdgePatches(
-          activeRoutingInput.edges,
-          finalEdges,
+        const isRequestCurrent = () => (
+          !cancelled
+          && displayRoutingInputRef.current?.cacheSignature === displayEdgeCacheSignature
+          && displayRoutingInputRef.current?.inputGeometryDigest === inputGeometryDigest
         );
-        if (!routingPatches) {
+        const workerRoutingPatches = createBaseReactFlowDisplayEdgePatches(
+          workerResult.projectedEdges,
+          workerResult.edges,
+        );
+        if (!workerRoutingPatches) {
           updateDisplayRoutingDebugState({
             stage: 'shape-mismatch',
             signature: displayEdgeCacheSignature,
@@ -266,12 +339,13 @@ export const useBaseReactFlowDisplayRouting = ({
           logBaseReactFlowEventBindingFailure('displayEdgesShapeMismatch', new Error('Display edge shape mismatch'));
           return;
         }
-        const latestSourceEdges = displayRoutingInputRef.current?.edges ?? activeRoutingInput.edges;
-        const mergedFinalEdges = mergeBaseReactFlowDisplayEdgePatches(
-          latestSourceEdges,
-          routingPatches,
+        const latestRoutingInput = displayRoutingInputRef.current;
+        if (!latestRoutingInput || !isRequestCurrent()) return;
+        const mergedWorkerEdges = mergeBaseReactFlowDisplayEdgePatches(
+          latestRoutingInput.edges,
+          workerRoutingPatches,
         );
-        if (!mergedFinalEdges) {
+        if (!mergedWorkerEdges) {
           updateDisplayRoutingDebugState({
             stage: 'latest-shape-mismatch',
             signature: displayEdgeCacheSignature,
@@ -281,11 +355,98 @@ export const useBaseReactFlowDisplayRouting = ({
           });
           return;
         }
-        const workerOutputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(finalEdges);
+        let resolvedWorkerResult = workerResult;
+        if (workerResult.hardClean !== true) {
+          const repairRequestId = `${requestId}:repair`;
+          updateDisplayRoutingDebugState({
+            stage: 'worker-fallback-loading',
+            signature: displayEdgeCacheSignature,
+            requestId: repairRequestId,
+            nodeCount,
+            edgeCount,
+          });
+          resolvedWorkerResult = await repairBaseReactFlowDisplayEdgesInWorker({
+            workerRef: displayEdgeWorkerRef,
+            requestId: repairRequestId,
+            edges: mergedWorkerEdges,
+            nodes: latestRoutingInput.nodes,
+            timeoutMs: displayQualityPolicy.timeoutMs,
+            signal: workerAbortController.signal,
+          });
+          if (!isRequestCurrent()) return;
+          updateDisplayRoutingDebugState({
+            stage: 'worker-fallback-repaired',
+            signature: displayEdgeCacheSignature,
+            requestId: repairRequestId,
+            nodeCount,
+            edgeCount: resolvedWorkerResult.edges.length,
+          });
+        }
+        if (!isRequestCurrent()) return;
+        workerCompleted = true;
+        const reportedFinalEdges = resolvedWorkerResult.edges;
+        const repairRoutingPatches = createBaseReactFlowDisplayEdgePatches(
+          workerResult.hardClean === true
+            ? mergedWorkerEdges
+            : resolvedWorkerResult.projectedEdges,
+          workerResult.hardClean === true
+            ? mergedWorkerEdges
+            : reportedFinalEdges,
+        );
+        if (!repairRoutingPatches) {
+          updateDisplayRoutingDebugState({
+            stage: 'shape-mismatch',
+            signature: displayEdgeCacheSignature,
+            requestId,
+            nodeCount,
+            edgeCount,
+          });
+          logBaseReactFlowEventBindingFailure('displayEdgesShapeMismatch', new Error('Display edge shape mismatch'));
+          return;
+        }
+        const latestSourceEdges = displayRoutingInputRef.current?.edges;
+        if (!latestSourceEdges) return;
+        const mergedTransactions = mergeBaseReactFlowDisplayRoutingTransactions({
+          latestSourceEdges,
+          workerRoutingPatches,
+          repairRoutingPatches,
+        });
+        if (!mergedTransactions) {
+          updateDisplayRoutingDebugState({
+            stage: 'latest-shape-mismatch',
+            signature: displayEdgeCacheSignature,
+            requestId,
+            nodeCount,
+            edgeCount,
+          });
+          return;
+        }
+        const mergedFinalEdges = mergedTransactions.edges;
         const mergedOutputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(mergedFinalEdges);
-        const trustedWorkerHardClean = workerResult.hardClean === true
-          && workerOutputRouteSignature !== null
-          && workerOutputRouteSignature === mergedOutputRouteSignature;
+        const trustedFinalHardClean = resolvedWorkerResult.hardClean === true
+          && doBaseReactFlowDisplayRoutesMatchExactly(reportedFinalEdges, mergedFinalEdges);
+        if (!trustedFinalHardClean) {
+          updateDisplayRoutingDebugState({
+            stage: 'final-quality-rejected',
+            signature: displayEdgeCacheSignature,
+            requestId,
+            nodeCount,
+            edgeCount,
+          });
+          logBaseReactFlowEventBindingFailure(
+            'displayEdgesFinalQuality',
+            new Error('display-edge-worker-final-signature-mismatch'),
+          );
+          return;
+        }
+        const cacheReplaySignature = mergedTransactions.cachePatches
+          ? resolveBaseReactFlowDisplayCacheReplaySignature({
+            sourceEdges: latestSourceEdges,
+            finalEdges: mergedFinalEdges,
+            cachePatches: mergedTransactions.cachePatches,
+            finalOutputRouteSignature: mergedOutputRouteSignature,
+          })
+          : null;
         const finalAppliedAt = Date.now();
         updateDisplayRoutingDebugState({
           stage: 'final-applied',
@@ -297,18 +458,24 @@ export const useBaseReactFlowDisplayRouting = ({
           routeMs: workerStartedAt === null ? undefined : finalAppliedAt - workerStartedAt,
           workerStartCount: displayEdgeWorkerStartCountRef.current,
           workerAbortCount: displayEdgeWorkerAbortCountRef.current,
+          workerResolution: resolvedWorkerResult.routeResolution,
+          outputRouteSignature: mergedOutputRouteSignature ?? undefined,
         });
         setDeferredDisplayEdges({
           signature: displayEdgeCacheSignature,
-          edges: mergedFinalEdges,
-          hardClean: trustedWorkerHardClean,
+          geometryDigest: inputGeometryDigest,
+          displayPatches: mergedTransactions.displayPatches,
+          hardClean: true,
         });
-        cancelCacheWrite = scheduleBaseReactFlowDisplayCacheWrite(() => {
-          writeBaseReactFlowDisplayEdgesCache(displayEdgeCacheSignature, routingPatches, {
-            hardClean: trustedWorkerHardClean,
-            outputRouteSignature: mergedOutputRouteSignature ?? undefined,
+        if (cacheReplaySignature !== null && mergedTransactions.cachePatches) {
+          const cachePatches = mergedTransactions.cachePatches;
+          cancelCacheWrite = scheduleBaseReactFlowDisplayCacheWrite(() => {
+            writeBaseReactFlowDisplayEdgesCache(displayEdgeCacheSignature, cachePatches, {
+              hardClean: true,
+              outputRouteSignature: cacheReplaySignature,
+            });
           });
-        });
+        }
       }).catch((error) => {
         if (cancelled) return;
         workerCompleted = true;
@@ -342,38 +509,22 @@ export const useBaseReactFlowDisplayRouting = ({
       cancelSchedule();
     };
   }, [
-    safeCachedFinalDisplayEdges,
+    cachedDisplayCandidateEdges,
     displayEdgeCacheSignature,
     displayQualityPolicy,
+    inputGeometryDigest,
     isContainerReady,
     routingGeometryReady,
   ]);
 
   const resolvedDisplayEdges = resolveBaseReactFlowDisplayedEdges({
     signature: displayEdgeCacheSignature,
+    geometryDigest: inputGeometryDigest,
     policyMode: displayQualityPolicy.mode,
     deferred: deferredDisplayEdges,
-    cached: safeCachedFinalDisplayEdges,
+    cached: null,
     immediate: edges,
   });
-  const resolvedDisplayEdgesAreHardClean = deferredDisplayEdges?.signature === displayEdgeCacheSignature
-    ? deferredDisplayEdges.hardClean
-    : Boolean(safeCachedFinalDisplayEdges && cachedFinalDisplayEntry?.hardClean);
-  const displayEndpointGeometryKey = useMemo(
-    () => computeBaseReactFlowEndpointGeometryKey(routingNodes),
-    [routingNodes],
-  );
-  const displayEdges = useMemo(
-    () => resolvedDisplayEdgesAreHardClean
-      ? resolvedDisplayEdges
-      : repairBaseReactFlowMeasuredDisplayEdges(
-        resolvedDisplayEdges,
-        routingNodes,
-      ),
-    // The exact key represents every node field consumed by endpoint anchoring and hard safety.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [resolvedDisplayEdges, resolvedDisplayEdgesAreHardClean, displayEndpointGeometryKey],
-  );
 
-  return displayEdges;
+  return resolvedDisplayEdges;
 };

@@ -5,6 +5,10 @@ import { findStrictCrossings } from '../../strategies/shared/edgeDetachedOverlap
 import { buildSharedNodeTerminalSideCandidates } from './baseReactFlowSharedNodePortRoleRepair';
 import { compactOrthogonalPath } from './baseReactFlowDisplayEdgeCore';
 import {
+  displayTerminalSideCanSwitch,
+  resolveDisplayTerminalHandleForSide,
+} from './baseReactFlowDisplayTerminalPolicy';
+import {
   displayAxisOf,
   fullDisplayPortSide,
   getDisplayComputedPath,
@@ -20,25 +24,115 @@ import {
   type DisplaySegment,
 } from './baseReactFlowDisplayGeometry';
 
-const MIN_DISPLAY_ENDPOINT_STUB = 48;
+export { displayTerminalSideCanSwitch } from './baseReactFlowDisplayTerminalPolicy';
 
-export const displayTerminalSideCanSwitch = (
-  edge: Edge,
+const MIN_DISPLAY_ENDPOINT_STUB = 48;
+const TERMINAL_SIDE_TOLERANCE = 2;
+
+const pointOnDeclaredTerminalSide = (
+  point: DisplayPoint,
+  rect: DisplayRect,
+  side: 'top' | 'bottom' | 'left' | 'right',
+): DisplayPoint | null => {
+  const tangentMinimum = side === 'left' || side === 'right' ? rect.y : rect.x;
+  const tangentMaximum = tangentMinimum + (
+    side === 'left' || side === 'right' ? rect.height : rect.width
+  );
+  const tangent = side === 'left' || side === 'right' ? point.y : point.x;
+  if (
+    tangent < tangentMinimum - TERMINAL_SIDE_TOLERANCE
+    || tangent > tangentMaximum + TERMINAL_SIDE_TOLERANCE
+  ) return null;
+  if (side === 'left') return { x: rect.x, y: tangent };
+  if (side === 'right') return { x: rect.x + rect.width, y: tangent };
+  if (side === 'top') return { x: tangent, y: rect.y };
+  return { x: tangent, y: rect.y + rect.height };
+};
+
+/**
+ * Replaces a tangential terminal departure with an outward stub while keeping
+ * the terminal's existing slot on the declared node side. Reusing that slot is
+ * important when the side centre is already occupied by an opposite-flow edge.
+ * Candidates splice into an existing parallel segment, so the untouched
+ * terminal and the stable remainder of the route stay unchanged.
+ */
+export const buildDeclaredTerminalAxisStubCandidates = (
+  path: DisplayPoint[],
   role: 'source' | 'target',
-  nextSide: 'top' | 'bottom' | 'left' | 'right',
-): boolean => {
-  const data = ((edge.data || {}) as Record<string, any>);
-  const manualSides = Array.isArray(data.manualHandleSides)
-    ? data.manualHandleSides.map((side: unknown) => String(side).toLowerCase())
-    : [];
-  const policy = String(data[`${role}PortPolicy`] ?? data[`${role}PortConstraint`] ?? '')
-    .toLowerCase();
-  if (policy === 'forbidden') return false;
-  const fixed = manualSides.includes(role)
-    || data[`${role}HandleLocked`] === true
-    || ['strong', 'fixed', 'fixed-side', 'fixed_side', 'fixed-pos', 'fixed_pos'].includes(policy);
-  if (!fixed) return true;
-  return normalizeHandle(role === 'source' ? edge.sourceHandle : edge.targetHandle) === nextSide[0];
+  rect: DisplayRect,
+  side: 'top' | 'bottom' | 'left' | 'right',
+  minStub = MIN_DISPLAY_ENDPOINT_STUB,
+  maxCandidates = 6,
+): DisplayPoint[][] => {
+  if (
+    path.length < 3
+    || !Number.isFinite(minStub)
+    || minStub <= 0
+    || !Number.isInteger(maxCandidates)
+    || maxCandidates <= 0
+  ) return [];
+  const oriented = role === 'source'
+    ? path.map(point => ({ ...point }))
+    : [...path].reverse().map(point => ({ ...point }));
+  const terminal = pointOnDeclaredTerminalSide(oriented[0], rect, side);
+  if (!terminal) return [];
+  const horizontalTerminal = side === 'left' || side === 'right';
+  const expectedAxis = horizontalTerminal ? 'h' : 'v';
+  const outwardDirection = side === 'right' || side === 'bottom' ? 1 : -1;
+  const boundary = horizontalTerminal ? terminal.x : terminal.y;
+  const laneCoordinates = [
+    boundary + outwardDirection * minStub,
+    boundary + outwardDirection * (minStub + RESIDUAL_PARALLEL_LANE_GAP),
+    boundary + outwardDirection * (minStub + RESIDUAL_PARALLEL_LANE_GAP * 2),
+  ].filter((coordinate, index, coordinates) => (
+    Number.isFinite(coordinate)
+    && coordinates.findIndex(other => Math.abs(other - coordinate) <= 0.5) === index
+  )).sort((first, second) => (
+    Math.abs(first - boundary) - Math.abs(second - boundary)
+  ));
+  const candidates: DisplayPoint[][] = [];
+  const seen = new Set<string>();
+
+  for (const laneCoordinate of laneCoordinates) {
+    for (let segmentIndex = 1; segmentIndex < oriented.length - 1; segmentIndex += 1) {
+      const segmentStart = oriented[segmentIndex];
+      const segmentEnd = oriented[segmentIndex + 1];
+      if (displayAxisOf(segmentStart, segmentEnd) !== expectedAxis) continue;
+      const segmentMinimum = horizontalTerminal
+        ? Math.min(segmentStart.x, segmentEnd.x)
+        : Math.min(segmentStart.y, segmentEnd.y);
+      const segmentMaximum = horizontalTerminal
+        ? Math.max(segmentStart.x, segmentEnd.x)
+        : Math.max(segmentStart.y, segmentEnd.y);
+      if (
+        laneCoordinate < segmentMinimum - TERMINAL_SIDE_TOLERANCE
+        || laneCoordinate > segmentMaximum + TERMINAL_SIDE_TOLERANCE
+      ) continue;
+      const stub = horizontalTerminal
+        ? { x: laneCoordinate, y: terminal.y }
+        : { x: terminal.x, y: laneCoordinate };
+      const splice = horizontalTerminal
+        ? { x: laneCoordinate, y: segmentStart.y }
+        : { x: segmentStart.x, y: laneCoordinate };
+      const candidateOriented = compactOrthogonalPath([
+        terminal,
+        stub,
+        splice,
+        segmentEnd,
+        ...oriented.slice(segmentIndex + 2),
+      ]);
+      const candidate = role === 'source'
+        ? candidateOriented
+        : [...candidateOriented].reverse();
+      if (candidate.length < 2) continue;
+      const key = candidate.map(point => `${point.x}:${point.y}`).join('|');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      candidates.push(candidate);
+      if (candidates.length >= maxCandidates) return candidates;
+    }
+  }
+  return candidates;
 };
 
 export const displayTerminalRoleNeedsDeclaredAxisRepair = (
@@ -76,17 +170,27 @@ export const withDisplayPortBridge = (
 ): Edge => {
   const candidate = withDisplayComputedPath(edge, path);
   const data = ((candidate.data || {}) as Record<string, any>);
+  const resolvedSourceHandle = resolveDisplayTerminalHandleForSide(
+    edge,
+    'source',
+    sourceHandle,
+  );
+  const resolvedTargetHandle = resolveDisplayTerminalHandleForSide(
+    edge,
+    'target',
+    targetHandle,
+  );
   return {
     ...candidate,
-    sourceHandle,
-    targetHandle,
+    sourceHandle: resolvedSourceHandle,
+    targetHandle: resolvedTargetHandle,
     data: {
       ...data,
       treeRouting: data.treeRouting && Array.isArray(data.treeRouting.points)
         ? {
           ...data.treeRouting,
-          effectiveSourceHandle: sourceHandle,
-          effectiveTargetHandle: targetHandle,
+          effectiveSourceHandle: resolvedSourceHandle,
+          effectiveTargetHandle: resolvedTargetHandle,
           points: path,
         }
         : data.treeRouting,

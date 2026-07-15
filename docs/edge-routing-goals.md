@@ -252,6 +252,11 @@
 35. **深层候选使用父子数值状态而不是字符串 pair memo** — beam/compound 搜索从父候选继续修改少量边时，应保存父状态的单边分数、线段分解和受影响 pair contribution，只减去本轮旧贡献并加入本轮新贡献；不得每深入一层就从最初 baseline 重算全部累计变化边，也不得为每个 pair 构造字符串 key。状态必须使用当前 candidate 的完整 Edge metadata 判定 related/permitted overlap；跨 evaluator、边数变化、重复/越界索引或未声明引用变化必须退回全量评分。
 36. **阶段内几何快照只做精确复用** — 同一候选在 local dogleg、endpoint lane、障碍和 overlap 检查之间应复用一次 compact path、segments、length/bends 和有限数值 bounds。空间索引只能缩小待扫描集合，最终开闭区间、source/target 排除、容器过滤和原有迭代顺序必须保持；NaN、Infinity、超量或无法证明等价的输入必须退回原完整扫描。阶段快照不得升级成无界全局缓存。
 37. **所有路径后处理必须是空间安全事务** — micro cleanup、可读旧路径恢复、圆角前压平和 compound/beam 联动修复不能只比较边自身的正交、交叉、overlap、长度和弯折。候选生成前应复用节点障碍与端点校验快照；每个普通候选和累计 beam 状态都必须按完整 \`changedIndexes\` 证明节点命中不增加、端点 attached/anchored 不退化，失败后继续搜索次优安全候选而不是提交后再指望后续 pass 补救。调用阶段仍须保留全图 hard gate 作为纵深防线；任何后处理都不得把已 hard-clean 的输入改回穿节点、贴边反向逃逸或飞线状态。
+38. **持久化缓存属于外部输入** — `localStorage`、导入快照和预编译产物即使携带 `hardClean=true` 也不能直接进入 UI。必须先经过有界 schema parse、有限数值和路径点校验，再只提取 routing-owned 字段；旧 `label`、`style`、marker、className、交互状态、业务 metadata 和未授权 quality intent 必须丢弃。候选合并到最新 Edge 后，还要在当前实测节点几何上重新执行完整 hard gate，验证完成前不得显示。
+39. **缓存验证与失效重算必须原子化** — 持久化候选应通过同一个 Worker job 执行 `validate-or-route`：候选 shape、版本、签名、路由字段或硬门禁任一失败时，直接在同一 job 内进入完整路由；成功时只提交一次最终结果。不得先显示缓存、失败后再跳成重算结果，也不得把全图硬门禁搬回主线程造成双份 CPU 和 bundle。
+40. **静态标准图允许预编译最终路由，但不得特判图或边** — 预编译产物必须由 production-preview 浏览器在真实 DOM measured geometry 下生成，以通用 input geometry signature 索引，并用独立 64/128-bit canonical geometry digest 做碰撞保护；产物还必须绑定 routing version、source hash、显式 schema、output route signature 和 `hardClean=true`。源码受控产物可以通过独立 schema 授权路由器生成的 `sharedTrunkAware`、`sharedTrunkSynthesized`、`isTreeBus` 三个布尔 intent，但持久化缓存仍不得携带这些字段，其他 intent 或类型一律拒绝。运行时按签名惰性加载，仍执行第 38、39 条验证；任何浏览器、字体、DPR、CSS、布局或版本差异都只能安全 miss 并回退正式 Worker，不能按 diagram ID、edge ID 或固定坐标强行命中。
+41. **端口侧约束与精确 handle 身份必须分离建模** — `left/right/top/bottom` 只表示端口侧，不能替代人工提供的 exact/compound handle ID。人工 handle、显式 lock、strong/fixed/forbidden policy 必须在 normalize、重锚、共享主干、端点排序、回退恢复及最终提交等所有写回入口保持不可变；同侧修复也不得把 compound ID 降级为裸 side。只有路由器在本次计算中生成的 runtime handle，才允许由通过完整 hard gate 的可信 worker/预编译结果继续细化；持久化缓存、导入内容等不可信候选不得据此改写端口身份。
+42. **主线程与 Worker 的共享路由代码必须按构建图求交** — 共享 chunk 应由“路由 Worker 的静态可达模块”与“客户端入口（含动态入口）的可达模块”求交得到；仅 Worker 使用的候选生成、修复和评分阶段必须留在 Worker 私有闭包，不能为了方便维护白名单而让主线程重复下载、解析和解码。分类器要有循环、缺失模块信息、重复 Worker 或入口缺失的 fail-closed 测试；每次生产构建还须同时验证 chunk 依赖闭包、总 bundle、关键 decoded 资源和真实冷路由时延，性能优化不得改变最终路径或 hard report。
 
 ## 验证标准
 
@@ -277,13 +282,17 @@
 20. **链式 junction 回归** — 至少覆盖同一路径连续遇到两根阻塞主干、相邻主干不足 `24px` 时拒绝候选、以及水平/垂直镜像三类场景；正式整图用例还必须验证 junction 候选不会制造新的无关共享段。
 21. **端口约束来源回归** — 同一条边分别带 `runtimeHandleLock`、人工 fixed handle 和 forbidden policy，验证前者仍可按实际边界接受合法自动端口，后两者不能被自动换侧。
 22. **冷启动单次计算回归** — 清空该 geometry signature 的最终路径缓存后加载标准图，记录 `workerPrewarm`、`workerStart`、`workerAbort`、`finalCommit`；必须满足 `workerStart=1`、`workerAbort=0`、`finalCommit=1`，并且提交结果通过完整硬门禁。节点测量期间允许多次更新待定输入，但不得计为 route start。
-23. **热缓存零计算回归** — 使用相同路由版本和 geometry signature 再次加载时，必须直接应用已校验的最终补丁，满足 `workerStart=0`、`workerAbort=0`；缓存命中仍需校验 edge shape、签名和补丁边界，不能因跳过计算而覆盖最新业务/交互属性。
+23. **热缓存可信层级回归** — 只有当前 JS realm 内生成、且 hard report 已绑定同一完整 geometry identity 的内存结果才允许 `workerStart=0`。来自 `localStorage`、快照或预编译产物的候选必须走一次 Worker `validate-or-route`，满足 `workerStart=1`、`workerAbort=0`、`fullRouteStart=0`、`finalCommit=1`；还要断言验证前 UI 为空、非法/陈旧候选在同一 job 内回退完整路由、业务和交互属性不被覆盖。
 24. **增量评分全量 parity 回归** — changed-index 上下文至少覆盖零条、一条、两条和多条边变化，以及 source/target、共享主干意图和 path carrier metadata 变化；逐项断言其完整质量对象、候选排序和最终选择与全量评分一致。
 25. **fixed-point 缓存失效回归** — 至少覆盖同一数组命中、逐字段完全等价的克隆数组命中，以及 computed path、edge id/source/target、source/target handle、人工端口侧、handle lock、port policy/constraint、quality intent、edge/node 顺序、节点 id/type/parent/位置/尺寸和路由版本的变化失效；还要验证 canonical key 不依赖 route hash、容量淘汰确定，正修复结果和本来零交叉的便宜早退不会被登记为 fixed point，非法、非有限或超大输入安全退化为 miss。
 26. **同轴外侧包络回归** — 至少覆盖 `H→H`、`V→V` 镜像、局部平移会新增严格交叉的长反向无关 overlap，以及空路径、非有限坐标、超量路径点/节点和非法选项；断言外侧候选保留首尾轴向与端点、候选数有界，正式 WMS 用例的 overlap、严格交叉、障碍、stub、tiny dogleg 和 hairpin 同时为零。
 27. **父子增量状态全量 parity 回归** — 至少覆盖深度 1–4、连续修改不同边、同一边重复修改、source/target/handle/共享主干 intent 变化、跨 context、重复/负数/小数/越界索引，以及未声明边引用变化；每一步完整质量对象必须逐字段等于全量 scorer，最终候选顺序和选择不得改变。
 28. **阶段几何快照 parity 回归** — endpoint-lane 与 local-dogleg 快照至少覆盖空路径、非正交、端点相触、严格交叉、正反向 overlap、源/目标节点内嵌、容器过滤、NaN/Infinity 和大输入边界；索引路径与原始全扫描必须逐项一致，非有限输入必须验证 fallback。
 29. **后处理空间安全回归** — 至少构造一个单边简化会穿无关节点、一个端点沿节点边界反向滑行、以及一个 compound cleanup 为清理 tiny dogleg 而需要联动移动 peer 的场景；断言不安全候选被跳过、搜索可继续命中次优安全候选，并且最终障碍、attached/anchored 与全部边质量硬字段同时不退化。
+30. **预编译路由产物回归** — 生成器必须在 production-preview 浏览器中等待稳定 geometry 和单次 final commit，再输出 routing-only patch；CI 至少验证 artifact schema、routing version、source hash、32-bit lookup key、独立 canonical digest、output signature 和当前节点硬门禁。还要覆盖 digest 碰撞保护、版本/字体或几何变化 miss、畸形/超量产物拒绝、惰性 chunk 加载，以及命中后不进入完整路由。
+31. **端口来源与精确身份回归** — 至少覆盖人工 compound handle、人工 fixed side、forbidden policy、路由器 runtime handle、可信 worker/预编译候选和不可信持久化候选；断言人工 exact ID 在同侧 normalize 后仍逐字符保留，固定/禁止端口不能换侧，runtime handle 只有在可信结果通过完整门禁时才能改写，并确认所有策略入口使用同一 policy 而不是直接写 handle 字段。
+32. **路由 bundle 图分类回归** — 构建分类器至少覆盖 POSIX/Windows 路径、客户端动态可达、Worker 私有模块、循环依赖、缺失模块、重复 Worker、排除 Worker 入口和重复构建清理；生产构建须断言 Worker 静态闭包、共享 chunk 不包含 Worker 私有修复阶段、主题 chunk 不反向依赖路由共享 chunk，并在相同构建上运行总 bundle 与三次独立冷启动预算。
+33. **交接前统一工程门禁** — 路由语义、缓存 schema、Worker 协议或 chunk 边界变化后，必须先通过无增量缓存的 `tsc --noEmit`，再通过项目 `typecheck` 增量基线、生产 build、bundle、预编译产物复现、统一 CI 入口与静态安全检查；不得只运行单个回归测试就宣称可以交接。冷路由 profile 必须基于与最终产物相同的 production build，且质量断言与计时在同一次样本中完成。
 
 ## 行业依据
 

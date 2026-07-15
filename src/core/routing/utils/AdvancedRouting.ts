@@ -5,7 +5,7 @@
  * 对应 Implementation Plan Phase 1.2
  */
 
-import { EdgeType } from '../../factories/EdgeFactory';
+import { EdgeType } from '../../types/edgeType';
 import { diagramConfigManager } from '../../components/config/DiagramConfig';
 import { Point } from '../types/routing';
 import { repairEdgeCrossingViolations } from '../../algorithms/edgeCrossingRepair';

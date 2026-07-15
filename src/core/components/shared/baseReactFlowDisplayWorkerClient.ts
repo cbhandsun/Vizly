@@ -1,23 +1,56 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { MutableRefObject } from 'react';
 import {
-  baseReactFlowDisplayOutputRouteSignatureMatches,
-  type BaseReactFlowDisplayEdgesCacheEntry,
-} from './baseReactFlowDisplayCache';
+  parseDisplayEdgesWorkerResponse,
+  readDisplayEdgesWorkerRequestId,
+  DISPLAY_WORKER_MAX_COORDINATE_MAGNITUDE,
+  type DisplayEdgesWorkerRequest,
+  type DisplayEdgesWorkerResponse,
+  type DisplayEdgesWorkerCandidateSource,
+  type DisplayEdgesWorkerRouteResolution,
+  type DisplayQualityMode,
+} from './baseReactFlowDisplayWorkerProtocol';
+import { sanitizeBaseReactFlowPrecompiledRoutePatches } from './baseReactFlowPrecompiledRouteArtifact';
+import {
+  createBaseReactFlowDisplayEdgePatches,
+  doBaseReactFlowDisplayRoutesMatchExactly,
+  mergeBaseReactFlowDisplayEdgePatches,
+  sanitizeBaseReactFlowDisplayCachePatches,
+} from './baseReactFlowDisplayRoutingTransaction';
+
+export type { DisplayQualityMode } from './baseReactFlowDisplayWorkerProtocol';
+export {
+  createBaseReactFlowDisplayEdgePatches,
+  doBaseReactFlowDisplayRoutesMatchExactly,
+  mergeBaseReactFlowDisplayEdgePatches,
+  mergeBaseReactFlowDisplayRoutingTransactions,
+  mergeTrustedBaseReactFlowDisplayCacheEntry,
+  resolveBaseReactFlowDisplayCacheReplaySignature,
+} from './baseReactFlowDisplayRoutingTransaction';
 
 export type DeferredDisplayEdges = {
   signature: string;
-  edges: Edge[];
+  geometryDigest: string;
+  displayPatches: Edge[];
   hardClean: boolean;
 };
 
 export type BaseReactFlowDisplayWorkerResult = {
   edges: Edge[];
   hardClean: boolean;
+  routeResolution: DisplayEdgesWorkerRouteResolution;
+  /** Exact DTO edge baseline that produced the worker response. */
+  projectedEdges: Edge[];
 };
+
+type BaseReactFlowDisplayWorkerResponseResult = Omit<
+  BaseReactFlowDisplayWorkerResult,
+  'projectedEdges'
+>;
 
 export type DisplayRoutingInput = {
   cacheSignature: string;
+  inputGeometryDigest: string;
   edges: Edge[];
   nodes: Node[];
   enableSmartEdges: boolean;
@@ -26,32 +59,12 @@ export type DisplayRoutingInput = {
   displayEdgeEpoch: number;
 };
 
-export type DisplayQualityMode = 'full' | 'interactive';
-
 export type DisplayQualityPolicy = {
   mode: DisplayQualityMode | 'skip';
   timeoutMs: number;
 };
 
 type DisplayQualityCancel = () => void;
-type DisplayWorkerResponse = {
-  requestId: string;
-  edges?: Edge[];
-  hardClean?: boolean;
-  error?: string;
-  boundedCandidate?: {
-    candidate: 'terminal-lane' | 'polished';
-    hardClean: boolean;
-    obstacleHits: number;
-    quality: Record<string, number>;
-    unrelatedOverlapPairs?: Array<{
-      firstId: string;
-      secondId: string;
-      overlap: number;
-    }>;
-  };
-};
-
 type DisplayRoutingDebugState = {
   stage?: string;
   signature?: string;
@@ -67,7 +80,11 @@ type DisplayRoutingDebugState = {
   workerStartCount?: number;
   workerAbortCount?: number;
   error?: string;
-  boundedCandidate?: DisplayWorkerResponse['boundedCandidate'];
+  boundedCandidate?: DisplayEdgesWorkerResponse['boundedCandidate'];
+  inputGeometryDigest?: string;
+  outputRouteSignature?: string;
+  routingVersion?: string;
+  workerResolution?: DisplayEdgesWorkerRouteResolution;
 };
 
 const DISPLAY_WORKER_TIMEOUT_MS = 60_000;
@@ -81,6 +98,13 @@ const LARGE_DISPLAY_EDGE_THRESHOLD = 36;
 const INTERACTIVE_DISPLAY_NODE_THRESHOLD = 30;
 const INTERACTIVE_DISPLAY_EDGE_THRESHOLD = 24;
 const DISPLAY_QUALITY_GEOMETRY_SETTLE_MS = 320;
+
+type DisplayWorkerIdleListeners = {
+  error: EventListener;
+  messageerror: EventListener;
+};
+
+const displayWorkerIdleListeners = new WeakMap<Worker, DisplayWorkerIdleListeners>();
 
 export const resolveBaseReactFlowDisplayQualityPolicy = ({
   nodeCount,
@@ -183,18 +207,25 @@ export const scheduleBaseReactFlowDisplayCacheWrite = (
 
 export const resolveBaseReactFlowDisplayedEdges = ({
   signature,
+  geometryDigest,
   policyMode,
   deferred,
   cached,
   immediate,
 }: {
   signature: string;
+  geometryDigest: string;
   policyMode: DisplayQualityPolicy['mode'];
   deferred: DeferredDisplayEdges | null;
   cached: Edge[] | null;
   immediate: Edge[];
 }): Edge[] => {
-  if (deferred?.signature === signature) return deferred.edges;
+  if (
+    deferred?.signature === signature
+    && deferred.geometryDigest === geometryDigest
+  ) {
+    return mergeBaseReactFlowDisplayEdgePatches(immediate, deferred.displayPatches) ?? [];
+  }
   if (cached) return cached;
   return policyMode === 'skip' ? immediate : [];
 };
@@ -229,6 +260,19 @@ const projectDisplayWorkerValue = (value: unknown, depth = 0): unknown => {
   return next;
 };
 
+const projectDisplayWorkerStyleDimension = (value: unknown): number | string | undefined => {
+  if (
+    typeof value === 'number'
+    && Number.isFinite(value)
+    && value >= 0
+    && value <= DISPLAY_WORKER_MAX_COORDINATE_MAGNITUDE
+  ) return value;
+  if (typeof value !== 'string' || value.length === 0 || value.length > 100) return undefined;
+  const match = value.trim().match(/^(?:\d+(?:\.\d+)?|\.\d+)(?:px|%)?$/i);
+  if (!match || Number.parseFloat(value) > DISPLAY_WORKER_MAX_COORDINATE_MAGNITUDE) return undefined;
+  return value;
+};
+
 const projectDisplayWorkerPosition = (value: unknown, fallback = { x: 0, y: 0 }) => {
   const point = (value && typeof value === 'object') ? value as Record<string, unknown> : {};
   return {
@@ -247,9 +291,10 @@ const projectDisplayWorkerNodes = (nodes: Node[]): Node[] => (
       ? node.data as Record<string, unknown>
       : {};
     const projectedStyle = {
-      width: projectDisplayWorkerValue(style.width),
-      height: projectDisplayWorkerValue(style.height),
+      width: projectDisplayWorkerStyleDimension(style.width),
+      height: projectDisplayWorkerStyleDimension(style.height),
     };
+    const projectedLayoutDirection = projectDisplayWorkerValue(data.layoutDirection);
     const projected: Record<string, unknown> = {
       id: node.id,
       type: node.type,
@@ -269,9 +314,9 @@ const projectDisplayWorkerNodes = (nodes: Node[]): Node[] => (
       style: Object.values(projectedStyle).some(value => typeof value !== 'undefined')
         ? projectedStyle
         : undefined,
-      data: typeof data.layoutDirection === 'undefined'
+      data: typeof projectedLayoutDirection === 'undefined'
         ? {}
-        : { layoutDirection: projectDisplayWorkerValue(data.layoutDirection) },
+        : { layoutDirection: projectedLayoutDirection },
     };
     return projected as Node;
   })
@@ -286,7 +331,7 @@ const projectDisplayWorkerEdges = (edges: Edge[]): Edge[] => (
       sourceHandle: edge.sourceHandle,
       targetHandle: edge.targetHandle,
       type: edge.type,
-      label: (edge as any).label,
+      label: projectDisplayWorkerValue((edge as any).label),
       animated: (edge as any).animated,
       style: projectDisplayWorkerValue((edge as any).style),
       markerStart: projectDisplayWorkerValue((edge as any).markerStart),
@@ -305,118 +350,41 @@ export const projectBaseReactFlowDisplayWorkerInput = ({
   nodes: projectDisplayWorkerNodes(nodes),
 });
 
-const ROUTING_PATCH_NO_CHANGE = Symbol('routing-patch-no-change');
-
-const isRoutingPatchObject = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
-
-const isRoutingPatchKeySafe = (key: string): boolean => (
-  key !== '__proto__' && key !== 'prototype' && key !== 'constructor'
-);
-
-const buildRoutingValuePatch = (baseline: unknown, routed: unknown): unknown | typeof ROUTING_PATCH_NO_CHANGE => {
-  if (Object.is(baseline, routed)) return ROUTING_PATCH_NO_CHANGE;
-  if (Array.isArray(routed)) {
-    if (Array.isArray(baseline) && baseline.length === routed.length) {
-      const unchanged = routed.every((item, index) => (
-        buildRoutingValuePatch(baseline[index], item) === ROUTING_PATCH_NO_CHANGE
-      ));
-      if (unchanged) return ROUTING_PATCH_NO_CHANGE;
-    }
-    return routed;
-  }
-  if (isRoutingPatchObject(routed)) {
-    const baselineObject = isRoutingPatchObject(baseline) ? baseline : {};
-    const patch: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(routed)) {
-      if (!isRoutingPatchKeySafe(key)) continue;
-      const childPatch = buildRoutingValuePatch(baselineObject[key], value);
-      if (childPatch !== ROUTING_PATCH_NO_CHANGE) patch[key] = childPatch;
-    }
-    return Object.keys(patch).length > 0 ? patch : ROUTING_PATCH_NO_CHANGE;
-  }
-  return routed;
+const detachBaseReactFlowDisplayWorkerIdleListeners = (worker: Worker): void => {
+  const listeners = displayWorkerIdleListeners.get(worker);
+  if (!listeners) return;
+  worker.removeEventListener('error', listeners.error);
+  worker.removeEventListener('messageerror', listeners.messageerror);
+  displayWorkerIdleListeners.delete(worker);
 };
 
-const applyRoutingValuePatch = (baseline: unknown, patch: unknown): unknown => {
-  if (Array.isArray(patch)) return patch;
-  if (!isRoutingPatchObject(patch)) return patch;
-  const baselineObject = isRoutingPatchObject(baseline) ? baseline : {};
-  const merged: Record<string, unknown> = { ...baselineObject };
-  for (const [key, value] of Object.entries(patch)) {
-    if (!isRoutingPatchKeySafe(key)) continue;
-    merged[key] = applyRoutingValuePatch(baselineObject[key], value);
-  }
-  return merged;
-};
-
-export const createBaseReactFlowDisplayEdgePatches = (
-  sourceEdges: Edge[],
-  routedEdges: Edge[],
-): Edge[] | null => {
-  if (sourceEdges.length !== routedEdges.length) return null;
-  const patches: Edge[] = [];
-  for (let index = 0; index < routedEdges.length; index += 1) {
-    const routedEdge = routedEdges[index];
-    const sourceEdge = sourceEdges[index];
-    if (
-      routedEdge?.id !== sourceEdge?.id
-      || routedEdge.source !== sourceEdge.source
-      || routedEdge.target !== sourceEdge.target
-    ) {
-      return null;
-    }
-    const valuePatch = buildRoutingValuePatch(sourceEdge, routedEdge);
-    const patch = valuePatch === ROUTING_PATCH_NO_CHANGE || !isRoutingPatchObject(valuePatch)
-      ? {}
-      : valuePatch;
-    patches.push({
-      id: routedEdge.id,
-      source: routedEdge.source,
-      target: routedEdge.target,
-      ...patch,
-    } as Edge);
-  }
-  return patches;
-};
-
-export const mergeBaseReactFlowDisplayEdgePatches = (
-  sourceEdges: Edge[],
-  patches: Edge[],
-): Edge[] | null => {
-  if (sourceEdges.length !== patches.length) return null;
-  const merged: Edge[] = [];
-  for (let index = 0; index < sourceEdges.length; index += 1) {
-    const sourceEdge = sourceEdges[index];
-    const patch = patches[index];
-    if (
-      patch?.id !== sourceEdge?.id
-      || patch.source !== sourceEdge.source
-      || patch.target !== sourceEdge.target
-    ) {
-      return null;
-    }
-    merged.push(applyRoutingValuePatch(sourceEdge, patch) as Edge);
-  }
-  return merged;
+const terminateBaseReactFlowDisplayWorker = (
+  worker: Worker,
+  workerRef: MutableRefObject<Worker | null>,
+): void => {
+  detachBaseReactFlowDisplayWorkerIdleListeners(worker);
+  worker.terminate();
+  if (workerRef.current === worker) workerRef.current = null;
 };
 
 /**
- * Applies cache patches to the newest source edges while reusing hardClean only
- * when the merged path/handle geometry exactly matches the report-bound signature.
+ * A prewarmed/reusable worker has no request listeners yet. Keep a small idle
+ * health guard so module-load, CSP, or structured-clone failures cannot leave
+ * a dead worker in the ref until the next request times out.
  */
-export const mergeTrustedBaseReactFlowDisplayCacheEntry = (
-  sourceEdges: Edge[],
-  cacheEntry: BaseReactFlowDisplayEdgesCacheEntry,
-): Edge[] | null => {
-  if (cacheEntry.hardClean !== true) return null;
-  const merged = mergeBaseReactFlowDisplayEdgePatches(sourceEdges, cacheEntry.edges);
-  if (!merged) return null;
-  return baseReactFlowDisplayOutputRouteSignatureMatches(
-    merged,
-    cacheEntry.outputRouteSignature,
-  ) ? merged : null;
+const armBaseReactFlowDisplayWorkerIdleListeners = (
+  worker: Worker,
+  workerRef: MutableRefObject<Worker | null>,
+): void => {
+  detachBaseReactFlowDisplayWorkerIdleListeners(worker);
+  const retireWorker = () => terminateBaseReactFlowDisplayWorker(worker, workerRef);
+  const listeners: DisplayWorkerIdleListeners = {
+    error: retireWorker,
+    messageerror: retireWorker,
+  };
+  displayWorkerIdleListeners.set(worker, listeners);
+  worker.addEventListener('error', listeners.error);
+  worker.addEventListener('messageerror', listeners.messageerror);
 };
 
 const ensureBaseReactFlowDisplayWorker = (
@@ -424,10 +392,17 @@ const ensureBaseReactFlowDisplayWorker = (
 ): Worker | null => {
   if (typeof window === 'undefined' || typeof Worker === 'undefined') return null;
   if (workerRef.current) return workerRef.current;
-  workerRef.current = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', import.meta.url), {
-    type: 'module',
-  });
-  return workerRef.current;
+  try {
+    const worker = new Worker(new URL('./baseReactFlowDisplayEdges.worker.ts', import.meta.url), {
+      type: 'module',
+    });
+    workerRef.current = worker;
+    armBaseReactFlowDisplayWorkerIdleListeners(worker, workerRef);
+    return worker;
+  } catch {
+    workerRef.current = null;
+    return null;
+  }
 };
 
 /**
@@ -439,7 +414,203 @@ export const prewarmBaseReactFlowDisplayWorker = (
   workerRef: MutableRefObject<Worker | null>,
 ): boolean => ensureBaseReactFlowDisplayWorker(workerRef) !== null;
 
-export const computeBaseReactFlowDisplayEdgesInWorker = ({
+export const doesBaseReactFlowDisplayWorkerResolutionMatchOperation = (
+  operation: DisplayEdgesWorkerRequest['operation'],
+  routeResolution: DisplayEdgesWorkerRouteResolution,
+): boolean => {
+  if (operation === 'route') return routeResolution === 'full-route';
+  if (operation === 'repair') return routeResolution === 'repair';
+  return routeResolution === 'validated-candidate' || routeResolution === 'full-route';
+};
+
+const requestBaseReactFlowDisplayEdgesWorker = ({
+  workerRef,
+  request,
+  qualityMode = 'full',
+  timeoutMs = DISPLAY_WORKER_TIMEOUT_MS,
+  signal,
+}: {
+  workerRef: MutableRefObject<Worker | null>;
+  request: DisplayEdgesWorkerRequest;
+  qualityMode?: DisplayQualityMode;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}): Promise<BaseReactFlowDisplayWorkerResponseResult> => (
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error('display-edge-worker-cancelled'));
+      return;
+    }
+    const worker = ensureBaseReactFlowDisplayWorker(workerRef);
+    if (!worker || typeof window === 'undefined') {
+      reject(new Error('display-edge-worker-unavailable'));
+      return;
+    }
+    // The idle guard owns error events only between requests. Detach it before
+    // installing request-scoped listeners so one error cannot race two owners.
+    detachBaseReactFlowDisplayWorkerIdleListeners(worker);
+
+    let settled = false;
+    const terminateWorker = () => {
+      terminateBaseReactFlowDisplayWorker(worker, workerRef);
+    };
+    const finish = (callback: () => void, terminate = false) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      worker.removeEventListener('message', handleMessage);
+      worker.removeEventListener('error', handleError);
+      worker.removeEventListener('messageerror', handleMessageError);
+      signal?.removeEventListener('abort', handleAbort);
+      if (terminate) terminateWorker();
+      else armBaseReactFlowDisplayWorkerIdleListeners(worker, workerRef);
+      callback();
+    };
+    const handleMessage = (event: MessageEvent<unknown>) => {
+      const responseRequestId = readDisplayEdgesWorkerRequestId(event.data);
+      if (responseRequestId !== request.requestId) return;
+      const response = parseDisplayEdgesWorkerResponse(event.data, request.requestId);
+      if (!response) {
+        finish(() => {
+          updateDisplayRoutingDebugState({
+            stage: 'worker-response-error',
+            requestId: request.requestId,
+            error: 'display-edge-worker-invalid-response',
+          });
+          reject(new Error('display-edge-worker-invalid-response'));
+        }, true);
+        return;
+      }
+      if (response.boundedCandidate && !response.edges && !response.error) {
+        updateDisplayRoutingDebugState({
+          stage: 'worker-bounded-fallback',
+          requestId: request.requestId,
+          boundedCandidate: response.boundedCandidate,
+        });
+        return;
+      }
+      const responseEdges = Array.isArray(response.edges) ? response.edges : null;
+      const routeResolution = response.routeResolution;
+      if (responseEdges) {
+        if (
+          !routeResolution
+          || !doesBaseReactFlowDisplayWorkerResolutionMatchOperation(
+            request.operation,
+            routeResolution,
+          )
+        ) {
+          finish(() => {
+            updateDisplayRoutingDebugState({
+              stage: 'worker-response-error',
+              requestId: request.requestId,
+              error: 'display-edge-worker-resolution-mismatch',
+            });
+            reject(new Error('display-edge-worker-resolution-mismatch'));
+          }, true);
+          return;
+        }
+        if (
+          routeResolution === 'validated-candidate'
+          && (
+            request.operation !== 'validate-or-route'
+            || !request.candidateEdges
+            || !doBaseReactFlowDisplayRoutesMatchExactly(
+              request.candidateEdges,
+              responseEdges,
+            )
+          )
+        ) {
+          finish(() => {
+            updateDisplayRoutingDebugState({
+              stage: 'worker-response-error',
+              requestId: request.requestId,
+              error: 'display-edge-worker-candidate-mismatch',
+            });
+            reject(new Error('display-edge-worker-candidate-mismatch'));
+          }, true);
+          return;
+        }
+      }
+      finish(() => {
+        if (response.error || !responseEdges || !routeResolution) {
+          updateDisplayRoutingDebugState({
+            stage: 'worker-response-error',
+            requestId: request.requestId,
+            error: response.error || 'display-edge-worker-empty-response',
+          });
+          reject(new Error(response.error || 'display-edge-worker-empty-response'));
+          return;
+        }
+        updateDisplayRoutingDebugState({
+          stage: 'worker-response',
+          requestId: request.requestId,
+          edgeCount: responseEdges.length,
+        });
+        resolve({
+          edges: responseEdges,
+          hardClean: response.hardClean === true,
+          routeResolution,
+        });
+      });
+    };
+    const handleError = () => {
+      finish(() => {
+        updateDisplayRoutingDebugState({ stage: 'worker-error', requestId: request.requestId, error: 'display-edge-worker-error' });
+        reject(new Error('display-edge-worker-error'));
+      }, true);
+    };
+    const handleMessageError = () => {
+      finish(() => {
+        updateDisplayRoutingDebugState({ stage: 'worker-message-error', requestId: request.requestId, error: 'display-edge-worker-message-error' });
+        reject(new Error('display-edge-worker-message-error'));
+      }, true);
+    };
+    const handleAbort = () => {
+      finish(() => {
+        updateDisplayRoutingDebugState({
+          stage: 'worker-cancelled',
+          requestId: request.requestId,
+          error: 'display-edge-worker-cancelled',
+        });
+        reject(new Error('display-edge-worker-cancelled'));
+      }, true);
+    };
+    const safeTimeoutMs = resolveBaseReactFlowDisplayWorkerTimeoutMs(timeoutMs, qualityMode);
+    const timeoutId = window.setTimeout(() => {
+      finish(() => {
+        updateDisplayRoutingDebugState({ stage: 'worker-timeout', requestId: request.requestId, error: 'display-edge-worker-timeout' });
+        reject(new Error('display-edge-worker-timeout'));
+      }, true);
+    }, safeTimeoutMs);
+
+    worker.addEventListener('message', handleMessage);
+    worker.addEventListener('error', handleError);
+    worker.addEventListener('messageerror', handleMessageError);
+    signal?.addEventListener('abort', handleAbort, { once: true });
+    try {
+      updateDisplayRoutingDebugState({ stage: 'worker-post', requestId: request.requestId });
+      worker.postMessage(request);
+    } catch {
+      finish(() => reject(new Error('display-edge-worker-post-failed')), true);
+    }
+  })
+);
+
+export const resolveBaseReactFlowDisplayWorkerTimeoutMs = (
+  timeoutMs: number,
+  qualityMode: DisplayQualityMode,
+): number => {
+  const maximumTimeoutMs = qualityMode === 'interactive'
+    ? INTERACTIVE_DISPLAY_WORKER_TIMEOUT_MS
+    : COMPLEX_DISPLAY_WORKER_TIMEOUT_MS;
+  const fallbackTimeoutMs = qualityMode === 'interactive'
+    ? INTERACTIVE_DISPLAY_WORKER_TIMEOUT_MS
+    : DISPLAY_WORKER_TIMEOUT_MS;
+  const candidate = Number.isFinite(timeoutMs) ? Math.round(timeoutMs) : fallbackTimeoutMs;
+  return Math.max(1_000, Math.min(candidate, maximumTimeoutMs));
+};
+
+export const computeBaseReactFlowDisplayEdgesInWorker = async ({
   workerRef,
   requestId,
   edges,
@@ -448,6 +619,8 @@ export const computeBaseReactFlowDisplayEdgesInWorker = ({
   smartEdgePadding,
   isLargeGraph,
   displayEdgeEpoch,
+  cachedCandidateEdges = null,
+  candidateSource,
   qualityMode = 'full',
   timeoutMs = DISPLAY_WORKER_TIMEOUT_MS,
   signal,
@@ -460,125 +633,87 @@ export const computeBaseReactFlowDisplayEdgesInWorker = ({
   smartEdgePadding: number;
   isLargeGraph: boolean;
   displayEdgeEpoch: number;
+  cachedCandidateEdges?: Edge[] | null;
+  candidateSource?: DisplayEdgesWorkerCandidateSource;
   qualityMode?: DisplayQualityMode;
   timeoutMs?: number;
   signal?: AbortSignal;
-}): Promise<BaseReactFlowDisplayWorkerResult> => (
-  new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new Error('display-edge-worker-cancelled'));
-      return;
-    }
-    const worker = ensureBaseReactFlowDisplayWorker(workerRef);
-    if (!worker || typeof window === 'undefined') {
-      reject(new Error('display-edge-worker-unavailable'));
-      return;
-    }
-
-    let settled = false;
-    const terminateWorker = () => {
-      worker.terminate();
-      if (workerRef.current === worker) {
-        workerRef.current = null;
+}): Promise<BaseReactFlowDisplayWorkerResult> => {
+  const projectedInput = projectBaseReactFlowDisplayWorkerInput({ edges, nodes });
+  const rawPrecompiledPatches = cachedCandidateEdges && candidateSource === 'precompiled'
+    ? createBaseReactFlowDisplayEdgePatches(edges, cachedCandidateEdges)
+    : null;
+  const safeCandidatePatches = cachedCandidateEdges
+    ? (candidateSource === 'precompiled'
+      ? sanitizeBaseReactFlowPrecompiledRoutePatches(edges, rawPrecompiledPatches)
+      : sanitizeBaseReactFlowDisplayCachePatches(edges, cachedCandidateEdges))
+    : null;
+  // Rebuild the cache candidate from the projected current graph so external
+  // cache fields can never replace labels, styles, markers, or business data.
+  const projectedCandidateEdges = safeCandidatePatches
+    ? mergeBaseReactFlowDisplayEdgePatches(projectedInput.edges, safeCandidatePatches)
+    : null;
+  const routeRequest = {
+    requestId,
+    edges: projectedInput.edges,
+    nodes: projectedInput.nodes,
+    enableSmartEdges,
+    smartEdgePadding,
+    isLargeGraph,
+    displayEdgeEpoch,
+    qualityMode,
+  };
+  const result = await requestBaseReactFlowDisplayEdgesWorker({
+    workerRef,
+    request: projectedCandidateEdges
+      ? {
+        ...routeRequest,
+        operation: 'validate-or-route',
+        candidateEdges: projectedCandidateEdges,
+        candidateSource: candidateSource === 'precompiled' ? 'precompiled' : 'persistent',
       }
-    };
-    const finish = (callback: () => void, terminate = false) => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timeoutId);
-      worker.removeEventListener('message', handleMessage);
-      worker.removeEventListener('error', handleError);
-      worker.removeEventListener('messageerror', handleMessageError);
-      signal?.removeEventListener('abort', handleAbort);
-      if (terminate) terminateWorker();
-      callback();
-    };
-    const handleMessage = (event: MessageEvent<DisplayWorkerResponse>) => {
-      const response = event.data;
-      if (!response || response.requestId !== requestId) return;
-      if (response.boundedCandidate && !response.edges && !response.error) {
-        updateDisplayRoutingDebugState({
-          stage: 'worker-bounded-fallback',
-          requestId,
-          boundedCandidate: response.boundedCandidate,
-        });
-        return;
-      }
-      finish(() => {
-        if (response.error || !Array.isArray(response.edges)) {
-          updateDisplayRoutingDebugState({
-            stage: 'worker-response-error',
-            requestId,
-            error: response.error || 'display-edge-worker-empty-response',
-          });
-          reject(new Error(response.error || 'display-edge-worker-empty-response'));
-          return;
-        }
-        updateDisplayRoutingDebugState({
-          stage: 'worker-response',
-          requestId,
-          edgeCount: response.edges.length,
-        });
-        resolve({
-          edges: response.edges,
-          hardClean: response.hardClean === true,
-        });
-      });
-    };
-    const handleError = () => {
-      finish(() => {
-        updateDisplayRoutingDebugState({ stage: 'worker-error', requestId, error: 'display-edge-worker-error' });
-        reject(new Error('display-edge-worker-error'));
-      });
-    };
-    const handleMessageError = () => {
-      finish(() => {
-        updateDisplayRoutingDebugState({ stage: 'worker-message-error', requestId, error: 'display-edge-worker-message-error' });
-        reject(new Error('display-edge-worker-message-error'));
-      });
-    };
-    const handleAbort = () => {
-      finish(() => {
-        updateDisplayRoutingDebugState({
-          stage: 'worker-cancelled',
-          requestId,
-          error: 'display-edge-worker-cancelled',
-        });
-        reject(new Error('display-edge-worker-cancelled'));
-      }, true);
-    };
-    const maximumTimeoutMs = qualityMode === 'interactive'
-      ? INTERACTIVE_DISPLAY_WORKER_TIMEOUT_MS
-      : COMPLEX_DISPLAY_WORKER_TIMEOUT_MS;
-    const timeoutId = window.setTimeout(() => {
-      finish(() => {
-        updateDisplayRoutingDebugState({ stage: 'worker-timeout', requestId, error: 'display-edge-worker-timeout' });
-        reject(new Error('display-edge-worker-timeout'));
-      }, true);
-    }, Math.max(1_000, Math.min(timeoutMs, maximumTimeoutMs)));
+      : { ...routeRequest, operation: 'route' },
+    qualityMode,
+    timeoutMs,
+    signal,
+  });
+  return { ...result, projectedEdges: projectedInput.edges };
+};
 
-    worker.addEventListener('message', handleMessage);
-    worker.addEventListener('error', handleError);
-    worker.addEventListener('messageerror', handleMessageError);
-    signal?.addEventListener('abort', handleAbort, { once: true });
-    try {
-      updateDisplayRoutingDebugState({ stage: 'worker-post', requestId });
-      const projectedInput = projectBaseReactFlowDisplayWorkerInput({ edges, nodes });
-      worker.postMessage({
-        requestId,
-        edges: projectedInput.edges,
-        nodes: projectedInput.nodes,
-        enableSmartEdges,
-        smartEdgePadding,
-        isLargeGraph,
-        displayEdgeEpoch,
-        qualityMode,
-      });
-    } catch {
-      finish(() => reject(new Error('display-edge-worker-post-failed')), true);
-    }
-  })
-);
+export const repairBaseReactFlowDisplayEdgesInWorker = async ({
+  workerRef,
+  requestId,
+  edges,
+  nodes,
+  timeoutMs = DISPLAY_WORKER_TIMEOUT_MS,
+  signal,
+}: {
+  workerRef: MutableRefObject<Worker | null>;
+  requestId: string;
+  edges: Edge[];
+  nodes: Node[];
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}): Promise<BaseReactFlowDisplayWorkerResult> => {
+  const projectedInput = projectBaseReactFlowDisplayWorkerInput({ edges, nodes });
+  const result = await requestBaseReactFlowDisplayEdgesWorker({
+    workerRef,
+    request: {
+      operation: 'repair',
+      requestId,
+      edges: projectedInput.edges,
+      nodes: projectedInput.nodes,
+    },
+    qualityMode: 'full',
+    timeoutMs,
+    signal,
+  });
+  if (signal?.aborted) throw new Error('display-edge-worker-cancelled');
+  if (result.hardClean !== true) {
+    throw new Error('display-edge-worker-final-quality-failed');
+  }
+  return { ...result, projectedEdges: projectedInput.edges };
+};
 
 export const doDisplayEdgesMatchSourceGraph = (sourceEdges: Edge[], displayEdges: Edge[]): boolean => (
   sourceEdges.length === displayEdges.length

@@ -1,5 +1,11 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
+import {
+  edgeTerminalSideCanSwitch,
+  readEdgeTerminalPolicy,
+  resolveEdgeTerminalHandleForSide,
+  type EdgeTerminalRole,
+} from '../../routing/utils/edgeTerminalPolicy';
 import { normalizeHandle } from '../../routing/utils/handleUtils';
 import { repairDisplayMicroArtifacts } from './edgeDisplayMicroCleanup';
 import { getRoutingObstacles } from './edgeRoutingPathGeometry';
@@ -184,7 +190,7 @@ function shiftedSameSideStarts(start: Point, rect: Rect, side: Side): Point[] {
   });
 }
 
-type PathCandidate = { path: Point[]; sourceHandle?: string };
+type PathCandidate = { path: Point[]; sourceHandle?: Side };
 
 function shiftedSourceSideCandidates(path: Point[], sourceRect: Rect | null): PathCandidate[] {
   if (!sourceRect || path.length < 3) return [];
@@ -261,7 +267,80 @@ function sourceSideBypassCandidates(path: Point[], sourceRect: Rect | null): Pat
   return candidates;
 }
 
-function withRawPathCandidate(edge: Edge, rawEdge: Edge, path: Point[], sourceHandle?: string): Edge {
+function terminalHandle(edge: Edge, role: EdgeTerminalRole): string | null | undefined {
+  return role === 'source' ? edge.sourceHandle : edge.targetHandle;
+}
+
+function terminalSideCanBeUsed(
+  edge: Edge,
+  rawEdge: Edge,
+  role: EdgeTerminalRole,
+  side: Side,
+): boolean {
+  return edgeTerminalSideCanSwitch(edge, role, side)
+    && edgeTerminalSideCanSwitch(rawEdge, role, side);
+}
+
+function isCompoundHandle(handle: string | null | undefined, side: Side): boolean {
+  if (typeof handle !== 'string' || handleSide(handle) !== side) return false;
+  const normalized = handle.toLowerCase();
+  return normalized !== side && normalized !== side[0];
+}
+
+function resolveRestoredTerminalHandleForSide(
+  edge: Edge,
+  rawEdge: Edge,
+  role: EdgeTerminalRole,
+  side: Side,
+): string | null | undefined {
+  const currentPolicy = readEdgeTerminalPolicy(edge, role);
+  const rawPolicy = readEdgeTerminalPolicy(rawEdge, role);
+  const currentHandle = terminalHandle(edge, role);
+  const rawHandle = terminalHandle(rawEdge, role);
+
+  if (currentPolicy.sourceExactFixed) {
+    return resolveEdgeTerminalHandleForSide(edge, role, side);
+  }
+  if (rawPolicy.sourceExactFixed) {
+    return resolveEdgeTerminalHandleForSide(rawEdge, role, side);
+  }
+  if (currentPolicy.sideFixed) {
+    return resolveEdgeTerminalHandleForSide(edge, role, side);
+  }
+  if (rawPolicy.sideFixed) {
+    return resolveEdgeTerminalHandleForSide(rawEdge, role, side);
+  }
+  if (isCompoundHandle(currentHandle, side)) {
+    return resolveEdgeTerminalHandleForSide(edge, role, side);
+  }
+  if (isCompoundHandle(rawHandle, side)) {
+    return resolveEdgeTerminalHandleForSide(rawEdge, role, side);
+  }
+  if (handleSide(currentHandle) === side) {
+    return resolveEdgeTerminalHandleForSide(edge, role, side);
+  }
+  return resolveEdgeTerminalHandleForSide(rawEdge, role, side);
+}
+
+function resolveRawTerminalHandle(
+  edge: Edge,
+  rawEdge: Edge,
+  role: EdgeTerminalRole,
+): string | null | undefined {
+  const rawHandle = terminalHandle(rawEdge, role);
+  const rawSide = handleSide(rawHandle);
+  if (!rawSide) {
+    return readEdgeTerminalPolicy(edge, role).sideFixed
+      ? terminalHandle(edge, role)
+      : rawHandle;
+  }
+  if (!terminalSideCanBeUsed(edge, rawEdge, role, rawSide)) {
+    return terminalHandle(edge, role);
+  }
+  return resolveRestoredTerminalHandleForSide(edge, rawEdge, role, rawSide);
+}
+
+function withRawPathCandidate(edge: Edge, rawEdge: Edge, path: Point[], sourceHandle?: Side): Edge {
   const data: any = {
     ...(edge.data || {}),
     computedPath: path,
@@ -274,8 +353,10 @@ function withRawPathCandidate(edge: Edge, rawEdge: Edge, path: Point[], sourceHa
   if (data.runtimeHandleLock === undefined) delete data.runtimeHandleLock;
   return {
     ...edge,
-    sourceHandle: sourceHandle ?? rawEdge.sourceHandle,
-    targetHandle: rawEdge.targetHandle,
+    sourceHandle: sourceHandle
+      ? resolveRestoredTerminalHandleForSide(edge, rawEdge, 'source', sourceHandle)
+      : resolveRawTerminalHandle(edge, rawEdge, 'source'),
+    targetHandle: resolveRawTerminalHandle(edge, rawEdge, 'target'),
     data,
   };
 }
@@ -369,6 +450,8 @@ export function restoreReadableRawLockedPaths(
     const polishedCandidateEdges = repairDisplayMicroArtifacts(rawCandidateEdges);
     const polishedPath = compactPath(getEdgePath(polishedCandidateEdges[edgeIndex]));
     const sourceRect = getNodeRect(nodeById.get(edge.source));
+    const sourcePositionIsFixed = readEdgeTerminalPolicy(edge, 'source').positionFixed
+      || readEdgeTerminalPolicy(rawEdge, 'source').positionFixed;
     let bestEdges: Edge[] | null = null;
     let bestQuality = baselineQuality;
 
@@ -415,8 +498,10 @@ export function restoreReadableRawLockedPaths(
 
     consider(polishedCandidateEdges);
 
-    if (!bestEdges) {
-      for (const candidate of shiftedSourceSideCandidates(polishedPath, sourceRect)) {
+    if (!bestEdges && !sourcePositionIsFixed) {
+      for (const candidate of shiftedSourceSideCandidates(polishedPath, sourceRect)
+        .filter(item => !item.sourceHandle
+          || terminalSideCanBeUsed(edge, rawEdge, 'source', item.sourceHandle))) {
         consider(
           currentEdges.map((candidateEdge, candidateIndex) => (
             candidateIndex === edgeIndex
@@ -428,8 +513,11 @@ export function restoreReadableRawLockedPaths(
       }
     }
 
-    if (!bestEdges) {
-      for (const candidate of sourceSideBypassCandidates(polishedPath, sourceRect).slice(0, MAX_SIDE_BYPASS_CANDIDATES)) {
+    if (!bestEdges && !sourcePositionIsFixed) {
+      for (const candidate of sourceSideBypassCandidates(polishedPath, sourceRect)
+        .filter(item => !item.sourceHandle
+          || terminalSideCanBeUsed(edge, rawEdge, 'source', item.sourceHandle))
+        .slice(0, MAX_SIDE_BYPASS_CANDIDATES)) {
         consider(
           currentEdges.map((candidateEdge, candidateIndex) => (
             candidateIndex === edgeIndex

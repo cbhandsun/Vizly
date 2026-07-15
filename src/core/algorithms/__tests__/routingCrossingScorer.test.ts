@@ -90,6 +90,30 @@ describe('RoutingCrossingScorer', () => {
         expect(score.totalScore).toBe(0);
     });
 
+    it('applies shared buddy policy once while preserving source and target trunk semantics', () => {
+        const paths = new Map([
+            ['first', [
+                { x: 0, y: 0 }, { x: 100, y: 0 },
+                { x: 100, y: 50 }, { x: 0, y: 50 }, { x: 0, y: 100 },
+            ]],
+            ['second', [
+                { x: 20, y: 0 }, { x: 120, y: 0 },
+                { x: 120, y: 50 }, { x: 60, y: 50 }, { x: 60, y: 100 },
+            ]],
+        ]);
+        const scoreFor = (types: Array<'o2m' | 'm2o'>) => new RoutingCrossingScorer({
+            buddyGroups: types.map(type => ({
+                type,
+                edgeIds: new Set(['first', 'second']),
+            })),
+            parallelOverlapMinLength: 20,
+        }).score(paths);
+
+        expect(scoreFor(['o2m']).parallelOverlaps).toBe(2);
+        expect(scoreFor(['m2o']).parallelOverlaps).toBe(4);
+        expect(scoreFor(['o2m', 'm2o']).parallelOverlaps).toBe(0);
+    });
+
     it('scores a single-edge replacement exactly like a complete trial score', () => {
         const scorer = new RoutingCrossingScorer({
             buddyGroups: [{ type: 'o2m', edgeIds: new Set(['alpha', 'beta']) }],

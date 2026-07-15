@@ -38,6 +38,7 @@ import {
   createDisplayObstacleEvaluationContext,
 } from './baseReactFlowDisplayEvaluation';
 import {
+  buildDeclaredTerminalAxisStubCandidates,
   buildOppositeRoleSharedNodeCandidates,
   displayTerminalRoleNeedsDeclaredAxisRepair,
   displayTerminalSideCanSwitch,
@@ -48,9 +49,6 @@ import {
 } from './baseReactFlowDisplayOverlapRepair';
 import {
   createDisplayTerminalValidationSnapshot,
-  displayEdgesHaveNodeAnchoredTerminals,
-  displayEdgesHaveNodeAttachedTerminals,
-  keepNodeAnchoredTerminalCandidates,
 } from './baseReactFlowTerminalAxisRepair';
 
 export {
@@ -848,6 +846,7 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
         if (!needsRepair) return null;
         return {
           index,
+          nodeAnchorMismatches: Number(!terminalValidation.validateEdge(edge).anchored),
           numericalStaircaseTranslations,
           declaredAxisMismatches: Number(sourceAxisMismatch) + Number(targetAxisMismatch),
           obstacleHits: path.length >= 2
@@ -857,12 +856,14 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
       })
       .filter((entry): entry is {
         index: number;
+        nodeAnchorMismatches: number;
         numericalStaircaseTranslations: number;
         declaredAxisMismatches: number;
         obstacleHits: number;
       } => Boolean(entry))
       .sort((first, second) => (
-        second.numericalStaircaseTranslations - first.numericalStaircaseTranslations
+        second.nodeAnchorMismatches - first.nodeAnchorMismatches
+        || second.numericalStaircaseTranslations - first.numericalStaircaseTranslations
         || second.declaredAxisMismatches - first.declaredAxisMismatches
         || second.obstacleHits - first.obstacleHits
         || first.index - second.index
@@ -940,6 +941,34 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
           declaredSourceSide,
           declaredTargetSide,
         ));
+      }
+      if (countRoutingObstacleHits(path, edge, routingObstacles) === 0) {
+        for (const candidatePath of buildDeclaredTerminalAxisStubCandidates(
+          path,
+          'source',
+          sourceRect,
+          declaredSourceSide,
+        )) {
+          appendPriorityCandidate(withDisplayPortBridge(
+            edge,
+            candidatePath,
+            declaredSourceSide,
+            declaredTargetSide,
+          ));
+        }
+        for (const candidatePath of buildDeclaredTerminalAxisStubCandidates(
+          path,
+          'target',
+          targetRect,
+          declaredTargetSide,
+        )) {
+          appendPriorityCandidate(withDisplayPortBridge(
+            edge,
+            candidatePath,
+            declaredSourceSide,
+            declaredTargetSide,
+          ));
+        }
       }
       for (const candidatePath of buildFacingPortPathCandidates(
         sourceRect,

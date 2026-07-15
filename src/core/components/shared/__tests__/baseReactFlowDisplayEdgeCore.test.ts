@@ -5,10 +5,12 @@ import {
   anchorComputedDisplayEdgeEndpoints,
   compactOrthogonalPath,
   computeBaseReactFlowDisplayCacheSignature,
+  computeBaseDisplayInputSignature,
   computeBaseReactFlowDisplayEdgeEpoch,
   computeBaseReactFlowEndpointGeometryKey,
   computeBaseReactFlowDisplayOutputRouteSignature,
   createBaseReactFlowFastDisplayEdges,
+  normalizeBaseEdge,
   readBaseReactFlowDisplayEdgesCache,
   readBaseReactFlowDisplayEdgesCacheEntry,
   synthesizeStableFallbackPath,
@@ -41,6 +43,69 @@ afterEach(() => {
 });
 
 describe('baseReactFlowDisplayEdgeCore', () => {
+  it('does not rewrite cross-container source-authored terminal sides', () => {
+    const input: Edge = {
+      id: 'manual-cross-container',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'source-top-port-1',
+      targetHandle: 'target-bottom-port-1',
+      data: { manualHandleSides: ['source', 'target'] },
+    };
+
+    const result = normalizeBaseEdge({
+      edge: input,
+      nodeById: new Map(baseNodes.map(node => [node.id, node])),
+      displayEdgeEpoch: 1,
+    });
+
+    expect(result.sourceHandle).toBe('source-top-port-1');
+    expect(result.targetHandle).toBe('target-bottom-port-1');
+  });
+
+  it('allows router-owned runtime terminals to switch sides during auto reverse repair', () => {
+    const input: Edge = {
+      id: 'runtime-auto-reverse',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'source-bottom-runtime',
+      targetHandle: 'target-top-runtime',
+      data: {
+        auto: ['source', 'target'],
+        runtimeHandleLock: { source: true, target: true },
+      },
+    };
+
+    const result = normalizeBaseEdge({
+      edge: input,
+      nodeById: new Map(baseNodes.map(node => [node.id, node])),
+      displayEdgeEpoch: 1,
+    });
+
+    expect(result.sourceHandle).toBe('right');
+    expect(result.targetHandle).toBe('left');
+  });
+
+  it('preserves exact shorthand handles during base normalization', () => {
+    const input: Edge = {
+      id: 'manual-shorthand',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'r',
+      targetHandle: 'l',
+      data: { manualHandles: true },
+    };
+
+    const result = normalizeBaseEdge({
+      edge: input,
+      nodeById: new Map(baseNodes.map(node => [node.id, node])),
+      displayEdgeEpoch: 1,
+    });
+
+    expect(result.sourceHandle).toBe('r');
+    expect(result.targetHandle).toBe('l');
+  });
+
   it('re-exports split routing primitives without mutating caller inputs', () => {
     expect(anchorComputedDisplayEdgeEndpoints).toBe(anchorComputedDisplayEdgeEndpointsDirect);
     expect(compactOrthogonalPath).toBe(compactOrthogonalPathDirect);
@@ -152,10 +217,57 @@ describe('baseReactFlowDisplayEdgeCore', () => {
       smartEdgePadding: 20,
       isLargeGraph: false,
     });
+    const signatureE = computeBaseReactFlowDisplayCacheSignature({
+      nodes: baseNodes,
+      edges: [{
+        ...edges[0],
+        data: {
+          ...(edges[0].data as Record<string, unknown>),
+          treeRouting: {},
+        },
+      }],
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    });
 
     expect(signatureB).not.toBe(signatureA);
     expect(signatureC).not.toBe(signatureA);
     expect(signatureD).not.toBe(signatureA);
+    expect(signatureE).not.toBe(signatureA);
+  });
+
+  it.each([
+    ['runtime boolean lock', { runtimeHandleLock: true }],
+    ['legacy runtime lock', { _runtimeHandleLock: { source: true } }],
+    ['legacy manual handle', { _manualHandles: { target: true } }],
+  ] as const)('invalidates both display identities for a %s', (_name, lockData) => {
+    const edge: Edge = {
+      id: 'identity-lock',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'right-port-1',
+      targetHandle: 'left-port-1',
+      data: {},
+    };
+    const input = {
+      nodes: baseNodes,
+      edges: [edge],
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+    };
+    const lockedInput = {
+      ...input,
+      edges: [{ ...edge, data: lockData }],
+    };
+
+    expect(computeBaseReactFlowDisplayCacheSignature(lockedInput)).not.toBe(
+      computeBaseReactFlowDisplayCacheSignature(input),
+    );
+    expect(computeBaseDisplayInputSignature(lockedInput)).not.toBe(
+      computeBaseDisplayInputSignature(input),
+    );
   });
 
   it('invalidates display cache signatures for sub-pixel boundaries and fixed handle positions', () => {
@@ -472,6 +584,64 @@ describe('baseReactFlowDisplayEdgeCore', () => {
 
     expect(result.sourceHandle).toBe('bottom');
     expect((result.data as any).computedPath).toEqual(originalPath);
+  });
+
+  it('keeps an exact compound terminal id fixed during endpoint anchoring', () => {
+    const nodes: Node[] = [
+      { id: 'source', position: { x: 300, y: 0 }, data: {}, measured: { width: 100, height: 60 } },
+      { id: 'target', position: { x: 0, y: 200 }, data: {}, measured: { width: 100, height: 60 } },
+    ];
+    const originalPath = [
+      { x: 300, y: 60 },
+      { x: 300, y: 108 },
+      { x: 50, y: 108 },
+      { x: 50, y: 200 },
+    ];
+    const [result] = anchorComputedDisplayEdgeEndpoints([{
+      id: 'manual-compound-bottom-port',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'source-bottom-port-1',
+      targetHandle: 'target-top-port-1',
+      data: {
+        computedPath: originalPath,
+        manualHandles: { source: true, target: true },
+      },
+    }], nodes);
+
+    expect(result.sourceHandle).toBe('source-bottom-port-1');
+    expect(result.targetHandle).toBe('target-top-port-1');
+    const path = (result.data as any).computedPath as Array<{ x: number; y: number }>;
+    expect(path[0].y).toBe(60);
+    expect(path.at(-1)?.y).toBe(200);
+    expect(path.every((point, index) => (
+      index === 0 || point.x === path[index - 1].x || point.y === path[index - 1].y
+    ))).toBe(true);
+  });
+
+  it('lets endpoint anchoring refine a router-owned runtime side', () => {
+    const nodes: Node[] = [
+      { id: 'source', position: { x: 300, y: 0 }, data: {}, measured: { width: 100, height: 60 } },
+      { id: 'target', position: { x: 0, y: 200 }, data: {}, measured: { width: 100, height: 60 } },
+    ];
+    const [result] = anchorComputedDisplayEdgeEndpoints([{
+      id: 'runtime-compound-bottom-port',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'source-bottom-runtime',
+      targetHandle: 'target-top-runtime',
+      data: {
+        runtimeHandleLock: { source: true, target: true },
+        computedPath: [
+          { x: 300, y: 60 },
+          { x: 300, y: 108 },
+          { x: 50, y: 108 },
+          { x: 50, y: 200 },
+        ],
+      },
+    }], nodes);
+
+    expect(result.sourceHandle).toBe('left');
   });
 
   it('keeps fast fallback paths orthogonal when the locked layout contains diagonals', () => {

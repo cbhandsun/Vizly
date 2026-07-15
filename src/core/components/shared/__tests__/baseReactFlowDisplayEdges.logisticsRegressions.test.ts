@@ -14,9 +14,17 @@ import {
   createBaseReactFlowDisplayEdges,
   createBaseReactFlowPreDisplayFinalEdges,
 } from '../baseReactFlowDisplayEdges';
-import { computeBaseReactFlowDisplayEdgeEpoch } from '../baseReactFlowDisplayEdgeCore';
+import {
+  computeBaseReactFlowDisplayEdgeEpoch,
+  computeBaseReactFlowDisplayOutputRouteSignature,
+} from '../baseReactFlowDisplayEdgeCore';
 import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
 import { projectBaseReactFlowDisplayWorkerInput } from '../baseReactFlowDisplayWorkerClient';
+import {
+  createBaseReactFlowDisplayEdgePatches,
+  mergeBaseReactFlowDisplayRoutingTransactions,
+  resolveBaseReactFlowDisplayCacheReplaySignature,
+} from '../baseReactFlowDisplayRoutingTransaction';
 import {
   countHairpins,
   detachedDisplayEndpoints,
@@ -27,6 +35,10 @@ import {
   tinyInteriorSegments,
   withAbsoluteNodePositions,
 } from './baseReactFlowDisplayEdges.testUtils';
+
+type PositionedNode = Node & {
+  positionAbsolute: { x: number; y: number };
+};
 
 describe('baseReactFlowDisplayEdges logistics regressions', () => {
   it('removes logistics multi-trunk crossings before display', () => {
@@ -247,7 +259,7 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
   it('keeps the browser worker logistics candidate under the same hard gates', async () => {
     const canvas = await standardDataToCanvas(logisticsStandardData as any);
     const projected = projectBaseReactFlowDisplayWorkerInput(canvas);
-    const browserMeasuredNodes: Node[] = [
+    const browserMeasuredNodes: PositionedNode[] = [
       { ...node('titlegroup-external', 953.4875, 0, 1715.4, 365), type: 'titleGroup', positionAbsolute: { x: 953.4875, y: 0 } },
       { ...node('titlegroup-logistics', 0, 525, 2368.25, 1157), type: 'titleGroup', positionAbsolute: { x: 0, y: 525 } },
       { ...node('titlegroup-data', 1547.6875, 1842, 547, 404), type: 'titleGroup', positionAbsolute: { x: 1547.6875, y: 1842 } },
@@ -503,6 +515,7 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
       }),
     };
     const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'route',
       requestId: 'logistics-worker-hard-gates',
       edges: browserProjected.edges,
       nodes: browserProjected.nodes,
@@ -549,7 +562,17 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
       targetHandle: edge.targetHandle,
       path: ((edge.data as any).computedPath || []) as Array<{ x: number; y: number }>,
     }));
-
+    const workerRoutingPatches = createBaseReactFlowDisplayEdgePatches(projected.edges, result);
+    const mergedTransactions = workerRoutingPatches
+      ? mergeBaseReactFlowDisplayRoutingTransactions({
+        latestSourceEdges: projected.edges,
+        workerRoutingPatches,
+        repairRoutingPatches: createBaseReactFlowDisplayEdgePatches(result, result)!,
+      })
+      : null;
+    const finalOutputRouteSignature = mergedTransactions
+      ? computeBaseReactFlowDisplayOutputRouteSignature(mergedTransactions.edges)
+      : null;
     expect(quality.nonOrthogonalSegments, JSON.stringify({ quality, paths }, null, 2)).toBe(0);
     expect(
       quality.strictCrossings,
@@ -589,6 +612,17 @@ describe('baseReactFlowDisplayEdges logistics regressions', () => {
           path: (edge.data as any)?.computedPath,
         })), null, 2),
     ).toBe(true);
+    expect(finalOutputRouteSignature).not.toBeNull();
+    expect(result.some(edge => (
+      (edge.data as any)?.sharedTrunkAware === true
+      || (edge.data as any)?.sharedTrunkSynthesized === true
+    ))).toBe(true);
+    expect(resolveBaseReactFlowDisplayCacheReplaySignature({
+      sourceEdges: projected.edges,
+      finalEdges: mergedTransactions?.edges ?? [],
+      cachePatches: mergedTransactions?.cachePatches ?? [],
+      finalOutputRouteSignature,
+    })).toBeNull();
     expect(durationMs, JSON.stringify({ durationMs, quality }, null, 2)).toBeLessThan(30_000);
   }, 60_000);
 

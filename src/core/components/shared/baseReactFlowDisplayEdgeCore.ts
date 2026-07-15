@@ -1,6 +1,12 @@
 import type { Edge, Node, XYPosition } from '@xyflow/react';
 
-import { expandHandle } from '../../routing/utils/handleUtils';
+import { expandHandle, normalizeHandle } from '../../routing/utils/handleUtils';
+import {
+  edgeTerminalSideCanSwitch,
+  readEdgeTerminalPolicy,
+  resolveEdgeTerminalHandleForSide,
+  type EdgeTerminalRole,
+} from '../../routing/utils/edgeTerminalPolicy';
 import { anchorComputedDisplayEdgeEndpoints } from './baseReactFlowDisplayEndpointAnchoring';
 import {
   anchorForHandle,
@@ -65,8 +71,13 @@ const clearComputedLayoutData = ({
 });
 
 const normalizeRuntimeHandles = (edge: Edge): Edge => {
-  const sourceHandle = edge.sourceHandle ? expandHandle(String(edge.sourceHandle)) : edge.sourceHandle;
-  const targetHandle = edge.targetHandle ? expandHandle(String(edge.targetHandle)) : edge.targetHandle;
+  const normalizeHandleForRole = (role: EdgeTerminalRole): string | null | undefined => {
+    const currentHandle = role === 'source' ? edge.sourceHandle : edge.targetHandle;
+    if (!currentHandle || readEdgeTerminalPolicy(edge, role).sourceExactFixed) return currentHandle;
+    return expandHandle(String(currentHandle));
+  };
+  const sourceHandle = normalizeHandleForRole('source');
+  const targetHandle = normalizeHandleForRole('target');
   if (sourceHandle === edge.sourceHandle && targetHandle === edge.targetHandle) return edge;
   return { ...edge, sourceHandle, targetHandle };
 };
@@ -85,8 +96,31 @@ const normalizeTreeBusHandles = ({
   const targetHandle = expandHandle(String(treeRouting.effectiveTargetHandle || edge.targetHandle || ''));
   if (!sourceHandle && !targetHandle) return edge;
 
-  const nextSource = sourceHandle || edge.sourceHandle;
-  const nextTarget = targetHandle || edge.targetHandle;
+  const resolveTreeHandle = (
+    role: EdgeTerminalRole,
+    candidateHandle: string,
+  ): string | null | undefined => {
+    const normalizedSide = normalizeHandle(candidateHandle);
+    const side = normalizedSide === 't'
+      ? 'top'
+      : normalizedSide === 'b'
+        ? 'bottom'
+        : normalizedSide === 'l'
+          ? 'left'
+          : normalizedSide === 'r'
+            ? 'right'
+            : null;
+    if (!side || !edgeTerminalSideCanSwitch(edge, role, side)) {
+      return role === 'source' ? edge.sourceHandle : edge.targetHandle;
+    }
+    return resolveEdgeTerminalHandleForSide(edge, role, side);
+  };
+  const nextSource = sourceHandle
+    ? resolveTreeHandle('source', sourceHandle)
+    : edge.sourceHandle;
+  const nextTarget = targetHandle
+    ? resolveTreeHandle('target', targetHandle)
+    : edge.targetHandle;
   if (nextSource === edge.sourceHandle && nextTarget === edge.targetHandle) return edge;
 
   return clearComputedLayoutData({
@@ -171,13 +205,18 @@ const normalizeCrossContainerManualHandles = ({
   if (Math.abs(dx) < 80) return edge;
 
   const nextHandles = dx >= 0
-    ? { sourceHandle: 'right', targetHandle: 'left' }
-    : { sourceHandle: 'left', targetHandle: 'right' };
+    ? { sourceHandle: 'right', targetHandle: 'left' } as const
+    : { sourceHandle: 'left', targetHandle: 'right' } as const;
+  if (
+    !edgeTerminalSideCanSwitch(edge, 'source', nextHandles.sourceHandle)
+    || !edgeTerminalSideCanSwitch(edge, 'target', nextHandles.targetHandle)
+  ) return edge;
 
   return clearComputedLayoutData({
     edge: {
       ...edge,
-      ...nextHandles,
+      sourceHandle: resolveEdgeTerminalHandleForSide(edge, 'source', nextHandles.sourceHandle),
+      targetHandle: resolveEdgeTerminalHandleForSide(edge, 'target', nextHandles.targetHandle),
     },
     data,
     displayEdgeEpoch,
@@ -226,14 +265,21 @@ const normalizeAutoReverseSideHandles = ({
   if (!isVerticalReverseWithSideRoom) return edge;
 
   const nextHandles = dx >= 0
-    ? { sourceHandle: 'right', targetHandle: 'left' }
-    : { sourceHandle: 'left', targetHandle: 'right' };
-  if (edge.sourceHandle === nextHandles.sourceHandle && edge.targetHandle === nextHandles.targetHandle) return edge;
+    ? { sourceHandle: 'right', targetHandle: 'left' } as const
+    : { sourceHandle: 'left', targetHandle: 'right' } as const;
+  if (
+    !edgeTerminalSideCanSwitch(edge, 'source', nextHandles.sourceHandle)
+    || !edgeTerminalSideCanSwitch(edge, 'target', nextHandles.targetHandle)
+  ) return edge;
+  const nextSourceHandle = resolveEdgeTerminalHandleForSide(edge, 'source', nextHandles.sourceHandle);
+  const nextTargetHandle = resolveEdgeTerminalHandleForSide(edge, 'target', nextHandles.targetHandle);
+  if (edge.sourceHandle === nextSourceHandle && edge.targetHandle === nextTargetHandle) return edge;
 
   return clearComputedLayoutData({
     edge: {
       ...edge,
-      ...nextHandles,
+      sourceHandle: nextSourceHandle,
+      targetHandle: nextTargetHandle,
     },
     data: {
       ...data,

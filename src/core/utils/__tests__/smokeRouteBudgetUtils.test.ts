@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   defaultDesktopRouteBudgets,
+  isFinalWmsDisplayRoutingReady,
   resolveRouteBudget,
   shouldRetryEvaluateAfterTimeout,
 } from '../../../../scripts/smokeRouteBudgetUtils.mjs';
@@ -45,5 +46,51 @@ describe('smokeRouteBudgetUtils', () => {
     expect(shouldRetryEvaluateAfterTimeout(new Error('CDP command timed out: Runtime.evaluate'), { isMobile: true })).toBe(true);
     expect(shouldRetryEvaluateAfterTimeout(new Error('CDP command timed out: Runtime.evaluate'), { isMobile: false })).toBe(false);
     expect(shouldRetryEvaluateAfterTimeout(new Error('CDP command timed out: Page.navigate'), { isMobile: true })).toBe(false);
+  });
+
+  it('marks WMS ready only after one final hard-clean routing commit', () => {
+    const finalState = {
+      stage: 'final-applied',
+      workerStartCount: 1,
+      workerAbortCount: 0,
+      workerResolution: 'validated-candidate',
+      routeMs: 42,
+      finalAppliedAt: 1_000,
+      outputRouteSignature: 'route-v2:44:208:c245f0d5d0caa25f',
+    };
+
+    expect(isFinalWmsDisplayRoutingReady(finalState)).toBe(true);
+    expect(isFinalWmsDisplayRoutingReady({
+      ...finalState,
+      workerResolution: 'full-route',
+    })).toBe(true);
+    expect(isFinalWmsDisplayRoutingReady({
+      ...finalState,
+      workerResolution: 'repair',
+    })).toBe(true);
+  });
+
+  it('rejects mounted, stale, aborted, and malformed WMS routing states', () => {
+    const finalState = {
+      stage: 'final-applied',
+      workerStartCount: 1,
+      workerAbortCount: 0,
+      workerResolution: 'validated-candidate',
+      routeMs: 42,
+      finalAppliedAt: 1_000,
+      outputRouteSignature: 'route-v2:44:208:c245f0d5d0caa25f',
+    };
+
+    expect(isFinalWmsDisplayRoutingReady(null)).toBe(false);
+    expect(isFinalWmsDisplayRoutingReady([])).toBe(false);
+    expect(isFinalWmsDisplayRoutingReady({ ...finalState, stage: 'worker-response' })).toBe(false);
+    expect(isFinalWmsDisplayRoutingReady({ ...finalState, workerStartCount: 2 })).toBe(false);
+    expect(isFinalWmsDisplayRoutingReady({ ...finalState, workerAbortCount: 1 })).toBe(false);
+    expect(isFinalWmsDisplayRoutingReady({ ...finalState, routeMs: Number.NaN })).toBe(false);
+    expect(isFinalWmsDisplayRoutingReady({ ...finalState, finalAppliedAt: 0 })).toBe(false);
+    expect(isFinalWmsDisplayRoutingReady({
+      ...finalState,
+      outputRouteSignature: 'route-v2:forged',
+    })).toBe(false);
   });
 });

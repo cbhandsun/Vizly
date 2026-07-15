@@ -15,6 +15,7 @@ import {
   chooseFewestStrictCrossings,
   countStrictEdgeCrossings,
   keepIfNoNewStrictCrossings,
+  type EdgePathQualityScore,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
 import {
   repairSharedTargetEntryCrossings,
@@ -47,6 +48,124 @@ const repairEndpointOrthogonalPathsTwice = <T extends Edge[]>(
   return first === edges ? first : repairEndpointOrthogonalPaths(first, nodes) as T;
 };
 
+type SharedTargetEntryPoint = { x: number; y: number };
+type SharedTargetEntrySegment = {
+  a: SharedTargetEntryPoint;
+  b: SharedTargetEntryPoint;
+  axis: 'h' | 'v';
+};
+
+const SHARED_TARGET_ENTRY_EPS = 0.5;
+
+const getSharedTargetEntryPath = (edge: Edge): SharedTargetEntryPoint[] => {
+  const raw = (edge.data as any)?.computedPath || (edge.data as any)?.treeRouting?.points || [];
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((point: any) => ({ x: Number(point?.x), y: Number(point?.y) }))
+    .filter((point: SharedTargetEntryPoint) => (
+      Number.isFinite(point.x) && Number.isFinite(point.y)
+    ));
+};
+
+const getSharedTargetEntrySegments = (edge: Edge): SharedTargetEntrySegment[] => {
+  const path = getSharedTargetEntryPath(edge);
+  const segments: SharedTargetEntrySegment[] = [];
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const a = path[index];
+    const b = path[index + 1];
+    const horizontal = Math.abs(a.y - b.y) <= SHARED_TARGET_ENTRY_EPS
+      && Math.abs(a.x - b.x) > SHARED_TARGET_ENTRY_EPS;
+    const vertical = Math.abs(a.x - b.x) <= SHARED_TARGET_ENTRY_EPS
+      && Math.abs(a.y - b.y) > SHARED_TARGET_ENTRY_EPS;
+    if (horizontal || vertical) {
+      segments.push({ a, b, axis: horizontal ? 'h' : 'v' });
+    }
+  }
+  return segments;
+};
+
+const sharedTargetEntrySegmentsStrictlyCross = (
+  first: SharedTargetEntrySegment,
+  second: SharedTargetEntrySegment,
+): boolean => {
+  if (first.axis === second.axis) return false;
+  const horizontal = first.axis === 'h' ? first : second;
+  const vertical = first.axis === 'v' ? first : second;
+  const x = vertical.a.x;
+  const y = horizontal.a.y;
+  return x > Math.min(horizontal.a.x, horizontal.b.x) + SHARED_TARGET_ENTRY_EPS
+    && x < Math.max(horizontal.a.x, horizontal.b.x) - SHARED_TARGET_ENTRY_EPS
+    && y > Math.min(vertical.a.y, vertical.b.y) + SHARED_TARGET_ENTRY_EPS
+    && y < Math.max(vertical.a.y, vertical.b.y) - SHARED_TARGET_ENTRY_EPS;
+};
+
+/**
+ * Mirrors the shared-target repair's raw path and strict-crossing geometry.
+ * A false result is therefore an exact proof that the repair cannot act.
+ */
+export const hasSharedTargetEntryStrictCrossing = (edges: Edge[]): boolean => {
+  const targetSegments = new Map<string, SharedTargetEntrySegment[][]>();
+  for (const edge of edges) {
+    if (!edge.target) continue;
+    const segments = getSharedTargetEntrySegments(edge);
+    if (segments.length === 0) continue;
+    const relatedPaths = targetSegments.get(edge.target);
+    if (relatedPaths) {
+      for (const relatedSegments of relatedPaths) {
+        for (const first of segments) {
+          for (const second of relatedSegments) {
+            if (sharedTargetEntrySegmentsStrictlyCross(first, second)) return true;
+          }
+        }
+      }
+      relatedPaths.push(segments);
+    } else {
+      targetSegments.set(edge.target, [segments]);
+    }
+  }
+  return false;
+};
+
+/**
+ * Avoid the repair's repeated whole-graph scoring when its own strict-crossing
+ * geometry proves that no shared-target pair can produce a candidate.
+ */
+export const repairSharedTargetEntryStrictCrossingsIfNeeded = <T extends Edge[]>(
+  edges: T,
+  repair: (candidate: Edge[]) => Edge[] = repairSharedTargetEntryCrossings,
+): T => (
+  hasSharedTargetEntryStrictCrossing(edges)
+    ? repair(edges) as T
+    : edges
+);
+
+export const canSkipLargeDetachedOverlapRepair = (
+  edgeCount: number,
+  quality: EdgePathQualityScore,
+): boolean => edgeCount > 24 && !hasHardDisplayOverlapRisk(quality);
+
+/**
+ * For graphs above the detached repair's related-overlap search limit, a
+ * hard-overlap-clean quality report is the repair's exact no-op condition.
+ * Keeping the small-graph path unchanged preserves its sub-threshold visual
+ * overlap cleanup.
+ */
+export const separateLargeDetachedParallelOverlapsIfNeeded = <T extends Edge[]>(
+  edges: T,
+  nodes: Node[],
+  minOverlap: number,
+  options: NonNullable<Parameters<typeof separateDetachedParallelOverlaps>[3]>,
+  repair: typeof separateDetachedParallelOverlaps = separateDetachedParallelOverlaps,
+): T => {
+  if (canSkipLargeDetachedOverlapRepair(
+    edges.length,
+    calculateEdgePathQualityScore(edges),
+  )) {
+    return edges;
+  }
+  return repair(edges, nodes, minOverlap, options) as T;
+};
+
 export const createBaseReactFlowFullRouteQualityEdges = ({
   normalizedEdges,
   repairNodes,
@@ -65,7 +184,7 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     );
   const detachedRoutedEdges = reusePreparedGlobalRouting
     ? globallyRoutedEdges
-    : separateDetachedParallelOverlaps(
+    : separateLargeDetachedParallelOverlapsIfNeeded(
       globallyRoutedEdges,
       repairNodes,
       96,
@@ -77,7 +196,7 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
   const secondaryTrunkEdges = synthesizeSharedEndpointTrunks(localTrunkEdges, { nodes: repairNodes });
   const secondaryDetachedEdges = reusePreparedGlobalRouting
     ? secondaryTrunkEdges
-    : separateDetachedParallelOverlaps(
+    : separateLargeDetachedParallelOverlapsIfNeeded(
       secondaryTrunkEdges,
       repairNodes,
       24,
@@ -124,8 +243,8 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     repairNodes,
   );
   const finalDetachedQualityEdges = repairEndpointOrthogonalPaths(
-    separateDetachedParallelOverlaps(
-      repairSharedTargetEntryCrossings(finalTargetQualityEdges),
+    separateLargeDetachedParallelOverlapsIfNeeded(
+      repairSharedTargetEntryStrictCrossingsIfNeeded(finalTargetQualityEdges),
       repairNodes,
       16,
       DISPLAY_DETACHED_OVERLAP_REPAIR_OPTIONS,
@@ -133,8 +252,8 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     repairNodes,
   );
   const finalEndpointQualityEdges = repairEndpointOrthogonalPaths(
-    separateDetachedParallelOverlaps(
-      repairSharedTargetEntryCrossings(
+    separateLargeDetachedParallelOverlapsIfNeeded(
+      repairSharedTargetEntryStrictCrossingsIfNeeded(
         repairLocalDoglegArtifacts(finalDetachedQualityEdges, repairNodes),
       ),
       repairNodes,
@@ -147,7 +266,9 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     refineGlobalEdgeWaypoints(finalEndpointQualityEdges, repairNodes),
     repairNodes,
   );
-  const finalTargetEntryQualityEdges = repairSharedTargetEntryCrossings(finalCrossingQualityEdges);
+  const finalTargetEntryQualityEdges = repairSharedTargetEntryStrictCrossingsIfNeeded(
+    finalCrossingQualityEdges,
+  );
   const finalGlobalCrossingCandidate = repairEndpointOrthogonalPaths(
     refineGlobalEdgeWaypoints(finalTargetEntryQualityEdges, repairNodes),
     repairNodes,
@@ -181,7 +302,7 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
     finalPostGlobalEndpointLaneCandidate,
     repairEndpointOrthogonalPaths(finalPostGlobalEndpointLaneCandidate, repairNodes),
   );
-  const finalDetachedOverlapCandidate = separateDetachedParallelOverlaps(
+  const finalDetachedOverlapCandidate = separateLargeDetachedParallelOverlapsIfNeeded(
     finalPreOverlapRepairCandidate,
     repairNodes,
     16,
@@ -262,7 +383,7 @@ export const createBaseReactFlowFullRouteQualityEdges = ({
   }
 
   const finalLocalPolishCandidate = repairLocalDoglegArtifacts(finalQualityEdges, repairNodes);
-  const finalDetachedPolishCandidate = separateDetachedParallelOverlaps(
+  const finalDetachedPolishCandidate = separateLargeDetachedParallelOverlapsIfNeeded(
     finalLocalPolishCandidate,
     repairNodes,
     16,

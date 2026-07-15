@@ -1,6 +1,9 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
-import { normalizeHandle } from '../../routing/utils/handleUtils';
+import {
+  edgeTerminalSideCanSwitch,
+  resolveEdgeTerminalHandleForSide,
+} from '../../routing/utils/edgeTerminalPolicy';
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
@@ -135,24 +138,6 @@ function pathDeviation(path: Point[]): PathDeviation {
       || Math.sign(firstDelta) !== Math.sign(expectedFirstDelta)
     ) ? Math.round(Math.abs(firstDelta)) : 0,
   };
-}
-
-function fixedSourceSide(edge: Edge): Side | null {
-  const data = ((edge.data || {}) as Record<string, any>);
-  const manualSides = Array.isArray(data.manualHandleSides)
-    ? data.manualHandleSides.map((side: unknown) => String(side).toLowerCase())
-    : [];
-  const policy = String(data.sourcePortPolicy ?? data.sourcePortConstraint ?? '').toLowerCase();
-  const fixed = manualSides.includes('source')
-    || data.sourceHandleLocked === true
-    || ['strong', 'fixed', 'fixed-side', 'fixed_side', 'fixed-pos', 'fixed_pos'].includes(policy);
-  if (!fixed) return null;
-  const side = normalizeHandle(edge.sourceHandle);
-  if (side === 't') return 'top';
-  if (side === 'b') return 'bottom';
-  if (side === 'l') return 'left';
-  if (side === 'r') return 'right';
-  return null;
 }
 
 function getNodeRect(node: ReactFlowNode): Rect | null {
@@ -481,7 +466,9 @@ function withComputedPath(edge: Edge, path: Point[], sourceHandle?: Side): Edge 
   }
   return {
     ...edge,
-    ...(sourceHandle ? { sourceHandle } : {}),
+    ...(sourceHandle ? {
+      sourceHandle: resolveEdgeTerminalHandleForSide(edge, 'source', sourceHandle),
+    } : {}),
     data,
   };
 }
@@ -514,7 +501,6 @@ export function repairReverseFlowBypassCrossings(edges: Edge[], nodes: ReactFlow
       if (!path || !sourceRect || !targetRect) continue;
 
       const currentRelation = relationToOtherEdges(path, edge, repaired, edgesById);
-      const declaredSourceSide = fixedSourceSide(edge);
       if (currentRelation.crossings <= 0 && currentRelation.reverseOverlap < 16) continue;
 
       const ignored = new Set([edge.source, edge.target]);
@@ -539,7 +525,7 @@ export function repairReverseFlowBypassCrossings(edges: Edge[], nodes: ReactFlow
         obstacles,
       );
       const candidates = generatedCandidates
-        .filter(candidate => !declaredSourceSide || candidate.sourceHandle === declaredSourceSide)
+        .filter(candidate => edgeTerminalSideCanSwitch(edge, 'source', candidate.sourceHandle))
         .filter(candidate => !pathIntersectsAnyRect(candidate.path, obstacles))
         .map(candidate => {
           const relation = relationToOtherEdges(candidate.path, edge, repaired, edgesById);

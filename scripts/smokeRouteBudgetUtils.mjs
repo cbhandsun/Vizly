@@ -54,3 +54,29 @@ export const shouldRetryEvaluateAfterTimeout = (error, { isMobile = false } = {}
   if (!isMobile || !(error instanceof Error)) return false;
   return /CDP command timed out: Runtime\.evaluate/.test(error.message);
 };
+
+/**
+ * The WMS page is not ready merely because React Flow mounted. Its user-visible
+ * contract is the single final, hard-clean display route committed by the
+ * routing hook. Keeping this predicate pure lets the CDP smoke probe and its
+ * unit tests share the exact boundary rules.
+ */
+export const isFinalWmsDisplayRoutingReady = (value) => (
+  Boolean(value)
+  && typeof value === 'object'
+  && !Array.isArray(value)
+  && value.stage === 'final-applied'
+  && value.workerStartCount === 1
+  && value.workerAbortCount === 0
+  && (
+    value.workerResolution === 'validated-candidate'
+    || value.workerResolution === 'full-route'
+    || value.workerResolution === 'repair'
+  )
+  && Number.isFinite(value.routeMs)
+  && value.routeMs >= 0
+  && Number.isFinite(value.finalAppliedAt)
+  && value.finalAppliedAt > 0
+  && typeof value.outputRouteSignature === 'string'
+  && /^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/.test(value.outputRouteSignature)
+);

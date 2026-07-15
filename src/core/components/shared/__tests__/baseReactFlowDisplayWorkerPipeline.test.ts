@@ -11,10 +11,14 @@ import {
   withDisplayAbsolutePositions,
   writeBaseReactFlowDisplayEdgesCache,
 } from '../baseReactFlowDisplayEdgeCore';
-import { computeBaseReactFlowDisplayEdgesWorkerResponse } from '../baseReactFlowDisplayEdges.worker';
+import {
+  computeBaseReactFlowDisplayEdgesWorkerResponse,
+  handleBaseReactFlowDisplayWorkerMessage,
+} from '../baseReactFlowDisplayEdges.worker';
 import * as declaredRoleRepair from '../baseReactFlowDeclaredTerminalRoleRepair';
 import * as endpointStubRepair from '../baseReactFlowDisplayEndpointStubRepair';
 import * as displayFinalizer from '../baseReactFlowDisplayFinalizer';
+import * as fullRoutePipeline from '../baseReactFlowDisplayFullRoutePipeline';
 import * as measuredDisplayRepair from '../baseReactFlowDisplayMeasuredRepair';
 import * as outerPortTransaction from '../baseReactFlowDisplayOuterPortTransaction';
 import { getDisplayHardQualityGateReport } from '../baseReactFlowDisplayQualityGates';
@@ -22,7 +26,7 @@ import * as renderTerminalSafety from '../baseReactFlowRenderTerminalSafety';
 import * as terminalPortRepair from '../baseReactFlowDisplayTerminalPortRepair';
 import {
   createBaseReactFlowDisplayEdgePatches,
-  mergeBaseReactFlowDisplayEdgePatches,
+  mergeTrustedBaseReactFlowDisplayCacheEntry,
   resolveBaseReactFlowDisplayedEdges,
 } from '../baseReactFlowDisplayWorkerClient';
 
@@ -70,6 +74,167 @@ afterEach(() => {
 });
 
 describe('baseReactFlowDisplayEdges worker pipeline', () => {
+  it('rejects malformed worker messages before they reach routing code', () => {
+    expect(handleBaseReactFlowDisplayWorkerMessage(null)).toEqual({
+      requestId: 'invalid-request',
+      error: 'display-edge-worker-invalid-request',
+    });
+    expect(handleBaseReactFlowDisplayWorkerMessage({
+      operation: 'repair',
+      requestId: 'invalid-repair',
+      edges: [{ id: 'edge', source: 'source', target: 'target' }],
+      nodes: [{ id: 'source', position: { x: Number.NaN, y: 0 }, data: {} }],
+    })).toEqual({
+      requestId: 'invalid-repair',
+      error: 'display-edge-worker-invalid-request',
+    });
+  });
+
+  it('dispatches repair-only messages through the measured repair pipeline', () => {
+    const repairSpy = vi.spyOn(
+      measuredDisplayRepair,
+      'repairBaseReactFlowMeasuredDisplayEdgesWithReport',
+    );
+
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'repair',
+      requestId: 'repair-only',
+      edges,
+      nodes,
+    });
+
+    expect(repairSpy).toHaveBeenCalledTimes(1);
+    expect(response.requestId).toBe('repair-only');
+    expect(Array.isArray(response.edges)).toBe(true);
+    expect(typeof response.hardClean).toBe('boolean');
+    expect(response.routeResolution).toBe('repair');
+  });
+
+  it('commits a clean cache candidate without entering the full-route pipeline', () => {
+    const fullRouteSpy = vi.spyOn(fullRoutePipeline, 'createBaseReactFlowFullRouteEdges');
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'validate-or-route',
+      requestId: 'validate-clean-cache',
+      edges,
+      candidateEdges: edges,
+      candidateSource: 'persistent',
+      nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: 1,
+      qualityMode: 'full',
+    });
+
+    expect(response).toEqual({
+      requestId: 'validate-clean-cache',
+      edges,
+      hardClean: true,
+      routeResolution: 'validated-candidate',
+    });
+    expect(fullRouteSpy).not.toHaveBeenCalled();
+  });
+
+  it('reroutes invalid, stale, and malformed cache candidates in the same worker job', () => {
+    const fullRouteSpy = vi.spyOn(fullRoutePipeline, 'createBaseReactFlowFullRouteEdges');
+    const routeInput = {
+      edges,
+      nodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: 2,
+      qualityMode: 'full' as const,
+    };
+    const invalidCandidate = edges.map(edge => ({
+      ...edge,
+      data: {
+        ...(edge.data || {}),
+        computedPath: [{ x: 100, y: 30 }, { x: 200, y: 80 }, { x: 300, y: 30 }],
+      },
+    }));
+    const invalid = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'validate-or-route',
+      requestId: 'validate-invalid-cache',
+      candidateEdges: invalidCandidate,
+      candidateSource: 'persistent',
+      ...routeInput,
+    });
+    expect(invalid.error).toBeUndefined();
+    expect(invalid.edges).not.toEqual(invalidCandidate);
+
+    const stale = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'validate-or-route',
+      requestId: 'validate-stale-cache',
+      candidateEdges: [{ ...edges[0], id: 'stale-edge' }],
+      candidateSource: 'persistent',
+      ...routeInput,
+    });
+    expect(stale.error).toBeUndefined();
+
+    const malformed = handleBaseReactFlowDisplayWorkerMessage({
+      operation: 'validate-or-route',
+      requestId: 'validate-malformed-cache',
+      candidateSource: 'persistent',
+      candidateEdges: [{
+        ...edges[0],
+        data: { computedPath: [{ x: Number.NaN, y: 0 }] },
+      }],
+      ...routeInput,
+    });
+    expect(malformed.error).toBeUndefined();
+    expect(fullRouteSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it('validates hard-clean candidates above the persistent-cache edge limit', () => {
+    const graphNodes: Node[] = [];
+    const graphEdges: Edge[] = [];
+    for (let index = 0; index < 301; index += 1) {
+      const y = index * 30;
+      graphNodes.push(
+        {
+          id: `source-${index}`,
+          position: { x: 0, y },
+          measured: { width: 10, height: 10 },
+          data: {},
+        },
+        {
+          id: `target-${index}`,
+          position: { x: 200, y },
+          measured: { width: 10, height: 10 },
+          data: {},
+        },
+      );
+      graphEdges.push({
+        id: `edge-${index}`,
+        source: `source-${index}`,
+        target: `target-${index}`,
+        sourceHandle: 'right',
+        targetHandle: 'left',
+        data: { computedPath: [{ x: 10, y: y + 5 }, { x: 200, y: y + 5 }] },
+      });
+    }
+    const fullRouteSpy = vi.spyOn(fullRoutePipeline, 'createBaseReactFlowFullRouteEdges');
+    const response = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'validate-or-route',
+      requestId: 'validate-301-edges',
+      edges: graphEdges,
+      candidateEdges: graphEdges,
+      candidateSource: 'persistent',
+      nodes: graphNodes,
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: 3,
+      qualityMode: 'full',
+    });
+
+    expect(response.hardClean).toBe(true);
+    expect(response.edges).toHaveLength(301);
+    expect(response.routeResolution).toBe('validated-candidate');
+    expect(fullRouteSpy).not.toHaveBeenCalled();
+  });
+
   it('runs the shared finalizer and matches the direct final display route', () => {
     const input = {
       edges,
@@ -85,6 +250,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       'finalizeBaseReactFlowDisplayEdgesWithReport',
     );
     const workerResponse = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'route',
       requestId: 'worker-direct-parity',
       ...input,
       qualityMode: 'full',
@@ -95,6 +261,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       requestId: 'worker-direct-parity',
       edges: direct,
       hardClean: true,
+      routeResolution: 'full-route',
     });
   });
 
@@ -260,6 +427,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
 
   it('reports a genuinely clean interactive result as hard clean', () => {
     const workerResponse = computeBaseReactFlowDisplayEdgesWorkerResponse({
+      operation: 'route',
       requestId: 'interactive-hard-clean',
       edges,
       nodes,
@@ -327,7 +495,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     }
   });
 
-  it('revalidates hard-clean cache patches after merging them onto current edges', () => {
+  it('revalidates persisted cache patches in the worker before final-only display', async () => {
     window.localStorage.clear();
     const sourceEdge: Edge = {
       id: 'cached-edge',
@@ -341,7 +509,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       },
     };
 
-    const evaluateCachedPath = (
+    const evaluateCachedPath = async (
       signature: string,
       computedPath: Array<{ x: number; y: number }>,
       candidateNodes: Node[],
@@ -368,17 +536,29 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       });
       const cachedEntry = readBaseReactFlowDisplayEdgesCacheEntry(signature);
       expect(cachedEntry?.hardClean).toBe(true);
-      const merged = cachedEntry
-        ? mergeBaseReactFlowDisplayEdgePatches([sourceEdge], cachedEntry.edges)
+      const candidate = cachedEntry
+        ? mergeTrustedBaseReactFlowDisplayCacheEntry([sourceEdge], cachedEntry)
         : null;
-      expect((merged?.[0].data as any)?.businessMetadata).toEqual({ owner: 'current' });
-      const safeCached = merged && baseReactFlowDisplayHardQualityIsClean(merged, candidateNodes)
-        ? merged
-        : null;
-      return { merged, safeCached };
+      expect((candidate?.[0].data as any)?.businessMetadata).toEqual({ owner: 'current' });
+      expect(candidate).not.toBeNull();
+      if (!candidate) throw new Error('expected a signed routing-only cache candidate');
+      const response = await computeBaseReactFlowDisplayEdgesWorkerResponse({
+        operation: 'validate-or-route',
+        requestId: signature,
+        edges: [sourceEdge],
+        candidateEdges: candidate,
+        candidateSource: 'persistent',
+        nodes: candidateNodes,
+        enableSmartEdges: true,
+        smartEdgePadding: 20,
+        isLargeGraph: false,
+        displayEdgeEpoch: 1,
+        qualityMode: 'full',
+      });
+      return { candidate, response };
     };
 
-    const good = evaluateCachedPath(
+    const good = await evaluateCachedPath(
       'cache-quality-good',
       [
         { x: 100, y: 30 },
@@ -388,14 +568,36 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       ],
       nodes,
     );
-    expect(good.safeCached).toEqual(good.merged);
+    expect(good.response).toMatchObject({
+      requestId: 'cache-quality-good',
+      edges: good.candidate,
+      hardClean: true,
+      routeResolution: 'validated-candidate',
+    });
     expect(resolveBaseReactFlowDisplayedEdges({
       signature: 'cache-quality-good',
+      geometryDigest: 'digest-good',
       policyMode: 'full',
       deferred: null,
-      cached: good.safeCached,
+      cached: null,
       immediate: [sourceEdge],
-    })).toEqual(good.merged);
+    })).toEqual([]);
+    expect(resolveBaseReactFlowDisplayedEdges({
+      signature: 'cache-quality-good',
+      geometryDigest: 'digest-good',
+      policyMode: 'full',
+      deferred: {
+        signature: 'cache-quality-good',
+        geometryDigest: 'digest-good',
+        displayPatches: createBaseReactFlowDisplayEdgePatches(
+          [sourceEdge],
+          good.response.edges!,
+        )!,
+        hardClean: true,
+      },
+      cached: null,
+      immediate: [sourceEdge],
+    })).toEqual(good.candidate);
 
     const obstacleNodes: Node[] = [
       nodes[0],
@@ -407,7 +609,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       },
       nodes[1],
     ];
-    const obstacleHit = evaluateCachedPath(
+    const obstacleHit = await evaluateCachedPath(
       'cache-quality-obstacle',
       [
         { x: 100, y: 30 },
@@ -415,7 +617,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       ],
       obstacleNodes,
     );
-    const wrongHandleAxis = evaluateCachedPath(
+    const wrongHandleAxis = await evaluateCachedPath(
       'cache-quality-wrong-handle',
       [
         { x: 100, y: 30 },
@@ -425,7 +627,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       ],
       nodes,
     );
-    const detached = evaluateCachedPath(
+    const detached = await evaluateCachedPath(
       'cache-quality-detached',
       [
         { x: 120, y: 30 },
@@ -435,15 +637,9 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     );
 
     for (const rejected of [obstacleHit, wrongHandleAxis, detached]) {
-      expect(rejected.merged).not.toBeNull();
-      expect(rejected.safeCached).toBeNull();
-      expect(resolveBaseReactFlowDisplayedEdges({
-        signature: 'cache-quality-rejected',
-        policyMode: 'full',
-        deferred: null,
-        cached: rejected.safeCached,
-        immediate: [sourceEdge],
-      })).toEqual([]);
+      expect(rejected.response.edges).toBeDefined();
+      expect(rejected.response.edges).not.toEqual(rejected.candidate);
+      expect(rejected.response.routeResolution).toBe('full-route');
     }
   });
 });

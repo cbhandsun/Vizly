@@ -60,6 +60,12 @@ interface EdgePairScoreContribution {
     edgeScoreTouches: number;
 }
 
+interface SharedBuddyOverlapPolicy {
+    sameBuddy: boolean;
+    protectsSourceTrunk: boolean;
+    protectsTargetTrunk: boolean;
+}
+
 interface RoutingCrossingScoreState {
     edgeIds: string[];
     edgeIndexById: Map<string, number>;
@@ -402,10 +408,14 @@ export class RoutingCrossingScorer {
         let parallelOverlaps = 0;
         let edgeScore = 0;
         let edgeScoreTouches = 0;
+        const buddyPolicy = this.sharedBuddyOverlapPolicy(
+            firstSegments[0]?.edgeId,
+            secondSegments[0]?.edgeId,
+        );
+        const sameBuddy = buddyPolicy.sameBuddy;
 
         for (const first of firstSegments) {
             for (const second of secondSegments) {
-                const sameBuddy = this.sameBuddyGroup(first.edgeId, second.edgeId);
                 if (RoutingCrossingScorer.segmentsStrictlyCross(first, second)) {
                     if (sameBuddy) {
                         buddyCrossings++;
@@ -420,7 +430,7 @@ export class RoutingCrossingScorer {
 
                 // Same-buddy collinear overlap is intentional only while it remains
                 // a short source/target junction. Long shared trunks obscure flow.
-                if (sameBuddy && this.isProtectedSharedTrunkOverlap(first, second)) continue;
+                if (sameBuddy && this.isProtectedSharedTrunkOverlap(first, second, buddyPolicy)) continue;
 
                 const overlapUnits = RoutingCrossingScorer.parallelOverlapUnits(
                     first,
@@ -593,31 +603,37 @@ export class RoutingCrossingScorer {
         return segments;
     }
 
-    private sameBuddyGroup(edgeA: string, edgeB: string): boolean {
+    private sharedBuddyOverlapPolicy(
+        edgeA: string | undefined,
+        edgeB: string | undefined,
+    ): SharedBuddyOverlapPolicy {
+        const policy: SharedBuddyOverlapPolicy = {
+            sameBuddy: false,
+            protectsSourceTrunk: false,
+            protectsTargetTrunk: false,
+        };
+        if (!edgeA || !edgeB) return policy;
         const groupsA = this.buddyGroupByEdgeId.get(edgeA);
         const groupsB = this.buddyGroupByEdgeId.get(edgeB);
-        if (!groupsA || !groupsB) return false;
-        for (const group of groupsA) {
-            if (groupsB.has(group)) return true;
-        }
-        return false;
-    }
-
-    private isProtectedSharedTrunkOverlap(a: OrthogonalSegment, b: OrthogonalSegment): boolean {
-        const groupsA = this.buddyGroupByEdgeId.get(a.edgeId);
-        const groupsB = this.buddyGroupByEdgeId.get(b.edgeId);
-        if (!groupsA || !groupsB) return false;
-
+        if (!groupsA || !groupsB) return policy;
         for (const group of groupsA) {
             if (!groupsB.has(group)) continue;
-            if (group.startsWith('o2m:') && a.segmentIndex === 0 && b.segmentIndex === 0) return true;
-            if (group.startsWith('m2o:')
-                && a.segmentIndex >= a.pointCount - 3
-                && b.segmentIndex >= b.pointCount - 3) {
-                return true;
-            }
+            policy.sameBuddy = true;
+            if (group.startsWith('o2m:')) policy.protectsSourceTrunk = true;
+            if (group.startsWith('m2o:')) policy.protectsTargetTrunk = true;
         }
-        return false;
+        return policy;
+    }
+
+    private isProtectedSharedTrunkOverlap(
+        a: OrthogonalSegment,
+        b: OrthogonalSegment,
+        policy: SharedBuddyOverlapPolicy,
+    ): boolean {
+        if (policy.protectsSourceTrunk && a.segmentIndex === 0 && b.segmentIndex === 0) return true;
+        return policy.protectsTargetTrunk
+            && a.segmentIndex >= a.pointCount - 3
+            && b.segmentIndex >= b.pointCount - 3;
     }
 
     private addEdgeScore(byEdge: Map<string, number>, edgeId: string, delta: number): void {

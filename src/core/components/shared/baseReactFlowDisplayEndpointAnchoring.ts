@@ -1,6 +1,10 @@
 import type { Edge, Node, XYPosition } from '@xyflow/react';
 
 import {
+  edgeTerminalSideCanSwitch,
+  resolveEdgeTerminalHandleForSide,
+} from '../../routing/utils/edgeTerminalPolicy';
+import {
   fastDisplayHardSafetyIsClean,
 } from './baseReactFlowFastEdgeSafety';
 import { isFinitePoint } from './baseReactFlowDisplayCache';
@@ -346,25 +350,6 @@ const preferredDisplayPortSides = (
   return null;
 };
 
-const displayPortSideCanSwitch = (
-  edge: Edge,
-  terminalAtStart: boolean,
-): boolean => {
-  const data = ((edge.data || {}) as Record<string, any>);
-  const role = terminalAtStart ? 'source' : 'target';
-  const manualSides = Array.isArray(data.manualHandleSides)
-    ? data.manualHandleSides.map((side: unknown) => String(side).toLowerCase())
-    : [];
-  if (manualSides.includes(role) || data[`${role}HandleLocked`] === true) return false;
-  const policy = String(
-    data[`${role}PortPolicy`]
-      ?? data[`${role}PortConstraint`]
-      ?? '',
-  ).toLowerCase();
-  return !['strong', 'fixed', 'fixed-side', 'fixed_side', 'fixed-pos', 'fixed_pos', 'forbidden']
-    .includes(policy);
-};
-
 const insetTerminalOnSide = (
   terminal: XYPosition,
   rect: NodeRect,
@@ -447,7 +432,7 @@ const buildPreferredPortSideCandidate = (
   let targetHandle = edge.targetHandle;
   let sourceChanged = false;
   let targetChanged = false;
-  if (displayPortSideCanSwitch(edge, true)) {
+  if (edgeTerminalSideCanSwitch(edge, 'source', preferred.source)) {
     const currentSourceSide = sideForHandle(edge.sourceHandle) || closestRectSide(candidatePath[0], sourceRect);
     const foldedSource = foldTerminalCornerElbow({
       path: candidatePath,
@@ -458,11 +443,11 @@ const buildPreferredPortSideCandidate = (
     });
     if (foldedSource) {
       candidatePath = foldedSource;
-      sourceHandle = preferred.source;
+      sourceHandle = resolveEdgeTerminalHandleForSide(edge, 'source', preferred.source);
       sourceChanged = true;
     }
   }
-  if (displayPortSideCanSwitch(edge, false)) {
+  if (edgeTerminalSideCanSwitch(edge, 'target', preferred.target)) {
     const currentTargetSide = sideForHandle(edge.targetHandle)
       || closestRectSide(candidatePath[candidatePath.length - 1], targetRect);
     const foldedTarget = foldTerminalCornerElbow({
@@ -474,7 +459,7 @@ const buildPreferredPortSideCandidate = (
     });
     if (foldedTarget) {
       candidatePath = foldedTarget;
-      targetHandle = preferred.target;
+      targetHandle = resolveEdgeTerminalHandleForSide(edge, 'target', preferred.target);
       targetChanged = true;
     }
   }
@@ -532,19 +517,23 @@ const anchorComputedPathEndpoints = (
     sourceAnchored
     && requestedSourceSide
     && requestedSourceSide !== anchoredSourceSide
-    && displayPortSideCanSwitch(edge, true)
+    && edgeTerminalSideCanSwitch(edge, 'source', anchoredSourceSide)
   );
   const targetHandleChanged = Boolean(
     targetAnchored
     && requestedTargetSide
     && requestedTargetSide !== anchoredTargetSide
-    && displayPortSideCanSwitch(edge, false)
+    && edgeTerminalSideCanSwitch(edge, 'target', anchoredTargetSide)
   );
   const sourceChanged = sourceAnchored || sourceHandleChanged;
   const targetChanged = targetAnchored || targetHandleChanged;
   if (!sourceChanged && !targetChanged) return edge;
-  const sourceHandle = sourceHandleChanged ? anchoredSourceSide : edge.sourceHandle;
-  const targetHandle = targetHandleChanged ? anchoredTargetSide : edge.targetHandle;
+  const sourceHandle = sourceHandleChanged
+    ? resolveEdgeTerminalHandleForSide(edge, 'source', anchoredSourceSide)
+    : edge.sourceHandle;
+  const targetHandle = targetHandleChanged
+    ? resolveEdgeTerminalHandleForSide(edge, 'target', anchoredTargetSide)
+    : edge.targetHandle;
   const treeRouting = data.treeRouting && Array.isArray(data.treeRouting.points)
     ? {
       ...data.treeRouting,

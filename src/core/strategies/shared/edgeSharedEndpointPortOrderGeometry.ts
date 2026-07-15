@@ -1,5 +1,10 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
+import {
+  edgeTerminalSideCanSwitch,
+  edgeTerminalSideIsFixed,
+  resolveEdgeTerminalHandleForSide,
+} from '../../routing/utils/edgeTerminalPolicy';
 import { normalizeHandle } from '../../routing/utils/handleUtils';
 import { getEdgePath, type PathSegmentRef } from './edgeDetachedOverlapRepair';
 import { type EdgePathQualityScore } from './edgeStrictCrossingGuard';
@@ -88,18 +93,7 @@ export function terminalSide(point: Point, rect: Rect, handle: unknown): Side | 
 }
 
 export function terminalSideIsFixed(edge: Edge, role: Role): boolean {
-  const data = (edge.data || {}) as Record<string, any>;
-  const manualSides = Array.isArray(data.manualHandleSides)
-    ? data.manualHandleSides.map((value: unknown) => String(value).toLowerCase())
-    : [];
-  const manualHandles = data.manualHandles;
-  const policy = String(data[`${role}PortPolicy`] ?? data[`${role}PortConstraint`] ?? '').toLowerCase();
-  return data.manualHandles === true
-    || (manualHandles && typeof manualHandles === 'object' && manualHandles[role] === true)
-    || manualSides.includes(role)
-    || data[`${role}HandleLocked`] === true
-    || data[`${role}HandlePositionLocked`] === true
-    || ['strong', 'fixed', 'fixed-side', 'fixed_side', 'fixed-pos', 'fixed_pos'].includes(policy);
+  return edgeTerminalSideIsFixed(edge, role);
 }
 
 export function compactPath(path: Point[]): Point[] {
@@ -140,9 +134,14 @@ export function withPath(
     data.treeRouting = { ...data.treeRouting, points: path };
   }
   const result = { ...edge, data };
-  if (role && terminalSideOverride) {
-    if (role === 'source') result.sourceHandle = terminalSideOverride;
-    else result.targetHandle = terminalSideOverride;
+  if (
+    role
+    && terminalSideOverride
+    && edgeTerminalSideCanSwitch(edge, role, terminalSideOverride)
+  ) {
+    const handle = resolveEdgeTerminalHandleForSide(edge, role, terminalSideOverride);
+    if (role === 'source') result.sourceHandle = handle;
+    else result.targetHandle = handle;
   }
   return result;
 }
