@@ -111,7 +111,6 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
         strokeWidth: connectPreview ? 3.5 : 2.5,
         strokeDasharray: connectPreview ? '0' : '4 4'
     } : undefined;
-
     return (
         <BaseReactFlow
             onInit={onInit}
@@ -125,7 +124,9 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
             onConnectStart={onConnectStart}
             onConnectEnd={onConnectEnd}
             fitView
-            fitMode="none"
+            fitMode="fitAll"
+            fitPadding={0.1}
+            pinFit={false}
             style={{ width: '100%', height: '100%' }}
             enableSmartEdges={enableSmartEdges}
             showControls={false}

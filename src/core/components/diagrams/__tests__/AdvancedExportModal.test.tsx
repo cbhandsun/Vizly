@@ -1,0 +1,160 @@
+import React from 'react';
+import { render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  AdvancedExportModeNotice,
+  SvgExportPreview,
+} from '../ui/AdvancedExportModal';
+import { isSceneBasedAdvancedExportFormat } from '../advancedExportMode';
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (_key: string, fallback?: string | Record<string, unknown>) => (
+      typeof fallback === 'string' ? fallback : _key
+    ),
+  }),
+}));
+
+vi.mock('../../../utils/imageExporter', () => ({
+  downloadImage: vi.fn(),
+  copyImageToClipboard: vi.fn(),
+}));
+
+vi.mock('../../../store/useDiagramStore', () => ({
+  useDiagramStore: {
+    getState: () => ({ nodes: [] }),
+  },
+}));
+
+vi.mock('@/core/utils/antdStaticBridge', () => ({
+  appMessage: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+const installReactFlowInstance = () => {
+  (window as any).reactFlowInstance = {
+    getNodes: () => [
+      {
+        id: 'a',
+        position: { x: 0, y: 0 },
+        measured: { width: 120, height: 60 },
+        data: { label: '<script>x</script>Alpha' },
+      },
+      {
+        id: 'b',
+        position: { x: 220, y: 0 },
+        measured: { width: 120, height: 60 },
+        data: { label: 'Beta' },
+      },
+    ],
+    getEdges: () => [
+      { id: 'a-b', source: 'a', target: 'b', label: '<img onerror=x>safe edge' },
+    ],
+    getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+  };
+};
+
+afterEach(() => {
+  delete (window as any).reactFlowInstance;
+  vi.clearAllMocks();
+});
+
+describe('AdvancedExportModal SVG preview', () => {
+  it('prefers explicit React Flow snapshots over the global fallback', async () => {
+    (window as any).reactFlowInstance = {
+      getNodes: () => {
+        throw new Error('global fallback should not be used');
+      },
+      getEdges: () => [],
+    };
+    const getReactFlowSnapshot = vi.fn(() => ({
+      nodes: [
+        {
+          id: 'snapshot-node',
+          position: { x: 0, y: 0 },
+          measured: { width: 120, height: 60 },
+          data: { label: 'Snapshot Node' },
+        },
+      ],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    }));
+
+    render(<SvgExportPreview visible getReactFlowSnapshot={getReactFlowSnapshot} />);
+
+    const preview = await screen.findByTestId('svg-export-preview');
+    const image = preview.querySelector('img');
+    expect(getReactFlowSnapshot).toHaveBeenCalledTimes(1);
+    const decodedSvg = decodeURIComponent(image?.getAttribute('src') ?? '');
+    expect(decodedSvg).toContain('Snapshot');
+    expect(decodedSvg).toContain('Node');
+  });
+
+  it('renders a safe SVG preview when SVG format is selected', async () => {
+    installReactFlowInstance();
+    render(<SvgExportPreview visible />);
+
+    const preview = await screen.findByTestId('svg-export-preview');
+    const image = preview.querySelector('img');
+
+    expect(image?.getAttribute('src')).toMatch(/^data:image\/svg\+xml;charset=utf-8,/);
+    expect(decodeURIComponent(image?.getAttribute('src') ?? '')).toContain('Alpha');
+    expect(decodeURIComponent(image?.getAttribute('src') ?? '')).toContain('safe edge');
+    expect(decodeURIComponent(image?.getAttribute('src') ?? '')).not.toContain('<script>');
+    expect(decodeURIComponent(image?.getAttribute('src') ?? '')).not.toContain('onerror');
+    expect(preview.textContent).toContain('2 nodes / 1 edges');
+  });
+
+  it('shows a safe empty state when preview generation fails', async () => {
+    (window as any).reactFlowInstance = {
+      getNodes: () => {
+        throw new Error('Authorization: Bearer svg-preview-secret');
+      },
+      getEdges: () => [],
+    };
+
+    render(<SvgExportPreview visible />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('svg-export-preview-error')).toBeTruthy();
+    });
+    expect(document.body.textContent).not.toContain('svg-preview-secret');
+  });
+});
+
+describe('AdvancedExportModeNotice', () => {
+  it('classifies PNG and SVG as scene-based advanced export formats', () => {
+    expect(isSceneBasedAdvancedExportFormat('png')).toBe(true);
+    expect(isSceneBasedAdvancedExportFormat('svg')).toBe(true);
+    expect(isSceneBasedAdvancedExportFormat('jpg')).toBe(false);
+    expect(isSceneBasedAdvancedExportFormat('pdf')).toBe(false);
+    expect(isSceneBasedAdvancedExportFormat('json')).toBe(false);
+  });
+
+  it('explains the scene model safe approximation for PNG and SVG when snapshots are available', () => {
+    render(<AdvancedExportModeNotice format="svg" hasSnapshotProvider />);
+
+    expect(screen.getByTestId('advanced-export-mode-notice').textContent).toContain(
+      'scene model safe approximation',
+    );
+  });
+
+  it('explains fallback behavior when the selected format is not scene based', () => {
+    render(<AdvancedExportModeNotice format="pdf" hasSnapshotProvider />);
+
+    expect(screen.getByTestId('advanced-export-mode-notice').textContent).toContain(
+      'existing export path',
+    );
+  });
+
+  it('explains fallback behavior when scene snapshots are unavailable', () => {
+    render(<AdvancedExportModeNotice format="png" hasSnapshotProvider={false} />);
+
+    expect(screen.getByTestId('advanced-export-mode-notice').textContent).toContain(
+      'existing export path',
+    );
+  });
+});

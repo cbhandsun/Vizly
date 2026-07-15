@@ -6,6 +6,7 @@ import { PresenceHeader } from '../../../../components/diagrams/collaboration/Pr
 
 import { TopActionButtons } from '../TopActionButtons';
 import { ModernFlowchartToolbar } from '../ModernFlowchartToolbar';
+import type { ReactFlowRenderSnapshot } from '../../../rendering/reactFlowScene';
 
 export interface DesignerHeaderLayerProps {
     diagramId?: string;
@@ -48,6 +49,7 @@ export interface DesignerHeaderLayerProps {
         setPluginManagerVisible: (v: boolean) => void;
         isCommentMode: boolean; // ⭐ Phase 11
         setIsCommentMode: (v: boolean) => void;
+        getReactFlowSnapshot?: () => ReactFlowRenderSnapshot | null | undefined;
     };
 
     toolbar: {
@@ -108,7 +110,7 @@ export interface DesignerHeaderLayerProps {
 
 export const DesignerHeaderLayer = React.memo(
     ({
-        _diagramId = 'flowchart-designer',
+        diagramId: _diagramId = 'flowchart-designer',
         topActions,
         toolbar
     }: DesignerHeaderLayerProps) => {
@@ -117,6 +119,7 @@ export const DesignerHeaderLayer = React.memo(
         return (
             <>
                 <TopActionButtons
+                    diagramId={_diagramId}
                     onExportJSON={topActions.onExportJSON}
                     onExportPNG={topActions.onExportPNG}
                     onExportSVG={topActions.onExportSVG}
@@ -146,6 +149,7 @@ export const DesignerHeaderLayer = React.memo(
                     setPluginManagerVisible={topActions.setPluginManagerVisible}
                     isCommentMode={topActions.isCommentMode}
                     setIsCommentMode={topActions.setIsCommentMode}
+                    getReactFlowSnapshot={topActions.getReactFlowSnapshot}
                     onToggleAI={toolbar.onToggleAI}
                     aiChatActive={toolbar.aiChatActive}
                     disablePortal={false}

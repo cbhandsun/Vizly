@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { __smartEdgeRoutingTestUtils } from '../useSmartEdgeRouting';
+import { resolveRenderedSmartEdgePath } from '../smartEdgeRoutingRenderedPath';
 
 const parsePoints = (path: string): Array<{ x: number; y: number }> => {
     const matches = [...path.matchAll(/[-+]?\d*\.?\d+(?:e[-+]?\d+)?/gi)].map(match => Number(match[0]));
@@ -72,6 +73,55 @@ const minDistanceToRect = (
 };
 
 describe('useSmartEdgeRouting repair helpers', () => {
+    it('preserves a stable orthogonal path and leaves resolver inputs unchanged', () => {
+        const routingNodeRects = [
+            { id: 'source', x: 0, y: 0, width: 100, height: 80 },
+            { id: 'target', x: 300, y: 0, width: 100, height: 80 },
+        ];
+        const safeObstacles: Array<{ x: number; y: number; width: number; height: number }> = [];
+        const nodeSnapshot = structuredClone(routingNodeRects);
+        const obstacleSnapshot = structuredClone(safeObstacles);
+
+        const path = resolveRenderedSmartEdgePath({
+            props: { sourceX: 100, sourceY: 40, targetX: 300, targetY: 40 } as never,
+            id: 'edge-1',
+            source: 'source',
+            target: 'target',
+            jumpPath: null,
+            busGeometryPath: null,
+            finalPath: 'M 100 40 L 300 40',
+            isLayoutPathLocked: false,
+            canUseFreshWorkerPath: false,
+            edgeData: undefined,
+            nodesDragging: true,
+            isLoading: true,
+            edgeConfig: { strictOrthogonal: true },
+            visualCornerRadius: 0,
+            renderCornerRadius: 0,
+            safeObstacles,
+            renderedBusinessObstacles: [],
+            routingNodeRects,
+            hasSameSourceFanOut: false,
+        });
+
+        expect(path).toBe('M 100 40 L 300 40');
+        expect(routingNodeRects).toEqual(nodeSnapshot);
+        expect(safeObstacles).toEqual(obstacleSnapshot);
+    });
+
+    it('moves generated label positions away from peer edge paths', () => {
+        const offset = __smartEdgeRoutingTestUtils.getLabelAutoOffset(
+            'M 100 0 L 100 200',
+            { x: 100, y: 100 },
+            '发货指令(SOP)',
+            [[{ x: 130, y: 60 }, { x: 130, y: 140 }]],
+            []
+        );
+
+        expect(offset.x).toBeLessThan(-10);
+        expect(Math.abs(offset.y)).toBeLessThanOrEqual(32);
+    });
+
     it('delays same-source fan-out detours when the target enters from a side port', () => {
         const detouredPath = [
             'M 100 100',

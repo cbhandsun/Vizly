@@ -38,6 +38,8 @@ interface ParallelOverlapHit {
 }
 
 const EPS = 1.5;
+type RoutingReplacementContext = ReturnType<RoutingCrossingScorer['createReplacementContext']>;
+
 export function repairEdgeCrossingViolations(
     edgePaths: Map<string, Point[]>,
     options: EdgeCrossingRepairOptions = {}
@@ -57,7 +59,8 @@ export function repairEdgeCrossingViolations(
         buddyGroups: options.buddyGroups,
         parallelOverlapMinLength: Math.max(24, spacing * 3),
     });
-    let currentScore = scorer.score(result);
+    const scoreContext = scorer.createReplacementContext(result);
+    let currentScore = scoreContext.currentScore;
 
     for (let iteration = 0; iteration < (options.maxIterations ?? 4); iteration++) {
         const crossings = findRepairableCrossings(result, buddyGroupByEdgeId);
@@ -69,6 +72,7 @@ export function repairEdgeCrossingViolations(
                 result,
                 currentScore,
                 scorer,
+                scoreContext,
                 obstacles,
                 options.ignoredRectsByEdge,
                 buddyTypesByEdgeId,
@@ -88,6 +92,7 @@ export function repairEdgeCrossingViolations(
                     result,
                     currentScore,
                     scorer,
+                    scoreContext,
                     obstacles,
                     options.ignoredRectsByEdge,
                     buddyTypesByEdgeId,
@@ -102,7 +107,7 @@ export function repairEdgeCrossingViolations(
         if (!repaired) break;
 
         result.set(repaired.edgeId, repaired.points);
-        currentScore = repaired.score;
+        currentScore = scoreContext.commitReplacement(repaired.edgeId, repaired.points);
     }
 
     return result;
@@ -113,6 +118,7 @@ function chooseBestCrossingRepair(
     allPaths: Map<string, Point[]>,
     currentScore: ReturnType<RoutingCrossingScorer['score']>,
     scorer: RoutingCrossingScorer,
+    scoreContext: RoutingReplacementContext,
     obstacles: Rectangle[],
     ignoredRectsByEdge: Map<string, Rectangle[]> | undefined,
     buddyTypesByEdgeId: Map<string, Set<BuddyGroup['type']>>,
@@ -135,9 +141,7 @@ function chooseBestCrossingRepair(
         const obstacleHits = countPathObstacleHits(candidate.points, obstacles, ignored);
         if (!allowObstacleHitIfImprovesCrossing && obstacleHits > 0) continue;
 
-        const trial = new Map(allPaths);
-        trial.set(candidate.edgeId, candidate.points);
-        const score = scorer.score(trial);
+        const score = scoreContext.scoreReplacement(candidate.edgeId, candidate.points);
         if (!scorer.isBetter(score, currentScore)) continue;
 
         const length = RoutingCrossingScorer.pathLength(candidate.points);
@@ -156,6 +160,7 @@ function chooseBestParallelOverlapRepair(
     allPaths: Map<string, Point[]>,
     currentScore: ReturnType<RoutingCrossingScorer['score']>,
     scorer: RoutingCrossingScorer,
+    scoreContext: RoutingReplacementContext,
     obstacles: Rectangle[],
     ignoredRectsByEdge: Map<string, Rectangle[]> | undefined,
     buddyTypesByEdgeId: Map<string, Set<BuddyGroup['type']>>,
@@ -175,9 +180,7 @@ function chooseBestParallelOverlapRepair(
         const obstacleHits = countPathObstacleHits(candidate.points, obstacles, ignored);
         if (!allowObstacleHitIfImprovesCrossing && obstacleHits > 0) continue;
 
-        const trial = new Map(allPaths);
-        trial.set(candidate.edgeId, candidate.points);
-        const score = scorer.score(trial);
+        const score = scoreContext.scoreReplacement(candidate.edgeId, candidate.points);
         if (!scorer.isBetter(score, currentScore)) continue;
 
         const length = RoutingCrossingScorer.pathLength(candidate.points);

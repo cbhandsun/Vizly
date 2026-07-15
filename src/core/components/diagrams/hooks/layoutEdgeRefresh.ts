@@ -19,7 +19,8 @@ export const hasTrustedLockedComputedPath = (edge: Edge): boolean => {
   if (!data) return false;
 
   const isLayoutLocked = data.layoutPathLocked === true || data._layoutPathLocked === true;
-  return isLayoutLocked && hasRenderableComputedPath(data.computedPath);
+  const isStablePath = String(edge.type || '').toLowerCase() === 'stablepath';
+  return (isLayoutLocked || isStablePath) && hasRenderableComputedPath(data.computedPath);
 };
 
 export const refreshDomainLayoutEdgeForRender = (edge: Edge, layoutEpoch: number): Edge => {

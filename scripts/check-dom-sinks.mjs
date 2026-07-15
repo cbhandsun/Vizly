@@ -2,13 +2,22 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import ts from 'typescript';
 
-const sourceFiles = execFileSync('git', ['ls-files', 'src'], {
+const gitFiles = (args) => execFileSync('git', args, {
   encoding: 'utf8',
   stdio: ['ignore', 'pipe', 'pipe'],
 })
   .split(/\r?\n/)
   .map(line => line.trim())
-  .filter(file => file && /\.(?:tsx?|jsx?)$/i.test(file) && existsSync(file));
+  .filter(Boolean);
+
+// Match the source-size gate: local verification must cover new modules before
+// they are staged, while ignored build output remains outside the scan.
+const sourceFiles = [...new Set([
+  ...gitFiles(['ls-files', '--', 'src']),
+  ...gitFiles(['ls-files', '--others', '--exclude-standard', '--', 'src']),
+])]
+  .filter(file => /\.(?:tsx?|jsx?)$/i.test(file) && existsSync(file))
+  .sort();
 
 const failures = [];
 

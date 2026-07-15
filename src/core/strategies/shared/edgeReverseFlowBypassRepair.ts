@@ -1,5 +1,7 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
+import { normalizeHandle } from '../../routing/utils/handleUtils';
+
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
 type Side = 'top' | 'bottom' | 'left' | 'right';
@@ -7,8 +9,13 @@ type Segment = { a: Point; b: Point };
 
 const EPS = 0.5;
 const MIN_ENDPOINT_STUB = 56;
+const SHALLOW_OPPOSITE_SECTOR_STUB = 48;
 const OUTER_LANE_PADDING = 56;
 const SHARED_LANE_SCORE_BONUS = 150;
+const BACKTRACK_SCORE_WEIGHT = 2500;
+const LARGE_BACKTRACK_DELTA = 48;
+const STRICT_CROSSING_DEVIATION_DELTA = MIN_ENDPOINT_STUB * 2;
+const MAX_SHALLOW_OPPOSITE_SECTOR_GRAPH_EDGES = 24;
 
 const num = (value: unknown, fallback: number): number => (
   typeof value === 'number' && Number.isFinite(value) ? value : fallback
@@ -74,6 +81,78 @@ function pathLength(path: Point[]): number {
     total += Math.abs(path[index].x - path[index + 1].x) + Math.abs(path[index].y - path[index + 1].y);
   }
   return total;
+}
+
+type PathDeviation = {
+  mainAxisBacktrack: number;
+  dualAxisBacktrack: number;
+  envelope: number;
+  sourceWrongWay: number;
+};
+
+function pathDeviation(path: Point[]): PathDeviation {
+  if (path.length < 2) {
+    return { mainAxisBacktrack: 0, dualAxisBacktrack: 0, envelope: 0, sourceWrongWay: 0 };
+  }
+  const start = path[0];
+  const end = path[path.length - 1];
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  let horizontalTravel = 0;
+  let verticalTravel = 0;
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const axis = axisOf(path[index], path[index + 1]);
+    if (!axis) continue;
+    if (axis === 'h') horizontalTravel += Math.abs(path[index + 1].x - path[index].x);
+    if (axis === 'v') verticalTravel += Math.abs(path[index + 1].y - path[index].y);
+  }
+
+  const minEndpointX = Math.min(start.x, end.x);
+  const maxEndpointX = Math.max(start.x, end.x);
+  const minEndpointY = Math.min(start.y, end.y);
+  const maxEndpointY = Math.max(start.y, end.y);
+  const minPathX = Math.min(...path.map(point => point.x));
+  const maxPathX = Math.max(...path.map(point => point.x));
+  const minPathY = Math.min(...path.map(point => point.y));
+  const maxPathY = Math.max(...path.map(point => point.y));
+  const firstAxis = axisOf(path[0], path[1]);
+  const firstDelta = firstAxis === 'h' ? path[1].x - path[0].x : path[1].y - path[0].y;
+  const expectedFirstDelta = firstAxis === 'h' ? dx : dy;
+  const horizontalBacktrack = Math.max(0, horizontalTravel - Math.abs(dx)) / 2;
+  const verticalBacktrack = Math.max(0, verticalTravel - Math.abs(dy)) / 2;
+
+  return {
+    mainAxisBacktrack: Math.round(Math.abs(dx) >= Math.abs(dy) ? horizontalBacktrack : verticalBacktrack),
+    dualAxisBacktrack: Math.round(horizontalBacktrack + verticalBacktrack),
+    envelope: Math.round(
+      Math.max(0, minEndpointX - minPathX)
+      + Math.max(0, maxPathX - maxEndpointX)
+      + Math.max(0, minEndpointY - minPathY)
+      + Math.max(0, maxPathY - maxEndpointY),
+    ),
+    sourceWrongWay: firstAxis && (
+      Math.abs(expectedFirstDelta) <= EPS
+      || Math.sign(firstDelta) !== Math.sign(expectedFirstDelta)
+    ) ? Math.round(Math.abs(firstDelta)) : 0,
+  };
+}
+
+function fixedSourceSide(edge: Edge): Side | null {
+  const data = ((edge.data || {}) as Record<string, any>);
+  const manualSides = Array.isArray(data.manualHandleSides)
+    ? data.manualHandleSides.map((side: unknown) => String(side).toLowerCase())
+    : [];
+  const policy = String(data.sourcePortPolicy ?? data.sourcePortConstraint ?? '').toLowerCase();
+  const fixed = manualSides.includes('source')
+    || data.sourceHandleLocked === true
+    || ['strong', 'fixed', 'fixed-side', 'fixed_side', 'fixed-pos', 'fixed_pos'].includes(policy);
+  if (!fixed) return null;
+  const side = normalizeHandle(edge.sourceHandle);
+  if (side === 't') return 'top';
+  if (side === 'b') return 'bottom';
+  if (side === 'l') return 'left';
+  if (side === 'r') return 'right';
+  return null;
 }
 
 function getNodeRect(node: ReactFlowNode): Rect | null {
@@ -182,9 +261,11 @@ function parallelOverlap(first: Segment, second: Segment): number {
 function relationToOtherEdges(path: Point[], edge: Edge, otherPaths: Map<string, Point[]>, edgesById: Map<string, Edge>): {
   crossings: number;
   overlap: number;
+  reverseOverlap: number;
 } {
   let crossings = 0;
   let overlap = 0;
+  let reverseOverlap = 0;
   const segments = toSegments(path);
   for (const [otherId, otherPath] of otherPaths) {
     const other = edgesById.get(otherId);
@@ -193,11 +274,22 @@ function relationToOtherEdges(path: Point[], edge: Edge, otherPaths: Map<string,
     for (const first of segments) {
       for (const second of toSegments(otherPath)) {
         if (!related && strictCrosses(first, second)) crossings += 1;
-        if (!related) overlap += parallelOverlap(first, second);
+        const segmentOverlap = parallelOverlap(first, second);
+        if (!related) overlap += segmentOverlap;
+        if (segmentOverlap > 0 && segmentDirection(first) * segmentDirection(second) < 0) {
+          reverseOverlap += segmentOverlap;
+        }
       }
     }
   }
-  return { crossings, overlap };
+  return { crossings, overlap, reverseOverlap };
+}
+
+function segmentDirection(segment: Segment): number {
+  const axis = axisOf(segment.a, segment.b);
+  if (axis === 'h') return Math.sign(segment.b.x - segment.a.x);
+  if (axis === 'v') return Math.sign(segment.b.y - segment.a.y);
+  return 0;
 }
 
 function targetEntryPoint(end: Point, targetSide: Side): Point {
@@ -221,6 +313,22 @@ function bottomBranchValue(sourceRect: Rect, pathsById: Map<string, Point[]>, ed
     return Math.max(sourceBottom + MIN_ENDPOINT_STUB, Math.round(values.sort((a, b) => a - b)[Math.floor(values.length / 2)]));
   }
   return Math.round(sourceBottom + Math.max(MIN_ENDPOINT_STUB, Math.min(96, sourceRect.height * 0.65)));
+}
+
+function topBranchValue(sourceRect: Rect, pathsById: Map<string, Point[]>, edges: Edge[], sourceId: string): number {
+  const sourceTop = sourceRect.y;
+  const values = edges
+    .filter(edge => edge.source === sourceId)
+    .map(edge => pathsById.get(edge.id))
+    .filter((path): path is Point[] => Array.isArray(path) && path.length >= 2)
+    .filter(path => Math.abs(path[0].y - sourceTop) <= 2 && path[1].y < path[0].y - EPS)
+    .map(path => path[1].y)
+    .filter(Number.isFinite);
+
+  if (values.length > 0) {
+    return Math.min(sourceTop - MIN_ENDPOINT_STUB, Math.round(values.sort((a, b) => a - b)[Math.floor(values.length / 2)]));
+  }
+  return Math.round(sourceTop - Math.max(MIN_ENDPOINT_STUB, Math.min(96, sourceRect.height * 0.65)));
 }
 
 function outerLaneX(sourceRect: Rect, targetEntry: Point, obstacles: Rect[], direction: 'left' | 'right'): number {
@@ -262,7 +370,7 @@ function sameSourceBypassLaneXs(
   return result;
 }
 
-function generateBottomOuterBypassCandidates(
+function generateReverseFlowBypassCandidates(
   edge: Edge,
   path: Point[],
   sourceRect: Rect,
@@ -270,7 +378,7 @@ function generateBottomOuterBypassCandidates(
   pathsById: Map<string, Point[]>,
   edges: Edge[],
   obstacles: Rect[],
-): Array<{ path: Point[]; sharedLane: boolean }> {
+): Array<{ path: Point[]; sharedLane: boolean; sourceHandle: Side }> {
   const sourceSide = sourceSideFromPath(path, sourceRect);
   if (sourceSide !== 'top') return [];
 
@@ -281,12 +389,27 @@ function generateBottomOuterBypassCandidates(
   const end = path[path.length - 1];
   const targetSide = targetSideFromPath(path, targetRect) ?? 'bottom';
   const targetEntry = targetEntryPoint(end, targetSide);
+  const sourceTop = path[0];
+  const topBranchY = topBranchValue(sourceRect, pathsById, edges, edge.source);
   const sourceBottom = { x: sourceCenter.x, y: sourceRect.y + sourceRect.height };
   const branchY = bottomBranchValue(sourceRect, pathsById, edges, edge.source);
   const preferredDirection = targetCenter.x >= sourceCenter.x ? 'right' as const : 'left' as const;
   const directions = preferredDirection === 'right' ? ['right', 'left'] as const : ['left', 'right'] as const;
 
-  return directions.flatMap(direction => {
+  const topCandidates = directions.map(direction => ({
+    sourceHandle: 'top' as const,
+    sharedLane: false,
+    path: compactPath([
+      sourceTop,
+      { x: sourceTop.x, y: topBranchY },
+      { x: outerLaneX(sourceRect, targetEntry, obstacles, direction), y: topBranchY },
+      { x: outerLaneX(sourceRect, targetEntry, obstacles, direction), y: targetEntry.y },
+      targetEntry,
+      end,
+    ]),
+  }));
+
+  const bottomCandidates = directions.flatMap(direction => {
     const laneXs = [
       ...sameSourceBypassLaneXs(edge, pathsById, edges, sourceRect, direction)
         .map(laneX => ({ laneX, sharedLane: true })),
@@ -301,6 +424,7 @@ function generateBottomOuterBypassCandidates(
       })
       .map(({ laneX, sharedLane }) => ({
         sharedLane,
+        sourceHandle: 'bottom' as const,
         path: compactPath([
           sourceBottom,
           { x: sourceBottom.x, y: branchY },
@@ -311,9 +435,35 @@ function generateBottomOuterBypassCandidates(
         ]),
       }));
   });
+
+  // A target in the opposite vertical sector must not inherit the deep branch lane used by
+  // ordinary bottom-sector peers. Keep one bounded sector split so a blocked top exit can still
+  // satisfy hard crossing/obstacle gates without dropping to a graph-wide lower trunk.
+  const shallowBottomCandidate = {
+    sourceHandle: 'bottom' as const,
+    sharedLane: false,
+    path: compactPath([
+      sourceBottom,
+      { x: sourceBottom.x, y: sourceBottom.y + SHALLOW_OPPOSITE_SECTOR_STUB },
+      { x: targetEntry.x, y: sourceBottom.y + SHALLOW_OPPOSITE_SECTOR_STUB },
+      targetEntry,
+      end,
+    ]),
+  };
+
+  // The shallow side-switch is a bounded small/medium-graph alternative. Dense graphs already
+  // have established sector trunks; injecting a new shallow branch there can perturb a later
+  // buddy repair even when this edge's local relation score improves.
+  return edges.length <= MAX_SHALLOW_OPPOSITE_SECTOR_GRAPH_EDGES
+    ? [
+      ...topCandidates,
+      shallowBottomCandidate,
+      ...bottomCandidates,
+    ]
+    : [...topCandidates, ...bottomCandidates];
 }
 
-function withComputedPath(edge: Edge, path: Point[]): Edge {
+function withComputedPath(edge: Edge, path: Point[], sourceHandle?: Side): Edge {
   const data: any = {
     ...(edge.data || {}),
     computedPath: path,
@@ -331,7 +481,7 @@ function withComputedPath(edge: Edge, path: Point[]): Edge {
   }
   return {
     ...edge,
-    sourceHandle: 'bottom',
+    ...(sourceHandle ? { sourceHandle } : {}),
     data,
   };
 }
@@ -355,6 +505,7 @@ export function repairReverseFlowBypassCrossings(edges: Edge[], nodes: ReactFlow
   const allObstacles = getRoutingObstacles(nodes);
 
   const repaired = new Map(pathsById);
+  const repairedSourceHandles = new Map<string, Side>();
   for (let pass = 0; pass < 2; pass += 1) {
     for (const edge of edges) {
       const path = repaired.get(edge.id);
@@ -363,38 +514,77 @@ export function repairReverseFlowBypassCrossings(edges: Edge[], nodes: ReactFlow
       if (!path || !sourceRect || !targetRect) continue;
 
       const currentRelation = relationToOtherEdges(path, edge, repaired, edgesById);
-      if (currentRelation.crossings <= 0) continue;
+      const declaredSourceSide = fixedSourceSide(edge);
+      if (currentRelation.crossings <= 0 && currentRelation.reverseOverlap < 16) continue;
 
       const ignored = new Set([edge.source, edge.target]);
       const obstacles = Array.from(allObstacles.entries())
         .filter(([nodeId]) => !ignored.has(nodeId))
         .map(([, rect]) => rect);
       const baseLength = pathLength(path);
+      const currentDeviation = pathDeviation(path);
       const currentScore = currentRelation.crossings * 100000
+        + currentRelation.reverseOverlap * 1500
         + currentRelation.overlap * 100
         + baseLength * 0.04
+        + currentDeviation.mainAxisBacktrack * BACKTRACK_SCORE_WEIGHT
         + Math.max(0, path.length - 2) * 20;
-
-      const candidates = generateBottomOuterBypassCandidates(edge, path, sourceRect, targetRect, repaired, edges, obstacles)
+      const generatedCandidates = generateReverseFlowBypassCandidates(
+        edge,
+        path,
+        sourceRect,
+        targetRect,
+        repaired,
+        edges,
+        obstacles,
+      );
+      const candidates = generatedCandidates
+        .filter(candidate => !declaredSourceSide || candidate.sourceHandle === declaredSourceSide)
         .filter(candidate => !pathIntersectsAnyRect(candidate.path, obstacles))
         .map(candidate => {
           const relation = relationToOtherEdges(candidate.path, edge, repaired, edgesById);
           const length = pathLength(candidate.path);
+          const deviation = pathDeviation(candidate.path);
           return {
             path: candidate.path,
+            sourceHandle: candidate.sourceHandle,
             relation,
+            deviation,
             score: relation.crossings * 100000
+              + relation.reverseOverlap * 1500
               + relation.overlap * 100
               + length * 0.04
+              + deviation.mainAxisBacktrack * BACKTRACK_SCORE_WEIGHT
               + Math.max(0, candidate.path.length - 2) * 20
               - (candidate.sharedLane ? SHARED_LANE_SCORE_BONUS : 0),
           };
         })
-        .filter(candidate => candidate.relation.crossings < currentRelation.crossings)
+        .filter(candidate => (
+          candidate.relation.crossings < currentRelation.crossings
+          || candidate.relation.reverseOverlap < currentRelation.reverseOverlap - 1
+        ))
+        .filter(candidate => {
+          const changesSourceSide = candidate.sourceHandle !== sourceSideFromPath(path, sourceRect);
+          if (!changesSourceSide) {
+            return candidate.deviation.mainAxisBacktrack
+                <= currentDeviation.mainAxisBacktrack + LARGE_BACKTRACK_DELTA
+              || candidate.relation.crossings < currentRelation.crossings;
+          }
+          const deviationDelta = candidate.relation.crossings < currentRelation.crossings
+            ? STRICT_CROSSING_DEVIATION_DELTA
+            : LARGE_BACKTRACK_DELTA;
+          return candidate.deviation.mainAxisBacktrack <= currentDeviation.mainAxisBacktrack + deviationDelta
+            && candidate.deviation.sourceWrongWay <= currentDeviation.sourceWrongWay + deviationDelta
+            && candidate.deviation.dualAxisBacktrack <= currentDeviation.dualAxisBacktrack + deviationDelta
+            && candidate.deviation.envelope <= currentDeviation.envelope + deviationDelta;
+        })
         .filter(candidate => candidate.score < currentScore)
         .sort((a, b) => a.score - b.score);
 
-      if (candidates[0]) repaired.set(edge.id, candidates[0].path);
+      if (candidates[0]) {
+        repaired.set(edge.id, candidates[0].path);
+        repairedSourceHandles.set(edge.id, candidates[0].sourceHandle);
+      }
     }
   }
 
@@ -402,6 +592,6 @@ export function repairReverseFlowBypassCrossings(edges: Edge[], nodes: ReactFlow
     const original = pathsById.get(edge.id);
     const path = repaired.get(edge.id);
     if (!original || !path || pathEquals(original, path)) return edge;
-    return withComputedPath(edge, path);
+    return withComputedPath(edge, path, repairedSourceHandles.get(edge.id));
   });
 }

@@ -160,4 +160,27 @@ describe('auditRenderedEdgeRouting', () => {
       }),
     ]));
   });
+
+  it('reports dominant-axis backtracking before a long return route', () => {
+    const result = auditRenderedEdgeRouting([
+      {
+        id: 'edge-tms-execution-oms-order',
+        source: 'tms-execution',
+        target: 'oms-order',
+        path: 'M 701 2638 L 701 2734 L 171 2734 L 171 694 L 260 694 L 260 598',
+      },
+    ], [
+      { id: 'tms-execution', x: 600, y: 2500, width: 202, height: 138 },
+      { id: 'oms-order', x: 184, y: 500, width: 152, height: 98 },
+    ]);
+
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        edgeId: 'edge-tms-execution-oms-order',
+        rule: 'main-axis-backtrack',
+        measuredValue: 96,
+      }),
+    ]));
+  });
 });

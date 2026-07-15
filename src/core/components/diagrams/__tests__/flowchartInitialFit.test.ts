@@ -1,7 +1,9 @@
 import type { Node, ReactFlowInstance } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import flowchartDesignerSource from '../FlowchartDesigner.tsx?raw';
 import { scheduleFlowchartInitialFit } from '../flowchartInitialFit';
+import { dispatchDiagramControl } from '../../shared/diagramControl';
 
 describe('flowchartInitialFit', () => {
   afterEach(() => {
@@ -51,5 +53,45 @@ describe('flowchartInitialFit', () => {
 
     vi.advanceTimersByTime(100);
     expect(dispatchFit).not.toHaveBeenCalled();
+  });
+
+  it('keeps the designer initializer bound to the fit dispatcher', () => {
+    vi.useFakeTimers();
+
+    expect(flowchartDesignerSource).toMatch(
+      /import\s*{\s*dispatchDiagramControl\s*}\s*from\s*['"]\.\.\/shared\/diagramControl['"]/,
+    );
+    expect(flowchartDesignerSource).toMatch(
+      /dispatchFit:\s*\(\)\s*=>\s*dispatchDiagramControl\(\s*['"]fit['"]\s*,\s*id\s*\)/,
+    );
+
+    const handleDiagramControl = vi.fn();
+    window.addEventListener('diagramControl', handleDiagramControl);
+
+    const reactFlowInstance = {
+      getNodes: vi.fn(() => [
+        {
+          id: 'node-1',
+          type: 'custom',
+          position: { x: 0, y: 0 },
+          data: { label: 'Node 1' },
+        },
+      ] satisfies Node[]),
+    } as Pick<ReactFlowInstance<Node, unknown>, 'getNodes'>;
+
+    expect(() => scheduleFlowchartInitialFit({
+      reactFlowInstance,
+      delayMs: 1,
+      dispatchFit: () => dispatchDiagramControl('fit', 'diagram-1'),
+    })).not.toThrow();
+    expect(() => vi.advanceTimersByTime(1)).not.toThrow();
+
+    expect(handleDiagramControl).toHaveBeenCalledTimes(1);
+    expect((handleDiagramControl.mock.calls[0][0] as CustomEvent).detail).toEqual({
+      action: 'fit',
+      diagramId: 'diagram-1',
+    });
+
+    window.removeEventListener('diagramControl', handleDiagramControl);
   });
 });

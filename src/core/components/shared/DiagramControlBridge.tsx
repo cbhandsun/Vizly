@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
+import { clampDiagramFullFitZoom, MIN_DIAGRAM_FULL_FIT_ZOOM } from './diagramControlFit';
 import { logDiagramControlBridgeFailure } from './diagramControlLogging';
 
 interface DiagramControlBridgeProps {
@@ -77,13 +78,13 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           const container = resolveContainer();
           // 若无法解析到容器，退化为内置fitView
           if (!container) {
-            rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: 0.45, maxZoom: 1.15 });
+            rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: MIN_DIAGRAM_FULL_FIT_ZOOM, maxZoom: 1.15 });
             return;
           }
 
           const nodes = rf.getNodes();
           if (!nodes || nodes.length === 0) {
-            rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: 0.45, maxZoom: 1.15 });
+            rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: MIN_DIAGRAM_FULL_FIT_ZOOM, maxZoom: 1.15 });
             return;
           }
 
@@ -156,8 +157,7 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           const rawZoomW = safeAvailW / bboxWidth;
           const rawZoomH = safeAvailH / bboxHeight;
           const rawZoom = Math.min(rawZoomW, rawZoomH);
-          const MIN_FIT_ZOOM = 0.45;
-          const zoom = Math.max(MIN_FIT_ZOOM, Math.min(1.0, rawZoom * 0.98)); // 使用 1.0 作为上限，避免图形放大后显得比系统 UI 字体突兀
+          const zoom = clampDiagramFullFitZoom(rawZoom); // 使用 1.0 作为上限，避免图形放大后显得比系统 UI 字体突兀
 
           // 设计行业尖端实践 (Figma/Miro)：真实的绝对居中（水平居中 + 垂直居中）
           // 修正：如果触发了最小缩放防线，图形可能比容器大。为了避免顶部或左侧被切掉，必须保证 extraCenter 大于等于 0
@@ -179,8 +179,7 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
               const rzW = aw / bboxWidth;
               const rzH = ah / bboxHeight;
               const rz = Math.min(rzW, rzH);
-              const MIN_FIT_ZOOM = 0.45;
-              const z = Math.max(MIN_FIT_ZOOM, Math.min(1.0, rz * 0.98));
+              const z = clampDiagramFullFitZoom(rz);
               const xc = OVERALL_SAFE_LEFT + pad + Math.max(0, (aw - bboxWidth * z) / 2) - (minX * z);
               const yc = OVERALL_SAFE_TOP + pad + Math.max(0, (ah - bboxHeight * z) / 2) - (minY * z);
               rf.setViewport({ x: xc, y: yc, zoom: z });
@@ -191,7 +190,7 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
         } catch (error) {
           logDiagramControlBridgeFailure('fitFallback', error);
           try {
-            rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: 0.45, maxZoom: 1.0 });
+            rf.fitView({ padding: 24, includeHiddenNodes: false, duration: 450, minZoom: MIN_DIAGRAM_FULL_FIT_ZOOM, maxZoom: 1.0 });
           } catch (fallbackError) {
             logDiagramControlBridgeFailure('fitFallback', fallbackError);
           }

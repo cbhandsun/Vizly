@@ -23,6 +23,15 @@ const MAX_CONFIG_OBJECT_KEYS = 1000;
 const MAX_CONFIG_STRING_CHARS = 64 * 1024;
 const DANGEROUS_CONFIG_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
+const getConfigLocalStorage = (): Storage | null => {
+  if (typeof globalThis === 'undefined' || !('localStorage' in globalThis)) return null;
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+};
+
 const parseBoundedConfigJson = (json: string, maxChars: number, label: string): unknown => {
   if (json.length > maxChars) {
     throw new Error(`${label}超过大小限制`);
@@ -315,11 +324,13 @@ export class ConfigManager {
    * 加载持久化配置
    */
   private loadPersistedConfigs(): void {
+    const storage = getConfigLocalStorage();
+    if (!storage) return;
     this.definitions.forEach((definition, key) => {
       if (definition.persistent) {
+        const storageKey = definition.storageKey || key;
         try {
-          const storageKey = definition.storageKey || key;
-          const stored = localStorage.getItem(`config_${storageKey}`);
+          const stored = storage.getItem(`config_${storageKey}`);
           
           if (stored !== null) {
             const value = sanitizeConfigValue(parseBoundedConfigJson(
@@ -331,13 +342,16 @@ export class ConfigManager {
               this.configs.set(key, value);
               this.configLogger.debug(`加载持久化配置: ${key}`, { value });
             } else {
-              localStorage.removeItem(`config_${storageKey}`);
+              storage.removeItem(`config_${storageKey}`);
             }
           }
         } catch (error) {
-          const storageKey = definition.storageKey || key;
           logUiStorageReadFailure('ConfigManager.loadPersistedConfigs', `config_${storageKey}`, error);
-          localStorage.removeItem(`config_${storageKey}`);
+          try {
+            storage.removeItem(`config_${storageKey}`);
+          } catch {
+            // Ignore cleanup failures; defaults remain active.
+          }
           this.configLogger.warn(`加载配置失败: ${key}`, { error });
         }
       }
@@ -388,10 +402,12 @@ export class ConfigManager {
   private persistConfig(key: string, value: any): void {
     const definition = this.definitions.get(key);
     if (!definition || !definition.persistent) return;
+    const storage = getConfigLocalStorage();
+    if (!storage) return;
 
     try {
       const storageKey = definition.storageKey || key;
-      localStorage.setItem(`config_${storageKey}`, JSON.stringify(value));
+      storage.setItem(`config_${storageKey}`, JSON.stringify(value));
       this.configLogger.debug(`持久化配置: ${key}`, { value });
     } catch (error) {
       const storageKey = definition.storageKey || key;

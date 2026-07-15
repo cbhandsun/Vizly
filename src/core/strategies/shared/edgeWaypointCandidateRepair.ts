@@ -4,9 +4,28 @@ import type { BuddyGroup } from '../../algorithms/globalChannelRouting';
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
 type Segment = { a: Point; b: Point };
+type PaddedRectBounds = { x1: number; y1: number; x2: number; y2: number };
+
+export type RoutingObstacleHitEvaluation = Readonly<{
+  endpointNodeTraversalHits: number;
+  routingObstacleHits: number;
+  unrelatedObstacleHits: number;
+}>;
+
+export type RoutingObstacleEvaluationContext = Readonly<{
+  countEndpointNodeTraversalHits: (path: Point[]) => number;
+  countPathHits: (path: Point[]) => number;
+  countUnrelatedObstacleHits: (path: Point[]) => number;
+  evaluate: (path: Point[]) => RoutingObstacleHitEvaluation;
+}>;
+
+const ENDPOINT_INTERIOR_TOLERANCE = 0.51;
 
 const EPS = 0.5;
 const FLEXIBLE_SHARED_TRUNK_MIN = 24;
+const SEVERE_DETOUR_RATIO = 2.5;
+const SOFT_DETOUR_RATIO = 1.8;
+const EXCESSIVE_BENDS = 6;
 
 const num = (value: unknown, fallback: number): number => (
   typeof value === 'number' && Number.isFinite(value) ? value : fallback
@@ -74,16 +93,56 @@ function segmentIntersectsRect(segment: Segment, rect: Rect, padding = 10): bool
   const y2 = rect.y + rect.height + padding;
   if (Math.abs(segment.a.y - segment.b.y) < EPS) {
     const y = segment.a.y;
-    if (y < y1 || y > y2) return false;
+    if (y <= y1 || y >= y2) return false;
     return Math.max(Math.min(segment.a.x, segment.b.x), x1) < Math.min(Math.max(segment.a.x, segment.b.x), x2);
   }
   if (Math.abs(segment.a.x - segment.b.x) < EPS) {
     const x = segment.a.x;
-    if (x < x1 || x > x2) return false;
+    if (x <= x1 || x >= x2) return false;
     return Math.max(Math.min(segment.a.y, segment.b.y), y1) < Math.min(Math.max(segment.a.y, segment.b.y), y2);
   }
   return false;
 }
+
+const paddedRectBounds = (rect: Rect, padding: number): PaddedRectBounds => ({
+  x1: rect.x - padding,
+  y1: rect.y - padding,
+  x2: rect.x + rect.width + padding,
+  y2: rect.y + rect.height + padding,
+});
+
+const countPathRectHits = (path: Point[], rects: readonly PaddedRectBounds[]): number => {
+  let hits = 0;
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const a = path[index];
+    const b = path[index + 1];
+    const deltaX = Math.abs(a.x - b.x);
+    const deltaY = Math.abs(a.y - b.y);
+    if (!(deltaX > EPS || deltaY > EPS)) continue;
+
+    if (deltaY < EPS) {
+      const y = a.y;
+      const segmentStart = Math.min(a.x, b.x);
+      const segmentEnd = Math.max(a.x, b.x);
+      for (const rect of rects) {
+        if (y <= rect.y1 || y >= rect.y2) continue;
+        if (Math.max(segmentStart, rect.x1) < Math.min(segmentEnd, rect.x2)) hits += 1;
+      }
+      continue;
+    }
+
+    if (deltaX < EPS) {
+      const x = a.x;
+      const segmentStart = Math.min(a.y, b.y);
+      const segmentEnd = Math.max(a.y, b.y);
+      for (const rect of rects) {
+        if (x <= rect.x1 || x >= rect.x2) continue;
+        if (Math.max(segmentStart, rect.y1) < Math.min(segmentEnd, rect.y2)) hits += 1;
+      }
+    }
+  }
+  return hits;
+};
 
 function distancePointToSegment(point: Point, segment: Segment): number {
   const dx = segment.b.x - segment.a.x;
@@ -123,6 +182,37 @@ function rectIntersectsExpandedBounds(rect: Rect, bounds: Rect, padding: number)
     && rect.x <= bounds.x + bounds.width + padding
     && rect.y + rect.height >= bounds.y - padding
     && rect.y <= bounds.y + bounds.height + padding;
+}
+
+function pathLength(points: Point[]): number {
+  let total = 0;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    total += Math.abs(points[index + 1].x - points[index].x) + Math.abs(points[index + 1].y - points[index].y);
+  }
+  return total;
+}
+
+function manhattanDistance(points: Point[]): number {
+  if (points.length < 2) return 0;
+  const start = points[0];
+  const end = points[points.length - 1];
+  return Math.abs(end.x - start.x) + Math.abs(end.y - start.y);
+}
+
+function pathVisualComplexityRisk(points: Point[]): number {
+  if (points.length < 2) return 0;
+  const direct = Math.max(1, manhattanDistance(points));
+  const ratio = pathLength(points) / direct;
+  const bends = Math.max(0, points.length - 2);
+  let risk = 0;
+  if (ratio > SEVERE_DETOUR_RATIO) risk += (ratio - SEVERE_DETOUR_RATIO) * 1600;
+  else if (ratio > SOFT_DETOUR_RATIO) risk += (ratio - SOFT_DETOUR_RATIO) * 450;
+  if (bends > EXCESSIVE_BENDS) risk += (bends - EXCESSIVE_BENDS) * 300;
+  return risk;
+}
+
+export function pathHasVisualComplexityRisk(points: Point[]): boolean {
+  return pathVisualComplexityRisk(compactPath(points)) > 0;
 }
 
 function pathBounds(points: Point[]): Rect {
@@ -183,27 +273,86 @@ function endpointStubPoint(anchor: Point, adjacent: Point | undefined, length: n
 
 export function pathHasNodeRoutingRisk(path: Point[], nodes: ReactFlowNode[] | undefined, edge: Edge | undefined): boolean {
   if (!nodes || nodes.length === 0 || !edge) return false;
+  const nodeRects = businessRects(nodes);
   for (const segment of toSegments(path)) {
-    for (const node of businessRects(nodes)) {
-      if (node.id === edge.source || node.id === edge.target) continue;
-      if (segmentIntersectsRect(segment, node.rect, 12) || segmentToRectDistance(segment, node.rect) < 16) return true;
+    for (const node of nodeRects) {
+      if (node.id === edge.source || node.id === edge.target) {
+        if (segmentIntersectsRect(segment, node.rect, 0)) return true;
+        continue;
+      }
+      if (segmentIntersectsRect(segment, node.rect, 8) || segmentToRectDistance(segment, node.rect) < 16) return true;
     }
   }
   return false;
 }
 
-export function countUnrelatedObstacleHits(path: Point[], edge: Edge, obstacles: Map<string, Rect>): number {
-  let hits = 0;
+export function createRoutingObstacleEvaluationContext(
+  edge: Edge,
+  obstacles: Map<string, Rect>,
+): RoutingObstacleEvaluationContext {
+  const sourceId = edge.source;
+  const targetId = edge.target;
+  const unrelatedRects: PaddedRectBounds[] = [];
   for (const [nodeId, rect] of obstacles) {
-    if (nodeId === edge.source || nodeId === edge.target) continue;
-    for (const segment of toSegments(path)) {
-      if (segmentIntersectsRect(segment, rect, 12)) hits += 1;
-    }
+    if (nodeId === sourceId || nodeId === targetId) continue;
+    unrelatedRects.push(paddedRectBounds(rect, 8));
   }
-  return hits;
+  const endpointRects: PaddedRectBounds[] = [];
+  for (const nodeId of new Set([sourceId, targetId])) {
+    const rect = obstacles.get(nodeId);
+    if (rect) endpointRects.push(paddedRectBounds(rect, -ENDPOINT_INTERIOR_TOLERANCE));
+  }
+  const routingRects = [...unrelatedRects, ...endpointRects];
+  const countUnrelatedPathHits = (path: Point[]): number => countPathRectHits(path, unrelatedRects);
+  const countEndpointPathHits = (path: Point[]): number => countPathRectHits(path, endpointRects);
+
+  return Object.freeze({
+    countEndpointNodeTraversalHits: countEndpointPathHits,
+    countPathHits: (path: Point[]): number => countPathRectHits(path, routingRects),
+    countUnrelatedObstacleHits: countUnrelatedPathHits,
+    evaluate: (path: Point[]): RoutingObstacleHitEvaluation => {
+      const unrelatedObstacleHits = countUnrelatedPathHits(path);
+      const endpointNodeTraversalHits = countEndpointPathHits(path);
+      return Object.freeze({
+        endpointNodeTraversalHits,
+        routingObstacleHits: unrelatedObstacleHits + endpointNodeTraversalHits,
+        unrelatedObstacleHits,
+      });
+    },
+  });
 }
 
-export function generateWaypointCandidates(basePath: Point[], layoutDirection: string, nodes?: ReactFlowNode[], edge?: Edge): Point[][] {
+export function countUnrelatedObstacleHits(path: Point[], edge: Edge, obstacles: Map<string, Rect>): number {
+  return createRoutingObstacleEvaluationContext(edge, obstacles).countUnrelatedObstacleHits(path);
+}
+
+/**
+ * Counts route segments that enter the interior of their own source or target node.
+ *
+ * Endpoint nodes cannot be treated like ordinary padded obstacles because a valid route must
+ * touch their boundary. The boundary itself is therefore allowed, while any segment that crosses
+ * the open node interior is a hard routing failure. This catches terminal boundary slides that
+ * turn back through the node after leaving a declared handle.
+ */
+export function countEndpointNodeTraversalHits(
+  path: Point[],
+  edge: Edge,
+  obstacles: Map<string, Rect>,
+): number {
+  return createRoutingObstacleEvaluationContext(edge, obstacles).countEndpointNodeTraversalHits(path);
+}
+
+export function countRoutingObstacleHits(path: Point[], edge: Edge, obstacles: Map<string, Rect>): number {
+  return createRoutingObstacleEvaluationContext(edge, obstacles).countPathHits(path);
+}
+
+export function generateWaypointCandidates(
+  basePath: Point[],
+  layoutDirection: string,
+  nodes?: ReactFlowNode[],
+  edge?: Edge,
+  options: { includeNodeAwareLanes?: boolean } = {},
+): Point[][] {
   const base = compactPath(basePath);
   if (base.length < 2) return [base];
 
@@ -225,7 +374,7 @@ export function generateWaypointCandidates(basePath: Point[], layoutDirection: s
     ...offsets.map(o => Math.round(start.y + o)),
     ...offsets.map(o => Math.round(end.y + o)),
   ]);
-  if (pathHasNodeRoutingRisk(base, nodes, edge)) {
+  if (pathHasNodeRoutingRisk(base, nodes, edge) || options.includeNodeAwareLanes) {
     const nodeAwareLanes = buildNodeAwareWaypointLanes(base, nodes, edge);
     for (const x of nodeAwareLanes.x) xLanes.add(x);
     for (const y of nodeAwareLanes.y) yLanes.add(y);
@@ -300,7 +449,7 @@ export function generateWaypointCandidates(basePath: Point[], layoutDirection: s
     .sort((a, b) => (isHorizontalLayout
       ? Math.abs((a[1]?.y ?? start.y) - start.y) - Math.abs((b[1]?.y ?? start.y) - start.y)
       : Math.abs((a[1]?.x ?? start.x) - start.x) - Math.abs((b[1]?.x ?? start.x) - start.x)))
-    .slice(0, 140);
+    .slice(0, options.includeNodeAwareLanes ? 260 : 140);
 }
 
 function edgeHasBuddyType(edgeId: string, groups: BuddyGroup[], type: BuddyGroup['type']): boolean {

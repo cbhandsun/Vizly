@@ -107,6 +107,156 @@ describe('buildRenderSceneFromReactFlow', () => {
     });
   });
 
+  it('normalizes database-like node shapes for SVG export', () => {
+    const scene = buildRenderSceneFromReactFlow(
+      [{
+        id: 'db',
+        type: 'custom',
+        position: { x: 0, y: 0 },
+        measured: { width: 120, height: 80 },
+        data: { label: 'Orders', shape: 'database' },
+      } as any],
+      [],
+    );
+
+    expect(scene.nodes[0]).toMatchObject({
+      shape: 'database',
+      label: 'Orders',
+    });
+  });
+
+  it('normalizes ER table columns for SVG export', () => {
+    const scene = buildRenderSceneFromReactFlow(
+      [{
+        id: 'orders',
+        type: 'ERDatabaseNode',
+        position: { x: 0, y: 0 },
+        measured: { width: 220, height: 160 },
+        data: {
+          tableName: 'orders',
+          columns: [
+            { name: 'id', type: 'uuid', isPrimary: true },
+            { name: '<b>customer_id</b>', type: 'uuid', isForeign: true },
+            { name: '<img onerror=x>total', type: 'decimal' },
+          ],
+        },
+      } as any],
+      [],
+    );
+
+    expect(scene.nodes[0]).toMatchObject({
+      shape: 'database',
+      label: 'orders',
+      tableColumns: [
+        { name: 'id', type: 'uuid', isPrimary: true, isForeign: false },
+        { name: 'customer_id', type: 'uuid', isPrimary: false, isForeign: true },
+        { name: 'total', type: 'decimal', isPrimary: false, isForeign: false },
+      ],
+    });
+  });
+
+  it('normalizes container and swimlane metadata for SVG export', () => {
+    const scene = buildRenderSceneFromReactFlow(
+      [
+        {
+          id: 'domain',
+          type: 'titleGroup',
+          position: { x: 0, y: 0 },
+          measured: { width: 360, height: 220 },
+          data: {
+            label: 'Domain',
+            collapsed: true,
+            childCount: 5,
+            themeColor: '#2563eb',
+          },
+        } as any,
+        {
+          id: 'lane',
+          type: 'swimlane',
+          position: { x: 400, y: 0 },
+          measured: { width: 360, height: 220 },
+          data: {
+            label: 'Fulfillment',
+            laneCount: 3,
+            direction: 'horizontal',
+            themeColor: '#0f766e',
+          },
+        } as any,
+      ],
+      [],
+    );
+
+    expect(scene.nodes[0]).toMatchObject({
+      shape: 'group',
+      container: {
+        isContainer: true,
+        isSwimlane: false,
+        isLane: false,
+        collapsed: true,
+        childCount: 5,
+        laneCount: 0,
+        laneDirection: 'vertical',
+        headerColor: '#2563eb',
+      },
+    });
+    expect(scene.nodes[1]).toMatchObject({
+      shape: 'group',
+      container: {
+        isContainer: true,
+        isSwimlane: true,
+        collapsed: false,
+        laneCount: 3,
+        laneDirection: 'horizontal',
+        headerColor: '#0f766e',
+      },
+    });
+  });
+
+  it('normalizes node metadata used by SVG export', () => {
+    const scene = buildRenderSceneFromReactFlow(
+      [{
+        id: 'arch',
+        type: 'architecture',
+        position: { x: 0, y: 0 },
+        measured: { width: 160, height: 96 },
+        data: {
+          label: 'API Gateway',
+          description: '<b>Public ingress</b>',
+          icon: 'mdi:api',
+          status: 'warning',
+        },
+      } as any],
+      [],
+    );
+
+    expect(scene.nodes[0]).toMatchObject({
+      label: 'API Gateway',
+      subtitle: 'Public ingress',
+      icon: 'mdi:api',
+      status: 'warning',
+    });
+  });
+
+  it('rejects unsafe or unknown node metadata values', () => {
+    const scene = buildRenderSceneFromReactFlow(
+      [{
+        id: 'meta',
+        position: { x: 0, y: 0 },
+        data: {
+          label: 'Meta',
+          icon: '<img onerror=x>evil',
+          status: 'url(javascript:alert(1))',
+        },
+      } as any],
+      [],
+    );
+
+    expect(scene.nodes[0]).toMatchObject({
+      icon: 'evil',
+      status: undefined,
+    });
+  });
+
   it('rejects unsafe SVG style tokens from nodes, edges, and theme input', () => {
     const scene = buildRenderSceneFromReactFlow(
       [{

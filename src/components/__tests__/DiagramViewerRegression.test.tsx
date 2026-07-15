@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const canvasOpsMock = vi.fn(() => ({}));
@@ -225,11 +225,11 @@ vi.mock('../diagramViewerLogging', () => ({
     logDiagramViewerSwitchConfirmationFailure: vi.fn(),
 }));
 
-vi.mock('../data/diagram-definitions', () => ({
+vi.mock('@/data/diagram-definitions', () => ({
     diagramDefinitions: [{
         id: 'test-diagram',
         name: 'test',
-        component: ({ ...props }: Record<string, unknown>) => <div data-testid="diagram" {...props} />,
+        component: () => <div data-testid="diagram" />,
     }],
 }));
 
@@ -264,6 +264,7 @@ describe('DiagramViewer regression', () => {
             </MemoryRouter>
         );
 
+        expect(screen.getByTestId('diagram')).toBeInTheDocument();
         expect(canvasOpsMock).toHaveBeenCalledTimes(1);
         const callArg = canvasOpsMock.mock.calls[0]?.[0] as { onExportPNG?: unknown; onExportPDF?: unknown; onExportSVG?: unknown; onExportGIF?: unknown };
         expect(callArg?.onExportPNG).toBe(exportToPNGMock);

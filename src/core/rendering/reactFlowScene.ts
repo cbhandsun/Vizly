@@ -4,6 +4,8 @@ import { normalizeSvgFontWeight, normalizeSvgPaint, normalizeSvgStrokeDasharray 
 import type { DiagramRenderScene, RenderBounds, RenderEdgeGeometry, RenderNodeGeometry, RenderPoint } from './types';
 
 const MAX_LABEL_CHARS = 240;
+const MAX_TABLE_COLUMNS = 24;
+const MAX_COLUMN_TEXT_CHARS = 80;
 const DEFAULT_WIDTH = 220;
 const DEFAULT_HEIGHT = 120;
 export interface ReactFlowRenderSnapshot {
@@ -39,12 +41,48 @@ const textFromUnknown = (value: unknown): string => {
   return text.length > MAX_LABEL_CHARS ? `${text.slice(0, MAX_LABEL_CHARS)}...` : text;
 };
 
+const iconTextFromUnknown = (value: unknown): string | undefined => {
+  const text = textFromUnknown(value);
+  if (!text) return undefined;
+  return text.slice(0, 48);
+};
+
 const firstText = (...values: unknown[]): string => {
   for (const value of values) {
     const text = textFromUnknown(value);
     if (text) return text;
   }
   return '';
+};
+
+const normalizeStatus = (value: unknown): RenderNodeGeometry['status'] | undefined => {
+  const raw = String(value ?? '').toLowerCase();
+  if (raw === 'success' || raw === 'ok' || raw === 'healthy' || raw === 'normal') return raw === 'normal' ? 'normal' : 'success';
+  if (raw === 'warning' || raw === 'warn') return 'warning';
+  if (raw === 'error' || raw === 'danger' || raw === 'critical' || raw === 'failed') return 'error';
+  return undefined;
+};
+
+const columnTextFromUnknown = (value: unknown): string => {
+  const text = textFromUnknown(value);
+  return text.length > MAX_COLUMN_TEXT_CHARS ? `${text.slice(0, MAX_COLUMN_TEXT_CHARS)}...` : text;
+};
+
+const normalizeTableColumns = (value: unknown): RenderNodeGeometry['tableColumns'] | undefined => {
+  if (!Array.isArray(value)) return undefined;
+  const columns = value.slice(0, MAX_TABLE_COLUMNS).map(column => {
+    const record = column as Record<string, unknown> | null | undefined;
+    const name = columnTextFromUnknown(record?.name ?? record?.label ?? record?.field);
+    const type = columnTextFromUnknown(record?.type ?? record?.dataType ?? record?.kind);
+    if (!name && !type) return null;
+    return {
+      name: name || 'column',
+      type,
+      isPrimary: record?.isPrimary === true || record?.primaryKey === true || record?.key === 'PK',
+      isForeign: record?.isForeign === true || record?.foreignKey === true || record?.key === 'FK',
+    };
+  }).filter((column): column is NonNullable<typeof column> => !!column);
+  return columns.length ? columns : undefined;
 };
 
 const nodePosition = (node: Node): RenderPoint => {
@@ -73,10 +111,46 @@ const dataStyleColor = (data: Record<string, unknown> | undefined, style: unknow
 const normalizeShape = (node: Node, data: Record<string, unknown> | undefined): string | undefined => {
   const raw = String(data?.shape ?? data?.nodeShape ?? node.type ?? '').toLowerCase();
   if (raw.includes('diamond') || raw.includes('decision')) return 'diamond';
+  if (raw.includes('database') || raw.includes('cylinder') || raw.includes('table')) return 'database';
   if (raw.includes('ellipse') || raw.includes('circle') || raw.includes('oval')) return 'ellipse';
   if (raw.includes('note') || raw.includes('sticky')) return 'note';
   if (raw.includes('group') || raw.includes('swimlane')) return 'group';
   return undefined;
+};
+
+const isContainerType = (node: Node, data: Record<string, unknown> | undefined): boolean => {
+  const raw = String(data?.shape ?? data?.nodeShape ?? node.type ?? '').toLowerCase();
+  return raw.includes('group') || raw.includes('swimlane') || raw.includes('domain') || raw.includes('container');
+};
+
+const normalizeLaneDirection = (value: unknown): 'horizontal' | 'vertical' => {
+  const raw = String(value ?? '').toLowerCase();
+  return raw === 'horizontal' || raw === 'h' || raw === 'tb' || raw === 'bt' ? 'horizontal' : 'vertical';
+};
+
+const normalizeContainerMetadata = (
+  node: Node,
+  data: Record<string, unknown> | undefined,
+  shape: string | undefined,
+): RenderNodeGeometry['container'] | undefined => {
+  const type = String(node.type ?? '').toLowerCase();
+  const isSwimlane = type.includes('swimlane') || String(data?.shape ?? '').toLowerCase().includes('swimlane');
+  const isLane = data?.isLane === true || type.includes('lane');
+  const isContainer = shape === 'group' || isContainerType(node, data);
+  if (!isContainer && !isSwimlane && !isLane) return undefined;
+  const laneCount = coerceRenderNumber(data?.laneCount, 0, 0, 24);
+  const childCount = coerceRenderNumber(data?.childCount ?? data?.childrenCount, 0, 0, 999);
+  const dataStyle = data?.style as Record<string, unknown> | undefined;
+  return {
+    isContainer: true,
+    isSwimlane,
+    isLane,
+    collapsed: data?.collapsed === true,
+    childCount,
+    laneCount,
+    laneDirection: normalizeLaneDirection(data?.direction ?? data?.laneDirection),
+    headerColor: normalizeSvgPaint(data?.themeColor ?? dataStyle?.backgroundColor ?? dataStyle?.borderColor, ''),
+  };
 };
 
 const normalizeBorderRadius = (style: unknown, shape: string | undefined): number => {
@@ -98,6 +172,10 @@ const buildNode = (node: Node): RenderNodeGeometry | null => {
   const data = node.data as Record<string, unknown> | undefined;
   const shape = normalizeShape(node, data);
   const dataStyle = data?.style as Record<string, unknown> | undefined;
+  const tableColumns = normalizeTableColumns(data?.columns);
+  const label = firstText(data?.tableName, data?.title, data?.label, data?.description, (node as any).label, node.id);
+  const subtitle = firstText(data?.subtitle, data?.caption, data?.description);
+  const container = normalizeContainerMetadata(node, data, shape);
   return {
     id: String(node.id),
     x: position.x,
@@ -106,7 +184,10 @@ const buildNode = (node: Node): RenderNodeGeometry | null => {
     height,
     hidden: false,
     zIndex: coerceRenderNumber((node as any).zIndex, 0, -10_000, 10_000),
-    label: firstText(data?.title, data?.label, data?.description, (node as any).label, node.id),
+    label,
+    subtitle: subtitle && subtitle !== label ? subtitle : undefined,
+    icon: iconTextFromUnknown(data?.icon),
+    status: normalizeStatus(data?.status ?? data?.state ?? data?.severity),
     type: typeof node.type === 'string' ? node.type : undefined,
     shape,
     fill: dataStyleColor(data, node.style, 'backgroundColor', styleColor(node.style, 'background', defaultTheme.nodeFill)),
@@ -118,6 +199,8 @@ const buildNode = (node: Node): RenderNodeGeometry | null => {
     borderRadius: normalizeBorderRadius(node.style ?? dataStyle, shape),
     fontSize: coerceRenderNumber((node.style as any)?.fontSize ?? dataStyle?.fontSize, 13, 8, 48),
     fontWeight: normalizeSvgFontWeight((node.style as any)?.fontWeight) || normalizeSvgFontWeight(dataStyle?.fontWeight),
+    tableColumns,
+    container,
   };
 };
 

@@ -1,32 +1,47 @@
-import type { Edge } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
+import {
+  computeBaseReactFlowDisplayEdgeEpoch,
+  createBaseReactFlowDisplayEdges,
+} from '../../shared/baseReactFlowDisplayEdges';
+import {
+  hasTrustedLayoutPath,
+  prepareBaseDiagramDisplayEdges,
+} from './baseDiagramEdgePreparation';
 
-type EdgeData = Record<string, unknown>;
-
-const isFinitePoint = (value: unknown): value is { x: number; y: number } => {
-  if (!value || typeof value !== 'object') return false;
-  const point = value as Record<string, unknown>;
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
-};
-
-const hasRenderableComputedPath = (value: unknown): boolean => (
-  Array.isArray(value)
-  && value.length >= 2
-  && value.every(isFinitePoint)
-);
-
-export const hasTrustedLayoutPath = (edge: Edge): boolean => {
-  const data = edge.data as EdgeData | undefined;
-  if (!data) return false;
-
-  const isLayoutLocked = data.layoutPathLocked === true || data._layoutPathLocked === true;
-  return isLayoutLocked && hasRenderableComputedPath(data.computedPath);
-};
+export { hasTrustedLayoutPath } from './baseDiagramEdgePreparation';
 
 export const hasPostProcessedLayoutPath = hasTrustedLayoutPath;
 
-export const createBaseDiagramDisplayEdges = (edges: Edge[]): Edge[] => (
-  edges.map(edge => {
-    if (!hasTrustedLayoutPath(edge) || edge.type === 'stablePath') return edge;
-    return { ...edge, type: 'stablePath' };
-  })
-);
+type BaseDiagramDisplayEdgesOptions = {
+  edges: Edge[];
+  nodes?: Node[];
+  enableSmartEdges?: boolean;
+  smartEdgePadding?: number;
+  isLargeGraph?: boolean;
+  displayEdgeEpoch?: number;
+};
+
+export const createBaseDiagramDisplayEdges = (
+  input: Edge[] | BaseDiagramDisplayEdgesOptions,
+): Edge[] => {
+  const options = Array.isArray(input) ? { edges: input } : input;
+  const {
+    edges,
+    nodes,
+    enableSmartEdges = false,
+    smartEdgePadding = 20,
+    isLargeGraph = false,
+    displayEdgeEpoch,
+  } = options;
+
+  if (!nodes?.length) return prepareBaseDiagramDisplayEdges(edges);
+
+  return createBaseReactFlowDisplayEdges({
+    edges,
+    nodes,
+    enableSmartEdges,
+    smartEdgePadding,
+    isLargeGraph,
+    displayEdgeEpoch: displayEdgeEpoch ?? computeBaseReactFlowDisplayEdgeEpoch({ edges, nodes }),
+  });
+};

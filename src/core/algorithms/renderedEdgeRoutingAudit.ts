@@ -67,6 +67,7 @@ type EndpointSide = 'top' | 'right' | 'bottom' | 'left';
 const EPS = 1;
 const NODE_NEAR_PATH_WARNING_DISTANCE = 16;
 const PARALLEL_OVERLAP_ERROR_LENGTH = 24;
+const MAIN_AXIS_BACKTRACK_WARNING_DISTANCE = 48;
 const CONTAINER_TYPES = new Set(['group', 'subGroup', 'titleGroup', 'domain', 'subDomain', 'swimlane']);
 
 export function parseRenderedSvgPath(path: string): ParsedPathPoint[] {
@@ -300,6 +301,35 @@ const directPathHitsBusinessNode = (
     return false;
 };
 
+const mainAxisBacktrackDistance = (points: OrthogonalPoint[]): number => {
+    if (points.length < 2) return 0;
+    const start = points[0];
+    const end = points[points.length - 1];
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const horizontalDominant = Math.abs(dx) >= Math.abs(dy);
+    const mainDelta = horizontalDominant ? dx : dy;
+    if (Math.abs(mainDelta) <= EPS) return 0;
+
+    const expectedDirection = mainDelta > 0 ? 1 : -1;
+    let total = 0;
+    for (let index = 0; index < points.length - 1; index += 1) {
+        const current = points[index];
+        const next = points[index + 1];
+        const segmentDx = next.x - current.x;
+        const segmentDy = next.y - current.y;
+        const segmentHorizontal = Math.abs(segmentDy) <= EPS && Math.abs(segmentDx) > EPS;
+        const segmentVertical = Math.abs(segmentDx) <= EPS && Math.abs(segmentDy) > EPS;
+        if (horizontalDominant && !segmentHorizontal) continue;
+        if (!horizontalDominant && !segmentVertical) continue;
+        const direction = (horizontalDominant ? segmentDx : segmentDy) > 0 ? 1 : -1;
+        if (direction !== expectedDirection) {
+            total += Math.abs(segmentDx) + Math.abs(segmentDy);
+        }
+    }
+    return Number(total.toFixed(2));
+};
+
 export function auditRenderedEdgeRouting(edges: RenderedAuditEdge[], nodes: RenderedAuditNode[]): RenderedRoutingAuditResult {
     const nodeById = new Map(nodes.map(node => [node.id, node]));
     const parsedEdges = edges.map(edge => {
@@ -398,6 +428,15 @@ export function auditRenderedEdgeRouting(edges: RenderedAuditEdge[], nodes: Rend
         }
 
         const visualPoints = simplifyOrthogonalPointChain(points);
+        const backtrackDistance = mainAxisBacktrackDistance(visualPoints);
+        if (backtrackDistance >= MAIN_AXIS_BACKTRACK_WARNING_DISTANCE) {
+            pushWarning({
+                edgeId: edge.id,
+                rule: 'main-axis-backtrack',
+                reason: 'Rendered path moves away from the target on its dominant axis before returning, which reads as an unnecessary loop or far-side trunk.',
+                measuredValue: backtrackDistance,
+            });
+        }
         const doglegRisks = detectLocalDoglegRisks(visualPoints);
         const directPath = buildAlignedDirectPath(visualPoints);
         const alignedDirectBlocked = directPath

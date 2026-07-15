@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import { isBaseReactFlowNodeHidden } from './baseReactFlowRenderableNodes';
 
 type Bounds = {
   minX: number;
@@ -57,7 +58,8 @@ export const shouldSkipBaseReactFlowMinorResize = ({
 };
 
 export const computeBaseReactFlowNodeBounds = (nodes: Node[]): Bounds | null => {
-  if (nodes.length === 0) {
+  const visibleNodes = nodes.filter((node) => !isBaseReactFlowNodeHidden(node));
+  if (visibleNodes.length === 0) {
     return null;
   }
 
@@ -67,7 +69,7 @@ export const computeBaseReactFlowNodeBounds = (nodes: Node[]): Bounds | null => 
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
 
-  for (const node of nodes) {
+  for (const node of visibleNodes) {
     const width = resolveNodeDimension(
       node.measured?.width ?? node.width ?? (node.style as any)?.width,
       DEFAULT_NODE_WIDTH,

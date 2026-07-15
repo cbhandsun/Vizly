@@ -57,6 +57,33 @@ describe('baseReactFlowFitWidthTop', () => {
     });
   });
 
+  it('ignores hidden group containers when computing fit bounds', () => {
+    const nodes: Node[] = [
+      {
+        id: 'hidden-domain',
+        type: 'titleGroup',
+        position: { x: -1000, y: -1000 },
+        data: { hidden: true },
+        width: 4000,
+        height: 3000,
+      },
+      {
+        id: 'visible-node',
+        type: 'custom',
+        position: { x: 100, y: 80 },
+        data: {},
+        measured: { width: 120, height: 60 },
+      },
+    ];
+
+    expect(computeBaseReactFlowNodeBounds(nodes)).toEqual({
+      minX: 100,
+      minY: 80,
+      maxX: 220,
+      maxY: 140,
+    });
+  });
+
   it('expands bounds for edge labels and smart edges', () => {
     const edges: Edge[] = [
       {

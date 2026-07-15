@@ -28,6 +28,53 @@ import {
   smoothShortSegments,
 } from '../smartEdgeUtils';
 
+function renderedStraightSegmentLengths(path: string): number[] {
+  const tokens = [...path.matchAll(/([MLHVAZ])|(-?\d*\.?\d+(?:e[-+]?\d+)?)/gi)]
+    .map(match => (match[1] ? match[1].toUpperCase() : Number(match[2])));
+  let index = 0;
+  let command: string | null = null;
+  let current = { x: 0, y: 0 };
+  const lengths: number[] = [];
+  const isCommand = (value: unknown): value is string => typeof value === 'string';
+  const addLine = (point: { x: number; y: number }) => {
+    if (Math.abs(current.x - point.x) < 1 || Math.abs(current.y - point.y) < 1) {
+      lengths.push(Math.abs(current.x - point.x) + Math.abs(current.y - point.y));
+    }
+    current = point;
+  };
+
+  while (index < tokens.length) {
+    if (isCommand(tokens[index])) command = tokens[index++] as string;
+    if (!command) break;
+    if (command === 'M') {
+      if (index + 1 >= tokens.length) break;
+      current = { x: Number(tokens[index++]), y: Number(tokens[index++]) };
+      command = 'L';
+    } else if (command === 'L') {
+      while (index + 1 < tokens.length && !isCommand(tokens[index])) {
+        addLine({ x: Number(tokens[index++]), y: Number(tokens[index++]) });
+      }
+    } else if (command === 'H') {
+      while (index < tokens.length && !isCommand(tokens[index])) {
+        addLine({ x: Number(tokens[index++]), y: current.y });
+      }
+    } else if (command === 'V') {
+      while (index < tokens.length && !isCommand(tokens[index])) {
+        addLine({ x: current.x, y: Number(tokens[index++]) });
+      }
+    } else if (command === 'A') {
+      while (index + 6 < tokens.length && !isCommand(tokens[index])) {
+        index += 5;
+        current = { x: Number(tokens[index++]), y: Number(tokens[index++]) };
+      }
+    } else {
+      break;
+    }
+  }
+
+  return lengths;
+}
+
 describe('smartEdgeUtils geometry primitives', () => {
   it('normalizes node positions with precedence and finite-value guards', () => {
     expect(getNodePosition(undefined)).toEqual({ x: 0, y: 0 });
@@ -219,10 +266,11 @@ describe('smartEdgeUtils geometry primitives', () => {
   it('creates filleted and jump-aware SVG paths', () => {
     const filleted = createFilletedPath([
       { x: 0, y: 0 },
-      { x: 40, y: 0 },
-      { x: 40, y: 40 },
+      { x: 64, y: 0 },
+      { x: 64, y: 64 },
     ], 10);
-    expect(filleted).toMatch(/^M 0 0 L 30 0 A 9\.999999999999998 9\.999999999999998 0 0 1 40 10 L 40 40$/);
+    expect(filleted).toContain(' A ');
+    expect(renderedStraightSegmentLengths(filleted)).toEqual([54, 54]);
     expect(filleted).not.toMatch(/[CQ]/);
 
     expect(createFilletedPath([
@@ -252,6 +300,18 @@ describe('smartEdgeUtils geometry primitives', () => {
     ], 0)).toBe('M 248.99652099609375 645.4461669921875 L 248.99652099609375 1062.5556640625');
   });
 
+  it('does not mutate caller-owned routing points while normalizing SVG output', () => {
+    const points = [
+      { x: 242.5, y: 902 },
+      { x: 243, y: 1062 },
+    ];
+    const snapshot = points.map(point => ({ ...point }));
+
+    createFilletedPath(points, 4);
+
+    expect(points).toEqual(snapshot);
+  });
+
   it('removes render-time tiny dogleg bridges before corner filleting', () => {
     const path = createFilletedPath([
       { x: 243, y: 646 },
@@ -278,6 +338,31 @@ describe('smartEdgeUtils geometry primitives', () => {
     ], 8);
 
     expect(path).not.toMatch(/A [^ ]+ [^ ]+ 0 0 [01] ([\\d.]+) ([\\d.]+) L \\1 \\2 A/);
+  });
+
+  it('keeps short bridges readable after render-time filleting', () => {
+    const path = createFilletedPath([
+      { x: 139, y: 2488 },
+      { x: 139, y: 2148 },
+      { x: 296, y: 2148 },
+      { x: 296, y: 1914 },
+      { x: 314, y: 1914 },
+      { x: 314, y: 1772 },
+    ], 8);
+
+    expect(renderedStraightSegmentLengths(path).filter(length => length > 1 && length < 12)).toEqual([]);
+  });
+
+  it('preserves readable terminal stubs while filleting the adjacent bend', () => {
+    const path = createFilletedPath([
+      { x: 0, y: 0 },
+      { x: 48, y: 0 },
+      { x: 48, y: 48 },
+    ], 8);
+
+    expect(renderedStraightSegmentLengths(path).filter(length => length > 1 && length < 12)).toEqual([]);
+    expect(renderedStraightSegmentLengths(path)[0]).toBeGreaterThanOrEqual(48);
+    expect(renderedStraightSegmentLengths(path).at(-1)).toBeGreaterThanOrEqual(48);
   });
 
   it('straightens aligned local doglegs when the direct corridor is clear', () => {

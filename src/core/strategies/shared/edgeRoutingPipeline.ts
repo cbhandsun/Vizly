@@ -1,763 +1,67 @@
- 
 /**
  * @file 边路由管线
- * @description 从 DomainVerticalLayoutStrategy 提取的完整边路由管线。
- *   包含 positionAbsolute 计算、智能边路由决策、两轮优化、
- *   后处理管线（捆绑/分层/正交化/总线/标签避让）以及 ELK 集成。
+ * @description 组装智能边路由、后处理和可选 ELK 路由阶段。
  */
-import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
+import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
+
 import { diagramConfigManager } from '../../components/config/DiagramConfig';
+import { expandHandle } from '../../routing/utils/handleUtils';
 import {
-  decideEdgeRouting,
-  separateParallelEdges,
-  globalOptimizeEdgeRouting,
+  assignGlobalPorts,
+  beautifyOrthogonalEdges,
   bundleEdges,
+  decideEdgeRouting,
+  distributePortConnections,
+  globalOptimizeEdgeRouting,
   layerBasedEdgeRouting,
   optimizeEdgeLabelPositions,
-  beautifyOrthogonalEdges,
   optimizeTreeBusRouting,
-  assignGlobalPorts,
-  distributePortConnections,
+  separateParallelEdges,
 } from '../../utils/HandlePicker';
 import { routeEdgesWithELK } from '../../utils/elkEdgeRouter';
-import { expandHandle } from '../../routing/utils/handleUtils';
-import { repairEdgeCrossingViolations } from '../../algorithms/edgeCrossingRepair';
-import { repairHardObstacleViolations } from '../../algorithms/hardObstaclePathRepair';
 import { logElkEdgeRouterFallback } from '../layoutLogging';
-import {
-  buildEdgeTopologyStats,
-  buildPipelineBuddyGroups,
-  edgeTopologyPriority,
-} from './edgeRoutingTopology';
-import {
-  countUnrelatedObstacleHits,
-  generateWaypointCandidates,
-  pathHasNodeRoutingRisk,
-  preservesSharedTrunk,
-} from './edgeWaypointCandidateRepair';
-import { repairSameNodeInOutCrossings } from './edgeSameNodeRoleRepair';
+import { separateDetachedParallelOverlaps } from './edgeDetachedOverlapRepair';
+import { repairDetachedStrictCrossingBypasses } from './edgeDetachedStrictCrossingRepair';
 import { repairEndpointLaneCrossings } from './edgeEndpointLaneNudgeRepair';
 import { repairEndpointOrthogonalPaths } from './edgeEndpointPathRepair';
-import { separateDetachedParallelOverlaps } from './edgeDetachedOverlapRepair';
 import { refineGlobalEdgeWaypoints } from './edgeGlobalWaypointRefinement';
 import { repairLocalDoglegArtifacts } from './edgeLocalDoglegRepair';
 import { repairReverseFlowBypassCrossings } from './edgeReverseFlowBypassRepair';
 import {
+  computeAbsolutePosition,
+  handleToAnchor,
+  lockComputedPathsForDisplay,
+  sanitizeComputedPaths,
+  setAbsolutePositions,
+} from './edgeRoutingPathGeometry';
+import {
+  buildEdgeTopologyStats,
+  edgeTopologyPriority,
+} from './edgeRoutingTopology';
+import {
+  reduceEdgeCrossingsWithWaypoints,
+  repairSharedTrunkAwareCrossings,
+  repairSharedTrunkAwareObstacles,
+} from './edgeRoutingWaypointRefinement';
+import { repairSameNodeInOutCrossings } from './edgeSameNodeRoleRepair';
+import {
+  repairSharedTargetEntryCrossings,
   synthesizeSharedEndpointTrunks,
   synthesizeSharedTargetTrunks,
 } from './edgeSharedTrunkSynthesis';
-
-const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-type Point = { x: number; y: number };
-type Segment = { a: Point; b: Point };
-type Rect = { x: number; y: number; width: number; height: number };
-
-/**
- * 计算节点的绝对位置（考虑 parentId 链）
- */
-export function computeAbsolutePosition(
-  node: ReactFlowNode,
-  nodeMap: Map<string, ReactFlowNode>
-): { x: number; y: number } {
-  let x = (node.position as any)?.x ?? 0;
-  let y = (node.position as any)?.y ?? 0;
-  let current = node;
-  let depth = 0;
-  const visited = new Set<string>();
-  visited.add(node.id);
-
-  while (current.parentId && depth < 20) {
-    if (visited.has(current.parentId)) break;
-    const parent = nodeMap.get(current.parentId);
-    if (!parent) break;
-    x += (parent.position as any)?.x ?? 0;
-    y += (parent.position as any)?.y ?? 0;
-    visited.add(parent.id);
-    current = parent;
-    depth++;
-  }
-  return { x, y };
-}
-
-/**
- * 为所有节点计算并设置 positionAbsolute
- * @param nodes 所有节点（会就地修改 positionAbsolute 属性）
- */
-export function setAbsolutePositions(nodes: ReactFlowNode[]): void {
-  const nodeMap = new Map<string, ReactFlowNode>(nodes.map(n => [n.id, n] as const));
-  for (const node of nodes) {
-    const absPos = computeAbsolutePosition(node, nodeMap);
-    (node as any).positionAbsolute = absPos;
-  }
-}
-
-/** Handle 方向到锚点的映射 */
-function handleToAnchor(
-  pos: any,
-  w: number,
-  h: number,
-  handle: string | null | undefined,
-  nodeType?: string
-): { x: number; y: number } {
-  if ((!handle || handle === 'source' || handle === 'target') &&
-    (nodeType === 'group' || nodeType === 'subGroup' || nodeType === 'domain')) {
-    return { x: pos.x + w / 2, y: pos.y + h / 2 };
-  }
-  switch (handle) {
-    case 'l': case 'left': return { x: pos.x, y: pos.y + h / 2 };
-    case 'r': case 'right': return { x: pos.x + w, y: pos.y + h / 2 };
-    case 't': case 'top': return { x: pos.x + w / 2, y: pos.y };
-    case 'b': case 'bottom': return { x: pos.x + w / 2, y: pos.y + h };
-    default: return { x: pos.x + w / 2, y: pos.y + h / 2 };
-  }
-}
-
-function getEdgePath(edge: any): Point[] {
-  const raw = edge?.data?.computedPath || edge?.data?.elkPath || [];
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((p: any) => ({ x: Number(p?.x), y: Number(p?.y) }))
-    .filter((p: Point) => Number.isFinite(p.x) && Number.isFinite(p.y));
-}
-
-function axisOf(a: Point, b: Point): 'h' | 'v' | null {
-  if (Math.abs(a.y - b.y) < 0.5 && Math.abs(a.x - b.x) > 0.5) return 'h';
-  if (Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) > 0.5) return 'v';
-  return null;
-}
-
-function compactCollinearPath(points: Point[]): Point[] {
-  const deduped: Point[] = [];
-  for (const p of points) {
-    const prev = deduped[deduped.length - 1];
-    if (!prev || Math.abs(prev.x - p.x) > 0.5 || Math.abs(prev.y - p.y) > 0.5) {
-      deduped.push({ x: Math.round(p.x), y: Math.round(p.y) });
-    }
-  }
-  if (deduped.length <= 2) return deduped;
-  const result: Point[] = [deduped[0]];
-  for (let i = 1; i < deduped.length - 1; i++) {
-    const prev = result[result.length - 1];
-    const cur = deduped[i];
-    const next = deduped[i + 1];
-    const sameX = Math.abs(prev.x - cur.x) < 0.5 && Math.abs(cur.x - next.x) < 0.5;
-    const sameY = Math.abs(prev.y - cur.y) < 0.5 && Math.abs(cur.y - next.y) < 0.5;
-    if (!sameX && !sameY) result.push(cur);
-  }
-  result.push(deduped[deduped.length - 1]);
-  return result;
-}
-
-function chooseDiagonalBend(prev: Point | undefined, a: Point, b: Point, next: Point | undefined): Point {
-  const hv = { x: b.x, y: a.y };
-  const vh = { x: a.x, y: b.y };
-  const score = (bend: Point) => {
-    const firstAxis = axisOf(a, bend);
-    const lastAxis = axisOf(bend, b);
-    const prevAxis = prev ? axisOf(prev, a) : null;
-    const nextAxis = next ? axisOf(b, next) : null;
-    const firstLen = Math.abs(a.x - bend.x) + Math.abs(a.y - bend.y);
-    const lastLen = Math.abs(bend.x - b.x) + Math.abs(bend.y - b.y);
-    return (prevAxis && firstAxis && prevAxis !== firstAxis ? 2 : 0)
-      + (nextAxis && lastAxis && nextAxis !== lastAxis ? 2 : 0)
-      + (Math.min(firstLen, lastLen) < 8 ? 3 : 0);
-  };
-  return score(hv) <= score(vh) ? hv : vh;
-}
-
-function expandDiagonalSegments(points: Point[]): Point[] {
-  if (points.length <= 1) return points;
-  const expanded: Point[] = [points[0]];
-  for (let i = 0; i < points.length - 1; i++) {
-    const a = expanded[expanded.length - 1];
-    const b = points[i + 1];
-    if (Math.abs(a.x - b.x) < 0.5 || Math.abs(a.y - b.y) < 0.5) {
-      expanded.push(b);
-      continue;
-    }
-    const bend = chooseDiagonalBend(expanded[expanded.length - 2], a, b, points[i + 2]);
-    expanded.push(bend, b);
-  }
-  return expanded;
-}
-
-function removeShortJogs(points: Point[], threshold = 6): Point[] {
-  let result = points;
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (let i = 1; i < result.length - 1; i++) {
-      const prev = result[i - 1];
-      const cur = result[i];
-      const next = result[i + 1];
-      const prevLen = Math.abs(prev.x - cur.x) + Math.abs(prev.y - cur.y);
-      const nextLen = Math.abs(cur.x - next.x) + Math.abs(cur.y - next.y);
-      if ((prevLen < threshold || nextLen < threshold) && axisOf(prev, next)) {
-        result = [...result.slice(0, i), ...result.slice(i + 1)];
-        changed = true;
-        break;
-      }
-    }
-  }
-  return result;
-}
-
-function compactPath(points: Point[]): Point[] {
-  const rounded = compactCollinearPath(points);
-  const orthogonal = expandDiagonalSegments(rounded);
-  return compactCollinearPath(removeShortJogs(compactCollinearPath(orthogonal)));
-}
-
-function pathEquals(a: Point[], b: Point[]): boolean {
-  return a.length === b.length && a.every((p, i) =>
-    Math.abs(p.x - b[i]?.x) <= 0.5 && Math.abs(p.y - b[i]?.y) <= 0.5
-  );
-}
-
-function withComputedPath(edge: Edge, path: Point[], flags: Record<string, unknown> = {}): Edge {
-  const data: any = { ...(edge.data || {}), ...flags, computedPath: path };
-  if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-    data.treeRouting = { ...data.treeRouting, points: path };
-  }
-  return { ...edge, data };
-}
-
-function lockComputedPathsForDisplay(edges: Edge[]): Edge[] {
-  return edges.map(edge => {
-    const path = getEdgePath(edge);
-    if (path.length < 2) return edge;
-    return {
-      ...edge,
-      type: edge.type || 'advanced-smart-step',
-      data: {
-        ...(edge.data || {}),
-        computedPath: path,
-        layoutPathLocked: true,
-        runtimeHandleLock: {
-          ...((((edge.data as any)?.runtimeHandleLock) && typeof (edge.data as any).runtimeHandleLock === 'object')
-            ? (edge.data as any).runtimeHandleLock
-            : {}),
-          source: true,
-          target: true,
-        },
-      },
-    };
-  });
-}
-
-function sanitizeComputedPaths(edges: Edge[]): Edge[] {
-  return edges.map(edge => {
-    const path = getEdgePath(edge);
-    if (path.length < 2) return edge;
-    const compacted = compactPath(path);
-    if (pathEquals(path, compacted)) return edge;
-    return withComputedPath(edge, compacted, { orthogonalSanitized: true });
-  });
-}
-
-export function repairSharedTrunkAwareCrossings(edges: Edge[], nodes: ReactFlowNode[]): Edge[] {
-  const inputEdges = repairSameNodeInOutCrossings(edges, nodes);
-  const edgePaths = new Map<string, Point[]>();
-  for (const edge of inputEdges) {
-    const path = compactPath(getEdgePath(edge));
-    if (edge.id && path.length >= 2) edgePaths.set(edge.id, path);
-  }
-  if (edgePaths.size < 2) return inputEdges;
-
-  const obstaclesByNode = getRoutingObstacles(nodes);
-  const ignoredRectsByEdge = new Map<string, Rect[]>();
-  for (const edge of inputEdges) {
-    const ignored = [obstaclesByNode.get(edge.source), obstaclesByNode.get(edge.target)]
-      .filter((rect): rect is Rect => !!rect);
-    if (ignored.length > 0) ignoredRectsByEdge.set(edge.id, ignored);
-  }
-
-  const repaired = repairEdgeCrossingViolations(edgePaths, {
-    spacing: 12,
-    maxIterations: 8,
-    buddyGroups: buildPipelineBuddyGroups(edges),
-    obstacles: Array.from(obstaclesByNode.values()),
-    ignoredRectsByEdge, preserveEndpointDirections: true,
-  });
-  const edgesById = new Map(inputEdges.map(edge => [edge.id, edge] as const));
-  const repairedPaths = new Map(edgePaths);
-  for (const [edgeId, path] of repaired) {
-    if (path) repairedPaths.set(edgeId, path);
-  }
-
-  return inputEdges.map(edge => {
-    const path = repaired.get(edge.id);
-    const original = edgePaths.get(edge.id);
-    if (!path || !original || pathEquals(path, original)) return edge;
-    const originalAgainstRepaired = new Map(repairedPaths);
-    originalAgainstRepaired.set(edge.id, original);
-    if (
-      strictCrossingCountForEdgePath(path, edge, repairedPaths, edgesById)
-      > strictCrossingCountForEdgePath(original, edge, originalAgainstRepaired, edgesById)
-    ) {
-      return edge;
-    }
-    return withComputedPath(edge, path, { crossingOptimized: true, sharedTrunkAware: true });
-  });
-}
-
-function strictCrossingCountForEdgePath(
-  path: Point[],
-  edge: Edge,
-  paths: Map<string, Point[]>,
-  edgesById: Map<string, Edge>,
-): number {
-  const segments = toSegments(path);
-  let crossings = 0;
-  for (const [otherId, otherPath] of paths) {
-    if (otherId === edge.id) continue;
-    const other = edgesById.get(otherId);
-    if (!other || other.source === edge.source || other.target === edge.target) continue;
-    for (const first of segments) {
-      for (const second of toSegments(otherPath)) {
-        crossings += segmentRelation(first, second).crossings;
-      }
-    }
-  }
-  return crossings;
-}
-
-function repairSharedTrunkAwareObstacles(
-  edges: Edge[],
-  nodes: ReactFlowNode[],
-  minClearance = 0,
-): Edge[] {
-  const edgePaths = new Map<string, Point[]>();
-  for (const edge of edges) {
-    const path = compactPath(getEdgePath(edge));
-    if (edge.id && path.length >= 2) edgePaths.set(edge.id, path);
-  }
-  if (edgePaths.size === 0) return edges;
-
-  const obstaclesByNode = getRoutingObstacles(nodes);
-  const ignoredRectsByEdge = new Map<string, Rect[]>();
-  for (const edge of edges) {
-    const ignored = [obstaclesByNode.get(edge.source), obstaclesByNode.get(edge.target)]
-      .filter((rect): rect is Rect => !!rect);
-    if (ignored.length > 0) ignoredRectsByEdge.set(edge.id, ignored);
-  }
-
-  const repaired = repairHardObstacleViolations(edgePaths, {
-    spacing: 12,
-    maxIterationsPerEdge: 6,
-    buddyGroups: buildPipelineBuddyGroups(edges),
-    obstacles: Array.from(obstaclesByNode.values()),
-    ignoredRectsByEdge,
-    minClearance,
-  });
-
-  return edges.map(edge => {
-    const path = repaired.get(edge.id);
-    const original = edgePaths.get(edge.id);
-    if (!path || !original || pathEquals(path, original)) return edge;
-    return withComputedPath(edge, path, {
-      hardObstacleRepaired: true,
-      obstacleClearanceOptimized: minClearance > 0,
-      sharedTrunkAware: true,
-    });
-  });
-}
-
-function toSegments(points: Point[]): Segment[] {
-  const segments: Segment[] = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    const a = points[i];
-    const b = points[i + 1];
-    if (Math.abs(a.x - b.x) > 0.5 || Math.abs(a.y - b.y) > 0.5) {
-      segments.push({ a, b });
-    }
-  }
-  return segments;
-}
-
-function pointNear(p: Point, q: Point, tolerance = 2): boolean {
-  return Math.abs(p.x - q.x) <= tolerance && Math.abs(p.y - q.y) <= tolerance;
-}
-
-function rangeOverlap(a1: number, a2: number, b1: number, b2: number): number {
-  const minA = Math.min(a1, a2);
-  const maxA = Math.max(a1, a2);
-  const minB = Math.min(b1, b2);
-  const maxB = Math.max(b1, b2);
-  return Math.max(0, Math.min(maxA, maxB) - Math.max(minA, minB));
-}
-
-function segmentRelation(s1: Segment, s2: Segment): { crossings: number; overlap: number } {
-  const s1H = Math.abs(s1.a.y - s1.b.y) < 0.5;
-  const s1V = Math.abs(s1.a.x - s1.b.x) < 0.5;
-  const s2H = Math.abs(s2.a.y - s2.b.y) < 0.5;
-  const s2V = Math.abs(s2.a.x - s2.b.x) < 0.5;
-
-  if (s1H && s2V) {
-    const x = s2.a.x;
-    const y = s1.a.y;
-    const crosses =
-      x > Math.min(s1.a.x, s1.b.x) + 1 &&
-      x < Math.max(s1.a.x, s1.b.x) - 1 &&
-      y > Math.min(s2.a.y, s2.b.y) + 1 &&
-      y < Math.max(s2.a.y, s2.b.y) - 1;
-    if (!crosses) return { crossings: 0, overlap: 0 };
-    const p = { x, y };
-    const endpointTouch = [s1.a, s1.b].some(a => pointNear(a, p)) || [s2.a, s2.b].some(a => pointNear(a, p));
-    return { crossings: endpointTouch ? 0 : 1, overlap: 0 };
-  }
-
-  if (s1V && s2H) return segmentRelation(s2, s1);
-
-  if (s1H && s2H && Math.abs(s1.a.y - s2.a.y) < 2) {
-    return { crossings: 0, overlap: rangeOverlap(s1.a.x, s1.b.x, s2.a.x, s2.b.x) };
-  }
-
-  if (s1V && s2V && Math.abs(s1.a.x - s2.a.x) < 2) {
-    return { crossings: 0, overlap: rangeOverlap(s1.a.y, s1.b.y, s2.a.y, s2.b.y) };
-  }
-
-  return { crossings: 0, overlap: 0 };
-}
-
-function segmentIntersectsRect(seg: Segment, rect: Rect, padding = 10): boolean {
-  const x1 = rect.x - padding;
-  const y1 = rect.y - padding;
-  const x2 = rect.x + rect.width + padding;
-  const y2 = rect.y + rect.height + padding;
-  if (Math.abs(seg.a.y - seg.b.y) < 0.5) {
-    const y = seg.a.y;
-    if (y < y1 || y > y2) return false;
-    return Math.max(Math.min(seg.a.x, seg.b.x), x1) < Math.min(Math.max(seg.a.x, seg.b.x), x2);
-  }
-  if (Math.abs(seg.a.x - seg.b.x) < 0.5) {
-    const x = seg.a.x;
-    if (x < x1 || x > x2) return false;
-    return Math.max(Math.min(seg.a.y, seg.b.y), y1) < Math.min(Math.max(seg.a.y, seg.b.y), y2);
-  }
-  return false;
-}
-
-function getRoutingObstacles(nodes: ReactFlowNode[]): Map<string, Rect> {
-  const result = new Map<string, Rect>();
-  const ignoredTypes = new Set(['titleGroup', 'subGroup', 'group', 'domain']);
-  for (const node of nodes) {
-    if (ignoredTypes.has(String(node.type || ''))) continue;
-    const pos = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-    const width = num((node as any).measured?.width ?? node.width ?? (node.style as any)?.width, 100);
-    const height = num((node as any).measured?.height ?? node.height ?? (node.style as any)?.height, 60);
-    result.set(node.id, { x: pos.x, y: pos.y, width, height });
-  }
-  return result;
-}
-
-function getNodeRect(node: ReactFlowNode): Rect | null {
-  const pos = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-  const width = num((node as any).measured?.width ?? node.width ?? (node.style as any)?.width, 0);
-  const height = num((node as any).measured?.height ?? node.height ?? (node.style as any)?.height, 0);
-  if (width <= 1 || height <= 1) return null;
-  return { x: num((pos as any).x, 0), y: num((pos as any).y, 0), width, height };
-}
-
-function isContainerNode(node: ReactFlowNode): boolean {
-  return new Set(['titleGroup', 'subGroup', 'group', 'domain', 'subDomain', 'swimlane'])
-    .has(String(node.type ?? ''));
-}
-
-function rectCenter(rect: Rect): Point {
-  return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-}
-
-function pointInRect(point: Point, rect: Rect, padding = 0): boolean {
-  return point.x >= rect.x - padding
-    && point.x <= rect.x + rect.width + padding
-    && point.y >= rect.y - padding
-    && point.y <= rect.y + rect.height + padding;
-}
-
-function segmentLength(segment: Segment): number {
-  return Math.abs(segment.a.x - segment.b.x) + Math.abs(segment.a.y - segment.b.y);
-}
-
-function distancePointToSegment(point: Point, segment: Segment): number {
-  const dx = segment.b.x - segment.a.x;
-  const dy = segment.b.y - segment.a.y;
-  const lenSq = dx * dx + dy * dy;
-  const t = lenSq === 0
-    ? 0
-    : Math.max(0, Math.min(1, ((point.x - segment.a.x) * dx + (point.y - segment.a.y) * dy) / lenSq));
-  const x = segment.a.x + dx * t;
-  const y = segment.a.y + dy * t;
-  return Math.hypot(point.x - x, point.y - y);
-}
-
-function segmentToRectDistance(segment: Segment, rect: Rect): number {
-  if (segmentIntersectsRect(segment, rect, 0)) return 0;
-  const corners = [
-    { x: rect.x, y: rect.y },
-    { x: rect.x + rect.width, y: rect.y },
-    { x: rect.x + rect.width, y: rect.y + rect.height },
-    { x: rect.x, y: rect.y + rect.height },
-  ];
-  let min = Infinity;
-  for (const corner of corners) {
-    min = Math.min(min, distancePointToSegment(corner, segment));
-  }
-
-  const isVertical = Math.abs(segment.a.x - segment.b.x) < 0.5;
-  const isHorizontal = Math.abs(segment.a.y - segment.b.y) < 0.5;
-  if (isVertical && segment.a.x >= rect.x && segment.a.x <= rect.x + rect.width) {
-    if (Math.max(segment.a.y, segment.b.y) < rect.y) {
-      min = Math.min(min, rect.y - Math.max(segment.a.y, segment.b.y));
-    } else if (Math.min(segment.a.y, segment.b.y) > rect.y + rect.height) {
-      min = Math.min(min, Math.min(segment.a.y, segment.b.y) - (rect.y + rect.height));
-    }
-  }
-  if (isHorizontal && segment.a.y >= rect.y && segment.a.y <= rect.y + rect.height) {
-    if (Math.max(segment.a.x, segment.b.x) < rect.x) {
-      min = Math.min(min, rect.x - Math.max(segment.a.x, segment.b.x));
-    } else if (Math.min(segment.a.x, segment.b.x) > rect.x + rect.width) {
-      min = Math.min(min, Math.min(segment.a.x, segment.b.x) - (rect.x + rect.width));
-    }
-  }
-  return min;
-}
-
-function segmentInsideRectLength(segment: Segment, rect: Rect): number {
-  const mid = {
-    x: (segment.a.x + segment.b.x) / 2,
-    y: (segment.a.y + segment.b.y) / 2,
-  };
-  return pointInRect(mid, rect) ? segmentLength(segment) : 0;
-}
-
-function scoreContainerBoundaryHug(segment: Segment, rect: Rect): number {
-  const len = segmentLength(segment);
-  if (len < 40) return 0;
-
-  const isVertical = Math.abs(segment.a.x - segment.b.x) < 0.5;
-  const isHorizontal = Math.abs(segment.a.y - segment.b.y) < 0.5;
-  if (isVertical) {
-    const x = segment.a.x;
-    const overlap = rangeOverlap(segment.a.y, segment.b.y, rect.y, rect.y + rect.height);
-    const distance = Math.min(Math.abs(x - rect.x), Math.abs(x - (rect.x + rect.width)));
-    return overlap > 40 && distance < 8 ? (8 - distance) * overlap * 4 : 0;
-  }
-  if (isHorizontal) {
-    const y = segment.a.y;
-    const overlap = rangeOverlap(segment.a.x, segment.b.x, rect.x, rect.x + rect.width);
-    const distance = Math.min(Math.abs(y - rect.y), Math.abs(y - (rect.y + rect.height)));
-    return overlap > 40 && distance < 8 ? (8 - distance) * overlap * 4 : 0;
-  }
-  return 0;
-}
-
-function buildNodeVisualContext(nodes: ReactFlowNode[]): {
-  business: Array<{ id: string; rect: Rect }>;
-  containers: Array<{ id: string; rect: Rect }>;
-} {
-  const business: Array<{ id: string; rect: Rect }> = [];
-  const containers: Array<{ id: string; rect: Rect }> = [];
-  for (const node of nodes) {
-    const rect = getNodeRect(node);
-    if (!rect) continue;
-    if (isContainerNode(node)) {
-      containers.push({ id: node.id, rect });
-    } else {
-      business.push({ id: node.id, rect });
-    }
-  }
-  return { business, containers };
-}
-
-function scoreVisualSoftConstraints(
-  path: Point[],
-  edge: Edge,
-  nodes: ReactFlowNode[],
-  baseLength: number
-): number {
-  const { business, containers } = buildNodeVisualContext(nodes);
-  const segments = toSegments(path);
-  const sourceRect = business.find(node => node.id === edge.source)?.rect;
-  const targetRect = business.find(node => node.id === edge.target)?.rect;
-  const relatedContainerIds = new Set<string>();
-  for (const container of containers) {
-    if ((sourceRect && pointInRect(rectCenter(sourceRect), container.rect))
-      || (targetRect && pointInRect(rectCenter(targetRect), container.rect))) {
-      relatedContainerIds.add(container.id);
-    }
-  }
-
-  let score = 0;
-  for (const segment of segments) {
-    for (const node of business) {
-      if (node.id === edge.source || node.id === edge.target) continue;
-      const distance = segmentToRectDistance(segment, node.rect);
-      if (distance < 12) {
-        score += (12 - distance) * 120;
-      } else if (distance < 28) {
-        score += (28 - distance) * 18;
-      }
-    }
-
-    for (const container of containers) {
-      score += scoreContainerBoundaryHug(segment, container.rect);
-      if (relatedContainerIds.has(container.id)) continue;
-      const insideLength = segmentInsideRectLength(segment, container.rect);
-      if (insideLength > 80) {
-        score += (insideLength - 80) * 18;
-      }
-    }
-  }
-
-  const length = pathLength(path);
-  const manhattan = Math.max(1, Math.abs(path[0].x - path[path.length - 1].x)
-    + Math.abs(path[0].y - path[path.length - 1].y));
-  const ratio = length / manhattan;
-  if (ratio > 2.5) score += (ratio - 2.5) * 1600;
-  else if (ratio > 1.8) score += (ratio - 1.8) * 450;
-
-  const bends = Math.max(0, path.length - 2);
-  if (bends > 6) score += (bends - 6) * 300;
-  score += Math.max(0, length - baseLength) * 0.04;
-  return score;
-}
-
-function pathLength(points: Point[]): number {
-  let total = 0;
-  for (let i = 0; i < points.length - 1; i++) {
-    total += Math.abs(points[i + 1].x - points[i].x) + Math.abs(points[i + 1].y - points[i].y);
-  }
-  return total;
-}
-
-function scorePathCandidate(
-  path: Point[],
-  acceptedPaths: Point[][],
-  originalPaths: Point[][],
-  edge: Edge,
-  nodes: ReactFlowNode[],
-  obstacles: Map<string, Rect>,
-  baseLength: number
-): number {
-  const segments = toSegments(path);
-  let crossingsAccepted = 0;
-  let crossingsAll = 0;
-  let overlap = 0;
-  for (const otherPath of acceptedPaths) {
-    for (const s1 of segments) {
-      for (const s2 of toSegments(otherPath)) {
-        const rel = segmentRelation(s1, s2);
-        crossingsAccepted += rel.crossings;
-        overlap += rel.overlap;
-      }
-    }
-  }
-  for (const otherPath of originalPaths) {
-    for (const s1 of segments) {
-      for (const s2 of toSegments(otherPath)) {
-        const rel = segmentRelation(s1, s2);
-        crossingsAll += rel.crossings;
-        overlap += rel.overlap * 0.25;
-      }
-    }
-  }
-
-  const obstacleHits = countUnrelatedObstacleHits(path, edge, obstacles);
-
-  const length = pathLength(path);
-  const bends = Math.max(0, path.length - 2);
-  const detour = Math.max(0, length - baseLength);
-  return obstacleHits * 120000
-    + crossingsAccepted * 2600
-    + crossingsAll * 360
-    + overlap * 12
-    + scoreVisualSoftConstraints(path, edge, nodes, baseLength)
-    + bends * 10
-    + length * 0.015
-    + detour * 0.08;
-}
-
-export function reduceEdgeCrossingsWithWaypoints(
-  edges: Edge[],
-  nodes: ReactFlowNode[],
-  layoutDirection: string,
-  options: { onlyNodeRiskEdges?: boolean } = {},
-): Edge[] {
-  if (edges.length < 1) return edges;
-  const obstacles = getRoutingObstacles(nodes);
-  const originalPathsById = new Map<string, Point[]>();
-  for (const edge of edges) {
-    const path = compactPath(getEdgePath(edge));
-    if (path.length >= 2) originalPathsById.set(edge.id, path);
-  }
-  if (originalPathsById.size < 1) return edges;
-  const buddyGroups = buildPipelineBuddyGroups(edges);
-  const topologyStats = buildEdgeTopologyStats(edges);
-
-  const edgeOrder = edges
-    .map((edge, index) => ({ edge, index, path: originalPathsById.get(edge.id) }))
-    .filter((entry): entry is { edge: Edge; index: number; path: Point[] } => !!entry.path)
-    .sort((a, b) => {
-      const topologyDelta = edgeTopologyPriority(a.edge, topologyStats) - edgeTopologyPriority(b.edge, topologyStats);
-      if (topologyDelta !== 0) return topologyDelta;
-      if (edgeTopologyPriority(a.edge, topologyStats) === 0) return pathLength(b.path) - pathLength(a.path);
-      return pathLength(a.path) - pathLength(b.path);
-    });
-
-  const acceptedPaths: Point[][] = [];
-  const chosenPaths = new Map<string, Point[]>();
-
-  for (const { edge, path } of edgeOrder) {
-    if (options.onlyNodeRiskEdges && !pathHasNodeRoutingRisk(path, nodes, edge)) {
-      chosenPaths.set(edge.id, path);
-      acceptedPaths.push(path);
-      continue;
-    }
-
-    const others = Array.from(originalPathsById.entries())
-      .filter(([id]) => id !== edge.id)
-      .map(([, p]) => p);
-    const baseLength = pathLength(path);
-    const candidates = generateWaypointCandidates(path, layoutDirection, nodes, edge);
-    let bestPath = path;
-    let bestScore = scorePathCandidate(path, acceptedPaths, others, edge, nodes, obstacles, baseLength);
-    let bestObstacleHits = countUnrelatedObstacleHits(path, edge, obstacles);
-    for (const candidate of candidates.slice(1)) {
-      if (!preservesSharedTrunk(candidate, path, edge, buddyGroups, obstacles)) continue;
-      const candidateObstacleHits = countUnrelatedObstacleHits(candidate, edge, obstacles);
-      if (candidateObstacleHits > bestObstacleHits) continue;
-      const score = scorePathCandidate(candidate, acceptedPaths, others, edge, nodes, obstacles, baseLength);
-      if (score < bestScore - 5) {
-        bestScore = score;
-        bestPath = candidate;
-        bestObstacleHits = candidateObstacleHits;
-      }
-    }
-    chosenPaths.set(edge.id, bestPath);
-    acceptedPaths.push(bestPath);
-  }
-
-  const reduced = edges.map(edge => {
-    const path = chosenPaths.get(edge.id);
-    if (!path) return edge;
-    const original = originalPathsById.get(edge.id);
-    const changed = !original || path.length !== original.length ||
-      path.some((p, i) => Math.abs(p.x - original[i]?.x) > 0.5 || Math.abs(p.y - original[i]?.y) > 0.5);
-    if (!changed) return edge;
-    return withComputedPath(edge, path, { crossingOptimized: true });
-  });
-  let repaired = repairSameNodeInOutCrossings(reduced, nodes);
-  repaired = sanitizeComputedPaths(repaired);
-  repaired = repairSharedTrunkAwareObstacles(repaired, nodes, 18);
-  repaired = repairSharedTrunkAwareCrossings(repaired, nodes);
-  repaired = sanitizeComputedPaths(repaired);
-  return repaired;
-}
-
-/**
- * 处理单条边的路由
- */
+import {
+  chooseFewestStrictCrossings,
+  keepIfNoNewStrictCrossings,
+} from './edgeStrictCrossingGuard';
+
+export {
+  computeAbsolutePosition,
+  reduceEdgeCrossingsWithWaypoints,
+  repairSharedTrunkAwareCrossings,
+  setAbsolutePositions,
+};
+
+/** 处理单条边的路由。 */
 function processEdge(
   edge: any,
   existingPaths: Array<{ points: Array<{ x: number; y: number }> }>,
@@ -774,23 +78,23 @@ function processEdge(
     ...(edge.data || {}),
     intraContainerNoObstacle: true,
     obstacleScope: 'corridor',
-    obstaclePadding: 24, // [FIX] Increased from 16 for better visual clearance from adjacent nodes/groups
+    obstaclePadding: 24,
     pathOptions: {
       ...(edge.data?.pathOptions || {}),
       gridRatio: 1.04,
-      borderRadius: 4, // [FIX] Hyper-Glass V3: unified to 4px sharp orthogonal corners
+      borderRadius: 4,
     },
   };
 
-  const srcNode = nodeMap.get(edge.source);
-  const tgtNode = nodeMap.get(edge.target);
+  const sourceNode = nodeMap.get(edge.source);
+  const targetNode = nodeMap.get(edge.target);
 
   let finalType = baseType;
   let finalSourceHandle = edge.sourceHandle;
   let finalTargetHandle = edge.targetHandle;
   let computedPath: Array<{ x: number; y: number }> = [];
 
-  if (srcNode && tgtNode) {
+  if (sourceNode && targetNode) {
     const routingConfig = {
       mode: 'advanced-smart' as const,
       globalPath: (cfgEdge.pathType || 'step') as string,
@@ -802,44 +106,68 @@ function processEdge(
       preAssignedPorts: globalPorts,
     };
 
-    const choice = decideEdgeRouting(srcNode, tgtNode, nodes, routingConfig);
+    const choice = decideEdgeRouting(sourceNode, targetNode, nodes, routingConfig);
     finalType = choice.type;
     finalSourceHandle = choice.sourceHandle;
     finalTargetHandle = choice.targetHandle;
     computedPath = choice.computedPath || [];
 
     if (computedPath.length < 2) {
-      const sPos = (srcNode as any).positionAbsolute ?? (srcNode as any).position ?? { x: 0, y: 0 };
-      const tPos = (tgtNode as any).positionAbsolute ?? (tgtNode as any).position ?? { x: 0, y: 0 };
-      const sW = (srcNode as any)?.measured?.width ?? 100;
-      const sH = (srcNode as any)?.measured?.height ?? 50;
-      const tW = (tgtNode as any)?.measured?.width ?? 100;
-      const tH = (tgtNode as any)?.measured?.height ?? 50;
+      const sourcePosition = (sourceNode as any).positionAbsolute
+        ?? (sourceNode as any).position
+        ?? { x: 0, y: 0 };
+      const targetPosition = (targetNode as any).positionAbsolute
+        ?? (targetNode as any).position
+        ?? { x: 0, y: 0 };
+      const sourceWidth = (sourceNode as any)?.measured?.width ?? 100;
+      const sourceHeight = (sourceNode as any)?.measured?.height ?? 50;
+      const targetWidth = (targetNode as any)?.measured?.width ?? 100;
+      const targetHeight = (targetNode as any)?.measured?.height ?? 50;
 
       if (!finalSourceHandle) {
-        const dx = tPos.x - sPos.x;
-        const dy = tPos.y - sPos.y;
-        finalSourceHandle = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'bottom' : 'top');
+        const dx = targetPosition.x - sourcePosition.x;
+        const dy = targetPosition.y - sourcePosition.y;
+        finalSourceHandle = Math.abs(dx) > Math.abs(dy)
+          ? (dx > 0 ? 'right' : 'left')
+          : (dy > 0 ? 'bottom' : 'top');
       }
       if (!finalTargetHandle) {
-        const dx = sPos.x - tPos.x;
-        const dy = sPos.y - tPos.y;
-        finalTargetHandle = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'bottom' : 'top');
+        const dx = sourcePosition.x - targetPosition.x;
+        const dy = sourcePosition.y - targetPosition.y;
+        finalTargetHandle = Math.abs(dx) > Math.abs(dy)
+          ? (dx > 0 ? 'right' : 'left')
+          : (dy > 0 ? 'bottom' : 'top');
       }
 
       computedPath = [
-        handleToAnchor(sPos, sW, sH, finalSourceHandle, srcNode.type),
-        handleToAnchor(tPos, tW, tH, finalTargetHandle, tgtNode.type),
+        handleToAnchor(
+          sourcePosition,
+          sourceWidth,
+          sourceHeight,
+          finalSourceHandle,
+          sourceNode.type,
+        ),
+        handleToAnchor(
+          targetPosition,
+          targetWidth,
+          targetHeight,
+          finalTargetHandle,
+          targetNode.type,
+        ),
       ];
     }
   }
 
-    return {
+  return {
     edge: {
       ...edge,
       type: finalType,
-      sourceHandle: finalSourceHandle ? expandHandle(String(finalSourceHandle)) : finalSourceHandle,
-      targetHandle: finalTargetHandle ? expandHandle(String(finalTargetHandle)) : finalTargetHandle,
+      sourceHandle: finalSourceHandle
+        ? expandHandle(String(finalSourceHandle))
+        : finalSourceHandle,
+      targetHandle: finalTargetHandle
+        ? expandHandle(String(finalTargetHandle))
+        : finalTargetHandle,
       data: { ...newData, computedPath },
     },
     computedPath,
@@ -852,17 +180,14 @@ export interface EdgeRoutingOptions {
 }
 
 /**
- * 执行完整的边路由管线
+ * 执行完整的边路由管线。
  *
- * 包含以下阶段：
  * 1. 设置 positionAbsolute
  * 2. 全局端口分配
  * 3. 边排序（短边先处理）
  * 4. 两轮路由优化
- * 5. P2-P8 后处理管线
+ * 5. P2-P10 后处理管线
  * 6. ELK 边路由集成（可选）
- *
- * @returns 路由后的边数组
  */
 export async function runEdgeRoutingPipeline(
   nodes: ReactFlowNode[],
@@ -871,46 +196,63 @@ export async function runEdgeRoutingPipeline(
 ): Promise<Edge[]> {
   const { layoutDirection } = options;
   const cfgEdge = (diagramConfigManager.getConfig() as any)?.edge || {};
-  const nodeMap = new Map<string, ReactFlowNode>(nodes.map(n => [n.id, n] as const));
+  const nodeMap = new Map<string, ReactFlowNode>(nodes.map(node => [node.id, node] as const));
 
-  // 1. 设置 positionAbsolute
   setAbsolutePositions(nodes);
 
-  // 2. 全局端口分配
   const routedPaths: Array<{ points: Array<{ x: number; y: number }> }> = [];
   const globalPorts = assignGlobalPorts(nodes, edges, { ...cfgEdge, layoutDirection });
   const topologyStats = buildEdgeTopologyStats(edges);
 
-  // 3. 边排序：桥接边先占位，其余短边先处理、长边后处理
   const edgesWithDistance = edges.map((edge, originalIndex) => {
-    const srcNode = nodeMap.get(edge.source);
-    const tgtNode = nodeMap.get(edge.target);
+    const sourceNode = nodeMap.get(edge.source);
+    const targetNode = nodeMap.get(edge.target);
     let distance = 0;
-    if (srcNode && tgtNode) {
-      const srcPos = (srcNode as any).positionAbsolute ?? (srcNode as any).position ?? { x: 0, y: 0 };
-      const tgtPos = (tgtNode as any).positionAbsolute ?? (tgtNode as any).position ?? { x: 0, y: 0 };
-      const sW = (srcNode as any)?.measured?.width ?? 100;
-      const sH = (srcNode as any)?.measured?.height ?? 50;
-      const tW = (tgtNode as any)?.measured?.width ?? 100;
-      const tH = (tgtNode as any)?.measured?.height ?? 50;
-      const srcCx = srcPos.x + sW / 2;
-      const srcCy = srcPos.y + sH / 2;
-      const tgtCx = tgtPos.x + tW / 2;
-      const tgtCy = tgtPos.y + tH / 2;
-      distance = Math.sqrt((tgtCx - srcCx) ** 2 + (tgtCy - srcCy) ** 2);
+    if (sourceNode && targetNode) {
+      const sourcePosition = (sourceNode as any).positionAbsolute
+        ?? (sourceNode as any).position
+        ?? { x: 0, y: 0 };
+      const targetPosition = (targetNode as any).positionAbsolute
+        ?? (targetNode as any).position
+        ?? { x: 0, y: 0 };
+      const sourceWidth = (sourceNode as any)?.measured?.width ?? 100;
+      const sourceHeight = (sourceNode as any)?.measured?.height ?? 50;
+      const targetWidth = (targetNode as any)?.measured?.width ?? 100;
+      const targetHeight = (targetNode as any)?.measured?.height ?? 50;
+      const sourceCenterX = sourcePosition.x + sourceWidth / 2;
+      const sourceCenterY = sourcePosition.y + sourceHeight / 2;
+      const targetCenterX = targetPosition.x + targetWidth / 2;
+      const targetCenterY = targetPosition.y + targetHeight / 2;
+      distance = Math.sqrt(
+        (targetCenterX - sourceCenterX) ** 2 + (targetCenterY - sourceCenterY) ** 2,
+      );
     }
-    return { edge, originalIndex, distance, topologyPriority: edgeTopologyPriority(edge, topologyStats) };
+    return {
+      edge,
+      originalIndex,
+      distance,
+      topologyPriority: edgeTopologyPriority(edge, topologyStats),
+    };
   });
 
-  edgesWithDistance.sort((a, b) => {
-    if (a.topologyPriority !== b.topologyPriority) return a.topologyPriority - b.topologyPriority;
-    return a.distance - b.distance;
+  edgesWithDistance.sort((first, second) => {
+    if (first.topologyPriority !== second.topologyPriority) {
+      return first.topologyPriority - second.topologyPriority;
+    }
+    return first.distance - second.distance;
   });
 
-  // 4. 第一轮路由
   const sortedResults: Array<{ result: any; originalIndex: number }> = [];
   for (const item of edgesWithDistance) {
-    const result = processEdge(item.edge, routedPaths, nodeMap, nodes, cfgEdge, layoutDirection, globalPorts);
+    const result = processEdge(
+      item.edge,
+      routedPaths,
+      nodeMap,
+      nodes,
+      cfgEdge,
+      layoutDirection,
+      globalPorts,
+    );
     routedPaths.push({ points: result.computedPath });
     sortedResults.push({ result, originalIndex: item.originalIndex });
   }
@@ -920,41 +262,50 @@ export async function runEdgeRoutingPipeline(
     firstPassResults[item.originalIndex] = item.result;
   }
 
-  // 5. 第二轮：重新优化长边（前5条最长的边）
   const longEdgeIndices = [...edgesWithDistance]
-    .sort((a, b) => a.distance - b.distance)
+    .sort((first, second) => first.distance - second.distance)
     .slice(-Math.min(5, Math.ceil(edges.length / 4)))
     .map(item => item.originalIndex);
 
-  for (const idx of longEdgeIndices) {
-    const otherPaths = routedPaths.filter((_, i) => i !== idx);
-    const result = processEdge(edges[idx], otherPaths, nodeMap, nodes, cfgEdge, layoutDirection, globalPorts);
-    firstPassResults[idx] = result;
-    const sortedIdx = edgesWithDistance.findIndex(item => item.originalIndex === idx);
-    if (sortedIdx >= 0) {
-      routedPaths[sortedIdx] = { points: result.computedPath };
+  for (const index of longEdgeIndices) {
+    const otherPaths = routedPaths.filter((_, pathIndex) => pathIndex !== index);
+    const result = processEdge(
+      edges[index],
+      otherPaths,
+      nodeMap,
+      nodes,
+      cfgEdge,
+      layoutDirection,
+      globalPorts,
+    );
+    firstPassResults[index] = result;
+    const sortedIndex = edgesWithDistance.findIndex(item => item.originalIndex === index);
+    if (sortedIndex >= 0) {
+      routedPaths[sortedIndex] = { points: result.computedPath };
     }
   }
 
-  let finalEdges = firstPassResults.map((r: any) => r.edge);
+  let finalEdges = firstPassResults.map((result: any) => result.edge);
 
-  // P2: 全局路由优化（可选）
   const enableGlobalOptimization = cfgEdge?.globalOptimization ?? false;
   if (enableGlobalOptimization && finalEdges.length > 1) {
     finalEdges = globalOptimizeEdgeRouting(
-      finalEdges, nodes,
-      { mode: 'advanced-smart', layoutDirection, directionalHandlePolicy: 'force', topK: 4, preAssignedPorts: globalPorts },
+      finalEdges,
+      nodes,
+      {
+        mode: 'advanced-smart',
+        layoutDirection,
+        directionalHandlePolicy: 'force',
+        topK: 4,
+        preAssignedPorts: globalPorts,
+      },
       3,
     );
   }
 
-  // P3: 并行边分离
   finalEdges = separateParallelEdges(finalEdges, 12);
-
-  // P4: 动态多端口分布
   finalEdges = distributePortConnections(finalEdges, nodes, 16);
 
-  // P5: 高级边捆绑
   const bundlingEnabled = cfgEdge?.bundling ?? true;
   finalEdges = bundleEdges(finalEdges, nodes, {
     enabled: bundlingEnabled,
@@ -964,27 +315,21 @@ export async function runEdgeRoutingPipeline(
     bundleSpacing: 8,
   });
 
-  // P6: 分层边路由（长边控制点）
   finalEdges = layerBasedEdgeRouting(finalEdges, nodes, {
     enabled: true,
     layerThreshold: 400,
     layoutDirection,
   });
-
-  // P7: 正交边美化
   finalEdges = beautifyOrthogonalEdges(finalEdges, nodes, {
     enabled: true,
     minSegmentLength: 20,
   });
-
-  // P8: 树状总线路由
   finalEdges = optimizeTreeBusRouting(finalEdges, nodes, {
     enabled: true,
     minBusSize: 2,
     layoutDirection,
   });
 
-  // P8.5: 总线后处理。P8 会重写 treeRouting.points，这里同步修正正交/交叉，保护共享主干。
   finalEdges = sanitizeComputedPaths(finalEdges);
   finalEdges = repairSharedTrunkAwareObstacles(finalEdges, nodes);
   finalEdges = sanitizeComputedPaths(finalEdges);
@@ -997,7 +342,6 @@ export async function runEdgeRoutingPipeline(
   finalEdges = repairSharedTrunkAwareObstacles(finalEdges, nodes, 18);
   finalEdges = sanitizeComputedPaths(finalEdges);
 
-  // P8.6: 视觉软约束优化。只在硬避障/交叉已满足后，降低贴边、近距、绕远和无关容器穿行。
   finalEdges = reduceEdgeCrossingsWithWaypoints(finalEdges, nodes, layoutDirection);
   finalEdges = sanitizeComputedPaths(finalEdges);
   finalEdges = repairSharedTrunkAwareObstacles(finalEdges, nodes, 18);
@@ -1008,16 +352,12 @@ export async function runEdgeRoutingPipeline(
   finalEdges = repairSharedTrunkAwareObstacles(finalEdges, nodes, 18);
   finalEdges = sanitizeComputedPaths(finalEdges);
 
-  // P9: 边标签智能避让
   finalEdges = optimizeEdgeLabelPositions(finalEdges, nodes, {
     enabled: true,
     labelPadding: 8,
   });
 
-  // P10: ELK 边路由（可选）
-  const globalElkEnabled = cfgEdge?.useElkRouting ?? false;
-  const useElkRouting = globalElkEnabled;
-
+  const useElkRouting = cfgEdge?.useElkRouting ?? false;
   if (useElkRouting && finalEdges.length > 0) {
     try {
       const elkPaths = await routeEdgesWithELK(nodes, finalEdges, {
@@ -1038,30 +378,35 @@ export async function runEdgeRoutingPipeline(
           return edge;
         });
       }
-    } catch (err) {
-      logElkEdgeRouterFallback(err);
+    } catch (error) {
+      logElkEdgeRouterFallback(error);
     }
   }
 
-  // ⭐️ [FIX] Ensure all handles are expanded to full format ('top', 'bottom', 'left', 'right')
-  // to avoid matching failures in React Flow / FlowchartNode!
   finalEdges = finalEdges.map(edge => ({
     ...edge,
-    sourceHandle: edge.sourceHandle ? expandHandle(String(edge.sourceHandle)) : edge.sourceHandle,
-    targetHandle: edge.targetHandle ? expandHandle(String(edge.targetHandle)) : edge.targetHandle,
+    sourceHandle: edge.sourceHandle
+      ? expandHandle(String(edge.sourceHandle))
+      : edge.sourceHandle,
+    targetHandle: edge.targetHandle
+      ? expandHandle(String(edge.targetHandle))
+      : edge.targetHandle,
   }));
 
   finalEdges = separateDetachedParallelOverlaps(
     repairLocalDoglegArtifacts(
-      synthesizeSharedEndpointTrunks(repairEndpointOrthogonalPaths(repairEndpointOrthogonalPaths(finalEdges, nodes), nodes)),
+      synthesizeSharedEndpointTrunks(
+        repairEndpointOrthogonalPaths(repairEndpointOrthogonalPaths(finalEdges, nodes), nodes),
+        { nodes },
+      ),
       nodes,
     ),
     nodes,
     24,
   );
-  finalEdges = synthesizeSharedEndpointTrunks(finalEdges);
+  finalEdges = synthesizeSharedEndpointTrunks(finalEdges, { nodes });
   finalEdges = repairEndpointOrthogonalPaths(repairEndpointOrthogonalPaths(finalEdges, nodes), nodes);
-  finalEdges = synthesizeSharedTargetTrunks(finalEdges);
+  finalEdges = synthesizeSharedTargetTrunks(finalEdges, { nodes });
   finalEdges = repairEndpointOrthogonalPaths(repairEndpointOrthogonalPaths(finalEdges, nodes), nodes);
   finalEdges = repairSameNodeInOutCrossings(finalEdges, nodes);
   finalEdges = repairEndpointOrthogonalPaths(finalEdges, nodes);
@@ -1080,6 +425,119 @@ export async function runEdgeRoutingPipeline(
   finalEdges = repairLocalDoglegArtifacts(finalEdges, nodes);
   finalEdges = refineGlobalEdgeWaypoints(finalEdges, nodes);
   finalEdges = repairLocalDoglegArtifacts(finalEdges, nodes);
+  finalEdges = synthesizeSharedTargetTrunks(finalEdges, { nodes });
+  finalEdges = repairEndpointOrthogonalPaths(finalEdges, nodes);
+  finalEdges = repairSharedTargetEntryCrossings(finalEdges);
+  finalEdges = separateDetachedParallelOverlaps(finalEdges, nodes, 16);
+  finalEdges = repairEndpointOrthogonalPaths(finalEdges, nodes);
+  finalEdges = repairLocalDoglegArtifacts(finalEdges, nodes);
+  finalEdges = repairSharedTargetEntryCrossings(finalEdges);
+  finalEdges = separateDetachedParallelOverlaps(finalEdges, nodes, 16);
+  finalEdges = repairEndpointOrthogonalPaths(finalEdges, nodes);
+  finalEdges = refineGlobalEdgeWaypoints(finalEdges, nodes);
+  finalEdges = repairEndpointOrthogonalPaths(finalEdges, nodes);
+  finalEdges = repairSharedTargetEntryCrossings(finalEdges);
+
+  const finalGlobalCrossingCandidate = repairEndpointOrthogonalPaths(
+    refineGlobalEdgeWaypoints(finalEdges, nodes),
+    nodes,
+  );
+  const finalSharedCrossingCandidate = repairEndpointOrthogonalPaths(
+    repairSharedTrunkAwareCrossings(finalGlobalCrossingCandidate, nodes),
+    nodes,
+  );
+  const finalEndpointLaneCandidate = keepIfNoNewStrictCrossings(
+    finalSharedCrossingCandidate,
+    repairEndpointOrthogonalPaths(
+      repairEndpointLaneCrossings(finalSharedCrossingCandidate, nodes),
+      nodes,
+    ),
+  );
+  const finalPostSharedGlobalCandidate = keepIfNoNewStrictCrossings(
+    finalEndpointLaneCandidate,
+    repairEndpointOrthogonalPaths(
+      refineGlobalEdgeWaypoints(finalEndpointLaneCandidate, nodes),
+      nodes,
+    ),
+  );
+  const finalPostGlobalEndpointLaneCandidate = keepIfNoNewStrictCrossings(
+    finalPostSharedGlobalCandidate,
+    repairEndpointOrthogonalPaths(
+      repairEndpointLaneCrossings(finalPostSharedGlobalCandidate, nodes),
+      nodes,
+    ),
+  );
+  const finalPreOverlapRepairCandidate = keepIfNoNewStrictCrossings(
+    finalPostGlobalEndpointLaneCandidate,
+    repairEndpointOrthogonalPaths(finalPostGlobalEndpointLaneCandidate, nodes),
+  );
+  const finalDetachedOverlapCandidate = separateDetachedParallelOverlaps(
+    finalPreOverlapRepairCandidate,
+    nodes,
+    16,
+  );
+  const finalCrossingRepairCandidate = keepIfNoNewStrictCrossings(
+    finalPreOverlapRepairCandidate,
+    finalDetachedOverlapCandidate,
+  );
+  finalEdges = chooseFewestStrictCrossings(
+    finalEdges,
+    finalGlobalCrossingCandidate,
+    finalSharedCrossingCandidate,
+    finalEndpointLaneCandidate,
+    finalPostSharedGlobalCandidate,
+    finalPostGlobalEndpointLaneCandidate,
+    finalPreOverlapRepairCandidate,
+    finalCrossingRepairCandidate,
+  );
+
+  const finalStrictSweepCandidate = repairEndpointOrthogonalPaths(
+    refineGlobalEdgeWaypoints(finalEdges, nodes),
+    nodes,
+  );
+  const finalStrictEndpointLaneCandidate = repairEndpointOrthogonalPaths(
+    repairEndpointLaneCrossings(finalEdges, nodes),
+    nodes,
+  );
+  const finalStrictBypassRawCandidate = repairDetachedStrictCrossingBypasses(
+    finalEdges,
+    nodes,
+  );
+  const finalStrictBypassCandidate = repairEndpointOrthogonalPaths(
+    finalStrictBypassRawCandidate,
+    nodes,
+  );
+  const finalQualityBaseEdges = chooseFewestStrictCrossings(
+    finalEdges,
+    finalStrictSweepCandidate,
+    finalStrictEndpointLaneCandidate,
+    finalStrictBypassRawCandidate,
+    finalStrictBypassCandidate,
+  );
+  const finalPostQualityStrictBypassRawCandidate = repairDetachedStrictCrossingBypasses(
+    finalQualityBaseEdges,
+    nodes,
+  );
+  const finalPostQualityStrictBypassCandidate = repairEndpointOrthogonalPaths(
+    finalPostQualityStrictBypassRawCandidate,
+    nodes,
+  );
+  finalEdges = chooseFewestStrictCrossings(
+    finalQualityBaseEdges,
+    finalPostQualityStrictBypassRawCandidate,
+    finalPostQualityStrictBypassCandidate,
+  );
+  for (let pass = 0; pass < 3; pass += 1) {
+    const strictBypassRawCandidate = repairDetachedStrictCrossingBypasses(finalEdges, nodes);
+    const strictBypassCandidate = repairEndpointOrthogonalPaths(strictBypassRawCandidate, nodes);
+    const nextFinalEdges = chooseFewestStrictCrossings(
+      finalEdges,
+      strictBypassRawCandidate,
+      strictBypassCandidate,
+    );
+    if (nextFinalEdges === finalEdges) break;
+    finalEdges = nextFinalEdges;
+  }
   finalEdges = lockComputedPathsForDisplay(finalEdges);
   return finalEdges;
 }

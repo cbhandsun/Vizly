@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const projectRoot = process.cwd();
@@ -14,14 +14,15 @@ const walk = (dir) => {
     return [];
   }
 
-  const entries = readdirSync(dir);
+  const entries = readdirSync(dir, { withFileTypes: true });
   return entries.flatMap((entry) => {
-    const entryPath = path.join(dir, entry);
-    const stat = statSync(entryPath);
-    if (stat.isDirectory()) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
       return walk(entryPath);
     }
-    return [entryPath];
+    // Test sources are regular files. Skipping links also prevents a workspace
+    // junction from escaping the declared search roots or creating a cycle.
+    return entry.isFile() ? [entryPath] : [];
   });
 };
 

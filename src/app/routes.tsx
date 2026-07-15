@@ -2,6 +2,7 @@
 import React, { Suspense } from 'react';
 import { useLocation } from 'react-router-dom';
 import { coerceSafeStringParam, getQueryOrHashParamFromLocation, type LocationLike, coerceDiagramId } from '@/core/utils/inputBoundary';
+import { loadDiagramViewerRoute } from './diagramViewerRouteLoader';
 
 type LazyPageModule = { default: React.ComponentType };
 
@@ -20,7 +21,7 @@ const withAntdRoute = (loadPage: () => Promise<LazyPageModule>) => React.lazy(as
   };
 });
 
-const DiagramViewerRoute = withAntdRoute(() => import('./DiagramViewerRoute'));
+const DiagramViewerRoute = withAntdRoute(loadDiagramViewerRoute);
 const ThemeColorComparison = withAntdRoute(() => import('@/pages/ThemeColorComparison'));
 const ThemeSideBySideComparison = withAntdRoute(() => import('@/pages/ThemeSideBySideComparison'));
 const DocsPreview = withAntdRoute(() => import('@/pages/DocsPreview'));

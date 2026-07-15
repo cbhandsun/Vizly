@@ -11,12 +11,12 @@ import { cancelLayoutTransition, suspendLayoutTransitions } from '../../../utils
 import { expandHandle } from '../../../routing/utils/handleUtils';
 import { parseAutoSavePayload } from '../../../utils/autoSaveStorage';
 import { readReactFlowCanvasSize } from '../../../utils/domViewport';
+import { loadStandardPresetCanvas } from './standardPresetCanvasCache';
 import {
     logDesignerSystemSyncAutoSaveFailure,
     logDesignerSystemSyncAutosaveRecalculationFailure,
     logDesignerSystemSyncDataRegistryImportFailure,
     logDesignerSystemSyncDataRegistryWriteFailure,
-    logDesignerSystemSyncDesignerUtilsImportFailure,
     logDesignerSystemSyncFreshSeedClearFailure,
     logDesignerSystemSyncImportDataFailure,
     logDesignerSystemSyncPresetLoadFailure,
@@ -779,20 +779,20 @@ export function useDesignerSystemSync({
                 logDesignerSystemSyncAutosaveRecalculationFailure(error);
             });
         } else {
-            hasRestoredAutoSave.current = true;
-            
             // Core Fallback & Preset Injection Logic
             if (preset) {
                 // IF the requested diagram matches a known standard preset map
                 // WE securely run standardDataToCanvas to apply ELK.js layout mapping!
-                import('../designerUtils').then(({ standardDataToCanvas }) => {
-                    standardDataToCanvas(preset).then(({ nodes: newNodes, edges: newEdges }) => {
-                        suspendLayoutTransitions(setNodes);
-                        setNodes(newNodes);
-                        setEdges(newEdges);
-                        needsInitialFitView.current = true;
-                    }).catch(e => logDesignerSystemSyncStandardDataToCanvasFailure('preset', e));
-                }).catch(e => logDesignerSystemSyncDesignerUtilsImportFailure(e));
+                loadStandardPresetCanvas(String(id || ''), preset).then(({ nodes: newNodes, edges: newEdges }) => {
+                    suspendLayoutTransitions(setNodes);
+                    setNodes(newNodes);
+                    setEdges(newEdges);
+                    needsInitialFitView.current = true;
+                    hasRestoredAutoSave.current = true;
+                }).catch(e => {
+                    hasRestoredAutoSave.current = true;
+                    logDesignerSystemSyncStandardDataToCanvasFailure('preset', e);
+                });
             } else if (PLUGIN_EMPTY_CANVAS_IDS.has(String(id || ''))) {
                 const emptyState = getPluginEmptyState(pluginId);
                 if (emptyState) {
@@ -800,6 +800,7 @@ export function useDesignerSystemSync({
                     setEdges(emptyState.edges);
                     needsInitialFitView.current = true;
                 }
+                hasRestoredAutoSave.current = true;
             } else {
                 // Try DataRegistry for imported/general templates before falling back to empty state
                 import('@/data/DataRegistry').then(async ({ dataRegistry }) => {
@@ -813,7 +814,11 @@ export function useDesignerSystemSync({
                                 setNodes(newNodes);
                                 setEdges(newEdges);
                                 needsInitialFitView.current = true;
-                            }).catch(e => logDesignerSystemSyncStandardDataToCanvasFailure('registry', e));
+                                hasRestoredAutoSave.current = true;
+                            }).catch(e => {
+                                hasRestoredAutoSave.current = true;
+                                logDesignerSystemSyncStandardDataToCanvasFailure('registry', e);
+                            });
                         });
                     } else {
                         // Normal plugin fallback empty state
@@ -824,8 +829,12 @@ export function useDesignerSystemSync({
                             // ALWAYS trigger initial viewport adjustment, even for empty canvases
                             needsInitialFitView.current = true;
                         }
+                        hasRestoredAutoSave.current = true;
                     }
-                }).catch(e => logDesignerSystemSyncDataRegistryImportFailure(e));
+                }).catch(e => {
+                    hasRestoredAutoSave.current = true;
+                    logDesignerSystemSyncDataRegistryImportFailure(e);
+                });
             }
         }
     }, [loadSaved, clearSaved, setNodes, setEdges, pluginId, id, presetLookup, messageApi]);
@@ -866,7 +875,8 @@ export function useDesignerSystemSync({
     }, [reactFlowInstance, nodes]);
 
     return {
-        performanceMode
+        performanceMode,
+        isInitialDiagramLoading: isStandardPresetId(id) && (!presetLookup.ready || !hasRestoredAutoSave.current)
     };
 }
 

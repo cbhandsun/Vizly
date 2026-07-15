@@ -16,7 +16,7 @@ import { LayeredConfigManager } from '../../../config/LayeredConfigManager';
 import { diagramConfigManager } from '../../config/DiagramConfig';
 import { LayoutStabilityContext } from '../../../context/LayoutStabilityContext';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
-import { createBaseDiagramDisplayEdges } from './baseDiagramDisplayEdges';
+import { prepareBaseDiagramDisplayEdges } from './baseDiagramEdgePreparation';
 
 // Domain Hooks
 import { useDiagramStability, calcNodeSignature, calcEdgeSignature } from './hooks/useDiagramStability';
@@ -111,6 +111,7 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
   nodesConnectable: nodesConnectableProp,
   elementsSelectable: elementsSelectableProp,
   fitTriggerKey: baseFitTriggerKey,
+  enableSmartEdges: enableSmartEdgesProp,
   onNodesChange: onNodesChangeProp,
   onEdgesChange: onEdgesChangeProp,
   disablePostEdgeProcessing,
@@ -211,6 +212,11 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
 
   // Hook 4: Container Clamp
   useDiagramContainerClamp({ rfNodes, setRfNodes });
+
+  const effectiveEnableSmartEdges = useMemo(
+    () => enableSmartEdgesProp ?? (!disablePostEdgeProcessing && edgeMode === 'advanced-smart'),
+    [disablePostEdgeProcessing, edgeMode, enableSmartEdgesProp],
+  );
 
   // 原有: 受控节点同步
   useEffect(() => {
@@ -336,9 +342,21 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
     stablePath: StablePathEdge,
   }), []);
 
+  const displayInputEdges = useMemo(
+    () => prepareBaseDiagramDisplayEdges(rfEdges),
+    [rfEdges],
+  );
   const displayEdges = useMemo(
-    () => createBaseDiagramDisplayEdges(rfEdges),
-    [rfEdges]
+    () => displayInputEdges.map(edge => ({
+      ...edge,
+      data: {
+        ...edge.data,
+        _dragUpdate: dragUpdateCounter,
+        _draggingNodeIds: draggingNodeIds,
+        _layoutEpoch: layoutEpoch,
+      },
+    })),
+    [displayInputEdges, dragUpdateCounter, draggingNodeIds, layoutEpoch],
   );
 
   if (!theme) return <div>Loading theme...</div>;
@@ -405,15 +423,7 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
             {...props}
             disableZoomCompensation={props.disableZoomCompensation}
             nodes={themedNodes}
-            edges={displayEdges.map(edge => ({
-              ...edge,
-              data: {
-                ...edge.data,
-                _dragUpdate: dragUpdateCounter,
-                _draggingNodeIds: draggingNodeIds,
-                _layoutEpoch: layoutEpoch
-              }
-            }))}
+            edges={displayEdges}
             nodeTypes={nodeTypes as unknown as NodeTypes}
             edgeTypes={edgeTypes}
             onNodesChange={handleNodesChange}
@@ -433,7 +443,7 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
             nodesDraggable={resolvedInteractions.nodesDraggable}
             nodesConnectable={resolvedInteractions.nodesConnectable}
             elementsSelectable={resolvedInteractions.elementsSelectable}
-            enableSmartEdges={props.enableSmartEdges ?? (!disablePostEdgeProcessing && edgeMode === 'advanced-smart')}
+            enableSmartEdges={effectiveEnableSmartEdges}
             fitTriggerKey={fitTriggerKey}
           />
         </LayoutStabilityContext.Provider>

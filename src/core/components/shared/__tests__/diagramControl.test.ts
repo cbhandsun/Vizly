@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  clampDiagramFullFitZoom,
+  MAX_DIAGRAM_FULL_FIT_ZOOM,
+  MIN_DIAGRAM_FULL_FIT_ZOOM,
+} from '../diagramControlFit';
+
 const logDiagramControlDispatchFailure = vi.fn();
 
 vi.mock('../diagramControlLogging', () => ({
@@ -25,5 +31,17 @@ describe('diagramControl', () => {
       'fit',
       expect.any(Error)
     );
+  });
+
+  it('allows full-fit views below the old 45 percent clipping floor', () => {
+    expect(clampDiagramFullFitZoom(0.3)).toBeCloseTo(0.294);
+    expect(clampDiagramFullFitZoom(0.3)).toBeLessThan(0.45);
+  });
+
+  it('clamps invalid and extreme full-fit zoom values', () => {
+    expect(clampDiagramFullFitZoom(Number.NaN)).toBe(MIN_DIAGRAM_FULL_FIT_ZOOM);
+    expect(clampDiagramFullFitZoom(Number.POSITIVE_INFINITY)).toBe(MIN_DIAGRAM_FULL_FIT_ZOOM);
+    expect(clampDiagramFullFitZoom(-1)).toBe(MIN_DIAGRAM_FULL_FIT_ZOOM);
+    expect(clampDiagramFullFitZoom(100)).toBe(MAX_DIAGRAM_FULL_FIT_ZOOM);
   });
 });

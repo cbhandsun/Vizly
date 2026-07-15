@@ -1,0 +1,363 @@
+import type { Edge, Node } from '@xyflow/react';
+
+import { expandHandle } from '../../routing/utils/handleUtils';
+
+type FastPoint = { x: number; y: number };
+type FastRect = { id: string; x: number; y: number; width: number; height: number };
+
+const EPSILON = 0.5;
+const OBSTACLE_PADDING = 8;
+const LANE_CLEARANCE = 12;
+const CONTAINER_TYPES = new Set(['titleGroup', 'subGroup', 'group', 'domain', 'subDomain', 'swimlane']);
+
+const finiteNumber = (value: unknown, fallback = 0): number => (
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback
+);
+
+const samePoint = (a: FastPoint, b: FastPoint): boolean => (
+  Math.abs(a.x - b.x) <= EPSILON && Math.abs(a.y - b.y) <= EPSILON
+);
+
+const compactPath = (path: FastPoint[]): FastPoint[] => {
+  const deduped = path.filter((point, index) => index === 0 || !samePoint(point, path[index - 1]));
+  if (deduped.length < 3) return deduped;
+  const compacted = [deduped[0]];
+  for (let index = 1; index < deduped.length - 1; index += 1) {
+    const previous = compacted[compacted.length - 1];
+    const point = deduped[index];
+    const next = deduped[index + 1];
+    const sameX = Math.abs(previous.x - point.x) <= EPSILON && Math.abs(point.x - next.x) <= EPSILON;
+    const sameY = Math.abs(previous.y - point.y) <= EPSILON && Math.abs(point.y - next.y) <= EPSILON;
+    if (!sameX && !sameY) compacted.push(point);
+  }
+  compacted.push(deduped[deduped.length - 1]);
+  return compacted;
+};
+
+const resolveNodePosition = (
+  node: Node,
+  nodeById: Map<string, Node>,
+  seen = new Set<string>(),
+): FastPoint => {
+  const absolute = (node as any).positionAbsolute;
+  if (absolute) {
+    return { x: finiteNumber(absolute.x), y: finiteNumber(absolute.y) };
+  }
+  const local = node.position ?? { x: 0, y: 0 };
+  const position = { x: finiteNumber(local.x), y: finiteNumber(local.y) };
+  const parentId = (node as any).parentId;
+  if (!parentId || seen.has(parentId)) return position;
+  const parent = nodeById.get(parentId);
+  if (!parent) return position;
+  seen.add(parentId);
+  const parentPosition = resolveNodePosition(parent, nodeById, seen);
+  return { x: position.x + parentPosition.x, y: position.y + parentPosition.y };
+};
+
+const nodeRects = (nodes: Node[]): FastRect[] => {
+  const nodeById = new Map(nodes.map(node => [node.id, node] as const));
+  return nodes
+  .filter(node => !CONTAINER_TYPES.has(String(node.type || '')))
+  .map((node) => {
+    const position = resolveNodePosition(node, nodeById);
+    const width = finiteNumber((node as any).measured?.width ?? node.width ?? (node.style as any)?.width);
+    const height = finiteNumber((node as any).measured?.height ?? node.height ?? (node.style as any)?.height);
+    return {
+      id: node.id,
+      x: finiteNumber((position as any).x) - OBSTACLE_PADDING,
+      y: finiteNumber((position as any).y) - OBSTACLE_PADDING,
+      width: width + OBSTACLE_PADDING * 2,
+      height: height + OBSTACLE_PADDING * 2,
+    };
+  })
+  .filter(rect => rect.width > OBSTACLE_PADDING * 2 + 1 && rect.height > OBSTACLE_PADDING * 2 + 1);
+};
+
+const segmentHitsRect = (a: FastPoint, b: FastPoint, rect: FastRect): boolean => {
+  if (Math.abs(a.x - b.x) <= EPSILON) {
+    const x = (a.x + b.x) / 2;
+    return x > rect.x + EPSILON
+      && x < rect.x + rect.width - EPSILON
+      && Math.max(a.y, b.y) > rect.y + EPSILON
+      && Math.min(a.y, b.y) < rect.y + rect.height - EPSILON;
+  }
+  if (Math.abs(a.y - b.y) <= EPSILON) {
+    const y = (a.y + b.y) / 2;
+    return y > rect.y + EPSILON
+      && y < rect.y + rect.height - EPSILON
+      && Math.max(a.x, b.x) > rect.x + EPSILON
+      && Math.min(a.x, b.x) < rect.x + rect.width - EPSILON;
+  }
+  return true;
+};
+
+const relevantRects = (edge: Edge, rects: FastRect[]): FastRect[] => (
+  rects.filter(rect => rect.id !== edge.source && rect.id !== edge.target)
+);
+
+const pathObstacleHits = (path: FastPoint[], rects: FastRect[]): number => {
+  let hits = 0;
+  for (let index = 0; index < path.length - 1; index += 1) {
+    for (const rect of rects) {
+      if (segmentHitsRect(path[index], path[index + 1], rect)) hits += 1;
+    }
+  }
+  return hits;
+};
+
+const pathLength = (path: FastPoint[]): number => path.reduce((total, point, index) => {
+  if (index === 0) return total;
+  const previous = path[index - 1];
+  return total + Math.abs(point.x - previous.x) + Math.abs(point.y - previous.y);
+}, 0);
+
+const handleSide = (handle: string | null | undefined): string => (
+  String(expandHandle(String(handle || '')) || '').toLowerCase()
+);
+
+const preferredDiagonalBend = (
+  edge: Edge,
+  segmentIndex: number,
+  lastSegmentIndex: number,
+  a: FastPoint,
+  b: FastPoint,
+): FastPoint | null => {
+  if (segmentIndex === 0) {
+    const side = handleSide(edge.sourceHandle);
+    if (side === 'left' || side === 'right') return { x: b.x, y: a.y };
+    if (side === 'top' || side === 'bottom') return { x: a.x, y: b.y };
+  }
+  if (segmentIndex === lastSegmentIndex) {
+    const side = handleSide(edge.targetHandle);
+    if (side === 'left' || side === 'right') return { x: a.x, y: b.y };
+    if (side === 'top' || side === 'bottom') return { x: b.x, y: a.y };
+  }
+  return null;
+};
+
+const orthogonalizePath = (edge: Edge, path: FastPoint[], rects: FastRect[]): FastPoint[] => {
+  const expanded: FastPoint[] = [path[0]];
+  const lastSegmentIndex = path.length - 2;
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const a = path[index];
+    const b = path[index + 1];
+    if (Math.abs(a.x - b.x) > EPSILON && Math.abs(a.y - b.y) > EPSILON) {
+      const preferred = preferredDiagonalBend(edge, index, lastSegmentIndex, a, b);
+      const bends = preferred
+        ? [preferred]
+        : [{ x: b.x, y: a.y }, { x: a.x, y: b.y }];
+      let best = bends[0];
+      let bestHits = pathObstacleHits([a, best, b], rects);
+      for (const bend of bends.slice(1)) {
+        const hits = pathObstacleHits([a, bend, b], rects);
+        if (hits < bestHits) {
+          best = bend;
+          bestHits = hits;
+        }
+      }
+      expanded.push(best);
+    }
+    expanded.push(b);
+  }
+  return compactPath(expanded);
+};
+
+const firstObstacleHit = (path: FastPoint[], rects: FastRect[]) => {
+  for (let segmentIndex = 0; segmentIndex < path.length - 1; segmentIndex += 1) {
+    for (const rect of rects) {
+      if (segmentHitsRect(path[segmentIndex], path[segmentIndex + 1], rect)) {
+        return { segmentIndex, rect };
+      }
+    }
+  }
+  return null;
+};
+
+const pointInsideRect = (point: FastPoint, rect: FastRect): boolean => (
+  point.x > rect.x + EPSILON
+  && point.x < rect.x + rect.width - EPSILON
+  && point.y > rect.y + EPSILON
+  && point.y < rect.y + rect.height - EPSILON
+);
+
+const firstInteriorObstacleWaypoint = (path: FastPoint[], rects: FastRect[]) => {
+  for (let pointIndex = 1; pointIndex < path.length - 1; pointIndex += 1) {
+    for (const rect of rects) {
+      if (pointInsideRect(path[pointIndex], rect)) return { pointIndex, rect };
+    }
+  }
+  return null;
+};
+
+const interiorWaypointEscapeCandidates = (
+  path: FastPoint[],
+  pointIndex: number,
+  rect: FastRect,
+): FastPoint[][] => {
+  const previous = path[pointIndex - 1];
+  const next = path[pointIndex + 1];
+  const prefix = path.slice(0, pointIndex - 1);
+  const suffix = path.slice(pointIndex + 2);
+  const corners = [
+    { x: rect.x - LANE_CLEARANCE, y: rect.y - LANE_CLEARANCE },
+    { x: rect.x + rect.width + LANE_CLEARANCE, y: rect.y - LANE_CLEARANCE },
+    { x: rect.x - LANE_CLEARANCE, y: rect.y + rect.height + LANE_CLEARANCE },
+    { x: rect.x + rect.width + LANE_CLEARANCE, y: rect.y + rect.height + LANE_CLEARANCE },
+  ];
+  return corners.flatMap(corner => [
+    compactPath([
+      ...prefix,
+      previous,
+      { x: corner.x, y: previous.y },
+      corner,
+      { x: next.x, y: corner.y },
+      next,
+      ...suffix,
+    ]),
+    compactPath([
+      ...prefix,
+      previous,
+      { x: previous.x, y: corner.y },
+      corner,
+      { x: corner.x, y: next.y },
+      next,
+      ...suffix,
+    ]),
+  ]);
+};
+
+const detourCandidates = (
+  path: FastPoint[],
+  segmentIndex: number,
+  rect: FastRect,
+): FastPoint[][] => {
+  const a = path[segmentIndex];
+  const b = path[segmentIndex + 1];
+  const prefix = path.slice(0, segmentIndex);
+  const suffix = path.slice(segmentIndex + 2);
+  if (Math.abs(a.x - b.x) <= EPSILON) {
+    const direction = b.y >= a.y ? 1 : -1;
+    const approachY = direction > 0 ? rect.y - LANE_CLEARANCE : rect.y + rect.height + LANE_CLEARANCE;
+    const exitY = direction > 0 ? rect.y + rect.height + LANE_CLEARANCE : rect.y - LANE_CLEARANCE;
+    return [rect.x - LANE_CLEARANCE, rect.x + rect.width + LANE_CLEARANCE].map(laneX => compactPath([
+      ...prefix,
+      a,
+      { x: a.x, y: approachY },
+      { x: laneX, y: approachY },
+      { x: laneX, y: exitY },
+      { x: a.x, y: exitY },
+      b,
+      ...suffix,
+    ]));
+  }
+  const direction = b.x >= a.x ? 1 : -1;
+  const approachX = direction > 0 ? rect.x - LANE_CLEARANCE : rect.x + rect.width + LANE_CLEARANCE;
+  const exitX = direction > 0 ? rect.x + rect.width + LANE_CLEARANCE : rect.x - LANE_CLEARANCE;
+  return [rect.y - LANE_CLEARANCE, rect.y + rect.height + LANE_CLEARANCE].map(laneY => compactPath([
+    ...prefix,
+    a,
+    { x: approachX, y: a.y },
+    { x: approachX, y: laneY },
+    { x: exitX, y: laneY },
+    { x: exitX, y: a.y },
+    b,
+    ...suffix,
+  ]));
+};
+
+const repairObstacleHits = (path: FastPoint[], rects: FastRect[]): FastPoint[] => {
+  let current = path;
+  const maximumPasses = Math.max(1, Math.min(16, rects.length * 2));
+  for (let pass = 0; pass < maximumPasses; pass += 1) {
+    const interiorWaypoint = firstInteriorObstacleWaypoint(current, rects);
+    if (interiorWaypoint) {
+      const baselineHits = pathObstacleHits(current, rects);
+      let best = current;
+      let bestScore = baselineHits * 1_000_000_000 + pathLength(current) + current.length * 4;
+      for (const candidate of interiorWaypointEscapeCandidates(
+        current,
+        interiorWaypoint.pointIndex,
+        interiorWaypoint.rect,
+      )) {
+        const candidateHits = pathObstacleHits(candidate, rects);
+        if (candidateHits >= baselineHits) continue;
+        const score = candidateHits * 1_000_000_000 + pathLength(candidate) + candidate.length * 4;
+        if (score < bestScore) {
+          best = candidate;
+          bestScore = score;
+        }
+      }
+      if (best !== current) {
+        current = best;
+        continue;
+      }
+    }
+    const hit = firstObstacleHit(current, rects);
+    if (!hit) break;
+    const baselineHits = pathObstacleHits(current, rects);
+    let best = current;
+    let bestScore = baselineHits * 1_000_000_000 + pathLength(current) + current.length * 4;
+    for (const candidate of detourCandidates(current, hit.segmentIndex, hit.rect)) {
+      const candidateHits = pathObstacleHits(candidate, rects);
+      if (candidateHits >= baselineHits) continue;
+      const score = candidateHits * 1_000_000_000 + pathLength(candidate) + candidate.length * 4;
+      if (score < bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+    }
+    if (best === current) break;
+    current = best;
+  }
+  return compactPath(current);
+};
+
+const fastComputedPath = (edge: Edge): FastPoint[] => {
+  const value = (edge.data as any)?.computedPath;
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(point => point && Number.isFinite(point.x) && Number.isFinite(point.y))
+    .map(point => ({ x: Number(point.x), y: Number(point.y) }));
+};
+
+export const fastDisplayHardSafetyIsClean = (edges: Edge[], nodes: Node[]): boolean => {
+  if (edges.length === 0 || nodes.length === 0) return false;
+  const rects = nodeRects(nodes);
+  return edges.every((edge) => {
+    const path = fastComputedPath(edge);
+    if (path.length < 2) return false;
+    const isOrthogonal = path.slice(0, -1).every((point, index) => {
+      const next = path[index + 1];
+      return Math.abs(point.x - next.x) <= EPSILON || Math.abs(point.y - next.y) <= EPSILON;
+    });
+    return isOrthogonal && pathObstacleHits(path, relevantRects(edge, rects)) === 0;
+  });
+};
+
+export const repairFastDisplayHardSafety = (edges: Edge[], nodes: Node[]): Edge[] => {
+  if (edges.length === 0 || nodes.length === 0) return edges;
+  const rects = nodeRects(nodes);
+  let changed = false;
+  const repairedEdges = edges.map((edge) => {
+    const path = fastComputedPath(edge);
+    if (path.length < 2) return edge;
+    const obstacles = relevantRects(edge, rects);
+    const orthogonal = orthogonalizePath(edge, path, obstacles);
+    const repaired = repairObstacleHits(orthogonal, obstacles);
+    if (repaired.length === path.length && repaired.every((point, index) => samePoint(point, path[index]))) {
+      return edge;
+    }
+    const data = {
+      ...((edge.data || {}) as Record<string, any>),
+      computedPath: repaired,
+      layoutPathLocked: true,
+      fastHardSafetyRepaired: true,
+    };
+    if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
+      data.treeRouting = { ...data.treeRouting, points: repaired };
+    }
+    changed = true;
+    return { ...edge, data };
+  });
+  return changed ? repairedEdges : edges;
+};

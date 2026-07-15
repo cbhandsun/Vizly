@@ -1,4 +1,6 @@
-export const RENDERED_PATH_CACHE_VERSION = 'domain-dagre-computed-path-v4';
+import { EDGE_ROUTING_CACHE_VERSION } from './routingVersion';
+
+export const RENDERED_PATH_CACHE_VERSION = EDGE_ROUTING_CACHE_VERSION;
 
 type RenderedPathCacheWindow = Window & {
     __dv_rendered_path_cache__?: Map<string, string>;

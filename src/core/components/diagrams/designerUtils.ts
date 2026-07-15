@@ -18,6 +18,24 @@ const resolveRestorableThemeId = (themeId?: string): string | undefined => {
     return availableThemeIds.has(themeId) ? themeId : undefined;
 };
 
+const resolveGeneratedGroupLayoutOptions = (layout: StandardDiagramData['layout'] | undefined) => {
+    const layoutAny = layout as any;
+    return {
+        generateDomainGroups: layoutAny?.generateDomainGroups !== false,
+        generateSubDomainGroups: layoutAny?.generateSubDomainGroups !== false,
+        domainWhitelist: Array.isArray(layoutAny?.domainWhitelist) ? layoutAny.domainWhitelist : undefined,
+        subDomainWhitelist: Array.isArray(layoutAny?.subDomainWhitelist) ? layoutAny.subDomainWhitelist : undefined,
+    };
+};
+
+export type StandardDataToCanvasOptions = {
+    edgeRoutingQuality?: 'full' | 'interactive';
+};
+
+const stripHiddenCanvasNodes = (nodes: Node[]): Node[] => (
+    nodes.filter(node => !((node as any).hidden === true || (node.data as any)?.hidden === true))
+);
+
 /**
  * Converts React Flow canvas data into the application's StandardDiagramData format.
  * Strictly follows STANDARD_DIAGRAM_DATA_AI_GUIDE.md
@@ -214,7 +232,11 @@ import { PluginRegistry } from '../../services/PluginRegistry';
  *   - 有多域（≥2）：调用 DomainDagreLayoutStrategy（含域容器生成+智能边路由）
  *   - 无多域：内部扁平 dagre 布局
  */
-export const standardDataToCanvas = async (inputData: StandardDiagramData, pluginId?: string): Promise<{ nodes: Node[], edges: Edge[] }> => {
+export const standardDataToCanvas = async (
+    inputData: StandardDiagramData,
+    pluginId?: string,
+    options: StandardDataToCanvasOptions = {},
+): Promise<{ nodes: Node[], edges: Edge[] }> => {
     // ---- [Plugin Migration Pipeline] ----
     // Derive the target plugin id: specified pluginId > inputData.type > default 'flowchart'
     const targetPluginId = pluginId || inputData.type || 'flowchart';
@@ -490,14 +512,14 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
                     ...(nodeLayout ? { nodeLayout } : {}),
                     spacing: data.layout?.spacing || { horizontal: 50, vertical: 50 },
                     padding: { top: 40, right: 20, bottom: 20, left: 20 },
-                    generateDomainGroups: true,
-                    generateSubDomainGroups: true,
+                    ...resolveGeneratedGroupLayoutOptions(data.layout),
+                    ...(options.edgeRoutingQuality ? { edgeRoutingQuality: options.edgeRoutingQuality } : {}),
                     fitDomainContent: true,
                     domainOrder: (data.layout as any)?.domainOrder,
                     subDomainOrder: (data.layout as any)?.subDomainOrder,
                 } as any);
                 return {
-                    nodes: result.nodes,
+                    nodes: stripHiddenCanvasNodes(result.nodes),
                     // [FIX] 若布局策略返回空 edges（例如所有 source/target 均不在 idMap 中），
                     // 回退到原始 edges，避免模版连线被意外丢失。
                     edges: (result.edges && result.edges.length > 0) ? result.edges : edges
@@ -545,7 +567,7 @@ export const standardDataToCanvas = async (inputData: StandardDiagramData, plugi
 
     }
 
-    return { nodes, edges };
+    return { nodes: stripHiddenCanvasNodes(nodes), edges };
 };
 
 /**

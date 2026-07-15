@@ -1,9 +1,8 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import type { LayoutOptions } from '../types/layout';
 import type { StandardNodeData } from '../models/DiagramModels';
-import dagre from 'dagre';
 import { ILayoutStrategy } from './LayoutStrategyManager';
-import { decideEdgeRouting, separateParallelEdges, assignGlobalPorts } from '../utils/HandlePicker';
+import { separateParallelEdges } from '../utils/HandlePicker';
 import { diagramConfigManager } from '../components/config/DiagramConfig';
 import {
     applyDomainGrouping,
@@ -13,12 +12,15 @@ import {
     ensureMeasuredForNodes,
     centerSubGroupsInDomain
 } from '../utils/layoutUtils';
-import { expandHandle, normalizeHandle } from '../routing/utils/handleUtils';
-import { logDomainDagreMissingNodeHandle } from './layoutLogging';
-import { repairSharedTrunkAwareCrossings } from './shared/edgeRoutingPipeline';
-import { lockComputedPathOnEdge, resolveRoutingResultPath } from './shared/edgeFallbackPath';
-import { repairEndpointOrthogonalPaths } from './shared/edgeEndpointPathRepair';
-import { separateDetachedParallelOverlaps } from './shared/edgeDetachedOverlapRepair';
+import {
+    calculateBounds,
+    layoutWithDagre,
+    mapEdgesToContainers,
+} from './DomainDagreLayoutHelpers';
+import {
+    applyDomainDagreEdgeRouting,
+    prepareDomainDagreEdges,
+} from './DomainDagreEdgePreparation';
 /**
  * 域级 Dagre 布局策略
  * 
@@ -187,12 +189,14 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 const inWhite = Array.isArray(subWhitelist) ? subWhitelist.includes(key) : false;
                 const visible = showSub ? (Array.isArray(subWhitelist) ? inWhite : true) : false;
                 clone.data.hidden = !visible;
+                clone.hidden = !visible;
             }
             if (String(n.type || '') === 'titleGroup') {
                 const dKey = String(((clone.data?.domain || '') || '')).trim();
                 const inWhiteDom = Array.isArray(domainWhitelist) ? domainWhitelist.includes(dKey) : false;
                 const visibleDom = showDomain ? (Array.isArray(domainWhitelist) ? inWhiteDom : true) : false;
                 clone.data.hidden = !visibleDom;
+                clone.hidden = !visibleDom;
             }
             return clone as ReactFlowNode;
         });
@@ -247,7 +251,12 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 } else {
                     const dk = domainOf(n);
                     if (dk && String(n.type) !== 'titleGroup') {
-                        const titleGroup = nodesToConvert.find(t => String(t.type) === 'titleGroup' && String((t.data as any)?.domain) === dk);
+                        const titleGroup = nodesToConvert.find(t => (
+                            String(t.type) === 'titleGroup'
+                            && String((t.data as any)?.domain) === dk
+                            && !(t as any).hidden
+                            && !(t.data as any)?.hidden
+                        ));
                         if (titleGroup) {
                             n.parentId = titleGroup.id;
                             n.extent = 'parent';
@@ -318,7 +327,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         if (domains.length === 0 && subGroups.length === 0) {
 
             // 直接使用 Dagre 布局所有叶节点
-            const result = this.layoutWithDagre(
+            const result = layoutWithDagre(
                 leafNodes,
                 edges,
                 isHorizontal ? 'LR' : 'TB',
@@ -358,7 +367,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             });
 
             // 智能边路由
-            this.applyEdgeRouting(updatedNodes, validEdges, idMap, cfg, options);
+            applyDomainDagreEdgeRouting(updatedNodes, validEdges, idMap, cfg, options);
 
             // 并行边分离
             const separatedEdges = separateParallelEdges(validEdges, 12);
@@ -401,7 +410,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                         sgChildren.some(n => n.id === e.target)
                     );
 
-                    const result = this.layoutWithDagre(
+                    const result = layoutWithDagre(
                         sgChildren,
                         sgEdges,
                         subDomainNodeIsHorizontal ? 'LR' : 'TB',
@@ -420,7 +429,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
                     // 计算子域尺寸（使用有效内边距确保左右对称）
                     // 计算子域尺寸（增加底部安全边距与 Dagre 专项缓冲 40px）
-                    const bounds = this.calculateBounds(sgChildren, getNodeDimensions, widthCompensation);
+                    const bounds = calculateBounds(sgChildren, getNodeDimensions, widthCompensation);
                     const sgWidth = bounds.width + sdPadHEffective * 2;
                     const sdBottomSafe = num(cfg?.subDomain?.padding?.bottom, 16);
                     const sgHeight = bounds.height + sdTitleH + titleSafe + sdPadV * 2 + sdBottomSafe + 40;
@@ -437,13 +446,13 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             const topLevelItems: ReactFlowNode[] = [...subGroups, ...freeNodes];
 
             // 映射边到顶层项
-            const topLevelEdges = this.mapEdgesToContainers(
+            const topLevelEdges = mapEdgesToContainers(
                 edges,
                 nodeToSubGroup
             );
 
             // 使用 Dagre 布局顶层项
-            const topResult = this.layoutWithDagre(
+            const topResult = layoutWithDagre(
                 topLevelItems,
                 topLevelEdges,
                 domainSubGroupIsHorizontal ? 'LR' : 'TB',
@@ -489,7 +498,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 .map(e => ({ ...e }));  // 克隆每个 edge 对象
 
             // 智能边路由
-            this.applyEdgeRouting(updatedNodes, validEdges, idMap, cfg, options);
+            applyDomainDagreEdgeRouting(updatedNodes, validEdges, idMap, cfg, options);
 
             // 并行边分离
             const separatedEdges = separateParallelEdges(validEdges, 12);
@@ -630,7 +639,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     sgChildren.some(n => n.id === e.target)
                 );
 
-                const result = this.layoutWithDagre(
+                const result = layoutWithDagre(
                     sgChildren,
                     sgEdges,
                     subDomainNodeIsHorizontal ? 'LR' : 'TB',
@@ -650,7 +659,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     };
                 });
 
-                const bounds = this.calculateBounds(sgChildren, getNodeDimensions, widthCompensation);
+                const bounds = calculateBounds(sgChildren, getNodeDimensions, widthCompensation);
                 const nextWidth = bounds.width + sdPadHEffective * 2;
                 const nextHeight = bounds.height + sdTitleH + titleSafe + sdPadV * 2 + bottomSafe;
                 const curWidth = num((sg as any).style?.width ?? (sg as any).measured?.width, 0);
@@ -701,7 +710,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     );
 
                     // 使用 Dagre 布局子域
-                    const result = this.layoutWithDagre(
+                    const result = layoutWithDagre(
                         sgChildren,
                         sgEdges,
                         subDomainNodeIsHorizontal ? 'LR' : 'TB',
@@ -720,7 +729,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                     });
 
                     // 计算子域尺寸（使用有效内边距确保左右对称）
-                    const bounds = this.calculateBounds(sgChildren, getNodeDimensions, widthCompensation);
+                    const bounds = calculateBounds(sgChildren, getNodeDimensions, widthCompensation);
                     const sgWidth = bounds.width + sdPadHEffective * 2;
                     const sgHeight = bounds.height + sdTitleH + sdPadV * 2;
 
@@ -756,9 +765,9 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 });
 
                 // 使用 Dagre 布局域内元素
-                const result = this.layoutWithDagre(
+                const result = layoutWithDagre(
                     domainChildren,
-                    this.mapEdgesToContainers(domainEdges, nodeToSubGroup),
+                    mapEdgesToContainers(domainEdges, nodeToSubGroup),
                     domainSubGroupIsHorizontal ? 'LR' : 'TB',
                     domainSubGroupIsHorizontal ? nodeGapV : nodeGapH,
                     domainSubGroupIsHorizontal ? nodeGapH : nodeGapV,
@@ -826,7 +835,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 // 因为子域的 measured 已经包含了内部节点的尺寸
                 // 而叶节点的 position 是相对于父子域的，不能直接加入域边界计算
                 // 计算域尺寸（包含标题高度、安全边距、底部缓冲区以及全局 bottomSafeGap 补偿）
-                const bounds = this.calculateBounds(domainChildren, getNodeDimensions, widthCompensation);
+                const bounds = calculateBounds(domainChildren, getNodeDimensions, widthCompensation);
                 const domainWidth = bounds.width + dPadHEffective * 2;
                 const domainHeight = bounds.height + dTitleH + titleSafe + dPadV * 2 + bottomSafe + bottomSafeGap;
 
@@ -896,7 +905,7 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         });
 
         if (domainLayoutNodes.length > 0) {
-            const result = this.layoutWithDagre(
+            const result = layoutWithDagre(
                 domainLayoutNodes,
                 crossDomainEdges,
                 isHorizontal ? 'LR' : 'TB',
@@ -1059,967 +1068,21 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         // ============================================
         // 第三阶段：智能边路由
         // ============================================
-
-        const getAbsPos = (n: ReactFlowNode): { x: number, y: number } => {
-            let x = n.position.x;
-            let y = n.position.y;
-            let current = n;
-            let depth = 0;
-            while (current.parentId && depth < 10) {
-                const parent = idMap.get(current.parentId);
-                if (!parent) break;
-                x += parent.position.x;
-                y += parent.position.y;
-                current = parent;
-                depth++;
-            }
-            return { x, y };
-        };
-
-        // 确保所有节点有 positionAbsolute、width、height 和 measured
-        updatedNodes.forEach(n => {
-            const absPos = getAbsPos(n);
-            (n as any).positionAbsolute = absPos;
-
-            // [FIX] 忽略 React Flow 的 measured（它可能在不同渲染周期有不同值），只使用 ensureMeasuredForNodes 写入的 style
-            const w = (n as any).style?.width || (n as any).width || 200;
-            const h = (n as any).style?.height || (n as any).height || 80;
-            (n as any).width = w;
-            (n as any).height = h;
-            (n as any).measured = { width: w, height: h };
+        const finalRoutedEdges = await prepareDomainDagreEdges({
+            nodes: updatedNodes,
+            edges,
+            options,
+            config: cfg,
+            nodeById: idMap,
+            leafNodes,
         });
-
-        // 调试日志：检查几个节点的尺寸信息
-        const _sampleLeafs = leafNodes.slice(0, 3);
-
-        const cfgEdge = cfg?.edge || {};
-        const routingConfig = {
-            mode: 'advanced-smart' as const,
-            globalPath: (cfgEdge.pathType || 'step') as string,
-            autoPathSelection: true,
-            angleToleranceDeg: Number(cfgEdge.angleToleranceDeg ?? 36),
-            bezierDistanceThreshold: Number(cfgEdge.bezierDistanceThreshold ?? 280),
-            // [FIX] 增大搜索范围，让 A* 算法能寻找到绕行空旷区域的路径
-            obstacleScopePadding: Number(cfgEdge.obstacleScopePadding ?? 300),
-            corridorObstacleThreshold: Number(cfgEdge.corridorObstacleThreshold ?? 6),
-            directionalHandlePolicy: String(cfgEdge.directionalHandlePolicy || 'prefer') as any,
-            verticalBiasThreshold: Number(cfgEdge.verticalBiasThreshold ?? 1.2),
-            // [FIX] 增大障碍物膨胀，让节点周围有更大禁区，迫使连线绕行空旷区域
-            obstaclePadding: Number(cfgEdge.obstaclePadding ?? 80),
-            ignoreContainers: Boolean(cfgEdge.ignoreContainers ?? false),
-            layoutDirection: options.direction || 'TB',
-            // [FIX] 增大 A* 扩展次数，允许搜索更远的绕行路径
-            gridAStarMaxExpansions: Number(cfgEdge.gridAStarMaxExpansions ?? 600),
-            // [FIX] 减小网格尺寸，提高绕行精度
-            gridAStarGridSize: Number(cfgEdge.gridAStarGridSize ?? 30)
-        };
-
-        // Enforce strict direction for Dagre to ensure stability
-        if (routingConfig.mode === 'advanced-smart') {
-            routingConfig.directionalHandlePolicy = 'force';
-            (routingConfig as any).preAssignedPortPolicy = 'prefer';
-        }
-
-        // [FIX] 确保传入 decideEdgeRouting 的节点数组顺序是确定性的
-        // 这对于 A* 障碍物避让计算非常重要，不同的顺序可能导致不同的路径选择
-        const sortedNodesForRouting = [...updatedNodes].sort((a, b) => a.id.localeCompare(b.id));
-
-        // 克隆 edges 以确保 React 能检测到修改
-        // Sort edges by source then target to ensure consistent processing order for "bus" optimization
-        // [FIX] Clear stale computedPath from previous layouts so EdgeRouter always recomputes fresh.
-        // Without this, the old C-shaped path would be preserved across layout runs.
-        const clonedEdges = edges
-            .map(e => ({
-                ...e,
-                data: e.data ? { ...e.data as object, computedPath: undefined } : e.data
-            }))
-            .sort((a, b) => {
-                const sComp = a.source.localeCompare(b.source);
-                if (sComp !== 0) return sComp;
-                return a.target.localeCompare(b.target);
-            });
-
-
-        const nodeUsage: Record<string, Record<string, number>> = {};
-        // P1: Edge-Edge Avoidance - 收集已路由边的路径
-        const routedPaths: Array<{ points: Array<{ x: number; y: number }> }> = [];
-        const isAutoHandle = (edge: Edge, side: 'source' | 'target') => {
-            const data = (edge.data ?? {}) as Record<string, any>;
-            const auto = Array.isArray(data.auto) ? data.auto : [];
-            return Boolean(data[side === 'source' ? 'autoSource' : 'autoTarget']) || auto.includes(side);
-        };
-        const oppositeHandle = (h: string): string => {
-            const normalized = normalizeHandle(h);
-            if (normalized === 'l') return 'right';
-            if (normalized === 'r') return 'left';
-            if (normalized === 't') return 'bottom';
-            if (normalized === 'b') return 'top';
-            return 'bottom';
-        };
-        const sourceOutCounts = new Map<string, number>();
-        const targetInCounts = new Map<string, number>();
-        clonedEdges.forEach(edge => {
-            sourceOutCounts.set(edge.source, (sourceOutCounts.get(edge.source) || 0) + 1);
-            targetInCounts.set(edge.target, (targetInCounts.get(edge.target) || 0) + 1);
-        });
-        const getRolePortForce = (
-            edge: Edge,
-            source: ReactFlowNode,
-            target: ReactFlowNode,
-            edgePorts?: { source?: string; target?: string }
-        ) => {
-            if (!edgePorts) return { sourceFanOut: false, targetFanIn: false };
-            const layoutDir = String(options.direction || 'TB').toUpperCase();
-            const isVerticalFlow = layoutDir === 'TB' || layoutDir === 'BT';
-            const isHorizontalFlow = layoutDir === 'LR' || layoutDir === 'RL';
-            const sourcePre = normalizeHandle(edgePorts.source);
-            const targetPre = normalizeHandle(edgePorts.target);
-            const sPos = (source as any).positionAbsolute ?? source.position ?? { x: 0, y: 0 };
-            const tPos = (target as any).positionAbsolute ?? target.position ?? { x: 0, y: 0 };
-            const sDims = {
-                width: (source as any).measured?.width || (source as any).style?.width || 200,
-                height: (source as any).measured?.height || (source as any).style?.height || 80,
-            };
-            const tDims = {
-                width: (target as any).measured?.width || (target as any).style?.width || 200,
-                height: (target as any).measured?.height || (target as any).style?.height || 80,
-            };
-            const dx = (tPos.x + tDims.width / 2) - (sPos.x + sDims.width / 2);
-            const dy = (tPos.y + tDims.height / 2) - (sPos.y + sDims.height / 2);
-            const sourceFanOut = (sourceOutCounts.get(edge.source) || 0) > 1;
-            const targetFanIn = (targetInCounts.get(edge.target) || 0) > 1;
-
-            if (isVerticalFlow) {
-                const sourceMatchesFlow = sourceFanOut && (sourcePre === 'b' || sourcePre === 't')
-                    && Math.abs(dy) > 30
-                    && ((sourcePre === 'b' && dy > 0) || (sourcePre === 't' && dy < 0));
-                const targetMatchesFlow = targetFanIn && (targetPre === 't' || targetPre === 'b')
-                    && Math.abs(dy) > 30
-                    && ((targetPre === 't' && dy > 0) || (targetPre === 'b' && dy < 0));
-                return { sourceFanOut: sourceMatchesFlow, targetFanIn: targetMatchesFlow };
-            }
-
-            if (isHorizontalFlow) {
-                const sourceMatchesFlow = sourceFanOut && (sourcePre === 'r' || sourcePre === 'l')
-                    && Math.abs(dx) > 30
-                    && ((sourcePre === 'r' && dx > 0) || (sourcePre === 'l' && dx < 0));
-                const targetMatchesFlow = targetFanIn && (targetPre === 'l' || targetPre === 'r')
-                    && Math.abs(dx) > 30
-                    && ((targetPre === 'l' && dx > 0) || (targetPre === 'r' && dx < 0));
-                return { sourceFanOut: sourceMatchesFlow, targetFanIn: targetMatchesFlow };
-            }
-
-            return { sourceFanOut: false, targetFanIn: false };
-        };
-
-        // [FIX] 强制同步点：让出到微任务队列，确保所有待处理的状态更新完成
-        // 这模拟了 DevTools 打开时 console.log 造成的微小延迟，解决 F12 打开/关闭的差异问题
-        await Promise.resolve();
-
-        // 预分配智能端口（支持多路重心对齐）
-        const globalPorts = assignGlobalPorts(sortedNodesForRouting, clonedEdges, routingConfig);
-
-        clonedEdges.forEach(edge => {
-            const source = idMap.get(edge.source);
-            const target = idMap.get(edge.target);
-            if (!source || !target) {
-                // [FIX] 即使 source/target 不在 idMap 中，也要确保边有 handle ID
-                // 否则 React Flow 无法定位连接点，边不会渲染
-                const dir = (options.direction || 'TB').toUpperCase();
-                if (!edge.sourceHandle) {
-                    edge.sourceHandle = (dir === 'LR' || dir === 'RL') ? 'right' : 'bottom';
-                }
-                if (!edge.targetHandle) {
-                    edge.targetHandle = (dir === 'LR' || dir === 'RL') ? 'left' : 'top';
-                }
-                logDomainDagreMissingNodeHandle(String(edge.id || `${edge.source}->${edge.target}`), !!source, !!target);
-                return;
-            }
-
-            const sUsage = nodeUsage[source.id] || {};
-            const tUsage = nodeUsage[target.id] || {};
-            const edgeDataForManual = (edge.data ?? {}) as Record<string, any>;
-            const manualSides = Array.isArray(edgeDataForManual.manualHandleSides)
-                ? edgeDataForManual.manualHandleSides.map((side: any) => String(side).toLowerCase())
-                : [];
-            const manualHandles = edgeDataForManual.manualHandles ?? edgeDataForManual._manualHandles;
-            const hasManualSourceHandle = manualSides.includes('source')
-                || manualHandles === true
-                || Boolean(manualHandles && typeof manualHandles === 'object' && manualHandles.source);
-            const hasManualTargetHandle = manualSides.includes('target')
-                || manualHandles === true
-                || Boolean(manualHandles && typeof manualHandles === 'object' && manualHandles.target);
-
-            let explicitSourceHandle = edge.sourceHandle && hasManualSourceHandle && !isAutoHandle(edge, 'source')
-                ? normalizeHandle(edge.sourceHandle)
-                : undefined;
-            let explicitTargetHandle = edge.targetHandle && hasManualTargetHandle && !isAutoHandle(edge, 'target')
-                ? normalizeHandle(edge.targetHandle)
-                : undefined;
-
-            // [FIX] Same-side overshoot guard for explicit handles.
-            // JSON data or stale localStorage may contain explicit handles that create
-            // geometrically absurd paths (e.g. both=right when target is far to the right,
-            // causing a huge U-turn loop). Detect this and DROP the explicit handles,
-            // letting globalPorts + geometry choose the optimal ports.
-            if (explicitSourceHandle && explicitTargetHandle) {
-                const sAbsPos = (source as any).positionAbsolute || source.position;
-                const tAbsPos = (target as any).positionAbsolute || target.position;
-                const sDims = { width: (source as any).measured?.width || (source as any).style?.width || 200, height: (source as any).measured?.height || (source as any).style?.height || 80 };
-                const tDims = { width: (target as any).measured?.width || (target as any).style?.width || 200, height: (target as any).measured?.height || (target as any).style?.height || 80 };
-                const oCenterDx = (tAbsPos.x + tDims.width / 2) - (sAbsPos.x + sDims.width / 2);
-                const oCenterDy = (tAbsPos.y + tDims.height / 2) - (sAbsPos.y + sDims.height / 2);
-                const OVERSHOOT_PX = 40;
-
-                const sh = explicitSourceHandle; // 'r','l','t','b'
-                const th = explicitTargetHandle;
-
-                // Same-side overshoot: source and target use the same side, and target is
-                // clearly on that same side → path loops around
-                let isSameSideOvershoot = false;
-                if (sh === th) {
-                    if (sh === 'r' && oCenterDx > OVERSHOOT_PX) isSameSideOvershoot = true;
-                    if (sh === 'l' && oCenterDx < -OVERSHOOT_PX) isSameSideOvershoot = true;
-                    if (sh === 'b' && oCenterDy > OVERSHOOT_PX) isSameSideOvershoot = true;
-                    if (sh === 't' && oCenterDy < -OVERSHOOT_PX) isSameSideOvershoot = true;
-                }
-                // Source exits AWAY from target (opposite direction)
-                let isSourceAwayFromTarget = false;
-                if (sh === 'r' && oCenterDx < -OVERSHOOT_PX) isSourceAwayFromTarget = true;
-                if (sh === 'l' && oCenterDx > OVERSHOOT_PX) isSourceAwayFromTarget = true;
-                if (sh === 'b' && oCenterDy < -OVERSHOOT_PX) isSourceAwayFromTarget = true;
-                if (sh === 't' && oCenterDy > OVERSHOOT_PX) isSourceAwayFromTarget = true;
-
-                if (isSameSideOvershoot || isSourceAwayFromTarget) {
-                    // Drop explicit handles — let globalPorts and geometry decide
-                    explicitSourceHandle = undefined;
-                    explicitTargetHandle = undefined;
-                }
-            }
-
-            const mergedPorts = { ...globalPorts };
-
-            // [FIX] Lift per-edge handle decisions into per-node entries.
-            // assignGlobalPorts stores per-edge decisions as globalPorts[edge.id],
-            // but PortSelector only reads globalPorts[nodeId]. When per-node
-            // consensus doesn't exist (e.g. L-OMS has 3 outgoing edges in different
-            // directions), the per-edge decision is lost. Lift it here.
-            const edgePorts = globalPorts[edge.id];
-            if (edgePorts) {
-                if (edgePorts.source) {
-                    mergedPorts[source.id] = {
-                        ...mergedPorts[source.id],
-                        source: edgePorts.source
-                    };
-                }
-                if (edgePorts.target) {
-                    mergedPorts[target.id] = {
-                        ...mergedPorts[target.id],
-                        target: edgePorts.target
-                    };
-                }
-            }
-
-            if (explicitSourceHandle) {
-                mergedPorts[source.id] = {
-                    ...mergedPorts[source.id],
-                    source: explicitSourceHandle
-                };
-            }
-            if (explicitTargetHandle) {
-                mergedPorts[target.id] = {
-                    ...mergedPorts[target.id],
-                    target: explicitTargetHandle
-                };
-            }
-
-            const routingConfigForEdge = {
-                ...routingConfig,
-                preAssignedPorts: mergedPorts
-            };
-            const rolePortForce = getRolePortForce(edge, source, target, edgePorts);
-            const forceRolePorts = rolePortForce.sourceFanOut || rolePortForce.targetFanIn;
-            if (forceRolePorts) {
-                (routingConfigForEdge as any).preAssignedPortPolicy = 'force';
-                if (rolePortForce.sourceFanOut && edgePorts?.source && !explicitTargetHandle) {
-                    mergedPorts[target.id] = {
-                        ...mergedPorts[target.id],
-                        target: oppositeHandle(edgePorts.source),
-                    };
-                }
-                if (rolePortForce.targetFanIn && edgePorts?.target && !explicitSourceHandle) {
-                    mergedPorts[source.id] = {
-                        ...mergedPorts[source.id],
-                        source: oppositeHandle(edgePorts.target),
-                    };
-                }
-            }
-
-            const routingResult = explicitSourceHandle && explicitTargetHandle
-                ? {
-                    type: 'advanced-smart-step' as const,
-                    sourceHandle: explicitSourceHandle,
-                    targetHandle: explicitTargetHandle,
-                    autoSource: false,
-                    autoTarget: false,
-                    computedPath: undefined as Array<{ x: number; y: number }> | undefined,
-                }
-                : decideEdgeRouting(
-                    source,
-                    target,
-                    sortedNodesForRouting,  // [FIX] 使用排序后的节点数组确保确定性
-                    { ...routingConfigForEdge, routedPaths },  // P1: 传入已路由路径
-                    { source: sUsage, target: tUsage },
-                    true
-                );
-
-            edge.type = routingResult.type;
-            edge.sourceHandle = expandHandle(routingResult.sourceHandle);
-            edge.targetHandle = expandHandle(routingResult.targetHandle);
-            if (!edge.data) edge.data = {} as any;
-            (edge.data as any).autoSource = Boolean(routingResult.autoSource);
-            (edge.data as any).autoTarget = Boolean(routingResult.autoTarget);
-            const autoList: string[] = [];
-            if (routingResult.autoSource) autoList.push('source');
-            if (routingResult.autoTarget) autoList.push('target');
-            (edge.data as any).auto = autoList;
-
-            const computedPathForEdge = resolveRoutingResultPath({
-                routingResult,
-                source,
-                target,
-                nodeById: idMap,
-            });
-
-            lockComputedPathOnEdge(edge, computedPathForEdge);
-
-            // P1: 记录此边的完整计算路径
-            if (computedPathForEdge.length >= 2) {
-                routedPaths.push({ points: computedPathForEdge });
-            } else {
-                // Fallback: 使用起点终点
-                const sPos = (source as any).positionAbsolute ?? (source as any).position ?? { x: 0, y: 0 };
-                const tPos = (target as any).positionAbsolute ?? (target as any).position ?? { x: 0, y: 0 };
-                const sW = (source as any)?.measured?.width ?? 100;
-                const sH = (source as any)?.measured?.height ?? 50;
-                const tW = (target as any)?.measured?.width ?? 100;
-                const tH = (target as any)?.measured?.height ?? 50;
-
-                // 根据 handle 计算锚点
-                const handleToAnchor = (pos: any, w: number, h: number, handle: string) => {
-                    switch (handle) {
-                        case 'l': case 'left': return { x: pos.x, y: pos.y + h / 2 };
-                        case 'r': case 'right': return { x: pos.x + w, y: pos.y + h / 2 };
-                        case 't': case 'top': return { x: pos.x + w / 2, y: pos.y };
-                        case 'b': case 'bottom': return { x: pos.x + w / 2, y: pos.y + h };
-                        default: return { x: pos.x + w / 2, y: pos.y + h / 2 };
-                    }
-                };
-
-                const startPt = handleToAnchor(sPos, sW, sH, routingResult.sourceHandle);
-                const endPt = handleToAnchor(tPos, tW, tH, routingResult.targetHandle);
-                routedPaths.push({ points: [startPt, endPt] });
-            }
-
-            if (!nodeUsage[source.id]) nodeUsage[source.id] = {};
-            nodeUsage[source.id][edge.sourceHandle] =
-                (nodeUsage[source.id][edge.sourceHandle] || 0) + 1;
-
-            if (!nodeUsage[target.id]) nodeUsage[target.id] = {};
-            nodeUsage[target.id][edge.targetHandle] =
-                (nodeUsage[target.id][edge.targetHandle] || 0) + 1;
-        });
-
-        // ═══════════════════════════════════════════════════════════════
-        // [FIX] Port Ordering: Avoid unnecessary crossings for same-side edges
-        //
-        // When multiple edges share the same side of a node (e.g. two edges
-        // exit from the bottom of WMS), their anchor points default to the
-        // center of that side. Without reordering, the edge going to the
-        // LEFT target may be placed to the RIGHT of the edge going to the
-        // RIGHT target — creating an X-crossing.
-        //
-        // Fix: group edges by (node, side), sort by the opposing endpoint's
-        // perpendicular coordinate, and spread anchor points evenly.
-        // ═══════════════════════════════════════════════════════════════
-        {
-            // Collect edges by source-side and target-side
-            type EdgePortInfo = { edgeIdx: number; edge: any; otherPos: { x: number; y: number }; handle: string };
-            const sourceGroups = new Map<string, EdgePortInfo[]>(); // key: nodeId:handle
-            const targetGroups = new Map<string, EdgePortInfo[]>();
-
-            clonedEdges.forEach((edge, idx) => {
-                const src = idMap.get(edge.source);
-                const tgt = idMap.get(edge.target);
-                if (!src || !tgt) return;
-
-                const sh = normalizeHandle(edge.sourceHandle || 'bottom');
-                const th = normalizeHandle(edge.targetHandle || 'top');
-
-                const tAbsPos = (tgt as any).positionAbsolute || tgt.position;
-                const sAbsPos = (src as any).positionAbsolute || src.position;
-                const tDims = { width: (tgt as any).measured?.width || (tgt as any).style?.width || 200, height: (tgt as any).measured?.height || (tgt as any).style?.height || 80 };
-                const sDims = { width: (src as any).measured?.width || (src as any).style?.width || 200, height: (src as any).measured?.height || (src as any).style?.height || 80 };
-
-                const sKey = `${edge.source}:${sh}:source`;
-                if (!sourceGroups.has(sKey)) sourceGroups.set(sKey, []);
-                sourceGroups.get(sKey)!.push({
-                    edgeIdx: idx, edge, handle: sh,
-                    otherPos: { x: tAbsPos.x + tDims.width / 2, y: tAbsPos.y + tDims.height / 2 }
-                });
-
-                const tKey = `${edge.target}:${th}:target`;
-                if (!targetGroups.has(tKey)) targetGroups.set(tKey, []);
-                targetGroups.get(tKey)!.push({
-                    edgeIdx: idx, edge, handle: th,
-                    otherPos: { x: sAbsPos.x + sDims.width / 2, y: sAbsPos.y + sDims.height / 2 }
-                });
-            });
-
-            const reorderPortAnchors = (groups: Map<string, EdgePortInfo[]>, role: 'source' | 'target') => {
-                for (const [key, group] of groups) {
-                    if (group.length < 2) continue;
-
-                    const nodeId = key.split(':')[0];
-                    const handle = key.split(':')[1];
-                    const node = idMap.get(nodeId);
-                    if (!node) continue;
-
-                    const absPos = (node as any).positionAbsolute || node.position;
-                    const dims = {
-                        width: (node as any).measured?.width || (node as any).style?.width || 200,
-                        height: (node as any).measured?.height || (node as any).style?.height || 80
-                    };
-
-                    // For top/bottom ports: sort by other endpoint's X coordinate
-                    // For left/right ports: sort by other endpoint's Y coordinate
-                    const isVerticalPort = handle === 't' || handle === 'b';
-                    group.sort((a, b) => {
-                        if (isVerticalPort) return a.otherPos.x - b.otherPos.x;
-                        return a.otherPos.y - b.otherPos.y;
-                    });
-
-                    // Spread anchor points evenly along the port side
-                    const n = group.length;
-                    for (let i = 0; i < n; i++) {
-                        const fraction = (i + 1) / (n + 1); // e.g. for 2 edges: 1/3, 2/3
-                        const entry = group[i];
-                        const path = (entry.edge.data as any)?.computedPath;
-                        if (!path || path.length < 2) continue;
-
-                        const ptIdx = role === 'source' ? 0 : path.length - 1;
-                        const adjacentIdx = role === 'source' ? 1 : path.length - 2;
-                        const stubLength = 32;
-                        if (isVerticalPort) {
-                            // Spread along X axis
-                            const nextX = absPos.x + dims.width * fraction;
-                            const oldAdjacent = { ...path[adjacentIdx] };
-                            path[ptIdx] = {
-                                ...path[ptIdx],
-                                x: nextX
-                            };
-                            const isSidewaysFirstSegment = Math.abs(oldAdjacent.y - path[ptIdx].y) < 0.5;
-                            if (isSidewaysFirstSegment) {
-                                const outward = handle === 't' ? -1 : 1;
-                                path[adjacentIdx] = {
-                                    x: nextX,
-                                    y: path[ptIdx].y + outward * stubLength
-                                };
-                            } else {
-                                path[adjacentIdx] = {
-                                    ...path[adjacentIdx],
-                                    x: nextX
-                                };
-                            }
-                        } else {
-                            // Spread along Y axis
-                            const nextY = absPos.y + dims.height * fraction;
-                            const oldAdjacent = { ...path[adjacentIdx] };
-                            path[ptIdx] = {
-                                ...path[ptIdx],
-                                y: nextY
-                            };
-                            const isSidewaysFirstSegment = Math.abs(oldAdjacent.x - path[ptIdx].x) < 0.5;
-                            if (isSidewaysFirstSegment) {
-                                const outward = handle === 'l' ? -1 : 1;
-                                path[adjacentIdx] = {
-                                    x: path[ptIdx].x + outward * stubLength,
-                                    y: nextY
-                                };
-                            } else {
-                                path[adjacentIdx] = {
-                                    ...path[adjacentIdx],
-                                    y: nextY
-                                };
-                            }
-                        }
-                        if (
-                            Math.abs(path[ptIdx].x - path[adjacentIdx].x) < 0.5 &&
-                            Math.abs(path[ptIdx].y - path[adjacentIdx].y) < 0.5
-                        ) {
-                            path.splice(adjacentIdx, 1);
-                        }
-                    }
-                }
-            };
-
-            reorderPortAnchors(sourceGroups, 'source');
-            reorderPortAnchors(targetGroups, 'target');
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // [FIX] 禁用 P4-P8 后处理管道（对齐 DiagramView-SVG 设计）
-        // 根因：P7 beautifyOrthogonalEdges / P8 optimizeTreeBusRouting
-        // 使用短格式 handle ID ('r'/'l'/'t'/'b')，与 FlowchartNode 的
-        // 全称 Handle ID ('right'/'left'/'top'/'bottom') 不兼容，
-        // 导致 React Flow 无法匹配 Handle → 边不渲染。
-        // decideEdgeRouting 返回的 handle 已经是正确的全称格式，
-        // 直接使用即可。
-        // ═══════════════════════════════════════════════════════════════
-        const finalRoutedEdges = separateDetachedParallelOverlaps(repairEndpointOrthogonalPaths(repairEndpointOrthogonalPaths(separateDetachedParallelOverlaps(repairSharedTrunkAwareCrossings(clonedEdges, updatedNodes), updatedNodes), updatedNodes), updatedNodes), updatedNodes, 24);
         convertToHierarchicalFormat(updatedNodes, nodeToSubGroup);
         sortHierarchicalNodes(updatedNodes);
 
         return { nodes: updatedNodes, edges: finalRoutedEdges };
     }
 
-    /**
-     * 使用 Dagre 进行布局
-     */
-    private layoutWithDagre(
-        nodes: ReactFlowNode[],
-        edges: Edge[],
-        direction: string,
-        nodeSep: number,
-        rankSep: number,
-        getNodeDimensions?: (node: ReactFlowNode) => { width: number; height: number },
-        ranker: string = 'network-simplex'
-    ): { id: string; x: number; y: number }[] {
-        if (nodes.length === 0) return [];
 
-        const g = new dagre.graphlib.Graph();
-
-        // 分析边的连接模式，确定最佳对齐策略
-        const outDegree: Record<string, number> = {};
-        const inDegree: Record<string, number> = {};
-        edges.forEach(e => {
-            outDegree[e.source] = (outDegree[e.source] || 0) + 1;
-            inDegree[e.target] = (inDegree[e.target] || 0) + 1;
-        });
-
-        // 检测是否有一对多或多对一的模式
-        const hasOneToMany = Object.values(outDegree).some(d => d > 1);
-        const hasManyToOne = Object.values(inDegree).some(d => d > 1);
-
-        // 根据连接模式选择对齐策略
-        // - 一对多模式：使用 'DL' (down-left) 让目标节点向下展开
-        // - 多对一模式：使用 'UL' (up-left) 让源节点向上聚合
-        // - 混合模式或无特殊模式：使用 undefined (居中对齐)
-        let alignStrategy: string | undefined;
-        if (hasOneToMany && !hasManyToOne) {
-            alignStrategy = 'DL';
-        } else if (hasManyToOne && !hasOneToMany) {
-            alignStrategy = 'UL';
-        } else {
-            // 混合模式或简单链式：居中对齐通常效果最好
-            alignStrategy = undefined;
-        }
-
-        g.setGraph({
-            rankdir: direction === 'LR' ? 'LR' : direction === 'RL' ? 'RL' : direction === 'BT' ? 'BT' : 'TB',
-            nodesep: nodeSep,
-            ranksep: rankSep,
-            ranker: ranker,
-            align: alignStrategy,
-            marginx: 0,
-            marginy: 0,
-        });
-
-        g.setDefaultEdgeLabel(() => ({}));
-
-        // 添加节点（按输入顺序，Dagre 会尊重这个顺序进行层级分配）
-        nodes.forEach(node => {
-            // 使用传入的尺寸获取器，或者默认逻辑
-            const dims = getNodeDimensions ? getNodeDimensions(node) : this.getNodeDimensions(node);
-            const w = dims.width;
-            const h = dims.height;
-
-            g.setNode(node.id, { width: w, height: h });
-        });
-
-        // 添加边（带权重和最小层级跨度）
-        edges.forEach(edge => {
-            if (g.hasNode(edge.source) && g.hasNode(edge.target)) {
-                // 计算边的权重：一对多的边权重较低，让目标节点更分散
-                const sourceOutDegree = outDegree[edge.source] || 1;
-                const targetInDegree = inDegree[edge.target] || 1;
-
-                // 权重计算：连接度越高，权重越低（允许更灵活的布局）
-                const weight = 1 / Math.max(sourceOutDegree, targetInDegree);
-
-                g.setEdge(edge.source, edge.target, {
-                    weight: weight,
-                    minlen: 1,  // 最小层级跨度
-                });
-            }
-        });
-
-        // 执行布局
-        dagre.layout(g);
-
-        // 收集结果
-        const result: { id: string; x: number; y: number }[] = [];
-        nodes.forEach(node => {
-            const nodeWithPos = g.node(node.id);
-            if (nodeWithPos) {
-                const dims = getNodeDimensions ? getNodeDimensions(node) : this.getNodeDimensions(node);
-                const w = dims.width;
-                const h = dims.height;
-
-                // Dagre 返回的是中心点，需要转换为左上角
-                result.push({
-                    id: node.id,
-                    x: nodeWithPos.x - w / 2,
-                    y: nodeWithPos.y - h / 2,
-                });
-            }
-        });
-
-        return result;
-    }
-
-    /**
-     * 将叶节点边映射到容器边
-     */
-    private mapEdgesToContainers(edges: Edge[], nodeToContainer: Map<string, string>): Edge[] {
-        const containerEdges: Edge[] = [];
-        const seen = new Set<string>();
-
-        edges.forEach(e => {
-            const srcContainer = nodeToContainer.get(e.source) || e.source;
-            const tgtContainer = nodeToContainer.get(e.target) || e.target;
-
-            if (srcContainer !== tgtContainer) {
-                const key = `${srcContainer}->${tgtContainer}`;
-                if (!seen.has(key)) {
-                    seen.add(key);
-                    containerEdges.push({
-                        ...e,
-                        id: `cnt-${e.id}`,
-                        source: srcContainer,
-                        target: tgtContainer
-                    });
-                }
-            }
-        });
-
-        return containerEdges;
-    }
-
-    /**
-     * 计算节点的边界框
-     */
-    private getNodeDimensions(node: ReactFlowNode): { width: number; height: number } {
-        const w = (node as any).measured?.width
-            || (typeof (node as any).style?.width === 'number' ? (node as any).style.width : null)
-            || (node as any).width
-            || 200;
-        const h = (node as any).measured?.height
-            || (typeof (node as any).style?.height === 'number' ? (node as any).style.height : null)
-            || (node as any).height
-            || 80;
-        return { width: w, height: h };
-    }
-
-    /**
-     * 计算节点的边界框
-     * @param widthCompensation 可选的宽度补偿系数，用于补偿中文文本实际渲染宽度与计算宽度的差异
-     */
-    private calculateBounds(
-        nodes: ReactFlowNode[],
-        getNodeDimensions?: (node: ReactFlowNode) => { width: number; height: number },
-        widthCompensation: number = 1.0
-    ): { width: number; height: number; minX: number; minY: number } {
-        if (nodes.length === 0) {
-            return { width: 200, height: 100, minX: 0, minY: 0 };
-        }
-
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-        nodes.forEach(node => {
-            const x = node.position.x;
-            const y = node.position.y;
-            const dims = getNodeDimensions ? getNodeDimensions(node) : this.getNodeDimensions(node);
-            // 应用宽度补偿系数
-            const w = dims.width * widthCompensation;
-            const h = dims.height;
-
-            minX = Math.min(minX, x);
-            minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x + w);
-            maxY = Math.max(maxY, y + h);
-        });
-
-        return {
-            width: Math.max(100, maxX - minX),
-            height: Math.max(60, maxY - minY),
-            minX,
-            minY
-        };
-    }
-
-    /**
-     * 应用智能边路由
-     */
-    private applyEdgeRouting(
-        nodes: ReactFlowNode[],
-        edges: Edge[],
-        idMap: Map<string, ReactFlowNode>,
-        cfg: any,
-        options: LayoutOptions
-    ): void {
-        const getNodeSize = (n: ReactFlowNode): { width: number; height: number } => {
-            const w = (n as any).style?.width ?? (n as any).measured?.width ?? (n as any).width ?? 120;
-            const h = (n as any).style?.height ?? (n as any).measured?.height ?? (n as any).height ?? 60;
-            return { width: w, height: h };
-        };
-        const getNodeCenter = (n: ReactFlowNode): { cx: number; cy: number } => {
-            const pos = (n as any).positionAbsolute || n.position || { x: 0, y: 0 };
-            const size = getNodeSize(n);
-            return { cx: pos.x + size.width / 2, cy: pos.y + size.height / 2 };
-        };
-        const getDominantHandle = (centerNode: ReactFlowNode, relatives: ReactFlowNode[]): string => {
-            if (relatives.length === 0) return 'bottom';
-            const c = getNodeCenter(centerNode);
-            let sumX = 0;
-            let sumY = 0;
-            let count = 0;
-            relatives.forEach(rel => {
-                if (!rel) return;
-                const r = getNodeCenter(rel);
-                sumX += r.cx;
-                sumY += r.cy;
-                count += 1;
-            });
-            if (count === 0) return 'bottom';
-            const dx = sumX / count - c.cx;
-            const dy = sumY / count - c.cy;
-            const layoutDir = String(options.direction || 'TB').toUpperCase();
-            const isHorizontalFlow = layoutDir === 'LR' || layoutDir === 'RL';
-            if (isHorizontalFlow) {
-                if (count > 1 && Math.abs(dx) > 30) return dx > 0 ? 'right' : 'left';
-                if (Math.abs(dy) > Math.abs(dx) * 1.1) return dy > 0 ? 'bottom' : 'top';
-                return dx > 0 ? 'right' : 'left';
-            }
-            if (count > 1 && Math.abs(dy) > 30) return dy > 0 ? 'bottom' : 'top';
-            if (Math.abs(dx) > Math.abs(dy) * 1.1) return dx > 0 ? 'right' : 'left';
-            return dy > 0 ? 'bottom' : 'top';
-        };
-        const oppositeHandle = (h: string): string => {
-            if (h === 'left' || h === 'l') return 'right';
-            if (h === 'right' || h === 'r') return 'left';
-            if (h === 'top' || h === 't') return 'bottom';
-            if (h === 'bottom' || h === 'b') return 'top';
-            return 'bottom';
-        };
-
-        const getAbsPos = (n: ReactFlowNode): { x: number, y: number } => {
-            let x = n.position.x;
-            let y = n.position.y;
-            let current = n;
-            let depth = 0;
-            while (current.parentId && depth < 10) {
-                const parent = idMap.get(current.parentId);
-                if (!parent) break;
-                x += parent.position.x;
-                y += parent.position.y;
-                current = parent;
-                depth++;
-            }
-            return { x, y };
-        };
-
-        nodes.forEach(n => {
-            (n as any).positionAbsolute = getAbsPos(n);
-        });
-
-        const cfgEdge = cfg?.edge || {};
-        const routingConfig = {
-            mode: 'advanced-smart' as const,
-            globalPath: (cfgEdge.pathType || 'step') as string,
-            autoPathSelection: true,
-            angleToleranceDeg: Number(cfgEdge.angleToleranceDeg ?? 36),
-            bezierDistanceThreshold: Number(cfgEdge.bezierDistanceThreshold ?? 280),
-            obstacleScopePadding: Number(cfgEdge.obstacleScopePadding ?? 160),
-            corridorObstacleThreshold: Number(cfgEdge.corridorObstacleThreshold ?? 6),
-            directionalHandlePolicy: String(cfgEdge.directionalHandlePolicy || 'prefer') as any,
-            verticalBiasThreshold: Number(cfgEdge.verticalBiasThreshold ?? 1.2),
-            obstaclePadding: Number(cfgEdge.obstaclePadding ?? 24),
-            ignoreContainers: Boolean(cfgEdge.ignoreContainers ?? false),
-            layoutDirection: options.direction || 'TB'
-        };
-
-        // ============================================
-        // 预分析：检测一对多和多对一模式
-        // ============================================
-        const outgoingEdges: Record<string, Edge[]> = {};  // 每个源节点的出边
-        const incomingEdges: Record<string, Edge[]> = {};  // 每个目标节点的入边
-
-        edges.forEach(edge => {
-            if (!outgoingEdges[edge.source]) outgoingEdges[edge.source] = [];
-            outgoingEdges[edge.source].push(edge);
-            if (!incomingEdges[edge.target]) incomingEdges[edge.target] = [];
-            incomingEdges[edge.target].push(edge);
-        });
-
-        // 预计算：对于多对一的目标节点，决定统一的目标端口
-        const manyToOneTargetHandle: Record<string, string> = {};
-
-        for (const [targetId, edgeList] of Object.entries(incomingEdges)) {
-            if (edgeList.length > 1) {
-                const targetNode = idMap.get(targetId);
-                if (!targetNode) continue;
-                const sources = edgeList.map(e => idMap.get(e.source)).filter(Boolean) as ReactFlowNode[];
-                const unifiedHandle = getDominantHandle(targetNode, sources);
-                manyToOneTargetHandle[targetId] = unifiedHandle;
-            }
-        }
-
-        // 预计算：对于一对多的源节点，决定统一的源端口
-        const oneToManySourceHandle: Record<string, string> = {};
-
-        for (const [sourceId, edgeList] of Object.entries(outgoingEdges)) {
-            if (edgeList.length > 1) {
-                const sourceNode = idMap.get(sourceId);
-                if (!sourceNode) continue;
-                const targets = edgeList.map(e => idMap.get(e.target)).filter(Boolean) as ReactFlowNode[];
-                const unifiedHandle = getDominantHandle(sourceNode, targets);
-                oneToManySourceHandle[sourceId] = unifiedHandle;
-            }
-        }
-
-        // ============================================
-        // 边路由：应用统一端口或智能选择
-        // ============================================
-        const nodeUsage: Record<string, Record<string, number>> = {};
-        edges.forEach(edge => {
-            const source = idMap.get(edge.source);
-            const target = idMap.get(edge.target);
-            if (!source || !target) return;
-
-            const sUsage = nodeUsage[source.id] || {};
-            const tUsage = nodeUsage[target.id] || {};
-
-            // 检查是否需要使用预定的统一端口
-            const unifiedSourceHandle = oneToManySourceHandle[source.id];
-            const unifiedTargetHandle = manyToOneTargetHandle[target.id];
-            const edgeData = (edge.data ?? {}) as Record<string, any>;
-            const manualSides = Array.isArray(edgeData.manualHandleSides)
-                ? edgeData.manualHandleSides.map((side: any) => String(side).toLowerCase())
-                : [];
-            const sourceDomain = String((source.data as any)?.domain || '').trim();
-            const targetDomain = String((target.data as any)?.domain || '').trim();
-            const sourceSubDomain = String((source.data as any)?.subDomain || '').trim();
-            const targetSubDomain = String((target.data as any)?.subDomain || '').trim();
-            const isHorizontalSubDomainEdge = sourceDomain
-                && targetDomain
-                && sourceDomain === targetDomain
-                && sourceSubDomain
-                && targetSubDomain
-                && sourceSubDomain !== targetSubDomain;
-            const sourceParentId = String((source as any).parentId || '');
-            const targetParentId = String((target as any).parentId || '');
-            const isCrossContainerEdge = Boolean(sourceParentId && targetParentId && sourceParentId !== targetParentId);
-            if (
-                (isHorizontalSubDomainEdge || isCrossContainerEdge) &&
-                manualSides.includes('source') &&
-                manualSides.includes('target') &&
-                ['top', 'bottom', 't', 'b'].includes(String(edge.sourceHandle || '').toLowerCase()) &&
-                ['top', 'bottom', 't', 'b'].includes(String(edge.targetHandle || '').toLowerCase())
-            ) {
-                const sPos = (source as any).positionAbsolute ?? source.position ?? { x: 0 };
-                const tPos = (target as any).positionAbsolute ?? target.position ?? { x: 0 };
-                if ((tPos.x ?? 0) >= (sPos.x ?? 0)) {
-                    edge.sourceHandle = 'right';
-                    edge.targetHandle = 'left';
-                } else {
-                    edge.sourceHandle = 'left';
-                    edge.targetHandle = 'right';
-                }
-            }
-            const preserveManualHandles = Boolean(edge.sourceHandle && edge.targetHandle)
-                && manualSides.includes('source')
-                && manualSides.includes('target');
-
-            let routingResult;
-            if (preserveManualHandles) {
-                routingResult = {
-                    type: 'advanced-smart-step' as const,
-                    sourceHandle: edge.sourceHandle,
-                    targetHandle: edge.targetHandle,
-                    autoSource: false,
-                    autoTarget: false,
-                    computedPath: undefined as Array<{ x: number; y: number }> | undefined,
-                };
-            } else if (unifiedSourceHandle || unifiedTargetHandle) {
-                let sourceHandle: string;
-                let targetHandle: string;
-
-                if (unifiedTargetHandle) {
-                    targetHandle = unifiedTargetHandle;
-                    sourceHandle = oppositeHandle(targetHandle);
-                } else {
-                    sourceHandle = unifiedSourceHandle || 'bottom';
-                    targetHandle = oppositeHandle(sourceHandle);
-                }
-
-                routingResult = {
-                    type: 'advanced-smart-step' as const,
-                    sourceHandle,
-                    targetHandle,
-                    computedPath: undefined as Array<{ x: number; y: number }> | undefined,
-                };
-            } else {
-                // 无统一端口约束，使用完整的智能路由
-                routingResult = decideEdgeRouting(
-                    source,
-                    target,
-                    nodes,
-                    routingConfig,
-                    { source: sUsage, target: tUsage },
-                    true
-                );
-            }
-
-            edge.type = routingResult.type;
-            edge.sourceHandle = expandHandle(routingResult.sourceHandle);
-            edge.targetHandle = expandHandle(routingResult.targetHandle);
-            if (!edge.data) edge.data = {} as any;
-            (edge.data as any).autoSource = Boolean(routingResult.autoSource);
-            (edge.data as any).autoTarget = Boolean(routingResult.autoTarget);
-            const autoList: string[] = [];
-            if (routingResult.autoSource) autoList.push('source');
-            if (routingResult.autoTarget) autoList.push('target');
-            (edge.data as any).auto = autoList;
-
-            lockComputedPathOnEdge(edge, resolveRoutingResultPath({
-                routingResult,
-                source,
-                target,
-                nodeById: idMap,
-            }));
-            if (!nodeUsage[source.id]) nodeUsage[source.id] = {};
-            nodeUsage[source.id][edge.sourceHandle] =
-                (nodeUsage[source.id][edge.sourceHandle] || 0) + 1;
-
-            if (!nodeUsage[target.id]) nodeUsage[target.id] = {};
-            nodeUsage[target.id][edge.targetHandle] =
-                (nodeUsage[target.id][edge.targetHandle] || 0) + 1;
-        });
-        separateDetachedParallelOverlaps(repairEndpointOrthogonalPaths(repairEndpointOrthogonalPaths(separateDetachedParallelOverlaps(repairSharedTrunkAwareCrossings(edges, nodes), nodes), nodes), nodes), nodes, 24)
-            .forEach((edge, index) => { edges[index] = edge; });
-    }
 }
 
 export default DomainDagreLayoutStrategy;
-

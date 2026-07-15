@@ -4,7 +4,9 @@ import { LayoutType } from '../../types/layout';
 import DomainDagreLayoutStrategy from '../DomainDagreLayoutStrategy';
 import demandAllocation from '../../../data/standardized/DeamndAllocation.json';
 import logisticsStandardData from '../../../data/standardized/LogisticsStandardData.json';
+import systemsInteractionStandardData from '../../../data/standardized/SystemsInteractionStandardData.json';
 import transportDrivenStandardData from '../../../data/standardized/TransportDrivenStandardData.json';
+import wmsProcessFlowStandardData from '../../../data/standardized/WmsProcessFlowStandardData.json';
 import { standardDataToCanvas } from '../../components/diagrams/designerUtils';
 import {
     computeBaseReactFlowDisplayEdgeEpoch,
@@ -151,6 +153,66 @@ describe('DomainDagreLayoutStrategy', () => {
         expect(Math.abs(computedPath[0].x - (sourceAbs.x + sourceSize.width + 1))).toBeLessThanOrEqual(1);
         expect(Math.abs(computedPath[computedPath.length - 1].x - (targetAbs.x - 1))).toBeLessThanOrEqual(1);
     });
+
+    it('respects standard data group visibility options before laying out system interaction diagrams', async () => {
+        const canvas = await standardDataToCanvas(systemsInteractionStandardData as any);
+        const expectedSubDomains = new Set((systemsInteractionStandardData as any).layout.subDomainWhitelist);
+
+        const domainGroups = canvas.nodes.filter(
+            node => String(node.type) === 'titleGroup'
+        );
+        const visibleSubGroups = canvas.nodes.filter(
+            node => String(node.type) === 'subGroup' && !(node.data as any)?.hidden
+        );
+        const hiddenGroups = canvas.nodes.filter(
+            node => ['titleGroup', 'subGroup'].includes(String(node.type || '')) && (node.data as any)?.hidden
+        );
+        const hiddenGroupIds = new Set(hiddenGroups.map(node => node.id));
+        const visibleNodesParentedToHiddenGroups = canvas.nodes.filter(
+            node => !(node as any).hidden && node.parentId && hiddenGroupIds.has(String(node.parentId))
+        );
+
+        expect(domainGroups).toHaveLength(0);
+        expect(hiddenGroups).toHaveLength(0);
+        expect(visibleNodesParentedToHiddenGroups).toEqual([]);
+        expect(new Set(visibleSubGroups.map(node => String((node.data as any)?.subDomain || '')))).toEqual(expectedSubDomains);
+        expect(canvas.edges).toHaveLength((systemsInteractionStandardData as any).edges.length);
+    }, 15_000);
+
+    it('keeps large standard conversions layout-compatible in interactive edge-routing mode', async () => {
+        const canvas = await standardDataToCanvas(wmsProcessFlowStandardData as any, undefined, {
+            edgeRoutingQuality: 'interactive',
+        });
+
+        const hiddenGroups = canvas.nodes.filter(
+            node => ['titleGroup', 'subGroup'].includes(String(node.type || '')) && (node.data as any)?.hidden
+        );
+        const interactiveEdges = canvas.edges.filter(edge => (edge.data as any)?.algorithm === 'domain-dagre-interactive');
+        const fanOutSources = new Set(['order-input', 'allocation', 'task-generate', 'task-group', 'operation']);
+        const fanOutEdges = canvas.edges.filter(edge => fanOutSources.has(edge.source));
+        const sharedTrunkFanOutEdges = fanOutEdges.filter(edge => (edge.data as any)?.sharedTrunkSynthesized === true);
+
+        expect(canvas.nodes.length).toBeGreaterThanOrEqual((wmsProcessFlowStandardData as any).nodes.length);
+        expect(canvas.edges).toHaveLength((wmsProcessFlowStandardData as any).edges.length);
+        expect(hiddenGroups).toHaveLength(0);
+        expect(interactiveEdges).toHaveLength(canvas.edges.length);
+        expect(canvas.edges.every(edge => (edge.data as any)?.trunkPolishVersion === 2)).toBe(true);
+        expect(sharedTrunkFanOutEdges.length).toBeGreaterThan(0);
+        expect(canvas.edges.every(edge => Array.isArray((edge.data as any)?.computedPath))).toBe(true);
+        expect(canvas.edges.every(edge => (edge.data as any)?.layoutPathLocked === true)).toBe(true);
+    }, 15_000);
+
+    it('keeps reverse systems-interaction feedback off the forward target trunk in interactive mode', async () => {
+        const canvas = await standardDataToCanvas(systemsInteractionStandardData as any, undefined, {
+            edgeRoutingQuality: 'interactive',
+        });
+        const feedback = canvas.edges.find(edge => edge.id === 'edge-tms-execution-wms-outbound');
+        const path = pathFor(canvas.edges, 'edge-tms-execution-wms-outbound');
+
+        expect(feedback).toBeTruthy();
+        expect(path.length).toBeGreaterThanOrEqual(2);
+        expect(path[1].y).toBeLessThan(path[0].y);
+    }, 15_000);
 
     it('keeps WMS quota fan-out on the vertical process axis in horizontal subdomain dagre', async () => {
         const canvas = await standardDataToCanvas(demandAllocation as any);

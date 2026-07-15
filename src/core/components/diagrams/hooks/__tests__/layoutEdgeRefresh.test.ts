@@ -46,6 +46,24 @@ describe('layoutEdgeRefresh', () => {
     expect((refreshed.data as any)._layoutEpoch).toBe(456);
   });
 
+  it('preserves stablePath computed paths even when older data lacks lock flags', () => {
+    const computedPath = [{ x: 0, y: 0 }, { x: 40, y: 0 }];
+    const edge = {
+      ...makeEdge({
+        computedPath,
+        algorithm: 'domain-dagre',
+      }),
+      type: 'stablePath',
+    };
+
+    const refreshed = refreshDomainLayoutEdgeForRender(edge, 567);
+
+    expect(hasTrustedLockedComputedPath(edge)).toBe(true);
+    expect((refreshed.data as any).computedPath).toBe(computedPath);
+    expect((refreshed.data as any).algorithm).toBe('domain-dagre');
+    expect((refreshed.data as any)._layoutEpoch).toBe(567);
+  });
+
   it('does not preserve invalid post-processed computed paths', () => {
     const edge = makeEdge({
       computedPath: [{ x: 0, y: 0 }, { x: Number.NaN, y: 0 }],

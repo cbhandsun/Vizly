@@ -29,6 +29,12 @@ describe('useFlowchartExportControls', () => {
     const { useFlowchartExportControls } = await import('../useFlowchartExportControls');
     const { result } = renderHook(() => useFlowchartExportControls('diagram-1', reactFlowInstance as any));
 
+    expect(result.current.getReactFlowSnapshot()).toEqual({
+      nodes: [{ id: 'n1' }],
+      edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
+      viewport: { x: 1, y: 2, zoom: 1.25 },
+    });
+
     await act(async () => {
       await result.current.exportToSVG();
     });
@@ -55,4 +61,3 @@ describe('useFlowchartExportControls', () => {
     expect(context.getReactFlowSnapshot()).toBeNull();
   });
 });
-

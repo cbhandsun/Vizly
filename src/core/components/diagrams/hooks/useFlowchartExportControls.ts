@@ -15,6 +15,8 @@ export const useFlowchartExportControls = (
     };
   }, [reactFlowInstance]);
 
-  return useDiagramControls(diagramId, false, { getReactFlowSnapshot });
+  return {
+    ...useDiagramControls(diagramId, false, { getReactFlowSnapshot }),
+    getReactFlowSnapshot,
+  };
 };
-

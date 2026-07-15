@@ -1403,7 +1403,6 @@ export function findPath(
             for (let di = 0; di < optimized.length - 1; di++) {
                 detourLen += Math.abs(optimized[di + 1].x - optimized[di].x) + Math.abs(optimized[di + 1].y - optimized[di].y);
             }
-
             if (detourLen > directDist * DETOUR_RATIO && directDist > 100) {
                 // 路径绕行过大，尝试放宽障碍物检查生成更短路径
                 const relaxedPath = generateSimplePath(start, end, [], lineObstacles, {

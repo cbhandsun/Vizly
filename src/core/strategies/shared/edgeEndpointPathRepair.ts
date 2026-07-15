@@ -659,6 +659,7 @@ function straightenNearlyAlignedEndpointPath(
   edgePaths: EdgePathContext[],
 ): Point[] | null {
   if (path.length < 3) return null;
+  if ((edge.data as any)?.sharedTrunkSynthesized === true) return null;
   const sourceRect = nodeRect(nodeById.get(edge.source));
   const targetRect = nodeRect(nodeById.get(edge.target));
   if (!sourceRect || !targetRect) return null;
@@ -811,7 +812,8 @@ export function repairEndpointOrthogonalPaths(edges: Edge[], nodes: ReactFlowNod
 
   const endpointContextList = Array.from(endpointContexts.values());
 
-  return edgePaths.map(({ edge, edgeKey, path }) => {
+  let changed = false;
+  const repairedEdges = edgePaths.map(({ edge, edgeKey, path }) => {
     if (path.length < 2) return edge;
 
     let repaired = path;
@@ -827,6 +829,7 @@ export function repairEndpointOrthogonalPaths(edges: Edge[], nodes: ReactFlowNod
     }
     repaired = straightenNearlyAlignedEndpointPath(repaired, edge, edgeKey, nodeById, edgePaths) ?? repaired;
     if (samePath(path, repaired)) return edge;
+    changed = true;
     return withComputedPath(edge, repaired, {
       detachedSourceEndpointReanchored: sourceContext?.detachedEndpoint === true
         || ((edge.data as any)?.detachedSourceEndpointReanchored === true),
@@ -834,4 +837,5 @@ export function repairEndpointOrthogonalPaths(edges: Edge[], nodes: ReactFlowNod
         || ((edge.data as any)?.detachedTargetEndpointReanchored === true),
     });
   });
+  return changed ? repairedEdges : edges;
 }

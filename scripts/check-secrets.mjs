@@ -53,12 +53,24 @@ const shouldScan = (file) => {
 
 const isAllowlisted = (line) => allowlistPatterns.some((pattern) => pattern.test(line));
 
-const files = execFileSync('git', ['ls-files'], { encoding: 'utf8' })
+const gitFiles = (args) => execFileSync('git', args, {
+  encoding: 'utf8',
+  stdio: ['ignore', 'pipe', 'pipe'],
+})
   .split(/\r?\n/)
   .map((line) => line.trim())
-  .filter(Boolean)
+  .filter(Boolean);
+
+// Local verification must inspect new files before they are staged. Ignored
+// files remain excluded so developer-only .env files and build output do not
+// become part of the repository gate.
+const files = [...new Set([
+  ...gitFiles(['ls-files']),
+  ...gitFiles(['ls-files', '--others', '--exclude-standard']),
+])]
   .filter(shouldScan)
-  .filter((file) => existsSync(file));
+  .filter((file) => existsSync(file))
+  .sort();
 
 const findings = [];
 
@@ -88,4 +100,4 @@ if (findings.length > 0) {
   process.exit(1);
 }
 
-console.log(`No potential secrets found in ${files.length} tracked text files.`);
+console.log(`No potential secrets found in ${files.length} tracked or untracked text files.`);

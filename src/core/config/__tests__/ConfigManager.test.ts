@@ -81,6 +81,27 @@ describe('ConfigManager', () => {
     expect(payload).not.toContain('config-read-secret');
   });
 
+  it('uses defaults and skips persistence when localStorage is unavailable', async () => {
+    const localStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: undefined,
+    });
+
+    try {
+      module = await importFreshConfigManager();
+      manager = module.ConfigManager.getInstance();
+
+      expect(manager.get('theme.mode')).toBe('light');
+      expect(() => manager.set('theme.primaryColor', '#00ffaa', module.ConfigSource.USER_OVERRIDE)).not.toThrow();
+      expect(manager.get('theme.primaryColor')).toBe('#00ffaa');
+    } finally {
+      if (localStorageDescriptor) {
+        Object.defineProperty(globalThis, 'localStorage', localStorageDescriptor);
+      }
+    }
+  });
+
   it('gets fallbacks, throws for missing config without fallback, and validates set values', () => {
     expect(manager.get('missing.key', 'fallback')).toBe('fallback');
     expect(() => manager.get('missing.key')).toThrow('配置项不存在: missing.key');

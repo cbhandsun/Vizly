@@ -50,16 +50,21 @@ import {
   scheduleBaseReactFlowContainerReadyUpdate,
 } from './baseReactFlowContainerReady';
 import {
+  areBaseReactFlowInternalNodesReadyForRouting,
+  collectBaseReactFlowInternalNodes,
+  computeBaseReactFlowInternalNodeGeometrySignature,
+  filterBaseReactFlowVisibleNodes,
+  mergeBaseReactFlowMeasuredNodes,
+  normalizeBaseReactFlowRenderableNodes,
+} from './baseReactFlowRenderableNodes';
+import {
   computeBaseReactFlowFitViewport,
   computeBaseReactFlowNodeBounds,
   expandBaseReactFlowBoundsForEdges,
   shouldSkipBaseReactFlowMinorResize,
 } from './baseReactFlowFitWidthTop';
 import { resolveBaseReactFlowFitSchedule } from './baseReactFlowFitSchedule';
-import {
-  computeBaseReactFlowDisplayEdgeEpoch,
-  createBaseReactFlowDisplayEdges,
-} from './baseReactFlowDisplayEdges';
+import { useBaseReactFlowDisplayRouting } from './useBaseReactFlowDisplayRouting';
 import {
   bindBaseReactFlowWheelHandler,
   createBaseReactFlowWheelHandler,
@@ -184,6 +189,7 @@ interface BaseReactFlowProps {
 const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 };
 const DEFAULT_SNAP_GRID: [number, number] = [12, 12];
 const DEFAULT_STYLE: React.CSSProperties = {};
+
 
 const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   nodes = [],
@@ -328,13 +334,39 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     });
   }, []);
 
+  const renderNodes = useMemo(() => (
+    normalizeBaseReactFlowRenderableNodes(nodes)
+  ), [nodes]);
+
+  const visibleNodes = useMemo(() => (
+    filterBaseReactFlowVisibleNodes(renderNodes)
+  ), [renderNodes]);
+  const visibleNodeIds = useMemo(() => visibleNodes.map(node => node.id), [visibleNodes]);
+  const internalNodeGeometrySignature = useStore(useCallback((state: any) => (
+    computeBaseReactFlowInternalNodeGeometrySignature(visibleNodeIds, state.nodeLookup)
+  ), [visibleNodeIds]));
+  const internalFlowNodes = useMemo(() => collectBaseReactFlowInternalNodes(
+    visibleNodeIds,
+    (rfStore.getState() as any).nodeLookup,
+  ), [visibleNodeIds, internalNodeGeometrySignature, rfStore]);
+  const routingNodes = useMemo(() => (
+    mergeBaseReactFlowMeasuredNodes(visibleNodes, internalFlowNodes)
+  ), [visibleNodes, internalFlowNodes]);
+
   const isLargeGraph = useMemo(() => {
     return computeBaseReactFlowIsLargeGraph({
-      nodeCount: nodes.length,
+      nodeCount: visibleNodes.length,
       edgeCount: edges.length,
       performanceConfig,
     });
-  }, [nodes.length, edges.length, performanceConfig]);
+  }, [visibleNodes.length, edges.length, performanceConfig]);
+
+  const routingGeometryReady = useMemo(() => (
+    isLargeGraph || areBaseReactFlowInternalNodesReadyForRouting(
+      visibleNodeIds,
+      (rfStore.getState() as any).nodeLookup,
+    )
+  ), [internalNodeGeometrySignature, isLargeGraph, rfStore, visibleNodeIds]);
 
   /**
    * 启用 React Flow 虚拟化选项（函数级注释）
@@ -410,14 +442,14 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 
   // 监听节点变化，重置初始化状态（仅在节点集合结构变化时重置）
   useEffect(() => {
-    const currentSig = computeBaseReactFlowNodeStructureSignature(nodes);
+    const currentSig = computeBaseReactFlowNodeStructureSignature(renderNodes);
     const prevSig = prevNodesSigRef.current;
     let resetTimer: ReturnType<typeof setTimeout> | null = null;
 
     if (shouldResetBaseReactFlowInitialization({
       currentSignature: currentSig,
       previousSignature: prevSig,
-      nodeCount: nodes.length,
+      nodeCount: visibleNodes.length,
     })) {
       resetTimer = scheduleBaseReactFlowInitializationReset({
         setHasInitialized,
@@ -429,12 +461,12 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       });
     }
 
-    prevNodesRef.current = [...nodes];
+    prevNodesRef.current = [...renderNodes];
     prevNodesSigRef.current = currentSig;
     return () => {
       if (resetTimer) clearTimeout(resetTimer);
     };
-  }, [nodes]);
+  }, [renderNodes, visibleNodes.length]);
 
   // 执行fitWidthTop的核心逻辑 - 复用回到顶部的逻辑
   /**
@@ -462,7 +494,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     if (!force && hasInitialized && shouldSkipBaseReactFlowMinorResize({
       currentSize: containerSize,
       previousSize: prevContainer.current,
-      nodeCount: nodes.length || 0,
+      nodeCount: visibleNodes.length || 0,
     })) {
         return false;
     }
@@ -478,10 +510,11 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         return false;
       }
 
-      const currentEdges = rfInstance.getEdges();
       const expandedBounds = expandBaseReactFlowBoundsForEdges({
         bounds: nodeBounds,
-        edges: currentEdges,
+        // Fit must stay anchored to source graph data. Display-only edge routing may
+        // swap in later and should never pull the viewport or make the layout look reflowed.
+        edges,
       });
 
       // 复用回到顶部的缩放和位置计算逻辑
@@ -525,7 +558,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 
       // 设置冷却期，避免频繁调用（自适应）
       // 已初始化后随节点数量适度增加冷却时长，范围约 300–1000ms
-      const adaptiveCooldown = hasInitialized ? Math.min(1000, 300 + Math.min(nodes.length, 700)) : 120;
+      const adaptiveCooldown = hasInitialized ? Math.min(1000, 300 + Math.min(visibleNodes.length, 700)) : 120;
       cooldownUntil.current = Date.now() + adaptiveCooldown;
 
       if (!hasInitialized) {
@@ -537,7 +570,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       logBaseReactFlowFitWidthTopFailure(error);
       return false;
     }
-  }, [rfInstance, containerSize, nodes, maxZoom, minZoom, hasInitialized, fitPadding]);
+  }, [rfInstance, containerSize, visibleNodes.length, edges, maxZoom, minZoom, hasInitialized, fitPadding]);
 
   // 统一视口适配逻辑（P2 Optimization - Refactored & Unified）
   /**
@@ -555,7 +588,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     const schedulePlan = resolveBaseReactFlowFitSchedule({
       fitMode,
       hasInstance: Boolean(rfInstance),
-      nodeCount: nodes.length,
+      nodeCount: visibleNodes.length,
       fitTriggerKey,
       lastFitTriggerKey: lastFitTriggerKeyRef.current,
       pinFit,
@@ -570,8 +603,12 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     const timeoutId = setTimeout(() => {
       if (fitMode === 'fitWidthTop') {
         performFitWidthTop(schedulePlan.isTriggerKeyChanged);
-      } else if (fitMode === 'fitAll' && pinFit) {
+      } else if (fitMode === 'fitAll') {
         rfInstance.fitView({ padding: fitPadding });
+        prevContainer.current = { ...containerSize };
+        if (!hasInitialized) {
+          setHasInitialized(true);
+        }
       }
 
       // 更新状态
@@ -584,7 +621,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   }, [
     fitMode,
     rfInstance,
-    nodes.length,
+    visibleNodes.length,
     containerSize,
     fitTriggerKey,
     pinFit,
@@ -611,36 +648,28 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     });
   }, [edgeTypes]);
 
-  const displayEdgeEpoch = useMemo(() => {
-    return computeBaseReactFlowDisplayEdgeEpoch({
-      nodes,
-      edges,
-    });
-  }, [nodes, edges]);
-
-  const displayEdges = useMemo((): Edge[] => {
-    return createBaseReactFlowDisplayEdges({
-      edges,
-      nodes,
-      enableSmartEdges,
-      smartEdgePadding,
-      isLargeGraph,
-      displayEdgeEpoch,
-    });
-  }, [edges, nodes, enableSmartEdges, smartEdgePadding, isLargeGraph, displayEdgeEpoch]);
+  const displayEdges = useBaseReactFlowDisplayRouting({
+    edges,
+    routingNodes,
+    routingGeometryReady,
+    isContainerReady,
+    enableSmartEdges,
+    smartEdgePadding,
+    isLargeGraph,
+  });
 
   const nodeInternalsRefreshKey = useMemo(() => {
-    return nodes.map((node) => {
+    return visibleNodes.map((node) => {
       const measured = (node as any).measured;
       const width = measured?.width ?? node.width ?? (node.style as any)?.width ?? '';
       const height = measured?.height ?? node.height ?? (node.style as any)?.height ?? '';
       return `${node.id}:${node.position?.x ?? 0}:${node.position?.y ?? 0}:${width}:${height}`;
     }).join('|');
-  }, [nodes]);
+  }, [visibleNodes]);
 
   useEffect(() => {
-    if (nodes.length === 0) return;
-    const nodeIds = nodes.map(node => node.id);
+    if (visibleNodes.length === 0) return;
+    const nodeIds = visibleNodes.map(node => node.id);
     const refresh = () => {
       refreshBaseReactFlowNodeInternals({
         container: containerRef.current,
@@ -660,11 +689,11 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       refresh,
       areHandlesMeasured: allRenderableHandlesMeasured,
     });
-  }, [nodes, nodes.length, nodeInternalsRefreshKey, updateNodeInternals, rfStore]);
+  }, [visibleNodes, nodeInternalsRefreshKey, updateNodeInternals, rfStore]);
 
   useEffect(() => {
-    if (nodes.length === 0) return;
-    const nodeIds = nodes.map(node => node.id);
+    if (visibleNodes.length === 0) return;
+    const nodeIds = visibleNodes.map(node => node.id);
     const refreshFromMountedDom = () => {
       refreshBaseReactFlowNodeInternals({
         container: containerRef.current,
@@ -676,7 +705,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     return scheduleBaseReactFlowMountedDomRefresh({
       refresh: refreshFromMountedDom,
     });
-  }, [nodes, nodes.length, rfStore, updateNodeInternals]);
+  }, [visibleNodes, rfStore, updateNodeInternals]);
 
   /**
    * 函数级注释：导出期间隐藏背景网格
@@ -798,7 +827,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         <ReactFlow
           proOptions={proOptions}
           onlyRenderVisibleElements={isLargeGraph}
-          nodes={nodes}
+          nodes={visibleNodes}
           edges={displayEdges}
           nodeTypes={nodeTypes}
           edgeTypes={mergedEdgeTypes} // 使用合并后的边类型

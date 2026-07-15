@@ -30,8 +30,15 @@ export const PRESET_DOC_TYPES: Record<StandardPresetKey, string> = {
 
 export const PRESET_ID_ALIASES: Record<string, StandardPresetKey> = {
   'enterprise-architecture': 'ArchitectureStandardData',
+  'enterprise-architecture-v2': 'ArchitectureStandardData',
+  'blank-canvas-template': 'BlankCanvasStandardData',
   'logistics-planning': 'LogisticsPlanningStandardData',
+  'logistics-planning-v1': 'LogisticsPlanningStandardData',
   'supply-chain-arch': 'LogisticsStandardData',
+  'logistics-architecture-v1': 'LogisticsStandardData',
+  'systems-interaction-v1': 'SystemsInteractionStandardData',
+  'tms-architecture-v1': 'TmsStandardData',
+  'transport-driven-v1': 'TransportDrivenStandardData',
   'wms-e2e-solution': 'WmsStandardData',
   'wms-architecture': 'WmsStandardData',
   'wms-demand-allocation-strategy-v2': 'DeamndAllocation',

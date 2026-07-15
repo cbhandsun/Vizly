@@ -12,8 +12,10 @@ import { CollaborationAvatars } from './ui/CollaborationAvatars';
 import { AdvancedExportModal } from './ui/AdvancedExportModal';
 import { PluginManagerModal } from './ui/PluginManagerModal';
 import { ApiOutlined } from '@ant-design/icons';
+import type { ReactFlowRenderSnapshot } from '../../rendering/reactFlowScene';
 
 interface TopActionButtonsProps {
+    diagramId?: string;
     onExportJSON: () => void;
     onExportPNG?: () => Promise<void>;
     onExportSVG?: () => Promise<void>;
@@ -51,10 +53,11 @@ interface TopActionButtonsProps {
     disablePortal?: boolean;
     onToggleAI?: () => void;
     aiChatActive?: boolean;
+    getReactFlowSnapshot?: () => ReactFlowRenderSnapshot | null | undefined;
 }
 
 export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
-    onExportJSON, onExportPNG, onExportSVG, onExportPDF, onExportGIF, onExportMermaid,
+    diagramId, onExportJSON, onExportPNG, onExportSVG, onExportPDF, onExportGIF, onExportMermaid,
     onImportClick, onEditJson,
     onStartPresentation, onShowDiff,
     onSaveToCloud, onDirectSave, isDirectSaveDisabled, extraActionItems, onShare, onShowHistory,
@@ -77,6 +80,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
     disablePortal = false,
     onToggleAI,
     aiChatActive = false,
+    getReactFlowSnapshot,
 }) => {
     const { t } = useTranslation();
     const screens = Grid.useBreakpoint();
@@ -90,6 +94,8 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             <AdvancedExportModal 
                 visible={exportModalVisible} 
                 onClose={() => setExportModalVisible(false)} 
+                diagramId={diagramId}
+                getReactFlowSnapshot={getReactFlowSnapshot}
             />
             <PluginManagerModal 
                 visible={pluginManagerVisible} 

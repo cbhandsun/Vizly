@@ -18,13 +18,24 @@ const PRESET_LOADERS: Record<StandardPresetKey, PresetLoader> = {
   WmsStandardData: () => import('./WmsStandardData.json'),
 };
 
-export const loadStandardPresetById = async (id?: string): Promise<StandardDiagramData | null> => {
+const presetPromises = new Map<StandardPresetKey, Promise<StandardDiagramData>>();
+
+export const loadStandardPresetById = (id?: string): Promise<StandardDiagramData | null> => {
   const key = resolvePresetKey(id);
-  if (!key) return null;
+  if (!key) return Promise.resolve(null);
 
   const loader = PRESET_LOADERS[key];
-  if (!loader) return null;
+  if (!loader) return Promise.resolve(null);
 
-  const mod = await loader();
-  return mod.default ?? (mod as unknown as StandardDiagramData);
+  let cached = presetPromises.get(key);
+  if (!cached) {
+    cached = loader().then((mod) => (
+      mod.default ?? (mod as unknown as StandardDiagramData)
+    )).catch((error) => {
+      presetPromises.delete(key);
+      throw error;
+    });
+    presetPromises.set(key, cached);
+  }
+  return cached;
 };

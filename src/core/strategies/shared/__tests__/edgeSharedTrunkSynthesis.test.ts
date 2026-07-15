@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { Edge } from '@xyflow/react';
-import { synthesizeSharedEndpointTrunks } from '../edgeSharedTrunkSynthesis';
+import type { Edge, Node } from '@xyflow/react';
+import {
+  repairSharedTargetEntryCrossings,
+  synthesizeSharedEndpointTrunks,
+  synthesizeSharedSourceTrunks,
+  synthesizeSharedTargetTrunks,
+} from '../edgeSharedTrunkSynthesis';
 
 const coversVerticalSegment = (
   path: Array<{ x: number; y: number }>,
@@ -103,7 +108,53 @@ const lastSegmentAxis = (path: Array<{ x: number; y: number }>): 'h' | 'v' | nul
   return axisOf(previous, end);
 };
 
+const node = (id: string, x: number, y: number, width = 120, height = 80): Node => ({
+  id,
+  type: 'custom',
+  position: { x, y },
+  measured: { width, height },
+  data: {},
+});
+
 describe('synthesizeSharedEndpointTrunks', () => {
+  it('does not rewrite target-side trunks when only source trunks are requested', () => {
+    const edges: Edge[] = [
+      {
+        id: 'left-hub',
+        source: 'left',
+        target: 'hub',
+        data: {
+          computedPath: [
+            { x: 100, y: 40 },
+            { x: 100, y: 120 },
+            { x: 180, y: 120 },
+            { x: 180, y: 240 },
+          ],
+        },
+      },
+      {
+        id: 'right-hub',
+        source: 'right',
+        target: 'hub',
+        data: {
+          computedPath: [
+            { x: 320, y: 40 },
+            { x: 320, y: 140 },
+            { x: 260, y: 140 },
+            { x: 260, y: 240 },
+          ],
+        },
+      },
+    ];
+
+    const result = synthesizeSharedSourceTrunks(edges);
+
+    expect(result.map(edge => (edge.data as any).computedPath)).toEqual(
+      edges.map(edge => (edge.data as any).computedPath),
+    );
+    expect(result.every(edge => (edge.data as any).sharedTrunkSynthesized !== true)).toBe(true);
+  });
+
   it('coalesces same-source bottom branches onto a shared source trunk', () => {
     const edges: Edge[] = [
       {
@@ -214,6 +265,102 @@ describe('synthesizeSharedEndpointTrunks', () => {
       { x: 1283, y: 961 },
     ]);
     expect(coversHorizontalSegment(directPath, 851, 1283, 1364)).toBe(true);
+  });
+
+  it('routes direct same-target entries through a shared target trunk', () => {
+    const edges: Edge[] = [
+      {
+        id: 'edge-master-data-tms-planning',
+        source: 'master-data',
+        target: 'tms-planning',
+        data: {
+          computedPath: [
+            { x: 310, y: 746 },
+            { x: 310, y: 834 },
+            { x: 318, y: 842 },
+            { x: 506, y: 842 },
+            { x: 514, y: 850 },
+            { x: 514, y: 2703 },
+            { x: 506, y: 2711 },
+            { x: 318, y: 2711 },
+            { x: 310, y: 2719 },
+            { x: 310, y: 2807 },
+          ],
+        },
+      },
+      {
+        id: 'edge-wms-outbound-tms-planning',
+        source: 'wms-outbound',
+        target: 'tms-planning',
+        data: {
+          computedPath: [
+            { x: 366, y: 2648 },
+            { x: 366, y: 2806 },
+          ],
+        },
+      },
+    ];
+
+    const result = synthesizeSharedTargetTrunks(edges);
+    const masterPath = (result[0].data as any).computedPath as Array<{ x: number; y: number }>;
+    const directPath = (result[1].data as any).computedPath as Array<{ x: number; y: number }>;
+
+    expect(strictlyCrosses(masterPath, directPath)).toBe(false);
+    expect(coversVerticalSegment(masterPath, 338, 2711, 2807)).toBe(true);
+    expect(coversVerticalSegment(directPath, 338, 2711, 2806)).toBe(true);
+    expect((result[1].data as any).sharedTrunkSynthesized).toBe(true);
+  });
+
+  it('joins same-target entries at the crossing point when later cleanup overextends an entry segment', () => {
+    const edges: Edge[] = [
+      {
+        id: 'edge-master-data-tms-planning',
+        source: 'master-data',
+        target: 'tms-planning',
+        data: {
+          computedPath: [
+            { x: 310, y: 746 },
+            { x: 310, y: 834 },
+            { x: 318, y: 842 },
+            { x: 506, y: 842 },
+            { x: 514, y: 850 },
+            { x: 514, y: 2702 },
+            { x: 506, y: 2710 },
+            { x: 318, y: 2710 },
+            { x: 310, y: 2718 },
+            { x: 310, y: 2806 },
+          ],
+        },
+      },
+      {
+        id: 'edge-wms-outbound-tms-planning',
+        source: 'wms-outbound',
+        target: 'tms-planning',
+        data: {
+          computedPath: [
+            { x: 366, y: 2648 },
+            { x: 366, y: 2714 },
+            { x: 358, y: 2722 },
+            { x: 318, y: 2722 },
+            { x: 310, y: 2730 },
+            { x: 310, y: 2806 },
+          ],
+        },
+      },
+    ];
+
+    const result = repairSharedTargetEntryCrossings(edges);
+    const masterPath = (result[0].data as any).computedPath as Array<{ x: number; y: number }>;
+    const directPath = (result[1].data as any).computedPath as Array<{ x: number; y: number }>;
+
+    expect(strictlyCrosses(masterPath, directPath)).toBe(false);
+    expect(directPath).toEqual([
+      { x: 366, y: 2648 },
+      { x: 366, y: 2710 },
+      { x: 310, y: 2710 },
+      { x: 310, y: 2806 },
+    ]);
+    expect((result[1].data as any).sharedTrunkSynthesized).toBe(true);
   });
 
   it('moves one source-direction subgroup to a cleaner lane when another trunk crosses it', () => {
@@ -332,6 +479,170 @@ describe('synthesizeSharedEndpointTrunks', () => {
     expect(paths.every(path => lastSegmentAxis(path) === 'v')).toBe(true);
     expect((result[0].data as any).sharedTrunkSynthesized).toBe(true);
     expect((result[1].data as any).sharedTrunkSynthesized).toBe(true);
+  });
+
+  it('does not merge same-target entries from opposite approach directions when anchors are far apart', () => {
+    const edges: Edge[] = [
+      {
+        id: 'left-to-hub',
+        source: 'left',
+        target: 'hub',
+        data: {
+          computedPath: [
+            { x: 20, y: 20 },
+            { x: 20, y: 100 },
+            { x: 100, y: 100 },
+            { x: 100, y: 180 },
+          ],
+        },
+      },
+      {
+        id: 'right-to-hub',
+        source: 'right',
+        target: 'hub',
+        data: {
+          computedPath: [
+            { x: 580, y: 20 },
+            { x: 580, y: 120 },
+            { x: 500, y: 120 },
+            { x: 500, y: 180 },
+          ],
+        },
+      },
+    ];
+
+    const result = synthesizeSharedTargetTrunks(edges);
+
+    expect((result[0].data as any).computedPath).toEqual((edges[0].data as any).computedPath);
+    expect((result[1].data as any).computedPath).toEqual((edges[1].data as any).computedPath);
+    expect((result[0].data as any).sharedTrunkSynthesized).toBeUndefined();
+    expect((result[1].data as any).sharedTrunkSynthesized).toBeUndefined();
+  });
+
+  it('does not let a direct target entry collapse opposite target half-groups', () => {
+    const edges: Edge[] = [
+      {
+        id: 'left-to-hub',
+        source: 'left',
+        target: 'hub',
+        data: {
+          computedPath: [
+            { x: 40, y: 20 },
+            { x: 40, y: 120 },
+            { x: 100, y: 120 },
+            { x: 100, y: 200 },
+          ],
+        },
+      },
+      {
+        id: 'direct-to-hub',
+        source: 'center',
+        target: 'hub',
+        data: {
+          computedPath: [
+            { x: 300, y: 20 },
+            { x: 300, y: 200 },
+          ],
+        },
+      },
+      {
+        id: 'right-to-hub',
+        source: 'right',
+        target: 'hub',
+        data: {
+          computedPath: [
+            { x: 600, y: 20 },
+            { x: 600, y: 140 },
+            { x: 500, y: 140 },
+            { x: 500, y: 200 },
+          ],
+        },
+      },
+    ];
+
+    const result = synthesizeSharedTargetTrunks(edges);
+
+    expect(result.map(edge => (edge.data as any).computedPath)).toEqual(
+      edges.map(edge => (edge.data as any).computedPath),
+    );
+    expect(result.every(edge => (edge.data as any).sharedTrunkSynthesized !== true)).toBe(true);
+  });
+
+  it('uses node hemispheres to avoid merging same-target ports from opposite sides', () => {
+    const edges: Edge[] = [
+      {
+        id: 'left-to-hub',
+        source: 'left',
+        target: 'hub',
+        data: {
+          computedPath: [
+            { x: 60, y: 80 },
+            { x: 60, y: 180 },
+            { x: 280, y: 180 },
+            { x: 280, y: 300 },
+          ],
+        },
+      },
+      {
+        id: 'right-to-hub',
+        source: 'right',
+        target: 'hub',
+        data: {
+          computedPath: [
+            { x: 780, y: 80 },
+            { x: 780, y: 200 },
+            { x: 400, y: 200 },
+            { x: 400, y: 300 },
+          ],
+        },
+      },
+    ];
+    const nodes = [
+      node('left', 0, 40),
+      node('right', 720, 40),
+      node('hub', 300, 300),
+    ];
+
+    const result = synthesizeSharedTargetTrunks(edges, { nodes });
+
+    expect(result.map(edge => (edge.data as any).computedPath)).toEqual(
+      edges.map(edge => (edge.data as any).computedPath),
+    );
+    expect(result.every(edge => (edge.data as any).sharedTrunkSynthesized !== true)).toBe(true);
+  });
+
+  it('detaches a reverse feedback edge that was already merged into the forward target trunk', () => {
+    const edges: Edge[] = [
+      {
+        id: 'edge-tms-execution-wms-outbound',
+        source: 'tms-execution',
+        target: 'wms-outbound',
+        data: {
+          computedPath: [
+            { x: 701, y: 2638 },
+            { x: 701, y: 2692 },
+            { x: 521, y: 2692 },
+            { x: 521, y: 1748 },
+            { x: 701, y: 1748 },
+            { x: 701, y: 1844 },
+          ],
+        },
+      },
+    ];
+    const nodes = [
+      node('wms-outbound', 600, 1844, 220, 158),
+      node('tms-execution', 600, 2480, 220, 158),
+    ];
+
+    const [result] = synthesizeSharedTargetTrunks(edges, { nodes });
+    const path = (result.data as any).computedPath as Array<{ x: number; y: number }>;
+
+    expect(result.sourceHandle).toBe('top');
+    expect(result.targetHandle).toBe('bottom');
+    expect((result.data as any).targetHemisphereBacktrackRepaired).toBe(true);
+    expect(path[1].y).toBeLessThan(path[0].y);
+    expect(path[path.length - 2].y).toBeGreaterThan(path[path.length - 1].y);
+    expect(path.length).toBeLessThanOrEqual(4);
   });
 
   it('does not leave a tangential boundary tail after target trunk synthesis', () => {

@@ -1,0 +1,239 @@
+import type { Edge, Node } from '@xyflow/react';
+
+import { createEdgePathQualityEvaluationContext } from '../../strategies/shared/edgeStrictCrossingGuard';
+import { compactOrthogonalPath } from './baseReactFlowDisplayEdgeCore';
+import {
+  countDisplayShortEndpointStubs,
+  displayAxisOf,
+  getDisplayComputedPath,
+  segmentDisplayLength,
+  withDisplayComputedPath,
+  type DisplayPoint,
+} from './baseReactFlowDisplayGeometry';
+import {
+  createDisplayObstacleEvaluationContext,
+  evaluateDisplayObstacleCandidate,
+  evaluateDisplayQualityCandidate,
+} from './baseReactFlowDisplayEvaluation';
+import {
+  buildSafeEndpointSideStepCandidates,
+  MIN_DISPLAY_ENDPOINT_STUB,
+} from './baseReactFlowDisplayEndpointStubCandidates';
+import {
+  buildStrictCrossingCompanionShiftVariants,
+} from './baseReactFlowDisplayTerminalPortRepair';
+import { finalStrictDisplaySweep } from './baseReactFlowDisplayStrictSweepRepair';
+
+export const MIN_RENDER_SAFE_ENDPOINT_STUB = 56;
+const MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS = 8;
+
+export const countRenderUnsafeEndpointStubs = (edges: Edge[]): number => edges.reduce((total, edge) => {
+  const path = getDisplayComputedPath(edge);
+  if (path.length < 3) return total;
+  return total
+    + (segmentDisplayLength(path[0], path[1]) < MIN_RENDER_SAFE_ENDPOINT_STUB ? 1 : 0)
+    + (segmentDisplayLength(path[path.length - 2], path[path.length - 1]) < MIN_RENDER_SAFE_ENDPOINT_STUB ? 1 : 0);
+}, 0);
+
+export const repairFinalShortEndpointStubs = <T extends Edge[]>(edges: T, nodes: Node[]): T => {
+  const qualityContext = createEdgePathQualityEvaluationContext(edges);
+  const obstacleContext = createDisplayObstacleEvaluationContext(edges, nodes);
+  const baselineQuality = qualityContext.evaluate(edges);
+  const baselineEndpointStubIssues = countDisplayShortEndpointStubs(edges, MIN_DISPLAY_ENDPOINT_STUB);
+  if (baselineEndpointStubIssues === 0) return edges;
+  let bestEdges = edges;
+  let bestQuality = baselineQuality;
+  let bestEndpointStubIssues = baselineEndpointStubIssues;
+  let bestObstacleHits = obstacleContext.evaluate(edges);
+  let qualityEvaluations = 0;
+
+  const edgeRepairOrder = edges
+    .map((edge, edgeIndex) => {
+      const path = getDisplayComputedPath(edge);
+      if (path.length < 3) return null;
+      const first = segmentDisplayLength(path[0], path[1]);
+      const last = segmentDisplayLength(path[path.length - 2], path[path.length - 1]);
+      const shortest = Math.min(first, last);
+      return shortest < MIN_DISPLAY_ENDPOINT_STUB ? { edge, edgeIndex, shortest } : null;
+    })
+    .filter((entry): entry is { edge: Edge; edgeIndex: number; shortest: number } => entry !== null)
+    .sort((first, second) => first.shortest - second.shortest);
+
+  edgeRepairOrder.forEach(({ edge, edgeIndex, shortest }) => {
+    if (qualityEvaluations >= MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS) return;
+    const path = getDisplayComputedPath(edge);
+    const candidatePaths = buildSafeEndpointSideStepCandidates(path, edgeIndex, bestEdges, nodes);
+    for (const candidatePath of candidatePaths) {
+      if (qualityEvaluations >= MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS) break;
+      const candidateEdges = bestEdges.map((item, index) => (
+        index === edgeIndex ? withDisplayComputedPath(item, candidatePath) : item
+      )) as T;
+      const initialQuality = evaluateDisplayQualityCandidate(qualityContext, edges, candidateEdges);
+      const initialObstacleHits = evaluateDisplayObstacleCandidate(obstacleContext, edges, candidateEdges);
+      const initialEndpointStubIssues = countDisplayShortEndpointStubs(candidateEdges, MIN_DISPLAY_ENDPOINT_STUB);
+      const variants: T[] = [candidateEdges];
+      if (
+        initialObstacleHits <= bestObstacleHits
+        && initialEndpointStubIssues < bestEndpointStubIssues
+        && initialQuality.strictCrossings > bestQuality.strictCrossings
+        && initialQuality.strictCrossings <= bestQuality.strictCrossings + 2
+      ) {
+        variants.push(
+          ...buildStrictCrossingCompanionShiftVariants(candidateEdges, edgeIndex),
+          finalStrictDisplaySweep(candidateEdges, nodes),
+        );
+      }
+      for (const variantEdges of variants) {
+        if (qualityEvaluations >= MAX_FINAL_ENDPOINT_STUB_REPAIR_EVALUATIONS) break;
+        qualityEvaluations += 1;
+        const candidateQuality = evaluateDisplayQualityCandidate(qualityContext, edges, variantEdges);
+        const candidateObstacleHits = evaluateDisplayObstacleCandidate(obstacleContext, edges, variantEdges);
+        const candidateEndpointStubIssues = countDisplayShortEndpointStubs(variantEdges, MIN_DISPLAY_ENDPOINT_STUB);
+        const allowSevereStubExpansionHairpin = shortest <= 16
+          && candidateEndpointStubIssues < bestEndpointStubIssues
+          && candidateQuality.strictCrossings <= bestQuality.strictCrossings
+          && candidateQuality.reverseOverlap <= bestQuality.reverseOverlap
+          && candidateQuality.unrelatedOverlap <= bestQuality.unrelatedOverlap
+          && candidateQuality.unexplainedRelatedOverlap <= bestQuality.unexplainedRelatedOverlap;
+        if (candidateObstacleHits > bestObstacleHits) continue;
+        if (
+          candidateQuality.nonOrthogonalSegments > bestQuality.nonOrthogonalSegments
+          || candidateQuality.strictCrossings > bestQuality.strictCrossings
+          || candidateQuality.reverseOverlap > bestQuality.reverseOverlap
+          || candidateQuality.unrelatedOverlap > bestQuality.unrelatedOverlap
+          || candidateQuality.relatedOverlap > bestQuality.relatedOverlap
+          || candidateQuality.unexplainedRelatedOverlap > bestQuality.unexplainedRelatedOverlap
+          || candidateQuality.tinyInteriorDoglegs > bestQuality.tinyInteriorDoglegs
+          || candidateQuality.hairpins > bestQuality.hairpins + (allowSevereStubExpansionHairpin ? 1 : 0)
+        ) continue;
+        if (candidateEndpointStubIssues >= bestEndpointStubIssues) continue;
+        bestEdges = variantEdges;
+        bestQuality = candidateQuality;
+        bestEndpointStubIssues = candidateEndpointStubIssues;
+        bestObstacleHits = candidateObstacleHits;
+      }
+    }
+  });
+
+  return bestEdges;
+};
+
+const buildRenderSafeEndpointStubPaths = (path: DisplayPoint[]): DisplayPoint[][] => {
+  if (path.length < 3) return [];
+  const sourceLength = segmentDisplayLength(path[0], path[1]);
+  const targetLength = segmentDisplayLength(path[path.length - 2], path[path.length - 1]);
+  const sourceNeedsRepair = sourceLength < MIN_RENDER_SAFE_ENDPOINT_STUB;
+  const targetNeedsRepair = targetLength < MIN_RENDER_SAFE_ENDPOINT_STUB;
+  if (!sourceNeedsRepair && !targetNeedsRepair) return [];
+
+  const extendSource = (candidate: DisplayPoint[]): boolean => {
+    const axis = displayAxisOf(candidate[0], candidate[1]);
+    if (!axis || candidate.length < 3) return false;
+    if (axis === 'h') {
+      const direction = Math.sign(candidate[1].x - candidate[0].x);
+      if (direction === 0) return false;
+      const coordinate = candidate[0].x + direction * MIN_RENDER_SAFE_ENDPOINT_STUB;
+      candidate[1].x = coordinate;
+      candidate[2].x = coordinate;
+    } else {
+      const direction = Math.sign(candidate[1].y - candidate[0].y);
+      if (direction === 0) return false;
+      const coordinate = candidate[0].y + direction * MIN_RENDER_SAFE_ENDPOINT_STUB;
+      candidate[1].y = coordinate;
+      candidate[2].y = coordinate;
+    }
+    return true;
+  };
+  const extendTarget = (candidate: DisplayPoint[]): boolean => {
+    const lastIndex = candidate.length - 1;
+    const axis = displayAxisOf(candidate[lastIndex - 1], candidate[lastIndex]);
+    if (!axis || candidate.length < 3) return false;
+    if (axis === 'h') {
+      const direction = Math.sign(candidate[lastIndex - 1].x - candidate[lastIndex].x);
+      if (direction === 0) return false;
+      const coordinate = candidate[lastIndex].x + direction * MIN_RENDER_SAFE_ENDPOINT_STUB;
+      candidate[lastIndex - 1].x = coordinate;
+      candidate[lastIndex - 2].x = coordinate;
+    } else {
+      const direction = Math.sign(candidate[lastIndex - 1].y - candidate[lastIndex].y);
+      if (direction === 0) return false;
+      const coordinate = candidate[lastIndex].y + direction * MIN_RENDER_SAFE_ENDPOINT_STUB;
+      candidate[lastIndex - 1].y = coordinate;
+      candidate[lastIndex - 2].y = coordinate;
+    }
+    return true;
+  };
+
+  const candidates: DisplayPoint[][] = [];
+  if (sourceNeedsRepair) {
+    const candidate = path.map(point => ({ ...point }));
+    if (extendSource(candidate)) candidates.push(compactOrthogonalPath(candidate));
+  }
+  if (targetNeedsRepair) {
+    const candidate = path.map(point => ({ ...point }));
+    if (extendTarget(candidate)) candidates.push(compactOrthogonalPath(candidate));
+  }
+  if (sourceNeedsRepair && targetNeedsRepair) {
+    const candidate = path.map(point => ({ ...point }));
+    if (extendSource(candidate) && extendTarget(candidate)) {
+      candidates.unshift(compactOrthogonalPath(candidate));
+    }
+  }
+  return candidates;
+};
+
+export const repairRenderSafeEndpointStubs = <T extends Edge[]>(
+  edges: T,
+  nodes: Node[],
+  maxEvaluations = 64,
+): T => {
+  let current = edges;
+  let evaluations = 0;
+  const skippedEdgeIds = new Set<string>();
+  for (let pass = 0; pass < edges.length && evaluations < maxEvaluations; pass += 1) {
+    const baselineIssues = countRenderUnsafeEndpointStubs(current);
+    if (baselineIssues === 0) break;
+    const edgeIndex = current.findIndex((edge) => {
+      if (skippedEdgeIds.has(edge.id)) return false;
+      const path = getDisplayComputedPath(edge);
+      return path.length >= 3 && (
+        segmentDisplayLength(path[0], path[1]) < MIN_RENDER_SAFE_ENDPOINT_STUB
+        || segmentDisplayLength(path[path.length - 2], path[path.length - 1]) < MIN_RENDER_SAFE_ENDPOINT_STUB
+      );
+    });
+    if (edgeIndex < 0) break;
+    const qualityContext = createEdgePathQualityEvaluationContext(current);
+    const baselineQuality = qualityContext.evaluate(current);
+    const obstacleContext = createDisplayObstacleEvaluationContext(current, nodes);
+    const baselineObstacleHits = obstacleContext.evaluate(current);
+    let accepted: T | null = null;
+    for (const candidatePath of buildRenderSafeEndpointStubPaths(getDisplayComputedPath(current[edgeIndex]))) {
+      if (evaluations >= maxEvaluations) break;
+      evaluations += 1;
+      const candidate = current.map((edge, index) => (
+        index === edgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
+      )) as T;
+      const candidateIssues = countRenderUnsafeEndpointStubs(candidate);
+      if (candidateIssues >= baselineIssues) continue;
+      const candidateQuality = qualityContext.evaluateChanged(candidate, [edgeIndex]);
+      if (
+        candidateQuality.nonOrthogonalSegments > baselineQuality.nonOrthogonalSegments
+        || candidateQuality.strictCrossings > baselineQuality.strictCrossings
+        || candidateQuality.reverseOverlap > baselineQuality.reverseOverlap
+        || candidateQuality.unrelatedOverlap > baselineQuality.unrelatedOverlap
+        || candidateQuality.unexplainedRelatedOverlap > baselineQuality.unexplainedRelatedOverlap
+        || candidateQuality.tinyInteriorDoglegs > baselineQuality.tinyInteriorDoglegs
+        || candidateQuality.hairpins > baselineQuality.hairpins
+      ) continue;
+      if (obstacleContext.evaluate(candidate) > baselineObstacleHits) continue;
+      accepted = candidate;
+      break;
+    }
+    if (!accepted) {
+      skippedEdgeIds.add(current[edgeIndex].id);
+      continue;
+    }
+    current = accepted;
+  }
+  return current;
+};

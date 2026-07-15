@@ -8,6 +8,13 @@
 // template type 值与 plugin.id 注册名之间存在历史差异，此映射表统一桥接
 export const TYPE_TO_PLUGIN_ID: Record<string, string> = {
     'flowchart':    'flowchart',
+    'logistics':    'flowchart',
+    'logistics-planning': 'flowchart',
+    'systems-interaction': 'flowchart',
+    'tms':          'flowchart',
+    'transport-driven': 'flowchart',
+    'wms':          'flowchart',
+    'wms-process':  'flowchart',
     'mindmap':      'mindmap',
     'timeline':     'timeline-diagram',
     'architecture': 'architecture-diagram',

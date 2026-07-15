@@ -101,6 +101,32 @@ describe('repairEndpointOrthogonalPaths', () => {
     expect((repaired.data as any)?.endpointOrthogonalRepaired).toBe(true);
   });
 
+  it('does not straighten synthesized shared target trunks back into direct entries', () => {
+    const sharedTargetPath = [
+      { x: 366, y: 2648 },
+      { x: 366, y: 2710 },
+      { x: 338, y: 2710 },
+      { x: 338, y: 2806 },
+    ];
+    const edges: Edge[] = [{
+      id: 'edge-wms-outbound-tms-planning',
+      source: 'wms-outbound',
+      target: 'tms-planning',
+      data: {
+        computedPath: sharedTargetPath,
+        sharedTrunkSynthesized: true,
+      },
+    }];
+
+    const [repaired] = repairEndpointOrthogonalPaths(edges, [
+      node('wms-outbound', 286, 2588, 160, 60),
+      node('tms-planning', 250, 2806, 176, 100),
+    ]);
+
+    expect((repaired.data as any)?.computedPath).toEqual(sharedTargetPath);
+    expect((repaired.data as any)?.endpointOrthogonalRepaired).toBeUndefined();
+  });
+
   it('extends a detached source stub far enough to avoid crossing existing lanes', () => {
     const edges: Edge[] = [
       {
@@ -469,6 +495,27 @@ describe('repairEndpointOrthogonalPaths', () => {
     expect(path[1].y - path[0].y).toBeLessThan(100);
     expect(pathHitsRect(path, { x: 10, y: 120, width: 80, height: 100 })).toBe(false);
     expect((repaired.data as any)?.endpointOrthogonalRepaired).toBe(true);
+  });
+
+  it('preserves the input array identity when endpoint paths are already valid', () => {
+    const edges: Edge[] = [{
+      id: 'already-valid',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: {
+        computedPath: [
+          { x: 100, y: 25 },
+          { x: 300, y: 25 },
+        ],
+      },
+    }];
+
+    expect(repairEndpointOrthogonalPaths(edges, [
+      node('source', 0, 0),
+      node('target', 300, 0),
+    ])).toBe(edges);
   });
 });
 

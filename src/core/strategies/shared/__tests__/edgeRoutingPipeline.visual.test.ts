@@ -3,13 +3,20 @@ import type { Edge, Node } from '@xyflow/react';
 import {
   refineGlobalEdgeWaypoints,
 } from '../edgeGlobalWaypointRefinement';
+import { repairEndpointLaneCrossings } from '../edgeEndpointLaneNudgeRepair';
 import {
   reduceEdgeCrossingsWithWaypoints,
-  runEdgeRoutingPipeline,
 } from '../edgeRoutingPipeline';
-import { separateDetachedParallelOverlaps } from '../edgeDetachedOverlapRepair';
 import { repairSameNodeInOutCrossings } from '../edgeSameNodeRoleRepair';
 import { repairLocalDoglegArtifacts } from '../edgeLocalDoglegRepair';
+import {
+  hasStrictCrossing,
+  maxParallelOverlap,
+  pathHitsRect,
+  pathLength,
+  renderedSystemsInteractionEdges,
+  terminalStubLength,
+} from './edgeRoutingPipelineVisualTestHelpers';
 
 const node = (
   id: string,
@@ -30,6 +37,48 @@ const node = (
 });
 
 describe('reduceEdgeCrossingsWithWaypoints visual soft constraints', () => {
+  it('repairs strict in/out crossings even when the two edges share a node', () => {
+    const edges: Edge[] = [
+      {
+        id: 'hub-outgoing',
+        source: 'hub',
+        target: 'downstream',
+        data: {
+          computedPath: [
+            { x: 100, y: 100 },
+            { x: 100, y: 130 },
+            { x: 160, y: 130 },
+            { x: 160, y: 220 },
+            { x: 100, y: 220 },
+            { x: 100, y: 250 },
+          ],
+        },
+      },
+      {
+        id: 'incoming-hub',
+        source: 'upstream',
+        target: 'hub',
+        data: {
+          computedPath: [
+            { x: 260, y: 160 },
+            { x: 100, y: 160 },
+            { x: 100, y: 100 },
+          ],
+        },
+      },
+    ];
+
+    const [outgoing, incoming] = refineGlobalEdgeWaypoints(edges, [
+      node('hub', 'task', 50, 50, 100, 50),
+      node('upstream', 'task', 240, 136, 80, 48),
+      node('downstream', 'task', 120, 250, 80, 48),
+    ]);
+    const outgoingPath = (outgoing.data?.computedPath ?? []) as Array<{ x: number; y: number }>;
+    const incomingPath = (incoming.data?.computedPath ?? []) as Array<{ x: number; y: number }>;
+
+    expect(hasStrictCrossing(outgoingPath, incomingPath)).toBe(false);
+  });
+
   it('uses global waypoint refinement to pull an over-extended dogleg away from avoidable crossings', () => {
     const edges: Edge[] = [
       {
@@ -590,6 +639,254 @@ describe('reduceEdgeCrossingsWithWaypoints visual soft constraints', () => {
     expect(hasStrictCrossing(inventoryPath, salesPath)).toBe(false);
   });
 
+  it('moves the rendered inventory master-data lane away from the outbound fulfillment lane', () => {
+    const nodes: Node[] = [
+      node('master-data', 'custom', 100, 587, 420, 158),
+      node('wms-inventory', 'custom', 142, 2171, 336, 158),
+      node('oms-fulfill', 'custom', 148, 1613, 332, 158),
+      node('wms-outbound', 'custom', 115, 2489, 390, 158),
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'edge-master-data-wms-inventory',
+        source: 'master-data',
+        target: 'wms-inventory',
+        data: {
+          computedPath: [
+            { x: 310, y: 746 },
+            { x: 310, y: 834 },
+            { x: 318, y: 842 },
+            { x: 500, y: 842 },
+            { x: 508, y: 850 },
+            { x: 508, y: 2066 },
+            { x: 500, y: 2074 },
+            { x: 342, y: 2074 },
+            { x: 334, y: 2082 },
+            { x: 334, y: 2170 },
+          ],
+        },
+      },
+      {
+        id: 'edge-oms-fulfill-wms-outbound',
+        source: 'oms-fulfill',
+        target: 'wms-outbound',
+        data: {
+          computedPath: [
+            { x: 338, y: 1772 },
+            { x: 338, y: 2020 },
+            { x: 346, y: 2028 },
+            { x: 482, y: 2028 },
+            { x: 490, y: 2036 },
+            { x: 490, y: 2384 },
+            { x: 482, y: 2392 },
+            { x: 318, y: 2392 },
+            { x: 310, y: 2400 },
+            { x: 310, y: 2488 },
+          ],
+        },
+      },
+    ];
+
+    const [inventory, outbound] = refineGlobalEdgeWaypoints(edges, nodes);
+    const inventoryPath = (inventory.data?.computedPath ?? []) as Array<{ x: number; y: number }>;
+    const outboundPath = (outbound.data?.computedPath ?? []) as Array<{ x: number; y: number }>;
+
+    expect(hasStrictCrossing(inventoryPath, outboundPath)).toBe(false);
+  });
+
+  it('slides the outbound source lane far enough to avoid the rendered inventory return crossing', () => {
+    const nodes: Node[] = [
+      node('wms-inventory', 'custom', 142, 2171, 336, 158),
+      node('wms-outbound', 'custom', 115, 2489, 390, 158),
+      node('oms-atc', 'custom', 104, 1295, 220, 158),
+      node('oms-fulfill', 'custom', 148, 1613, 332, 158),
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'edge-wms-inventory-oms-atc',
+        source: 'wms-inventory',
+        target: 'oms-atc',
+        data: {
+          computedPath: [
+            { x: 310, y: 2329 },
+            { x: 310, y: 2406 },
+            { x: 302, y: 2414 },
+            { x: 144, y: 2414 },
+            { x: 136, y: 2406 },
+            { x: 136, y: 1546 },
+            { x: 144, y: 1538 },
+            { x: 306, y: 1538 },
+            { x: 314, y: 1530 },
+            { x: 314, y: 1454 },
+          ],
+        },
+      },
+      {
+        id: 'edge-wms-outbound-oms-fulfill',
+        source: 'wms-outbound',
+        target: 'oms-fulfill',
+        data: {
+          computedPath: [
+            { x: 193, y: 2488 },
+            { x: 193, y: 2400 },
+            { x: 185, y: 2392 },
+            { x: 138, y: 2392 },
+            { x: 130, y: 2384 },
+            { x: 130, y: 2156 },
+            { x: 138, y: 2148 },
+            { x: 288, y: 2148 },
+            { x: 296, y: 2140 },
+            { x: 296, y: 1920 },
+            { x: 302, y: 1914 },
+            { x: 308, y: 1914 },
+            { x: 314, y: 1908 },
+            { x: 314, y: 1772 },
+          ],
+        },
+      },
+    ];
+
+    const [inventory, outbound] = repairEndpointLaneCrossings(edges, nodes);
+    const inventoryPath = (inventory.data?.computedPath ?? []) as Array<{ x: number; y: number }>;
+    const outboundPath = (outbound.data?.computedPath ?? []) as Array<{ x: number; y: number }>;
+
+    expect(
+      hasStrictCrossing(inventoryPath, outboundPath),
+      JSON.stringify(outboundPath),
+    ).toBe(false);
+    expect(outboundPath[0].y).toBe(2488);
+    expect(outboundPath[0].x).not.toBe(193);
+  });
+
+  it('slides the fulfillment source lane after a crossing migrates onto the source leg', () => {
+    const nodes: Node[] = [
+      node('master-data', 'custom', 100, 587, 420, 158),
+      node('oms-fulfill', 'custom', 148, 1613, 332, 158),
+      node('wms-inventory', 'custom', 142, 2171, 336, 158),
+      node('wms-outbound', 'custom', 115, 2489, 390, 158),
+      node('oms-atc', 'custom', 141, 1295, 347, 158),
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'edge-master-data-wms-inventory',
+        source: 'master-data',
+        target: 'wms-inventory',
+        data: {
+          computedPath: [
+            { x: 310, y: 746 },
+            { x: 310, y: 842 },
+            { x: 508, y: 842 },
+            { x: 508, y: 2074 },
+            { x: 334, y: 2074 },
+            { x: 334, y: 2170 },
+          ],
+        },
+      },
+      {
+        id: 'edge-oms-fulfill-wms-outbound',
+        source: 'oms-fulfill',
+        target: 'wms-outbound',
+        data: {
+          computedPath: [
+            { x: 338, y: 1772 },
+            { x: 338, y: 2086 },
+            { x: 490, y: 2086 },
+            { x: 490, y: 2392 },
+            { x: 310, y: 2392 },
+            { x: 310, y: 2488 },
+          ],
+        },
+      },
+      {
+        id: 'edge-wms-inventory-oms-atc',
+        source: 'wms-inventory',
+        target: 'oms-atc',
+        data: {
+          computedPath: [
+            { x: 310, y: 2329 },
+            { x: 310, y: 2389 },
+            { x: 314, y: 2389 },
+            { x: 314, y: 1454 },
+          ],
+        },
+      },
+      {
+        id: 'edge-wms-outbound-oms-fulfill',
+        source: 'wms-outbound',
+        target: 'oms-fulfill',
+        data: {
+          computedPath: [
+            { x: 193, y: 2488 },
+            { x: 193, y: 2392 },
+            { x: 130, y: 2392 },
+            { x: 130, y: 2147 },
+            { x: 314, y: 2147 },
+            { x: 314, y: 1772 },
+          ],
+        },
+      },
+    ];
+
+    const result = repairEndpointLaneCrossings(edges, nodes);
+    const masterDataPath = (result.find(edge => edge.id === 'edge-master-data-wms-inventory')?.data as any).computedPath;
+    const fulfillmentPath = (result.find(edge => edge.id === 'edge-oms-fulfill-wms-outbound')?.data as any).computedPath;
+
+    expect(
+      hasStrictCrossing(masterDataPath, fulfillmentPath),
+      JSON.stringify(fulfillmentPath),
+    ).toBe(false);
+  });
+
+  it('uses an outer bypass when source sliding alone cannot clear a migrated crossing', () => {
+    const nodes: Node[] = [
+      node('master-data', 'custom', 100, 587, 420, 158),
+      node('oms-fulfill', 'custom', 148, 1613, 332, 158),
+      node('wms-inventory', 'custom', 142, 2171, 336, 158),
+      node('wms-outbound', 'custom', 115, 2489, 390, 158),
+    ];
+    const edges: Edge[] = [
+      {
+        id: 'edge-master-data-wms-inventory',
+        source: 'master-data',
+        target: 'wms-inventory',
+        data: {
+          computedPath: [
+            { x: 310, y: 746 },
+            { x: 310, y: 842 },
+            { x: 508, y: 842 },
+            { x: 508, y: 2074 },
+            { x: 334, y: 2074 },
+            { x: 334, y: 2170 },
+          ],
+        },
+      },
+      {
+        id: 'edge-oms-fulfill-wms-outbound',
+        source: 'oms-fulfill',
+        target: 'wms-outbound',
+        data: {
+          computedPath: [
+            { x: 338, y: 1772 },
+            { x: 338, y: 2086 },
+            { x: 490, y: 2086 },
+            { x: 490, y: 2392 },
+            { x: 310, y: 2392 },
+            { x: 310, y: 2488 },
+          ],
+        },
+      },
+    ];
+
+    const result = repairEndpointLaneCrossings(edges, nodes);
+    const masterDataPath = (result[0].data as any).computedPath;
+    const fulfillmentPath = (result[1].data as any).computedPath;
+
+    expect(
+      hasStrictCrossing(masterDataPath, fulfillmentPath),
+      JSON.stringify(fulfillmentPath),
+    ).toBe(false);
+  });
+
   it('extends short terminal stubs after local dogleg cleanup', () => {
     const edges: Edge[] = [
       {
@@ -886,209 +1183,3 @@ describe('reduceEdgeCrossingsWithWaypoints visual soft constraints', () => {
     expect(path[1].y - path[0].y).toBeLessThan(120);
   });
 });
-
-describe('runEdgeRoutingPipeline display contract', () => {
-  it('locks computed paths so the display layer renders the repaired route', async () => {
-    const nodes: Node[] = [
-      node('source', 'custom', 0, 0, 100, 60),
-      node('target', 'custom', 260, 0, 100, 60),
-    ];
-    const edges: Edge[] = [{
-      id: 'source-target',
-      source: 'source',
-      target: 'target',
-      type: 'advanced-smart-step',
-    }];
-
-    const [edge] = await runEdgeRoutingPipeline(nodes, edges, { layoutDirection: 'LR' });
-    const data = edge.data as any;
-
-    expect(data.computedPath).toEqual(expect.arrayContaining([
-      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
-    ]));
-    expect(data.layoutPathLocked).toBe(true);
-    expect(data.runtimeHandleLock).toMatchObject({ source: true, target: true });
-  });
-});
-
-describe('separateDetachedParallelOverlaps', () => {
-  it('separates long shared middle lanes without moving the target endpoint trunks', () => {
-    const nodes: Node[] = [
-      node('master-data', 'custom', 300, 2800, 90, 60),
-      node('tms-execution', 'custom', 130, 2300, 90, 60),
-      node('logistics-oms', 'custom', 200, 744, 180, 60),
-    ];
-    const edges: Edge[] = [
-      {
-        id: 'edge-master-data-oms',
-        source: 'master-data',
-        target: 'logistics-oms',
-        data: {
-          computedPath: [
-            { x: 347, y: 2816 },
-            { x: 347, y: 2507 },
-            { x: 443, y: 2507 },
-            { x: 443, y: 1972 },
-            { x: 347, y: 1972 },
-            { x: 347, y: 804 },
-          ],
-        },
-      },
-      {
-        id: 'edge-tms-oms-status',
-        source: 'tms-execution',
-        target: 'logistics-oms',
-        data: {
-          computedPath: [
-            { x: 178, y: 2330 },
-            { x: 178, y: 2181 },
-            { x: 443, y: 2181 },
-            { x: 443, y: 1972 },
-            { x: 242, y: 1972 },
-            { x: 242, y: 804 },
-          ],
-        },
-      },
-    ];
-
-    const result = separateDetachedParallelOverlaps(edges, nodes);
-    const first = (result[0].data?.computedPath ?? []) as Array<{ x: number; y: number }>;
-    const second = (result[1].data?.computedPath ?? []) as Array<{ x: number; y: number }>;
-
-    expect(maxParallelOverlap(first, second)).toBeLessThan(96);
-    expect(first[0]).toEqual({ x: 347, y: 2816 });
-    expect(first[first.length - 1]).toEqual({ x: 347, y: 804 });
-    expect(second[0]).toEqual({ x: 178, y: 2330 });
-    expect(second[second.length - 1]).toEqual({ x: 242, y: 804 });
-  });
-});
-
-function hasStrictCrossing(a: Array<{ x: number; y: number }>, b: Array<{ x: number; y: number }>): boolean {
-  for (let i = 0; i < a.length - 1; i++) {
-    for (let j = 0; j < b.length - 1; j++) {
-      const a1 = a[i];
-      const a2 = a[i + 1];
-      const b1 = b[j];
-      const b2 = b[j + 1];
-      const aH = Math.abs(a1.y - a2.y) < 0.5;
-      const aV = Math.abs(a1.x - a2.x) < 0.5;
-      const bH = Math.abs(b1.y - b2.y) < 0.5;
-      const bV = Math.abs(b1.x - b2.x) < 0.5;
-      if (aH === bH || (!aH && !aV) || (!bH && !bV)) continue;
-      const h1 = aH ? a1 : b1;
-      const h2 = aH ? a2 : b2;
-      const v1 = aV ? a1 : b1;
-      const v2 = aV ? a2 : b2;
-      const x = v1.x;
-      const y = h1.y;
-      if (
-        x > Math.min(h1.x, h2.x) + 1
-        && x < Math.max(h1.x, h2.x) - 1
-        && y > Math.min(v1.y, v2.y) + 1
-        && y < Math.max(v1.y, v2.y) - 1
-      ) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-function maxParallelOverlap(a: Array<{ x: number; y: number }>, b: Array<{ x: number; y: number }>): number {
-  let maxOverlap = 0;
-  for (let i = 0; i < a.length - 1; i += 1) {
-    for (let j = 0; j < b.length - 1; j += 1) {
-      maxOverlap = Math.max(maxOverlap, segmentOverlap(a[i], a[i + 1], b[j], b[j + 1]));
-    }
-  }
-  return maxOverlap;
-}
-
-function pathLength(path: Array<{ x: number; y: number }>): number {
-  let total = 0;
-  for (let index = 0; index < path.length - 1; index += 1) {
-    total += Math.abs(path[index].x - path[index + 1].x) + Math.abs(path[index].y - path[index + 1].y);
-  }
-  return total;
-}
-
-function terminalStubLength(path: Array<{ x: number; y: number }>, atStart: boolean): number {
-  if (path.length < 2) return 0;
-  const first = atStart ? path[0] : path[path.length - 1];
-  const second = atStart ? path[1] : path[path.length - 2];
-  return Math.abs(first.x - second.x) + Math.abs(first.y - second.y);
-}
-
-function renderedSystemsInteractionEdges(): Edge[] {
-  const paths: Array<[string, string, string, Array<{ x: number; y: number }>]> = [
-    ['edge-carrier-customer', 'carrier', 'customer', [{ x: 325, y: 3752 }, { x: 325, y: 3910 }]],
-    ['edge-master-data-oms-order', 'master-data', 'oms-order', [{ x: 310, y: 746 }, { x: 310, y: 977 }]],
-    ['edge-master-data-tms-planning', 'master-data', 'tms-planning', [{ x: 310, y: 746 }, { x: 310, y: 842 }, { x: 0, y: 842 }, { x: 0, y: 3124 }, { x: 40, y: 3124 }, { x: 40, y: 2711 }, { x: 310, y: 2711 }, { x: 310, y: 2807 }]],
-    ['edge-master-data-wms-inventory', 'master-data', 'wms-inventory', [{ x: 310, y: 746 }, { x: 310, y: 842 }, { x: 520, y: 842 }, { x: 520, y: 2040 }, { x: 320, y: 2040 }, { x: 320, y: 2152 }, { x: 310, y: 2152 }, { x: 310, y: 2170 }]],
-    ['edge-oms-atc-fulfill', 'oms-atc', 'oms-fulfill', [{ x: 210, y: 1454 }, { x: 210, y: 1528 }, { x: 314, y: 1528 }, { x: 314, y: 1612 }]],
-    ['edge-oms-fulfill-wms-outbound', 'oms-fulfill', 'wms-outbound', [{ x: 314, y: 1772 }, { x: 314, y: 1820 }, { x: 128, y: 1820 }, { x: 128, y: 2392 }, { x: 310, y: 2392 }, { x: 310, y: 2488 }]],
-    ['edge-oms-order-atc', 'oms-order', 'oms-atc', [{ x: 369, y: 1136 }, { x: 369, y: 1295 }]],
-    ['edge-sales-oms-order', 'sales', 'oms-order', [{ x: 317, y: 200 }, { x: 317, y: 289 }, { x: 640, y: 289 }, { x: 640, y: 880 }, { x: 315, y: 880 }, { x: 315, y: 976 }]],
-    ['edge-tms-execution-carrier', 'tms-execution', 'carrier', [{ x: 310, y: 3284 }, { x: 310, y: 3683 }]],
-    ['edge-tms-execution-oms-order', 'tms-execution', 'oms-order', [{ x: 380, y: 3124 }, { x: 380, y: 3028 }, { x: 322, y: 3028 }, { x: 322, y: 3124 }, { x: 28, y: 3124 }, { x: 28, y: 1232 }, { x: 314, y: 1232 }, { x: 314, y: 1136 }]],
-    ['edge-tms-execution-wms-outbound', 'tms-execution', 'wms-outbound', [{ x: 240, y: 3124 }, { x: 240, y: 3028 }, { x: 106, y: 3028 }, { x: 106, y: 2744 }, { x: 310, y: 2744 }, { x: 310, y: 2648 }]],
-    ['edge-tms-planning-execution', 'tms-planning', 'tms-execution', [{ x: 310, y: 2966 }, { x: 310, y: 3124 }]],
-    ['edge-wms-inventory-oms-atc', 'wms-inventory', 'oms-atc', [{ x: 310, y: 2170 }, { x: 310, y: 2026 }, { x: 516, y: 2026 }, { x: 516, y: 1538 }, { x: 314, y: 1538 }, { x: 314, y: 1454 }]],
-    ['edge-wms-inventory-outbound', 'wms-inventory', 'wms-outbound', [{ x: 310, y: 2330 }, { x: 310, y: 2489 }]],
-    ['edge-wms-outbound-oms-fulfill', 'wms-outbound', 'oms-fulfill', [{ x: 193, y: 2488 }, { x: 193, y: 2392 }, { x: 137, y: 2392 }, { x: 137, y: 1914 }, { x: 314, y: 1914 }, { x: 314, y: 1772 }]],
-    ['edge-wms-outbound-tms-planning', 'wms-outbound', 'tms-planning', [{ x: 366, y: 2648 }, { x: 366, y: 2806 }]],
-  ];
-
-  return paths.map(([id, source, target, computedPath]) => ({
-    id,
-    source,
-    target,
-    data: { computedPath },
-  }));
-}
-
-function segmentOverlap(
-  a1: { x: number; y: number },
-  a2: { x: number; y: number },
-  b1: { x: number; y: number },
-  b2: { x: number; y: number },
-): number {
-  const aVertical = Math.abs(a1.x - a2.x) < 1;
-  const bVertical = Math.abs(b1.x - b2.x) < 1;
-  if (aVertical !== bVertical) return 0;
-  if (aVertical) {
-    if (Math.abs(a1.x - b1.x) > 1) return 0;
-    return Math.max(0, Math.min(Math.max(a1.y, a2.y), Math.max(b1.y, b2.y))
-      - Math.max(Math.min(a1.y, a2.y), Math.min(b1.y, b2.y)));
-  }
-  if (Math.abs(a1.y - b1.y) > 1) return 0;
-  return Math.max(0, Math.min(Math.max(a1.x, a2.x), Math.max(b1.x, b2.x))
-    - Math.max(Math.min(a1.x, a2.x), Math.min(b1.x, b2.x)));
-}
-
-function pathHitsRect(
-  path: Array<{ x: number; y: number }>,
-  rect: { x: number; y: number; width: number; height: number },
-): boolean {
-  for (let i = 0; i < path.length - 1; i++) {
-    const a = path[i];
-    const b = path[i + 1];
-    const horizontal = Math.abs(a.y - b.y) < 0.5;
-    const vertical = Math.abs(a.x - b.x) < 0.5;
-    if (horizontal) {
-      const y = a.y;
-      if (y <= rect.y || y >= rect.y + rect.height) continue;
-      if (Math.max(Math.min(a.x, b.x), rect.x) < Math.min(Math.max(a.x, b.x), rect.x + rect.width)) {
-        return true;
-      }
-    }
-    if (vertical) {
-      const x = a.x;
-      if (x <= rect.x || x >= rect.x + rect.width) continue;
-      if (Math.max(Math.min(a.y, b.y), rect.y) < Math.min(Math.max(a.y, b.y), rect.y + rect.height)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}

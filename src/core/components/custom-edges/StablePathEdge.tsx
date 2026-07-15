@@ -7,8 +7,9 @@
  * 完全绕过 React Flow 的自动路径计算。
  */
 import React, { memo } from 'react';
-import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps } from '@xyflow/react';
-import { createFilletedPath, getSmartLabelPosition } from '../../algorithms/smartEdgeUtils';
+import { BaseEdge, EdgeLabelRenderer, useStore, type EdgeProps } from '@xyflow/react';
+import { getSmartLabelPosition } from '../../algorithms/smartEdgeUtils';
+import { getEdgeLabelAutoOffset } from './edgeLabelAvoidance';
 
 interface Point {
     x: number;
@@ -20,15 +21,17 @@ interface Point {
  */
 function snapNearOrthogonalPoints(points: Point[]): Point[] {
     const snapped = points.map(p => ({ ...p }));
-    const microAxisSnap = 1;
+    const microAxisSnap = 8;
+    const minMajorAxisLength = 16;
+    const maxMinorAxisRatio = 0.08;
     for (let i = 0; i < snapped.length - 1; i++) {
         const a = snapped[i];
         const b = snapped[i + 1];
         const dx = Math.abs(a.x - b.x);
         const dy = Math.abs(a.y - b.y);
-        if (dx <= microAxisSnap && dy > microAxisSnap) {
+        if (dy >= minMajorAxisLength && dx <= microAxisSnap && dx <= dy * maxMinorAxisRatio) {
             b.x = a.x;
-        } else if (dy <= microAxisSnap && dx > microAxisSnap) {
+        } else if (dx >= minMajorAxisLength && dy <= microAxisSnap && dy <= dx * maxMinorAxisRatio) {
             b.y = a.y;
         }
     }
@@ -50,6 +53,35 @@ function pointsToPath(points: Point[]): string {
     return pathData.join(' ');
 }
 
+function fallbackOrthogonalPoints(
+    sourceX: number,
+    sourceY: number,
+    targetX: number,
+    targetY: number,
+    sourcePosition: unknown,
+): Point[] {
+    const start = { x: sourceX, y: sourceY };
+    const end = { x: targetX, y: targetY };
+    if (Math.abs(sourceX - targetX) <= 1 || Math.abs(sourceY - targetY) <= 1) {
+        return snapNearOrthogonalPoints([start, end]);
+    }
+
+    const sourceSide = String(sourcePosition ?? '').toLowerCase();
+    const verticalFirst = sourceSide === 'top' || sourceSide === 'bottom';
+    return snapNearOrthogonalPoints(verticalFirst
+        ? [start, { x: sourceX, y: targetY }, end]
+        : [start, { x: targetX, y: sourceY }, end]);
+}
+
+const autoLabelOffset = (
+    ownPath: Point[],
+    labelPoint: Point,
+    labelText: string,
+    peerPaths: Point[][],
+): Point => {
+    return getEdgeLabelAutoOffset(ownPath, labelPoint, labelText, peerPaths);
+};
+
 /**
  * 稳定路径边组件
  */
@@ -63,7 +95,6 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         targetX,
         targetY,
         sourcePosition,
-        targetPosition,
         data,
         style,
         markerEnd,
@@ -75,6 +106,23 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         _labelBgPadding,
         _labelBgBorderRadius,
     } = props;
+    const peerPaths = useStore((state: any) => (
+        Array.isArray(state.edges)
+            ? state.edges
+                .filter((edge: any) => edge?.id !== id)
+                .map((edge: any) => (edge?.data as any)?.computedPath)
+                .filter((path: unknown): path is Point[] => (
+                    Array.isArray(path)
+                    && path.length >= 2
+                    && path.every((point: any) => (
+                        typeof point?.x === 'number'
+                        && Number.isFinite(point.x)
+                        && typeof point?.y === 'number'
+                        && Number.isFinite(point.y)
+                    ))
+                ))
+            : []
+    ));
 
     // ReactFlow perf check: we are completely safe from global node movement here
     // 读取预计算的路径点
@@ -83,33 +131,58 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
     let edgePath: string;
     let labelX: number;
     let labelY: number;
+    let renderPath: Point[] | undefined;
 
     if (computedPath && computedPath.length >= 2) {
-        const edgeConfig = (data as any)?.edgeConfig;
-        const configuredRadius = Number(edgeConfig?.borderRadius ?? (data as any)?.borderRadius ?? 8);
-        const renderRadius = Number.isFinite(configuredRadius)
-            ? Math.max(0, Math.min(24, configuredRadius))
-            : 8;
-        edgePath = createFilletedPath(computedPath, renderRadius) || pointsToPath(computedPath);
+        renderPath = snapNearOrthogonalPoints(computedPath);
+        edgePath = pointsToPath(renderPath);
 
         // 计算标签位置（路径中点）
-        const pos = getSmartLabelPosition(computedPath);
+        const pos = getSmartLabelPosition(renderPath);
         labelX = pos.x;
         labelY = pos.y;
     } else {
-        // Fallback: 使用 React Flow 的 smoothstep 路径
-        const [path, lx, ly] = getSmoothStepPath({
-            sourceX,
-            sourceY,
-            sourcePosition,
-            targetX,
-            targetY,
-            targetPosition,
-            borderRadius: 8,
-        });
-        edgePath = path;
-        labelX = lx;
-        labelY = ly;
+        renderPath = fallbackOrthogonalPoints(sourceX, sourceY, targetX, targetY, sourcePosition);
+        edgePath = pointsToPath(renderPath);
+        const pos = getSmartLabelPosition(renderPath);
+        labelX = pos.x;
+        labelY = pos.y;
+    }
+
+    const dataLabelPosition = (data as any)?.labelPosition;
+    if (
+        dataLabelPosition
+        && typeof dataLabelPosition.x === 'number'
+        && Number.isFinite(dataLabelPosition.x)
+        && typeof dataLabelPosition.y === 'number'
+        && Number.isFinite(dataLabelPosition.y)
+    ) {
+        labelX = dataLabelPosition.x;
+        labelY = dataLabelPosition.y;
+    }
+
+    const labelOffset = (data as any)?.labelOffset;
+    const hasManualLabelPosition = !!labelOffset
+        || typeof (data as any)?.absoluteLabelX === 'number'
+        || typeof (data as any)?.absoluteLabelY === 'number';
+
+    if (labelOffset) {
+        labelX += Number(labelOffset.x) || 0;
+        labelY += Number(labelOffset.y) || 0;
+    }
+
+    if (typeof (data as any)?.absoluteLabelX === 'number' && Number.isFinite((data as any).absoluteLabelX)) {
+        labelX = (data as any).absoluteLabelX;
+    }
+
+    if (typeof (data as any)?.absoluteLabelY === 'number' && Number.isFinite((data as any).absoluteLabelY)) {
+        labelY = (data as any).absoluteLabelY;
+    }
+
+    if (!hasManualLabelPosition && label && renderPath && renderPath.length >= 2) {
+        const offset = autoLabelOffset(renderPath, { x: labelX, y: labelY }, String(label), peerPaths);
+        labelX += offset.x;
+        labelY += offset.y;
     }
 
     return (

@@ -23,6 +23,9 @@ export interface RenderNodeGeometry {
   hidden: boolean;
   zIndex: number;
   label: string;
+  subtitle?: string;
+  icon?: string;
+  status?: 'normal' | 'success' | 'warning' | 'error';
   type?: string;
   shape?: string;
   fill: string;
@@ -32,6 +35,26 @@ export interface RenderNodeGeometry {
   borderRadius: number;
   fontSize: number;
   fontWeight?: string;
+  tableColumns?: RenderNodeTableColumn[];
+  container?: RenderNodeContainerMetadata;
+}
+
+export interface RenderNodeTableColumn {
+  name: string;
+  type: string;
+  isPrimary: boolean;
+  isForeign: boolean;
+}
+
+export interface RenderNodeContainerMetadata {
+  isContainer: boolean;
+  isSwimlane: boolean;
+  isLane: boolean;
+  collapsed: boolean;
+  childCount: number;
+  laneCount: number;
+  laneDirection: 'horizontal' | 'vertical';
+  headerColor?: string;
 }
 
 export interface RenderEdgeMarker {

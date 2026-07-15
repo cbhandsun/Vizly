@@ -62,6 +62,7 @@ import { appMessage } from '@/core/utils/antdStaticBridge';
 import { resolvePluginId } from '@/core/plugins/registry';
 import { ensureBuiltInPlugins } from '@/core/plugins/builtInPlugins';
 import { getStandardPresetDocTypeById } from '@/data/standardized/presetMetadata';
+import { loadStandardPresetById } from '@/data/standardized/presetLoader';
 import { getDiagramDocTypeFromStorage } from '@/core/utils/diagramTypeStorage';
 import { createAutoSavePayload } from '@/core/utils/autoSaveStorage';
 import { addCustomPreset, getCustomPreset } from '@/core/utils/customPresetStorage';
@@ -112,10 +113,11 @@ import { appModal } from '@/core/utils/antdStaticBridge';
 
 const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
 
-const loadFlowchartDesigner = async (pluginId?: string) => {
+const loadFlowchartDesigner = async (pluginId?: string, presetId?: string) => {
     const [{ default: FlowchartDesigner }] = await Promise.all([
         import('@/core/components/diagrams/FlowchartDesigner'),
         ensureBuiltInPlugins(pluginId || 'flowchart'),
+        loadStandardPresetById(presetId),
     ]);
 
     return {
@@ -336,12 +338,12 @@ const DiagramViewer: React.FC = () => {
             // Plugins that override the canvas entirely (mindmap, timeline, network...)
             // register themselves via PluginRegistry and contribute canvas + toolbar via hooks.
             // The legacy UnifiedDesigner is just an architecture skeleton and must NOT be used here.
-            return lazy(() => loadFlowchartDesigner(resolvedPluginId));
+            return lazy(() => loadFlowchartDesigner(resolvedPluginId, selectedDiagramId));
         }
 
         // Fallback to FlowchartDesigner if not found
-        return lazy(() => loadFlowchartDesigner());
-    }, [selectedDiagram?.component, resolvedPluginId]);
+        return lazy(() => loadFlowchartDesigner(undefined, selectedDiagramId));
+    }, [selectedDiagram?.component, resolvedPluginId, selectedDiagramId]);
 
     // 仅显示主流程（动线）开关状态（函数级注释）
     // - 将开关迁移到“更多”菜单中统一管理

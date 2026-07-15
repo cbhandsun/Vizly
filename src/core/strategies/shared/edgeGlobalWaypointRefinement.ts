@@ -229,17 +229,6 @@ function segmentIntersectsRect(segment: Segment, rect: Rect, padding = 4): boole
   return false;
 }
 
-function obstacleHits(path: Point[], edge: Edge, obstacles: Map<string, Rect>): number {
-  let hits = 0;
-  for (const segment of toSegments(path)) {
-    for (const [nodeId, rect] of obstacles) {
-      if (nodeId === edge.source || nodeId === edge.target) continue;
-      if (segmentIntersectsRect(segment, rect)) hits += 1;
-    }
-  }
-  return hits;
-}
-
 function strictCrosses(first: Segment, second: Segment): boolean {
   const firstAxis = axisOf(first.a, first.b);
   const secondAxis = axisOf(second.a, second.b);
@@ -439,94 +428,116 @@ function shiftCandidatesAwayFromLaneBand(
     .filter((candidate): candidate is Point[] => candidate !== null);
 }
 
-function unrelatedCrossings(
-  path: Point[],
-  edgeKey: string,
-  paths: Map<string, Point[]>,
-  edgeByKey: Map<string, Edge>,
-): number {
-  const edge = edgeByKey.get(edgeKey);
-  if (!edge) return 0;
-  let total = 0;
-  for (const [otherKey, otherPath] of paths) {
-    if (otherKey === edgeKey) continue;
-    const other = edgeByKey.get(otherKey);
-    if (!other || sharesEndpoint(edge, other)) continue;
-    for (const first of toSegments(path)) {
-      for (const second of toSegments(otherPath)) {
-        if (strictCrosses(first, second)) total += 1;
-      }
-    }
-  }
-  return total;
-}
+type PathCandidateMetrics = {
+  strictCrossings: number;
+  unrelatedCrossings: number;
+  visualUnrelatedCrossings: number;
+  unrelatedOverlap: number;
+  obstacleHits: number;
+  turnbacks: number;
+  bends: number;
+  length: number;
+  score: number;
+};
 
-function visualUnrelatedCrossings(
-  path: Point[],
-  edgeKey: string,
-  paths: Map<string, Point[]>,
-  edgeByKey: Map<string, Edge>,
-): number {
-  const edge = edgeByKey.get(edgeKey);
-  if (!edge) return 0;
-  let total = 0;
-  for (const [otherKey, otherPath] of paths) {
-    if (otherKey === edgeKey) continue;
-    const other = edgeByKey.get(otherKey);
-    if (!other || sharesEndpoint(edge, other)) continue;
-    for (let firstIndex = 0; firstIndex < path.length - 1; firstIndex += 1) {
-      const first = { a: path[firstIndex], b: path[firstIndex + 1] };
-      for (let secondIndex = 0; secondIndex < otherPath.length - 1; secondIndex += 1) {
-        const second = { a: otherPath[secondIndex], b: otherPath[secondIndex + 1] };
-        if (visualStrictCrosses(first, second)) total += 1;
-      }
-    }
-  }
-  return total;
-}
+type PathCandidateEvaluationContext = {
+  evaluate: (path: Point[]) => PathCandidateMetrics;
+};
 
-function unrelatedOverlapScore(
-  path: Point[],
-  edgeKey: string,
-  paths: Map<string, Point[]>,
-  edgeByKey: Map<string, Edge>,
-): number {
-  const edge = edgeByKey.get(edgeKey);
-  if (!edge) return 0;
-  let total = 0;
-  for (const [otherKey, otherPath] of paths) {
-    if (otherKey === edgeKey) continue;
-    const other = edgeByKey.get(otherKey);
-    if (!other || sharesEndpoint(edge, other)) continue;
-    for (const first of toSegments(path)) {
-      for (const second of toSegments(otherPath)) {
-        const overlap = parallelOverlapLength(first, second);
-        if (overlap > MIN_INTERIOR_LEG) total += overlap - MIN_INTERIOR_LEG;
-      }
-    }
+const toVisualSegments = (path: Point[]): Segment[] => {
+  const segments: Segment[] = [];
+  for (let index = 0; index < path.length - 1; index += 1) {
+    segments.push({ a: path[index], b: path[index + 1] });
   }
-  return total;
-}
+  return segments;
+};
 
-function strictCrossingCount(
-  path: Point[],
-  edgeKey: string,
-  paths: Map<string, Point[]>,
+function createPathCandidateEvaluationContext(
+  edge: Edge,
+  key: string,
+  workingPaths: Map<string, Point[]>,
   edgeByKey: Map<string, Edge>,
-): number {
-  const edge = edgeByKey.get(edgeKey);
-  let total = 0;
-  for (const [otherKey, otherPath] of paths) {
-    if (otherKey === edgeKey) continue;
-    const other = edgeByKey.get(otherKey);
-    if (edge && other && sharesEndpoint(edge, other)) continue;
-    for (const first of toSegments(path)) {
-      for (const second of toSegments(otherPath)) {
-        if (strictCrosses(first, second)) total += 1;
+  obstacles: Map<string, Rect>,
+): PathCandidateEvaluationContext {
+  const otherPaths = [...workingPaths.entries()]
+    .filter(([otherKey]) => otherKey !== key)
+    .map(([otherKey, otherPath]) => {
+      const otherEdge = edgeByKey.get(otherKey);
+      return {
+        segments: toSegments(otherPath),
+        visualSegments: toVisualSegments(otherPath),
+        unrelated: Boolean(otherEdge && !sharesEndpoint(edge, otherEdge)),
+      };
+    });
+  const relevantObstacles = [...obstacles.entries()]
+    .filter(([nodeId]) => nodeId !== edge.source && nodeId !== edge.target)
+    .map(([, rect]) => rect);
+  const cache = new WeakMap<Point[], PathCandidateMetrics>();
+
+  return {
+    evaluate: (path: Point[]): PathCandidateMetrics => {
+      const cached = cache.get(path);
+      if (cached) return cached;
+      const segments = toSegments(path);
+      const visualSegments = toVisualSegments(path);
+      let strictCrossings = 0;
+      let unrelatedCrossingCount = 0;
+      let visualUnrelatedCrossingCount = 0;
+      let unrelatedOverlap = 0;
+      let obstacleHitCount = 0;
+
+      for (const other of otherPaths) {
+        for (const first of segments) {
+          for (const second of other.segments) {
+            if (strictCrosses(first, second)) {
+              strictCrossings += 1;
+              if (other.unrelated) unrelatedCrossingCount += 1;
+            }
+            if (other.unrelated) {
+              const overlap = parallelOverlapLength(first, second);
+              if (overlap > MIN_INTERIOR_LEG) unrelatedOverlap += overlap - MIN_INTERIOR_LEG;
+            }
+          }
+        }
+        if (other.unrelated) {
+          for (const first of visualSegments) {
+            for (const second of other.visualSegments) {
+              if (visualStrictCrosses(first, second)) visualUnrelatedCrossingCount += 1;
+            }
+          }
+        }
       }
-    }
-  }
-  return total;
+      for (const segment of segments) {
+        for (const rect of relevantObstacles) {
+          if (segmentIntersectsRect(segment, rect)) obstacleHitCount += 1;
+        }
+      }
+
+      const turnbacks = turnbackCount(path);
+      const bends = bendCount(path);
+      const length = pathLength(path);
+      const metrics: PathCandidateMetrics = {
+        strictCrossings,
+        unrelatedCrossings: unrelatedCrossingCount,
+        visualUnrelatedCrossings: visualUnrelatedCrossingCount,
+        unrelatedOverlap,
+        obstacleHits: obstacleHitCount,
+        turnbacks,
+        bends,
+        length,
+        score: unrelatedCrossingCount * 10000
+          + visualUnrelatedCrossingCount * 9000
+          + strictCrossings * 7000
+          + unrelatedOverlap * 80
+          + obstacleHitCount * 5000
+          + turnbacks * 500
+          + bends * 40
+          + length,
+      };
+      cache.set(path, metrics);
+      return metrics;
+    },
+  };
 }
 
 function sharesEndpoint(first: Edge, second: Edge): boolean {
@@ -690,6 +701,7 @@ function safeToAcceptCandidate(
   workingPaths: Map<string, Point[]>,
   edgeByKey: Map<string, Edge>,
   obstacles: Map<string, Rect>,
+  evaluationContext = createPathCandidateEvaluationContext(edge, key, workingPaths, edgeByKey, obstacles),
 ): boolean {
   if (!sameEndpoints(original, candidate)) return false;
   if (!isStrictlyOrthogonal(candidate)) return false;
@@ -697,22 +709,20 @@ function safeToAcceptCandidate(
   if (lastDirection(candidate) !== lastDirection(original)) return false;
   if (!keepsEndpointStubs(original, candidate)) return false;
 
-  const originalObstacleHits = obstacleHits(original, edge, obstacles);
-  const candidateObstacleHits = obstacleHits(candidate, edge, obstacles);
+  const originalMetrics = evaluationContext.evaluate(original);
+  const candidateMetrics = evaluationContext.evaluate(candidate);
+  const originalObstacleHits = originalMetrics.obstacleHits;
+  const candidateObstacleHits = candidateMetrics.obstacleHits;
   if (candidateObstacleHits > originalObstacleHits) return false;
 
-  const originalPaths = new Map(workingPaths);
-  originalPaths.set(key, original);
-  const candidatePaths = new Map(workingPaths);
-  candidatePaths.set(key, candidate);
-  const originalStrictCrossings = strictCrossingCount(original, key, originalPaths, edgeByKey);
-  const candidateStrictCrossings = strictCrossingCount(candidate, key, candidatePaths, edgeByKey);
-  const originalCrossings = unrelatedCrossings(original, key, originalPaths, edgeByKey);
-  const candidateCrossings = unrelatedCrossings(candidate, key, candidatePaths, edgeByKey);
-  const originalVisualCrossings = visualUnrelatedCrossings(original, key, originalPaths, edgeByKey);
-  const candidateVisualCrossings = visualUnrelatedCrossings(candidate, key, candidatePaths, edgeByKey);
-  const originalOverlap = unrelatedOverlapScore(original, key, originalPaths, edgeByKey);
-  const candidateOverlap = unrelatedOverlapScore(candidate, key, candidatePaths, edgeByKey);
+  const originalStrictCrossings = originalMetrics.strictCrossings;
+  const candidateStrictCrossings = candidateMetrics.strictCrossings;
+  const originalCrossings = originalMetrics.unrelatedCrossings;
+  const candidateCrossings = candidateMetrics.unrelatedCrossings;
+  const originalVisualCrossings = originalMetrics.visualUnrelatedCrossings;
+  const candidateVisualCrossings = candidateMetrics.visualUnrelatedCrossings;
+  const originalOverlap = originalMetrics.unrelatedOverlap;
+  const candidateOverlap = candidateMetrics.unrelatedOverlap;
   if (candidateCrossings > originalCrossings) return false;
   if (candidateVisualCrossings > originalVisualCrossings) return false;
   if (candidateStrictCrossings > originalStrictCrossings) return false;
@@ -723,6 +733,7 @@ function safeToAcceptCandidate(
   ) {
     return false;
   }
+  if (candidateStrictCrossings < originalStrictCrossings) return true;
 
   return candidateImproves(
     original,
@@ -753,6 +764,7 @@ function safeToAcceptEndpointSlideCandidate(
   workingPaths: Map<string, Point[]>,
   edgeByKey: Map<string, Edge>,
   obstacles: Map<string, Rect>,
+  evaluationContext = createPathCandidateEvaluationContext(edge, key, workingPaths, edgeByKey, obstacles),
 ): boolean {
   if (slidingEndpoint === 'source' && !samePoint(original[original.length - 1], candidate[candidate.length - 1])) return false;
   if (slidingEndpoint === 'target' && !samePoint(original[0], candidate[0])) return false;
@@ -761,24 +773,26 @@ function safeToAcceptEndpointSlideCandidate(
   if (lastDirection(candidate) !== lastDirection(original)) return false;
   if (!keepsEndpointStubs(original, candidate)) return false;
 
-  const originalObstacleHits = obstacleHits(original, edge, obstacles);
-  const candidateObstacleHits = obstacleHits(candidate, edge, obstacles);
+  const originalMetrics = evaluationContext.evaluate(original);
+  const candidateMetrics = evaluationContext.evaluate(candidate);
+  const originalObstacleHits = originalMetrics.obstacleHits;
+  const candidateObstacleHits = candidateMetrics.obstacleHits;
   if (candidateObstacleHits > originalObstacleHits) return false;
 
-  const originalPaths = new Map(workingPaths);
-  originalPaths.set(key, original);
-  const candidatePaths = new Map(workingPaths);
-  candidatePaths.set(key, candidate);
-  const originalCrossings = unrelatedCrossings(original, key, originalPaths, edgeByKey);
-  const candidateCrossings = unrelatedCrossings(candidate, key, candidatePaths, edgeByKey);
-  const originalVisualCrossings = visualUnrelatedCrossings(original, key, originalPaths, edgeByKey);
-  const candidateVisualCrossings = visualUnrelatedCrossings(candidate, key, candidatePaths, edgeByKey);
+  const originalStrictCrossings = originalMetrics.strictCrossings;
+  const candidateStrictCrossings = candidateMetrics.strictCrossings;
+  const originalCrossings = originalMetrics.unrelatedCrossings;
+  const candidateCrossings = candidateMetrics.unrelatedCrossings;
+  const originalVisualCrossings = originalMetrics.visualUnrelatedCrossings;
+  const candidateVisualCrossings = candidateMetrics.visualUnrelatedCrossings;
+  if (candidateStrictCrossings > originalStrictCrossings) return false;
   if (candidateCrossings > originalCrossings) return false;
   if (candidateVisualCrossings > originalVisualCrossings) return false;
 
-  const originalOverlap = unrelatedOverlapScore(original, key, originalPaths, edgeByKey);
-  const candidateOverlap = unrelatedOverlapScore(candidate, key, candidatePaths, edgeByKey);
-  return candidateCrossings < originalCrossings
+  const originalOverlap = originalMetrics.unrelatedOverlap;
+  const candidateOverlap = candidateMetrics.unrelatedOverlap;
+  return candidateStrictCrossings < originalStrictCrossings
+    || candidateCrossings < originalCrossings
     || candidateVisualCrossings < originalVisualCrossings
     || candidateObstacleHits < originalObstacleHits
     || candidateOverlap + MIN_INTERIOR_LEG < originalOverlap;
@@ -871,17 +885,9 @@ function pathQualityScore(
   workingPaths: Map<string, Point[]>,
   edgeByKey: Map<string, Edge>,
   obstacles: Map<string, Rect>,
+  evaluationContext = createPathCandidateEvaluationContext(edge, key, workingPaths, edgeByKey, obstacles),
 ): number {
-  const paths = new Map(workingPaths);
-  paths.set(key, path);
-  return unrelatedCrossings(path, key, paths, edgeByKey) * 10000
-    + visualUnrelatedCrossings(path, key, paths, edgeByKey) * 9000
-    + strictCrossingCount(path, key, paths, edgeByKey) * 7000
-    + unrelatedOverlapScore(path, key, paths, edgeByKey) * 80
-    + obstacleHits(path, edge, obstacles) * 5000
-    + turnbackCount(path) * 500
-    + bendCount(path) * 40
-    + pathLength(path);
+  return evaluationContext.evaluate(path).score;
 }
 
 function findBestInteriorCrossingShiftCandidate(
@@ -893,13 +899,31 @@ function findBestInteriorCrossingShiftCandidate(
   obstacles: Map<string, Rect>,
   nodeById: Map<string, ReactFlowNode>,
 ): Point[] | null {
+  const evaluationContext = createPathCandidateEvaluationContext(
+    edge,
+    key,
+    workingPaths,
+    edgeByKey,
+    obstacles,
+  );
   let best: Point[] | null = null;
-  let bestScore = pathQualityScore(edge, key, path, workingPaths, edgeByKey, obstacles);
+  let bestScore = pathQualityScore(
+    edge,
+    key,
+    path,
+    workingPaths,
+    edgeByKey,
+    obstacles,
+    evaluationContext,
+  );
+  const seenCandidates = new Set<string>();
+  const laneBandCandidates = new Map<number, Point[][]>();
 
   for (const [otherKey, otherPath] of workingPaths) {
     if (otherKey === key) continue;
     const other = edgeByKey.get(otherKey);
-    if (!other || sharesEndpoint(edge, other)) continue;
+    if (!other) continue;
+    const relatedByEndpoint = sharesEndpoint(edge, other);
     const otherSegments = toSegments(otherPath);
 
     for (let segmentIndex = 0; segmentIndex < path.length - 1; segmentIndex += 1) {
@@ -908,19 +932,48 @@ function findBestInteriorCrossingShiftCandidate(
       for (const otherSegment of otherSegments) {
         const hasStrictCrossing = strictCrosses(segment, otherSegment) || visualStrictCrosses(segment, otherSegment);
         const hasLongOverlap = parallelOverlapLength(segment, otherSegment) > MIN_INTERIOR_LEG;
+        if (relatedByEndpoint && !hasStrictCrossing) continue;
         if (!hasStrictCrossing && !hasLongOverlap) continue;
+        let bandCandidates = laneBandCandidates.get(segmentIndex);
+        if (!bandCandidates) {
+          bandCandidates = shiftCandidatesAwayFromLaneBand(
+            edge,
+            path,
+            segmentIndex,
+            workingPaths,
+            edgeByKey,
+            obstacles,
+          );
+          laneBandCandidates.set(segmentIndex, bandCandidates);
+        }
         const candidates = [
           ...(hasStrictCrossing ? shiftCandidatesAwayFromCrossing(path, segmentIndex, otherSegment) : []),
           ...(hasLongOverlap ? shiftCandidatesAwayFromOverlap(path, segmentIndex, otherSegment) : []),
-          ...shiftCandidatesAwayFromLaneBand(edge, path, segmentIndex, workingPaths, edgeByKey, obstacles),
+          ...bandCandidates,
         ];
-        const seenCandidates = new Set<string>();
         for (const candidate of candidates) {
           const candidateKey = candidate.map(point => `${point.x},${point.y}`).join(';');
           if (seenCandidates.has(candidateKey)) continue;
           seenCandidates.add(candidateKey);
-          if (!safeToAcceptCandidate(edge, key, path, candidate, workingPaths, edgeByKey, obstacles)) continue;
-          const score = pathQualityScore(edge, key, candidate, workingPaths, edgeByKey, obstacles);
+          if (!safeToAcceptCandidate(
+            edge,
+            key,
+            path,
+            candidate,
+            workingPaths,
+            edgeByKey,
+            obstacles,
+            evaluationContext,
+          )) continue;
+          const score = pathQualityScore(
+            edge,
+            key,
+            candidate,
+            workingPaths,
+            edgeByKey,
+            obstacles,
+            evaluationContext,
+          );
           if (score < bestScore) {
             best = candidate;
             bestScore = score;
@@ -940,10 +993,19 @@ function findBestInteriorCrossingShiftCandidate(
               workingPaths,
               edgeByKey,
               obstacles,
+              evaluationContext,
             )) {
               continue;
             }
-            const score = pathQualityScore(edge, key, endpointCandidate.path, workingPaths, edgeByKey, obstacles);
+            const score = pathQualityScore(
+              edge,
+              key,
+              endpointCandidate.path,
+              workingPaths,
+              edgeByKey,
+              obstacles,
+              evaluationContext,
+            );
             if (score < bestScore) {
               best = endpointCandidate.path;
               bestScore = score;

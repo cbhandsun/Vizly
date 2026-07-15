@@ -5,31 +5,34 @@ const DEFAULT_MAX_LINES = 1200;
 
 const oversizedBaseline = new Map([
   ['src/core/utils/layout/subGroupLayout.ts', 4903],
-  ['src/core/algorithms/smartEdgeUtils.ts', 4065],
   ['src/core/strategies/DomainVerticalLayoutStrategy.ts', 3258],
   ['src/core/services/EdgeRoutingCoordinator.ts', 3050],
   ['src/core/workers/core/EdgeRoutingWorker.ts', 2267],
-  ['src/core/components/custom-edges/hooks/useSmartEdgeRouting.ts', 2036],
-  ['src/core/strategies/DomainDagreLayoutStrategy.ts', 2026],
   ['src/core/algorithms/pathfinding.ts', 1727],
-  ['src/core/components/diagrams/FlowchartDesigner.tsx', 1537],
-  ['src/core/algorithms/orthogonalWaypointRefiner.ts', 1471],
-  ['src/core/algorithms/__tests__/routingCrossingScorer.test.ts', 1469],
   ['src/components/debug/tabs/VisualizerTab.tsx', 1410],
   ['src/core/routing/utils/AdvancedRouting.ts', 1354],
   ['src/components/ai/AIChatPanel.tsx', 1353],
   ['src/core/components/diagrams/hooks/useMindMapOrchestrator.ts', 1329],
-  ['src/core/strategies/shared/edgeRoutingPipeline.ts', 1245],
   ['src/components/ui/ConfigurationPanel.tsx', 1239],
 ]);
 
-const sourceFiles = execFileSync('git', ['ls-files', 'src'], {
+const gitFiles = (args) => execFileSync('git', args, {
   encoding: 'utf8',
   stdio: ['ignore', 'pipe', 'pipe'],
 })
   .split(/\r?\n/)
   .map(line => line.trim())
-  .filter(file => file && /\.(?:tsx?|jsx?)$/i.test(file) && existsSync(file));
+  .filter(Boolean);
+
+// Local verification must cover new modules before they are staged. Limiting
+// the gate to tracked files creates a blind spot exactly while large files are
+// being split into new helpers.
+const sourceFiles = [...new Set([
+  ...gitFiles(['ls-files', '--', 'src']),
+  ...gitFiles(['ls-files', '--others', '--exclude-standard', '--', 'src']),
+])]
+  .filter(file => /\.(?:tsx?|jsx?)$/i.test(file) && existsSync(file))
+  .sort();
 
 const failures = [];
 

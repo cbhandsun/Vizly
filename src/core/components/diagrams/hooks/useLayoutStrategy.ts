@@ -25,6 +25,97 @@ interface UseLayoutStrategyParams {
     diagramId?: string;
 }
 
+const getNodeDataString = (node: Node, key: string): string => (
+    typeof (node.data as any)?.[key] === 'string'
+        ? String((node.data as any)[key]).trim()
+        : ''
+);
+
+const isGeneratedTitleGroupNode = (node: Node): boolean => (
+    String(node.type || '') === 'titleGroup' || String(node.id || '').startsWith('titlegroup-')
+);
+
+const isGeneratedSubGroupNode = (node: Node): boolean => (
+    String(node.type || '') === 'subGroup' || String(node.id || '').startsWith('subgroup-')
+);
+
+const isHiddenLayoutNode = (node: Node): boolean => (
+    node.hidden === true || (node.data as any)?.hidden === true
+);
+
+const uniqueVisibleDataValues = (nodes: Node[], predicate: (node: Node) => boolean, key: string): string[] | undefined => {
+    const values = nodes
+        .filter(node => predicate(node) && !isHiddenLayoutNode(node))
+        .map(node => getNodeDataString(node, key))
+        .filter(Boolean);
+    return values.length ? Array.from(new Set(values)) : undefined;
+};
+
+export const resolveLayoutStrategyGeneratedGroupOptions = (preset: any, currentNodes: Node[] = []) => {
+    const layout = preset?.layout as any;
+    if (!layout && currentNodes.length > 0) {
+        const hasGeneratedContainers = currentNodes.some(node => (
+            isGeneratedTitleGroupNode(node) || isGeneratedSubGroupNode(node)
+        ));
+        if (hasGeneratedContainers) {
+            const visibleDomains = uniqueVisibleDataValues(currentNodes, isGeneratedTitleGroupNode, 'domain');
+            const visibleSubDomains = uniqueVisibleDataValues(currentNodes, isGeneratedSubGroupNode, 'subDomain');
+            return {
+                generateDomainGroups: Boolean(visibleDomains?.length),
+                generateSubDomainGroups: Boolean(visibleSubDomains?.length),
+                domainWhitelist: visibleDomains,
+                subDomainWhitelist: visibleSubDomains,
+            };
+        }
+    }
+    return {
+        generateDomainGroups: layout?.generateDomainGroups !== false,
+        generateSubDomainGroups: layout?.generateSubDomainGroups !== false,
+        domainWhitelist: Array.isArray(layout?.domainWhitelist) ? layout.domainWhitelist : undefined,
+        subDomainWhitelist: Array.isArray(layout?.subDomainWhitelist) ? layout.subDomainWhitelist : undefined,
+    };
+};
+
+export const stripHiddenGeneratedLayoutNodes = (nodes: Node[], groupOptions?: ReturnType<typeof resolveLayoutStrategyGeneratedGroupOptions>): Node[] => (
+    nodes.filter(node => {
+        if (isHiddenLayoutNode(node)) return false;
+        if (groupOptions?.generateDomainGroups === false && isGeneratedTitleGroupNode(node)) return false;
+        if (groupOptions?.generateSubDomainGroups === false && isGeneratedSubGroupNode(node)) return false;
+        return true;
+    })
+);
+
+export const resolveLayoutStrategyPresetFromCandidates = (
+    presetMap: Record<string, any>,
+    candidates: Array<string | undefined>,
+): { id?: string; preset?: any } => {
+    for (const candidate of candidates) {
+        const id = coerceDiagramId(candidate || '');
+        if (!id) continue;
+        const preset = presetMap[id];
+        if (preset) return { id, preset };
+    }
+    return {};
+};
+
+export const normalizeLayoutVisibilityNodes = (rawNodes: Node[]): Node[] => {
+    const collapsedGroups = rawNodes.filter(n => n.data?.collapsed);
+    const childrenMap = buildChildrenMap(rawNodes);
+    const hiddenNodeIds = new Set<string>();
+    collapsedGroups.forEach(group => {
+        getDescendantIds(rawNodes, group.id, childrenMap).forEach(id => hiddenNodeIds.add(id));
+    });
+
+    return rawNodes.map(n => {
+        const dataHidden = n.data?.hidden === true;
+        const shouldHide = hiddenNodeIds.has(n.id) || n.hidden === true || dataHidden;
+        if (shouldHide) {
+            return { ...n, hidden: true, data: { ...n.data, hidden: true } };
+        }
+        return { ...n, hidden: false };
+    });
+};
+
 /**
  * 边验证：确保布局后所有边有效
  *
@@ -32,7 +123,7 @@ interface UseLayoutStrategyParams {
  * 而 FlowchartNode 只注册了全称 Handle ID ('right'/'left'/'top'/'bottom')
  * 必须先正确映射短格式→全称，再验证有效性
  */
-function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], dir: 'TB' | 'LR'): Edge[] {
+export function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], dir: 'TB' | 'LR'): Edge[] {
     const nodeIdSet = new Set(resultNodes.map(n => n.id));
     const expandHandle = (h: string | null | undefined): string | null => {
         if (!h) return null;
@@ -144,6 +235,10 @@ function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], dir: 'TB'
                 isTreeBus: e.data?.isTreeBus,
                 useElkRouting: e.data?.useElkRouting,
                 algorithm: e.data?.algorithm,
+                layoutPathLocked: e.data?.layoutPathLocked,
+                _layoutPathLocked: e.data?._layoutPathLocked,
+                sharedTrunkAware: e.data?.sharedTrunkAware,
+                stablePathQuality: e.data?.stablePathQuality,
                 _layoutEpoch: e.data?._layoutEpoch
             };
 
@@ -197,23 +292,7 @@ export function useLayoutStrategy({
 
             // 1. 自动传播折叠容器的折叠状态到子节点
             // 确保布局策略和后处理管线能够通过 data.hidden 正确过滤隐藏节点
-            const collapsedGroups = rawNodes.filter(n => n.data?.collapsed);
-            const childrenMap = buildChildrenMap(rawNodes);
-            const hiddenNodeIds = new Set<string>();
-            collapsedGroups.forEach(group => {
-                getDescendantIds(rawNodes, group.id, childrenMap).forEach(id => hiddenNodeIds.add(id));
-            });
-
-            const allNodes = rawNodes.map(n => {
-                if (hiddenNodeIds.has(n.id)) {
-                    return { ...n, hidden: true, data: { ...n.data, hidden: true } };
-                }
-                // 如果节点不在隐藏列表中，但包含遗留的折叠隐藏状态，将其还原
-                if (n.data?.hidden) {
-                    return { ...n, hidden: false, data: { ...n.data, hidden: false } };
-                }
-                return { ...n, hidden: false };
-            });
+            const allNodes = normalizeLayoutVisibilityNodes(rawNodes);
 
             // ═══ 前处理：过滤容器、转绝对坐标、清除 parentId ═══
             const nodeById = new Map(allNodes.map(n => [n.id, n]));
@@ -327,38 +406,42 @@ export function useLayoutStrategy({
                 // [FIX] 获取域排序：显式配置 > 标准数据节点出现顺序 > 策略内部扫描兜底
                 let domainOrder: string[] | undefined;
                 let subDomainOrder: Record<string, string[]> | undefined;
+                let generatedGroupOptions = resolveLayoutStrategyGeneratedGroupOptions(undefined, allNodes);
                 try {
-                    const currentDiagramId = coerceDiagramId(
-                        diagramId || getQueryOrHashParamFromLocation(
-                            typeof window === 'undefined' ? undefined : window.location,
-                            'diagram'
-                        ) || ''
+                    const locationDiagramId = getQueryOrHashParamFromLocation(
+                        typeof window === 'undefined' ? undefined : window.location,
+                        'diagram'
                     );
-                    if (currentDiagramId) {
-                        const { PRESET_MAP } = await import('@/data/standardized');
-                        const preset = PRESET_MAP[currentDiagramId];
-                        if (preset) {
-                            // 优先显式配置
-                            domainOrder = (preset as any).layout?.domainOrder;
-                            subDomainOrder = (preset as any).layout?.subDomainOrder;
-                            // 回退：从节点出现顺序推导
-                            if (!domainOrder && Array.isArray((preset as any).nodes)) {
-                                const implicitOrder: string[] = [];
-                                const implicitSubOrder: Record<string, string[]> = {};
-                                for (const n of (preset as any).nodes) {
-                                    const d = String(n.domain || '').trim();
-                                    if (!d || d === '默认域' || d === 'default') continue;
-                                    if (!implicitOrder.includes(d)) implicitOrder.push(d);
-                                    const s = String(n.subDomain || '').trim();
-                                    if (s) {
-                                        if (!implicitSubOrder[d]) implicitSubOrder[d] = [];
-                                        if (!implicitSubOrder[d].includes(s)) implicitSubOrder[d].push(s);
-                                    }
+                    const candidate = resolveLayoutStrategyPresetFromCandidates(
+                        await import('@/data/standardized').then(({ PRESET_MAP }) => PRESET_MAP),
+                        [
+                            diagramId,
+                            locationDiagramId || undefined,
+                        ],
+                    );
+                    const preset = candidate.preset;
+                    if (preset) {
+                        generatedGroupOptions = resolveLayoutStrategyGeneratedGroupOptions(preset, allNodes);
+                        // 优先显式配置
+                        domainOrder = (preset as any).layout?.domainOrder;
+                        subDomainOrder = (preset as any).layout?.subDomainOrder;
+                        // 回退：从节点出现顺序推导
+                        if (!domainOrder && Array.isArray((preset as any).nodes)) {
+                            const implicitOrder: string[] = [];
+                            const implicitSubOrder: Record<string, string[]> = {};
+                            for (const n of (preset as any).nodes) {
+                                const d = String(n.domain || '').trim();
+                                if (!d || d === '默认域' || d === 'default') continue;
+                                if (!implicitOrder.includes(d)) implicitOrder.push(d);
+                                const s = String(n.subDomain || '').trim();
+                                if (s) {
+                                    if (!implicitSubOrder[d]) implicitSubOrder[d] = [];
+                                    if (!implicitSubOrder[d].includes(s)) implicitSubOrder[d].push(s);
                                 }
-                                if (implicitOrder.length > 0) {
-                                    domainOrder = implicitOrder;
-                                    if (!subDomainOrder) subDomainOrder = implicitSubOrder;
-                                }
+                            }
+                            if (implicitOrder.length > 0) {
+                                domainOrder = implicitOrder;
+                                if (!subDomainOrder) subDomainOrder = implicitSubOrder;
                             }
                         }
                     }
@@ -392,8 +475,7 @@ export function useLayoutStrategy({
                     nodeLayout: finalNodeLayout as any,
                     spacing: { horizontal: 50, vertical: 50 },
                     padding: { top: 40, right: 20, bottom: 20, left: 20 },
-                    generateDomainGroups: true,
-                    generateSubDomainGroups: true,
+                    ...generatedGroupOptions,
                     fitDomainContent: true,
                     domainOrder,
                     subDomainOrder,
@@ -405,7 +487,10 @@ export function useLayoutStrategy({
                     // [FIX] 保留非流程图节点（mindmap、sticky-note 等）：布局算法不处理它们，但不能丢弃
                     const resultNodeIds = new Set(result.nodes.map((n: any) => n.id));
                     const preservedNodes = allNodes.filter(n => nonLayoutTypes.has(n.type || '') && !resultNodeIds.has(n.id));
-                    const finalNodes = [...result.nodes, ...preservedNodes];
+                    const finalNodes = stripHiddenGeneratedLayoutNodes(
+                        [...result.nodes, ...preservedNodes],
+                        generatedGroupOptions,
+                    );
                     // 域布局策略已完成所有位置计算，禁止后处理微调
                     // [FIX] Clear edges + cache BEFORE animation
                     setEdges(sanitizeLayoutEdges(finalNodes, result.edges, dir));
