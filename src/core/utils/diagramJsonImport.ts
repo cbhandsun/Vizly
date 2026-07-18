@@ -1,4 +1,4 @@
-import { coerceRemoteDiagramContent } from '@/services/remoteDiagramContent';
+import { coerceRemoteDiagramContent } from './remoteDiagramContent';
 import { coerceClipboardData, type ClipboardData } from './flowchartClipboard';
 
 export const DIAGRAM_JSON_IMPORT_MAX_CHARS = 5 * 1024 * 1024;

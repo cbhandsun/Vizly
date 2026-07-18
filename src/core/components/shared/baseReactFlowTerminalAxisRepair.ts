@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import { readEdgeTerminalPolicy } from '../../routing/utils/edgeTerminalPolicy';
 import { normalizeHandle } from '../../routing/utils/handleUtils';
 import { countEndpointNodeTraversalHits } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import { createEdgePathQualityEvaluationContext } from '../../strategies/shared/edgeStrictCrossingGuard';
@@ -31,16 +32,8 @@ const expectedAxis = (side: Side | null): Axis | null => (
 );
 
 const fixedTerminalHandleSide = (edge: Edge, role: 'source' | 'target'): Side | null => {
-  const data = ((edge.data || {}) as Record<string, any>);
-  const manualSides = Array.isArray(data.manualHandleSides)
-    ? data.manualHandleSides.map((side: unknown) => String(side).toLowerCase())
-    : [];
-  const policy = String(data[`${role}PortPolicy`] ?? data[`${role}PortConstraint`] ?? '')
-    .toLowerCase();
-  const fixed = manualSides.includes(role)
-    || data[`${role}HandleLocked`] === true
-    || ['strong', 'fixed', 'fixed-side', 'fixed_side', 'fixed-pos', 'fixed_pos'].includes(policy);
-  return fixed ? normalizeHandle(edge[`${role}Handle`]) : null;
+  const policy = readEdgeTerminalPolicy(edge, role);
+  return policy.sideFixed ? normalizeHandle(edge[`${role}Handle`]) : null;
 };
 
 const axisOf = (a: Point, b: Point): Axis | null => {
@@ -747,9 +740,7 @@ const endpointDirectionsMatchNodes = (
 ): boolean => {
   if (path.length < 2) return false;
   const source = path[0];
-  const sourceNeighbor = path[1];
   const target = path[path.length - 1];
-  const targetNeighbor = path[path.length - 2];
   const sourceRect = nodeRects.get(edge.source);
   const targetRect = nodeRects.get(edge.target);
   const declaredSourceSide = fixedTerminalHandleSide(edge, 'source');

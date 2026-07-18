@@ -5,12 +5,10 @@
  * 根据给定节点的主题和路径，生成若干子主题建议。
  */
 
-import { getAIConfig } from '@/components/ai/aiConfigStorage';
 import {
-    formatAIProviderRequestError,
-    requestAIChatCompletionJson,
-    type AIProviderRequestConfig,
-} from '@/services/ai/aiProviderClient';
+    getMindMapAIRuntime,
+    type MindMapAIProviderConfig,
+} from '../../ports/mindMapAIRuntime';
 import type { NodeObj } from 'mind-elixir';
 import {
     parseTaskClassifications,
@@ -48,23 +46,27 @@ export interface AIExpandResult {
 }
 
 const requestMindMapChat = async (
-    provider: AIProviderRequestConfig,
+    provider: MindMapAIProviderConfig,
     modelId: string,
     messages: Array<{ role: string; content: string }>,
     options: { max_tokens: number; temperature: number }
 ) => {
-    return requestAIChatCompletionJson(provider, {
+    return getMindMapAIRuntime().requestChatCompletionJson(provider, {
         model: modelId,
         messages,
         ...options,
     });
 };
 
+const formatMindMapAIRequestError = (error: unknown, maxLength = 120) => (
+    getMindMapAIRuntime().formatRequestError(error, maxLength)
+);
+
 /** 调用用户配置的 AI 接口，生成子主题列表 */
 export async function expandNodeWithAI(options: AIExpandOptions): Promise<AIExpandResult> {
     const { node, ancestorPath = [], count = 4, mapTitle } = options;
 
-    const config = getAIConfig();
+    const config = await getMindMapAIRuntime().loadConfig();
     const [providerId, modelId] = config.activeModelKey.split(':');
     const provider = config.providers.find(p => p.id === providerId);
 
@@ -112,7 +114,7 @@ export async function expandNodeWithAI(options: AIExpandOptions): Promise<AIExpa
 
         return { topics };
     } catch (e: any) {
-        return { topics: [], error: formatAIProviderRequestError(e, 120) };
+        return { topics: [], error: await formatMindMapAIRequestError(e) };
     }
 }
 
@@ -131,7 +133,7 @@ export function getAncestorPath(root: NodeObj, targetId: string): string[] {
 
 /** 根据用户提示词 (Prompt)，使用 AI 生成完整的思维导图 JSON 树 */
 export async function generateMindMapFromPrompt(promptText: string): Promise<{ nodeData: NodeObj } | { error: string }> {
-    const config = getAIConfig();
+    const config = await getMindMapAIRuntime().loadConfig();
     const [providerId, modelId] = config.activeModelKey.split(':');
     const provider = config.providers.find(p => p.id === providerId);
 
@@ -178,13 +180,13 @@ interface NodeObj {
         const nodeData = cleanAndValidateTree(parsed, true);
         return { nodeData };
     } catch (e: any) {
-        return { error: formatAIProviderRequestError(e, 120) };
+        return { error: await formatMindMapAIRequestError(e) };
     }
 }
 
 /** 使用 AI 根据子节点内容归纳修改当前节点的主题 */
 export async function summarizeNodeWithAI(nodeTopic: string, childrenTopics: string[]): Promise<{ topic: string } | { error: string }> {
-    const config = getAIConfig();
+    const config = await getMindMapAIRuntime().loadConfig();
     const [providerId, modelId] = config.activeModelKey.split(':');
     const provider = config.providers.find(p => p.id === providerId);
 
@@ -215,7 +217,7 @@ ${childrenTopics.map(t => `- ${t}`).join('\n')}
         topic = topic.replace(/^["'“‘]/, '').replace(/["'”’]$/, '').trim();
         return { topic: cleanMindMapTopic(topic || nodeTopic, nodeTopic) };
     } catch (e: any) {
-        return { error: formatAIProviderRequestError(e, 120) };
+        return { error: await formatMindMapAIRequestError(e) };
     }
 }
 
@@ -269,7 +271,7 @@ export async function processNodeWithAICustomAction(
 ): Promise<AICustomActionResult> {
     const { node, customPrompt, ancestorPath = [], mapTitle } = options;
 
-    const config = getAIConfig();
+    const config = await getMindMapAIRuntime().loadConfig();
     const [providerId, modelId] = config.activeModelKey.split(':');
     const provider = config.providers.find(p => p.id === providerId);
 
@@ -335,7 +337,7 @@ JSON 结构中只能包含以下可选字段：
         const parsed = JSON.parse(content);
         return sanitizeAICustomActionResult(parsed);
     } catch (e: any) {
-        return { error: formatAIProviderRequestError(e, 120) };
+        return { error: await formatMindMapAIRequestError(e) };
     }
 }
 
@@ -346,7 +348,7 @@ export async function generateSpeakerNotes(
     childText?: string,
     tone = '专业商务'
 ): Promise<{ notes: string } | { error: string }> {
-    const config = getAIConfig();
+    const config = await getMindMapAIRuntime().loadConfig();
     const [providerId, modelId] = config.activeModelKey.split(':');
     const provider = config.providers.find(p => p.id === providerId);
 
@@ -386,7 +388,7 @@ ${safeChildText ? `此节点包含的子概念/大纲："${safeChildText}"` : ''
         const notes = cleanSpeakerNotes(data.choices?.[0]?.message?.content);
         return { notes };
     } catch (e: any) {
-        return { error: formatAIProviderRequestError(e, 120) };
+        return { error: await formatMindMapAIRequestError(e) };
     }
 }
 
@@ -395,7 +397,7 @@ export async function analyzeNodesRelationship(
     sourceTopic: string,
     targetTopic: string
 ): Promise<{ relationText: string } | { error: string }> {
-    const config = getAIConfig();
+    const config = await getMindMapAIRuntime().loadConfig();
     const [providerId, modelId] = config.activeModelKey.split(':');
     const provider = config.providers.find(p => p.id === providerId);
 
@@ -425,7 +427,7 @@ export async function analyzeNodesRelationship(
         relationText = relationText.replace(/^["'“‘]/, '').replace(/["'”’]$/, '').trim();
         return { relationText };
     } catch (e: any) {
-        return { error: formatAIProviderRequestError(e, 120) };
+        return { error: await formatMindMapAIRequestError(e) };
     }
 }
 
@@ -435,7 +437,7 @@ export type { TaskClassificationResult, TaskItemInput } from './mindmapTaskAIPar
 export async function classifyTasksWithAI(
     tasks: TaskItemInput[]
 ): Promise<{ classifications: TaskClassificationResult[] } | { error: string }> {
-    const config = getAIConfig();
+    const config = await getMindMapAIRuntime().loadConfig();
     const [providerId, modelId] = config.activeModelKey.split(':');
     const provider = config.providers.find(p => p.id === providerId);
 
@@ -476,7 +478,7 @@ ${JSON.stringify(tasks, null, 2)}
         }
         return { classifications };
     } catch (e: any) {
-        return { error: formatAIProviderRequestError(e, 120) };
+        return { error: await formatMindMapAIRequestError(e) };
     }
 }
 

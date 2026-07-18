@@ -12,6 +12,11 @@ import { repairBaseReactFlowMeasuredDisplayEdgesWithReport } from './baseReactFl
 import { baseReactFlowDisplayHardQualityIsClean } from './baseReactFlowDisplayQualityGates';
 import { createBaseReactFlowInteractiveDisplayEdges } from './baseReactFlowDisplayQualitySeedPipeline';
 import { createBaseReactFlowPreDisplayFinalEdges } from './baseReactFlowDisplayPreDisplayPipeline';
+import { sanitizeBaseReactFlowPrecompiledRoutePatches } from './baseReactFlowPrecompiledRouteArtifact';
+import {
+  mergeBaseReactFlowDisplayEdgePatches,
+  sanitizeBaseReactFlowDisplayCachePatches,
+} from './baseReactFlowDisplayRoutingTransaction';
 import {
   parseDisplayEdgesWorkerRequest,
   readDisplayEdgesWorkerRequestId,
@@ -52,15 +57,26 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       routeResolution: 'repair',
     };
   }
+  const safeCandidatePatches = request.operation === 'validate-or-route'
+    && request.candidatePatches
+    ? (request.candidateSource === 'precompiled'
+      ? sanitizeBaseReactFlowPrecompiledRoutePatches(request.edges, request.candidatePatches)
+      : sanitizeBaseReactFlowDisplayCachePatches(request.edges, request.candidatePatches))
+    : null;
+  const candidateEdges = request.operation === 'validate-or-route'
+    ? (request.candidateEdges
+      ?? (safeCandidatePatches
+        ? mergeBaseReactFlowDisplayEdgePatches(request.edges, safeCandidatePatches)
+        : null))
+    : null;
   if (
-    request.operation === 'validate-or-route'
-    && request.candidateEdges
-    && doesDisplayCandidateMatchSourceGraph(request.edges, request.candidateEdges)
-    && baseReactFlowDisplayHardQualityIsClean(request.candidateEdges, request.nodes)
+    candidateEdges
+    && doesDisplayCandidateMatchSourceGraph(request.edges, candidateEdges)
+    && baseReactFlowDisplayHardQualityIsClean(candidateEdges, request.nodes)
   ) {
     return {
       requestId: request.requestId,
-      edges: request.candidateEdges,
+      edges: candidateEdges,
       hardClean: true,
       routeResolution: 'validated-candidate',
     };

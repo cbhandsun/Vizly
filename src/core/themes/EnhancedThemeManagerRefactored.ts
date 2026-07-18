@@ -6,12 +6,6 @@
 import {
   Theme,
   ThemePreset,
-  _ThemeTransition,
-  _ThemePerformanceOptions,
-  _ThemeEvent,
-  _ThemeEventListener,
-  _ThemeChangeEvent,
-  _ThemePresetEvent,
   ThemeColor
 } from './types/ThemeTypes';
 
@@ -25,8 +19,6 @@ import {
   getAvailableThemeIds,
   preloadThemePreset,
   clearThemePresetCache,
-  _getCachedThemePreset,
-  _isThemePresetCached,
   getCacheStats
 } from './ThemePresetLoader';
 
@@ -44,6 +36,7 @@ import {
   logThemeManagerLoadFailure,
   logThemeManagerPreloadFailure,
 } from './themeLogging';
+import { getApplicationDiagramRuntime } from '../ports/applicationDiagramRuntime';
 
 /**
  * 主题管理器事件类型
@@ -224,10 +217,8 @@ export class EnhancedThemeManager {
 
       // 如果预设不存在，尝试从数据中心(DataRegistry)提取内嵌的主题属性
       try {
-        const { DataRegistry } = await import('../../data/DataRegistry');
-        const dataService = DataRegistry.getInstance().getDataService();
-        const result = await dataService.queryDiagrams({});
-        const diagramWithTheme = result.data.find((d: any) => d.theme?.name === themeId);
+        const diagrams = await getApplicationDiagramRuntime().listDiagrams();
+        const diagramWithTheme = diagrams.find((d: any) => d.theme?.name === themeId);
         
         if (diagramWithTheme && diagramWithTheme.theme) {
           // 借用 light 预设作为基础主题拼装出一个完整的 Theme 对象

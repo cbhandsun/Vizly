@@ -86,7 +86,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     expect(resolveBaseReactFlowDisplayWorkerTimeoutMs(900_000, 'full')).toBe(300_000);
   });
 
-  it('projects only routing-owned cache fields into validate-or-route', async () => {
+  it('transfers only routing-owned cache patches into validate-or-route', async () => {
     const harness = installWorkerHarness();
     const workerRef = { current: null };
     const controller = new AbortController();
@@ -139,21 +139,24 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     const request = harness.posted[0] as any;
     expect(request.operation).toBe('validate-or-route');
     expect(request.candidateSource).toBe('persistent');
-    expect(request.candidateEdges[0]).toMatchObject({
-      label: 'current label',
-      style: { stroke: 'green' },
-      markerEnd: { type: 'arrowclosed', color: 'green' },
+    expect(request.candidateEdges).toBeUndefined();
+    expect(request.candidatePatches[0]).toMatchObject({
+      id: 'edge',
+      source: 'source',
+      target: 'target',
       type: 'stablePath',
       sourceHandle: 'right',
       targetHandle: 'left',
       data: {
-        businessMetadata: { owner: 'current' },
-        sharedTrunkAware: false,
         computedPath: [{ x: 100, y: 30 }, { x: 300, y: 30 }],
       },
     });
-    expect(request.candidateEdges[0].className).toBeUndefined();
-    expect(request.candidateEdges[0].data.treeRouting).toBeUndefined();
+    expect(request.candidatePatches[0].label).toBeUndefined();
+    expect(request.candidatePatches[0].style).toBeUndefined();
+    expect(request.candidatePatches[0].markerEnd).toBeUndefined();
+    expect(request.candidatePatches[0].className).toBeUndefined();
+    expect(request.candidatePatches[0].data.businessMetadata).toBeUndefined();
+    expect(request.candidatePatches[0].data.treeRouting).toBeUndefined();
     const rejected = expect(pending).rejects.toThrow('display-edge-worker-cancelled');
     controller.abort();
     await rejected;
@@ -203,12 +206,14 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     expect(harness.posted[0]).toMatchObject({
       operation: 'validate-or-route',
       candidateSource: 'precompiled',
-      candidateEdges: [{
+      candidatePatches: [{
+        id: 'edge',
+        source: 'source',
+        target: 'target',
         type: 'stablePath',
         sourceHandle: 'right',
         targetHandle: 'left',
         data: {
-          businessMetadata: { owner: 'current' },
           sharedTrunkAware: true,
           computedPath: [{ x: 100, y: 30 }, { x: 300, y: 30 }],
         },
@@ -254,6 +259,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
 
     expect(harness.posted[0]).toMatchObject({ operation: 'route' });
     expect((harness.posted[0] as any).candidateEdges).toBeUndefined();
+    expect((harness.posted[0] as any).candidatePatches).toBeUndefined();
     expect((harness.posted[0] as any).candidateSource).toBeUndefined();
     const rejected = expect(pending).rejects.toThrow('display-edge-worker-cancelled');
     controller.abort();

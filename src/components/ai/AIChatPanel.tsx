@@ -1,40 +1,22 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-// import Drawer from 'antd/es/drawer';
 import Modal from 'antd/es/modal';
 import Input from 'antd/es/input';
 import Button from 'antd/es/button';
-// import Avatar from 'antd/es/avatar';
-import Collapse from 'antd/es/collapse';
-
-import Dropdown from 'antd/es/dropdown';
 import Select from 'antd/es/select';
-// import message from 'antd/es/message';
 import Space from 'antd/es/space';
+import Tooltip from 'antd/es/tooltip';
 import Typography from 'antd/es/typography';
 import {
-    
     AudioOutlined,
-    CheckCircleOutlined,
-    CloudOutlined,
     CloudServerOutlined,
-    CodeOutlined,
     CloseOutlined,
-    DatabaseOutlined,
     DeleteOutlined,
-    DownOutlined,
     EditOutlined,
-    _HistoryOutlined,
-    _LeftOutlined,
     MenuFoldOutlined,
-    _MenuUnfoldOutlined,
     PlusOutlined,
-    _RightOutlined,
     SendOutlined,
     SettingOutlined,
-    StopOutlined,
-    _ThunderboltOutlined,
-    _UserOutlined,
-    RobotOutlined
+    StopOutlined
 } from '@ant-design/icons';
 import { getAIConfig, loadCloudAIConfig, persistAIConfig } from './aiConfigStorage';
 import { useTranslation } from 'react-i18next';
@@ -50,9 +32,7 @@ import {
     buildAnalysisContext 
 } from '../../services/ai/diagramPrompts';
 import List from 'antd/es/list';
-import Tooltip from 'antd/es/tooltip';
 import Popconfirm from 'antd/es/popconfirm';
-import {   } from '@xyflow/react';
 import { parseAIStreamDelta } from './aiStreamParsing';
 import { sanitizeAIProviderError } from '@/services/ai/errorSecurity';
 import { formatAIProviderRequestError, requestAIChatCompletion, resolveAIProviderEndpoint } from '@/services/ai/aiProviderClient';
@@ -88,162 +68,28 @@ import {
     logAICommandExecutionError,
     logBlockedAutonomousCommand,
 } from './aiLogging';
-import ShortcutsGuide from './ShortcutsGuide';
+import { MemoizedMessageItem } from './AIChatMessageItem';
 import './AIChatPanel.css';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 
-
-
-const MarkdownMessage = React.lazy(() => import('./MarkdownMessage'));
 const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
 
 
 
-// --- Utilities ---
 const generateId = (prefix: string = 'msg') => 
     `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-
-// --- Typing Indicator Component ---
-const _TypingIndicator: React.FC = () => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '12px 16px', background: 'rgba(22, 119, 255, 0.05)', borderRadius: 12, width: 'fit-content', margin: '8px 0' }}>
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1677ff', animation: 'typingDotBreath 1.4s infinite ease-in-out', animationDelay: '0s' }} />
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1677ff', animation: 'typingDotBreath 1.4s infinite ease-in-out', animationDelay: '0.2s' }} />
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1677ff', animation: 'typingDotBreath 1.4s infinite ease-in-out', animationDelay: '0.4s' }} />
-        <style>{`
-            @keyframes typingDotBreath {
-                0%, 100% { transform: scale(0.8); opacity: 0.4; }
-                50% { transform: scale(1.2); opacity: 1; filter: blur(0.5px); }
-            }
-        `}</style>
-    </div>
-);
-
-// --- Constants ---
-const _HISTORY_STORAGE_KEY = 'AIChatPanel.history';
-const _CUSTOM_PRESETS_STORAGE_KEY = 'DiagramView.CustomPresets';
 
 const isAbortError = (error: unknown): boolean => {
     return error instanceof DOMException && error.name === 'AbortError';
 };
 
 // --- Message Item Component (with Memo) ---
-interface MessageItemProps {
-    item: Message;
-    t: any;
-    onPreviewJson?: (json: string) => void;
-    onApplyJson?: (json: string) => void;
-    handleSaveDiagramTo?: (json: string, target: 'local' | 's3' | 'supabase') => void;
-}
-
-const MessageItem: React.FC<MessageItemProps> = ({ 
-    item, 
-    t, 
-    onPreviewJson, 
-    onApplyJson, 
-    handleSaveDiagramTo
-}) => {
-    const isAi = item.role === 'assistant';
-
-    return (
-        <div className={`ai-chat-message ${item.role}`}>
-            <div className="ai-chat-bubble">
-                <div className="ai-chat-bubble-content">
-                    {item.reasoningContent && (
-                        <div className="ai-chat-reasoning">
-                            <Collapse
-                                ghost
-                                size="small"
-                                expandIcon={({ isActive }) => <RobotOutlined style={{ color: isActive ? 'var(--color-primary-500, #1677ff)' : '#999', transition: 'all 0.3s' }} />}
-                                items={[{
-                                    key: 'reasoning',
-                                    label: <Typography.Text type="secondary" style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>{item.isStreaming ? (<span className="reasoning-pulse-dot" />) : null}{t('aiChat.reasoning') || 'Thinking Process...'}</Typography.Text>,
-                                    children: (
-                                        <div className="reasoning-content-inner">
-                                            {item.reasoningContent}
-                                        </div>
-                                    )
-                                }]}
-                            />
-                        </div>
-                    )}
-                    
-                    <div className="ai-markdown-content">
-                        <React.Suspense fallback={<span className="ai-markdown-fallback">{item.content}</span>}>
-                            <MarkdownMessage content={item.content} />
-                        </React.Suspense>
-                    </div>
-
-                    {item.content && item.content.includes('正在为您准备快捷键指南...') && (
-                        <ShortcutsGuide />
-                    )}
-
-                    {item.isStreaming && <span className="ai-chat-cursor" />}
-                </div>
-
-                {/* JSON Action Buttons - Capsule Toolbar */}
-                {isAi && item.hasJson && item.jsonContent && (
-                    <div className="ai-chat-actions-capsule">
-                        <Space size={4} split={<div style={{ width: 1, height: 14, background: 'rgba(0,0,0,0.06)' }} />}>
-                            <Tooltip title={t('aiChat.previewJson')}>
-                                <Button 
-                                    type="text"
-                                    size="small" 
-                                    className="action-icon-btn"
-                                    icon={<CodeOutlined />} 
-                                    onClick={() => onPreviewJson?.(item.jsonContent!)}
-                                />
-                            </Tooltip>
-                            
-                            <Dropdown
-                                menu={{
-                                    items: [
-                                        { key: 'local', label: t('aiChat.saveToLocal'), icon: <DatabaseOutlined /> },
-                                        { key: 'supabase', label: t('aiChat.saveToSupabase'), icon: <CloudOutlined /> },
-                                        { key: 's3', label: t('aiChat.saveToS3'), icon: <CloudServerOutlined /> },
-                                    ],
-                                    onClick: ({ key }) => handleSaveDiagramTo?.(item.jsonContent!, key as any)
-                                }}
-                            >
-                                <Tooltip title={t('aiChat.saveDiagram')}>
-                                    <Button type="text" size="small" className="action-icon-btn" icon={<DownOutlined />} />
-                                </Tooltip>
-                            </Dropdown>
-
-                            <Tooltip title={t('aiChat.applyToCanvas')}>
-                                <Button 
-                                    size="small" 
-                                    type="primary" 
-                                    className="action-btn-apply-capsule"
-                                    icon={<CheckCircleOutlined />} 
-                                    onClick={() => onApplyJson?.(item.jsonContent!)}
-                                >
-                                    应用图表
-                                </Button>
-                            </Tooltip>
-                        </Space>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-
-const MemoizedMessageItem = React.memo(MessageItem, (prev, next) => {
-    // Only re-render if content, streaming status or json status changes
-    return prev.item.content === next.item.content && 
-           prev.item.isStreaming === next.item.isStreaming &&
-           prev.item.reasoningContent === next.item.reasoningContent &&
-           prev.item.hasJson === next.item.hasJson;
-});
-
 /**
  * The internal view component for AI Chat, suitable for both Drawer and Sidebar embedding.
  */
 
 export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, onOpenConfig, onApplyJson, onPreviewJson, diagramNodesRef, diagramEdgesRef, canvasOps, pluginId, diagramId }) => {
-    // --- i18n ---
     const { t } = useTranslation();
-    // --- Auth ---
     const { user } = useAuth();
 
     // --- State ---

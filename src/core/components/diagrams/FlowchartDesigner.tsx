@@ -1,7 +1,7 @@
 import { useDiagramStylePreset_v2 } from "../../hooks/useDiagramStylePreset_v2";
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { message, notification } from 'antd';
-import { Node, Edge, BackgroundVariant, ReactFlowInstance, NodeTypes, addEdge } from '@xyflow/react';
+import { Node, Edge, BackgroundVariant, ReactFlowInstance, NodeTypes, addEdge, type Connection } from '@xyflow/react';
 
 import { useDesignerCanvasState } from './hooks/useDesignerCanvasState';
 import { useDesignerInteractions } from './hooks/useDesignerInteractions';
@@ -87,6 +87,7 @@ import {
 import { scheduleFlowchartInitialFit } from './flowchartInitialFit';
 import { runFlowchartSmartOptimize } from './flowchartSmartOptimize';
 import { FlowchartDesignerView } from './FlowchartDesignerView';
+import { getApplicationDiagramRuntime } from '../../ports/applicationDiagramRuntime';
 
 // useMindMapOrchestrator decoupled
 
@@ -155,7 +156,6 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     businessData,
     extraExportItems,
     isYjsSynced,
-    _onSyncPush,
     activeUsers = [],
     yAwareness,
     onCloudSave,
@@ -171,6 +171,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     topActionArea,
     isVersionHistoryOpen = false,
     onVersionHistoryClose,
+    renderVersionHistoryPanel,
+    loadLayoutPresetMap,
     showOnlyMainFlow: externalShowOnlyMainFlow = false,
     highlightMainFlow: externalHighlightMainFlow = false,
     onMainFlowAnimationChange,
@@ -346,7 +348,6 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     const [, setHighlightedNodeId] = useState<string | null>(null);
 
     const {
-        _isGesturing,
         currentZoom,
         showOverlay,
         handleTouchStart,
@@ -398,7 +399,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                 setEdges,
                 reactFlowInstance,
                 reactFlowWrapper,
-                addNode: (type, data = {}, position) => {
+                addNode: (type: string, data: Record<string, unknown> = {}, position?: { x: number; y: number }) => {
                     if (!reactFlowInstance) return;
                     takeSnapshot(nodesRef.current, edgesRef.current);
                     
@@ -441,7 +442,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
                 getPluginState: () => {
                     return useDiagramStore.getState().pluginStates[pluginId];
                 },
-                setPluginState: (patch) => {
+                setPluginState: (patch: any) => {
                     useDiagramStore.getState().setPluginState(pluginId, patch);
                 }
             };
@@ -476,14 +477,14 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         activePlugin, pluginCtx,
         onNodesChange, onEdgesChange,
         virtualizedNodes: nodesWithCollapseState, edgesWithCollapseState: edgesWithCollapseState,
-        onConnect: (params) => {
+         onConnect: (params: Connection) => {
              takeSnapshot(nodesRef.current, edgesRef.current);
              
              const isRelationship = (params.sourceHandle?.includes('relationship') || params.targetHandle?.includes('relationship'));
              
              if (isRelationship) {
                  const id = `rel-${Date.now()}`;
-                 const newEdge = {
+                  const newEdge: Edge = {
                      ...params,
                      id,
                      type: 'relationshipEdge',
@@ -514,13 +515,13 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         layerSyncedNodes, visibleEdges, onNodesChangeWithLock, onEdgesChangeWithLock,
         handleLabelOffsetChange, handleLabelStyleChange, handleWaypointsChange, handleEdgeLabelChange,
         handleGroup, handleUngroup,
-        _selectionMode, isMarqueeActive, setIsMarqueeActive,
-        guides, _clearGuides,
+        isMarqueeActive, setIsMarqueeActive,
+        guides,
         handleAlign, handleDistribute, canAlign, canDistribute,
         hasCopiedStyle, copyStyle, pasteStyle,
-        templates, groupedTemplates, saveAsTemplate, _saveGroupAsTemplate, createFromTemplate, deleteTemplate, renameTemplate,
+        templates, groupedTemplates, saveAsTemplate, createFromTemplate, deleteTemplate, renameTemplate,
         annotations, annotationMode, addAnnotation, updateAnnotation, deleteAnnotation, toggleResolved, ANNOTATION_COLORS,
-        quickAddMenu, handleAddNode, closeMenu, openQuickAddMenu, _getFlowPosition,
+        quickAddMenu, handleAddNode, closeMenu, openQuickAddMenu,
         setQuickConnectPreview, nodesWithGhost, finalEdgesWithGhost,
         isConnecting, connectPreview, onConnectStart, enhancedOnConnect, enhancedOnConnectEnd,
         isValidConnection,
@@ -554,7 +555,6 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         onEdgeContextMenu,
         onPaneContextMenu,
         onPaneClick: contextMenuPaneClick,
-        _onPaneClick,
         handleContextMenuAction,
         handleSelectAll,
         handleBringToFront,
@@ -568,7 +568,6 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         handleDuplicateWithToast,
         handleGroupWithToast,
         handleUngroupWithToast,
-        _onContextMenuActionWithToast,
         handleLock,
         // 隐藏功能暴露
         handleMatchSize,
@@ -657,6 +656,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         takeSnapshot,
         reactFlowInstance,
         diagramId: diagramIdForExport,
+        loadLayoutPresetMap,
     });
     
     // 监听折叠状态变化，自动触发排版微调，让周围节点紧凑排列
@@ -777,7 +777,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
             handleStrategyLayout,
             handleExport,
             setAiChatVisible,
-            setActiveRightTab,
+            setActiveRightTab: (tab) => setActiveRightTab(tab === 'ai' ? 'ai' : 'property'),
             reactFlowInstance,
             activePlugin,
             setNodes,
@@ -811,9 +811,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         setEdges,
         fitView: handleFitView,
         registerStandardReload: async ({ normalized, currentId: reloadId, title }) => {
-            const { dataRegistry } = await import('@/data/DataRegistry');
-            const localSvc = dataRegistry.getDataService();
-            localSvc.registerRemoteDiagram(normalized, {
+            await getApplicationDiagramRuntime().registerDiagram(normalized, {
                 id: reloadId,
                 title,
             }, true, {
@@ -916,7 +914,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         handleStrategyLayout, 
         handleSmartLayout,
         setShowShortcuts, 
-        pluginCtx, 
+        pluginCtx: pluginCtx ?? undefined,
         activePlugin,
         onOpenPlugins: () => setPluginManagerVisible(true),
         isCommentMode,
@@ -1034,7 +1032,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         onOpenSettings, onOpenShareDialog, onPaneContextMenu, onPaneDoubleClick, onPaneMouseLeave, onPaneMouseMove,
         onSelectionChange, onVersionHistoryClose, onboardingDismissed, pastEntries, pasteStyle, performanceMode, pluginCtx, pluginId, pluginManagerVisible,
         presentationActive, presentationSlides, preset, quickAddMenu, reactFlowInstance, reactFlowWrapper, redo, renameLayer, renameTemplate, renderAIChatPanel,
-        renderAIConfigModal, renderShareDialog, renderThemeSelector, reorderLayers, rightSidebarWidth, saveState, selectedEdges, selectedNodes, setActiveLayerId,
+        renderAIConfigModal, renderShareDialog, renderThemeSelector, renderVersionHistoryPanel, reorderLayers, rightSidebarWidth, saveState, selectedEdges, selectedNodes, setActiveLayerId,
         setActiveRightTab, setAiChatVisible, setAutoRoutingEnabled, setCanvasSearchVisible, setCommandPaletteVisible, setDiffResult, setEdges,
         setExportModalVisible, setHighlightedNodeId, setHistoryPanelVisible, setIsCommentMode, setIsDrawingMode, setIsMarqueeActive, setJsonEditorVisible,
         setLayerColor, setLeftDrawerOpen, setLeftDrawerWidth, setMobileAddDrawerVisible, setMobilePropertyDrawerVisible, setNodes, setOnboardingDismissed,

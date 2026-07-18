@@ -4,24 +4,11 @@ import { diagramConfigManager } from '../components/config/DiagramConfig'
 import { LayeredConfigManager } from '../config/LayeredConfigManager';
 import { ILayoutStrategy } from './LayoutStrategyManager'
 import {
-  _applyDomainGrouping,
-  _applySubGrouping,
-  _assignChildrenToSubGroupsBySemantic,
-  _normalizeMissingNodeSubDomainByDomain,
-  _normalizeSubGroupDomainByChildren,
   ensureMeasuredForNodes,
-  _resolveSubGroupChildrenOverlapsStrict,
   recomputeSubGroupContainersBasic,
-  _enforceSubGroupTitleClearance,
-  _resolveFreeNodeOverlapsInDomain,
-  _resolveSubGroupOverlaps,
-  _enforceDomainContainerStrictContainment,
   finalizeDomainWidthsByProjection,
   finalizeDomainHeightsByProjection,
-  _clampNodesToContainers,
   resolveDomainContainerOverlaps,
-  _centerSubGroupsInDomain,
-
   scatterNodesAtSamePoint,
   resolveAllNodeOverlapsGlobal,
 } from '../utils/layoutUtils'

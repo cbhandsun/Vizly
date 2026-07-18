@@ -40,6 +40,35 @@ describe('baseReactFlowDisplayWorkerProtocol', () => {
       candidateEdges: validRepairRequest.edges,
       candidateSource: 'persistent',
     });
+    const validPatches = parseDisplayEdgesWorkerRequest({
+      ...validRepairRequest,
+      operation: 'validate-or-route',
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: 1,
+      qualityMode: 'full',
+      candidatePatches: validRepairRequest.edges,
+      candidateSource: 'precompiled',
+    });
+    expect(validPatches).toMatchObject({
+      operation: 'validate-or-route',
+      candidateEdges: null,
+      candidatePatches: validRepairRequest.edges,
+      candidateSource: 'precompiled',
+    });
+    expect(parseDisplayEdgesWorkerRequest({
+      ...validRepairRequest,
+      operation: 'validate-or-route',
+      enableSmartEdges: true,
+      smartEdgePadding: 20,
+      isLargeGraph: false,
+      displayEdgeEpoch: 1,
+      qualityMode: 'full',
+      candidateEdges: validRepairRequest.edges,
+      candidatePatches: validRepairRequest.edges,
+      candidateSource: 'persistent',
+    })).toBeNull();
 
     const malformed = parseDisplayEdgesWorkerRequest({
       ...validRepairRequest,

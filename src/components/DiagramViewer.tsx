@@ -29,6 +29,7 @@ const CollaborationModal = React.lazy(() => import('./ui/CollaborationModal').th
 const AIConfigModal = React.lazy(() => import('./ai/AIConfigModal'));
 const AIChatView = React.lazy(() => import('./ai/AIChatPanel').then(m => ({ default: m.AIChatView })));
 const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
+const VersionHistoryPanel = React.lazy(() => import('./diagrams/ui/VersionHistoryPanel').then(m => ({ default: m.VersionHistoryPanel })));
 import { parseAIDiagramJson } from './ai/aiDiagramImport';
 import {      Input } from 'antd';
 import {
@@ -51,7 +52,7 @@ import {
 const CloudStorageManagerModal = React.lazy(() => import('./storage/CloudStorageManagerModal').then(m => ({ default: m.CloudStorageManagerModal })));
 const MermaidImportModal = React.lazy(() => import('./ui/MermaidImportModal').then(m => ({ default: m.MermaidImportModal })));
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
-import { invalidateRemoteDiagramPreview } from '@/core/utils/remoteDiagramPreview';
+import { invalidateRemoteDiagramPreview } from '@/services/remoteDiagramPreview';
 import DiagramControlBridge from '@/core/components/shared/DiagramControlBridge';
 
 
@@ -112,6 +113,12 @@ import { ErrorBoundary } from './ui/ErrorBoundary';
 import { appModal } from '@/core/utils/antdStaticBridge';
 
 const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
+const loadLayoutPresetMap = () => import('@/data/standardized').then(({ PRESET_MAP }) => PRESET_MAP);
+const renderVersionHistoryPanel = (props: { diagramId: string; isOpen: boolean; onClose: () => void }) => (
+    <Suspense fallback={null}>
+        <VersionHistoryPanel {...props} />
+    </Suspense>
+);
 
 const loadFlowchartDesigner = async (pluginId?: string, presetId?: string) => {
     const [{ default: FlowchartDesigner }] = await Promise.all([
@@ -986,6 +993,8 @@ const DiagramViewer: React.FC = () => {
                                                 isDirectSaveDisabled={false}
                                                 onSaveAsTo={handleSaveTo}
                                                 onOpenSettings={() => setIsSettingsOpen(true)}
+                                                loadLayoutPresetMap={loadLayoutPresetMap}
+                                                renderVersionHistoryPanel={renderVersionHistoryPanel}
                                                 renderAIChatPanel={() => (
                                                     <Suspense fallback={<div className="p-4 text-center text-gray-500">Loading AI...</div>}>
                                                         <AIChatView

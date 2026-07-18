@@ -265,7 +265,7 @@ function runPhasesOnGroup(
     nudgeThreshold: number;
     maxSweeps: number;
   },
-  _isHorizontal: boolean,
+  isHorizontal: boolean,
 ): PhaseResult {
   // 构建 node rect 查找表
   const rects = buildNodeRects(groupNodes);
@@ -333,7 +333,7 @@ function applyChannelSpacing(
   layers: LayerInfo[],
   rectMap: Map<string, NodeRect>,
   opts: { channelWidth: number; maxExtraSpacing: number },
-  _isHorizontal: boolean,
+  isHorizontal: boolean,
 ): { nodes: Node[]; adjustments: number } {
   if (layers.length < 2) return { nodes, adjustments: 0 };
 
@@ -402,7 +402,7 @@ function applyCrossingMinimization(
   layers: LayerInfo[],
   rectMap: Map<string, NodeRect>,
   opts: { maxSweeps: number },
-  _isHorizontal: boolean,
+  isHorizontal: boolean,
 ): Node[] {
   if (layers.length < 2) return nodes;
 

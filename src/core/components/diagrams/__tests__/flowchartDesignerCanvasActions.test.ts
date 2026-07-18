@@ -8,6 +8,7 @@ import {
     copyFlowchartAsMermaid,
     exportFlowchartAsMermaid,
 } from '../flowchartDesignerCanvasActions';
+import type { NodeTemplate } from '../hooks/useNodeTemplates';
 
 describe('flowchartDesignerCanvasActions', () => {
   it('exports mermaid artifacts via the provided downloader', async () => {
@@ -52,7 +53,14 @@ describe('flowchartDesignerCanvasActions', () => {
     const appendEdges = vi.fn();
 
     const plan = applyFlowchartTemplate({
-      template: { id: 'tpl-1', name: 'Template' },
+      template: {
+        id: 'tpl-1',
+        name: 'Template',
+        category: 'test',
+        nodeType: 'flowchart',
+        data: {},
+        createdAt: 0,
+      } satisfies NodeTemplate,
       viewport: { x: 10, y: 20, zoom: 1.5 },
       createFromTemplate: vi.fn(() => ({ nodes, edges })),
       appendNodes,

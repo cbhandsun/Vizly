@@ -9,7 +9,7 @@ import type { MenuProps } from 'antd';
 import { useAuth } from '@/context/useAuth';
 import { useSubscription } from '@/context/useSubscription';
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
-import { invalidateRemoteDiagramPreview } from '@/core/utils/remoteDiagramPreview';
+import { invalidateRemoteDiagramPreview } from '@/services/remoteDiagramPreview';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { getFlowDataBridge } from '@/core/utils/flowDataBridge';
 import { logCloudSaveEnsureFailure, logCloudSaveFailure } from '@/components/diagrams/hooks/diagramStorageLogging';

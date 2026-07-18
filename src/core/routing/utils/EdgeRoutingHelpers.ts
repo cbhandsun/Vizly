@@ -3,8 +3,37 @@
  * 
  * 包含从 HandlePicker 迁移过来的实用工具函数，用于边路由的后处理和优化。
  */
-import { decideEdgeRouting } from '../../utils/HandlePicker';
 import { expandHandle } from './handleUtils';
+
+export interface EdgeRoutingDecision {
+    (
+        sourceNode: any,
+        targetNode: any,
+        allNodes: any[],
+        config: any,
+    ): {
+        sourceHandle: string;
+        targetHandle: string;
+        type: string;
+    };
+}
+
+let edgeRoutingDecision: EdgeRoutingDecision | null = null;
+
+/**
+ * Registers the legacy routing decision adapter without coupling this utility
+ * module back to the compatibility facade that re-exports it.
+ */
+export function configureEdgeRoutingDecision(decision: EdgeRoutingDecision): void {
+    edgeRoutingDecision = decision;
+}
+
+const getEdgeRoutingDecision = (): EdgeRoutingDecision => {
+    if (!edgeRoutingDecision) {
+        throw new Error('Edge routing decision adapter has not been configured.');
+    }
+    return edgeRoutingDecision;
+};
 
 // Types
 interface EdgeRoutingCacheEntry {
@@ -166,7 +195,7 @@ export function incrementalEdgeRouting<T extends {
         const tgtNode = idMap.get(edge.target);
         if (!srcNode || !tgtNode) return edge;
 
-        const routingResult = decideEdgeRouting(srcNode, tgtNode, nodes, cfg);
+        const routingResult = getEdgeRoutingDecision()(srcNode, tgtNode, nodes, cfg);
 
         edgeRoutingCache.setCache(edge.id, {
             sourceHandle: routingResult.sourceHandle,

@@ -44,6 +44,51 @@ describe('runEdgeRoutingPipeline display contract', () => {
     expect(data.layoutPathLocked).toBe(true);
     expect(data.runtimeHandleLock).toMatchObject({ source: true, target: true });
   });
+
+  it('keeps exact and side-fixed compound handle identities while routing geometry by side', async () => {
+    const nodes: Node[] = [
+      node('source', 'custom', 0, 0, 100, 60),
+      node('target', 'custom', 0, 260, 100, 60),
+    ];
+    const input: Edge = {
+      id: 'fixed-terminals',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'source-right-port-7',
+      targetHandle: 'target-left-port-3',
+      data: {
+        manualHandles: { source: true },
+        targetPortPolicy: 'strong',
+      },
+    };
+    const positionsBefore = nodes.map(candidate => ({ ...candidate.position }));
+
+    const [routed] = await runEdgeRoutingPipeline(nodes, [input], { layoutDirection: 'TB' });
+
+    expect(routed.sourceHandle).toBe('source-right-port-7');
+    expect(routed.targetHandle).toBe('target-left-port-3');
+    expect(nodes.map(candidate => candidate.position)).toEqual(positionsBefore);
+  });
+
+  it('does not refine a runtime-owned compound handle before a hard-gated route result', async () => {
+    const nodes: Node[] = [
+      node('source', 'custom', 0, 0, 100, 60),
+      node('target', 'custom', 0, 260, 100, 60),
+    ];
+    const input: Edge = {
+      id: 'runtime-terminal',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'source-right-runtime-port-2',
+      targetHandle: 'target-left-runtime-port-4',
+      data: { runtimeHandleLock: { source: true, target: true } },
+    };
+
+    const [routed] = await runEdgeRoutingPipeline(nodes, [input], { layoutDirection: 'TB' });
+
+    expect(routed.sourceHandle).toBe('source-right-runtime-port-2');
+    expect(routed.targetHandle).toBe('target-left-runtime-port-4');
+  });
 });
 
 describe('separateDetachedParallelOverlaps', () => {

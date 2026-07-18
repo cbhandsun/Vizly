@@ -4,58 +4,19 @@ import { autoMindMapLayout, calculateSummaryGeometry, calculateSubtreeBounds } f
 import { useRef } from 'react';
 import { parseIndentedText } from '../../../utils/textTreeParser';
 import { appMessage } from '../../../utils/antdStaticBridge';
-import { downloadFile } from '../../../utils/downloadUtils';
+import {
+    MIND_MAP_PALETTE,
+    collectMindMapSubtree,
+    createMindMapPastePayload,
+    createMindMapQuickAdd,
+    type MindMapClipboard,
+} from './mindMapOrchestratorCommands';
+import { downloadMindMapMarkdown } from './mindMapMarkdown';
 
-// XMind-inspired premium palette: vibrant yet harmonious branch colors
-export const PALETTE = ['#e85d4a', '#f0872a', '#c27af5', '#2dd4bf', '#3b82f6', '#f59e0b', '#10b981'];
+export const PALETTE: readonly string[] = MIND_MAP_PALETTE;
+export { exportMindMapToMarkdown } from './mindMapMarkdown';
 
-// ─── T-1: Module-level mindmap clipboard (subtree copy/paste) ───────────────
-// Stored at module scope so it persists across renders without triggering re-renders.
-interface MindMapClipboard {
-    nodes: Node[];
-    edges: Edge[];
-    rootId: string;
-}
 let mindmapClipboard: MindMapClipboard | null = null;
-
-// ─── T-2: Markdown export utility ───────────────────────────────────────────
-/**
- * Exports a mindmap to Markdown format (XMind-compatible indented structure).
- * Root becomes # heading, children become nested - list items.
- */
-export function exportMindMapToMarkdown(nodes: Node[], edges: Edge[]): string {
-    const nodeMap = new Map(nodes.map(n => [n.id, n]));
-    const childrenMap = new Map<string, string[]>();
-    for (const e of edges) {
-        if (e.type === 'relationshipEdge') continue;
-        if (!childrenMap.has(e.source)) childrenMap.set(e.source, []);
-        childrenMap.get(e.source)!.push(e.target);
-    }
-    const root = nodes.find(n => n.type === 'mindmap' && (n.data?.depth === 0 || n.data?.depth === undefined));
-    if (!root) return '';
-
-    const lines: string[] = [];
-    function dfs(nodeId: string, depth: number) {
-        const node = nodeMap.get(nodeId);
-        if (!node) return;
-        // Strip HTML tags from label for clean Markdown output
-        const label = ((node.data?.label as string) || 'Untitled').replace(/<[^>]+>/g, '').trim();
-        lines.push(depth === 0 ? `# ${label}` : `${'  '.repeat(depth - 1)}- ${label}`);
-        const children = (childrenMap.get(nodeId) || []).sort((a, b) => {
-            const na = nodeMap.get(a);
-            const nb = nodeMap.get(b);
-            return (na?.position?.y ?? 0) - (nb?.position?.y ?? 0);
-        });
-        children.forEach(c => dfs(c, depth + 1));
-    }
-    dfs(root.id, 0);
-    return lines.join('\n');
-}
-
-/** Triggers a browser file download with the given text content */
-function downloadTextFile(filename: string, content: string, mimeType = 'text/plain') {
-    downloadFile(content, filename, mimeType);
-}
 
 export function useMindMapOrchestrator(
     nodes: Node[],
@@ -67,8 +28,6 @@ export function useMindMapOrchestrator(
     const prevRootDataRef = useRef<Record<string, string>>({});
 
     useLayoutEffect(() => {
-        // --- STEP 1: Lightweight Structural Signature ---
-        // We calculate a cheap hash first to see if we can skip map building.
         // HASH includes: set of IDs, collapsed state, measured dimensions (if available)
         const structHashParts: string[] = [];
         for (const n of nodes) {
@@ -380,50 +339,17 @@ export function useMindMapOrchestrator(
         // 1. Take a snapshot for undo/redo before structural changes
         takeSnapshot();
 
-        // 2. Generate new node ID
-        const newChildId = `mindmap-node-${Date.now()}`;
-
-        // 3. Determine Color (Inherit or Assign new)
-        let branchColor: string | undefined;
-        if (depth === 0) {
-            // It's a new root branch
-            const siblingCount = edges.filter(ed => ed.source === parentId).length;
-            branchColor = PALETTE[siblingCount % PALETTE.length];
-        } else {
-            // Inherit from parent
-            // [M-5] Use setNodes functional update's snapshot via nodes closure (already updated by the time callback runs)
-            const parentNode = nodes.find(n => n.id === parentId);
-            branchColor = parentNode?.data?.branchColor as string | undefined;
-        }
-
-        // 4. Create the new Node object
-        const newNode: Node = {
-            id: newChildId,
-            type: 'mindmap',
-            position: { x: 0, y: 0 }, 
-            data: {
-                label: '',
-                depth: depth + 1,
-                direction: direction,
-                branchColor: branchColor,
-                isNew: true
-            },
-        };
-
-        // 5. Create proper semantic edge
-        const newEdge: Edge = {
-            id: `edge-${parentId}-${newChildId}`,
-            source: parentId,
-            target: newChildId,
-            type: 'mindmapEdge', // Pure MindMap Custom Edge
-            animated: false, 
-            style: { 
-                strokeWidth: Math.max(1.5, 4 - depth * 0.8), 
-                stroke: branchColor || (depth === 0 ? '#6366f1' : '#94a3b8') 
-            },
-            data: { kind: 'mindmap' },
-            markerEnd: '' as any // Explicitly remove default arrowheads
-        };
+        const siblingCount = edges.filter((edge) => edge.source === parentId).length;
+        const parentBranchColor = nodes.find((node) => node.id === parentId)
+            ?.data?.branchColor as string | undefined;
+        const { node: newNode, edge: newEdge } = createMindMapQuickAdd({
+            parentId,
+            direction: typeof direction === 'string' ? direction : 'LR',
+            depth: typeof depth === 'number' ? depth : 0,
+            siblingCount,
+            parentBranchColor,
+            idSeed: Date.now(),
+        });
 
         // 6. Use functional updates ensuring exact latest state.
         setEdges(currentEdges => {
@@ -655,23 +581,7 @@ export function useMindMapOrchestrator(
                 const selectedMindNodes = nodes.filter(n => n.selected && n.type === 'mindmap');
                 if (selectedMindNodes.length === 1) {
                     const copyRoot = selectedMindNodes[0];
-                    // DFS collect entire subtree
-                    const subtreeNodeIds = new Set<string>();
-                    const stack = [copyRoot.id];
-                    const edgeChildMap = new Map<string, string[]>();
-                    for (const ed of edges) {
-                        if (ed.type === 'relationshipEdge') continue;
-                        if (!edgeChildMap.has(ed.source)) edgeChildMap.set(ed.source, []);
-                        edgeChildMap.get(ed.source)!.push(ed.target);
-                    }
-                    while (stack.length > 0) {
-                        const cur = stack.pop()!;
-                        subtreeNodeIds.add(cur);
-                        (edgeChildMap.get(cur) || []).forEach(c => stack.push(c));
-                    }
-                    const subtreeNodes = nodes.filter(n => subtreeNodeIds.has(n.id));
-                    const subtreeEdges = edges.filter(ed => subtreeNodeIds.has(ed.source) && subtreeNodeIds.has(ed.target));
-                    mindmapClipboard = { nodes: subtreeNodes, edges: subtreeEdges, rootId: copyRoot.id };
+                    mindmapClipboard = collectMindMapSubtree(nodes, edges, copyRoot.id);
                     // Also write plain text label to system clipboard for cross-app paste
                     try { navigator.clipboard?.writeText((copyRoot.data?.label as string) || ''); } catch { /* ignore */ }
                     e.stopPropagation(); // Don't let designer's copy handler fire
@@ -685,59 +595,19 @@ export function useMindMapOrchestrator(
                     e.preventDefault();
                     e.stopPropagation();
                     const target = targetNodes[0];
-                    const clip = mindmapClipboard;
+                    const payload = createMindMapPastePayload(mindmapClipboard, target.id, Date.now());
+                    if (!payload) return;
 
                     takeSnapshot();
-
-                    // Remap IDs to avoid collisions
-                    const idMap = new Map<string, string>();
-                    const ts = Date.now();
-                    clip.nodes.forEach((n, i) => { idMap.set(n.id, `mindmap-paste-${ts}-${i}`); });
-
-                    const pastedNodes: Node[] = clip.nodes.map(n => ({
-                        ...n,
-                        id: idMap.get(n.id)!,
-                        position: {
-                            x: n.position.x + 40,
-                            y: n.position.y + 40,
-                        },
-                        selected: n.id === clip.rootId,
-                        data: { ...n.data }
-                    }));
-                    const pastedEdges: Edge[] = [
-                        // Edge connecting target -> paste root
-                        {
-                            id: `edge-${target.id}-${idMap.get(clip.rootId)}`,
-                            source: target.id,
-                            target: idMap.get(clip.rootId)!,
-                            type: 'mindmapEdge',
-                            animated: false,
-                            markerEnd: '' as any,
-                            data: { kind: 'mindmap' }
-                        },
-                        // Internal subtree edges with remapped IDs
-                        ...clip.edges.map(ed => ({
-                            ...ed,
-                            id: `edge-${idMap.get(ed.source)}-${idMap.get(ed.target)}`,
-                            source: idMap.get(ed.source)!,
-                            target: idMap.get(ed.target)!
-                        }))
-                    ];
-
-                    setEdges(eds => [...eds, ...pastedEdges]);
-                    setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...pastedNodes]);
+                    setEdges(eds => [...eds, ...payload.edges]);
+                    setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...payload.nodes]);
                 }
             }
 
             // ── T-2: Ctrl+Shift+E — Export current mindmap as Markdown ─────────
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'e') {
                 e.preventDefault();
-                const md = exportMindMapToMarkdown(nodes, edges);
-                if (md) {
-                    const rootLabel = nodes.find(n => n.type === 'mindmap' && n.data?.depth === 0)?.data?.label as string || 'mindmap';
-                    const safeFilename = rootLabel.replace(/[^a-zA-Z0-9一-龥]/g, '_').substring(0, 40);
-                    downloadTextFile(`${safeFilename}.md`, md, 'text/markdown');
-                }
+                downloadMindMapMarkdown(nodes, edges);
             }
         };
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaProjectDiagram, FaExchangeAlt } from 'react-icons/fa';
 
-import { PresenceHeader } from '../../../../components/diagrams/collaboration/PresenceHeader';
+import { PresenceHeader } from '../collaboration/PresenceHeader';
 
 import { TopActionButtons } from '../TopActionButtons';
 import { ModernFlowchartToolbar } from '../ModernFlowchartToolbar';

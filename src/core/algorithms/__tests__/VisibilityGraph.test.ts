@@ -7,7 +7,7 @@ import {
     findPathOnVisibilityGraph,
     getGraphStats,
     VisibilityGraph
-} from '../VisibilityGraph';
+} from '../visibilityGraph';
 import { Point, Rectangle, LineSegment } from '../geometryUtils';
 import { SpatialIndex } from '../SpatialIndex';
 

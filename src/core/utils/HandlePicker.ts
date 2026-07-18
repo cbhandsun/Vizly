@@ -17,6 +17,7 @@ import {
 import { EdgeType } from '../types/edgeType';
 import { diagramConfigManager } from '../components/config/DiagramConfig';
 import { analyzeGeometry } from '../algorithms/geometry-classifier';
+import { configureEdgeRoutingDecision } from '../routing/utils/EdgeRoutingHelpers';
 
 // Re-export types for compatibility
 export { EdgeType, EDGE_ROUTING_PRESETS };
@@ -468,3 +469,5 @@ export function decideEdgeRouting(
         computedPath: decision.computedPath
     };
 }
+
+configureEdgeRoutingDecision(decideEdgeRouting);

@@ -121,6 +121,14 @@ export interface DiagramComponentProps {
   isVersionHistoryOpen?: boolean;
   /** (IoC) 关闭版本历史面板回调 */
   onVersionHistoryClose?: () => void;
+  /** (IoC) 应用层提供版本历史实现，核心画布不直接依赖存储/UI 适配器 */
+  renderVersionHistoryPanel?: (props: {
+    diagramId: string;
+    isOpen: boolean;
+    onClose: () => void;
+  }) => React.ReactNode;
+  /** (IoC) 应用层按需提供标准布局预设，核心布局逻辑不直接依赖数据注册表 */
+  loadLayoutPresetMap?: () => Promise<Record<string, unknown>>;
 }
 
 // 图表数据接口

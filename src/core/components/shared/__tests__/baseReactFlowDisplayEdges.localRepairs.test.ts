@@ -1,7 +1,10 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
-import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
+import {
+  calculateEdgePathQualityScore,
+  MIN_EDGE_PATH_PENALIZED_OVERLAP,
+} from '../../../strategies/shared/edgeStrictCrossingGuard';
 import {
   createBaseReactFlowDisplayEdges,
   createBaseReactFlowInteractiveDisplayEdges,
@@ -441,7 +444,11 @@ describe('baseReactFlowDisplayEdges local repairs', () => {
         paths.find(path => path.id === 'edge-master-data-wms-inventory')?.path ?? [],
         paths.find(path => path.id === 'edge-oms-fulfill-wms-outbound')?.path ?? [],
       ),
-    ).toBeLessThan(24);
+      JSON.stringify(paths.filter(path => [
+        'edge-master-data-wms-inventory',
+        'edge-oms-fulfill-wms-outbound',
+      ].includes(path.id)), null, 2),
+    ).toBeLessThanOrEqual(MIN_EDGE_PATH_PENALIZED_OVERLAP);
 
     const inventoryPath = paths.find(path => path.id === 'edge-master-data-wms-inventory')?.path ?? [];
     expect(tinyInteriorSegments(inventoryPath)).toEqual([]);

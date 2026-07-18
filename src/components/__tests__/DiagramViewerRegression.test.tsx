@@ -152,7 +152,7 @@ vi.mock('@/core/utils/diagramSnapshot', () => ({
     tryAttachDiagramSnapshot: vi.fn(),
 }));
 
-vi.mock('@/core/utils/remoteDiagramPreview', () => ({
+vi.mock('@/services/remoteDiagramPreview', () => ({
     invalidateRemoteDiagramPreview: vi.fn(),
 }));
 

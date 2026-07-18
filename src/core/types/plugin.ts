@@ -142,7 +142,7 @@ export interface DiagramTypePlugin {
   /** 注册插件自定义全局快捷键 */
   contributeShortcuts?(ctx: PluginContext): KeyboardShortcut[];
   /** 注册插件自定义按需全局指令，会被自动吸附进 Ctrl+K 的全局命令面板中 */
-  contributeCommands?(ctx: PluginContext): import('../components/ui/CommandPalette').CommandItem[];
+  contributeCommands?(ctx: PluginContext): CommandItem[];
 
   // ====== 被动监听钩子 (Passive Event Observers) ======
   /** 插件初始化生命周期 */

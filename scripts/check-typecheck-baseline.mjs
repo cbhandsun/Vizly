@@ -114,9 +114,13 @@ if (writeBaseline) {
   }
 
   if (comparison.removals.length > 0) {
-    process.stdout.write(
-      `[typecheck] ${comparison.removals.length} historical diagnostic fingerprint(s) decreased; baseline refresh is optional\n`,
+    process.stderr.write(
+      `Typecheck baseline gate failed: ${comparison.removals.length} historical diagnostic fingerprint(s) decreased.\n`,
     );
+    process.stderr.write(
+      'Review the resolved diagnostics and run npm run typecheck:baseline so fixed debt cannot silently return.\n',
+    );
+    process.exit(1);
   }
 }
 

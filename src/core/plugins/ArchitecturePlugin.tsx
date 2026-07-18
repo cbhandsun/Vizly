@@ -14,7 +14,7 @@ import {
     ApiOutlined, SwapOutlined, HddOutlined, CloudServerOutlined, LaptopOutlined,
     SearchOutlined, SafetyCertificateOutlined,
     CheckCircleOutlined, WarningOutlined, CloseCircleOutlined, InfoCircleOutlined,
-    ApartmentOutlined, NodeIndexOutlined, PartitionOutlined, _ColumnWidthOutlined
+    ApartmentOutlined, NodeIndexOutlined, PartitionOutlined
 } from '@ant-design/icons';
 import { useTopologyLinter } from '../hooks/useTopologyLinter';
 import { useDiagramStore } from '../store/useDiagramStore';
@@ -26,7 +26,7 @@ export class ArchitecturePlugin implements DiagramTypePlugin {
   version = '1.1.0';
   description = '专为企业架构师设计的绘图工具，内置合规性校验 (Linter)、分层拓扑布局与标准化组件库。';
   author = 'Vizly Core';
-  category = 'Productivity';
+  category = 'Productivity' as const;
   tags = ['Enterprise', 'Architecture', 'Governance'];
   brandColor = '#722ed1';
 

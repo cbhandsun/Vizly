@@ -2,6 +2,7 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import type { Node } from '@xyflow/react';
 
 import {
+    coerceFlowchartSummarySourceIds,
     createFlowchartDesignerCommandEventHandler,
     createFlowchartSummaryEventHandler,
 } from '../flowchartDesignerEventHandlers';
@@ -10,6 +11,19 @@ describe('flowchartDesignerEventHandlers', () => {
     afterEach(() => {
         vi.unstubAllGlobals();
         document.body.innerHTML = '';
+    });
+
+    it('coerces, bounds, and deduplicates summary source ids', () => {
+        expect(coerceFlowchartSummarySourceIds({
+            sourceIds: [' node-1 ', 'node-1', 2, '', 'node-2'],
+        })).toEqual(['node-1', 'node-2']);
+        expect(coerceFlowchartSummarySourceIds(null)).toEqual([]);
+        expect(coerceFlowchartSummarySourceIds({ sourceIds: 'node-1' })).toEqual([]);
+        expect(coerceFlowchartSummarySourceIds({ sourceIds: ['x'.repeat(257), 'ok'] }))
+            .toEqual(['ok']);
+
+        const manyIds = Array.from({ length: 1_100 }, (_, index) => `node-${index}`);
+        expect(coerceFlowchartSummarySourceIds({ sourceIds: manyIds })).toHaveLength(1_000);
     });
 
     it('creates a command handler using current window dimensions and toolbar lookup', () => {
@@ -94,5 +108,8 @@ describe('flowchartDesignerEventHandlers', () => {
         });
 
         expect(handler({ detail: {} })).toBeNull();
+        expect(handler({})).toBeNull();
+        expect(handler({ detail: null })).toBeNull();
+        expect(handler({ detail: { sourceIds: [1, {}, ''] } })).toBeNull();
     });
 });

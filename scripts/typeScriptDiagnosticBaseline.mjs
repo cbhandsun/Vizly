@@ -352,7 +352,7 @@ export const parseTypecheckBaselineJson = (
 };
 
 export const parseTypecheckTimeoutMs = (raw) => {
-  if (raw === undefined || raw === '') return 300_000;
+  if (raw === undefined || raw === '') return 600_000;
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value < 1_000 || value > 900_000) {
     throw new TypeError('TYPECHECK_TIMEOUT_MS must be an integer between 1000 and 900000');

@@ -116,7 +116,7 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
       operation: 'validate-or-route',
       requestId: 'validate-clean-cache',
       edges,
-      candidateEdges: edges,
+      candidatePatches: edges,
       candidateSource: 'persistent',
       nodes,
       enableSmartEdges: true,

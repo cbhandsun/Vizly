@@ -1,4 +1,4 @@
-import type { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 
 import {
     createFlowchartSummaryNode,
@@ -16,10 +16,10 @@ export const runFlowchartSummaryInsert = ({
     scheduleSelection,
 }: {
     nodes: Node[];
-    edges: unknown[];
+    edges: Edge[];
     sourceIds?: string[];
     label: string;
-    takeSnapshot: (nodes: Node[], edges: unknown[]) => void;
+    takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
     appendNode: (node: Node) => void;
     applySelection: (summaryNodeId: string) => void;
     scheduleSelection: (callback: () => void) => void;

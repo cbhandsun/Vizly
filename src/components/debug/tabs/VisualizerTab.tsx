@@ -9,106 +9,15 @@ import Tooltip from 'antd/es/tooltip';
 import { theme } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { EdgeRoutingCoordinator } from '@/core/services/EdgeRoutingCoordinator';
-import type { AlgorithmDebugInfo, Point } from '@/core/types/routing';
-
-interface DebugObstacle {
-    x: number;
-    y: number;
-    w?: number;
-    h?: number;
-    width?: number;
-    height?: number;
-}
-
-type DebugEdge = [Point, Point];
-
-type VisibilityGraphLike =
-    | DebugEdge[]
-    | {
-        edges?: Array<{
-            x1: number;
-            y1: number;
-            x2: number;
-            y2: number;
-        }>;
-    };
-
-interface AlgorithmDebugPayload {
-    grid?: AlgorithmDebugInfo['grid'];
-    visited?: Point[];
-    obstacles?: DebugObstacle[];
-    rawPoints?: Point[];
-    vg?: DebugEdge[];
-    visibilityGraph?: DebugEdge[];
-    quadTree?: DebugObstacle[];
-    spatialIndex?: DebugObstacle[];
-    strategy?: string;
-    sourceRect?: DebugObstacle;
-    targetRect?: DebugObstacle;
-}
-
-interface DebugMetadata {
-    strategy?: string;
-    duration?: number;
-    steps?: number;
-    length?: number;
-    executionTime?: number;
-}
-
-interface DebugPayload extends AlgorithmDebugInfo {
-    edgeId?: string;
-    pathPoints?: Point[];
-    path?: Point[];
-    // Additional debug info that might be passed dynamically
-    obstacles?: DebugObstacle[];
-    vg?: DebugEdge[];
-    points?: Array<Point & { type: 'start' | 'end' | string }>;
-    quadTree?: DebugObstacle[];
-    metadata?: DebugMetadata;
-}
-
-interface RawDebugEdge {
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-}
-
-function isRawDebugEdge(value: unknown): value is RawDebugEdge {
-    if (!value || typeof value !== 'object') return false;
-    const v = value as Partial<RawDebugEdge>;
-    return typeof v.x1 === 'number'
-        && typeof v.y1 === 'number'
-        && typeof v.x2 === 'number'
-        && typeof v.y2 === 'number';
-}
-
-function normalizeVisibilityGraph(vg: VisibilityGraphLike | undefined | null): DebugEdge[] {
-    if (!vg) return [];
-    if (Array.isArray(vg)) {
-        return vg.map((edge) => {
-            if (Array.isArray(edge) && edge.length >= 2) {
-                return edge as DebugEdge;
-            }
-            if (isRawDebugEdge(edge)) {
-                return [{ x: edge.x1, y: edge.y1 }, { x: edge.x2, y: edge.y2 }];
-            }
-            return null;
-        }).filter((e): e is DebugEdge => !!e);
-    }
-    const container = vg as { edges?: RawDebugEdge[] } | null;
-    if (container?.edges && Array.isArray(container.edges)) {
-        return container.edges
-            .map((e) => {
-                if (isRawDebugEdge(e)) {
-                    return [{ x: e.x1, y: e.y1 }, { x: e.x2, y: e.y2 }];
-                }
-                return null;
-            })
-            .filter((e): e is DebugEdge => !!e);
-    }
-    return [];
-}
+import type { Point } from '@/core/types/routing';
+import {
+    calculateVisualizerFit,
+    normalizeVisibilityGraph,
+    type AlgorithmDebugPayload,
+    type DebugObstacle,
+    type DebugPayload,
+    type VisibilityGraphLike,
+} from './visualizerModel';
 
 // Define interface for Coordinator to avoid 'any'
 interface DebuggableCoordinator {
@@ -119,7 +28,6 @@ interface DebuggableCoordinator {
     notifyGraphChange(): void;
 }
 
-/** [UX] Reusable scan result row — used in both anomaly list and full-edge list */
 interface ScanRowItemProps {
     row: { edgeId: string; port: string; strategy: string; geo: string; isM2O: boolean; anomaly: boolean };
     geoColor: (geo: string) => string;
@@ -164,18 +72,14 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
     const [showQuadTree, setShowQuadTree] = useState(false);
     const [showTrunk, setShowTrunk] = useState(true); // [主干可视化] Trunk Axis + Peer Group overlay
     const [isMaximized, setIsMaximized] = useState(false);
-    // [UX] Mouse world-coordinate tracking for HUD crosshair display
     const [mouseWorldPos, setMouseWorldPos] = useState<{ x: number; y: number } | null>(null);
-    // [UX] Expand all edges in scan (not just anomalies)
     const [showAllScanEdges, setShowAllScanEdges] = useState(false);
 
-    // [SCAN] Batch scan state
     interface ScanRow { edgeId: string; port: string; strategy: string; geo: string; isM2O: boolean; anomaly: boolean; }
     const [scanResults, setScanResults] = useState<ScanRow[] | null>(null);
     const [isScanning, setIsScanning] = useState(false);
     const [showScan, setShowScan] = useState(false);
 
-    // Zoom & Pan State
     const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
     const [isDragging, setIsDragging] = useState(false);
     const lastMouseRef = useRef({ x: 0, y: 0 });
@@ -186,7 +90,6 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
     // [UX] Ref to fitToContent so reset button can reuse it without stale closure
     const debugDataRef = useRef<DebugPayload | null>(null);
 
-    // Canvas sizing state
     const containerRef = useRef<HTMLDivElement>(null);
     const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
 
@@ -194,7 +97,6 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
         targetEdgeIdRef.current = targetEdgeId;
     }, [targetEdgeId]);
 
-    // Handle Resize
     useEffect(() => {
         if (!containerRef.current) return;
 
@@ -215,7 +117,6 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
         return () => observer.disconnect();
     }, [isMaximized, customHeight]);
 
-    // Helper to transform coordinates
     const toScreen = useCallback((x: number, y: number) => {
         return {
             x: x * transform.k + transform.x,
@@ -223,127 +124,14 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
         };
     }, [transform]);
 
-    // Auto-fit content
     const fitToContent = useCallback((data: DebugPayload) => {
         if (!containerRef.current) return;
         const { clientWidth, clientHeight } = containerRef.current;
-        const width = clientWidth || canvasSize.width;
-        const height = clientHeight || canvasSize.height;
-
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        let hasContent = false;
-
-        const updateBounds = (x: number, y: number) => {
-            minX = Math.min(minX, x);
-            minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x);
-            maxY = Math.max(maxY, y);
-            hasContent = true;
-        };
-
-        const updateRect = (x: number, y: number, w: number, h: number) => {
-            updateBounds(x, y);
-            updateBounds(x + w, y + h);
-        };
-
-        const algorithmDebug = data.algorithmDebug && typeof data.algorithmDebug === 'object'
-            ? (data.algorithmDebug as AlgorithmDebugPayload)
-            : null;
-
-        // === PRIORITY BOUNDS: Path + Source/Target rects ===
-        // Fit tightly around the "hero" elements first.
-        // Without this, 21 obstacles spread over 4742px collapse scale to 0.063x,
-        // making the 2px path line render at 0.13px — effectively invisible.
-        const path = data.pathPoints || data.path;
-        if (path && Array.isArray(path)) {
-            path.forEach((p) => updateBounds(p.x, p.y));
-        }
-
-        const rawPoints = algorithmDebug?.rawPoints;
-        if (rawPoints && Array.isArray(rawPoints)) {
-            rawPoints.forEach((p) => updateBounds(p.x, p.y));
-        }
-
-        const srcRect = algorithmDebug?.sourceRect;
-        const tgtRect = algorithmDebug?.targetRect;
-        if (srcRect) updateRect(srcRect.x, srcRect.y, srcRect.w ?? (srcRect as any).width ?? 0, srcRect.h ?? (srcRect as any).height ?? 0);
-        if (tgtRect) updateRect(tgtRect.x, tgtRect.y, tgtRect.w ?? (tgtRect as any).width ?? 0, tgtRect.h ?? (tgtRect as any).height ?? 0);
-
-        if (data.points && Array.isArray(data.points)) {
-            data.points.forEach((p) => updateBounds(p.x, p.y));
-        }
-
-        // === SECONDARY BOUNDS: Obstacles filtered by proximity ===
-        // Only include obstacles within 2x the primary content span.
-        // Distant obstacles in unrelated graph regions are excluded.
-        const primaryMinX = hasContent ? minX : -Infinity;
-        const primaryMinY = hasContent ? minY : -Infinity;
-        const primaryMaxX = hasContent ? maxX : Infinity;
-        const primaryMaxY = hasContent ? maxY : Infinity;
-        const primaryW = Math.max(primaryMaxX - primaryMinX, 200);
-        const primaryH = Math.max(primaryMaxY - primaryMinY, 200);
-        const OBSTACLE_MARGIN = 2.0;
-
-        const obstacles = data.obstacles ?? algorithmDebug?.obstacles;
-        if (obstacles && Array.isArray(obstacles)) {
-            obstacles.forEach((o) => {
-                const ox = o.x, oy = o.y;
-                const ow = o.w ?? o.width ?? 0, oh = o.h ?? o.height ?? 0;
-                const inX = ox + ow >= primaryMinX - primaryW * OBSTACLE_MARGIN && ox <= primaryMaxX + primaryW * OBSTACLE_MARGIN;
-                const inY = oy + oh >= primaryMinY - primaryH * OBSTACLE_MARGIN && oy <= primaryMaxY + primaryH * OBSTACLE_MARGIN;
-                if (inX && inY) updateRect(ox, oy, ow, oh);
-            });
-        }
-
-        // Grid (always include — defines the search space scope)
-        const grid = data.grid ?? algorithmDebug?.grid;
-        if (grid && 'data' in grid) {
-            updateRect(grid.minX, grid.minY, grid.cols * grid.size, grid.rows * grid.size);
-        }
-
-        const visitedForFit = data.visited ?? algorithmDebug?.visited;
-        if (visitedForFit && Array.isArray(visitedForFit)) {
-            visitedForFit.forEach((p) => updateBounds(p.x, p.y));
-        }
-
-        const vgRaw: VisibilityGraphLike | undefined =
-            data.vg ?? algorithmDebug?.vg ?? algorithmDebug?.visibilityGraph;
-        const vgEdges = normalizeVisibilityGraph(vgRaw);
-        if (vgEdges.length > 0) {
-            vgEdges.forEach((edge) => {
-                updateBounds(edge[0].x, edge[0].y);
-                updateBounds(edge[1].x, edge[1].y);
-            });
-        }
-
-        if (!hasContent) return;
-
-        // Add padding
-        const padding = 50;
-        const contentW = maxX - minX;
-        const contentH = maxY - minY;
-
-        if (contentW <= 0 || contentH <= 0) return;
-
-        const scaleX = (width - padding * 2) / contentW;
-        const scaleY = (height - padding * 2) / contentH;
-        let scale = Math.min(scaleX, scaleY);
-        if (!Number.isFinite(scale) || scale <= 0) {
-            scale = 1;
-        }
-        const MAX_SCALE = 4;
-        // [FIX] MIN_SCALE lowered to 0.05: proximity filtering above prevents the scale
-        // from going very low in practice; this is a safety floor for edge cases.
-        const MIN_SCALE = 0.05;
-        scale = Math.max(MIN_SCALE, Math.min(scale, MAX_SCALE));
-
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
-
-        const x = width / 2 - centerX * scale;
-        const y = height / 2 - centerY * scale;
-
-        setTransform({ x, y, k: scale });
+        const nextTransform = calculateVisualizerFit(data, {
+            width: clientWidth || canvasSize.width,
+            height: clientHeight || canvasSize.height,
+        });
+        if (nextTransform) setTransform(nextTransform);
     }, [canvasSize]);
 
     const drawVisualization = useCallback((data: DebugPayload) => {

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
-import { invalidateRemoteDiagramPreview } from '@/core/utils/remoteDiagramPreview';
+import { invalidateRemoteDiagramPreview } from '@/services/remoteDiagramPreview';
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { getFlowDataBridge } from '@/core/utils/flowDataBridge';

@@ -19,8 +19,9 @@ export const createFlowchartReverseImportSuccessHandler = ({
     notifySuccess: (filename: string) => void;
     scheduleFitView: () => void;
 }) => (
-    event: Pick<CustomEvent<{ filename?: string }>, 'detail'>
+    event: Event | Pick<CustomEvent<{ filename?: string }>, 'detail'>
 ): void => {
-    notifySuccess(event.detail?.filename || '');
+    const detail = 'detail' in event ? event.detail : undefined;
+    notifySuccess(detail?.filename || '');
     scheduleFitView();
 };

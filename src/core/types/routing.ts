@@ -398,6 +398,11 @@ export interface PathFindingJob {
     // Bidirectional Edge Separation
     bidirectionalChannel?: number;
     bidirectionalSpacing?: number;
+    bidirectionalCount?: number;
+
+    // Legacy flat group metadata retained at the worker protocol boundary while
+    // callers migrate to busRoutingPlan.
+    peerGroupSize?: number;
 
     isReverseEdge?: boolean;
     debug?: boolean;

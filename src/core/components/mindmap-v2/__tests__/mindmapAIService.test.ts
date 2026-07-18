@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { configureMindMapAIRuntime } from '../../../ports/mindMapAIRuntime';
 import {
   cleanAndValidateTree,
   cleanMindMapIcons,
@@ -12,7 +13,7 @@ import {
   MINDMAP_MAX_NOTE_LENGTH,
   MINDMAP_MAX_TOPIC_LENGTH,
 } from '../mindmapTreeSanitizer';
-import { sanitizeAICustomActionResult } from '../mindmapAIService';
+import { expandNodeWithAI, sanitizeAICustomActionResult } from '../mindmapAIService';
 
 describe('cleanAndValidateTree', () => {
   it('keeps only safe AI-generated hyperlinks', () => {
@@ -155,5 +156,40 @@ describe('cleanAndValidateTree', () => {
     expect(result.newChildren?.[0]?.children).toEqual([]);
     expect(Object.hasOwn(result.newChildren?.[0] || {}, 'constructor')).toBe(false);
     expect(Object.prototype).not.toHaveProperty('polluted');
+  });
+});
+
+describe('mind map AI runtime boundary', () => {
+  it('uses the application-provided runtime without importing outer layers', async () => {
+    configureMindMapAIRuntime({
+      loadConfig: async () => ({
+        activeModelKey: 'test:model-a',
+        providers: [{ id: 'test', enabled: true, baseUrl: 'https://ai.example.test/v1', apiKey: 'secret' }],
+      }),
+      requestChatCompletionJson: async () => ({
+        choices: [{ message: { content: '- 主题一\n2. 主题二' } }],
+      }),
+      formatRequestError: async () => 'safe error',
+    });
+
+    await expect(expandNodeWithAI({
+      node: { id: 'root', topic: '根主题' } as any,
+      count: 2,
+    })).resolves.toEqual({ topics: ['主题一', '主题二'] });
+  });
+
+  it('returns the runtime-provided sanitized error on request failure', async () => {
+    configureMindMapAIRuntime({
+      loadConfig: async () => ({
+        activeModelKey: 'test:model-a',
+        providers: [{ id: 'test', enabled: true, baseUrl: 'https://ai.example.test/v1', apiKey: 'secret' }],
+      }),
+      requestChatCompletionJson: async () => { throw new Error('Bearer sensitive-token'); },
+      formatRequestError: async () => 'request failed safely',
+    });
+
+    await expect(expandNodeWithAI({
+      node: { id: 'root', topic: '根主题' } as any,
+    })).resolves.toEqual({ topics: [], error: 'request failed safely' });
   });
 });

@@ -1,182 +1,50 @@
-export { default as FlowchartDesigner } from './components/diagrams/FlowchartDesigner';
-export * from './types/common';
-// removed to avoid diagramConfig duplicate
-// removed to avoid diagramConfig duplicate
-export * from './types/diagram-components';
-export { useDiagramControls } from './hooks/useDiagramControls';
-export * from './components/shared/DiagramStyleManager';
-export { EdgeRoutingCoordinator } from './services/EdgeRoutingCoordinator';
-export { default as PresentationMode } from './components/presentation/PresentationMode';
-export { usePresentationSlides, generateSlides } from './hooks/usePresentationSlides';
-export type { PresentationSlide } from './hooks/usePresentationSlides';
+/**
+ * Public core boundary.
+ *
+ * This module deliberately exposes portable contracts and explicit runtime
+ * entry points only. UI components, individual plugins, and implementation
+ * helpers must be imported from their owning module so an accidental root
+ * import cannot load the whole designer or hide a dependency boundary.
+ */
 
-// ---- Newly Exported Core Modules ----
-export { BaseDiagramComponent, type BaseDiagramConfig } from './components/diagrams/base/BaseDiagramComponent';
-export { ModernFlowchartSidebar } from './components/diagrams/ModernFlowchartSidebar';
-export { default as MermaidDiagram, type MermaidDiagramProps } from './components/diagrams/MermaidDiagram';
-export { getEdgeLabelStyleMenuItems } from './components/diagrams/EdgeLabelStyleMenu';
-export { EdgeUpdateProvider, type Waypoint } from './components/diagrams/EdgeUpdateContext';
-export { useEdgeUpdate, useEdgeTheme } from './components/diagrams/useEdgeUpdate';
-export { EditableLabel } from './components/diagrams/EditableLabel';
-export { NodeUpdateProvider } from './components/diagrams/NodeUpdateContext';
-export { useNodeUpdate, useBusinessData } from './components/diagrams/useNodeUpdate';
-export { useCollapsibleGroups, getDescendantIds } from './components/diagrams/hooks/useCollapsibleGroups';
-export { DesignerRightSidebar } from './components/diagrams/DesignerRightSidebar';
-export * from './components/diagrams/hooks/useSmartRoutingConfig';
-export { TopActionButtons } from './components/diagrams/TopActionButtons';
-
-// Diagrams
-export { default as SmartEdgeDemoEnhanced } from './components/diagrams/SmartEdgeDemoEnhanced';
-export { default as EdgeModeTest } from './components/diagrams/EdgeModeTest';
-export { PerformanceDemo } from './components/diagrams/PerformanceDemo';
-
-// Layout Utils
-export * as layoutHelpers from './components/diagrams/layoutHelpers';
-
-// Export core modules for standard DiagramView engine usage
 export const DiagramCoreInfo = {
   version: '1.0.0',
   license: 'MIT',
-  name: '@/core'
-};
+  name: '@/core',
+} as const;
 
-export * from './utils/diagramAnalyzer';
-export * from './types/layout';
-export * from './components/config/DiagramConfig';
-export * from './config/LayeredConfigManager';
-export * from './strategies/LayoutStrategyManager';
-export * from './services/ReactFlowAdapter';
-export * from './services/DiagramOrchestrator';
-export * from './utils/HandlePicker';
-export * from './utils/EnhancedTextMeasurement';
-export * from './themes/presets';
-export * from './themes/ThemeUtils';
-export * from './utils/colorUtils';
-export * from './utils/antdStaticBridge';
-export * from './utils/coerceDiagram';
-export * from './utils/consoleCleanup';
-export * from './utils/performanceMonitor';
-export * from './utils/globalErrorHandler';
-export * from './utils/layoutRecommender';
-export * from './strategies/nodeLayoutStrategy/HorizontalLayoutStrategy';
-export * from './strategies/nodeLayoutStrategy/VerticalLayoutStrategy';
-export * from './strategies/nodeLayoutStrategy/CenteredLayoutStrategy';
-export * from './strategies/nodeLayoutStrategy/DagreLayoutStrategy';
-export * from './strategies/nodeLayoutStrategy/GridLayoutStrategy';
-export * from './strategies/DomainVerticalLayoutStrategy';
-export * from './algorithms/EdgeBundler';
-export * from './workers/core/AStarPathfinder';
-export * from './workers/core/VisibilityGraphRouter';
+// Shared domain contracts.
+export * from './types/common';
+export type {
+  DiagramComponentProps,
+  DiagramDefinition,
+  ResolvedEdgeConfig,
+} from './types/diagram-components';
+export type {
+  BatchPathFindingJob,
+  BatchPathFindingResult,
+  PathFindingJob,
+  PathFindingRequest,
+  PathFindingResult,
+  SharedGraphContext,
+} from './types/routing';
+export type {
+  DiagramType,
+  StandardDiagramData,
+  StandardEdgeData,
+  StandardNodeData,
+} from './models/DiagramModels';
 
-
-export * from './components/diagrams/layoutHelpers';
-export * from './utils/layoutUtils';
-
-export * from './utils/nodeValidation';
-export * from './utils/remoteDiagramPreview';
-export * from './types/diagrams';
-
-export type { StandardDiagramData, StandardNodeData, StandardEdgeData, DiagramType, Theme } from './models/DiagramModels';
-export { edgeFactory, EdgeFactory } from './factories/EdgeFactory';
-export type { EdgeConfig } from './factories/EdgeFactory';
-export { nodeFactory, NodeFactory } from './factories/NodeFactory';
-export type { NodeConfig } from './factories/NodeFactory';
-export type { ThemeColor } from './themes/types/ThemeTypes';
-export { LayoutOptimizer } from './components/layout/LayoutOptimizer';
-
-export * from './utils/diagramSnapshot';
-export * from './models/DiagramModels';
-export type { ThemePreset } from './themes/types/ThemeTypes';
-export { LayoutStrategyManager } from './strategies/LayoutStrategyManager';
-export { DomainVerticalLayoutStrategy } from './strategies/DomainVerticalLayoutStrategy';
-export { DiagramOrchestrator } from './services/DiagramOrchestrator';
-export { ReactFlowAdapter } from './services/ReactFlowAdapter';
-export type { PathFindingJob, SharedGraphContext, PathFindingResult } from './types/diagram-components';
-export { Logger } from './utils/Logger';
-export { ErrorHandler } from './utils/ErrorHandler';
-export * from './themes/EnhancedThemeManager';
-export * from './themes/ThemePresetManager';
-export * from './themes/ThemePerformanceOptimizer';
-export { useTheme } from './themes/useCoreTheme';
-export * from './config/ConfigIntegration';
-export * from './hooks/useDiagramFilter';
-export * from './hooks/useDiagramHostStorage';
-export { ErrorType, ErrorSeverity, createError } from './utils/ErrorHandler';
-export { CommandPalette } from './components/ui/CommandPalette';
-export type { CommandItem } from './components/ui/CommandPalette';
-export { ShortcutsHelpModal } from './components/ui/ShortcutsHelpModal';
-export { useUIState } from './hooks/useUIState';
-export * from './components/shared';
-export { default as LazyMonacoEditor } from './components/lazy/LazyMonacoEditor';
-export { dispatchDiagramControl } from './components/shared/diagramControl';
-export { getFlowStyleMaps } from './components/shared/layoutUtils';
-export { useEdgeNormalization } from './hooks/useEdgeNormalization';
-export { RoutingPerformanceMonitor } from './monitoring/RoutingPerformanceMonitor';
-export { logger } from './utils/Logger';
-export { baseTypography } from './themes/BaseConstants.ts';
-export { baseSpacing } from './themes/BaseConstants.ts';
-export { baseBorderRadius } from './themes/BaseConstants.ts';
-export { baseShadow } from './themes/BaseConstants.ts';
-export { baseAnimation } from './themes/BaseConstants.ts';
-export { getDomainMain } from './components/shared/layoutUtils';
-export { hexToRgba } from './components/shared/layoutUtils';
-export type { MasterDataType } from './types/master-data';
-export type { DiagramControlAction } from './components/shared/diagramControl';
-export { getDomainTheme } from './components/shared/layoutUtils';
-export { default as AppLayout } from './components/layout/AppLayout';
-export { AntdApiBridge } from './components/shared/AntdApiBridge';
-export { CryptoService } from './utils/CryptoService';
-export { ErrorBoundary } from './components/shared/ErrorBoundary';
-export { withErrorBoundary } from './components/shared/withErrorBoundary';
-export { useErrorHandler } from './components/shared/useErrorHandler';
-export { usePanelZoom } from './hooks/usePanelZoom';
-export { fetchRemoteDiagramPreview } from './utils/remoteDiagramPreview';
-export * from './themes/types/ThemeTypes';
-
-export * from './hooks/useConfigIntegration';
-
-// ---- Json & Utils System ----
-export { JsonEditorModal } from './components/diagrams/JsonEditorModal';
-export * from './components/diagrams/designerUtils';
-export * from './utils/jsonUtils';
-
-// ---- Plugin System ----
-export * from './types/plugin';
+// Plugin contracts and their explicit asynchronous registration boundary.
+export type {
+  CommandItem,
+  DiagramTypePlugin,
+  PluginContext,
+  SidebarPanel,
+} from './types/plugin';
 export { PluginRegistry } from './services/PluginRegistry';
-export * from './plugins/FlowchartPlugin';
-export * from './plugins/ArchitecturePlugin';
-export * from './plugins/TimelinePlugin';
-export * from './plugins/MindMapPlugin';
-export * from './plugins/SwimlanePlugin';
-export * from './plugins/ERDiagramPlugin';
-export * from './plugins/NetworkTopologyPlugin';
-export { default as UnifiedDesigner } from './components/diagrams/FlowchartDesigner';
-export type { DiagramComponentProps as UnifiedDesignerProps } from './types/diagram-components';
-export { default as ArchitectureNode } from './components/custom-nodes/ArchitectureNode';
+export { ensureBuiltInPlugins } from './plugins/builtInPlugins';
 
-// ---- Auto Register Built-in Plugins ----
-import { PluginRegistry as InternalPluginRegistry } from './services/PluginRegistry';
-import { FlowchartPlugin as InternalFlowchartPlugin } from './plugins/FlowchartPlugin';
-import { ArchitecturePlugin as InternalArchitecturePlugin } from './plugins/ArchitecturePlugin';
-import { TimelinePlugin as InternalTimelinePlugin } from './plugins/TimelinePlugin';
-import { MindMapPlugin as InternalMindMapPlugin } from './plugins/MindMapPlugin';
-import { SwimlanePlugin as InternalSwimlanePlugin } from './plugins/SwimlanePlugin';
-import { ERDiagramPlugin as InternalERDiagramPlugin } from './plugins/ERDiagramPlugin';
-import { NetworkTopologyPlugin as InternalNetworkTopologyPlugin } from './plugins/NetworkTopologyPlugin';
-import { SequencePlugin as InternalSequencePlugin } from './plugins/SequencePlugin';
-
-export function initializePlugins() {
-  const __registry = InternalPluginRegistry.getInstance();
-  if (!__registry.getPlugin('flowchart')) {
-    __registry.register(new InternalFlowchartPlugin(), true);
-    __registry.register(new InternalArchitecturePlugin());
-    __registry.register(new InternalTimelinePlugin());
-    __registry.register(new InternalMindMapPlugin());
-    __registry.register(new InternalSwimlanePlugin());
-    __registry.register(new InternalERDiagramPlugin());
-    __registry.register(new InternalNetworkTopologyPlugin());
-    __registry.register(new InternalSequencePlugin());
-  }
-}
-
-export * from './hooks/useTopologyLinter';
+// Runtime coordinators that do not expose UI implementation details.
+export { EdgeRoutingCoordinator } from './services/EdgeRoutingCoordinator';
+export { LayoutStrategyManager } from './strategies/LayoutStrategyManager';

@@ -2,6 +2,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  coerceFlowchartFocusEntityDetail,
   createFlowchartFocusEntityEventHandler,
   focusFlowchartEdge,
   focusFlowchartNode,
@@ -39,6 +40,31 @@ const createReactFlowInstance = (zoom = 1.75) => ({
 });
 
 describe('flowchartFocusEntity', () => {
+  it('coerces focus event detail and rejects ambiguous or unsafe values', () => {
+    expect(coerceFlowchartFocusEntityDetail({
+      nodeId: ' node-1 ',
+      preserveZoom: true,
+      zoom: 2.5,
+    })).toEqual({
+      nodeId: 'node-1',
+      preserveZoom: true,
+      zoom: 2.5,
+    });
+
+    expect(coerceFlowchartFocusEntityDetail(undefined)).toBeNull();
+    expect(coerceFlowchartFocusEntityDetail({})).toBeNull();
+    expect(coerceFlowchartFocusEntityDetail({ nodeId: 'a', edgeId: 'b' })).toBeNull();
+    expect(coerceFlowchartFocusEntityDetail({ nodeId: 'x'.repeat(257) })).toBeNull();
+    expect(coerceFlowchartFocusEntityDetail({ nodeId: 'node-1', zoom: Number.NaN }))
+      .toBeNull();
+    expect(coerceFlowchartFocusEntityDetail({ nodeId: 'node-1', zoom: Number.POSITIVE_INFINITY }))
+      .toBeNull();
+    expect(coerceFlowchartFocusEntityDetail({ nodeId: 'node-1', zoom: -1 }))
+      .toBeNull();
+    expect(coerceFlowchartFocusEntityDetail({ nodeId: 'node-1', preserveZoom: 'yes' }))
+      .toBeNull();
+  });
+
   it('focuses a node and clears edge selection when requested', () => {
     const reactFlowInstance = createReactFlowInstance();
     const setSelectedNodes = vi.fn();
@@ -158,6 +184,27 @@ describe('flowchartFocusEntity', () => {
     });
     expect(setSelectedNodes).toHaveBeenCalledWith([nodes[1]]);
     expect(setSelectedEdges).toHaveBeenCalledWith([]);
+  });
+
+  it('rejects malformed focus events without changing selection', () => {
+    const reactFlowInstance = createReactFlowInstance();
+    const setSelectedNodes = vi.fn();
+    const setSelectedEdges = vi.fn();
+    const handler = createFlowchartFocusEntityEventHandler({
+      reactFlowInstance,
+      nodes,
+      edges,
+      setSelectedNodes,
+      setSelectedEdges,
+    });
+
+    expect(handler({})).toBe(false);
+    expect(handler({ detail: null })).toBe(false);
+    expect(handler({ detail: { nodeId: 123 } })).toBe(false);
+    expect(handler({ detail: { nodeId: 'node-1', edgeId: 'edge-1' } })).toBe(false);
+    expect(reactFlowInstance.setCenter).not.toHaveBeenCalled();
+    expect(setSelectedNodes).not.toHaveBeenCalled();
+    expect(setSelectedEdges).not.toHaveBeenCalled();
   });
 
   it('returns false without mutating selection when dependencies are missing', () => {

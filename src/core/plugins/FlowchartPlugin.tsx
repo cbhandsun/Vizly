@@ -26,7 +26,7 @@ export class FlowchartPlugin extends BaseDiagramPlugin implements DiagramTypePlu
     version = '1.1.0';
     description = 'Vizly 的核心画布引擎，支持自由布局、智能连线与全量基础形状。适用于大多数通用绘图场景。';
     author = 'Vizly Core';
-    category = 'Core';
+    category = 'Core' as const;
     tags = ['General', 'Flowchart', 'Base'];
     brandColor = '#1890ff';
 

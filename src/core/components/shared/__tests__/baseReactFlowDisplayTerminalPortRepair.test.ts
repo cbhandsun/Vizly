@@ -507,6 +507,28 @@ describe('baseReactFlowDisplayTerminalPortRepair', () => {
       { reverseOverlap: 0, unexplainedRelatedOverlap: 0 },
     ]);
 
+    const exactTargetLockedEdges = edges.map((edge, index) => (
+      index === 0
+        ? {
+          ...edge,
+          targetHandle: 'task-group-right-port-3',
+          data: {
+            ...(edge.data || {}),
+            manualHandles: { target: true },
+          },
+        }
+        : edge
+    ));
+    const exactTargetLockedRepair = repairSharedPortAndTinyTerminalLanes(
+      exactTargetLockedEdges,
+      nodes,
+      8,
+    );
+    const exactTargetLockedPath = (exactTargetLockedRepair[0].data as any)
+      .computedPath as Array<{ x: number; y: number }>;
+    expect(exactTargetLockedRepair[0].targetHandle).toBe('task-group-right-port-3');
+    expect(exactTargetLockedPath.at(-1)).toEqual({ x: 2795.2, y: 1253 });
+
     const nodesWithBridgeBlocker: Node[] = [
       ...nodes,
       node('bridge-blocker-source', 2809, 1100, 20, 20),

@@ -414,6 +414,15 @@ export const prewarmBaseReactFlowDisplayWorker = (
   workerRef: MutableRefObject<Worker | null>,
 ): boolean => ensureBaseReactFlowDisplayWorker(workerRef) !== null;
 
+/** Releases both request-idle guards and the worker owned by a canvas hook. */
+export const disposeBaseReactFlowDisplayWorker = (
+  workerRef: MutableRefObject<Worker | null>,
+): void => {
+  const worker = workerRef.current;
+  if (!worker) return;
+  terminateBaseReactFlowDisplayWorker(worker, workerRef);
+};
+
 export const doesBaseReactFlowDisplayWorkerResolutionMatchOperation = (
   operation: DisplayEdgesWorkerRequest['operation'],
   routeResolution: DisplayEdgesWorkerRouteResolution,
@@ -509,13 +518,19 @@ const requestBaseReactFlowDisplayEdgesWorker = ({
           }, true);
           return;
         }
+        const submittedCandidateEdges = request.operation === 'validate-or-route'
+          ? (request.candidateEdges
+            ?? (request.candidatePatches
+              ? mergeBaseReactFlowDisplayEdgePatches(request.edges, request.candidatePatches)
+              : null))
+          : null;
         if (
           routeResolution === 'validated-candidate'
           && (
             request.operation !== 'validate-or-route'
-            || !request.candidateEdges
+            || !submittedCandidateEdges
             || !doBaseReactFlowDisplayRoutesMatchExactly(
-              request.candidateEdges,
+              submittedCandidateEdges,
               responseEdges,
             )
           )
@@ -648,11 +663,6 @@ export const computeBaseReactFlowDisplayEdgesInWorker = async ({
       ? sanitizeBaseReactFlowPrecompiledRoutePatches(edges, rawPrecompiledPatches)
       : sanitizeBaseReactFlowDisplayCachePatches(edges, cachedCandidateEdges))
     : null;
-  // Rebuild the cache candidate from the projected current graph so external
-  // cache fields can never replace labels, styles, markers, or business data.
-  const projectedCandidateEdges = safeCandidatePatches
-    ? mergeBaseReactFlowDisplayEdgePatches(projectedInput.edges, safeCandidatePatches)
-    : null;
   const routeRequest = {
     requestId,
     edges: projectedInput.edges,
@@ -665,11 +675,11 @@ export const computeBaseReactFlowDisplayEdgesInWorker = async ({
   };
   const result = await requestBaseReactFlowDisplayEdgesWorker({
     workerRef,
-    request: projectedCandidateEdges
+    request: safeCandidatePatches
       ? {
         ...routeRequest,
         operation: 'validate-or-route',
-        candidateEdges: projectedCandidateEdges,
+        candidatePatches: safeCandidatePatches,
         candidateSource: candidateSource === 'precompiled' ? 'precompiled' : 'persistent',
       }
       : { ...routeRequest, operation: 'route' },

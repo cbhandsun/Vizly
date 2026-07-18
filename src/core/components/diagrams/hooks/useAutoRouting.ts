@@ -13,6 +13,7 @@ interface UseAutoRoutingOptions {
     takeSnapshot: (nodes: any[], edges: Edge[]) => void;
     reactFlowInstance: ReactFlowInstance<any, any>;
     diagramId?: string;
+    loadLayoutPresetMap?: () => Promise<Record<string, unknown>>;
 }
 
 /**
@@ -27,6 +28,7 @@ export function useAutoRouting({
     takeSnapshot,
     reactFlowInstance,
     diagramId,
+    loadLayoutPresetMap,
 }: UseAutoRoutingOptions) {
     // [FIX] Read initial value from DiagramConfig instead of hardcoding false.
     // When autoRoutingEnabled starts as false, BaseReactFlow converts 'advanced-smart-step'
@@ -51,6 +53,7 @@ export function useAutoRouting({
         takeSnapshot,
         reactFlowInstance,
         diagramId,
+        loadLayoutPresetMap,
     });
 
     // 布局时自动启用 autoRouting + 管理稳定性标记

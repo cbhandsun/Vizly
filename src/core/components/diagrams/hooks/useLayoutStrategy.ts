@@ -23,6 +23,7 @@ interface UseLayoutStrategyParams {
     takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
     reactFlowInstance: ReactFlowInstance<any, any> | null;
     diagramId?: string;
+    loadLayoutPresetMap?: () => Promise<Record<string, unknown>>;
 }
 
 const getNodeDataString = (node: Node, key: string): string => (
@@ -96,6 +97,16 @@ export const resolveLayoutStrategyPresetFromCandidates = (
         if (preset) return { id, preset };
     }
     return {};
+};
+
+export const loadLayoutStrategyPresetFromCandidates = async (
+    loadPresetMap: (() => Promise<Record<string, unknown>>) | undefined,
+    candidates: Array<string | undefined>,
+): Promise<{ id?: string; preset?: unknown }> => {
+    if (!loadPresetMap) return {};
+    const presetMap = await loadPresetMap();
+    if (!presetMap || typeof presetMap !== 'object' || Array.isArray(presetMap)) return {};
+    return resolveLayoutStrategyPresetFromCandidates(presetMap, candidates);
 };
 
 export const normalizeLayoutVisibilityNodes = (rawNodes: Node[]): Node[] => {
@@ -256,6 +267,7 @@ export function useLayoutStrategy({
     takeSnapshot,
     _reactFlowInstance,
     diagramId,
+    loadLayoutPresetMap,
 }: UseLayoutStrategyParams) {
     // [对齐 SVG 版] 跟踪当前域布局策略和方向
     const [lastDomainStrategy, setLastDomainStrategy] = useState<string>('domain-dagre');
@@ -412,8 +424,8 @@ export function useLayoutStrategy({
                         typeof window === 'undefined' ? undefined : window.location,
                         'diagram'
                     );
-                    const candidate = resolveLayoutStrategyPresetFromCandidates(
-                        await import('@/data/standardized').then(({ PRESET_MAP }) => PRESET_MAP),
+                    const candidate = await loadLayoutStrategyPresetFromCandidates(
+                        loadLayoutPresetMap,
                         [
                             diagramId,
                             locationDiagramId || undefined,
@@ -520,7 +532,7 @@ export function useLayoutStrategy({
         } catch (err) {
             logLayoutStrategyFailure(strategyName, err);
         }
-    }, [diagramId, setNodes, setEdges, takeSnapshot, nodesRef, edgesRef, twoStepFitView]);
+    }, [diagramId, loadLayoutPresetMap, setNodes, setEdges, takeSnapshot, nodesRef, edgesRef, twoStepFitView]);
 
     return {
         handleStrategyLayout,

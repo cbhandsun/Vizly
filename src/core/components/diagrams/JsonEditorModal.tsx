@@ -7,6 +7,7 @@ import { appMessage } from '@/core/utils/antdStaticBridge';
 import { coerceStandardDiagramImport, parseDiagramJson } from '@/core/utils/diagramJsonImport';
 import { downloadFile } from '@/core/utils/downloadUtils';
 import { logJsonEditorExistingDiagramMergeFailure } from './diagramImportLogging';
+import { getApplicationDiagramRuntime } from '../../ports/applicationDiagramRuntime';
 
 
 const LazyMonacoEditor = React.lazy(() => import('../lazy/LazyMonacoEditor'));
@@ -63,9 +64,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                     let fullData = canvasToStandardData(nodes, edges, 'Flowchart Export');
                     if (diagramId) {
                         try {
-                            const { dataRegistry } = await import('@/data/DataRegistry');
-                            const localSvc = dataRegistry.getDataService();
-                            const existing = localSvc.getDiagram(diagramId);
+                            const existing = await getApplicationDiagramRuntime().loadDiagram(diagramId);
                             if (existing) {
                                 fullData = {
                                     ...existing,
@@ -95,9 +94,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
 
             // 如果有 DiagramID 并且是在标准模式，把修改后的布局和元数据存回去并触发页面刷新（向后兼容布局修改生效）
             if (diagramId && jsonFormatMode === 'standard') {
-                const { dataRegistry } = await import('@/data/DataRegistry');
-                const localSvc = dataRegistry.getDataService();
-                localSvc.registerRemoteDiagram({ ...data, id: diagramId }, {
+                await getApplicationDiagramRuntime().registerDiagram({ ...data, id: diagramId }, {
                     id: diagramId,
                     title: data.name || data.metadata?.title || 'Flowchart Export',
                 }, false, {

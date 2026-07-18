@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
+import { edgeTerminalPositionIsFixed } from '../../routing/utils/edgeTerminalPolicy';
 import { normalizeHandle } from '../../routing/utils/handleUtils';
 import {
   createEdgePathQualityEvaluationContext,
@@ -269,10 +270,7 @@ const buildSharedPortBoundarySlideCandidates = (
     const axis = sideAxis(descriptor.side);
     const tangentMin = axis === 'h' ? targetRect.y : targetRect.x;
     const tangentMax = tangentMin + (axis === 'h' ? targetRect.height : targetRect.width);
-    const data = (incoming.data || {}) as Record<string, any>;
-    const targetPolicy = String(data.targetPortPolicy ?? data.targetPortConstraint ?? '').toLowerCase();
-    const positionLocked = data.targetHandlePositionLocked === true
-      || ['fixed-pos', 'fixed_pos'].includes(targetPolicy);
+    const positionLocked = edgeTerminalPositionIsFixed(incoming, 'target');
     const interiorTangent = tangentCoordinate(descriptor.outwardSegment[0], axis);
     const exactInteriorTangents = [
       interiorTangent - MIN_INTERIOR_LANE,

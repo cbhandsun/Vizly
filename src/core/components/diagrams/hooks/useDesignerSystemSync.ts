@@ -5,8 +5,6 @@ import { useAutoSave } from './useAutoSave';
 import { PluginRegistry } from '../../../services/PluginRegistry';
 import { analyzeDiagram } from '@/utils/diagramAnalyzer';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
-import { isStandardPresetId } from '@/data/standardized/presetMetadata';
-import { loadStandardPresetById } from '@/data/standardized/presetLoader';
 import { cancelLayoutTransition, suspendLayoutTransitions } from '../../../utils/animateLayoutTransition';
 import { expandHandle } from '../../../routing/utils/handleUtils';
 import { parseAutoSavePayload } from '../../../utils/autoSaveStorage';
@@ -23,6 +21,7 @@ import {
     logDesignerSystemSyncStaleAutosaveDetected,
     logDesignerSystemSyncStandardDataToCanvasFailure,
 } from './designerSystemSyncLogging';
+import { getApplicationDiagramRuntime } from '../../../ports/applicationDiagramRuntime';
 
 const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
 
@@ -300,9 +299,7 @@ export function useDesignerSystemSync({
                         
                         // 写回 DataRegistry 中
                         try {
-                            const { dataRegistry } = await import('@/data/DataRegistry');
-                            const localSvc = dataRegistry.getDataService();
-                            localSvc.registerRemoteDiagram(safeData, {
+                            await getApplicationDiagramRuntime().registerDiagram(safeData, {
                                 id: diagramIdForExport,
                                 title: diagramIdForExport,
                             }, true, {
@@ -672,14 +669,14 @@ export function useDesignerSystemSync({
 
     useEffect(() => {
         let cancelled = false;
-        if (!isStandardPresetId(id)) {
+        if (!getApplicationDiagramRuntime().isStandardPresetId(id)) {
             setPresetLookup({ id, ready: true, preset: null });
             return () => { cancelled = true; };
         }
 
         setPresetLookup({ id, ready: false, preset: null });
 
-        void loadStandardPresetById(id).then((preset) => {
+        void getApplicationDiagramRuntime().loadStandardPreset(id).then((preset) => {
             if (!cancelled) setPresetLookup({ id, ready: true, preset });
         }).catch((error) => {
             logDesignerSystemSyncPresetLoadFailure(error);
@@ -803,10 +800,7 @@ export function useDesignerSystemSync({
                 hasRestoredAutoSave.current = true;
             } else {
                 // Try DataRegistry for imported/general templates before falling back to empty state
-                import('@/data/DataRegistry').then(async ({ dataRegistry }) => {
-                    await dataRegistry.initialize();
-                    const localSvc = dataRegistry.getDataService();
-                    const existing = localSvc.getDiagram(id || '');
+                getApplicationDiagramRuntime().loadDiagram(id || '', { initialize: true }).then(async (existing) => {
                     if (existing) {
                         import('../designerUtils').then(({ standardDataToCanvas }) => {
                             standardDataToCanvas(existing).then(({ nodes: newNodes, edges: newEdges }) => {
@@ -876,7 +870,7 @@ export function useDesignerSystemSync({
 
     return {
         performanceMode,
-        isInitialDiagramLoading: isStandardPresetId(id) && (!presetLookup.ready || !hasRestoredAutoSave.current)
+        isInitialDiagramLoading: getApplicationDiagramRuntime().isStandardPresetId(id) && (!presetLookup.ready || !hasRestoredAutoSave.current)
     };
 }
 

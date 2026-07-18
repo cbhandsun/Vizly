@@ -10,6 +10,7 @@ import {
 } from './baseReactFlowDisplayEdgeCore';
 import {
   computeBaseReactFlowDisplayEdgesInWorker,
+  disposeBaseReactFlowDisplayWorker,
   prewarmBaseReactFlowDisplayWorker,
   repairBaseReactFlowDisplayEdgesInWorker,
   resolveBaseReactFlowDisplayedEdges,
@@ -63,8 +64,7 @@ export const useBaseReactFlowDisplayRouting = ({
   const displayRoutingInputRef = useRef<DisplayRoutingInput | null>(null);
 
   useEffect(() => () => {
-    displayEdgeWorkerRef.current?.terminate();
-    displayEdgeWorkerRef.current = null;
+    disposeBaseReactFlowDisplayWorker(displayEdgeWorkerRef);
   }, []);
 
   const displayEdgeEpoch = useMemo(() => {

@@ -81,8 +81,10 @@ export type DisplayEdgesWorkerValidateOrRouteRequest = Omit<
   'operation'
 > & {
   operation: 'validate-or-route';
-  /** Null means the candidate failed protocol validation and must be rerouted. */
-  candidateEdges: Edge[] | null;
+  /** Legacy full candidate. New clients send routing-only patches instead. */
+  candidateEdges?: Edge[] | null;
+  /** Null means the routing-only candidate failed protocol validation. */
+  candidatePatches?: Edge[] | null;
   candidateSource: DisplayEdgesWorkerCandidateSource;
 };
 
@@ -343,12 +345,19 @@ export const parseDisplayEdgesWorkerRequest = (
     if (value.candidateSource !== 'persistent' && value.candidateSource !== 'precompiled') {
       return null;
     }
+    if (
+      typeof value.candidateEdges !== 'undefined'
+      && typeof value.candidatePatches !== 'undefined'
+    ) return null;
     return {
       ...routeRequest,
       operation: 'validate-or-route',
       candidateSource: value.candidateSource,
       candidateEdges: isDisplayEdgesWorkerEdgeList(value.candidateEdges)
         ? value.candidateEdges
+        : null,
+      candidatePatches: isDisplayEdgesWorkerEdgeList(value.candidatePatches)
+        ? value.candidatePatches
         : null,
     };
   }

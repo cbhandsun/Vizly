@@ -5,7 +5,14 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
 import { diagramConfigManager } from '../../components/config/DiagramConfig';
-import { expandHandle } from '../../routing/utils/handleUtils';
+import {
+  edgeTerminalHandleChangeIsAllowed,
+  readEdgeTerminalPolicy,
+  resolveEdgeTerminalHandleForSide,
+  type EdgeTerminalRole,
+  type EdgeTerminalSide,
+} from '../../routing/utils/edgeTerminalPolicy';
+import { normalizeHandle } from '../../routing/utils/handleUtils';
 import {
   assignGlobalPorts,
   beautifyOrthogonalEdges,
@@ -61,6 +68,78 @@ export {
   setAbsolutePositions,
 };
 
+const HANDLE_SIDE_BY_SHORTHAND: Record<'l' | 'r' | 't' | 'b', EdgeTerminalSide> = {
+  l: 'left',
+  r: 'right',
+  t: 'top',
+  b: 'bottom',
+};
+
+const edgeTerminalHandle = (
+  edge: Edge,
+  role: EdgeTerminalRole,
+): string | null | undefined => (
+  role === 'source' ? edge.sourceHandle : edge.targetHandle
+);
+
+/**
+ * A routing choice selects a terminal side, not a DOM handle identity. Keep an
+ * existing exact/compound ID when the side is unchanged and reject changes to
+ * source-authored or unvalidated runtime-owned terminals.
+ */
+const resolvePipelineTerminalHandle = (
+  edge: Edge,
+  role: EdgeTerminalRole,
+  proposedHandle: unknown,
+): string | null | undefined => {
+  const currentHandle = edgeTerminalHandle(edge, role);
+  if (typeof proposedHandle !== 'string') return currentHandle;
+  const shorthand = normalizeHandle(proposedHandle);
+  if (!shorthand) return currentHandle;
+  const resolvedHandle = resolveEdgeTerminalHandleForSide(
+    edge,
+    role,
+    HANDLE_SIDE_BY_SHORTHAND[shorthand],
+  );
+  return edgeTerminalHandleChangeIsAllowed(edge, role, resolvedHandle)
+    ? resolvedHandle
+    : currentHandle;
+};
+
+const constrainPipelinePortsForEdge = (
+  edge: Edge,
+  globalPorts: Record<string, { source?: string; target?: string }>,
+): Record<string, { source?: string; target?: string }> => {
+  let constrainedPorts = globalPorts;
+  const constrainRole = (role: EdgeTerminalRole, nodeId: string): void => {
+    const policy = readEdgeTerminalPolicy(edge, role);
+    if (!policy.sideFixed && !policy.runtimeFixed) return;
+    const side = normalizeHandle(edgeTerminalHandle(edge, role));
+    if (!side) return;
+    if (constrainedPorts === globalPorts) constrainedPorts = { ...globalPorts };
+    constrainedPorts[nodeId] = {
+      ...(constrainedPorts[nodeId] || {}),
+      [role]: HANDLE_SIDE_BY_SHORTHAND[side],
+    };
+  };
+  constrainRole('source', edge.source);
+  constrainRole('target', edge.target);
+  return constrainedPorts;
+};
+
+const preservePipelineTerminalOwnership = (
+  baselineEdges: readonly Edge[],
+  candidateEdges: Edge[],
+): Edge[] => candidateEdges.map((candidate, index) => {
+  const baseline = baselineEdges[index];
+  if (!baseline) return candidate;
+  return {
+    ...candidate,
+    sourceHandle: resolvePipelineTerminalHandle(baseline, 'source', candidate.sourceHandle),
+    targetHandle: resolvePipelineTerminalHandle(baseline, 'target', candidate.targetHandle),
+  };
+});
+
 /** 处理单条边的路由。 */
 function processEdge(
   edge: any,
@@ -103,13 +182,13 @@ function processEdge(
       directionalHandlePolicy: 'force' as const,
       angleToleranceDeg: Number(cfgEdge.angleToleranceDeg ?? 36),
       routedPaths: existingPaths,
-      preAssignedPorts: globalPorts,
+      preAssignedPorts: constrainPipelinePortsForEdge(edge, globalPorts),
     };
 
     const choice = decideEdgeRouting(sourceNode, targetNode, nodes, routingConfig);
     finalType = choice.type;
-    finalSourceHandle = choice.sourceHandle;
-    finalTargetHandle = choice.targetHandle;
+    finalSourceHandle = resolvePipelineTerminalHandle(edge, 'source', choice.sourceHandle);
+    finalTargetHandle = resolvePipelineTerminalHandle(edge, 'target', choice.targetHandle);
     computedPath = choice.computedPath || [];
 
     if (computedPath.length < 2) {
@@ -162,12 +241,8 @@ function processEdge(
     edge: {
       ...edge,
       type: finalType,
-      sourceHandle: finalSourceHandle
-        ? expandHandle(String(finalSourceHandle))
-        : finalSourceHandle,
-      targetHandle: finalTargetHandle
-        ? expandHandle(String(finalTargetHandle))
-        : finalTargetHandle,
+      sourceHandle: finalSourceHandle,
+      targetHandle: finalTargetHandle,
       data: { ...newData, computedPath },
     },
     computedPath,
@@ -289,17 +364,21 @@ export async function runEdgeRoutingPipeline(
 
   const enableGlobalOptimization = cfgEdge?.globalOptimization ?? false;
   if (enableGlobalOptimization && finalEdges.length > 1) {
-    finalEdges = globalOptimizeEdgeRouting(
-      finalEdges,
-      nodes,
-      {
-        mode: 'advanced-smart',
-        layoutDirection,
-        directionalHandlePolicy: 'force',
-        topK: 4,
-        preAssignedPorts: globalPorts,
-      },
-      3,
+    const preGlobalOptimizationEdges = finalEdges;
+    finalEdges = preservePipelineTerminalOwnership(
+      preGlobalOptimizationEdges,
+      globalOptimizeEdgeRouting(
+        finalEdges,
+        nodes,
+        {
+          mode: 'advanced-smart',
+          layoutDirection,
+          directionalHandlePolicy: 'force',
+          topK: 4,
+          preAssignedPorts: globalPorts,
+        },
+        3,
+      ),
     );
   }
 
@@ -382,16 +461,6 @@ export async function runEdgeRoutingPipeline(
       logElkEdgeRouterFallback(error);
     }
   }
-
-  finalEdges = finalEdges.map(edge => ({
-    ...edge,
-    sourceHandle: edge.sourceHandle
-      ? expandHandle(String(edge.sourceHandle))
-      : edge.sourceHandle,
-    targetHandle: edge.targetHandle
-      ? expandHandle(String(edge.targetHandle))
-      : edge.targetHandle,
-  }));
 
   finalEdges = separateDetachedParallelOverlaps(
     repairLocalDoglegArtifacts(
@@ -538,6 +607,7 @@ export async function runEdgeRoutingPipeline(
     if (nextFinalEdges === finalEdges) break;
     finalEdges = nextFinalEdges;
   }
+  finalEdges = preservePipelineTerminalOwnership(edges, finalEdges);
   finalEdges = lockComputedPathsForDisplay(finalEdges);
   return finalEdges;
 }

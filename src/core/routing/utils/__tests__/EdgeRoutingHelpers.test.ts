@@ -8,10 +8,6 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock('../../../utils/HandlePicker', () => ({
-  decideEdgeRouting: mocks.decideEdgeRouting,
-}));
-
 import {
   EdgeRoutingCache,
   applyParallelOffset,
@@ -21,6 +17,7 @@ import {
   incrementalEdgeRouting,
   pickHandlesByGeometry,
   separateParallelEdges,
+  configureEdgeRoutingDecision,
 } from '../EdgeRoutingHelpers';
 
 describe('EdgeRoutingCache', () => {
@@ -62,6 +59,7 @@ describe('EdgeRoutingHelpers', () => {
   beforeEach(() => {
     clearEdgeRoutingCache();
     mocks.decideEdgeRouting.mockClear();
+    configureEdgeRoutingDecision(mocks.decideEdgeRouting);
   });
 
   const nodes = [

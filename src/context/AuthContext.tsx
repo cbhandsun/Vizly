@@ -8,6 +8,7 @@ import {
     logAuthRuntimeStateClearFailure,
     logCloudAdapterConfigurationFailure,
 } from './authLogging';
+import { clearAuthSensitiveRuntimeState } from './authSensitiveRuntime';
 
 const noSupabaseError = { error: { message: 'Supabase is not configured', name: 'AuthError', status: 0 } as unknown as AuthError };
 
@@ -84,17 +85,7 @@ const clearSensitiveRuntimeState = async (
     if (!userId) return;
 
     try {
-        const [{ CryptoService }, { clearRuntimeAIConfig }] = await Promise.all([
-            import('@/core/utils/CryptoService'),
-            import('@/components/ai/aiConfigStorage')
-        ]);
-
-        clearRuntimeAIConfig(userId);
-        if (options.removeLocalSecret) {
-            CryptoService.clearUserSecret(userId);
-        } else {
-            CryptoService.clearKeyCache();
-        }
+        await clearAuthSensitiveRuntimeState(userId, options);
     } catch (error) {
         logAuthRuntimeStateClearFailure(error);
     }

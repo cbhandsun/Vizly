@@ -328,6 +328,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // Windows process startup dominates this suite: a representative isolated
+    // jsdom shard dropped from 157.5s to 83.3s with threads. File isolation
+    // remains enabled because shared environments leak mocks and storage state.
+    pool: 'threads',
     coverage: {
       provider: 'v8',
       allowExternal: true,

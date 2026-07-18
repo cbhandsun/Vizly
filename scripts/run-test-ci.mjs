@@ -1,5 +1,10 @@
 import { spawn } from 'node:child_process';
 
+import {
+  resolveTestCiConcurrency,
+  resolveTestCiShardTimeoutMs,
+} from './lib/test-ci-runner-policy.mjs';
+
 const shardNames = [
   'test:ci:node',
   'test:ci:dom-utils-security',
@@ -18,6 +23,7 @@ const shardNames = [
   'test:ci:ui-components-warehouse',
   'test:ci:ui-diagrams',
   'test:ci:core-components-shared-flow',
+  'test:ci:core-components-shared-flow-logistics',
   'test:ci:core-components-shared-flow-hub-port-role',
   'test:ci:core-components-shared-flow-measured-outcome',
   'test:ci:core-components-shared-flow-routing-quality',
@@ -34,28 +40,6 @@ const shardNames = [
   'test:ci:routing-services',
   'test:ci:routing-layout',
 ];
-
-const parseConcurrency = () => {
-  const raw = process.env.TEST_CI_CONCURRENCY;
-  if (!raw) return 2;
-
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value < 1) {
-    throw new Error(`Invalid TEST_CI_CONCURRENCY value: ${raw}`);
-  }
-  return value;
-};
-
-const parseShardTimeoutMs = () => {
-  const raw = process.env.TEST_CI_SHARD_TIMEOUT_MS;
-  if (!raw) return 900_000;
-
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value < 1) {
-    throw new Error(`Invalid TEST_CI_SHARD_TIMEOUT_MS value: ${raw}`);
-  }
-  return value;
-};
 
 const commandForScript = (name) => {
   if (process.platform === 'win32') {
@@ -95,8 +79,8 @@ const killProcessTree = (pid) => new Promise((resolve) => {
   killer.on('exit', resolve);
 });
 
-const concurrency = parseConcurrency();
-const shardTimeoutMs = parseShardTimeoutMs();
+const concurrency = resolveTestCiConcurrency({ raw: process.env.TEST_CI_CONCURRENCY });
+const shardTimeoutMs = resolveTestCiShardTimeoutMs(process.env.TEST_CI_SHARD_TIMEOUT_MS);
 const pending = [...shardNames];
 const failures = [];
 let running = 0;

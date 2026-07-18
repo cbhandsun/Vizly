@@ -20,7 +20,7 @@ export interface UseDesignerEventHandlersProps {
     undo: any;
     redo: any;
     reactFlowInstance: any;
-    reactFlowWrapper: React.RefObject<HTMLDivElement>;
+    reactFlowWrapper: React.RefObject<HTMLDivElement | null>;
     isDragging: boolean;
     pluginCtx: any;
     activePlugin: any;

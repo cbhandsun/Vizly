@@ -186,6 +186,7 @@ export interface PostProcessContext {
         globalChannelType?: 'horizontal' | 'vertical';
         bidirectionalChannel?: number;     // [FIX Phase 2] Bidirectional pair channel (0/1)
         bidirectionalSpacing?: number;     // [FIX Phase 2] Spacing for bidirectional pairs
+        bidirectionalCount?: number;
         strategy?: string;
         peerGroupSize?: number;
         hasSharedTrunk?: boolean;
@@ -399,7 +400,7 @@ export class PathPostProcessor {
         // Phase 3b: Bidirectional Direct Offset
         // 对双向边的中间路径点直接做硬偏移，绕过 nudgeSegments 的安全裁剪。
         if (metadata.bidirectionalChannel !== undefined && metadata.bidirectionalSpacing) {
-            const biCount = (metadata as any).bidirectionalCount ?? 2;
+            const biCount = metadata.bidirectionalCount ?? 2;
             const biOffset = (metadata.bidirectionalChannel - (biCount - 1) / 2) * metadata.bidirectionalSpacing;
 
             if (Math.abs(biOffset) > 0.5) {

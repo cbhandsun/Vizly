@@ -1,7 +1,7 @@
 import React from 'react';
 import { ConnectionMode, Node, SelectionMode } from '@xyflow/react';
 
-import { LiveCursors } from '../../../components/diagrams/collaboration/LiveCursors';
+import { LiveCursors } from './collaboration/LiveCursors';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { LayoutStabilityContext } from '../../context/LayoutStabilityContext';
 import { PluginContext } from '../../types/plugin';
@@ -25,8 +25,6 @@ import { RemoteCursors } from './ui/RemoteCursors';
 import { UnifiedDesignerShell } from './UnifiedDesignerShell';
 import { generateSlides } from '../../hooks/usePresentationSlides';
 import { persistFlowchartOnboardingDismissed } from './flowchartOnboardingStorage';
-
-const VersionHistoryPanel = React.lazy(() => import('../../../components/diagrams/ui/VersionHistoryPanel').then(m => ({ default: m.VersionHistoryPanel })));
 
 export type FlowchartDesignerViewModel = Record<string, any>;
 
@@ -204,6 +202,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         renderAIConfigModal,
         renderShareDialog,
         renderThemeSelector,
+        renderVersionHistoryPanel,
         reorderLayers,
         rightSidebarWidth,
         saveState,
@@ -714,17 +713,11 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                         renderAIConfigModal={renderAIConfigModal}
                         renderShareDialog={renderShareDialog}
                     />
-                    {isVersionHistoryOpen && (
-                        <React.Suspense fallback={null}>
-                            <VersionHistoryPanel
-                                diagramId={id || 'default-diagram'}
-                                isOpen={isVersionHistoryOpen}
-                                onClose={() => {
-                                    if (onVersionHistoryClose) onVersionHistoryClose();
-                                }}
-                            />
-                        </React.Suspense>
-                    )}
+                    {isVersionHistoryOpen && renderVersionHistoryPanel?.({
+                        diagramId: id || 'default-diagram',
+                        isOpen: true,
+                        onClose: () => onVersionHistoryClose?.(),
+                    })}
 
                     <LaserPointer active={presentationActive && laserEnabled} />
 
