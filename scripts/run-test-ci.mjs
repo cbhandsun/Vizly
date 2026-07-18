@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 
 import {
+  rankSlowestTestCiShards,
   resolveTestCiConcurrency,
   resolveTestCiShardTimeoutMs,
 } from './lib/test-ci-runner-policy.mjs';
@@ -83,6 +84,7 @@ const concurrency = resolveTestCiConcurrency({ raw: process.env.TEST_CI_CONCURRE
 const shardTimeoutMs = resolveTestCiShardTimeoutMs(process.env.TEST_CI_SHARD_TIMEOUT_MS);
 const pending = [...shardNames];
 const failures = [];
+const results = [];
 let running = 0;
 let completed = 0;
 
@@ -102,7 +104,10 @@ const runShard = (name) => new Promise((resolve) => {
       windowsHide: true,
     });
   } catch (error) {
+    const durationMs = Date.now() - startedAt;
+    results.push({ name, durationMs });
     failures.push({ name, error });
+    log(`[${name}] failed in ${Math.round(durationMs / 100) / 10}s (${error.message})`);
     resolve();
     return;
   }
@@ -114,7 +119,9 @@ const runShard = (name) => new Promise((resolve) => {
     settled = true;
     clearTimeout(timeout);
 
-    const seconds = Math.round((Date.now() - startedAt) / 100) / 10;
+    const durationMs = Date.now() - startedAt;
+    const seconds = Math.round(durationMs / 100) / 10;
+    results.push({ name, durationMs });
     if (error) {
       failures.push({ name, error });
       log(`[${name}] failed in ${seconds}s (${error.message})`);
@@ -167,7 +174,18 @@ const schedule = async () => {
 };
 
 log(`Running ${shardNames.length} test:ci shards with concurrency ${concurrency}, shard timeout ${shardTimeoutMs}ms.`);
+const suiteStartedAt = Date.now();
 await schedule();
+
+const suiteSeconds = Math.round((Date.now() - suiteStartedAt) / 100) / 10;
+const slowestShards = rankSlowestTestCiShards(results, Math.min(5, results.length));
+log(`\nCompleted ${completed} test:ci shards in ${suiteSeconds}s.`);
+if (slowestShards.length > 0) {
+  log('Slowest test:ci shards:');
+  for (const { name, durationMs } of slowestShards) {
+    log(`- ${name}: ${Math.round(durationMs / 100) / 10}s`);
+  }
+}
 
 if (failures.length > 0) {
   console.error(`\n${failures.length} test:ci shard${failures.length === 1 ? '' : 's'} failed:`);

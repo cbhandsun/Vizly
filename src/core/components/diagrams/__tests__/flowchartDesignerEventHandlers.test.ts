@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import type { Node } from '@xyflow/react';
 

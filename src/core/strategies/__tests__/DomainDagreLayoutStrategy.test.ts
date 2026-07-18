@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it, vi } from 'vitest';
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import { LayoutType } from '../../types/layout';

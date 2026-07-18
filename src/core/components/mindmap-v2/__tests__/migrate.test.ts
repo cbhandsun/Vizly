@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NodeObj } from 'mind-elixir';
 import { downloadText, markdownToNodeObj, migrateV1ToV2, nodeObjToFlowchartJson, nodeObjToMarkdown, nodeObjToOpml, opmlToNodeObj } from '../migrate';

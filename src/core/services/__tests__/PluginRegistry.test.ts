@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PluginRegistry } from '../PluginRegistry';
 import type { DiagramTypePlugin, PluginContext } from '../../types';

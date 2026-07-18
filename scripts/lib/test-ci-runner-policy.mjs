@@ -20,3 +20,13 @@ export const resolveTestCiShardTimeoutMs = (raw) => {
   if (raw === undefined || raw === '') return 900_000;
   return parsePositiveInteger(raw, 'TEST_CI_SHARD_TIMEOUT_MS');
 };
+
+export const rankSlowestTestCiShards = (results, limit = 5) => {
+  const normalizedLimit = parsePositiveInteger(limit, 'test:ci slow-shard limit');
+  return results
+    .filter(({ durationMs }) => Number.isFinite(durationMs) && durationMs >= 0)
+    .toSorted((left, right) => (
+      right.durationMs - left.durationMs || left.name.localeCompare(right.name)
+    ))
+    .slice(0, normalizedLimit);
+};

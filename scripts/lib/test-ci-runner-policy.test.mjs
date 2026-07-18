@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  rankSlowestTestCiShards,
   resolveTestCiConcurrency,
   resolveTestCiShardTimeoutMs,
 } from './test-ci-runner-policy.mjs';
@@ -22,5 +23,17 @@ describe('test:ci runner policy', () => {
       expect(() => resolveTestCiConcurrency({ raw })).toThrow(/Invalid TEST_CI_CONCURRENCY/);
       expect(() => resolveTestCiShardTimeoutMs(raw)).toThrow(/Invalid TEST_CI_SHARD_TIMEOUT_MS/);
     }
+  });
+
+  it('ranks valid shard timings deterministically and applies the report limit', () => {
+    expect(rankSlowestTestCiShards([
+      { name: 'fast', durationMs: 10 },
+      { name: 'slow-b', durationMs: 30 },
+      { name: 'slow-a', durationMs: 30 },
+      { name: 'invalid', durationMs: Number.NaN },
+    ], 2)).toEqual([
+      { name: 'slow-a', durationMs: 30 },
+      { name: 'slow-b', durationMs: 30 },
+    ]);
   });
 });
