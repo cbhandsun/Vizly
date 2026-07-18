@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     AI_PROVIDER_REQUEST_BODY_MAX_CHARS,

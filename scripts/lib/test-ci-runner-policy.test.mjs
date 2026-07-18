@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isRetryableTestCiInfrastructureFailure,
   rankSlowestTestCiShards,
   resolveTestCiConcurrency,
+  resolveTestCiShardRetries,
   resolveTestCiShardTimeoutMs,
 } from './test-ci-runner-policy.mjs';
 
@@ -16,12 +18,18 @@ describe('test:ci runner policy', () => {
     expect(resolveTestCiConcurrency({ raw: '3', platform: 'win32' })).toBe(3);
     expect(resolveTestCiShardTimeoutMs('120000')).toBe(120_000);
     expect(resolveTestCiShardTimeoutMs()).toBe(900_000);
+    expect(resolveTestCiShardRetries()).toBe(1);
+    expect(resolveTestCiShardRetries('0')).toBe(0);
+    expect(resolveTestCiShardRetries('2')).toBe(2);
   });
 
   it('rejects empty, negative, fractional, and non-numeric overrides', () => {
     for (const raw of ['0', '-1', '1.5', 'NaN']) {
       expect(() => resolveTestCiConcurrency({ raw })).toThrow(/Invalid TEST_CI_CONCURRENCY/);
       expect(() => resolveTestCiShardTimeoutMs(raw)).toThrow(/Invalid TEST_CI_SHARD_TIMEOUT_MS/);
+    }
+    for (const raw of ['-1', '1.5', 'NaN']) {
+      expect(() => resolveTestCiShardRetries(raw)).toThrow(/Invalid TEST_CI_SHARD_RETRIES/);
     }
   });
 
@@ -30,10 +38,20 @@ describe('test:ci runner policy', () => {
       { name: 'fast', durationMs: 10 },
       { name: 'slow-b', durationMs: 30 },
       { name: 'slow-a', durationMs: 30 },
+      { name: 'fast', durationMs: 25 },
       { name: 'invalid', durationMs: Number.NaN },
     ], 2)).toEqual([
+      { name: 'fast', durationMs: 35 },
       { name: 'slow-a', durationMs: 30 },
-      { name: 'slow-b', durationMs: 30 },
     ]);
+  });
+
+  it('retries only Vitest worker startup timeouts', () => {
+    expect(isRetryableTestCiInfrastructureFailure(
+      '[vitest-pool]: Failed to start threads worker. Timeout waiting for worker to respond',
+    )).toBe(true);
+    expect(isRetryableTestCiInfrastructureFailure(
+      'AssertionError: expected 1 to be 2',
+    )).toBe(false);
   });
 });

@@ -1,8 +1,10 @@
 import { spawn } from 'node:child_process';
 
 import {
+  isRetryableTestCiInfrastructureFailure,
   rankSlowestTestCiShards,
   resolveTestCiConcurrency,
+  resolveTestCiShardRetries,
   resolveTestCiShardTimeoutMs,
 } from './lib/test-ci-runner-policy.mjs';
 
@@ -82,11 +84,11 @@ const killProcessTree = (pid) => new Promise((resolve) => {
 
 const concurrency = resolveTestCiConcurrency({ raw: process.env.TEST_CI_CONCURRENCY });
 const shardTimeoutMs = resolveTestCiShardTimeoutMs(process.env.TEST_CI_SHARD_TIMEOUT_MS);
+const shardRetries = resolveTestCiShardRetries(process.env.TEST_CI_SHARD_RETRIES);
 const pending = [...shardNames];
 const failures = [];
 const results = [];
 let running = 0;
-let completed = 0;
 
 const log = (message) => {
   process.stdout.write(`${message}\n`);
@@ -94,13 +96,18 @@ const log = (message) => {
 
 const runShard = (name) => new Promise((resolve) => {
   const startedAt = Date.now();
+  let outputTail = '';
+  const captureOutput = (chunk, target) => {
+    target.write(chunk);
+    outputTail = `${outputTail}${chunk.toString('utf8')}`.slice(-64 * 1024);
+  };
   log(`\n[${name}] starting`);
   const { command, args } = commandForScript(name);
   let child;
   try {
     child = spawn(command, args, {
       env: process.env,
-      stdio: 'inherit',
+      stdio: ['inherit', 'pipe', 'pipe'],
       windowsHide: true,
     });
   } catch (error) {
@@ -111,6 +118,9 @@ const runShard = (name) => new Promise((resolve) => {
     resolve();
     return;
   }
+
+  child.stdout?.on('data', (chunk) => captureOutput(chunk, process.stdout));
+  child.stderr?.on('data', (chunk) => captureOutput(chunk, process.stderr));
 
   let settled = false;
   let timedOut = false;
@@ -131,8 +141,9 @@ const runShard = (name) => new Promise((resolve) => {
     } else if (code === 0) {
       log(`[${name}] passed in ${seconds}s`);
     } else {
-      failures.push({ name, code, signal });
-      log(`[${name}] failed in ${seconds}s${signal ? ` (${signal})` : ''}`);
+      const retryable = isRetryableTestCiInfrastructureFailure(outputTail);
+      failures.push({ name, code, signal, retryable });
+      log(`[${name}] failed in ${seconds}s${signal ? ` (${signal})` : ''}${retryable ? ' (retryable worker startup timeout)' : ''}`);
     }
     resolve();
   };
@@ -164,7 +175,6 @@ const schedule = async () => {
     running += 1;
     runShard(name).finally(() => {
       running -= 1;
-      completed += 1;
     });
   }
 
@@ -173,13 +183,28 @@ const schedule = async () => {
   }
 };
 
-log(`Running ${shardNames.length} test:ci shards with concurrency ${concurrency}, shard timeout ${shardTimeoutMs}ms.`);
+log(`Running ${shardNames.length} test:ci shards with concurrency ${concurrency}, shard timeout ${shardTimeoutMs}ms, infrastructure retries ${shardRetries}.`);
 const suiteStartedAt = Date.now();
 await schedule();
 
+let retryAttempts = 0;
+for (let retry = 1; retry <= shardRetries; retry += 1) {
+  const retryNames = [...new Set(
+    failures.filter(({ retryable }) => retryable).map(({ name }) => name),
+  )];
+  if (retryNames.length === 0) break;
+
+  const retainedFailures = failures.filter(({ retryable }) => !retryable);
+  failures.splice(0, failures.length, ...retainedFailures);
+  pending.push(...retryNames);
+  retryAttempts += retryNames.length;
+  log(`\nRetrying ${retryNames.length} shard${retryNames.length === 1 ? '' : 's'} after Vitest worker startup timeout (${retry}/${shardRetries}).`);
+  await schedule();
+}
+
 const suiteSeconds = Math.round((Date.now() - suiteStartedAt) / 100) / 10;
 const slowestShards = rankSlowestTestCiShards(results, Math.min(5, results.length));
-log(`\nCompleted ${completed} test:ci shards in ${suiteSeconds}s.`);
+log(`\nCompleted ${shardNames.length} test:ci shards in ${suiteSeconds}s${retryAttempts > 0 ? ` with ${retryAttempts} infrastructure retry attempt${retryAttempts === 1 ? '' : 's'}` : ''}.`);
 if (slowestShards.length > 0) {
   log('Slowest test:ci shards:');
   for (const { name, durationMs } of slowestShards) {
@@ -200,4 +225,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-log(`\nAll ${completed} test:ci shards passed.`);
+log(`\nAll ${shardNames.length} test:ci shards passed.`);

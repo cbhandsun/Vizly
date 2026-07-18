@@ -6,6 +6,14 @@ const parsePositiveInteger = (raw, name) => {
   return value;
 };
 
+const parseNonNegativeInteger = (raw, name) => {
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`Invalid ${name} value: ${raw}`);
+  }
+  return value;
+};
+
 export const resolveTestCiConcurrency = ({ raw, platform = process.platform } = {}) => {
   if (raw === undefined || raw === '') {
     // On Windows, parallel Vitest processes contend while each process also
@@ -21,10 +29,25 @@ export const resolveTestCiShardTimeoutMs = (raw) => {
   return parsePositiveInteger(raw, 'TEST_CI_SHARD_TIMEOUT_MS');
 };
 
+export const resolveTestCiShardRetries = (raw) => {
+  if (raw === undefined || raw === '') return 1;
+  return parseNonNegativeInteger(raw, 'TEST_CI_SHARD_RETRIES');
+};
+
+export const isRetryableTestCiInfrastructureFailure = (output) => (
+  output.includes('[vitest-pool]: Failed to start')
+  && output.includes('Timeout waiting for worker to respond')
+);
+
 export const rankSlowestTestCiShards = (results, limit = 5) => {
   const normalizedLimit = parsePositiveInteger(limit, 'test:ci slow-shard limit');
-  return results
-    .filter(({ durationMs }) => Number.isFinite(durationMs) && durationMs >= 0)
+  const durationsByName = new Map();
+  for (const { name, durationMs } of results) {
+    if (!Number.isFinite(durationMs) || durationMs < 0) continue;
+    durationsByName.set(name, (durationsByName.get(name) ?? 0) + durationMs);
+  }
+  return [...durationsByName.entries()]
+    .map(([name, durationMs]) => ({ name, durationMs }))
     .toSorted((left, right) => (
       right.durationMs - left.durationMs || left.name.localeCompare(right.name)
     ))
