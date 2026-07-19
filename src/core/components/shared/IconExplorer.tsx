@@ -3,7 +3,7 @@ import { Modal, Input, Space, Card, Empty, Pagination, Spin, Tag, Typography } f
 import { Icon } from '@iconify/react';
 import { FaSearch } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
-import { buildIconifySearchUrl, isSafeIconifyIconName, parseIconifySearchResponse } from '../../utils/iconifySecurity';
+import { isSafeIconifyIconName, searchIconifyIcons } from '../../utils/iconifySecurity';
 import { logSharedIconExplorerSearchFailure } from './iconSearchLogging';
 
 const { Text } = Typography;
@@ -40,28 +40,36 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({
   const [total, setTotal] = useState(0);
   const pageSize = 40;
 
-  const searchIcons = async (query: string, category: string | null, pageNum: number) => {
+  const searchIcons = async (
+    query: string,
+    category: string | null,
+    pageNum: number,
+    signal: AbortSignal,
+  ) => {
     setLoading(true);
     try {
       // Iconify Search API
       const start = (pageNum - 1) * pageSize;
-      const response = await fetch(
-        buildIconifySearchUrl({ query, collection: category, limit: pageSize, start })
+      const data = await searchIconifyIcons(
+        { query, collection: category, limit: pageSize, start },
+        { signal },
       );
-      const data = parseIconifySearchResponse(await response.json(), pageSize);
       setIcons(data.icons);
       setTotal(data.total);
     } catch (error) {
+      if (signal.aborted) return;
       logSharedIconExplorerSearchFailure(error);
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   };
 
   useEffect(() => {
+    const controller = new AbortController();
     if (visible) {
-      searchIcons(searchTerm, selectedCategory, page);
+      void searchIcons(searchTerm, selectedCategory, page, controller.signal);
     }
+    return () => controller.abort();
   }, [visible, searchTerm, selectedCategory, page]);
 
   const handleSearch = (value: string) => {

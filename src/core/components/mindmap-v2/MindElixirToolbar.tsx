@@ -76,6 +76,7 @@ import {
     logMindmapToolbarStatsUpdateFailure,
     logMindmapToolbarSummaryFailure,
 } from './mindmapToolbarLogging';
+import { persistMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeStorage';
 
 
 const DIRECTION_OPTIONS = [
@@ -93,8 +94,6 @@ function setExpandedAll(node: NodeObj, expanded: boolean): NodeObj {
         children: (node.children ?? []).map(c => setExpandedAll(c, expanded)),
     };
 }
-
-const THEME_KEY_LS = 'vizly_mindmap_theme';
 
 // ─── Focus mode state (module-level, shared) ─────────────────────────────────
 let _isFocused = false;
@@ -163,9 +162,7 @@ const MindElixirToolbar: React.FC = () => {
     }, [isPresenting, presentation]);
 
     // Active theme
-    const [activeThemeKey, setActiveThemeKey] = useState<string>(() => {
-        return localStorage.getItem(THEME_KEY_LS) || 'indigo';
-    });
+    const [activeThemeKey, setActiveThemeKey] = useState<string>(resolveMindMapThemeKey);
 
     // Read current direction: prefer live instance value, fall back to localStorage
     const currentDir = mind
@@ -189,7 +186,7 @@ const MindElixirToolbar: React.FC = () => {
         if (!theme) return;
         mind.changeTheme(theme);
         setActiveThemeKey(key);
-        localStorage.setItem(THEME_KEY_LS, key);
+        persistMindMapThemeKey(key);
     }, [mind]);
 
     const handleCollapseAll = useCallback(() => {

@@ -23,7 +23,7 @@ import 'mind-elixir/style.css';
 
 import { PluginContext } from '../../types/plugin';
 import { VIZLY_HYPER_THEME, VIZLY_HYPER_DARK_THEME, VIZLY_THEMES } from './theme';
-import { migrateV1ToV2, directionStringToInt, markdownToNodeObj, opmlToNodeObj } from './migrate';
+import { migrateV1ToV2, directionStringToInt, markdownToNodeObj, opmlToNodeObj, findNodeById } from './migrate';
 import { isMindMapV2 } from './types';
 import { registerMindElixirInstance, unregisterMindElixirInstance } from './mindElixirStore';
 import { MindElixirContext } from './MindElixirContext';
@@ -41,7 +41,6 @@ import MindMapMultiplayerCursors from './MindMapMultiplayerCursors';
 import { MindMapAIPanel } from './MindMapAIPanel';
 import { emitToggleOutline } from './mindmapOutlineStore';
 import { MindMapSpeakerNotes } from './MindMapSpeakerNotes';
-import { findNodeById } from './migrate';
 import { getFileSizeLimitError, MINDMAP_TEXT_IMPORT_MAX_BYTES } from '../../utils/fileImportGuards';
 import { marked } from 'marked';
 import { sanitizeMarkdownHtml, toSafeExternalUrl } from '../../utils/sanitizeHtml';
@@ -50,6 +49,7 @@ import { cleanMindMapBridgeNode, cleanMindMapChildNode } from './mindmapBridgeSe
 import { parseMindElixirClipboardNodes } from './mindmapClipboardSecurity';
 import { createSafeMindMapV2Payload } from './mindmapPersistenceSecurity';
 import { getSafeMindMapShortcutAction } from './mindmapKeyboardSecurity';
+import { persistMindMapThemeKey, readStoredMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeStorage';
 import {
     logMindmapWrapperAiBridgeFailure,
     logMindmapWrapperClipboardPayloadBlocked,
@@ -424,7 +424,7 @@ function loadData(ctx: PluginContext): MindElixirData {
             const v2 = metaNode.data.mindmapV2;
             if (isMindMapV2(v2)) {
                 // If themeKey persisted separately, sync localStorage
-                if (v2.themeKey) localStorage.setItem('vizly_mindmap_theme', v2.themeKey);
+                if (v2.themeKey) persistMindMapThemeKey(v2.themeKey);
                 return {
                     nodeData: v2.nodeData,
                     direction: persistedDir ?? (v2.direction ?? MindElixir.SIDE) as 0 | 1 | 2,
@@ -466,7 +466,7 @@ function loadData(ctx: PluginContext): MindElixirData {
 
 function saveData(ctx: PluginContext, mind: MindElixirInstance): void {
     try {
-        const themeKey = localStorage.getItem('vizly_mindmap_theme') ?? 'indigo';
+        const themeKey = resolveMindMapThemeKey();
         const v2Payload = createSafeMindMapV2Payload(mind.getData(), themeKey, MindElixir.SIDE as 0 | 1 | 2 | 3);
 
         const setNodes = (ctx as any).setNodes;
@@ -588,7 +588,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         const initialData = loadData(ctx);
 
         // Theme priority: localStorage key > isDark flag > default
-        const storedThemeKey = localStorage.getItem('vizly_mindmap_theme');
+        const storedThemeKey = readStoredMindMapThemeKey();
         const theme = storedThemeKey
             ? (VIZLY_THEMES[storedThemeKey] ?? (isDark ? VIZLY_HYPER_DARK_THEME : VIZLY_HYPER_THEME))
             : (isDark ? VIZLY_HYPER_DARK_THEME : VIZLY_HYPER_THEME);
@@ -642,7 +642,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         const mq = window.matchMedia('(prefers-color-scheme: dark)');
         const handleColorScheme = (e: MediaQueryListEvent) => {
             // 只在用户没有手动选主题时自动切换
-            const hasManualTheme = localStorage.getItem('vizly_mindmap_theme');
+            const hasManualTheme = readStoredMindMapThemeKey();
             if (hasManualTheme) return;
             mind.changeTheme(e.matches ? VIZLY_HYPER_DARK_THEME : VIZLY_HYPER_THEME);
         };

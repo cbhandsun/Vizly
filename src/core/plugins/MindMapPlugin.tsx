@@ -28,16 +28,19 @@ import { isMindMapV2 } from '../components/mindmap-v2/types';
 import { getMindElixirInstance } from '../components/mindmap-v2/mindElixirStore';
 import { VIZLY_THEMES } from '../components/mindmap-v2/theme';
 import { subscribeSearchOpen } from '../components/mindmap-v2/mindmapSearchStore';
+import {
+    isStoredApplicationThemeDark,
+    persistMindMapThemeKey,
+    resolveMindMapThemeKey,
+} from '../components/mindmap-v2/mindmapThemeStorage';
 
 // ── Theme-aware canvas wrapper ─────────────────────────────────────────────────
 // Keeps theme state at plugin level so toolbar & property panel share the same key
 const MindMapCanvas: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
-    const [themeKey] = useState<string>(() => {
-        return localStorage.getItem('vizly_mindmap_theme') || 'indigo';
-    });
+    const [themeKey] = useState<string>(resolveMindMapThemeKey);
     const isDark = themeKey === 'dark'
         || document.documentElement.classList.contains('dark')
-        || localStorage.getItem('vizly-theme') === 'dark';
+        || isStoredApplicationThemeDark();
 
     const [searchOpen, setSearchOpen] = useState(false);
 
@@ -90,16 +93,14 @@ const MindMapCanvas: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
 
 // ── Property Panel wrapper (stateful theme) ────────────────────────────────────
 const PropertyPanelWrapper: React.FC = () => {
-    const [themeKey, setThemeKey] = useState<string>(() => {
-        return localStorage.getItem('vizly_mindmap_theme') || 'indigo';
-    });
+    const [themeKey, setThemeKey] = useState<string>(resolveMindMapThemeKey);
 
     const handleThemeChange = (key: string) => {
         const mind = getMindElixirInstance();
         const theme = VIZLY_THEMES[key];
         if (mind && theme) {
             mind.changeTheme(theme);
-            localStorage.setItem('vizly_mindmap_theme', key);
+            persistMindMapThemeKey(key);
             setThemeKey(key);
         }
     };

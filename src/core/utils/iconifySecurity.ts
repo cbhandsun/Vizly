@@ -1,9 +1,26 @@
+import { fetchWithTimeout, readResponseJsonWithLimit } from './boundedResponse';
+
 const ICONIFY_SEARCH_ENDPOINT = 'https://api.iconify.design/search';
 const ICONIFY_SVG_ENDPOINT = 'https://api.iconify.design';
 const MAX_ICONIFY_QUERY_LENGTH = 80;
 const MAX_ICONIFY_RESULTS = 100;
 const ICONIFY_ID_PATTERN = /^[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*$/i;
 const ICONIFY_COLLECTION_PATTERN = /^[a-z0-9][a-z0-9-]*$/i;
+const ICONIFY_REQUEST_TIMEOUT_MS = 10_000;
+const MAX_ICONIFY_RESPONSE_CHARS = 256 * 1024;
+
+export interface IconifySearchOptions {
+    query: unknown;
+    collection?: unknown;
+    limit?: number;
+    start?: number;
+}
+
+export interface IconifyRequestOptions {
+    signal?: AbortSignal;
+    timeoutMs?: number;
+    fetchImplementation?: typeof fetch;
+}
 
 export const normalizeIconifyQuery = (query: unknown, fallback = 'cloud'): string => {
     if (typeof query !== 'string') return fallback;
@@ -19,12 +36,7 @@ export const isSafeIconifyIconName = (iconName: unknown): iconName is string => 
     return typeof iconName === 'string' && ICONIFY_ID_PATTERN.test(iconName) && iconName.length <= 128;
 };
 
-export const buildIconifySearchUrl = (options: {
-    query: unknown;
-    collection?: unknown;
-    limit?: number;
-    start?: number;
-}): string => {
+export const buildIconifySearchUrl = (options: IconifySearchOptions): string => {
     const url = new URL(ICONIFY_SEARCH_ENDPOINT);
     url.searchParams.set('query', normalizeIconifyQuery(options.query));
 
@@ -60,6 +72,25 @@ export const parseIconifySearchResponse = (value: unknown, maxResults = MAX_ICON
         : icons.length;
 
     return { icons, total };
+};
+
+export const searchIconifyIcons = async (
+    options: IconifySearchOptions,
+    {
+        signal,
+        timeoutMs = ICONIFY_REQUEST_TIMEOUT_MS,
+        fetchImplementation,
+    }: IconifyRequestOptions = {},
+): Promise<{ icons: string[]; total: number }> => {
+    const response = await fetchWithTimeout(buildIconifySearchUrl(options), {
+        timeoutMs,
+        signal,
+        fetchImplementation,
+        headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) throw new Error(`Iconify request failed (${response.status}).`);
+    const parsed = await readResponseJsonWithLimit(response, MAX_ICONIFY_RESPONSE_CHARS);
+    return parseIconifySearchResponse(parsed, options.limit);
 };
 
 export const buildIconifySvgUrl = (iconName: unknown): string | null => {

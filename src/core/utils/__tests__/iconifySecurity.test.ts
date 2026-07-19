@@ -5,6 +5,7 @@ import {
     isSafeIconifyIconName,
     normalizeIconifyQuery,
     parseIconifySearchResponse,
+    searchIconifyIcons,
 } from '../iconifySecurity';
 
 describe('iconifySecurity', () => {
@@ -50,5 +51,28 @@ describe('iconifySecurity', () => {
         expect(buildIconifySvgUrl('logos:aws-lambda'))
             .toBe('https://api.iconify.design/logos:aws-lambda.svg');
         expect(buildIconifySvgUrl('logos:aws/lambda')).toBeNull();
+    });
+
+    it('fetches, bounds, and validates Iconify search responses', async () => {
+        const result = await searchIconifyIcons(
+            { query: 'cloud', limit: 2 },
+            {
+                fetchImplementation: async () => new Response(JSON.stringify({
+                    total: 50_000,
+                    icons: ['mdi:cloud', 'javascript:alert(1)', 'logos:aws'],
+                }), { status: 200 }),
+            },
+        );
+        expect(result).toEqual({ icons: ['mdi:cloud', 'logos:aws'], total: 10_000 });
+
+        await expect(searchIconifyIcons(
+            { query: 'cloud' },
+            { fetchImplementation: async () => new Response('{}', { status: 503 }) },
+        )).rejects.toThrow('Iconify request failed (503)');
+
+        await expect(searchIconifyIcons(
+            { query: 'cloud' },
+            { fetchImplementation: async () => new Response('x'.repeat(300 * 1024)) },
+        )).rejects.toThrow('exceeded');
     });
 });
