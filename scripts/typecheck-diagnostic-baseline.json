@@ -130,20 +130,6 @@
       },
       {
         "category": "error",
-        "file": "src/components/ai/AIConfigModal.tsx",
-        "code": 2724,
-        "messageHash": "1057e3c039aa9faa65ae683dab45d0a22037dd31f73f54e2e898d4b246360d53",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/ai/AIConfigModal.tsx",
-        "code": 2724,
-        "messageHash": "3ca9b662237610e76cd1d804c2eed374196228902e696fe29367a23046014394",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/components/ai/aiConfigStorage.ts",
         "code": 2339,
         "messageHash": "943bb70b25984ae19be3685c6ed36272ce1c8dd8b68eb42245f6843155d7d062",

@@ -14,9 +14,7 @@ import Checkbox from 'antd/es/checkbox';
 import {
     PlusOutlined,
     DeleteOutlined,
-    _RobotOutlined,
     RocketOutlined,
-    _GlobalOutlined,
     SettingOutlined,
     CheckCircleFilled,
     AppstoreOutlined,
@@ -48,6 +46,7 @@ import {
     logAIConfigModalCloudLoadFailure,
     logAIConfigRequestFailure,
 } from './aiLogging';
+import { filterAIModels, filterAIProviders, groupAIModels } from './aiConfigModelCollections';
 
 const { Text, Title, Paragraph } = Typography;
 const loadStorageService = async () => (await import('@/services/SupabaseStorage')).storageService;
@@ -246,20 +245,11 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     const selectedProvider = config.providers.find(p => p.id === selectedProviderId);
 
     // Derived state for rendering
-    const filteredProviders = config.providers.filter(p =>
-        p.name.toLowerCase().includes(searchText.toLowerCase())
-    );
+    const filteredProviders = filterAIProviders(config.providers, searchText);
 
     // Group models by 'group' field
     const groupedModels = useMemo(() => {
-        if (!selectedProvider) return {};
-        const groups: Record<string, AIModel[]> = {};
-        selectedProvider.models.forEach(m => {
-            const key = m.group || 'Other';
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(m);
-        });
-        return groups;
+        return groupAIModels(selectedProvider?.models ?? []);
     }, [selectedProvider]);
 
     // --- Test Connection ---
@@ -332,20 +322,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
         }
     };
 
-    const filteredDiscoveredModels = discoveredModels.filter(m => 
-        m.id.toLowerCase().includes(discoverySearchText.toLowerCase()) || 
-        m.name.toLowerCase().includes(discoverySearchText.toLowerCase())
-    );
-
     const groupedDiscoveredModels = useMemo(() => {
-        const groups: Record<string, AIModel[]> = {};
-        filteredDiscoveredModels.forEach(m => {
-            const key = m.group || 'Other';
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(m);
-        });
-        return groups;
-    }, [filteredDiscoveredModels]);
+        return groupAIModels(filterAIModels(discoveredModels, discoverySearchText));
+    }, [discoveredModels, discoverySearchText]);
 
     const handleFetchModels = async (provider: AIProviderConfig) => {
         if (!provider.baseUrl) {
