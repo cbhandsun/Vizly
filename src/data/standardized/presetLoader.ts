@@ -1,8 +1,31 @@
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
+import { coerceToStandardDiagramData } from '@/core/utils/coerceDiagram';
 import { resolvePresetKey, type StandardPresetKey } from './presetMetadata';
 
-type PresetModule = { default: StandardDiagramData };
-type PresetLoader = () => Promise<PresetModule>;
+type PresetLoader = () => Promise<unknown>;
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  typeof value === 'object' && value !== null
+);
+
+export const parseStandardPresetModule = (
+  moduleValue: unknown,
+  key: StandardPresetKey,
+): StandardDiagramData => {
+  const raw = isRecord(moduleValue) && 'default' in moduleValue
+    ? moduleValue.default
+    : moduleValue;
+  if (
+    !isRecord(raw)
+    || typeof raw.id !== 'string'
+    || raw.id.trim() === ''
+    || !Array.isArray(raw.nodes)
+    || !Array.isArray(raw.edges)
+  ) {
+    throw new Error(`Invalid standard preset module: ${key}`);
+  }
+  return coerceToStandardDiagramData(raw, { id: key, title: key });
+};
 
 const PRESET_LOADERS: Record<StandardPresetKey, PresetLoader> = {
   ArchitectureStandardData: () => import('./ArchitectureStandardData.json'),
@@ -29,8 +52,8 @@ export const loadStandardPresetById = (id?: string): Promise<StandardDiagramData
 
   let cached = presetPromises.get(key);
   if (!cached) {
-    cached = loader().then((mod) => (
-      mod.default ?? (mod as unknown as StandardDiagramData)
+    cached = loader().then((moduleValue) => (
+      parseStandardPresetModule(moduleValue, key)
     )).catch((error) => {
       presetPromises.delete(key);
       throw error;
