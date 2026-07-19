@@ -47,9 +47,7 @@ import {
     logDiagramViewerStandardDataLayoutFallbackFailure,
     logDiagramViewerSwitchConfirmationFailure,
 } from './diagramViewerLogging';
-import {
-    clearBlankTemplateLocalState,
-} from './diagramViewerStorage';
+import { clearBlankTemplateLocalState } from './diagramViewerStorage';
 const CloudStorageManagerModal = React.lazy(() => import('./storage/CloudStorageManagerModal').then(m => ({ default: m.CloudStorageManagerModal })));
 const MermaidImportModal = React.lazy(() => import('./ui/MermaidImportModal').then(m => ({ default: m.MermaidImportModal })));
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
@@ -111,6 +109,11 @@ import {
 
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { appModal } from '@/core/utils/antdStaticBridge';
+import {
+    coerceRemoteDiagramSelection,
+    selectDiagramViewerTemplate,
+    type DiagramViewerTemplateData,
+} from './diagramViewerTemplateSelection';
 
 const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
 const loadLayoutPresetMap = () => import('@/data/standardized').then(({ PRESET_MAP }) => PRESET_MAP);
@@ -747,6 +750,47 @@ const DiagramViewer: React.FC = () => {
         return true;
     }, [hasFeature, showUpgradeModal, t]);
 
+    const handleTemplateChange = useCallback(async (_value: string[], leafKey: string, rootGroup: string) => {
+        await selectDiagramViewerTemplate(leafKey, rootGroup, {
+            loadRemoteDiagram: async (providerName, id) => {
+                const { unifiedStorage } = await import('@/services/UnifiedStorageService');
+                const savedDiagram = await unifiedStorage.getProvider(providerName).loadDiagram(id);
+                return coerceRemoteDiagramSelection(savedDiagram, id);
+            },
+            loadSystemTemplate: async (id) => {
+                const { supabase } = await import('@/services/supabase');
+                if (!supabase) return null;
+                const { data, error } = await supabase
+                    .from('system_templates')
+                    .select('content, title, id')
+                    .eq('id', id)
+                    .single();
+                if (error) throw error;
+                return coerceRemoteDiagramSelection(data, id);
+            },
+            loadStandardPreset: async (id) => {
+                const { PRESET_MAP } = await import('@/data/standardized');
+                return (PRESET_MAP[id] ?? null) as unknown as DiagramViewerTemplateData | null;
+            },
+            getLocalPreset: (id) => getCustomPreset(id) as unknown as DiagramViewerTemplateData | null,
+            parseRemoteContent: (content, fallback) => parseRemoteDiagramContent(
+                typeof content === 'string' ? content : JSON.stringify(content),
+                { id: fallback.id, title: fallback.title ?? fallback.id },
+            ) as unknown as DiagramViewerTemplateData,
+            seedAndNavigate: seedAutoSaveAndNavigate,
+            clearBlankTemplate: (id) => clearBlankTemplateLocalState(localStorage, id),
+            selectDiagram: handleSelectDiagram,
+            showLoading: (message) => appMessage.loading(message, 0),
+            showError: (message) => appMessage.error(message),
+            logFailure: logDiagramViewerRemoteLoadFailure,
+            translate: (key, values) => {
+                if (key === 'storage.manager.downloading') return t('storage.manager.downloading');
+                if (key === 'storage.manager.noContent') return t('storage.manager.noContent');
+                return t('diagramViewer.cloudLoad.error', { message: values?.message ?? '' });
+            },
+        });
+    }, [handleSelectDiagram, seedAutoSaveAndNavigate, t]);
+
     const commandItems: CommandItem[] = useMemo(() => {
         const modifierLabel = getDiagramViewerCommandModifierLabel({
             platform: typeof navigator !== 'undefined' ? navigator.platform || '' : '',
@@ -805,97 +849,7 @@ const DiagramViewer: React.FC = () => {
                             <div className="flex items-center max-w-[240px]">
                                 <TemplateCascaderMenu
                                     style={{ width: '100%', minWidth: 160 }}
-                                    onChange={async (val, leafKey, rootGroup) => {
-                                        if (!leafKey) return;
-
-                                        if (rootGroup === 's3' || rootGroup === 'cloud' || rootGroup === 'supabase') {
-                                            const providerName = rootGroup === 's3' ? 's3' : 'supabase';
-                                            const messageKey = appMessage.loading(t('storage.manager.downloading'), 0);
-                                            try {
-                                                const { unifiedStorage } = await import('@/services/UnifiedStorageService');
-                                                const provider = unifiedStorage.getProvider(providerName);
-                                                const savedDiagram = await provider.loadDiagram(leafKey);
-                                                if (savedDiagram && savedDiagram.content) {
-                                                    const parsedContent = parseRemoteDiagramContent(savedDiagram.content, {
-                                                        id: savedDiagram.id,
-                                                        title: savedDiagram.title,
-                                                    });
-                                                    const normalized = {
-                                                        ...parsedContent,
-                                                        id: savedDiagram.id,
-                                                        name: savedDiagram.title || parsedContent.name,
-                                                        metadata: {
-                                                            ...(parsedContent.metadata || {}),
-                                                            title: savedDiagram.title,
-                                                            cloud: { provider: providerName, id: savedDiagram.id, title: savedDiagram.title }
-                                                        }
-                                                    };
-                                                    seedAutoSaveAndNavigate(normalized, savedDiagram.id);
-                                                } else {
-                                                    appMessage.error(t('storage.manager.noContent'));
-                                                }
-                                            } catch (e: any) {
-                                                logDiagramViewerRemoteLoadFailure(providerName, String(leafKey), e);
-                                                appMessage.error(t('diagramViewer.cloudLoad.error', { message: e.message }));
-                                            } finally {
-                                                messageKey();
-                                            }
-                                        } else if (rootGroup === 'system-templates') {
-                                            const messageKey = appMessage.loading('正在加载云端模板...', 0);
-                                            try {
-                                                const { supabase } = await import('@/services/supabase');
-                                                if (supabase) {
-                                                    const { data, error } = await supabase.from('system_templates').select('content, title, id').eq('id', leafKey).single();
-                                                    if (!error && data && data.content) {
-                                                        const parsedContent = parseRemoteDiagramContent(data.content, { id: data.id, title: data.title });
-                                                        const baseData = {
-                                                            ...parsedContent,
-                                                            id: data.id,
-                                                            name: data.title || parsedContent.name,
-                                                            metadata: {
-                                                                ...(parsedContent.metadata || {}),
-                                                                title: data.title
-                                                            }
-                                                        };
-                                                        const normalized = baseData;
-                                                        seedAutoSaveAndNavigate(normalized, data.id);
-                                                    } else {
-                                                        appMessage.error('模板内容为空');
-                                                    }
-                                                }
-                                            } catch (e: any) {
-                                                logDiagramViewerRemoteLoadFailure('system-templates', String(leafKey), e);
-                                                appMessage.error(`加载失败: ${e.message}`);
-                                            } finally {
-                                                messageKey();
-                                            }
-                                        } else {
-                                            if (rootGroup === 'local-workspace') {
-                                                const found = getCustomPreset(leafKey);
-                                                if (found) {
-                                                    const trueId = found.id || leafKey;
-                                                    seedAutoSaveAndNavigate(found, trueId);
-                                                    return;
-                                                }
-                                            }
-                                            
-                                            const { PRESET_MAP } = await import('@/data/standardized');
-                                            const preset = PRESET_MAP[leafKey];
-                                            if (preset) {
-                                                const trueId = preset.id || leafKey;
-                                                seedAutoSaveAndNavigate({
-                                                    ...preset,
-                                                    id: trueId,
-                                                    metadata: { ...preset.metadata, title: preset.name }
-                                                }, trueId);
-                                            } else {
-                                                // If there's no preset, this is a blank template or direct URL load via UI menu.
-                                                // We must clear any potentially poisoned autosave data before navigating to force a new blank/default canvas.
-                                                clearBlankTemplateLocalState(localStorage, leafKey);
-                                                handleSelectDiagram(leafKey);
-                                            }
-                                        }
-                                    }}
+                                    onChange={handleTemplateChange}
                                 />
                             </div>
                         </>
