@@ -11,35 +11,20 @@ import { LayeredConfigManager } from '../../config/LayeredConfigManager';
 import { parseHandlePosition } from '../../routing/utils/handleUtils';
 import { safeLog } from '../../utils/consoleCleanup';
 import type { CenteredCoords } from './hooks/useSmartPathWorker';
+import { resolveSmartEdgeHandleSelection } from './smartEdgeHandleSelection';
+import {
+    createSmartEdgeAbsolutePositionResolver,
+    type SmartEdgeNode,
+    type SmartEdgePoint,
+} from './smartEdgeNodeGeometry';
 
 // [FIX C-6] 模块级方向投票缓存：相同拓扑签名 → 复用计算结果，避免每条边重复 O(E) 计算。
 // 整个应用生命周期内 key 数量 << 20，不存在内存泄漏风险（每次签名变化 clear 一次）。
 type LayoutDirection = 'LR' | 'RL' | 'TB' | 'BT';
-type Point = { x: number; y: number };
+type Point = SmartEdgePoint;
 type DirectionBucket = 'up' | 'down' | 'left' | 'right';
 
-type SmartNodeData = Record<string, unknown> & {
-    domain?: unknown;
-    subDomain?: unknown;
-};
-
-type SmartNode = {
-    id?: string;
-    type?: string;
-    x?: number;
-    y?: number;
-    width?: number;
-    height?: number;
-    dragging?: boolean;
-    parentId?: string;
-    parentNode?: string;
-    position?: Point;
-    positionAbsolute?: Point;
-    computed?: { positionAbsolute?: Point };
-    internals?: { positionAbsolute?: Point };
-    measured?: { width?: number; height?: number };
-    data?: SmartNodeData;
-};
+type SmartNode = SmartEdgeNode;
 
 type SmartEdgeConfig = {
     bundleStrength: number;
@@ -111,7 +96,7 @@ const readHandlePair = (value: unknown): HandleFlagPair => {
     return { source: false, target: false };
 };
 
-const _directionVoteCache = new Map<string, LayoutDirection>();
+const _directionVoteCache = new Map<number, LayoutDirection>();
 
 // [P1-2] 模块级 multiEdgeInfo 缓存：
 // 原问题：每条边各自对 storeEdges 做 O(E) forEach，31 条边 = 31 次扫描。
@@ -257,31 +242,10 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
     }, [targetNodeInternal]);
 
     // 🚀 [PERF] getAbsPos 直接使用 nodeLookup Map，无需每条边重建
-    const getAbsPos = useMemo(() => {
-        const resolve = (nodeLike: SmartNode | SimpleNodeData, visited?: Set<string>): Point => {
-            const abs = nodeLike?.internals?.positionAbsolute || nodeLike?.computed?.positionAbsolute || nodeLike?.positionAbsolute;
-            if (abs) return abs;
-            const base = nodeLike?.position || { x: nodeLike?.x ?? 0, y: nodeLike?.y ?? 0 };
-            const parentId = nodeLike?.parentId || nodeLike?.parentNode;
-            if (!parentId) return base;
-            const v = visited || new Set<string>();
-            const myId = String(nodeLike?.id ?? '');
-            if (myId && v.has(myId)) return base;
-            if (myId) v.add(myId);
-            const parent = nodeLookup?.get(String(parentId)) || simpleNodeMap.get(String(parentId));
-            if (!parent) return base;
-            const pAbs = resolve(parent, v);
-            return { x: pAbs.x + (base.x ?? 0), y: pAbs.y + (base.y ?? 0) };
-        };
-
-        return (id: string): { x: number; y: number } => {
-            const live = nodeLookup?.get(String(id));
-            if (live) return resolve(live);
-            const n = simpleNodeMap.get(id);
-            if (n) return resolve(n);
-            return { x: 0, y: 0 };
-        };
-    }, [nodeLookup, simpleNodeMap]);
+    const getAbsPos = useMemo(
+        () => createSmartEdgeAbsolutePositionResolver(nodeLookup, simpleNodeMap),
+        [nodeLookup, simpleNodeMap],
+    );
 
     // Detect dragging state from live node objects
     // [FIX] Priority to _draggingNodeIds from props.data which updates in real-time during drag
@@ -294,56 +258,23 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
     // Combine with store state for robustness
     const nodesDragging = !!(isSourceDragging || isTargetDragging || sourceNode?.dragging || targetNode?.dragging);
 
-    const { sourceHandleId, targetHandleId } = useMemo(() => {
-        const rawSource = rawSourceHandleId;
-        const rawTarget = rawTargetHandleId;
-        const lowerSource = String(rawSource || '').toLowerCase();
-        const lowerTarget = String(rawTarget || '').toLowerCase();
-        const isHorizontal = (handle: string) =>
-            handle === 'left' || handle === 'right' || handle === 'l' || handle === 'r' || handle.includes('left') || handle.includes('right');
-        const manualSides = Array.isArray(edgeData.manualHandleSides)
-            ? edgeData.manualHandleSides.map((side) => String(side).toLowerCase())
-            : [];
-        if (!manualSides.includes('source') || !manualSides.includes('target')) {
-            return { sourceHandleId: rawSource, targetHandleId: rawTarget };
-        }
-        if (!isHorizontal(lowerSource) || !isHorizontal(lowerTarget)) {
-            return { sourceHandleId: rawSource, targetHandleId: rawTarget };
-        }
-
-        const sourceAbs = sourceNode?.positionAbsolute || { x: sourceX, y: sourceY };
-        const targetAbs = targetNode?.positionAbsolute || { x: targetX, y: targetY };
-        const sourceW = sourceNode?.measured?.width || sourceNode?.width || 0;
-        const sourceH = sourceNode?.measured?.height || sourceNode?.height || 0;
-        const targetW = targetNode?.measured?.width || targetNode?.width || 0;
-        const targetH = targetNode?.measured?.height || targetNode?.height || 0;
-        const dx = (targetAbs.x + targetW / 2) - (sourceAbs.x + sourceW / 2);
-        const dy = (targetAbs.y + targetH / 2) - (sourceAbs.y + sourceH / 2);
-        if (Math.abs(dx) < 80 || Math.abs(dy) <= Math.abs(dx) * 1.4) {
-            return { sourceHandleId: rawSource, targetHandleId: rawTarget };
-        }
-
-        const sourceParent = sourceNode?.parentId || sourceNode?.parentNode;
-        const targetParent = targetNode?.parentId || targetNode?.parentNode;
-        const sourceDomain = String(sourceNode?.data?.domain || '').trim();
-        const targetDomain = String(targetNode?.data?.domain || '').trim();
-        const sourceSubDomain = String(sourceNode?.data?.subDomain || '').trim();
-        const targetSubDomain = String(targetNode?.data?.subDomain || '').trim();
-        const isCrossContainerEdge = Boolean(sourceParent && targetParent && sourceParent !== targetParent)
-            || Boolean(sourceDomain && targetDomain && sourceDomain === targetDomain && sourceSubDomain && targetSubDomain && sourceSubDomain !== targetSubDomain);
-        if (!isCrossContainerEdge && Math.abs(dy) <= 480) {
-            return { sourceHandleId: rawSource, targetHandleId: rawTarget };
-        }
-
-        const isAutoSubDomainSideHandle = edgeData.inferredSubDomainHandles === true;
-        const participatesInFan = endpointFanCounts.incomingToTarget > 1 || endpointFanCounts.outgoingFromSource > 1;
-        if (isAutoSubDomainSideHandle && participatesInFan) {
-            return { sourceHandleId: rawSource, targetHandleId: rawTarget };
-        }
-
-        const outerSide = dx >= 0 ? 'right' : 'left';
-        return { sourceHandleId: outerSide, targetHandleId: outerSide };
-    }, [edgeData, rawSourceHandleId, rawTargetHandleId, sourceNode, sourceX, sourceY, targetNode, targetX, targetY, endpointFanCounts]);
+    const { sourceHandleId, targetHandleId } = useMemo(
+        () => resolveSmartEdgeHandleSelection({
+            rawSourceHandleId,
+            rawTargetHandleId,
+            manualHandleSides: edgeData.manualHandleSides,
+            inferredSubDomainHandles: edgeData.inferredSubDomainHandles,
+            sourceNode,
+            targetNode,
+            sourceX,
+            sourceY,
+            targetX,
+            targetY,
+            incomingToTarget: endpointFanCounts.incomingToTarget,
+            outgoingFromSource: endpointFanCounts.outgoingFromSource,
+        }),
+        [edgeData, rawSourceHandleId, rawTargetHandleId, sourceNode, sourceX, sourceY, targetNode, targetX, targetY, endpointFanCounts],
+    );
 
     const handleSelectionPolicy = useMemo(() => {
         const layered = (() => {

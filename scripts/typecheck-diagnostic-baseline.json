@@ -361,48 +361,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/components/custom-edges/useSmartEdgeContext.ts",
-        "code": 2339,
-        "messageHash": "4c2ffd591df4925313b04b9a52a6a3c4ea11f5fe76ab7afb605d670a9cc4c0d9",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-edges/useSmartEdgeContext.ts",
-        "code": 2339,
-        "messageHash": "4cad5037df193c1c5bf545c7006b0e82b865a5564a48458f7e25174983ce470c",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-edges/useSmartEdgeContext.ts",
-        "code": 2339,
-        "messageHash": "6afce3bf93eba802536f8a46f7eb7c401d8d976ede5f3a2c190ce24c9b3c287f",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-edges/useSmartEdgeContext.ts",
-        "code": 2339,
-        "messageHash": "92c55f5356888282622b449235dc871f27a306f0f6bc1cb0e4cc8e4d8f55e0a2",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-edges/useSmartEdgeContext.ts",
-        "code": 2339,
-        "messageHash": "9509fd570a7b1b94a8a021996753d655aade9cae978956570c160d25dfdd7690",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-edges/useSmartEdgeContext.ts",
-        "code": 2345,
-        "messageHash": "358c413d340e34b57ee8ab276ff5e4a66d63f9f53ca4d894b994ea16cb88ab37",
-        "count": 2
-      },
-      {
-        "category": "error",
         "file": "src/core/components/custom-nodes/FlowchartNode.tsx",
         "code": 2339,
         "messageHash": "59b4a4e495afb9f80ae6d96f0ac0569dc509844bcfa84670f4dee36d4eff9e2e",
