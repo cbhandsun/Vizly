@@ -5,12 +5,12 @@ import { SearchOutlined, ApartmentOutlined, CloudOutlined, DatabaseOutlined, Fol
 import { useDiagramStorage } from '../hooks/useDiagramStorage';
 import { readCustomPresetMap } from '@/core/utils/customPresetStorage';
 import {
+  buildCustomTemplateMenuLeafOptions,
+  buildTemplateMenuLeafOptions,
   GENERAL_CATEGORIES,
   coerceCascaderPath,
   getRootGroupFromPath,
   normalizeTemplateItem,
-  normalizeTemplateMenuId,
-  normalizeTemplateMenuText,
 } from './templateCascaderOptions';
 
 export interface TemplateCascaderMenuProps {
@@ -20,7 +20,7 @@ export interface TemplateCascaderMenuProps {
   placeholder?: string;
   allowClear?: boolean;
   templatesOnly?: boolean;
-  children?: React.ReactNode;
+  children?: React.ReactElement;
 }
 
 interface CascaderOption extends DefaultOptionType {
@@ -92,13 +92,7 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       options.push({
         value: 's3',
         label: <span><CloudOutlined style={{ marginRight: 8, color: '#fa8c16' }} />S3 存储</span>,
-        children: s3Diagrams
-          .map(d => {
-            const id = normalizeTemplateMenuId(d.id);
-            if (!id) return null;
-            return { value: id, label: normalizeTemplateMenuText(d.title, id) || id };
-          })
-          .filter((option): option is CascaderOption => !!option)
+        children: buildTemplateMenuLeafOptions(s3Diagrams),
       });
     }
 
@@ -107,13 +101,7 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
       options.push({
         value: 'supabase',
         label: <span><DatabaseOutlined style={{ marginRight: 8, color: '#3eaf7c' }} />个人云端图表</span>,
-        children: supabaseDiagrams
-          .map(d => {
-            const id = normalizeTemplateMenuId(d.id);
-            if (!id) return null;
-            return { value: id, label: normalizeTemplateMenuText(d.title, id) || id };
-          })
-          .filter((option): option is CascaderOption => !!option)
+        children: buildTemplateMenuLeafOptions(supabaseDiagrams),
       });
     }
 
@@ -122,13 +110,7 @@ export const TemplateCascaderMenu: React.FC<TemplateCascaderMenuProps> = ({
     try {
       customKeys = Object.keys(readCustomPresetMap());
     } catch { /* ignore */ }
-    const customOptions = customKeys
-      .map(k => {
-        const id = normalizeTemplateMenuId(k);
-        if (!id) return null;
-        return { value: `custom:${id}`, label: id };
-      })
-      .filter((option): option is CascaderOption => !!option);
+    const customOptions = buildCustomTemplateMenuLeafOptions(customKeys);
     if (customOptions.length > 0) {
       options.push({
         value: 'local-workspace',

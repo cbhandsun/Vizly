@@ -151,27 +151,6 @@
       },
       {
         "category": "error",
-        "file": "src/components/diagrams/ui/TemplateCascaderMenu.tsx",
-        "code": 2322,
-        "messageHash": "149ed2aafd86cdfd24e63f10e046b436645002e22e5645b8f5ba44f62491b541",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/diagrams/ui/TemplateCascaderMenu.tsx",
-        "code": 2322,
-        "messageHash": "23fe4b46b153e8ae11ee1633eef31285ca60f052f955b44696ed7f19c609dc75",
-        "count": 3
-      },
-      {
-        "category": "error",
-        "file": "src/components/diagrams/ui/TemplateCascaderMenu.tsx",
-        "code": 2677,
-        "messageHash": "c1ae5896dbb07bb7b073fdba3b5c0c4f9ffdcab871e31f8c20234ee48066b2a1",
-        "count": 3
-      },
-      {
-        "category": "error",
         "file": "src/components/diagramViewerAiBridge.ts",
         "code": 2322,
         "messageHash": "e32b2a78399b02e6d465f00dc181e1fe571c709855fd5b96fa6835d62d51b1d0",

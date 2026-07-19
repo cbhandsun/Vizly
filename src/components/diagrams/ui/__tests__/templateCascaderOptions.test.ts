@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildCustomTemplateMenuLeafOptions,
+  buildTemplateMenuLeafOptions,
   coerceCascaderPath,
   getRootGroupFromPath,
   normalizeTemplateItem,
@@ -20,6 +22,25 @@ describe('template cascader option guards', () => {
       title: 'tmpl-1',
       category: '其他行业',
     });
+  });
+
+  it('builds cloud and local leaf options only from normalized identifiers', () => {
+    expect(buildTemplateMenuLeafOptions([
+      { id: ' remote-1 ', title: '<Remote>' },
+      { id: '', title: 'Missing id' },
+      { id: 42, title: 'Wrong type' },
+    ])).toEqual([{ value: 'remote-1', label: 'Remote' }]);
+
+    expect(buildCustomTemplateMenuLeafOptions([
+      ' local-1 ',
+      '<local-2>',
+      '',
+      null,
+    ])).toEqual([
+      { value: 'custom:local-1', label: 'local-1' },
+      { value: 'custom:local-2', label: 'local-2' },
+    ]);
+    expect(buildTemplateMenuLeafOptions([])).toEqual([]);
   });
 
   it('coerces cascader paths and only accepts known root groups', () => {
