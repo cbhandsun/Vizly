@@ -34,7 +34,7 @@ const node = (
   width,
   height,
   data: {},
-});
+} as Node & { positionAbsolute: { x: number; y: number } });
 
 describe('reduceEdgeCrossingsWithWaypoints visual soft constraints', () => {
   it('repairs strict in/out crossings even when the two edges share a node', () => {

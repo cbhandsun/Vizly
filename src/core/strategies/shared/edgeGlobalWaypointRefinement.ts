@@ -572,7 +572,8 @@ function inferEndpointSide(point: Point, rect: Rect): Side | null {
     { side: 'b', distance: Math.abs(point.y - (rect.y + rect.height)) },
     { side: 'l', distance: Math.abs(point.x - rect.x) },
     { side: 'r', distance: Math.abs(point.x - (rect.x + rect.width)) },
-  ].sort((first, second) => first.distance - second.distance);
+  ];
+  candidates.sort((first, second) => first.distance - second.distance);
   const nearest = candidates[0];
   return nearest && nearest.distance <= SIDE_TOLERANCE ? nearest.side : null;
 }
