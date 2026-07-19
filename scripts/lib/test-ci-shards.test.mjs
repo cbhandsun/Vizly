@@ -15,7 +15,7 @@ describe('test:ci shard catalog', () => {
   it('keeps every shard in exactly one non-empty CI group', () => {
     const grouped = Object.values(TEST_CI_SHARD_GROUPS).flat();
     expect(TEST_CI_GROUP_NAMES).toEqual(['foundation', 'ui', 'flow', 'core', 'routing']);
-    expect(grouped).toHaveLength(35);
+    expect(grouped).toHaveLength(36);
     expect(new Set(grouped).size).toBe(grouped.length);
     expect(TEST_CI_SHARDS).toEqual(grouped);
     expect(Object.values(TEST_CI_SHARD_GROUPS).every((shards) => shards.length > 0)).toBe(true);
