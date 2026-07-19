@@ -1432,41 +1432,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/strategies/shared/edgeDisplaySoftQualityRepair.ts",
-        "code": 2322,
-        "messageHash": "b8f6019602436716e5e24bcd72db793394afb7436e53c88d6eb91ee8388b0da8",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/strategies/shared/edgeDisplaySoftQualityRepair.ts",
-        "code": 2322,
-        "messageHash": "fdd86f8c009f88891846db52a4fc20bc2b83691af0b7ffa45cefa02368fcee8b",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/strategies/shared/edgeDisplaySoftQualityRepair.ts",
-        "code": 2339,
-        "messageHash": "4ff48c1388dd039728d6dfdc3b155c2afd8d764bbad2a2d8e1fa30db5698b0a6",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/strategies/shared/edgeDisplaySoftQualityRepair.ts",
-        "code": 2339,
-        "messageHash": "c51ecd3ba1842b0b67e14da7fe048f59dace6be7ad379956a7502349cad17ae2",
-        "count": 4
-      },
-      {
-        "category": "error",
-        "file": "src/core/strategies/shared/edgeDisplaySoftQualityRepair.ts",
-        "code": 7006,
-        "messageHash": "174a0dbe3e6c727fb635841b87f33b329a3b913c32d099e96858a88de1b822c9",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/strategies/shared/edgeFallbackPath.ts",
         "code": 2345,
         "messageHash": "87d715c9e063129be8c877758556e56e5b43a097c8bb9f117a2dda070f4d8c75",

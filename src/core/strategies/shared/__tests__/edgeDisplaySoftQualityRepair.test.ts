@@ -86,6 +86,10 @@ describe('repairDisplaySoftQualityRisks', () => {
         { x: 400, y: 30 },
       ]),
     ];
+    edges[0].data = {
+      ...edges[0].data,
+      treeRouting: { points: (edges[0].data as { computedPath: unknown }).computedPath, mode: 'tree' },
+    };
 
     const capped = repairDisplaySoftQualityRisks(edges, nodes, 'LR', {
       maxCandidatesPerEdge: 1,
@@ -103,6 +107,29 @@ describe('repairDisplaySoftQualityRisks', () => {
       pathHitsRect(repairedPath, { x: 190, y: 10, width: 80, height: 40 }),
       JSON.stringify(repairedPath),
     ).toBe(false);
+    expect((repaired[0].data as { treeRouting: { points: unknown } }).treeRouting.points).toEqual(repairedPath);
+  });
+
+  it('bounds invalid repair budgets without bypassing the default quality gate', () => {
+    const nodes: Node[] = [
+      node('source', 0, 0, 80, 60),
+      node('obstacle', 190, 10, 80, 40),
+      node('target', 400, 0, 80, 60),
+    ];
+    const edges = [edge('edge-obstacle', 'source', 'target', [
+      { x: 80, y: 30 },
+      { x: 400, y: 30 },
+    ])];
+
+    const repaired = repairDisplaySoftQualityRisks(edges, nodes, 'LR', {
+      maxEdges: Number.NaN,
+      maxCandidatesPerEdge: Number.POSITIVE_INFINITY,
+      maxQualityEvaluations: Number.NaN,
+    });
+    const disabled = repairDisplaySoftQualityRisks(edges, nodes, 'LR', { maxEdges: -1 });
+
+    expect(pathFor(repaired, 'edge-obstacle')).not.toEqual(pathFor(edges, 'edge-obstacle'));
+    expect(pathFor(disabled, 'edge-obstacle')).toEqual(pathFor(edges, 'edge-obstacle'));
   });
 });
 
