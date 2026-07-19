@@ -12,7 +12,6 @@
     "src/core/algorithms/orthogonalWaypointRefiner.ts": 1159,
     "src/core/algorithms/pathfinding.ts": 1188,
     "src/core/config/DiagramConfig.ts": 1049,
-    "src/core/components/custom-edges/useSmartEdgeContext.ts": 1015,
     "src/core/components/diagrams/hooks/useDesignerSystemSync.ts": 877,
     "src/core/components/diagrams/timeline-pro/ProTaskLayer.tsx": 744,
     "src/core/components/layout/LayoutOptimizer.ts": 954,
