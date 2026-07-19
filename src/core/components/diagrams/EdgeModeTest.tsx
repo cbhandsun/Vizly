@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import BaseDiagramComponent from './base/BaseDiagramComponent';
 import SmartEdgeConfigPanel, { SmartEdgeSettings } from '../ui/SmartEdgeConfigPanel';
-import { diagramConfigManager } from '../config/DiagramConfig';
+import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import { LayeredConfigManager, ConfigLayer } from '../../config/LayeredConfigManager';
 import { useEdgeNormalization } from '../../hooks/useEdgeNormalization';
 

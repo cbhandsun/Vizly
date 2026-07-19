@@ -3,7 +3,7 @@ import type { StandardNodeData } from '../models/DiagramModels';
 import type { LayoutOptions } from '../types/layout';
 
 import { LayeredConfigManager } from '../config/LayeredConfigManager';
-import { diagramConfigManager } from '../components/config/DiagramConfig';
+import { diagramConfigManager } from '../config/DiagramConfig';
 import { pushFreeNodesBelowSubGroupRow, resolveDomainContainerOverlaps, scatterNodesAtSamePoint } from '../utils/layoutUtils';
 import { ILayoutStrategy } from './LayoutStrategyManager';
 import { applyDomainGrouping, applySubGrouping, assignChildrenToSubGroupsBySemantic, normalizeSubGroupDomainByChildren, enforceDomainContainerStrictContainment, recomputeSubGroupContainersBasic, purgeSubGroupChildrenBySemantic, resolveSubGroupOverlaps, resolveFreeNodeOverlapsInDomain, resolveSubGroupChildrenOverlapsStrict, expandSubGroupContainersBySemantic, enforceSubGroupStrictContainmentByChildren, finalizeSubGroupHeightsByProjectionPreserveAnchor, finalizeDomainWidthsByProjection, ensureMeasuredForNodes, normalizeMissingNodeSubDomainByDomain, finalizeSubGroupWidthsByProjectionPreserveAnchor, unifySubGroupWidthsByDomain, finalizeDomainHeightsByProjection, reflowSubGroupChildrenVertical, packSubGroupChildrenRigid, clampDomainHeightsToSubGroups, enforceSubGroupTitleClearance, reflowSubGroupChildrenGrid, unifySubGroupGapsInDomain, unifySubGroupHeightsByDomain, reflowSubGroupChildrenDagre, syncDagreChildPositions, centerSubGroupsInDomain, scaleDomainContentToFitWidthAll } from '../utils/layoutUtils';

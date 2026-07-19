@@ -16,7 +16,7 @@
     "src/core/algorithms/edgeCrossingRepair.ts": 894,
     "src/core/algorithms/orthogonalWaypointRefiner.ts": 1159,
     "src/core/algorithms/pathfinding.ts": 1188,
-    "src/core/components/config/DiagramConfig.ts": 1049,
+    "src/core/config/DiagramConfig.ts": 1049,
     "src/core/components/custom-edges/hooks/useSmartPathWorker.ts": 893,
     "src/core/components/custom-edges/useSmartEdgeContext.ts": 1084,
     "src/core/components/diagrams/FlowchartDesigner.tsx": 1056,

@@ -6,7 +6,7 @@ import { Position } from '@xyflow/react';
 import { useSimpleNodeMap, type SimpleNodeData } from '../../hooks/useNodeMap';
 import { getConvergencePositions } from './convergencePositions';
 import { selectBestPortCombination } from '../../algorithms/smartEdgeUtils';
-import { diagramConfigManager } from '../config/DiagramConfig';
+import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import { LayeredConfigManager } from '../../config/LayeredConfigManager';
 import { parseHandlePosition } from '../../routing/utils/handleUtils';
 import { safeLog } from '../../utils/consoleCleanup';

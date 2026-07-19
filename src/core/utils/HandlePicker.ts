@@ -15,7 +15,7 @@ import {
 } from '../routing';
 
 import { EdgeType } from '../types/edgeType';
-import { diagramConfigManager } from '../components/config/DiagramConfig';
+import { diagramConfigManager } from '../config/DiagramConfig';
 import { analyzeGeometry } from '../algorithms/geometry-classifier';
 import { configureEdgeRoutingDecision } from '../routing/utils/EdgeRoutingHelpers';
 

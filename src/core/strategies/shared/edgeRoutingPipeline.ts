@@ -4,7 +4,7 @@
  */
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
-import { diagramConfigManager } from '../../components/config/DiagramConfig';
+import { diagramConfigManager } from '../../config/DiagramConfig';
 import {
   edgeTerminalHandleChangeIsAllowed,
   readEdgeTerminalPolicy,

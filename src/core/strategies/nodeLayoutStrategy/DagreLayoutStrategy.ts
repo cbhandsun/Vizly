@@ -3,7 +3,7 @@ import type { LayoutOptions } from '../../types/layout';
 import { ILayoutStrategy } from '../LayoutStrategyManager';
 import { reflowSubGroupChildrenDagre, applySubGrouping, assignChildrenToSubGroupsBySemantic, applyDomainGrouping, ensureMeasuredForNodes, recomputeSubGroupContainersBasic, enforceDomainContainerStrictContainment, resolveDomainContainerOverlaps, finalizeDomainWidthsByProjection, finalizeDomainHeightsByProjection } from '../../utils/layoutUtils';
 import type { StandardNodeData } from '../../models/DiagramModels';
-import { diagramConfigManager } from '../../components/config/DiagramConfig';
+import { diagramConfigManager } from '../../config/DiagramConfig';
 
 /**
  * Dagre 分层布局策略（节点布局）

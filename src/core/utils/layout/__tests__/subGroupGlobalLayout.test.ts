@@ -1,7 +1,7 @@
 import type { Node as ReactFlowNode } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../components/config/DiagramConfig', () => ({
+vi.mock('../../../config/DiagramConfig', () => ({
   diagramConfigManager: {
     getConfig: () => ({
       diagram: { padding: { left: 40, top: 40 } },

@@ -1,6 +1,6 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react'
 import type { LayoutOptions } from '../types/layout'
-import { diagramConfigManager } from '../components/config/DiagramConfig'
+import { diagramConfigManager } from '../config/DiagramConfig'
 import { LayeredConfigManager } from '../config/LayeredConfigManager';
 import { ILayoutStrategy } from './LayoutStrategyManager'
 import {

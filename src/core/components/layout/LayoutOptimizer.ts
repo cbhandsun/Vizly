@@ -4,7 +4,7 @@
  */
 
 import { enhancedTextMeasurement } from '../../utils/EnhancedTextMeasurement';
-import { diagramConfigManager } from '../config/DiagramConfig';
+import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import {
   logLayoutOptimizerNodeHeightFallback,
   logLayoutOptimizerNodeWidthFallback,

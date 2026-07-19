@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { computeMinimapBounds, safeNumber, lerp, easeOutCubic } from './useMinimapMath';
-import { diagramConfigManager } from '../../config/DiagramConfig';
+import { diagramConfigManager } from '@/core/config/DiagramConfig';
 
 export function useMinimapNavigation(
     anchorRef: React.RefObject<HTMLDivElement | null>,

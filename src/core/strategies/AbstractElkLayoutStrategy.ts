@@ -1,7 +1,7 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import type { LayoutOptions } from '../types/layout';
 import { ILayoutStrategy } from './LayoutStrategyManager';
-import { diagramConfigManager } from '../components/config/DiagramConfig';
+import { diagramConfigManager } from '../config/DiagramConfig';
 import {
   applyDomainGrouping,
   applySubGrouping,

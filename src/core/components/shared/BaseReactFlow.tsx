@@ -24,7 +24,7 @@ import FixedMiniMap from './FixedMiniMap';
 import { AdvancedSmartStepEdge, AdvancedSmartBezierEdge, AdvancedSmartStraightEdge } from '../custom-edges/AdvancedSmartEdge';
 import { SmartOrthogonalEdge } from '../custom-edges/SmartOrthogonalEdge';
 import { ObstacleProvider } from '../custom-edges/ObstacleProvider';
-import { diagramConfigManager } from '../config/DiagramConfig';
+import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import { getLastViewport, setLastViewport, getUiScale } from './viewportStore';
 import { ElkEdge } from '../custom-edges/ElkEdge'; // 导入 ElkEdge
 import { StablePathEdge } from '../custom-edges/StablePathEdge'; // 导入稳定路径边组件

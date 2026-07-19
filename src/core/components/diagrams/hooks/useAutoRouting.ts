@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { Edge, ReactFlowInstance } from '@xyflow/react';
-import { diagramConfigManager, EdgeConfig } from '../../config/DiagramConfig';
+import { diagramConfigManager, EdgeConfig } from '@/core/config/DiagramConfig';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { useLayoutStrategy } from './useLayoutStrategy';
 import { syncAutoPathSelection, applyRoutingProfile, DESIGNER_ROUTING_PROFILE } from './useSmartRoutingConfig';

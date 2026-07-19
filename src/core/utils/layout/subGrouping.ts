@@ -1,6 +1,6 @@
 import type { Node as ReactFlowNode } from '@xyflow/react';
 import type { GroupNodeData, StandardNodeData } from '../../models/DiagramModels';
-import { diagramConfigManager } from '../../components/config/DiagramConfig';
+import { diagramConfigManager } from '../../config/DiagramConfig';
 import { deriveDomainClassFromDomain } from '../domainKey';
 import { calculateBoundingBox } from './geometryUtils';
 

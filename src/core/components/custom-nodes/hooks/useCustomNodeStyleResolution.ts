@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { getDomainTheme, resolveThemeDomainKey } from '../../../utils/domainKey';
 import { ensureReadableText } from '../../../utils/colorUtils';
-import { diagramConfigManager } from '../../config/DiagramConfig';
+import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v2';
 import { getQueryOrHashParamFromLocation } from '../../../utils/inputBoundary';
 

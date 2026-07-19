@@ -6,7 +6,7 @@
  */
 
 import { EdgeType } from '../../types/edgeType';
-import { diagramConfigManager } from '../../components/config/DiagramConfig';
+import { diagramConfigManager } from '../../config/DiagramConfig';
 import { Point } from '../types/routing';
 import { postProcessTreeBusRouting } from './advancedTreeBusPostProcessing';
 

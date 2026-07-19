@@ -1,6 +1,6 @@
 import { Edge, MarkerType } from '@xyflow/react';
 import { ReactNode } from 'react';
-import { diagramConfigManager } from '../components/config/DiagramConfig';
+import { diagramConfigManager } from '../config/DiagramConfig';
 import { getConfigIntegration } from '../config/ConfigIntegration';
 import { resolveThemeDomainKey } from '../utils/domainKey';
 import { diagramStyleManager } from '../components/shared/DiagramStyleManager';

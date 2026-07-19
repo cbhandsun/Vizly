@@ -13,7 +13,7 @@ import { StablePathEdge } from '../../custom-edges/StablePathEdge';
 import { validateAndFixNodes } from '../../../utils/nodeValidation';
 import { ILayoutStrategy } from '../../../strategies/LayoutStrategyManager';
 import { LayeredConfigManager } from '../../../config/LayeredConfigManager';
-import { diagramConfigManager } from '../../config/DiagramConfig';
+import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import { LayoutStabilityContext } from '../../../context/LayoutStabilityContext';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { prepareBaseDiagramDisplayEdges } from './baseDiagramEdgePreparation';

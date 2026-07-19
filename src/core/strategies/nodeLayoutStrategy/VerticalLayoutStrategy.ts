@@ -1,6 +1,6 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import type { StandardNodeData } from '../../models/DiagramModels';
-import { diagramConfigManager } from '../../components/config/DiagramConfig';
+import { diagramConfigManager } from '../../config/DiagramConfig';
 import type { LayoutOptions } from '../../types/layout';
 import { ILayoutStrategy } from '../LayoutStrategyManager';
 import { calculateVerticalLayout, applySubGrouping, assignChildrenToSubGroupsBySemantic, applyDomainGrouping, resolveSubGroupOverlaps, enforceDomainContainerStrictContainment, resolveDomainContainerOverlaps, clampNodesToContainers } from '../../utils/layoutUtils';

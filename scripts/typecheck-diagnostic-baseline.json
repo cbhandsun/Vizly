@@ -438,13 +438,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/components/config/DiagramConfig.ts",
-        "code": 2322,
-        "messageHash": "e5ad703af4f7121c8ab7a807b149cd2e0fa29a9c6e53d8f529e8eb0c513fab2d",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/components/custom-edges/RelationshipEdge.tsx",
         "code": 2339,
         "messageHash": "b3276374f2b33cb54e7cd6cd3c42c5e83d29371fe0387312152a4871e809d29f",
@@ -2048,13 +2041,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/services/EdgeDecisionService.ts",
-        "code": 2352,
-        "messageHash": "883933af97223aee1f6cd671051ca4b9f5e6e012c3646010e3fe3dfe13993f70",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/services/EdgeRoutingCoordinator.ts",
         "code": 2322,
         "messageHash": "d4241597c731ddb28977a15a525bf2ba8de6dc350f9c6fef05a82b218e2559d8",
@@ -2597,41 +2583,6 @@
         "file": "src/services/__tests__/DataService.test.ts",
         "code": 2741,
         "messageHash": "d5af1f2371b65bf720ddeb02a417a04fa02903c9dd8396edd2ea03136a6f1768",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/services/__tests__/EdgeDecisionService.test.ts",
-        "code": 2304,
-        "messageHash": "38e8b5af203053867a0335566ba3f2d06ce8a8462caa3a68ad635a32418ba17a",
-        "count": 11
-      },
-      {
-        "category": "error",
-        "file": "src/services/__tests__/EdgeDecisionService.test.ts",
-        "code": 2304,
-        "messageHash": "90c7ac119fd8445fe1532f936ad86311484666f579243e6a0ab132ffc6a81346",
-        "count": 5
-      },
-      {
-        "category": "error",
-        "file": "src/services/__tests__/EdgeDecisionService.test.ts",
-        "code": 2593,
-        "messageHash": "64a28696cbdd8f2de95e585ef0ed64b36e7772bb6d0c26288b52da7664dda424",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/services/__tests__/EdgeDecisionService.test.ts",
-        "code": 2593,
-        "messageHash": "907dfb922936e9c35a7bdae746eb9eaf3344156ea38474b4b626aab012b8050a",
-        "count": 7
-      },
-      {
-        "category": "error",
-        "file": "src/services/__tests__/EdgeDecisionService.test.ts",
-        "code": 2593,
-        "messageHash": "f8b12fcc3350b8ca6624bba806137dee87df2cc556f2ad196b0f11c925895e58",
         "count": 1
       },
       {

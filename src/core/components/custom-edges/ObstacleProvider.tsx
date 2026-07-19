@@ -12,7 +12,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useStore } from '@xyflow/react';
-import { diagramConfigManager } from '../config/DiagramConfig';
+import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import { ObstacleContext } from './obstacleContext';
 import type { ObstacleContextValue, NodeBBox } from './obstacleContext';
 

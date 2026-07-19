@@ -3,7 +3,7 @@ import type { LayoutOptions } from '../types/layout';
 import type { StandardNodeData } from '../models/DiagramModels';
 import { ILayoutStrategy } from './LayoutStrategyManager';
 import { separateParallelEdges } from '../utils/HandlePicker';
-import { diagramConfigManager } from '../components/config/DiagramConfig';
+import { diagramConfigManager } from '../config/DiagramConfig';
 import {
     applyDomainGrouping,
     applySubGrouping,

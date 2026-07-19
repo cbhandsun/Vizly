@@ -1,5 +1,5 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
-import { diagramConfigManager } from '../components/config/DiagramConfig';
+import { diagramConfigManager } from '../config/DiagramConfig';
 
 /**
  * 使用 Cytoscape 对子域 children 进行布局

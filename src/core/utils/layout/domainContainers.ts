@@ -1,5 +1,5 @@
 import type { Edge, Node as ReactFlowNode, XYPosition } from '@xyflow/react';
-import { diagramConfigManager } from '../../components/config/DiagramConfig';
+import { diagramConfigManager } from '../../config/DiagramConfig';
 import { calculateBoundingBox, countRectOverlaps } from './geometryUtils';
 
 /**

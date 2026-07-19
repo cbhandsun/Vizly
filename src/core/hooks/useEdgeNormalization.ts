@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Edge, Node } from '@xyflow/react';
 import { decideEdgeRouting } from '../utils/HandlePicker';
-import { diagramConfigManager } from '../components/config/DiagramConfig';
+import { diagramConfigManager } from '../config/DiagramConfig';
 
 export interface EdgeNormalizationOptions {
   enableSmartRouting?: boolean; // Default: true. If false, bypasses smart routing.

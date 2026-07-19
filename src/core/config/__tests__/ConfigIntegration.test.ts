@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { diagramConfigManager } from '../../components/config/DiagramConfig';
+import { diagramConfigManager } from '../../config/DiagramConfig';
 import { ThemePresetManager } from '../../themes/ThemePresetManager';
 import { ConfigIntegration } from '../ConfigIntegration';
 

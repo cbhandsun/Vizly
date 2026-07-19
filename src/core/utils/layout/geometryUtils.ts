@@ -1,6 +1,6 @@
 import { Node as ReactFlowNode } from '@xyflow/react';
 import { Position, Rectangle } from '../../types/common';
-import { diagramConfigManager } from '../../components/config/DiagramConfig';
+import { diagramConfigManager } from '../../config/DiagramConfig';
 import { LayoutOptimizer } from '../../components/layout/LayoutOptimizer';
 
 /**

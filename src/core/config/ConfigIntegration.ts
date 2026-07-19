@@ -6,8 +6,8 @@
 import { LayeredConfigManager, ConfigLayer } from './LayeredConfigManager';
 import type { LayeredConfigChangeEvent } from './LayeredConfigManager';
 import { validators } from './ConfigValidation';
-import { DiagramConfigManager } from '../components/config/DiagramConfig';
-import type { CanvasConfig, DomainConfig, EdgeConfig, NodeConfig } from '../components/config/DiagramConfig';
+import { DiagramConfigManager } from '../config/DiagramConfig';
+import type { CanvasConfig, DomainConfig, EdgeConfig, NodeConfig } from '../config/DiagramConfig';
 import { EnhancedThemeManager } from '../themes/EnhancedThemeManager';
 import { ThemePresetManager } from '../themes/ThemePresetManager';
 import { ThemePerformanceOptimizer } from '../themes/ThemePerformanceOptimizer';

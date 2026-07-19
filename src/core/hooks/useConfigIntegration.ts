@@ -10,7 +10,7 @@ import { ConfigLayer } from '../config/LayeredConfigManager';
 import type { LayeredConfigChangeEvent } from '../config/LayeredConfigManager';
 import type { Theme } from '../themes/types/ThemeTypes';
 import type { PerformanceMetrics } from '../themes/ThemePerformanceOptimizer';
-import { diagramConfigManager } from '../components/config/DiagramConfig';
+import { diagramConfigManager } from '../config/DiagramConfig';
 import { safeLog } from '../utils/consoleCleanup';
 import { redactSensitiveLogValue } from '../utils/logSecurity';
 

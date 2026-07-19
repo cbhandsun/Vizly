@@ -7,7 +7,7 @@ import { useMemo, type CSSProperties } from 'react';
 import { Node, Edge, MarkerType } from '@xyflow/react';
 import { LayoutOptimizer } from './LayoutOptimizer';
 const DEFAULT_DATA_EDGE_COLOR = '#00aaff';
-import { diagramConfigManager, type DiagramConfig } from '../config/DiagramConfig';
+import { diagramConfigManager, type DiagramConfig } from '@/core/config/DiagramConfig';
 import { MasterDataType, DomainData } from '../../types';
 import { useConfigIntegration } from '../../hooks/useConfigIntegration';
 

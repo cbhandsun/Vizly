@@ -12,7 +12,7 @@ vi.hoisted(() => {
   });
 });
 
-vi.mock('../../../components/config/DiagramConfig', () => ({
+vi.mock('../../../config/DiagramConfig', () => ({
   diagramConfigManager: {
     getConfig: () => ({
       domain: {

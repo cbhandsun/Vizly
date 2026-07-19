@@ -1,5 +1,5 @@
 import React from 'react';
-import { diagramConfigManager } from '../config/DiagramConfig';
+import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import { logSmartEdgeConfigSyncFailure } from './smartEdgeConfigLogging';
 
 export interface SmartEdgeSettings {
