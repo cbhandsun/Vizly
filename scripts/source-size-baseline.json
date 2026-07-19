@@ -7,7 +7,6 @@
     "compositionRoot": 300
   },
   "oversizedFiles": {
-    "src/core/config/DiagramConfig.ts": 1049,
     "src/core/components/diagrams/timeline-pro/ProTaskLayer.tsx": 744,
     "src/core/components/layout/LayoutOptimizer.ts": 954,
     "src/core/components/mindmap-v2/MindElixirToolbar.tsx": 922,
