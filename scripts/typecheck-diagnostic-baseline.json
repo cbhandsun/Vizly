@@ -1649,13 +1649,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/strategies/shared/edgeEndpointPathRepair.ts",
-        "code": 2322,
-        "messageHash": "7e2de64b12dc3b92e29a7e8372519ed533728037016586a2129e691f2799d049",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/strategies/shared/edgeFallbackPath.ts",
         "code": 2345,
         "messageHash": "87d715c9e063129be8c877758556e56e5b43a097c8bb9f117a2dda070f4d8c75",

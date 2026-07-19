@@ -48,7 +48,6 @@
     "src/core/strategies/shared/__tests__/edgeLocalDoglegRepair.test.ts": 1047,
     "src/core/strategies/shared/__tests__/edgeRoutingPipeline.visual.test.ts": 1186,
     "src/core/strategies/shared/edgeDetachedOverlapRepair.ts": 1024,
-    "src/core/strategies/shared/edgeEndpointPathRepair.ts": 842,
     "src/core/strategies/shared/edgeGlobalWaypointRefinement.ts": 1114,
     "src/core/strategies/shared/edgeLocalDoglegAdvancedCandidates.ts": 809,
     "src/core/strategies/shared/edgeLocalDoglegBasicCandidates.ts": 810,
