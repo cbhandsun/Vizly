@@ -40,7 +40,6 @@
     "src/core/strategies/shared/edgeTerminalBoundaryStairGeometry.ts": 1011,
     "src/core/utils/LayoutAlgorithms.ts": 866,
     "src/core/utils/layout/domainContainers.ts": 907,
-    "src/core/utils/layout/subGroupLayout.ts": 1197,
     "src/pages/DiagramManagementPage.tsx": 815
   }
 }

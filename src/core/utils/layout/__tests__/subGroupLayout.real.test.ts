@@ -70,6 +70,8 @@ import {
   enforceSubGroupTitleClearance,
   expandSubGroupContainersBySemantic,
   expandSubGroupsToDomainWidth,
+  equalizeSubGroupVerticalMarginsByProjection,
+  fitSubGroupsToDomainSymmetric,
   finalizeSubGroupHeightsByProjection,
   finalizeSubGroupHeightsByProjectionPreserveAnchor,
   finalizeSubGroupWidthsByProjectionPreserveAnchor,
@@ -80,6 +82,7 @@ import {
   packSubGroupChildrenRigid,
   packSubGroupChildrenGridStrict,
   packSubGroupsInDomain,
+  packSubGroupsVerticallySymmetric,
   recomputeSubGroupContainersBasic,
   rankSnapDomainFreeNodes,
   rankSnapSubGroupChildren,
@@ -97,6 +100,7 @@ import {
   strengthenDomainsAggressive,
   strengthenSubGroupsInDomainWithGridStrict,
   unifySubGroupLeftAnchors,
+  unifySubGroupLeftAnchorsStrict,
   writeSubGroupChildrenRelativeOffsets,
 } from '../subGroupLayout';
 
@@ -500,5 +504,31 @@ describe('subGroup layout helpers', () => {
     expect(scaledSg.measured.width).toBeGreaterThan(100);
     expect(scaledChild.position.x).toBeGreaterThan(scaledSg.position.x + scaledSg.measured.width);
     expect(scaledChild.measured.width).toBeGreaterThan(60);
+  });
+
+  it('keeps strict domain fitting and compatibility no-op stages deterministic', () => {
+    const base = [
+      domain(500, 360),
+      sgNode('sg-a', 100, 120, 100, 80, ['a']),
+      child('a', 120, 150, { subDomain: 'sg-a' }),
+    ] as never;
+
+    const fitted = fitSubGroupsToDomainSymmetric(base);
+    expect((fitted.find(n => n.id === 'sg-a') as any)).toMatchObject({
+      position: { x: 28, y: 120 },
+      measured: { width: 444, height: 80 },
+    });
+    expect((fitted.find(n => n.id === 'a') as any).position.x).toBe(48);
+
+    const anchored = unifySubGroupLeftAnchorsStrict(base);
+    expect((anchored.find(n => n.id === 'sg-a') as any).position.x).toBe(28);
+    expect((anchored.find(n => n.id === 'a') as any).position.x).toBe(48);
+
+    const verticalNoop = packSubGroupsVerticallySymmetric(base, Number.POSITIVE_INFINITY);
+    const marginNoop = equalizeSubGroupVerticalMarginsByProjection(base);
+    expect(verticalNoop).toEqual(base);
+    expect(marginNoop).toEqual(base);
+    expect(verticalNoop).not.toBe(base);
+    expect(marginNoop).not.toBe(base);
   });
 });
