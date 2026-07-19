@@ -15,58 +15,14 @@ const COMPACT_DOMAINS: Record<string, { fontScale: number; widthScale: number; p
   interface:{ fontScale: 0.85, widthScale: 0.85, paddingHScale: 0.85, paddingVScale: 0.85 },
 };
 
-/**
- * 节点类型枚举
- */
-export enum NodeType {
-  CUSTOM = 'custom',
-  SUB_GROUP = 'subGroup',
-  DOMAIN = 'domain',
-  INPUT = 'input',
-  OUTPUT = 'output',
-  DEFAULT = 'default'
-}
+import { ownNodeConfigRecords, validateNodeConfig } from './NodeFactoryBoundary';
+import { NodeType, type NodeConfig } from './NodeFactoryTypes';
 
-/**
- * 节点创建配置接口
- */
-export interface NodeConfig {
-  id: string;
-  type?: NodeType;
-  position: { x: number; y: number };
-  description: string;
-  draggable?: boolean;
-  theme?: any; // 暂时使用any类型
-  /**
-   * 函数级注释：域类标识（强制）
-   * - 新数据必须显式提供，用于唯一域主题解析。
-   */
-  domainClass?: string;
-  domain?: string;
-  /**
-   * 函数级注释：新增字段 subDomain
-   * - 目的：标准化数据中的顶层 `subDomain` 能被工厂透传到 `node.data.subDomain`
-   * - 背景：布局的 applySubGrouping 按 `node.data.subDomain` 聚合；若未透传则不会生成子域容器
-   */
-  subDomain?: string;
-  parentId?: string;
-  zIndex?: number;
-  width?: number;
-  height?: number;
-  style?: Record<string, any>;
-  data?: Record<string, any>;
-  shape?: string;
-  metadata?: any;
-}
-
-/**
- * 节点验证结果接口
- */
-export interface NodeValidationResult {
-  isValid: boolean;
-  errors: string[];
-  warnings: string[];
-}
+export {
+  NodeType,
+  type NodeConfig,
+  type NodeValidationResult
+} from './NodeFactoryTypes';
 
 /**
  * 节点工厂类 - 统一管理节点的创建和配置
@@ -109,10 +65,11 @@ export class NodeFactory {
      * - 主题解析：以 domainClass 优先命中主题键，缺失时由 domain 推导
      */
     // 验证配置
-    const validation = this.validateConfig(config);
+    const validation = validateNodeConfig(config);
     if (!validation.isValid) {
       throw new Error(`节点创建失败: ${validation.errors.join(', ')}`);
     }
+    config = ownNodeConfigRecords(config);
 
     // 规范化节点类型（函数级注释）
     // - 允许字符串类型并做别名映射：titlegroup -> titleGroup，subgroup -> subGroup
@@ -737,56 +694,6 @@ export class NodeFactory {
     }
 
     return updatedNode;
-  }
-
-  /**
-   * 验证节点配置
-   */
-  private validateConfig(config: NodeConfig): NodeValidationResult {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-
-    // 必填字段验证
-    if (!config.id) {
-      errors.push('节点ID不能为空');
-    }
-
-    if (!config.description) {
-      errors.push('节点描述不能为空');
-    }
-
-    if (!config.position) {
-      errors.push('节点位置不能为空');
-    } else {
-      if (typeof config.position.x !== 'number' || typeof config.position.y !== 'number') {
-        errors.push('节点位置必须是数字');
-      }
-    }
-
-    // ID格式验证
-    if (config.id && !/^[a-zA-Z0-9_-]+$/.test(config.id)) {
-      warnings.push('节点ID建议只包含字母、数字、下划线和连字符');
-    }
-
-    // 尺寸验证
-    if (config.width && config.width < 50) {
-      warnings.push('节点宽度过小，可能影响显示效果');
-    }
-
-    if (config.height && config.height < 30) {
-      warnings.push('节点高度过小，可能影响显示效果');
-    }
-
-    // zIndex验证
-    if (config.zIndex && config.zIndex < 0) {
-      warnings.push('负的zIndex可能导致节点被其他元素遮挡');
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      warnings
-    };
   }
 
   /**
