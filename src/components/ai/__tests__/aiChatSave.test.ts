@@ -1,15 +1,29 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import {
     executeAIChatDiagramSave,
     prepareAIChatDiagramSave,
     resolveAIChatCloudDiagramId,
 } from '../aiChatSave';
 
-const makeDiagram = (overrides: Record<string, unknown> = {}) => ({
+const makeDiagram = (overrides: Partial<StandardDiagramData> = {}): StandardDiagramData => ({
     id: 'diagram-id',
+    name: 'AI Diagram',
     type: 'flowchart',
+    version: '1.0.0',
     nodes: [],
     edges: [],
+    layout: {
+        type: 'flow',
+        direction: 'TB',
+        spacing: { horizontal: 80, vertical: 80 },
+        padding: { horizontal: 24, vertical: 24 },
+    },
+    theme: {
+        name: 'default',
+        displayName: 'Default',
+        domains: {},
+    },
     metadata: {
         title: 'AI Diagram',
     },

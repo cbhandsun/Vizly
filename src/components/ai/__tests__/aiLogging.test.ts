@@ -22,6 +22,7 @@ describe('aiLogging', () => {
     const {
       logAIChatCancelFailure,
       logAIChatCloudConfigLoadFailure,
+      logAIChatConversationSyncFailure,
       logAIChatEndpointValidationFailure,
       logAIChatInvalidDiagramSavePayload,
       logAIChatLocalIndexPersistFailure,
@@ -40,6 +41,7 @@ describe('aiLogging', () => {
     logAIConfigEndpointValidationFailure('Anthropic', 'testConnection', new Error('cookie=ai-config-endpoint-secret'));
     logAIConfigRequestFailure('fetchModels', 'OpenAI', new Error('secret=ai-config-request-secret'));
     logAIChatCloudConfigLoadFailure(new Error('token=chat-secret'));
+    logAIChatConversationSyncFailure(new Error('token=conversation-sync-secret'));
     logAIChatEndpointValidationFailure('OpenAI', new Error('cookie=endpoint-secret'));
     logAIChatCancelFailure(new Error('secret=cancel-secret'));
     logAIChatInvalidDiagramSavePayload(new Error('password=invalid-payload-secret'));
@@ -64,6 +66,7 @@ describe('aiLogging', () => {
     expect(warnMessages).toContain('[AIConfigModal] testConnection endpoint validation failed for "Anthropic":');
     expect(warnMessages).toContain('[AIChatPanel] Invalid endpoint for provider "OpenAI":');
     expect(warnMessages).toContain('[AIChatPanel] Stream cancel failed:');
+    expect(warnMessages).toContain('[AIChatPanel] Failed to synchronize conversations:');
     expect(warnMessages).toContain('[AIChatPanel] Invalid AI diagram payload for save:');
     expect(warnMessages).toContain('[AIChatPanel] Failed to persist local diagram index:');
     expect(warnPayload).toContain('[AI Pilot] Blocked autonomous command:');
@@ -79,6 +82,7 @@ describe('aiLogging', () => {
     expect(warnPayload).not.toContain('ai-config-endpoint-secret');
     expect(warnPayload).not.toContain('ai-storage-secret');
     expect(warnPayload).not.toContain('cancel-secret');
+    expect(warnPayload).not.toContain('conversation-sync-secret');
     expect(warnPayload).not.toContain('invalid-payload-secret');
     expect(warnPayload).not.toContain('index-secret');
     expect(warnPayload).not.toContain('policy-secret');

@@ -25,6 +25,10 @@ export const logAIChatCloudConfigLoadFailure = (error: unknown): void => {
   safeLog.error('AIChatPanel: Failed to load cloud AI config', redactSensitiveLogValue(error));
 };
 
+export const logAIChatConversationSyncFailure = (error: unknown): void => {
+  safeLog.warn('[AIChatPanel] Failed to synchronize conversations:', redactSensitiveLogValue(error));
+};
+
 export const logAIChatEndpointValidationFailure = (providerName: string, error: unknown): void => {
   safeLog.warn(`[AIChatPanel] Invalid endpoint for provider "${providerName}":`, redactSensitiveLogValue(error));
 };

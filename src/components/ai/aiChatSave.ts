@@ -55,6 +55,12 @@ const buildFallbackTitle = (now: number): string => `ai-generated-${now}`;
 
 const buildFallbackId = (now: number): string => `ai-${now}`;
 
+export const normalizeAIChatSaveTitle = (value: unknown, fallbackTitle: string): string => {
+    const fallback = fallbackTitle.trim().slice(0, 200) || 'ai-generated';
+    if (typeof value !== 'string') return fallback;
+    return value.trim().slice(0, 200) || fallback;
+};
+
 export const prepareAIChatDiagramSave = ({
     jsonContent,
     target,
@@ -71,7 +77,7 @@ export const prepareAIChatDiagramSave = ({
     });
 
     return {
-        saveTitle: getDiagramTitle(diagram, fallbackTitle),
+        saveTitle: normalizeAIChatSaveTitle(getDiagramTitle(diagram, fallbackTitle), fallbackTitle),
         saveJson: serializeDiagram(diagram),
         saveTarget: target,
     };
@@ -113,7 +119,7 @@ export const executeAIChatDiagramSave = async ({
     loadUnifiedStorage,
 }: ExecuteAIChatDiagramSaveOptions): Promise<ExecutedAIChatDiagramSave> => {
     const timestamp = now();
-    const trimmedTitle = title.trim() || buildFallbackTitle(timestamp);
+    const trimmedTitle = normalizeAIChatSaveTitle(title, buildFallbackTitle(timestamp));
     const diagram = parseDiagram(jsonContent, {
         id: buildFallbackId(timestamp),
         title: trimmedTitle,

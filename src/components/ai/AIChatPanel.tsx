@@ -1,87 +1,25 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import Modal from 'antd/es/modal';
-import Input from 'antd/es/input';
-import Button from 'antd/es/button';
-import Select from 'antd/es/select';
-import Space from 'antd/es/space';
-import Tooltip from 'antd/es/tooltip';
-import Typography from 'antd/es/typography';
-import {
-    AudioOutlined,
-    CloudServerOutlined,
-    CloseOutlined,
-    DeleteOutlined,
-    EditOutlined,
-    MenuFoldOutlined,
-    PlusOutlined,
-    SendOutlined,
-    SettingOutlined,
-    StopOutlined
-} from '@ant-design/icons';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import type { TextAreaRef } from 'antd/es/input/TextArea';
 import { getAIConfig, loadCloudAIConfig, persistAIConfig } from './aiConfigStorage';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/useAuth';
 import { PluginRegistry } from '@/core/services/PluginRegistry';
-import { aiConversationService, Conversation, Message } from '@/services/ai/AIConversationService';
-import { dataRegistry } from '@/data/DataRegistry';
-import { 
-    DIAGRAM_SYSTEM_PROMPT, 
-    MINDMAP_SYSTEM_PROMPT,
-    enhanceWithSlashCommand, 
-    buildDiagramContext, 
-    buildAnalysisContext 
-} from '../../services/ai/diagramPrompts';
-import List from 'antd/es/list';
-import Popconfirm from 'antd/es/popconfirm';
-import { parseAIStreamDelta } from './aiStreamParsing';
-import { sanitizeAIProviderError } from '@/services/ai/errorSecurity';
-import { formatAIProviderRequestError, requestAIChatCompletion, resolveAIProviderEndpoint } from '@/services/ai/aiProviderClient';
-import { getAIDiagramTitle, parseAIDiagramJson, registerAIDiagramLocally, serializeAIDiagram, upsertDiagramConfigIndex } from './aiDiagramImport';
+import { aiConversationService, type Message } from '@/services/ai/AIConversationService';
 import { executeAICommandContent, type AICommandExecutionSuccess } from './aiCommandExecution';
+import type { AIChatPanelProps } from './types';
 import {
-    buildAIChatConversationUpdate,
-    createAIChatPendingMessageState,
-} from './aiChatConversationState';
-import {
-    resolveAIChatActiveModelSelection,
-    validateAIChatRequestSelection,
-} from './aiChatRequestConfig';
-import {
-    buildAIChatRequestMessages,
-    consumeAIChatStream,
-} from './aiChatRequestFlow';
-import {
-    executeAIChatDiagramSave,
-    prepareAIChatDiagramSave,
-} from './aiChatSave';
-import { 
-     
-    AIChatPanelProps
-} from './types';
-import {
-    logAIChatCancelFailure,
     logAIChatCloudConfigLoadFailure,
-    logAIChatEndpointValidationFailure,
-    logAIChatInvalidDiagramSavePayload,
-    logAIChatLocalIndexPersistFailure,
     logAICommandExecutionError,
     logBlockedAutonomousCommand,
 } from './aiLogging';
-import { MemoizedMessageItem } from './AIChatMessageItem';
 import './AIChatPanel.css';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import type { PluginContext } from '@/core/types/plugin';
-
-const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
-
-
-
-const generateId = (prefix: string = 'msg') => 
-    `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-
-const isAbortError = (error: unknown): boolean => {
-    return error instanceof DOMException && error.name === 'AbortError';
-};
+import { useAIChatDiagramSave } from './useAIChatDiagramSave';
+import { useAIChatConversations } from './useAIChatConversations';
+import { createAIChatMessageId } from './aiChatConversationModel';
+import { AIChatViewLayout, type AIChatSlashCommand } from './AIChatViewLayout';
+import { useAIChatRequestLifecycle } from './useAIChatRequestLifecycle';
 
 // --- Message Item Component (with Memo) ---
 /**
@@ -95,7 +33,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     // --- State ---
     // [M-8] Memoize SLASH_COMMANDS: t() results are stable between renders unless locale changes.
     // Previously rebuilt on every render, causing filteredCommands comparison instability.
-    const SLASH_COMMANDS = useMemo(() => [
+    const SLASH_COMMANDS = useMemo<AIChatSlashCommand[]>(() => [
         { key: '/add', label: t('aiChat.commands.add.label'), description: t('aiChat.commands.add.desc') },
         { key: '/connect', label: t('aiChat.commands.connect.label'), description: t('aiChat.commands.connect.desc') },
         { key: '/layout', label: t('aiChat.commands.layout.label'), description: t('aiChat.commands.layout.desc') },
@@ -109,34 +47,44 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         { key: '/help', label: t('aiChat.commands.help.label'), description: t('aiChat.commands.help.desc') },
     ], [t]);
 
-    const [conversations, setConversations] = useState<Conversation[]>(() => {
-        aiConversationService.setUserId(user?.id || null);
-        return aiConversationService.getConversations();
+    const {
+        conversations,
+        setConversations,
+        activeId,
+        activeConversation,
+        messages,
+        editingId,
+        editingTitle,
+        setEditingTitle,
+        handleNewChat,
+        handleSwitchChat,
+        handleDeleteChat,
+        handleStartRename,
+        handleSaveRename,
+        addLocalMessage,
+    } = useAIChatConversations({
+        userId: user?.id,
+        welcomeMessage: t('aiChat.welcomeMsg'),
     });
-    const [activeId, setActiveId] = useState<string | null>(() => aiConversationService.getActiveConversationId());
     const [inputValue, setInputValue] = useState('');
-    const [loading, setLoading] = useState(false);
     const [showCommands, setShowCommands] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Default to closed overlay
     const [filteredCommands, setFilteredCommands] = useState(SLASH_COMMANDS);
     const [isListening, setIsListening] = useState(false); // Voice UI Feedback state
 
     const [aiConfig, setAiConfig] = useState(() => getAIConfig(user?.id));
-    const activeRequestControllerRef = useRef<AbortController | null>(null);
 
     useEffect(() => {
-        return () => {
-            activeRequestControllerRef.current?.abort(new DOMException('AI chat panel unmounted', 'AbortError'));
-            activeRequestControllerRef.current = null;
+        let cancelled = false;
+        const handleConfigChange = () => {
+            if (!cancelled) setAiConfig(getAIConfig(user?.id));
         };
-    }, []);
-
-    useEffect(() => {
-        setAiConfig(getAIConfig(user?.id));
-        const handleConfigChange = () => setAiConfig(getAIConfig(user?.id));
+        const refreshTimer = window.setTimeout(handleConfigChange, 0);
         window.addEventListener('storage', handleConfigChange);
         window.addEventListener('aiConfigChanged', handleConfigChange);
         return () => {
+            cancelled = true;
+            window.clearTimeout(refreshTimer);
             window.removeEventListener('storage', handleConfigChange);
             window.removeEventListener('aiConfigChanged', handleConfigChange);
         };
@@ -177,6 +125,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
 
     // Ensure active model is valid and enabled
     useEffect(() => {
+        let fallbackTimer: number | undefined;
         const parts = (aiConfig.activeModelKey || '').split(':');
         const pId = parts[0];
         const mId = parts.slice(1).join(':');
@@ -188,11 +137,17 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                 const fallback = availableModels[0];
                 if (aiConfig.activeModelKey !== fallback.value) {
                     const newConfig = { ...aiConfig, activeModelKey: fallback.value };
-                    setAiConfig(newConfig);
-                    persistAIConfig(user?.id, newConfig);
+                    fallbackTimer = window.setTimeout(() => {
+                        setAiConfig(newConfig);
+                        persistAIConfig(user?.id, newConfig);
+                    }, 0);
                 }
             }
         }
+
+        return () => {
+            if (fallbackTimer !== undefined) window.clearTimeout(fallbackTimer);
+        };
     }, [aiConfig, availableModels, user?.id]);
 
     // Find the readable name for the currently active model (even if disabled)
@@ -215,19 +170,8 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         appMessage.success(t('aiChat.autoSwitched', { name: availableModels.find(m => m.value === val)?.label || val }));
     };
 
-    // UI Local state
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [editingTitle, setEditingTitle] = useState('');
-
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<any>(null);
-
-    // Get current active conversation
-    const activeConversation = useMemo(
-        () => conversations.find(c => c.id === activeId) || null,
-        [activeId, conversations]
-    );
-    const messages = useMemo(() => activeConversation?.messages || [], [activeConversation]);
+    const inputRef = useRef<TextAreaRef>(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -236,84 +180,6 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
-
-    // Sync with User & Cloud
-    useEffect(() => {
-        aiConversationService.setUserId(user?.id || null);
-        if (user?.id) {
-            aiConversationService.syncFromCloud().then(convs => {
-                setConversations(convs);
-                const active = aiConversationService.getActiveConversationId();
-                if (active && convs.some(c => c.id === active)) {
-                    setActiveId(active);
-                } else if (convs.length > 0) {
-                    setActiveId(convs[0].id);
-                } else {
-                    setActiveId(null);
-                }
-            });
-        } else {
-            // Load anonymous local conversations
-            const localConvs = aiConversationService.getConversations();
-            setConversations(localConvs);
-            const active = aiConversationService.getActiveConversationId();
-            if (active && localConvs.some(c => c.id === active)) {
-                setActiveId(active);
-            } else if (localConvs.length > 0) {
-                setActiveId(localConvs[0].id);
-            } else {
-                setActiveId(null);
-            }
-        }
-    }, [user?.id]);
-
-    // --- Actions ---
-    const handleNewChat = useCallback(() => {
-        const welcomeMsg: Message = {
-            id: generateId(),
-            role: 'assistant',
-            content: t('aiChat.welcomeMsg')
-        };
-        const newConv = aiConversationService.createConversation(welcomeMsg);
-        setConversations(aiConversationService.getConversations());
-        setActiveId(newConv.id);
-    }, [t]);
-
-    useEffect(() => {
-        if (!user?.id && conversations.length === 0) {
-            handleNewChat();
-        } else if (!activeId && conversations.length > 0) {
-            setActiveId(conversations[0].id);
-        }
-    }, [activeId, conversations, handleNewChat, user?.id]);
-
-    const handleSwitchChat = (id: string) => {
-        setActiveId(id);
-        aiConversationService.setActiveConversationId(id);
-    };
-
-    const handleDeleteChat = (id: string, e?: React.MouseEvent) => {
-        e?.stopPropagation();
-        aiConversationService.deleteConversation(id);
-        const updated = aiConversationService.getConversations();
-        setConversations(updated);
-        if (activeId === id) {
-            const nextId = updated.length > 0 ? updated[0].id : null;
-            setActiveId(nextId);
-        }
-    };
-
-    const handleStartRename = (conv: Conversation, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setEditingId(conv.id);
-        setEditingTitle(conv.title);
-    };
-
-    const handleSaveRename = (id: string) => {
-        aiConversationService.updateConversation(id, { title: editingTitle });
-        setConversations(aiConversationService.getConversations());
-        setEditingId(null);
-    };
 
     // --- Keyboard Shortcuts ---
     useEffect(() => {
@@ -383,14 +249,6 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
     });
 
     // --- Handle Slash Commands ---
-    const addLocalMessage = useCallback((role: 'user' | 'assistant', content: string) => {
-        if (!activeId) return;
-        const msg: Message = { id: generateId(), role, content };
-        const updatedMessages = [...(aiConversationService.getConversations().find(c => c.id === activeId)?.messages || []), msg];
-        aiConversationService.updateConversation(activeId, { messages: updatedMessages });
-        setConversations(aiConversationService.getConversations());
-    }, [activeId]);
-
     const handleSlashCommand = (command: string): boolean => {
         const trimmed = command.trim();
         const lower = trimmed.toLowerCase();
@@ -399,7 +257,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         const args = parts.slice(1).join(' ');
 
         if (lower === '/clear') {
-            const welcomeMsg: Message = { id: generateId(), role: 'assistant', content: t('aiChat.clearedMsg') };
+            const welcomeMsg: Message = { id: createAIChatMessageId(), role: 'assistant', content: t('aiChat.clearedMsg') };
             if (activeId) {
                 aiConversationService.updateConversation(activeId, { messages: [welcomeMsg] });
                 setConversations(aiConversationService.getConversations());
@@ -649,479 +507,100 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
         }
     };
 
-    const handleStopGeneration = () => {
-        activeRequestControllerRef.current?.abort(new DOMException('用户已停止生成', 'AbortError'));
-    };
+    const {
+        loading,
+        handleStopGeneration,
+        sendAIMessage,
+    } = useAIChatRequestLifecycle({
+        t,
+        userId: user?.id,
+        inputValue,
+        setInputValue,
+        setShowCommands,
+        activeId,
+        messages,
+        setConversations,
+        pluginId,
+        diagramNodesRef,
+        diagramEdgesRef,
+        canvasOps,
+        onOpenConfig,
+        processCommands,
+    });
 
-    // --- Streaming Send Message ---
     const handleSendMessage = async () => {
-        if (loading) return;
-        if (!inputValue.trim()) return;
-
-        // Check for local slash commands
+        if (loading || !inputValue.trim()) return;
         if (inputValue.startsWith('/') && handleSlashCommand(inputValue)) {
             setInputValue('');
             setShowCommands(false);
             return;
         }
-
-        let config = getAIConfig(user?.id);
-        const modelSelection = resolveAIChatActiveModelSelection(config);
-        const activeProvider = modelSelection.provider;
-        const activeModel = modelSelection.model;
-
-        if (modelSelection.autoSwitched && activeProvider && activeModel) {
-            persistAIConfig(user?.id, modelSelection.nextConfig);
-            config = modelSelection.nextConfig;
-            appMessage.info(t('aiChat.autoSwitched', { name: `${activeProvider.name} - ${activeModel.name}` }));
-        }
-
-        const validation = validateAIChatRequestSelection(modelSelection, (provider) => {
-            resolveAIProviderEndpoint(provider, '/chat/completions');
-        });
-        if (!validation.ok) {
-            if (validation.reason === 'missing-model') {
-                appMessage.warning('没有找到可用的模型，请先在设置中启用模型');
-            } else if (validation.reason === 'missing-api-key' && activeProvider) {
-                appMessage.warning(`请先在 AI 设置中配置 ${activeProvider.name} 的 API Key`);
-            } else if (validation.reason === 'invalid-endpoint' && activeProvider) {
-                logAIChatEndpointValidationFailure(activeProvider.name, new Error('invalid-endpoint'));
-                appMessage.warning(`${activeProvider.name} 的 Base URL 必须使用 HTTPS，或本机 HTTP localhost/127.0.0.1。`);
-            }
-            onOpenConfig();
-            return;
-        }
-
-        const pendingMessageState = createAIChatPendingMessageState(messages, inputValue, generateId);
-        const newUserMsg = pendingMessageState.newUserMessage;
-        const aiMsgId = pendingMessageState.newAssistantMessage.id;
-        const updatedMessages = pendingMessageState.updatedMessages;
-
-        if (activeId) {
-            // Update title if it's the first real message
-            const updates: Partial<Conversation> = { messages: updatedMessages };
-            if (messages.length <= 1) {
-                updates.title = aiConversationService.generateTitle(inputValue);
-            }
-            aiConversationService.updateConversation(activeId, updates);
-            setConversations(aiConversationService.getConversations());
-        }
-
-        setInputValue('');
-        setShowCommands(false);
-        setLoading(true);
-        const requestController = new AbortController();
-        activeRequestControllerRef.current = requestController;
-        let accumulatedContent = '';
-        let accumulatedReasoning = '';
-
-        try {
-            const contextPrompt = pluginId === 'mindmap' ? MINDMAP_SYSTEM_PROMPT : (config.systemPrompt || DIAGRAM_SYSTEM_PROMPT);
-            const requestMessages = buildAIChatRequestMessages({
-                systemPrompt: contextPrompt,
-                pluginId,
-                historyMessages: messages,
-                userContent: enhanceWithSlashCommand(newUserMsg.content)
-                    + buildDiagramContext(diagramNodesRef?.current || [], diagramEdgesRef?.current || [])
-                    + (newUserMsg.content.trim().startsWith('/analyze')
-                        ? (canvasOps?.onAnalyze ? `\n\n[实时图表巡检报告]\n${canvasOps.onAnalyze().summary}` : buildAnalysisContext(diagramNodesRef?.current || [], diagramEdgesRef?.current || []))
-                        : ''),
-            });
-            const response = await requestAIChatCompletion(validation.provider, {
-                model: validation.model.id,
-                messages: requestMessages,
-                stream: true
-            }, { signal: requestController.signal, timeoutMs: 120_000 });
-
-            // Handle streaming response
-            const reader = response.body?.getReader();
-            let lastUpdateTimestamp = Date.now();
-            const THROTTLE_MS = 60; // 约 16fps，保证视觉流畅且不阻塞进程
-
-            if (reader) {
-                const cancelReader = () => {
-                    void reader.cancel().catch((error) => {
-                        logAIChatCancelFailure(error);
-                    });
-                };
-                const streamState = await consumeAIChatStream({
-                    reader,
-                    signal: requestController.signal,
-                    parseDelta: parseAIStreamDelta,
-                    onAbortReader: cancelReader,
-                    onDelta: (state) => {
-                        accumulatedContent = state.content;
-                        accumulatedReasoning = state.reasoningContent;
-
-                        if (!activeId) return;
-
-                        const now = Date.now();
-                        if (now - lastUpdateTimestamp <= THROTTLE_MS) return;
-
-                        const convs = [...aiConversationService.getConversations()];
-                        const cIdx = convs.findIndex(c => c.id === activeId);
-                        if (cIdx !== -1) {
-                            convs[cIdx].messages = buildAIChatConversationUpdate(
-                                convs[cIdx],
-                                aiMsgId,
-                                state,
-                                { isStreaming: true }
-                            ).messages || convs[cIdx].messages;
-                            setConversations(convs);
-                        }
-                        lastUpdateTimestamp = now;
-                    },
-                });
-                accumulatedContent = streamState.content;
-                accumulatedReasoning = streamState.reasoningContent;
-            }
-
-            // Finalize message
-            // Phase 3: 执行原子化指令
-            await processCommands(accumulatedContent);
-
-            if (activeId) {
-                const activeConversation = aiConversationService.getConversations().find(c => c.id === activeId);
-                if (activeConversation) {
-                    aiConversationService.updateConversation(activeId, buildAIChatConversationUpdate(
-                        activeConversation,
-                        aiMsgId,
-                        {
-                            content: accumulatedContent,
-                            reasoningContent: accumulatedReasoning,
-                        }
-                    ));
-                }
-                setConversations(aiConversationService.getConversations());
-            }
-
-        } catch (error: any) {
-            if (isAbortError(error)) {
-                if (activeId) {
-                    const convs = [...aiConversationService.getConversations()];
-                    const cIdx = convs.findIndex(c => c.id === activeId);
-                    if (cIdx !== -1) {
-                        convs[cIdx].messages = buildAIChatConversationUpdate(
-                            convs[cIdx],
-                            aiMsgId,
-                            {
-                                content: accumulatedContent,
-                                reasoningContent: accumulatedReasoning,
-                            },
-                            {
-                                fallbackContent: '已停止生成',
-                            }
-                        ).messages || convs[cIdx].messages;
-                        aiConversationService.updateConversation(activeId, { messages: convs[cIdx].messages });
-                        setConversations(convs);
-                    }
-                }
-                return;
-            }
-
-            const safeError = formatAIProviderRequestError(error);
-            appMessage.error(t('aiChat.requestFailed', { error: safeError }));
-            if (activeId) {
-                const convs = [...aiConversationService.getConversations()];
-                const cIdx = convs.findIndex(c => c.id === activeId);
-                if (cIdx !== -1) {
-                    convs[cIdx].messages = buildAIChatConversationUpdate(
-                        convs[cIdx],
-                        aiMsgId,
-                        {
-                            content: '',
-                            reasoningContent: '',
-                        },
-                        {
-                            fallbackContent: t('aiChat.requestError', { error: safeError }),
-                        }
-                    ).messages || convs[cIdx].messages;
-                    setConversations(convs);
-                }
-            }
-        } finally {
-            if (activeRequestControllerRef.current === requestController) {
-                activeRequestControllerRef.current = null;
-            }
-            setLoading(false);
-        }
+        await sendAIMessage();
     };
 
-    // --- Save Modal States ---
-    const [saveModalVisible, setSaveModalVisible] = useState(false);
-    const [saveTarget, setSaveTarget] = useState<'local' | 's3' | 'supabase' | null>(null);
-    const [saveTitle, setSaveTitle] = useState('');
-    const [saveJson, setSaveJson] = useState('');
-
-    // --- Multi-Target Save Handler (Step 1: Open Modal) ---
-    const handleSaveDiagramTo = (jsonContent: string, target: 'local' | 's3' | 'supabase') => {
-        try {
-            const preparedSave = prepareAIChatDiagramSave({
-                jsonContent,
-                target,
-                parseDiagram: parseAIDiagramJson,
-                getDiagramTitle: getAIDiagramTitle,
-                serializeDiagram: serializeAIDiagram,
-            });
-            setSaveTitle(preparedSave.saveTitle);
-            setSaveJson(preparedSave.saveJson);
-            setSaveTarget(preparedSave.saveTarget);
-            setSaveModalVisible(true);
-        } catch (error: any) {
-            logAIChatInvalidDiagramSavePayload(error);
-            appMessage.error(t('aiChat.invalidDiagram'));
-        }
-    };
-
-    // --- Multi-Target Save Executor (Step 2: Save) ---
-    const executeSave = async () => {
-        if (!saveTarget || !saveJson) return;
-        setSaveModalVisible(false);
-
-        try {
-            const target = saveTarget;
-            const targetLabel = target === 'local' ? t('storage.manager.local') : (target === 's3' ? 'S3' : 'Supabase');
-            const hide = appMessage.loading(t('aiChat.status.savingTo', { target: targetLabel }), 0);
-
-            try {
-                const result = await executeAIChatDiagramSave({
-                    jsonContent: saveJson,
-                    target,
-                    title: saveTitle,
-                    userId: user?.id,
-                    localStorage,
-                    parseDiagram: parseAIDiagramJson,
-                    getLocalDataService: () => dataRegistry.getDataService(),
-                    registerLocalDiagram: registerAIDiagramLocally,
-                    persistLocalIndex: (storage, diagram, title) => {
-                        try {
-                            upsertDiagramConfigIndex(storage, diagram, title);
-                        } catch (error) {
-                            logAIChatLocalIndexPersistFailure(error);
-                        }
-                    },
-                    loadUnifiedStorage,
-                });
-                appMessage.success(t('aiChat.status.saveSuccess', { target: targetLabel, title: result.title }));
-            } finally {
-                hide();
-            }
-        } catch (error: any) {
-            const errMsg = sanitizeAIProviderError(error);
-            appMessage.error(t('aiChat.status.saveFailed', { error: errMsg }));
-        }
-    };
+    const {
+        saveModalVisible,
+        setSaveModalVisible,
+        saveTarget,
+        saveTitle,
+        setSaveTitle,
+        handleSaveDiagramTo,
+        executeSave,
+    } = useAIChatDiagramSave({ t, userId: user?.id });
 
     // --- Select Slash Command ---
-    const handleSelectCommand = (cmd: typeof SLASH_COMMANDS[0]) => {
+    const handleSelectCommand = (cmd: AIChatSlashCommand) => {
         setInputValue(cmd.key + ' ');
         setShowCommands(false);
         inputRef.current?.focus();
     };
 
     return (
-        <div className="ai-chat-container">
-            {/* Overlay Sidebar: Conversations List */}
-            {isSidebarOpen && (
-                <div className="ai-chat-sidebar-overlay" onClick={() => setIsSidebarOpen(false)} />
-            )}
-            <div className={`ai-chat-sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
-                <div className="ai-chat-sidebar-header">
-                    <Typography.Text strong>{t('aiChat.historyTitle')}</Typography.Text>
-                    <Button size="small" icon={<PlusOutlined />} onClick={() => { handleNewChat(); setIsSidebarOpen(false); }} type="text" />
-                </div>
-                <div className="ai-chat-sidebar-list">
-                    <List
-                        dataSource={conversations}
-                        renderItem={conv => (
-                            <div
-                                onClick={() => { handleSwitchChat(conv.id); setIsSidebarOpen(false); }}
-                                className={`ai-chat-history-item ${activeId === conv.id ? 'active' : ''}`}
-                            >
-                                {editingId === conv.id ? (
-                                    <Input
-                                        size="small"
-                                        value={editingTitle}
-                                        onChange={e => setEditingTitle(e.target.value)}
-                                        onPressEnter={() => handleSaveRename(conv.id)}
-                                        onBlur={() => handleSaveRename(conv.id)}
-                                        autoFocus
-                                        onClick={e => e.stopPropagation()}
-                                    />
-                                ) : (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, flex: 1, marginRight: 8 }}>
-                                            {conv.title}
-                                        </div>
-                                        <div className="item-actions" style={{ display: 'none' }}>
-                                            <Space size={4}>
-                                                <EditOutlined style={{ fontSize: 13, color: '#999' }} onClick={(e) => handleStartRename(conv, e)} />
-                                                <Popconfirm
-                                                    title={t('aiChat.deleteConversation')}
-                                                    onConfirm={() => handleDeleteChat(conv.id)}
-                                                    onCancel={e => e?.stopPropagation()}
-                                                    placement="right"
-                                                >
-                                                    <DeleteOutlined style={{ fontSize: 13, color: '#ff4d4f' }} onClick={e => e.stopPropagation()} />
-                                                </Popconfirm>
-                                            </Space>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    />
-                </div>
-            </div>
-
-            {/* Main Content Area */}
-            {/* Inline Header */}
-            <div className="ai-chat-inline-header">
-                <Space size={4}>
-                    <Button
-                        icon={<MenuFoldOutlined />}
-                        type="text"
-                        size="small"
-                        onClick={() => setIsSidebarOpen(true)}
-                        title={t('aiChat.viewHistory')}
-                    />
-                    <Select
-                        size="small"
-                        variant="borderless"
-                        value={aiConfig.activeModelKey}
-                        onChange={handleModelChange}
-                        dropdownMatchSelectWidth={false}
-                        options={availableModels.reduce((acc: any[], curr) => {
-                            const group = acc.find(g => g.label === curr.group);
-                            if (group) {
-                                group.options.push({ label: curr.label, value: curr.value });
-                            } else {
-                                acc.push({ label: curr.group, options: [{ label: curr.label, value: curr.value }] });
-                            }
-                            return acc;
-                        }, [])}
-                        labelRender={() => (
-                            <span style={{ color: '#1677ff' }}>{activeModelName}</span>
-                        )}
-                        style={{ maxWidth: 160, fontWeight: 500 }}
-                    />
-                    <Typography.Text type="secondary" style={{ fontSize: 12, maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', verticalAlign: 'middle', marginLeft: 4 }} title={activeConversation?.title}>
-                        {activeConversation?.title || ''}
-                    </Typography.Text>
-                </Space>
-                <Space size={4}>
-                    {user ? (
-                        <Tooltip title={t('aiChat.loggedIn', { email: user.email })}>
-                            <CloudServerOutlined style={{ color: '#52c41a', fontSize: 14 }} />
-                        </Tooltip>
-                    ) : (
-                        <Tooltip title={t('aiChat.notLoggedIn')}>
-                            <CloudServerOutlined style={{ color: '#bfbfbf', fontSize: 14 }} />
-                        </Tooltip>
-                    )}
-                    <Button icon={<SettingOutlined />} type="text" size="small" onClick={onOpenConfig} title={t('aiChat.settings')} />
-                    <Button icon={<CloseOutlined />} type="text" size="small" onClick={onClose} title={t('aiChat.close')} />
-                </Space>
-            </div>
-
-            {/* Content */}
-            <div className="ai-chat-messages">
-                {messages.map(item => (
-                    <MemoizedMessageItem
-                        key={item.id}
-                        item={item}
-                        t={t}
-                        onPreviewJson={onPreviewJson}
-                        onApplyJson={onApplyJson}
-                        handleSaveDiagramTo={handleSaveDiagramTo}
-                    />
-                ))}
-                <div ref={messagesEndRef} />
-            </div>
-
-            {/* Slash Command Menu */}
-            {showCommands && (
-                <div className="ai-chat-commands">
-                    {filteredCommands.map(cmd => (
-                        <div
-                            key={cmd.key}
-                            onClick={() => handleSelectCommand(cmd)}
-                            className="ai-chat-command-item"
-                        >
-                            <Typography.Text code>{cmd.label}</Typography.Text>
-                            <Typography.Text type="secondary">{cmd.description}</Typography.Text>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* Input */}
-            <div className="ai-chat-input-area">
-                <div className="ai-chat-input-row">
-                    <Input.TextArea
-                        ref={inputRef}
-                        value={inputValue}
-                        onChange={e => handleInputChange(e.target.value)}
-                        onPressEnter={(e) => {
-                            if (!e.shiftKey) {
-                                e.preventDefault();
-                                handleSendMessage();
-                            }
-                        }}
-                        placeholder={t('aiChat.inputPlaceholder')}
-                        autoSize={{ minRows: 1, maxRows: 6 }}
-                        disabled={loading}
-                        className="ai-chat-textarea"
-                    />
-                    <div className="ai-chat-input-tools">
-                        <span className="ai-chat-input-hint">{t('aiChat.inputHint')}</span>
-                        <Space size={8}>
-                            <Button
-                                className={`voice-btn ${isListening ? 'listening' : ''}`}
-                                icon={<AudioOutlined />}
-                                shape="circle"
-                                onClick={handleVoiceToggle}
-                                title="Voice (Beta)"
-                            />
-                            <Button
-                                type={loading ? 'default' : 'primary'}
-                                danger={loading}
-                                shape="circle"
-                                icon={loading ? <StopOutlined /> : <SendOutlined />}
-                                onClick={loading ? handleStopGeneration : handleSendMessage}
-                                disabled={!loading && !inputValue.trim()}
-                                title={loading ? '停止生成' : '发送'}
-                                className="ai-chat-send-btn"
-                            />
-                        </Space>
-                    </div>
-                </div>
-            </div>
-
-            {/* Save Dialog */}
-            <Modal
-                title={t('aiChat.saveDialogTitle')}
-                open={saveModalVisible}
-                onOk={executeSave}
-                onCancel={() => setSaveModalVisible(false)}
-                okText={t('aiChat.confirmSave')}
-                cancelText={t('aiChat.cancel')}
-            >
-                <div style={{ padding: '10px 0' }}>
-                    <div style={{ marginBottom: 8 }}>名称:</div>
-                    <Input
-                        value={saveTitle}
-                        onChange={e => setSaveTitle(e.target.value)}
-                        placeholder={t('aiChat.namePlaceholder')}
-                        onPressEnter={executeSave}
-                        autoFocus
-                    />
-                    <div style={{ marginTop: 8, fontSize: 12, color: '#999' }}>
-                        将保存到: <span style={{ color: '#1677ff' }}>{saveTarget === 'local' ? '本地' : (saveTarget === 's3' ? 'S3' : 'Supabase')}</span>
-                    </div>
-                </div>
-            </Modal>
-        </div>
+        <AIChatViewLayout
+            t={t}
+            user={user}
+            conversations={conversations}
+            activeId={activeId}
+            activeConversation={activeConversation}
+            messages={messages}
+            editingId={editingId}
+            editingTitle={editingTitle}
+            setEditingTitle={setEditingTitle}
+            handleNewChat={handleNewChat}
+            handleSwitchChat={handleSwitchChat}
+            handleDeleteChat={handleDeleteChat}
+            handleStartRename={handleStartRename}
+            handleSaveRename={handleSaveRename}
+            isSidebarOpen={isSidebarOpen}
+            setIsSidebarOpen={setIsSidebarOpen}
+            aiConfig={aiConfig}
+            availableModels={availableModels}
+            activeModelName={activeModelName}
+            handleModelChange={handleModelChange}
+            onOpenConfig={onOpenConfig}
+            onClose={onClose}
+            onPreviewJson={onPreviewJson}
+            onApplyJson={onApplyJson}
+            handleSaveDiagramTo={handleSaveDiagramTo}
+            messagesEndRef={messagesEndRef}
+            showCommands={showCommands}
+            filteredCommands={filteredCommands}
+            handleSelectCommand={handleSelectCommand}
+            inputRef={inputRef}
+            inputValue={inputValue}
+            handleInputChange={handleInputChange}
+            handleSendMessage={handleSendMessage}
+            loading={loading}
+            isListening={isListening}
+            handleVoiceToggle={handleVoiceToggle}
+            handleStopGeneration={handleStopGeneration}
+            saveModalVisible={saveModalVisible}
+            setSaveModalVisible={setSaveModalVisible}
+            executeSave={executeSave}
+            saveTitle={saveTitle}
+            setSaveTitle={setSaveTitle}
+            saveTarget={saveTarget}
+        />
     );
 };
 
