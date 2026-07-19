@@ -12,10 +12,13 @@ import {
   matchesThemePresetModule,
 } from './vite-plugins/buildChunkGroups'
 import { createDisplayRoutingChunkClassifier } from './vite-plugins/displayRoutingChunkClassifier'
+import coverageThresholds from './scripts/coverage-thresholds.json'
 
 const projectRoot = dirname(fileURLToPath(import.meta.url))
 const projectRealRoot = realpathSync(projectRoot)
 const displayRoutingChunks = createDisplayRoutingChunkClassifier(matchesAppSafeLoggingModule)
+const shardCoverageReportsDirectory = process.env.VIZLY_COVERAGE_REPORTS_DIR
+const isShardCoverage = process.env.TEST_CI_COVERAGE === '1'
 
 const vendorChunkRules: Array<[string, string[]]> = [
   ['vendor-react', ['react', 'react-dom', 'react-router', 'react-router-dom', 'react-error-boundary']],
@@ -335,8 +338,8 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       allowExternal: true,
-      reporter: ['text', 'html', 'json', 'lcov'],
-      reportsDirectory: './.coverage',
+      reporter: isShardCoverage ? ['json'] : ['text', 'html', 'json', 'lcov'],
+      reportsDirectory: shardCoverageReportsDirectory || './.coverage',
       exclude: [
         'dist/**',
         'coverage/**',
@@ -347,12 +350,7 @@ export default defineConfig({
         'src/main.tsx',
         'src/core/vite-env.d.ts',
       ],
-      thresholds: {
-        statements: 61,
-        branches: 48,
-        functions: 61,
-        lines: 63,
-      },
+      thresholds: isShardCoverage ? undefined : coverageThresholds,
     },
   },
   resolve: {

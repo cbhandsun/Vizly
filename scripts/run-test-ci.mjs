@@ -4,57 +4,33 @@ import {
   isRetryableTestCiInfrastructureFailure,
   rankSlowestTestCiShards,
   resolveTestCiConcurrency,
+  resolveTestCiCoverageEnabled,
   resolveTestCiShardRetries,
   resolveTestCiShardTimeoutMs,
 } from './lib/test-ci-runner-policy.mjs';
+import {
+  getTestCiCoverageReportName,
+  isTestCiTimingSensitiveShard,
+  resolveTestCiShardSelection,
+  shouldCollectTestCiCoverage,
+} from './lib/test-ci-shards.mjs';
 
-const shardNames = [
-  'test:ci:node',
-  'test:ci:dom-utils-security',
-  'test:ci:dom-utils-storage',
-  'test:ci:dom-utils-import',
-  'test:ci:dom-utils-layout',
-  'test:ci:dom-utils-misc',
-  'test:ci:dom-utils-app',
-  'test:ci:dom-services',
-  'test:ci:dom-workers',
-  'test:ci:context',
-  'test:ci:ui-app',
-  'test:ci:ui-components-diagram',
-  'test:ci:ui-components-support',
-  'test:ci:ui-components-primitives',
-  'test:ci:ui-components-warehouse',
-  'test:ci:ui-diagrams',
-  'test:ci:core-components-shared-flow',
-  'test:ci:core-components-shared-flow-logistics',
-  'test:ci:core-components-shared-flow-hub-port-role',
-  'test:ci:core-components-shared-flow-measured-outcome',
-  'test:ci:core-components-shared-flow-routing-quality',
-  'test:ci:core-components-shared-worker-boundary',
-  'test:ci:core-components-shared-misc',
-  'test:ci:core-components-ui',
-  'test:ci:core-hooks',
-  'test:ci:core-components-b',
-  'test:ci:core-components-c',
-  'test:ci:core-components-extra',
-  'test:ci:data-main',
-  'test:ci:mindmap',
-  'test:ci:routing-core',
-  'test:ci:routing-services',
-  'test:ci:routing-layout',
-];
+const requestedGroup = process.env.TEST_CI_GROUP?.trim() || 'all';
+const shardNames = resolveTestCiShardSelection(requestedGroup);
+const coverageEnabled = resolveTestCiCoverageEnabled(process.env.TEST_CI_COVERAGE);
 
-const commandForScript = (name) => {
+const commandForScript = (name, collectCoverage) => {
+  const coverageArgs = collectCoverage ? ['--', '--coverage'] : [];
   if (process.platform === 'win32') {
     return {
       command: process.env.ComSpec || 'cmd.exe',
-      args: ['/d', '/s', '/c', 'npm', 'run', name],
+      args: ['/d', '/s', '/c', 'npm', 'run', name, ...coverageArgs],
     };
   }
 
   return {
     command: 'npm',
-    args: ['run', name],
+    args: ['run', name, ...coverageArgs],
   };
 };
 
@@ -89,6 +65,7 @@ const pending = [...shardNames];
 const failures = [];
 const results = [];
 let running = 0;
+let runningExclusive = false;
 
 const log = (message) => {
   process.stdout.write(`${message}\n`);
@@ -102,11 +79,17 @@ const runShard = (name) => new Promise((resolve) => {
     outputTail = `${outputTail}${chunk.toString('utf8')}`.slice(-64 * 1024);
   };
   log(`\n[${name}] starting`);
-  const { command, args } = commandForScript(name);
+  const collectCoverage = shouldCollectTestCiCoverage(name, coverageEnabled);
+  const { command, args } = commandForScript(name, collectCoverage);
   let child;
   try {
     child = spawn(command, args, {
-      env: process.env,
+      env: {
+        ...process.env,
+        ...(collectCoverage ? {
+          VIZLY_COVERAGE_REPORTS_DIR: `coverage/shards/${getTestCiCoverageReportName(name)}`,
+        } : {}),
+      },
       stdio: ['inherit', 'pipe', 'pipe'],
       windowsHide: true,
     });
@@ -166,15 +149,19 @@ const runShard = (name) => new Promise((resolve) => {
 
 const schedule = async () => {
   while (pending.length > 0) {
-    if (running >= concurrency) {
+    const nextName = pending[0];
+    const nextIsExclusive = isTestCiTimingSensitiveShard(nextName);
+    if (running >= concurrency || runningExclusive || (nextIsExclusive && running > 0)) {
       await new Promise((resolve) => setTimeout(resolve, 100));
       continue;
     }
 
     const name = pending.shift();
     running += 1;
+    if (nextIsExclusive) runningExclusive = true;
     runShard(name).finally(() => {
       running -= 1;
+      if (nextIsExclusive) runningExclusive = false;
     });
   }
 
@@ -183,7 +170,7 @@ const schedule = async () => {
   }
 };
 
-log(`Running ${shardNames.length} test:ci shards with concurrency ${concurrency}, shard timeout ${shardTimeoutMs}ms, infrastructure retries ${shardRetries}.`);
+log(`Running test:ci group ${requestedGroup} (${shardNames.length} shards) with concurrency ${concurrency}, shard timeout ${shardTimeoutMs}ms, infrastructure retries ${shardRetries}, coverage ${coverageEnabled ? 'enabled' : 'disabled'}.`);
 const suiteStartedAt = Date.now();
 await schedule();
 

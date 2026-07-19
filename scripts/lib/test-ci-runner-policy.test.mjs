@@ -4,6 +4,7 @@ import {
   isRetryableTestCiInfrastructureFailure,
   rankSlowestTestCiShards,
   resolveTestCiConcurrency,
+  resolveTestCiCoverageEnabled,
   resolveTestCiShardRetries,
   resolveTestCiShardTimeoutMs,
 } from './test-ci-runner-policy.mjs';
@@ -21,6 +22,9 @@ describe('test:ci runner policy', () => {
     expect(resolveTestCiShardRetries()).toBe(1);
     expect(resolveTestCiShardRetries('0')).toBe(0);
     expect(resolveTestCiShardRetries('2')).toBe(2);
+    expect(resolveTestCiCoverageEnabled()).toBe(false);
+    expect(resolveTestCiCoverageEnabled('0')).toBe(false);
+    expect(resolveTestCiCoverageEnabled('1')).toBe(true);
   });
 
   it('rejects empty, negative, fractional, and non-numeric overrides', () => {
@@ -31,6 +35,7 @@ describe('test:ci runner policy', () => {
     for (const raw of ['-1', '1.5', 'NaN']) {
       expect(() => resolveTestCiShardRetries(raw)).toThrow(/Invalid TEST_CI_SHARD_RETRIES/);
     }
+    expect(() => resolveTestCiCoverageEnabled('true')).toThrow(/Invalid TEST_CI_COVERAGE/);
   });
 
   it('ranks valid shard timings deterministically and applies the report limit', () => {

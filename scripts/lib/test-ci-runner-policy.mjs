@@ -34,6 +34,12 @@ export const resolveTestCiShardRetries = (raw) => {
   return parseNonNegativeInteger(raw, 'TEST_CI_SHARD_RETRIES');
 };
 
+export const resolveTestCiCoverageEnabled = (raw) => {
+  if (raw === undefined || raw === '' || raw === '0') return false;
+  if (raw === '1') return true;
+  throw new Error(`Invalid TEST_CI_COVERAGE value: ${raw}`);
+};
+
 export const isRetryableTestCiInfrastructureFailure = (output) => (
   output.includes('[vitest-pool]: Failed to start')
   && output.includes('Timeout waiting for worker to respond')

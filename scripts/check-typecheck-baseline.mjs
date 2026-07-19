@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,6 +18,7 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, '..');
 const baselinePath = path.join(scriptDirectory, 'typecheck-diagnostic-baseline.json');
 const compilerPath = path.join(projectRoot, 'node_modules', 'typescript', 'bin', 'tsc');
+const buildInfoDirectory = path.join(projectRoot, 'node_modules', '.cache', 'vizly-typecheck');
 const projects = ['tsconfig.app.json', 'tsconfig.node.json'];
 const { writeBaseline } = parseTypecheckArguments(process.argv.slice(2));
 
@@ -28,6 +29,7 @@ if (!existsSync(compilerPath)) {
 const timeout = parseTypecheckTimeoutMs(process.env.TYPECHECK_TIMEOUT_MS);
 const projectDiagnostics = {};
 const startedAt = Date.now();
+mkdirSync(buildInfoDirectory, { recursive: true });
 
 for (const projectName of projects) {
   if (!existsSync(path.join(projectRoot, projectName))) {
@@ -36,7 +38,14 @@ for (const projectName of projects) {
   const projectStartedAt = Date.now();
   const result = spawnSync(
     process.execPath,
-    [compilerPath, '-p', projectName, '--noEmit', '--pretty', 'false', '--incremental', 'false'],
+    [
+      compilerPath,
+      '-p', projectName,
+      '--noEmit',
+      '--pretty', 'false',
+      '--incremental', 'true',
+      '--tsBuildInfoFile', path.join(buildInfoDirectory, `${projectName}.tsbuildinfo`),
+    ],
     {
       cwd: projectRoot,
       encoding: 'utf8',
