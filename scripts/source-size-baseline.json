@@ -32,7 +32,6 @@
     "src/core/strategies/shared/edgeDetachedOverlapRepair.ts": 1024,
     "src/core/strategies/shared/edgeLocalDoglegAdvancedCandidates.ts": 809,
     "src/core/strategies/shared/edgeLocalDoglegBasicCandidates.ts": 810,
-    "src/core/strategies/shared/edgeSharedTrunkSynthesis.ts": 1138,
     "src/core/strategies/shared/edgeStrictCrossingGuard.ts": 1046,
     "src/core/strategies/shared/edgeTerminalBoundaryStairGeometry.ts": 1011,
     "src/core/utils/LayoutAlgorithms.ts": 866,

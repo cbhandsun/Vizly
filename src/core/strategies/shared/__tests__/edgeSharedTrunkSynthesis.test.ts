@@ -6,6 +6,7 @@ import {
   synthesizeSharedSourceTrunks,
   synthesizeSharedTargetTrunks,
 } from '../edgeSharedTrunkSynthesis';
+import { getEdgePath } from '../edgeSharedTrunkSynthesisCore';
 
 const coversVerticalSegment = (
   path: Array<{ x: number; y: number }>,
@@ -117,6 +118,30 @@ const node = (id: string, x: number, y: number, width = 120, height = 80): Node 
 });
 
 describe('synthesizeSharedEndpointTrunks', () => {
+  it('normalizes malformed runtime collections and extreme path coordinates', () => {
+    expect(synthesizeSharedEndpointTrunks(null as never, null as never)).toEqual([]);
+    expect(synthesizeSharedSourceTrunks([null, {}] as never)).toEqual([]);
+    expect(synthesizeSharedTargetTrunks('invalid' as never)).toEqual([]);
+    expect(repairSharedTargetEntryCrossings(null as never)).toEqual([]);
+
+    expect(getEdgePath({
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      data: {
+        computedPath: [
+          null,
+          { x: Number.NaN, y: 0 },
+          { x: Number.MAX_VALUE, y: -Number.MAX_VALUE },
+          { x: 10, y: 20 },
+        ],
+      },
+    } as Edge)).toEqual([
+      { x: 10_000_000, y: -10_000_000 },
+      { x: 10, y: 20 },
+    ]);
+  });
+
   it('does not rewrite target-side trunks when only source trunks are requested', () => {
     const edges: Edge[] = [
       {
