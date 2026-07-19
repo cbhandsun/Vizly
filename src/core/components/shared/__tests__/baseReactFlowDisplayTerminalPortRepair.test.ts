@@ -8,7 +8,10 @@ import wmsStandardData from '../../../../data/standardized/WmsStandardData.json'
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
 import { countDisplayObstacleHits } from '../baseReactFlowDisplayEvaluation';
-import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from '../baseReactFlowDisplayTerminalPortRepair';
+import {
+  repairAxisMismatchedTerminalsWithBoundedPortRoles,
+  repairTerminalHandleHemisphereHairpins,
+} from '../baseReactFlowDisplayTerminalPortRepair';
 import { repairRenderSafeTerminalAxes } from '../baseReactFlowRenderTerminalSafety';
 import {
   buildBoundedSharedPortLaneSchedule,
@@ -38,6 +41,56 @@ const displayEdge = (
 });
 
 describe('baseReactFlowDisplayTerminalPortRepair', () => {
+  it('repairs a handle hemisphere hairpin and keeps tree routing in sync', () => {
+    const computedPath = [
+      { x: 0, y: 0 },
+      { x: 0, y: 20 },
+      { x: 60, y: 20 },
+      { x: 60, y: -20 },
+      { x: 120, y: -20 },
+    ];
+    const edges: Edge[] = [{
+      id: 'hemisphere-hairpin',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: {
+        computedPath,
+        treeRouting: { points: computedPath, version: 1 },
+      },
+    }];
+
+    const repaired = repairTerminalHandleHemisphereHairpins(edges, []);
+    const repairedData = repaired[0].data as Record<string, any>;
+
+    expect(repaired).not.toBe(edges);
+    expect(repairedData.terminalHandleHemisphereRepaired).toBe(true);
+    expect(repairedData.treeRouting).toMatchObject({ version: 1 });
+    expect(repairedData.treeRouting.points).toEqual(repairedData.computedPath);
+    expect(calculateEdgePathQualityScore(repaired).hairpins).toBe(0);
+  });
+
+  it('preserves the edge array when no hemisphere repair applies', () => {
+    const edges: Edge[] = [{
+      id: 'straight',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: {
+        computedPath: [
+          { x: 0, y: 0 },
+          { x: 60, y: 0 },
+          { x: 120, y: 0 },
+          { x: 180, y: 0 },
+        ],
+      },
+    }];
+
+    expect(repairTerminalHandleHemisphereHairpins(edges, [])).toBe(edges);
+  });
+
   it('replaces a rendered boundary trunk with a direct declared target stub', () => {
     const nodes: Node[] = [
       node('l-oms', 826.5, 534, 179, 118),

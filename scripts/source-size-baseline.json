@@ -32,7 +32,7 @@
     "src/core/components/shared/baseReactFlowDisplayEndpointStubCandidates.ts": 803,
     "src/core/components/shared/baseReactFlowDisplayLaneCandidates.ts": 942,
     "src/core/components/shared/baseReactFlowDisplayOverlapRepair.ts": 1112,
-    "src/core/components/shared/baseReactFlowDisplayTerminalPortRepair.ts": 1166,
+    "src/core/components/shared/baseReactFlowDisplayTerminalPortRepair.ts": 1021,
     "src/core/components/shared/baseReactFlowTerminalAxisRepair.ts": 940,
     "src/core/components/shared/exportUtils.ts": 1077,
     "src/core/config/ConfigManager.ts": 829,

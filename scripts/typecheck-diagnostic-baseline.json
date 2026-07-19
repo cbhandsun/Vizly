@@ -1390,20 +1390,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/components/shared/baseReactFlowDisplayTerminalPortRepair.ts",
-        "code": 2339,
-        "messageHash": "3ad79ad8f539211128c799be7349f01613435226b2e96b01e4f2ad5fa3bbd1ec",
-        "count": 4
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/shared/baseReactFlowDisplayTerminalPortRepair.ts",
-        "code": 2554,
-        "messageHash": "0d7f88caa9641107a48c1e7e16181950d9d374636b6c4d2f833dab296c63e034",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/components/shared/baseReactFlowFastEdgeSafety.ts",
         "code": 2339,
         "messageHash": "2d2c51341bd8f5c419115d91107b2d89732ea43a649cbe8a0a7dd18700a39194",
