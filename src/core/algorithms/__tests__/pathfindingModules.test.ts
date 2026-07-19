@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { Position } from '@xyflow/react';
 
-import { getPathfindingConfig, setPathfindingConfig } from '../pathfinding';
+import {
+  buildPathfindingGrid,
+  findPath,
+  getPathfindingConfig,
+  setPathfindingConfig,
+} from '../pathfinding';
 import { isPathBlocked } from '../pathfindingCollision';
 import { MinHeap } from '../pathfindingMinHeap';
 import {
@@ -40,6 +45,54 @@ describe('pathfinding modules', () => {
 
     expect(heap.size()).toBe(3);
     expect([heap.pop(), heap.pop(), heap.pop(), heap.pop()]).toEqual([1, 2, 0, undefined]);
+  });
+
+  it('normalizes invalid grid sizes, coordinates, and alignment points', () => {
+    const invalid = buildPathfindingGrid([], {
+      startX: Number.NaN,
+      startY: Number.POSITIVE_INFINITY,
+      endX: 100,
+      endY: 100,
+    }, Number.NaN, { x: Number.NaN, y: 0 });
+    expect(invalid.size).toBe(20);
+    expect(invalid.maxIndex).toBeGreaterThan(0);
+    expect(invalid.data).toHaveLength(invalid.maxIndex);
+
+    const clamped = buildPathfindingGrid([], {
+      startX: 0,
+      startY: 0,
+      endX: 100,
+      endY: 100,
+    }, 10_000);
+    expect(clamped.size).toBe(1_000);
+
+    const extreme = buildPathfindingGrid([{
+      x: Number.POSITIVE_INFINITY,
+      y: 0,
+      width: 10,
+      height: 10,
+    }], {
+      startX: -1_000_000_000,
+      startY: -1_000_000_000,
+      endX: 1_000_000_000,
+      endY: 1_000_000_000,
+    }, 2);
+    expect(extreme.maxIndex).toBeLessThanOrEqual(2_000_000);
+    expect(extreme.size).toBeGreaterThan(2);
+
+    expect(() => buildPathfindingGrid(null as never, null as never, 20)).not.toThrow();
+    expect(() => buildPathfindingGrid([null, {}, { x: 0, y: 0, width: -1, height: 2 }] as never, {
+      startX: 0,
+      startY: 0,
+      endX: 10,
+      endY: 10,
+    })).not.toThrow();
+
+    expect(findPath(
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      [null, {}, { x: 0, y: 0, width: -1, height: 2 }] as never,
+    )).toEqual([{ x: 0, y: 0 }, { x: 100, y: 0 }]);
   });
 
   it('detects rectangle crossings on horizontal, vertical, and diagonal segments', () => {
