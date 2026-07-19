@@ -44,7 +44,6 @@
     "src/core/strategies/shared/LayoutRefinement.ts": 907,
     "src/core/strategies/shared/__tests__/edgeDisplayMicroCleanup.test.ts": 1130,
     "src/core/strategies/shared/__tests__/edgeLocalDoglegRepair.test.ts": 1047,
-    "src/core/strategies/shared/__tests__/edgeRoutingPipeline.visual.test.ts": 1186,
     "src/core/strategies/shared/edgeDetachedOverlapRepair.ts": 1024,
     "src/core/strategies/shared/edgeGlobalWaypointRefinement.ts": 1114,
     "src/core/strategies/shared/edgeLocalDoglegAdvancedCandidates.ts": 809,

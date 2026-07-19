@@ -567,13 +567,12 @@ function segmentLength(a: Point, b: Point): number {
 }
 
 function inferEndpointSide(point: Point, rect: Rect): Side | null {
-  const candidates: Array<{ side: Side; distance: number }> = [
+  const candidates = ([
     { side: 't', distance: Math.abs(point.y - rect.y) },
     { side: 'b', distance: Math.abs(point.y - (rect.y + rect.height)) },
     { side: 'l', distance: Math.abs(point.x - rect.x) },
     { side: 'r', distance: Math.abs(point.x - (rect.x + rect.width)) },
-  ];
-  candidates.sort((first, second) => first.distance - second.distance);
+  ] satisfies Array<{ side: Side; distance: number }>).sort((first, second) => first.distance - second.distance);
   const nearest = candidates[0];
   return nearest && nearest.distance <= SIDE_TOLERANCE ? nearest.side : null;
 }
