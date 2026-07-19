@@ -25,7 +25,7 @@
     "src/core/components/diagrams/timeline-pro/ProTaskLayer.tsx": 744,
     "src/core/components/diagrams/timeline-pro/ProTimelineCanvas.tsx": 890,
     "src/core/components/layout/LayoutOptimizer.ts": 954,
-    "src/core/components/mindmap-v2/MindElixirToolbar.tsx": 925,
+    "src/core/components/mindmap-v2/MindElixirToolbar.tsx": 922,
     "src/core/components/mindmap-v2/MindElixirWrapper.tsx": 1161,
     "src/core/components/mindmap-v2/MindMapPropertyPanel.tsx": 808,
     "src/core/components/shared/BaseReactFlow.tsx": 1050,

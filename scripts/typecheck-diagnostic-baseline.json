@@ -1054,34 +1054,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/components/mindmap-v2/MindElixirToolbar.tsx",
-        "code": 2322,
-        "messageHash": "647d30f1c893c5f2bb55e28ff8002dca65349df39a695572449bd9869488579c",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindElixirToolbar.tsx",
-        "code": 2322,
-        "messageHash": "fc46f066beee42bdeb998d57edf3f433141cc2808b580247312f8878c315ccd8",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindElixirToolbar.tsx",
-        "code": 2345,
-        "messageHash": "eba7570387975f716cbd445395b9181fdfb2813381d7550440037f706ec121c9",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindElixirToolbar.tsx",
-        "code": 2739,
-        "messageHash": "583b93f116c9066d6971f2ce0d028ac710282b24962aaccabe09944a03ac5e1e",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/components/mindmap-v2/MindMapAIPanel.tsx",
         "code": 2322,
         "messageHash": "9883c56fc02455d9489ef86f8c27213dfd668883083306bf560bce81f34b1588",

@@ -77,6 +77,9 @@ import {
     logMindmapToolbarSummaryFailure,
 } from './mindmapToolbarLogging';
 import { persistMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeStorage';
+import { coerceMindElixirDirection } from './mindElixirDirection';
+import { emitVizlyMindMapOperation } from './mindmapOperationBridge';
+import { setMindMapTreeExpanded } from './mindmapTreeExpansion';
 
 
 const DIRECTION_OPTIONS = [
@@ -85,15 +88,6 @@ const DIRECTION_OPTIONS = [
     { label: '← 向左展开', value: 'L' },
     { label: '↓ 向下展开', value: 'TB' },
 ];
-
-/** Recursively set expanded flag on all nodes */
-function setExpandedAll(node: NodeObj, expanded: boolean): NodeObj {
-    return {
-        ...node,
-        expanded,
-        children: (node.children ?? []).map(c => setExpandedAll(c, expanded)),
-    };
-}
 
 // ─── Focus mode state (module-level, shared) ─────────────────────────────────
 let _isFocused = false;
@@ -175,7 +169,7 @@ const MindElixirToolbar: React.FC = () => {
     const handleDirectionChange = useCallback((dir: string) => {
         if (!mind) return;
         const data = mind.getData();
-        const dirInt = directionStringToInt(dir) as 0 | 1 | 2;
+        const dirInt = coerceMindElixirDirection(directionStringToInt(dir));
         mind.refresh({ ...data, nodeData: cleanAndValidateTree(data.nodeData, true), direction: dirInt });
         localStorage.setItem('vizly_mindmap_dir', dir);  // persist direction
     }, [mind]);
@@ -192,7 +186,7 @@ const MindElixirToolbar: React.FC = () => {
     const handleCollapseAll = useCallback(() => {
         if (!mind) return;
         const data = mind.getData();
-        const newNodeData = setExpandedAll(cleanAndValidateTree(data.nodeData, true), false);
+        const newNodeData = setMindMapTreeExpanded(cleanAndValidateTree(data.nodeData, true), false);
         newNodeData.expanded = true; // Keep root expanded
         mind.refresh({ ...data, nodeData: newNodeData });
     }, [mind]);
@@ -200,7 +194,7 @@ const MindElixirToolbar: React.FC = () => {
     const handleExpandAll = useCallback(() => {
         if (!mind) return;
         const data = mind.getData();
-        mind.refresh({ ...data, nodeData: setExpandedAll(cleanAndValidateTree(data.nodeData, true), true) });
+        mind.refresh({ ...data, nodeData: setMindMapTreeExpanded(cleanAndValidateTree(data.nodeData, true), true) });
     }, [mind]);
 
     const handleFitView = useCallback(() => {
@@ -215,7 +209,7 @@ const MindElixirToolbar: React.FC = () => {
             mind.refresh({ ...data, nodeData });
             mind.layout();
             setTimeout(() => mind.toCenter(), 80);
-            mind.bus.fire('operation', {
+            emitVizlyMindMapOperation(mind, {
                 name: 'autoArrangeMindmap',
                 obj: nodeData,
             });
@@ -482,7 +476,7 @@ const MindElixirToolbar: React.FC = () => {
                                         }
                                         mind.renderArrow();
                                         // 触发 operation 记录，同步协同和静默保存
-                                        mind.bus.fire('operation', {
+                                        emitVizlyMindMapOperation(mind, {
                                             name: 'editArrowLabel',
                                             obj: newArrow,
                                         });
@@ -512,7 +506,7 @@ const MindElixirToolbar: React.FC = () => {
         opmlInputRef.current?.click();
     }, []);
 
-    const loadAndRefresh = useCallback((nodeData: import('mind-elixir').NodeObj) => {
+    const loadAndRefresh = useCallback((nodeData: NodeObj) => {
         if (!mind) return;
         mind.refresh({ nodeData: cleanAndValidateTree(nodeData, true) });
         mind.toCenter();
@@ -537,7 +531,10 @@ const MindElixirToolbar: React.FC = () => {
                 const json = parseDiagramJson(String(ev.target?.result || ''));
                 const data = cleanMindMapData(json);
                 if (!mind) return;
-                mind.refresh(data);
+                mind.refresh({
+                    ...data,
+                    direction: coerceMindElixirDirection(data.direction),
+                });
                 mind.toCenter();
                 (mind as any).clearHistory?.();
             } catch (err) { logMindmapToolbarImportFailure('JSON', err); }
