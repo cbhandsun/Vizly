@@ -8,7 +8,7 @@
   },
   "oversizedFiles": {
     "src/components/DiagramViewer.tsx": 1104,
-    "src/components/ai/AIChatPanel.tsx": 1199,
+    "src/components/ai/AIChatPanel.tsx": 1141,
     "src/components/ai/AIConfigModal.tsx": 720,
     "src/components/debug/tabs/VisualizerTab.tsx": 1198,
     "src/components/ui/ConfigurationPanel.tsx": 1192,

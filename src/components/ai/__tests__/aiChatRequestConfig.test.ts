@@ -127,7 +127,11 @@ describe('aiChatRequestConfig', () => {
 
         const validation = validateAIChatRequestSelection(selection, resolveEndpoint);
 
-        expect(validation).toEqual({ ok: true });
+        expect(validation).toEqual({
+            ok: true,
+            provider: selection.provider,
+            model: selection.model,
+        });
         expect(resolveEndpoint).toHaveBeenCalledWith(selection.provider);
     });
 });

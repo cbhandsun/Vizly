@@ -7,10 +7,9 @@ export interface AIChatResolvedModelSelection {
     autoSwitched: boolean;
 }
 
-export interface AIChatRequestValidationResult {
-    ok: boolean;
-    reason?: 'missing-model' | 'missing-api-key' | 'invalid-endpoint';
-}
+export type AIChatRequestValidationResult =
+    | { ok: true; provider: AIProviderConfig; model: AIModel }
+    | { ok: false; reason: 'missing-model' | 'missing-api-key' | 'invalid-endpoint' };
 
 const findFirstEnabledModelSelection = (
     providers: AIProviderConfig[]
@@ -93,5 +92,9 @@ export const validateAIChatRequestSelection = (
         };
     }
 
-    return { ok: true };
+    return {
+        ok: true,
+        provider: selection.provider,
+        model: selection.model,
+    };
 };

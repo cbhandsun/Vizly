@@ -36,9 +36,8 @@ import Popconfirm from 'antd/es/popconfirm';
 import { parseAIStreamDelta } from './aiStreamParsing';
 import { sanitizeAIProviderError } from '@/services/ai/errorSecurity';
 import { formatAIProviderRequestError, requestAIChatCompletion, resolveAIProviderEndpoint } from '@/services/ai/aiProviderClient';
-import { getAICommandIds } from './aiCommandPolicy';
 import { getAIDiagramTitle, parseAIDiagramJson, registerAIDiagramLocally, serializeAIDiagram, upsertDiagramConfigIndex } from './aiDiagramImport';
-import { extractValidatedAICommands } from './aiCommandExtraction';
+import { executeAICommandContent, type AICommandExecutionSuccess } from './aiCommandExecution';
 import {
     buildAIChatConversationUpdate,
     createAIChatPendingMessageState,
@@ -71,6 +70,7 @@ import {
 import { MemoizedMessageItem } from './AIChatMessageItem';
 import './AIChatPanel.css';
 import { appMessage } from '@/core/utils/antdStaticBridge';
+import type { PluginContext } from '@/core/types/plugin';
 
 const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
 
@@ -331,114 +331,56 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [onClose]);
 
-    /**
-     * 解析并执行 AI 输出中的原子化命令
-     * 格式：[COMMAND: {"action": "addNode", "label": "...", ...}]
-     */
-    const processCommands = async (content: string) => {
-        if (!canvasOps) return;
-
-        const extraction = extractValidatedAICommands(content);
-        extraction.rejected.slice(0, 3).forEach(({ action, reason }) => {
-            logBlockedAutonomousCommand(action, reason);
-            appMessage.warning(`AI 指令 "${action}" 已被拦截：${reason}`);
-        });
-
-        for (const cmd of extraction.commands) {
-            try {
-                // [GAP-10] 首选：尝试通过插件分发器执行 (Architecture First)
-                if (pluginId) {
-                    const ctx = pluginId === 'flowchart' ? ((window as any).__flowContextBridge) : (diagramNodesRef ? {
-                        getNodes: () => diagramNodesRef.current,
-                        getEdges: () => diagramEdgesRef?.current || [],
-                        addNode: canvasOps?.onAddNode,
-                        updateNodesBatch: (ids: any, updates: any) => canvasOps?.onUpdateNodes?.(ids, updates),
-                        takeSnapshot: () => {},
-                        diagramId
-                    } : null);
-
-                    if (ctx) {
-                        const handled = await PluginRegistry.getInstance().executeAIAction(pluginId, cmd.action, cmd, ctx as any);
-                        if (handled) {
-                            continue; 
-                        }
-                    }
-                }
-
-                // 次选：回退到通用内置指令处理
-                switch (cmd.action) {
-                    case 'addNode':
-                        if (canvasOps.onAddNode) {
-                            const newId = canvasOps.onAddNode(cmd.label, cmd.shape || cmd.type);
-                            if (newId) appMessage.success(t('aiChat.status.nodeAdded', { label: cmd.label }));
-                        }
-                        break;
-                    case 'deleteNodes':
-                        if (canvasOps.onDeleteNodes && cmd.ids) {
-                            canvasOps.onDeleteNodes(cmd.ids);
-                            appMessage.success(t('aiChat.status.nodesDeleted', { count: cmd.ids.length }));
-                        }
-                        break;
-                    case 'connectNodes':
-                        if (canvasOps.onConnectNodes && cmd.source && cmd.target) {
-                            canvasOps.onConnectNodes(cmd.source, cmd.target, cmd.label);
-                            appMessage.success(t('aiChat.status.connected', { label: cmd.label || '' }));
-                        }
-                        break;
-                    case 'triggerLayout':
-                    case 'layout':
-                        if (canvasOps.onAutoLayout) {
-                            canvasOps.onAutoLayout(cmd.strategy);
-                            appMessage.success(t('aiChat.status.layoutApplied', { strategy: cmd.strategy || t('aiChat.status.smartLayout') }));
-                        }
-                        break;
-                    case 'groupNodes':
-                        if (canvasOps.onGroupNodes && cmd.ids) {
-                            canvasOps.onGroupNodes(cmd.ids, cmd.name || cmd.label);
-                            appMessage.success(t('aiChat.status.groupCreated', { name: cmd.name || cmd.label || t('aiChat.status.smartGroup') }));
-                        }
-                        break;
-                    case 'export':
-                        if (canvasOps.onExport) {
-                            canvasOps.onExport(cmd.type || 'png');
-                        }
-                        break;
-                    case 'save':
-                        if (canvasOps.onSave) {
-                            canvasOps.onSave();
-                        }
-                        break;
-                    case 'share':
-                        if (canvasOps.onShare) canvasOps.onShare();
-                        break;
-                    case 'updateTheme':
-                        if (canvasOps.onUpdateTheme && cmd.style) {
-                            canvasOps.onUpdateTheme(cmd.style);
-                        }
-                        break;
-                    case 'presentation':
-                        if (canvasOps.onTogglePresentation) {
-                            canvasOps.onTogglePresentation(cmd.active !== false);
-                        }
-                        break;
-                    case 'animatePath':
-                        if (canvasOps.onAnimatePath) {
-                            const ids = getAICommandIds(cmd);
-                            const options = cmd.params?.options || {};
-                            if (ids) canvasOps.onAnimatePath(ids, { duration: cmd.duration ?? options.duration, loop: cmd.loop ?? options.loop });
-                        }
-                        break;
-                    default:
-                        break;
-                }
-                
-                // [Phase 15] 为连续指令增加微小延迟，确保 React Flow 状态稳定同步
-                await new Promise(resolve => setTimeout(resolve, 100));
-            } catch (e) {
-                logAICommandExecutionError(e, cmd);
-            }
+    const notifyCommandSuccess = (event: AICommandExecutionSuccess) => {
+        switch (event.type) {
+            case 'node-added':
+                appMessage.success(t('aiChat.status.nodeAdded', { label: event.label }));
+                break;
+            case 'nodes-connected':
+                appMessage.success(t('aiChat.status.connected', { label: event.label }));
+                break;
+            case 'layout-applied':
+                appMessage.success(t('aiChat.status.layoutApplied', { strategy: event.strategy || t('aiChat.status.smartLayout') }));
+                break;
+            case 'group-created':
+                appMessage.success(t('aiChat.status.groupCreated', { name: event.name || t('aiChat.status.smartGroup') }));
+                break;
         }
     };
+
+    const processCommands = (content: string) => executeAICommandContent({
+        content,
+        canvasOps,
+        pluginId,
+        resolvePluginContext: () => {
+            if (pluginId === 'flowchart') {
+                return (window as Window & { __flowContextBridge?: unknown }).__flowContextBridge ?? null;
+            }
+            if (!diagramNodesRef) return null;
+            return {
+                getNodes: () => diagramNodesRef.current,
+                getEdges: () => diagramEdgesRef?.current || [],
+                addNode: canvasOps?.onAddNode,
+                updateNodesBatch: (ids: string[], updates: Record<string, unknown>) => canvasOps?.onUpdateNodes?.(ids, updates),
+                takeSnapshot: () => {},
+                diagramId,
+            };
+        },
+        executePluginAction: (targetPluginId, command, context) => (
+            PluginRegistry.getInstance().executeAIAction(
+                targetPluginId,
+                command.action,
+                command,
+                context as PluginContext,
+            )
+        ),
+        onRejected: (action, reason) => {
+            logBlockedAutonomousCommand(action, reason);
+            appMessage.warning(`AI 指令 "${action}" 已被拦截：${reason}`);
+        },
+        onSuccess: notifyCommandSuccess,
+        onExecutionError: logAICommandExecutionError,
+    });
 
     // --- Handle Slash Commands ---
     const addLocalMessage = useCallback((role: 'user' | 'assistant', content: string) => {
@@ -785,8 +727,8 @@ ${renderCategory('🤖 AI 智能指令', categories.ai)}
                         ? (canvasOps?.onAnalyze ? `\n\n[实时图表巡检报告]\n${canvasOps.onAnalyze().summary}` : buildAnalysisContext(diagramNodesRef?.current || [], diagramEdgesRef?.current || []))
                         : ''),
             });
-            const response = await requestAIChatCompletion(activeProvider, {
-                model: activeModel.id,
+            const response = await requestAIChatCompletion(validation.provider, {
+                model: validation.model.id,
                 messages: requestMessages,
                 stream: true
             }, { signal: requestController.signal, timeoutMs: 120_000 });
