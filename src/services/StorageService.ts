@@ -1,20 +1,18 @@
 import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { IStorageProvider, DiagramMetadata, SavedDiagram } from './storage/types';
-import { coerceS3StorageConfig, redactSensitiveValue } from './storageSecurity';
+import {
+    coerceS3StorageConfig,
+    hasPersistedS3SecretField,
+    redactSensitiveValue,
+    type ValidatedS3StorageConfig,
+} from './storageSecurity';
 import { parseRemoteDiagramJson } from './remoteDiagramContent';
 import { safeLog } from '@/core/utils/consoleCleanup';
 import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
 import { logUiStorageReadFailure, logUiStorageWriteFailure } from '@/core/utils/uiStorageLogging';
 import { safeJsonParseWithLimit } from '@/core/utils/jsonUtils';
 
-export interface StorageConfig {
-    endpoint: string;
-    accessKeyId: string;
-    secretAccessKey: string;
-    bucket: string;
-    region: string;
-    s3ForcePathStyle?: boolean; // For MinIO or compatible services
-}
+export type StorageConfig = ValidatedS3StorageConfig;
 
 export interface StorageItem {
     key: string;
@@ -146,8 +144,8 @@ export class S3StorageProvider implements IStorageProvider {
                 }
 
                 this.config = safeConfig;
-                if (parsed.secretAccessKey) {
-                    this.persistSanitizedConfig(this.config, 'S3StorageProvider.loadConfig');
+                if (hasPersistedS3SecretField(parsed)) {
+                    this.persistSanitizedConfig(safeConfig, 'S3StorageProvider.loadConfig');
                 }
                 this.initializeClient();
             }
@@ -166,8 +164,8 @@ export class S3StorageProvider implements IStorageProvider {
         }
 
         this.config = safeConfig;
-        this.persistSessionSecret(this.config.secretAccessKey, 'S3StorageProvider.saveConfig');
-        this.persistSanitizedConfig(this.config, 'S3StorageProvider.saveConfig');
+        this.persistSessionSecret(safeConfig.secretAccessKey, 'S3StorageProvider.saveConfig');
+        this.persistSanitizedConfig(safeConfig, 'S3StorageProvider.saveConfig');
         this.initializeClient();
     }
 
@@ -252,7 +250,7 @@ export class S3StorageProvider implements IStorageProvider {
             // Use metadata from content if available, else standard fallback
             return {
                 id: id,
-                title: content.title || content.metadata?.title || content.name || fallbackTitle,
+                title: content.metadata?.title || content.name || fallbackTitle,
                 content: content,
                 updated_at: (response.LastModified || new Date()).toISOString(),
                 user_id: 's3-user' // S3 doesn't have inherent user concept here
@@ -338,7 +336,7 @@ export class S3StorageProvider implements IStorageProvider {
             });
             await client.send(command);
             return true;
-        } catch (error: any) {
+        } catch (error) {
             safeLog.error('S3 Connection Test Failed', redactSensitiveLogValue(error));
             throw error;
         }

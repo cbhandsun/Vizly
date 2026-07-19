@@ -15,6 +15,16 @@ export interface PersistedS3StorageConfig {
     s3ForcePathStyle?: boolean;
 }
 
+export type ValidatedS3StorageConfig = Omit<PersistedS3StorageConfig, 'secretAccessKey'> & {
+    secretAccessKey: string;
+};
+
+export const hasPersistedS3SecretField = (rawConfig: unknown): boolean =>
+    !!rawConfig
+    && typeof rawConfig === 'object'
+    && !Array.isArray(rawConfig)
+    && Object.hasOwn(rawConfig, 'secretAccessKey');
+
 export const normalizeS3Endpoint = (rawEndpoint: string): string | null => {
     const trimmed = rawEndpoint.trim();
     if (!trimmed || trimmed.length > MAX_ENDPOINT_LENGTH || trimmed.startsWith('//')) return null;
@@ -61,7 +71,7 @@ const normalizeRegion = (value: unknown): string | null => {
 export const coerceS3StorageConfig = (
     rawConfig: unknown,
     sessionSecret = ''
-): PersistedS3StorageConfig | null => {
+): ValidatedS3StorageConfig | null => {
     if (!rawConfig || typeof rawConfig !== 'object' || Array.isArray(rawConfig)) {
         return null;
     }

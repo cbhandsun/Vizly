@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { coerceS3StorageConfig, normalizeS3Endpoint, redactSensitiveValue } from '../storageSecurity';
+import {
+    coerceS3StorageConfig,
+    hasPersistedS3SecretField,
+    normalizeS3Endpoint,
+    redactSensitiveValue,
+} from '../storageSecurity';
 
 describe('storageSecurity', () => {
     it('allows HTTPS and local HTTP S3 endpoints only', () => {
@@ -44,6 +49,14 @@ describe('storageSecurity', () => {
             region: 'us-east-1',
             s3ForcePathStyle: true,
         });
+    });
+
+    it('detects a persisted secret field without trusting its value', () => {
+        expect(hasPersistedS3SecretField({ secretAccessKey: 'legacy-secret' })).toBe(true);
+        expect(hasPersistedS3SecretField({ secretAccessKey: 42 })).toBe(true);
+        expect(hasPersistedS3SecretField({})).toBe(false);
+        expect(hasPersistedS3SecretField(null)).toBe(false);
+        expect(hasPersistedS3SecretField([])).toBe(false);
     });
 
     it('rejects wrong-shaped, incomplete, or unsafe S3 configs', () => {
