@@ -529,13 +529,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/components/diagrams/hooks/useDesignerCanvasState.ts",
-        "code": 2339,
-        "messageHash": "791ab5b32092f48c04138bbd1c686349c2af96012f1f438e106424741c756fbe",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/components/diagrams/hooks/useDesignerInteractions.ts",
         "code": 2322,
         "messageHash": "68d8625cbcb42b74b757a510cc6ca8974a36689ae2daab4ccc25742736463729",

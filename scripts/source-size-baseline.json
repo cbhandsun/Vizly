@@ -14,7 +14,6 @@
     "src/core/config/DiagramConfig.ts": 1049,
     "src/core/components/custom-edges/hooks/useSmartPathWorker.ts": 893,
     "src/core/components/custom-edges/useSmartEdgeContext.ts": 1015,
-    "src/core/components/diagrams/FlowchartDesigner.tsx": 1056,
     "src/core/components/diagrams/FlowchartDesignerView.tsx": 760,
     "src/core/components/diagrams/hooks/useDesignerSystemSync.ts": 877,
     "src/core/components/diagrams/timeline-pro/ProTaskLayer.tsx": 744,

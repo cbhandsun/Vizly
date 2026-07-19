@@ -5,12 +5,10 @@ import { diagramStyleManager } from '../../shared/DiagramStyleManager';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { useFlowchartState } from './useFlowchartState';
 import { subscribeViewport } from '../../shared/viewportStore';
-import { appMessage } from '@/core/utils/antdStaticBridge';
 import { logDiagramGlobalThemeSyncFailure } from '../diagramThemeLogging';
 
 
 export interface UseDesignerCanvasStateProps {
-    id?: string;
     externalReadonly?: boolean;
     externalEdgeMode?: 'advanced-smart' | 'native';
     externalShowOnlyMainFlow?: boolean;
@@ -18,12 +16,10 @@ export interface UseDesignerCanvasStateProps {
     onReadonlyChange?: (isReadonly: boolean) => void;
     onMainFlowAnimationChange?: (highlight: boolean) => void;
     onShowOnlyMainFlowChange?: (showOnly: boolean) => void;
-    onOpenSettings?: () => void;
     onSyncPush?: (nodes: any[], edges: any[]) => void;
 }
 
 export function useDesignerCanvasState({
-    _id,
     externalReadonly = false,
     externalEdgeMode = 'advanced-smart',
     externalShowOnlyMainFlow = false,
@@ -31,7 +27,6 @@ export function useDesignerCanvasState({
     onReadonlyChange,
     onMainFlowAnimationChange,
     onShowOnlyMainFlowChange,
-    onOpenSettings,
     onSyncPush,
 }: UseDesignerCanvasStateProps) {
     const preset = useDiagramStylePreset_v2();
@@ -81,14 +76,6 @@ export function useDesignerCanvasState({
         setInternalHighlightMainFlow(next);
         if (onMainFlowAnimationChange) onMainFlowAnimationChange(next);
     }, [internalHighlightMainFlow, onMainFlowAnimationChange]);
-
-    const handleOpenSettings = useCallback(() => {
-        if (onOpenSettings) {
-            onOpenSettings();
-        } else {
-            appMessage.info('当前独立设计器模式未挂载高级首选项面板，请在主视图中或按快捷键 Ctrl+Shift+, 打开。');
-        }
-    }, [onOpenSettings]);
 
     useEffect(() => {
         // 静态 import，避免动态异步导入导致组件卸载时 unsubscribe 丢失内存泄漏
@@ -238,8 +225,6 @@ export function useDesignerCanvasState({
         highlightMainFlow,
         handleToggleShowOnlyMainFlow,
         handleToggleHighlightMainFlow,
-        
-        handleOpenSettings,
         
         theme,
         canvasBg,
