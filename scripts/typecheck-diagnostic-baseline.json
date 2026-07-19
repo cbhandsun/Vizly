@@ -116,13 +116,6 @@
       },
       {
         "category": "error",
-        "file": "src/components/diagrams/hooks/useCloudSave.ts",
-        "code": 2322,
-        "messageHash": "309bb740ca03dcf007d96d935a4882db95213ae4e090e434e38a1b18f1657cfd",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/components/diagrams/hooks/useVersionHistory.ts",
         "code": 2345,
         "messageHash": "1d0e6252b8b8026c0f44886f8edcb10d184ee74e512d8a827810dd5d96f74bb4",
@@ -420,13 +413,6 @@
         "file": "src/core/components/diagrams/__tests__/unifiedDesignerState.test.ts",
         "code": 2353,
         "messageHash": "e8f86e159a95628d2fae72956c01a7905a826cef991ca722c3e6a24675e4d30f",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/advancedExportActions.ts",
-        "code": 2345,
-        "messageHash": "d0a4021adfb697ec4b8055f87c037a31d7471658799ec1b02004a829239716e1",
         "count": 1
       },
       {
@@ -1152,31 +1138,10 @@
       },
       {
         "category": "error",
-        "file": "src/core/hooks/__tests__/useOptimizedDiagramControls.test.tsx",
-        "code": 2322,
-        "messageHash": "a344ade09acc510ed00f5f84a772f65841b7b6e83faa1753a5e9003bf9cc9911",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/hooks/useConfigIntegration.ts",
         "code": 7053,
         "messageHash": "b61738cdb75d5ed0c77cb8dd754eec9b4f4ad1746816e2fef4155ca5190fe7d3",
         "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/hooks/useOptimizedDiagramControls.ts",
-        "code": 2724,
-        "messageHash": "8da7081277b1b0607d33f6b2f44716ac1002fbf09771386dd083cd0ec1015726",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/hooks/useOptimizedDiagramControls.ts",
-        "code": 2724,
-        "messageHash": "ccd61c60a06dd76093a2ff852c5f2051a56c77714ff8e69665afa3749cd3583a",
-        "count": 1
       },
       {
         "category": "error",
