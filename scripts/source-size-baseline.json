@@ -52,7 +52,6 @@
     "src/core/strategies/shared/edgeGlobalWaypointRefinement.ts": 1114,
     "src/core/strategies/shared/edgeLocalDoglegAdvancedCandidates.ts": 809,
     "src/core/strategies/shared/edgeLocalDoglegBasicCandidates.ts": 810,
-    "src/core/strategies/shared/edgeSharedEndpointPortOrderRepair.ts": 895,
     "src/core/strategies/shared/edgeSharedTrunkSynthesis.ts": 1138,
     "src/core/strategies/shared/edgeStrictCrossingGuard.ts": 1046,
     "src/core/strategies/shared/edgeTerminalBoundaryStairGeometry.ts": 1011,

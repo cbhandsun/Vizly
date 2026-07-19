@@ -1670,20 +1670,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/strategies/shared/edgeSharedEndpointPortOrderRepair.ts",
-        "code": 2304,
-        "messageHash": "74b7bec37ddfa400e99f49e6629cde4e0a3321a42381e4c0df275e6e500576b2",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/strategies/shared/edgeSharedEndpointPortOrderRepair.ts",
-        "code": 2339,
-        "messageHash": "465e65efed1f9de9c2b0468b63ad402ffbc0622f5b3562da3c20e3b2809ac203",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/themes/BaseConstants.ts",
         "code": 2307,
         "messageHash": "9acea9b1d907e604f0469d443742ada0ea02a8740ec575b54b7a14f82d035d6b",
