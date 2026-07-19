@@ -963,48 +963,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapOutlinePanel.tsx",
-        "code": 2322,
-        "messageHash": "691c5881553cb3b759d23278cc39e4045b716d87962cd67d712b83df2d5fe611",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapOutlinePanel.tsx",
-        "code": 2322,
-        "messageHash": "e53509b8a1a4ac6b9e2a16364e1f9c5d6f854e9755a36be8ba743d4bd9152ec9",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapOutlinePanel.tsx",
-        "code": 2345,
-        "messageHash": "0b331f98d9ec4106bcd1cac7d60c69f8f7b7fa06452fc0fb2b3356d3315f3681",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapOutlinePanel.tsx",
-        "code": 2345,
-        "messageHash": "c56b90ab6a28be7de13babd792db216efe63f25e8e6d4d189eda591db8198012",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapOutlinePanel.tsx",
-        "code": 2345,
-        "messageHash": "eba7570387975f716cbd445395b9181fdfb2813381d7550440037f706ec121c9",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapOutlinePanel.tsx",
-        "code": 2739,
-        "messageHash": "583b93f116c9066d6971f2ce0d028ac710282b24962aaccabe09944a03ac5e1e",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/components/mindmap-v2/MindMapSpeakerNotes.tsx",
         "code": 2322,
         "messageHash": "4aeb6f7101f54cb73702544a78672e83528b9b4e6668cc670f7933699b5d3a24",

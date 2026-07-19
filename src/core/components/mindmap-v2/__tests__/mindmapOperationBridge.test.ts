@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { MindElixirInstance, NodeObj } from 'mind-elixir';
 
-import { emitVizlyMindMapOperation } from '../mindmapOperationBridge';
+import { emitVizlyMindMapOperation, refreshVizlyMindMapData } from '../mindmapOperationBridge';
 
 describe('emitVizlyMindMapOperation', () => {
     it('emits application operations through the mind-elixir operation channel', () => {
@@ -17,6 +17,7 @@ describe('emitVizlyMindMapOperation', () => {
 
         emitVizlyMindMapOperation(mind, { name: 'autoArrangeMindmap', obj: node });
         emitVizlyMindMapOperation(mind, { name: 'editArrowLabel', obj: arrow });
+        emitVizlyMindMapOperation(mind, { name: 'outline_structure_change', obj: node });
 
         expect(fire).toHaveBeenNthCalledWith(1, 'operation', {
             name: 'autoArrangeMindmap',
@@ -26,5 +27,22 @@ describe('emitVizlyMindMapOperation', () => {
             name: 'editArrowLabel',
             obj: arrow,
         });
+        expect(fire).toHaveBeenNthCalledWith(3, 'operation', {
+            name: 'outline_structure_change',
+            obj: node,
+        });
+    });
+
+    it('refreshes runtime-supported direction values through one typed adapter', () => {
+        const refresh = vi.fn();
+        const mind = { refresh } as unknown as MindElixirInstance;
+        const data = {
+            nodeData: { id: 'root', topic: 'Root' } as NodeObj,
+            direction: 3,
+        };
+
+        refreshVizlyMindMapData(mind, data);
+
+        expect(refresh).toHaveBeenCalledWith(data);
     });
 });

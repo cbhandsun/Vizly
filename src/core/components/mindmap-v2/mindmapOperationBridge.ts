@@ -1,10 +1,15 @@
-import type { MindElixirInstance, NodeObj } from 'mind-elixir';
+import type { MindElixirData, MindElixirInstance, NodeObj } from 'mind-elixir';
 
 type MindElixirArrow = MindElixirInstance['arrows'][number];
 
 export type VizlyMindMapOperation =
     | { name: 'autoArrangeMindmap'; obj: NodeObj }
-    | { name: 'editArrowLabel'; obj: MindElixirArrow };
+    | { name: 'editArrowLabel'; obj: MindElixirArrow }
+    | { name: 'outline_structure_change'; obj: NodeObj };
+
+export type VizlyMindMapData = Omit<MindElixirData, 'direction'> & {
+    direction?: number;
+};
 
 type OperationEmitter = (event: 'operation', operation: VizlyMindMapOperation) => void;
 
@@ -16,4 +21,13 @@ export const emitVizlyMindMapOperation = (
     // runtime pubsub accepts application operations. Keep that cast here.
     const emit = mind.bus.fire as unknown as OperationEmitter;
     emit('operation', operation);
+};
+
+export const refreshVizlyMindMapData = (
+    mind: MindElixirInstance,
+    data: VizlyMindMapData,
+): void => {
+    // The runtime accepts direction 3 and existing persisted Vizly maps use it,
+    // while the upstream declaration currently narrows direction to 0 | 1 | 2.
+    mind.refresh(data as MindElixirData);
 };
