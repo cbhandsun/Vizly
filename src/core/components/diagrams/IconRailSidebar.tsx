@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Input, Typography, theme, Tooltip, Flex, Popover, Slider, Button, Empty, Tree } from 'antd';
 import {
-    _FaShapes, FaCompass, FaStream, FaStar, FaSearch,
+    FaCompass, FaStream, FaStar, FaSearch,
     FaPlay, FaBox, FaTimes,
     FaSearchPlus, FaSearchMinus, FaRegComment
 } from 'react-icons/fa';
@@ -16,12 +16,6 @@ import {
 } from './iconRailSidebarStorage';
 import type { NodeTemplate } from './hooks/useNodeTemplates';
 import type { LayerConfig } from './hooks/useLayerManagement';
-import {
-    FaPlay as _FaPlayIcon, _FaSquare, _FaStop, _FaDatabase, _FaQuestion,
-    _FaLayerGroup, _FaThLarge, _FaImage,
-    _FaKeyboard,
-    _FaServer, _FaNetworkWired, _FaLock, _FaPlug, _FaUser, _FaEnvelope, _FaBell, _FaCog, _FaCode, _FaTerminal
-} from 'react-icons/fa';
 import './IconRailSidebar.css';
 
 const { Text } = Typography;
