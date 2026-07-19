@@ -1733,20 +1733,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/themes/ThemePresetManager.ts",
-        "code": 2322,
-        "messageHash": "f7da6d20f4a889e80cd876c95fbf49793231c9edc588f7f26633b2607540ff45",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/themes/ThemePresetManager.ts",
-        "code": 2339,
-        "messageHash": "4ae7bea41b2c721d12eb66a4f6963707154331e11e3871c48d5cb47b38fcc08f",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/utils/__tests__/customPresetStorage.test.ts",
         "code": 2739,
         "messageHash": "298e523828bbb014dcf31d81df1675fdd35687ebdfbc06eb96e5f498d0713c80",

@@ -115,4 +115,28 @@ describe('ThemePresetManager secure import', () => {
     expect(preset.tags[0]).toBe('first');
     expect(preset.tags).not.toContain(123);
   });
+
+  it('creates structurally complete template themes and typed export envelopes', async () => {
+    const [{ LayeredConfigManager }, { ThemePresetManager }] = await Promise.all([
+      import('../../config/LayeredConfigManager'),
+      import('../ThemePresetManager'),
+    ]);
+    const manager = new ThemePresetManager(LayeredConfigManager.getInstance());
+    const baseTheme = clone(lightThemePreset.theme);
+
+    const preset = manager.createPresetFromTemplate('ocean-blue', baseTheme, {
+      name: 'Template Export',
+    });
+
+    expect(preset).not.toBeNull();
+    expect(preset?.theme.palette.primary.main).toBe('#0077be');
+    expect(preset?.theme.typography).toEqual(baseTheme.typography);
+    expect(preset?.theme.animation).toEqual(baseTheme.animation);
+    const exported = JSON.parse(manager.exportPreset(preset!.id) ?? '{}');
+    expect(exported).toMatchObject({
+      version: '1.0',
+      preset: { id: preset!.id, name: 'Template Export' },
+    });
+    expect(Number.isNaN(Date.parse(exported.exportedAt))).toBe(false);
+  });
 });
