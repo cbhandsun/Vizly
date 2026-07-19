@@ -20,7 +20,8 @@ import { useSubscription } from '../context/useSubscription';
 const RoutingDebugPanel = React.lazy(() => import('./debug/RoutingDebugPanel').then(m => ({ default: m.RoutingDebugPanel })));
 import { LayeredConfigManager, ConfigLayer } from '@/core/config/LayeredConfigManager';
 import { DiagramLayout } from './layout/DiagramLayout';
-import { CommandPalette, type CommandItem } from '@/core/components/ui/CommandPalette';
+import { CommandPalette } from '@/core/components/ui/CommandPalette';
+import type { CommandItem } from '@/core/types/plugin';
 import { readRecentCommandIds } from '@/core/components/ui/commandPaletteStorage';
 import { useYjsCollaboration } from './diagrams/collaboration/YjsProviderHooks';
 import { useCloudSave } from './diagrams/hooks/useCloudSave';
@@ -54,9 +55,6 @@ const MermaidImportModal = React.lazy(() => import('./ui/MermaidImportModal').th
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
 import { invalidateRemoteDiagramPreview } from '@/services/remoteDiagramPreview';
 import DiagramControlBridge from '@/core/components/shared/DiagramControlBridge';
-
-
-
 const DraggableSettingsPanel = React.lazy(() => import('./ui/DraggableSettingsPanel').then(m => ({ default: m.DraggableSettingsPanel })));
 const TemplateCascaderMenu = React.lazy(() => import('./diagrams/ui/TemplateCascaderMenu').then(m => ({ default: m.TemplateCascaderMenu })));
 import { appMessage } from '@/core/utils/antdStaticBridge';
@@ -103,6 +101,8 @@ import {
 } from './diagramViewerSeedNavigation';
 import { ensureDiagramSwitchConfirmed } from './diagramViewerSwitchGuard';
 import { parseRemoteDiagramContent } from '@/services/remoteDiagramContent';
+import { coerceToStandardDiagramData } from '@/core/utils/coerceDiagram';
+import { importMermaidGraphToBridge } from './diagramViewerMermaidImport';
 import {
     normalizeCollaborationRoomName,
     normalizeCollaborationServerUrl,
@@ -188,32 +188,16 @@ const DiagramViewer: React.FC = () => {
     const { saveToCloud, shareDialogOpen, closeShareDialog, ensureSaved } = useCloudSave(selectedDiagramId);
     
     // --- Phase 6: Mermaid Import Logic ---
-    const handleImportMermaidNodes = useCallback(async (nodes: any[], edges: any[]) => {
+    const handleImportMermaidNodes = useCallback(async (nodes: unknown[], edges: unknown[]) => {
         const bridge = getFlowDataBridge(selectedDiagramId);
-        if (!bridge) {
+        const addNode = bridge?.addNode;
+        if (!bridge || !addNode) {
             appMessage.error(t('diagramViewer.canvasNotFound'));
             return;
         }
 
         try {
-            // 1. 批量创建节点 (利用更新后的 addNode 支持自定义 ID)
-            for (const n of nodes) {
-                await bridge.addNode({
-                    id: n.id,
-                    label: n.data.label,
-                    type: n.data.type,
-                    shape: n.data.shape,
-                    parentId: n.parentId,
-                    position: n.position
-                });
-            }
-
-            // 2. 批量连接
-            for (const e of edges) {
-                if (bridge.connectNodes) {
-                    bridge.connectNodes({ source: e.source, target: e.target, label: e.label });
-                }
-            }
+            await importMermaidGraphToBridge({ bridge: { addNode, connectNodes: bridge.connectNodes }, nodes, edges });
 
             // 3. 自动触发智能布局
             setTimeout(() => {
@@ -450,7 +434,7 @@ const DiagramViewer: React.FC = () => {
     const handleDirectSave = useCallback(async () => {
         const bridge = getFlowDataBridge(selectedDiagramId);
         const cloudMeta = bridge?.metadata?.cloud;
-        if (cloudMeta && cloudMeta.provider && cloudMeta.title) {
+        if (bridge && cloudMeta?.provider && cloudMeta.title) {
             // 已存在云记录，静默同名同 id 覆盖更新
             const hide = appMessage.loading(t('diagramViewer.directSave.saving', { provider: cloudMeta.provider }), 0);
             try {
@@ -459,7 +443,7 @@ const DiagramViewer: React.FC = () => {
                     selectedDiagramId,
                     getProvider: async (providerName) => {
                         const { unifiedStorage } = await import('@/services/UnifiedStorageService');
-                        return unifiedStorage.getProvider(providerName as any);
+                                return unifiedStorage.getProvider(providerName);
                     },
                     attachSnapshot: tryAttachDiagramSnapshot,
                     invalidatePreview: invalidateRemoteDiagramPreview,
@@ -501,7 +485,11 @@ const DiagramViewer: React.FC = () => {
                 data: seedData,
                 convertStandardDataToCanvas: async (normalizedSeedData) => {
                     const { standardDataToCanvas } = await import('@/core/components/diagrams/designerUtils');
-                    return standardDataToCanvas(normalizedSeedData);
+                    const standardData = coerceToStandardDiagramData(normalizedSeedData, {
+                        id,
+                        title: typeof normalizedSeedData.name === 'string' ? normalizedSeedData.name : id,
+                    });
+                    return standardDataToCanvas(standardData);
                 },
                 logLayoutFallbackFailure: logDiagramViewerStandardDataLayoutFallbackFailure,
             }),
@@ -1007,7 +995,7 @@ const DiagramViewer: React.FC = () => {
                                                             diagramEdgesRef={aiEdgesRef as any}
                                                             canvasOps={aiCanvasOps}
                                                             onClose={() => {
-                                                                const aiBtn = document.querySelector('.toolbar-button-ai');
+                                                                const aiBtn = document.querySelector<HTMLElement>('.toolbar-button-ai');
                                                                 if (aiBtn) aiBtn.click();
                                                             }}
                                                         />

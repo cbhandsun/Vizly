@@ -7,7 +7,7 @@
     "compositionRoot": 300
   },
   "oversizedFiles": {
-    "src/components/DiagramViewer.tsx": 1104,
+    "src/components/DiagramViewer.tsx": 1092,
     "src/components/ai/AIChatPanel.tsx": 1141,
     "src/components/ai/AIConfigModal.tsx": 720,
     "src/components/debug/tabs/VisualizerTab.tsx": 1198,

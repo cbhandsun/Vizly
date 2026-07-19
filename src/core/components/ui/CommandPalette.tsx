@@ -9,7 +9,7 @@ import type { InputRef } from 'antd';
 import Button from 'antd/es/button';
 import { useTranslation } from 'react-i18next';
 
-import { CommandItem } from '../../types/plugin';
+import type { CommandGroup, CommandItem } from '../../types/plugin';
 import {
   bumpCommandUsage,
   bumpRecentCommandId,

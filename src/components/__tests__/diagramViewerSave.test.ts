@@ -94,4 +94,35 @@ describe('diagramViewerSave', () => {
     expect(saveDiagram).toHaveBeenCalledTimes(1);
     expect(invalidatePreview).toHaveBeenCalledWith('cloud-id');
   });
+
+  it('rejects unsupported providers and oversized titles at the save boundary', async () => {
+    const provider = {
+      isConfigured: () => true,
+      saveDiagram: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await expect(saveDiagramViewerDirectCloud({
+      bridge: {
+        id: 'bridge-id',
+        nodes: [],
+        metadata: { cloud: { provider: 'ftp', id: 'cloud-id', title: 'Cloud Title' } },
+      },
+      selectedDiagramId: 'diagram-a',
+      getProvider: vi.fn(async () => provider),
+      attachSnapshot: async (diagram) => ({ diagram }),
+      invalidatePreview: vi.fn(),
+    })).rejects.toThrow('云端保存元数据无效');
+
+    await expect(saveDiagramViewerCloudReplica({
+      bridge: { id: 'bridge-id', nodes: [] },
+      selectedDiagramId: 'diagram-a',
+      providerName: 'supabase',
+      title: 'x'.repeat(501),
+      getProvider: vi.fn(async () => provider),
+      attachSnapshot: async (diagram) => ({ diagram }),
+      invalidatePreview: vi.fn(),
+      createId: () => 'new-id',
+    })).rejects.toThrow('图表名称无效');
+    expect(provider.saveDiagram).not.toHaveBeenCalled();
+  });
 });

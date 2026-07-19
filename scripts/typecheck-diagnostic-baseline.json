@@ -186,86 +186,9 @@
       },
       {
         "category": "error",
-        "file": "src/components/DiagramViewer.tsx",
-        "code": 2322,
-        "messageHash": "23be63e8c678f0809cf1f8ce2d51e6b7b47f5bd263846e879fb5fb23f05cdbbe",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/DiagramViewer.tsx",
-        "code": 2322,
-        "messageHash": "374a120e414733366df2a74ef630c416db443e92ca4a3f196c306719815a5045",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/DiagramViewer.tsx",
-        "code": 2322,
-        "messageHash": "b700c9ad66974f47a9256e2b24801a221b91b740bd95626a9f3955260325bb08",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/DiagramViewer.tsx",
-        "code": 2322,
-        "messageHash": "d9f4abe60907e139151f63e0284d31814bea2af7c97f0d2ddb3d0b1b963f39ae",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/DiagramViewer.tsx",
-        "code": 2339,
-        "messageHash": "ffe0fc18c5bb46c95924fb6167b90b1fa1430ec3e26ff098cd4e5903c4d6e63e",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/DiagramViewer.tsx",
-        "code": 2345,
-        "messageHash": "b21d40631ae049e604ce9753afe857dd9e652624fbf0fc51b447d29d61e006a7",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/DiagramViewer.tsx",
-        "code": 2345,
-        "messageHash": "b9ac486fa4c814ddb1686f12c99de18c2434dbd477f845d4e7c80b1844bec197",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/DiagramViewer.tsx",
-        "code": 2459,
-        "messageHash": "ebbb7d1f07d52a8f3a6abea2007d0ca0c9a0e62554471976bb00b07b069b852f",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/DiagramViewer.tsx",
-        "code": 2722,
-        "messageHash": "c7847f4a193c0c3557eb5783954f1371197bbbb0fafbacf507d572271d1dd17b",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/DiagramViewer.tsx",
-        "code": 18048,
-        "messageHash": "2773b84ce330be12abd990cb2b0a3a641598ab7deb13fea748520f0ed7689266",
-        "count": 3
-      },
-      {
-        "category": "error",
         "file": "src/components/diagramViewerAiBridge.ts",
         "code": 2322,
         "messageHash": "e32b2a78399b02e6d465f00dc181e1fe571c709855fd5b96fa6835d62d51b1d0",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/diagramViewerCommandItems.ts",
-        "code": 2459,
-        "messageHash": "ebbb7d1f07d52a8f3a6abea2007d0ca0c9a0e62554471976bb00b07b069b852f",
         "count": 1
       },
       {
@@ -1744,13 +1667,6 @@
         "code": 2339,
         "messageHash": "83b49a45946070c2053dc9625c70b3043d205af53ebf553654c3d7ef280ccceb",
         "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/ui/CommandPalette.tsx",
-        "code": 2304,
-        "messageHash": "e0a2b8201789cd3a1c5cb680541210e69a5f04bdd156e2f425b773f983cf0e49",
-        "count": 4
       },
       {
         "category": "error",
