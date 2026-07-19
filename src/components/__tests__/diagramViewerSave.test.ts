@@ -5,12 +5,20 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createDiagramViewerSaveCopy,
   isDiagramViewerBridgeSavable,
+  normalizeDiagramSaveAsName,
   saveDiagramViewerCloudReplica,
   saveDiagramViewerDirectCloud,
   syncDiagramViewerBridgeCloudReplica,
 } from '../diagramViewerSave';
 
 describe('diagramViewerSave', () => {
+  it('normalizes save-as names at the UI boundary', () => {
+    expect(normalizeDiagramSaveAsName('  Diagram name  ')).toBe('Diagram name');
+    expect(normalizeDiagramSaveAsName('')).toBeNull();
+    expect(normalizeDiagramSaveAsName(null)).toBeNull();
+    expect(normalizeDiagramSaveAsName('x'.repeat(501))).toBeNull();
+  });
+
   it('checks whether a bridge has savable diagram data', () => {
     expect(isDiagramViewerBridgeSavable(undefined)).toBe(false);
     expect(isDiagramViewerBridgeSavable({ id: 'a' })).toBe(false);

@@ -28,6 +28,8 @@ const parseRequiredText = (value: unknown, maxLength = 500): string | null => {
   return text && text.length <= maxLength ? text : null;
 };
 
+export const normalizeDiagramSaveAsName = (value: unknown): string | null => parseRequiredText(value, 500);
+
 export const isDiagramViewerBridgeSavable = (
   bridge: DiagramBridgeLike | null | undefined,
 ): bridge is DiagramBridgeLike & { nodes: unknown[] } => (
