@@ -2,6 +2,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import { exportMindMapToMarkdown } from '../mindMapMarkdown';
+import { createMindMapLayoutSignature } from '../useMindMapAutoLayout';
 import {
   collectMindMapSubtree,
   createMindMapPastePayload,
@@ -28,6 +29,32 @@ const edge = (source: string, target: string, type = 'mindmapEdge'): Edge => ({
 });
 
 describe('mind map orchestrator commands', () => {
+  it('tracks structural layout inputs but ignores relationship-only changes', () => {
+    const root = node('root', 0);
+    root.data = { ...root.data, direction: 'LR', pathStyle: 'bezier', shape: 'pill' };
+    const child = node('child', 1);
+    const structuralEdge = edge('root', 'child');
+    const baseline = createMindMapLayoutSignature([root, child], [structuralEdge]);
+
+    expect(createMindMapLayoutSignature([], [])).toBe('####C#');
+    expect(createMindMapLayoutSignature([root, child], [
+      structuralEdge,
+      edge('root', 'child', 'relationshipEdge'),
+    ])).toBe(baseline);
+    expect(createMindMapLayoutSignature([
+      root,
+      { ...child, data: { ...child.data, collapsed: true } },
+    ], [structuralEdge])).not.toBe(baseline);
+    expect(createMindMapLayoutSignature([
+      { ...root, data: { ...root.data, direction: 'TB' } },
+      child,
+    ], [structuralEdge])).not.toBe(baseline);
+    expect(createMindMapLayoutSignature([
+      root,
+      { ...child, data: { ...child.data, branchColor: '#ff0000' } },
+    ], [structuralEdge])).not.toBe(baseline);
+  });
+
   it('exports ordered plain Markdown and terminates on cyclic input', () => {
     const nodes = [
       node('root', 0, '<b>Root</b>\nTitle'),

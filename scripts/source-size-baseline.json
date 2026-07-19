@@ -21,7 +21,6 @@
     "src/core/components/diagrams/FlowchartDesigner.tsx": 1056,
     "src/core/components/diagrams/FlowchartDesignerView.tsx": 760,
     "src/core/components/diagrams/hooks/useDesignerSystemSync.ts": 877,
-    "src/core/components/diagrams/hooks/useMindMapOrchestrator.ts": 1199,
     "src/core/components/diagrams/timeline-pro/ProTaskLayer.tsx": 744,
     "src/core/components/layout/LayoutOptimizer.ts": 954,
     "src/core/components/mindmap-v2/MindElixirToolbar.tsx": 922,
