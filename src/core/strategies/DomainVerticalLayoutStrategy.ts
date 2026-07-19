@@ -1,29 +1,13 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
-import type { StandardNodeData } from '../models/DiagramModels';
 import type { LayoutOptions } from '../types/layout';
 
-import { LayeredConfigManager } from '../config/LayeredConfigManager';
-import { diagramConfigManager } from '../config/DiagramConfig';
 import { pushFreeNodesBelowSubGroupRow, resolveDomainContainerOverlaps, scatterNodesAtSamePoint } from '../utils/layoutUtils';
 import { ILayoutStrategy } from './LayoutStrategyManager';
-import { applyDomainGrouping, applySubGrouping, assignChildrenToSubGroupsBySemantic, normalizeSubGroupDomainByChildren, enforceDomainContainerStrictContainment, recomputeSubGroupContainersBasic, purgeSubGroupChildrenBySemantic, resolveSubGroupOverlaps, resolveFreeNodeOverlapsInDomain, resolveSubGroupChildrenOverlapsStrict, expandSubGroupContainersBySemantic, enforceSubGroupStrictContainmentByChildren, finalizeSubGroupHeightsByProjectionPreserveAnchor, finalizeDomainWidthsByProjection, ensureMeasuredForNodes, normalizeMissingNodeSubDomainByDomain, finalizeSubGroupWidthsByProjectionPreserveAnchor, unifySubGroupWidthsByDomain, finalizeDomainHeightsByProjection, reflowSubGroupChildrenVertical, packSubGroupChildrenRigid, clampDomainHeightsToSubGroups, enforceSubGroupTitleClearance, reflowSubGroupChildrenGrid, unifySubGroupGapsInDomain, unifySubGroupHeightsByDomain, reflowSubGroupChildrenDagre, syncDagreChildPositions, centerSubGroupsInDomain, scaleDomainContentToFitWidthAll } from '../utils/layoutUtils';
-import { auditAndFixSubGroupChildrenBindings, centerSubGroupChildrenHorizontally, centerSubGroupChildrenVertically, layoutSubGroupChildrenInRow, alignSubGroupGridRows, alignSubGroupStack } from '../utils/layoutUtils';
-import { injectSemanticSubGroupsForMissingKeys, rebindChildrenNormalized } from './shared/semanticHelpers';
+import { assignChildrenToSubGroupsBySemantic, enforceDomainContainerStrictContainment, recomputeSubGroupContainersBasic, purgeSubGroupChildrenBySemantic, resolveSubGroupOverlaps, resolveFreeNodeOverlapsInDomain, resolveSubGroupChildrenOverlapsStrict, expandSubGroupContainersBySemantic, enforceSubGroupStrictContainmentByChildren, finalizeSubGroupHeightsByProjectionPreserveAnchor, finalizeDomainWidthsByProjection, ensureMeasuredForNodes, finalizeSubGroupWidthsByProjectionPreserveAnchor, unifySubGroupWidthsByDomain, finalizeDomainHeightsByProjection, packSubGroupChildrenRigid, clampDomainHeightsToSubGroups, unifySubGroupGapsInDomain, unifySubGroupHeightsByDomain, syncDagreChildPositions, centerSubGroupsInDomain, scaleDomainContentToFitWidthAll } from '../utils/layoutUtils';
+import { centerSubGroupChildrenHorizontally, centerSubGroupChildrenVertically, layoutSubGroupChildrenInRow, alignSubGroupGridRows, alignSubGroupStack } from '../utils/layoutUtils';
 import { ensureDomainContainment } from './shared/geometryGuard';
 import { runEdgeRoutingPipeline } from './shared/edgeRoutingPipeline';
-import { safeLog } from '../utils/consoleCleanup';
-import {
-  applyDomainVerticalVisibility,
-  collectDomainVerticalDomainOrder,
-  collectOrderedDomainSubGroups,
-  createDomainVerticalOrderKey,
-  resolveDomainVerticalNodeLayout,
-} from './shared/domainVerticalLayoutPreparation';
-import {
-  centerProjectedDagreSubGroups,
-  preprocessDomainVerticalDagreSubGroups,
-  reconstructDomainVerticalDagreLayout,
-} from './shared/domainVerticalDagreReconstruction';
+import { collectOrderedDomainSubGroups } from './shared/domainVerticalLayoutPreparation';
 import {
   alignDomainsToLeftAnchor,
   centerVisibleDomainMembersHorizontally,
@@ -34,15 +18,8 @@ import {
   layoutNodesHorizontally,
   layoutNodesInGrid,
   layoutNodesVertically,
-  placeNodeRowWithoutWrap,
-  placeNodeRowWithWrap,
   resolveNodeOverlapsByLayout,
 } from './shared/domainVerticalNodeLayoutPrimitives';
-import {
-  collectVisibleSubGroupChildren,
-  layoutSubGroupChildrenByMode,
-  resolveSubGroupChildOverlapsByMode,
-} from './shared/domainVerticalSubGroupChildLayout';
 import {
   equalizeVisibleSubGroupHeightsByDomain,
   projectAndUnifyDomainContainerBounds,
@@ -52,14 +29,9 @@ import {
   projectSingleDomainContainer,
   unifyContainerWidthsByMaximum,
 } from './shared/domainVerticalContainerProjection';
-import { snapshotVisibleSubGroupChildOriginOffsets } from './shared/domainVerticalRelativeOffsets';
-import { resolveDomainVerticalPipelineControls } from './shared/domainVerticalPipelineControls';
 import { alignDomainVerticalTerminalSubGroupChildren } from './shared/domainVerticalTerminalChildAlignment';
 import { recoverGridSubGroupsByDomainWidth } from './shared/domainVerticalGridSubGroupRecovery';
-import {
-  areAllTitleGroupDomainsHidden,
-  layoutHiddenDomainSubGroups,
-} from './shared/domainVerticalHiddenDomainLayout';
+import { layoutHiddenDomainSubGroups } from './shared/domainVerticalHiddenDomainLayout';
 import { layoutInitialSubGroupsInDomain } from './shared/domainVerticalSubGroupInitialLayout';
 import { finalizeInitialSubGroupLayout } from './shared/domainVerticalSubGroupPostLayout';
 import { finalizeDomainInternalLayout } from './shared/domainVerticalFinalInternalLayout';
@@ -68,6 +40,8 @@ import {
   separateSubGroupsAndExpandDomainsIteratively,
 } from './shared/domainVerticalSubGroupHorizontalRecovery';
 import { finalizePhaseTwoSubGroupLayout } from './shared/domainVerticalPhaseTwoSubGroupLayout';
+import { prepareDomainVerticalLayout } from './shared/domainVerticalLayoutContext';
+import { runDomainVerticalPhaseOne } from './shared/domainVerticalPhaseOne';
 
 /**
  * 域纵向布局策略
@@ -90,423 +64,38 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
    * - 不调用复杂消重，仅通过顺序堆叠与单次回收保证不重叠
    */
   async calculateLayout(nodes: ReactFlowNode[], edges: Edge[], options: LayoutOptions): Promise<{ nodes: ReactFlowNode[]; edges: Edge[] }> {
-    const cfg = diagramConfigManager.getConfig() as any;
-    const layoutCfg = diagramConfigManager.getLayoutConfig() as any;
-    const layeredCfg = LayeredConfigManager.getInstance();
-    const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-
-    const padH = num(layoutCfg?.GROUP_PADDING?.H, 24);
-    const titleH = num(layoutCfg?.GROUP_TITLE_HEIGHT, 48);
-    const titleV = num(layoutCfg?.GROUP_TITLE_SAFE_GAP, 8); // Use safeGap as vertical padding proxy
-    const titleSafe = num(layoutCfg?.GROUP_TITLE_SAFE_GAP, 8);
-    const bottomSafe = num(layoutCfg?.GROUP_BOTTOM_SAFE_GAP, 12);
-    const domainGap = num(layoutCfg?.DOMAIN_H_GAP, 40);
-
-    // 新增：读取对称性补偿配置
-    const sideSafeGap = num((cfg?.domain?.sideSafeGap), 0);
-    const bottomSafeGap = num((cfg?.domain?.bottomSafeGap), 0);
-    const widthCompensation = num((cfg?.domain?.widthCompensation), 1.0);
-
-    /**
-     * 函数级注释：域间垂直间距（紧凑化）
-     * - 依据 layout.autoGapScale.v 对域间距进行缩放，默认偏紧凑（<=1）
-     * - 去除对标题安全留白的额外加成，仅保留域间距本身，避免上下间隔过大
-     */
-    const vScale = num((cfg?.layout?.autoGapScale?.v as any), 0.7);
-    const domainGapEff = Math.max(12, Math.round(domainGap * vScale));
-    const domainGapFinal = Math.max(domainGapEff, Math.floor(titleSafe + Math.max(6, Math.floor(padH * 0.5))));
-
-    const subPadH = num((cfg?.subDomain?.padding?.horizontal ?? cfg?.subGroup?.padding?.horizontal ?? layoutCfg?.SUB_GROUP_PADDING?.H), 18);
-    const subTitleH = num((cfg?.subDomain?.title?.height ?? cfg?.subGroup?.title?.height ?? layoutCfg?.SUB_GROUP_TITLE_HEIGHT), 30);
-    const subTitleV = num((cfg?.subDomain?.title?.padding?.vertical ?? cfg?.subGroup?.title?.padding?.vertical ?? layoutCfg?.SUB_GROUP_TITLE_SAFE_GAP), 16);
-    const subBottomSafe = num((cfg?.subDomain?.padding?.bottom ?? cfg?.subGroup?.padding?.bottom ?? layoutCfg?.SUB_GROUP_PADDING?.V_BOTTOM), 16);
-    const subPadTop = num((cfg?.subDomain?.padding?.top ?? cfg?.subGroup?.padding?.top ?? layoutCfg?.SUB_GROUP_PADDING?.V_TOP), 28);
-
-    const nodeH = num(layoutCfg?.NODE_H_GAP, 120);
-    const nodeV = num(layoutCfg?.NODE_V_GAP, 60);
-
-    const baseHGapCfg = num((layoutCfg?.NODE_H_GAP), 120);
-    const scaleHCfg = num(((cfg?.layout?.autoGapScale?.h) as any), 1);
-    const hGapDet = Math.max(12, Math.floor(baseHGapCfg * Math.min(1.0, scaleHCfg)));
-    /**
-     * 函数级注释：同域子域行间距（紧凑化）
-     * - 定义：仅作用于同一域内子域容器之间的垂直间距
-     * - 策略：按节点垂直间距 nodeV 的 0.6 比例，并保留 8 像素下限，获得更紧凑的子域堆叠
-     */
-    const subGroupVGapCompact = Math.max(8, Math.floor(nodeV * 0.6));
-
-    const domainWhitelist = (options as any)?.domainWhitelist as string[] | undefined;
-    const subWhitelist = (options as any)?.subDomainWhitelist as string[] | undefined;
-    const showDomain = !!(options as any)?.generateDomainGroups;
-    const showSub = !!((options as any)?.generateSubDomainGroups);
-    const pipelineControls = resolveDomainVerticalPipelineControls({
-      optionStopAfterPhase: (options as any)?.stopAfterPhase,
-      configuredStopAfterPhase: layeredCfg.get<string>(
-        'diagram.layout.stopAfterPhase',
-        'none',
-      ),
-      optionLockSubGroupHeights: (options as any)?.__lockSubGroupHeights,
-      optionFitDomainContent: (options as any)?.fitDomainContent,
-      configuredConstantGapMode: layeredCfg.get<boolean>(
-        'diagram.layout.constantGapMode' as any,
-        true,
-      ),
-    });
+    const safeEdges = Array.isArray(edges) ? edges : [];
+    const safeOptions = options && typeof options === 'object'
+      ? options
+      : {} as LayoutOptions;
+    const context = prepareDomainVerticalLayout(nodes, safeOptions);
+    let { updatedNodes, cursorYGlobal } = context;
+    const {
+      cfg, layoutCfg, layeredCfg, num, padH, titleH, titleV, titleSafe,
+      bottomSafe, sideSafeGap, bottomSafeGap, widthCompensation,
+      domainGapEff, domainGapFinal, subPadH, subTitleH, subTitleV,
+      subBottomSafe, subPadTop, nodeH, nodeV, hGapDet,
+      subGroupVGapCompact, pipelineControls, orderKeyOf, effectiveTopPad,
+      domains, containerTypes: CONTAINER_TYPES, targetWGlobal,
+      anchorLeftGlobal, nodeLayoutName, nodeLayoutMetrics,
+      layoutSubGroupChildren, placeRowWrap, placeRowNoWrap,
+    } = context;
     const { constantGapMode, fitDomainContent, stopAfterPhase } = pipelineControls;
 
-    let updatedNodes: ReactFlowNode[] = nodes as ReactFlowNode[];
-    const orderKeyOf = createDomainVerticalOrderKey(
-      nodes,
-      (options as any)?.subDomainOrder,
-    );
-    // 函数级注释：域/子域分组与缺失子域键补齐（与水平策略对齐）
-    updatedNodes = applyDomainGrouping(updatedNodes as any, domainWhitelist) as any;
-    updatedNodes = normalizeMissingNodeSubDomainByDomain(updatedNodes) as any;
-    updatedNodes = applySubGrouping(updatedNodes as unknown as ReactFlowNode<StandardNodeData>[], subWhitelist) as any;
-    updatedNodes = ensureMeasuredForNodes(updatedNodes);
-    updatedNodes = normalizeSubGroupDomainByChildren(updatedNodes);
-
-    /**
-     * 子域标题有效顶部留白计算
-     * 函数级注释：
-     * - 当开启 ENSURE_SUB_GROUP_TITLE_CLEARANCE 时，取 max(标题高度+内边距+top, SUB_GROUP_TITLE_CLEARANCE)
-     * - 关闭时仅使用 标题高度+内边距+top
-    */
-    const effectiveTopPad = (): number => {
-      const layout = layoutCfg;
-      const raw = subTitleH + subTitleV + subPadTop;
-      const ensure = !!layout?.ENSURE_SUB_GROUP_TITLE_CLEARANCE;
-      const clearance = num(layout?.SUB_GROUP_TITLE_CLEARANCE, raw);
-      return ensure ? Math.max(raw, clearance) : raw;
-    };
-    /**
-     * 函数级注释：容器可见性与左锚锁定
-     * - 为 titleGroup/domain/group 三类容器设置 anchorLocked，避免后续任何水平避让破坏左锚
-     * - 子域(subGroup)按白名单控制显隐，并保留可参与内部布局的状态
-     */
-    updatedNodes = applyDomainVerticalVisibility(updatedNodes, {
-      domainWhitelist,
-      subDomainWhitelist: subWhitelist,
-      generateDomainGroups: showDomain,
-      generateSubDomainGroups: showSub,
-    });
-
-    // 语义处理由阶段一管线统一执行：注入→归一→绑定→审计
-
-
-    const domains = collectDomainVerticalDomainOrder(
+    const phaseOne = runDomainVerticalPhaseOne(
       updatedNodes,
-      (options as any)?.domainOrder,
+      safeEdges,
+      safeOptions,
+      context,
     );
-    /**
-     * 函数级注释：域容器稳定排序索引
-     * - 来源：按输入数据结构出现顺序或 options.domainOrder 构建的域顺序
-     * - 作用：在所有“顶对齐/堆叠/间距统一”阶段，使用稳定顺序避免因几何变化导致的显示顺序漂移
-     */
-    // 容器类型统一集合（函数级注释）
-    // 用于统一域宽、左锚、垂直堆叠等阶段，确保所有域容器类型均参与计算
-    const CONTAINER_TYPES = new Set(['titleGroup', 'domain', 'group']);
+    updatedNodes = phaseOne.nodes;
+    const { allTitleGroupsHidden } = phaseOne;
 
-    // injectSemanticSubGroupsForMissingKeys 和 rebindChildrenNormalized 已提取至 shared/semanticHelpers.ts
-
-    /**
-     * 函数级注释：按最大列数进行横排并换行
-     * - 目的：当域内存在多个子域时，控制每行最多元素数并进行换行
-     */
-
-
-    let cursorYGlobal = num((options as any)?.padding?.top, 80);
-    const targetWGlobal = num(((options as any)?.containerSize?.width), num((cfg?.diagram?.container?.width), 1200));
-    /**
-     * 函数级注释：统一左锚并取整
-     * - 目的：消除子像素导致的视觉不齐，所有域左锚统一为整数像素
-     */
-    const anchorLeftGlobal = Math.round(num((options as any)?.padding?.left, Math.max(40, num((cfg?.diagram?.padding?.left), 40))));
-    // 节点布局策略归一化（函数级注释）
-    // 目的：统一映射到 'grid' | 'horizontal' | 'vertical' | 'centered' | 'dagre'
-    const nodeLayoutName = resolveDomainVerticalNodeLayout(
-      (options as any)?.nodeLayout,
-      cfg?.diagram?.layout?.nodeStrategy,
-    );
-    const nodeLayoutMetrics = {
-      minimumWidth: num(layoutCfg?.NODE_MIN_WIDTH, 120),
-      defaultWidth: 240,
-      defaultHeight: num(cfg?.node?.height, 80),
-      horizontalGap: hGapDet,
-      verticalGap: nodeV,
-    };
-    const layoutSubGroupChildren = (
-      subGroup: ReactFlowNode,
-      children: ReactFlowNode[],
-      topPadding: number,
-    ) => layoutSubGroupChildrenByMode(subGroup, children, {
-      layout: nodeLayoutName,
-      horizontalPadding: subPadH,
-      topPadding,
-      horizontalGap: Math.max(12, hGapDet),
-      verticalGap: Math.max(8, nodeV),
-      metrics: nodeLayoutMetrics,
-      projectVertical: reflowSubGroupChildrenVertical,
-      projectGrid: reflowSubGroupChildrenGrid,
-    });
-    const placeRowWrap = (
-      list: ReactFlowNode[],
-      left: number,
-      right: number,
-      startY: number,
-    ) => placeNodeRowWithWrap(
-      list,
-      left,
-      right,
-      startY,
-      nodeLayoutName === 'grid' ? Math.max(12, hGapDet) : Math.max(12, nodeH),
-      nodeLayoutMetrics,
-    );
-    const placeRowNoWrap = (
-      list: ReactFlowNode[],
-      left: number,
-      startY: number,
-    ) => placeNodeRowWithoutWrap(
-      list,
-      left,
-      startY,
-      Math.max(12, nodeH),
-      nodeLayoutMetrics,
-    );
-
-
-
-    /** 函数级注释：阶段一（注入→归一→严格布局→回收→统一）
-     * - 注入缺失子域容器、规范化 children 归属
-     * - 按选定节点布局策略对子域 children 严格排布
-     * - 回收子域容器尺寸，并按域统一子域宽度与左锚
-     */
-    updatedNodes = purgeSubGroupChildrenBySemantic(updatedNodes) as any;
-    updatedNodes = injectSemanticSubGroupsForMissingKeys(updatedNodes) as any;
-    updatedNodes = assignChildrenToSubGroupsBySemantic(updatedNodes) as any;
     {
-      /**
-       * 函数级注释：阶段一同点散列（子域 children）
-       * - 目标：在严格布局之前，对属于同一子域且初始坐标相同的业务节点进行轻量散列，避免早期视觉重叠；
-       * - 规则：按 x 轴散列，间距使用 hGapDet 的下限；仅调整 position，不改变 measured。
-       */
-      const idm = new Map<string, ReactFlowNode>(updatedNodes.map(n => [n.id, n] as const));
-      const sgs = updatedNodes.filter(n => String(n.type || '') === 'subGroup');
-      for (const sg of sgs) {
-        const ch = Array.isArray((sg as any)?.data?.children) ? (sg as any).data.children as string[] : [];
-        const list = ch
-          .map(id => idm.get(id))
-          .filter((nn): nn is ReactFlowNode => !!nn && !(((nn as any)?.data) || {})?.hidden);
-        if (list.length >= 2) scatterNodesAtSamePoint(list as any, 'x', Math.max(12, hGapDet), 2);
-      }
-
-    }
-    updatedNodes = rebindChildrenNormalized(updatedNodes) as any;
-    updatedNodes = auditAndFixSubGroupChildrenBindings(updatedNodes) as any;
-    // 对于 dagre 布局，使用 reflowSubGroupChildrenDagre；其他布局使用 enforceSubGroupChildrenLayoutStrict
-    // 重要：在 dagre 布局之前确保节点尺寸已计算完成，否则投影会使用错误的默认尺寸
-    updatedNodes = ensureMeasuredForNodes(updatedNodes);
-    if (nodeLayoutName === 'dagre') {
-      updatedNodes = preprocessDomainVerticalDagreSubGroups(updatedNodes, edges, {
-        direction: (options as any)?.direction
-          || (cfg as any)?.diagram?.layout?.direction
-          || 'TB',
-        horizontalGap: hGapDet,
-        verticalGap: nodeV,
-        reflowSubGroup: reflowSubGroupChildrenDagre,
-        resolveStrict: (currentNodes, horizontalGap, verticalGap) =>
-          resolveSubGroupChildrenOverlapsStrict(
-            currentNodes as any,
-            horizontalGap,
-            verticalGap,
-          ) as any,
-        recomputeContainers: currentNodes =>
-          recomputeSubGroupContainersBasic(currentNodes) as any,
-      });
-    }
-
-    const allTitleGroupsHidden = areAllTitleGroupDomainsHidden(updatedNodes);
-
-    // dagre 布局后的子域垂直堆叠：把子域作为整体，在每个域内垂直排布
-    {
-      const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-      safeLog.debug(`[DOMAIN-HIDDEN-CHECK] allDomainsHidden=${allTitleGroupsHidden}`);
-
-      if (!allTitleGroupsHidden) {
-        // [STANDARD PIPELINE]
-        if (nodeLayoutName === 'dagre') {
-          const globalPadLeft = num((options as any)?.padding?.left, 40);
-          const globalPadTop = num((options as any)?.padding?.top, 80);
-          const domainPadH = num(cfg?.domain?.padding?.horizontal, 24);
-          const domainPadV = num(cfg?.domain?.padding?.vertical, 16);
-          const dagreDomainGap = 48;
-          const subGroupGap = num(cfg?.subDomain?.margin?.bottom, 24);
-          const dagreTitleHeight = num(cfg?.domain?.title?.height, 48);
-          const dagreTitlePadding = num(cfg?.domain?.title?.padding?.vertical, 12);
-          const dagreTitleSafeGap = num(cfg?.domain?.title?.safeGap, 16);
-
-          updatedNodes = reconstructDomainVerticalDagreLayout(updatedNodes, {
-            paddingLeft: globalPadLeft,
-            paddingTop: globalPadTop,
-            domainPaddingHorizontal: domainPadH,
-            domainPaddingVertical: domainPadV,
-            domainGap: dagreDomainGap,
-            subGroupGap,
-            domainTitleHeight: dagreTitleHeight,
-            domainTitlePaddingVertical: dagreTitlePadding,
-            domainTitleSafeGap: dagreTitleSafeGap,
-            domainOrder: domains,
-          });
-          updatedNodes = syncDagreChildPositions(updatedNodes);
-          updatedNodes = finalizeDomainWidthsByProjection(updatedNodes) as any;
-          updatedNodes = finalizeDomainHeightsByProjection(updatedNodes) as any;
-          updatedNodes = centerProjectedDagreSubGroups(updatedNodes, {
-            domainPaddingHorizontal: domainPadH,
-            subGroupGap,
-          });
-        }
-
-      }
-
-
-
-
-      // 子域垂直堆叠后，同步 dagre 子节点位置，确保 __dagreRel 与实际位置一致
-      // dagre 模式跳过：reflowSubGroupChildrenDagre 已精确计算容器尺寸
-      if (nodeLayoutName !== 'dagre') {
-        updatedNodes = enforceSubGroupStrictContainmentByChildren(updatedNodes) as any;
-      }
-      /**
-       * 函数级注释：尺寸刷新优先（投影与消重前）
-       * - 目标：在阶段一的严格布局与容器回收完成后，先刷新 measured，保证后续严格消重使用准确尺寸。
-       */
-      updatedNodes = ensureMeasuredForNodes(updatedNodes);
-      updatedNodes = resolveSubGroupChildOverlapsByMode(updatedNodes, {
-        layout: nodeLayoutName,
-        horizontalGap: Math.max(12, hGapDet),
-        verticalGap: Math.max(8, nodeV),
-        fallbackChildWidth: nodeLayoutMetrics.minimumWidth,
-        resolveStrict: (currentNodes, horizontalGap, verticalGap) =>
-          resolveSubGroupChildrenOverlapsStrict(
-            currentNodes as any,
-            horizontalGap,
-            verticalGap,
-          ) as any,
-        recomputeContainers: currentNodes =>
-          recomputeSubGroupContainersBasic(currentNodes) as any,
-      });
-      /**
-       * 函数级注释：确保节点与子域容器 measured 完整后再投影
-       * - 目标：在严格布局与回收后，强制刷新节点与容器的 measured，避免以旧值参与宽度投影
-       */
-      updatedNodes = ensureMeasuredForNodes(updatedNodes);
-      /**
-       * 函数级注释：子域高度按投影（保留锚点）
-       * - 目标：以 children 的最大下缘为准回收子域高度，同时不改变当前锚点，避免后续左锚与推开受影响
-       * - dagre 模式跳过：dagre 已精确计算尺寸，不需要再次投影
-       */
-      if (!pipelineControls.lockSubGroupHeights && nodeLayoutName !== 'dagre') {
-        updatedNodes = finalizeSubGroupHeightsByProjectionPreserveAnchor(updatedNodes) as any;
-      }
-      if (nodeLayoutName !== 'dagre') {
-        updatedNodes = finalizeSubGroupWidthsByProjectionPreserveAnchor(updatedNodes) as any;
-        updatedNodes = recomputeSubGroupContainersBasic(updatedNodes) as any;
-      }
-      /**
-       * 函数级注释：阶段一同域子域高度统一
-       * - 目标：在严格布局与尺寸回收完成后，按域取该域内子域容器的最大高度，并将同域子域高度统一为该值，确保横排视觉对齐
-       * - 规则：保留当前锚点（position.y 不变）；不平移 children；仅更新子域容器的 style/measured/height
-       * - dagre 模式跳过：子域是垂直堆叠的，不需要高度统一
-      */
-      if (nodeLayoutName !== 'dagre') {
-        updatedNodes = equalizeVisibleSubGroupHeightsByDomain(
-          updatedNodes,
-          subTitleH + subTitleV + subPadTop + subBottomSafe,
-        );
-      }
-
-      /**
-       * 函数级注释：阶段一子域顶端对齐（垂直策略）
-       * - 目标：子域容器的顶部对齐到域内容区的 innerTop，避免在阶段一出现左右锚统一造成的误解
-       * - dagre 模式跳过：dagre 已在前面正确处理了垂直堆叠
-       */
-      if (nodeLayoutName !== 'dagre') {
-        const tgs = updatedNodes.filter(n => String(n.type || '') === 'titleGroup');
-        for (const dc of tgs) {
-          // 跳过隐藏的域容器
-          if ((dc as any)?.data?.hidden) continue;
-          const dId = String((((dc as any).data?.domain || '')));
-          const dy = num(((dc as any)?.position?.y), 0);
-          const innerTop = dy + titleH + titleV + titleSafe;
-          const sgs = updatedNodes.filter(n => String(n.type || '') === 'subGroup' && String(((n.data as any)?.domain || '')) === dId && !(((n as any)?.data) || {})?.hidden);
-          for (const sg of sgs) {
-            const sx = num(((sg as any)?.position?.x), 0);
-            const newY = Math.round(innerTop - effectiveTopPad());
-            (sg as any).position = { x: sx, y: newY } as any;
-          }
-        }
-      }
-      if (nodeLayoutName !== 'dagre') {
-        updatedNodes = enforceSubGroupTitleClearance(updatedNodes) as any;
-      }
-      {
-        updatedNodes = snapshotVisibleSubGroupChildOriginOffsets(updatedNodes);
-        /**
-         * 函数级注释：阶段一子域专用重排（按布局类型，无折行）
-         * - 目标：在记录 __rel 后，按节点布局选择进行一次重排；horizontal/centered 不做可用宽度折行，保持线性横排；
-         * - 行为：vertical→reflowSubGroupChildrenVertical；grid→reflowSubGroupChildrenGrid；horizontal/centered→layoutHorizontal；随后仅回收容器尺寸与按投影回收子域尺寸。
-         */
-        // dagre 布局已在前面计算完成，跳过整个阶段一重排以保留分层结构
-        if (nodeLayoutName === 'dagre') {
-          // dagre：跳过容器尺寸回收，因为 reflowSubGroupChildrenDagre 已精确计算
-          // 注意：recomputeSubGroupContainersBasic 会用错误的 minHeight=200 覆盖正确的尺寸
-        } else {
-          const idm = new Map<string, ReactFlowNode>(updatedNodes.map(n => [n.id, n] as const));
-          const sgs = updatedNodes.filter(n => String(n.type || '') === 'subGroup');
-          for (const sg of sgs) {
-            const list = collectVisibleSubGroupChildren(sg, idm);
-            if (!list.length) continue;
-            layoutSubGroupChildren(sg, list, effectiveTopPad());
-            if (nodeLayoutName === 'vertical') {
-              try {
-                const tg = updatedNodes.find(nn => String(nn.type || '') === 'titleGroup' && String((((nn as any)?.data?.domain || ''))) === String(((sg as any)?.data?.domain || '')));
-                if (tg) {
-                  const numLocal = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-                  const tgX = numLocal(((tg as any)?.position?.x), 0);
-                  const tgW = numLocal((((tg as any)?.measured?.width ?? (tg as any)?.style?.width)), 0);
-                  const innerLeftDom = tgX + Math.max(subPadH, 0);
-                  const domainInnerW = Math.max(1, tgW - Math.max(subPadH, 0) * 2);
-                  const centerXDom = innerLeftDom + domainInnerW / 2;
-                  const sgPos = (sg as any)?.position || { x: 0, y: 0 } as any;
-                  const innerLeft = numLocal(sgPos.x, 0) + Math.max(subPadH, 0);
-                  const innerRight = numLocal(sgPos.x, 0) + numLocal((((sg as any)?.measured?.width ?? (sg as any)?.style?.width ?? (sg as any)?.width)), 0) - Math.max(subPadH, 0);
-                  for (const n of list) {
-                    const w = numLocal(((n as any)?.measured?.width ?? (n as any)?.style?.width ?? (n as any)?.width), nodeLayoutMetrics.minimumWidth);
-                    const y = numLocal(((n as any)?.position?.y), 0);
-                    const desired = Math.round(centerXDom - w / 2);
-                    const clamped = Math.min(Math.max(desired, innerLeft), Math.max(innerLeft, innerRight - w));
-                    (n as any).position = { x: clamped, y } as any;
-                  }
-                }
-              } catch {
-                // ignore
-              }
-            }
-          }
-          updatedNodes = recomputeSubGroupContainersBasic(updatedNodes) as any;
-          updatedNodes = finalizeSubGroupWidthsByProjectionPreserveAnchor(updatedNodes) as any;
-          updatedNodes = finalizeSubGroupHeightsByProjectionPreserveAnchor(updatedNodes) as any;
-          updatedNodes = equalizeVisibleSubGroupHeightsByDomain(
-            updatedNodes,
-            subTitleH + subTitleV + subPadTop + subBottomSafe,
-          );
-        }
-      }
-
       /** 函数级注释：阶段停靠（phase1）
        * - 依据配置或 options.stopAfterPhase，可在阶段一结束时提前返回，便于对齐水平策略的调试体验
        */
-      if (stopAfterPhase === 'phase1') return { nodes: updatedNodes, edges } as any;
+      if (stopAfterPhase === 'phase1') return { nodes: updatedNodes, edges: safeEdges } as any;
       const layoutHorizontal = (
         list: ReactFlowNode[],
         left: number,
@@ -643,7 +232,7 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
         // 与 dagre 模式下 allDomainsHidden 分支保持一致
         updatedNodes = layoutHiddenDomainSubGroups(updatedNodes, {
           layout: nodeLayoutName,
-          top: num((options as any)?.padding?.top, 80),
+          top: num((safeOptions as any)?.padding?.top, 80),
           gap: 48,
           anchorLeft: anchorLeftGlobal,
           horizontalPadding: subPadH,
@@ -721,7 +310,7 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
       // 二次垂直防重叠确认（函数级注释）
       // - 统一域宽后再执行一次垂直防重叠，确保最终高度与间隙满足要求（包含阴影安全）
       updatedNodes = stackDomainsVerticallyRigid(updatedNodes, {
-        top: num((options as any)?.padding?.top, 0),
+        top: num((safeOptions as any)?.padding?.top, 0),
         gap: domainGapEff,
         domainOrder: domains,
         containerTypes: CONTAINER_TYPES,
@@ -733,7 +322,7 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
       // - 目标：无条件按顺序使域容器顶部单调递增，保证最小间隙（domainGap + shadowPad），彻底消除轻微贴边
       // - 方法：按 y 升序遍历域容器，赋值当前域的目标 top = max(当前 top, 上一域 bottom + domainGap + shadowPad)，并同步平移域成员
       updatedNodes = stackDomainsVerticallyRigid(updatedNodes, {
-        top: num((options as any)?.padding?.top, 0),
+        top: num((safeOptions as any)?.padding?.top, 0),
         gap: domainGapFinal,
         domainOrder: domains,
         containerTypes: CONTAINER_TYPES,
@@ -778,7 +367,7 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
         updatedNodes = finalizeDomainHeightsByProjection(updatedNodes) as any;
 
         updatedNodes = stackDomainsVerticallyRigid(updatedNodes, {
-          top: num((options as any)?.padding?.top, 0),
+          top: num((safeOptions as any)?.padding?.top, 0),
           gap: domainGapEff,
           sortBy: 'position',
           fallbackHeight: titleH + titleV + titleSafe + bottomSafe,
@@ -897,7 +486,7 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
 
       updatedNodes = finalizePhaseTwoSubGroupLayout(updatedNodes, {
         layout: nodeLayoutName,
-        top: num((options as any)?.padding?.top, 0),
+        top: num((safeOptions as any)?.padding?.top, 0),
         domainGap: domainGapFinal,
         domainOrder: domains,
         domainHorizontalPadding: padH,
@@ -1033,7 +622,7 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
       /** 函数级注释：阶段停靠（phase2）
        * - 若配置为在阶段二结束时提前返回，则此处直接返回当前稳定结果
        */
-      if (stopAfterPhase === 'phase2') return { nodes: updatedNodes, edges } as any;
+      if (stopAfterPhase === 'phase2') return { nodes: updatedNodes, edges: safeEdges } as any;
       updatedNodes = projectDomainHeightsFromVisibleMembers(updatedNodes, {
         titleHeight: titleH,
         titleVerticalPadding: titleV,
@@ -1143,7 +732,7 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
         // `finalizeDomainHeightsByProjection` 可能增大了域高度，导致后续域被遮挡。
         // 必须基于最终高度重新计算所有域的 Y 坐标，并同步移动域内所有内容。
         updatedNodes = stackDomainsVerticallyRigid(updatedNodes, {
-          top: num((options as any)?.padding?.top, 80),
+          top: num((safeOptions as any)?.padding?.top, 80),
           gap: 48,
           domainOrder: domains,
         });
@@ -1151,7 +740,7 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
     }
 
     // ===== 边路由管线（已提取至 shared/edgeRoutingPipeline.ts）=====
-    const finalRoutedEdges = await runEdgeRoutingPipeline(updatedNodes, edges, { layoutDirection: 'TB' });
+    const finalRoutedEdges = await runEdgeRoutingPipeline(updatedNodes, safeEdges, { layoutDirection: 'TB' });
 
     // ===== 最终几何包含保障（已提取至 shared/geometryGuard.ts）=====
     ensureDomainContainment(updatedNodes, 30);
