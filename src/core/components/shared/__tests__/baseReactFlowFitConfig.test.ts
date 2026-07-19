@@ -63,4 +63,19 @@ describe('baseReactFlowFitConfig', () => {
       readConfig: () => ({}),
     })).toBe(1);
   });
+
+  it('rejects non-finite, negative, and excessive config values', () => {
+    for (const fitRatio of [Number.NaN, Number.POSITIVE_INFINITY, -1, 3, 'not-a-number']) {
+      expect(readBaseReactFlowFitRatio({
+        search: '',
+        readConfig: () => ({ canvas: { zoom: { fitRatio } } }),
+      })).toBe(0.85);
+    }
+
+    for (const maxFitZoom of [Number.NaN, Number.POSITIVE_INFINITY, 0, -1, 5]) {
+      expect(readBaseReactFlowMaxFitZoom({
+        readConfig: () => ({ canvas: { zoom: { maxFitZoom } } }),
+      })).toBe(1);
+    }
+  });
 });
