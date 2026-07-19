@@ -26,7 +26,6 @@
     "src/core/components/layout/LayoutOptimizer.ts": 954,
     "src/core/components/mindmap-v2/MindElixirToolbar.tsx": 922,
     "src/core/components/mindmap-v2/MindElixirWrapper.tsx": 1161,
-    "src/core/components/mindmap-v2/MindMapPropertyPanel.tsx": 808,
     "src/core/components/shared/BaseReactFlow.tsx": 959,
     "src/core/components/shared/baseReactFlowDisplayEndpointStubCandidates.ts": 803,
     "src/core/components/shared/baseReactFlowDisplayLaneCandidates.ts": 942,

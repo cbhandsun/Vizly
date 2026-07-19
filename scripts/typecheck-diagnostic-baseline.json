@@ -1152,13 +1152,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapPropertyPanel.tsx",
-        "code": 2724,
-        "messageHash": "e95db6a487e41158ae8aade295e2369d4e50a6fd7c188bfc9483836825805a86",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/components/mindmap-v2/MindMapSpeakerNotes.tsx",
         "code": 2322,
         "messageHash": "4aeb6f7101f54cb73702544a78672e83528b9b4e6668cc670f7933699b5d3a24",

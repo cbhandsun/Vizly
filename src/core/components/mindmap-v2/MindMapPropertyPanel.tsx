@@ -8,11 +8,10 @@ import {
 } from 'antd';
 import {
     FontSizeOutlined, DeleteOutlined, PlusOutlined, EditOutlined,
-    LinkOutlined, _FileTextOutlined, SmileOutlined, TagsOutlined, RobotOutlined,
+    LinkOutlined, SmileOutlined, TagsOutlined, RobotOutlined,
 } from '@ant-design/icons';
 import type { NodeObj, TagObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
-import { VIZLY_THEME_OPTIONS } from './theme';
 import { expandNodeWithAI, getAncestorPath, summarizeNodeWithAI } from './mindmapAIService';
 import {
     applyTaskMeta,
@@ -41,107 +40,20 @@ import {
     logMindmapPropertyReshapeFailure,
     logMindmapPropertySetTopicFailure,
 } from './mindmapPanelLogging';
+import {
+    CanvasPanel,
+    ColorSwatch,
+    IconsPicker,
+    PropertyRow as Row,
+} from './MindMapPropertyPanelControls';
+import {
+    PRESET_TAGS,
+    TASK_PRIORITY_OPTIONS,
+    TASK_STATUS_OPTIONS,
+} from './mindMapPropertyPanelOptions';
 
 const { Text } = Typography;
 const { TextArea } = Input;
-
-// ─── 图标分组 ─────────────────────────────────────────────────────────────────
-const ICON_GROUPS: Record<string, string[]> = {
-    '优先级': ['🔴', '🟠', '🟡', '🟢', '🔵'],
-    '状态':   ['✅', '⬜', '🔄', '❌', '⏸️', '🚀'],
-    '标注':   ['⭐', '💡', '❓', '❗', '📌', '🔒', '💬', '🎯'],
-    '情绪':   ['👍', '👎', '👀', '🤔', '💪', '🙌'],
-    '数字':   ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣'],
-};
-
-// ─── 预设标签 ─────────────────────────────────────────────────────────────────
-const PRESET_TAGS: TagObj[] = [
-    { text: '重要', style: { background: '#fef3c7', color: '#92400e', borderColor: '#fcd34d' } },
-    { text: '待办', style: { background: '#dbeafe', color: '#1e40af', borderColor: '#93c5fd' } },
-    { text: '完成', style: { background: '#d1fae5', color: '#065f46', borderColor: '#6ee7b7' } },
-    { text: '风险', style: { background: '#fee2e2', color: '#991b1b', borderColor: '#fca5a5' } },
-    { text: '想法', style: { background: '#ede9fe', color: '#5b21b6', borderColor: '#c4b5fd' } },
-    { text: '问题', style: { background: '#f3f4f6', color: '#374151', borderColor: '#d1d5db' } },
-];
-
-const QUICK_COLORS = [
-    '#6366f1', '#8b5cf6', '#06b6d4', '#10b981',
-    '#f59e0b', '#ef4444', '#ec4899', '#64748b', '#ffffff', '#1e293b',
-];
-
-const TASK_STATUS_OPTIONS: Array<{ label: string; value: TaskStatus }> = [
-    { label: '待办', value: 'todo' },
-    { label: '进行中', value: 'doing' },
-    { label: '已完成', value: 'done' },
-];
-
-const TASK_PRIORITY_OPTIONS: Array<{ label: string; value: TaskPriority }> = [
-    { label: '无', value: '无' },
-    { label: '低', value: '低' },
-    { label: '中', value: '中' },
-    { label: '高', value: '高' },
-];
-
-// ─── ColorSwatch ──────────────────────────────────────────────────────────────
-const ColorSwatch: React.FC<{
-    value?: string; onChange: (c: string) => void; withTransparent?: boolean;
-}> = ({ value, onChange, withTransparent }) => (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
-        {withTransparent && (
-            <button title="透明" onClick={() => onChange('')}
-                style={{ width: 22, height: 22, borderRadius: 5, cursor: 'pointer', flexShrink: 0,
-                    border: value === '' ? '2px solid #6366f1' : '1px solid #e2e8f0',
-                    background: 'repeating-conic-gradient(#ccc 0% 25%,#fff 0% 50%) 0 0/8px 8px' }} />
-        )}
-        {QUICK_COLORS.map(c => (
-            <button key={c} title={c} onClick={() => onChange(c)} style={{
-                width: 22, height: 22, borderRadius: 5, background: c, cursor: 'pointer', flexShrink: 0,
-                border: value === c ? '2px solid #6366f1' : '1px solid rgba(0,0,0,0.1)',
-            }} />
-        ))}
-        <label title="自定义" style={{ width: 22, height: 22, borderRadius: 5, cursor: 'pointer',
-            border: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: 12, color: '#94a3b8', overflow: 'hidden' }}>
-            +<input type="color" value={value || '#6366f1'}
-                onChange={e => onChange(e.target.value)}
-                style={{ opacity: 0, position: 'absolute', width: 0, height: 0 }} />
-        </label>
-    </div>
-);
-
-// ─── Row ──────────────────────────────────────────────────────────────────────
-const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-    <div style={{ marginBottom: 12 }}>
-        <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>{label}</Text>
-        {children}
-    </div>
-);
-
-// ─── IconsPicker popover ───────────────────────────────────────────────────────
-const IconsPicker: React.FC<{ icons: string[]; onToggle: (icon: string) => void }> = ({ icons, onToggle }) => (
-    <div style={{ width: 260 }}>
-        {Object.entries(ICON_GROUPS).map(([group, emojis]) => (
-            <div key={group} style={{ marginBottom: 8 }}>
-                <Text type="secondary" style={{ fontSize: 10, display: 'block', marginBottom: 4 }}>{group}</Text>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {emojis.map(emoji => (
-                        <button key={emoji} onClick={() => onToggle(emoji)}
-                            title={icons.includes(emoji) ? '点击移除' : '点击添加'}
-                            style={{
-                                fontSize: 18, cursor: 'pointer', border: 'none', padding: '2px 4px',
-                                borderRadius: 6, background: icons.includes(emoji)
-                                    ? 'rgba(99,102,241,0.15)' : 'transparent',
-                                outline: icons.includes(emoji) ? '2px solid #6366f1' : 'none',
-                                transition: 'all 0.15s',
-                            }}>
-                            {emoji}
-                        </button>
-                    ))}
-                </div>
-            </div>
-        ))}
-    </div>
-);
 
 // ─── Node Property Panel ───────────────────────────────────────────────────────
 const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
@@ -729,44 +641,6 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
         </div>
     );
 };
-
-// ─── Canvas Panel ─────────────────────────────────────────────────────────────
-const CanvasPanel: React.FC<{ activeTheme: string; onThemeChange: (k: string) => void }> = ({ activeTheme, onThemeChange }) => (
-    <div style={{ padding: '12px 16px' }}>
-        <Text strong style={{ fontSize: 13, display: 'block', marginBottom: 14 }}>🎨 画布主题</Text>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {VIZLY_THEME_OPTIONS.map(opt => {
-                const isActive = activeTheme === opt.key;
-                return (
-                    <button key={opt.key} onClick={() => onThemeChange(opt.key)} style={{
-                        display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-                        border: `2px solid ${isActive ? '#6366f1' : 'transparent'}`,
-                        borderRadius: 10, background: isActive ? 'rgba(99,102,241,0.08)' : 'rgba(0,0,0,0.02)',
-                        cursor: 'pointer', width: '100%', textAlign: 'left', transition: 'all 0.18s ease',
-                    }}>
-                        <div style={{ width: 28, height: 28, borderRadius: 7, flexShrink: 0,
-                            background: opt.theme.cssVar['--main-bgcolor'],
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }} />
-                        <div>
-                            <div style={{ fontWeight: 500, fontSize: 13, color: '#1e293b' }}>{opt.label}</div>
-                            <div style={{ fontSize: 11, color: isActive ? '#6366f1' : '#94a3b8', fontWeight: isActive ? 500 : 400 }}>
-                                {isActive ? '✓ 当前主题' : opt.theme.name}
-                            </div>
-                        </div>
-                    </button>
-                );
-            })}
-        </div>
-        <Divider style={{ margin: '16px 0 10px' }} />
-        <div style={{ background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.08)',
-            borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'rgba(0,0,0,0.45)', lineHeight: 1.9 }}>
-            <div>💡 点击节点可编辑属性</div>
-            <div>📋 右键节点打开操作菜单</div>
-            <div>⌨️ Tab 键添加子节点</div>
-            <div>🖱️ 滚轮缩放 / 拖拽平移</div>
-        </div>
-    </div>
-);
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 interface MindMapPropertyPanelProps {
