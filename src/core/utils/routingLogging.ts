@@ -182,6 +182,10 @@ export const logEdgeRoutingCoordinatorParallelPoolInitFailure = (error: unknown)
   safeLog.warn('[EdgeRoutingCoordinator] Failed to initialize parallel pool:', redactSensitiveLogValue(error));
 };
 
+export const logEdgeRoutingGraphVersionSubscriberFailure = (error: unknown): void => {
+  safeLog.warn('[EdgeRoutingCoordinator] Graph version subscriber failed:', redactSensitiveLogValue(error));
+};
+
 export const logEdgeRoutingCoordinatorCachesCleared = (graphVersion?: number): void => {
   if (typeof graphVersion === 'number') {
     safeLog.info(`[EdgeRoutingCoordinator] All caches cleared. graphVersion=${graphVersion}`);

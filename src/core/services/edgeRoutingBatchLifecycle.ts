@@ -41,7 +41,7 @@ interface CommitRoutingBatchResultsOptions {
   seqByEdge: ReadonlyMap<string, number>;
   getLatestSeq: (edgeId: string) => number | undefined;
   pendingResolvers: Map<string, PendingRoutingResolver>;
-  dirtyEdgeIds: Set<string>;
+  clearDirtyEdge: (edgeId: string) => void;
   onMissingResult?: (edgeId: string, index: number) => void;
   onResult: (
     request: RoutingBatchRequest,
@@ -140,7 +140,7 @@ export const commitRoutingBatchResults = ({
   seqByEdge,
   getLatestSeq,
   pendingResolvers,
-  dirtyEdgeIds,
+  clearDirtyEdge,
   onMissingResult,
   onResult,
   onCommitFailure,
@@ -170,7 +170,7 @@ export const commitRoutingBatchResults = ({
     const superseded = typeof expectedSeq === 'number'
       && typeof latestSeq === 'number'
       && expectedSeq !== latestSeq;
-    if (!superseded) dirtyEdgeIds.delete(request.edgeId);
+    if (!superseded) clearDirtyEdge(request.edgeId);
     if (pending) {
       pending.resolve(result);
       pendingResolvers.delete(request.edgeId);

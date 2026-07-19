@@ -21,7 +21,6 @@ import { optimizePaths } from '../algorithms/LPNudge';
 import { clearRenderedPathCache } from '../routing/renderedPathCache';
 import { buildRoutedLabelObstacle, getGraphEdgeLabelText } from './edgeRoutingLabels';
 import { buildEdgeRoutingCandidateAxes } from './edgeRoutingCandidateAxes';
-import { detectChangedEdgeRoutingNodes, type EdgeRoutingSnapshotNode } from './edgeRoutingNodeChangeDetection';
 import { collectHardNodeObstacleRects, collectSoftNodeObstacleRects, type EdgeRoutingObstacleNode } from './edgeRoutingNodeObstacles';
 import { routeJobsWithParallelFallback, routeSerialFallbackJobs } from './edgeRoutingParallel';
 import { createEdgeRoutingObstacleCollector } from './edgeRoutingObstacles';
@@ -40,6 +39,7 @@ import {
     logEdgeRoutingCoordinatorParallelIncomplete,
     logEdgeRoutingCoordinatorParallelPoolInitFailure,
     logEdgeRoutingCoordinatorSerialRoutingFailure,
+    logEdgeRoutingGraphVersionSubscriberFailure,
 } from '../utils/routingLogging';
 import {
     collectFixedRoutingPathContext,
@@ -60,12 +60,12 @@ import {
 } from './edgeRoutingBatchLifecycle';
 import { assignBusRoutingMetadata } from './edgeRoutingBusGroupProcessing';
 import { buildEdgeRoutingFailureFallback } from './edgeRoutingFailureFallback';
+import { EdgeRoutingIncrementalState } from './edgeRoutingIncrementalState';
 
 /**
  * [P0-2] Main coordination service for edge routing.
  * Manages caching, worker delegation, and incremental updates.
  */
-
 export type RoutingRequest = RoutingBatchRequest;
 
 export interface PortUsageStats {
@@ -119,18 +119,12 @@ export class EdgeRoutingCoordinator {
     private vgCacheManager: VisibilityGraphCache;
     private strategySelector: RoutingStrategySelector;
 
-    // [P0-2] State for incremental updates
-    private dirtyEdges: Set<string> = new Set();
-    private edgeDependencies: Map<string, Set<string>> = new Map(); // edgeId -> Set<nodeId>
-    private allEdges: Edge[] = [];
+    // [P0-2] Topology, graph-version, and dirty-edge state
+    private incrementalState = new EdgeRoutingIncrementalState(logEdgeRoutingGraphVersionSubscriberFailure);
     /** [SharedTrunk] Accumulated shared trunk segments from latest batch, keyed by group ID */
     private sharedTrunks: Map<string, SharedTrunkSegment> = new Map();
     private routedLabelObstacles: Map<string, Rectangle & { edgeId: string; ownerId: string }> = new Map();
     private latestRoutedPaths: Map<string, { graphKey: string; points: Point[]; updatedAt: number }> = new Map();
-
-    private graphVersion: number = 0;
-    // [P0-2] graphVersion 璁㈤槄鑰呴泦鍚堬紝鐢ㄤ簬 useSyncExternalStore 鍝嶅簲寮忚闃?
-    private graphVersionSubscribers: Set<() => void> = new Set();
 
     // [P2-3] Port Usage for Congestion Awareness
     // private portUsageStats: Record<string, PortUsageStats> = {};
@@ -198,8 +192,7 @@ export class EdgeRoutingCoordinator {
 
     /** [COLD-START] 灏嗘墍鏈夊凡鐭ヨ竟鏍囪涓鸿剰 */
     private markAllDirty(): void {
-        this.latestRequests.forEach((_, edgeId) => this.dirtyEdges.add(edgeId));
-        this.allEdges.forEach(e => this.dirtyEdges.add(e.id));
+        this.incrementalState.markAllDirty(this.latestRequests.keys());
     }
 
     /**
@@ -282,7 +275,7 @@ export class EdgeRoutingCoordinator {
      * [P0] Get current graph version
      */
     public getGraphVersion(): number {
-        return this.graphVersion;
+        return this.incrementalState.getGraphVersion();
     }
 
     /**
@@ -292,13 +285,7 @@ export class EdgeRoutingCoordinator {
      * 鑰屼笉闇€瑕佹妸 getGraphVersion() 鍑芥暟璋冪敤鏀捐繘 deps array銆?
      */
     public subscribeGraphVersion(callback: () => void): () => void {
-        this.graphVersionSubscribers.add(callback);
-        return () => this.graphVersionSubscribers.delete(callback);
-    }
-
-    /** [P0-2] 閫氱煡鎵€鏈?graphVersion 璁㈤槄鑰?*/
-    private notifyGraphVersionSubscribers(): void {
-        this.graphVersionSubscribers.forEach(cb => cb());
+        return this.incrementalState.subscribeGraphVersion(callback);
     }
 
     /**
@@ -307,34 +294,25 @@ export class EdgeRoutingCoordinator {
      */
     public notifyGraphChange(changedNodeIds?: string[]): void {
         // [P2.1] Incremental cache invalidation
-        if (changedNodeIds && changedNodeIds.length > 0 && this.edgeDependencies.size > 0) {
+        if (changedNodeIds && changedNodeIds.length > 0 && this.incrementalState.hasDependencies()) {
             // [FIX] DO NOT increment graphVersion in incremental mode!
             // graphVersion is part of every cache key (getCachedResult uses it).
             // Incrementing it invalidates ALL cached results, even for edges whose
             // source/target didn't move. Only delete specific edge caches.
-            const affectedEdges = new Set<string>();
-            for (const nodeId of changedNodeIds) {
-                const deps = this.edgeDependencies.get(nodeId);
-                if (deps) {
-                    for (const edgeId of deps) {
-                        affectedEdges.add(edgeId);
-                        this.cache.deleteByEdgeId(edgeId);
-                    }
-                }
-            }
+            const affectedEdges = this.incrementalState.getAffectedEdgeIds(changedNodeIds);
             // Mark only affected edges as dirty
             for (const edgeId of affectedEdges) {
-                this.dirtyEdges.add(edgeId);
+                this.cache.deleteByEdgeId(edgeId);
+                this.incrementalState.markDirty(edgeId);
                 this.latestRoutedPaths.delete(edgeId);
             }
         } else {
             // Fallback: full invalidation when no specific nodes provided
-            this.graphVersion++;
-            this.notifyGraphVersionSubscribers();
+            this.incrementalState.incrementGraphVersion();
             this.cache.clear();
             this.latestRoutedPaths.clear();
-            this.dirtyEdges.clear();
-            this.allEdges.forEach(edge => this.dirtyEdges.add(edge.id));
+            this.incrementalState.clearDirtyEdges();
+            this.incrementalState.markAllDirty();
         }
 
         this.workerPool.markDirty();
@@ -365,19 +343,18 @@ export class EdgeRoutingCoordinator {
     public forceClearAllCaches(): void {
         this.cache.clear();
         this.workerPool.markDirty();
-        this.dirtyEdges.clear();
-        this.edgeDependencies.clear();
+        this.incrementalState.clearDirtyEdges();
+        this.incrementalState.resetDependencies();
         this.latestRequests.clear();
         this.latestRoutedPaths.clear();
         this.routedLabelObstacles.clear();
-        this.graphVersion++;
-        this.notifyGraphVersionSubscribers();
+        this.incrementalState.incrementGraphVersion();
         
         // Clear global SVG path cache to prevent "flying lines" UI fallback.
         clearRenderedPathCache();
 
         // Re-mark all known edges as dirty so they re-route on next render
-        this.allEdges.forEach(edge => this.dirtyEdges.add(edge.id));
+        this.incrementalState.markAllDirty();
         this.scheduleBatchRouting();
 
         logEdgeRoutingCoordinatorCachesCleared();
@@ -433,7 +410,7 @@ export class EdgeRoutingCoordinator {
             // Non-critical: proceed with stale coords if refresh fails
         }
 
-        this.dirtyEdges.add(targetId);
+        this.incrementalState.markDirty(targetId);
 
         if (this.pendingTimeout) {
             clearTimeout(this.pendingTimeout);
@@ -466,7 +443,7 @@ export class EdgeRoutingCoordinator {
         // 1. Generate Cache Key
             const cacheParams = {
             ...this.extractCacheableParams(job, graph),
-            version: this.graphVersion
+            version: this.incrementalState.getGraphVersion()
         };
         const key = this.cache.generateKey(edgeId, cacheParams);
 
@@ -573,50 +550,11 @@ export class EdgeRoutingCoordinator {
      * Call this once with all edges to build the dependency graph.
      */
     public initializeEdges(edges: Edge[]): void {
-        const oldEdgeIds = new Set(this.allEdges.map(e => e.id));
-        const newEdgeIds = new Set(edges.map(e => e.id));
-        const affectedNodes = new Set<string>();
-
-        // Detect removed edges
-        this.allEdges.forEach(e => {
-            if (!newEdgeIds.has(e.id)) {
-                affectedNodes.add(e.source);
-                affectedNodes.add(e.target);
-            }
-        });
-
-        // Detect added or changed edges
-        edges.forEach(e => {
-            if (!oldEdgeIds.has(e.id)) {
-                affectedNodes.add(e.source);
-                affectedNodes.add(e.target);
-            } else {
-                const old = this.allEdges.find(o => o.id === e.id);
-                if (old && (old.source !== e.source || old.target !== e.target)) {
-                    affectedNodes.add(old.source);
-                    affectedNodes.add(old.target);
-                    affectedNodes.add(e.source);
-                    affectedNodes.add(e.target);
-                }
-            }
-        });
-
-        this.allEdges = edges;
-        this.edgeDependencies.clear();
-
-        // Build dependency map: edge 鈫?nodes it depends on
-        edges.forEach(edge => {
-            const deps = new Set<string>();
-            deps.add(edge.source);
-            deps.add(edge.target);
-            this.edgeDependencies.set(edge.id, deps);
-        });
-
+        const { affectedNodeIds, hadExistingEdges } = this.incrementalState.initializeEdges(edges);
         // [FIX] Invalidate affected nodes to trigger peer re-routing when topology changes
-        if (affectedNodes.size > 0 && oldEdgeIds.size > 0) {
-            this.notifyGraphChange(Array.from(affectedNodes));
+        if (affectedNodeIds.length > 0 && hadExistingEdges) {
+            this.notifyGraphChange(affectedNodeIds);
         }
-
     }
 
     /**
@@ -624,65 +562,35 @@ export class EdgeRoutingCoordinator {
      * This marks all edges connected to these nodes as dirty.
      */
     public markNodesChanged(nodeIds: string[] | string): void {
-        const ids = Array.isArray(nodeIds) ? nodeIds : [nodeIds];
-        const initialDirty = new Set<string>();
-
-        ids.forEach(nodeId => {
-            // Find all edges that depend on this node
-            this.edgeDependencies.forEach((deps, edgeId) => {
-                if (deps.has(nodeId)) {
-                    initialDirty.add(edgeId);
-                }
-            });
-        });
-
-        // [FIX] Expand dirty set to include siblings (edges sharing source or target).
-        // Since bus trunk centroids depend on ALL peers, moving one peer must invalidate and re-route ALL peers.
-        initialDirty.forEach(edgeId => {
-            this.dirtyEdges.add(edgeId);
-            const edge = this.allEdges.find(e => e.id === edgeId);
-            if (edge) {
-                this.allEdges.forEach(sibling => {
-                    if (sibling.source === edge.source || sibling.target === edge.target) {
-                        this.dirtyEdges.add(sibling.id);
-                    }
-                });
-            }
-        });
+        this.incrementalState.markNodesChanged(nodeIds);
     }
 
     /**
      * [P0-2] Get list of dirty edges that need rerouting.
      */
     public getDirtyEdges(): string[] {
-        return Array.from(this.dirtyEdges);
+        return this.incrementalState.getDirtyEdgeIds();
     }
 
     /**
      * [P0-2] Clear dirty flags after rerouting.
      */
     public clearDirtyEdges(): void {
-        this.dirtyEdges.clear();
+        this.incrementalState.clearDirtyEdges();
     }
 
     /**
      * [P0-2] Check if incremental routing is needed.
      */
     public hasDirtyEdges(): boolean {
-        return this.dirtyEdges.size > 0;
+        return this.incrementalState.hasDirtyEdges();
     }
 
     /**
      * [P0-2] Get incremental routing statistics.
      */
     public getIncrementalStats(): { total: number; dirty: number; ratio: number } {
-        const total = this.allEdges.length;
-        const dirty = this.dirtyEdges.size;
-        return {
-            total,
-            dirty,
-            ratio: total > 0 ? dirty / total : 0
-        };
+        return this.incrementalState.getStats();
     }
 
     private buildJob(request: RoutingRequest): PathFindingJob {
@@ -704,7 +612,7 @@ export class EdgeRoutingCoordinator {
         // If the smart edge hook dispatched a route() request, its fingerprint changed 
         // (e.g. user toggled edge type). Without this, the Promise never resolves and the edge 
         // enters a permanent fallback 'Straight Line' mode.
-        this.dirtyEdges.add(request.edgeId);
+        this.incrementalState.markDirty(request.edgeId);
 
         // Debounce trigger
         this.scheduleBatchRouting();
@@ -729,7 +637,7 @@ export class EdgeRoutingCoordinator {
     public getCachedResult(request: RoutingRequest): PathFindingResult | null {
         const cacheParams = {
             ...this.extractCacheableParams(request.job, request.graph),
-            version: this.graphVersion
+            version: this.incrementalState.getGraphVersion()
         };
         const key = this.cache.generateKey(request.edgeId, cacheParams);
         return this.cache.get(key) ?? null;
@@ -753,7 +661,7 @@ export class EdgeRoutingCoordinator {
      * this is sufficient for grouping purposes.
      */
     private buildGraphKey(_graph: SharedGraphContext): string {
-        return `v${this.graphVersion}`;
+        return `v${this.incrementalState.getGraphVersion()}`;
     }
 
     /**
@@ -765,7 +673,7 @@ export class EdgeRoutingCoordinator {
         if (dirtyIds.length === 0) return new Map();
         const group = createRoutingBatchSnapshot(dirtyIds, this.latestRequests);
         if (!group) {
-            this.dirtyEdges.clear();
+            this.incrementalState.clearDirtyEdges();
             return new Map();
         }
 
@@ -831,7 +739,7 @@ export class EdgeRoutingCoordinator {
             seqByEdge: group.seqByEdge,
             getLatestSeq: edgeId => this.latestRequests.get(edgeId)?.seq,
             pendingResolvers: this.pendingResolvers,
-            dirtyEdgeIds: this.dirtyEdges,
+            clearDirtyEdge: edgeId => this.incrementalState.clearDirtyEdge(edgeId),
             onMissingResult: logEdgeRoutingCoordinatorMissingResult,
             onCommitFailure: error => logEdgeRoutingCoordinatorBatchRoutingFailure(error),
             onResult: (request, result, job) => {
@@ -839,7 +747,7 @@ export class EdgeRoutingCoordinator {
                 if (!isBus) {
                     const cacheParams = {
                         ...this.extractCacheableParams(request.job, group.graph, pendingEdges),
-                        version: this.graphVersion
+                        version: this.incrementalState.getGraphVersion()
                     };
                     const key = this.cache.generateKey(request.edgeId, cacheParams);
                     this.cache.set(key, result);
@@ -904,7 +812,7 @@ export class EdgeRoutingCoordinator {
                 graphKey: entry.graphKey,
                 sourceId: entry.request.job?.source,
                 targetId: entry.request.job?.target,
-                dirty: this.dirtyEdges.has(edgeId),
+                dirty: this.incrementalState.isDirty(edgeId),
                 cachedPoints: cached?.points,
                 points: cached?.points ?? (
                     latest?.graphKey === entry.graphKey ? latest.points : undefined
@@ -970,7 +878,7 @@ export class EdgeRoutingCoordinator {
      */
     public async routeIncremental(context: SharedGraphContext): Promise<Map<string, PathFindingResult>> {
         // [FIX C-9] 浣跨敤鐪熷疄鐨勮妭鐐瑰彉鍖栨娴嬶紙鍙栦唬鍘熸潵鐨勭┖鍑芥暟锛?
-            const changedNodeIds = this.identifyChangedNodes(context.nodes as any[], this.allEdges);
+        const changedNodeIds = this.incrementalState.detectChangedNodes(context.nodes as any[]);
         if (changedNodeIds.length > 0) {
             // 灏嗘娴嬪埌鐨勭Щ鍔ㄨ妭鐐规爣璁颁负 dirty锛屼娇澶栭儴鏃犻渶鎵嬪姩璋冪敤 markNodesChanged
             this.markNodesChanged(changedNodeIds);
@@ -978,24 +886,6 @@ export class EdgeRoutingCoordinator {
 
         return this.batchRouteDirtyEdges();
     }
-
-
-    // [FIX C-9] 鑺傜偣浣嶇疆蹇収锛岀敤浜庡閲忔娴?
-    private _nodePositionSnapshot = new Map<string, { x: number; y: number }>();
-
-    /**
-     * [FIX C-9] 鍩轰簬浣嶇疆蹇収妫€娴嬫樉钁楃Щ鍔ㄧ殑鑺傜偣銆?
-     * 涓庝笂娆¤矾鐢辨椂鐨勫潗鏍囧姣旓紝瓒呰繃闃堝€硷紙2px锛夊垯鏍囪涓?宸插彉鍖?銆?
-     * 鍚屾椂鏇存柊蹇収浠ュ涓嬫瀵规瘮銆?
-     */
-    private identifyChangedNodes(allNodes: any[], _allEdges: Edge[]): string[] {
-        return detectChangedEdgeRoutingNodes(
-            allNodes as EdgeRoutingSnapshotNode[],
-            this._nodePositionSnapshot
-        );
-    }
-
-
     /**
      * [P0] Route all edges using parallel worker pool
      * Target: 60-75% performance improvement for initial render
@@ -1011,9 +901,9 @@ export class EdgeRoutingCoordinator {
             useParallelRouting: this.useParallelRouting,
             parallelPool: this.parallelPool,
             runSerialFallback: () => this.routeSerialFallback(jobs, graph),
-            allEdges: this.allEdges,
+            allEdges: this.incrementalState.getEdges() as Edge[],
             setAllEdges: (edges) => {
-                this.allEdges = edges;
+                this.incrementalState.replaceEdges(edges);
             },
         });
     }
@@ -1129,16 +1019,15 @@ export class EdgeRoutingCoordinator {
      * 鐢ㄤ簬淇敼浜嗚矾鐢辩畻娉曞悗鏃犻渶閲嶅惎鍗冲彲楠岃瘉鏁堟灉銆?
      */
     public clearAllCaches(): void {
-        this.graphVersion++;
-        this.notifyGraphVersionSubscribers();
+        const graphVersion = this.incrementalState.incrementGraphVersion();
         this.cache.clear();
         this.latestRoutedPaths.clear();
         this.routedLabelObstacles.clear();
         clearRenderedPathCache();
-        this.dirtyEdges.clear();
-        this.allEdges.forEach(edge => this.dirtyEdges.add(edge.id));
+        this.incrementalState.clearDirtyEdges();
+        this.incrementalState.markAllDirty();
         this.workerPool.markDirty();
-        logEdgeRoutingCoordinatorCachesCleared(this.graphVersion);
+        logEdgeRoutingCoordinatorCachesCleared(graphVersion);
     }
 
     /**

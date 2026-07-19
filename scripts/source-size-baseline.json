@@ -30,7 +30,7 @@
     "src/core/factories/EdgeFactory.ts": 832,
     "src/core/factories/NodeFactory.ts": 847,
     "src/core/routing/utils/AdvancedRouting.ts": 1052,
-    "src/core/services/EdgeRoutingCoordinator.ts": 1184,
+    "src/core/services/EdgeRoutingCoordinator.ts": 1073,
     "src/core/strategies/DomainDagreLayoutStrategy.ts": 1089,
     "src/core/strategies/DomainHorizontalLayoutStrategy.ts": 883,
     "src/core/strategies/DomainVerticalLayoutStrategy.ts": 1163,

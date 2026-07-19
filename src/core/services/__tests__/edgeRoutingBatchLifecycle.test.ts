@@ -156,7 +156,7 @@ describe('edgeRoutingBatchLifecycle', () => {
       seqByEdge: new Map([['edge-a', 1]]),
       getLatestSeq: () => 1,
       pendingResolvers,
-      dirtyEdgeIds,
+      clearDirtyEdge: edgeId => dirtyEdgeIds.delete(edgeId),
       onMissingResult,
       onResult: vi.fn(),
     });
@@ -185,7 +185,7 @@ describe('edgeRoutingBatchLifecycle', () => {
       ]),
       getLatestSeq: edgeId => edgeId === 'edge-a' ? 9 : 2,
       pendingResolvers: new Map([['edge-a', { resolve }]]),
-      dirtyEdgeIds,
+      clearDirtyEdge: edgeId => dirtyEdgeIds.delete(edgeId),
       onResult,
     });
 
@@ -207,7 +207,7 @@ describe('edgeRoutingBatchLifecycle', () => {
       seqByEdge: new Map([['edge-a', 1]]),
       getLatestSeq: () => 1,
       pendingResolvers: new Map([['edge-a', { resolve }]]),
-      dirtyEdgeIds: new Set(['edge-a']),
+      clearDirtyEdge: vi.fn(),
       onResult: () => {
         throw failure;
       },
