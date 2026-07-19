@@ -15,7 +15,6 @@
     "src/core/components/shared/baseReactFlowDisplayLaneCandidates.ts": 942,
     "src/core/components/shared/baseReactFlowDisplayOverlapRepair.ts": 1112,
     "src/core/components/shared/baseReactFlowDisplayTerminalPortRepair.ts": 1021,
-    "src/core/config/ConfigManager.ts": 829,
     "src/core/config/LayeredConfigManager.ts": 968,
     "src/core/factories/EdgeFactory.ts": 832,
     "src/core/factories/NodeFactory.ts": 847,
