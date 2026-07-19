@@ -120,6 +120,35 @@ describe('EdgeFactory', () => {
     expect(() => factory.createEdge({ source: '', target: 'b' })).toThrow('源节点ID不能为空');
     expect(() => factory.createEdge({ source: 'a', target: '' })).toThrow('目标节点ID不能为空');
     expect(() => factory.createEdge({ source: 'a', target: 'b', strokeWidth: 0 })).toThrow('线条宽度必须大于0');
+    expect(() => factory.createEdge({ source: 1, target: 'b' } as any)).toThrow('源节点ID不能为空');
+    expect(() => factory.createEdge({ source: 'a', target: 'b', strokeWidth: Number.NaN })).toThrow(
+      '线条宽度必须是有限数值'
+    );
+    expect(() => factory.createEdge({ source: 'a', target: 'b', strokeWidth: Number.POSITIVE_INFINITY })).toThrow(
+      '线条宽度必须是有限数值'
+    );
+    expect(() => factory.createEdge({ source: 'a', target: 'b', style: new Date() as any })).toThrow(
+      'style必须是普通对象'
+    );
+    expect(() => factory.createEdge({ source: 'a', target: 'b', type: 'unknown' as any })).toThrow('边缘类型无效');
+    expect(() => factory.createEdge({ source: 'a', target: 'b', markerEnd: 'yes' as any })).toThrow(
+      'markerEnd必须是布尔值'
+    );
+  });
+
+  it('owns mutable style/data inputs and cloned edge records', () => {
+    const style = { opacity: 0.5 };
+    const data = { nested: { enabled: true } };
+    const edge = factory.createEdge({ source: 'a', target: 'b', style, data });
+    style.opacity = 1;
+    data.nested.enabled = false;
+
+    const clone = factory.cloneEdge(edge);
+    (clone.data as any).nested.enabled = false;
+    (clone.style as any).opacity = 0.1;
+
+    expect((edge.data as any).nested.enabled).toBe(true);
+    expect((edge.style as any).opacity).toBe(0.5);
   });
 
   it('creates batch, sequential, domain, and many-to-many edges', () => {
@@ -185,6 +214,14 @@ describe('EdgeFactory', () => {
     expect((updated as any).labelStyle.color).toBe('#123456');
     expect((updated as any).markerEnd.width).toBe(14);
     expect((updated as any).markerEnd.height).toBe(16);
+
+    const clearedHandles = factory.updateEdge(updated, {
+      sourceHandle: null,
+      targetHandle: null,
+    });
+    expect(clearedHandles.sourceHandle).toBeNull();
+    expect(clearedHandles.targetHandle).toBeNull();
+    expect(() => factory.updateEdge(updated, { strokeWidth: Number.NaN })).toThrow('线条宽度必须是有限数值');
   });
 
   it('clones edges and returns defaults for native and smart types', () => {

@@ -1,85 +1,24 @@
 import { Edge, MarkerType } from '@xyflow/react';
-import { ReactNode } from 'react';
 import { diagramConfigManager } from '../config/DiagramConfig';
 import { getConfigIntegration } from '../config/ConfigIntegration';
 import { resolveThemeDomainKey } from '../utils/domainKey';
 import { diagramStyleManager } from '../components/shared/DiagramStyleManager';
 import { EdgeType } from '../types/edgeType';
+import {
+  normalizeEdgeHandleId,
+  ownEdgeConfigRecords,
+  validateEdgeConfig
+} from './EdgeFactoryBoundary';
+import { EdgeStyleType, type EdgeConfig } from './EdgeFactoryTypes';
 
-// Compatibility export: callers historically imported EdgeType from the
-// factory. The canonical definition now lives in a worker-safe module.
+// Compatibility exports: callers historically imported these from the factory.
 export { EdgeType } from '../types/edgeType';
-
-/**
- * 边缘样式类型枚举
- */
-export enum EdgeStyleType {
-  MAIN = 'main',           // 主流程
-  DEPENDENCY = 'dependency', // 依赖关系
-  DATA = 'data',           // 数据流
-  SUPPORT = 'support',     // 支撑关系
-  CORE = 'core',           // 核心流程
-  CHANNEL = 'channel',     // 渠道
-  MIDEND = 'midend',       // 中台
-  SCM = 'scm',             // 供应链
-  LOGISTICS = 'logistics', // 物流
-  CORP = 'corp',           // 企业
-  INFRA = 'infra',         // 基础设施
-  FEEDBACK = 'feedback',    // 反馈/回流
-  CUSTOM = 'custom'      // 自定义样式
-}
-
-/**
- * 连接点方向枚举
- */
-export enum HandleDirection {
-  TOP = 't',
-  BOTTOM = 'b',
-  LEFT = 'l',
-  RIGHT = 'r'
-}
-
-/**
- * 边缘创建配置接口
- */
-export interface EdgeConfig {
-  id?: string;
-  source: string;
-  target: string;
-  type?: EdgeType;
-  styleType?: EdgeStyleType;
-  // 允许更细粒度的角落把手，如 'r-t' | 'r-b' | 'l-t' | 'l-b'
-  // 默认仍支持基础方向 't' | 'b' | 'l' | 'r'
-  sourceHandle?: string | null;
-  targetHandle?: string | null;
-  label?: ReactNode;
-  animated?: boolean;
-  strokeWidth?: number;
-  strokeColor?: string;
-  strokeDasharray?: string;
-  /**
-   * 是否启用终点箭头标记；默认启用
-   * 说明：当值为 false 时，不设置 markerEnd；其他情况根据样式自动设置
-   */
-  markerEnd?: boolean;
-  /**
-   * 是否启用起点箭头标记；默认启用
-   * 说明：为满足“连线有起止点”的可读性要求，默认在起点也添加箭头标记。
-   * 当值为 false 时，不设置 markerStart。
-   */
-  markerStart?: boolean;
-  style?: Record<string, any>;
-  data?: Record<string, any>;
-}
-
-/**
- * 边缘验证结果接口
- */
-export interface EdgeValidationResult {
-  isValid: boolean;
-  errors: string[];
-  warnings: string[];
-}
+export {
+  EdgeStyleType,
+  HandleDirection,
+  type EdgeConfig,
+  type EdgeValidationResult
+} from './EdgeFactoryTypes';
 
 /**
  * 边缘工厂类 - 统一管理边缘的创建和配置
@@ -113,10 +52,11 @@ export class EdgeFactory {
    */
   createEdge(config: EdgeConfig): Edge {
     // 验证配置
-    const validation = this.validateConfig(config);
+    const validation = validateEdgeConfig(config);
     if (!validation.isValid) {
       throw new Error(`边缘创建失败: ${validation.errors.join(', ')}`);
     }
+    config = ownEdgeConfigRecords(config);
 
     // 生成ID
     const id = config.id || this.generateEdgeId(config.source, config.target);
@@ -189,11 +129,11 @@ export class EdgeFactory {
     // 设置连接点
     if (config.sourceHandle !== undefined) {
       // 规范化把手ID，统一映射到节点实际注册的全称 handle。
-      edge.sourceHandle = this.normalizeHandleId(config.sourceHandle);
+      edge.sourceHandle = normalizeEdgeHandleId(config.sourceHandle);
     }
     if (config.targetHandle !== undefined) {
       // 规范化把手ID，统一映射到节点实际注册的全称 handle。
-      edge.targetHandle = this.normalizeHandleId(config.targetHandle);
+      edge.targetHandle = normalizeEdgeHandleId(config.targetHandle);
     }
 
     // 设置动画
@@ -405,7 +345,7 @@ export class EdgeFactory {
    */
   cloneEdge(edge: Edge, newId?: string): Edge {
     return {
-      ...edge,
+      ...ownEdgeConfigRecords(edge),
       id: newId || `${edge.id}_clone`
     };
   }
@@ -414,7 +354,16 @@ export class EdgeFactory {
    * 更新边缘配置
    */
   updateEdge(edge: Edge, updates: Partial<EdgeConfig>): Edge {
-    const updatedEdge = { ...edge };
+    const validation = validateEdgeConfig({
+      source: edge.source,
+      target: edge.target,
+      ...updates
+    });
+    if (!validation.isValid) {
+      throw new Error(`边缘更新失败: ${validation.errors.join(', ')}`);
+    }
+    updates = ownEdgeConfigRecords(updates);
+    const updatedEdge = { ...ownEdgeConfigRecords(edge) };
 
     if (updates.type) {
       const previousNativeLabel = (edge as any)?.label;
@@ -487,14 +436,14 @@ export class EdgeFactory {
       };
     }
 
-    if (updates.sourceHandle) {
+    if (updates.sourceHandle !== undefined) {
       // 规范化把手ID，统一映射到节点实际注册的全称 handle。
-      (updatedEdge as any).sourceHandle = this.normalizeHandleId(updates.sourceHandle);
+      (updatedEdge as any).sourceHandle = normalizeEdgeHandleId(updates.sourceHandle);
     }
 
-    if (updates.targetHandle) {
+    if (updates.targetHandle !== undefined) {
       // 规范化把手ID，统一映射到节点实际注册的全称 handle。
-      (updatedEdge as any).targetHandle = this.normalizeHandleId(updates.targetHandle);
+      (updatedEdge as any).targetHandle = normalizeEdgeHandleId(updates.targetHandle);
     }
 
     if (updates.label !== undefined) {
@@ -709,90 +658,6 @@ export class EdgeFactory {
       default:
         return 'bezier';
     }
-  }
-
-  /**
-   * 验证边缘配置
-   */
-  private validateConfig(config: EdgeConfig): EdgeValidationResult {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-
-    // 必填字段验证
-    if (!config.source) {
-      errors.push('源节点ID不能为空');
-    }
-
-    if (!config.target) {
-      errors.push('目标节点ID不能为空');
-    }
-
-    // 自环检查
-    if (config.source === config.target) {
-      warnings.push('检测到自环连接，可能不是预期行为');
-    }
-
-    // ID格式验证
-    if (config.id && !/^[a-zA-Z0-9_-]+$/.test(config.id)) {
-      warnings.push('边缘ID建议只包含字母、数字、下划线和连字符');
-    }
-
-    // 样式验证
-    if (config.strokeWidth !== undefined && config.strokeWidth <= 0) {
-      errors.push('线条宽度必须大于0');
-    }
-
-    if (config.strokeColor && !/^#[0-9A-Fa-f]{6}$/.test(config.strokeColor)) {
-      warnings.push('颜色格式建议使用十六进制格式（如 #FF0000）');
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      warnings
-    };
-  }
-
-  /**
-   * 规范化把手ID
-   * 函数级注释：
-   * - 输入可为 'top'/'bottom'/'left'/'right'、't'/'b'/'l'/'r'、以及复合形式如 'right-top'/'rt'；
-   * - 输出统一为自定义节点实际注册的把手ID：'top' | 'bottom' | 'left' | 'right'；
-   * - 若无法解析，返回 null，让渲染组件按默认策略处理（通常居中或节点默认把手）。
-   */
-  private normalizeHandleId(handle: string | null | undefined): string | null {
-    if (handle === null || typeof handle === 'undefined') return handle ?? null;
-    const raw = String(handle).trim().toLowerCase();
-
-    // 明确定义映射表，覆盖常见同义词
-    const map: Record<string, string> = {
-      // 上
-      t: 'top', top: 'top', up: 'top', north: 'top', upper: 'top',
-      // 下
-      b: 'bottom', bottom: 'bottom', down: 'bottom', south: 'bottom', lower: 'bottom',
-      // 左
-      l: 'left', left: 'left', west: 'left',
-      // 右
-      r: 'right', right: 'right', east: 'right'
-    };
-
-    if (map[raw]) return map[raw];
-
-    // 支持复合把手形式：'right-top', 'r-t', 'rt', 'tr' 等
-    const tokens = raw.split(/[-_\s]/g).filter(Boolean);
-    for (const tk of tokens) {
-      if (map[tk]) return map[tk];
-    }
-
-    // 压缩字符形式：仅保留字母并尝试两字符，例如 'rt'/'tr' 等
-    const compact = raw.replace(/[^a-z]/g, '');
-    if (compact.length === 2) {
-      if (map[compact[0]]) return map[compact[0]];
-      if (map[compact[1]]) return map[compact[1]];
-    }
-
-    // 无法识别则返回 null
-    return null;
   }
 
   /**
