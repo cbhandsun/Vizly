@@ -202,6 +202,42 @@ describe('RoutingCrossingScorer', () => {
 });
 
 describe('refineOrthogonalWaypointsDetailed', () => {
+    it('normalizes malformed runtime paths and extreme coordinates before scoring', () => {
+        const empty = refineOrthogonalWaypointsDetailed(null as never, null as never);
+        expect(empty.paths).toEqual(new Map());
+        expect(empty.summary.initial.totalScore).toBe(0);
+
+        const result = refineOrthogonalWaypointsDetailed(new Map<unknown, unknown>([
+            ['invalid-points', [null, { x: Number.NaN, y: 0 }]],
+            ['bounded', [
+                { x: Number.MAX_VALUE, y: -Number.MAX_VALUE },
+                { x: 0, y: 0 },
+            ]],
+            [42, [{ x: 0, y: 0 }, { x: 10, y: 0 }]],
+        ]) as never, {
+            spacing: Number.POSITIVE_INFINITY,
+            maxPasses: -10,
+            enableReroute: false,
+            hardObstacles: [null, {
+                x: 0,
+                y: 0,
+                width: Number.POSITIVE_INFINITY,
+                height: 10,
+            }],
+            candidateAxes: {
+                horizontal: [Number.NaN, Number.MAX_VALUE],
+                vertical: null,
+            },
+        } as never);
+
+        expect([...result.paths.keys()]).toEqual(['invalid-points', 'bounded']);
+        expect(result.paths.get('invalid-points')).toEqual([]);
+        expect(result.paths.get('bounded')).toEqual([
+            { x: 10_000_000, y: -10_000_000 },
+            { x: 0, y: 0 },
+        ]);
+    });
+
     it('moves internal bend axes when doing so reduces avoidable crossings', () => {
         const paths = new Map([
             ['dogleg', [{ x: 0, y: 0 }, { x: 0, y: 50 }, { x: 100, y: 50 }, { x: 100, y: 100 }]],
