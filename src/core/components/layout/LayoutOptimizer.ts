@@ -9,6 +9,7 @@ import {
   logLayoutOptimizerNodeHeightFallback,
   logLayoutOptimizerNodeWidthFallback,
 } from './layoutOptimizerLogging';
+import { LayoutDomainSizer, type DomainData } from './LayoutDomainSizer';
 
 interface CachedMeasurement {
   width: number;
@@ -23,12 +24,6 @@ const FLOWCHART_BODY_FONT_SIZE = 13;
 const FLOWCHART_BODY_FONT_WEIGHT = '400';
 const FLOWCHART_WIDTH_SAFETY = 28;
 
-interface DomainData {
-  title: string;
-  nodes: string[];
-  descs: string[];
-}
-
 /**
  * 高性能布局优化器类
  * 使用缓存和批量计算来提升性能
@@ -40,6 +35,11 @@ export class LayoutOptimizer {
   private cacheQueryCount = 0;
   private cacheHitCount = 0;
   private lastTtlAdjustAt = 0;
+  private readonly domainSizer = new LayoutDomainSizer({
+    getConfig: () => this.config,
+    calculateMultipleNodeWidths: (descriptions, options) => this.calculateMultipleNodeWidths(descriptions, options),
+    calculateMultipleNodeHeights: (descriptions, options) => this.calculateMultipleNodeHeights(descriptions, options),
+  });
 
   // 紧凑域配置（需与 NodeFactory 保持一致）
   public readonly COMPACT_DOMAINS: Record<string, { fontScale: number; widthScale: number; paddingHScale: number; paddingVScale: number }> = {
@@ -627,124 +627,21 @@ export class LayoutOptimizer {
     return measurements.map(m => Math.max(m.height, paddingV * 2));
   }
 
-  /**
-   * 优化的子域宽度计算
-   */
-  public calculateSubDomainWidth(
-    nodeDescriptions: string[],
-    layout: 'single' | 'double' = 'single',
-    options?: { domainKey?: string }
-  ): number {
-    const nodeWidths = this.calculateMultipleNodeWidths(nodeDescriptions, options);
-
-    if (layout === 'double') {
-      // 双列布局：计算每行的宽度，取最大值
-      const rows: number[] = [];
-      for (let i = 0; i < nodeWidths.length; i += 2) {
-        const rowWidth = nodeWidths[i] +
-          (nodeWidths[i + 1] || 0) +
-          (nodeWidths[i + 1] ? this.config.NODE_H_GAP : 0);
-        rows.push(rowWidth);
-      }
-      const maxRowWidth = Math.max(0, ...rows);
-      const subGroupPaddingH = this.config.SUB_GROUP_PADDING?.H ?? 30;
-      return maxRowWidth + subGroupPaddingH * 2 + 40; // 安全边距
-    } else {
-      // 单列布局：取最大节点宽度
-      const maxNodeWidth = Math.max(0, ...nodeWidths);
-      const subGroupPaddingH = this.config.SUB_GROUP_PADDING?.H ?? 30;
-      return maxNodeWidth + subGroupPaddingH * 2 + 20; // 安全边距
-    }
+  public calculateSubDomainWidth(nodeDescriptions: string[], layout: 'single' | 'double' = 'single', options?: { domainKey?: string }): number {
+    return this.domainSizer.calculateSubDomainWidth(nodeDescriptions, layout, options);
   }
 
-  /**
-   * 优化的域宽度计算
-   */
-  public calculateDomainWidth(
-    subDomainWidths: number[],
-    nodeDescriptions: string[] = [],
-    layout: 'horizontal' | 'vertical' = 'horizontal',
-    options?: { domainKey?: string }
-  ): number {
-    let maxWidth = 0;
-
-    // 考虑子域宽度
-    if (subDomainWidths.length > 0) {
-      if (layout === 'horizontal') {
-        // 水平排列：所有子域宽度之和加间隙
-        const totalSubDomainWidth = subDomainWidths.reduce((sum, w) => sum + w, 0) +
-          (subDomainWidths.length - 1) * this.config.DOMAIN_H_GAP;
-        maxWidth = Math.max(maxWidth, totalSubDomainWidth);
-      } else {
-        // 垂直排列：取最大子域宽度
-        maxWidth = Math.max(maxWidth, Math.max(0, ...subDomainWidths));
-      }
-    }
-
-    // 考虑直接节点宽度
-    if (nodeDescriptions.length > 0) {
-      const nodeWidths = this.calculateMultipleNodeWidths(nodeDescriptions, options);
-      const totalNodeWidth = nodeWidths.reduce((sum, w) => sum + w, 0) +
-        (nodeWidths.length - 1) * this.config.NODE_H_GAP;
-      maxWidth = Math.max(maxWidth, totalNodeWidth);
-    }
-
-    const groupPaddingH = this.config.GROUP_PADDING?.H ?? 40;
-    // 加上域的内边距和安全边距
-    return maxWidth + groupPaddingH * 2 + 60; // 安全边距
+  public calculateDomainWidth(subDomainWidths: number[], nodeDescriptions: string[] = [], layout: 'horizontal' | 'vertical' = 'horizontal', options?: { domainKey?: string }): number {
+    return this.domainSizer.calculateDomainWidth(subDomainWidths, nodeDescriptions, layout, options);
   }
 
-  /**
-   * 计算单层域的实际需要宽度（基于内容）
-   */
   public calculateSingleLayerDomainWidth(domainData: DomainData, domainKey?: string): number {
-    const nodeWidths = this.calculateMultipleNodeWidths(domainData.descs, { domainKey });
-    const totalNodeWidth = nodeWidths.reduce((sum, w) => sum + w, 0);
-    const totalGap = (nodeWidths.length - 1) * this.config.NODE_H_GAP;
-
-    const groupPaddingH = this.config.GROUP_PADDING?.H ?? 40;
-    return totalNodeWidth + totalGap + groupPaddingH * 2;
+    return this.domainSizer.calculateSingleLayerDomainWidth(domainData, domainKey);
   }
 
-  /**
-   * 计算后台域的最小宽度需求（基于实际内容计算）
-   */
   public calculateBackendDomainMinWidth(domainData: DomainData, domainKey?: string): number {
-    if (!domainData) return 800;
-
-    const nodeWidths = this.calculateMultipleNodeWidths(domainData.descs, { domainKey });
-
-    // 根据域的特点选择布局策略
-    if (domainData.nodes.length === 6) {
-      // SCM域：2x3布局
-      const rows = [
-        [nodeWidths[0], nodeWidths[1]], // 第一行
-        [nodeWidths[2], nodeWidths[3]], // 第二行
-        [nodeWidths[4], nodeWidths[5]]  // 第三行
-      ];
-
-      const maxRowWidth = Math.max(0, ...rows.map(row =>
-        row.reduce((sum, w) => sum + w, 0) + (row.length - 1) * this.config.NODE_H_GAP
-      ));
-
-      const subGroupPaddingH = this.config.SUB_GROUP_PADDING?.H ?? 30;
-      return maxRowWidth + subGroupPaddingH * 2 + 40;
-    } else if (domainData.nodes.length === 5) {
-      // 物流域：1（调度中心） + 3（同排） + 1（计费结算）
-      const row1Width = nodeWidths[0] || 0;
-      const row2Width = (nodeWidths[1] || 0) + (nodeWidths[2] || 0) + (nodeWidths[3] || 0) + this.config.NODE_H_GAP * 2;
-      const row3Width = nodeWidths[4] || 0;
-      const maxRowWidth = Math.max(row1Width, row2Width, row3Width);
-      const subGroupPaddingH = this.config.SUB_GROUP_PADDING?.H ?? 30;
-      return maxRowWidth + subGroupPaddingH * 2 + 40;
-    } else {
-      // 其他域：单列布局
-      const maxNodeWidth = Math.max(0, ...nodeWidths);
-      const subGroupPaddingH = this.config.SUB_GROUP_PADDING?.H ?? 30;
-      return maxNodeWidth + subGroupPaddingH * 2 + 20;
-    }
+    return this.domainSizer.calculateBackendDomainMinWidth(domainData, domainKey);
   }
-
   /**
    * 获取缓存统计信息
    */
@@ -761,190 +658,40 @@ export class LayoutOptimizer {
     this.measurementCache.clear();
   }
 
-  /**
-   * 计算复杂域的实际需要宽度（包含子域）
-   */
-  public calculateComplexDomainWidth(domainKey: string, masterData: any): number {
-    const domainData = masterData[domainKey];
-    if (!domainData) return 800;
-
-    // 根据不同域的特点计算宽度
-    switch (domainKey) {
-      case 'mid': {
-        // 中台域：多行布局
-        const nodeWidths = this.calculateMultipleNodeWidths(domainData.descs, { domainKey });
-        const rows = [
-          [nodeWidths[0], nodeWidths[1], nodeWidths[2]], // 第一行：交易、支付、履约
-          [nodeWidths[3], nodeWidths[4], nodeWidths[5]], // 第二行：商品、价格、会员
-          [nodeWidths[6], nodeWidths[7]], // 第三行：风控、营销
-          [nodeWidths[8], nodeWidths[9]]  // 第四行：规则、库存
-        ];
-
-        const maxRowWidth = Math.max(0, ...rows.map(row =>
-          row.reduce((sum, w) => sum + w, 0) + (row.length - 1) * this.config.NODE_H_GAP
-        ));
-
-        const groupPaddingH = this.config.GROUP_PADDING?.H ?? 40;
-        return maxRowWidth + groupPaddingH * 2;
-      }
-
-      case 'data':
-        // 数据域：2x3布局
-        return this.calculateSingleLayerDomainWidth(domainData, domainKey);
-
-      default:
-        return this.calculateSingleLayerDomainWidth(domainData, domainKey);
-    }
+  public calculateComplexDomainWidth(domainKey: string, masterData: unknown): number {
+    return this.domainSizer.calculateComplexDomainWidth(domainKey, masterData);
   }
 
-  /**
-   * 计算后端复合域的宽度（包含三个子域）
-   */
-  public calculateBackendComplexDomainWidth(masterData: any): number {
-    const scmWidth = this.calculateBackendDomainMinWidth(masterData['be-scm'], 'be-scm');
-    const logisticsWidth = this.calculateBackendDomainMinWidth(masterData['be-logistics'], 'be-logistics');
-    const corpWidth = this.calculateBackendDomainMinWidth(masterData['be-corp'], 'be-corp');
-
-    const beColumnGap = this.config.BE_COLUMN_GAP ?? 60;
-    // 三个子域水平排列，加上间隙
-    const totalWidth = scmWidth + logisticsWidth + corpWidth + 2 * beColumnGap;
-
-    const groupPaddingH = this.config.GROUP_PADDING?.H ?? 40;
-    return totalWidth + groupPaddingH * 2;
+  public calculateBackendComplexDomainWidth(masterData: unknown): number {
+    return this.domainSizer.calculateBackendComplexDomainWidth(masterData);
   }
 
-  /**
-   * 计算所有域的宽度需求
-   */
-  public calculateAllDomainWidths(masterData: any): { [key: string]: number } {
-    if (!masterData) return {}; // 如果 masterData 未定义，则返回空对象
-    const domainWidths: { [key: string]: number } = {};
-
-    // 计算后端复合域
-    domainWidths['backend'] = this.calculateBackendComplexDomainWidth(masterData);
-
-    // 计算其他域
-    for (const [key, domainData] of Object.entries(masterData)) {
-      if (key.startsWith('be-')) continue; // 跳过后端子域，已在复合域中计算
-
-      if (key === 'mid' || key === 'data') {
-        domainWidths[key] = this.calculateComplexDomainWidth(key, masterData);
-      } else {
-        domainWidths[key] = this.calculateSingleLayerDomainWidth(domainData as DomainData, key);
-      }
-    }
-
-    return domainWidths;
+  public calculateAllDomainWidths(masterData: unknown): { [key: string]: number } {
+    return this.domainSizer.calculateAllDomainWidths(masterData);
   }
 
-  /**
-   * 计算统一的域宽度（所有域中的最大宽度）
-   */
-  public calculateUnifiedDomainWidth(masterData: any): number {
-    if (!masterData) return 1200; // 如果 masterData 未定义，则返回默认宽度
-    const allWidths = this.calculateAllDomainWidths(masterData);
-    const maxWidth = Math.max(0, ...Object.values(allWidths));
-
-    // 确保最小宽度
-    return Math.max(maxWidth, 1200);
+  public calculateUnifiedDomainWidth(masterData: unknown): number {
+    return this.domainSizer.calculateUnifiedDomainWidth(masterData);
   }
 
-  /**
-   * 计算单层域的实际需要高度（基于内容）
-   */
   public calculateSingleLayerDomainHeight(domainData: DomainData, domainKey?: string): number {
-    const nodeHeights = this.calculateMultipleNodeHeights(domainData.descs, { domainKey });
-    // 假设是单行水平布局，高度由最高的节点决定
-    const maxNodeHeight = Math.max(0, ...nodeHeights);
-
-    const groupPaddingV = this.config.GROUP_PADDING?.V ?? 40;
-    return maxNodeHeight + groupPaddingV * 2;
+    return this.domainSizer.calculateSingleLayerDomainHeight(domainData, domainKey);
   }
 
-  /**
-   * 计算后台域的最小高度需求（基于实际内容计算）
-   */
   public calculateBackendDomainMinHeight(domainData: DomainData, domainKey?: string): number {
-    if (!domainData) return 400; // 默认高度
-
-    const nodeHeights = this.calculateMultipleNodeHeights(domainData.descs, { domainKey });
-    let contentHeight: number;
-
-    // 根据宽度计算中使用的相同布局逻辑来计算高度
-    if (domainData.nodes.length === 6) {
-      // SCM域：2x3布局 (3行 x 2列)
-      const rows = [
-        [nodeHeights[0], nodeHeights[1]], // 第1行
-        [nodeHeights[2], nodeHeights[3]], // 第2行
-        [nodeHeights[4], nodeHeights[5]]  // 第3行
-      ];
-
-      const totalRowHeights = rows.map(row => Math.max(row[0] || 0, row[1] || 0))
-        .reduce((sum, h) => sum + h, 0);
-      contentHeight = totalRowHeights + (rows.length > 1 ? (rows.length - 1) * this.config.NODE_V_GAP : 0);
-
-    } else {
-      // 其他域：默认单列布局
-      const totalNodeHeight = nodeHeights.reduce((sum, h) => sum + h, 0);
-      contentHeight = totalNodeHeight + (nodeHeights.length > 1 ? (nodeHeights.length - 1) * this.config.NODE_V_GAP : 0);
-    }
-
-    const subGroupPaddingV = this.config.SUB_GROUP_PADDING.V_TOP + this.config.SUB_GROUP_PADDING.V_BOTTOM;
-    return contentHeight + subGroupPaddingV;
+    return this.domainSizer.calculateBackendDomainMinHeight(domainData, domainKey);
   }
 
-  /**
-   * 计算复杂域的实际需要高度（包含子域）
-   */
-  public calculateComplexDomainHeight(domainKey: string, masterData: any): number {
-    const domainData = masterData[domainKey];
-    if (!domainData) return 400;
-
-    switch (domainKey) {
-      case 'mid': {
-        // 中台域：多行布局
-        const nodeHeights = this.calculateMultipleNodeHeights(domainData.descs, { domainKey });
-        const rows = [
-          [nodeHeights[0], nodeHeights[1], nodeHeights[2]],
-          [nodeHeights[3], nodeHeights[4], nodeHeights[5]],
-          [nodeHeights[6], nodeHeights[7]],
-          [nodeHeights[8], nodeHeights[9]]
-        ];
-
-        const totalRowHeights = rows.map(row => Math.max(0, ...row))
-          .reduce((sum, h) => sum + h, 0);
-        const contentHeight = totalRowHeights + (rows.length > 1 ? (rows.length - 1) * this.config.NODE_V_GAP : 0);
-
-        const groupPaddingV = this.config.GROUP_PADDING?.V ?? 40;
-        return contentHeight + groupPaddingV * 2;
-      }
-
-      default:
-        return this.calculateSingleLayerDomainHeight(domainData as DomainData, domainKey);
-    }
+  public calculateComplexDomainHeight(domainKey: string, masterData: unknown): number {
+    return this.domainSizer.calculateComplexDomainHeight(domainKey, masterData);
   }
 
-  /**
-   * 计算后端复合域的高度（包含三个子域）
-   */
-  public calculateBackendComplexDomainHeight(masterData: any): number {
-    const scmHeight = this.calculateBackendDomainMinHeight(masterData['be-scm'], 'be-scm');
-    const logisticsHeight = this.calculateBackendDomainMinHeight(masterData['be-logistics'], 'be-logistics');
-    const corpHeight = this.calculateBackendDomainMinHeight(masterData['be-corp'], 'be-corp');
-
-    // 水平排列，高度取最大值
-    const maxHeight = Math.max(scmHeight, logisticsHeight, corpHeight);
-
-    const groupPaddingV = this.config.GROUP_PADDING?.V ?? 40;
-    return maxHeight + groupPaddingV * 2;
+  public calculateBackendComplexDomainHeight(masterData: unknown): number {
+    return this.domainSizer.calculateBackendComplexDomainHeight(masterData);
   }
 
-  /**
-   * 计算自适应画布宽度（统一域宽度加上padding）
-   */
-  public calculateAdaptiveCanvasWidth(masterData: any): number {
-    const unifiedWidth = this.calculateUnifiedDomainWidth(masterData);
-    return unifiedWidth + this.config.DOMAIN_H_GAP;
+  public calculateAdaptiveCanvasWidth(masterData: unknown): number {
+    return this.domainSizer.calculateAdaptiveCanvasWidth(masterData);
   }
 }
 
