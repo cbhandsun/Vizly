@@ -7,8 +7,6 @@ import {
   adjustToWorkDay,
   addWorkDays,
   getWorkDays,
-  _getWorkDaysSigned,
-  _addWorkDaysSigned,
   calculateCriticalPath
 } from '../../../hooks/useProTimelineEngine';
 import ProTimelineAxis from './ProTimelineAxis';
@@ -19,9 +17,8 @@ import { ProResourceDrawer } from './ProResourceDrawer';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { appMessage } from '../../../utils/antdStaticBridge';
 import { addDaysToDateOnly, parseDateOnlyTime, todayDateOnly } from '../../../utils/dateOnly';
-
-import { ZoomInOutlined, ZoomOutOutlined, CameraOutlined, DeleteOutlined, TeamOutlined } from '@ant-design/icons';
-import { Button, Tooltip, Segmented, Switch } from 'antd';
+import { ProTimelineChrome, ProTimelineKeyframes } from './ProTimelineChrome';
+import { projectProTimelineTasks } from './proTimelineTaskProjection';
 
 const ROW_HEIGHT = 42;
 const HEADER_HEIGHT = 52;
@@ -52,7 +49,6 @@ export default function ProTimelineCanvas() {
 
   const [theme] = useTheme({ autoInitialize: true });
     
-    // Theme Token Mappings
     const isDark = theme?.mode === 'dark';
     const canvasBg = theme?.diagram?.canvas?.background || (isDark ? '#141414' : '#fdfdfe');
     const borderColor = theme?.palette?.neutral?.border || (isDark ? '#303030' : 'rgba(0,0,0,0.06)');
@@ -100,30 +96,10 @@ export default function ProTimelineCanvas() {
       appMessage.success('已成功清空当前项目的基线排期');
   }, [setNodes]);
 
-    // Convert nodes → ProGanttTasks
-    const tasks = useMemo<ProGanttTask[]>(() => {
-        return nodes.filter(n => ['phase', 'event', 'milestone', 'summary'].includes(n.data.type as string) || n.type === 'timelineNode').map(n => {
-            const deps = edges.filter(e => e.target === n.id).map(e => e.source);
-            return {
-                id: n.id,
-                name: (n.data.label as string) || '未命名',
-                startDate: (n.data.date as string),
-                endDate: (n.data.endDate as string) || (n.data.date as string),
-                progress: n.data.progress as number | undefined,
-                dependencies: deps,
-                type: n.data.type as string,
-                color: (n.data.color as string) || undefined,
-                _rawSelected: n.selected,
-                status: n.data.status as string,
-                parentId: n.data.parentId as string | undefined,
-                isExpanded: n.data.isExpanded as boolean | undefined,
-                assignee: n.data.assignee as string | undefined,
-                priority: n.data.priority as 'high' | 'medium' | 'low' | undefined,
-                baselineStartDate: n.data.baselineStartDate as string | undefined,
-                baselineEndDate: n.data.baselineEndDate as string | undefined,
-            };
-        }).filter(t => t.startDate || t.type === 'summary' || t.type === 'phase');
-    }, [nodes, edges]);
+    const tasks = useMemo<ProGanttTask[]>(
+        () => projectProTimelineTasks(nodes, edges),
+        [nodes, edges],
+    );
 
   // 始终运行 CPM 拓扑以提供底层的循环依赖安全检测
   const cpmResult = useMemo(() => {
@@ -150,7 +126,6 @@ export default function ProTimelineCanvas() {
       return cpmResult.cyclicTaskIds;
   }, [cpmResult]);
   
-  // 1D-Packing & Hierarchical Rollup
   const packedTasks = useMemo(() => {
      const computed = calculateSwimlanes(tasks);
      return computed.map(t => ({
@@ -163,10 +138,8 @@ export default function ProTimelineCanvas() {
      }));
   }, [tasks, dateToX]);
 
-  // Selected task
   const selectedTaskId = useMemo(() => nodes.find(n => n.selected)?.id || null, [nodes]);
 
-  // --- 事件处理 ---
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
       e.stopPropagation();
       if (e.ctrlKey || e.metaKey) {
@@ -354,7 +327,7 @@ export default function ProTimelineCanvas() {
           const currentStart = node.data.date as string;
           const currentEnd = (node.data.endDate as string) || currentStart;
           
-          targetStart = updates.startDate || updates.date || currentStart;
+          targetStart = updates.startDate || currentStart;
           targetEnd = updates.endDate || currentEnd;
           
           if (targetStart !== currentStart || targetEnd !== currentEnd) {
@@ -498,7 +471,6 @@ export default function ProTimelineCanvas() {
         }
     }, [nodes, setNodes, updateNodeData]);
 
-  // Initial pan
   const initPanRef = useRef(false);
   useEffect(() => {
      if (packedTasks.length > 0 && !initPanRef.current) {
@@ -506,8 +478,6 @@ export default function ProTimelineCanvas() {
          initPanRef.current = true;
      }
   }, [packedTasks, packedTasks.length, setPan]);
-
-  // (weekendColumns CSS O(1) fallback handled in canvas render)
 
   const totalVisibleRows = packedTasks.filter(t => t._computed?.isVisible !== false).length;
   const totalRows = Math.max(totalVisibleRows, 8);
@@ -694,152 +664,24 @@ export default function ProTimelineCanvas() {
                 />
             </div>
 
-            {/* ===== Pro Timeline Analytics Bar (项目高级分析控制器) ===== */}
-            <div style={{
-                position: 'absolute',
-                bottom: 24,
-                right: 335,
-                background: glassBg,
-                backdropFilter: 'blur(12px) saturate(180%)',
-                border: `1px solid ${borderColor}`,
-                borderRadius: 99,
-                boxShadow: `0 6px 16px ${shadowColor}`,
-                padding: '4px 14px',
-                zIndex: 100,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12
-            }}>
-                <Tooltip title="分析团队工时与资源负载">
-                    <Button 
-                        type="text" 
-                        size="small" 
-                        shape="circle"
-                        icon={<TeamOutlined />} 
-                        onClick={() => setShowResourceDrawer(true)}
-                        style={{ color: showResourceDrawer ? '#1890ff' : secondaryTextColor }}
-                    />
-                </Tooltip>
-                
-                <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                    <span style={{ color: secondaryTextColor, fontWeight: 500 }}>关键路径</span>
-                    <Switch 
-                        size="small" 
-                        checked={showCriticalPath} 
-                        onChange={toggleCriticalPath}
-                    />
-                </div>
-                
-                <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                    <span style={{ color: secondaryTextColor, fontWeight: 500 }}>对比基线</span>
-                    <Switch 
-                        size="small" 
-                        checked={showBaseline} 
-                        onChange={toggleBaseline}
-                    />
-                </div>
-
-                <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
-
-                <Tooltip title="锁定当前排期为基线快照">
-                    <Button 
-                        type="text" 
-                        size="small" 
-                        shape="circle"
-                        icon={<CameraOutlined />} 
-                        onClick={handleSaveBaseline}
-                        style={{ color: secondaryTextColor }}
-                    />
-                </Tooltip>
-
-                <Tooltip title="清空基线排期">
-                    <Button 
-                        type="text" 
-                        size="small" 
-                        shape="circle"
-                        icon={<DeleteOutlined />} 
-                        onClick={handleClearBaseline}
-                        danger
-                    />
-                </Tooltip>
-            </div>
- 
-            {/* ===== Timeline Zoom Bar (Gantt 专用缩放控制器) ===== */}
-            <div style={{
-                position: 'absolute',
-                bottom: 24,
-                right: 24,
-                background: glassBg,
-                backdropFilter: 'blur(12px) saturate(180%)',
-                border: `1px solid ${borderColor}`,
-                borderRadius: 99,
-                boxShadow: `0 6px 16px ${shadowColor}`,
-                padding: '4px 12px 4px 8px',
-                zIndex: 100,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8
-            }}>
-                <Segmented
-                    size="small"
-                    value={viewMode}
-                    onChange={(val) => setViewMode(val as any)}
-                    options={[
-                        { label: '天', value: 'day' },
-                        { label: '周', value: 'week' },
-                        { label: '月', value: 'month' },
-                        { label: '季', value: 'quarter' }
-                    ]}
-                    style={{
-                        background: 'transparent',
-                        fontSize: 12,
-                    }}
-                />
-                
-                <div style={{ width: 1, height: 16, backgroundColor: borderColor }} />
-
-                <Tooltip title="缩小时间轴区域">
-                    <Button 
-                        type="text" 
-                        size="small" 
-                        shape="circle"
-                        icon={<ZoomOutOutlined />} 
-                        onClick={() => setZoom(Math.max(0.15, zoomLevel - 0.2))} 
-                    />
-                </Tooltip>
-                
-                <Tooltip title="点击恢复默认 100% 比例">
-                    <span 
-                        onClick={() => setZoom(1)}
-                        style={{ 
-                            fontSize: 12, 
-                            minWidth: 42, 
-                            textAlign: 'center', 
-                            fontFamily: 'monospace', 
-                            cursor: 'pointer', 
-                            fontWeight: 600,
-                            color: secondaryTextColor,
-                            userSelect: 'none'
-                        }}
-                    >
-                        {Math.round(zoomLevel * 100)}%
-                    </span>
-                </Tooltip>
-                
-                <Tooltip title="放大时间轴区域">
-                    <Button 
-                        type="text" 
-                        size="small" 
-                        shape="circle"
-                        icon={<ZoomInOutlined />} 
-                        onClick={() => setZoom(Math.min(5, zoomLevel + 0.2))} 
-                    />
-                </Tooltip>
-            </div>
+            <ProTimelineChrome
+                borderColor={borderColor}
+                glassBackground={glassBg}
+                shadowColor={shadowColor}
+                secondaryTextColor={secondaryTextColor}
+                showResourceDrawer={showResourceDrawer}
+                onOpenResourceDrawer={() => setShowResourceDrawer(true)}
+                showCriticalPath={showCriticalPath}
+                onToggleCriticalPath={toggleCriticalPath}
+                showBaseline={showBaseline}
+                onToggleBaseline={toggleBaseline}
+                onSaveBaseline={handleSaveBaseline}
+                onClearBaseline={handleClearBaseline}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                zoomLevel={zoomLevel}
+                onZoomChange={setZoom}
+            />
 
             {/* ===== Pro Resource Drawer ===== */}
             <ProResourceDrawer
@@ -851,39 +693,4 @@ export default function ProTimelineCanvas() {
         </div>
     </div>
   );
-}
-
-// Stable CSS injection - only runs once, no dangerouslySetInnerHTML
-const KEYFRAMES_ID = 'pro-timeline-keyframes';
-function ProTimelineKeyframes() {
-    useEffect(() => {
-        if (document.getElementById(KEYFRAMES_ID)) return;
-        const style = document.createElement('style');
-        style.id = KEYFRAMES_ID;
-        style.textContent = `
-            @keyframes pulse-ring {
-                0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.7); }
-                70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(255, 77, 79, 0); }
-                100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 77, 79, 0); }
-            }
-            @keyframes pro-timeline-critical-glow {
-                0% { box-shadow: 0 0 4px rgba(255, 77, 79, 0.5), inset 0 0 2px rgba(255, 77, 79, 0.3); }
-                50% { box-shadow: 0 0 12px rgba(255, 77, 79, 0.85), inset 0 0 4px rgba(255, 77, 79, 0.5); }
-                100% { box-shadow: 0 0 4px rgba(255, 77, 79, 0.5), inset 0 0 2px rgba(255, 77, 79, 0.3); }
-            }
-            @keyframes pro-timeline-cyclic-glow {
-                0% { box-shadow: 0 0 4px rgba(250, 173, 20, 0.5), inset 0 0 2px rgba(250, 173, 20, 0.3); }
-                50% { box-shadow: 0 0 12px rgba(250, 173, 20, 0.9), inset 0 0 4px rgba(250, 173, 20, 0.5); }
-                100% { box-shadow: 0 0 4px rgba(250, 173, 20, 0.5), inset 0 0 2px rgba(250, 173, 20, 0.3); }
-            }
-            @keyframes pro-timeline-dash-flow {
-                to {
-                    stroke-dashoffset: -20;
-                }
-            }
-        `;
-        document.head.appendChild(style);
-        return () => { style.remove(); };
-    }, []);
-    return null;
 }

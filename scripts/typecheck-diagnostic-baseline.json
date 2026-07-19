@@ -921,27 +921,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/components/diagrams/timeline-pro/ProTimelineCanvas.tsx",
-        "code": 2339,
-        "messageHash": "b18d268511974f26fbabe4c1527a0ec6d5010b3917ef9e5361d59aa15e0c0562",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/timeline-pro/ProTimelineCanvas.tsx",
-        "code": 2724,
-        "messageHash": "e3ca44e4eed17fbc70daa4fec9b23632ccbfdc33a5dec2d04519fe3bd244ea61",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/timeline-pro/ProTimelineCanvas.tsx",
-        "code": 2724,
-        "messageHash": "ed48f02ad555461a85fcd03f359c5f8e2ded7c66fbf902e035c6fa10f5a16ef8",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/components/diagrams/timeline-pro/ProTimelinePropertyPanel.tsx",
         "code": 2322,
         "messageHash": "f54e4df30253a97a9d14d6b69c853b393eaa2a12b86bdd0c5cf65a3193dd2781",

@@ -1,4 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import type { Edge, Node } from '@xyflow/react';
+import {
+    coerceProTimelineViewMode,
+    stepProTimelineZoom,
+} from '../../components/diagrams/timeline-pro/proTimelineChromeBoundary';
+import { projectProTimelineTasks } from '../../components/diagrams/timeline-pro/proTimelineTaskProjection';
 import {
     addWorkDays,
     adjustToWorkDay,
@@ -33,5 +39,63 @@ describe('useProTimelineEngine date helpers', () => {
         expect(isWeekend('2026-02-31')).toBe(false);
         expect(getWorkDays('2026-02-31', '2026-03-02')).toBe(0);
         expect(getWorkDaysSigned('bad', '2026-03-02')).toBe(0);
+    });
+
+    it('coerces chrome controls at the component boundary', () => {
+        expect(coerceProTimelineViewMode('quarter', 'day')).toBe('quarter');
+        expect(coerceProTimelineViewMode('year', 'week')).toBe('week');
+        expect(stepProTimelineZoom(Number.NaN, 0.2)).toBe(1.2);
+        expect(stepProTimelineZoom(0.2, -1)).toBe(0.15);
+        expect(stepProTimelineZoom(4.9, 1)).toBe(5);
+    });
+
+    it('projects external node data into validated timeline tasks', () => {
+        const nodes: Node[] = [
+            {
+                id: 'valid',
+                type: 'timelineNode',
+                position: { x: 0, y: 0 },
+                selected: true,
+                data: {
+                    type: 'event',
+                    label: ' Task ',
+                    date: '2026-07-20',
+                    endDate: 'invalid',
+                    progress: '120',
+                    priority: 'urgent',
+                },
+            },
+            {
+                id: 'invalid-date',
+                type: 'timelineNode',
+                position: { x: 0, y: 0 },
+                data: { type: 'event', date: '2026-02-31' },
+            },
+            {
+                id: 'phase-without-date',
+                position: { x: 0, y: 0 },
+                data: { type: 'phase', label: '' },
+            },
+        ];
+        const edges: Edge[] = [{ id: 'dependency', source: 'phase-without-date', target: 'valid' }];
+
+        expect(projectProTimelineTasks(nodes, edges)).toEqual([
+            expect.objectContaining({
+                id: 'valid',
+                name: 'Task',
+                startDate: '2026-07-20',
+                endDate: '2026-07-20',
+                progress: 100,
+                priority: undefined,
+                dependencies: ['phase-without-date'],
+                _rawSelected: true,
+            }),
+            expect.objectContaining({
+                id: 'phase-without-date',
+                name: '未命名',
+                startDate: '',
+                endDate: '',
+            }),
+        ]);
     });
 });
