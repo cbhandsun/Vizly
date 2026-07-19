@@ -186,6 +186,10 @@ export const logEdgeRoutingGraphVersionSubscriberFailure = (error: unknown): voi
   safeLog.warn('[EdgeRoutingCoordinator] Graph version subscriber failed:', redactSensitiveLogValue(error));
 };
 
+export const logEdgeRoutingDebugListenerFailure = (error: unknown): void => {
+  safeLog.warn('[EdgeRoutingCoordinator] Debug listener failed:', redactSensitiveLogValue(error));
+};
+
 export const logEdgeRoutingCoordinatorCachesCleared = (graphVersion?: number): void => {
   if (typeof graphVersion === 'number') {
     safeLog.info(`[EdgeRoutingCoordinator] All caches cleared. graphVersion=${graphVersion}`);

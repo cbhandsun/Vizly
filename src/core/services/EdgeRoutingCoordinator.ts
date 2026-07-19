@@ -16,15 +16,15 @@ import { PathfindingWorkerPool } from '../workers/PathfindingWorkerPool'; // [FI
 import { RoutingStrategySelector } from '../algorithms/RoutingStrategySelector';
 import { VisibilityGraphCache } from '../algorithms/VisibilityGraphCache';
 import { setPathfindingConfig } from '../algorithms/pathfinding';
-import { LineObstacle, Rectangle } from '../algorithms/pathfinding';
 import { optimizePaths } from '../algorithms/LPNudge';
 import { clearRenderedPathCache } from '../routing/renderedPathCache';
-import { buildRoutedLabelObstacle, getGraphEdgeLabelText } from './edgeRoutingLabels';
 import { buildEdgeRoutingCandidateAxes } from './edgeRoutingCandidateAxes';
-import { collectHardNodeObstacleRects, collectSoftNodeObstacleRects, type EdgeRoutingObstacleNode } from './edgeRoutingNodeObstacles';
 import { routeJobsWithParallelFallback, routeSerialFallbackJobs } from './edgeRoutingParallel';
-import { createEdgeRoutingObstacleCollector } from './edgeRoutingObstacles';
-import { scheduleEdgeRoutingBatch } from './edgeRoutingScheduling';
+import {
+    collectHardEdgeRoutingObstacles,
+    collectSoftEdgeRoutingObstacles,
+} from './edgeRoutingObstacles';
+import { EdgeRoutingScheduler } from './edgeRoutingScheduling';
 import {
     assignSameSidePortSeparation as separateSameSidePorts,
 } from './edgeRoutingPortSeparation';
@@ -39,20 +39,15 @@ import {
     logEdgeRoutingCoordinatorParallelIncomplete,
     logEdgeRoutingCoordinatorParallelPoolInitFailure,
     logEdgeRoutingCoordinatorSerialRoutingFailure,
+    logEdgeRoutingDebugListenerFailure,
     logEdgeRoutingGraphVersionSubscriberFailure,
 } from '../utils/routingLogging';
-import {
-    collectFixedRoutingPathContext,
-    collectPendingRoutingLineObstacles,
-    type KnownRoutingPathCandidate,
-} from './edgeRoutingCoordinatorPostProcessing';
 import {
     assignGlobalRoutingChannels,
     injectRoutingCongestionContext,
 } from './edgeRoutingChannelAssignment';
 import { applyGlobalRoutingPostProcessing } from './edgeRoutingGlobalPostProcessing';
 import {
-    buildRoutingDebugPayload,
     commitRoutingBatchResults,
     createRoutingBatchSnapshot,
     syncPreparedJobsToLatestRequests,
@@ -61,48 +56,15 @@ import {
 import { assignBusRoutingMetadata } from './edgeRoutingBusGroupProcessing';
 import { buildEdgeRoutingFailureFallback } from './edgeRoutingFailureFallback';
 import { EdgeRoutingIncrementalState } from './edgeRoutingIncrementalState';
+import { EdgeRoutingResultContext } from './edgeRoutingResultContext';
+import { EdgeRoutingDebugState, refreshDebugRoutingRequestEndpoints } from './edgeRoutingDebugState';
+import { buildEdgeRoutingCacheParams } from './edgeRoutingCacheParams';
 
 /**
  * [P0-2] Main coordination service for edge routing.
  * Manages caching, worker delegation, and incremental updates.
  */
 export type RoutingRequest = RoutingBatchRequest;
-
-export interface PortUsageStats {
-    top: number;
-    bottom: number;
-    left: number;
-    right: number;
-}
-
-/** [Phase 2] Debug data structure for trunk visualization */
-interface TrunkDebugData {
-    /** Edge ID */
-    edgeId: string;
-    /** Edge type (main, feedback, data, etc.) */
-    edgeType?: string;
-    /** Geometric delta */
-    delta: number;
-    /** Direction sign */
-    dirSign: number;
-    /** Classified side (1 = forward, -1 = backward) */
-    side: number;
-    /** Whether edge type influenced classification */
-    typeInfluenced: boolean;
-    /** Trunk geometry if assigned */
-    trunk?: {
-        direction: 'horizontal' | 'vertical';
-        axis: number;
-        range: { min: number; max: number };
-        port?: string;
-    };
-}
-
-type CacheablePathFindingJob = Partial<PathFindingJob> & {
-    sourceRect?: Rectangle;
-    targetRect?: Rectangle;
-    type?: string;
-};
 
 export class EdgeRoutingCoordinator {
     private static instance: EdgeRoutingCoordinator | null = null;
@@ -121,32 +83,20 @@ export class EdgeRoutingCoordinator {
 
     // [P0-2] Topology, graph-version, and dirty-edge state
     private incrementalState = new EdgeRoutingIncrementalState(logEdgeRoutingGraphVersionSubscriberFailure);
-    /** [SharedTrunk] Accumulated shared trunk segments from latest batch, keyed by group ID */
-    private sharedTrunks: Map<string, SharedTrunkSegment> = new Map();
-    private routedLabelObstacles: Map<string, Rectangle & { edgeId: string; ownerId: string }> = new Map();
-    private latestRoutedPaths: Map<string, { graphKey: string; points: Point[]; updatedAt: number }> = new Map();
-
-    // [P2-3] Port Usage for Congestion Awareness
-    // private portUsageStats: Record<string, PortUsageStats> = {};
-
+    private resultContext = new EdgeRoutingResultContext();
+    private debugState = new EdgeRoutingDebugState(logEdgeRoutingDebugListenerFailure);
+    private scheduler = new EdgeRoutingScheduler(() => {
+        void this.triggerBatchRouting();
+    });
     // [P2-3] Pending Requests for Batching
     // Track latest request per edge to avoid duplicate work in same tick
     private latestRequests: Map<string, { request: RoutingRequest; graphKey: string; seq: number; updatedAt: number }> = new Map();
     private requestSeq: number = 0;
 
-    // [NEW] Debug State
-    private debugEdgeId: string | null = null;
-    private onDebugData: ((data: unknown) => void) | null = null;
-
-    // [Phase 2] Trunk Debug Data Collection
-    private trunkDebugData: Map<string, TrunkDebugData> = new Map();
-
     public clearDebugEdge(): void {
-        this.setDebugEdge(null);
+        this.debugState.selectEdge(null);
     }
 
-    // [FIX] Debounce Timer
-    private pendingTimeout: any = null;
     // Map to store resolvers for pending edge requests
     private pendingResolvers: Map<
         string,
@@ -155,24 +105,8 @@ export class EdgeRoutingCoordinator {
 
     private readonly MAX_PENDING_SEGMENTS = 400;
 
-    private isDragging: boolean = false;
-
-    // [COLD-START] 鍐峰惎鍔ㄤ繚鎶わ細freeze 鏈熼棿鎵€鏈?scheduleBatchRouting 璋冪敤琚寕璧?
-    // 鐩村埌 unfreeze() 琚皟鐢紝鍐嶄竴娆℃€ф壒閲忚Е鍙戯紝閬垮厤鑺傜偣娴嬮噺涓嶇ǔ瀹氭椂 A* 澶ч噺鏃犳晥杩唬
-    private isFrozen: boolean = false;
-    private frozenDuringColdStart: boolean = false;
-
-    /**
-     * [COLD-START] 鍐荤粨璺敱璋冨害銆?
-     * 鍦ㄤ粠缂撳瓨鍔犺浇鏁版嵁鏃惰皟鐢紝闃叉鑺傜偣灏哄鏈ǔ瀹氬墠瑙﹀彂澶ч噺 A* 璁＄畻銆?
-     */
     public freeze(): void {
-        this.isFrozen = true;
-        this.frozenDuringColdStart = true;
-        if (this.pendingTimeout) {
-            clearTimeout(this.pendingTimeout);
-            this.pendingTimeout = null;
-        }
+        this.scheduler.freeze();
     }
 
     /**
@@ -180,11 +114,7 @@ export class EdgeRoutingCoordinator {
      * 鍦ㄨ妭鐐规祴閲忕ǔ瀹氬悗锛圧F measured.width > 0锛夎皟鐢ㄣ€?
      */
     public unfreeze(): void {
-        if (!this.isFrozen) return;
-        this.isFrozen = false;
-        this.frozenDuringColdStart = false;
-        // 绔嬪嵆瑙﹀彂涓€娆℃壒閲忚矾鐢憋紙鎵€鏈夌Н鍘嬬殑璇锋眰閮藉湪 latestRequests 閲岋級
-        if (this.latestRequests.size > 0) {
+        if (this.scheduler.unfreeze() && this.latestRequests.size > 0) {
             this.markAllDirty();
             this.scheduleBatchRouting();
         }
@@ -200,11 +130,7 @@ export class EdgeRoutingCoordinator {
      * Increases debounce delay during drag to reduce CPU load (~75% fewer route calls).
      */
     public setDragging(dragging: boolean): void {
-        this.isDragging = dragging;
-        if (!dragging) {
-            // Immediately trigger routing on drag-end to snap to final position
-            this.scheduleBatchRouting();
-        }
+        if (this.scheduler.setDragging(dragging)) this.scheduleBatchRouting();
     }
 
     /**
@@ -212,19 +138,7 @@ export class EdgeRoutingCoordinator {
      * Call this after manually marking edges as dirty.
      */
     public scheduleBatchRouting(): void {
-        scheduleEdgeRoutingBatch({
-            isFrozen: this.isFrozen,
-            isDragging: this.isDragging,
-            pendingTimeout: this.pendingTimeout,
-            clearTimer: (handle) => clearTimeout(handle as Parameters<typeof clearTimeout>[0]),
-            scheduleTimer: (callback, delayMs) => setTimeout(callback, delayMs),
-            setPendingTimeout: (handle) => {
-                this.pendingTimeout = handle;
-            },
-            triggerBatchRouting: () => {
-                void this.triggerBatchRouting();
-            },
-        });
+        this.scheduler.schedule();
     }
 
     private constructor() {
@@ -304,13 +218,13 @@ export class EdgeRoutingCoordinator {
             for (const edgeId of affectedEdges) {
                 this.cache.deleteByEdgeId(edgeId);
                 this.incrementalState.markDirty(edgeId);
-                this.latestRoutedPaths.delete(edgeId);
+                this.resultContext.deletePath(edgeId);
             }
         } else {
             // Fallback: full invalidation when no specific nodes provided
             this.incrementalState.incrementGraphVersion();
             this.cache.clear();
-            this.latestRoutedPaths.clear();
+            this.resultContext.clearPaths();
             this.incrementalState.clearDirtyEdges();
             this.incrementalState.markAllDirty();
         }
@@ -346,8 +260,8 @@ export class EdgeRoutingCoordinator {
         this.incrementalState.clearDirtyEdges();
         this.incrementalState.resetDependencies();
         this.latestRequests.clear();
-        this.latestRoutedPaths.clear();
-        this.routedLabelObstacles.clear();
+        this.resultContext.clearPaths();
+        this.resultContext.clearLabelObstacles();
         this.incrementalState.incrementGraphVersion();
         
         // Clear global SVG path cache to prevent "flying lines" UI fallback.
@@ -360,17 +274,12 @@ export class EdgeRoutingCoordinator {
         logEdgeRoutingCoordinatorCachesCleared();
     }
 
-    private onSelectionChange: ((edgeId: string | null) => void) | null = null;
-
     public setDebugEdge(edgeId: string | null) {
-        this.debugEdgeId = edgeId;
-        if (this.onSelectionChange) {
-            this.onSelectionChange(edgeId);
-        }
+        this.debugState.selectEdge(edgeId);
     }
 
     public forceDebugReRoute(edgeId?: string | null): void {
-        const targetId = edgeId ?? this.debugEdgeId;
+        const targetId = edgeId ?? this.debugState.getSelectedEdgeId();
         if (!targetId) {
             return;
         }
@@ -382,54 +291,20 @@ export class EdgeRoutingCoordinator {
             return;
         }
 
-        // [FIX] Refresh source/target coordinates from the latest stored graph context.
-        // If nodes moved since the last route, the cached job has stale sourceX/Y/targetX/Y.
-        // Pull fresh center-point coordinates so debug routing reflects the current layout.
-        try {
-            const freshNodes: any[] = entry.request.graph?.nodes ?? [];
-            const freshNodeMap = new Map<string, any>(freshNodes.map((n: any) => [n.id, n]));
-            const srcNode = freshNodeMap.get(entry.request.job.source);
-            const tgtNode = freshNodeMap.get(entry.request.job.target);
-            if (srcNode) {
-                const sx = srcNode.positionAbsolute?.x ?? srcNode.position?.x ?? srcNode.x ?? entry.request.job.sourceX;
-                const sy = srcNode.positionAbsolute?.y ?? srcNode.position?.y ?? srcNode.y ?? entry.request.job.sourceY;
-                const sw = srcNode.measured?.width ?? srcNode.width ?? 150;
-                const sh = srcNode.measured?.height ?? srcNode.height ?? 80;
-                entry.request.job.sourceX = sx + sw / 2;
-                entry.request.job.sourceY = sy + sh / 2;
-            }
-            if (tgtNode) {
-                const tx = tgtNode.positionAbsolute?.x ?? tgtNode.position?.x ?? tgtNode.x ?? entry.request.job.targetX;
-                const ty = tgtNode.positionAbsolute?.y ?? tgtNode.position?.y ?? tgtNode.y ?? entry.request.job.targetY;
-                const tw = tgtNode.measured?.width ?? tgtNode.width ?? 150;
-                const th = tgtNode.measured?.height ?? tgtNode.height ?? 80;
-                entry.request.job.targetX = tx + tw / 2;
-                entry.request.job.targetY = ty + th / 2;
-            }
-        } catch {
-            // Non-critical: proceed with stale coords if refresh fails
-        }
+        refreshDebugRoutingRequestEndpoints(entry.request);
 
         this.incrementalState.markDirty(targetId);
 
-        if (this.pendingTimeout) {
-            clearTimeout(this.pendingTimeout);
-        }
-        this.pendingTimeout = setTimeout(() => {
-            this.pendingTimeout = null;
-            this.triggerBatchRouting();
-        }, 0);
+        this.scheduler.scheduleImmediate();
     }
 
-
     public registerDebugListener(callback: ((data: unknown) => void) | null) {
-        this.onDebugData = callback;
+        this.debugState.registerDataListener(callback);
     }
 
     public registerSelectionListener(callback: ((edgeId: string | null) => void) | null) {
-        this.onSelectionChange = callback;
+        this.debugState.registerSelectionListener(callback);
     }
-
 
     /**
      * Route an edge using Cache -> Worker fallback.
@@ -441,14 +316,14 @@ export class EdgeRoutingCoordinator {
         const isBus = !!job.isOneToMany || !!job.isManyToOne;
 
         // 1. Generate Cache Key
-            const cacheParams = {
-            ...this.extractCacheableParams(job, graph),
+        const cacheParams = {
+            ...buildEdgeRoutingCacheParams(job, graph),
             version: this.incrementalState.getGraphVersion()
         };
         const key = this.cache.generateKey(edgeId, cacheParams);
 
         // 2. Check Cache
-            const cached = isBus ? null : this.cache.get(key);
+        const cached = isBus ? null : this.cache.get(key);
         if (cached) {
             this.monitor.track({
                 edgeId: edgeId,
@@ -457,7 +332,7 @@ export class EdgeRoutingCoordinator {
             });
             const graphKey = this.buildGraphKey(graph);
             this.latestRequests.set(edgeId, { request, graphKey, seq: ++this.requestSeq, updatedAt: performance.now() });
-            this.storeLatestRoutedPath(edgeId, cached, graphKey);
+            this.resultContext.storePath(edgeId, cached, graphKey);
             return cached;
         }
 
@@ -470,7 +345,7 @@ export class EdgeRoutingCoordinator {
                 // called multiple times for the same edge, the old resolver would be
                 // overwritten, orphaning the old Promise (it would never resolve).
                 // By chaining, ALL Promises for this edge resolve together.
-            const previousResolve = existing.resolve;
+                const previousResolve = existing.resolve;
                 existing.resolve = (result: PathFindingResult | PromiseLike<PathFindingResult>) => {
                     previousResolve(result);
                     resolve(result);
@@ -501,48 +376,6 @@ export class EdgeRoutingCoordinator {
             assignGlobalChannels: this.assignGlobalChannels.bind(this),
             calculatePath: (job, currentGraph) => this.workerPool.calculatePath(job, currentGraph as any),
         });
-    }
-
-    /**
-     * [P2-3] Extract parameters relevant for caching key
-     */
-    private extractCacheableParams(
-        job: CacheablePathFindingJob,
-        _graph: SharedGraphContext,
-        pendingEdges?: Array<{ start: { x: number; y: number }; end: { x: number; y: number } }>
-    ): Record<string, unknown> {
-        // We only care about things that affect pathfinding geometry
-        // [H-9] Compute lightweight XOR hash of pendingEdges so cache key changes when
-        // neighboring edges reroute (their new segments affect port selection).
-        let peHash = 0;
-        if (pendingEdges && pendingEdges.length > 0) {
-            peHash = pendingEdges.length;
-            for (const seg of pendingEdges) {
-                peHash = ((peHash * 31) + Math.round(seg.start.x + seg.end.y * 7)) >>> 0;
-            }
-        }
-        return {
-            rv: 15,
-            s: job.source,
-            t: job.target,
-            sx: Math.round(job.sourceX ?? 0),
-            sy: Math.round(job.sourceY ?? 0),
-            tx: Math.round(job.targetX ?? 0),
-            ty: Math.round(job.targetY ?? 0),
-            sr: job.sourceRect ? `${job.sourceRect.x},${job.sourceRect.y},${job.sourceRect.width},${job.sourceRect.height}` : '0',
-            tr: job.targetRect ? `${job.targetRect.x},${job.targetRect.y},${job.targetRect.width},${job.targetRect.height}` : '0',
-            // Include obstacles signature? Ideally yes, but maybe graph version handles it.
-            // For now rely on graphVersion for global obstacle changes.
-            // But if we want local caching, we might need a spatial hash of relevant obstacles.
-            type: job.type || 's', // Smart
-            sourceHandle: job.sourceHandle || '',
-            targetHandle: job.targetHandle || '',
-            sourcePosition: job.sourcePosition || '',
-            targetPosition: job.targetPosition || '',
-            // [FIX] Include Bus Routing params in cache key
-            bus: `${!!job.isOneToMany}|${!!job.isManyToOne}|${job.busTrunkSource?.x ?? 0},${job.busTrunkSource?.y ?? 0}|${job.busTrunkTarget?.x ?? 0},${job.busTrunkTarget?.y ?? 0}`,
-            pe: peHash,  // [H-9] pendingEdges fingerprint
-        };
     }
 
     /**
@@ -636,23 +469,11 @@ export class EdgeRoutingCoordinator {
 
     public getCachedResult(request: RoutingRequest): PathFindingResult | null {
         const cacheParams = {
-            ...this.extractCacheableParams(request.job, request.graph),
+            ...buildEdgeRoutingCacheParams(request.job, request.graph),
             version: this.incrementalState.getGraphVersion()
         };
         const key = this.cache.generateKey(request.edgeId, cacheParams);
         return this.cache.get(key) ?? null;
-    }
-
-    private storeLatestRoutedPath(edgeId: string, result: PathFindingResult, graphKey: string): void {
-        if (!result.points || result.points.length < 2 || result.error) {
-            this.latestRoutedPaths.delete(edgeId);
-            return;
-        }
-        this.latestRoutedPaths.set(edgeId, {
-            graphKey,
-            points: result.points.map(point => ({ x: point.x, y: point.y })),
-            updatedAt: performance.now(),
-        });
     }
 
     /**
@@ -680,32 +501,21 @@ export class EdgeRoutingCoordinator {
         const startTime = performance.now();
         const jobs = group.requests.map(request => {
             const job = this.buildJob(request);
-            if (this.debugEdgeId && request.edgeId === this.debugEdgeId) {
-                job.debug = true;
-            }
+            this.debugState.prepareJob(job);
             return job;
         });
         assignBusRoutingMetadata(jobs, group.graph, {
             onClassification: classification => {
-                this.trunkDebugData.set(classification.edge.id, {
-                    edgeId: classification.edge.id,
-                    edgeType: classification.edge.type,
-                    delta: classification.delta,
-                    dirSign: 0,
-                    side: 0,
-                    typeInfluenced: false,
-                });
+                this.debugState.recordClassification(classification.edge, classification.delta);
             },
-            onTrunk: (edges, trunk) => edges.forEach(edge => {
-                const debugEntry = this.trunkDebugData.get(edge.id);
-                if (!debugEntry) return;
-                debugEntry.trunk = {
+            onTrunk: (edges, trunk) => {
+                this.debugState.recordTrunk(edges.map(edge => edge.id), {
                     direction: trunk.direction,
                     axis: trunk.axis,
                     range: trunk.range,
                     port: trunk.suggestedPort,
-                };
-            }),
+                });
+            },
         });
         this.assignSameSidePortSeparation(jobs, group.graph);
         syncPreparedJobsToLatestRequests(jobs, this.latestRequests);
@@ -717,7 +527,10 @@ export class EdgeRoutingCoordinator {
             if (request.job.source) relatedNodeIds.add(request.job.source);
             if (request.job.target) relatedNodeIds.add(request.job.target);
         });
-        const pendingEdges = this.collectPendingEdges(
+        const pendingEdges = this.resultContext.collectPendingPathObstacles(
+            this.latestRequests,
+            entry => this.getCachedResult(entry.request),
+            edgeId => this.incrementalState.isDirty(edgeId),
             group.graphKey,
             relatedNodeIds,
             this.MAX_PENDING_SEGMENTS
@@ -746,7 +559,7 @@ export class EdgeRoutingCoordinator {
                 const isBus = !!job?.isOneToMany || !!job?.isManyToOne;
                 if (!isBus) {
                     const cacheParams = {
-                        ...this.extractCacheableParams(request.job, group.graph, pendingEdges),
+                        ...buildEdgeRoutingCacheParams(request.job, group.graph, pendingEdges),
                         version: this.incrementalState.getGraphVersion()
                     };
                     const key = this.cache.generateKey(request.edgeId, cacheParams);
@@ -761,104 +574,11 @@ export class EdgeRoutingCoordinator {
                     bendCount: (result.metadata as any)?.bendCount,
                     efficiencyRatio: (result.metadata as any)?.efficiencyRatio,
                 });
-                const shouldEmitDebug =
-                    (this.debugEdgeId && request.edgeId === this.debugEdgeId) ||
-                    job?.debug ||
-                    group.graph.config?.debug;
-                if (shouldEmitDebug && this.onDebugData) {
-                    this.onDebugData(buildRoutingDebugPayload(
-                        request.edgeId,
-                        result,
-                        this.trunkDebugData.get(request.edgeId),
-                        job
-                    ));
-                }
-                this.storeLatestRoutedPath(request.edgeId, result, group.graphKey);
-                this.updateRoutedLabelObstacle(request.edgeId, result, group.graph);
+                this.debugState.emitResult(request.edgeId, result, job, group.graph.config?.debug);
+                this.resultContext.storePath(request.edgeId, result, group.graphKey);
+                this.resultContext.updateLabelObstacle(request.edgeId, result, group.graph);
             },
         });
-    }
-
-    private collectPendingEdges(graphKey: string, relatedNodeIds: Set<string>, maxSegments: number): LineObstacle[] {
-        return collectPendingRoutingLineObstacles(
-            this.collectKnownRoutingPathCandidates(),
-            graphKey,
-            relatedNodeIds,
-            maxSegments
-        );
-    }
-
-    private collectFixedPathContext(
-        graphKey: string,
-        activeResults: PathFindingResult[],
-        activeEdgeIds: Set<string>,
-        maxEdges: number = 80
-    ): Map<string, Point[]> {
-        return collectFixedRoutingPathContext(
-            this.collectKnownRoutingPathCandidates(),
-            graphKey,
-            activeResults,
-            activeEdgeIds,
-            maxEdges
-        );
-    }
-
-    private collectKnownRoutingPathCandidates(): KnownRoutingPathCandidate[] {
-        return [...this.latestRequests.entries()].map(([edgeId, entry]) => {
-            const cached = this.getCachedResult(entry.request);
-            const latest = this.latestRoutedPaths.get(edgeId);
-            return {
-                edgeId,
-                graphKey: entry.graphKey,
-                sourceId: entry.request.job?.source,
-                targetId: entry.request.job?.target,
-                dirty: this.incrementalState.isDirty(edgeId),
-                cachedPoints: cached?.points,
-                points: cached?.points ?? (
-                    latest?.graphKey === entry.graphKey ? latest.points : undefined
-                ),
-            };
-        });
-    }
-
-    private collectSoftRoutingObstacles(graph: SharedGraphContext, excludedEdgeIds: Set<string> = new Set()): Rectangle[] {
-        const soft: Rectangle[] = [];
-        const pushRect = createEdgeRoutingObstacleCollector(soft, { excludedOwnerIds: excludedEdgeIds });
-
-        (graph.softObstacles ?? []).forEach(pushRect);
-        (graph.routingLabels ?? []).forEach(pushRect);
-        this.routedLabelObstacles.forEach(pushRect);
-
-        const nodes = (graph.nodes ?? []) as EdgeRoutingObstacleNode[];
-        collectSoftNodeObstacleRects(nodes).forEach(pushRect);
-
-        return soft;
-    }
-
-    private collectHardRoutingObstacles(graph: SharedGraphContext): Rectangle[] {
-        const hard: Rectangle[] = [];
-        const pushRect = createEdgeRoutingObstacleCollector(hard, { dedupe: true });
-
-        (graph.obstacles ?? []).forEach(pushRect);
-
-        const nodes = (graph.nodes ?? []) as EdgeRoutingObstacleNode[];
-        collectHardNodeObstacleRects(nodes).forEach(pushRect);
-
-        return hard;
-    }
-
-    private updateRoutedLabelObstacle(edgeId: string, result: PathFindingResult, graph: SharedGraphContext): void {
-        const labelObstacle = buildRoutedLabelObstacle(
-            edgeId,
-            getGraphEdgeLabelText(edgeId, graph),
-            result
-        );
-        if (!labelObstacle) {
-            this.routedLabelObstacles.delete(edgeId);
-            return;
-        }
-
-        this.routedLabelObstacles.set(edgeId, labelObstacle);
     }
 
     private buildWaypointCandidateAxes(
@@ -867,7 +587,10 @@ export class EdgeRoutingCoordinator {
     ): { horizontal: number[]; vertical: number[] } {
         return buildEdgeRoutingCandidateAxes({
             hardObstacles: graph.obstacles ?? [],
-            softObstacles: this.collectSoftRoutingObstacles(graph),
+            softObstacles: collectSoftEdgeRoutingObstacles(
+                graph,
+                this.resultContext.getLabelObstacles()
+            ),
             assignedJobs,
         });
     }
@@ -962,7 +685,6 @@ export class EdgeRoutingCoordinator {
         );
     }
 
-
     /**
      * [P2-3] Inject Congestion Context
      * Pass information about OTHER edges in the batch to the worker
@@ -972,12 +694,8 @@ export class EdgeRoutingCoordinator {
         injectRoutingCongestionContext(jobs, graph);
     }
 
-    /**
-     * [SharedTrunk] Public accessor 鈥?returns the latest shared trunk segments.
-     * Called by useSmartPathWorker to pass trunk data to the canvas rendering layer.
-     */
     public getSharedTrunks(): SharedTrunkSegment[] {
-        return Array.from(this.sharedTrunks.values());
+        return [];
     }
 
     /**
@@ -1005,24 +723,31 @@ export class EdgeRoutingCoordinator {
             config: graph.config,
             assignedJobs,
             fixedContextPaths: graphKey
-                ? this.collectFixedPathContext(graphKey, activeResults, activeEdgeIds)
+                ? this.resultContext.collectFixedPathContext(
+                    this.latestRequests,
+                    entry => this.getCachedResult(entry.request),
+                    edgeId => this.incrementalState.isDirty(edgeId),
+                    graphKey,
+                    activeResults,
+                    activeEdgeIds
+                )
                 : undefined,
-            hardObstacles: this.collectHardRoutingObstacles(graph),
-            softObstacles: this.collectSoftRoutingObstacles(graph, currentBatchEdgeIds),
+            hardObstacles: collectHardEdgeRoutingObstacles(graph),
+            softObstacles: collectSoftEdgeRoutingObstacles(
+                graph,
+                this.resultContext.getLabelObstacles(),
+                currentBatchEdgeIds
+            ),
             candidateAxes: this.buildWaypointCandidateAxes(graph, assignedJobs),
             onFailure: logEdgeRoutingCoordinatorGlobalNudgeFailure,
         });
     }
 
-    /**
-     * [DEV] 寮哄埗娓呯┖鎵€鏈夎矾鐢辩紦瀛樺苟閫掑 graphVersion锛岃鎵€鏈夎竟閲嶆柊璁＄畻璺緞銆?
-     * 鐢ㄤ簬淇敼浜嗚矾鐢辩畻娉曞悗鏃犻渶閲嶅惎鍗冲彲楠岃瘉鏁堟灉銆?
-     */
     public clearAllCaches(): void {
         const graphVersion = this.incrementalState.incrementGraphVersion();
         this.cache.clear();
-        this.latestRoutedPaths.clear();
-        this.routedLabelObstacles.clear();
+        this.resultContext.clearPaths();
+        this.resultContext.clearLabelObstacles();
         clearRenderedPathCache();
         this.incrementalState.clearDirtyEdges();
         this.incrementalState.markAllDirty();
@@ -1034,10 +759,11 @@ export class EdgeRoutingCoordinator {
      * Cleanup resources
      */
     public cleanup(): void {
+        this.scheduler.cancel();
         this.workerPool.terminate();
         this.parallelPool?.terminate();
         this.cache.clear();
-        this.routedLabelObstacles.clear();
+        this.resultContext.clearLabelObstacles();
         EdgeRoutingCoordinator.instance = null;
     }
     /**
