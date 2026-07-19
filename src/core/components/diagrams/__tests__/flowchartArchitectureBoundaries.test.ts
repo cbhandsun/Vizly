@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { BackgroundVariant } from '@xyflow/react';
+import { safeLog } from '@/core/utils/consoleCleanup';
 
 import {
     createFlowchartPluginNodeId,
@@ -11,6 +12,7 @@ import {
     resolveFlowchartPluginNodePosition,
 } from '../flowchartPluginRuntimeModel';
 import { coerceFlowchartThemeGridState } from '../hooks/useFlowchartShellState';
+import { resolveFlowchartPluginContribution } from '../flowchartDesignerViewModel';
 
 describe('flowchart architecture boundaries', () => {
     it('normalizes plugin node types, data, ids, and explicit positions', () => {
@@ -72,5 +74,18 @@ describe('flowchart architecture boundaries', () => {
             gridVariant: BackgroundVariant.Lines,
         });
         expect(coerceFlowchartThemeGridState({ style: 123 })).toBeNull();
+    });
+
+    it('isolates failing plugin UI contributions and redacts the failure', () => {
+        const warn = vi.spyOn(safeLog, 'warn').mockImplementation(() => undefined);
+        const result = resolveFlowchartPluginContribution(
+            'toolbar',
+            () => { throw new Error('token=plugin-ui-secret'); },
+            null,
+        );
+
+        expect(result).toBeNull();
+        expect(warn).toHaveBeenCalledOnce();
+        expect(JSON.stringify(warn.mock.calls)).not.toContain('plugin-ui-secret');
     });
 });
