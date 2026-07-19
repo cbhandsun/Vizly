@@ -1082,27 +1082,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/components/mindmap-v2/MindElixirWrapper.tsx",
-        "code": 2339,
-        "messageHash": "8ac6858c0b525805d65c75e726fb46598c316bd45a0f86a2ac851bfa56910635",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindElixirWrapper.tsx",
-        "code": 2345,
-        "messageHash": "599850f3388a133af70bbbc7e150a0ce837147d877263d29c7490a04a48e4ee6",
-        "count": 4
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindElixirWrapper.tsx",
-        "code": 2345,
-        "messageHash": "eba7570387975f716cbd445395b9181fdfb2813381d7550440037f706ec121c9",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/components/mindmap-v2/MindMapAIPanel.tsx",
         "code": 2322,
         "messageHash": "9883c56fc02455d9489ef86f8c27213dfd668883083306bf560bce81f34b1588",

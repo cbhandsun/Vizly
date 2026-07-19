@@ -18,7 +18,7 @@ import React, {
     useState,
 } from 'react';
 import MindElixir from 'mind-elixir';
-import type { MindElixirInstance, MindElixirData, NodeObj } from 'mind-elixir';
+import type { MindElixirInstance, MindElixirData, NodeObj, Topic } from 'mind-elixir';
 import 'mind-elixir/style.css';
 
 import { PluginContext } from '../../types/plugin';
@@ -65,6 +65,8 @@ import {
     logMindmapWrapperSaveFailure,
     logMindmapWrapperShapeSyncFailure,
 } from './mindmapWrapperLogging';
+import { coerceMindElixirDirection } from './mindElixirDirection';
+import { projectMindMapTreeToBridge } from './mindmapBridgeProjection';
 
 // ─── Default data shown for a fresh mindmap ──────────────────────────────────
 const DEFAULT_DATA: MindElixirData = {
@@ -411,7 +413,7 @@ function loadData(ctx: PluginContext): MindElixirData {
         // Restore persisted direction from localStorage (user may have changed it)
         const { directionStringToInt: d2i } = { directionStringToInt };
         const lsDir = localStorage.getItem('vizly_mindmap_dir');
-        const persistedDir = lsDir ? (d2i(lsDir) as 0 | 1 | 2) : null;
+        const persistedDir = lsDir ? coerceMindElixirDirection(d2i(lsDir)) : null;
 
         if (nodes.length === 0) return {
             ...DEFAULT_DATA,
@@ -427,7 +429,7 @@ function loadData(ctx: PluginContext): MindElixirData {
                 if (v2.themeKey) persistMindMapThemeKey(v2.themeKey);
                 return {
                     nodeData: v2.nodeData,
-                    direction: persistedDir ?? (v2.direction ?? MindElixir.SIDE) as 0 | 1 | 2,
+                    direction: persistedDir ?? coerceMindElixirDirection(v2.direction),
                     theme: v2.theme ?? VIZLY_HYPER_THEME,
                 };
             }
@@ -455,7 +457,7 @@ function loadData(ctx: PluginContext): MindElixirData {
         const v2 = migrateV1ToV2({ nodes: mindmapNodes, edges });
         return {
             nodeData: v2.nodeData,
-            direction: persistedDir ?? (v2.direction ?? MindElixir.SIDE) as 0 | 1 | 2,
+            direction: persistedDir ?? coerceMindElixirDirection(v2.direction),
             theme: VIZLY_HYPER_THEME,
         };
     } catch {
@@ -489,46 +491,6 @@ function saveData(ctx: PluginContext, mind: MindElixirInstance): void {
     } catch (e) {
         logMindmapWrapperSaveFailure(e);
     }
-}
-
-function flattenMindmapTree(root: NodeObj, parentId: string | null = null, depth = 0, side?: 'left' | 'right'): { nodes: any[], edges: any[] } {
-    const nodes: any[] = [];
-    const edges: any[] = [];
-
-    const nodeSide = root.side || side || 'right';
-
-    nodes.push({
-        id: root.id,
-        type: 'mindmap',
-        data: {
-            label: root.topic,
-            depth,
-            side: root.id === 'root' ? undefined : nodeSide,
-            parentId: parentId || undefined,
-            note: root.note,
-            url: root.hyperLink,
-            tags: root.tags,
-            icons: root.icons,
-        }
-    });
-
-    if (parentId) {
-        edges.push({
-            id: `edge_${parentId}_${root.id}`,
-            source: parentId,
-            target: root.id,
-        });
-    }
-
-    if (root.children) {
-        root.children.forEach(child => {
-            const childRes = flattenMindmapTree(child, root.id, depth + 1, nodeSide);
-            nodes.push(...childRes.nodes);
-            edges.push(...childRes.edges);
-        });
-    }
-
-    return { nodes, edges };
 }
 
 function isMindMapTextEditingTarget(target: EventTarget | null): boolean {
@@ -732,14 +694,14 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             const action = getSafeMindMapShortcutAction(event);
             if (!action || !mind.editable || isMindMapTextEditingTarget(event.target)) return;
 
-            const tpc = mind.currentNode as HTMLElement | null;
+            const tpc: Topic | null = mind.currentNode;
             if (!tpc) return;
 
             event.preventDefault();
             event.stopImmediatePropagation();
 
             try {
-                const nodeObj = (tpc as any).nodeObj as NodeObj | undefined;
+                const nodeObj = tpc.nodeObj;
                 if (action === 'addChild') {
                     mind.addChild(tpc, cleanMindMapChildNode());
                 } else if (action === 'insertParent') {
@@ -945,12 +907,12 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             get nodes() {
                 if (!mindRef.current) return [];
                 const data = mindRef.current.getData();
-                return flattenMindmapTree(data.nodeData).nodes;
+                return projectMindMapTreeToBridge(data.nodeData).nodes;
             },
             get edges() {
                 if (!mindRef.current) return [];
                 const data = mindRef.current.getData();
-                return flattenMindmapTree(data.nodeData).edges;
+                return projectMindMapTreeToBridge(data.nodeData).edges;
             },
             importData: async (newData: any) => {
                 if (!mindRef.current) return;
@@ -959,7 +921,10 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                         ? newData
                         : migrateV1ToV2(newData);
                     const safeData = cleanMindMapData(v2);
-                    mindRef.current.refresh(safeData);
+                    mindRef.current.refresh({
+                        ...safeData,
+                        direction: coerceMindElixirDirection(safeData.direction),
+                    });
                     saveData(ctx, mindRef.current);
                 } catch (err) {
                     logMindmapWrapperAiBridgeFailure('importData', err);
