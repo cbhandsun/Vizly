@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import { LayoutType } from '../../types/layout';
 import DomainDagreLayoutStrategy from '../DomainDagreLayoutStrategy';
+import { reorderDomainDagrePortAnchors } from '../domainDagrePortAnchorOrdering';
 import demandAllocation from '../../../data/standardized/DeamndAllocation.json';
 import logisticsStandardData from '../../../data/standardized/LogisticsStandardData.json';
 import systemsInteractionStandardData from '../../../data/standardized/SystemsInteractionStandardData.json';
@@ -64,6 +65,72 @@ const absolutePositionOf = (node: ReactFlowNode, nodes: ReactFlowNode[]) => {
 };
 
 describe('DomainDagreLayoutStrategy', () => {
+    it('orders shared port anchors without parsing structured node ids', () => {
+        const nodes: ReactFlowNode[] = [
+            {
+                id: 'domain:source',
+                position: { x: 10, y: 20 },
+                style: { width: '120px', height: '60px' },
+                data: {},
+            },
+            {
+                id: 'target:left',
+                position: { x: 200, y: 200 },
+                style: { width: 40, height: 40 },
+                data: {},
+            },
+            {
+                id: 'target:right',
+                position: { x: 400, y: 200 },
+                style: { width: 40, height: 40 },
+                data: {},
+            },
+        ];
+        const edges: Edge[] = [
+            {
+                id: 'left-edge',
+                source: 'domain:source',
+                target: 'target:left',
+                sourceHandle: 'bottom',
+                targetHandle: 'top',
+                data: {
+                    computedPath: [
+                        { x: 70, y: 80 },
+                        { x: 70, y: 112 },
+                        { x: 220, y: 112 },
+                        { x: 220, y: 200 },
+                    ],
+                },
+            },
+            {
+                id: 'right-edge',
+                source: 'domain:source',
+                target: 'target:right',
+                sourceHandle: 'bottom',
+                targetHandle: 'top',
+                data: {
+                    computedPath: [
+                        { x: 70, y: 80 },
+                        { x: 70, y: 112 },
+                        { x: 420, y: 112 },
+                        { x: 420, y: 200 },
+                    ],
+                },
+            },
+        ];
+
+        reorderDomainDagrePortAnchors(edges, new Map(nodes.map(node => [node.id, node])));
+
+        expect((edges[0].data as any).computedPath.slice(0, 2)).toEqual([
+            { x: 50, y: 80 },
+            { x: 50, y: 112 },
+        ]);
+        expect((edges[1].data as any).computedPath.slice(0, 2)).toEqual([
+            { x: 90, y: 80 },
+            { x: 90, y: 112 },
+        ]);
+    });
+
     it('keeps subdomains horizontal in every domain while laying out nodes inside subdomains with dagre', async () => {
         const nodes: ReactFlowNode[] = [
             makeNode('d1-a-node', 'first-domain', 'inbound'),

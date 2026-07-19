@@ -1593,27 +1593,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/strategies/DomainDagreEdgePreparation.ts",
-        "code": 2322,
-        "messageHash": "18ceb90bda9376861501412e407f67dc07a73623cdb82d3fae0c489c868b4212",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/strategies/DomainDagreEdgePreparation.ts",
-        "code": 2322,
-        "messageHash": "eb10df9d6fec9608af50a025762c235fcedbccfe1348b4b4dee53f4791fea575",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/strategies/DomainDagreEdgePreparation.ts",
-        "code": 2345,
-        "messageHash": "e66398108dd3b6ea3ee374a965600ec9595b4c5eb6b7a3ca20b8afc31e57c359",
-        "count": 2
-      },
-      {
-        "category": "error",
         "file": "src/core/strategies/DomainDagreLayoutHelpers.ts",
         "code": 2722,
         "messageHash": "c7847f4a193c0c3557eb5783954f1371197bbbb0fafbacf507d572271d1dd17b",
