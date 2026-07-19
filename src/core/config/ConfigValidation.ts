@@ -6,8 +6,8 @@
 export type ConfigValidationResult = true | string;
 
 export interface ConfigValidator<T = unknown> {
-  validate: (value: T) => ConfigValidationResult;
-  sanitize?: (value: T) => T;
+  validate: (value: unknown) => ConfigValidationResult;
+  sanitize?: (value: unknown) => T;
 }
 
 export interface ConfigSchema<T = unknown> {
@@ -22,8 +22,22 @@ export interface ConfigSchema<T = unknown> {
 
 type PlainObject = Record<string, unknown>;
 
-const isPlainObject = (value: unknown): value is PlainObject => (
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+const isPlainObject = (value: unknown): value is PlainObject => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  } catch {
+    return false;
+  }
+};
+
+const isFiniteNumber = (value: unknown): value is number => (
+  typeof value === 'number' && Number.isFinite(value)
+);
+
+const sanitizeString = (value: unknown): string => (
+  typeof value === 'string' ? value.trim() : ''
 );
 
 // 基础验证器
@@ -33,17 +47,17 @@ export const validators = {
    */
   string: {
     required: (): ConfigValidator<string> => ({
-      validate: (value: string) => {
+      validate: (value: unknown) => {
         if (typeof value !== 'string' || value.trim().length === 0) {
           return '字符串不能为空';
         }
         return true;
       },
-      sanitize: (value: string) => value.trim()
+      sanitize: sanitizeString
     }),
 
     minLength: (min: number): ConfigValidator<string> => ({
-      validate: (value: string) => {
+      validate: (value: unknown) => {
         if (typeof value !== 'string' || value.length < min) {
           return `字符串长度不能少于 ${min} 个字符`;
         }
@@ -52,7 +66,7 @@ export const validators = {
     }),
 
     maxLength: (max: number): ConfigValidator<string> => ({
-      validate: (value: string) => {
+      validate: (value: unknown) => {
         if (typeof value !== 'string' || value.length > max) {
           return `字符串长度不能超过 ${max} 个字符`;
         }
@@ -61,7 +75,8 @@ export const validators = {
     }),
 
     pattern: (regex: RegExp, message?: string): ConfigValidator<string> => ({
-      validate: (value: string) => {
+      validate: (value: unknown) => {
+        regex.lastIndex = 0;
         if (typeof value !== 'string' || !regex.test(value)) {
           return message || `字符串格式不正确`;
         }
@@ -70,8 +85,8 @@ export const validators = {
     }),
 
     oneOf: (options: string[]): ConfigValidator<string> => ({
-      validate: (value: string) => {
-        if (!options.includes(value)) {
+      validate: (value: unknown) => {
+        if (typeof value !== 'string' || !options.includes(value)) {
           return `值必须是以下之一: ${options.join(', ')}`;
         }
         return true;
@@ -79,7 +94,7 @@ export const validators = {
     }),
 
     color: (): ConfigValidator<string> => ({
-      validate: (value: string) => {
+      validate: (value: unknown) => {
         const text = typeof value === 'string' ? value.trim() : '';
         const hexPattern = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
         const rgbPattern = /^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/;
@@ -96,15 +111,21 @@ export const validators = {
         }
         return true;
       },
-      sanitize: (value: string) => value.toLowerCase()
+      sanitize: (value: unknown) => sanitizeString(value).toLowerCase()
     }),
 
     url: (): ConfigValidator<string> => ({
-      validate: (value: string) => {
+      validate: (value: unknown) => {
+        if (typeof value !== 'string' || value.trim().length === 0) {
+          return 'URL 格式不正确';
+        }
         try {
           const parsed = new URL(value);
           if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
             return 'URL 协议不安全，仅支持 HTTP 或 HTTPS';
+          }
+          if (parsed.username || parsed.password) {
+            return 'URL 不能包含认证信息';
           }
           return true;
         } catch {
@@ -119,8 +140,8 @@ export const validators = {
    */
   number: {
     required: (): ConfigValidator<number> => ({
-      validate: (value: number) => {
-        if (typeof value !== 'number' || isNaN(value)) {
+      validate: (value: unknown) => {
+        if (!isFiniteNumber(value)) {
           return '必须是有效数字';
         }
         return true;
@@ -128,8 +149,8 @@ export const validators = {
     }),
 
     min: (min: number): ConfigValidator<number> => ({
-      validate: (value: number) => {
-        if (typeof value !== 'number' || value < min) {
+      validate: (value: unknown) => {
+        if (!isFiniteNumber(value) || value < min) {
           return `数值不能小于 ${min}`;
         }
         return true;
@@ -137,8 +158,8 @@ export const validators = {
     }),
 
     max: (max: number): ConfigValidator<number> => ({
-      validate: (value: number) => {
-        if (typeof value !== 'number' || value > max) {
+      validate: (value: unknown) => {
+        if (!isFiniteNumber(value) || value > max) {
           return `数值不能大于 ${max}`;
         }
         return true;
@@ -146,8 +167,8 @@ export const validators = {
     }),
 
     range: (min: number, max: number): ConfigValidator<number> => ({
-      validate: (value: number) => {
-        if (typeof value !== 'number' || value < min || value > max) {
+      validate: (value: unknown) => {
+        if (!isFiniteNumber(value) || value < min || value > max) {
           return `数值必须在 ${min} 到 ${max} 之间`;
         }
         return true;
@@ -155,18 +176,18 @@ export const validators = {
     }),
 
     integer: (): ConfigValidator<number> => ({
-      validate: (value: number) => {
-        if (typeof value !== 'number' || !Number.isInteger(value)) {
+      validate: (value: unknown) => {
+        if (!isFiniteNumber(value) || !Number.isInteger(value)) {
           return '必须是整数';
         }
         return true;
       },
-      sanitize: (value: number) => Math.round(value)
+      sanitize: (value: unknown) => isFiniteNumber(value) ? Math.round(value) : 0
     }),
 
     positive: (): ConfigValidator<number> => ({
-      validate: (value: number) => {
-        if (typeof value !== 'number' || value <= 0) {
+      validate: (value: unknown) => {
+        if (!isFiniteNumber(value) || value <= 0) {
           return '必须是正数';
         }
         return true;
@@ -174,8 +195,8 @@ export const validators = {
     }),
 
     percentage: (): ConfigValidator<number> => ({
-      validate: (value: number) => {
-        if (typeof value !== 'number' || value < 0 || value > 100) {
+      validate: (value: unknown) => {
+        if (!isFiniteNumber(value) || value < 0 || value > 100) {
           return '百分比必须在 0 到 100 之间';
         }
         return true;
@@ -188,13 +209,13 @@ export const validators = {
    */
   boolean: {
     required: (): ConfigValidator<boolean> => ({
-      validate: (value: boolean) => {
+      validate: (value: unknown) => {
         if (typeof value !== 'boolean') {
           return '必须是布尔值';
         }
         return true;
       },
-      sanitize: (value: boolean) => Boolean(value)
+      sanitize: (value: unknown) => Boolean(value)
     })
   },
 
@@ -203,8 +224,8 @@ export const validators = {
    */
   object: {
     required: (): ConfigValidator<object> => ({
-      validate: (value: object) => {
-        if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      validate: (value: unknown) => {
+        if (!isPlainObject(value)) {
           return '必须是对象';
         }
         return true;
@@ -212,7 +233,7 @@ export const validators = {
     }),
 
     hasKeys: (keys: string[]): ConfigValidator<PlainObject> => ({
-      validate: (value: PlainObject) => {
+      validate: (value: unknown) => {
         if (!isPlainObject(value)) return '必须是对象';
         const missingKeys = keys.filter(key => !(key in value));
         if (missingKeys.length > 0) {
@@ -223,7 +244,7 @@ export const validators = {
     }),
 
     shape: (schema: Record<string, ConfigValidator<unknown>>): ConfigValidator<PlainObject> => ({
-      validate: (value: PlainObject) => {
+      validate: (value: unknown) => {
         if (!isPlainObject(value)) return '必须是对象';
         const errors: string[] = [];
         
@@ -241,8 +262,8 @@ export const validators = {
         }
         return true;
       },
-      sanitize: (value: PlainObject) => {
-        if (!isPlainObject(value)) return value;
+      sanitize: (value: unknown) => {
+        if (!isPlainObject(value)) return {};
         const sanitized = { ...value };
         
         Object.entries(schema).forEach(([key, validator]) => {
@@ -261,7 +282,7 @@ export const validators = {
    */
   array: {
     required: <T = unknown>(): ConfigValidator<T[]> => ({
-      validate: (value: T[]) => {
+      validate: (value: unknown) => {
         if (!Array.isArray(value)) {
           return '必须是数组';
         }
@@ -270,7 +291,7 @@ export const validators = {
     }),
 
     minLength: <T = unknown>(min: number): ConfigValidator<T[]> => ({
-      validate: (value: T[]) => {
+      validate: (value: unknown) => {
         if (!Array.isArray(value) || value.length < min) {
           return `数组长度不能少于 ${min}`;
         }
@@ -279,7 +300,7 @@ export const validators = {
     }),
 
     maxLength: <T = unknown>(max: number): ConfigValidator<T[]> => ({
-      validate: (value: T[]) => {
+      validate: (value: unknown) => {
         if (!Array.isArray(value) || value.length > max) {
           return `数组长度不能超过 ${max}`;
         }
@@ -288,7 +309,7 @@ export const validators = {
     }),
 
     items: <T = unknown>(itemValidator: ConfigValidator<T>): ConfigValidator<T[]> => ({
-      validate: (value: T[]) => {
+      validate: (value: unknown) => {
         if (!Array.isArray(value)) {
           return '必须是数组';
         }
@@ -306,8 +327,8 @@ export const validators = {
         }
         return true;
       },
-      sanitize: (value: T[]) => {
-        if (!Array.isArray(value)) return value;
+      sanitize: (value: unknown) => {
+        if (!Array.isArray(value)) return [];
         
         return value.map(item => 
           itemValidator.sanitize ? itemValidator.sanitize(item) : item
@@ -319,7 +340,7 @@ export const validators = {
 
 // 组合验证器
 export const combineValidators = <T>(...validators: ConfigValidator<T>[]): ConfigValidator<T> => ({
-  validate: (value: T) => {
+  validate: (value: unknown) => {
     for (const validator of validators) {
       const result = validator.validate(value);
       if (result !== true) {
@@ -328,10 +349,10 @@ export const combineValidators = <T>(...validators: ConfigValidator<T>[]): Confi
     }
     return true;
   },
-  sanitize: (value: T) => {
+  sanitize: (value: unknown) => {
     return validators.reduce((acc, validator) => {
       return validator.sanitize ? validator.sanitize(acc) : acc;
-    }, value);
+    }, value) as T;
   }
 });
 
@@ -551,37 +572,64 @@ export const commonSchemas: ConfigSchema[] = [
 ];
 
 // 配置验证工具函数
-export const validateConfigValue = <T>(
+export const validateConfigValue = (
   key: string, 
-  value: T, 
+  value: unknown,
   schemas: ConfigSchema[] = commonSchemas
-): { isValid: boolean; error?: string; sanitizedValue?: T } => {
+): { isValid: boolean; error?: string; sanitizedValue?: unknown } => {
   const schema = schemas.find(s => s.key === key);
   if (!schema?.validator) {
     return { isValid: true, sanitizedValue: value };
   }
 
-  const validationResult = schema.validator.validate(value);
-  if (validationResult !== true) {
-    return { isValid: false, error: typeof validationResult === 'string' ? validationResult : '验证失败' };
+  try {
+    const validationResult = schema.validator.validate(value);
+    if (validationResult !== true) {
+      return { isValid: false, error: typeof validationResult === 'string' ? validationResult : '验证失败' };
+    }
+
+    const sanitizedValue = schema.validator.sanitize
+      ? schema.validator.sanitize(value)
+      : value;
+
+    return { isValid: true, sanitizedValue };
+  } catch {
+    return { isValid: false, error: '验证器执行失败' };
   }
-
-  const sanitizedValue = schema.validator.sanitize 
-    ? schema.validator.sanitize(value) 
-    : value;
-
-  return { isValid: true, sanitizedValue };
 };
 
 // 批量验证配置
 export const validateConfigBatch = (
-  configs: Record<string, unknown>,
+  configs: unknown,
   schemas: ConfigSchema[] = commonSchemas
 ): { isValid: boolean; errors: Record<string, string>; sanitizedConfigs: Record<string, unknown> } => {
   const errors: Record<string, string> = {};
   const sanitizedConfigs: Record<string, unknown> = {};
 
-  Object.entries(configs).forEach(([key, value]) => {
+  if (!isPlainObject(configs)) {
+    return {
+      isValid: false,
+      errors: { $config: '配置必须是对象' },
+      sanitizedConfigs,
+    };
+  }
+
+  let entries: Array<[string, unknown]>;
+  try {
+    entries = Object.entries(configs);
+  } catch {
+    return {
+      isValid: false,
+      errors: { $config: '配置读取失败' },
+      sanitizedConfigs,
+    };
+  }
+
+  entries.forEach(([key, value]) => {
+    if (key === '__proto__' || key === 'prototype' || key === 'constructor') {
+      errors.$config = `配置键不安全: ${key}`;
+      return;
+    }
     const result = validateConfigValue(key, value, schemas);
     if (!result.isValid) {
       errors[key] = result.error!;

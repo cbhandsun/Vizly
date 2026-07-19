@@ -1628,52 +1628,10 @@
       },
       {
         "category": "error",
-        "file": "src/core/config/__tests__/ConfigValidation.test.ts",
-        "code": 2322,
-        "messageHash": "2da258959c03743b8c5fb9a136d2c6a239eb745520cf4b085afef30c195adeb5",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/config/__tests__/ConfigValidation.test.ts",
-        "code": 2322,
-        "messageHash": "9e914cc5317b5191382a0865b9adc3f3d9a6dd8c0e388a43daae18d778e9186f",
-        "count": 2
-      },
-      {
-        "category": "error",
         "file": "src/core/config/ConfigIntegration.ts",
         "code": 2739,
         "messageHash": "a0bfabe04660b55bf4e52d3dd549b23d9a8cb588c77488086188bc8d72f86a14",
         "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/config/ConfigValidation.ts",
-        "code": 2322,
-        "messageHash": "14345f9f848fc9adb26fd458d97d2ed952729235b32f4635b36525b52f7c4644",
-        "count": 4
-      },
-      {
-        "category": "error",
-        "file": "src/core/config/ConfigValidation.ts",
-        "code": 2322,
-        "messageHash": "2da258959c03743b8c5fb9a136d2c6a239eb745520cf4b085afef30c195adeb5",
-        "count": 10
-      },
-      {
-        "category": "error",
-        "file": "src/core/config/ConfigValidation.ts",
-        "code": 2322,
-        "messageHash": "91a23b1217a588e96256e6a2a0cd1f82ba581fff85eb29a5decdea441dce93c2",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/config/ConfigValidation.ts",
-        "code": 2322,
-        "messageHash": "9e914cc5317b5191382a0865b9adc3f3d9a6dd8c0e388a43daae18d778e9186f",
-        "count": 4
       },
       {
         "category": "error",
