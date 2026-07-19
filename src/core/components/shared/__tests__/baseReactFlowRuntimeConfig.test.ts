@@ -8,6 +8,7 @@ import {
   detectBaseReactFlowTouchDevice,
   readBaseReactFlowPerformanceConfig,
   readBaseReactFlowZoomSensitivity,
+  resolveBaseReactFlowReconnectRadius,
   resolveBaseReactFlowInteractionFlags,
 } from '../baseReactFlowRuntimeConfig';
 
@@ -53,6 +54,14 @@ describe('baseReactFlowRuntimeConfig', () => {
       effectivePreventScrolling: false,
       effectivePanOnScroll: false,
     });
+  });
+
+  it('forwards only valid reconnect radii to React Flow', () => {
+    expect(resolveBaseReactFlowReconnectRadius(24)).toBe(24);
+    expect(resolveBaseReactFlowReconnectRadius(0)).toBe(0);
+    expect(resolveBaseReactFlowReconnectRadius(undefined)).toBeUndefined();
+    expect(resolveBaseReactFlowReconnectRadius(Number.NaN)).toBeUndefined();
+    expect(resolveBaseReactFlowReconnectRadius(-1)).toBeUndefined();
   });
 
   it('reads performance config and computes large-graph mode', () => {

@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useLayoutEffect, useState, useEffect, useCallback } from 'react';
-import { ReactFlow, Background, BackgroundVariant, Controls, useReactFlow, ReactFlowProvider, EdgeLabelRenderer, useStore, useStoreApi, useUpdateNodeInternals, SelectionMode, ConnectionMode } from '@xyflow/react';
+import { ReactFlow, Background, BackgroundVariant, Controls, useReactFlow, ReactFlowProvider, useStore, useStoreApi, useUpdateNodeInternals, SelectionMode, ConnectionMode } from '@xyflow/react';
 import type {
   Node,
   Edge,
@@ -70,12 +70,6 @@ import {
   createBaseReactFlowWheelHandler,
 } from './baseReactFlowWheel';
 import {
-  computeBaseReactFlowAlignGuideLine,
-  computeBaseReactFlowRightEdgeGuideLines,
-  readBaseReactFlowAlignGuideEnabled,
-  readBaseReactFlowRightEdgeGuideFlags,
-} from './baseReactFlowOverlayGuides';
-import {
   computeBaseReactFlowNodeStructureSignature,
   scheduleBaseReactFlowInitializationReset,
   shouldResetBaseReactFlowInitialization,
@@ -92,14 +86,18 @@ import {
   detectBaseReactFlowTouchDevice,
   readBaseReactFlowPerformanceConfig,
   readBaseReactFlowZoomSensitivity,
+  resolveBaseReactFlowReconnectRadius,
   resolveBaseReactFlowInteractionFlags,
 } from './baseReactFlowRuntimeConfig';
 import {
   logBaseReactFlowConfigReadFailure,
   logBaseReactFlowEventBindingFailure,
   logBaseReactFlowFitWidthTopFailure,
-  logBaseReactFlowOverlayFlagReadFailure,
 } from './baseReactFlowLogging';
+import {
+  BaseReactFlowAlignGuide,
+  BaseReactFlowRightEdgeGuides,
+} from './baseReactFlowOverlayRenderers';
 import { getWindowSearchString } from '../../utils/inputBoundary';
 
 
@@ -265,7 +263,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   isValidConnection,
   selectionOnDrag = false,
   edgesReconnectable,
-  _reconnectRadius = 0,
+  reconnectRadius,
   onReconnect,
   onReconnectStart,
   onReconnectEnd,
@@ -727,7 +725,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     };
   }, []);
 
-  // AlignGuide、RightEdgeGuides 已提取为文件级独立组件（见 BaseReactFlowInner 函数之后）
+  // 调试辅助线由独立渲染器读取开关和节点快照。
 
   // 处理初始化
   const handleInit = useCallback((instance: ReactFlowInstance<any, any>) => {
@@ -815,6 +813,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const rawUiScale = getUiScale();
   const uiScale = disableZoomCompensation ? 1 : rawUiScale;
   const counterZoom = uiScale !== 1 ? (1 / uiScale) : 1;
+  const effectiveReconnectRadius = resolveBaseReactFlowReconnectRadius(reconnectRadius);
 
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', ...style }} className={className}>
@@ -886,6 +885,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           isValidConnection={isValidConnection}
           selectionOnDrag={selectionOnDrag}
           edgesReconnectable={edgesReconnectable}
+          reconnectRadius={effectiveReconnectRadius}
           onReconnect={onReconnect}
           onReconnectStart={onReconnectStart}
           onReconnectEnd={onReconnectEnd}
@@ -911,8 +911,8 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
             />
           )}
           <DiagramControlBridge />
-          <AlignGuide />
-          <RightEdgeGuides />
+          <BaseReactFlowAlignGuide />
+          <BaseReactFlowRightEdgeGuides />
           {children}
           {enableSmartEdges && sharedTrunks.length > 0 && (
             <SharedTrunkLayer trunks={sharedTrunks} />
@@ -941,97 +941,6 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   );
 };
 
-
-/**
- * 对齐辅助线渲染（文件级独立组件，避免内联导致的无限循环）
- * - 目的：在画布上显示统一左锚的垂直参考线，便于人工校验域的左对齐
- * - 开关：URL ?alignGuide=1 或 localStorage 'diagram-align-guide'='true'
- */
-const AlignGuide: React.FC = () => {
-  const nodesStore = useStore((s: any) => s.nodes) as any[];
-
-  const guideEnabled = useMemo(() => {
-    return readBaseReactFlowAlignGuideEnabled({
-      getSearch: () => getWindowSearchString(),
-      getStorageItem: (key) => (typeof window !== 'undefined' ? localStorage.getItem(key) : null),
-      onReadFailure: (scope, error) => logBaseReactFlowOverlayFlagReadFailure(scope, error),
-    });
-  }, []);
-
-  if (!guideEnabled || !Array.isArray(nodesStore) || nodesStore.length === 0) return null;
-
-  const guideLine = computeBaseReactFlowAlignGuideLine(nodesStore);
-  if (!guideLine) return null;
-
-  return (
-    <EdgeLabelRenderer>
-      <div
-        key="align-guide-boundary"
-        style={{
-          position: 'absolute',
-          transform: `translate(${guideLine.x}px, ${guideLine.y}px)`,
-          width: 0,
-          height: guideLine.height,
-          borderLeft: '2px dashed #ef4444',
-          boxShadow: '0 0 0 1px rgba(239,68,68,0.12)',
-          pointerEvents: 'none',
-          zIndex: 4,
-        }}
-        aria-label="align-guide"
-        title="左锚参考线"
-      />
-    </EdgeLabelRenderer>
-  );
-};
-
-/**
- * 右界辅助线渲染（文件级独立组件，避免内联导致的无限循环）
- * - 目的：显示每个域容器的右缘以及域内容的最大右缘
- * - 开关：URL ?alignGuideRight=1 或 ?alignContentMax=1
- */
-const RightEdgeGuides: React.FC = () => {
-  const nodesStore = useStore((s: any) => s.nodes) as any[];
-
-  const flags = useMemo(() => {
-    return readBaseReactFlowRightEdgeGuideFlags({
-      getSearch: () => getWindowSearchString(),
-      getStorageItem: (key) => (typeof window !== 'undefined' ? localStorage.getItem(key) : null),
-      onReadFailure: (scope, error) => logBaseReactFlowOverlayFlagReadFailure(scope, error),
-    });
-  }, []);
-
-  if ((!flags.rightLine && !flags.contentLine) || !Array.isArray(nodesStore) || nodesStore.length === 0) return null;
-
-  const overlays = computeBaseReactFlowRightEdgeGuideLines({
-    nodes: nodesStore,
-    flags,
-  });
-
-  return (
-    <>
-      {overlays.map((overlay) => (
-        <EdgeLabelRenderer key={overlay.key}>
-          <div
-            style={{
-              position: 'absolute',
-              transform: `translate(${overlay.x}px, ${overlay.y}px)`,
-              width: 0,
-              height: overlay.height,
-              borderLeft: overlay.kind === 'right' ? '2px dashed #60a5fa' : '2px dashed #f59e0b',
-              boxShadow: overlay.kind === 'right'
-                ? '0 0 0 1px rgba(96,165,250,0.12)'
-                : '0 0 0 1px rgba(245,158,11,0.12)',
-              pointerEvents: 'none',
-              zIndex: 4,
-            }}
-            aria-label={overlay.kind === 'right' ? 'domain-right-guide' : 'domain-content-max-guide'}
-            title={overlay.kind === 'right' ? '域右缘参考线' : '内容最大右缘参考线'}
-          />
-        </EdgeLabelRenderer>
-      ))}
-    </>
-  );
-};
 
 /**
  * BaseReactFlow 包装组件（函数级注释）

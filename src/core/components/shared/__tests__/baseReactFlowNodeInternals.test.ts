@@ -59,6 +59,23 @@ describe('baseReactFlowNodeInternals', () => {
     expect(updateNodeInternalsFallback).toHaveBeenCalledWith(['node-1']);
   });
 
+  it('rejects malformed third-party store snapshots at the adapter boundary', () => {
+    const updateNodeInternalsFallback = vi.fn();
+    refreshBaseReactFlowNodeInternals({
+      container: document.body,
+      nodeIds: ['node-1'],
+      rfStore: { getState: () => null },
+      updateNodeInternals: updateNodeInternalsFallback,
+    });
+
+    expect(updateNodeInternalsFallback).toHaveBeenCalledWith(['node-1']);
+    expect(areBaseReactFlowHandlesMeasured({
+      container: document.body,
+      nodeIds: ['node-1'],
+      rfStore: { getState: () => ({ nodeLookup: 'invalid' }) },
+    })).toBe(false);
+  });
+
   it('reports whether mounted handles have measured bounds', () => {
     document.body.innerHTML = '<div class="react-flow__node" data-id="node-1"><div class="react-flow__handle"></div></div>';
 

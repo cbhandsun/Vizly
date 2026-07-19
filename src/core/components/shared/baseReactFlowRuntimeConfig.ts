@@ -33,6 +33,12 @@ export const detectBaseReactFlowTouchDevice = ({
   maxTouchPoints: number;
 }): boolean => hasTouchStart || maxTouchPoints > 0;
 
+export const resolveBaseReactFlowReconnectRadius = (
+  value: number | undefined,
+): number | undefined => (
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+);
+
 export const resolveBaseReactFlowInteractionFlags = ({
   preventScrolling,
   panOnScroll,

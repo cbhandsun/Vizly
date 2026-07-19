@@ -1,13 +1,22 @@
 type ReactFlowNodeInternalsState = {
-  updateNodeInternals?: (internals: Map<string, { id: string; nodeElement: HTMLElement; force: boolean }>, options?: { triggerFitView?: boolean }) => void;
+  updateNodeInternals?: unknown;
   nodeLookup?: Map<string, { internals?: { handleBounds?: { source?: unknown[]; target?: unknown[] } } }>;
 };
 
 type ReactFlowStoreApi = {
-  getState: () => ReactFlowNodeInternalsState;
+  getState: () => unknown;
 };
 
 type RefreshFn = () => void;
+
+const readReactFlowNodeInternalsState = (
+  rfStore: ReactFlowStoreApi,
+): ReactFlowNodeInternalsState => {
+  const state = rfStore.getState();
+  return typeof state === 'object' && state !== null
+    ? state as ReactFlowNodeInternalsState
+    : {};
+};
 
 export const getBaseReactFlowNodeElement = (
   container: HTMLElement | null,
@@ -28,7 +37,7 @@ export const refreshBaseReactFlowNodeInternals = ({
   rfStore: ReactFlowStoreApi;
   updateNodeInternals: (nodeIds: string[]) => void;
 }): void => {
-  const state = rfStore.getState();
+  const state = readReactFlowNodeInternalsState(rfStore);
   const internalsMap = new Map<string, { id: string; nodeElement: HTMLElement; force: boolean }>();
 
   for (const id of nodeIds) {
@@ -55,9 +64,9 @@ export const areBaseReactFlowHandlesMeasured = ({
   nodeIds: string[];
   rfStore: ReactFlowStoreApi;
 }): boolean => {
-  const state = rfStore.getState();
+  const state = readReactFlowNodeInternalsState(rfStore);
   const nodeLookup = state.nodeLookup;
-  if (!nodeLookup) return false;
+  if (!(nodeLookup instanceof Map)) return false;
 
   return nodeIds.every((id) => {
     const element = getBaseReactFlowNodeElement(container, id);
