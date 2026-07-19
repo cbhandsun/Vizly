@@ -9,7 +9,6 @@
   "oversizedFiles": {
     "src/components/DiagramViewer.tsx": 1092,
     "src/components/ai/AIChatPanel.tsx": 1141,
-    "src/components/ui/ConfigurationPanel.tsx": 1192,
     "src/core/algorithms/costAwarePorts.ts": 1127,
     "src/core/algorithms/edgeCrossingRepair.ts": 894,
     "src/core/algorithms/orthogonalWaypointRefiner.ts": 1159,
