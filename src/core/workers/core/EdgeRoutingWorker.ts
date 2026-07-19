@@ -11,19 +11,8 @@ import {
     PathfindingContext,
     PathFindingResult,
     Position,
-    PathFindingJob,
-    UnifiedRoutingConfig
 } from '../../types/routing';
 
-import { GridBuilder } from './GridBuilder';
-import { VisibilityGraphRouter } from './VisibilityGraphRouter';
-import { AStarPathfinder } from './AStarPathfinder';
-import { BusDetector } from '../preprocessing/BusDetector';
-import { PortSelector } from '../preprocessing/PortSelector';
-import { ObstacleAnalyzer } from '../preprocessing/ObstacleAnalyzer';
-import { PathPostProcessor } from '../postprocessing/PathPostProcessor';
-import { TrunkCalculator } from './TrunkCalculator';
-import { countObstaclesInDirection } from './GraphBuilder';
 import { getNodePosition, getPortOffsetPoint } from '../../algorithms/smartEdgeUtils';
 import {
     logRoutingWorkerDebug,
@@ -36,73 +25,24 @@ import {
 } from './edgeRoutingWorkerContext';
 import {
     chooseWorkerEndpointOrthogonalPort,
-    collectWorkerPeerGroups,
-    oppositeWorkerPort,
-    resolveWorkerPortAnchors,
-    resolveWorkerPortFromTrunkAxis,
 } from './edgeRoutingWorkerBusGeometry';
-import { applyWorkerPortGuards } from './edgeRoutingWorkerPortGuards';
 import {
-    buildWorkerPostProcessContext,
-    buildWorkerRoutingResult,
-} from './edgeRoutingWorkerResult';
-import {
-    buildWorkerReverseBypassPath,
     ensureSafeWorkerStitch,
     isWorkerPathBlocked,
 } from './edgeRoutingWorkerPathSafety';
 import { buildWorkerDualTrunkPath } from './edgeRoutingWorkerDualTrunk';
-import { routeWorkerFallback } from './edgeRoutingWorkerFallback';
-import { selectWorkerPorts } from './edgeRoutingWorkerPortSelection';
+import {
+    parseWorkerHandleDirection,
+    resolveWorkerEndpoints,
+} from './edgeRoutingWorkerEndpointResolution';
+import { getWorkerRoutingModules } from './edgeRoutingWorkerModules';
+import {
+    createWorkerRoutingErrorResult,
+    finalizeWorkerRoute,
+    type WorkerRouteDebugData,
+} from './edgeRoutingWorkerFinalization';
 
 export class EdgeRoutingWorker {
-    // [H-4] Module-level singleton cache for stateless routing modules.
-    // These are reconstructed only when config.algorithm.gridSize or borderRadius changes,
-    // reducing per-route object allocation and GC pressure.
-    private static _cachedConfig: UnifiedRoutingConfig | null = null;
-    private static _gridBuilder: GridBuilder | null = null;
-    private static _astar: AStarPathfinder | null = null;
-    private static _analyzer: ObstacleAnalyzer | null = null;
-    private static _postProcessor: PathPostProcessor | null = null;
-    private static _trunkCalculator: TrunkCalculator | null = null;
-    // [B1] 加入单例缓存：vgRouter/busDetector/portSelector 是纯配置驱动的无状态类，可安全复用
-    // 原代论说“轻量级—每条边新建”，但 50 条边批处理创建 150 个对象，增加 GC 压力
-    private static _vgRouter: VisibilityGraphRouter | null = null;
-    private static _busDetector: BusDetector | null = null;
-    private static _portSelectorWorker: PortSelector | null = null;
-
-    private static getModules(config: UnifiedRoutingConfig) {
-        // Re-use if same config reference or same gridSize (the only field that changes module behavior)
-        const cached = EdgeRoutingWorker._cachedConfig;
-        const stale = !cached ||
-            cached.algorithm.gridSize !== config.algorithm.gridSize ||
-            cached.postProcessing.borderRadius !== config.postProcessing.borderRadius;
-
-        if (stale) {
-            EdgeRoutingWorker._cachedConfig = config;
-            EdgeRoutingWorker._gridBuilder = new GridBuilder(config);
-            EdgeRoutingWorker._astar = new AStarPathfinder(config);
-            EdgeRoutingWorker._analyzer = new ObstacleAnalyzer();
-            EdgeRoutingWorker._postProcessor = new PathPostProcessor(config);
-            EdgeRoutingWorker._trunkCalculator = new TrunkCalculator();
-            // [B1] 同步重建配置相关单例
-            EdgeRoutingWorker._vgRouter = new VisibilityGraphRouter(config);
-            EdgeRoutingWorker._busDetector = new BusDetector(config);
-            EdgeRoutingWorker._portSelectorWorker = new PortSelector(config);
-        }
-
-        return {
-            gridBuilder: EdgeRoutingWorker._gridBuilder!,
-            astar: EdgeRoutingWorker._astar!,
-            analyzer: EdgeRoutingWorker._analyzer!,
-            postProcessor: EdgeRoutingWorker._postProcessor!,
-            trunkCalculator: EdgeRoutingWorker._trunkCalculator!,
-            vgRouter: EdgeRoutingWorker._vgRouter!,
-            busDetector: EdgeRoutingWorker._busDetector!,
-            portSelector: EdgeRoutingWorker._portSelectorWorker!,
-        };
-    }
-
     /**
      * Main execution entry point for a single edge
      */
@@ -111,7 +51,8 @@ export class EdgeRoutingWorker {
         const { prebuiltGrid, spatialIndex: prebuiltSpatialIndex } = runtime;
 
         // 1. Initialize Modules — stateless ones are cached, stateful ones created fresh
-        const { gridBuilder, astar, analyzer, postProcessor, trunkCalculator, vgRouter, busDetector, portSelector } = EdgeRoutingWorker.getModules(config);
+        const modules = getWorkerRoutingModules(config);
+        const { gridBuilder, astar, analyzer, trunkCalculator, busDetector, portSelector } = modules;
         const isPathBlocked = (path: Point[], obstacles: Rectangle[], padding = 0) =>
             isWorkerPathBlocked(path, obstacles, analyzer, padding);
         const ensureSafeStitch = (points: Point[], start: Point, end: Point, obstacles: Rectangle[]) =>
@@ -126,14 +67,10 @@ export class EdgeRoutingWorker {
             prebuiltSpatialIndex
         );
         if (!contextResolution.ok) {
-            return this.errorResult(job, contextResolution.error);
+            return createWorkerRoutingErrorResult(job, contextResolution.error);
         }
         const {
-            nodes: workerNodes,
             nodeMap,
-            edgeMap,
-            sourceNode: sNode,
-            targetNode: tNode,
             sourceRect: sRect,
             targetRect: tRect,
             allObstacles,
@@ -148,320 +85,32 @@ export class EdgeRoutingWorker {
 
 
 
-        // 4. Pre-processing: Bus Consensus & Direction
-        // [H-6] Pass pre-built nodeMap to avoid O(N) Array.find() inside resolveBusOrientation
-        const busOrientation = busDetector.resolveBusOrientation(
-            !!job.isManyToOne,
-            job.isManyToOne ? job.target : job.source,
-            graph.edges,
-            graph.nodes,
-            job.layoutDirection || 'LR',
-            nodeMap
-        );
-
-        let startPos = job.sourcePosition || Position.Right;
-        let endPos = job.targetPosition || Position.Left;
-
-        const hasExplicitSource = !!job.sourceHandle;
-        const hasExplicitTarget = !!job.targetHandle;
-        // [B4] 内联箭头函数提升为静态方法，避免每条边创建闭包对象
-        const parseHandleDir = EdgeRoutingWorker.parseHandleDir;
-
-        let hasFixedSourcePort = false;
-        let hasFixedTargetPort = false;
-        let busPeerGroupSize = 0;
-        let busPeerGroupKey: string | null = null;
-        let busPeerGroupMembers: string[] | null = null;
-
-        if (hasExplicitSource) {
-            const p = parseHandleDir(job.sourceHandle);
-            if (p) {
-                startPos = p;
-                hasFixedSourcePort = true;
-            }
-        }
-
-        if (hasExplicitTarget) {
-            const p = parseHandleDir(job.targetHandle);
-            if (p) {
-                endPos = p;
-                hasFixedTargetPort = true;
-            }
-        }
-
-
-        // [IRONCLAD LOCK] When an edge is a verified member of a global trunk, it MUST NOT
-        // reject the port assignment. Group consensus takes absolute priority over local geometric efficiency.
-        // [S4] isGlobalTrunkMember is still used by portSelector allowSourceOverride / allowTargetOverride.
-        const isGlobalTrunkMember = !!(job.busTrunkSource && job.busTrunkTarget);
-        const fallbackTrunk = job.busTrunkSource && job.busTrunkTarget
-            ? { source: job.busTrunkSource, target: job.busTrunkTarget }
-            : undefined;
-
-        // [S4] busSourcePort / busTargetPort 不再由 Coordinator 预注入。
-        // 端口决策统一在此 Worker 内部，通过 busTrunkSource/busTrunkTarget 几何推算。
-        // [S5-P2] O2M hub 源端口 + M2O hub 目标端口 统一使用 resolvePortFromTrunkAxis()
-
-        // O2M: hub（源）面向 trunk axis
-        // [FIX-dual] 去掉 !job.isManyToOne 互斥条件。
-        // 双身份边同时有 O2M 和 M2O 的 trunk 数据，两端独立处理。
-        // O2M 端使用 o2mTrunk 数据推算 source port。
-        const o2mTrunk = job.busRoutingPlan?.o2mTrunk ?? job.o2mTrunk ?? (job as any).o2mTrunk;
-        if (job.isOneToMany && o2mTrunk && !hasFixedSourcePort) {
-            startPos = resolveWorkerPortFromTrunkAxis({
-                rectangle: sRect,
-                otherRectangle: tRect,
-                trunkHint: o2mTrunk,
-                fallbackTrunk,
-                isGlobalTrunkMember,
-            });
-            hasFixedSourcePort = true;
-        }
-
-        // M2O: hub（目标）面向 trunk axis
-        // [M2O TRUNK] Target node must face the trunk axis.
-        // Trunk axis sits between the sources and the target.
-        // → If trunk is ABOVE target: target faces UP → Position.Top
-        // → If trunk is BELOW target: target faces DOWN → Position.Bottom
-        // [FIX-shared-port] Same fix: don't pass per-edge source rect to hub port calculation.
-        const m2oTrunk = job.busRoutingPlan?.m2oTrunk ?? job.m2oTrunk ?? (job as any).m2oTrunk;
-        if (job.isManyToOne && m2oTrunk && !hasFixedTargetPort) {
-            endPos = resolveWorkerPortFromTrunkAxis({
-                rectangle: tRect,
-                isTargetSide: true,
-                trunkHint: m2oTrunk,
-                fallbackTrunk,
-                isGlobalTrunkMember,
-            });
-            hasFixedTargetPort = true;
-        }
-
-        // Dual-identity edges need two independent peer groups:
-        // O2M owns the source-side fan-out; M2O owns the target-side fan-in.
-        const { o2mPeerGroup, m2oPeerGroup } = collectWorkerPeerGroups(
-            job,
-            edgeMap,
-            nodeMap
-        );
-        const peerGroupForDebug = o2mPeerGroup ?? m2oPeerGroup;
-
-        if (peerGroupForDebug) {
-            busPeerGroupSize = Math.max(o2mPeerGroup?.edges.length ?? 0, m2oPeerGroup?.edges.length ?? 0);
-            busPeerGroupKey = [
-                o2mPeerGroup ? `o2m:${o2mPeerGroup.key}` : null,
-                m2oPeerGroup ? `m2o:${m2oPeerGroup.key}` : null,
-            ].filter(Boolean).join('|') || peerGroupForDebug.key;
-            busPeerGroupMembers = Array.from(new Set([
-                ...(o2mPeerGroup?.members ?? []),
-                ...(m2oPeerGroup?.members ?? []),
-            ]));
-        }
-
-        // [FIX-dual] 去掉 !job.isManyToOne 互斥。O2M hub source port consensus。
-        if (!hasFixedSourcePort && job.isOneToMany && o2mPeerGroup) {
-            if (o2mPeerGroup.edges.length > 1) {
-                const result = busDetector.calculateBusConsensus(
-                    false, sRect, o2mPeerGroup.edges,
-                    workerNodes, spatialIndex || null, routingObstacles, startPos, hasExplicitSource
-                );
-                startPos = result.position;
-                hasFixedSourcePort = result.hasFixed;
-            }
-        }
-
-        if (!hasFixedTargetPort && job.isManyToOne && m2oPeerGroup) {
-            if (m2oPeerGroup.edges.length > 1) {
-                const result = busDetector.calculateBusConsensus(
-                    true, tRect, m2oPeerGroup.edges,
-                    workerNodes, spatialIndex || null, routingObstacles, endPos, hasExplicitTarget
-                );
-                endPos = result.position;
-                hasFixedTargetPort = result.hasFixed;
-            }
-        }
-
-        // [S5-P2] O2M peer 目标端口：使用 resolvePortFromTrunkAxis() 统一推算
-        // 若无 trunk 信息，回退到中心点几何计算
-        if (!hasFixedTargetPort && (job.isOneToMany || (job.busTrunkSource && job.busTrunkTarget))) {
-            if (job.busTrunkSource && job.busTrunkTarget) {
-                // O2M peer 端用 o2mTrunk 数据
-                endPos = resolveWorkerPortFromTrunkAxis({
-                    rectangle: tRect,
-                    otherRectangle: sRect,
-                    isTargetSide: true,
-                    trunkHint: o2mTrunk ?? undefined,
-                    fallbackTrunk,
-                    isGlobalTrunkMember,
-                });
-            } else {
-                // Fallback: Center-to-Center Logic（无 trunk 时）
-                const sCenter = { x: sRect.x + sRect.width / 2, y: sRect.y + sRect.height / 2 };
-                const tCenter = { x: tRect.x + tRect.width / 2, y: tRect.y + tRect.height / 2 };
-                const dx = sCenter.x - tCenter.x;
-                const dy = sCenter.y - tCenter.y;
-                const isHorizontalRel = Math.abs(dx) > Math.abs(dy) * 0.8;
-                endPos = isHorizontalRel ? (dx > 0 ? Position.Right : Position.Left)
-                                         : (dy > 0 ? Position.Bottom : Position.Top);
-            }
-
-            // [S5-P1] 障碍物回退：若推算端口被堵 > 2 个障碍物，尝试对称端口
-            const blocked = countObstaclesInDirection(tRect, endPos, routingObstacles, 40);
-            if (blocked > 2) {
-                const fallback = oppositeWorkerPort(endPos);
-                const fallbackBlocked = countObstaclesInDirection(tRect, fallback, routingObstacles, 40);
-                if (fallbackBlocked < blocked) {
-                    endPos = fallback;
-                }
-                // 若两者都堵，保持 endPos 不变，让 A* 负责绕行
-            }
-            hasFixedTargetPort = true;
-        }
-
-        // [S5-P2] M2O peer 源端口：使用 resolvePortFromTrunkAxis() 统一推算
-        if (!hasFixedSourcePort && (job.isManyToOne || (job.busTrunkSource && job.busTrunkTarget))) {
-            if (job.busTrunkSource && job.busTrunkTarget) {
-                // M2O peer 端用 m2oTrunk 数据
-                startPos = resolveWorkerPortFromTrunkAxis({
-                    rectangle: sRect,
-                    otherRectangle: tRect,
-                    trunkHint: m2oTrunk ?? undefined,
-                    fallbackTrunk,
-                    isGlobalTrunkMember,
-                });
-            } else {
-                // Fallback: Center-to-Center Logic（无 trunk 时）
-                const sCenter = { x: sRect.x + sRect.width / 2, y: sRect.y + sRect.height / 2 };
-                const tCenter = { x: tRect.x + tRect.width / 2, y: tRect.y + tRect.height / 2 };
-                const dx = tCenter.x - sCenter.x;
-                const dy = tCenter.y - sCenter.y;
-                const isHorizontalRel = Math.abs(dx) > Math.abs(dy) * 0.8;
-                startPos = isHorizontalRel ? (dx > 0 ? Position.Right : Position.Left)
-                                           : (dy > 0 ? Position.Bottom : Position.Top);
-            }
-
-            // [S5-P1] 障碍物回退：若推算端口被堵 > 2 个障碍物，尝试对称端口
-            const blocked = countObstaclesInDirection(sRect, startPos, routingObstacles, 40);
-            if (blocked > 2) {
-                const fallback = oppositeWorkerPort(startPos);
-                const fallbackBlocked = countObstaclesInDirection(sRect, fallback, routingObstacles, 40);
-                if (fallbackBlocked < blocked) {
-                    startPos = fallback;
-                }
-            }
-            hasFixedSourcePort = true;
-        }
-
-        // 5. Port Selection
-        const portUsage = runtime.portUsage || {};
-        const selectedPorts = selectWorkerPorts({
-            job,
-            config,
-            selector: portSelector,
-            sourceRect: sRect,
-            targetRect: tRect,
-            obstacles: routingObstacles,
-            pendingEdges: graph.pendingEdges,
-            effectiveDirection: busOrientation.busDir,
-            portUsage,
+        const endpointResolution = resolveWorkerEndpoints({
+            context,
+            resolved: contextResolution.value,
+            busDetector,
+            portSelector,
+        });
+        let {
             startPosition: startPos,
             endPosition: endPos,
-            hasFixedSourcePort,
-            hasFixedTargetPort,
-            hasExplicitSource,
-            hasExplicitTarget,
-            isGlobalTrunkMember,
-        });
-        startPos = selectedPorts.startPosition;
-        endPos = selectedPorts.endPosition;
-
-
-        // 5.5 [FIX] Reverse Edge: Smart Bypass Port Selection (AFTER port selection)
-        // Runs AFTER all bus/trunk/portSelector logic so it has final authority.
-        // Forces same-side ports on a PERPENDICULAR side to create a U-turn bypass path.
-        //
-        // [FIX-diagonal] When the edge is classified as DIAGONAL (e.g. diagonal-ne for e21),
-        // the geometry rules already have an optimal L-shape port (e.g. R→L or B→T).
-        // Forcing same-side bypass (e.g. R→R) is both forbidden AND suboptimal.
-        // Guard: only activate bypass if the dominant axis ratio is high (>1.8), meaning
-        // the edge is nearly pure-horizontal or pure-vertical (i.e. a true U-turn case).
-        const guardedPorts = applyWorkerPortGuards({
-            job,
-            sourceNode: sNode,
-            targetNode: tNode,
-            sourceRect: sRect,
-            targetRect: tRect,
-            routingObstacles,
-            startPosition: startPos,
-            endPosition: endPos,
-            isGlobalTrunkMember,
-            hasExplicitSource,
-            hasExplicitTarget,
-            onDebug: config.debug ? logRoutingWorkerDebug : undefined,
-        });
-        startPos = guardedPorts.startPosition;
-        endPos = guardedPorts.endPosition;
-        const { isReverseBypassActive, reverseBypassSide } = guardedPorts;
-
-        // 5.6 [FIX] Self-Collision Guard: Prevent port selections that force paths through own node body.
-        // When bus/trunk logic selects a port that faces AWAY from the target (e.g., Bottom port
-        // but target is to the upper-right), the A* path must loop back through the source node.
-        // This guard detects such cases and overrides to the direct geometric port.
-        // Only applies to non-reverse edges (reverse edges intentionally use same-side ports).
-        // 5.7 [FIX-C-shape] C-shape anti-pattern guard — runs INDEPENDENTLY of the self-collision
-        // guard above so it works even when hasExplicitSource/hasExplicitTarget are set.
-        //
-        // Problem: When BOTH ports are horizontal (Left/Right) but the nodes are primarily
-        // vertically separated (|dy| >> |dx|), the orthogonal path must go:
-        //   → horizontal stub → vertical leg → horizontal stub  (C-shape or Z-shape, 3 segments)
-        // This is always worse than an L-shape path via Bottom→Top:
-        //   → vertical leg → horizontal stub  (2 segments, direct)
-        //
-        // Trigger: both ports horizontal + |dy| > |dx| * 2 (vertical dominance)
-        //          AND not a global trunk member (trunk ports are set by Coordinator)
-        //          AND not a reverse bypass (bypass intentionally uses same-side ports)
-        //          AND no edge-level explicit handle override (sourceHandle/targetHandle strings)
-        // 5.8 [FIX-crossgroup-lateral] Cross-subGroup lateral links should use facing side ports.
-        // In domain layouts with horizontal subgroups, a left-lower node often connects to a
-        // right-upper node. Pure geometry can pick Top/Bottom ports and A* then routes outside
-        // the target container, creating the tall blue detour seen in WMS diagrams. If the two
-        // node boxes are already separated by a clear horizontal gap, use the facing side ports
-        // and still let A* handle obstacles between them.
-        const isPrecomputedSharedTrunkMember =
-            !!(job.busTrunkSource && job.busTrunkTarget) && ((job.busRoutingPlan?.peerGroupSize ?? job.peerGroupSize ?? 0) > 1);
-
-        if (isPrecomputedSharedTrunkMember && job.isManyToOne && !hasExplicitSource) {
-            startPos = resolveWorkerPortFromTrunkAxis({
-                rectangle: sRect,
-                otherRectangle: tRect,
-                trunkHint: m2oTrunk ?? undefined,
-                fallbackTrunk,
-                isGlobalTrunkMember,
-            });
-        }
-
-        // 6. Resolve distributed endpoint anchors and offset stubs.
-        const portAnchors = resolveWorkerPortAnchors({
-            job,
-            config,
-            selector: portSelector,
-            sourceRect: sRect,
-            targetRect: tRect,
-            sourcePosition: startPos,
-            targetPosition: endPos,
-        });
+        } = endpointResolution;
         const {
             startPoint: startPt,
             endPoint: endPt,
             startOffset: startWithOffset,
             endOffset: endWithOffset,
-        } = portAnchors;
-
+            hasExplicitSource,
+            hasExplicitTarget,
+            o2mTrunk,
+            m2oTrunk,
+        } = endpointResolution;
         // 7. Pathfinding Strategy
         let pathPoints: Point[] | null = null;
         let strategyName = 'Unknown';
         const shouldCollectDebugData = job.debug === true;
         const shouldLogRouteDebug = config.debug === true && (config as any).verboseConsole === true;
-        const debugData: { visited?: Point[]; grid?: { minX: number, minY: number, cols: number, rows: number, size: number, data: Int32Array } } = {};
+        const debugData: WorkerRouteDebugData = {};
 
         // [总线主干道] Check if trunk routing should be applied
         const isBusScenario = (job.isOneToMany || job.isManyToOne);
@@ -1062,114 +711,20 @@ export class EdgeRoutingWorker {
             }
         }
 
-        // 7.5 [FIX] Reverse Edge: Forced U-turn Path Construction
-        // When bypass is active, construct a deterministic U-shaped orthogonal path
-        // instead of relying on A* which may take shortcuts through obstacles.
-        if (!pathPoints && isReverseBypassActive && reverseBypassSide !== null) {
-            pathPoints = buildWorkerReverseBypassPath({
-                layoutDirection: job.layoutDirection,
-                bypassSide: reverseBypassSide,
-                sourceRect: sRect,
-                targetRect: tRect,
-                obstacles: routingObstacles,
-                startPoint: startPt,
-                startOffset: startWithOffset,
-                endOffset: endWithOffset,
-                endPoint: endPt,
-                analyzer,
-            });
-            if (pathPoints) {
-                strategyName = 'Reverse U-Turn';
-            }
-        }
-
-        // Fallback to standard routing if trunk routing failed or not applicable
-        if (!pathPoints) {
-            const lineObstacles = (graph.pendingEdges ?? []) as import('../../algorithms/pathfinding').LineObstacle[];
-            const fallback = routeWorkerFallback({
-                job,
-                config,
-                startPoint: startPt,
-                startOffset: startWithOffset,
-                endOffset: endWithOffset,
-                endPoint: endPt,
-                startPosition: startPos,
-                endPosition: endPos,
-                sourceRect: sRect,
-                targetRect: tRect,
-                routingObstacles,
-                allObstacles,
-                spatialIndex,
-                clearanceRects,
-                containerBorders,
-                lineObstacles,
-                prebuiltGrid,
-                congestionGrid: runtime.congestionGrid,
-                shouldCollectDebugData,
-                debugData,
-                gridBuilder,
-                astar,
-                visibilityGraphRouter: vgRouter,
-                analyzer,
-            });
-            pathPoints = fallback.points;
-            strategyName = fallback.strategyName;
-        }
-
-        // 8. Post-Processing
-        // [FIX] Include source/target node rects as extraObstacles for post-processing.
-        // routingObstacles excludes source/target to allow A* to start/end inside them,
-        // but simplification steps (trySimplify4PointCShape, collapseRedundantBends)
-        // must still avoid cutting through the source/target nodes themselves.
-        const postContext = buildWorkerPostProcessContext({
-            job,
-            config,
-            obstacles: routingObstacles,
-            sourceRect: sRect,
-            targetRect: tRect,
-            startPosition: startPos,
-            endPosition: endPos,
-            strategyName,
-            hasSharedTrunk: isSharedGlobalTrunk,
-        });
-
-        if (!pathPoints || pathPoints.length === 0) {
-            return this.errorResult(job, 'Pathfinding failed to generate any path');
-        }
-
-        const { points: finalPoints, svgPath } = postProcessor.process(pathPoints, postContext);
-
-        return buildWorkerRoutingResult({
-            job,
-            svgPath,
-            finalPoints,
-            rawPoints: pathPoints,
-            strategyName,
+        return finalizeWorkerRoute({
+            context,
+            resolved: contextResolution.value,
+            endpoints: endpointResolution,
+            modules,
+            initialPoints: pathPoints,
+            initialStrategyName: strategyName,
+            finalStartPosition: startPos,
+            finalEndPosition: endPos,
             debugData,
-            routingObstacles,
-            sourceRect: sRect,
-            targetRect: tRect,
-            startPosition: startPos,
-            endPosition: endPos,
-            hasExplicitSource,
-            hasExplicitTarget,
+            shouldCollectDebugData,
             hasPrecomputedTrunk,
-            busPeerGroupSize,
-            busPeerGroupKey,
-            busPeerGroupMembers,
+            isSharedGlobalTrunk,
         });
-    }
-
-    private static errorResult(job: PathFindingJob, message: string): PathFindingResult {
-        return {
-            jobId: job.jobId,
-            edgeId: job.edgeId,
-            path: '',
-            points: [],
-            labelX: 0,
-            labelY: 0,
-            error: message
-        };
     }
 
     /**
@@ -1178,18 +733,6 @@ export class EdgeRoutingWorker {
      * 提升为静态方法后，50 条边批处理中只有一个函数引用。
      */
     static parseHandleDir(h?: string | null): Position | undefined {
-        if (!h) return undefined;
-        const s = String(h).toLowerCase();
-        // Priority 1: exact match
-        if (s === 'left' || s === 'l')   return Position.Left;
-        if (s === 'right' || s === 'r')  return Position.Right;
-        if (s === 'top' || s === 't')    return Position.Top;
-        if (s === 'bottom' || s === 'b') return Position.Bottom;
-        // Priority 2: substring match (catches compound IDs like 'source-right', 't-right')
-        if (s.includes('left'))   return Position.Left;
-        if (s.includes('right'))  return Position.Right;
-        if (s.includes('top'))    return Position.Top;
-        if (s.includes('bottom')) return Position.Bottom;
-        return undefined;
+        return parseWorkerHandleDirection(h);
     }
 }
