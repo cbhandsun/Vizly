@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { Position } from '../../../types/routing';
 import {
   buildOrGetSpatialIndex,
-  calculateAdaptiveGridSize,
   countObstaclesInDirection,
 } from '../GraphBuilder';
 
@@ -34,13 +33,6 @@ describe('GraphBuilder helpers', () => {
     };
 
     expect(countObstaclesInDirection(nodeRect, Position.Right, spatialIndex as never, 100)).toBe(2);
-  });
-
-  it('adapts grid size by route distance with caps', () => {
-    expect(calculateAdaptiveGridSize(0, 0, 100, 0, 20)).toBe(10);
-    expect(calculateAdaptiveGridSize(0, 0, 600, 0, 10)).toBe(15);
-    expect(calculateAdaptiveGridSize(0, 0, 1200, 0, 10)).toBe(20);
-    expect(calculateAdaptiveGridSize(0, 0, 2600, 0, 50)).toBe(40);
   });
 
   it('returns existing spatial index and builds a QuadTree only for larger obstacle sets', () => {

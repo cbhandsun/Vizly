@@ -1,15 +1,12 @@
 {
   "schemaVersion": 1,
   "edges": [
-    "src/core/routing/EdgeRouter.ts -> src/core/workers/core/GraphBuilder.ts",
     "src/core/routing/utils/AdvancedRouting.ts -> src/core/components/config/DiagramConfig.ts",
     "src/core/services/DiagramOrchestrator.ts -> src/core/components/config/DiagramConfig.ts",
     "src/core/services/DiagramOrchestrator.ts -> src/core/themes/EnhancedThemeManager.ts",
     "src/core/services/DiagramOrchestrator.ts -> src/core/themes/ThemeUtils.ts",
     "src/core/services/EdgeDecisionService.ts -> src/core/components/config/DiagramConfig.ts",
     "src/core/services/ReactFlowAdapter.ts -> src/core/components/config/DiagramConfig.ts",
-    "src/core/services/ReactFlowAdapter.ts -> src/core/themes/index.ts",
-    "src/core/types/diagram-components.ts -> src/core/strategies/LayoutStrategyManager.ts",
-    "src/core/types/diagram-updates.ts -> src/core/components/custom-nodes/FlowchartNode.tsx"
+    "src/core/services/ReactFlowAdapter.ts -> src/core/themes/index.ts"
   ]
 }

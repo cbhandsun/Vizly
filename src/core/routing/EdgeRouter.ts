@@ -2,7 +2,7 @@ import { geometryAnalyzer } from './core/GeometryAnalyzer';
 import { portSelector } from './core/PortSelector';
 import { costEvaluator } from './core/CostEvaluator';
 import * as pathFinder from '../algorithms/pathfinding';
-import { calculateAdaptiveGridSize } from '../workers/core/GraphBuilder'; // [P1]
+import { calculateAdaptiveGridSize } from '../algorithms/adaptiveGridSize';
 import { expandHandle, normalizeHandle, isHorizontalHandle, isVerticalHandle } from './utils/handleUtils';
 import { logEdgeRouterFatalError } from '../utils/routingLogging';
 

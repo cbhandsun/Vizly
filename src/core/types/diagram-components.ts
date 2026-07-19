@@ -1,5 +1,5 @@
-import { ComponentType } from 'react';
-import { ILayoutStrategy } from '../strategies/LayoutStrategyManager';
+import type { ComponentType } from 'react';
+import type { ILayoutStrategy } from './layout-strategy';
 import { NodeData, EdgeData, DiagramConfig } from './common';
 import { LayoutType } from './layout';
 

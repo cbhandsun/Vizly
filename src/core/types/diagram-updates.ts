@@ -1,6 +1,6 @@
 // Type definitions for diagram data updates
 import { Edge } from '@xyflow/react';
-import { FlowchartNodeData, FlowchartShape } from '../components/custom-nodes/FlowchartNode';
+import type { FlowchartNodeData, FlowchartShape } from './flowchart-node';
 
 /**
  * Type-safe interface for node data updates
