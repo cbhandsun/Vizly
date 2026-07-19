@@ -2,6 +2,18 @@ import { LayoutOptions } from '../../types/layout';
 import { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import { Position } from '../../types/common';
 
+const readBoundedHeuristic = (
+  value: unknown,
+  fallback: number,
+  max: number,
+  min = 0,
+): number => typeof value === 'number'
+  && Number.isFinite(value)
+  && value >= min
+  && value <= max
+  ? value
+  : fallback;
+
 /**
  * @file 统一布局工具函数
  * @description 整合所有图表的布局计算逻辑，避免重复代码
@@ -157,13 +169,13 @@ export function decideHierDirectionByFan(
   const avgPerLevel = levelCount ? (nodes.length / levelCount) : nodes.length;
   const edgeCount = edges.length;
   const h = options.autoDirectionHeuristics || {};
-  const thrLR = typeof h.aspectThresholdLR === 'number' ? h.aspectThresholdLR : 1.2;
-  const thrTB = typeof h.aspectThresholdTB === 'number' ? h.aspectThresholdTB : 0.8;
-  const minLvlTB = typeof h.minLevelCountTB === 'number' ? h.minLevelCountTB : 3;
-  const minAvgLR = typeof h.minAvgPerLevelLR === 'number' ? h.minAvgPerLevelLR : 4;
-  const fanOutDeg = typeof h.fanOutDegree === 'number' ? h.fanOutDegree : 3;
-  const fanInDeg = typeof h.fanInDegree === 'number' ? h.fanInDegree : 3;
-  const fanScoreThr = typeof h.fanScoreThreshold === 'number' ? h.fanScoreThreshold : 0.2;
+  const thrLR = readBoundedHeuristic(h.aspectThresholdLR, 1.2, 1_000);
+  const thrTB = readBoundedHeuristic(h.aspectThresholdTB, 0.8, 1_000);
+  const minLvlTB = readBoundedHeuristic(h.minLevelCountTB, 3, 1_000_000);
+  const minAvgLR = readBoundedHeuristic(h.minAvgPerLevelLR, 4, 1_000_000);
+  const fanOutDeg = readBoundedHeuristic(h.fanOutDegree, 3, 1_000_000);
+  const fanInDeg = readBoundedHeuristic(h.fanInDegree, 3, 1_000_000);
+  const fanScoreThr = readBoundedHeuristic(h.fanScoreThreshold, 0.2, 1);
   let fanScore = 0;
   try {
     const outDeg: Record<string, number> = {};
@@ -192,10 +204,10 @@ export function decideHierDirectionByFan(
   const lr = estimateBoundsLR();
 
   const weights = {
-    area: typeof h.areaWeight === 'number' ? h.areaWeight : 0.55,
-    fan: typeof h.fanWeight === 'number' ? h.fanWeight : 0.25,
-    density: typeof h.densityWeight === 'number' ? h.densityWeight : 0.10,
-    imbalance: typeof h.imbalanceWeight === 'number' ? h.imbalanceWeight : 0.10,
+    area: readBoundedHeuristic(h.areaWeight, 0.55, 1_000_000),
+    fan: readBoundedHeuristic(h.fanWeight, 0.25, 1_000_000),
+    density: readBoundedHeuristic(h.densityWeight, 0.10, 1_000_000),
+    imbalance: readBoundedHeuristic(h.imbalanceWeight, 0.10, 1_000_000),
   };
   const norm = (v: number, base: number) => v / Math.max(1, base);
   const areaTB = tb.width * tb.height;

@@ -133,6 +133,14 @@ export interface LayoutOptions {
     fanInDegree?: number;
     /** 当高扇入/扇出占比超过该阈值且边数充足时倾向 LR（默认 0.2） */
     fanScoreThreshold?: number;
+    /** 估算布局面积在方向评分中的权重（默认 0.55） */
+    areaWeight?: number;
+    /** 高扇入/扇出在方向评分中的权重（默认 0.25） */
+    fanWeight?: number;
+    /** 边密度在方向评分中的权重（默认 0.10） */
+    densityWeight?: number;
+    /** 层内节点不均衡在方向评分中的权重（默认 0.10） */
+    imbalanceWeight?: number;
   };
 
   /**
