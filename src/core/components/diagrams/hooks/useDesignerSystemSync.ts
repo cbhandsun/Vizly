@@ -6,8 +6,6 @@ import { PluginRegistry } from '../../../services/PluginRegistry';
 import { analyzeDiagram } from '@/utils/diagramAnalyzer';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { cancelLayoutTransition, suspendLayoutTransitions } from '../../../utils/animateLayoutTransition';
-import { expandHandle } from '../../../routing/utils/handleUtils';
-import { parseAutoSavePayload } from '../../../utils/autoSaveStorage';
 import { readReactFlowCanvasSize } from '../../../utils/domViewport';
 import { loadStandardPresetCanvas } from './standardPresetCanvasCache';
 import {
@@ -15,13 +13,17 @@ import {
     logDesignerSystemSyncAutosaveRecalculationFailure,
     logDesignerSystemSyncDataRegistryImportFailure,
     logDesignerSystemSyncDataRegistryWriteFailure,
-    logDesignerSystemSyncFreshSeedClearFailure,
     logDesignerSystemSyncImportDataFailure,
     logDesignerSystemSyncPresetLoadFailure,
     logDesignerSystemSyncStaleAutosaveDetected,
     logDesignerSystemSyncStandardDataToCanvasFailure,
 } from './designerSystemSyncLogging';
 import { getApplicationDiagramRuntime } from '../../../ports/applicationDiagramRuntime';
+import {
+    clearDesignerFreshSeedFlag,
+    mergePresetExplicitEdgeHandles,
+    recalculateAutosaveNodeSizes,
+} from './designerSystemSyncPersistence';
 
 const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
 
@@ -31,18 +33,6 @@ const getPluginEmptyState = (pluginId: string) => {
 };
 
 const stripHtml = (value: string) => value ? value.replace(/<[^>]*>?/gm, '') : '';
-
-const clearFreshSeedFlagInStorage = (storageKey: string) => {
-    try {
-        const parsed = parseAutoSavePayload(localStorage.getItem(storageKey));
-        if (!parsed?.isFreshSeed) return;
-        const next = { ...parsed };
-        delete next.isFreshSeed;
-        localStorage.setItem(storageKey, JSON.stringify(next));
-    } catch (error) {
-        logDesignerSystemSyncFreshSeedClearFailure(storageKey, error);
-    }
-};
 
 export interface UseDesignerSystemSyncProps {
     id?: string;
@@ -56,110 +46,6 @@ export interface UseDesignerSystemSyncProps {
     pluginId: string;
     messageApi?: MessageInstance;
 }
-
-const mergePresetExplicitEdgeHandles = (saved: any, preset: any) => {
-    if (!saved || !Array.isArray(saved.edges)) return saved;
-    const presetById = new Map<string, any>();
-    if (preset && Array.isArray(preset.edges)) {
-        for (const edge of preset.edges) {
-            if (edge?.id && (edge.sourceHandle || edge.targetHandle)) presetById.set(String(edge.id), edge);
-        }
-    }
-    const nodeById = new Map<string, any>((saved.nodes || []).map((node: any) => [String(node.id), node]));
-
-    const edges = saved.edges.map((edge: Edge) => {
-        const presetEdge = presetById.get(String(edge.id));
-        const expandedExistingSourceHandle = edge.sourceHandle ? expandHandle(String(edge.sourceHandle)) : edge.sourceHandle;
-        const expandedExistingTargetHandle = edge.targetHandle ? expandHandle(String(edge.targetHandle)) : edge.targetHandle;
-        const sourceNode = nodeById.get(String(edge.source));
-        const targetNode = nodeById.get(String(edge.target));
-        const sourceDomain = sourceNode?.domain ?? sourceNode?.data?.domain;
-        const targetDomain = targetNode?.domain ?? targetNode?.data?.domain;
-        const sourceSubDomain = sourceNode?.subDomain ?? sourceNode?.data?.subDomain;
-        const targetSubDomain = targetNode?.subDomain ?? targetNode?.data?.subDomain;
-        const isCrossSubDomainEdge = Boolean(
-            sourceDomain &&
-            targetDomain &&
-            sourceDomain === targetDomain &&
-            sourceSubDomain &&
-            targetSubDomain &&
-            sourceSubDomain !== targetSubDomain
-        );
-        if (!presetEdge && !isCrossSubDomainEdge) {
-            if (expandedExistingSourceHandle === edge.sourceHandle && expandedExistingTargetHandle === edge.targetHandle) return edge;
-            return {
-                ...edge,
-                sourceHandle: expandedExistingSourceHandle,
-                targetHandle: expandedExistingTargetHandle,
-            };
-        }
-        const sourceHandle = presetEdge?.sourceHandle ? expandHandle(String(presetEdge.sourceHandle)) : (isCrossSubDomainEdge ? 'right' : expandedExistingSourceHandle);
-        const targetHandle = presetEdge?.targetHandle ? expandHandle(String(presetEdge.targetHandle)) : (isCrossSubDomainEdge ? 'left' : expandedExistingTargetHandle);
-        const manualHandleSides = [
-            ...(sourceHandle ? ['source'] : []),
-            ...(targetHandle ? ['target'] : []),
-        ];
-        const prevAuto = Array.isArray((edge.data as any)?.auto) ? (edge.data as any).auto : [];
-        const auto = prevAuto.filter((side: string) => !manualHandleSides.includes(side));
-        return {
-            ...edge,
-            sourceHandle,
-            targetHandle,
-            data: {
-                ...(edge.data as any),
-                auto,
-                autoSource: manualHandleSides.includes('source') ? false : (edge.data as any)?.autoSource,
-                autoTarget: manualHandleSides.includes('target') ? false : (edge.data as any)?.autoTarget,
-                manualHandleSides: manualHandleSides.length > 0 ? manualHandleSides : (edge.data as any)?.manualHandleSides,
-            }
-        };
-    });
-    return { ...saved, edges };
-};
-
-const recalculateAutosaveNodeSizes = async (nodes: Node[]) => {
-    const containerTypes = new Set(['titleGroup', 'subGroup', 'swimlane', 'group']);
-    const toFiniteNumber = (value: unknown) => {
-        const parsed = typeof value === 'string' ? parseFloat(value) : Number(value);
-        return Number.isFinite(parsed) ? parsed : 0;
-    };
-    const hasUsableSize = (node: Node) => {
-        if (containerTypes.has(node.type || '')) return true;
-        const width = toFiniteNumber(node.width || (node as any).measured?.width || (node.style as any)?.width);
-        const height = toFiniteNumber(node.height || (node as any).measured?.height || (node.style as any)?.height);
-        return width > 0 && height > 0;
-    };
-
-    if (nodes.every(hasUsableSize)) return nodes;
-
-    const { LayoutOptimizer } = await import('../../layout/LayoutOptimizer');
-    const layoutOptimizer = LayoutOptimizer.getInstance();
-
-    return nodes.map((node: Node) => {
-        if (containerTypes.has(node.type || '')) return node;
-
-        const desc = String(node.data?.description || node.data?.label || '');
-        if (!desc) return node;
-
-        const calculatedWidth = layoutOptimizer.calculateNodeWidth(desc);
-        const calculatedHeight = layoutOptimizer.calculateNodeHeight(desc);
-        const contentWidth = Math.max(
-            calculatedWidth,
-            toFiniteNumber(node.width || (node as any).measured?.width || (node.style as any)?.width)
-        );
-        const contentHeight = Math.max(
-            calculatedHeight,
-            toFiniteNumber(node.height || (node as any).measured?.height || (node.style as any)?.height)
-        );
-        return {
-            ...node,
-            width: contentWidth,
-            height: contentHeight,
-            style: { ...node.style, width: contentWidth, height: contentHeight },
-            measured: { ...(node as any).measured, width: contentWidth, height: contentHeight },
-        };
-    });
-};
 
 export function useDesignerSystemSync({
     id, diagramIdForExport, nodes, edges, setNodes, setEdges,
@@ -741,7 +627,7 @@ export function useDesignerSystemSync({
                 
                 // If the isFreshSeed flag is stale (crash remnant), strip it from storage
                 if (saved.isFreshSeed && !isFreshAndValid) {
-                    clearFreshSeedFlagInStorage(`flowchart-autosave-v2-${id || 'default'}`);
+                    clearDesignerFreshSeedFlag(`flowchart-autosave-v2-${id || 'default'}`);
                     saved = { ...saved, isFreshSeed: false };
                 }
                 
@@ -768,7 +654,7 @@ export function useDesignerSystemSync({
                 // so that subsequent autosave cycles are no longer blocked by the guard.
                 if (saved.isFreshSeed) {
                     messageApi?.success('加载模板成功');
-                    clearFreshSeedFlagInStorage(`flowchart-autosave-v2-${id || 'default'}`);
+                    clearDesignerFreshSeedFlag(`flowchart-autosave-v2-${id || 'default'}`);
                 } else {
                     messageApi?.info('已恢复上次编辑内容');
                 }
