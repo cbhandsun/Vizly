@@ -60,7 +60,7 @@
     "test:ci:mindmap": "vitest run --environment=node --pool=threads --maxWorkers=2 src/core/components/mindmap-v2/__tests__",
     "test:ci:routing": "npm run test:ci:routing-core && npm run test:ci:routing-services && npm run test:ci:routing-services-performance && npm run test:ci:routing-layout",
     "test:ci:routing-core": "vitest run --environment=node --pool=threads --maxWorkers=2 src/core/factories/__tests__ src/core/plugins/__tests__ src/core/routing/__tests__ src/core/routing/algorithms/__tests__ src/core/routing/core/__tests__ src/core/routing/utils/__tests__",
-    "test:ci:routing-services": "vitest run --environment=node --pool=threads --maxWorkers=2 src/core/services/__tests__ src/core/strategies/shared/__tests__ --exclude src/core/strategies/shared/__tests__/edgeSharedEndpointPortOrderRepair.test.ts",
+    "test:ci:routing-services": "vitest run --environment=node --pool=threads --maxWorkers=3 src/core/services/__tests__ src/core/strategies/shared/__tests__ --exclude src/core/strategies/shared/__tests__/edgeSharedEndpointPortOrderRepair.test.ts",
     "test:ci:routing-services-performance": "vitest run --environment=node --pool=threads --maxWorkers=1 src/core/strategies/shared/__tests__/edgeSharedEndpointPortOrderRepair.test.ts",
     "test:ci:routing-layout": "vitest run --environment=node --pool=threads --maxWorkers=2 src/core/strategies/__tests__ src/core/utils/layout/__tests__",
     "test:all:lowcpu": "vitest run --maxWorkers=2",
