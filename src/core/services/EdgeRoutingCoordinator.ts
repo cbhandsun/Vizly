@@ -59,6 +59,7 @@ import {
     type RoutingBatchRequest,
 } from './edgeRoutingBatchLifecycle';
 import { assignBusRoutingMetadata } from './edgeRoutingBusGroupProcessing';
+import { buildEdgeRoutingFailureFallback } from './edgeRoutingFailureFallback';
 
 /**
  * [P0-2] Main coordination service for edge routing.
@@ -714,24 +715,12 @@ export class EdgeRoutingCoordinator {
 
         try {
             await this.batchRouteDirtyEdges();
-        } catch (err: any) {
-            logEdgeRoutingCoordinatorBatchRoutingFailure(err);
+        } catch (error: unknown) {
+            logEdgeRoutingCoordinatorBatchRoutingFailure(error);
             // [FIX] Ensure pending resolvers are cleared to avoid deadlocks
             for (const [edgeId, pending] of this.pendingResolvers.entries()) {
                 const entry = this.latestRequests.get(edgeId);
-                const sx = Number.isFinite(entry?.request.job.sourceX) ? entry!.request.job.sourceX : 0;
-                const sy = Number.isFinite(entry?.request.job.sourceY) ? entry!.request.job.sourceY : 0;
-                const tx = Number.isFinite(entry?.request.job.targetX) ? entry!.request.job.targetX : 0;
-                const ty = Number.isFinite(entry?.request.job.targetY) ? entry!.request.job.targetY : 0;
-                pending.resolve({
-                    jobId: entry?.request.job.jobId || edgeId,
-                    edgeId,
-                    path: `M ${sx} ${sy} L ${tx} ${ty}`,
-                    points: [{ x: sx, y: sy }, { x: tx, y: ty }],
-                    labelX: (sx + tx) / 2,
-                    labelY: (sy + ty) / 2,
-                    error: 'Batch routing failed: ' + err.message
-                });
+                pending.resolve(buildEdgeRoutingFailureFallback(edgeId, entry?.request.job));
             }
             this.pendingResolvers.clear();
         }
