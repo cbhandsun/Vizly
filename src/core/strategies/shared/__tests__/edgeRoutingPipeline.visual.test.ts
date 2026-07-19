@@ -5,6 +5,7 @@ import {
 } from '../edgeGlobalWaypointRefinement';
 import { repairSameNodeInOutCrossings } from '../edgeSameNodeRoleRepair';
 import { repairLocalDoglegArtifacts } from '../edgeLocalDoglegRepair';
+import { getEdgePath } from '../edgeGlobalWaypointGeometry';
 import {
   hasStrictCrossing,
   maxParallelOverlap,
@@ -29,6 +30,38 @@ const node = (
   height,
   data: {},
 } as Node & { positionAbsolute: { x: number; y: number } });
+
+describe('global waypoint path input boundary', () => {
+  it('coerces finite coordinates and rejects malformed route points', () => {
+    const boundaryEdge = {
+      id: 'boundary',
+      source: 'source',
+      target: 'target',
+      data: {
+        computedPath: [
+          { x: '12.5', y: 4 },
+          { x: 7, y: '-3' },
+          null,
+          'invalid',
+          { x: '', y: 2 },
+          { x: Number.NaN, y: 2 },
+          { x: Number.POSITIVE_INFINITY, y: 2 },
+          { x: '1e999', y: 2 },
+        ],
+      },
+    } as unknown as Edge;
+
+    expect(getEdgePath(boundaryEdge)).toEqual([
+      { x: 12.5, y: 4 },
+      { x: 7, y: -3 },
+    ]);
+    expect(getEdgePath({
+      ...boundaryEdge,
+      data: { computedPath: 'invalid', treeRouting: { points: [{ x: 1, y: 2 }] } },
+    } as unknown as Edge)).toEqual([{ x: 1, y: 2 }]);
+    expect(getEdgePath({ ...boundaryEdge, data: null } as unknown as Edge)).toEqual([]);
+  });
+});
 
 describe('reduceEdgeCrossingsWithWaypoints visual soft constraints', () => {
   it('repairs strict in/out crossings even when the two edges share a node', () => {
