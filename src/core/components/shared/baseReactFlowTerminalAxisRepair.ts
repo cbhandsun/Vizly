@@ -1,19 +1,35 @@
 import type { Edge, Node } from '@xyflow/react';
 
-import { readEdgeTerminalPolicy } from '../../routing/utils/edgeTerminalPolicy';
 import { normalizeHandle } from '../../routing/utils/handleUtils';
 import { countEndpointNodeTraversalHits } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import { createEdgePathQualityEvaluationContext } from '../../strategies/shared/edgeStrictCrossingGuard';
+import {
+  boundarySideFromTerminalEndpoint as boundarySideFromEndpoint,
+  expectedTerminalAxis as expectedAxis,
+  MIN_TERMINAL_STUB as MIN_STUB,
+  readTerminalEdgePath as edgePath,
+  readTerminalNodeRect as nodeRect,
+  TERMINAL_EPSILON as EPS,
+  terminalAxisOf as axisOf,
+  terminalCoordinateIsOutward as isOutward,
+  type TerminalAxis as Axis,
+  type TerminalPoint as Point,
+  type TerminalRect as Rect,
+  type TerminalHandleSide as Side,
+} from './baseReactFlowTerminalGeometry';
 
-type Point = { x: number; y: number };
-type Axis = 'h' | 'v';
-type Side = 't' | 'b' | 'l' | 'r';
-type Rect = { x: number; y: number; width: number; height: number };
+export {
+  createDisplayTerminalValidationSnapshot,
+  displayEdgesHaveNodeAnchoredTerminals,
+  displayEdgesHaveNodeAttachedTerminals,
+  getDisplayTerminalValidationReport,
+  keepNodeAnchoredTerminalCandidates,
+  type DisplayTerminalValidation,
+  type DisplayTerminalValidationOptions,
+  type DisplayTerminalValidationReport,
+  type DisplayTerminalValidationSnapshot,
+} from './baseReactFlowTerminalValidation';
 
-const EPS = 0.5;
-const TERMINAL_ATTACHMENT_TOLERANCE = 1.5;
-const MAX_RENDERED_FILLET_TRANSITION = 24;
-const MIN_STUB = 48;
 const LANE_GAP = 24;
 const VISUAL_LANE_TOLERANCE = 4;
 const OBSTACLE_PADDING = 4;
@@ -22,33 +38,6 @@ const MAX_TRUNK_LANES = 24;
 const MAX_AXIS_CANDIDATES = 4_096;
 const MAX_TERMINAL_AXIS_REPAIR_PASSES = 4;
 const LOCAL_OVERLAP_BYPASS_SPAN = 140;
-
-const finite = (value: unknown, fallback = 0): number => (
-  typeof value === 'number' && Number.isFinite(value) ? value : fallback
-);
-
-const expectedAxis = (side: Side | null): Axis | null => (
-  side === 't' || side === 'b' ? 'v' : side === 'l' || side === 'r' ? 'h' : null
-);
-
-const fixedTerminalHandleSide = (edge: Edge, role: 'source' | 'target'): Side | null => {
-  const policy = readEdgeTerminalPolicy(edge, role);
-  return policy.sideFixed ? normalizeHandle(edge[`${role}Handle`]) : null;
-};
-
-const axisOf = (a: Point, b: Point): Axis | null => {
-  if (Math.abs(a.y - b.y) <= EPS && Math.abs(a.x - b.x) > EPS) return 'h';
-  if (Math.abs(a.x - b.x) <= EPS && Math.abs(a.y - b.y) > EPS) return 'v';
-  return null;
-};
-
-const edgePath = (edge: Edge): Point[] => {
-  const raw = (edge.data as any)?.computedPath || (edge.data as any)?.treeRouting?.points || [];
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((point: any) => ({ x: Number(point?.x), y: Number(point?.y) }))
-    .filter((point: Point) => Number.isFinite(point.x) && Number.isFinite(point.y));
-};
 
 const compactPath = (path: Point[]): Point[] => {
   const deduped: Point[] = [];
@@ -212,14 +201,6 @@ const crossingEdgeIndexes = (paths: Point[][]): Set<number> => {
   return indexes;
 };
 
-const nodeRect = (node: Node): Rect | null => {
-  const position = (node as any).positionAbsolute ?? node.position;
-  const width = finite((node as any).measured?.width ?? node.width ?? (node.style as any)?.width);
-  const height = finite((node as any).measured?.height ?? node.height ?? (node.style as any)?.height);
-  if (!position || width <= 1 || height <= 1) return null;
-  return { x: finite(position.x), y: finite(position.y), width, height };
-};
-
 const routingObstacles = (nodes: Node[]): Map<string, Rect> => {
   const ignored = new Set(['titleGroup', 'subGroup', 'group', 'domain', 'subDomain', 'swimlane']);
   const result = new Map<string, Rect>();
@@ -241,25 +222,6 @@ const inferSideFromEndpoint = (point: Point, rect: Rect | undefined): Side | nul
   ];
   distances.sort((first, second) => first[1] - second[1]);
   return distances[0][1] <= 3 ? distances[0][0] : null;
-};
-
-const boundarySideFromEndpoint = (point: Point, rect: Rect | undefined): Side | null => {
-  if (!rect) return null;
-  const withinX = point.x >= rect.x - TERMINAL_ATTACHMENT_TOLERANCE
-    && point.x <= rect.x + rect.width + TERMINAL_ATTACHMENT_TOLERANCE;
-  const withinY = point.y >= rect.y - TERMINAL_ATTACHMENT_TOLERANCE
-    && point.y <= rect.y + rect.height + TERMINAL_ATTACHMENT_TOLERANCE;
-  if (withinX && Math.abs(point.y - rect.y) <= TERMINAL_ATTACHMENT_TOLERANCE) return 't';
-  if (
-    withinX
-    && Math.abs(point.y - (rect.y + rect.height)) <= TERMINAL_ATTACHMENT_TOLERANCE
-  ) return 'b';
-  if (withinY && Math.abs(point.x - rect.x) <= TERMINAL_ATTACHMENT_TOLERANCE) return 'l';
-  if (
-    withinY
-    && Math.abs(point.x - (rect.x + rect.width)) <= TERMINAL_ATTACHMENT_TOLERANCE
-  ) return 'r';
-  return null;
 };
 
 const segmentHitsRect = (a: Point, b: Point, rect: Rect): boolean => {
@@ -327,13 +289,6 @@ const outwardCoordinate = (point: Point, side: Side, distance = MIN_STUB): numbe
   if (side === 'b') return point.y + distance;
   if (side === 'l') return point.x - distance;
   return point.x + distance;
-};
-
-const isOutward = (coordinate: number, point: Point, side: Side): boolean => {
-  if (side === 't') return coordinate <= point.y - MIN_STUB;
-  if (side === 'b') return coordinate >= point.y + MIN_STUB;
-  if (side === 'l') return coordinate <= point.x - MIN_STUB;
-  return coordinate >= point.x + MIN_STUB;
 };
 
 const nearestUnique = (values: number[], preferred: number, limit: number): number[] => {
@@ -730,210 +685,4 @@ export const repairTerminalHandleAxisCrossings = (edges: Edge[], nodes: Node[]):
     current = best;
   }
   return current;
-};
-
-const endpointDirectionsMatchNodes = (
-  edge: Edge,
-  path: Point[],
-  nodeRects: Map<string, Rect>,
-  allowRenderedFilletTransitions = false,
-): boolean => {
-  if (path.length < 2) return false;
-  const source = path[0];
-  const target = path[path.length - 1];
-  const sourceRect = nodeRects.get(edge.source);
-  const targetRect = nodeRects.get(edge.target);
-  const declaredSourceSide = fixedTerminalHandleSide(edge, 'source');
-  const declaredTargetSide = fixedTerminalHandleSide(edge, 'target');
-  const hintedSourceSide = normalizeHandle(edge.sourceHandle);
-  const hintedTargetSide = normalizeHandle(edge.targetHandle);
-  const endpointLiesOnSide = (point: Point, rect: Rect | undefined, side: Side): boolean => {
-    if (!rect) return false;
-    const withinX = point.x >= rect.x - TERMINAL_ATTACHMENT_TOLERANCE
-      && point.x <= rect.x + rect.width + TERMINAL_ATTACHMENT_TOLERANCE;
-    const withinY = point.y >= rect.y - TERMINAL_ATTACHMENT_TOLERANCE
-      && point.y <= rect.y + rect.height + TERMINAL_ATTACHMENT_TOLERANCE;
-    if (side === 't') return withinX && Math.abs(point.y - rect.y) <= TERMINAL_ATTACHMENT_TOLERANCE;
-    if (side === 'b') {
-      return withinX
-        && Math.abs(point.y - (rect.y + rect.height)) <= TERMINAL_ATTACHMENT_TOLERANCE;
-    }
-    if (side === 'l') return withinY && Math.abs(point.x - rect.x) <= TERMINAL_ATTACHMENT_TOLERANCE;
-    return withinY
-      && Math.abs(point.x - (rect.x + rect.width)) <= TERMINAL_ATTACHMENT_TOLERANCE;
-  };
-  // A corner belongs to two geometric sides. When the edge declares a handle,
-  // that declaration is the only stable way to disambiguate the intended port
-  // hemisphere; the generic boundary detector deliberately remains the
-  // fallback for auto-port edges.
-  const sourceSide = hintedSourceSide && endpointLiesOnSide(source, sourceRect, hintedSourceSide)
-    ? hintedSourceSide
-    : boundarySideFromEndpoint(source, sourceRect);
-  const targetSide = hintedTargetSide && endpointLiesOnSide(target, targetRect, hintedTargetSide)
-    ? hintedTargetSide
-    : boundarySideFromEndpoint(target, targetRect);
-  if (!sourceSide || !targetSide) return false;
-  if (declaredSourceSide && declaredSourceSide !== sourceSide) return false;
-  if (declaredTargetSide && declaredTargetSide !== targetSide) return false;
-
-  const terminalEscapesOutward = (
-    orderedPath: Point[],
-    side: Side,
-    rect: Rect | undefined,
-    allowBoundaryTrunk: boolean,
-  ): boolean => {
-    const [terminal, adjacent, next, afterNext] = orderedPath;
-    if (!terminal || !adjacent) return false;
-    const outwardAxis = expectedAxis(side);
-    const firstAxis = axisOf(terminal, adjacent);
-    if (firstAxis === outwardAxis) {
-      const coordinate = side === 't' || side === 'b' ? adjacent.y : adjacent.x;
-      return isOutward(coordinate, terminal, side);
-    }
-    if (!allowBoundaryTrunk || !rect || !next || !firstAxis || firstAxis === outwardAxis) return false;
-    const adjacentStaysOnBoundary = side === 't'
-      ? Math.abs(adjacent.y - rect.y) <= 3
-      : side === 'b'
-        ? Math.abs(adjacent.y - (rect.y + rect.height)) <= 3
-        : side === 'l'
-          ? Math.abs(adjacent.x - rect.x) <= 3
-          : Math.abs(adjacent.x - (rect.x + rect.width)) <= 3;
-    if (!adjacentStaysOnBoundary) return false;
-    let outwardPoint = next;
-    if (axisOf(adjacent, next) !== outwardAxis) {
-      const transitionDx = Math.abs(next.x - adjacent.x);
-      const transitionDy = Math.abs(next.y - adjacent.y);
-      const transitionMovesOutward = side === 't'
-        ? next.y < adjacent.y
-        : side === 'b'
-          ? next.y > adjacent.y
-          : side === 'l'
-            ? next.x < adjacent.x
-            : next.x > adjacent.x;
-      const isBoundedRenderedFillet = allowRenderedFilletTransitions
-        && Boolean(afterNext)
-        && axisOf(adjacent, next) === null
-        && axisOf(next, afterNext) === outwardAxis
-        && transitionDx > EPS
-        && transitionDy > EPS
-        && transitionDx <= MAX_RENDERED_FILLET_TRANSITION
-        && transitionDy <= MAX_RENDERED_FILLET_TRANSITION
-        && transitionMovesOutward;
-      if (!isBoundedRenderedFillet || !afterNext) return false;
-      outwardPoint = afterNext;
-    }
-    const coordinate = side === 't' || side === 'b' ? outwardPoint.y : outwardPoint.x;
-    return isOutward(coordinate, adjacent, side);
-  };
-
-  return terminalEscapesOutward(path, sourceSide, sourceRect, !declaredSourceSide)
-    && terminalEscapesOutward([...path].reverse(), targetSide, targetRect, !declaredTargetSide);
-};
-
-export type DisplayTerminalValidation = {
-  attached: boolean;
-  anchored: boolean;
-};
-
-export type DisplayTerminalValidationSnapshot = {
-  validateEdge: (edge: Edge) => DisplayTerminalValidation;
-};
-
-export type DisplayTerminalValidationOptions = {
-  allowRenderedFilletTransitions?: boolean;
-};
-
-export type DisplayTerminalValidationReport = {
-  allAttached: boolean;
-  allAnchored: boolean;
-  unanchoredEdgeIndexes: number[];
-};
-
-/**
- * Builds the node-boundary lookup once for callers that validate multiple edge
- * collections against the same graph geometry.
- */
-export const createDisplayTerminalValidationSnapshot = (
-  nodes: Node[],
-  options: DisplayTerminalValidationOptions = {},
-): DisplayTerminalValidationSnapshot => {
-  const nodeRects = new Map<string, Rect>();
-  for (const node of nodes) {
-    const rect = nodeRect(node);
-    if (rect) nodeRects.set(node.id, rect);
-  }
-
-  return {
-    validateEdge: (edge) => {
-      const path = edgePath(edge);
-      const anchored = endpointDirectionsMatchNodes(
-        edge,
-        path,
-        nodeRects,
-        options.allowRenderedFilletTransitions === true,
-      );
-      if (anchored) return { attached: true, anchored: true };
-      if (path.length < 2) return { attached: false, anchored: false };
-      return {
-        attached: Boolean(
-          boundarySideFromEndpoint(path[0], nodeRects.get(edge.source))
-          && boundarySideFromEndpoint(path[path.length - 1], nodeRects.get(edge.target))
-        ),
-        anchored: false,
-      };
-    },
-  };
-};
-
-export const getDisplayTerminalValidationReport = (
-  edges: readonly Edge[],
-  snapshot: DisplayTerminalValidationSnapshot,
-): DisplayTerminalValidationReport => {
-  let allAttached = true;
-  const unanchoredEdgeIndexes: number[] = [];
-  edges.forEach((edge, index) => {
-    const validation = snapshot.validateEdge(edge);
-    if (!validation.attached) allAttached = false;
-    if (!validation.anchored) unanchoredEdgeIndexes.push(index);
-  });
-  return {
-    allAttached,
-    allAnchored: unanchoredEdgeIndexes.length === 0,
-    unanchoredEdgeIndexes,
-  };
-};
-
-export const displayEdgesHaveNodeAnchoredTerminals = (
-  edges: Edge[],
-  nodes: Node[],
-  options: DisplayTerminalValidationOptions = {},
-): boolean => {
-  const snapshot = createDisplayTerminalValidationSnapshot(nodes, options);
-  return getDisplayTerminalValidationReport(edges, snapshot).allAnchored;
-};
-
-export const displayEdgesHaveNodeAttachedTerminals = (
-  edges: Edge[],
-  nodes: Node[],
-): boolean => {
-  const snapshot = createDisplayTerminalValidationSnapshot(nodes);
-  return getDisplayTerminalValidationReport(edges, snapshot).allAttached;
-};
-
-export const keepNodeAnchoredTerminalCandidates = (
-  candidates: Edge[],
-  baseline: Edge[],
-  nodes: Node[],
-): Edge[] => {
-  const nodeRects = new Map<string, Rect>();
-  for (const node of nodes) {
-    const rect = nodeRect(node);
-    if (rect) nodeRects.set(node.id, rect);
-  }
-  return candidates.map((edge, index) => {
-    const path = edgePath(edge);
-    return endpointDirectionsMatchNodes(edge, path, nodeRects)
-      ? edge
-      : baseline[index] ?? edge;
-  });
 };

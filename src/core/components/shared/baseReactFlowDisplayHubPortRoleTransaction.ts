@@ -172,7 +172,7 @@ const discoverHubRoles = (
 };
 
 const currentPortSide = (edge: Edge, role: SharedNodePortRole): SharedNodePortSide | null => (
-  fullDisplayPortSide(normalizeHandle(role === 'source' ? edge.sourceHandle : edge.targetHandle))
+  fullDisplayPortSide(normalizeHandle(role === 'source' ? edge.sourceHandle : edge.targetHandle)) ?? null
 );
 
 const facingPortSides = (

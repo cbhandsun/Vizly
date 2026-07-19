@@ -58,7 +58,7 @@ const clamp = (value: number, minimum: number, maximum: number): number => (
 );
 
 const declaredSide = (edge: Edge, role: TerminalRole): TerminalSide | null => (
-  fullDisplayPortSide(normalizeHandle(role === 'source' ? edge.sourceHandle : edge.targetHandle))
+  fullDisplayPortSide(normalizeHandle(role === 'source' ? edge.sourceHandle : edge.targetHandle)) ?? null
 );
 
 const terminalTangent = (point: DisplayPoint, side: TerminalSide): number => (
