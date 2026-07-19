@@ -1,6 +1,7 @@
 import type { AlgorithmDebugInfo, Point } from '@/core/types/routing';
 
 export interface DebugObstacle {
+    id?: string;
     x: number;
     y: number;
     w?: number;
