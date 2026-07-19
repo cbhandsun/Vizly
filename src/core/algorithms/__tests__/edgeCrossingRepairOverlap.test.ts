@@ -270,6 +270,38 @@ describe('repairEdgeCrossingViolations parallel overlaps', () => {
         expect(result.get('hub-to-left')).toEqual(paths.get('hub-to-left'));
         expect(result.get('hub-to-right')).toEqual(paths.get('hub-to-right'));
     });
+
+    it('normalizes malformed runtime input without leaking non-finite geometry', () => {
+        expect(repairEdgeCrossingViolations(null as never, null as never)).toEqual(new Map());
+
+        const paths = new Map<unknown, unknown>([
+            ['horizontal', [{ x: -1e100, y: 50 }, { x: 1e100, y: 50 }]],
+            ['vertical', [{ x: 50, y: -1e100 }, { x: 50, y: 1e100 }]],
+            ['invalid-point', [{ x: 0, y: 0 }, { x: Number.NaN, y: 20 }]],
+            [42, [{ x: 0, y: 0 }, { x: 20, y: 0 }]],
+        ]);
+
+        const result = repairEdgeCrossingViolations(paths as never, {
+            spacing: Number.POSITIVE_INFINITY,
+            maxIterations: Number.POSITIVE_INFINITY,
+            obstacles: [
+                null,
+                { x: Number.NaN, y: 0, width: 10, height: 10 },
+                { x: 0, y: 0, width: -10, height: 10 },
+            ],
+            buddyGroups: [null, { type: 'invalid', edgeIds: new Set(['horizontal']) }],
+            ignoredRectsByEdge: new Map([[42, []]]),
+            mutableEdgeIds: new Set(['horizontal', 'vertical', 42]),
+        } as never);
+
+        expect([...result.keys()].sort()).toEqual(['horizontal', 'vertical']);
+        expect([...result.values()].flat().every(point =>
+            Number.isFinite(point.x)
+            && Number.isFinite(point.y)
+            && Math.abs(point.x) <= 10_000_000
+            && Math.abs(point.y) <= 10_000_000
+        )).toBe(true);
+    });
 });
 
 function maxCollinearOverlap(a: Array<{ x: number; y: number }>, b: Array<{ x: number; y: number }>): number {
