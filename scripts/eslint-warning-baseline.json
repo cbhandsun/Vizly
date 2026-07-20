@@ -12,8 +12,6 @@
     "src/core/components/shared/baseReactFlowDisplayStrictResidualRepair.ts :: no-useless-assignment": 6,
     "src/core/strategies/DomainDagreEdgePreparation.ts :: @typescript-eslint/no-unused-vars": 1,
     "src/core/strategies/shared/__tests__/edgeDetachedOverlapRepair.regression.test.ts :: @typescript-eslint/no-unused-vars": 5,
-    "src/core/strategies/shared/edgeDetachedOverlapRepair.ts :: @typescript-eslint/no-unused-vars": 1,
-    "src/core/strategies/shared/edgeDetachedOverlapRepairTypes.ts :: @typescript-eslint/no-unused-vars": 1,
-    "src/core/strategies/shared/edgeLocalDoglegAdvancedCandidates.ts :: @typescript-eslint/no-unused-vars": 1
+    "src/core/strategies/shared/edgeDetachedOverlapRepairTypes.ts :: @typescript-eslint/no-unused-vars": 1
   }
 }
