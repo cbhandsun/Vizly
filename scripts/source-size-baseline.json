@@ -7,7 +7,6 @@
     "compositionRoot": 300
   },
   "oversizedFiles": {
-    "src/core/components/shared/baseReactFlowDisplayEndpointStubCandidates.ts": 803,
     "src/core/components/shared/baseReactFlowDisplayLaneCandidates.ts": 942,
     "src/core/components/shared/baseReactFlowDisplayTerminalPortRepair.ts": 1021,
     "src/core/strategies/shared/__tests__/edgeDisplayMicroCleanup.test.ts": 1130,
