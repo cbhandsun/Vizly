@@ -1,7 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { normalizeHandle } from '../../routing/utils/handleUtils';
-import { findStrictCrossings } from '../../strategies/shared/edgeDetachedOverlapRepair';
 import { countRoutingObstacleHits } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import {
   createEdgePathQualityEvaluationContext,
@@ -12,10 +11,7 @@ import {
   buildNearTerminalSideCandidates,
   buildSharedNodeTerminalSideCandidates,
 } from './baseReactFlowSharedNodePortRoleRepair';
-import { buildStrictCrossingZipperCandidates } from './baseReactFlowStrictCrossingZipperRepair';
-import {
-  anchorComputedDisplayEdgeEndpoints,
-} from './baseReactFlowDisplayEdgeCore';
+import { anchorComputedDisplayEdgeEndpoints } from './baseReactFlowDisplayEdgeCore';
 import {
   buildDisplayRoutingObstacles,
   displayAxisOf,
@@ -24,12 +20,9 @@ import {
   getDisplayComputedPath,
   getDisplayNodeRect,
   oppositeDisplayPortSide,
-  withDisplayComputedPath,
   type DisplayPoint,
 } from './baseReactFlowDisplayGeometry';
-import {
-  createDisplayObstacleEvaluationContext,
-} from './baseReactFlowDisplayEvaluation';
+import { createDisplayObstacleEvaluationContext } from './baseReactFlowDisplayEvaluation';
 import {
   buildDeclaredTerminalAxisStubCandidates,
   buildOppositeRoleSharedNodeCandidates,
@@ -51,6 +44,17 @@ import {
   inferTerminalGeometrySide,
   MIN_DISPLAY_ENDPOINT_STUB,
 } from './baseReactFlowDisplayTerminalGeometry';
+import { buildSingleEdgeZipperCandidates } from './baseReactFlowDisplayTerminalPortZipperCandidates';
+import {
+  createDisplayDeclaredAxisMismatchCounter,
+  rollbackIncompleteDeclaredAxisTransactions,
+} from './baseReactFlowDisplayDeclaredAxisTransaction';
+import {
+  createDisplayTerminalPortCandidateBuckets,
+  displayTerminalPortCandidateIsBetter,
+  displayTerminalPortCandidateIsComplete,
+  rankDisplayTerminalPortCandidates,
+} from './baseReactFlowDisplayTerminalPortCandidateRanking';
 
 export { repairTerminalHandleHemisphereHairpins } from './baseReactFlowDisplayHemisphereHairpinRepair';
 
@@ -77,57 +81,31 @@ const detachedTerminalQualityDoesNotRegress = (
   && candidate.hairpins <= baseline.hairpins
 );
 
-const buildSingleEdgeZipperCandidates = <T extends Edge[]>(
-  edges: T,
-  moverEdgeIndex: number,
-  maxCandidates = 4,
-): T[] => {
-  const paths = edges.map(edge => getDisplayComputedPath(edge));
-  const crossings = findStrictCrossings(paths, edges)
-    .filter(crossing => (
-      crossing.a.edgeIndex === moverEdgeIndex || crossing.b.edgeIndex === moverEdgeIndex
-    ));
-  const candidates: T[] = [];
-
-  for (const crossing of crossings) {
-    const segment = crossing.a.edgeIndex === moverEdgeIndex ? crossing.a : crossing.b;
-    const other = crossing.a.edgeIndex === moverEdgeIndex ? crossing.b : crossing.a;
-    const path = paths[moverEdgeIndex];
-    if (
-      !path
-      || segment.axis === other.axis
-      || segment.segIdx <= 0
-      || segment.segIdx >= path.length - 2
-    ) continue;
-    const blockers = paths.flatMap((blockerPath, edgeIndex) => {
-      if (edgeIndex === moverEdgeIndex || blockerPath.length < 2) return [];
-      return blockerPath.slice(0, -1).flatMap((point, segmentIndex) => {
-        const next = blockerPath[segmentIndex + 1];
-        const axis = displayAxisOf(point, next);
-        if (!axis || axis === segment.axis) return [];
-        return [{
-          path: blockerPath,
-          segment: { segmentIndex, axis, a: point, b: next },
-        }];
-      });
-    });
-    for (const candidatePath of buildStrictCrossingZipperCandidates(
-      path,
-      {
-        segmentIndex: segment.segIdx,
-        axis: segment.axis,
-        a: segment.a,
-        b: segment.b,
-      },
-      blockers,
-    )) {
-      candidates.push(edges.map((edge, edgeIndex) => (
-        edgeIndex === moverEdgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
-      )) as T);
-      if (candidates.length >= maxCandidates) return candidates;
-    }
-  }
-  return candidates;
+const buildApproachSideTerminalCandidate = (
+  path: DisplayPoint[],
+  role: 'source' | 'target',
+  rect: NonNullable<ReturnType<typeof getDisplayNodeRect>>,
+): { path: DisplayPoint[]; side: 'top' | 'bottom' | 'left' | 'right' } | null => {
+  if (path.length < 2) return null;
+  const terminalIndex = role === 'source' ? 0 : path.length - 1;
+  const adjacentIndex = role === 'source' ? 1 : path.length - 2;
+  const terminal = path[terminalIndex];
+  const adjacent = path[adjacentIndex];
+  const axis = displayAxisOf(terminal, adjacent);
+  if (!axis) return null;
+  const side = axis === 'h'
+    ? (adjacent.x < terminal.x ? 'left' : 'right')
+    : (adjacent.y < terminal.y ? 'top' : 'bottom');
+  const endpoint = side === 'left'
+    ? { x: rect.x, y: Math.max(rect.y, Math.min(rect.y + rect.height, adjacent.y)) }
+    : side === 'right'
+      ? { x: rect.x + rect.width, y: Math.max(rect.y, Math.min(rect.y + rect.height, adjacent.y)) }
+      : side === 'top'
+        ? { x: Math.max(rect.x, Math.min(rect.x + rect.width, adjacent.x)), y: rect.y }
+        : { x: Math.max(rect.x, Math.min(rect.x + rect.width, adjacent.x)), y: rect.y + rect.height };
+  const candidatePath = path.map(point => ({ ...point }));
+  candidatePath[terminalIndex] = endpoint;
+  return { path: candidatePath, side };
 };
 
 export const repairDetachedTerminalsWithBoundedPortRoles = <T extends Edge[]>(
@@ -335,6 +313,7 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
   const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   const routingObstacles = buildDisplayRoutingObstacles(nodes);
   const terminalValidation = createDisplayTerminalValidationSnapshot(nodes);
+  const countDeclaredAxisMismatches = createDisplayDeclaredAxisMismatchCounter(nodes);
   for (let pass = 0; pass < edges.length && qualityEvaluations < maxQualityEvaluations; pass += 1) {
     const edgeIndex = current
       .map((edge, index) => {
@@ -412,24 +391,32 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
       continue;
     }
 
-    const candidateEdges: Edge[] = [];
-    const handleOnlyCandidateEdges: Edge[] = [];
-    const insetNudgeCandidateEdges: Edge[] = [];
-    const appendCandidate = (candidateEdge: Edge) => {
-      if (!terminalValidation.validateEdge(candidateEdge).anchored) return;
-      candidateEdges.push(candidateEdge);
-    };
-    const appendPriorityCandidate = (candidateEdge: Edge) => {
-      if (!terminalValidation.validateEdge(candidateEdge).anchored) return;
-      handleOnlyCandidateEdges.push(candidateEdge);
-    };
-    const appendInsetNudgeCandidate = (candidateEdge: Edge) => {
-      if (!terminalValidation.validateEdge(candidateEdge).anchored) return;
-      insetNudgeCandidateEdges.push(candidateEdge);
-    };
+    const {
+      candidateEdges, handleOnlyCandidateEdges, insetNudgeCandidateEdges,
+      appendCandidate, appendPriorityCandidate, appendInsetNudgeCandidate,
+    } = createDisplayTerminalPortCandidateBuckets(
+      candidateEdge => terminalValidation.validateEdge(candidateEdge).anchored,
+    );
     appendCandidate(anchorComputedDisplayEdgeEndpoints([edge], nodes)[0] ?? edge);
     const geometrySourceSide = inferTerminalGeometrySide(path, 'source', sourceRect);
     const geometryTargetSide = inferTerminalGeometrySide(path, 'target', targetRect);
+    const approachSource = buildApproachSideTerminalCandidate(path, 'source', sourceRect);
+    const approachTarget = buildApproachSideTerminalCandidate(path, 'target', targetRect);
+    if (
+      approachSource
+      && approachTarget
+      && displayTerminalSideCanSwitch(edge, 'source', approachSource.side)
+      && displayTerminalSideCanSwitch(edge, 'target', approachTarget.side)
+    ) {
+      const approachPath = approachSource.path.map(point => ({ ...point }));
+      approachPath[approachPath.length - 1] = approachTarget.path[approachTarget.path.length - 1];
+      appendPriorityCandidate(withDisplayPortBridge(
+        edge,
+        approachPath,
+        approachSource.side,
+        approachTarget.side,
+      ));
+    }
     if (
       geometrySourceSide
       && geometryTargetSide
@@ -637,18 +624,19 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
     const baselineQuality = qualityContext.evaluate(current);
     const baselineObstacleHits = obstacleContext.evaluate(current);
     let accepted: T | null = null;
+    let acceptedDeclaredAxisMismatches = Number.POSITIVE_INFINITY;
     let acceptedObstacleHits = Number.POSITIVE_INFINITY;
-    const rankCandidateEdges = (edgesToRank: Edge[]) => edgesToRank
-      .map((candidateEdge, order) => ({
-        candidateEdge,
-        order,
-        obstacleHits: countRoutingObstacleHits(
+    const prioritizeDeclaredAxisCompletion = edges.length === 1;
+    const rankCandidateEdges = (edgesToRank: Edge[]) => rankDisplayTerminalPortCandidates(
+      edgesToRank,
+      countDeclaredAxisMismatches,
+      candidateEdge => countRoutingObstacleHits(
           getDisplayComputedPath(candidateEdge),
           candidateEdge,
           routingObstacles,
-        ),
-      }))
-      .sort((first, second) => first.obstacleHits - second.obstacleHits || first.order - second.order);
+      ),
+      prioritizeDeclaredAxisCompletion,
+    );
     const rankedCandidateEdges = baselineObstacleHits === 0
       ? [
         ...rankCandidateEdges(handleOnlyCandidateEdges),
@@ -660,7 +648,7 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
         ...rankCandidateEdges(candidateEdges),
         ...rankCandidateEdges(insetNudgeCandidateEdges),
       ];
-    for (const { candidateEdge } of rankedCandidateEdges) {
+    for (const { candidateEdge, declaredAxisMismatches } of rankedCandidateEdges) {
       if (qualityEvaluations >= maxQualityEvaluations) break;
       qualityEvaluations += 1;
       const candidate = current.map((item, index) => (
@@ -670,10 +658,19 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
       if (!detachedTerminalQualityDoesNotRegress(baselineQuality, candidateQuality)) continue;
       const candidateObstacleHits = obstacleContext.evaluateKnownChanges(candidate, [edgeIndex]);
       if (candidateObstacleHits > baselineObstacleHits) continue;
-      if (accepted && candidateObstacleHits >= acceptedObstacleHits) continue;
+      if (accepted && !displayTerminalPortCandidateIsBetter(
+        { declaredAxisMismatches, obstacleHits: candidateObstacleHits },
+        acceptedDeclaredAxisMismatches,
+        acceptedObstacleHits,
+        prioritizeDeclaredAxisCompletion,
+      )) continue;
       accepted = candidate;
+      acceptedDeclaredAxisMismatches = declaredAxisMismatches;
       acceptedObstacleHits = candidateObstacleHits;
-      if (candidateObstacleHits === 0) break;
+      if (displayTerminalPortCandidateIsComplete(
+        { declaredAxisMismatches, obstacleHits: candidateObstacleHits },
+        prioritizeDeclaredAxisCompletion,
+      )) break;
     }
     if (!accepted) {
       skippedEdgeIds.add(edge.id);
@@ -681,7 +678,11 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
     }
     current = accepted;
   }
-  return current;
+  return rollbackIncompleteDeclaredAxisTransactions(
+    edges,
+    current,
+    countDeclaredAxisMismatches,
+  );
 };
 
 export const repairBoundedReverseParallelOverlaps = <T extends Edge[]>(

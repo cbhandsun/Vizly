@@ -125,6 +125,12 @@ export const createSmokeRouteCatalog = (BASE_URL) => {
           workerHealthy,
           displayRouting: displayRouting && {
             stage: displayRouting.stage,
+            error: displayRouting.error,
+            requestId: displayRouting.requestId,
+            boundedCandidate: displayRouting.boundedCandidate,
+            inputGeometryDigest: displayRouting.inputGeometryDigest,
+            signature: displayRouting.signature,
+            terminalDiagnostics: displayRouting.terminalDiagnostics,
             workerStartCount: displayRouting.workerStartCount,
             workerAbortCount: displayRouting.workerAbortCount,
             workerResolution: displayRouting.workerResolution,

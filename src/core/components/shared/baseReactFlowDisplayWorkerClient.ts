@@ -17,6 +17,7 @@ import {
   mergeBaseReactFlowDisplayEdgePatches,
   sanitizeBaseReactFlowDisplayCachePatches,
 } from './baseReactFlowDisplayRoutingTransaction';
+import { createDisplayWorkerFinalQualityError } from './baseReactFlowDisplayWorkerFailure';
 
 export type { DisplayQualityMode } from './baseReactFlowDisplayWorkerProtocol';
 export {
@@ -34,7 +35,6 @@ export type DeferredDisplayEdges = {
   displayPatches: Edge[];
   hardClean: boolean;
 };
-
 export type BaseReactFlowDisplayWorkerResult = {
   edges: Edge[];
   hardClean: boolean;
@@ -42,11 +42,7 @@ export type BaseReactFlowDisplayWorkerResult = {
   /** Exact DTO edge baseline that produced the worker response. */
   projectedEdges: Edge[];
 };
-
-type BaseReactFlowDisplayWorkerResponseResult = Omit<
-  BaseReactFlowDisplayWorkerResult,
-  'projectedEdges'
->;
+type BaseReactFlowDisplayWorkerResponseResult = Omit<BaseReactFlowDisplayWorkerResult, 'projectedEdges'>;
 
 export type DisplayRoutingInput = {
   cacheSignature: string;
@@ -85,6 +81,7 @@ type DisplayRoutingDebugState = {
   outputRouteSignature?: string;
   routingVersion?: string;
   workerResolution?: DisplayEdgesWorkerRouteResolution;
+  terminalDiagnostics?: unknown;
 };
 
 const DISPLAY_WORKER_TIMEOUT_MS = 60_000;
@@ -720,7 +717,10 @@ export const repairBaseReactFlowDisplayEdgesInWorker = async ({
   });
   if (signal?.aborted) throw new Error('display-edge-worker-cancelled');
   if (result.hardClean !== true) {
-    throw new Error('display-edge-worker-final-quality-failed');
+    throw createDisplayWorkerFinalQualityError(
+      result.edges,
+      projectedInput.nodes,
+    );
   }
   return { ...result, projectedEdges: projectedInput.edges };
 };

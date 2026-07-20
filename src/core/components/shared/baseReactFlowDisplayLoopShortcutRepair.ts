@@ -2,6 +2,7 @@ import type { Edge, Node } from '@xyflow/react';
 
 import { normalizeHandle } from '../../routing/utils/handleUtils';
 import {
+  calculateEdgePathQualityScore,
   createEdgePathQualityEvaluationContext,
   type EdgePathQualityScore,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
@@ -291,6 +292,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
       const manhattan = Math.abs(last.x - first.x) + Math.abs(last.y - first.y);
       return {
         edgeIndex,
+        hairpins: calculateEdgePathQualityScore([edge]).hairpins,
         overlapHits: overlapHitsByEdge.get(edgeIndex) ?? 0,
         pointCount: path.length,
         excessLength: displayPathLength(path) - manhattan,
@@ -298,12 +300,14 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
     })
     .filter((entry): entry is {
       edgeIndex: number;
+      hairpins: number;
       overlapHits: number;
       pointCount: number;
       excessLength: number;
     } => Boolean(entry))
     .sort((first, second) => (
-      second.overlapHits - first.overlapHits
+      second.hairpins - first.hairpins
+      || second.overlapHits - first.overlapHits
       || second.excessLength - first.excessLength
       || second.pointCount - first.pointCount
       || first.edgeIndex - second.edgeIndex
@@ -330,6 +334,7 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
     bestQuality = candidateQuality;
     bestScore = candidateScore;
     return bestQuality.hairpins === 0
+      && bestQuality.strictCrossings === 0
       && bestQuality.reverseOverlap === 0
       && bestQuality.unrelatedOverlap === 0
       && bestQuality.unexplainedRelatedOverlap === 0;
@@ -363,6 +368,15 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
   }
 
   const nodeById = new Map(nodes.map(node => [node.id, node] as const));
+  const routingObstacleRects = [...buildDisplayRoutingObstacles(nodes).values()];
+  const outerBounds = routingObstacleRects.length > 0
+    ? {
+      left: Math.min(...routingObstacleRects.map(rect => rect.x)),
+      right: Math.max(...routingObstacleRects.map(rect => rect.x + rect.width)),
+      top: Math.min(...routingObstacleRects.map(rect => rect.y)),
+      bottom: Math.max(...routingObstacleRects.map(rect => rect.y + rect.height)),
+    }
+    : null;
   for (const { edgeIndex } of rankedEdgeIndexes) {
     const edge = edges[edgeIndex];
     const sourceNode = nodeById.get(edge.source);
@@ -375,10 +389,55 @@ export const repairDisplayLoopShortcuts = <T extends Edge[]>(
     const sides = ['top', 'bottom', 'left', 'right'] as const;
     const sourceSides = sides
       .filter(side => displayTerminalSideCanSwitch(edge, 'source', side))
-      .sort((first, second) => Number(first === currentSourceSide) - Number(second === currentSourceSide));
+      .sort((first, second) => Number(first !== currentSourceSide) - Number(second !== currentSourceSide));
     const targetSides = sides
       .filter(side => displayTerminalSideCanSwitch(edge, 'target', side))
       .sort((first, second) => Number(first !== currentTargetSide) - Number(second !== currentTargetSide));
+    if (outerBounds) {
+      const endpointForSide = (
+        rect: NonNullable<ReturnType<typeof getDisplayNodeRect>>,
+        side: typeof sides[number],
+      ): DisplayPoint => (
+        side === 'left'
+          ? { x: rect.x, y: rect.y + rect.height / 2 }
+          : side === 'right'
+            ? { x: rect.x + rect.width, y: rect.y + rect.height / 2 }
+            : side === 'top'
+              ? { x: rect.x + rect.width / 2, y: rect.y }
+              : { x: rect.x + rect.width / 2, y: rect.y + rect.height }
+      );
+      for (const side of sides) {
+        if (!sourceSides.includes(side) || !targetSides.includes(side)) continue;
+        const sourcePoint = endpointForSide(sourceRect, side);
+        const targetPoint = endpointForSide(targetRect, side);
+        const lane = side === 'top'
+          ? outerBounds.top - 96
+          : side === 'bottom'
+            ? outerBounds.bottom + 96
+            : side === 'left'
+              ? outerBounds.left - 96
+              : outerBounds.right + 96;
+        const candidatePath = side === 'top' || side === 'bottom'
+          ? [
+            sourcePoint,
+            { x: sourcePoint.x, y: lane },
+            { x: targetPoint.x, y: lane },
+            targetPoint,
+          ]
+          : [
+            sourcePoint,
+            { x: lane, y: sourcePoint.y },
+            { x: lane, y: targetPoint.y },
+            targetPoint,
+          ];
+        const candidate = edges.map((candidateEdge, candidateIndex) => (
+          candidateIndex === edgeIndex
+            ? withDisplayPortBridge(edge, candidatePath, side, side)
+            : candidateEdge
+        )) as T;
+        if (considerCandidate(candidate, [edgeIndex])) return best;
+      }
+    }
     for (const sourceSide of sourceSides) {
       for (const targetSide of targetSides) {
         if (sourceSide === currentSourceSide && targetSide === currentTargetSide) continue;

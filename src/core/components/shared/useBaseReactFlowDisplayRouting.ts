@@ -6,6 +6,7 @@ import {
   computeBaseReactFlowDisplayCacheSignature,
   computeBaseReactFlowDisplayOutputRouteSignature,
   readBaseReactFlowDisplayEdgesCacheEntry,
+  withDisplayAbsolutePositions,
   writeBaseReactFlowDisplayEdgesCache,
 } from './baseReactFlowDisplayEdgeCore';
 import {
@@ -32,6 +33,13 @@ import {
 import { resolveBaseReactFlowDisplayCandidate } from './baseReactFlowDisplayCandidateResolver';
 import { computeBaseReactFlowDisplayGeometryDigest } from './baseReactFlowDisplayInputIdentity';
 import { logBaseReactFlowEventBindingFailure } from './baseReactFlowLogging';
+import {
+  createDisplayTerminalValidationSnapshot,
+  getDisplayTerminalValidationReport,
+} from './baseReactFlowTerminalValidation';
+import { calculateEdgePathQualityScore } from '../../strategies/shared/edgeStrictCrossingGuard';
+import { displayTerminalRoleNeedsDeclaredAxisRepair } from './baseReactFlowDisplayTerminalPortCandidates';
+import { getDisplayComputedPath, getDisplayNodeRect } from './baseReactFlowDisplayGeometry';
 
 export type UseBaseReactFlowDisplayRoutingOptions = {
   edges: Edge[];
@@ -357,6 +365,97 @@ export const useBaseReactFlowDisplayRouting = ({
         }
         let resolvedWorkerResult = workerResult;
         if (workerResult.hardClean !== true) {
+          const debugHost = typeof window !== 'undefined' ? window.location.hostname : '';
+          if (debugHost === 'localhost' || debugHost === '127.0.0.1' || debugHost === '::1') {
+            const terminalNodes = withDisplayAbsolutePositions(
+              latestRoutingInput.nodes,
+              new Map(latestRoutingInput.nodes.map(node => [node.id, node] as const)),
+            );
+            const terminalSnapshot = createDisplayTerminalValidationSnapshot(terminalNodes);
+            const terminalReport = getDisplayTerminalValidationReport(
+              workerResult.edges,
+              terminalSnapshot,
+            );
+            const summarizeNode = (nodeId: string) => {
+              const node = terminalNodes.find(item => item.id === nodeId);
+              const rect = node ? getDisplayNodeRect(node) : null;
+              return node && {
+                id: node.id,
+                position: rect ? { x: rect.x, y: rect.y } : node.position,
+                width: rect?.width ?? node.width ?? node.measured?.width,
+                height: rect?.height ?? node.height ?? node.measured?.height,
+              };
+            };
+            const summarizeEdge = (edge: Edge) => {
+              const data = (edge.data ?? {}) as Record<string, unknown>;
+              return {
+                id: edge.id,
+                source: edge.source,
+                target: edge.target,
+                sourceHandle: edge.sourceHandle,
+                targetHandle: edge.targetHandle,
+                sourcePortPolicy: data.sourcePortPolicy,
+                targetPortPolicy: data.targetPortPolicy,
+                layoutDirection: data.layoutDirection,
+                path: data.computedPath,
+                sourceNode: summarizeNode(edge.source),
+                targetNode: summarizeNode(edge.target),
+              };
+            };
+            const hairpinEdges = workerResult.edges.filter(edge => (
+              calculateEdgePathQualityScore([edge]).hairpins > 0
+            ));
+            const terminalNodeById = new Map(terminalNodes.map(node => [node.id, node] as const));
+            const declaredAxisMismatches = workerResult.edges.filter((edge) => {
+              const sourceNode = terminalNodeById.get(edge.source);
+              const targetNode = terminalNodeById.get(edge.target);
+              if (!sourceNode || !targetNode) return true;
+              const sourceRect = getDisplayNodeRect(sourceNode);
+              const targetRect = getDisplayNodeRect(targetNode);
+              if (!sourceRect || !targetRect) return true;
+              const path = getDisplayComputedPath(edge);
+              return displayTerminalRoleNeedsDeclaredAxisRepair(
+                edge,
+                path,
+                'source',
+                sourceRect,
+              ) || displayTerminalRoleNeedsDeclaredAxisRepair(
+                edge,
+                path,
+                'target',
+                targetRect,
+              );
+            });
+            const unexplainedPairs: Array<{ first: Edge; second: Edge; overlap: number }> = [];
+            for (let firstIndex = 0; firstIndex < workerResult.edges.length; firstIndex += 1) {
+              for (
+                let secondIndex = firstIndex + 1;
+                secondIndex < workerResult.edges.length;
+                secondIndex += 1
+              ) {
+                const first = workerResult.edges[firstIndex];
+                const second = workerResult.edges[secondIndex];
+                const overlap = calculateEdgePathQualityScore(
+                  [first, second],
+                ).unexplainedRelatedOverlap;
+                if (overlap > 0) unexplainedPairs.push({ first, second, overlap });
+              }
+            }
+            updateDisplayRoutingDebugState({
+              terminalDiagnostics: {
+                unanchored: terminalReport.unanchoredEdgeIndexes.slice(0, 3).map(
+                  index => summarizeEdge(workerResult.edges[index]),
+                ),
+                hairpins: hairpinEdges.slice(0, 3).map(summarizeEdge),
+                declaredAxisMismatches: declaredAxisMismatches.slice(0, 3).map(summarizeEdge),
+                unexplainedPairs: unexplainedPairs.slice(0, 3).map(pair => ({
+                  first: summarizeEdge(pair.first),
+                  second: summarizeEdge(pair.second),
+                  overlap: pair.overlap,
+                })),
+              },
+            });
+          }
           const repairRequestId = `${requestId}:repair`;
           updateDisplayRoutingDebugState({
             stage: 'worker-fallback-loading',

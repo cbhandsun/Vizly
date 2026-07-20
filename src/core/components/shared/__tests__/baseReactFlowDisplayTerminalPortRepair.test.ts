@@ -239,7 +239,7 @@ describe('baseReactFlowDisplayTerminalPortRepair', () => {
     );
   });
 
-  it('repairs an axis-mismatched terminal without crossing nearby execution trunks or its blocker', () => {
+  it('rejects an obstacle-only improvement that leaves the declared terminal axis invalid', () => {
     const nodes: Node[] = [
       node('operation', 3495.6, 776.5, 216, 73),
       node('loading-handover', 4042.6, 1223, 130, 60),
@@ -278,11 +278,11 @@ describe('baseReactFlowDisplayTerminalPortRepair', () => {
     const repaired = repairAxisMismatchedTerminalsWithBoundedPortRoles(edges, nodes, 16);
     const repairedQuality = calculateEdgePathQualityScore(repaired);
 
-    expect(displayEdgesHaveNodeAnchoredTerminals([repaired[0]], nodes)).toBe(true);
+    expect(repaired[0]).toBe(loading);
     expect(
       countDisplayObstacleHits(repaired, nodes),
       JSON.stringify((repaired[0].data as any)?.computedPath, null, 2),
-    ).toBeLessThan(baselineObstacleHits);
+    ).toBeLessThanOrEqual(baselineObstacleHits);
     expect(repairedQuality.nonOrthogonalSegments).toBeLessThanOrEqual(baselineQuality.nonOrthogonalSegments);
     expect(repairedQuality.strictCrossings).toBeLessThanOrEqual(baselineQuality.strictCrossings);
     expect(repairedQuality.reverseOverlap).toBeLessThanOrEqual(baselineQuality.reverseOverlap);

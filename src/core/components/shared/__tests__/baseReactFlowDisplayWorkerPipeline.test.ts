@@ -301,6 +301,52 @@ describe('baseReactFlowDisplayEdges worker pipeline', () => {
     expect(finalized.report).toBe(report);
   });
 
+  it('repairs an isolated declared-axis mismatch before entering measured repair', () => {
+    const axisNodes: Node[] = [
+      { id: 'axis-source', position: { x: 0, y: 0 }, width: 100, height: 60, data: {} },
+      { id: 'axis-target', position: { x: 300, y: 400 }, width: 100, height: 60, data: {} },
+    ];
+    const axisEdges: Edge[] = [{
+      id: 'axis-edge',
+      source: 'axis-source',
+      target: 'axis-target',
+      sourceHandle: 'bottom',
+      targetHandle: 'left',
+      data: {
+        computedPath: [
+          { x: 50, y: 60 },
+          { x: 50, y: 100 },
+          { x: 300, y: 100 },
+          { x: 300, y: 430 },
+        ],
+      },
+    }];
+    const initialReport = getDisplayHardQualityGateReport(axisEdges, axisNodes, 'polished');
+    const measuredRepair = vi.spyOn(
+      measuredDisplayRepair,
+      'repairBaseReactFlowMeasuredDisplayEdgesWithReport',
+    );
+    const terminalAxisRepair = vi.spyOn(
+      terminalPortRepair,
+      'repairAxisMismatchedTerminalsWithBoundedPortRoles',
+    );
+
+    const finalized = displayFinalizer.finalizeBaseReactFlowDisplayEdgesWithReport(
+      axisEdges,
+      axisNodes,
+    );
+
+    expect(initialReport).toMatchObject({
+      hardClean: false,
+      terminalsAttached: true,
+      terminalsAnchored: false,
+    });
+    expect(finalized.report.hardClean).toBe(true);
+    expect(finalized.report.terminalsAnchored).toBe(true);
+    expect(terminalAxisRepair).toHaveBeenCalled();
+    expect(measuredRepair).not.toHaveBeenCalled();
+  });
+
   it('keeps an atomic 48px hard-clean route as baseline while applying the 56px preference', () => {
     const atomic48 = edges.map(edge => ({
       ...edge,
