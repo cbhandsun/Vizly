@@ -53,20 +53,18 @@ import { persistMindMapThemeKey, readStoredMindMapThemeKey, resolveMindMapThemeK
 import {
     logMindmapWrapperAiBridgeFailure,
     logMindmapWrapperClipboardPayloadBlocked,
-    logMindmapWrapperCollapsedBadgeFailure,
     logMindmapWrapperCopyTopicFailure,
     logMindmapWrapperDragImportFailure,
     logMindmapWrapperDragImportRejected,
-    logMindmapWrapperHistoryRecordFailure,
     logMindmapWrapperHyperlinkOpenFailure,
     logMindmapWrapperNotePreviewFailure,
     logMindmapWrapperSafePasteFailure,
     logMindmapWrapperSafeShortcutFailure,
     logMindmapWrapperSaveFailure,
-    logMindmapWrapperShapeSyncFailure,
 } from './mindmapWrapperLogging';
 import { coerceMindElixirDirection } from './mindElixirDirection';
 import { projectMindMapTreeToBridge } from './mindmapBridgeProjection';
+import { bindMindElixirOperationEffects } from './mindElixirOperationEffects';
 
 // ─── Default data shown for a fresh mindmap ──────────────────────────────────
 const DEFAULT_DATA: MindElixirData = {
@@ -395,15 +393,6 @@ function injectGradientFix() {
 }
 
 
-// ─── Debounce utility ─────────────────────────────────────────────────────────
-function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): T {
-    let timer: ReturnType<typeof setTimeout>;
-    return ((...args: any[]) => {
-        clearTimeout(timer);
-        timer = setTimeout(() => fn(...args), ms);
-    }) as T;
-}
-
 // ─── Load / Save helpers ──────────────────────────────────────────────────────
 function loadData(ctx: PluginContext): MindElixirData {
     try {
@@ -501,25 +490,6 @@ function isMindMapTextEditingTarget(target: EventTarget | null): boolean {
 }
 
 // ─── Wrapper Component ────────────────────────────────────────────────────────
-const OP_NAMES_MAP: Record<string, string> = {
-    insertSibling: '添加兄弟节点',
-    addChild: '添加子节点',
-    removeNodes: '删除节点',
-    removeNode: '删除节点',
-    setNodeTopic: '修改节点文本',
-    moveNode: '移动节点位置',
-    setNodeNote: '修改节点备注',
-    setNodeTags: '修改节点标签',
-    setNodeIcons: '修改节点图标',
-    setNodeHyperLink: '修改节点链接',
-    outline_structure_change: '大纲拖拽排序',
-    template_apply: '套用模板',
-    ai_custom_action: 'AI 交互式指令处理',
-    clearHistory: '清空历史',
-    import: '导入数据',
-    restore_version: '恢复历史版本'
-};
-
 interface MindElixirWrapperProps {
     ctx: PluginContext;
     isDark?: boolean;
@@ -649,22 +619,11 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         };
         mind.container.addEventListener('contextmenu', handleContextMenu);
 
-        // Debounced auto-save on every operation
-        const debouncedSave = debounce(() => saveRef.current(), 800);
-        const onOperation = (op: any) => {
-            debouncedSave();
-            
-            // Record history snapshot
-            const opName = op?.name;
-            const desc = OP_NAMES_MAP[opName] || '更新思维导图';
-            try {
-                const nodeData = mind.getData().nodeData;
-                addHistoryRecord(desc, nodeData);
-            } catch (err) {
-                logMindmapWrapperHistoryRecordFailure(err);
-            }
-        };
-        mind.bus.addListener('operation', onOperation);
+        const unbindOperationEffects = bindMindElixirOperationEffects({
+            mind,
+            root: containerRef.current,
+            onSave: () => saveRef.current(),
+        });
 
         const handleSafeMindElixirPaste = (event: ClipboardEvent) => {
             const text = event.clipboardData?.getData('text/plain') ?? '';
@@ -722,68 +681,6 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             }
         };
         mind.container.addEventListener('keydown', handleSafeNodeShortcut, true);
-
-        // ── Collapsed count badges (data-driven) ─────────────────────────────
-        // Walk the nodeData tree; for each collapsed node inject a child-count badge
-        const updateBadgesFromData = () => {
-            try {
-                const data = mind.getData();
-                const container = document.getElementById('vizly-mind-elixir-root');
-                if (!container) return;
-                container.querySelectorAll('.me-collapsed-badge').forEach(el => el.remove());
-                function walkNodes(node: NodeObj) {
-                    if (node.expanded === false && node.children && node.children.length > 0) {
-                        try {
-                            const tpc = mind.findEle(node.id);
-                            if (tpc && !tpc.querySelector('.me-collapsed-badge')) {
-                                const badge = document.createElement('span');
-                                badge.className = 'me-collapsed-badge node-children-count';
-                                badge.textContent = String(node.children.length);
-                                tpc.appendChild(badge);
-                            }
-                        } catch (error) {
-                            logMindmapWrapperCollapsedBadgeFailure(error);
-                        }
-                    }
-                    (node.children ?? []).forEach(walkNodes);
-                }
-                walkNodes(data.nodeData);
-            } catch (error) {
-                logMindmapWrapperCollapsedBadgeFailure(error);
-            }
-        };
-
-        mind.bus.addListener('operation', updateBadgesFromData);
-        // Initial badge update after layout settles
-        setTimeout(updateBadgesFromData, 350);
-
-        // ── Apply node shapes + note indicators to DOM ──────────────────────
-        const applyShapes = () => {
-            try {
-                const walk = (node: NodeObj) => {
-                    const shape = (node as any).shapeClass as string | undefined;
-                    try {
-                        const tpc = mind.findEle(node.id) as HTMLElement | null;
-                        const wrapper = tpc?.closest('me-wrapper') as HTMLElement | null;
-                        if (wrapper) {
-                            if (shape) wrapper.setAttribute('data-shape', shape);
-                            else wrapper.removeAttribute('data-shape');
-                            // Note indicator
-                            if (node.note) wrapper.setAttribute('data-note', '1');
-                            else wrapper.removeAttribute('data-note');
-                        }
-                    } catch (error) {
-                        logMindmapWrapperShapeSyncFailure(error);
-                    }
-                    (node.children ?? []).forEach(walk);
-                };
-                walk(mind.getData().nodeData);
-            } catch (error) {
-                logMindmapWrapperShapeSyncFailure(error);
-            }
-        };
-        mind.bus.addListener('operation', applyShapes);
-        setTimeout(applyShapes, 400);
 
         // ── Keyboard shortcuts: Alt+O (outline), Ctrl+Shift+C (copy text) ────
         const handleGlobalKeys = (e: KeyboardEvent) => {
@@ -865,14 +762,12 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
 
         return () => {
             mq.removeEventListener('change', handleColorScheme);
-            mind.bus.removeListener('operation', debouncedSave);
+            unbindOperationEffects();
             mind.container.removeEventListener('paste', handleSafeMindElixirPaste, true);
             mind.container.removeEventListener('keydown', handleSafeNodeShortcut, true);
-            mind.bus.removeListener('operation', updateBadgesFromData);
             mind.bus.removeListener('selectNodes', handleSelectNodes);
             mind.bus.removeListener('selectNewNode', handleSelectNewNode);
             mind.bus.removeListener('unselectNodes', handleUnselectNodes);
-            mind.bus.removeListener('operation', applyShapes);
             mind.container?.removeEventListener('click', handleHyperLinkClick);
             mind.container?.removeEventListener('contextmenu', handleContextMenu);
             mind.container?.removeEventListener('mouseover', handleNoteOver);
