@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import App from 'antd/es/app';
-import Avatar from 'antd/es/avatar';
 import Dropdown from 'antd/es/dropdown';
 import type { MenuProps } from 'antd/es/menu';
 import { coerceDiagramId, getQueryOrHashParamFromLocation, type LocationLike } from '@/core/utils/inputBoundary';
@@ -9,22 +8,16 @@ import {
     Blocks,
     Boxes,
     Building2,
-    ChevronDown,
     Cloud,
     Clock,
     Copy,
     Database,
     Ellipsis,
     ExternalLink,
-    Globe,
     Laptop,
     LayoutGrid,
     List,
-    Palette,
     Pencil,
-    Plus,
-    Search,
-    Settings,
     Share2,
     Trash2,
     User,
@@ -54,13 +47,15 @@ import {
     type UnifiedDiagramItem,
     type ViewMode,
 } from './diagramManagementPage.helpers';
-// PRESET_MAP 已迁移到 Supabase system_templates，仅在 handleCreateTemplate 中保留最小依赖
-
 import './WorkspaceDashboard.css';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { upsertDiagramConfigIndex } from '@/core/utils/diagramTypeStorage';
 import { safeLog } from '@/core/utils/consoleCleanup';
 import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
+import { DiagramCardSkeleton } from './DiagramCardSkeleton';
+import { WorkspaceCompactHeader } from './WorkspaceCompactHeader';
+import { WorkspaceEmptyState } from './WorkspaceEmptyState';
+import { WorkspaceGlobalHeader } from './WorkspaceGlobalHeader';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
@@ -84,7 +79,6 @@ const WorkspaceDashboardPage: React.FC = () => {
     const { modal } = App.useApp();
     const initialView = coerceFilterView(searchParams.get('view') || getQueryOrHashParamFromLocation(browserLocation, 'view'));
     
-    // --- State ---
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [activeView, setActiveView] = useState<FilterViewType>(initialView);
     const [loading, setLoading] = useState(true);
@@ -99,7 +93,6 @@ const WorkspaceDashboardPage: React.FC = () => {
         return readStoredCloudProvider();
     });
 
-    // --- Context Menu State (Phase 1.3) ---
     const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; item: UnifiedDiagramItem } | null>(null);
     const ctxMenuRef = useRef<HTMLDivElement>(null);
 
@@ -141,7 +134,6 @@ const WorkspaceDashboardPage: React.FC = () => {
         };
     }, [ctxMenu]);
 
-    // --- Data Loading ---
     const loadAllData = useCallback(async () => {
         setLoading(true);
         try {
@@ -412,140 +404,29 @@ const WorkspaceDashboardPage: React.FC = () => {
         return new Date(timestamp).toLocaleDateString();
     };
 
-    // --- Renderers ---
-    const DiagramCardSkeleton = () => (
-        <div className="skeleton-card">
-            <div className="skeleton-cover" />
-            <div className="skeleton-info">
-                <div className="skeleton-title" />
-                <div className="skeleton-meta" />
-            </div>
-        </div>
-    );
-
-    const CustomEmptyState = () => (
-        <div className="workspace-empty-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 24px', textAlign: 'center' }}>
-            <div className="workspace-empty-art" style={{ width: 48, height: 48, border: '1px dashed var(--vz-border)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                <Plus size={16} strokeWidth={2} style={{ color: 'var(--vz-text-secondary)' }} />
-            </div>
-            <div className="workspace-empty-title" style={{ fontSize: 15, fontWeight: 600, color: 'var(--vz-text-primary)', marginBottom: 4 }}>
-                No diagrams
-            </div>
-            <div className="workspace-empty-desc" style={{ fontSize: 13, color: 'var(--vz-text-tertiary)', marginBottom: 24, maxWidth: 300 }}>
-                Get started by creating a new document or pressing Ctrl+K.
-            </div>
-            <button className="create-btn-primary" onClick={() => handleCreateTemplate('blank')}>
-                <Plus className="plus-icon" size={16} strokeWidth={2} /> New Diagram
-            </button>
-        </div>
-    );
-
     // --- Computed Counts ---
     const localCount = useMemo(() => unifiedItems.filter(i => i.source === 'local').length, [unifiedItems]);
     const cloudCount = useMemo(() => unifiedItems.filter(i => i.source === 's3' || i.source === 'supabase').length, [unifiedItems]);
     const sharedCount = useMemo(() => unifiedItems.filter(i => i.role === 'viewer').length, [unifiedItems]);
     return (
         <div className="workspace-dashboard">
-            {/* Global Top Navigation */}
-            <header className="workspace-global-header">
-                <div className="workspace-header-brand" onClick={() => navigate('/manage')}>
-                    <div className="workspace-header-logo">
-                        <div style={{
-                            width: 28,
-                            height: 28,
-                            background: 'var(--vz-brand-gradient)',
-                            borderRadius: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#fff',
-                            fontSize: '16px',
-                            fontWeight: '800',
-                            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
-                        }}>V</div>
-                    </div>
-                    <div className="workspace-header-title">Vizly</div>
-                </div>
-                
-                <div className="workspace-header-search-container">
-                    <div className="workspace-search">
-                        <Search size={16} strokeWidth={2} style={{ color: 'var(--vz-brand-from)', opacity: 0.7 }}/>
-                        <input 
-                            placeholder="Find your ideas..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                </div>
-
-                <div className="workspace-header-actions">
-                    <button
-                        className="workspace-icon-btn"
-                        onClick={() => {
-                            const html = document.documentElement;
-                            const isDark = html.getAttribute('data-theme') === 'dark';
-                            html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-                        }}
-                        aria-label="Toggle theme"
-                        title="Toggle theme"
-                    >
-                        <Palette size={16} strokeWidth={2} />
-                    </button>
-                    <Dropdown
-                        menu={{
-                            items: [
-                                { key: 'en', label: '🇬🇧 English', onClick: () => {} },
-                                { key: 'zh', label: '🇨🇳 中文', onClick: () => {} },
-                            ]
-                        }}
-                        trigger={['click']}
-                        placement="bottomRight"
-                    >
-                        <button className="workspace-icon-btn" aria-label="Language" title="Language">
-                            <Globe size={16} strokeWidth={2} />
-                        </button>
-                    </Dropdown>
-                    <Dropdown menu={{ items: settingsMenu }} trigger={['click']} placement="bottomRight">
-                        <button className="workspace-settings-trigger" aria-label="Settings">
-                            {user ? <Avatar size={24} src={user.user_metadata?.avatar_url} icon={<User size={14} strokeWidth={2} />} /> : <Settings size={16} strokeWidth={2} />}
-                        </button>
-                    </Dropdown>
-                </div>
-            </header>
-
+            <WorkspaceGlobalHeader
+                searchTerm={searchTerm}
+                onSearchTermChange={setSearchTerm}
+                onNavigateHome={() => navigate('/manage')}
+                settingsMenu={settingsMenu}
+                isAuthenticated={Boolean(user)}
+                avatarUrl={typeof user?.user_metadata?.avatar_url === 'string' ? user.user_metadata.avatar_url : undefined}
+            />
             {/* Main Content Viewport */}
             <main className="workspace-main">
                 
-                {/* Hero Creation Matrix */}
                 {!searchTerm && (
-                    <div className="workspace-header-compact">
-                        <div className="workspace-title">
-                            Workspace
-                            <span className="workspace-count">{unifiedItems.length} documents</span>
-                        </div>
-
-                        <div className="workspace-actions-compact" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                            <Dropdown
-                                menu={{
-                                    items: [
-                                        { key: 'flowchart', label: 'Flowchart', onClick: () => handleCreateTemplate('flowchart') },
-                                        { key: 'mindmap', label: 'Mind Map', onClick: () => handleCreateTemplate('mindmap') },
-                                        { key: 'timeline', label: 'Timeline', onClick: () => handleCreateTemplate('timeline') },
-                                        { key: 'architecture', label: 'Architecture', onClick: () => handleCreateTemplate('architecture') },
-                                    ]
-                                }}
-                                trigger={['hover']}
-                                placement="bottomRight"
-                            >
-                                <button className="create-btn-primary" onClick={() => handleCreateTemplate('blank')}>
-                                    <Plus className="plus-icon" size={16} strokeWidth={2} />
-                                    New Diagram <ChevronDown size={12} strokeWidth={2} style={{ marginLeft: '4px' }} />
-                                </button>
-                            </Dropdown>
-                        </div>
-                    </div>
+                    <WorkspaceCompactHeader
+                        documentCount={unifiedItems.length}
+                        onCreateTemplate={handleCreateTemplate}
+                    />
                 )}
-
                 {/* Content Area with inner wrapper */}
                 <div className="workspace-main-inner">
                     {/* Filter Tabs with Counts */}
@@ -618,7 +499,7 @@ const WorkspaceDashboardPage: React.FC = () => {
                             {Array(8).fill(0).map((_, i) => <DiagramCardSkeleton key={i} />)}
                         </div>
                     ) : filteredItems.length === 0 ? (
-                        <CustomEmptyState />
+                        <WorkspaceEmptyState onCreate={() => handleCreateTemplate('blank')} />
                     ) : (
                         <div className={viewMode === 'grid' ? 'diagram-grid' : 'diagram-list'}>
                             {filteredItems.map(item => {

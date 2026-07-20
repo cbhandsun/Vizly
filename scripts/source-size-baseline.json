@@ -23,7 +23,6 @@
     "src/core/strategies/shared/edgeLocalDoglegAdvancedCandidates.ts": 809,
     "src/core/strategies/shared/edgeLocalDoglegBasicCandidates.ts": 810,
     "src/core/strategies/shared/edgeStrictCrossingGuard.ts": 1046,
-    "src/core/strategies/shared/edgeTerminalBoundaryStairGeometry.ts": 1011,
-    "src/pages/DiagramManagementPage.tsx": 815
+    "src/core/strategies/shared/edgeTerminalBoundaryStairGeometry.ts": 1011
   }
 }
