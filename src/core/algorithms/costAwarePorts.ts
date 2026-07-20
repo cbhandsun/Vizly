@@ -1,5 +1,4 @@
-import { Position } from '../types/flow';
-import type { EdgeConstraint, PortSelectionConfig } from '../types/routing';
+import { Position, type EdgeConstraint, type PortSelectionConfig } from '../types/routing';
 import type { LineObstacle, Rectangle } from './pathfinding';
 import { SpatialIndex } from './SpatialIndex';
 import { evaluatePortCombination } from './costAwarePortEvaluation';
@@ -15,7 +14,7 @@ import type { NodeRect, PortCandidate } from './costAwarePortTypes';
 
 export type { NodeRect, PortCandidate } from './costAwarePortTypes';
 
-const DEFAULT_CONFIG: Required<Omit<PortSelectionConfig, 'portUsage' | 'sourceId' | 'targetId' | 'globalChannelIndex' | 'globalChannelCount' | 'globalChannelType' | 'portUsageData' | 'preferredSourcePort' | 'preferredTargetPort'>> & { portUsage: Record<string, number>, sourceId: string, targetId: string } = {
+const DEFAULT_CONFIG: Required<Omit<PortSelectionConfig, 'portUsage' | 'sourceId' | 'targetId' | 'globalChannelIndex' | 'globalChannelCount' | 'globalChannelType' | 'portUsageData' | 'preferredSourcePort' | 'preferredTargetPort' | 'constrainedSourcePos' | 'constrainedTargetPos'>> & { portUsage: Record<string, number>, sourceId: string, targetId: string } = {
     bendPenalty: 50,
     obstaclePenalty: 100,
     crossingPenalty: 1200,

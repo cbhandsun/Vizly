@@ -114,7 +114,7 @@ export function useFlowchartNodeStyleResolution({ data, selected }: ResolutionPa
         if (!textColor) {
             if (isHighlyTransparent) {
                 // For highly transparent node backgrounds, rely on the app theme mode instead of the raw tint
-                textColor = theme.mode === 'dark' ? '#E5E7EB' : '#111111';
+                textColor = theme?.mode === 'dark' ? '#E5E7EB' : '#111111';
             } else {
                 textColor = pickReadableTextColor(finalBgColor, '#FFFFFF', '#333333');
             }

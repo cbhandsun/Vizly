@@ -1,5 +1,4 @@
-import { Position } from '../types/flow';
-import type { EdgeConstraint, PortSelectionConfig } from '../types/routing';
+import { Position, type EdgeConstraint, type PortSelectionConfig } from '../types/routing';
 import type { LineObstacle, Rectangle } from './pathfinding';
 import type { SpatialIndex } from './SpatialIndex';
 import type { NodeRect } from './costAwarePortTypes';
@@ -13,10 +12,7 @@ const MAX_COST = 10_000_000;
 
 type UnknownRecord = Record<string, unknown>;
 
-export type NormalizedPortSelectionConfig = PortSelectionConfig & {
-    constrainedSourcePos?: Position;
-    constrainedTargetPos?: Position;
-};
+export type NormalizedPortSelectionConfig = PortSelectionConfig;
 
 function isRecord(value: unknown): value is UnknownRecord {
     return typeof value === 'object' && value !== null && !Array.isArray(value);

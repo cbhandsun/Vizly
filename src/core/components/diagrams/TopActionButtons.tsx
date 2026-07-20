@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
     FaFileExport, FaFolderOpen, FaShareAlt, FaCloudUploadAlt, FaSave,
     FaPlay, FaImage, FaFileCode, FaFilePdf, FaFilm, FaProjectDiagram,
-    FaCode, FaHistory, FaExchangeAlt, _FaBars, FaCog, FaLock, FaUnlock,
+    FaCode, FaHistory, FaExchangeAlt, FaCog, FaLock, FaUnlock,
     FaMagic, FaRegComment, FaEllipsisH, FaRobot
 } from 'react-icons/fa';
 import { CollaborationAvatars } from './ui/CollaborationAvatars';

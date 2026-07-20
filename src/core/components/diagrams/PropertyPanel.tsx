@@ -6,7 +6,6 @@ import { FlowchartNodeData } from '../custom-nodes/FlowchartNode';
 import {
     Collapse,
     Typography,
-    _Empty,
 } from 'antd';
 import {
     SettingOutlined,
@@ -261,7 +260,10 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                     armSnapshot();
                     updateNodes({ icon: iconName });
                 }}
-                initialValue={getCommonValue(selectedNodes, (n) => getNodeData(n)?.icon)}
+                initialValue={getCommonValue(selectedNodes, (n) => {
+                    const icon = getNodeData(n)?.icon;
+                    return typeof icon === 'string' ? icon : undefined;
+                })}
             />
         </aside>
     );

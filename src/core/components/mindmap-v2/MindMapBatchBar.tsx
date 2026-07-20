@@ -26,11 +26,17 @@ const BATCH_COLORS = [
 
 interface BatchState {
     count: number;
-    nodeEls: Topic[];
     nodeObjs: NodeObj[];
 }
 
-const EMPTY: BatchState = { count: 0, nodeEls: [], nodeObjs: [] };
+const EMPTY: BatchState = { count: 0, nodeObjs: [] };
+
+const getSelectedElements = (
+    mind: NonNullable<ReturnType<typeof getMindElixirInstance>>,
+    nodes: NodeObj[],
+): Topic[] => nodes
+    .map(node => mind.findEle(node.id))
+    .filter((element): element is Topic => Boolean(element));
 
 const MindMapBatchBar: React.FC = () => {
     const [batch, setBatch] = useState<BatchState>(EMPTY);
@@ -41,31 +47,29 @@ const MindMapBatchBar: React.FC = () => {
     useEffect(() => {
         if (!mind) return;
 
-        const onSelectNodes = (objs: NodeObj[], els: Topic[]) => {
+        const onSelectNodes = (objs: NodeObj[]) => {
             if (!objs || objs.length < 2) {
                 setBatch(EMPTY);
                 return;
             }
-            setBatch({ count: objs.length, nodeEls: els, nodeObjs: objs });
+            setBatch({ count: objs.length, nodeObjs: objs });
         };
 
         const onUnselect = () => { setBatch(EMPTY); setColorOpen(false); };
 
-        mind.bus.addListener('selectNodes', onSelectNodes as any);
+        mind.bus.addListener('selectNodes', onSelectNodes);
         mind.bus.addListener('unselectNodes', onUnselect);
-        mind.bus.addListener('unselectNode', onUnselect);
 
         return () => {
-            mind.bus.removeListener('selectNodes', onSelectNodes as any);
+            mind.bus.removeListener('selectNodes', onSelectNodes);
             mind.bus.removeListener('unselectNodes', onUnselect);
-            mind.bus.removeListener('unselectNode', onUnselect);
         };
     }, [mind]);
 
     const handleBatchColor = useCallback((color: string) => {
         if (!mind) return;
-        batch.nodeEls.forEach(el => {
-            const obj = batch.nodeObjs.find(o => o.id === (el as HTMLElement).dataset?.nodeid);
+        getSelectedElements(mind, batch.nodeObjs).forEach(el => {
+            const obj = batch.nodeObjs.find(node => node.id === el.dataset?.nodeid);
             if (obj) {
                 try {
                     mind.reshapeNode(el, { ...obj, ...cleanMindMapNodePatch({ branchColor: color }) });
@@ -79,7 +83,7 @@ const MindMapBatchBar: React.FC = () => {
 
     const handleBatchExpand = useCallback((expand: boolean) => {
         if (!mind) return;
-        batch.nodeEls.forEach(el => {
+        getSelectedElements(mind, batch.nodeObjs).forEach(el => {
             try {
                 mind.expandNode(el, expand);
             } catch (error) {
@@ -91,7 +95,7 @@ const MindMapBatchBar: React.FC = () => {
     const handleBatchDelete = useCallback(() => {
         if (!mind) return;
         try {
-            mind.removeNodes(batch.nodeEls);
+            mind.removeNodes(getSelectedElements(mind, batch.nodeObjs));
         } catch (error) {
             logMindMapBatchActionFailure('removeNodes', error);
         }

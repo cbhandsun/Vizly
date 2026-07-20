@@ -31,7 +31,7 @@ const escapeXmlText = (value: string): string => value
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-export const isSafeImageExportDataUrl = (dataUrl: unknown): dataUrl is string => {
+export const isSafeImageExportDataUrl = (dataUrl: unknown): boolean => {
     if (typeof dataUrl !== 'string' || dataUrl.length > MAX_IMAGE_DATA_URL_CHARS) return false;
     return EXPORT_IMAGE_DATA_URL_PATTERN.test(dataUrl) || EXPORT_SVG_DATA_URL_PATTERN.test(dataUrl);
 };

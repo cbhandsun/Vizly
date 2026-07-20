@@ -3,10 +3,8 @@
  * 提供主题管理器的配置选项和工具函数
  */
 
-import { 
-  _Theme, 
-  _ThemePreset, 
-  ThemeTransition, 
+import {
+  ThemeTransition,
   ThemePerformanceOptions 
 } from './types/ThemeTypes';
 import {

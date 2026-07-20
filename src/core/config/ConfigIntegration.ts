@@ -393,7 +393,10 @@ export class ConfigIntegration {
           const performanceOptions = await this.layeredConfig.getConfig<Partial<ThemePerformanceOptions>>('theme.performance');
 
           // 提供默认的性能配置，防止undefined错误
-          const defaultPerformanceOptions = {
+          const defaultPerformanceOptions: ThemePerformanceOptions = {
+            lazyLoad: true,
+            preloadDelay: 1000,
+            maxCacheSize: 50 * 1024 * 1024,
             enableTransitions: true,
             transitionDuration: 300,
             batchUpdates: true,

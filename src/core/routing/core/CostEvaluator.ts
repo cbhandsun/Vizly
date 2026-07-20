@@ -10,7 +10,6 @@
 import type {
     CostContext,
     CostResult,
-    _EdgeRoutingWeights,
     Point,
     Rectangle,
     RoutingPlugin

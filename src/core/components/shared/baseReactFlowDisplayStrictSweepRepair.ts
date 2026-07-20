@@ -307,12 +307,12 @@ export const repairTerminalStrictCrossingsWithEndpointLanes = <T extends Edge[]>
 
 export const finalStrictDisplaySweep = <T extends Edge[]>(edges: T, nodes: Node[]): T => {
   if (countStrictEdgeCrossings(edges) === 0 && countDisplayStrictCrossings(edges) === 0) return edges;
-  const strictBypassRaw = repairDetachedStrictCrossingBypasses(edges, nodes);
-  const strictBypassOrthogonal = repairEndpointOrthogonalPaths(strictBypassRaw, nodes);
+  const strictBypassRaw = repairDetachedStrictCrossingBypasses(edges, nodes) as T;
+  const strictBypassOrthogonal = repairEndpointOrthogonalPaths(strictBypassRaw, nodes) as T;
   const terminalLaneRaw = repairTerminalStrictCrossingsWithEndpointLanes(strictBypassOrthogonal, nodes);
-  const terminalLaneOrthogonal = repairEndpointOrthogonalPaths(terminalLaneRaw, nodes);
+  const terminalLaneOrthogonal = repairEndpointOrthogonalPaths(terminalLaneRaw, nodes) as T;
   const internalLaneRaw = repairInternalStrictCrossingLanes(terminalLaneOrthogonal, nodes);
-  const internalLaneOrthogonal = repairEndpointOrthogonalPaths(internalLaneRaw, nodes);
+  const internalLaneOrthogonal = repairEndpointOrthogonalPaths(internalLaneRaw, nodes) as T;
   return chooseDisplayStrictPolishCandidate(
     nodes,
     edges,

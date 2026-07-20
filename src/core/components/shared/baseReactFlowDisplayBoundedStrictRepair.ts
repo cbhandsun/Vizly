@@ -19,6 +19,7 @@ import {
   sortedUniqueNumbers,
   withDisplayComputedPath,
   type DisplayPoint,
+  type DisplaySegment,
 } from './baseReactFlowDisplayGeometry';
 import {
   buildStrictObstacleSideBridgeXs,
@@ -34,6 +35,23 @@ import {
 import { displayEdgesHaveNodeAnchoredTerminals } from './baseReactFlowTerminalAxisRepair';
 
 const MIN_DISPLAY_ENDPOINT_STUB = 48;
+
+const toDisplaySegment = (segment: {
+  edgeIndex: number;
+  segIdx: number;
+  axis: 'h' | 'v';
+  a: DisplayPoint;
+  b: DisplayPoint;
+}): DisplaySegment => ({
+  edgeIndex: segment.edgeIndex,
+  segmentIndex: segment.segIdx,
+  axis: segment.axis,
+  direction: segment.axis === 'h'
+    ? Math.sign(segment.b.x - segment.a.x) as -1 | 0 | 1
+    : Math.sign(segment.b.y - segment.a.y) as -1 | 0 | 1,
+  a: segment.a,
+  b: segment.b,
+});
 
 export const repairBoundedPortAndInternalStrictCrossings = <T extends Edge[]>(
   edges: T,
@@ -467,8 +485,8 @@ export const repairBoundedPortAndInternalStrictCrossings = <T extends Edge[]>(
     }
 
     const portVariants = [
-      ...buildCrossingCompanionOuterPortVariants(edges, crossing.a, crossing.b, nodes),
-      ...buildCrossingCompanionOuterPortVariants(edges, crossing.b, crossing.a, nodes),
+      ...buildCrossingCompanionOuterPortVariants(edges, toDisplaySegment(crossing.a), toDisplaySegment(crossing.b), nodes),
+      ...buildCrossingCompanionOuterPortVariants(edges, toDisplaySegment(crossing.b), toDisplaySegment(crossing.a), nodes),
     ].slice(0, 4);
     for (const candidate of portVariants) {
       if (evaluations >= maxQualityEvaluations) return best;

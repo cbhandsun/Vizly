@@ -13,7 +13,7 @@ import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { findNodeById } from './migrate';
 import { expandNodeWithAI, getAncestorPath, summarizeNodeWithAI, processNodeWithAICustomAction } from './mindmapAIService';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
-import { cleanMindMapData, cleanMindMapTopic } from './mindmapTreeSanitizer';
+import { cleanMindMapData, cleanMindMapTopic, refreshMindElixirWithSanitizedData } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import { PlusOutlined, LoadingOutlined } from '@ant-design/icons';
 import { logMindMapFloatingActionFailure } from './mindmapFloatingLogging';
@@ -256,10 +256,11 @@ const MindMapFloatingBar: React.FC = () => {
                         }
 
                         const cleanData = cleanMindMapData(data);
-                        mind.refresh(cleanData);
+                        refreshMindElixirWithSanitizedData(mind, cleanData);
                         mind.bus.fire('operation', {
-                            name: 'ai_custom',
+                            name: 'reshapeNode',
                             obj: findNodeById(cleanData.nodeData, pos.nodeId) ?? cleanData.nodeData,
+                            origin: findNodeById(cleanData.nodeData, pos.nodeId) ?? cleanData.nodeData,
                         });
                     }
 

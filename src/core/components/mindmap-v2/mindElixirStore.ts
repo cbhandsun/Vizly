@@ -10,7 +10,7 @@
  * no Redux, no event emitters — just a plain module singleton.
  */
 
-import type { MindElixirInstance } from 'mind-elixir';
+import type { MindElixirInstance, NodeObj } from 'mind-elixir';
 
 
 let _activeInstance: MindElixirInstance | null = null;

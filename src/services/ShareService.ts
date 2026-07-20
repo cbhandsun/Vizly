@@ -8,6 +8,10 @@ import { coerceRemoteDiagramContent } from './remoteDiagramContent';
 import { safeLog } from '@/core/utils/consoleCleanup';
 import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
 
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+);
+
 // === 类型定义 ===
 
 export interface ShareRecord {
@@ -280,7 +284,7 @@ class ShareService {
             .rpc('get_shared_diagram_by_token', { p_share_token: normalizedToken })
             .maybeSingle();
 
-        if (!rpcError && rpcRow?.share && rpcRow?.diagram) {
+        if (!rpcError && isRecord(rpcRow) && rpcRow.share && rpcRow.diagram) {
             const share = coerceShareRecord(rpcRow.share, normalizedToken);
             if (!share) return null;
 

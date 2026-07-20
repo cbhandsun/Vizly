@@ -3,13 +3,14 @@ import { appMessage } from '@/core/utils/antdStaticBridge';
 import { renderCssVariableBlock } from '@/core/utils/cssVariables';
 import { getFlowDataBridge, type FlowDataBridgeEntry } from '@/core/utils/flowDataBridge';
 import { logDiagramViewerAiJsonImportFailure } from './diagramViewerLogging';
+import type { AnalysisResult } from '@/utils/diagramAnalyzer';
 
 type DiagramViewerBridge = FlowDataBridgeEntry & {
     importData?: (data: unknown, options?: { keepHistory?: boolean }) => void;
     deleteNodes?: (nodeIds: string[]) => void;
     triggerLayout?: (strategy?: string) => void;
     onGroupNodes?: (nodeIds: string[], groupName: string) => void;
-    onAnalyze?: () => { summary: string; nodes: unknown[]; issues: unknown[] };
+    onAnalyze?: () => AnalysisResult;
     animatePath?: (edgeIds: string[], options?: { duration?: number; loop?: boolean }) => void;
 };
 
@@ -106,8 +107,14 @@ export const createDiagramViewerCanvasOps = ({
     onAnalyze: () => {
         return getBridge(diagramId)?.onAnalyze?.() ?? {
             summary: analyzeFallbackSummary,
-            nodes: [],
             issues: [],
+            stats: {
+                nodeCount: 0,
+                edgeCount: 0,
+                orphanCount: 0,
+                connectedComponents: 0,
+                maxDepth: 0,
+            },
         };
     },
     onExport: (type) => {

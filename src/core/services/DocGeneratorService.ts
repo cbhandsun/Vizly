@@ -85,7 +85,7 @@ export class DocGeneratorService {
                 md += `| :--- | :--- | :--- | :--- |\n`;
                 domainNodes.forEach(n => {
                     const label = n.data?.label || n.id;
-                    const desc = (n.data?.description || 'No description provided').replace(/\n/g, '<br/>');
+                    const desc = String(n.data?.description || 'No description provided').replace(/\n/g, '<br/>');
                     const type = n.data?.type || n.type || 'Generic';
                     const status = n.data?.status || 'normal';
                     md += `| **${label}** | ${desc} | \`${type}\` | ${status} |\n`;

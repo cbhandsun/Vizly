@@ -3,7 +3,7 @@ import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import type { ManageStorageProvider } from '@/components/ui/ManageTopToolbar';
 import { safeLog } from '@/core/utils/consoleCleanup';
 import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
-import { coerceRemoteTemplateMetadata } from '@/core/utils/remoteTemplateMetadata';
+import { coerceRemoteTemplateMetadata, type RemoteTemplateMetadata } from '@/core/utils/remoteTemplateMetadata';
 
 let supabaseModulePromise: Promise<typeof import('@/services/supabase')> | null = null;
 let shareServiceModulePromise: Promise<typeof import('../services/ShareService')> | null = null;
@@ -24,7 +24,7 @@ export interface UnifiedDiagramItem {
     updatedAt: number;
     source: DataSourceType;
     role: string;
-    raw: StandardDiagramData | DiagramMetadata;
+    raw: StandardDiagramData | DiagramMetadata | RemoteTemplateMetadata;
 }
 
 const FILTER_VIEW_TYPES = new Set<FilterViewType>(['recent', 'local', 'cloud', 'shared', 'templates', 'general_templates']);
@@ -308,7 +308,7 @@ export const loadWorkspaceItems = async (activeView: FilterViewType, cloudProvid
                             updatedAt: 0,
                             source: isGeneral ? 'general_template' : 'template',
                             role: 'template',
-                            raw: coerceRemoteTemplateMetadata(template) as StandardDiagramData
+                            raw: coerceRemoteTemplateMetadata(template)
                         });
                     });
                 }

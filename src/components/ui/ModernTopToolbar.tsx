@@ -26,7 +26,6 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
   isFullscreen,
   onToggleFullscreen,
   showThemeSelector = true,
-  _showStyleSwitcher = true,
   showExport = true,
   leftChildren,
   centerChildren,
@@ -175,7 +174,7 @@ export const ModernTopToolbar: React.FC<TopToolbarProps> = ({
             {showExport && (
               <ExportTools
                 diagramId={diagramId}
-                diagramName={diagramName}
+                diagramName={diagramName ?? 'diagram'}
                 onToggleFullscreen={onToggleFullscreen}
                 isFullscreen={isFullscreen}
                 variant="compact"

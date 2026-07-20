@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { UserOutlined, DesktopOutlined } from '@ant-design/icons';
 import { useTheme } from '../../themes/useCoreTheme';
 
@@ -10,7 +10,13 @@ export interface ActivationBox {
   level?: number; // Supports nested activations
 }
 
-export const LifelineNode = memo(({ data, selected }: NodeProps) => {
+interface LifelineNodeData extends Record<string, unknown> {
+  activations?: ActivationBox[];
+  label?: string;
+  type?: 'actor' | 'system';
+}
+
+export const LifelineNode = memo(({ data, selected }: NodeProps<Node<LifelineNodeData>>) => {
   const [theme] = useTheme();
   
   const isDark = theme?.mode === 'dark';
@@ -19,7 +25,7 @@ export const LifelineNode = memo(({ data, selected }: NodeProps) => {
   const borderColor = selected ? primaryColor : (isDark ? '#434343' : '#d9d9d9');
   const textColor = isDark ? 'rgba(255,255,255,0.85)' : '#262626';
 
-  const { label, type = 'system', activations = [] } = data;
+  const { label = '', type = 'system', activations = [] } = data;
   const safeActivations = Array.isArray(activations) ? activations : [];
 
   return (

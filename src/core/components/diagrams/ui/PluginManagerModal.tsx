@@ -2,9 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Input, Tabs, Switch, Tag, Button, Typography, Space, Empty, Badge, Skeleton } from 'antd';
 import { 
-  _ApiOutlined, 
   SearchOutlined, 
-  _ThunderboltOutlined,
   UserOutlined,
   BlockOutlined,
   GlobalOutlined,

@@ -72,6 +72,8 @@ export interface PortSelectionConfig {
     // [NEW] Weighted Preference for Bus/Trunk Routing
     preferredSourcePort?: Position;
     preferredTargetPort?: Position;
+    constrainedSourcePos?: Position;
+    constrainedTargetPos?: Position;
 
     // [P3] Advanced Tuning & Context (Merged from costAwarePorts.ts)
     bendPenalty?: number;      // Cost per bend (default: 50)

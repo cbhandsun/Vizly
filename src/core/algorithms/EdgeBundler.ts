@@ -94,7 +94,7 @@ export class GlobalEdgeBundler {
             }
         });
 
-        //        return bundleMap;
+        return bundleMap;
     }
 
     /**

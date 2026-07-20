@@ -196,7 +196,7 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
                             />
                         </div>
                     )}
-                    {nodeData?.baselineStartDate && (
+                    {Boolean(nodeData?.baselineStartDate) && (
                         <>
                             <Divider style={{ margin: '12px 0' }} />
                             <div>

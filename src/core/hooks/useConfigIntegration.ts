@@ -411,7 +411,8 @@ export function usePerformanceMetrics(
         if (!prev && !currentMetrics) return null;
         if (prev && currentMetrics &&
           Object.keys(prev).length === Object.keys(currentMetrics).length &&
-          Object.keys(prev).every(k => prev[k] === currentMetrics[k])) {
+          (Object.keys(prev) as Array<keyof PerformanceMetrics>)
+            .every(key => prev[key] === currentMetrics[key])) {
           return prev;
         }
         return currentMetrics;

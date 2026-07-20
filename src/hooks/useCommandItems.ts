@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { type CommandItem } from '@/core/components/ui/CommandPalette';
+import type { CommandItem } from '@/core/types/plugin';
 
 export interface UseCommandItemsOptions {
     setIsShortcutsOpen: (open: boolean) => void;

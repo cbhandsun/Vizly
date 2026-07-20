@@ -2,13 +2,12 @@ import React, { memo } from 'react';
 import { Handle, Position, NodeProps, NodeResizer, Node, useStore } from '@xyflow/react';
 import { useFlowchartNodeInteractions } from './hooks/useFlowchartNodeInteractions';
 import { Icon } from '@iconify/react';
+import type { FlowchartNodeData } from '../../types/flowchart-node';
 import './FlowchartNode.css';
 
-export interface IconNodeData {
+export interface IconNodeData extends FlowchartNodeData {
     icon: string;       // e.g. "logos:react" or "mdi:aws"
     color?: string;     // override color if the icon supports it (e.g. mdi)
-    label?: string;     // optional label positioned under the icon
-    locked?: boolean;
 }
 
 export type IconNodeProps = NodeProps<Node<IconNodeData>>;

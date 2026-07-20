@@ -2,14 +2,10 @@ import { parseDiagramJson } from '@/core/utils/diagramJsonImport';
 
 import { logFlowchartDesignerMermaidImportFailure } from './flowchartDesignerLogging';
 import { applyFlowchartJsonImportPlan, applyFlowchartMermaidImportPlan, createFlowchartImportFallbackId } from './flowchartImportApply';
-import { buildFlowchartJsonImportPlan } from './flowchartImportPlan';
+import { buildFlowchartJsonImportPlan, type FlowchartImportPlugin } from './flowchartImportPlan';
 import { buildFlowchartMermaidImportPlan } from './flowchartMermaidImport';
 
 type ImportKind = 'json' | 'mermaid';
-
-type FlowchartImportPlugin = {
-    parseData?: (data: unknown) => { nodes: unknown[]; edges?: unknown[] } | null;
-};
 
 export const runFlowchartImportPipeline = async ({
     content,

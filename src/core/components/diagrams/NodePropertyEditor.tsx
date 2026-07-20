@@ -26,12 +26,7 @@ import {
     AppstoreOutlined,
     AlignLeftOutlined,
     AlignCenterOutlined,
-    AlignRightOutlined,
-    _PlusOutlined,
-    _DeleteOutlined,
-    _ArrowUpOutlined,
-    _ArrowDownOutlined,
-    _SearchOutlined
+    AlignRightOutlined
 } from '@ant-design/icons';
 import { FaSearch } from 'react-icons/fa';
 import { Clock } from 'lucide-react';

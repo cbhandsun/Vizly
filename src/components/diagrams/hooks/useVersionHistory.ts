@@ -4,7 +4,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { DiagramVersion } from '@/services/storage/types';
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
 import { appMessage } from '@/core/utils/antdStaticBridge';
-import { getFlowDataBridge } from '@/core/utils/flowDataBridge';
+import { getFlowDataBridge, getStandardFlowDataBridge } from '@/core/utils/flowDataBridge';
 import { coerceClipboardData } from '@/core/utils/flowchartClipboard';
 import {
     logVersionHistoryLoadFailure,
@@ -41,7 +41,7 @@ export function useVersionHistory(diagramId: string) {
 
         try {
             const unifiedStorage = await loadUnifiedStorage();
-            const bridge = getFlowDataBridge(diagramId);
+            const bridge = getStandardFlowDataBridge(diagramId);
             if (!bridge) {
                 appMessage.error('无法提取当前图表数据');
                 return;

@@ -14,7 +14,7 @@ interface HoverToolbarsOverlayProps {
     activePlugin?: import('../../types/plugin').DiagramTypePlugin | null;
     
     // Node update actions
-    updateNodesBatch: (nodeIds: string[], updates: NodeDataUpdate) => void;
+    updateNodesBatch: (nodeIds: string[], updates: NodeDataUpdate, options?: { snapshot?: boolean }) => void;
     updateEdgesBatch: (edgeIds: string[], updates: EdgeDataUpdate) => void;
     onUpdateNodes?: (updates: { id: string, position: { x: number, y: number } }[]) => void;
     

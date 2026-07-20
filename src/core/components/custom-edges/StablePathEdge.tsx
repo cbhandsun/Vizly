@@ -88,8 +88,6 @@ const autoLabelOffset = (
 export const StablePathEdge = memo<EdgeProps>((props) => {
     const {
         id,
-        _source,
-        _target,
         sourceX,
         sourceY,
         targetX,
@@ -101,10 +99,6 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         markerStart,
         label,
         labelStyle,
-        _labelShowBg,
-        _labelBgStyle,
-        _labelBgPadding,
-        _labelBgBorderRadius,
     } = props;
     const peerPaths = useStore((state: any) => (
         Array.isArray(state.edges)

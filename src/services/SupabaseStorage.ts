@@ -138,7 +138,9 @@ export class SupabaseStorageProvider implements IStorageProvider {
             .select()
             .single();
         if (error) throw error;
-        return this.coerceDiagramVersion(dbData, { includeSnapshot: true, requireSnapshot: true });
+        const version = this.coerceDiagramVersion(dbData, { includeSnapshot: true, requireSnapshot: true });
+        if (!version) throw new Error('Supabase returned an invalid version record.');
+        return version;
     }
 
     async listVersions(diagramId: string) {
@@ -296,7 +298,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
         return {
             ...diagram,
             id,
-            title: content.title || content.metadata?.title || content.name || title,
+            title: content.metadata?.title || content.name || title,
             content,
             updated_at: timestamp?.iso || new Date().toISOString(),
             user_id: coerceString(diagram.user_id) || 'anonymous',

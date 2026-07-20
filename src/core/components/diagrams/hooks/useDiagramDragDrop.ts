@@ -26,6 +26,36 @@ interface UseDiagramDragDropProps {
     activeLayerId?: string;
 }
 
+interface SwimlaneLane {
+    id: string;
+    label: string;
+    color?: string;
+}
+
+const DEFAULT_SWIMLANE_LANES: SwimlaneLane[] = [
+    { id: 'lane-1', label: '用户', color: '#3b82f6' },
+    { id: 'lane-2', label: '系统', color: '#10b981' },
+    { id: 'lane-3', label: '第三方', color: '#f59e0b' },
+];
+
+const coerceSwimlaneLanes = (value: unknown): SwimlaneLane[] => {
+    if (!Array.isArray(value)) return DEFAULT_SWIMLANE_LANES;
+    const lanes = value.slice(0, 20).flatMap((item, index) => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+        const record = item as Record<string, unknown>;
+        const label = typeof record.label === 'string' ? record.label.trim().slice(0, 80) : '';
+        if (!label) return [];
+        const id = typeof record.id === 'string' && record.id.trim()
+            ? record.id.trim().slice(0, 80)
+            : `lane-${index + 1}`;
+        const color = typeof record.color === 'string' && /^#[0-9a-f]{6}$/i.test(record.color)
+            ? record.color
+            : undefined;
+        return [{ id, label, ...(color ? { color } : {}) }];
+    });
+    return lanes.length > 0 ? lanes : DEFAULT_SWIMLANE_LANES;
+};
+
 export const useDiagramDragDrop = ({
     nodes,
     edges,
@@ -191,15 +221,12 @@ export const useDiagramDragDrop = ({
 
                 // ⭐ Swimlane: create container + child titleGroup nodes as lanes
                 if (typeName === 'swimlane') {
-                    const lanes = config?.lanes || [
-                        { id: 'lane-1', label: '用户', color: '#3b82f6' },
-                        { id: 'lane-2', label: '系统', color: '#10b981' },
-                        { id: 'lane-3', label: '第三方', color: '#f59e0b' },
-                    ];
+                    const lanes = coerceSwimlaneLanes(config.lanes);
                     const containerW = 800;
                     const containerH = 500;
                     const headerH = 36;
-                    const isHorizontal = config?.direction !== 'vertical';
+                    const direction = config.direction === 'vertical' ? 'vertical' : 'horizontal';
+                    const isHorizontal = direction !== 'vertical';
 
                     // Initial Layout Calculation
                     const laneW = isHorizontal ? containerW : Math.floor(containerW / lanes.length);
@@ -211,7 +238,7 @@ export const useDiagramDragDrop = ({
                         position,
                         data: {
                             label: label || 'Swimlane',
-                            direction: config?.direction || 'horizontal',
+                            direction,
                             layer: activeLayerId,
                             laneCount: lanes.length, // Store count for resizing logic
                         },

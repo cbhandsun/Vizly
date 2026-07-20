@@ -4,6 +4,13 @@
     "tsconfig.app.json": [
       {
         "category": "error",
+        "file": "src/components/__tests__/diagramViewerAiBridge.test.ts",
+        "code": 2322,
+        "messageHash": "4c69c3905f4392e2173e3d0484844e6614b3c909b286ac8996d043f98b6f8f0e",
+        "count": 1
+      },
+      {
+        "category": "error",
         "file": "src/components/__tests__/DiagramViewerRegression.test.tsx",
         "code": 2339,
         "messageHash": "de42573b94f667b40735369e6c25dde4491d8384cf9a2dc4e57c4a4bc77e34b7",
@@ -109,76 +116,6 @@
       },
       {
         "category": "error",
-        "file": "src/components/ai/aiConfigStorage.ts",
-        "code": 2339,
-        "messageHash": "943bb70b25984ae19be3685c6ed36272ce1c8dd8b68eb42245f6843155d7d062",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/components/diagrams/hooks/useVersionHistory.ts",
-        "code": 2345,
-        "messageHash": "1d0e6252b8b8026c0f44886f8edcb10d184ee74e512d8a827810dd5d96f74bb4",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/diagramViewerAiBridge.ts",
-        "code": 2322,
-        "messageHash": "e32b2a78399b02e6d465f00dc181e1fe571c709855fd5b96fa6835d62d51b1d0",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/ExportTools.tsx",
-        "code": 2739,
-        "messageHash": "475462794415438418d6bc01edc7c7e508caf9ba9c02aaa549c6f801fc4aac75",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/ExportTools.tsx",
-        "code": 18048,
-        "messageHash": "34d430b653944d88f36c94a8322cffef56cafb778d8cd004b6761d31025cba15",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/ui/EnhancedThemeSelector.tsx",
-        "code": 2339,
-        "messageHash": "ba2fb669e15826b9ce9b2dbd54dbfcaaeb5cfaafe3eec01b6b0d55a43e23a511",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/ui/ModernTopToolbar.tsx",
-        "code": 2322,
-        "messageHash": "eb10df9d6fec9608af50a025762c235fcedbccfe1348b4b4dee53f4791fea575",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/ui/ModernTopToolbar.tsx",
-        "code": 2339,
-        "messageHash": "b55f955ac0a3f98c7c6b0eb78beb61bbb184dc507a62f4e987621989f7f77e92",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/warehouse-3d/Scene.tsx",
-        "code": 2322,
-        "messageHash": "9753fba87b954e434bd49cffba92ab7394e58df70cef6a6627c20d2d7f6fa208",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/components/warehouse-3d/Scene.tsx",
-        "code": 2724,
-        "messageHash": "2e60568d2d8143b25c2ca9f37e123c02b9f0a33827a51c8ae21eb3a04cd93417",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/context/__tests__/AuthContext.test.tsx",
         "code": 7031,
         "messageHash": "70501a8587c2cd02e5720f6bad8293d5d4167b0314cb672275dfdbba4fa1fb87",
@@ -189,27 +126,6 @@
         "file": "src/core/algorithms/__tests__/routingCrossingScorer.test.ts",
         "code": 2740,
         "messageHash": "8bb642d7b2177bb61edc079f68ffd60217985dc58c2a47473de4486d9c1bb53d",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/algorithms/EdgeBundler.ts",
-        "code": 2366,
-        "messageHash": "c42b4d299744c81912e5d495ee6d84deee4d2279ebc925b15519ada75ed25fbd",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/algorithms/smartEdgeOrchestration.ts",
-        "code": 2304,
-        "messageHash": "8f2a6230e7406dee29ea2c588d330631a90c73dd278d6a14860680149b9bc48a",
-        "count": 4
-      },
-      {
-        "category": "error",
-        "file": "src/core/algorithms/unifiedPathSimplification.ts",
-        "code": 2339,
-        "messageHash": "ca84c7246b234d1b86b26d141641adcf685ecb7b716f997044a8cee355e639b4",
         "count": 1
       },
       {
@@ -228,160 +144,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/components/custom-edges/RelationshipEdge.tsx",
-        "code": 2339,
-        "messageHash": "b3276374f2b33cb54e7cd6cd3c42c5e83d29371fe0387312152a4871e809d29f",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-edges/renderers/AdvancedSmartEdgeGraphics.tsx",
-        "code": 2339,
-        "messageHash": "a1b2bf48d23c0be90760b017ae9d6016ccea71c59922b0064197a6e9ea555bfb",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-edges/renderers/AdvancedSmartEdgeGraphics.tsx",
-        "code": 2339,
-        "messageHash": "df130fe064bd64d9371b3bfd4c36a2822289aac035ead550fdf7d66550de7059",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-edges/renderers/AdvancedSmartEdgeGraphics.tsx",
-        "code": 2339,
-        "messageHash": "ef99f4988632dd8b6b12aab4d7f62ebd8e3cd2f6dce7f3cd9e47ed8fd91691e9",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-edges/StablePathEdge.tsx",
-        "code": 2339,
-        "messageHash": "3c331bc1d9faa3267d9c65362d69910fee4a9581d3f507484fc5d069b63229fb",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-edges/StablePathEdge.tsx",
-        "code": 2339,
-        "messageHash": "50d936fdb1777f1591a356cf58f8e02e05fb450a49442e44b727a21e389ef609",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-edges/StablePathEdge.tsx",
-        "code": 2339,
-        "messageHash": "8d703a89588cd06890a0d1c73fdbc2b945cd11c9ada968702eca64aaab015dbf",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-edges/StablePathEdge.tsx",
-        "code": 2339,
-        "messageHash": "9f2300cac4392197c69755db4b73785581dae3cac6c8f5a26fa867a590da3c26",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-edges/StablePathEdge.tsx",
-        "code": 2339,
-        "messageHash": "b0a470234a7f1970bd22134dd712fe0774272899703da801edc41cc4010757a5",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-edges/StablePathEdge.tsx",
-        "code": 2339,
-        "messageHash": "d9f7eb817defd25d3c4d80b569424cad93819479b2a1edcbc1b6bde3ce574233",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-nodes/FlowchartNode.tsx",
-        "code": 2339,
-        "messageHash": "1a30a32f17244c7787c80294b644b38d7e6c01ade9b1c4c3d374ead452119171",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-nodes/FlowchartNode.tsx",
-        "code": 2339,
-        "messageHash": "2bff25677076e4f645f52a360715fc182086081669d28063eb601c6c5f3566be",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-nodes/FlowchartNode.tsx",
-        "code": 2339,
-        "messageHash": "59b4a4e495afb9f80ae6d96f0ac0569dc509844bcfa84670f4dee36d4eff9e2e",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-nodes/FlowchartNode.tsx",
-        "code": 2339,
-        "messageHash": "b4e0de26714d18f28cc98144d42488d85d096f7cea8ca7d38cfd6b02848ab57b",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-nodes/hooks/useCustomNodeStyleResolution.ts",
-        "code": 2339,
-        "messageHash": "b43aed133cac8fcb33bd11f33e1ce2b1fe3f864b30de2a75997c59968858223a",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-nodes/hooks/useFlowchartNodeStyleResolution.tsx",
-        "code": 18047,
-        "messageHash": "82b9233abe86ab60b146364fbbdb24df64db658d76af2359b1da1363129ea58e",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-nodes/IconNode.tsx",
-        "code": 2339,
-        "messageHash": "c10c60d5469146bfcdaa030b59be90c27fdbc9d5418114f1ca926841e86c48bc",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-nodes/IconNode.tsx",
-        "code": 2344,
-        "messageHash": "53a0de3eaf36f79010f697748046d3d8f0635d5971bfa0e5e4e1ae267957f911",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-nodes/IconNode.tsx",
-        "code": 2344,
-        "messageHash": "92c2500685471a239b68057e60f0a008ab62903b9ad1c314732b2609f98d41cb",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-nodes/IconNode.tsx",
-        "code": 2345,
-        "messageHash": "0a9669ba7b57301a6a85d163dfc54883e1f64386bea093efb6079686f248e6e1",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-nodes/LifelineNode.tsx",
-        "code": 2322,
-        "messageHash": "e81b84b885a58a199eeb2ae3c079417326ddd75155a413980558074809e8b0f3",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/custom-nodes/renderers/CustomNodeGraphics.tsx",
-        "code": 2339,
-        "messageHash": "3c9d50a6128b33b8145934729a9d35209ec56bb0c320de16e5cbd8cda992e39b",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/components/diagrams/__tests__/flowchartImportApply.test.ts",
         "code": 2339,
         "messageHash": "ca6ac4a2b695ea910e3d09aac3815dc887709f4f9aeceea8fb0d9d60795c7388",
@@ -392,6 +154,13 @@
         "file": "src/core/components/diagrams/__tests__/flowchartImportApply.test.ts",
         "code": 2739,
         "messageHash": "39c89a9d12d239f5c260645df0d04d61c0a4266f43c2381e77316979334fdd91",
+        "count": 1
+      },
+      {
+        "category": "error",
+        "file": "src/core/components/diagrams/__tests__/flowchartImportFile.test.ts",
+        "code": 2554,
+        "messageHash": "381674fa8c969cc7c670cb8d7e0ba10858099566b5b9e69842ba711e60c052ed",
         "count": 1
       },
       {
@@ -417,90 +186,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/components/diagrams/base/EnhancedBaseDiagramComponent.tsx",
-        "code": 2339,
-        "messageHash": "015ecd4f1c773a729ad45e295b89ea91fd9cfbcf20f28b34a146a6d3d7d19bb3",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/base/EnhancedBaseDiagramComponent.tsx",
-        "code": 2339,
-        "messageHash": "519e41d0869d64ad088372905d6f6950c6f08d01af076bd1228c3ae5dbbcac2d",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/base/EnhancedBaseDiagramComponent.tsx",
-        "code": 2339,
-        "messageHash": "7674ac0a3ce1d4ceabe74fc368384c5be24db19d6638995164ffdaf65476fa2d",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/base/EnhancedBaseDiagramComponent.tsx",
-        "code": 2339,
-        "messageHash": "f6bbc09abdf3bc37f5e593c45e011998512c9383a93f14bc0c954234aa409412",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/FloatingContextToolbar.tsx",
-        "code": 2304,
-        "messageHash": "11ab2708798e2b4cd9ea71308f73251587b8d75ba27857bea5517e089f9f6cc4",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/FloatingContextToolbar.tsx",
-        "code": 2322,
-        "messageHash": "48157e3ba3a00b71d1462c959fd569d44d93c119fde3598a851fe870288bde85",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/FloatingContextToolbar.tsx",
-        "code": 2322,
-        "messageHash": "4ca36cf0cd91e579ac3c51620af6aca3b5854c762e784462bb0a449d107b680c",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/FloatingContextToolbar.tsx",
-        "code": 2724,
-        "messageHash": "7fc4dbcff3eab68abff762ed559ed07922763fac50f9c9a2f83b7156c6d5440e",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/FlowchartCanvasShell.tsx",
-        "code": 2339,
-        "messageHash": "de378953c9ebefb876218ef8a80998e259264fac50166e7fdfda40e282472dbb",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/flowchartImportFile.ts",
-        "code": 2322,
-        "messageHash": "ddb73dff981a58fc5f5a8e1f38fbd8e781132503dd627e87912b6638645a91b2",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/flowchartImportPipeline.ts",
-        "code": 2719,
-        "messageHash": "d8e58f8a4409163a0750242991df7751ae01c73a1afb9563c7e060449763ef33",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/FlowchartToolbar.tsx",
-        "code": 2724,
-        "messageHash": "b81bed6ec683c1acabd248f3267c22df35b59c97fd4e5b594e3defd74d44119e",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/components/diagrams/hooks/__tests__/useFlowchartExportControls.test.tsx",
         "code": 2493,
         "messageHash": "7b6cec65ae3e884136e48d7cb01bf7c5ce22a47d970a249ace92f5942d758420",
@@ -512,279 +197,6 @@
         "code": 18048,
         "messageHash": "44c9c5eff8520d02579f730125d041b2ff28d0381814fe987f4acdcd4eab8ee6",
         "count": 3
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/hooks/useDesignerInteractions.ts",
-        "code": 2322,
-        "messageHash": "68d8625cbcb42b74b757a510cc6ca8974a36689ae2daab4ccc25742736463729",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/hooks/useDesignerInteractions.ts",
-        "code": 2345,
-        "messageHash": "d18c778eede5965c79519177c034cda182860cb2cd0ec11ae8ae10937fce0c4a",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/hooks/useDiagramDragDrop.ts",
-        "code": 2339,
-        "messageHash": "b432f62f094a1d53b447323167845983d9b0b4e131cab8c2da1766b31e38b9b8",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/hooks/useDiagramDragDrop.ts",
-        "code": 2339,
-        "messageHash": "f056b05354bebc932bc9e966e7f14f4f432f39d9e6a893940472381ce0343c0e",
-        "count": 3
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/hooks/useLayeredVirtualization.ts",
-        "code": 2339,
-        "messageHash": "0ecb9cfdd40611872a3c3a2f26686907985d32e7fc55dc2f6dd77eb10588302d",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/hooks/useLayoutStrategy.ts",
-        "code": 2339,
-        "messageHash": "9a57e1c37c569f3cf9da385991013615104969b8e2daecdd3366b34fe63f2bd8",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/HoverToolbarsOverlay.tsx",
-        "code": 2554,
-        "messageHash": "96c21bab5ed537c89135b5433452d28d62f0e808b6bd2116b70135fdc2aa4fe9",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/mindmap-pro/MindMapOutlinePanel.tsx",
-        "code": 2322,
-        "messageHash": "c7887a040dfe7bc19e26ef2474f8b4901363c1a189165c36a7064260d434452d",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/mindmap-pro/MindMapOutlinePanel.tsx",
-        "code": 7006,
-        "messageHash": "2002cd4ea26a2bed926c6efc2218a6e675f7f591aa476aadbb48f5d3e009d40b",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/mindmap-pro/MindMapOutlinePanel.tsx",
-        "code": 7006,
-        "messageHash": "e85a13a036ee3fc8c382832b96ebbd8ea9bd638c3ee7ac2e665a813eba26cb14",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/ModernFlowchartSidebar.tsx",
-        "code": 2724,
-        "messageHash": "061dfc5a08cf5a956de181d10f0385b664be22da873ffdf82dd699c2cec69ed6",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/ModernFlowchartSidebar.tsx",
-        "code": 2724,
-        "messageHash": "75decb3f17cf8f086045731a0f488dcb8c6f91d8bbaf588c622617df3dd7333e",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/ModernFlowchartSidebar.tsx",
-        "code": 2724,
-        "messageHash": "7b4543bbaf1a0ca71cb087f2732198d82a44ecf33cb850c7b60d6fafd7d0003a",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/ModernFlowchartSidebar.tsx",
-        "code": 2724,
-        "messageHash": "80463e36833e16a4c3426e960d8d60c5f2a843f7b51bca2710c860ff9d6d3bad",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/ModernFlowchartSidebar.tsx",
-        "code": 2724,
-        "messageHash": "ba6745f421bc9ae22911b4e3c262ad5de4ba7f174ae24897dd4c2c134996b5fa",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/NodePropertyEditor.tsx",
-        "code": 2724,
-        "messageHash": "2f88b8f04e30a35823d38e4cfcb914a9be2ae1e504acddea685c94d9c3f670c8",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/NodePropertyEditor.tsx",
-        "code": 2724,
-        "messageHash": "3d8b7c8da30bfa736d692cac612f3889956a774297390de94e801932a0fe4bb5",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/NodePropertyEditor.tsx",
-        "code": 2724,
-        "messageHash": "6f8bcd18e642f6d888a6a3e3ad2951fd9988e5fa20852e1f61d4bac0b1a2c1e3",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/NodePropertyEditor.tsx",
-        "code": 2724,
-        "messageHash": "7e7fe433ceab68ad0d21c9f0da117d72fa6dc80cc3769bbc5728a07690ff8cbe",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/NodePropertyEditor.tsx",
-        "code": 2724,
-        "messageHash": "8afe5cc2bb6d11c6660c49efdd55156d88387b78f3e631b3d564b14d4625c9d9",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/PerformanceDemo.tsx",
-        "code": 2724,
-        "messageHash": "15d4df610a6f728fb6ab8f869407903b7549899b6ee6668428de8a651ab8a8a1",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/PropertyPanel.tsx",
-        "code": 2322,
-        "messageHash": "3be02a04cbb816f401f5eaf74be2cec5589d7671e19a3c76d3f70fcf200d879e",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/PropertyPanel.tsx",
-        "code": 2724,
-        "messageHash": "16aff39452ece73d8193e4fc013c53c4f471ac85165c53f9c8a63b7e49f52446",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/TemplateGallery.tsx",
-        "code": 2339,
-        "messageHash": "a0e607dac9e5da986fb39a50de2ba9ad44099b326942436ddd4c7774e25a8864",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/TemplateGallery.tsx",
-        "code": 2339,
-        "messageHash": "d1ee0ecda6f93d1cfa5a3630be26b3429be283d390725a54b930f0188d089ad6",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/timeline-pro/ProResourceDrawer.tsx",
-        "code": 2724,
-        "messageHash": "99680b0fa5721568f0f9b3e8ac84ceb9cbe5234dec52485a623bb3d172757671",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/timeline-pro/ProResourceDrawer.tsx",
-        "code": 2724,
-        "messageHash": "c87fe50055dd894364897b82d3946aab472ad37a27e420f0e43a518f0c0e0311",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/timeline-pro/ProTaskListPanel.tsx",
-        "code": 2339,
-        "messageHash": "4e171ca320dfd9d86378cf301dfee7a80554ed36e64abe2714996a8580615e58",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/timeline-pro/ProTimelineAxis.tsx",
-        "code": 2345,
-        "messageHash": "1048a35bbd25537d636eb8703ac80a98ee90a86833767dd4496cb2030a9ffa38",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/timeline-pro/ProTimelineAxis.tsx",
-        "code": 2345,
-        "messageHash": "3a9a5b86e9a6391bde42161a8d5f556aecffb880e7956d9c8d152c9e7f3cba4b",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/timeline-pro/ProTimelineAxis.tsx",
-        "code": 2345,
-        "messageHash": "fa487c362f5e9e76aa6a9ba667911e9f9581ef371fd07b24650a5394ffb0aaf6",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/timeline-pro/ProTimelinePropertyPanel.tsx",
-        "code": 2322,
-        "messageHash": "f54e4df30253a97a9d14d6b69c853b393eaa2a12b86bdd0c5cf65a3193dd2781",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/TopActionButtons.tsx",
-        "code": 2724,
-        "messageHash": "1b65ef2e5ce90772467f5aa81b0bb646ef0a986ca2b70c48f2da8a29841aabe5",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/ui/PluginErrorBoundary.tsx",
-        "code": 2307,
-        "messageHash": "62de861976ab1f45a9c08cb45d704ba311179f98e6eaae267abf8d9103c52370",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/ui/PluginManagerModal.tsx",
-        "code": 2724,
-        "messageHash": "2c780d043927184042518539228674ccf8a697ac5945ff9e3e36280ba42a625b",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/diagrams/ui/PluginManagerModal.tsx",
-        "code": 2724,
-        "messageHash": "6bc5bffb067be6dc21a04d78982f8358a03e61d2be4b1ec19d5dec47458b713f",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/edges/MindMapEdge.tsx",
-        "code": 2339,
-        "messageHash": "524208b652be4c03053916653d30116c435a1ab93b03e3cd943484f3bd3120f1",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/edges/MindMapEdge.tsx",
-        "code": 2339,
-        "messageHash": "ffa7a305b6423ccf27db484027b0852cea9ecf9b8879e0a21529191cd8a411c2",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/layout/MobileBottomDock.tsx",
-        "code": 2724,
-        "messageHash": "0e6c64ed4d6f6ed18d08ad31dcc1c455491cd7dfc969a5f889dd62e4d84ffbe5",
-        "count": 1
       },
       {
         "category": "error",
@@ -820,160 +232,6 @@
         "code": 2339,
         "messageHash": "dd3a008c22642dc74764b0bc150428532f0bf87fea86d7e3a20662f7b999ed04",
         "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/migrate.ts",
-        "code": 2322,
-        "messageHash": "77b43c297d51c9df62cae3cea3925aea64302ef606504f488753c972d0783ed3",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/migrate.ts",
-        "code": 2353,
-        "messageHash": "562bed32025791a661f1106b047a2ff72eed8bb5173ba2bff4d596fa07492bab",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/mindElixirStore.ts",
-        "code": 2304,
-        "messageHash": "12a5f0fbc64027e852b1df8c66ba0ad074ceae0df068f9bf6ae95ce481938180",
-        "count": 3
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapAIPanel.tsx",
-        "code": 2322,
-        "messageHash": "9883c56fc02455d9489ef86f8c27213dfd668883083306bf560bce81f34b1588",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapAIPanel.tsx",
-        "code": 2322,
-        "messageHash": "eb10df9d6fec9608af50a025762c235fcedbccfe1348b4b4dee53f4791fea575",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapAIPanel.tsx",
-        "code": 2345,
-        "messageHash": "9f19af1fd74cb6d26699b0a2596923207aa3af53f476fc0244778aff2084d7a7",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapAIPanel.tsx",
-        "code": 2739,
-        "messageHash": "583b93f116c9066d6971f2ce0d028ac710282b24962aaccabe09944a03ac5e1e",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapBatchBar.tsx",
-        "code": 2345,
-        "messageHash": "c56b90ab6a28be7de13babd792db216efe63f25e8e6d4d189eda591db8198012",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapEmptyGuide.tsx",
-        "code": 2345,
-        "messageHash": "9f19af1fd74cb6d26699b0a2596923207aa3af53f476fc0244778aff2084d7a7",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapFloatingBar.tsx",
-        "code": 2322,
-        "messageHash": "62b9981fba48c4423a3e65ccf2b83e3e5dad03dae47b169987108cfe70443827",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapFloatingBar.tsx",
-        "code": 2345,
-        "messageHash": "9f19af1fd74cb6d26699b0a2596923207aa3af53f476fc0244778aff2084d7a7",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapFloatingBar.tsx",
-        "code": 2739,
-        "messageHash": "583b93f116c9066d6971f2ce0d028ac710282b24962aaccabe09944a03ac5e1e",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapHistoryPanel.tsx",
-        "code": 2322,
-        "messageHash": "be6345f5a8028f962f8816431ba3520a7f92db9909197c72a8b2248a3fac284c",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapHistoryPanel.tsx",
-        "code": 2739,
-        "messageHash": "583b93f116c9066d6971f2ce0d028ac710282b24962aaccabe09944a03ac5e1e",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapSpeakerNotes.tsx",
-        "code": 2322,
-        "messageHash": "4aeb6f7101f54cb73702544a78672e83528b9b4e6668cc670f7933699b5d3a24",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapSpeakerNotes.tsx",
-        "code": 2739,
-        "messageHash": "531f0421239d9f2aac13aa82d5ea01e901756a3d2047912b9e059fe9f9ea10d7",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapTaskKanban.tsx",
-        "code": 2345,
-        "messageHash": "52b8a321bf0b8941ea638cb65c3818c78a5c0656abab95832e5cc5ba55a59351",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/mindmapTreeSanitizer.ts",
-        "code": 2339,
-        "messageHash": "8a50cf301db88fe1c42dbe8a0201628b715a300c3eb8285c4b0b22ebe4e0051e",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/mindmapTreeSanitizer.ts",
-        "code": 2339,
-        "messageHash": "e515d3774e2b015088df244f6530dbccd392041fef6b5d6b3b24e06d2940b5df",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/mindmapTreeSanitizer.ts",
-        "code": 2339,
-        "messageHash": "fc5c6b408a76b2705a9fd1d7dbb9cbef23abe67649ddb6493dfdcbd2528b086d",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/MindMapYjsIntegration.tsx",
-        "code": 2345,
-        "messageHash": "9f19af1fd74cb6d26699b0a2596923207aa3af53f476fc0244778aff2084d7a7",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/mindmap-v2/theme.ts",
-        "code": 2353,
-        "messageHash": "89e98870b1253ae3cbbfaeebad86c428383dd287532522ebc4ef976c2ee3eae9",
-        "count": 5
       },
       {
         "category": "error",
@@ -1019,128 +277,9 @@
       },
       {
         "category": "error",
-        "file": "src/core/components/shared/baseReactFlowDeclaredTerminalRoleRepair.ts",
-        "code": 2345,
-        "messageHash": "cdfe2e10ba8c66517fa10bfa0fcbeb5232b138be2b2e5075b2f0c18ae56d31d4",
-        "count": 4
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/shared/baseReactFlowDeclaredTerminalRoleRepair.ts",
-        "code": 2554,
-        "messageHash": "0d7f88caa9641107a48c1e7e16181950d9d374636b6c4d2f833dab296c63e034",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/shared/baseReactFlowDisplayBoundedStrictRepair.ts",
-        "code": 2345,
-        "messageHash": "a95604597e2e415c966da4073fb5e3d96f90fba842f05acfc334f177f032c009",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/shared/baseReactFlowDisplayHubPortRoleTransaction.ts",
-        "code": 2345,
-        "messageHash": "cdfe2e10ba8c66517fa10bfa0fcbeb5232b138be2b2e5075b2f0c18ae56d31d4",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/shared/baseReactFlowDisplayObstacleRepair.ts",
-        "code": 2339,
-        "messageHash": "b988becf65c390d424494ee5feaca92636af3c81b1a4046d92b2c596bc4e7850",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/shared/baseReactFlowDisplayObstacleRepair.ts",
-        "code": 2362,
-        "messageHash": "3e37de66947d48e73526b2eed8ebb5ef385510e4cfb5b1acfa99cd55bfbc59b9",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/shared/baseReactFlowDisplayObstacleRepair.ts",
-        "code": 2363,
-        "messageHash": "224fe07744f6761f00ff5512ca5acaae10400eda93ee7d99a7780e71e2851709",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/shared/baseReactFlowDisplayObstacleRepair.ts",
-        "code": 2365,
-        "messageHash": "d0866586280da45662eead584c8254504bc644928799da3450d72a2253561ae0",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/shared/baseReactFlowDisplayObstacleRepair.ts",
-        "code": 2365,
-        "messageHash": "dc6547c4793a02fd9c4cb7c2e32dfec74358804bc18fc1ccc9cd681d003cf3a0",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/shared/baseReactFlowDisplayQualityGates.ts",
-        "code": 2345,
-        "messageHash": "cdfe2e10ba8c66517fa10bfa0fcbeb5232b138be2b2e5075b2f0c18ae56d31d4",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/shared/baseReactFlowDisplayStrictSweepRepair.ts",
-        "code": 2322,
-        "messageHash": "93c90adc48cdccb4521ea0db047dcfb3e1e8265ebc525c8741654b6b48b42b6e",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/shared/baseReactFlowFastEdgeSafety.ts",
-        "code": 2339,
-        "messageHash": "2d2c51341bd8f5c419115d91107b2d89732ea43a649cbe8a0a7dd18700a39194",
-        "count": 4
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/shared/FixedMiniMap.tsx",
-        "code": 2339,
-        "messageHash": "72a586145aa6b69a93744f3aec8aea27add9353985b0ddd7377e93a3c384caf7",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/components/shared/FixedMiniMap.tsx",
-        "code": 2339,
-        "messageHash": "83b49a45946070c2053dc9625c70b3043d205af53ebf553654c3d7ef280ccceb",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/config/ConfigIntegration.ts",
-        "code": 2739,
-        "messageHash": "a0bfabe04660b55bf4e52d3dd549b23d9a8cb588c77488086188bc8d72f86a14",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/hooks/__tests__/useDiagramControls.test.tsx",
         "code": 2322,
         "messageHash": "5853d5672cb4cffbbb886e3a365e9afc68be1e752fd8f8e3090abe9001effdb9",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/hooks/useConfigIntegration.ts",
-        "code": 7053,
-        "messageHash": "b61738cdb75d5ed0c77cb8dd754eec9b4f4ad1746816e2fef4155ca5190fe7d3",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/rendering/edgeGeometry.ts",
-        "code": 2339,
-        "messageHash": "cba14366dcaa1784f079f78e5ff5dac0f99c126c5d94262166f065a336e2fe07",
         "count": 1
       },
       {
@@ -1176,13 +315,6 @@
         "file": "src/core/routing/core/__tests__/PortSelector.test.ts",
         "code": 2741,
         "messageHash": "279a4ae86e814df9f8db6cfb56e5b18ad7f5d1631e40c621705250c541b75a82",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/routing/core/CostEvaluator.ts",
-        "code": 2724,
-        "messageHash": "49bc73446e31ee0a246c0f368745c4fd01eb090db08cbedc9f197d2385a8cb81",
         "count": 1
       },
       {
@@ -1264,13 +396,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/services/DocGeneratorService.ts",
-        "code": 2339,
-        "messageHash": "f95cafb93535621c3af042c7eddf518248b3ab727d4a216f11a7fe47d48a109c",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/strategies/shared/__tests__/edgeEndpointLaneNudgeRepair.test.ts",
         "code": 2353,
         "messageHash": "0b63c2697dd350af9efb089f7feec68cdb6812e4324d4e2673a5e9ff60824f51",
@@ -1313,62 +438,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/strategies/shared/edgeFallbackPath.ts",
-        "code": 2345,
-        "messageHash": "87d715c9e063129be8c877758556e56e5b43a097c8bb9f117a2dda070f4d8c75",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/themes/BaseConstants.ts",
-        "code": 2307,
-        "messageHash": "9acea9b1d907e604f0469d443742ada0ea02a8740ec575b54b7a14f82d035d6b",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/themes/presets/CorporateTheme.ts",
-        "code": 2724,
-        "messageHash": "bc6826ce75acc2ed3a64ca3e5c69dd14902eab8de4fca7825bdceba77e5e6b5b",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/themes/themeImportSecurity.ts",
-        "code": 2344,
-        "messageHash": "365469443f8122636167c82d4dbcb31cbb6bf4d7063dfd84ff79406af593eb67",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/themes/themeImportSecurity.ts",
-        "code": 2344,
-        "messageHash": "bb65a538e9fd56cf8e2f90edded780fa960d824132948f9059c1b92c9c62c676",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/themes/themeImportSecurity.ts",
-        "code": 18046,
-        "messageHash": "d411026c6b8640a0430e7413d5e4f8c08ef492bdf71265086e40e604a259323b",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/core/themes/ThemeManagerConfig.ts",
-        "code": 2724,
-        "messageHash": "a4af0635c656500d973a59f4ac2f7045d2022e07a56a98b6f66eff390424ae33",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/themes/ThemeManagerConfig.ts",
-        "code": 2724,
-        "messageHash": "a80ecf768e159a5d0a2a5e6a4c0442af046623ca9ad5903f02145005c90a2b20",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/utils/__tests__/customPresetStorage.test.ts",
         "code": 2739,
         "messageHash": "298e523828bbb014dcf31d81df1675fdd35687ebdfbc06eb96e5f498d0713c80",
@@ -1401,20 +470,6 @@
         "code": 7016,
         "messageHash": "825568ecd739fd05408ad035d4518b3af4c4c000700be671664ac4be445e9caa",
         "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/utils/elkEdgeRouter.ts",
-        "code": 2339,
-        "messageHash": "5e609c414bee773b0530c552893ec16dfc7e9ad1d28306e21815cb718112b2ef",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/utils/imageExporter.ts",
-        "code": 2339,
-        "messageHash": "5058e660afde5ead7e4d229bfa35c7454e5b6d005cda6c3805818ec5cf596dc2",
-        "count": 2
       },
       {
         "category": "error",
@@ -1453,20 +508,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/utils/templateUtils.ts",
-        "code": 2339,
-        "messageHash": "52fdf0df57e25f8becb05d2684c85dddf52a9bf35bc876e19a76e9c6ff1cb688",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/utils/templateUtils.ts",
-        "code": 2339,
-        "messageHash": "66eaa45fa839ca4d5776d9b12f7bc48bfa4a649d602e0159e9ddcfc07b7eac85",
-        "count": 2
-      },
-      {
-        "category": "error",
         "file": "src/core/workers/core/__tests__/BusRouter.test.ts",
         "code": 2739,
         "messageHash": "16d02a69dfcc1cdb0a50ce3acbcd4edb028a881352d1577f15e7deae320586fa",
@@ -1488,30 +529,9 @@
       },
       {
         "category": "error",
-        "file": "src/core/workers/elkLayout.worker.ts",
-        "code": 2698,
-        "messageHash": "d989daad8a2c332e163767d323b24460b454f05c72057869a3b8a1c9595fee16",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/core/workers/preprocessing/PortSelector.ts",
-        "code": 2353,
-        "messageHash": "57d9024348b8686af67e08559be89346b63febc38cf668e93ed700e4afd7116e",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/data/__tests__/DataRegistry.test.ts",
         "code": 2352,
         "messageHash": "7141e90b22742d99e19473c524ab8d03fa73a82ec2195e13a8bc96c983c399bd",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/hooks/useCommandItems.ts",
-        "code": 2459,
-        "messageHash": "ebbb7d1f07d52a8f3a6abea2007d0ca0c9a0e62554471976bb00b07b069b852f",
         "count": 1
       },
       {
@@ -1534,13 +554,6 @@
         "code": 2739,
         "messageHash": "eca571eeea4e9a11666d912d5ccd947ec0179542f946ad75871330ac7babe75d",
         "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/pages/diagramManagementPage.helpers.ts",
-        "code": 2352,
-        "messageHash": "41a9abc074c7661778087e8571033521a5e1ea45a8696d62f3c89fe0c8ed11e6",
-        "count": 1
       },
       {
         "category": "error",
@@ -1579,52 +592,10 @@
       },
       {
         "category": "error",
-        "file": "src/services/__tests__/SupabaseStorage.test.ts",
-        "code": 18047,
-        "messageHash": "62c4980448a081fc0856675a80bc1fd993758ba98bf6e382c27bf7b2caca550e",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/services/__tests__/UnifiedStorageService.test.ts",
         "code": 2322,
         "messageHash": "f4d9667471f422b62248edc25d30c01a903ae620d10c1d49ac71a2b64e49147f",
         "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/services/ShareService.ts",
-        "code": 2339,
-        "messageHash": "830acc25a97e78c8134541ef11d5d2fafa4b2cc40c7d0da1d36dbbb7c96bf915",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/services/ShareService.ts",
-        "code": 2339,
-        "messageHash": "9f130dee4db9cfeb9a30beea203b1f505bf0d8454fe5aae6c5df3f5b518a4f16",
-        "count": 2
-      },
-      {
-        "category": "error",
-        "file": "src/services/SupabaseStorage.ts",
-        "code": 2339,
-        "messageHash": "2405f2b7022eee12513da44fc179649c54abcfc0da2e81db81af7639fbe47041",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/services/SupabaseStorage.ts",
-        "code": 2416,
-        "messageHash": "c7b227881e49ac1aa062e21db43fea5fcc4c9dbf467315dbe6d6a7df646af452",
-        "count": 1
-      },
-      {
-        "category": "error",
-        "file": "src/services/UnifiedStorageService.ts",
-        "code": 2322,
-        "messageHash": "57d8bdc8e1922f21412268d850cbef467323f0609252eee57d88a035df7d0006",
-        "count": 1
       }
     ],
     "tsconfig.node.json": []

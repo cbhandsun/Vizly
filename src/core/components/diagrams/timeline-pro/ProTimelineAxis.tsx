@@ -1,9 +1,12 @@
 import React, { useMemo } from 'react';
 import { useProTimelineEngine } from '../../../hooks/useProTimelineEngine';
 import dayjs from 'dayjs';
+import quarterOfYear from 'dayjs/plugin/quarterOfYear';
 import { useTheme } from '../../../themes/useCoreTheme';
 
 const HEADER_HEIGHT = 52;
+
+dayjs.extend(quarterOfYear);
 
 const isInRange = (value: dayjs.Dayjs, start: dayjs.Dayjs, end: dayjs.Dayjs) => {
     const time = value.valueOf();

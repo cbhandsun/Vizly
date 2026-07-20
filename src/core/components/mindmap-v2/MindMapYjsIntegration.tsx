@@ -4,6 +4,7 @@ import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { collaborationService } from '../../services/CollaborationService';
 import type { MindElixirInstance } from 'mind-elixir';
 import { parseRemoteMindMapYjsData, serializeLocalMindMapYjsData } from './mindmapYjsSecurity';
+import { refreshMindElixirWithSanitizedData } from './mindmapTreeSanitizer';
 import {
     logMindmapYjsCleanupFailure,
     logMindmapYjsInitialSyncParseFailure,
@@ -36,7 +37,7 @@ export default function MindMapYjsIntegration() {
             isRemoteUpdating.current = true;
             try {
                 const data = parseRemoteMindMapYjsData(remoteData);
-                instance.refresh(data);
+                refreshMindElixirWithSanitizedData(instance, data);
             } catch (e) {
                 logMindmapYjsInitialSyncParseFailure(e);
             }
@@ -76,7 +77,7 @@ export default function MindMapYjsIntegration() {
                         try {
                             const data = parseRemoteMindMapYjsData(newDataStr);
                             // Refresh redraws the map with new data
-                            instance.refresh(data);
+                            refreshMindElixirWithSanitizedData(instance, data);
                         } catch (e) {
                             logMindmapYjsRemoteSyncParseFailure(e);
                         }

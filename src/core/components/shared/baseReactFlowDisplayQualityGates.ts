@@ -36,8 +36,10 @@ const evaluateDisplayTerminalHardGates = (
     return terminalReport.allAnchored
       && edges.every((edge) => {
         const path = getDisplayComputedPath(edge);
-        const sourceRect = getDisplayNodeRect(nodeById.get(edge.source));
-        const targetRect = getDisplayNodeRect(nodeById.get(edge.target));
+        const sourceNode = nodeById.get(edge.source);
+        const targetNode = nodeById.get(edge.target);
+        const sourceRect = sourceNode ? getDisplayNodeRect(sourceNode) : null;
+        const targetRect = targetNode ? getDisplayNodeRect(targetNode) : null;
         return Boolean(
           sourceRect
           && targetRect

@@ -44,6 +44,19 @@ export const getFlowDataBridge = (diagramId: string): FlowDataBridgeEntry | unde
     return getFlowDataBridgeRegistry()?.[diagramId];
 };
 
+export const getStandardFlowDataBridge = (diagramId: string): StandardDiagramData | undefined => {
+    const entry = getFlowDataBridge(diagramId);
+    if (!entry) return undefined;
+    try {
+        return coerceStandardDiagramImport(entry, {
+            id: entry.id || diagramId,
+            title: entry.name || entry.metadata?.title || diagramId,
+        });
+    } catch {
+        return undefined;
+    }
+};
+
 export const getFlowDataBridgeNodes = (diagramId: string): unknown[] => {
     const nodes = getFlowDataBridge(diagramId)?.nodes;
     return Array.isArray(nodes) ? nodes : [];
@@ -59,3 +72,5 @@ export const removeFlowDataBridge = (diagramId: string): void => {
     if (!registry || !diagramId) return;
     delete registry[diagramId];
 };
+import type { StandardDiagramData } from '../models/DiagramModels';
+import { coerceStandardDiagramImport } from './diagramJsonImport';

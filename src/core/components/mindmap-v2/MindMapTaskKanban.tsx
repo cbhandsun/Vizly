@@ -114,6 +114,7 @@ export const MindMapTaskKanban: React.FC = () => {
         mind.bus.fire('operation', {
             name: 'reshapeNode',
             obj: node,
+            origin: node,
         });
 
         refreshTasks();
@@ -180,6 +181,7 @@ export const MindMapTaskKanban: React.FC = () => {
                 mind.bus.fire('operation', {
                     name: 'reshapeNode',
                     obj: data.nodeData,
+                    origin: data.nodeData,
                 });
                 refreshTasks();
                 message.success(`AI 成功规划并同步了 ${updatedCount} 个敏捷任务！`);

@@ -304,7 +304,7 @@ const loadStorageService = async () => (await import('@/services/SupabaseStorage
 export const loadCloudAIConfig = async (userId: string): Promise<AIConfigState | null> => {
     const storageService = await loadStorageService();
     const cloudConfig = await storageService.loadConfig('ai_config');
-    if (!cloudConfig || !Array.isArray(cloudConfig.providers)) return null;
+    if (!isRecord(cloudConfig) || !Array.isArray(cloudConfig.providers)) return null;
 
     const decryptedProviders = await Promise.all(cloudConfig.providers.map(async (provider: AIProviderConfig) => {
         if (provider.apiKey && (provider.apiKey.startsWith('ENC2:') || provider.apiKey.startsWith('ENC:'))) {

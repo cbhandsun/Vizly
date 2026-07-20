@@ -11,7 +11,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import type { NodeObj } from 'mind-elixir';
 import { generateMindMapFromPrompt } from './mindmapAIService';
-import { cleanMindMapData } from './mindmapTreeSanitizer';
+import { cleanMindMapData, refreshMindElixirWithSanitizedData } from './mindmapTreeSanitizer';
 import { logMindmapEmptyGuideCheckFailure } from './mindmapPanelLogging';
 
 function countNodes(node: NodeObj): number {
@@ -58,7 +58,7 @@ const MindMapEmptyGuide: React.FC = () => {
             if ('error' in res) {
                 setError(res.error || '生成失败，请重试');
             } else {
-                mind.refresh(cleanMindMapData({ nodeData: res.nodeData }));
+                refreshMindElixirWithSanitizedData(mind, cleanMindMapData({ nodeData: res.nodeData }));
                 mind.toCenter();
                 setPrompt('');
                 checkEmpty();

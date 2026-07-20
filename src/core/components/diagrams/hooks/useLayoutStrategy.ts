@@ -265,7 +265,6 @@ export function useLayoutStrategy({
     nodesRef,
     edgesRef,
     takeSnapshot,
-    _reactFlowInstance,
     diagramId,
     loadLayoutPresetMap,
 }: UseLayoutStrategyParams) {

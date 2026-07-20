@@ -25,9 +25,6 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
         contentRef,
         editStartRef,
         handleUpdateData,
-        _handleDelete,
-        _handleClone,
-        _handleDomainClassChange,
         handleQuickClone
     } = useFlowchartNodeInteractions(id as string, data, selected);
 
@@ -38,7 +35,6 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
         mainColor,
         finalBorderColor,
         finalBgColor,
-        _resolvedIcon,
         businessState,
         nodeStyle
     } = useFlowchartNodeStyleResolution({ data, selected });

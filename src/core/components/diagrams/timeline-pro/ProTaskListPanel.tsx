@@ -33,7 +33,7 @@ const getTypeIcons = (theme: any): Record<string, React.ReactNode> => ({
 });
 
 export default function ProTaskListPanel({
-    tasks, width, onWidthChange, hoveredTaskId, onHoverTask, onClickTask, selectedTaskId, _scrollTop, onScrollTopChange,
+    tasks, width, onWidthChange, hoveredTaskId, onHoverTask, onClickTask, selectedTaskId, onScrollTopChange,
     onTaskExpandToggle, onTaskUpdate, onTaskAdd, onTaskDelete, cyclicTaskIds
 }: ProTaskListPanelProps) {
     const [isResizing, setIsResizing] = useState(false);

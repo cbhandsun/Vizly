@@ -68,7 +68,6 @@ const parseNodeContent = (raw: string): { title: string; body: string } => {
 };
 
 const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
-    _id,
     data: d,
     selected,
     setHovered,

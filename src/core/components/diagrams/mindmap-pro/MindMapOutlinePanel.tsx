@@ -3,6 +3,7 @@ import { Tree, Empty, Input } from 'antd';
 import { PluginContext } from '../../../types/plugin';
 import type { DataNode } from 'antd/es/tree';
 import { SearchOutlined } from '@ant-design/icons';
+import type { InputRef } from 'antd';
 
 // [T-6] Inline-editable tree node title
 // Double-click switches to an input; Enter/Blur commits the edit back to canvas.
@@ -21,7 +22,7 @@ const EditableTitle: React.FC<EditableTitleProps> = ({
     nodeId, label, editingId, editingValue,
     onStartEdit, onChangeValue, onCommit, onCancel
 }) => {
-    const inputRef = useRef<HTMLInputElement>(null);
+    const inputRef = useRef<InputRef>(null);
 
     // Focus input when we enter edit mode for this node
     React.useLayoutEffect(() => {
@@ -110,7 +111,7 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
     }, []);
 
     // [Search] Build flat list of all (nodeId, label) for search matching
-    const allNodeLabels = useMemo(() => {
+    const allNodeLabels = useMemo<Array<{ id: string; label: string }>>(() => {
         return nodes
             .filter((n: any) => n.type === 'mindmap')
             .map((n: any) => ({

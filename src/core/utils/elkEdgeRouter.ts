@@ -38,8 +38,7 @@ export async function routeEdgesWithELK(
     const {
         direction = 'TB',
         edgeNodeSpacing = 20,
-        edgeEdgeSpacing = 15,
-        _bendMinimization = true
+        edgeEdgeSpacing = 15
     } = options;
 
     const { default: ELK } = await import('elkjs');

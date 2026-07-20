@@ -294,10 +294,7 @@ export const EnhancedThemeSelector: React.FC<EnhancedThemeSelectorProps> = ({
             getCol(themeData.palette.secondary, 'light') || getCol(themeData.palette.primary, 'dark')
         ];
     } else if (themeManager) {
-        let themeId = item.id;
-        if (themeId && !themeManager.hasTheme?.(themeId) && item.baseTheme) {
-            themeId = item.baseTheme;
-        }
+        const themeId = item.baseTheme || item.id;
         if (themeId) {
             const p = themeManager.getThemeColor(themeId, 'primary');
             const s = themeManager.getThemeColor(themeId, 'secondary');

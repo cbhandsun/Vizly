@@ -4,8 +4,6 @@ import {
     TeamOutlined, 
     WarningOutlined, 
     CalendarOutlined, 
-    _UserOutlined,
-    _ClockCircleOutlined,
     QuestionCircleOutlined,
     EyeOutlined
 } from '@ant-design/icons';

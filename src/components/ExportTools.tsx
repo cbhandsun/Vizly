@@ -11,7 +11,7 @@ import { useSubscription } from '@/context/useSubscription';
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
 import { invalidateRemoteDiagramPreview } from '@/services/remoteDiagramPreview';
 import { appMessage } from '@/core/utils/antdStaticBridge';
-import { getFlowDataBridge } from '@/core/utils/flowDataBridge';
+import { getFlowDataBridge, getStandardFlowDataBridge } from '@/core/utils/flowDataBridge';
 import { logCloudSaveEnsureFailure, logCloudSaveFailure } from '@/components/diagrams/hooks/diagramStorageLogging';
 import { downloadFile } from '@/core/utils/downloadUtils';
 import { escapeMarkdownInlineText, escapeMarkdownTableCell, escapeMermaidLabel, toMermaidNodeId } from '@/core/utils/exportTextSecurity';
@@ -172,7 +172,7 @@ const ExportTools: React.FC<ExportToolsProps> = ({
     
     // Fallback Bridge
     if (!diagram || !diagram.nodes || diagram.nodes.length === 0) {
-      const bridgeData = getFlowDataBridge(diagramId);
+      const bridgeData = getStandardFlowDataBridge(diagramId);
       if (bridgeData) diagram = bridgeData;
     }
 
@@ -264,8 +264,8 @@ ${mermaid}
       // Fallback 2: 全局数据桥接（当 ExportTools 在 ReactFlowProvider 外部时，如 FlowchartDesigner 场景）
       // 桥接数据已是 StandardDiagramData 格式（由 canvasToStandardData 转换）
       if (!diagram || !diagram.nodes || diagram.nodes.length === 0) {
-        const bridgeData = getFlowDataBridge(diagramId);
-        if (bridgeData && bridgeData.nodes?.length > 0) {
+        const bridgeData = getStandardFlowDataBridge(diagramId);
+        if (bridgeData && bridgeData.nodes.length > 0) {
           diagram = {
             ...bridgeData,
             id: bridgeData.id || diagramId,

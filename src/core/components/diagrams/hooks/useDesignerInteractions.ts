@@ -68,6 +68,8 @@ export function useDesignerInteractions({
     toggleVisibility, toggleLock, renameLayer, reorderLayers, getLayer, setLayerColor
 }: UseDesignerInteractionsProps) {
 
+    const normalizedActiveLayerId = activeLayerId ?? undefined;
+
 
     const {
         layerSyncedNodes,
@@ -107,7 +109,7 @@ export function useDesignerInteractions({
 
     const { hasCopiedStyle, copyStyle, pasteStyle } = useStylePainter(setNodes);
 
-    const { templates, groupedTemplates, saveAsTemplate, saveGroupAsTemplate, createFromTemplate, deleteTemplate, renameTemplate } = useNodeTemplates(activeLayerId);
+    const { templates, groupedTemplates, saveAsTemplate, saveGroupAsTemplate, createFromTemplate, deleteTemplate, renameTemplate } = useNodeTemplates(normalizedActiveLayerId);
     
     // ⭐ [GAP-02] 使用统一协作 Store 替代本地 Annotations
     const comments = useDiagramStore(state => state.comments);
@@ -126,7 +128,7 @@ export function useDesignerInteractions({
     }, [preset]);
 
     const { quickAddMenu, onConnectEnd: quickAddOnConnectEnd, handleAddNode, closeMenu, openQuickAddMenu, getFlowPosition } = useQuickAdd(
-        setNodes, setEdges, takeSnapshot, reactFlowInstance, getEdgeDefaults, nodes, edges, activeLayerId
+        setNodes, setEdges, takeSnapshot, reactFlowInstance, getEdgeDefaults, nodes, edges, normalizedActiveLayerId
     );
 
     const { setQuickConnectPreview, nodesWithGhost, edgesWithGhost } = useDesignerGhostNodes({
@@ -173,7 +175,7 @@ export function useDesignerInteractions({
 
     const { onDragOver, onDrop, onNodeDragStart, onNodeDrag, onNodeDragStop: originalOnNodeDragStop } = useDiagramDragDrop({
         nodes, edges, setNodes, setEdges, takeSnapshot, reactFlowInstance, setIsDragging, onSmartNodeDrag, clearGuides,
-        enableAltDuplicate: false, isConnecting, activeLayerId
+        enableAltDuplicate: false, isConnecting, activeLayerId: normalizedActiveLayerId
     });
 
     const [isDraggingNode, setIsDraggingNode] = useState(false);

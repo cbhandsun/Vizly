@@ -130,11 +130,19 @@ export const generateTemplateThumbnail = async (
     try {
         if (!Array.isArray(nodes) || nodes.length === 0 || !Array.isArray(edges)) return null;
 
-        const safeNodes = nodes
+        type ThumbnailNode = {
+            id: string;
+            data: Record<string, unknown>;
+            position: { x: number; y: number };
+            width: number;
+            height: number;
+        };
+        const safeNodes: ThumbnailNode[] = nodes
             .slice(0, MAX_THUMBNAIL_NODES)
             .filter((node): node is Record<string, any> => isRecord(node) && isRecord(node.position))
             .map(node => ({
-                ...node,
+                id: typeof node.id === 'string' ? node.id : '',
+                data: isRecord(node.data) ? node.data : {},
                 position: {
                     x: finiteNumber(node.position.x, 0),
                     y: finiteNumber(node.position.y, 0),
@@ -142,7 +150,7 @@ export const generateTemplateThumbnail = async (
                 width: finiteNumber(node.width, 150),
                 height: finiteNumber(node.height, 50),
             }))
-            .filter(node => node.width > 0 && node.height > 0);
+            .filter(node => node.id && node.width > 0 && node.height > 0);
 
         const safeEdges = edges
             .slice(0, MAX_THUMBNAIL_EDGES)

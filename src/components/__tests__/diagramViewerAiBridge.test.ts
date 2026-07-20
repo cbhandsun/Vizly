@@ -182,7 +182,17 @@ describe('diagramViewerAiBridge', () => {
             messageApi: messageState,
         });
 
-        expect(ops.onAnalyze?.()).toEqual({ summary: 'fallback summary', nodes: [], issues: [] });
+        expect(ops.onAnalyze?.()).toEqual({
+            summary: 'fallback summary',
+            issues: [],
+            stats: {
+                nodeCount: 0,
+                edgeCount: 0,
+                orphanCount: 0,
+                connectedComponents: 0,
+                maxDepth: 0,
+            },
+        });
 
         ops.onUpdateTheme?.({ '--bad': 'value' });
         ops.onTogglePresentation?.(true);

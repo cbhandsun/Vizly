@@ -63,7 +63,6 @@ const getStringValue = (value: unknown): string | undefined => (
 const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
   style,
   zoomable = true,
-  _pannable = true,
   defaultSize = 'large'
 }) => {
   // 接入主题系统
@@ -224,7 +223,7 @@ const FixedMiniMap: React.FC<FixedMiniMapProps> = ({
       // 如果容器尺寸收缩，自动纠正溢出边界的 relative offset
       setOverlayOffset(prev => {
         const getParentSize = () => {
-          const parent = container.offsetParent as HTMLElement;
+          const parent = (container as HTMLElement).offsetParent as HTMLElement | null;
           if (parent) return { width: parent.clientWidth, height: parent.clientHeight };
           return { width: window.innerWidth, height: window.innerHeight };
         };

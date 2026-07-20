@@ -25,7 +25,6 @@ import {
     useFloatingPosition,
     useSelectedNodeBounds,
     useNodesDragging,
-    type _OverflowItem,
 } from '../shared/FloatingToolbar';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -87,8 +86,8 @@ export interface FloatingContextToolbarProps {
 // ─── Popover Content Components ──────────────────────────────────────────────
 
 const AlignPanel: React.FC<{
-    onAlign: (dir: string) => void;
-    onDistribute: (dir: string) => void;
+    onAlign: (dir: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
+    onDistribute: (dir: 'horizontal' | 'vertical') => void;
     canAlign: boolean;
     canDistribute: boolean;
 }> = ({ onAlign, onDistribute, canAlign, canDistribute }) => (
@@ -156,6 +155,7 @@ const DomainClassPanel: React.FC<{ onChangeDomainClass: (domainClass: string) =>
 
 export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = React.memo(({
     selectedNodes, onDelete, onDuplicate, onChangeColor,
+    onChangeColorComplete,
     onLock, onOpacity, onBringToFront, onSendToBack, onUpdateStyle, onUpdateNodes,
     layers, onMoveToLayer, onChangeShape, onSaveAsComponent, onChangeDomainClass,
     onCopyStyle, onPasteStyle, hasCopiedStyle, extraToolbarContent, excludeToolbarFeatures,

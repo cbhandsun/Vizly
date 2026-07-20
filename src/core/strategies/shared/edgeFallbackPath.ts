@@ -89,7 +89,7 @@ function preferredBend(
   targetStub: EdgeFallbackPoint,
   sourceHandle: string | null | undefined,
 ): EdgeFallbackPoint {
-  const sourceAxis = ['l', 'r'].includes(normalizeHandle(String(sourceHandle || ''))) ? 'h' : 'v';
+  const sourceAxis = ['l', 'r'].includes(normalizeHandle(String(sourceHandle || '')) ?? '') ? 'h' : 'v';
   return sourceAxis === 'h'
     ? { x: targetStub.x, y: sourceStub.y }
     : { x: sourceStub.x, y: targetStub.y };

@@ -66,8 +66,8 @@ function cleanTaskText(value: unknown): string | undefined {
  * Map Vizly's direction string to mind-elixir direction integer
  * MindElixir.LEFT=3, MindElixir.RIGHT=1, MindElixir.SIDE=2, MindElixir.ROOT=0
  */
-export function directionStringToInt(dir: string): number {
-    const map: Record<string, number> = {
+export function directionStringToInt(dir: string): 0 | 1 | 2 | 3 {
+    const map: Record<string, 0 | 1 | 2 | 3> = {
         LR: 2,  // SIDE — root in center, branches left and right
         R: 1,   // RIGHT
         L: 3,   // LEFT
@@ -101,7 +101,7 @@ export function migrateV1ToV2(v1: VizlyMindMapV1Data): VizlyMindMapV2Data {
         // Fallback: return a blank tree
         return {
             _version: 'mindmap-v2',
-            nodeData: { id: 'root', topic: '中心主题', root: true, children: [] },
+            nodeData: { id: 'root', topic: '中心主题', children: [] },
             direction: 2,
             theme: VIZLY_HYPER_THEME,
         };
@@ -171,7 +171,7 @@ export function migrateV1ToV2(v1: VizlyMindMapV1Data): VizlyMindMapV2Data {
 
     return {
         _version: 'mindmap-v2',
-        nodeData: { ...(convertNode(rootNode) ?? { id: 'root', topic: '中心主题', children: [] }), root: true },
+        nodeData: convertNode(rootNode) ?? { id: 'root', topic: '中心主题', children: [] },
         direction,
         theme: VIZLY_HYPER_THEME,
     };

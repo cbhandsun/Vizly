@@ -347,14 +347,19 @@ export const repairFastDisplayHardSafety = (edges: Edge[], nodes: Node[]): Edge[
     if (repaired.length === path.length && repaired.every((point, index) => samePoint(point, path[index]))) {
       return edge;
     }
-    const data = {
-      ...((edge.data || {}) as Record<string, any>),
+    const originalData = (edge.data || {}) as Record<string, unknown>;
+    const data: Record<string, unknown> = {
+      ...originalData,
       computedPath: repaired,
       layoutPathLocked: true,
       fastHardSafetyRepaired: true,
     };
-    if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-      data.treeRouting = { ...data.treeRouting, points: repaired };
+    const treeRouting = originalData.treeRouting;
+    if (treeRouting && typeof treeRouting === 'object' && !Array.isArray(treeRouting)) {
+      const treeRoutingRecord = treeRouting as Record<string, unknown>;
+      if (Array.isArray(treeRoutingRecord.points)) {
+        data.treeRouting = { ...treeRoutingRecord, points: repaired };
+      }
     }
     changed = true;
     return { ...edge, data };
