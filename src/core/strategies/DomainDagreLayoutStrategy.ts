@@ -14,14 +14,12 @@ import {
 import {
     calculateBounds,
     layoutWithDagre,
-    mapEdgesToContainers,
 } from './DomainDagreLayoutHelpers';
 import {
     prepareDomainDagreEdges,
 } from './DomainDagreEdgePreparation';
 import {
     getDomainDagreNodeDimensions,
-    getDomainDagreSubDomainOrderIndex,
     normalizeDomainDagreNodes,
     resolveDomainDagreLayoutBoundary,
 } from './domainDagreLayoutBoundary';
@@ -36,6 +34,7 @@ import {
 } from './domainDagreHierarchy';
 import { runDomainDagreSimplifiedPath } from './domainDagreSimplifiedPaths';
 import { runDomainDagreTopLevelLayout } from './domainDagreTopLevelLayout';
+import { runDomainDagreNestedLayout } from './domainDagreNestedLayout';
 /**
  * 域级 Dagre 布局策略
  * 
@@ -118,10 +117,6 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         const getNodeDimensions = (node: ReactFlowNode): { width: number; height: number } => {
             return getDomainDagreNodeDimensions(node, defaultNodeW, defaultNodeH);
         };
-        const getSubDomainOrderIndex = (domainKey: string, subKey: string): number => {
-            return getDomainDagreSubDomainOrderIndex(subDomainOrderOpt, domainKey, subKey);
-        };
-
         // 应用域/子域分组和白名单过滤 (使用归一化后的节点以确保尺寸一致)
         let processedNodes: ReactFlowNode[] = normalizedNodes as ReactFlowNode[];
         processedNodes = applyDomainGrouping(processedNodes as any, domainWhitelist) as any;
@@ -352,177 +347,30 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
             });
         };
 
-        // ============================================
-        // 第一阶段：域内部布局（每个域单独使用 Dagre）
-        // ============================================
-
-        // 先将所有域位置初始化为 (0, 0)，内部布局相对于域原点
-        domains.forEach(domain => {
-            domain.position = { x: 0, y: 0 };
-        });
-
-        domains.forEach(domain => {
-            const dk = domainOf(domain);
-
-            // 获取该域下的所有子域（按 subDomainOrder 排序）
-            const domainSubGroups = subGroups.filter(sg => domainOf(sg) === dk);
-            domainSubGroups.sort((a, b) => {
-                const aKey = String(((a as any)?.data?.subDomain || (a as any)?.data?.description || '')).trim();
-                const bKey = String(((b as any)?.data?.subDomain || (b as any)?.data?.description || '')).trim();
-                return getSubDomainOrderIndex(dk, aKey) - getSubDomainOrderIndex(dk, bKey);
-            });
-
-            // 获取该域下的自由节点（不属于任何子域）
-            const domainFreeNodes = leafNodes.filter(n =>
-                domainOf(n) === dk && !nodeToSubGroup.has(n.id)
-            );
-
-            // 先布局每个子域内部
-            domainSubGroups.forEach(sg => {
-                const sgChildren = (childrenBySub.get(sg.id) || [])
-                    .map(id => idMap.get(id))
-                    .filter(Boolean) as ReactFlowNode[];
-
-                if (sgChildren.length > 0) {
-                    // 获取子域内的边
-                    const sgEdges = edges.filter(e =>
-                        sgChildren.some(n => n.id === e.source) &&
-                        sgChildren.some(n => n.id === e.target)
-                    );
-
-                    // 使用 Dagre 布局子域
-                    const result = layoutWithDagre(
-                        sgChildren,
-                        sgEdges,
-                        subDomainNodeIsHorizontal ? 'LR' : 'TB',
-                        subDomainNodeIsHorizontal ? nodeGapV : nodeGapH,
-                        subDomainNodeIsHorizontal ? nodeGapH : nodeGapV,
-                        getNodeDimensions
-                    );
-
-                    // 应用布局结果
-                    result.forEach(pos => {
-                        const node = idMap.get(pos.id);
-                        if (node) {
-                            // 使用有效内边距确保左右对称
-                            node.position = { x: pos.x + sdPadHEffective, y: pos.y + sdTitleH + sdPadV };
-                        }
-                    });
-
-                    // 计算子域尺寸（使用有效内边距确保左右对称）
-                    const bounds = calculateBounds(sgChildren, getNodeDimensions, widthCompensation);
-                    const sgWidth = bounds.width + sdPadHEffective * 2;
-                    const sgHeight = bounds.height + sdTitleH + sdPadV * 2;
-
-                    // 调试：打印子域边界计算详情
-
-                    (sg as any).measured = { width: sgWidth, height: sgHeight };
-                    (sg as any).style = { ...(sg as any).style, width: sgWidth, height: sgHeight };
-                }
-            });
-
-            // 布局子域 + 自由节点在域内的位置
-            const domainChildren: ReactFlowNode[] = [
-                ...domainSubGroups,
-                ...domainFreeNodes
-            ];
-
-            if (domainChildren.length > 0) {
-                // 获取域内跨子域边
-                const domainChildIds = new Set(domainChildren.map(c => c.id));
-                const domainEdges = edges.filter(e => {
-                    const src = idMap.get(e.source);
-                    const tgt = idMap.get(e.target);
-                    if (!src || !tgt) return false;
-                    if (domainOf(src) !== dk || domainOf(tgt) !== dk) return false;
-
-                    // Leaf-to-leaf edges inside subdomains must still participate in
-                    // domain-level layout after being lifted to their subGroup containers.
-                    // Without this, subdomains appear disconnected and Dagre spreads them
-                    // horizontally in one rank, stretching the domain container.
-                    const srcItem = nodeToSubGroup.get(e.source) || e.source;
-                    const tgtItem = nodeToSubGroup.get(e.target) || e.target;
-                    return domainChildIds.has(srcItem) && domainChildIds.has(tgtItem);
-                });
-
-                // 使用 Dagre 布局域内元素
-                const result = layoutWithDagre(
-                    domainChildren,
-                    mapEdgesToContainers(domainEdges, nodeToSubGroup),
-                    domainSubGroupIsHorizontal ? 'LR' : 'TB',
-                    domainSubGroupIsHorizontal ? nodeGapV : nodeGapH,
-                    domainSubGroupIsHorizontal ? nodeGapH : nodeGapV,
-                    getNodeDimensions
-                );
-
-                // 应用布局结果
-                result.forEach(pos => {
-                    const node = idMap.get(pos.id);
-                    if (node) {
-                        const oldX = node.position.x;
-                        const oldY = node.position.y;
-                        // 修正内边距与标题区域：dTitleH + titleSafe + dPadV
-                        const newX = pos.x + dPadHEffective;
-                        const newY = pos.y + dTitleH + titleSafe + dPadV;
-
-                        // 如果是子域，需要同步移动子节点
-                        if (String(node.type) === 'subGroup') {
-                            const deltaX = newX - oldX;
-                            const deltaY = newY - oldY;
-
-                            (childrenBySub.get(node.id) || []).forEach(childId => {
-                                const child = idMap.get(childId);
-                                if (child) {
-                                    child.position = {
-                                        x: child.position.x + deltaX,
-                                        y: child.position.y + deltaY
-                                    };
-                                }
-                            });
-                        }
-
-                        node.position = { x: newX, y: newY };
-                    }
-                });
-
-                if (domainSubGroupIsHorizontal && domainSubGroups.length > 1) {
-                    const rowY = Math.min(...domainSubGroups.map(sg => num((sg as any)?.position?.y, dTitleH + titleSafe + dPadV)));
-                    let cursorX = dPadHEffective;
-                    for (const sg of domainSubGroups) {
-                        const oldX = num((sg as any)?.position?.x, 0);
-                        const oldY = num((sg as any)?.position?.y, 0);
-                        const deltaX = cursorX - oldX;
-                        const deltaY = rowY - oldY;
-
-                        if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
-                            (childrenBySub.get(sg.id) || []).forEach(childId => {
-                                const child = idMap.get(childId);
-                                if (!child) return;
-                                child.position = {
-                                    x: child.position.x + deltaX,
-                                    y: child.position.y + deltaY
-                                };
-                            });
-                            sg.position = { x: cursorX, y: rowY };
-                        }
-
-                        const sgWidth = num((sg as any)?.style?.width ?? (sg as any)?.measured?.width, 0);
-                        cursorX += sgWidth + nodeGapH;
-                    }
-                }
-
-                // 计算域尺寸（使用有效内边距确保左右对称）
-                // 注意：只使用 domainChildren（子域 + 自由节点）来计算边界
-                // 因为子域的 measured 已经包含了内部节点的尺寸
-                // 而叶节点的 position 是相对于父子域的，不能直接加入域边界计算
-                // 计算域尺寸（包含标题高度、安全边距、底部缓冲区以及全局 bottomSafeGap 补偿）
-                const bounds = calculateBounds(domainChildren, getNodeDimensions, widthCompensation);
-                const domainWidth = bounds.width + dPadHEffective * 2;
-                const domainHeight = bounds.height + dTitleH + titleSafe + dPadV * 2 + bottomSafe + bottomSafeGap;
-
-                (domain as any).measured = { width: domainWidth, height: domainHeight };
-                (domain as any).style = { ...(domain as any).style, width: domainWidth, height: domainHeight };
-            }
+        runDomainDagreNestedLayout({
+            domains,
+            subGroups,
+            leafNodes,
+            edges,
+            nodeById: idMap,
+            childrenBySubGroup: childrenBySub,
+            nodeToSubGroup,
+            subDomainOrder: subDomainOrderOpt,
+            subDomainNodeIsHorizontal,
+            domainSubGroupIsHorizontal,
+            nodeGapH,
+            nodeGapV,
+            subDomainPaddingH: sdPadHEffective,
+            subDomainPaddingV: sdPadV,
+            subDomainTitleHeight: sdTitleH,
+            domainPaddingH: dPadHEffective,
+            domainPaddingV: dPadV,
+            domainTitleHeight: dTitleH,
+            titleSafetyGap: titleSafe,
+            bottomSafetyGap: bottomSafe,
+            globalBottomSafetyGap: bottomSafeGap,
+            widthCompensation,
+            getNodeDimensions,
         });
 
         // ============================================
