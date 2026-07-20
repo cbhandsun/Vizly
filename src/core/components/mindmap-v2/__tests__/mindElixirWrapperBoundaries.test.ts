@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -13,6 +14,16 @@ import {
 } from '../useMindElixirFileDrop';
 import { createMindElixirArrowModeController } from '../mindElixirArrowModeController';
 import type { MindElixirInstance, Topic } from 'mind-elixir';
+import {
+    isSupportedMindMapToolbarImport,
+    parseMindMapToolbarImport,
+} from '../useMindElixirImportActions';
+import { printMindMap } from '../useMindElixirExportActions';
+import {
+    coerceMindMapBackgroundPattern,
+    coerceMindMapDirectionKey,
+    useMindElixirCanvasPreferences,
+} from '../useMindElixirCanvasPreferences';
 
 describe('mind elixir wrapper boundaries', () => {
     it('accepts bounded hex palettes and rejects unsafe CSS values', () => {
@@ -57,6 +68,63 @@ describe('mind elixir wrapper boundaries', () => {
         expect(() => parseMindMapImportText('ideas.md', new ArrayBuffer(8))).toThrow(
             'Mind map import did not contain text.',
         );
+    });
+
+    it('validates toolbar import identities and rejects non-text reader results', () => {
+        expect(isSupportedMindMapToolbarImport('JSON', { name: 'map.json', type: '' })).toBe(true);
+        expect(isSupportedMindMapToolbarImport('Markdown', { name: 'map.bin', type: 'text/markdown' })).toBe(true);
+        expect(isSupportedMindMapToolbarImport('OPML', { name: 'map.zip', type: 'application/zip' })).toBe(false);
+        expect(() => parseMindMapToolbarImport('JSON', new ArrayBuffer(4))).toThrow(
+            'JSON import did not contain text.',
+        );
+        expect(parseMindMapToolbarImport('Markdown', '# Root')).toMatchObject({
+            kind: 'tree',
+            nodeData: expect.objectContaining({ topic: 'Root' }),
+        });
+    });
+
+    it('scopes print mode and removes it through the fallback cleanup', () => {
+        let scheduledCleanup: (() => void) | undefined;
+        const print = vi.fn();
+        const removeEventListener = vi.fn();
+        const cleanup = printMindMap({
+            documentRef: document,
+            windowRef: {
+                addEventListener: vi.fn(),
+                removeEventListener,
+                print,
+            },
+            schedule: callback => {
+                scheduledCleanup = callback;
+                return 1 as unknown as ReturnType<typeof setTimeout>;
+            },
+            clearSchedule: vi.fn(),
+        });
+
+        expect(document.body.classList.contains('vizly-mindmap-print')).toBe(true);
+        expect(print).toHaveBeenCalledOnce();
+        scheduledCleanup?.();
+        expect(document.body.classList.contains('vizly-mindmap-print')).toBe(false);
+        expect(removeEventListener).toHaveBeenCalledWith('afterprint', cleanup);
+    });
+
+    it('coerces persisted canvas preferences and applies validated directions', () => {
+        expect(coerceMindMapBackgroundPattern('grid')).toBe('grid');
+        expect(coerceMindMapBackgroundPattern('unsafe-pattern')).toBe('none');
+        expect(coerceMindMapDirectionKey('TB')).toBe('L');
+        expect(coerceMindMapDirectionKey('diagonal')).toBe('LR');
+
+        const refresh = vi.fn();
+        const mind = {
+            direction: 0,
+            getData: () => ({ nodeData: { id: 'root', topic: 'Root', children: [] }, direction: 0 }),
+            refresh,
+        } as unknown as MindElixirInstance;
+        const { result } = renderHook(() => useMindElixirCanvasPreferences(mind));
+
+        act(() => result.current.changeDirection('L'));
+        expect(refresh).toHaveBeenCalledWith(expect.objectContaining({ direction: 0 }));
+        expect(localStorage.getItem('vizly_mindmap_dir')).toBe('L');
     });
 
     it('removes the exact arrow listener on toggle and disposal', () => {

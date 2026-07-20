@@ -42,13 +42,9 @@ import {
     DeploymentUnitOutlined,
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
-import MindElixir from 'mind-elixir';
-import type { MindElixirInstance, NodeObj } from 'mind-elixir';
+import type { MindElixirInstance } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir, setPresentationState, toggleKanban, subscribeKanban, toggleAIPanel, subscribeAIPanel } from './mindElixirStore';
-import {
-    directionStringToInt, nodeObjToMarkdown, nodeObjToOpml, downloadText,
-    markdownToNodeObj, opmlToNodeObj, countNodes, getTreeDepth, nodeObjToFlowchartJson
-} from './migrate';
+import { countNodes, getTreeDepth } from './migrate';
 import { VIZLY_THEME_OPTIONS, VIZLY_THEMES } from './theme';
 import { usePresentationMode } from './MindMapPresentationMode';
 import { emitOpenSearch } from './mindmapSearchStore';
@@ -56,36 +52,29 @@ import { emitToggleOutline } from './mindmapOutlineStore';
 import { emitToggleHistory } from './mindmapHistoryStore';
 import MindMapShortcutsModal from './MindMapShortcutsModal';
 import MindMapTemplates from './MindMapTemplates';
-import { exportXmind } from './exportXmind';
-import { nodeObjToPitchMarkdown } from './mindmapPitchExport';
 import { arrangeMindMapTree } from './mindmapAutoArrange';
-import { getFileSizeLimitError, MINDMAP_TEXT_IMPORT_MAX_BYTES } from '../../utils/fileImportGuards';
-import { parseDiagramJson } from '../../utils/diagramJsonImport';
-import { downloadBlob } from '../../utils/downloadUtils';
-import { cleanAndValidateTree, cleanMindMapData } from './mindmapTreeSanitizer';
+import { cleanAndValidateTree } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import {
     logMindmapToolbarAddRootChildFailure,
     logMindmapToolbarAutoArrangeFailure,
-    logMindmapToolbarExportFailure,
     logMindmapToolbarFocusModeFailure,
-    logMindmapToolbarImportFailure,
-    logMindmapToolbarImportRejected,
     logMindmapToolbarStatsUpdateFailure,
     logMindmapToolbarSummaryFailure,
 } from './mindmapToolbarLogging';
 import { persistMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeStorage';
-import { coerceMindElixirDirection } from './mindElixirDirection';
 import { emitVizlyMindMapOperation } from './mindmapOperationBridge';
 import { setMindMapTreeExpanded } from './mindmapTreeExpansion';
 import { createMindElixirArrowModeController } from './mindElixirArrowModeController';
+import { useMindElixirImportActions } from './useMindElixirImportActions';
+import { useMindElixirExportActions } from './useMindElixirExportActions';
+import { useMindElixirCanvasPreferences } from './useMindElixirCanvasPreferences';
 
 
 const DIRECTION_OPTIONS = [
     { label: '↔ 双向展开', value: 'LR' },
     { label: '→ 向右展开', value: 'R' },
     { label: '← 向左展开', value: 'L' },
-    { label: '↓ 向下展开', value: 'TB' },
 ];
 
 // ─── Focus mode state (module-level, shared) ─────────────────────────────────
@@ -112,22 +101,12 @@ const MindElixirToolbar: React.FC = () => {
         toggleAIPanel();
     }, []);
 
-    // ── Canvas background pattern ──────────────────────────────────────────────
-    const [bgPattern, setBgPattern] = useState<'none' | 'grid' | 'dots'>(() =>
-        (localStorage.getItem('vizly_mindmap_bg') as any) ?? 'none'
-    );
-    const applyBgPattern = useCallback((pattern: 'none' | 'grid' | 'dots') => {
-        setBgPattern(pattern);
-        localStorage.setItem('vizly_mindmap_bg', pattern);
-        const el = document.getElementById('vizly-mind-elixir-root');
-        if (!el) return;
-        el.setAttribute('data-bg', pattern);
-    }, []);
-    // Apply on mount and when mind loads
-    useEffect(() => {
-        const el = document.getElementById('vizly-mind-elixir-root');
-        if (el) el.setAttribute('data-bg', bgPattern);
-    }, [mind, bgPattern]);
+    const {
+        backgroundPattern: bgPattern,
+        applyBackgroundPattern: applyBgPattern,
+        currentDirection: currentDir,
+        changeDirection: handleDirectionChange,
+    } = useMindElixirCanvasPreferences(mind);
 
     // Presentation mode — declare state first so callback closure is clean
     const [isPresenting, setIsPresenting] = useState(false);
@@ -156,22 +135,6 @@ const MindElixirToolbar: React.FC = () => {
 
     // Active theme
     const [activeThemeKey, setActiveThemeKey] = useState<string>(resolveMindMapThemeKey);
-
-    // Read current direction: prefer live instance value, fall back to localStorage
-    const currentDir = mind
-        ? (mind.direction === MindElixir.SIDE ? 'LR'
-            : mind.direction === MindElixir.RIGHT ? 'R'
-            : mind.direction === MindElixir.LEFT ? 'L'
-            : 'TB')
-        : (localStorage.getItem('vizly_mindmap_dir') || 'LR');
-
-    const handleDirectionChange = useCallback((dir: string) => {
-        if (!mind) return;
-        const data = mind.getData();
-        const dirInt = coerceMindElixirDirection(directionStringToInt(dir));
-        mind.refresh({ ...data, nodeData: cleanAndValidateTree(data.nodeData, true), direction: dirInt });
-        localStorage.setItem('vizly_mindmap_dir', dir);  // persist direction
-    }, [mind]);
 
     const handleThemeChange = useCallback((key: string) => {
         if (!mind) return;
@@ -239,101 +202,17 @@ const MindElixirToolbar: React.FC = () => {
         }
     }, [mind]);
 
-    const handleExportSvg = useCallback(async () => {
-        if (!mind) return;
-        try {
-            // exportSvg() returns a Blob directly
-            const blob = mind.exportSvg();
-            downloadBlob(blob, 'mindmap.svg', 'mindmap.svg');
-        } catch (e) {
-            logMindmapToolbarExportFailure('SVG', e);
-        }
-    }, [mind]);
-
-    const handleExportPng = useCallback(async () => {
-        if (!mind) return;
-        try {
-            const blob = await mind.exportPng();
-            if (!blob) return;
-            downloadBlob(blob, 'mindmap.png', 'mindmap.png');
-        } catch (e) {
-            logMindmapToolbarExportFailure('PNG', e);
-        }
-    }, [mind]);
-
-    const handleExportMarkdown = useCallback(() => {
-        if (!mind) return;
-        try {
-            const md = nodeObjToMarkdown(mind.getData().nodeData);
-            downloadText('mindmap.md', md, 'text/markdown');
-        } catch (e) { logMindmapToolbarExportFailure('Markdown', e); }
-    }, [mind]);
-
-    const handleExportOpml = useCallback(() => {
-        if (!mind) return;
-        try {
-            const opml = nodeObjToOpml(mind.getData().nodeData);
-            downloadText('mindmap.opml', opml, 'application/xml');
-        } catch (e) { logMindmapToolbarExportFailure('OPML', e); }
-    }, [mind]);
-
-    const handleExportJson = useCallback(() => {
-        if (!mind) return;
-        try {
-            const data = mind.getData();
-            const json = JSON.stringify(data, null, 2);
-            downloadText('mindmap.json', json, 'application/json');
-        } catch (e) { logMindmapToolbarExportFailure('JSON', e); }
-    }, [mind]);
-
-    const handleExportFlowchart = useCallback(() => {
-        if (!mind) return;
-        try {
-            const data = mind.getData();
-            const json = nodeObjToFlowchartJson(data.nodeData);
-            downloadText('mindmap_to_flowchart.vizly', json, 'application/json');
-        } catch (e) { logMindmapToolbarExportFailure('Flowchart', e); }
-    }, [mind]);
-
-    const handleExportPitchMarkdown = useCallback(() => {
-        if (!mind) return;
-        try {
-            const data = mind.getData();
-            const md = nodeObjToPitchMarkdown(data.nodeData);
-            downloadText('mindmap_pitch.md', md, 'text/markdown;charset=utf-8');
-        } catch (e) { logMindmapToolbarExportFailure('Pitch markdown', e); }
-    }, [mind]);
-
-    const handleExportXmind = useCallback(async () => {
-        if (!mind) return;
-        try {
-            const data = mind.getData();
-            const title = data.nodeData?.topic ?? 'mindmap';
-            await exportXmind(data.nodeData, title);
-        } catch (e) { logMindmapToolbarExportFailure('XMind', e); }
-    }, [mind]);
-
-    const handleExportPdf = useCallback(() => {
-        if (!mind) return;
-        // Use browser print API: hide everything except the mind-elixir container
-        const style = document.createElement('style');
-        style.id = 'me-print-style';
-        style.textContent = `
-            @media print {
-                body > * { display: none !important; }
-                #vizly-mind-elixir-root, #vizly-mind-elixir-root * { display: block !important; }
-                #vizly-mind-elixir-root {
-                    position: fixed !important;
-                    top: 0 !important; left: 0 !important;
-                    width: 100vw !important; height: 100vh !important;
-                    overflow: visible !important;
-                }
-            }
-        `;
-        document.head.appendChild(style);
-        window.print();
-        setTimeout(() => style.remove(), 1000);
-    }, [mind]);
+    const {
+        handleExportSvg,
+        handleExportPng,
+        handleExportMarkdown,
+        handleExportOpml,
+        handleExportJson,
+        handleExportFlowchart,
+        handleExportPitchMarkdown,
+        handleExportXmind,
+        handleExportPdf,
+    } = useMindElixirExportActions(mind);
 
     // ── Zoom controls ───────────────────────────────────────────────────────
     const [zoomVal, setZoomVal] = useState(100);
@@ -467,94 +346,17 @@ const MindElixirToolbar: React.FC = () => {
         arrowControllerRef.current?.toggle();
     }, []);
 
-    // ── Import Markdown ───────────────────────────────────────────────────────
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const opmlInputRef = useRef<HTMLInputElement>(null);
-
-    const handleImportMarkdown = useCallback(() => {
-        fileInputRef.current?.click();
-    }, []);
-
-    const handleImportOpml = useCallback(() => {
-        opmlInputRef.current?.click();
-    }, []);
-
-    const loadAndRefresh = useCallback((nodeData: NodeObj) => {
-        if (!mind) return;
-        mind.refresh({ nodeData: cleanAndValidateTree(nodeData, true) });
-        mind.toCenter();
-        (mind as any).clearHistory?.();
-    }, [mind]);
-
-    // ── JSON import ─────────────────────────────────────────────────────────────
-    const jsonInputRef = useRef<HTMLInputElement>(null);
-    const handleImportJson = useCallback(() => { jsonInputRef.current?.click(); }, []);
-    const handleJsonFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file || !mind) return;
-        const sizeError = getFileSizeLimitError(file, MINDMAP_TEXT_IMPORT_MAX_BYTES, 'mind map JSON');
-        if (sizeError) {
-            logMindmapToolbarImportRejected('JSON', sizeError);
-            e.target.value = '';
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            try {
-                const json = parseDiagramJson(String(ev.target?.result || ''));
-                const data = cleanMindMapData(json);
-                if (!mind) return;
-                mind.refresh({
-                    ...data,
-                    direction: coerceMindElixirDirection(data.direction),
-                });
-                mind.toCenter();
-                (mind as any).clearHistory?.();
-            } catch (err) { logMindmapToolbarImportFailure('JSON', err); }
-        };
-        reader.readAsText(file);
-        e.target.value = '';
-    }, [mind]);
-
-    const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file || !mind) return;
-        const sizeError = getFileSizeLimitError(file, MINDMAP_TEXT_IMPORT_MAX_BYTES, 'Markdown');
-        if (sizeError) {
-            logMindmapToolbarImportRejected('Markdown', sizeError);
-            e.target.value = '';
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            try {
-                const md = ev.target?.result as string;
-                loadAndRefresh(cleanAndValidateTree(markdownToNodeObj(md), true));
-            } catch (err) { logMindmapToolbarImportFailure('Markdown', err); }
-        };
-        reader.readAsText(file);
-        e.target.value = '';
-    }, [mind, loadAndRefresh]);
-
-    const handleOpmlFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file || !mind) return;
-        const sizeError = getFileSizeLimitError(file, MINDMAP_TEXT_IMPORT_MAX_BYTES, 'OPML');
-        if (sizeError) {
-            logMindmapToolbarImportRejected('OPML', sizeError);
-            e.target.value = '';
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            try {
-                const xml = ev.target?.result as string;
-                loadAndRefresh(cleanAndValidateTree(opmlToNodeObj(xml), true));
-            } catch (err) { logMindmapToolbarImportFailure('OPML', err); }
-        };
-        reader.readAsText(file);
-        e.target.value = '';
-    }, [mind, loadAndRefresh]);
+    const {
+        markdownInputRef: fileInputRef,
+        opmlInputRef,
+        jsonInputRef,
+        openMarkdownImport: handleImportMarkdown,
+        openOpmlImport: handleImportOpml,
+        openJsonImport: handleImportJson,
+        handleMarkdownFileChange: handleFileChange,
+        handleOpmlFileChange,
+        handleJsonFileChange,
+    } = useMindElixirImportActions(mind);
 
     // ── Stats ─────────────────────────────────────────────────────────────────
     const [stats, setStats] = useState({ nodes: 0, depth: 0 });

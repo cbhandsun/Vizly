@@ -320,3 +320,22 @@ me-wrapper[data-note] me-tpc::after {
     background: var(--vizly-mindmap-branch-10, var(--main-bgcolor)) !important;
     color: #ffffff !important;
 }
+
+@media print {
+    body.vizly-mindmap-print * {
+        visibility: hidden !important;
+    }
+
+    body.vizly-mindmap-print #vizly-mind-elixir-root,
+    body.vizly-mindmap-print #vizly-mind-elixir-root * {
+        visibility: visible !important;
+    }
+
+    body.vizly-mindmap-print #vizly-mind-elixir-root {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        overflow: visible !important;
+    }
+}

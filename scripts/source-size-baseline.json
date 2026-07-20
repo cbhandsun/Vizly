@@ -8,7 +8,6 @@
   },
   "oversizedFiles": {
     "src/core/components/diagrams/timeline-pro/ProTaskLayer.tsx": 744,
-    "src/core/components/mindmap-v2/MindElixirToolbar.tsx": 895,
     "src/core/components/shared/baseReactFlowDisplayEndpointStubCandidates.ts": 803,
     "src/core/components/shared/baseReactFlowDisplayLaneCandidates.ts": 942,
     "src/core/components/shared/baseReactFlowDisplayOverlapRepair.ts": 1112,
