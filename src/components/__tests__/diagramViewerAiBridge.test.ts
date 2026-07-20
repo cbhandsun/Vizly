@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+// @vitest-environment node
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     createDiagramViewerCanvasOps,
     importAIDiagramJsonToBridge,
@@ -21,13 +23,33 @@ vi.mock('../diagramViewerLogging', () => ({
     logDiagramViewerAiJsonImportFailure: loggingState.logDiagramViewerAiJsonImportFailure,
 }));
 
+const createDocumentStub = (): Document => {
+    const elements = new Map<string, { id: string; textContent: string | null }>();
+    const head = {
+        appendChild: (element: { id: string; textContent: string | null }) => {
+            elements.set(element.id, element);
+            return element;
+        },
+    };
+
+    return {
+        head,
+        createElement: () => ({ id: '', textContent: null }),
+        getElementById: (id: string) => elements.get(id) ?? null,
+    } as unknown as Document;
+};
+
 describe('diagramViewerAiBridge', () => {
     beforeEach(() => {
-        document.head.innerHTML = '';
+        vi.stubGlobal('document', createDocumentStub());
         vi.restoreAllMocks();
         messageState.success.mockReset();
         messageState.warning.mockReset();
         loggingState.logDiagramViewerAiJsonImportFailure.mockReset();
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
     });
 
     it('imports AI JSON into the active bridge for preview and apply modes', () => {

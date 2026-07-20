@@ -15,7 +15,7 @@ import {
   shouldCollectTestCiCoverage,
 } from './lib/test-ci-shards.mjs';
 
-const requestedGroup = process.env.TEST_CI_GROUP?.trim() || 'all';
+const requestedGroup = process.argv[2]?.trim() || process.env.TEST_CI_GROUP?.trim() || 'all';
 const shardNames = resolveTestCiShardSelection(requestedGroup);
 const coverageEnabled = resolveTestCiCoverageEnabled(process.env.TEST_CI_COVERAGE);
 

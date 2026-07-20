@@ -5,6 +5,7 @@ import {
   TEST_CI_COVERAGE_EXEMPT_SHARDS,
   TEST_CI_SHARDS,
   TEST_CI_SHARD_GROUPS,
+  TEST_CI_SLOW_SHARDS,
   resolveTestCiShardSelection,
   getTestCiCoverageReportName,
   isTestCiTimingSensitiveShard,
@@ -15,7 +16,7 @@ describe('test:ci shard catalog', () => {
   it('keeps every shard in exactly one non-empty CI group', () => {
     const grouped = Object.values(TEST_CI_SHARD_GROUPS).flat();
     expect(TEST_CI_GROUP_NAMES).toEqual(['foundation', 'ui', 'flow', 'core', 'routing']);
-    expect(grouped).toHaveLength(39);
+    expect(grouped).toHaveLength(40);
     expect(new Set(grouped).size).toBe(grouped.length);
     expect(TEST_CI_SHARDS).toEqual(grouped);
     expect(Object.values(TEST_CI_SHARD_GROUPS).every((shards) => shards.length > 0)).toBe(true);
@@ -25,6 +26,10 @@ describe('test:ci shard catalog', () => {
     expect(resolveTestCiShardSelection()).toEqual(TEST_CI_SHARDS);
     expect(resolveTestCiShardSelection('')).toEqual(TEST_CI_SHARDS);
     expect(resolveTestCiShardSelection(' ui ')).toEqual(TEST_CI_SHARD_GROUPS.ui);
+    expect(resolveTestCiShardSelection('slow')).toEqual(TEST_CI_SLOW_SHARDS);
+    expect(resolveTestCiShardSelection('fast')).toEqual(
+      TEST_CI_SHARDS.filter(shard => !TEST_CI_SLOW_SHARDS.includes(shard)),
+    );
   });
 
   it('rejects unknown groups instead of silently skipping tests', () => {
@@ -33,6 +38,7 @@ describe('test:ci shard catalog', () => {
 
   it('exempts only isolated timing-sensitive shards from instrumentation', () => {
     expect(TEST_CI_COVERAGE_EXEMPT_SHARDS).toEqual([
+      'test:ci:core-components-shared-flow-quality',
       'test:ci:core-components-shared-flow-logistics',
       'test:ci:routing-services-performance',
     ]);

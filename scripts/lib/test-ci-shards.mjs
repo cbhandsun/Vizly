@@ -24,6 +24,7 @@ export const TEST_CI_SHARD_GROUPS = Object.freeze({
   ]),
   flow: Object.freeze([
     'test:ci:core-components-shared-flow',
+    'test:ci:core-components-shared-flow-quality',
     'test:ci:core-components-shared-flow-logistics',
     'test:ci:core-components-shared-flow-hub-port-role',
     'test:ci:core-components-shared-flow-measured-outcome',
@@ -52,10 +53,12 @@ export const TEST_CI_SHARD_GROUPS = Object.freeze({
 
 export const TEST_CI_SHARDS = Object.freeze(Object.values(TEST_CI_SHARD_GROUPS).flat());
 export const TEST_CI_GROUP_NAMES = Object.freeze(Object.keys(TEST_CI_SHARD_GROUPS));
-export const TEST_CI_COVERAGE_EXEMPT_SHARDS = Object.freeze([
+export const TEST_CI_SLOW_SHARDS = Object.freeze([
+  'test:ci:core-components-shared-flow-quality',
   'test:ci:core-components-shared-flow-logistics',
   'test:ci:routing-services-performance',
 ]);
+export const TEST_CI_COVERAGE_EXEMPT_SHARDS = TEST_CI_SLOW_SHARDS;
 
 const uniqueShardCount = new Set(TEST_CI_SHARDS).size;
 if (uniqueShardCount !== TEST_CI_SHARDS.length) {
@@ -65,15 +68,21 @@ if (uniqueShardCount !== TEST_CI_SHARDS.length) {
 export const resolveTestCiShardSelection = (rawGroup) => {
   const group = typeof rawGroup === 'string' && rawGroup.trim() ? rawGroup.trim() : 'all';
   if (group === 'all') return [...TEST_CI_SHARDS];
+  if (group === 'fast') {
+    return TEST_CI_SHARDS.filter(shard => !TEST_CI_SLOW_SHARDS.includes(shard));
+  }
+  if (group === 'slow') return [...TEST_CI_SLOW_SHARDS];
   const shards = TEST_CI_SHARD_GROUPS[group];
   if (!shards) {
-    throw new Error(`Unknown TEST_CI_GROUP "${group}"; expected all or ${TEST_CI_GROUP_NAMES.join(', ')}`);
+    throw new Error(
+      `Unknown TEST_CI_GROUP "${group}"; expected all, fast, slow, or ${TEST_CI_GROUP_NAMES.join(', ')}`,
+    );
   }
   return [...shards];
 };
 
 export const isTestCiTimingSensitiveShard = (shardName) => (
-  TEST_CI_COVERAGE_EXEMPT_SHARDS.includes(shardName)
+  TEST_CI_SLOW_SHARDS.includes(shardName)
 );
 
 export const shouldCollectTestCiCoverage = (shardName, coverageEnabled) => (

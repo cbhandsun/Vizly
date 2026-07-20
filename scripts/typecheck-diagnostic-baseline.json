@@ -242,13 +242,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/components/shared/__tests__/baseReactFlowDisplayEdges.qualityGates.test.ts",
-        "code": 18046,
-        "messageHash": "166b2c9ecd7425639312757a9d2246b020933d7b15177e0955bfcda1597d3186",
-        "count": 2
-      },
-      {
-        "category": "error",
         "file": "src/core/components/shared/__tests__/baseReactFlowDisplayFinalTransaction.test.ts",
         "code": 2352,
         "messageHash": "ce09fc9e939409d07cf0645a41055b5748ce9782bc449a9308799e8520328489",
