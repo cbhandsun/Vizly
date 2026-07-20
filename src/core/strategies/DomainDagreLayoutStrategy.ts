@@ -35,6 +35,7 @@ import {
     sortDomainDagreSubGroups,
 } from './domainDagreHierarchy';
 import { runDomainDagreSimplifiedPath } from './domainDagreSimplifiedPaths';
+import { runDomainDagreTopLevelLayout } from './domainDagreTopLevelLayout';
 /**
  * 域级 Dagre 布局策略
  * 
@@ -535,164 +536,19 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         updatedNodes.forEach(n => idMap.set(n.id, n));
 
 
-        // ============================================
-        // 第二阶段：域级布局（使用 Dagre 基于跨域边排列）
-        // ============================================
-
-        // 提取跨域边
-        const crossDomainEdges: Edge[] = [];
-        const domainIdMap = new Map<string, string>();
-        domains.forEach(d => domainIdMap.set(domainOf(d), d.id));
-
-        edges.forEach(e => {
-            const src = idMap.get(e.source);
-            const tgt = idMap.get(e.target);
-            if (!src || !tgt) return;
-
-            const srcDomain = domainOf(src);
-            const tgtDomain = domainOf(tgt);
-
-            if (srcDomain && tgtDomain && srcDomain !== tgtDomain) {
-                const srcDomainId = domainIdMap.get(srcDomain);
-                const tgtDomainId = domainIdMap.get(tgtDomain);
-
-                if (srcDomainId && tgtDomainId) {
-                    // 避免重复边
-                    if (!crossDomainEdges.some(
-                        ce => ce.source === srcDomainId && ce.target === tgtDomainId
-                    )) {
-                        crossDomainEdges.push({
-                            id: `domain_edge_${srcDomainId}_${tgtDomainId}`,
-                            source: srcDomainId,
-                            target: tgtDomainId,
-                        });
-                    }
-                }
-            }
+        runDomainDagreTopLevelLayout({
+            nodes: updatedNodes,
+            edges,
+            domains: updatedNodes.filter(n => String(n.type || '') === 'titleGroup' && !isHidden(n)),
+            leafNodes,
+            nodeById: idMap,
+            nodeToSubGroup,
+            domainOrder: domainOrderArr ?? [],
+            domainOrderIndex,
+            isHorizontal,
+            domainGap,
+            getNodeDimensions,
         });
-
-        // 孤立节点
-        const orphanNodes = leafNodes.filter(n => !domainOf(n) && !nodeToSubGroup.has(n.id));
-
-        // 域级 Dagre 布局
-        const domainLayoutNodes: ReactFlowNode[] = [...domains, ...orphanNodes];
-
-        // 调试：打印域的尺寸
-        domainLayoutNodes.forEach(d => {
-            // [FIX] 忽略 RF measured，只用 style
-            const _w = (d as any).style?.width || 200;
-            const _h = (d as any).style?.height || 80;
-        });
-
-        if (domainLayoutNodes.length > 0) {
-            const result = layoutWithDagre(
-                domainLayoutNodes,
-                crossDomainEdges,
-                isHorizontal ? 'LR' : 'TB',
-                domainGap,
-                domainGap,
-                getNodeDimensions,
-                'network-simplex'  // 最优的层级分配算法
-            );
-
-            // 应用域级布局
-
-            result.forEach(pos => {
-                const node = idMap.get(pos.id);
-                if (!node) return;
-
-                // 域的旧位置应该是 (0, 0)，因为我们在阶段1前初始化了
-                const oldX = node.position.x;  // 应该是 0
-                const oldY = node.position.y;  // 应该是 0
-
-                // 新位置是 Dagre 计算的位置
-                const newX = pos.x;
-                const newY = pos.y;
-
-                // 如果是域，需要同步移动所有子节点
-                if (String(node.type) === 'titleGroup') {
-                    const dk = domainOf(node);
-
-                    // 计算需要移动的距离
-                    const deltaX = newX - oldX;
-                    const deltaY = newY - oldY;
-
-
-                    // 移动该域下的所有子节点
-                    updatedNodes.forEach(child => {
-                        if (child.id === node.id) return;
-                        if (domainOf(child) !== dk) return;
-
-                        child.position = {
-                            x: child.position.x + deltaX,
-                            y: child.position.y + deltaY
-                        };
-                    });
-                }
-
-                // 更新域/孤立节点位置
-                node.position = { x: newX, y: newY };
-            });
-        }
-
-        // ===== [FIX] 强制按 domainOrder 重排域堆叠顺序 =====
-        // Dagre 基于拓扑边决定域位置，可能与标准数据文件中的 domainOrder 不一致。
-        // 使用布局方向决定重排轴：TB/BT 沿 Y 轴，LR/RL 沿 X 轴。
-        // 不能根据中间态 x/y spread 猜测方向；TB 图在 Dagre 中间态横向散开时会被误判成横排。
-        // [FIX] 从 idMap 重新获取 domains：centerSubGroupsInDomain 可能替换了节点引用，
-        // 导致旧 domains 数组指向过时对象，position 不反映域级 Dagre 的结果
-        const freshDomains = updatedNodes.filter(n => String(n.type || '') === 'titleGroup' && !isHidden(n));
-        if (Array.isArray(domainOrderArr) && domainOrderArr.length && freshDomains.length > 1) {
-            const orderedDomains = freshDomains.slice().sort((a, b) => {
-                const ai = domainOrderIndex.get(domainOf(a)) ?? Infinity;
-                const bi = domainOrderIndex.get(domainOf(b)) ?? Infinity;
-                return ai - bi;
-            });
-
-            if (!isHorizontal) {
-                const startY = Math.min(...freshDomains.map(d => d.position.y));
-                const startX = Math.min(...freshDomains.map(d => d.position.x));
-                let cursorY = startY;
-                for (const d of orderedDomains) {
-                    const oldY = d.position.y;
-                    const deltaY = cursorY - oldY;
-                    const oldX = d.position.x;
-                    const deltaX = startX - oldX;
-                    if (Math.abs(deltaY) > 0.5 || Math.abs(deltaX) > 0.5) {
-                        const dk = domainOf(d);
-                        updatedNodes.forEach(child => {
-                            if (child.id === d.id) return;
-                            if (domainOf(child) !== dk) return;
-                            child.position = { x: child.position.x + deltaX, y: child.position.y + deltaY };
-                        });
-                        d.position = { x: startX, y: cursorY };
-                    }
-                    const h = num((d as any).style?.height ?? (d as any).measured?.height, 100);
-                    cursorY += h + domainGap;
-                }
-            } else {
-                const startX = Math.min(...freshDomains.map(d => d.position.x));
-                const startY = Math.min(...freshDomains.map(d => d.position.y));
-                let cursorX = startX;
-                for (const d of orderedDomains) {
-                    const oldX = d.position.x;
-                    const deltaX = cursorX - oldX;
-                    const oldY = d.position.y;
-                    const deltaY = startY - oldY;
-                    if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
-                        const dk = domainOf(d);
-                        updatedNodes.forEach(child => {
-                            if (child.id === d.id) return;
-                            if (domainOf(child) !== dk) return;
-                            child.position = { x: child.position.x + deltaX, y: child.position.y + deltaY };
-                        });
-                        d.position = { x: cursorX, y: startY };
-                    }
-                    const w = num((d as any).style?.width ?? (d as any).measured?.width, 200);
-                    cursorX += w + domainGap;
-                }
-            }
-        }
 
         // ============================================
         // 子域整体居中处理（在所有域级布局完成后）
