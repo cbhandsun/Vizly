@@ -11,6 +11,8 @@ import {
     isSupportedMindMapImportFile,
     parseMindMapImportText,
 } from '../useMindElixirFileDrop';
+import { createMindElixirArrowModeController } from '../mindElixirArrowModeController';
+import type { MindElixirInstance, Topic } from 'mind-elixir';
 
 describe('mind elixir wrapper boundaries', () => {
     it('accepts bounded hex palettes and rejects unsafe CSS values', () => {
@@ -55,5 +57,67 @@ describe('mind elixir wrapper boundaries', () => {
         expect(() => parseMindMapImportText('ideas.md', new ArrayBuffer(8))).toThrow(
             'Mind map import did not contain text.',
         );
+    });
+
+    it('removes the exact arrow listener on toggle and disposal', () => {
+        const addListener = vi.fn();
+        const removeListener = vi.fn();
+        const onEnabledChange = vi.fn();
+        const mind = { bus: { addListener, removeListener } } as unknown as MindElixirInstance;
+        const controller = createMindElixirArrowModeController({ mind, onEnabledChange });
+
+        controller.toggle();
+        expect(controller.isEnabled()).toBe(true);
+        const listener = addListener.mock.calls[0]?.[1];
+        controller.toggle();
+        expect(removeListener).toHaveBeenCalledWith('selectNodes', listener);
+        expect(controller.isEnabled()).toBe(false);
+
+        controller.toggle();
+        const secondListener = addListener.mock.calls[1]?.[1];
+        controller.dispose();
+        expect(removeListener).toHaveBeenLastCalledWith('selectNodes', secondListener);
+        expect(onEnabledChange).toHaveBeenLastCalledWith(false);
+    });
+
+    it('finishes arrow analysis and falls back safely when the provider rejects', async () => {
+        let listener: ((nodes: [], element: Topic) => void) | undefined;
+        const arrow = { label: '' };
+        const emitOperation = vi.fn();
+        const logFailure = vi.fn();
+        const mind = {
+            bus: {
+                addListener: (_event: string, next: typeof listener) => { listener = next; },
+                removeListener: vi.fn(),
+            },
+            arrows: [arrow],
+            createArrow: vi.fn(),
+            renderArrow: vi.fn(),
+            getData: () => ({ nodeData: { id: 'root', topic: 'Root', children: [] } }),
+            getObjById: (id: string) => ({ id, topic: id === 'left' ? 'Left' : 'Right' }),
+        } as unknown as MindElixirInstance;
+        const controller = createMindElixirArrowModeController({
+            mind,
+            onEnabledChange: vi.fn(),
+            dependencies: {
+                analyzeRelationship: vi.fn().mockRejectedValue(new Error('provider unavailable')),
+                emitOperation,
+                logFailure,
+            },
+        });
+        const left = { dataset: { nodeid: 'left' } } as unknown as Topic;
+        const right = { dataset: { nodeid: 'right' } } as unknown as Topic;
+
+        controller.toggle();
+        listener?.([], left);
+        listener?.([], right);
+        await vi.waitFor(() => expect(arrow.label).toBe('关联'));
+
+        expect(logFailure).toHaveBeenCalledOnce();
+        expect(emitOperation).toHaveBeenCalledWith(mind, expect.objectContaining({
+            name: 'editArrowLabel',
+            obj: arrow,
+        }));
+        expect(controller.isEnabled()).toBe(false);
     });
 });

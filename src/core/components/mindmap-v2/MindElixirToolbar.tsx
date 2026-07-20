@@ -43,7 +43,7 @@ import {
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import MindElixir from 'mind-elixir';
-import type { NodeObj } from 'mind-elixir';
+import type { MindElixirInstance, NodeObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir, setPresentationState, toggleKanban, subscribeKanban, toggleAIPanel, subscribeAIPanel } from './mindElixirStore';
 import {
     directionStringToInt, nodeObjToMarkdown, nodeObjToOpml, downloadText,
@@ -57,7 +57,6 @@ import { emitToggleHistory } from './mindmapHistoryStore';
 import MindMapShortcutsModal from './MindMapShortcutsModal';
 import MindMapTemplates from './MindMapTemplates';
 import { exportXmind } from './exportXmind';
-import { analyzeNodesRelationship } from './mindmapAIService';
 import { nodeObjToPitchMarkdown } from './mindmapPitchExport';
 import { arrangeMindMapTree } from './mindmapAutoArrange';
 import { getFileSizeLimitError, MINDMAP_TEXT_IMPORT_MAX_BYTES } from '../../utils/fileImportGuards';
@@ -67,7 +66,6 @@ import { cleanAndValidateTree, cleanMindMapData } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import {
     logMindmapToolbarAddRootChildFailure,
-    logMindmapToolbarArrowFailure,
     logMindmapToolbarAutoArrangeFailure,
     logMindmapToolbarExportFailure,
     logMindmapToolbarFocusModeFailure,
@@ -80,6 +78,7 @@ import { persistMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeSt
 import { coerceMindElixirDirection } from './mindElixirDirection';
 import { emitVizlyMindMapOperation } from './mindmapOperationBridge';
 import { setMindMapTreeExpanded } from './mindmapTreeExpansion';
+import { createMindElixirArrowModeController } from './mindElixirArrowModeController';
 
 
 const DIRECTION_OPTIONS = [
@@ -437,62 +436,36 @@ const MindElixirToolbar: React.FC = () => {
         } catch (e) { logMindmapToolbarSummaryFailure(e); }
     }, [mind]);
 
-    const arrowFromRef = useRef<import('mind-elixir').Topic | null>(null);
-    const [arrowMode, setArrowMode] = useState(false);
+    const [arrowState, setArrowState] = useState<{ mind: MindElixirInstance | null; enabled: boolean }>({
+        mind: null,
+        enabled: false,
+    });
+    const arrowMode = arrowState.mind === mind && arrowState.enabled;
+    const arrowControllerRef = useRef<ReturnType<typeof createMindElixirArrowModeController> | null>(null);
+
+    useEffect(() => {
+        if (!mind) {
+            arrowControllerRef.current = null;
+            return;
+        }
+        let mounted = true;
+        const controller = createMindElixirArrowModeController({
+            mind,
+            onEnabledChange: enabled => {
+                if (mounted) setArrowState({ mind, enabled });
+            },
+        });
+        arrowControllerRef.current = controller;
+        return () => {
+            mounted = false;
+            controller.dispose();
+            if (arrowControllerRef.current === controller) arrowControllerRef.current = null;
+        };
+    }, [mind]);
 
     const handleArrowMode = useCallback(() => {
-        if (!mind) return;
-        const entering = !arrowMode;
-        setArrowMode(entering);
-        arrowFromRef.current = null;
-        if (entering) {
-            // Intercept next two node clicks
-            const handler = (_nodes: any[], el: import('mind-elixir').Topic) => {
-                if (!arrowFromRef.current) {
-                    arrowFromRef.current = el;
-                } else {
-                    const fromEl = arrowFromRef.current;
-                    try {
-                        mind.createArrow(fromEl, el);
-                        // AI 语义智能分析与命名
-                        const arrows = mind.arrows || [];
-                        const newArrow = arrows[arrows.length - 1];
-                        if (newArrow) {
-                            newArrow.label = '...'; // 加载状态
-                            mind.renderArrow();
-
-                            const fromId = fromEl.dataset?.nodeid;
-                            const toId = el.dataset?.nodeid;
-                            if (fromId && toId) {
-                                const data = mind.getData();
-                                const fromNode = mind.getObjById(fromId, data.nodeData);
-                                const toNode = mind.getObjById(toId, data.nodeData);
-                                if (fromNode && toNode) {
-                                    analyzeNodesRelationship(fromNode.topic, toNode.topic).then((res) => {
-                                        if ('error' in res) {
-                                            newArrow.label = '关联'; // 兜底
-                                        } else {
-                                            newArrow.label = res.relationText;
-                                        }
-                                        mind.renderArrow();
-                                        // 触发 operation 记录，同步协同和静默保存
-                                        emitVizlyMindMapOperation(mind, {
-                                            name: 'editArrowLabel',
-                                            obj: newArrow,
-                                        });
-                                    });
-                                }
-                            }
-                        }
-                    } catch (e) { logMindmapToolbarArrowFailure(e); }
-                    arrowFromRef.current = null;
-                    setArrowMode(false);
-                    mind.bus.removeListener('selectNodes', handler as any);
-                }
-            };
-            mind.bus.addListener('selectNodes', handler as any);
-        }
-    }, [mind, arrowMode]);
+        arrowControllerRef.current?.toggle();
+    }, []);
 
     // ── Import Markdown ───────────────────────────────────────────────────────
     const fileInputRef = useRef<HTMLInputElement>(null);
