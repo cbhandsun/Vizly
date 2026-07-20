@@ -2,10 +2,8 @@ import type { Edge } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import { buildBoundedResidualOverlapMazeCandidate } from '../edgeDetachedResidualOverlapMaze';
-import {
-  routeStrictCrossingMazeCandidate,
-  type StrictCrossingMazeDiagnostics,
-} from '../edgeDetachedOverlapRepair';
+import { routeStrictCrossingMazeCandidate } from '../edgeDetachedStrictCrossingMaze';
+import type { StrictCrossingMazeDiagnostics } from '../edgeDetachedOverlapRepairTypes';
 import { countStrictEdgeCrossings } from '../edgeStrictCrossingGuard';
 
 type Point = { x: number; y: number };
