@@ -38,9 +38,9 @@ export interface ProGanttTask {
   };
 }
 
-export function buildHierarchicalTasks(tasks: ProGanttTask[]): ProGanttTask[] {
+export function buildHierarchicalTasks<T extends ProGanttTask>(tasks: T[]): T[] {
   // 1. Map to hold all tasks with fresh computed defaults
-  const taskMap = new Map<string, ProGanttTask & { children: string[] }>();
+  const taskMap = new Map<string, T & { children: string[] }>();
   tasks.forEach(t => {
       taskMap.set(t.id, { 
           ...t, 
@@ -102,7 +102,7 @@ export function buildHierarchicalTasks(tasks: ProGanttTask[]): ProGanttTask[] {
   roots.forEach(rid => rollupTask(rid));
 
   // 4. Top-down flatten and compute depth & visibility
-  const flattened: ProGanttTask[] = [];
+  const flattened: T[] = [];
   
   function flattenTask(taskId: string, depth: number, parentVisible: boolean) {
       const t = taskMap.get(taskId)!;
@@ -120,7 +120,7 @@ export function buildHierarchicalTasks(tasks: ProGanttTask[]): ProGanttTask[] {
 }
 
 // Global 1D bin-packing algorithm for swimlane collision detection
-export function calculateSwimlanes(tasks: ProGanttTask[]): ProGanttTask[] {
+export function calculateSwimlanes<T extends ProGanttTask>(tasks: T[]): T[] {
   const hierarchicalTasks = buildHierarchicalTasks(tasks);
   
   // Only allocate lanes for visible tasks

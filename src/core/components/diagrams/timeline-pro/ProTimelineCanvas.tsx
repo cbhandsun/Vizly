@@ -96,7 +96,7 @@ export default function ProTimelineCanvas() {
       appMessage.success('已成功清空当前项目的基线排期');
   }, [setNodes]);
 
-    const tasks = useMemo<ProGanttTask[]>(
+    const tasks = useMemo(
         () => projectProTimelineTasks(nodes, edges),
         [nodes, edges],
     );

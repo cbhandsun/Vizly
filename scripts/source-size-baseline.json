@@ -7,7 +7,6 @@
     "compositionRoot": 300
   },
   "oversizedFiles": {
-    "src/core/components/diagrams/timeline-pro/ProTaskLayer.tsx": 744,
     "src/core/components/shared/baseReactFlowDisplayEndpointStubCandidates.ts": 803,
     "src/core/components/shared/baseReactFlowDisplayLaneCandidates.ts": 942,
     "src/core/components/shared/baseReactFlowDisplayOverlapRepair.ts": 1112,

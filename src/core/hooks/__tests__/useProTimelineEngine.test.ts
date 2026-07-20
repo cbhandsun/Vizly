@@ -63,6 +63,8 @@ describe('useProTimelineEngine date helpers', () => {
                     endDate: 'invalid',
                     progress: '120',
                     priority: 'urgent',
+                    color: 'url(https://example.invalid/tracker)',
+                    status: 'x'.repeat(100),
                 },
             },
             {
@@ -87,6 +89,8 @@ describe('useProTimelineEngine date helpers', () => {
                 endDate: '2026-07-20',
                 progress: 100,
                 priority: undefined,
+                color: undefined,
+                status: 'x'.repeat(64),
                 dependencies: ['phase-without-date'],
                 _rawSelected: true,
             }),

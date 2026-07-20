@@ -8,10 +8,20 @@ export type ProjectedProTimelineTask = ProGanttTask & {
   status?: string;
 };
 
-const optionalString = (value: unknown): string | undefined => {
+const optionalString = (value: unknown, maxLength = 500): string | undefined => {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
-  return trimmed || undefined;
+  return trimmed ? trimmed.slice(0, maxLength) : undefined;
+};
+
+const optionalCssColor = (value: unknown): string | undefined => {
+  const color = optionalString(value, 64);
+  if (!color) return undefined;
+  if (/^#[\da-f]{3,4}$/i.test(color) || /^#[\da-f]{6}([\da-f]{2})?$/i.test(color)) return color;
+  if (/^[a-z]+$/i.test(color)) return color;
+  if (/^rgba?\([\d.%\s,]+\)$/i.test(color)) return color;
+  if (/^hsla?\([\d.%+\-\s,]+\)$/i.test(color)) return color;
+  return undefined;
 };
 
 const dateOnlyString = (value: unknown): string => {
@@ -40,7 +50,7 @@ export const projectProTimelineTasks = (
   }
 
   return nodes.flatMap((node) => {
-    const type = optionalString(node.data.type);
+    const type = optionalString(node.data.type, 32);
     if (!['phase', 'event', 'milestone', 'summary'].includes(type ?? '') && node.type !== 'timelineNode') {
       return [];
     }
@@ -50,18 +60,18 @@ export const projectProTimelineTasks = (
     const explicitEndDate = dateOnlyString(node.data.endDate);
     return [{
       id: node.id,
-      name: optionalString(node.data.label) ?? '未命名',
+      name: optionalString(node.data.label, 500) ?? '未命名',
       startDate,
       endDate: explicitEndDate || startDate,
       progress: optionalProgress(node.data.progress),
       dependencies: dependenciesByTarget.get(node.id) ?? [],
       type,
-      color: optionalString(node.data.color),
+      color: optionalCssColor(node.data.color),
       _rawSelected: node.selected,
-      status: optionalString(node.data.status),
-      parentId: optionalString(node.data.parentId),
+      status: optionalString(node.data.status, 64),
+      parentId: optionalString(node.data.parentId, 200),
       isExpanded: typeof node.data.isExpanded === 'boolean' ? node.data.isExpanded : undefined,
-      assignee: optionalString(node.data.assignee),
+      assignee: optionalString(node.data.assignee, 120),
       priority: optionalPriority(node.data.priority),
       baselineStartDate: dateOnlyString(node.data.baselineStartDate) || undefined,
       baselineEndDate: dateOnlyString(node.data.baselineEndDate) || undefined,
