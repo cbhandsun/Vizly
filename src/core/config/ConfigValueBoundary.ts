@@ -17,6 +17,7 @@ const MAX_CONFIG_ARRAY_ITEMS = 5000;
 const MAX_CONFIG_OBJECT_KEYS = 1000;
 const MAX_CONFIG_STRING_CHARS = 64 * 1024;
 const DANGEROUS_CONFIG_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+const CONFIG_PATH_SEGMENT_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 export const getConfigLocalStorage = (): Storage | null => {
   if (typeof globalThis === 'undefined' || !('localStorage' in globalThis)) return null;
@@ -86,6 +87,24 @@ export const sanitizeConfigValue = (value: unknown, depth = 0): ConfigValue => {
 };
 
 export const cloneConfigValue = <T>(value: T): T => sanitizeConfigValue(value) as T;
+
+export const createNestedConfigPatch = (
+  pathSegments: readonly string[],
+  value: unknown,
+): ConfigValue => {
+  if (pathSegments.length > MAX_CONFIG_VALUE_DEPTH) {
+    throw new Error('配置路径嵌套过深');
+  }
+
+  let patch: ConfigValue = sanitizeConfigValue(value);
+  for (const segment of [...pathSegments].reverse()) {
+    if (!CONFIG_PATH_SEGMENT_PATTERN.test(segment) || DANGEROUS_CONFIG_KEYS.has(segment)) {
+      throw new Error('配置路径包含非法字段');
+    }
+    patch = { [segment]: patch };
+  }
+  return patch;
+};
 
 export const configValuesEqual = (left: unknown, right: unknown): boolean => {
   if (Object.is(left, right)) return true;

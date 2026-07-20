@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { diagramConfigManager } from '../../config/DiagramConfig';
 import { ThemePresetManager } from '../../themes/ThemePresetManager';
 import { ConfigIntegration } from '../ConfigIntegration';
+import { DiagramConfigManager } from '../DiagramConfigManager';
 
 const safeLogState = vi.hoisted(() => ({
   debug: vi.fn(),
@@ -63,6 +64,43 @@ describe('ConfigIntegration', () => {
     expect(payload).not.toContain('live-token');
 
     integration.dispose();
+  });
+
+  it('preserves nested diagram config paths when synchronizing leaf updates', async () => {
+    const manager = new DiagramConfigManager();
+    const integration = new ConfigIntegration(manager, {
+      enableMigration: false,
+      preserveExistingConfig: true,
+      enableValidation: true,
+      enablePerformanceOptimization: false,
+      migrationStrategy: 'manual',
+    }) as any;
+    await integration.waitForReady();
+
+    const originalVerticalPadding = manager.getConfig().node.padding.vertical;
+    integration.synchronizer.syncToDiagramConfig('diagram.node.padding.horizontal', 37);
+    integration.synchronizer.syncToDiagramConfig('diagram.node.font.size', 15);
+
+    expect(manager.getConfig().node.padding).toEqual({
+      horizontal: 37,
+      vertical: originalVerticalPadding,
+    });
+    expect(manager.getConfig().node.font.size).toBe(15);
+
+    integration.dispose();
+  });
+
+  it('unregisters its layered config listener when disposed', async () => {
+    const integration = createIntegration() as any;
+    await integration.waitForReady();
+    const removeGlobalListener = vi.spyOn(
+      integration.layeredConfig,
+      'removeGlobalListener',
+    );
+
+    integration.dispose();
+
+    expect(removeGlobalListener).toHaveBeenCalledOnce();
   });
 
   it('handles malformed exported presets JSON in fallback mode', async () => {

@@ -4,7 +4,7 @@
  */
 
 import { LayeredConfigManager, ConfigLayer } from './LayeredConfigManager';
-import type { LayeredConfigChangeEvent } from './LayeredConfigManager';
+import type { LayeredConfigChangeEvent, LayeredConfigListener } from './LayeredConfigManager';
 import { validators } from './ConfigValidation';
 import { DiagramConfigManager } from '../config/DiagramConfig';
 import type { CanvasConfig, DomainConfig, EdgeConfig, NodeConfig } from '../config/DiagramConfig';
@@ -16,6 +16,7 @@ import type { Theme, ThemePerformanceOptions, ThemePreset } from '../themes/type
 import { safeLog } from '../utils/consoleCleanup';
 import { redactSensitiveLogValue } from '../utils/logSecurity';
 import { safeJsonParse } from '../utils/jsonUtils';
+import { createNestedConfigPatch } from './ConfigValueBoundary';
 
 export interface IntegrationOptions {
   enableMigration: boolean;
@@ -198,12 +199,22 @@ class ConfigMigrator {
 // 配置同步器
 class ConfigSynchronizer {
   private syncHandlers: Map<string, (value: unknown) => void> = new Map();
+  private readonly globalListener: LayeredConfigListener;
 
   constructor(
     private layeredConfig: LayeredConfigManager,
     private diagramConfig: DiagramConfigManager,
     private themeManager: EnhancedThemeManager
   ) {
+    this.globalListener = (event: LayeredConfigChangeEvent<unknown>) => {
+      const key = event.key || '';
+      const value = event.effectiveValue ?? event.newValue;
+      if (key.startsWith('diagram.')) {
+        this.syncToDiagramConfig(key, value);
+      } else if (key.startsWith('theme.')) {
+        this.syncToThemeManager(key, value);
+      }
+    };
     this.setupSyncHandlers();
   }
 
@@ -217,15 +228,7 @@ class ConfigSynchronizer {
      * - 做法：改用全局监听器，按 key 前缀路由到对应的同步处理；
      * - 细节：使用 event.effectiveValue（优先）或 newValue，保证读取到合并后的有效值。
      */
-    this.layeredConfig.addGlobalListener((event: LayeredConfigChangeEvent<unknown>) => {
-      const key = event.key || '';
-      const value = event.effectiveValue ?? event.newValue;
-      if (key.startsWith('diagram.')) {
-        this.syncToDiagramConfig(key, value);
-      } else if (key.startsWith('theme.')) {
-        this.syncToThemeManager(key, value);
-      }
-    });
+    this.layeredConfig.addGlobalListener(this.globalListener);
 
     // 设置具体的同步处理器
     this.syncHandlers.set('diagram.node', this.syncNodeConfig.bind(this));
@@ -238,18 +241,17 @@ class ConfigSynchronizer {
 
   /**
    * 路由并规范化配置值后同步至图表配置（函数级注释）
-   * - 解析键路径：diagram.<category>.<prop>...；仅支持一级属性合并（如 edge.mode、edge.pathType）；
-   * - 构造部分对象：将叶子值包裹为 { [prop]: value } 传递给对应的同步处理器；
+   * - 解析键路径：diagram.<category>.<prop>...；
+   * - 构造嵌套 patch：padding.horizontal 会变为 { padding: { horizontal: value } }；
    * - 作用：避免直接扩展原始值（数字/字符串）到对象导致无效合并。
    */
   private syncToDiagramConfig(key: string, value: unknown): void {
     const parts = String(key).split('.');
     if (parts[0] !== 'diagram' || parts.length < 2) return;
     const category = parts[1];
-    const prop = parts[2];
     const handler = this.syncHandlers.get(`diagram.${category}`);
     if (!handler) return;
-    const normalized = prop ? { [prop]: value } : value;
+    const normalized = createNestedConfigPatch(parts.slice(2), value);
     handler(normalized);
   }
 
@@ -323,6 +325,10 @@ class ConfigSynchronizer {
     } catch (error) {
       safeLog.error('Failed to sync theme:', redactSensitiveLogValue(error));
     }
+  }
+
+  dispose(): void {
+    this.layeredConfig.removeGlobalListener(this.globalListener);
   }
 }
 
@@ -621,6 +627,8 @@ export class ConfigIntegration {
    * 清理资源
    */
   dispose(): void {
+    this.synchronizer?.dispose();
+    this.synchronizer = undefined;
     this.performanceOptimizer?.dispose();
     // LayeredConfigManager 不需要dispose，它是单例
     this.themeManager?.dispose();

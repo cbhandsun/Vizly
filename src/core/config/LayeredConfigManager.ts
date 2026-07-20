@@ -668,8 +668,11 @@ export class LayeredConfigManager {
     this.globalListeners.forEach(listener => {
       try {
         listener(createLayeredConfigChangeEvent(key, oldValue, newValue, layer, effectiveValue));
-      } catch {
-        this.configLogger.error('全局配置监听器异常');
+      } catch (error) {
+        safeLog.error(
+          'LayeredConfigManager: global listener failed',
+          redactSensitiveLogValue(error),
+        );
       }
     });
   }
