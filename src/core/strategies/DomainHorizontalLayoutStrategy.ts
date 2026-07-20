@@ -1,7 +1,6 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import type { StandardNodeData } from '../models/DiagramModels';
 import type { LayoutOptions } from '../types/layout';
-import { LayoutType } from '../types/layout';
 import { diagramConfigManager } from '../config/DiagramConfig';
 import { LayeredConfigManager } from '../config/LayeredConfigManager';
 import { ILayoutStrategy } from './LayoutStrategyManager';
@@ -44,6 +43,12 @@ import {
 } from '../utils/layoutUtils';
 import { logLayoutDiagnosticsSummary, logSubGroupDebugSample } from './layoutLogging';
 import { runEdgeRoutingPipeline } from './shared/edgeRoutingPipeline';
+import { resolveDomainHorizontalLayoutBoundary } from './domainHorizontalLayoutBoundary';
+import {
+  applyDomainHorizontalGroupVisibility,
+  injectSemanticSubGroupsForMissingKeys,
+  rebindDomainHorizontalChildren,
+} from './domainHorizontalSemanticModel';
 
 /**
  * 域水平布局策略
@@ -64,42 +69,42 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
   /**
    * 计算布局
    * 函数级注释：
-   * - 两阶段流水线，移除循环钳制与复杂排序，保证稳定输出
-   */
+  * - 两阶段流水线，移除循环钳制与复杂排序，保证稳定输出
+  */
   async calculateLayout(nodes: ReactFlowNode[], edges: Edge[], options: LayoutOptions): Promise<{ nodes: ReactFlowNode[]; edges: Edge[] }> {
-    const cfg = diagramConfigManager.getConfig() as any;
-    const layoutCfg = diagramConfigManager.getLayoutConfig() as any;
+    nodes = Array.isArray(nodes) ? nodes : [];
+    edges = Array.isArray(edges) ? edges : [];
+    if (nodes.length === 0) return { nodes: [], edges };
+    const cfg = diagramConfigManager.getConfig();
+    const layoutCfg = diagramConfigManager.getLayoutConfig();
     const layeredCfg = LayeredConfigManager.getInstance();
-    const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-    const padH = num(cfg?.domain?.padding?.horizontal, 24);
-    const titleH = num(cfg?.domain?.title?.height, 40);
-    const titleV = num(cfg?.domain?.title?.padding?.vertical, 12);
-    const titleSafe = num(cfg?.domain?.title?.safeGap, 16);
-    // const bottomSafe = num((cfg?.domain?.bottomSafeGap ?? cfg?.domain?.padding?.bottom), padH);
-    const domainGap = num(cfg?.domain?.gap, 40);
-    const hScale = num(((cfg?.layout?.autoGapScale?.h) as any), 1);
-    const domainGapEffH = Math.max(12, Math.round(domainGap * hScale));
-    const sideSafe = Math.max(0, num((cfg?.domain?.sideSafeGap), 8));
-    const subPadH = num((cfg?.subDomain?.padding?.horizontal ?? (cfg as any)?.subGroup?.padding?.horizontal ?? layoutCfg?.SUB_GROUP_PADDING?.H), Math.max(16, Math.floor(padH * 0.8)));
-    const subTitleH = num((cfg?.subDomain?.title?.height ?? (cfg as any)?.subGroup?.title?.height), 28);
-    const subTitleV = num((cfg?.subDomain?.title?.padding?.vertical ?? (cfg as any)?.subGroup?.title?.padding?.vertical), 8);
-    const subPadTop = num((cfg?.subDomain?.padding?.top ?? layoutCfg?.SUB_GROUP_PADDING?.V_TOP ?? (cfg as any)?.subGroup?.padding?.top ?? (cfg as any)?.subGroup?.padding?.vertical), Math.max(12, Math.floor(padH * 0.8)));
-    const subBottomSafe = num((cfg?.subDomain?.padding?.bottom ?? layoutCfg?.SUB_GROUP_PADDING?.V_BOTTOM_SAFE ?? layoutCfg?.SUB_GROUP_PADDING?.V_BOTTOM ?? (cfg as any)?.subGroup?.padding?.bottom ?? (cfg as any)?.subGroup?.padding?.vertical), Math.max(12, Math.floor(padH * 0.8)));
-    const nodeV = num((diagramConfigManager.getLayoutConfig() as any)?.NODE_V_GAP, 80);
-    /** 函数级注释：横向节点间距细化值
-     * - 来源：布局配置中的 `NODE_H_GAP` 以及自动缩放 `layout.autoGapScale.h`
-     * - 用途：用于子域容器之间的横向避让与重叠消解
-     */
-    const baseHGapCfg = num((layoutCfg?.NODE_H_GAP), 120);
-    const scaleHCfg = num(((cfg?.layout?.autoGapScale?.h) as any), 1);
-    const hGapDet = Math.max(12, Math.floor(baseHGapCfg * Math.min(1.0, scaleHCfg)));
-    const anchorTopGlobal = Math.round(num((options as any)?.padding?.top, Math.max(40, num((cfg?.diagram?.padding?.top), 40))));
-    const anchorLeftGlobal = Math.round(num((options as any)?.padding?.left, Math.max(40, num((cfg?.diagram?.padding?.left), 40))));
-
-    const domainWhitelist = (options as any)?.domainWhitelist as string[] | undefined;
-    const subWhitelist = (options as any)?.subDomainWhitelist as string[] | undefined;
-    const showDomain = ((options as any)?.generateDomainGroups !== undefined) ? !!(options as any)?.generateDomainGroups : true;
-    const showSub = ((options as any)?.generateSubDomainGroups !== undefined) ? !!((options as any)?.generateSubDomainGroups) : true;
+    const num = (value: unknown, fallback: number) => (
+      typeof value === 'number' && Number.isFinite(value) ? value : fallback
+    );
+    const boundary = resolveDomainHorizontalLayoutBoundary(cfg, layoutCfg, options);
+    const {
+      padH,
+      titleH,
+      titleV,
+      titleSafe,
+      domainGapEffH,
+      sideSafe,
+      subPadH,
+      subTitleH,
+      subTitleV,
+      subPadTop,
+      subBottomSafe,
+      nodeV,
+      baseHGap: baseHGapCfg,
+      hGap: hGapDet,
+      anchorTop: anchorTopGlobal,
+      anchorLeft: anchorLeftGlobal,
+      domainWhitelist,
+      subDomainWhitelist: subWhitelist,
+      showDomainGroups: showDomain,
+      showSubDomainGroups: showSub,
+      nodeLayout: nodeLayoutEffective,
+    } = boundary;
 
     let updatedNodes: ReactFlowNode[] = nodes as ReactFlowNode[];
     updatedNodes = applyDomainGrouping(updatedNodes as any, domainWhitelist) as any;
@@ -108,45 +113,12 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
     updatedNodes = assignChildrenToSubGroupsBySemantic(updatedNodes as any) as ReactFlowNode[];
     updatedNodes = ensureMeasuredForNodes(updatedNodes);
     updatedNodes = normalizeSubGroupDomainByChildren(updatedNodes);
-    updatedNodes = updatedNodes.map(n => {
-      const clone: any = { ...n, data: { ...(n as any).data } };
-      if (String(n.type || '') === 'subGroup') {
-        const key = String((clone.data?.subDomain || '')).trim();
-        const inWhite = Array.isArray(subWhitelist) ? subWhitelist.includes(key) : false;
-        const visible = showSub ? (Array.isArray(subWhitelist) ? inWhite : true) : false;
-        clone.data.hidden = !visible;
-      }
-      if (String(n.type || '') === 'titleGroup') {
-        const dKey = String(((clone.data?.domain || '') || '')).trim();
-        const inWhiteDom = Array.isArray(domainWhitelist) ? domainWhitelist.includes(dKey) : false;
-        const visibleDom = showDomain ? (Array.isArray(domainWhitelist) ? inWhiteDom : true) : false;
-        clone.data.hidden = !visibleDom;
-        clone.data.anchorLocked = true;
-      }
-      if (String(n.type || '') === 'domain' || String(n.type || '') === 'group') {
-        clone.data.anchorLocked = true;
-      }
-      return clone as ReactFlowNode;
+    updatedNodes = applyDomainHorizontalGroupVisibility(updatedNodes, {
+      domainWhitelist,
+      subDomainWhitelist: subWhitelist,
+      showDomainGroups: showDomain,
+      showSubDomainGroups: showSub,
     });
-
-    // 传播隐藏状态到子节点：如果子域被隐藏，其 children 也应该被隐藏
-    {
-      const idMapLocal = new Map<string, ReactFlowNode>(updatedNodes.map(n => [n.id, n] as const));
-      const hiddenSubGroups = updatedNodes.filter(n =>
-        String(n.type || '') === 'subGroup' && !!((n as any)?.data?.hidden)
-      );
-      for (const sg of hiddenSubGroups) {
-        const children = Array.isArray((sg as any)?.data?.children) ? (sg as any).data.children as string[] : [];
-        for (const cid of children) {
-          const child = idMapLocal.get(cid);
-          if (child) {
-            (child as any).data = { ...((child as any).data || {}), hidden: true };
-          }
-        }
-      }
-    }
-
-    const idMap = new Map<string, ReactFlowNode>(updatedNodes.map(n => [n.id, n] as const));
     /** 函数级注释：诊断输出（可选） */
     const runDiagnostics = (list: ReactFlowNode[]) => {
       try {
@@ -172,57 +144,13 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
       }
     };
 
-    // 语义补建与绑定收敛
-    /**
-     * 函数级注释：语义键缺失子域注入（按 domain+subDomain 建立容器）
-     * - 目标：当某域存在业务节点的 subDomain 键，但没有对应子域容器时，自动创建该子域容器，随后由分配/回收流程完善 children 与尺寸。
-     */
-    const injectSemanticSubGroupsForMissingKeys = (list: ReactFlowNode[]): ReactFlowNode[] => {
-      const out = list.map(n => ({ ...n, data: { ...(n.data as any) } }));
-      const isGroupType = (t: any) => new Set(['subGroup', 'titleGroup', 'group', 'domain']).has(String(t || ''));
-      const norm = (s: string) => String(s || '').toLowerCase().replace(/\u3000|\u00A0/g, '').replace(/\s+/g, '').replace(/[+_-]/g, '');
-      const byDomainKeys = new Map<string, Set<string>>();
-      const existingKeys = new Map<string, Set<string>>();
-      for (const n of out) {
-        const dt: any = (n as any).data || {};
-        const d = String((dt?.domain || '')).trim();
-        if (!d) continue;
-        if (!byDomainKeys.has(d)) byDomainKeys.set(d, new Set<string>());
-        if (String(n.type || '') === 'subGroup') {
-          const sRaw = String((dt?.subDomain || '')).trim();
-          const set = existingKeys.get(d) || new Set<string>();
-          set.add(norm(sRaw)); existingKeys.set(d, set);
-        } else if (!isGroupType(n.type)) {
-          const k = norm(String(((dt?.subDomain ?? dt?.subdomain) ?? dt?.metadata?.subDomain) || '').trim());
-          if (k) (byDomainKeys.get(d) as Set<string>).add(k);
-        }
-      }
-      for (const [d, keys] of Array.from(byDomainKeys.entries())) {
-        const exists = existingKeys.get(d) || new Set<string>();
-        for (const k of Array.from(keys.values())) {
-          if (exists.has(k)) continue;
-          const sgId = `subGroup__${norm(d)}__${k}`;
-          const sgNode: any = {
-            id: sgId,
-            type: 'subGroup',
-            position: { x: 0, y: 0 },
-            data: { domain: d, subDomain: k, description: k, children: [] },
-            style: { width: 0, height: 0 },
-            measured: { width: 0, height: 0 },
-            draggable: false, // 锁定自动生成的子域
-          };
-          out.push(sgNode as ReactFlowNode);
-        }
-      }
-      return out as ReactFlowNode[];
-    };
-
     updatedNodes = purgeSubGroupChildrenBySemantic(updatedNodes) as any;
     updatedNodes = assignChildrenToSubGroupsBySemantic(updatedNodes) as any;
     updatedNodes = normalizeSubGroupDomainByChildren(updatedNodes) as any;
-    updatedNodes = injectSemanticSubGroupsForMissingKeys(updatedNodes) as any;
+    updatedNodes = injectSemanticSubGroupsForMissingKeys(updatedNodes);
     updatedNodes = assignChildrenToSubGroupsBySemantic(updatedNodes) as any;
     updatedNodes = auditAndFixSubGroupChildrenBindings(updatedNodes) as any;
+    updatedNodes = rebindDomainHorizontalChildren(updatedNodes);
     runDiagnostics(updatedNodes);
 
     // 域顺序
@@ -232,7 +160,7 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
      * 函数级注释：域内对象排序键（支持显式子域顺序）
      * - 优先级：显式 subDomainOrder > children 最小原始索引 > 节点原始索引
      */
-    const subOrderOptRaw: any = (options as any)?.subDomainOrder;
+    const subOrderOptRaw = boundary.subDomainOrder;
     const getExplicitSubIndex = (domainKey: string, subKey: string): number => {
       try {
         const dTrim = String(domainKey || '').trim();
@@ -282,7 +210,7 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
       const v = originalIndex.get(String((n as any)?.id || ''));
       return (typeof v === 'number') ? v : Number.POSITIVE_INFINITY;
     };
-    const orderOpt: string[] | undefined = (options as any)?.domainOrder as any;
+    const orderOpt = boundary.domainOrder;
     const domainsInData: string[] = [];
     const seenDomains = new Set<string>();
     for (const n of nodes) {
@@ -298,48 +226,6 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
 
 
 
-    /**
-     * 函数级注释：按规范化语义键重建 children（通用归一化）
-     * - 目标：解决中文/英文括号、标点、空白等差异导致的子域归属遗漏；对 sg.description 与 node.subDomain 做统一规范化后重建 children。
-     * - 规则：仅匹配同域；规范化移除空白、加减下划线、全/半角括号与常见中文标点。
-     */
-    const rebindChildrenNormalized = (list: ReactFlowNode[]): ReactFlowNode[] => {
-      const out = list.map(n => ({ ...n, data: { ...(n.data as any) } }));
-      const norm = (s: string) => String(s || '')
-        .toLowerCase()
-        .replace(/[\u3000\u00A0\s]+/g, '')
-        .replace(/[+_-]/g, '')
-        .replace(/[()（）【】[\]{}〈〉<>，、。：:；;．。！!？?]/g, '');
-      const isGroupType = (t: any) => new Set(['subGroup', 'titleGroup', 'group', 'domain']).has(String(t || ''));
-      const domainsArr = out
-        .map(n => String(((n as any)?.data?.domain ?? '')).trim())
-        .filter(Boolean);
-      const domainKeys = Array.from(new Set(domainsArr));
-      const idMapLocal = new Map<string, ReactFlowNode>(out.map(n => [n.id, n] as const));
-      for (const d of domainKeys) {
-        const sgList = out.filter(n => String(n.type || '') === 'subGroup' && (String(((n as any)?.data?.domain || ''))).trim() === d);
-        const biz = out.filter(n => !isGroupType(n.type) && (String(((n as any)?.data?.domain || ''))).trim() === d);
-        const bucket: Record<string, string[]> = {};
-        for (const n of biz) {
-          const nd: any = (n as any).data || {};
-          const subRaw = String(((nd?.subDomain ?? nd?.subdomain) ?? nd?.metadata?.subDomain) || '').trim();
-          const key = norm(subRaw);
-          const k = key || norm(d);
-          (bucket[k] || (bucket[k] = [])).push(n.id);
-        }
-        for (const sg of sgList) {
-          const dt: any = (sg as any).data || {};
-          const sKeyRaw = String((dt?.subDomain || '')).trim();
-          const k = norm(sKeyRaw || d);
-          const nextChildren = Array.from(new Set((bucket[k] || []).filter(id => !!idMapLocal.get(id)))) as string[];
-          ((sg as any).data || ((sg as any).data = {})).children = nextChildren;
-          // 统一写回 sg.data.domain
-          const d1 = String(((dt?.domain || '') || '')).trim(); if (d1 !== d) ((sg as any).data).domain = d;
-        }
-      }
-      return out as ReactFlowNode[];
-    };
-
     // 初始域横排（顶边对齐）
     let cursorX = anchorLeftGlobal;
     const domainsPlaced: ReactFlowNode[] = [];
@@ -351,34 +237,6 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
       cursorX += num(((tg as any)?.measured?.width ?? (tg as any)?.style?.width), 360) + domainGapEffH;
     }
 
-    const nodeLayoutRaw: any = (options as any)?.nodeLayout;
-    const nodeLayoutName: 'grid' | 'horizontal' | 'vertical' | 'centered' | 'dagre' = (() => {
-      const byEnum: Record<string, 'grid' | 'horizontal' | 'vertical' | 'centered' | 'dagre'> = {
-        [String(LayoutType.GRID)]: 'grid',
-        [String(LayoutType.HORIZONTAL)]: 'horizontal',
-        [String(LayoutType.VERTICAL)]: 'vertical',
-        [String(LayoutType.CENTERED)]: 'centered',
-        [String(LayoutType.DAGRE)]: 'dagre',
-      };
-      if (typeof nodeLayoutRaw === 'number' && isFinite(nodeLayoutRaw)) return byEnum[String(nodeLayoutRaw)] || 'vertical';
-      const s = String(nodeLayoutRaw || '').toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
-      const byString: Record<string, 'grid' | 'horizontal' | 'vertical' | 'centered' | 'dagre'> = {
-        'gridlayout': 'grid', 'grid': 'grid',
-        'horizontallayout': 'horizontal', 'horizontal': 'horizontal',
-        'verticallayout': 'vertical', 'vertical': 'vertical',
-        'centeredlayout': 'centered', 'centered': 'centered',
-        'dagrelayout': 'dagre', 'dagre': 'dagre',
-      };
-      if (byString[s]) return byString[s];
-      try {
-        const cfgNode = String((diagramConfigManager.getConfig() as any)?.diagram?.layout?.nodeStrategy || '').toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
-        return byString[cfgNode] || 'vertical';
-      } catch {
-        // ignore
-        return 'vertical';
-      }
-    })();
-    const nodeLayoutEffective: 'grid' | 'horizontal' | 'vertical' | 'centered' | 'dagre' = nodeLayoutName;
     /**
      * 函数级注释：子域纵向堆叠间距（按节点布局细化）
      * - 场景：在域水平布局中，同域子域按垂直方向堆叠；默认使用 `NODE_V_GAP`
@@ -391,8 +249,8 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
     })();
 
     // 阶段一：注入缺失子域 → 统一 children 布局 → 尺寸回收 → 子域尺寸统一 → 严格包含 → 子域高度投影 → 记录相对偏移
-    updatedNodes = injectSemanticSubGroupsForMissingKeys(updatedNodes) as any;
-    updatedNodes = rebindChildrenNormalized(updatedNodes) as any;
+    updatedNodes = injectSemanticSubGroupsForMissingKeys(updatedNodes);
+    updatedNodes = rebindDomainHorizontalChildren(updatedNodes);
     // 对于 dagre 布局，使用 reflowSubGroupChildrenDagre；其他布局使用 enforceSubGroupChildrenLayoutStrict
     if (nodeLayoutEffective === 'dagre') {
       const idm = new Map<string, ReactFlowNode>(updatedNodes.map(n => [n.id, n] as const));
@@ -418,6 +276,7 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
     updatedNodes = recomputeSubGroupContainersBasic(updatedNodes) as any;
     updatedNodes = unifySubGroupLeftAnchors(updatedNodes) as any;
     updatedNodes = auditAndFixSubGroupChildrenBindings(updatedNodes) as any;
+    updatedNodes = rebindDomainHorizontalChildren(updatedNodes);
     updatedNodes = enforceSubGroupStrictContainmentByChildren(updatedNodes) as any;
     updatedNodes = finalizeSubGroupHeightsByProjectionPreserveAnchor(updatedNodes) as any;
     {
@@ -439,7 +298,7 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
     }
     // 使用内部快照机制记录刚体相对偏移
 
-    const stopAfterPhaseRaw = String(((options as any)?.stopAfterPhase ?? layeredCfg.get<string>('diagram.layout.stopAfterPhase', 'none')) || 'none').toLowerCase().replace(/\s+/g, '');
+    const stopAfterPhaseRaw = String((boundary.stopAfterPhase ?? layeredCfg.get<string>('diagram.layout.stopAfterPhase', 'none')) || 'none').toLowerCase().replace(/\s+/g, '');
     const stopAfterPhase: 'none' | 'phase1' | 'phase2' = (stopAfterPhaseRaw === 'phase1' || stopAfterPhaseRaw === 'phase2') ? (stopAfterPhaseRaw as any) : 'none';
     if (stopAfterPhase === 'phase1') return { nodes: updatedNodes, edges } as any;
 
@@ -463,9 +322,9 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
      * 函数级注释：阶段二之后重建子域 children 映射
      * - 目标：在垂直重排/行打包/刚体移动后，确保每个子域的 children 集合与语义归属一致，以便投影计算包含全部成员。
      */
-    updatedNodes = injectSemanticSubGroupsForMissingKeys(updatedNodes) as any;
-    updatedNodes = rebindChildrenNormalized(updatedNodes) as any;
+    updatedNodes = injectSemanticSubGroupsForMissingKeys(updatedNodes);
     updatedNodes = auditAndFixSubGroupChildrenBindings(updatedNodes) as any;
+    updatedNodes = rebindDomainHorizontalChildren(updatedNodes);
     updatedNodes = recomputeSubGroupContainersBasic(updatedNodes) as any;
     updatedNodes = unifySubGroupLeftAnchors(updatedNodes) as any;
 
@@ -513,6 +372,7 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
      * - 规则：innerLeft = titleGroup.position.x + domain.padding.horizontal；子域左锚 = innerLeft - subPadH；
      */
     {
+      const currentNodeById = new Map<string, ReactFlowNode>(updatedNodes.map(n => [n.id, n] as const));
       const tgs = updatedNodes.filter(n => String(n.type || '') === 'titleGroup');
       for (const tg of tgs) {
         const dKey = String(((tg as any)?.data?.domain || ''));
@@ -534,7 +394,7 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
           // 刚体应用：依据快照重置 children 位置 = 子域新位置 + 相对偏移
           // dagre 布局优先使用 __dagreRel，非 dagre 使用 __rel
           for (const cid of ch) {
-            const c = idMap.get(cid);
+            const c = currentNodeById.get(cid);
             if (!c) continue;
             const dagreRel = (((c as any)?.data || {}) as any).__dagreRel;
             const rel = (((c as any)?.data || {}) as any).__rel;
@@ -548,7 +408,7 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
 
           // 刚体之后一次性垂直重排/行打包（仅在检测到重叠或行间距不足时执行）
           try {
-            const childrenNodes = ch.map(id => idMap.get(id)).filter((nn): nn is ReactFlowNode => !!nn);
+            const childrenNodes = ch.map(id => currentNodeById.get(id)).filter((nn): nn is ReactFlowNode => !!nn);
             const SAFE_W = num((diagramConfigManager.getLayoutConfig() as any)?.NODE_MIN_WIDTH, 120);
             const SAFE_H = Math.max(24, num((diagramConfigManager.getConfig() as any)?.node?.height, 80));
             const getW = (n: ReactFlowNode) => Math.max(SAFE_W, num(((n as any)?.measured?.width ?? (n as any)?.style?.width ?? (n as any)?.width), SAFE_W));
