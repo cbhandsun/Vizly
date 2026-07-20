@@ -16,6 +16,18 @@
 
 import type { Node, Edge } from '@xyflow/react';
 import { safeLog } from '../../utils/consoleCleanup';
+import {
+  assignLayers,
+  buildNodeRects,
+  countCrossings,
+  estimateDetourRatio,
+  findBlockingNodes,
+  rectsOverlap,
+} from './layoutRefinementGeometry';
+import type {
+  LayoutRefinementLayer as LayerInfo,
+  LayoutRefinementNodeRect as NodeRect,
+} from './layoutRefinementGeometry';
 
 // ═══════════════════════════════════════════════════════════════
 // 公开接口
@@ -72,27 +84,6 @@ export interface RefinementResult {
     durationMs: number;
     groupCount: number;
   };
-}
-
-// ═══════════════════════════════════════════════════════════════
-// 内部类型
-// ═══════════════════════════════════════════════════════════════
-
-interface LayerInfo {
-  /** 层索引（0=最顶层） */
-  index: number;
-  /** 该层的 y 坐标中心 */
-  y: number;
-  /** 该层内的节点 ID */
-  nodeIds: string[];
-}
-
-interface NodeRect {
-  id: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -289,13 +280,13 @@ function runPhasesOnGroup(
   const layers2 = assignLayers(rects2, opts.layerTolerance, isHorizontal);
 
   // ── Phase 2: 层内排序交叉最小化 ──
-  const crossingsBefore = countCrossings(groupEdges, rectMap2, isHorizontal);
+  const crossingsBefore = countCrossings(groupEdges, rectMap2);
   let crossingsAfter = crossingsBefore;
   if (opts.enableCrossingMinimization && layers2.length >= 2) {
     refined = applyCrossingMinimization(refined, groupEdges, layers2, rectMap2, opts, isHorizontal);
     const rects3 = buildNodeRects(refined);
     const rectMap3 = new Map(rects3.map(r => [r.id, r]));
-    crossingsAfter = countCrossings(groupEdges, rectMap3, isHorizontal);
+    crossingsAfter = countCrossings(groupEdges, rectMap3);
   }
 
   // ── Phase 3: 阻塞节点微调 ──
@@ -426,7 +417,7 @@ function applyCrossingMinimization(
   }
 
   // 多轮上下扫描
-  let bestCrossings = countCrossings(edges, rectMap, isHorizontal);
+  let bestCrossings = countCrossings(edges, rectMap);
   let bestCoords = new Map(nodeCoord);
 
   for (let sweep = 0; sweep < opts.maxSweeps; sweep++) {
@@ -447,7 +438,7 @@ function applyCrossingMinimization(
         tmpRects.set(id, { ...r, ...(isHorizontal ? { y: coord } : { x: coord }) });
       }
     }
-    const newCrossings = countCrossings(edges, tmpRects, isHorizontal);
+    const newCrossings = countCrossings(edges, tmpRects);
     if (newCrossings < bestCrossings) {
       bestCrossings = newCrossings;
       bestCoords = new Map(nodeCoord);
@@ -594,182 +585,6 @@ function applyNodeNudging(
   }
 
   return { nodes: Array.from(nodeMap.values()), nudges };
-}
-
-// ═══════════════════════════════════════════════════════════════
-// 工具函数
-// ═══════════════════════════════════════════════════════════════
-
-/** 从 Node[] 构建 NodeRect[] */
-function buildNodeRects(nodes: Node[]): NodeRect[] {
-  return nodes.map(n => ({
-    id: n.id,
-    x: n.position?.x ?? 0,
-    y: n.position?.y ?? 0,
-    w: (n as any).measured?.width ?? (n as any).width ?? 200,
-    h: (n as any).measured?.height ?? (n as any).height ?? 100,
-  }));
-}
-
-/**
- * 将节点按主轴坐标聚类为层
- *
- * 算法：按主轴坐标排序，相邻节点差 ≤ tolerance 则归入同一层
- */
-function assignLayers(rects: NodeRect[], tolerance: number, isHorizontal: boolean): LayerInfo[] {
-  if (rects.length === 0) return [];
-
-  const sorted = [...rects].sort((a, b) => {
-    const aV = isHorizontal ? a.x : a.y;
-    const bV = isHorizontal ? b.x : b.y;
-    return aV - bV;
-  });
-
-  const layers: LayerInfo[] = [];
-  let currentLayer: NodeRect[] = [sorted[0]];
-
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = isHorizontal ? sorted[i - 1].x : sorted[i - 1].y;
-    const curr = isHorizontal ? sorted[i].x : sorted[i].y;
-    if (curr - prev <= tolerance) {
-      currentLayer.push(sorted[i]);
-    } else {
-      layers.push(makeLayer(layers.length, currentLayer, isHorizontal));
-      currentLayer = [sorted[i]];
-    }
-  }
-  layers.push(makeLayer(layers.length, currentLayer, isHorizontal));
-
-  return layers;
-}
-
-function makeLayer(index: number, rects: NodeRect[], isHorizontal: boolean): LayerInfo {
-  const coords = rects.map(r => (isHorizontal ? r.x : r.y));
-  const avgCoord = coords.reduce((s, v) => s + v, 0) / coords.length;
-  return {
-    index,
-    y: avgCoord,
-    nodeIds: rects.map(r => r.id),
-  };
-}
-
-/** 计算两个 rectMap 状态下的边交叉数 */
-function countCrossings(edges: Edge[], rectMap: Map<string, NodeRect>, _isHorizontal: boolean): number {
-  let crossings = 0;
-  const edgeList = edges.filter(e => rectMap.has(e.source) && rectMap.has(e.target));
-
-  for (let i = 0; i < edgeList.length; i++) {
-    for (let j = i + 1; j < edgeList.length; j++) {
-      const a = edgeList[i];
-      const b = edgeList[j];
-      // 两条边共享端点则不算交叉
-      if (a.source === b.source || a.source === b.target ||
-        a.target === b.source || a.target === b.target) continue;
-
-      const as = rectMap.get(a.source)!;
-      const at = rectMap.get(a.target)!;
-      const bs = rectMap.get(b.source)!;
-      const bt = rectMap.get(b.target)!;
-
-      // 简化交叉检测：使用中心点连线的线段交叉
-      if (segmentsIntersect(
-        as.x + as.w / 2, as.y + as.h / 2,
-        at.x + at.w / 2, at.y + at.h / 2,
-        bs.x + bs.w / 2, bs.y + bs.h / 2,
-        bt.x + bt.w / 2, bt.y + bt.h / 2,
-      )) {
-        crossings++;
-      }
-    }
-  }
-  return crossings;
-}
-
-/** 线段 (x1,y1)-(x2,y2) 和 (x3,y3)-(x4,y4) 是否相交 */
-function segmentsIntersect(
-  x1: number, y1: number, x2: number, y2: number,
-  x3: number, y3: number, x4: number, y4: number,
-): boolean {
-  const d1 = direction(x3, y3, x4, y4, x1, y1);
-  const d2 = direction(x3, y3, x4, y4, x2, y2);
-  const d3 = direction(x1, y1, x2, y2, x3, y3);
-  const d4 = direction(x1, y1, x2, y2, x4, y4);
-
-  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
-    ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
-    return true;
-  }
-  return false;
-}
-
-function direction(ax: number, ay: number, bx: number, by: number, cx: number, cy: number): number {
-  return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
-}
-
-/**
- * 快速估算 detour ratio（不做完整 A*）
- *
- * 检查 src→tgt 的 Manhattan 直线通道上是否有障碍，
- * 如果有，估算绕行距离
- */
-function estimateDetourRatio(
-  src: NodeRect, tgt: NodeRect, allRects: NodeRect[],
-): number {
-  const manhattan = Math.abs(tgt.x - src.x) + Math.abs(tgt.y - src.y);
-  if (manhattan < 1) return 1;
-
-  const blockers = findBlockingNodes(src, tgt, allRects);
-  if (blockers.length === 0) return 1;
-
-  // 粗略估算：每个阻塞节点增加绕行 = 节点宽度 × 2
-  const extraDist = blockers.reduce((s, b) => s + (b.w + b.h), 0);
-  return (manhattan + extraDist) / manhattan;
-}
-
-/**
- * 找出在 src→tgt 直线通道上的阻塞节点
- */
-function findBlockingNodes(
-  src: NodeRect, tgt: NodeRect, allRects: NodeRect[],
-): NodeRect[] {
-  // 通道：从 src center 到 tgt center 的矩形区域
-  const scx = src.x + src.w / 2;
-  const scy = src.y + src.h / 2;
-  const tcx = tgt.x + tgt.w / 2;
-  const tcy = tgt.y + tgt.h / 2;
-
-  const minX = Math.min(scx, tcx);
-  const maxX = Math.max(scx, tcx);
-  const minY = Math.min(scy, tcy);
-  const maxY = Math.max(scy, tcy);
-
-  // 通道宽度 = 源/目标节点中较小的那个的一半
-  const halfWidth = Math.min(src.w, tgt.w, src.h, tgt.h) / 2;
-
-  return allRects.filter(r => {
-    if (r.id === src.id || r.id === tgt.id) return false;
-    const rcx = r.x + r.w / 2;
-    const rcy = r.y + r.h / 2;
-
-    // 节点中心在通道矩形内
-    const inCorridor =
-      rcx + r.w / 2 > minX - halfWidth &&
-      rcx - r.w / 2 < maxX + halfWidth &&
-      rcy + r.h / 2 > minY - halfWidth &&
-      rcy - r.h / 2 < maxY + halfWidth;
-
-    return inCorridor;
-  });
-}
-
-/** 检查两个矩形是否重叠（含 margin） */
-function rectsOverlap(a: NodeRect, b: NodeRect, margin: number): boolean {
-  return !(
-    a.x + a.w + margin <= b.x ||
-    b.x + b.w + margin <= a.x ||
-    a.y + a.h + margin <= b.y ||
-    b.y + b.h + margin <= a.y
-  );
 }
 
 /**
