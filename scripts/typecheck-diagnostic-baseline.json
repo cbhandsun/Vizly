@@ -1082,13 +1082,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/components/shared/baseReactFlowDisplayOuterPortCandidates.ts",
-        "code": 2345,
-        "messageHash": "364b2a4c580a29efbe9fb37fd2c07ee6b4e3b319dd6b8f3d6c5fa9911866882f",
-        "count": 1
-      },
-      {
-        "category": "error",
         "file": "src/core/components/shared/baseReactFlowDisplayQualityGates.ts",
         "code": 2345,
         "messageHash": "cdfe2e10ba8c66517fa10bfa0fcbeb5232b138be2b2e5075b2f0c18ae56d31d4",
