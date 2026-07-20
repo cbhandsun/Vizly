@@ -14,7 +14,6 @@
     "src/core/components/shared/baseReactFlowDisplayLaneCandidates.ts": 942,
     "src/core/components/shared/baseReactFlowDisplayOverlapRepair.ts": 1112,
     "src/core/components/shared/baseReactFlowDisplayTerminalPortRepair.ts": 1021,
-    "src/core/routing/utils/AdvancedRouting.ts": 1052,
     "src/core/strategies/DomainDagreLayoutStrategy.ts": 1089,
     "src/core/strategies/DomainHorizontalLayoutStrategy.ts": 883,
     "src/core/strategies/shared/LayoutRefinement.ts": 907,
