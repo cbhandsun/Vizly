@@ -6,8 +6,5 @@
     "test": 1000,
     "compositionRoot": 300
   },
-  "oversizedFiles": {
-    "src/core/strategies/shared/__tests__/edgeDisplayMicroCleanup.test.ts": 1130,
-    "src/core/strategies/shared/__tests__/edgeLocalDoglegRepair.test.ts": 1047
-  }
+  "oversizedFiles": {}
 }
