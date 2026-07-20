@@ -11,7 +11,6 @@
     "src/core/strategies/shared/__tests__/edgeDisplayMicroCleanup.test.ts": 1130,
     "src/core/strategies/shared/__tests__/edgeLocalDoglegRepair.test.ts": 1047,
     "src/core/strategies/shared/edgeDetachedOverlapRepair.ts": 1024,
-    "src/core/strategies/shared/edgeLocalDoglegAdvancedCandidates.ts": 809,
     "src/core/strategies/shared/edgeStrictCrossingGuard.ts": 1046,
     "src/core/strategies/shared/edgeTerminalBoundaryStairGeometry.ts": 1011
   }
