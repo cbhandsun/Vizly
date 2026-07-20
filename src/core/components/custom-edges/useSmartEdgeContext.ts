@@ -4,134 +4,30 @@ import type { EdgeProps, Edge } from '@xyflow/react';
 import { Position } from '@xyflow/react';
 import { useSimpleNodeMap, type SimpleNodeData } from '../../hooks/useNodeMap';
 import { selectBestPortCombination } from '../../algorithms/smartEdgeUtils';
-import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import { LayeredConfigManager } from '../../config/LayeredConfigManager';
 import { parseHandlePosition } from '../../routing/utils/handleUtils';
 import { safeLog } from '../../utils/consoleCleanup';
-import type { CenteredCoords } from './hooks/useSmartPathWorker';
 import { resolveSmartEdgeHandleSelection } from './smartEdgeHandleSelection';
+import { createSmartEdgeAbsolutePositionResolver } from './smartEdgeNodeGeometry';
 import {
-    createSmartEdgeAbsolutePositionResolver,
-    type SmartEdgeNode,
-    type SmartEdgePoint,
-} from './smartEdgeNodeGeometry';
+    getConfigSnapshot,
+    getEdgeData,
+    isRecord,
+    isLayoutDirection,
+    readHandlePair,
+    smartEdgeContextCache,
+    type DirectionBucket,
+    type LayoutDirection,
+    type Point,
+    type ReactFlowStoreSnapshot,
+    type SmartEdgeContextResult,
+    type SmartNode,
+} from './smartEdgeContextModel';
+export type { SmartEdgeContextResult } from './smartEdgeContextModel';
 import {
     buildSmartEdgeCenteredCoords,
     resolveSmartEdgeFallbackPositions,
 } from './smartEdgeCenteredCoords';
-
-// Reuse direction votes for identical topology signatures.
-type LayoutDirection = 'LR' | 'RL' | 'TB' | 'BT';
-type Point = SmartEdgePoint;
-type DirectionBucket = 'up' | 'down' | 'left' | 'right';
-
-type SmartNode = SmartEdgeNode;
-
-type SmartEdgeConfig = {
-    bundleStrength: number;
-    maxBundleSize: number;
-    obstaclePadding: number;
-    labelCollisionOffset: number;
-    jitterThresholdMultiplier: number;
-    borderRadius: number;
-    sourceOffset: number;
-    targetOffset: number;
-    minLastSegment: number;
-    gridSize: number;
-    jumpRadius: number;
-    debug: boolean;
-    debugPortHeatmap: boolean;
-    strictOrthogonal: boolean;
-} & Record<string, unknown>;
-
-type SmartEdgeData = Record<string, unknown> & {
-    _draggingNodeIds?: unknown;
-    manualHandleSides?: unknown;
-    inferredSubDomainHandles?: unknown;
-    handleSelectionPolicy?: unknown;
-    auto?: unknown;
-    manualHandles?: unknown;
-    _manualHandles?: unknown;
-    runtimeHandleLock?: unknown;
-    _runtimeHandleLock?: unknown;
-    edgeConfig?: Partial<SmartEdgeConfig>;
-    borderRadius?: unknown;
-    layoutDirection?: unknown;
-};
-
-type ReactFlowStoreSnapshot = {
-    edges?: Edge[];
-    nodeLookup?: Map<string, SmartNode>;
-};
-
-type DiagramConfigSnapshot = {
-    edge?: { handleSelectionPolicy?: unknown };
-    layout?: { direction?: unknown };
-};
-
-type HandleFlagPair = { source: boolean; target: boolean };
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-    typeof value === 'object' && value !== null;
-
-const isLayoutDirection = (value: unknown): value is LayoutDirection =>
-    value === 'LR' || value === 'RL' || value === 'TB' || value === 'BT';
-
-const getEdgeData = (data: unknown): SmartEdgeData =>
-    isRecord(data) ? data as SmartEdgeData : {};
-
-const getConfigSnapshot = (): DiagramConfigSnapshot => {
-    try {
-        const config = diagramConfigManager.getConfig();
-        return isRecord(config) ? config as DiagramConfigSnapshot : {};
-    } catch {
-        return {};
-    }
-};
-
-const readHandlePair = (value: unknown): HandleFlagPair => {
-    if (value === true) return { source: true, target: true };
-    if (isRecord(value)) {
-        return { source: Boolean(value.source), target: Boolean(value.target) };
-    }
-    return { source: false, target: false };
-};
-
-const _directionVoteCache = new Map<number, LayoutDirection>();
-
-// Cache hemisphere buckets per topology/source/target and select the current edge later.
-type EdgeListCache = { outgoingBuckets: Record<string, string[]>; incomingBuckets: Record<string, string[]> };
-const _multiEdgeListCache = new Map<string, EdgeListCache>();
-let _multiEdgeListCacheTopoSig: number = -1;
-/**
- * Return type for useSmartEdgeContext hook
- */
-export interface SmartEdgeContextResult {
-    layoutDirection: LayoutDirection;
-    isExplicitLayoutDirection: boolean;
-    multiEdgeInfo: {
-        isManyToOne: boolean;
-        isOneToMany: boolean;
-        incomingCount: number;
-        outgoingCount: number;
-        incomingIndex: number;
-        outgoingIndex: number;
-        enableBus: boolean;
-    };
-    centeredCoords: CenteredCoords;
-    fallbackPositions: { sourcePos: Position; targetPos: Position };
-    edgeConfig: SmartEdgeConfig;
-    handleSelectionPolicy: string;
-    respectSourceHandle: boolean;
-    respectTargetHandle: boolean;
-    isReverseEdge: boolean;
-    nodesDragging: boolean;
-    sourceHandleId?: string | null;
-    targetHandleId?: string | null;
-    // 🚀 [PERF] 暴露内部数据，避免边组件重复订阅
-    storeEdges: Edge[];
-    simpleNodeMap: Map<string, SimpleNodeData>;
-}
 
 /**
  * Centralised hook that gathers all smart‑edge related calculations.
@@ -428,7 +324,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
 
         // Priority 2: 基于拓扑签名缓存的多数投票
         // 签名相同 → 返回上次缓存结果，无需重新遍历所有边
-        const cached = _directionVoteCache.get(edgeTopologySig);
+        const cached = smartEdgeContextCache.directionVotes.get(edgeTopologySig);
         if (cached) return cached;
 
         let result: 'LR' | 'RL' | 'TB' | 'BT' = 'TB';
@@ -465,8 +361,10 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
         }
 
         // 缓存本次结果（限制缓存大小，避免内存泄漏）
-        if (_directionVoteCache.size > 20) _directionVoteCache.clear();
-        _directionVoteCache.set(edgeTopologySig, result);
+        if (smartEdgeContextCache.directionVotes.size > 20) {
+            smartEdgeContextCache.directionVotes.clear();
+        }
+        smartEdgeContextCache.directionVotes.set(edgeTopologySig, result);
         return result;
     }, [edgeLayoutDirectionOverride, edgeTopologySig, getAbsPos]);
     const isReverseEdge = useMemo(() => {
@@ -609,13 +507,13 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
     // 避免 E 条边各自对 storeEdges 做 O(E) forEach（总计 O(E²)）。
     const multiEdgeInfo = useMemo(() => {
         // 当拓扑签名变化时，清空旧缓存，防止无限增长
-        if (_multiEdgeListCacheTopoSig !== edgeTopologySig) {
-            _multiEdgeListCache.clear();
-            _multiEdgeListCacheTopoSig = edgeTopologySig;
+        if (smartEdgeContextCache.topologySignature !== edgeTopologySig) {
+            smartEdgeContextCache.multiEdgeLists.clear();
+            smartEdgeContextCache.topologySignature = edgeTopologySig;
         }
 
         const cacheKey = `${source}:${target}`;
-        let cached = _multiEdgeListCache.get(cacheKey);
+        let cached = smartEdgeContextCache.multiEdgeLists.get(cacheKey);
 
         if (!cached) {
             const sourceNodeStatic = simpleNodeMap.get(source);
@@ -689,7 +587,7 @@ export function useSmartEdgeContext(props: EdgeProps): SmartEdgeContextResult {
             }
 
             cached = { outgoingBuckets, incomingBuckets };
-            _multiEdgeListCache.set(cacheKey, cached);
+            smartEdgeContextCache.multiEdgeLists.set(cacheKey, cached);
         }
 
         const pickCurrentHemisphere = (buckets: Record<string, string[]>, currentId: string) => {

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Flex, Badge } from 'antd';
-import { 
-    FaPlus, FaLayerGroup, FaCogs, FaRobot, 
-    FaBars, FaUndo, FaRedo 
+import {
+    FaPlus, FaLayerGroup, FaCogs, FaRobot,
+    FaBars, FaUndo, FaRedo
 } from 'react-icons/fa';
 import './MobileBottomDock.css';
 

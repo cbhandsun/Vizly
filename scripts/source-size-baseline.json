@@ -6,5 +6,16 @@
     "test": 1000,
     "compositionRoot": 300
   },
-  "oversizedFiles": {}
+  "oversizedFiles": {
+    "src/core/components/custom-edges/hooks/useSmartPathWorker.ts": 737,
+    "src/core/components/diagrams/hooks/useDesignerSystemSync.ts": 763,
+    "src/core/components/diagrams/hooks/useDiagramDragDrop.ts": 760,
+    "src/core/components/diagrams/hooks/useMindMapOrchestrator.ts": 752,
+    "src/core/components/layout/LayoutOptimizer.ts": 701,
+    "src/core/components/shared/baseReactFlowDisplayLaneCandidates.ts": 719,
+    "src/core/components/shared/baseReactFlowDisplayOverlapRepair.ts": 726,
+    "src/core/components/shared/baseReactFlowDisplayPreDisplayPipeline.ts": 723,
+    "src/core/components/shared/baseReactFlowDisplayStrictResidualRepair.ts": 764,
+    "src/core/components/shared/baseReactFlowDisplayWorkerClient.ts": 737
+  }
 }

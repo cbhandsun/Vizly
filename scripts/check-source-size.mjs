@@ -23,10 +23,10 @@ const gitFiles = (args) => execFileSync('git', args, {
 // the gate to tracked files creates a blind spot exactly while large files are
 // being split into new helpers.
 const sourceFiles = [...new Set([
-  ...gitFiles(['ls-files', '--', 'src']),
-  ...gitFiles(['ls-files', '--others', '--exclude-standard', '--', 'src']),
+  ...gitFiles(['ls-files', '--', 'src', 'scripts']),
+  ...gitFiles(['ls-files', '--others', '--exclude-standard', '--', 'src', 'scripts']),
 ])]
-  .filter(file => /\.(?:tsx?|jsx?)$/i.test(file) && existsSync(file))
+  .filter(file => /\.(?:tsx?|jsx?|mjs|cjs)$/i.test(file) && existsSync(file))
   .sort();
 
 const lineCounts = new Map(sourceFiles.map(file => [

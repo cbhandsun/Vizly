@@ -1,9 +1,12 @@
 const TEST_FILE_PATTERN = /(?:^|\/)(?:__tests__|tests)(?:\/|$)|\.(?:test|spec)\.[^/]+$/i;
+const UI_MODULE_PATTERN = /(?:^|\/)(?:components|hooks)(?:\/|$)/i;
 
 export function resolveSourceSizeLimit(file, limits) {
   if (TEST_FILE_PATTERN.test(file)) return limits.test;
   if (file === 'src/main.tsx' || file.startsWith('src/main/')) return limits.compositionRoot;
-  if (/\.tsx$/i.test(file)) return limits.component;
+  if (/\.tsx$/i.test(file) || (UI_MODULE_PATTERN.test(file) && /\.[cm]?tsx?$/i.test(file))) {
+    return limits.component;
+  }
   return limits.default;
 }
 

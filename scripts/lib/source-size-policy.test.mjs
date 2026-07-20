@@ -28,9 +28,12 @@ describe('source size policy', () => {
 
   it('uses tighter budgets for components and composition roots while allowing larger tests', () => {
     expect(resolveSourceSizeLimit('src/components/Panel.tsx', limits)).toBe(700);
+    expect(resolveSourceSizeLimit('src/components/panelModel.ts', limits)).toBe(700);
+    expect(resolveSourceSizeLimit('src/core/hooks/useDiagramState.ts', limits)).toBe(700);
     expect(resolveSourceSizeLimit('src/main/bootstrapApplication.ts', limits)).toBe(300);
     expect(resolveSourceSizeLimit('src/core/__tests__/large.test.ts', limits)).toBe(1000);
     expect(resolveSourceSizeLimit('src/core/service.ts', limits)).toBe(800);
+    expect(resolveSourceSizeLimit('scripts/check-source-size.mjs', limits)).toBe(800);
   });
 
   it('rejects baselines that no longer exceed the applicable role budget', () => {
