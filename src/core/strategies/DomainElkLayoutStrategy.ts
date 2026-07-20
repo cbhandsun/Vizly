@@ -15,6 +15,7 @@ import {
 import { decideEdgeRouting, separateParallelEdges, globalOptimizeEdgeRouting, distributePortConnections, bundleEdges, layerBasedEdgeRouting, optimizeEdgeLabelPositions, beautifyOrthogonalEdges, optimizeTreeBusRouting } from '../utils/HandlePicker'
 import { expandHandle } from '../routing/utils/handleUtils'
 import { logDomainElkContainerUpdateFailure } from './layoutLogging';
+import { resolveDomainNodeLayoutAlgorithm } from './domainNodeLayoutEngine';
 
 /**
  * 域级 ELK 整体布局策略
@@ -33,7 +34,7 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
    * 计算布局
    * 函数级注释：
    * - 1) 生成域/子域容器并绑定 children；
-   * - 2) 使用 Cytoscape 或 ELK 对普通节点分层定位；
+   * - 2) 使用 ELK 对普通节点定位；旧 Cytoscape 配置映射到 ELK force/radial；
    * - 3) 子域容器尺寸回收 + 子域/自由节点重叠消解；
    * - 4) 若存在域容器：严格包含、统一域宽/高投影、子域居中与钳制；
    * - 5) 域容器间重叠消解，确保“统一域宽/严格包含/不重叠”。
@@ -105,38 +106,6 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
     const getH = (n: ReactFlowNode) => num((((n as any)?.measured?.height ?? (n as any)?.style?.height ?? (n as any)?.height)), (diagramConfigManager.getConfig() as any)?.node?.height || 80)
 
     try {
-      const nodeLayoutRaw: any = (options as any)?.nodeLayout
-      const sRaw = String(nodeLayoutRaw || '').toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '')
-      const useCytoscapeFcose = (sRaw.includes('cytoscape') || sRaw.includes('fcose'))
-      const useCytoscapeConcentric = sRaw.includes('concentric')
-      if (useCytoscapeFcose || useCytoscapeConcentric) {
-        const cytoscapeMod: any = await import('cytoscape')
-        const cytoscape = cytoscapeMod.default || cytoscapeMod
-        if (useCytoscapeFcose) {
-          const fcoseMod: any = await import('cytoscape-fcose')
-          try { (cytoscape as any).use(fcoseMod.default || fcoseMod) } catch { }
-        }
-        const elements: any[] = [
-          ...layoutCandidates.map(n => ({ data: { id: n.id, width: getW(n), height: getH(n) } })),
-          ...scopedEdges.map(e => ({ data: { id: e.id || `${e.source}->${e.target}`, source: e.source, target: e.target } }))
-        ]
-        const cy = cytoscape({ headless: true, elements, style: [{ selector: 'node', style: { width: 'data(width)', height: 'data(height)' } }] })
-        const layout = cy.layout(useCytoscapeFcose ? { name: 'fcose', animate: false } as any : { name: 'concentric', animate: false } as any)
-        layout.run()
-        for (const n of layoutCandidates) {
-          const el = cy.getElementById(n.id)
-          const p = el?.position?.() || { x: 0, y: 0 }
-            ; (n as any).position = { x: Math.round(p.x + left), y: Math.round(p.y + top) } as any
-        }
-        // 统一散列：沿较小间距轴展开同点，降低初始堆叠
-        try {
-          const cfgLayout: any = diagramConfigManager.getLayoutConfig() || {}
-          const hGap = Math.max(12, num(cfgLayout?.NODE_H_GAP, 120))
-          const vGap = Math.max(8, num(cfgLayout?.NODE_V_GAP, 80))
-          scatterNodesAtSamePoint(layoutCandidates, 'x' as any, hGap, 2)
-          scatterNodesAtSamePoint(layoutCandidates, 'y' as any, vGap, 2)
-        } catch { }
-      } else {
         const { default: ELK } = await import('elkjs')
         const elk = new ELK()
         const dirRaw = String(((options as any)?.direction || (diagramConfigManager.getConfig() as any)?.diagram?.layout?.direction || '')).toUpperCase()
@@ -158,7 +127,10 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
         const edgeNodeSpacing = Number(LayeredConfigManager.getInstance().get<number>('diagram.layout.ELK_EDGE_NODE_SPACING', 8) || 8)
         const edgeEdgeSpacing = Number(LayeredConfigManager.getInstance().get<number>('diagram.layout.ELK_EDGE_EDGE_SPACING', 4) || 4)
         const portPortSpacing = Number(LayeredConfigManager.getInstance().get<number>('diagram.layout.ELK_PORT_PORT_SPACING', 4) || 4)
-        let elkAlgorithm = String(LayeredConfigManager.getInstance().get<string>('diagram.layout.ELK_ALGORITHM', 'layered') || 'layered').toLowerCase()
+        let elkAlgorithm = resolveDomainNodeLayoutAlgorithm(
+          (options as any)?.nodeLayout,
+          LayeredConfigManager.getInstance().get<string>('diagram.layout.ELK_ALGORITHM', 'layered'),
+        )
 
         // Map short names to full qualified names
         const algoMap: Record<string, string> = {
@@ -204,7 +176,6 @@ export class DomainElkLayoutStrategy implements ILayoutStrategy {
         scatterNodesAtSamePoint(layoutCandidates, axis as any, axis === 'x' ? hGapCfg : vGapCfg, 2)
         // 双轴补散列，进一步避免角落聚集
         try { scatterNodesAtSamePoint(layoutCandidates, axis === 'x' ? 'y' as any : 'x' as any, axis === 'x' ? vGapCfg : hGapCfg, 2) } catch { }
-      }
     } catch { }
     // 纯节点布局模式：不进行域/子域容器约束，但做自由业务节点的重叠消解
     try {

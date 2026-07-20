@@ -95,8 +95,6 @@ const vendorChunkRules: Array<[string, string[]]> = [
     'd3-zoom',
   ]],
   ['vendor-layout-graph', ['dagre', 'graphlib', 'd3-force', 'd3-quadtree']],
-  ['vendor-layout-fcose', ['cytoscape-fcose', 'cose-base', 'layout-base']],
-  ['vendor-layout-cytoscape', ['cytoscape']],
   ['vendor-mindmap', ['mind-elixir']],
   ['vendor-motion', ['framer-motion', '@react-spring', 'motion-dom', 'motion-utils']],
   ['vendor-drawing', ['roughjs', 'perfect-freehand']],

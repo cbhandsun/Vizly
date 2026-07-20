@@ -103,8 +103,6 @@
     "@types/three": "^0.183.1",
     "@xyflow/react": "^12.10.2",
     "antd": "^6.3.5",
-    "cytoscape": "^3.33.1",
-    "cytoscape-fcose": "^2.2.0",
     "d3-force": "^3.0.0",
     "dagre": "^0.8.5",
     "elkjs": "^0.11.1",
