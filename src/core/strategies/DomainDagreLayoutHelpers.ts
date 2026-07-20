@@ -1,6 +1,46 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import dagre from 'dagre';
 
+const DEFAULT_NODE_WIDTH = 200;
+const DEFAULT_NODE_HEIGHT = 80;
+const MAX_NODE_DIMENSION = 100_000;
+const MAX_COORDINATE = 1_000_000;
+
+type NodeDimensions = { width: number; height: number };
+type NodeDimensionsResolver = (node: ReactFlowNode) => NodeDimensions;
+
+const boundedFinite = (value: unknown, fallback: number, min: number, max: number): number => (
+    typeof value === 'number' && Number.isFinite(value) && value >= min
+        ? Math.min(value, max)
+        : fallback
+);
+
+const firstValidDimension = (values: unknown[], fallback: number): number => {
+    for (const value of values) {
+        if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+            return Math.min(value, MAX_NODE_DIMENSION);
+        }
+    }
+    return fallback;
+};
+
+const resolveDimensions = (
+    node: ReactFlowNode,
+    resolver?: NodeDimensionsResolver,
+): NodeDimensions => {
+    const fallback = getNodeDimensions(node);
+    if (!resolver) return fallback;
+    try {
+        const resolved = resolver(node);
+        return {
+            width: boundedFinite(resolved?.width, fallback.width, 1, MAX_NODE_DIMENSION),
+            height: boundedFinite(resolved?.height, fallback.height, 1, MAX_NODE_DIMENSION),
+        };
+    } catch {
+        return fallback;
+    }
+};
+
 /**
  * 使用 Dagre 进行布局
  */
@@ -10,17 +50,19 @@ export function layoutWithDagre(
     direction: string,
     nodeSep: number,
     rankSep: number,
-    getNodeDimensions?: (node: ReactFlowNode) => { width: number; height: number },
+    resolveNodeDimensions?: NodeDimensionsResolver,
     ranker: string = 'network-simplex'
 ): { id: string; x: number; y: number }[] {
-    if (nodes.length === 0) return [];
+    const safeNodes = Array.isArray(nodes) ? nodes : [];
+    const safeEdges = Array.isArray(edges) ? edges : [];
+    if (safeNodes.length === 0) return [];
 
     const g = new dagre.graphlib.Graph();
 
     // 分析边的连接模式，确定最佳对齐策略
     const outDegree: Record<string, number> = {};
     const inDegree: Record<string, number> = {};
-    edges.forEach(e => {
+    safeEdges.forEach(e => {
         outDegree[e.source] = (outDegree[e.source] || 0) + 1;
         inDegree[e.target] = (inDegree[e.target] || 0) + 1;
     });
@@ -45,9 +87,11 @@ export function layoutWithDagre(
 
     g.setGraph({
         rankdir: direction === 'LR' ? 'LR' : direction === 'RL' ? 'RL' : direction === 'BT' ? 'BT' : 'TB',
-        nodesep: nodeSep,
-        ranksep: rankSep,
-        ranker: ranker,
+        nodesep: boundedFinite(nodeSep, 50, 0, 10_000),
+        ranksep: boundedFinite(rankSep, 50, 0, 10_000),
+        ranker: ['network-simplex', 'tight-tree', 'longest-path'].includes(ranker)
+            ? ranker
+            : 'network-simplex',
         align: alignStrategy,
         marginx: 0,
         marginy: 0,
@@ -56,9 +100,8 @@ export function layoutWithDagre(
     g.setDefaultEdgeLabel(() => ({}));
 
     // 添加节点（按输入顺序，Dagre 会尊重这个顺序进行层级分配）
-    nodes.forEach(node => {
-        // 使用传入的尺寸获取器，或者默认逻辑
-        const dims = getNodeDimensions ? getNodeDimensions(node) : getNodeDimensions(node);
+    safeNodes.forEach(node => {
+        const dims = resolveDimensions(node, resolveNodeDimensions);
         const w = dims.width;
         const h = dims.height;
 
@@ -66,7 +109,7 @@ export function layoutWithDagre(
     });
 
     // 添加边（带权重和最小层级跨度）
-    edges.forEach(edge => {
+    safeEdges.forEach(edge => {
         if (g.hasNode(edge.source) && g.hasNode(edge.target)) {
             // 计算边的权重：一对多的边权重较低，让目标节点更分散
             const sourceOutDegree = outDegree[edge.source] || 1;
@@ -87,10 +130,10 @@ export function layoutWithDagre(
 
     // 收集结果
     const result: { id: string; x: number; y: number }[] = [];
-    nodes.forEach(node => {
+    safeNodes.forEach(node => {
         const nodeWithPos = g.node(node.id);
         if (nodeWithPos) {
-            const dims = getNodeDimensions ? getNodeDimensions(node) : getNodeDimensions(node);
+            const dims = resolveDimensions(node, resolveNodeDimensions);
             const w = dims.width;
             const h = dims.height;
 
@@ -112,10 +155,14 @@ export function layoutWithDagre(
 export function mapEdgesToContainers(edges: Edge[], nodeToContainer: Map<string, string>): Edge[] {
     const containerEdges: Edge[] = [];
     const seen = new Set<string>();
+    const safeEdges = Array.isArray(edges) ? edges : [];
+    const safeNodeToContainer = nodeToContainer instanceof Map
+        ? nodeToContainer
+        : new Map<string, string>();
 
-    edges.forEach(e => {
-        const srcContainer = nodeToContainer.get(e.source) || e.source;
-        const tgtContainer = nodeToContainer.get(e.target) || e.target;
+    safeEdges.forEach(e => {
+        const srcContainer = safeNodeToContainer.get(e.source) || e.source;
+        const tgtContainer = safeNodeToContainer.get(e.target) || e.target;
 
         if (srcContainer !== tgtContainer) {
             const key = `${srcContainer}->${tgtContainer}`;
@@ -138,15 +185,23 @@ export function mapEdgesToContainers(edges: Edge[], nodeToContainer: Map<string,
  * 计算节点的边界框
  */
 export function getNodeDimensions(node: ReactFlowNode): { width: number; height: number } {
-    const w = (node as any).measured?.width
-        || (typeof (node as any).style?.width === 'number' ? (node as any).style.width : null)
-        || (node as any).width
-        || 200;
-    const h = (node as any).measured?.height
-        || (typeof (node as any).style?.height === 'number' ? (node as any).style.height : null)
-        || (node as any).height
-        || 80;
-    return { width: w, height: h };
+    const candidate = node as ReactFlowNode & {
+        width?: unknown;
+        height?: unknown;
+        measured?: { width?: unknown; height?: unknown };
+    };
+    return {
+        width: firstValidDimension([
+            candidate?.measured?.width,
+            candidate?.style?.width,
+            candidate?.width,
+        ], DEFAULT_NODE_WIDTH),
+        height: firstValidDimension([
+            candidate?.measured?.height,
+            candidate?.style?.height,
+            candidate?.height,
+        ], DEFAULT_NODE_HEIGHT),
+    };
 }
 
 /**
@@ -155,21 +210,23 @@ export function getNodeDimensions(node: ReactFlowNode): { width: number; height:
  */
 export function calculateBounds(
     nodes: ReactFlowNode[],
-    getNodeDimensions?: (node: ReactFlowNode) => { width: number; height: number },
+    resolveNodeDimensions?: NodeDimensionsResolver,
     widthCompensation: number = 1.0
 ): { width: number; height: number; minX: number; minY: number } {
-    if (nodes.length === 0) {
+    const safeNodes = Array.isArray(nodes) ? nodes : [];
+    if (safeNodes.length === 0) {
         return { width: 200, height: 100, minX: 0, minY: 0 };
     }
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const safeWidthCompensation = boundedFinite(widthCompensation, 1, 0.1, 10);
 
-    nodes.forEach(node => {
-        const x = node.position.x;
-        const y = node.position.y;
-        const dims = getNodeDimensions ? getNodeDimensions(node) : getNodeDimensions(node);
+    safeNodes.forEach(node => {
+        const x = boundedFinite(node?.position?.x, 0, -MAX_COORDINATE, MAX_COORDINATE);
+        const y = boundedFinite(node?.position?.y, 0, -MAX_COORDINATE, MAX_COORDINATE);
+        const dims = resolveDimensions(node, resolveNodeDimensions);
         // 应用宽度补偿系数
-        const w = dims.width * widthCompensation;
+        const w = dims.width * safeWidthCompensation;
         const h = dims.height;
 
         minX = Math.min(minX, x);

@@ -1278,13 +1278,6 @@
       },
       {
         "category": "error",
-        "file": "src/core/strategies/DomainDagreLayoutHelpers.ts",
-        "code": 2722,
-        "messageHash": "c7847f4a193c0c3557eb5783954f1371197bbbb0fafbacf507d572271d1dd17b",
-        "count": 3
-      },
-      {
-        "category": "error",
         "file": "src/core/strategies/shared/__tests__/edgeEndpointLaneNudgeRepair.test.ts",
         "code": 2353,
         "messageHash": "0b63c2697dd350af9efb089f7feec68cdb6812e4324d4e2673a5e9ff60824f51",
