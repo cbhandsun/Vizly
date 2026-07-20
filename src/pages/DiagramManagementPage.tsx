@@ -4,16 +4,11 @@ import type { MenuProps } from 'antd/es/menu';
 import { coerceDiagramId, getQueryOrHashParamFromLocation, type LocationLike } from '@/core/utils/inputBoundary';
 import { Cloud, Database, ExternalLink, Pencil, Trash2, User } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import type { DiagramMetadata } from '../services/storage/types';
-import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import type { ManageStorageProvider } from '@/components/ui/ManageTopToolbar';
 import { useAuth } from '@/context/useAuth';
 import {
     coerceFilterView,
-    createTemplateSeed,
     filterAndSortItems,
-    loadDataRegistry,
-    loadSupabaseClient,
     loadUnifiedStorage,
     loadWorkspaceItems,
     readStoredCloudProvider,
@@ -25,21 +20,18 @@ import {
 } from './diagramManagementPage.helpers';
 import './WorkspaceDashboard.css';
 import { appMessage } from '@/core/utils/antdStaticBridge';
-import { upsertDiagramConfigIndex } from '@/core/utils/diagramTypeStorage';
 import { safeLog } from '@/core/utils/consoleCleanup';
 import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
 import { WorkspaceCompactHeader } from './WorkspaceCompactHeader';
 import { WorkspaceDiagramCollection } from './WorkspaceDiagramCollection';
 import { WorkspaceGlobalHeader } from './WorkspaceGlobalHeader';
+import { createWorkspaceDiagramActions } from './diagramManagementActions';
 
 const AuthModal = React.lazy(() => import('@/components/auth/AuthModal').then(module => ({
     default: module.AuthModal,
 })));
 
-const asRecord = (value: unknown): Record<string, unknown> =>
-    typeof value === 'object' && value !== null && !Array.isArray(value)
-        ? value as Record<string, unknown>
-        : {};
+const workspaceDiagramActions = createWorkspaceDiagramActions();
 
 const WorkspaceDashboardPage: React.FC = () => {
     const navigate = useNavigate();
@@ -123,117 +115,35 @@ const WorkspaceDashboardPage: React.FC = () => {
 
     // --- Actions ---
     const handleOpenDiagram = async (item: UnifiedDiagramItem) => {
-        if (item.source === 'local') {
-            const raw = item.raw as StandardDiagramData;
-            navigateToDiagram(raw.id);
-            return;
-        }
-
-        if (item.source === 'supabase' && !user) {
-            setIsAuthModalOpen(true);
-            return;
-        }
-
-        // template 和 general_template 都来自 Supabase system_templates，统一处理
-        if (item.source === 'template' || item.source === 'general_template') {
-            const templateId = coerceDiagramId(asRecord(item.raw).id);
-            if (!templateId) {
-                appMessage.error('模版标识无效，无法加载。');
-                return;
-            }
-            const messageKey = appMessage.loading('正在加载模版...', 0);
-            try {
-                const supabase = await loadSupabaseClient();
-                if (supabase) {
-                    const { data, error } = await supabase
-                        .from('system_templates')
-                        .select('content, title, id')
-                        .eq('id', templateId)
-                        .single();
-                    if (!error && data && data.content) {
-                        const dataRegistry = await loadDataRegistry();
-                        await dataRegistry.initialize();
-                        const localService = dataRegistry.getDataService();
-                        const clonedId = crypto.randomUUID();
-                        const cloned = localService.registerRemoteDiagram(data.content, {
-                            id: clonedId,
-                            title: data.title,
-                        }, true, {
-                            id: clonedId,
-                            name: data.title,
-                            metadata: { title: data.title },
-                        });
-                        try {
-                            upsertDiagramConfigIndex(localStorage, {
-                                id: cloned.id,
-                                type: cloned.type || 'flowchart',
-                                name: cloned.name,
-                                updatedAt: Date.now(),
-                            });
-                        } catch { /* ignore */ }
-                        try { localStorage.removeItem(`flowchart-autosave-v2-${cloned.id}`); } catch (_e) {}
-                        navigateToDiagram(cloned.id);
-                    } else {
-                        appMessage.error('模版内容为空，请确认 Supabase 数据已迁移。');
-                    }
-                }
-            } catch (error: unknown) {
-                safeLog.error('Failed to load template', redactSensitiveLogValue(error));
-                appMessage.error('加载模版失败，请稍后重试。');
-            } finally {
-                messageKey();
-            }
-            return;
-        }
-
-
-        const hide = appMessage.loading("Loading diagram from cloud...", 0);
+        const isTemplate = item.source === 'template' || item.source === 'general_template';
+        const needsLoadingMessage = item.source !== 'local' && !(item.source === 'supabase' && !user);
+        const hide = needsLoadingMessage
+            ? appMessage.loading(isTemplate ? '正在加载模版...' : 'Loading diagram from cloud...', 0)
+            : null;
         try {
-            const [unifiedStorage, dataRegistry] = await Promise.all([
-                loadUnifiedStorage(),
-                loadDataRegistry(),
-            ]);
-            await dataRegistry.initialize();
-            const rawObj = item.raw as DiagramMetadata;
-            const savedDiagram = await unifiedStorage.loadDiagram(rawObj.id);
-            if (savedDiagram) {
-                const localService = dataRegistry.getDataService();
-                const normalized = localService.registerRemoteDiagram(savedDiagram.content, {
-                    id: savedDiagram.id,
-                    title: savedDiagram.title,
-                }, true, {
-                    id: savedDiagram.id,
-                    name: savedDiagram.title,
-                    metadata: {
-                        title: savedDiagram.title,
-                        updatedAt: savedDiagram.updated_at,
-                        cloud: {
-                            provider: item.source,
-                            id: savedDiagram.id,
-                            title: savedDiagram.title,
-                            openedAt: new Date().toISOString()
-                        }
-                    },
-                    isReadonly: item.role === 'viewer'
-                });
-                // 回写 type 索引，防止刷新后设计器无法识别图表类型
-                try {
-                    upsertDiagramConfigIndex(localStorage, {
-                        id: savedDiagram.id,
-                        type: normalized.type || 'flowchart',
-                        name: normalized.name,
-                        updatedAt: Date.now()
-                    });
-                } catch { /* ignore */ }
-                navigateToDiagram(savedDiagram.id);
-            } else {
-                appMessage.error("Diagram not found in cloud storage.");
+            const result = await workspaceDiagramActions.openDiagram(item, Boolean(user));
+            switch (result.kind) {
+                case 'navigate':
+                    navigateToDiagram(result.diagramId);
+                    break;
+                case 'auth-required':
+                    setIsAuthModalOpen(true);
+                    break;
+                case 'invalid-id':
+                    appMessage.error(isTemplate ? '模版标识无效，无法加载。' : 'Unable to open diagram: missing diagram id.');
+                    break;
+                case 'not-found':
+                    appMessage.error(isTemplate ? '模版内容为空，请确认 Supabase 数据已迁移。' : 'Diagram not found in cloud storage.');
+                    break;
+                case 'unavailable':
+                    appMessage.error(isTemplate ? '模版服务暂不可用。' : 'Cloud storage is unavailable.');
+                    break;
             }
         } catch (error: unknown) {
-            safeLog.error('Failed to open cloud diagram', redactSensitiveLogValue(error));
-            appMessage.error('Failed to open diagram.');
+            safeLog.error('Failed to open workspace diagram', redactSensitiveLogValue(error));
+            appMessage.error(isTemplate ? '加载模版失败，请稍后重试。' : 'Failed to open diagram.');
         } finally {
-            hide();
+            hide?.();
         }
     };
 
@@ -247,20 +157,15 @@ const WorkspaceDashboardPage: React.FC = () => {
             cancelText: 'Cancel',
             onOk: async () => {
                 try {
-                    if (item.source === 'local') {
-                        const dataRegistry = await loadDataRegistry();
-                        await dataRegistry.initialize();
-                        const localService = dataRegistry.getDataService();
-                        const rawObj = item.raw as StandardDiagramData;
-                        localService.deleteDiagram(rawObj.id);
-                    } else {
-                        const unifiedStorage = await loadUnifiedStorage();
-                        const rawObj = item.raw as DiagramMetadata;
-                        await unifiedStorage.deleteDiagram(rawObj.id);
+                    const result = await workspaceDiagramActions.deleteDiagram(item);
+                    if (result === 'invalid-id') {
+                        appMessage.error('Unable to delete diagram: missing diagram id.');
+                        return;
                     }
                     appMessage.success('Deleted successfully');
                     loadAllData();
-                } catch (_error) {
+                } catch (error: unknown) {
+                    safeLog.error('Failed to delete workspace diagram', redactSensitiveLogValue(error));
                     appMessage.error("Failed to delete diagram.");
                 }
             }
@@ -269,34 +174,12 @@ const WorkspaceDashboardPage: React.FC = () => {
 
     // Advanced Creation Router mapping to correct domains
     const handleCreateTemplate = async (templateKey: TemplateKey) => {
-        const templateData = createTemplateSeed(templateKey);
-
-        if (templateData) {
-            const dataRegistry = await loadDataRegistry();
-            await dataRegistry.initialize();
-            const localService = dataRegistry.getDataService();
-            const cloned = JSON.parse(JSON.stringify(templateData));
-            cloned.id = crypto.randomUUID(); // ensure fresh ID
-            // Ensure type is always set for consistent plugin routing
-            if (!cloned.type) {
-                const TYPE_DEFAULTS: Record<string, string> = {
-                    flowchart: 'flowchart', architecture: 'architecture',
-                    mindmap: 'mindmap', timeline: 'timeline', blank: 'flowchart'
-                };
-                cloned.type = TYPE_DEFAULTS[templateKey] || 'flowchart';
-            }
-            localService.registerDiagram(cloned);
-            // Persist diagram type index to localStorage so DiagramViewer
-            // can resolve the correct plugin even after a page refresh.
-            try {
-                upsertDiagramConfigIndex(localStorage, {
-                    id: cloned.id,
-                    type: cloned.type,
-                    name: cloned.name,
-                    updatedAt: Date.now(),
-                });
-            } catch { /* ignore storage errors */ }
-            navigateToDiagram(cloned.id);
+        try {
+            const diagramId = await workspaceDiagramActions.createDiagram(templateKey);
+            if (diagramId) navigateToDiagram(diagramId);
+        } catch (error: unknown) {
+            safeLog.error('Failed to create workspace diagram', redactSensitiveLogValue(error));
+            appMessage.error('Failed to create diagram.');
         }
     };
 
