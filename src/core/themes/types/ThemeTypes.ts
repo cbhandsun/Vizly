@@ -100,7 +100,7 @@ export interface EdgeColors {
   primary: ThemeColor;
   secondary: ThemeColor;
   dashed: ThemeColor;
-  [key: string]: any;
+  [key: string]: ThemeColor;
 }
 
 // 图表画布定义
