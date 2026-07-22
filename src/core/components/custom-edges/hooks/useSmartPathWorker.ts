@@ -15,6 +15,13 @@ import {
     type SmartPathObstacleItem as ObstacleItem,
     type SmartPathSimpleNode as SimpleNode,
 } from './smartPathWorkerObstacles';
+import {
+    getComputedPoints,
+    isComputedPathCompatibleWithHandles,
+    isRoutingResultCompatibleWithHandles,
+    pointsToOrthogonalPath,
+    type SmartPathPoint,
+} from './smartPathCompatibility';
 // import WorkerPool from '../../../workers/WorkerPool'; // Replaced by Coordinator
 
 // Define types locally to avoid circular deps
@@ -45,73 +52,13 @@ export interface SmartEdgeOptions {
 }
 
 export interface EdgeData {
-    elkPath?: Point2D[];
-    computedPath?: Point2D[];
+    elkPath?: SmartPathPoint[];
+    computedPath?: SmartPathPoint[];
     algorithm?: string;
     labelPosition?: { x: number; y: number };
     _layoutEpoch?: number;
     [key: string]: unknown;
 }
-
-type Point2D = { x: number; y: number };
-
-const pointsToOrthogonalPath = (points: Point2D[]): string => {
-    if (!Array.isArray(points) || points.length === 0) return '';
-    return points
-        .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
-        .join(' ');
-};
-
-const _getElkPoints = (edgeData: EdgeData): Point2D[] | null => {
-    if (!edgeData?.elkPath || !Array.isArray(edgeData.elkPath) || edgeData.elkPath.length <= 1) return null;
-    const path = edgeData.elkPath as unknown[];
-    if (!path.every(p => typeof (p as Point2D).x === 'number' && typeof (p as Point2D).y === 'number')) return null;
-    return edgeData.elkPath;
-};
-
-const getComputedPoints = (edgeData: EdgeData): Point2D[] | null => {
-    if (!edgeData?.computedPath || !Array.isArray(edgeData.computedPath) || edgeData.computedPath.length <= 1) return null;
-    const path = edgeData.computedPath as unknown[];
-    if (!path.every(p => {
-        const pt = p as Point2D;
-        return typeof pt.x === 'number' && typeof pt.y === 'number' && !Number.isNaN(pt.x) && !Number.isNaN(pt.y);
-    })) return null;
-    return edgeData.computedPath;
-};
-
-const isPointNear = (a: Point2D, b: Point2D, tolerance = 40): boolean => {
-    return Math.abs(a.x - b.x) <= tolerance && Math.abs(a.y - b.y) <= tolerance;
-};
-
-const isComputedPathCompatibleWithHandles = (
-    points: Point2D[] | null,
-    centeredCoords: CenteredCoords,
-    respectSourceHandle: boolean,
-    respectTargetHandle: boolean
-): boolean => {
-    if (!points || points.length < 2) return false;
-    const first = points[0];
-    const last = points[points.length - 1];
-
-    if (respectSourceHandle && !isPointNear(first, { x: centeredCoords.sourceX, y: centeredCoords.sourceY })) {
-        return false;
-    }
-    if (respectTargetHandle && !isPointNear(last, { x: centeredCoords.targetX, y: centeredCoords.targetY })) {
-        return false;
-    }
-    return true;
-};
-
-const isRoutingResultCompatibleWithHandles = (
-    result: { points?: Point2D[]; path?: string } | null | undefined,
-    centeredCoords: CenteredCoords,
-    respectSourceHandle: boolean,
-    respectTargetHandle: boolean
-): boolean => {
-    if (!respectSourceHandle && !respectTargetHandle) return true;
-    if (!result?.points || result.points.length < 2) return false;
-    return isComputedPathCompatibleWithHandles(result.points, centeredCoords, respectSourceHandle, respectTargetHandle);
-};
 
 const useLayoutStabilityReset = (
     isLayoutStable: boolean,
@@ -255,7 +202,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
     }, []);
     const computedPoints = useMemo(() => {
         if (isBus) return null;
-        const points = getComputedPoints(edgeData);
+        const points = getComputedPoints(edgeData.computedPath);
         return isComputedPathCompatibleWithHandles(points, centeredCoords, respectSourceHandle, respectTargetHandle)
             ? points
             : null;
