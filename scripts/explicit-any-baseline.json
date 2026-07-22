@@ -244,7 +244,6 @@
     "src/core/strategies/nodeLayoutStrategy/HorizontalLayoutStrategy.ts": 82,
     "src/core/strategies/nodeLayoutStrategy/VerticalLayoutStrategy.ts": 184,
     "src/core/strategies/shared/LayoutRefinement.ts": 9,
-    "src/core/strategies/shared/domainVerticalPhaseOne.ts": 30,
     "src/core/strategies/shared/edgeDetachedOverlapGeometry.ts": 11,
     "src/core/strategies/shared/edgeDetachedOverlapRepair.ts": 2,
     "src/core/strategies/shared/edgeDisplayMicroCleanupGeometry.ts": 5,
