@@ -211,7 +211,6 @@
     "src/core/hooks/useTopologyLinter.ts": 2,
     "src/core/plugins/ArchitecturePlugin.tsx": 4,
     "src/core/plugins/ERDiagramPlugin.tsx": 3,
-    "src/core/plugins/MindMapPlugin.tsx": 7,
     "src/core/plugins/NetworkTopologyPlugin.tsx": 4,
     "src/core/plugins/SwimlanePlugin.tsx": 2,
     "src/core/plugins/TimelinePlugin.tsx": 3,

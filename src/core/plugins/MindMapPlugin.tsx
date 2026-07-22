@@ -33,6 +33,17 @@ import {
     persistMindMapThemeKey,
     resolveMindMapThemeKey,
 } from '../components/mindmap-v2/mindmapThemeStorage';
+import { getFlowDataBridge } from '../utils/flowDataBridge';
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    Boolean(value && typeof value === 'object' && !Array.isArray(value))
+);
+
+const boundedText = (value: unknown, maxLength = 1000): string | undefined => (
+    typeof value === 'string' && value.trim().length > 0 && value.length <= maxLength
+        ? value.trim()
+        : undefined
+);
 
 // ── Theme-aware canvas wrapper ─────────────────────────────────────────────────
 // Keeps theme state at plugin level so toolbar & property panel share the same key
@@ -66,8 +77,7 @@ const MindMapCanvas: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
             const mind = getMindElixirInstance();
             if (!mind) return;
             try {
-                const nodeId = (mind.currentNode as any)?.id
-                    ?? (mind.currentNodes?.[0] as any)?.id;
+                const nodeId = mind.currentNode?.id ?? mind.currentNodes?.[0]?.id;
                 if (!nodeId) return;
                 const rootId = mind.getData()?.nodeData?.id;
                 if (nodeId === rootId) return; // can't duplicate root
@@ -123,13 +133,16 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
 
     version = '2.1';
 
-    async migrate(data: any, fromVersion: string | undefined): Promise<any> {
+    async migrate<T>(data: T, fromVersion: string | undefined): Promise<T> {
         const migratedData = await super.migrate(data, fromVersion);
 
-        if (!isMindMapV2(migratedData) && Array.isArray(migratedData?.nodes)) {
-            const mindmapNodes = migratedData.nodes.filter((n: any) => n.type === 'mindmap');
+        if (!isMindMapV2(migratedData) && isRecord(migratedData) && Array.isArray(migratedData.nodes)) {
+            const mindmapNodes = migratedData.nodes.filter((node) => isRecord(node) && node.type === 'mindmap');
             if (mindmapNodes.length > 0) {
-                const v2 = migrateV1ToV2({ nodes: mindmapNodes, edges: migratedData.edges ?? [] });
+                const v2 = migrateV1ToV2({
+                    nodes: mindmapNodes,
+                    edges: Array.isArray(migratedData.edges) ? migratedData.edges : [],
+                });
                 return {
                     nodes: [{
                         id: '__mindmap_meta__',
@@ -139,7 +152,7 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
                         data: { mindmapV2: v2, depth: -1, label: '' },
                     }],
                     edges: [],
-                };
+                } as T;
             }
         }
 
@@ -195,37 +208,45 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
     }
 
     // ── AI Actions (GAP-10 Phase 2) ──
-    async onAIAction(action: string, params: any, ctx: PluginContext): Promise<boolean> {
+    async onAIAction(action: string, params: unknown, ctx: PluginContext): Promise<boolean> {
         const diagramId = ctx.diagramId;
         if (!diagramId) return false;
-        const bridge = (window as any).__flowDataBridge?.[diagramId];
-        if (!bridge) return false;
+        const bridge = getFlowDataBridge(diagramId);
+        if (!bridge || !isRecord(params)) return false;
 
         switch (action) {
-            case 'addChild':
-                if (bridge.addChild) {
+            case 'addChild': {
+                const label = boundedText(params.label);
+                if (bridge.addChild && label) {
                     await bridge.addChild({
-                        parentId: params.parentId || 'root',
-                        label: params.label,
-                        side: params.side,
+                        parentId: boundedText(params.parentId, 200) || 'root',
+                        label,
+                        side: params.side === 'left' || params.side === 'right' ? params.side : undefined,
                     });
                     return true;
                 }
                 return false;
+            }
 
-            case 'deleteNodes':
-                if (bridge.deleteNodes && params.ids) {
-                    await bridge.deleteNodes(params.ids);
+            case 'deleteNodes': {
+                const ids = Array.isArray(params.ids)
+                    ? params.ids.map((id) => boundedText(id, 200)).filter((id): id is string => Boolean(id)).slice(0, 1000)
+                    : [];
+                if (bridge.deleteNodes && ids.length > 0) {
+                    await bridge.deleteNodes(ids);
                     return true;
                 }
                 return false;
+            }
 
-            case 'collapse':
-                if (bridge.collapse) {
-                    await bridge.collapse(params.id, params.collapsed);
+            case 'collapse': {
+                const id = boundedText(params.id, 200);
+                if (bridge.collapse && id && typeof params.collapsed === 'boolean') {
+                    await bridge.collapse(id, params.collapsed);
                     return true;
                 }
                 return false;
+            }
 
             case 'exportMindmapMd':
                 if (bridge.exportMindmapMd) {
@@ -234,12 +255,14 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
                 }
                 return false;
 
-            case 'export':
-                if (bridge.export) {
-                    await bridge.export({ type: params.type });
+            case 'export': {
+                const type = boundedText(params.type, 40);
+                if (bridge.export && type) {
+                    await bridge.export({ type });
                     return true;
                 }
                 return false;
+            }
 
             default:
                 return false;

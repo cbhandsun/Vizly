@@ -18,6 +18,11 @@ export interface FlowDataBridgeEntry extends Record<string, unknown> {
     edges?: unknown[];
     metadata?: FlowDataBridgeMetadata;
     addNode?: (payload: unknown) => unknown;
+    addChild?: (payload: unknown) => unknown;
+    deleteNodes?: (ids: string[]) => unknown;
+    collapse?: (id: string, collapsed: boolean) => unknown;
+    exportMindmapMd?: () => unknown;
+    export?: (payload: unknown) => unknown;
     connectNodes?: (payload: unknown) => unknown;
     replaceCanvasSnapshot?: (snapshot: unknown) => unknown;
 }
