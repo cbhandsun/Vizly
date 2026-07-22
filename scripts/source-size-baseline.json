@@ -10,7 +10,6 @@
     "src/core/components/diagrams/hooks/useDesignerSystemSync.ts": 763,
     "src/core/components/diagrams/hooks/useDiagramDragDrop.ts": 760,
     "src/core/components/diagrams/hooks/useMindMapOrchestrator.ts": 752,
-    "src/core/components/shared/baseReactFlowDisplayOverlapRepair.ts": 726,
     "src/core/components/shared/baseReactFlowDisplayStrictResidualRepair.ts": 758
   }
 }
