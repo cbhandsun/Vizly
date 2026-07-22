@@ -120,7 +120,7 @@
     "src/core/components/diagrams/hooks/useDesignerEventHandlers.ts": 20,
     "src/core/components/diagrams/hooks/useDesignerGhostNodes.ts": 2,
     "src/core/components/diagrams/hooks/useDesignerInteractions.ts": 34,
-    "src/core/components/diagrams/hooks/useDesignerSystemSync.ts": 40,
+    "src/core/components/diagrams/hooks/useDesignerSystemSync.ts": 36,
     "src/core/components/diagrams/hooks/useDiagramActions.ts": 3,
     "src/core/components/diagrams/hooks/useDiagramDragDrop.ts": 11,
     "src/core/components/diagrams/hooks/useFlowchartCanvasCommands.ts": 3,
