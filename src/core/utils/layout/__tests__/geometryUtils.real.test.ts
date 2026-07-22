@@ -46,6 +46,24 @@ describe('layout geometryUtils', () => {
     expect(sortNodesInRow(nodes as never).map(node => node.id)).toEqual(['seq1', 'seq2', 'x']);
   });
 
+  it('does not coerce unsafe sequence values or propagate invalid geometry', () => {
+    const dangerousSequence = {
+      toString: () => {
+        throw new Error('must not coerce arbitrary objects');
+      },
+    };
+    const nodes = [
+      { id: 'right', position: { x: 20, y: 0 }, data: { sequence: dangerousSequence } },
+      { id: 'left', position: { x: 10, y: 0 }, data: {} },
+    ];
+
+    expect(() => sortNodesInRow(nodes as never)).not.toThrow();
+    expect(nodes.map(node => node.id)).toEqual(['left', 'right']);
+    expect(calculateBoundingBox([
+      { id: 'invalid', position: { x: Number.NaN, y: 5 }, style: { width: 'bad', height: Infinity }, data: {} },
+    ] as never)).toEqual({ x: 0, y: 5, width: 0, height: 0 });
+  });
+
   it('ensures measured sizes for business nodes and preserves container sizes', () => {
     const result = ensureMeasuredForNodes([
       { id: 'biz', position: { x: 0, y: 0 }, data: { description: 'long description' } },
@@ -100,7 +118,9 @@ describe('layout geometryUtils', () => {
       { id: 'free', position: { x: 500, y: 50 }, measured: { width: 50, height: 30 }, data: { domain: 'D' } },
     ] as never);
 
-    const free = result.find(node => node.id === 'free') as any;
+    const free = result.find(node => node.id === 'free');
+    expect(free).toBeDefined();
+    if (!free) throw new Error('Expected free node');
     expect(free.position.y).toBeGreaterThanOrEqual(220);
     expect(free.position.x).toBeLessThanOrEqual(222);
   });
