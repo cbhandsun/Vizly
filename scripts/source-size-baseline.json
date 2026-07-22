@@ -8,7 +8,6 @@
   },
   "oversizedFiles": {
     "src/core/components/diagrams/hooks/useDesignerSystemSync.ts": 763,
-    "src/core/components/diagrams/hooks/useDiagramDragDrop.ts": 760,
     "src/core/components/diagrams/hooks/useMindMapOrchestrator.ts": 752
   }
 }
