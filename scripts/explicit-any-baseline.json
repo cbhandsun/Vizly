@@ -187,7 +187,6 @@
     "src/core/components/shared/baseReactFlowDisplayQualitySeedPipeline.ts": 1,
     "src/core/components/shared/baseReactFlowDisplayStrictResidualRepair.ts": 1,
     "src/core/components/shared/baseReactFlowDisplayTerminalPortCandidates.ts": 1,
-    "src/core/components/shared/baseReactFlowDisplayWorkerClient.ts": 9,
     "src/core/components/shared/baseReactFlowEdgeTypes.ts": 8,
     "src/core/components/shared/baseReactFlowFastEdgeSafety.ts": 9,
     "src/core/components/shared/baseReactFlowFitConfig.ts": 2,
