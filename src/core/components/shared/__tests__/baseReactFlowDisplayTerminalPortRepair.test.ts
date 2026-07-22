@@ -673,4 +673,62 @@ describe('baseReactFlowDisplayTerminalPortRepair', () => {
       'numeric-3', 'numeric-4',
     ]);
   });
+
+  it('collapses paired terminal micro-stairs before spending the bounded lane budget', () => {
+    const edge = (
+      id: string,
+      source: string,
+      target: string,
+      sourceHandle: string,
+      targetHandle: string,
+      computedPath: Array<{ x: number; y: number }>,
+    ): Edge => ({
+      id,
+      source,
+      target,
+      sourceHandle,
+      targetHandle,
+      type: 'advanced-smart-step',
+      data: { computedPath, layoutDirection: 'TB' },
+    });
+    const edges = [
+      edge('loms-tms', 'loms', 'tms', 'bottom', 'top', [
+        { x: 1323, y: 802 }, { x: 1323, y: 962 },
+      ]),
+      edge('loms-wms', 'loms', 'wms', 'bottom', 'right', [
+        { x: 1323, y: 802 }, { x: 1323, y: 899 }, { x: 1306, y: 899 },
+        { x: 1306, y: 923 }, { x: 510, y: 923 }, { x: 510, y: 1080 },
+        { x: 462, y: 1080 },
+      ]),
+      edge('tms-carrier', 'tms', 'carrier', 'top', 'bottom', [
+        { x: 1306, y: 962 }, { x: 1306, y: 865 }, { x: 1323, y: 865 },
+        { x: 1323, y: 889 }, { x: 1769, y: 889 }, { x: 1769, y: 277 },
+      ]),
+    ];
+    const nodes = [
+      node('loms', 1120.25, 605, 406, 197),
+      node('tms', 1113.25, 962, 420, 236),
+      node('wms', 42, 962, 420, 236),
+      node('carrier', 1608.5, 80, 322, 197),
+    ];
+
+    expect(calculateEdgePathQualityScore(edges)).toMatchObject({
+      tinyInteriorDoglegs: 2,
+      hairpins: 1,
+    });
+
+    const repaired = repairSharedPortAndTinyTerminalLanes(edges, nodes, 8);
+
+    expect(displayEdgesHaveNodeAnchoredTerminals(repaired, nodes)).toBe(true);
+    expect(calculateEdgePathQualityScore(repaired)).toMatchObject({
+      nonOrthogonalSegments: 0,
+      strictCrossings: 0,
+      reverseOverlap: 0,
+      unrelatedOverlap: 0,
+      unexplainedRelatedOverlap: 0,
+      shortEndpointStubs: 0,
+      tinyInteriorDoglegs: 0,
+      hairpins: 0,
+    });
+  });
 });

@@ -124,9 +124,10 @@ const pointOnSideBoundary = (
 const hardQualityDoesNotRegress = (
   baseline: EdgePathQualityScore,
   candidate: EdgePathQualityScore,
+  allowTransientStrictCrossing: boolean,
 ): boolean => (
   candidate.nonOrthogonalSegments <= baseline.nonOrthogonalSegments
-  && candidate.strictCrossings <= baseline.strictCrossings
+  && candidate.strictCrossings <= baseline.strictCrossings + (allowTransientStrictCrossing ? 1 : 0)
   && candidate.reverseOverlap <= baseline.reverseOverlap
   && candidate.unrelatedOverlap <= baseline.unrelatedOverlap
   && candidate.unexplainedRelatedOverlap <= baseline.unexplainedRelatedOverlap
@@ -454,7 +455,7 @@ const terminalMicroStaircaseCandidate = (
     || microDirection !== firstDirection
     || firstPerpendicularDirection === 0
     || firstPerpendicularDirection !== nextPerpendicularDirection
-    || microLength >= MIN_INTERIOR_LANE - MAX_NUMERIC_LANE_DRIFT
+    || microLength > MIN_INTERIOR_LANE
     || combinedStub < MIN_ENDPOINT_STUB
   ) return null;
 
@@ -470,8 +471,75 @@ const terminalMicroStaircaseCandidate = (
   return role === 'source' ? repairedOriented : [...repairedOriented].reverse();
 };
 
-const buildTerminalMicroStaircaseCandidates = (edges: Edge[]): EdgeCandidate[] => {
+const terminalNearReturnHairpinCandidate = (
+  edge: Edge,
+  path: DisplayPoint[],
+  role: TerminalRole,
+  side: PortSide,
+  rect: DisplayRect,
+): DisplayPoint[] | null => {
+  if (path.length < 5 || edgeTerminalPositionIsFixed(edge, role)) return null;
+  const oriented = role === 'source'
+    ? path.map(point => ({ ...point }))
+    : [...path].reverse().map(point => ({ ...point }));
+  const [terminal, first, second, third, continuation] = oriented;
+  const terminalAxis = sideAxis(side);
+  const perpendicularAxis = terminalAxis === 'h' ? 'v' : 'h';
+  if (
+    displayAxisOf(terminal, first) !== terminalAxis
+    || displayAxisOf(first, second) !== perpendicularAxis
+    || displayAxisOf(second, third) !== terminalAxis
+    || displayAxisOf(third, continuation) !== perpendicularAxis
+  ) return null;
+  const firstDirection = Math.sign(axisCoordinate(first, terminalAxis) - axisCoordinate(terminal, terminalAxis));
+  const returnDirection = Math.sign(axisCoordinate(third, terminalAxis) - axisCoordinate(second, terminalAxis));
+  const firstPerpendicularDirection = Math.sign(
+    axisCoordinate(second, perpendicularAxis) - axisCoordinate(first, perpendicularAxis),
+  );
+  const nextPerpendicularDirection = Math.sign(
+    axisCoordinate(continuation, perpendicularAxis) - axisCoordinate(third, perpendicularAxis),
+  );
+  const bridgeLength = Math.abs(
+    axisCoordinate(second, perpendicularAxis) - axisCoordinate(first, perpendicularAxis),
+  );
+  const collapsedStubLength = Math.abs(
+    axisCoordinate(third, terminalAxis) - axisCoordinate(terminal, terminalAxis),
+  );
+  if (
+    firstDirection !== sideDirection(side)
+    || returnDirection !== -firstDirection
+    || firstPerpendicularDirection === 0
+    || firstPerpendicularDirection !== nextPerpendicularDirection
+    || bridgeLength >= MIN_INTERIOR_LANE
+    || collapsedStubLength < MIN_ENDPOINT_STUB
+  ) return null;
+
+  const shiftedTangent = axisCoordinate(second, perpendicularAxis)
+    + nextPerpendicularDirection * MIN_INTERIOR_LANE;
+  const tangentMinimum = terminalAxis === 'h' ? rect.y : rect.x;
+  const tangentMaximum = tangentMinimum + (terminalAxis === 'h' ? rect.height : rect.width);
+  if (shiftedTangent < tangentMinimum || shiftedTangent > tangentMaximum) return null;
+  const shiftedTerminal = terminalAxis === 'h'
+    ? { x: terminal.x, y: shiftedTangent }
+    : { x: shiftedTangent, y: terminal.y };
+  const bridge = terminalAxis === 'h'
+    ? { x: third.x, y: shiftedTangent }
+    : { x: shiftedTangent, y: third.y };
+  const repairedOriented = compactOrthogonalPath([
+    shiftedTerminal,
+    bridge,
+    continuation,
+    ...oriented.slice(5),
+  ]);
+  return role === 'source' ? repairedOriented : [...repairedOriented].reverse();
+};
+
+const buildTerminalMicroStaircaseCandidates = (
+  edges: Edge[],
+  nodes: Node[],
+): EdgeCandidate[] => {
   const candidates: EdgeCandidate[] = [];
+  const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   edges.forEach((edge, edgeIndex) => {
     const path = getDisplayComputedPath(edge);
     for (const role of ['source', 'target'] as const) {
@@ -479,7 +547,12 @@ const buildTerminalMicroStaircaseCandidates = (edges: Edge[]): EdgeCandidate[] =
         role === 'source' ? edge.sourceHandle : edge.targetHandle,
       ));
       if (!side) continue;
-      const candidatePath = terminalMicroStaircaseCandidate(path, role, side);
+      const terminalNode = nodeById.get(role === 'source' ? edge.source : edge.target);
+      const terminalRect = terminalNode ? getDisplayNodeRect(terminalNode) : null;
+      const candidatePath = terminalMicroStaircaseCandidate(path, role, side)
+        ?? (terminalRect
+          ? terminalNearReturnHairpinCandidate(edge, path, role, side, terminalRect)
+          : null);
       if (!candidatePath) continue;
       candidates.push({
         edgeIndex,
@@ -494,6 +567,7 @@ export const repairSharedPortAndTinyTerminalLanes = <T extends Edge[]>(
   edges: T,
   nodes: Node[],
   maxQualityEvaluations = 8,
+  options: Readonly<{ allowTransientStrictCrossing?: boolean }> = {},
 ): T => {
   let current = edges;
   let qualityEvaluations = 0;
@@ -505,17 +579,14 @@ export const repairSharedPortAndTinyTerminalLanes = <T extends Edge[]>(
     const baselineObstacleHits = obstacleContext.evaluate(current);
     const baselineTerminals = getDisplayTerminalValidationReport(current, terminalValidation);
     const numericCandidates = [
+      ...buildTerminalMicroStaircaseCandidates(current, nodes),
       ...buildFloatingLaneGapCandidates(current),
-      ...buildTerminalMicroStaircaseCandidates(current),
     ];
     const sharedPortCandidates = buildSharedPortBoundarySlideCandidates(current, nodes);
     const remainingEvaluationBudget = maxQualityEvaluations - qualityEvaluations;
     const candidates = baselineQuality.tinyInteriorDoglegs > 0
-      ? interleaveBoundedRepairCandidates(
-        numericCandidates,
-        sharedPortCandidates,
-        remainingEvaluationBudget,
-      )
+      || baselineQuality.hairpins > 0
+      ? [...numericCandidates, ...sharedPortCandidates].slice(0, remainingEvaluationBudget)
       : interleaveBoundedRepairCandidates(
         sharedPortCandidates,
         numericCandidates,
@@ -531,7 +602,11 @@ export const repairSharedPortAndTinyTerminalLanes = <T extends Edge[]>(
       )) as T;
       const candidateQuality = qualityContext.evaluateChanged(candidate, [candidateEntry.edgeIndex]);
       if (
-        !hardQualityDoesNotRegress(baselineQuality, candidateQuality)
+        !hardQualityDoesNotRegress(
+          baselineQuality,
+          candidateQuality,
+          options.allowTransientStrictCrossing === true,
+        )
         || !hardQualityImproves(baselineQuality, candidateQuality)
         || obstacleContext.evaluateKnownChanges(candidate, [candidateEntry.edgeIndex]) > baselineObstacleHits
       ) continue;
