@@ -50,33 +50,10 @@ import {
 } from "./baseReactFlowTerminalAxisRepair";
 
 import { createBaseReactFlowFullRouteEdges } from "./baseReactFlowDisplayFullRoutePipeline";
-
-const displayReportOnlyNeedsTerminalAnchoring = (
-  report: BaseDisplayBoundedCandidateReport,
-): boolean =>
-  report.obstacleHits === 0 &&
-  report.terminalsAttached &&
-  !report.terminalsAnchored &&
-  report.quality.nonOrthogonalSegments === 0 &&
-  report.quality.strictCrossings === 0 &&
-  report.quality.reverseOverlap === 0 &&
-  report.quality.unrelatedOverlap === 0 &&
-  report.quality.unexplainedRelatedOverlap === 0 &&
-  report.quality.shortEndpointStubs === 0 &&
-  report.quality.tinyInteriorDoglegs === 0 &&
-  report.quality.hairpins === 0;
-
-const displayReportCanFinishWithAnchoringCluster = (
-  report: BaseDisplayBoundedCandidateReport,
-): boolean =>
-  report.obstacleHits === 0 &&
-  report.quality.nonOrthogonalSegments === 0 &&
-  report.quality.reverseOverlap === 0 &&
-  report.quality.unrelatedOverlap === 0 &&
-  report.quality.unexplainedRelatedOverlap === 0 &&
-  report.quality.shortEndpointStubs === 0 &&
-  report.quality.tinyInteriorDoglegs === 0 &&
-  report.quality.hairpins === 0;
+import {
+  displayReportCanFinishWithAnchoringCluster,
+  displayReportOnlyNeedsTerminalAnchoring,
+} from './baseReactFlowDisplayReportPolicy';
 
 export const createBaseReactFlowPreDisplayFinalEdges = (args: {
   edges: Edge[];
