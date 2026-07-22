@@ -9,16 +9,35 @@ import {
 const STANDARD_EDGE_TYPES = new Set(['main', 'dependency', 'support', 'data', 'feedback', 'custom']);
 
 type DiagramSeedData = {
-    nodes?: any[];
-    edges?: any[];
+    nodes?: unknown[];
+    edges?: unknown[];
     layout?: unknown;
     metadata?: unknown;
     [key: string]: unknown;
 };
 
 type CanvasLayoutResult = {
-    nodes: any[];
-    edges?: any[];
+    nodes: unknown[];
+    edges?: unknown[];
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    Boolean(
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)
+    )
+);
+
+export const coerceDiagramSeedData = (value: unknown): DiagramSeedData => {
+    if (!isRecord(value)) return {};
+    const { nodes, edges, ...rest } = value;
+    return {
+        ...rest,
+        ...(Array.isArray(nodes) ? { nodes } : {}),
+        ...(Array.isArray(edges) ? { edges } : {}),
+    };
 };
 
 type ConvertStandardDataToCanvas = (data: DiagramSeedData) => Promise<CanvasLayoutResult>;
@@ -47,8 +66,8 @@ interface FinalizeDiagramSeedNavigationOptions {
 export const needsStandardDiagramSeedConversion = (data: DiagramSeedData | null | undefined): boolean => {
     const firstNode = data?.nodes?.[0];
     const firstEdge = data?.edges?.[0];
-    const nodeIsStandard = Boolean(firstNode) && (!('data' in firstNode) || ('domain' in firstNode));
-    const edgeIsStandard = Boolean(firstEdge) && !('markerEnd' in firstEdge) && !('sourceHandle' in firstEdge);
+    const nodeIsStandard = isRecord(firstNode) && (!('data' in firstNode) || ('domain' in firstNode));
+    const edgeIsStandard = isRecord(firstEdge) && !('markerEnd' in firstEdge) && !('sourceHandle' in firstEdge);
 
     return Boolean(data && data.nodes && data.nodes.length > 0 && (nodeIsStandard || edgeIsStandard));
 };
@@ -75,8 +94,10 @@ export const normalizeDiagramSeedData = async ({
 
     if (!data?.edges?.length) return data;
 
-    const edges = data.edges.map((edge: any) => {
-        const needsFix = STANDARD_EDGE_TYPES.has(edge.type) || !edge.markerEnd;
+    const edges = data.edges.map((edge) => {
+        if (!isRecord(edge)) return edge;
+        const edgeType = typeof edge.type === 'string' ? edge.type : '';
+        const needsFix = STANDARD_EDGE_TYPES.has(edgeType) || !edge.markerEnd;
         if (!needsFix) return edge;
         return {
             ...edge,

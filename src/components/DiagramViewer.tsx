@@ -51,6 +51,7 @@ import {
     selectDiagramInViewer,
 } from './diagramViewerNavigation';
 import {
+    coerceDiagramSeedData,
     finalizeDiagramSeedNavigation,
     normalizeDiagramSeedData,
 } from './diagramViewerSeedNavigation';
@@ -335,9 +336,9 @@ const DiagramViewer: React.FC = () => {
         });
     }, [setSearchParams, addRecentDiagram]);
 
-    const seedAutoSaveAndNavigate = useCallback(async (data: any, id: string) => {
+    const seedAutoSaveAndNavigate = useCallback(async (data: unknown, id: string) => {
         await seedAutoSaveAndNavigateDiagram({
-            data,
+            data: coerceDiagramSeedData(data),
             id,
             ensureSwitchConfirmed: () => ensureDiagramSwitchConfirmed({
                 getCurrentNodeCount: async () => {

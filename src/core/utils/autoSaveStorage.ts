@@ -95,8 +95,8 @@ export const coerceAutoSavePayload = (value: unknown): AutoSavePayload | null =>
 
 export const createAutoSavePayload = (params: {
     diagramId?: string;
-    nodes: Node[];
-    edges: Edge[];
+    nodes: unknown[];
+    edges: unknown[];
     timestamp?: number;
     isFreshSeed?: boolean;
     layout?: unknown;

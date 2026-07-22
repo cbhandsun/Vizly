@@ -3,12 +3,20 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createAutoSavePayload, type AutoSavePayload } from '@/core/utils/autoSaveStorage';
 import {
+    coerceDiagramSeedData,
     finalizeDiagramSeedNavigation,
     needsStandardDiagramSeedConversion,
     normalizeDiagramSeedData,
 } from '../diagramViewerSeedNavigation';
 
 describe('diagramViewerSeedNavigation', () => {
+    it('coerces non-object seed input without exposing inherited fields', () => {
+        expect(coerceDiagramSeedData(null)).toEqual({});
+        expect(coerceDiagramSeedData('invalid')).toEqual({});
+        expect(coerceDiagramSeedData(Object.create({ nodes: [{ id: 'inherited' }] }))).toEqual({});
+        expect(coerceDiagramSeedData({ nodes: 'invalid', edges: null, name: 'safe' })).toEqual({ name: 'safe' });
+    });
+
     it('detects when diagram seed data needs standard-to-canvas conversion', () => {
         expect(needsStandardDiagramSeedConversion({
             nodes: [{ id: 'n1', domain: 'core' }],
@@ -23,6 +31,11 @@ describe('diagramViewerSeedNavigation', () => {
         expect(needsStandardDiagramSeedConversion({
             nodes: [{ id: 'n1', data: { label: 'A' } }],
             edges: [{ id: 'e1', markerEnd: { type: 'arrowclosed' }, sourceHandle: 'a' }],
+        })).toBe(false);
+
+        expect(needsStandardDiagramSeedConversion({
+            nodes: [null, 'invalid'],
+            edges: [42],
         })).toBe(false);
     });
 
@@ -101,20 +114,18 @@ describe('diagramViewerSeedNavigation', () => {
         });
         const createPayload = vi.fn((
             params: Parameters<typeof createAutoSavePayload>[0],
-        ): AutoSavePayload => ({
-            diagramId: 'diagram-b',
-            nodes: params.nodes,
-            edges: params.edges,
-            version: '1.0',
-            isFreshSeed: true,
-        }));
+        ): AutoSavePayload => {
+            const payload = createAutoSavePayload(params);
+            if (!payload) throw new Error('Expected valid autosave payload');
+            return payload;
+        });
 
         finalizeDiagramSeedNavigation({
             storage,
             currentDiagramId: 'diagram-a',
             nextDiagramId: 'diagram-b',
             processedData: {
-                nodes: [{ id: 'n1' }],
+                nodes: [{ id: 'n1', position: { x: 0, y: 0 }, data: { label: 'Node 1' } }],
                 edges: [],
                 metadata: { title: 'Diagram B' },
             },
@@ -131,7 +142,7 @@ describe('diagramViewerSeedNavigation', () => {
         expect(storage.removeItem).toHaveBeenCalledWith('flowchart-autosave-v2-diagram-a');
         expect(createPayload).toHaveBeenCalledWith(expect.objectContaining({
             diagramId: 'diagram-b',
-            nodes: [{ id: 'n1' }],
+            nodes: [{ id: 'n1', position: { x: 0, y: 0 }, data: { label: 'Node 1' } }],
             isFreshSeed: true,
         }));
         expect(storage.setItem).toHaveBeenCalledWith(
