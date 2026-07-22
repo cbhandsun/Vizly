@@ -376,10 +376,14 @@ export function findPathOnVisibilityGraph(
     prebuiltGraph?: VisibilityGraph,
     options: { obstacleOffset?: number, lineObstacles?: LineSegment[] } = {}
 ): Point[] | null {
-    // 1. 快速检查：起终点直接可见
-    // FIXME: We don't check lineObstacles for direct visibility here to keep it fast.
-    // If it's a direct shot, we allow it.
-    if (isVisible(start, end, obstacles)) {
+    // 1. 快速检查：起终点直接可见且不会穿越已有连线。
+    // lineObstacles are a soft cost in A*, so a crossing direct segment must enter
+    // the graph search instead of bypassing the crossing penalty entirely.
+    const directSegment: LineSegment = { start, end };
+    const directCrossesExistingLine = options.lineObstacles?.some(line => (
+        lineSegmentsIntersect(directSegment, line, false)
+    )) ?? false;
+    if (isVisible(start, end, obstacles) && !directCrossesExistingLine) {
         return [start, end];
     }
 
@@ -389,7 +393,9 @@ export function findPathOnVisibilityGraph(
         // 复用已有图（浅拷贝，避免修改原图）
         graph = {
             vertices: [...prebuiltGraph.vertices],
-            edges: new Map(prebuiltGraph.edges),
+            edges: new Map(
+                Array.from(prebuiltGraph.edges, ([vertex, neighbors]) => [vertex, [...neighbors]])
+            ),
             edgeCosts: new Map(prebuiltGraph.edgeCosts),
             vertexToObstacle: new Map(prebuiltGraph.vertexToObstacle)
         };

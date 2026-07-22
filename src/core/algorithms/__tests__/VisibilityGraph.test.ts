@@ -262,6 +262,30 @@ describe('VisibilityGraph', () => {
             expect(path).toEqual([start, end]);
         });
 
+        it('should search for an alternate path when the direct segment crosses an existing line', () => {
+            const start: Point = { x: 0, y: 0 };
+            const end: Point = { x: 10, y: 0 };
+            const prebuilt: VisibilityGraph = {
+                vertices: [{ x: 0, y: 10 }, { x: 10, y: 10 }],
+                edges: new Map([[0, [1]], [1, [0]]]),
+                edgeCosts: new Map([['0-1', 10], ['1-0', 10]]),
+                vertexToObstacle: new Map(),
+            };
+            const originalEdges = new Map(
+                Array.from(prebuilt.edges, ([vertex, neighbors]) => [vertex, [...neighbors]])
+            );
+
+            const path = findPathOnVisibilityGraph(start, end, [], prebuilt, {
+                lineObstacles: [{ start: { x: 5, y: -2 }, end: { x: 5, y: 2 } }],
+            });
+
+            expect(path).toHaveLength(3);
+            expect(path?.[0]).toEqual(start);
+            expect(path?.[1]?.y).toBe(10);
+            expect(path?.[2]).toEqual(end);
+            expect(prebuilt.edges).toEqual(originalEdges);
+        });
+
         it('should bypass obstacles and compute correct path when direct shot is blocked', () => {
             const start: Point = { x: -10, y: 0 };
             const end: Point = { x: 20, y: 0 };
