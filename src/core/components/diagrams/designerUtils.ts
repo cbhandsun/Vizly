@@ -1,5 +1,6 @@
 
 import { Node, Edge, MarkerType, Position } from '@xyflow/react';
+import type { CSSProperties } from 'react';
 import { StandardDiagramData, StandardNodeData, StandardEdgeData, GroupNodeData } from '../../models/DiagramModels';
 import { getThemeManager } from '../../themes';
 import { downloadFile } from '../../utils/downloadUtils';
@@ -10,6 +11,26 @@ import {
     logDesignerUtilsMigrationFailure,
     logDesignerUtilsThemeRestoreFailure,
 } from './designerUtilsLogging';
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    Boolean(value && typeof value === 'object' && !Array.isArray(value))
+);
+
+const optionalString = (value: unknown): string | undefined => (
+    typeof value === 'string' ? value : undefined
+);
+
+const resolveCanvasPosition = (value: unknown, fallback: Node['position']): Node['position'] => {
+    if (!isRecord(value)) return fallback;
+    return typeof value.x === 'number' && Number.isFinite(value.x)
+        && typeof value.y === 'number' && Number.isFinite(value.y)
+        ? { x: value.x, y: value.y }
+        : fallback;
+};
+
+const resolveCanvasStyle = (value: unknown): CSSProperties => (
+    isRecord(value) ? value as CSSProperties : {}
+);
 
 const resolveRestorableThemeId = (themeId?: string): string | undefined => {
     if (!themeId || themeId === 'manual') return undefined;
@@ -272,16 +293,17 @@ export const standardDataToCanvas = async (
 
     // ═══ 检测是否有已保存坐标 ═══
     const hasCanvasPositions = Array.isArray(data.nodes) &&
-        data.nodes.some((n: any) => n.metadata?.canvasPosition);
+        data.nodes.some((node) => isRecord(node.metadata) && isRecord(node.metadata.canvasPosition));
 
     // 1. Process Groups（仅在有 canvasPosition 时恢复）
     if (data.groups && hasCanvasPositions) {
         data.groups.forEach((g, idx) => {
+            const metadata = isRecord(g.metadata) ? g.metadata : {};
             const label = g.label || (g.description ? g.description.replace(/<[^>]*>?/gm, '') : 'Group');
             nodes.push({
                 id: g.id,
                 type: 'titleGroup',
-                position: g.metadata?.canvasPosition || { x: 0, y: idx * 300 },
+                position: resolveCanvasPosition(metadata.canvasPosition, { x: 0, y: idx * 300 }),
                 data: {
                     label,
                     description: g.description,
@@ -292,7 +314,7 @@ export const standardDataToCanvas = async (
                 style: {
                     width: (g.measured?.width || 400),
                     height: (g.measured?.height || 300),
-                    ...(g.metadata?.style || {})
+                    ...resolveCanvasStyle(metadata.style)
                 },
                 zIndex: -1
             });
@@ -304,7 +326,8 @@ export const standardDataToCanvas = async (
 
     data.nodes.forEach((n, idx) => {
         const metadata = n.metadata || {};
-        const shape = metadata.shape || 'rectangle';
+        const metadataStyle = resolveCanvasStyle(metadata.style);
+        const shape = optionalString(metadata.shape) || 'rectangle';
         const description = n.description || '';
         const titleMatch = description.match(/<b>(.*?)<\/b>/);
         const label = titleMatch ? titleMatch[1] : description.replace(/<[^>]*>?/gm, '').substring(0, 20);
@@ -316,35 +339,35 @@ export const standardDataToCanvas = async (
         const contentWidth = Math.max(
             optimizer.calculateNodeWidth(description),
             toFiniteNumber(metadata.width),
-            toFiniteNumber((metadata.style as any)?.width)
+            toFiniteNumber(metadataStyle.width)
         );
         const contentHeight = Math.max(
             optimizer.calculateNodeHeight(description),
             toFiniteNumber(metadata.height),
-            toFiniteNumber((metadata.style as any)?.height)
+            toFiniteNumber(metadataStyle.height)
         );
 
         // 如果明确是 group 类型，转化为 titleGroup 并直接放入
-        if (n.type === 'group' || (n as any).type === 'group') {
+        if (n.type === 'group') {
             const rawWidth = contentWidth > 400 ? contentWidth : 400;
-            const rawHeight = metadata.height || (n as any).height || 300;
+            const rawHeight = toFiniteNumber(metadata.height ?? n.height) || 300;
             nodes.push({
                 id: n.id,
                 type: 'titleGroup',
                 // 让大纲尽量不叠在一块
-                position: metadata.canvasPosition || { x: -50, y: idx * 300 - 50 },
-                parentId: metadata.parentId,
+                position: resolveCanvasPosition(metadata.canvasPosition, { x: -50, y: idx * 300 - 50 }),
+                parentId: optionalString(metadata.parentId),
                 data: {
                     label: label || 'Group',
                     description,
                     domain: n.domain,
                     domainClass: n.domainClass,
-                    themeColor: (n as any).themeColor
+                    themeColor: n.themeColor
                 },
                 style: {
                     width: rawWidth,
                     height: rawHeight,
-                    ...(metadata.style || {})
+                    ...metadataStyle
                 },
                 zIndex: -1
             });
@@ -352,8 +375,9 @@ export const standardDataToCanvas = async (
         }
 
         // 收集未明确声明的从属 parentId
-        if (n.parentId || metadata.parentId) {
-            pendingGroupIds.add(n.parentId || metadata.parentId);
+        const parentId = n.parentId || optionalString(metadata.parentId);
+        if (parentId) {
+            pendingGroupIds.add(parentId);
         }
 
         nodes.push({
@@ -361,22 +385,22 @@ export const standardDataToCanvas = async (
             type: n.type || 'flowchart',
             // 坐标：有保存坐标就用，没有就先设 (0,0) 让布局后算
             position: hasCanvasPositions
-                ? (metadata.canvasPosition || { x: 100 + (idx % 5) * 150, y: 100 + Math.floor(idx / 5) * 100 })
+                ? resolveCanvasPosition(metadata.canvasPosition, { x: 100 + (idx % 5) * 150, y: 100 + Math.floor(idx / 5) * 100 })
                 : { x: 0, y: 0 },
-            parentId: n.parentId || (hasCanvasPositions ? metadata.parentId : undefined),
-            extent: (n.parentId || (hasCanvasPositions && metadata.parentId)) ? 'parent' as const : undefined,
+            parentId: n.parentId || (hasCanvasPositions ? optionalString(metadata.parentId) : undefined),
+            extent: (n.parentId || (hasCanvasPositions && optionalString(metadata.parentId))) ? 'parent' as const : undefined,
             data: {
                 label,
                 description,
                 domain: n.domain,
                 domainClass: n.domainClass,
-                subDomain: (n as any).subDomain,
+                subDomain: n.subDomain,
                 shape,
                 icon: metadata.icon,
                 sequence: metadata.sequence,
                 theme: metadata.theme
             },
-            style: { ...metadata.style, width: contentWidth, height: contentHeight },
+            style: { ...metadataStyle, width: contentWidth, height: contentHeight },
             width: contentWidth,
             height: contentHeight,
             measured: { width: contentWidth, height: contentHeight }

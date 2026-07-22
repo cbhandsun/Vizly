@@ -68,14 +68,17 @@ export interface StandardNodeData {
   order?: number;
   role?: string;
   parent?: string;
+  parentId?: string;
+  position?: XYPosition;
+  themeColor?: string;
   width?: number;
   height?: number;
   zIndex?: number;
-  style?: CSSProperties | Record<string, any>;
-  data?: Record<string, any>;
-  metadata?: Record<string, any>;
+  style?: CSSProperties | Record<string, unknown>;
+  data?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   measured?: { width: number; height: number };
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -87,10 +90,10 @@ export interface StandardEdgeData {
   source: string;
   target: string;
   type: string;
-  markerEnd?: any;
-  markerStart?: any;
+  markerEnd?: Edge['markerEnd'];
+  markerStart?: Edge['markerStart'];
   label?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   zIndex?: number; // 添加 zIndex 属性
   style?: CSSProperties; // 添加 style 属性
   sourceHandle?: string; // 新增：源Handle ID
@@ -127,7 +130,7 @@ export interface GroupNodeData extends StandardNodeData {
   };
   data: StandardNodeData;
   position: XYPosition;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface EdgeData {
@@ -143,7 +146,7 @@ export interface EdgeData {
     animated?: boolean;
   };
   zIndex?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // === 布局数据模型 ===
@@ -217,7 +220,7 @@ export interface LayoutConfig {
   };
   COLS?: Record<string, number>;
   ROWS?: Record<string, number>;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // === 主题数据模型 ===
@@ -300,7 +303,7 @@ export type DiagramType =
 /**
  * 数据适配器接口
  */
-export interface DataAdapter<T = any> {
+export interface DataAdapter<T = unknown> {
   /**
    * 将原始数据转换为标准格式
    */
@@ -345,7 +348,7 @@ export interface QueryResult<T = StandardDiagramData> {
 /**
  * 缓存项
  */
-export interface CacheItem<T = any> {
+export interface CacheItem<T = unknown> {
   key: string;
   data: T;
   timestamp: number;
