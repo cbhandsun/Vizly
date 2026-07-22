@@ -159,6 +159,10 @@ export interface LayoutOptions {
   subDomainOrder?: string[] | Record<string, string[]>;
   /** 是否适配域内容宽度（用于覆盖默认排序等行为） */
   fitDomainContent?: boolean;
+  /** 调试/诊断：在指定垂直布局阶段后停止，入口会规范化大小写和空白。 */
+  stopAfterPhase?: string;
+  /** 内部兼容开关：保持子域容器高度不被后续阶段改写。 */
+  __lockSubGroupHeights?: boolean;
 
   /** 泳道布局：域排列顺序 */
   laneOrder?: string[];

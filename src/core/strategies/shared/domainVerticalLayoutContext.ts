@@ -1,5 +1,4 @@
 import type { Node as ReactFlowNode } from '@xyflow/react';
-import type { StandardNodeData } from '../../models/DiagramModels';
 import type { LayoutOptions } from '../../types/layout';
 
 import { LayeredConfigManager } from '../../config/LayeredConfigManager';
@@ -30,6 +29,40 @@ import { resolveDomainVerticalPipelineControls } from './domainVerticalPipelineC
 
 const MAX_ABSOLUTE_LAYOUT_VALUE = 1_000_000;
 
+type LegacySubGroupConfig = {
+  padding?: Partial<{
+    horizontal: number;
+    vertical: number;
+    top: number;
+    bottom: number;
+  }>;
+  title?: Partial<{
+    height: number;
+    padding: Partial<{ vertical: number }>;
+  }>;
+};
+
+type DiagramConfigSnapshot = ReturnType<typeof diagramConfigManager.getConfig>;
+type LayoutConfigSnapshot = ReturnType<typeof diagramConfigManager.getLayoutConfig>;
+
+type DomainVerticalDiagramConfig = DiagramConfigSnapshot & {
+  subDomain: DiagramConfigSnapshot['subDomain'] & {
+    margin?: { bottom?: number };
+  };
+  subGroup?: LegacySubGroupConfig;
+  diagram?: {
+    layout?: { nodeStrategy?: unknown; direction?: unknown };
+    container?: { width?: number };
+    padding?: { left?: number };
+  };
+};
+
+type DomainVerticalLayoutConfig = LayoutConfigSnapshot & {
+  SUB_GROUP_PADDING: LayoutConfigSnapshot['SUB_GROUP_PADDING'] & {
+    V_BOTTOM_SAFE?: number;
+  };
+};
+
 export const finiteLayoutNumber = (value: unknown, fallback: number): number => {
   const safeFallback = typeof fallback === 'number' && Number.isFinite(fallback)
     ? fallback
@@ -46,8 +79,8 @@ export function prepareDomainVerticalLayout(
   options: LayoutOptions,
 ) {
   const safeNodes = Array.isArray(nodes) ? nodes : [];
-  const cfg = diagramConfigManager.getConfig() as any;
-  const layoutCfg = diagramConfigManager.getLayoutConfig() as any;
+  const cfg = diagramConfigManager.getConfig() as DomainVerticalDiagramConfig;
+  const layoutCfg = diagramConfigManager.getLayoutConfig() as DomainVerticalLayoutConfig;
   const layeredCfg = LayeredConfigManager.getInstance();
   const num = finiteLayoutNumber;
 
@@ -106,35 +139,32 @@ export function prepareDomainVerticalLayout(
   );
   const subGroupVGapCompact = Math.max(8, Math.floor(nodeV * 0.6));
 
-  const domainWhitelist = (options as any)?.domainWhitelist as string[] | undefined;
-  const subWhitelist = (options as any)?.subDomainWhitelist as string[] | undefined;
+  const domainWhitelist = options.domainWhitelist;
+  const subWhitelist = options.subDomainWhitelist;
   const pipelineControls = resolveDomainVerticalPipelineControls({
-    optionStopAfterPhase: (options as any)?.stopAfterPhase,
+    optionStopAfterPhase: options.stopAfterPhase,
     configuredStopAfterPhase: layeredCfg.get<string>(
       'diagram.layout.stopAfterPhase',
       'none',
     ),
-    optionLockSubGroupHeights: (options as any)?.__lockSubGroupHeights,
-    optionFitDomainContent: (options as any)?.fitDomainContent,
+    optionLockSubGroupHeights: options.__lockSubGroupHeights,
+    optionFitDomainContent: options.fitDomainContent,
     configuredConstantGapMode: layeredCfg.get<boolean>(
-      'diagram.layout.constantGapMode' as any,
+      'diagram.layout.constantGapMode',
       true,
     ),
   });
 
-  let updatedNodes = applyDomainGrouping(safeNodes as any, domainWhitelist) as ReactFlowNode[];
-  updatedNodes = normalizeMissingNodeSubDomainByDomain(updatedNodes) as ReactFlowNode[];
-  updatedNodes = applySubGrouping(
-    updatedNodes as ReactFlowNode<StandardNodeData>[],
-    subWhitelist,
-  ) as ReactFlowNode[];
+  let updatedNodes = applyDomainGrouping(safeNodes, domainWhitelist);
+  updatedNodes = normalizeMissingNodeSubDomainByDomain(updatedNodes);
+  updatedNodes = applySubGrouping(updatedNodes, subWhitelist);
   updatedNodes = ensureMeasuredForNodes(updatedNodes);
   updatedNodes = normalizeSubGroupDomainByChildren(updatedNodes);
   updatedNodes = applyDomainVerticalVisibility(updatedNodes, {
     domainWhitelist,
     subDomainWhitelist: subWhitelist,
-    generateDomainGroups: Boolean((options as any)?.generateDomainGroups),
-    generateSubDomainGroups: Boolean((options as any)?.generateSubDomainGroups),
+    generateDomainGroups: Boolean(options.generateDomainGroups),
+    generateSubDomainGroups: Boolean(options.generateSubDomainGroups),
   });
 
   const effectiveTopPad = (): number => {
@@ -146,14 +176,14 @@ export function prepareDomainVerticalLayout(
   };
   const domains = collectDomainVerticalDomainOrder(
     updatedNodes,
-    (options as any)?.domainOrder,
+    options.domainOrder,
   );
   const orderKeyOf = createDomainVerticalOrderKey(
     safeNodes,
-    (options as any)?.subDomainOrder,
+    options.subDomainOrder,
   );
   const nodeLayoutName = resolveDomainVerticalNodeLayout(
-    (options as any)?.nodeLayout,
+    options.nodeLayout,
     cfg?.diagram?.layout?.nodeStrategy,
   );
   const nodeLayoutMetrics = {
@@ -232,13 +262,13 @@ export function prepareDomainVerticalLayout(
     effectiveTopPad,
     domains,
     containerTypes: new Set(['titleGroup', 'domain', 'group']),
-    cursorYGlobal: num((options as any)?.padding?.top, 80),
+    cursorYGlobal: num(options.padding?.top, 80),
     targetWGlobal: num(
-      (options as any)?.containerSize?.width,
+      options.containerSize?.width,
       num(cfg?.diagram?.container?.width, 1200),
     ),
     anchorLeftGlobal: Math.round(num(
-      (options as any)?.padding?.left,
+      options.padding?.left,
       Math.max(40, num(cfg?.diagram?.padding?.left, 40)),
     )),
     nodeLayoutName,
