@@ -112,7 +112,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
     }
 
     // === Version History (GAP-05) ===
-    async saveVersion(diagramId: string, data: any, message?: string) {
+    async saveVersion(diagramId: string, data: unknown, message?: string) {
         // Prevent UUID errors for string-based standard template IDs
         if (!UUID_REGEX.test(diagramId)) {
              throw new Error("Version history requires a saved Cloud Diagram (UUID format required).");

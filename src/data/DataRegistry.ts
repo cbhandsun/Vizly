@@ -218,7 +218,11 @@ export class DataRegistry {
           const localDiagrams = await localDB.listDiagrams();
           for (const diagram of localDiagrams) {
               try {
-                  const builtIn = this.builtInDiagrams.get(diagram.id);
+                  const diagramRecord = diagram && typeof diagram === 'object' && !Array.isArray(diagram)
+                    ? diagram as Record<string, unknown>
+                    : {};
+                  const diagramId = typeof diagramRecord.id === 'string' ? diagramRecord.id : '';
+                  const builtIn = diagramId ? this.builtInDiagrams.get(diagramId) : undefined;
                   const normalizedDiagram = normalizeLocalDiagramForRegistry(diagram, builtIn);
                   // 注册到内存，但不重复写入 IndexedDB
                   this.dataService.registerDiagram(normalizedDiagram, false);

@@ -327,11 +327,6 @@
     "src/hooks/useCommandItems.ts": 1,
     "src/pages/StorageConfigPage.tsx": 1,
     "src/services/DataService.ts": 2,
-    "src/services/IndexedDBStorage.ts": 4,
-    "src/services/StorageService.ts": 1,
-    "src/services/SupabaseStorage.ts": 1,
-    "src/services/UnifiedStorageService.ts": 2,
-    "src/services/ai/diagramPrompts.ts": 4,
-    "src/services/storage/types.ts": 3
+    "src/services/ai/diagramPrompts.ts": 4
   }
 }

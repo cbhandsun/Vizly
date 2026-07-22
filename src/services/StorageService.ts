@@ -18,7 +18,7 @@ export interface StorageItem {
     key: string;
     lastModified?: Date;
     size?: number;
-    data?: any;
+    data?: unknown;
 }
 
 const STORAGE_CONFIG_KEY = 'diagram_storage_config';

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import type { StorageConfig } from '../StorageService';
 
 const sendMock = vi.fn();
@@ -207,6 +208,7 @@ describe('S3StorageProvider', () => {
         s3Storage.saveConfig(config);
 
         const saved = await s3Storage.loadDiagram('remote.json');
+        const savedContent = saved.content as StandardDiagramData;
 
         expect(saved.title).toBe('Remote Title');
         expect(saved.content).toEqual(expect.objectContaining({
@@ -215,10 +217,10 @@ describe('S3StorageProvider', () => {
             type: 'custom',
             version: '1.0.0',
         }));
-        expect(saved.content.nodes).toEqual([
+        expect(savedContent.nodes).toEqual([
             expect.objectContaining({ id: 'n1', description: 'Node 1', domain: 'ops' }),
         ]);
-        expect(Object.hasOwn(saved.content.nodes[0], 'constructor')).toBe(false);
+        expect(Object.hasOwn(savedContent.nodes[0], 'constructor')).toBe(false);
     });
 
     it('rejects oversized remote S3 diagram JSON before parsing', async () => {

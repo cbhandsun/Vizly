@@ -1,3 +1,5 @@
+import type { ClipboardData } from '@/core/utils/flowchartClipboard';
+
 export interface DiagramMetadata {
     id: string; // ID or Key
     title: string;
@@ -10,7 +12,7 @@ export interface DiagramMetadata {
 export interface SavedDiagram {
     id: string;
     title: string;
-    content: any;
+    content: unknown;
     updated_at: string;
     user_id: string;
 }
@@ -18,7 +20,7 @@ export interface SavedDiagram {
 export interface DiagramVersion {
     id: string;
     diagramId: string;
-    snapshotData: any;
+    snapshotData: ClipboardData | null;
     authorId?: string;
     createdAt: number;
     message?: string;
@@ -37,7 +39,7 @@ export interface IStorageProvider {
     // Versioning Operations
     listVersions?(diagramId: string): Promise<DiagramVersion[]>;
     loadVersion?(diagramId: string, versionId: string): Promise<DiagramVersion | null>;
-    saveVersion?(diagramId: string, data: any, message?: string): Promise<DiagramVersion>;
+    saveVersion?(diagramId: string, data: unknown, message?: string): Promise<DiagramVersion>;
 
     // Config / Auth
     isConfigured(): boolean;
