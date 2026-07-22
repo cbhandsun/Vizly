@@ -67,7 +67,7 @@ describe('flowchartImportFile', () => {
         readAsText() {
           this.onerror?.call(
             this as unknown as FileReader,
-            new ProgressEvent('error') as ProgressEvent<FileReader>,
+            { type: 'error', target: this } as unknown as ProgressEvent<FileReader>,
           );
         },
       })
