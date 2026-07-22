@@ -41,6 +41,8 @@ export interface LayoutOptions {
   type: LayoutType;
   /** 节点布局类型（用于域/子域内节点排布） */
   nodeLayout?: LayoutType;
+  /** 路由阶段质量：交互时允许更轻量的计算。 */
+  edgeRoutingQuality?: 'full' | 'interactive';
   /** 水平对齐方式 */
   horizontalAlign?: AlignmentType;
   /** 垂直对齐方式 */

@@ -94,6 +94,7 @@ export interface StandardEdgeData {
   markerStart?: Edge['markerStart'];
   label?: string;
   metadata?: Record<string, unknown>;
+  data?: Record<string, unknown>;
   zIndex?: number; // 添加 zIndex 属性
   style?: CSSProperties; // 添加 style 属性
   sourceHandle?: string; // 新增：源Handle ID
@@ -128,7 +129,7 @@ export interface GroupNodeData extends StandardNodeData {
     width: number;
     height: number;
   };
-  data: StandardNodeData;
+  data: Record<string, unknown>;
   position: XYPosition;
   [key: string]: unknown;
 }

@@ -96,7 +96,6 @@
     "src/core/components/diagrams/base/EnhancedBaseDiagramComponent.tsx": 2,
     "src/core/components/diagrams/base/hooks/useDiagramDragOrchestration.ts": 3,
     "src/core/components/diagrams/base/hooks/useDiagramStability.ts": 10,
-    "src/core/components/diagrams/designerUtils.ts": 31,
     "src/core/components/diagrams/flowchartDesignerCanvasActions.ts": 1,
     "src/core/components/diagrams/flowchartDesignerViewModel.ts": 1,
     "src/core/components/diagrams/flowchartPluginRenderers.ts": 1,

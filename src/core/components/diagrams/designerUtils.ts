@@ -2,6 +2,7 @@
 import { Node, Edge, MarkerType, Position } from '@xyflow/react';
 import type { CSSProperties } from 'react';
 import { StandardDiagramData, StandardNodeData, StandardEdgeData, GroupNodeData } from '../../models/DiagramModels';
+import { LayoutType, type LayoutOptions } from '../../types/layout';
 import { getThemeManager } from '../../themes';
 import { downloadFile } from '../../utils/downloadUtils';
 import { validateAndFixNodes } from '../../utils/nodeValidation';
@@ -32,6 +33,12 @@ const resolveCanvasStyle = (value: unknown): CSSProperties => (
     isRecord(value) ? value as CSSProperties : {}
 );
 
+const optionalLayoutType = (value: unknown): LayoutType | undefined => (
+    typeof value === 'string' && (Object.values(LayoutType) as string[]).includes(value)
+        ? value as LayoutType
+        : undefined
+);
+
 const resolveRestorableThemeId = (themeId?: string): string | undefined => {
     if (!themeId || themeId === 'manual') return undefined;
     const themeManager = getThemeManager();
@@ -40,12 +47,11 @@ const resolveRestorableThemeId = (themeId?: string): string | undefined => {
 };
 
 const resolveGeneratedGroupLayoutOptions = (layout: StandardDiagramData['layout'] | undefined) => {
-    const layoutAny = layout as any;
     return {
-        generateDomainGroups: layoutAny?.generateDomainGroups !== false,
-        generateSubDomainGroups: layoutAny?.generateSubDomainGroups !== false,
-        domainWhitelist: Array.isArray(layoutAny?.domainWhitelist) ? layoutAny.domainWhitelist : undefined,
-        subDomainWhitelist: Array.isArray(layoutAny?.subDomainWhitelist) ? layoutAny.subDomainWhitelist : undefined,
+        generateDomainGroups: layout?.generateDomainGroups !== false,
+        generateSubDomainGroups: layout?.generateSubDomainGroups !== false,
+        domainWhitelist: Array.isArray(layout?.domainWhitelist) ? layout.domainWhitelist : undefined,
+        subDomainWhitelist: Array.isArray(layout?.subDomainWhitelist) ? layout.subDomainWhitelist : undefined,
     };
 };
 
@@ -54,7 +60,7 @@ export type StandardDataToCanvasOptions = {
 };
 
 const stripHiddenCanvasNodes = (nodes: Node[]): Node[] => (
-    nodes.filter(node => !((node as any).hidden === true || (node.data as any)?.hidden === true))
+    nodes.filter(node => !(node.hidden === true || (isRecord(node.data) && node.data.hidden === true)))
 );
 
 /**
@@ -72,7 +78,7 @@ export const canvasToStandardData = (
 
     nodes.forEach(node => {
         const isGroup = node.type === 'titleGroup' || node.type === 'subGroup';
-        const nodeData = (node.data || {}) as any; // 兜底：防止 data 为 undefined
+        const nodeData = isRecord(node.data) ? node.data : {};
 
         // Basic Metadata for positioning restoration
         const canvasMetadata = {
@@ -88,16 +94,16 @@ export const canvasToStandardData = (
 
         // Construct Description (HTML supported)
         // If user typed in label, we use that. 
-        const rawLabel = nodeData.label as string || '';
-        const description = (nodeData.description as string) || `<b>${rawLabel}</b>`;
+        const rawLabel = optionalString(nodeData.label) || '';
+        const description = optionalString(nodeData.description) || `<b>${rawLabel}</b>`;
 
         const baseProps = {
             id: node.id,
             description: description,
             // Domain mapping: Use strict domain prop, fallback to domainClass, fallback to 'core'
-            domain: (nodeData.domain as string) || (nodeData.domainClass as string) || '业务域',
-            subDomain: (nodeData.subDomain as string) || undefined,
-            domainClass: (nodeData.domainClass as string) || 'core',
+            domain: optionalString(nodeData.domain) || optionalString(nodeData.domainClass) || '业务域',
+            subDomain: optionalString(nodeData.subDomain),
+            domainClass: optionalString(nodeData.domainClass) || 'core',
             type: 'custom', // Fixed value as per guide
             metadata: {
                 ...canvasMetadata,
@@ -114,9 +120,9 @@ export const canvasToStandardData = (
                 isGroup: true,
                 measured: { width: canvasMetadata.width, height: canvasMetadata.height },
                 position: node.position, // Keep for type compat, but metadata.canvasPosition is source of truth
-                themeColor: nodeData.themeColor, // Persist themeColor
+                themeColor: optionalString(nodeData.themeColor), // Persist themeColor
                 data: nodeData // Store originals if needed
-            } as any as GroupNodeData); // Cast due to strict type differences
+            } satisfies GroupNodeData);
         } else {
             standardNodes.push({
                 ...baseProps,
@@ -124,28 +130,32 @@ export const canvasToStandardData = (
                 // Ensure mandatory fields
                 domain: baseProps.domain,
                 domainClass: baseProps.domainClass,
-            } as any as StandardNodeData);
+            } satisfies StandardNodeData);
         }
     });
 
     // Map Edges
-    const standardEdges: StandardEdgeData[] = edges.map(edge => ({
+    const standardEdges: StandardEdgeData[] = edges.map(edge => {
+        const edgeData = isRecord(edge.data) ? edge.data : {};
+        return {
         id: edge.id,
         source: edge.source,
         target: edge.target,
-        type: (edge.type === 'smart-step' || edge.type === 'smart') ? 'main' : (edge.type as any) || 'main',
-        label: (edge.label as string) || (edge.data?.label as string),
+        type: (edge.type === 'smart-step' || edge.type === 'smart') ? 'main' : edge.type || 'main',
+        label: optionalString(edge.label) || optionalString(edgeData.label),
         markerEnd: edge.markerEnd, // Persist markers
         style: edge.style, // Persist styles (dashed etc)
+        ...(edgeData.constraints !== undefined ? { data: { constraints: edgeData.constraints } } : {}),
         // Persist extra canvas data in metadata
         metadata: {
             sourceHandle: edge.sourceHandle,
             targetHandle: edge.targetHandle,
-            autoHandles: (edge.data as any)?.auto,
-            manualHandles: Boolean((edge.data as any)?.manualHandles),
-            manualHandleSides: (edge.data as any)?.manualHandleSides
+            autoHandles: edgeData.auto,
+            manualHandles: edgeData.manualHandles === true,
+            manualHandleSides: edgeData.manualHandleSides
         }
-    }));
+    };
+    });
 
     // 获取当前活动主题
     const currentTheme = getThemeManager().getCurrentTheme();
@@ -198,7 +208,7 @@ export const canvasToPureStandardData = (
 
     // Filter and strip UI-specific noise from nodes
     data.nodes = data.nodes.map(n => {
-        const pureNode: any = {
+        const pureNode: StandardNodeData = {
             id: n.id,
             description: n.description,
             domain: n.domain,
@@ -206,8 +216,8 @@ export const canvasToPureStandardData = (
             type: n.type
         };
         
-        if ((n as any).subDomain) {
-            pureNode.subDomain = (n as any).subDomain;
+        if (n.subDomain) {
+            pureNode.subDomain = n.subDomain;
         }
 
         // Only keep business sequence metadata
@@ -220,7 +230,7 @@ export const canvasToPureStandardData = (
 
     // Strip UI-specific noise from edges
     data.edges = data.edges.map(e => {
-        const pureEdge: any = {
+        const pureEdge: StandardEdgeData = {
             id: e.id,
             source: e.source,
             target: e.target,
@@ -231,9 +241,9 @@ export const canvasToPureStandardData = (
             pureEdge.label = e.label;
         }
 
-        const constraintData = (e as any).data?.constraints;
+        const constraintData = isRecord(e.data) ? e.data.constraints : undefined;
         if (constraintData) {
-            (pureEdge as any).data = { constraints: constraintData };
+            pureEdge.data = { constraints: constraintData };
         }
 
         return pureEdge as StandardEdgeData;
@@ -433,13 +443,15 @@ export const standardDataToCanvas = async (
     // 3. Process Edges
     data.edges.forEach(e => {
         const edgeId = e.id || `e-${e.source}-${e.target}-${Math.random().toString(36).substring(2,9)}`;
-        const edgeAny = e as any;
-        const rawSource = rawNodeById.get(e.source) as any;
-        const rawTarget = rawNodeById.get(e.target) as any;
-        const sourceDomain = rawSource?.domain ?? rawSource?.data?.domain;
-        const targetDomain = rawTarget?.domain ?? rawTarget?.data?.domain;
-        const sourceSubDomain = rawSource?.subDomain ?? rawSource?.data?.subDomain;
-        const targetSubDomain = rawTarget?.subDomain ?? rawTarget?.data?.subDomain;
+        const metadata = isRecord(e.metadata) ? e.metadata : {};
+        const rawSource = rawNodeById.get(e.source);
+        const rawTarget = rawNodeById.get(e.target);
+        const sourceData = isRecord(rawSource?.data) ? rawSource.data : {};
+        const targetData = isRecord(rawTarget?.data) ? rawTarget.data : {};
+        const sourceDomain = rawSource?.domain ?? optionalString(sourceData.domain);
+        const targetDomain = rawTarget?.domain ?? optionalString(targetData.domain);
+        const sourceSubDomain = rawSource?.subDomain ?? optionalString(sourceData.subDomain);
+        const targetSubDomain = rawTarget?.subDomain ?? optionalString(targetData.subDomain);
         const isCrossSubDomainEdge = Boolean(
             sourceDomain &&
             targetDomain &&
@@ -448,8 +460,8 @@ export const standardDataToCanvas = async (
             targetSubDomain &&
             sourceSubDomain !== targetSubDomain
         );
-        const explicitSourceHandle = edgeAny.sourceHandle ?? edgeAny.metadata?.sourceHandle;
-        const explicitTargetHandle = edgeAny.targetHandle ?? edgeAny.metadata?.targetHandle;
+        const explicitSourceHandle = e.sourceHandle ?? optionalString(metadata.sourceHandle);
+        const explicitTargetHandle = e.targetHandle ?? optionalString(metadata.targetHandle);
         const sourceHandle = explicitSourceHandle ? expandHandle(String(explicitSourceHandle)) : (isCrossSubDomainEdge ? 'right' : undefined);
         const targetHandle = explicitTargetHandle ? expandHandle(String(explicitTargetHandle)) : (isCrossSubDomainEdge ? 'left' : undefined);
         const manualHandleSides = [
@@ -460,9 +472,9 @@ export const standardDataToCanvas = async (
         if (hasCanvasPositions) {
             // 有保存坐标：使用保存的边数据
             const edgeType = e.type === 'main' ? 'advanced-smart-step' : (e.type || 'advanced-smart-step');
-            const inferredAuto = Array.isArray(edgeAny.metadata?.autoHandles)
-                ? edgeAny.metadata?.autoHandles
-                : ((edgeAny.metadata?.manualHandles === true || manualHandleSides.length > 0) ? undefined : ((edgeAny.metadata?.sourceHandle || edgeAny.metadata?.targetHandle) ? ['source', 'target'] : undefined));
+            const inferredAuto = Array.isArray(metadata.autoHandles)
+                ? metadata.autoHandles.filter((value): value is string => typeof value === 'string')
+                : ((metadata.manualHandles === true || manualHandleSides.length > 0) ? undefined : ((metadata.sourceHandle || metadata.targetHandle) ? ['source', 'target'] : undefined));
             edges.push({
                 id: edgeId,
                 source: e.source,
@@ -473,8 +485,8 @@ export const standardDataToCanvas = async (
                 targetHandle,
                 data: {
                     auto: inferredAuto,
-                    manualHandles: Boolean(edgeAny.metadata?.manualHandles),
-                    manualHandleSides: edgeAny.metadata?.manualHandleSides ?? (manualHandleSides.length > 0 ? manualHandleSides : undefined),
+                    manualHandles: metadata.manualHandles === true,
+                    manualHandleSides: metadata.manualHandleSides ?? (manualHandleSides.length > 0 ? manualHandleSides : undefined),
                     inferredSubDomainHandles
                 },
                 markerEnd: e.markerEnd || { type: MarkerType.ArrowClosed },
@@ -520,7 +532,7 @@ export const standardDataToCanvas = async (
         if (hasDomains) {
             // ═══ 有多域 → 按标准数据 layout.type 选择域策略；未声明时保持 DomainDagre 兼容默认 ═══
             try {
-                const layoutType = String((data.layout as any)?.type || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
+                const layoutType = String(data.layout?.type || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
                 const usesVerticalStrategy = layoutType === 'domainvertical' || layoutType === 'domainverticallayout';
                 const usesHorizontalStrategy = layoutType === 'domainhorizontal' || layoutType === 'domainhorizontallayout';
                 const strategy = usesVerticalStrategy
@@ -528,20 +540,22 @@ export const standardDataToCanvas = async (
                     : usesHorizontalStrategy
                         ? new (await import('../../strategies/DomainHorizontalLayoutStrategy')).DomainHorizontalLayoutStrategy()
                         : new (await import('../../strategies/DomainDagreLayoutStrategy')).DomainDagreLayoutStrategy();
-                const nodeLayout = (data.layout as any)?.nodeLayout
+                const layoutRecord = data.layout as unknown as Record<string, unknown>;
+                const nodeLayout = optionalLayoutType(layoutRecord.nodeLayout)
                     ?? ((usesVerticalStrategy || usesHorizontalStrategy) ? 'vertical' : undefined);
-                const result = await strategy.calculateLayout(nodes, edges, {
-                    type: strategy.getName() as any,
+                const layoutOptions: LayoutOptions = {
+                    type: LayoutType.DOMAIN_FIRST,
                     direction: direction as 'TB' | 'LR',
-                    ...(nodeLayout ? { nodeLayout } : {}),
+                    ...(nodeLayout ? { nodeLayout: optionalLayoutType(nodeLayout) } : {}),
                     spacing: data.layout?.spacing || { horizontal: 50, vertical: 50 },
                     padding: { top: 40, right: 20, bottom: 20, left: 20 },
                     ...resolveGeneratedGroupLayoutOptions(data.layout),
                     ...(options.edgeRoutingQuality ? { edgeRoutingQuality: options.edgeRoutingQuality } : {}),
                     fitDomainContent: true,
-                    domainOrder: (data.layout as any)?.domainOrder,
-                    subDomainOrder: (data.layout as any)?.subDomainOrder,
-                } as any);
+                    domainOrder: data.layout?.domainOrder,
+                    subDomainOrder: data.layout?.subDomainOrder,
+                };
+                const result = await strategy.calculateLayout(nodes, edges, layoutOptions);
                 return {
                     nodes: stripHiddenCanvasNodes(result.nodes),
                     // [FIX] 若布局策略返回空 edges（例如所有 source/target 均不在 idMap 中），
@@ -566,8 +580,8 @@ export const standardDataToCanvas = async (
 
         const flowNodes = nodes.filter(n => n.type === 'flowchart');
         flowNodes.forEach(node => {
-            const w = (node as any).width || 150;
-            const h = (node as any).height || 50;
+            const w = node.width || 150;
+            const h = node.height || 50;
             dagreGraph.setNode(node.id, { width: w, height: h });
         });
 
@@ -582,11 +596,11 @@ export const standardDataToCanvas = async (
         for (const node of flowNodes) {
             const pos = dagreGraph.node(node.id);
             if (!pos) continue;
-            const w = (node as any).width || 150;
-            const h = (node as any).height || 50;
+            const w = node.width || 150;
+            const h = node.height || 50;
             node.position = { x: pos.x - w / 2, y: pos.y - h / 2 };
-            (node as any).targetPosition = isHorizontal ? Position.Left : Position.Top;
-            (node as any).sourcePosition = isHorizontal ? Position.Right : Position.Bottom;
+            node.targetPosition = isHorizontal ? Position.Left : Position.Top;
+            node.sourcePosition = isHorizontal ? Position.Right : Position.Bottom;
         }
 
     }
