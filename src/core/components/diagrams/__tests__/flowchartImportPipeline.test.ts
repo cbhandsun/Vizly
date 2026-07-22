@@ -80,6 +80,35 @@ describe('flowchartImportPipeline', () => {
     expect(onJsonImportFailure).toHaveBeenCalled();
   });
 
+  it('uses the invalid-format message when a plugin throws a non-error value', async () => {
+    const onJsonImportFailure = vi.fn();
+
+    await runFlowchartImportPipeline({
+      content: JSON.stringify({ nodes: [], edges: [] }),
+      importKind: 'json',
+      invalidFormatMessage: 'Invalid format',
+      activePlugin: {
+        parseData: () => {
+          throw 'plugin failed';
+        },
+      },
+      fallbackTitle: 'Imported Diagram',
+      openedAt: '2026-06-25T00:00:00.000Z',
+      setNodes: vi.fn(),
+      setEdges: vi.fn(),
+      onStandardPluginSuccess: vi.fn(),
+      registerStandardReload: vi.fn(async () => undefined),
+      onStandardReloadQueued: vi.fn(),
+      onReactFlowSuccess: vi.fn(),
+      onJsonImportFailure,
+      onMermaidSuccess: vi.fn(),
+      onMermaidLayoutHint: vi.fn(),
+      onMermaidImportFailure: vi.fn(),
+    });
+
+    expect(onJsonImportFailure).toHaveBeenCalledWith('Invalid format');
+  });
+
   it('routes mermaid imports through the mermaid plan/apply pipeline', async () => {
     const setNodes = vi.fn();
     const setEdges = vi.fn();

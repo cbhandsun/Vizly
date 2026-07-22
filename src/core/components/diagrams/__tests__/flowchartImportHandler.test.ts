@@ -76,7 +76,7 @@ describe('flowchartImportHandler', () => {
         const handler = createFlowchartImportHandler({
             t: (key, params) => params ? `${key}:${JSON.stringify(params)}` : key,
             messageApi,
-            activePlugin: { id: 'plugin' },
+            activePlugin: { parseData: vi.fn(() => ({ nodes: [], edges: [] })) },
             businessDataId: 'biz-1',
             diagramId: 'diagram-1',
             setNodes: vi.fn(),
