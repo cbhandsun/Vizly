@@ -5,6 +5,10 @@ import {
   STRICT_OUTER_LANE_MAX_CANDIDATES,
   buildDirectionalStrictOuterLaneCandidates,
 } from '../baseReactFlowDisplayOuterLaneCandidates';
+import {
+  buildStrictInterSegmentLaneXs,
+  buildStrictInterSegmentLaneYs,
+} from '../baseReactFlowDisplayLanePositions';
 
 const edge: Edge = { id: 'edge', source: 'source', target: 'target' };
 const nodes: Node[] = [
@@ -46,5 +50,28 @@ describe('baseReactFlowDisplayOuterLaneCandidates', () => {
       { x: 300, y: 100 },
       { x: 300, y: 600 },
     ], nodes.filter(node => node.id !== 'obstacle'), edge)]).toEqual([]);
+  });
+});
+
+describe('display lane positions', () => {
+  it('finds sorted corridor midpoints while removing duplicate coordinates', () => {
+    const path = [{ x: 0, y: 0 }, { x: 100, y: 100 }];
+    const segments = [
+      { a: { x: 20, y: -10 }, b: { x: 20, y: 110 }, axis: 'v' as const },
+      { a: { x: 20, y: 0 }, b: { x: 20, y: 100 }, axis: 'v' as const },
+      { a: { x: 60, y: 0 }, b: { x: 60, y: 100 }, axis: 'v' as const },
+    ];
+    expect(buildStrictInterSegmentLaneXs(path, segments)).toEqual([40]);
+  });
+
+  it('ignores gaps outside the supported lane range and empty paths', () => {
+    const path = [{ x: 0, y: 0 }, { x: 100, y: 100 }];
+    const segments = [
+      { a: { x: 0, y: 10 }, b: { x: 100, y: 10 }, axis: 'h' as const },
+      { a: { x: 0, y: 15 }, b: { x: 100, y: 15 }, axis: 'h' as const },
+      { a: { x: 0, y: 120 }, b: { x: 100, y: 120 }, axis: 'h' as const },
+    ];
+    expect(buildStrictInterSegmentLaneYs(path, segments)).toEqual([]);
+    expect(buildStrictInterSegmentLaneYs([], segments)).toEqual([]);
   });
 });

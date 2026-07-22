@@ -14,6 +14,13 @@ import {
   type DisplayPoint,
   type DisplaySegment,
 } from './baseReactFlowDisplayGeometry';
+import {
+  buildStrictInterSegmentLaneXs,
+  buildStrictInterSegmentLaneYs,
+  buildStrictObstacleSideBridgeXs,
+  buildStrictObstacleSideBridgeYs,
+  STRICT_OBSTACLE_SIDE_CLEARANCES,
+} from './baseReactFlowDisplayLanePositions';
 
 const MIN_DISPLAY_ENDPOINT_STUB = 48;
 
@@ -24,6 +31,11 @@ export {
   STRICT_OUTER_LANE_STUB_LENGTHS,
   buildDirectionalStrictOuterLaneCandidates,
 } from './baseReactFlowDisplayOuterLaneCandidates';
+export {
+  buildStrictObstacleSideBridgeXs,
+  buildStrictObstacleSideBridgeYs,
+  STRICT_OBSTACLE_SIDE_CLEARANCES,
+} from './baseReactFlowDisplayLanePositions';
 
 export type StrictCrossingSegmentLike = {
   a: DisplayPoint;
@@ -34,105 +46,8 @@ export type StrictCrossingSegmentLike = {
 };
 
 export const STRICT_TERMINAL_ESCAPE_CLEARANCES = [24, 32, 48, 64, 96, 128, 160, 224];
-export const STRICT_OBSTACLE_SIDE_CLEARANCES = [16, 24, 32, 48, 64];
 export const STRICT_TERMINAL_MAX_CROSSINGS = 6;
 export const STRICT_TERMINAL_MAX_CANDIDATES = 160;
-
-export const buildStrictObstacleSideBridgeXs = (
-  nodes: Node[],
-  fromY: number,
-  toY: number,
-): number[] => {
-  const values: number[] = [];
-  for (const node of nodes) {
-    if (isDisplayContainerNode(node)) continue;
-    const rect = getDisplayNodeRect(node);
-    if (!rect) continue;
-    if (!rangesOverlapWithMargin(fromY, toY, rect.y, rect.y + rect.height, 8)) continue;
-    for (const clearance of STRICT_OBSTACLE_SIDE_CLEARANCES) {
-      values.push(rect.x - clearance, rect.x + rect.width + clearance);
-    }
-  }
-  return Array.from(new Set(values.map(value => Math.round(value * 1000) / 1000)))
-    .filter(value => Number.isFinite(value));
-};
-
-export const buildStrictObstacleSideBridgeYs = (
-  nodes: Node[],
-  fromX: number,
-  toX: number,
-): number[] => {
-  const values: number[] = [];
-  for (const node of nodes) {
-    if (isDisplayContainerNode(node)) continue;
-    const rect = getDisplayNodeRect(node);
-    if (!rect) continue;
-    if (!rangesOverlapWithMargin(fromX, toX, rect.x, rect.x + rect.width, 8)) continue;
-    for (const clearance of STRICT_OBSTACLE_SIDE_CLEARANCES) {
-      values.push(rect.y - clearance, rect.y + rect.height + clearance);
-    }
-  }
-  return Array.from(new Set(values.map(value => Math.round(value * 1000) / 1000)))
-    .filter(value => Number.isFinite(value));
-};
-
-export const buildStrictInterSegmentLaneXs = (
-  path: DisplayPoint[],
-  segments: DisplaySegment[],
-): number[] => {
-  const start = path[0];
-  const end = path[path.length - 1];
-  if (!start || !end) return [];
-  const minY = Math.min(start.y, end.y);
-  const maxY = Math.max(start.y, end.y);
-  const xs = Array.from(new Set(
-    segments
-      .filter(segment => segment.axis === 'v')
-      .filter(segment => rangesOverlapWithMargin(
-        minY,
-        maxY,
-        Math.min(segment.a.y, segment.b.y),
-        Math.max(segment.a.y, segment.b.y),
-        4,
-      ))
-      .map(segment => Math.round(segment.a.x * 1000) / 1000),
-  )).sort((first, second) => first - second);
-  const lanes: number[] = [];
-  for (let index = 0; index < xs.length - 1; index += 1) {
-    const gap = xs[index + 1] - xs[index];
-    if (gap >= 8 && gap <= 96) lanes.push((xs[index] + xs[index + 1]) / 2);
-  }
-  return lanes;
-};
-
-export const buildStrictInterSegmentLaneYs = (
-  path: DisplayPoint[],
-  segments: DisplaySegment[],
-): number[] => {
-  const start = path[0];
-  const end = path[path.length - 1];
-  if (!start || !end) return [];
-  const minX = Math.min(start.x, end.x);
-  const maxX = Math.max(start.x, end.x);
-  const ys = Array.from(new Set(
-    segments
-      .filter(segment => segment.axis === 'h')
-      .filter(segment => rangesOverlapWithMargin(
-        minX,
-        maxX,
-        Math.min(segment.a.x, segment.b.x),
-        Math.max(segment.a.x, segment.b.x),
-        4,
-      ))
-      .map(segment => Math.round(segment.a.y * 1000) / 1000),
-  )).sort((first, second) => first - second);
-  const lanes: number[] = [];
-  for (let index = 0; index < ys.length - 1; index += 1) {
-    const gap = ys[index + 1] - ys[index];
-    if (gap >= 8 && gap <= 96) lanes.push((ys[index] + ys[index + 1]) / 2);
-  }
-  return lanes;
-};
 
 export const buildStrictTerminalEscapeCandidates = (
   path: DisplayPoint[],
