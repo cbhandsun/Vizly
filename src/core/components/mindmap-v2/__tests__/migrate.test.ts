@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NodeObj } from 'mind-elixir';
 import { downloadText, markdownToNodeObj, migrateV1ToV2, nodeObjToFlowchartJson, nodeObjToMarkdown, nodeObjToOpml, opmlToNodeObj } from '../migrate';
+import { isMindMapV2 } from '../types';
 import { MINDMAP_TASK_ASSIGNEE_MAX_LENGTH } from '../mindmapTaskModel';
 import {
     MINDMAP_MAX_CHILDREN_PER_NODE,
@@ -29,7 +30,7 @@ describe('nodeObjToMarkdown', () => {
                     id: 'task',
                     topic: '交付首版',
                     children: [],
-                    ...( {
+                    ...{
                         task: {
                             status: 'doing',
                             priority: '高',
@@ -37,7 +38,7 @@ describe('nodeObjToMarkdown', () => {
                             dueDate: '2026-06-20',
                             progress: 60,
                         },
-                    } as any),
+                    },
                 },
             ],
         };
@@ -60,7 +61,7 @@ describe('nodeObjToMarkdown', () => {
                     topic: '交付首版',
                     note: '需要跨团队协同',
                     children: [],
-                    ...( {
+                    ...{
                         task: {
                             status: 'doing',
                             priority: '高',
@@ -68,7 +69,7 @@ describe('nodeObjToMarkdown', () => {
                             dueDate: '2026-06-20',
                             progress: 60,
                         },
-                    } as any),
+                    },
                 },
             ],
         };
@@ -133,7 +134,7 @@ describe('nodeObjToMarkdown', () => {
                 { id: 'child', type: 'mindmap', data: { label: 'Child', url: 'example.com/doc' }, position: { x: 0, y: 100 } },
             ],
             edges: [{ id: 'e1', source: 'root', target: 'child' }],
-        } as any);
+        });
 
         expect(migrated.nodeData.hyperLink).toBeUndefined();
         expect(migrated.nodeData.children?.[0]?.hyperLink).toBe('https://example.com/doc');
@@ -146,10 +147,21 @@ describe('nodeObjToMarkdown', () => {
                 { id: 'child', type: 'mindmap', data: { label: 'Child', branchColor: '#22c55e' }, position: { x: 0, y: 100 } },
             ],
             edges: [{ id: 'e1', source: 'root', target: 'child' }],
-        } as any);
+        });
 
         expect(migrated.nodeData.style).toBeUndefined();
         expect(migrated.nodeData.children?.[0]?.style).toEqual({ color: '#22c55e' });
+    });
+
+    it('ignores malformed legacy records and validates the complete v2 marker', () => {
+        const migrated = migrateV1ToV2({
+            nodes: [null, { id: 1 }, { id: 'root', type: 'mindmap', data: { label: 'Root' } }],
+            edges: [{ source: 'root', target: 3 }, 'invalid'],
+        });
+
+        expect(migrated.nodeData.topic).toBe('Root');
+        expect(isMindMapV2({ _version: 'mindmap-v2' })).toBe(false);
+        expect(isMindMapV2(migrated)).toBe(true);
     });
 
     it('bounds markdown import size, text, and child fan-out', () => {

@@ -23,10 +23,17 @@ export interface VizlyMindMapV2Data {
 
 /** Legacy React Flow based format (mindmap-v1) */
 export interface VizlyMindMapV1Data {
-    nodes: any[];
-    edges: any[];
+    nodes: unknown[];
+    edges: unknown[];
 }
 
-export function isMindMapV2(data: any): data is VizlyMindMapV2Data {
-    return data?._version === 'mindmap-v2';
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    Boolean(value && typeof value === 'object' && !Array.isArray(value))
+);
+
+export function isMindMapV2(data: unknown): data is VizlyMindMapV2Data {
+    if (!isRecord(data) || data._version !== 'mindmap-v2' || !isRecord(data.nodeData)) return false;
+    return typeof data.nodeData.id === 'string'
+        && typeof data.nodeData.topic === 'string'
+        && (data.direction === 0 || data.direction === 1 || data.direction === 2 || data.direction === 3);
 }
