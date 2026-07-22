@@ -12,6 +12,11 @@ import {
 import { downloadMindMapMarkdown } from './mindMapMarkdown';
 import { useMindMapAutoLayout } from './useMindMapAutoLayout';
 import { useMindMapSupplementalCommands } from './useMindMapSupplementalCommands';
+import {
+    collapseAllMindMapBranches,
+    expandAllMindMapNodes,
+    toggleMindMapNodeCollapse,
+} from './mindMapCollapseState';
 
 export const PALETTE: readonly string[] = MIND_MAP_PALETTE;
 export { exportMindMapToMarkdown } from './mindMapMarkdown';
@@ -423,106 +428,13 @@ export function useMindMapOrchestrator(
         return () => window.removeEventListener('paste', handlePaste, { capture: true });
     }, [edges, nodes, setEdges, setNodes, takeSnapshot]);
 
-    const handleToggleCollapse = useCallback((e: Event) => {
-        const detail = (e as CustomEvent).detail;
-        if (!detail || !detail.nodeId) return;
-        const { nodeId } = detail;
-
+    const handleToggleCollapse = useCallback((event: Event) => {
+        const detail = (event as CustomEvent<unknown>).detail;
+        if (!detail || typeof detail !== 'object') return;
+        const nodeId = Reflect.get(detail, 'nodeId');
+        if (typeof nodeId !== 'string' || !nodeId) return;
         takeSnapshot();
-
-        setNodes(currentNodes => {
-            const targetNode = currentNodes.find(n => n.id === nodeId);
-            if (!targetNode) return currentNodes;
-
-            const isCurrentlyCollapsed = !!targetNode.data?.collapsed;
-            
-            // 1. Toggle collapse state on target
-            let nextNodes = currentNodes.map(n => {
-                if (n.id === nodeId) {
-                    return { ...n, data: { ...n.data, collapsed: !isCurrentlyCollapsed } };
-                }
-                return n;
-            });
-
-            // 2. Compute visibility for all nodes based on tree structure
-            const childrenMap = new Map<string, string[]>();
-            const parentSet = new Set<string>();
-            edges.forEach(e => {
-                if (!childrenMap.has(e.source)) childrenMap.set(e.source, []);
-                childrenMap.get(e.source)!.push(e.target);
-                parentSet.add(e.target);
-            });
-
-            // [M-5] Build O(1) lookup map for nextNodes to avoid O(N) find() inside traverse().
-            // Previous: nextNodes.find() inside each recursive call = O(N²) for large trees.
-            const nextNodeMap = new Map<string, Node>(nextNodes.map(n => [n.id, n]));
-
-            const roots = nextNodes.filter(n => n.type === 'mindmap' && !parentSet.has(n.id));
-            const visibilityMap = new Map<string, { hidden: boolean, count: number }>();
-
-            function traverse(currentId: string, parentHidden: boolean, parentCollapsed: boolean): number {
-                // [M-5] O(1) map lookup instead of O(N) find()
-                const node = nextNodeMap.get(currentId);
-                const selfCollapsed = !!node?.data?.collapsed;
-                const isHidden = parentHidden || parentCollapsed;
-                
-                let descendants = 0;
-                const children = childrenMap.get(currentId) || [];
-                for (const childId of children) {
-                    descendants += 1; 
-                    const childDescendants = traverse(childId, isHidden, selfCollapsed);
-                    descendants += childDescendants;
-                }
-
-                visibilityMap.set(currentId, { hidden: isHidden, count: children.length });
-                return descendants;
-            }
-
-            roots.forEach(root => traverse(root.id, false, false));
-
-            // Apply visibility
-            nextNodes = nextNodes.map(n => {
-                if (n.type === 'mindmap') {
-                    const viz = visibilityMap.get(n.id);
-                    if (viz) {
-                        return { 
-                            ...n, 
-                            hidden: viz.hidden, 
-                            data: { ...n.data, childrenCount: viz.count }
-                        };
-                    }
-                }
-                return n;
-            });
-
-            // Note: edge hidden-state sync is handled by React Flow natively —
-            // RF auto-hides edges whose source or target node is hidden.
-
-            // Applying layout to nodes directly within setNodes
-            const visibleNodes = nextNodes.filter(n => n.type === 'mindmap' && !n.hidden);
-            const visibleEdges = edges.map(e => {
-                const viz = visibilityMap.get(e.target);
-                return viz ? { ...e, hidden: viz.hidden } : e;
-            }).filter(e => !e.hidden);
-
-            const rootNode = visibleNodes.find(n => n.data?.depth === 0);
-            const direction = rootNode?.data?.direction as string || 'LR';
-
-            const positions = autoMindMapLayout(visibleNodes, visibleEdges, direction, {
-                nodeSpacing: 48,
-                levelSpacing: 140
-            });
-
-            return nextNodes.map(n => {
-                if (n.type === 'mindmap' && positions.has(n.id)) {
-                    return { ...n, position: positions.get(n.id)! };
-                }
-                return n;
-            });
-        });
-
-
-
+        setNodes(currentNodes => toggleMindMapNodeCollapse(currentNodes, edges, nodeId));
     }, [edges, setNodes, takeSnapshot]);
 
     useEffect(() => {
@@ -530,40 +442,14 @@ export function useMindMapOrchestrator(
         return () => window.removeEventListener('mindmap:toggle-collapse', handleToggleCollapse);
     }, [handleToggleCollapse]);
 
-    // ── Collapse ALL non-root nodes ────────────────────────────────────────────
     const handleCollapseAll = useCallback(() => {
         takeSnapshot();
-        setNodes(currentNodes => {
-            const edgeChildMap = new Map<string, string[]>();
-            edges.forEach(e => {
-                if (e.type === 'relationshipEdge') return;
-                if (!edgeChildMap.has(e.source)) edgeChildMap.set(e.source, []);
-                edgeChildMap.get(e.source)!.push(e.target);
-            });
-
-            // Only collapse depth-1 nodes (direct children of root) — collapses whole subtrees
-            return currentNodes.map(n => {
-                if (n.type !== 'mindmap') return n;
-                const d = n.data?.depth as number | undefined;
-                const isRoot = d === 0 || (d === undefined && n.data?.direction !== undefined);
-                if (isRoot) return n;
-                const hasKids = (edgeChildMap.get(n.id) || []).length > 0;
-                if (!hasKids) return n;
-                return { ...n, data: { ...n.data, collapsed: true } };
-            });
-        });
+        setNodes(currentNodes => collapseAllMindMapBranches(currentNodes, edges));
     }, [edges, setNodes, takeSnapshot]);
 
-    // ── Expand ALL nodes ───────────────────────────────────────────────────────
     const handleExpandAll = useCallback(() => {
         takeSnapshot();
-        setNodes(currentNodes =>
-            currentNodes.map(n => {
-                if (n.type !== 'mindmap') return n;
-                if (!n.data?.collapsed) return n;
-                return { ...n, data: { ...n.data, collapsed: false }, hidden: false };
-            })
-        );
+        setNodes(currentNodes => expandAllMindMapNodes(currentNodes));
     }, [setNodes, takeSnapshot]);
 
     useEffect(() => {

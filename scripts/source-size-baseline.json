@@ -7,6 +7,5 @@
     "compositionRoot": 300
   },
   "oversizedFiles": {
-    "src/core/components/diagrams/hooks/useMindMapOrchestrator.ts": 752
   }
 }
