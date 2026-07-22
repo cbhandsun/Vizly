@@ -224,7 +224,6 @@
     "src/core/routing/core/CostEvaluator.ts": 2,
     "src/core/routing/utils/AdvancedRouting.ts": 24,
     "src/core/routing/utils/EdgeRoutingHelpers.ts": 19,
-    "src/core/sdk/BasePlugin.ts": 13,
     "src/core/services/DocGeneratorService.ts": 2,
     "src/core/services/EdgeRoutingCache.ts": 1,
     "src/core/services/EdgeRoutingCoordinator.ts": 6,

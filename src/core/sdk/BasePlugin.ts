@@ -1,6 +1,6 @@
 import React from 'react';
 import { MarkerType } from '@xyflow/react';
-import type { Node, Edge } from '@xyflow/react';
+import type { Node, Edge, NodeTypes, EdgeTypes } from '@xyflow/react';
 import { 
   DiagramTypePlugin, 
   PluginContext, 
@@ -11,24 +11,53 @@ import {
 } from '../types/plugin';
 
 import { coerceToStandardDiagramData } from '../utils/coerceDiagram';
+import { coerceClipboardData } from '../utils/flowchartClipboard';
+import type { StandardDiagramData } from '../models/DiagramModels';
 import { diagramStyleManager } from '../components/shared/DiagramStyleManager';
 import { logBasePluginStandardDataCoercionFailure } from './basePluginLogging';
 
-const standardDataToReactFlowLightweight = (standardData: any): { nodes: Node[]; edges: Edge[] } => {
-  const nodes = (standardData.nodes || []).map((nodeData: any, index: number) => {
-    const metadata = nodeData.metadata || {};
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value && typeof value === 'object' && !Array.isArray(value))
+);
+
+const finiteDimension = (value: unknown, fallback: number): number => (
+  typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback
+);
+
+const optionalString = (value: unknown): string | undefined => (
+  typeof value === 'string' ? value : undefined
+);
+
+const standardDataToReactFlowLightweight = (standardData: StandardDiagramData): { nodes: Node[]; edges: Edge[] } => {
+  const nodes = standardData.nodes.map((nodeData, index) => {
+    const nodeRecord = nodeData as unknown as Record<string, unknown>;
+    const metadata = isRecord(nodeData.metadata) ? nodeData.metadata : {};
+    const metadataStyle = isRecord(metadata.style) ? metadata.style : {};
     const description = nodeData.description || nodeData.label || '';
     const label = nodeData.label || String(description).replace(/<[^>]*>?/gm, '').slice(0, 40) || nodeData.id;
-    const width = metadata.width ?? nodeData.width ?? metadata.style?.width ?? 160;
-    const height = metadata.height ?? nodeData.height ?? metadata.style?.height ?? 80;
+    const width = finiteDimension(metadata.width ?? nodeData.width ?? metadataStyle.width, 160);
+    const height = finiteDimension(metadata.height ?? nodeData.height ?? metadataStyle.height, 80);
+    const positionValue = metadata.canvasPosition ?? nodeRecord.position;
+    const positionRecord = isRecord(positionValue) ? positionValue : {};
+    const position = {
+      x: typeof positionRecord.x === 'number' && Number.isFinite(positionRecord.x)
+        ? positionRecord.x
+        : 120 + (index % 4) * 180,
+      y: typeof positionRecord.y === 'number' && Number.isFinite(positionRecord.y)
+        ? positionRecord.y
+        : 120 + Math.floor(index / 4) * 120,
+    };
+    const customData = isRecord(nodeData.data) ? nodeData.data : {};
 
     return {
       id: nodeData.id,
       type: nodeData.type || 'custom',
-      position: metadata.canvasPosition || nodeData.position || { x: 120 + (index % 4) * 180, y: 120 + Math.floor(index / 4) * 120 },
-      parentId: nodeData.parentId || metadata.parentId,
+      position,
+      parentId: typeof nodeRecord.parentId === 'string'
+        ? nodeRecord.parentId
+        : typeof metadata.parentId === 'string' ? metadata.parentId : undefined,
       data: {
-        ...(nodeData.data || {}),
+        ...customData,
         ...metadata,
         label,
         description,
@@ -37,33 +66,35 @@ const standardDataToReactFlowLightweight = (standardData: any): { nodes: Node[];
         subDomain: nodeData.subDomain,
       },
       style: {
-        ...(metadata.style || {}),
+        ...metadataStyle,
         width,
         height,
       },
       width,
       height,
       measured: { width, height },
-    } as Node;
+    } satisfies Node;
   });
 
-  const edges = (standardData.edges || []).map((edgeData: any) => {
-    const metadata = edgeData.metadata || {};
+  const edges = standardData.edges.map((edgeData) => {
+    const edgeRecord = edgeData as unknown as Record<string, unknown>;
+    const metadata = isRecord(edgeData.metadata) ? edgeData.metadata : {};
+    const customData = isRecord(edgeRecord.data) ? edgeRecord.data : {};
     return {
       id: edgeData.id ?? `e-${edgeData.source}-${edgeData.target}`,
       source: edgeData.source,
       target: edgeData.target,
-      sourceHandle: edgeData.sourceHandle ?? metadata.sourceHandle,
-      targetHandle: edgeData.targetHandle ?? metadata.targetHandle,
+      sourceHandle: edgeData.sourceHandle ?? optionalString(metadata.sourceHandle),
+      targetHandle: edgeData.targetHandle ?? optionalString(metadata.targetHandle),
       type: edgeData.type === 'main' ? 'advanced-smart-step' : edgeData.type || 'advanced-smart-step',
       label: edgeData.label,
       markerEnd: edgeData.markerEnd || { type: MarkerType.ArrowClosed },
       style: edgeData.style,
       data: {
-        ...(edgeData.data || {}),
+        ...customData,
         ...metadata,
       },
-    } as Edge;
+    } satisfies Edge;
   });
 
   return { nodes, edges };
@@ -94,7 +125,7 @@ export abstract class BaseDiagramPlugin implements DiagramTypePlugin {
   /** 
    * 生命周期：捕获旧版本数据并洗牌升迁至当前最新结构 
    */
-  async migrate(data: any, _fromVersion: string | undefined): Promise<any> {
+  async migrate<T>(data: T, _fromVersion: string | undefined): Promise<T> {
     return data;
   }
 
@@ -107,23 +138,28 @@ export abstract class BaseDiagramPlugin implements DiagramTypePlugin {
       return { nodes: [], edges: [] };
     }
 
-    const raw = source as any;
+    const raw = source as Record<string, unknown>;
 
     // 1. 如果源数据已经是标准的 React Flow 格式 (节点带有明确的 position)
     const isRfFormat = Array.isArray(raw.nodes) && 
                       raw.nodes.length > 0 && 
-                      (raw.nodes[0] as any).position !== undefined;
+                      isRecord(raw.nodes[0]) && raw.nodes[0].position !== undefined;
 
     if (isRfFormat) {
+      const canvas = coerceClipboardData({
+        nodes: raw.nodes,
+        edges: Array.isArray(raw.edges) ? raw.edges : [],
+      });
+      if (!canvas) return { nodes: [], edges: [] };
       // [FIX] RF 格式数据跳过了 EdgeFactory，手动为缺失 style 的边注入 preset 默认值
       const preset = (() => { try { return diagramStyleManager.getPreset(); } catch { return null; } })();
       const defaultStroke = preset?.edges?.main?.color || '#3E8EDE';
       const defaultWidth = preset?.edges?.main?.width || 1.8;
-      const defaultDash = (preset?.edges?.main as any)?.dash || undefined;
+      const defaultDash = preset?.edges?.main?.dash || undefined;
       const defaultArrowW = preset?.edges?.main?.arrow?.width ?? 10;
       const defaultArrowH = preset?.edges?.main?.arrow?.height ?? 10;
 
-      const patchedEdges = (raw.edges || []).map((e: any) => {
+      const patchedEdges = canvas.edges.map((e) => {
         const hasStyle = e.style && (e.style.stroke || e.style.strokeWidth);
         if (hasStyle) return e;
         return {
@@ -142,7 +178,7 @@ export abstract class BaseDiagramPlugin implements DiagramTypePlugin {
           },
         };
       });
-      return { nodes: raw.nodes || [], edges: patchedEdges };
+      return { nodes: canvas.nodes, edges: patchedEdges };
     }
 
     // 2. 尝试从 StandardDiagramData 标准化格式转换
@@ -163,15 +199,14 @@ export abstract class BaseDiagramPlugin implements DiagramTypePlugin {
 
     // 3. 兜底解析
     return { 
-      nodes: Array.isArray(raw.nodes) ? raw.nodes : [], 
-      edges: Array.isArray(raw.edges) ? raw.edges : [] 
+      ...(coerceClipboardData(raw) ?? { nodes: [], edges: [] }),
     };
   }
 
   /**
    * 将 ReactFlow 状态序列化回领域数据
    */
-  serializeData(nodes: Node[], edges: Edge[]): any {
+  serializeData(nodes: Node[], edges: Edge[]): unknown {
     return { nodes, edges };
   }
 
@@ -192,11 +227,11 @@ export abstract class BaseDiagramPlugin implements DiagramTypePlugin {
   }
 
   // ====== 渲染 (默认行为) ======
-  getNodeTypes(): Record<string, React.ComponentType<any>> {
+  getNodeTypes(): NodeTypes {
     return {};
   }
 
-  getEdgeTypes(): Record<string, React.ComponentType<any>> {
+  getEdgeTypes(): EdgeTypes {
     return {};
   }
 
@@ -224,7 +259,7 @@ export abstract class BaseDiagramPlugin implements DiagramTypePlugin {
   // ====== 工具方法 ======
   
   /** 分发全局事件 */
-  protected emit(eventName: string, detail?: any) {
+  protected emit(eventName: string, detail?: unknown): void {
     const event = new CustomEvent(eventName, { detail });
     window.dispatchEvent(event);
   }
