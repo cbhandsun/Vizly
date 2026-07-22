@@ -3,6 +3,11 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "npm@12.0.1",
+  "engines": {
+    "node": ">=22.22.2 <23",
+    "npm": ">=12 <13"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -169,7 +174,7 @@
     "vitest": "^4.1.4"
   },
   "overrides": {
-    "dompurify": "^3.4.11",
+    "dompurify": "^3.4.12",
     "undici": "^7.28.0"
   }
 }
