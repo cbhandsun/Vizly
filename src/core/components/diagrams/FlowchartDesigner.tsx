@@ -51,7 +51,6 @@ import { useFlowchartPluginRuntime } from './hooks/useFlowchartPluginRuntime';
 import { useFlowchartExternalEvents } from './hooks/useFlowchartExternalEvents';
 import { useFlowchartShellState } from './hooks/useFlowchartShellState';
 import { useFlowchartCanvasCommands } from './hooks/useFlowchartCanvasCommands';
-import { runPermittedFlowchartExport } from './flowchartExportAccess';
 
 const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     id,
@@ -137,23 +136,11 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
 
     // ?图片导出支持 (PNG/SVG/PDF/GIF)
     const diagramIdForExport = id || 'flowchart-designer';
-    const {
-        exportToPNG,
-        exportToSVG: exportToSVGAction,
-        exportToPDF: exportToPDFAction,
-        exportToGIF,
-        getReactFlowSnapshot,
-    } = useFlowchartExportControls(diagramIdForExport, reactFlowInstance);
-    const exportToSVG = useCallback(() => runPermittedFlowchartExport(
-        'svg',
+    const { exportToPNG, exportToSVG, exportToPDF, exportToGIF, getReactFlowSnapshot } = useFlowchartExportControls(
+        diagramIdForExport,
+        reactFlowInstance,
         onExportPermissionCheck,
-        exportToSVGAction,
-    ), [exportToSVGAction, onExportPermissionCheck]);
-    const exportToPDF = useCallback(() => runPermittedFlowchartExport(
-        'pdf',
-        onExportPermissionCheck,
-        exportToPDFAction,
-    ), [exportToPDFAction, onExportPermissionCheck]);
+    );
 
     // ?性能监控
     useComponentPerformance('FlowchartDesigner');

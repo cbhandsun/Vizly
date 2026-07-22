@@ -10,6 +10,7 @@ import {
   logLayoutOptimizerNodeWidthFallback,
 } from './layoutOptimizerLogging';
 import { LayoutDomainSizer, type DomainData } from './LayoutDomainSizer';
+import { resolveLayoutNodeMaxWidth } from './layoutOptimizerConfig';
 
 interface CachedMeasurement {
   width: number;
@@ -191,15 +192,7 @@ export class LayoutOptimizer {
     const paddingV = (typeof config.NODE_PADDING?.vertical === 'number' && !isNaN(config.NODE_PADDING.vertical)) ? config.NODE_PADDING.vertical : 12;
     const minWidth = (typeof config.NODE_MIN_WIDTH === 'number' && !isNaN(config.NODE_MIN_WIDTH) && config.NODE_MIN_WIDTH > 0) ? config.NODE_MIN_WIDTH : 120;
     // 读取全局配置的最大宽度上限，作为强制夹紧边界
-    const hardMaxWidth = (() => {
-      try {
-        const full = diagramConfigManager.getConfig();
-        const mw = (full?.node?.maxWidth as number) ?? 0;
-        return (typeof mw === 'number' && !isNaN(mw) && mw > 0) ? mw : 420;
-      } catch {
-        return 420;
-      }
-    })();
+    const hardMaxWidth = resolveLayoutNodeMaxWidth();
 
     const cacheKey = this.getCacheKey(
       description,
@@ -298,20 +291,8 @@ export class LayoutOptimizer {
     const minWidth = (typeof overrides?.minWidth === 'number' && overrides.minWidth > 0)
       ? overrides.minWidth
       : base.NODE_MIN_WIDTH;
-    // 允许覆盖最大宽度，否则使用全局配置上限
-    const hardMaxWidth = (() => {
-      // 优先使用覆盖的最大宽度
-      if (typeof overrides?.maxWidth === 'number' && overrides.maxWidth > 0) {
-        return overrides.maxWidth;
-      }
-      try {
-        const full = diagramConfigManager.getConfig();
-        const mw = (full?.node?.maxWidth as number) ?? 0;
-        return (typeof mw === 'number' && !isNaN(mw) && mw > 0) ? mw : 420;
-      } catch {
-        return 420;
-      }
-    })();
+    // 允许覆盖最大宽度，否则使用已校验的全局配置上限
+    const hardMaxWidth = resolveLayoutNodeMaxWidth(overrides?.maxWidth);
 
     // 覆盖下的缓存键包含 padding 以确保精确测量缓存
     const cacheKey = `${description}|${fontSize}|${fontFamily}|${fontWeight}|${paddingH}|${paddingV}`;
@@ -404,16 +385,8 @@ export class LayoutOptimizer {
       // Let's stick to font/padding adjustments for measurement first.
     }
 
-    // 最大宽度硬上限：优先使用全局配置的 node.maxWidth，无效时回退 300
-    const hardMaxWidth = (() => {
-      try {
-        const full = diagramConfigManager.getConfig();
-        const mw = (full?.node?.maxWidth as number) ?? 0;
-        return (typeof mw === 'number' && !isNaN(mw) && mw > 0) ? mw : 420;
-      } catch {
-        return 420;
-      }
-    })();
+    // 最大宽度硬上限：读取并校验全局 node.maxWidth
+    const hardMaxWidth = resolveLayoutNodeMaxWidth();
 
     // 使用增强版文本测量系统的批量处理功能
     const measurements = enhancedTextMeasurement.measureMultipleNodes(descriptions, {
@@ -460,15 +433,7 @@ export class LayoutOptimizer {
     const fontWeight = (typeof config.NODE_FONT_WEIGHT === 'string' && config.NODE_FONT_WEIGHT.length > 0) ? config.NODE_FONT_WEIGHT : 'normal';
     const paddingH = (typeof config.NODE_PADDING?.horizontal === 'number' && !isNaN(config.NODE_PADDING.horizontal)) ? config.NODE_PADDING.horizontal : 16;
     const paddingV = (typeof config.NODE_PADDING?.vertical === 'number' && !isNaN(config.NODE_PADDING.vertical)) ? config.NODE_PADDING.vertical : 12;
-    const hardMaxWidth = (() => {
-      try {
-        const full = diagramConfigManager.getConfig();
-        const mw = (full?.node?.maxWidth as number) ?? 0;
-        return (typeof mw === 'number' && !isNaN(mw) && mw > 0) ? mw : 420;
-      } catch {
-        return 420;
-      }
-    })();
+    const hardMaxWidth = resolveLayoutNodeMaxWidth();
 
     try {
       // 使用增强版文本测量系统
@@ -529,18 +494,7 @@ export class LayoutOptimizer {
     const paddingV = (typeof overrides?.padding?.vertical === 'number')
       ? overrides!.padding!.vertical
       : base.NODE_PADDING.vertical;
-    const hardMaxWidth = (() => {
-      if (typeof overrides?.maxWidth === 'number' && overrides.maxWidth > 0) {
-        return overrides.maxWidth;
-      }
-      try {
-        const full = diagramConfigManager.getConfig();
-        const mw = (full?.node?.maxWidth as number) ?? 0;
-        return (typeof mw === 'number' && !isNaN(mw) && mw > 0) ? mw : 420;
-      } catch {
-        return 420;
-      }
-    })();
+    const hardMaxWidth = resolveLayoutNodeMaxWidth(overrides?.maxWidth);
 
     try {
       const measurement = enhancedTextMeasurement.measureNodeContent(description, {
