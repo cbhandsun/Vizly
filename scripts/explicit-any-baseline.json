@@ -250,7 +250,6 @@
     "src/core/strategies/shared/edgeDisplaySoftQualityRepair.ts": 11,
     "src/core/strategies/shared/edgeEndpointLaneNudgeRepair.ts": 11,
     "src/core/strategies/shared/edgeEndpointPathRepair.ts": 6,
-    "src/core/strategies/shared/edgeFallbackPath.ts": 17,
     "src/core/strategies/shared/edgeGlobalWaypointGeometry.ts": 7,
     "src/core/strategies/shared/edgeGlobalWaypointRefinement.ts": 1,
     "src/core/strategies/shared/edgeHairpinBridgeWidenRepair.ts": 12,

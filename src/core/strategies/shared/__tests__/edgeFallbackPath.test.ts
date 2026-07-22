@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { Node as ReactFlowNode } from '@xyflow/react';
-import { buildEndpointOrthogonalFallbackPath } from '../edgeFallbackPath';
+import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
+import {
+  buildEndpointOrthogonalFallbackPath,
+  lockComputedPathOnEdge,
+  resolveRoutingResultPath,
+} from '../edgeFallbackPath';
 
 const makeNode = (
   id: string,
@@ -61,5 +65,45 @@ describe('buildEndpointOrthogonalFallbackPath', () => {
     expect(path[0]).toEqual({ x: 370, y: 490 });
     expect(path[path.length - 1]).toEqual({ x: 610, y: 520 });
     expect(isOrthogonal(path)).toBe(true);
+  });
+
+  it('rejects non-finite computed paths and bounds invalid stub lengths', () => {
+    const source = makeNode('source', { x: 0, y: 0 });
+    const target = makeNode('target', { x: 300, y: 0 });
+    const path = resolveRoutingResultPath({
+      routingResult: { computedPath: [{ x: 0, y: 0 }, { x: Infinity, y: 0 }] },
+      source,
+      target,
+    });
+    const invalidStubPath = buildEndpointOrthogonalFallbackPath({
+      source,
+      target,
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      stubLength: Number.NaN,
+    });
+
+    expect(path.every(point => Number.isFinite(point.x) && Number.isFinite(point.y))).toBe(true);
+    expect(invalidStubPath.every(point => Number.isFinite(point.x) && Number.isFinite(point.y))).toBe(true);
+  });
+
+  it('locks a validated path while preserving existing edge metadata', () => {
+    const edge: Edge = {
+      id: 'edge',
+      source: 'source',
+      target: 'target',
+      data: { label: 'kept', runtimeHandleLock: { custom: true } },
+    };
+    const path = [{ x: 0, y: 0 }, { x: 20, y: 0 }];
+
+    lockComputedPathOnEdge(edge, path);
+
+    expect(edge.type).toBe('advanced-smart-step');
+    expect(edge.data).toMatchObject({
+      label: 'kept',
+      computedPath: path,
+      layoutPathLocked: true,
+      runtimeHandleLock: { custom: true, source: true, target: true },
+    });
   });
 });

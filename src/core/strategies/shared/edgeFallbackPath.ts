@@ -7,35 +7,60 @@ export interface EdgeFallbackPoint {
 }
 
 type NodeLookup = Map<string, ReactFlowNode>;
+type NodeWithAbsolutePosition = ReactFlowNode & { positionAbsolute?: unknown };
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value && typeof value === 'object' && !Array.isArray(value))
+);
 
 const toNumber = (value: unknown, fallback: number): number => (
   typeof value === 'number' && Number.isFinite(value) ? value : fallback
 );
 
+const readPoint = (value: unknown): EdgeFallbackPoint | null => {
+  if (!isRecord(value)) return null;
+  return {
+    x: toNumber(value.x, 0),
+    y: toNumber(value.y, 0),
+  };
+};
+
+const readFinitePath = (value: unknown): EdgeFallbackPoint[] | null => {
+  if (!Array.isArray(value) || value.length < 2) return null;
+  const points: EdgeFallbackPoint[] = [];
+  for (const candidate of value) {
+    if (!isRecord(candidate)
+      || typeof candidate.x !== 'number'
+      || !Number.isFinite(candidate.x)
+      || typeof candidate.y !== 'number'
+      || !Number.isFinite(candidate.y)) return null;
+    points.push({ x: candidate.x, y: candidate.y });
+  }
+  return points;
+};
+
 function getNodePosition(
   node: ReactFlowNode,
   nodeById?: NodeLookup,
 ): EdgeFallbackPoint {
-  const explicitAbsolute = (node as any).positionAbsolute;
+  const explicitAbsolute = readPoint((node as NodeWithAbsolutePosition).positionAbsolute);
   if (explicitAbsolute) {
-    return {
-      x: toNumber(explicitAbsolute.x, 0),
-      y: toNumber(explicitAbsolute.y, 0),
-    };
+    return explicitAbsolute;
   }
 
-  let x = toNumber((node.position as any)?.x, 0);
-  let y = toNumber((node.position as any)?.y, 0);
+  let x = toNumber(node.position?.x, 0);
+  let y = toNumber(node.position?.y, 0);
   let current = node;
   const visited = new Set<string>();
   while (nodeById && current.parentId && !visited.has(current.parentId)) {
     visited.add(current.parentId);
     const parent = nodeById.get(current.parentId);
     if (!parent) break;
-    const parentPosition = (parent as any).positionAbsolute ?? parent.position ?? { x: 0, y: 0 };
-    x += toNumber((parentPosition as any).x, 0);
-    y += toNumber((parentPosition as any).y, 0);
-    if ((parent as any).positionAbsolute) break;
+    const parentAbsolute = readPoint((parent as NodeWithAbsolutePosition).positionAbsolute);
+    const parentPosition = parentAbsolute ?? readPoint(parent.position) ?? { x: 0, y: 0 };
+    x += parentPosition.x;
+    y += parentPosition.y;
+    if (parentAbsolute) break;
     current = parent;
   }
   return { x, y };
@@ -43,8 +68,8 @@ function getNodePosition(
 
 function getNodeSize(node: ReactFlowNode): { width: number; height: number } {
   return {
-    width: toNumber((node.style as any)?.width, toNumber((node as any).measured?.width, toNumber(node.width, 120))),
-    height: toNumber((node.style as any)?.height, toNumber((node as any).measured?.height, toNumber(node.height, 60))),
+    width: toNumber(node.style?.width, toNumber(node.measured?.width, toNumber(node.width, 120))),
+    height: toNumber(node.style?.height, toNumber(node.measured?.height, toNumber(node.height, 60))),
   };
 }
 
@@ -135,8 +160,9 @@ export function buildEndpointOrthogonalFallbackPath({
 }): EdgeFallbackPoint[] {
   const start = anchorForHandle(source, sourceHandle, nodeById);
   const end = anchorForHandle(target, targetHandle, nodeById);
-  const sourceStub = offsetOutward(start, sourceHandle, stubLength);
-  const targetStub = offsetOutward(end, targetHandle, stubLength);
+  const safeStubLength = Math.max(0, Math.min(1_000_000, toNumber(stubLength, 32)));
+  const sourceStub = offsetOutward(start, sourceHandle, safeStubLength);
+  const targetStub = offsetOutward(end, targetHandle, safeStubLength);
   const bend = preferredBend(sourceStub, targetStub, sourceHandle);
 
   return simplifyOrthogonalPath([
@@ -154,14 +180,13 @@ export function resolveRoutingResultPath({
   target,
   nodeById,
 }: {
-  routingResult: { sourceHandle?: string | null; targetHandle?: string | null; computedPath?: EdgeFallbackPoint[] };
+  routingResult: { sourceHandle?: string | null; targetHandle?: string | null; computedPath?: unknown };
   source: ReactFlowNode;
   target: ReactFlowNode;
   nodeById?: NodeLookup;
 }): EdgeFallbackPoint[] {
-  if (Array.isArray(routingResult.computedPath) && routingResult.computedPath.length >= 2) {
-    return routingResult.computedPath;
-  }
+  const computedPath = readFinitePath(routingResult.computedPath);
+  if (computedPath) return computedPath;
   return buildEndpointOrthogonalFallbackPath({
     source,
     target,
@@ -173,15 +198,17 @@ export function resolveRoutingResultPath({
 
 export function lockComputedPathOnEdge(edge: Edge, computedPath: EdgeFallbackPoint[]): void {
   if (computedPath.length < 2) return;
-  if (!edge.data) edge.data = {};
-  (edge.data as any).computedPath = computedPath;
-  (edge.data as any).layoutPathLocked = true;
-  (edge.data as any).runtimeHandleLock = {
-    ...(((edge.data as any).runtimeHandleLock && typeof (edge.data as any).runtimeHandleLock === 'object')
-      ? (edge.data as any).runtimeHandleLock
-      : {}),
+  const data = isRecord(edge.data) ? edge.data : {};
+  const runtimeHandleLock = isRecord(data.runtimeHandleLock) ? data.runtimeHandleLock : {};
+  edge.data = {
+    ...data,
+    computedPath,
+    layoutPathLocked: true,
+    runtimeHandleLock: {
+    ...runtimeHandleLock,
     source: true,
     target: true,
+    },
   };
   edge.type = 'advanced-smart-step';
 }
