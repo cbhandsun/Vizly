@@ -3,6 +3,8 @@ import type { ILayoutStrategy } from './layout-strategy';
 import { NodeData, EdgeData, DiagramConfig } from './common';
 import { LayoutType } from './layout';
 
+export type DiagramExportFormat = 'pdf' | 'svg';
+
 export interface ResolvedEdgeConfig {
   mode: 'advanced-smart' | 'native';
   pathType?: string;
@@ -64,6 +66,8 @@ export interface DiagramComponentProps {
   businessData?: Record<string, any>;
   /** 供特定 SaaS 端游离于主代码外的增强导出菜单，通过 ContextMenuProps 等传入 */
   extraExportItems?: any[];
+  /** (IoC) 由宿主校验商业导出权限；返回 false 时阻止导出动作。 */
+  onExportPermissionCheck?: (format: DiagramExportFormat) => boolean;
 
   // ==========================================
   // 商业化/SaaS 层控制反转 (IoC) Props (Phase 5)

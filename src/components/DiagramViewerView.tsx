@@ -5,6 +5,7 @@ import { ConfigProvider } from 'antd';
 
 import { CommandPalette } from '@/core/components/ui/CommandPalette';
 import type { CommandItem } from '@/core/types/plugin';
+import type { DiagramExportFormat } from '@/core/types/diagram-components';
 import DiagramControlBridge from '@/core/components/shared/DiagramControlBridge';
 import { DiagramThemeProvider } from '@/core/themes/DiagramThemeProvider';
 import { appMessage } from '@/core/utils/antdStaticBridge';
@@ -67,7 +68,7 @@ interface DiagramViewerViewProps {
     roomName: string;
     SelectedDiagramComponent: React.ElementType | null;
     refreshNonce: number;
-    extraExportItems: unknown[];
+    onExportPermissionCheck: (format: DiagramExportFormat) => boolean;
     isYjsSynced: boolean;
     pushLocalChangesToYjs: unknown;
     provider: { awareness?: unknown } | null;
@@ -129,7 +130,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     roomName,
     SelectedDiagramComponent,
     refreshNonce,
-    extraExportItems,
+    onExportPermissionCheck,
     isYjsSynced,
     pushLocalChangesToYjs,
     provider,
@@ -257,7 +258,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                 onMainFlowAnimationChange={setMainFlowAnimationEnabled}
                                                 highlightMainFlow={mainFlowAnimationEnabled}
                                                 isReadonly={isReadonly}
-                                                extraExportItems={extraExportItems}
+                                                onExportPermissionCheck={onExportPermissionCheck}
                                                 isYjsSynced={isYjsSynced}
                                                 onSyncPush={pushLocalChangesToYjs}
                                                 activeUsers={activeUsers || []}

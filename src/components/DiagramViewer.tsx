@@ -72,6 +72,8 @@ import {
 import { useDiagramViewerCommands } from './useDiagramViewerCommands';
 import { useDiagramViewerSaveActions } from './useDiagramViewerSaveActions';
 import { DiagramViewerView } from './DiagramViewerView';
+import { ensureDiagramViewerExportAllowed } from './diagramViewerExportPolicy';
+import type { DiagramExportFormat } from '@/core/types/diagram-components';
 
 const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
 
@@ -369,41 +371,9 @@ const DiagramViewer: React.FC = () => {
             }),
         });
     }, [saveSelectedDiagramId, selectedDiagramId]);
-    // 构建通过 IoC 模式下发的商业级高级操作菜单
-    const extraExportItems = useMemo(() => [
-        {
-            key: 'pro-export-pdf',
-            label: (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', minWidth: '140px' }}>
-                    <span>{t('diagramViewer.export.pdf')}</span>
-                    <span style={{ fontSize: '14px', marginLeft: 8 }} title={t('common.proFeature')}>👑</span>
-                </div>
-            ),
-            onClick: () => {
-                if (!hasFeature('export-pdf')) {
-                    showUpgradeModal(t('diagramViewer.export.pdf'));
-                } else {
-                    // TODO: 真正的云渲染
-                }
-            }
-        },
-        {
-            key: 'pro-export-svg',
-            label: (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', minWidth: '140px' }}>
-                    <span>{t('diagramViewer.export.svg')}</span>
-                    <span style={{ fontSize: '14px', marginLeft: 8 }} title={t('common.proFeature')}>👑</span>
-                </div>
-            ),
-            onClick: () => {
-                if (!hasFeature('export-hd-svg')) {
-                    showUpgradeModal(t('diagramViewer.export.svg'));
-                } else {
-                    // TODO: 真正的云渲染
-                }
-            }
-        }
-    ], [hasFeature, showUpgradeModal, t]);
+    const handleExportPermissionCheck = useCallback((format: DiagramExportFormat) => (
+        ensureDiagramViewerExportAllowed(format, hasFeature, showUpgradeModal)
+    ), [hasFeature, showUpgradeModal]);
 
     // 同步 selectedDiagramId → localStorage（供命令面板等非 reload 路径使用）
     // 注意：seedAutoSaveAndNavigate 中有直接写 localStorage 的逻辑（用于 reload 前持久化），
@@ -635,7 +605,7 @@ const DiagramViewer: React.FC = () => {
             roomName={roomName}
             SelectedDiagramComponent={SelectedDiagramComponent}
             refreshNonce={refreshNonce}
-            extraExportItems={extraExportItems}
+            onExportPermissionCheck={handleExportPermissionCheck}
             isYjsSynced={isYjsSynced}
             pushLocalChangesToYjs={pushLocalChangesToYjs}
             provider={provider ?? null}
