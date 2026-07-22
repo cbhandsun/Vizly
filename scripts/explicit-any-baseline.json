@@ -271,7 +271,6 @@
     "src/core/strategies/shared/edgeTerminalBoundaryStairGeometry.ts": 1,
     "src/core/strategies/shared/edgeTerminalBoundaryStairRepair.ts": 1,
     "src/core/strategies/shared/edgeWaypointCandidateRepair.ts": 7,
-    "src/core/strategies/shared/geometryGuard.ts": 33,
     "src/core/strategies/shared/semanticHelpers.ts": 16,
     "src/core/themes/EnhancedThemeManagerRefactored.ts": 8,
     "src/core/themes/ThemePerformanceOptimizer.ts": 14,

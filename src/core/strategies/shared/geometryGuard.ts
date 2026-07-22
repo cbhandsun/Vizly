@@ -6,7 +6,28 @@
  */
 import type { Node as ReactFlowNode } from '@xyflow/react';
 
-const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
+const finiteNumber = (value: unknown, fallback: number): number => (
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback
+);
+
+const positionOf = (node: ReactFlowNode): { x: number; y: number } => ({
+  x: finiteNumber(node.position?.x, 0),
+  y: finiteNumber(node.position?.y, 0),
+});
+
+const widthOf = (node: ReactFlowNode): number => (
+  finiteNumber(node.measured?.width ?? node.style?.width ?? node.width, 0)
+);
+
+const heightOf = (node: ReactFlowNode): number => (
+  finiteNumber(node.measured?.height ?? node.style?.height ?? node.height, 0)
+);
+
+const writeSize = (node: ReactFlowNode, width: number, height: number): void => {
+  node.style = { ...(node.style ?? {}), width };
+  node.measured = { width, height };
+  node.width = width;
+};
 
 /**
  * 确保所有子元素都包含在域容器内
@@ -25,20 +46,18 @@ export function ensureDomainContainment(nodes: ReactFlowNode[], padH: number = 3
   let anyExpanded = false;
 
   for (const tg of titleGroups) {
-    const tgX = num(((tg as any)?.position?.x), 0);
-    const tgY = num(((tg as any)?.position?.y), 0);
-    const tgW = num(((tg as any)?.measured?.width ?? (tg as any)?.style?.width), 0);
-    const tgH = num(((tg as any)?.measured?.height ?? (tg as any)?.style?.height), 0);
+    const { x: tgX, y: tgY } = positionOf(tg);
+    const tgW = widthOf(tg);
+    const tgH = heightOf(tg);
     const tgRight = tgX + tgW;
     const tgBottom = tgY + tgH;
 
     let maxChildRight = -Infinity;
 
     for (const sg of subGroups) {
-      const sgX = num(((sg as any)?.position?.x), 0);
-      const sgY = num(((sg as any)?.position?.y), 0);
-      const sgW = num(((sg as any)?.measured?.width ?? (sg as any)?.style?.width), 0);
-      const sgCenterY = sgY + num(((sg as any)?.measured?.height ?? (sg as any)?.style?.height), 0) / 2;
+      const { x: sgX, y: sgY } = positionOf(sg);
+      const sgW = widthOf(sg);
+      const sgCenterY = sgY + heightOf(sg) / 2;
 
       // 几何包含判定：subGroup 的 Y 中心在 titleGroup 的 Y 范围内
       if (sgCenterY >= tgY && sgCenterY <= tgBottom && sgX >= tgX - 10) {
@@ -50,34 +69,28 @@ export function ensureDomainContainment(nodes: ReactFlowNode[], padH: number = 3
     for (const n of nodes) {
       const tp = String(n.type || '');
       if (tp === 'titleGroup' || tp === 'subGroup') continue;
-      const nX = num(((n as any)?.position?.x), 0);
-      const nY = num(((n as any)?.position?.y), 0);
-      const nW = num(((n as any)?.measured?.width ?? (n as any)?.style?.width), 0);
-      const nH = num(((n as any)?.measured?.height ?? (n as any)?.style?.height), 0);
+      const { x: nX, y: nY } = positionOf(n);
+      const nW = widthOf(n);
+      const nH = heightOf(n);
       const nCenterY = nY + nH / 2;
       if (nCenterY >= tgY && nCenterY <= tgBottom && nX >= tgX - 10) {
         maxChildRight = Math.max(maxChildRight, nX + nW);
       }
     }
 
-    if (isFinite(maxChildRight) && maxChildRight > tgRight) {
+    if (Number.isFinite(maxChildRight) && maxChildRight > tgRight) {
       const newW = Math.max(tgW, maxChildRight - tgX + padH);
-      ((tg as any).style || ((tg as any).style = {})).width = newW;
-      (tg as any).measured = { width: newW, height: tgH } as any;
-      (tg as any).width = newW;
+      writeSize(tg, newW, tgH);
       anyExpanded = true;
     }
   }
 
   // 如果有域被扩展，重新统一所有域宽
   if (anyExpanded) {
-    const maxW = Math.max(...titleGroups.map(tg => num(((tg as any)?.measured?.width ?? (tg as any)?.style?.width), 0)));
-    if (isFinite(maxW) && maxW > 0) {
+    const maxW = Math.max(...titleGroups.map(widthOf));
+    if (Number.isFinite(maxW) && maxW > 0) {
       for (const tg of titleGroups) {
-        const curH = num(((tg as any)?.measured?.height ?? (tg as any)?.style?.height), 0);
-        ((tg as any).style || ((tg as any).style = {})).width = maxW;
-        (tg as any).measured = { width: maxW, height: curH } as any;
-        (tg as any).width = maxW;
+        writeSize(tg, maxW, heightOf(tg));
       }
     }
   }
