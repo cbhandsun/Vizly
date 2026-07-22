@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import type { Node, Edge } from '@xyflow/react';
+import type { Node, Edge, NodeTypes } from '@xyflow/react';
 import {
     DiagramTypePlugin,
     PluginContext,
@@ -164,7 +164,7 @@ export class MindMapPlugin extends BaseDiagramPlugin implements DiagramTypePlugi
     getSupportedLayouts() { return ['MindElixirLayout']; }
     getDefaultLayout() { return 'MindElixirLayout'; }
 
-    getNodeTypes(): Record<string, any> { return {}; }
+    getNodeTypes(): NodeTypes { return {}; }
     getEdgeTypes() { return {}; }
 
     // ── Canvas Component ── mind-elixir renders here ──────────────────────────

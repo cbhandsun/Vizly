@@ -71,7 +71,7 @@ export class FlowchartPlugin extends BaseDiagramPlugin implements DiagramTypePlu
         ];
     }
 
-    createNodeData(type: string): Record<string, any> {
+    createNodeData(type: string): Record<string, unknown> {
         const CATEGORY_COLORS: Record<string, { main: string; border: string; text: string }> = {
             default:    { main: '#4A90D9', border: '#3A78C2', text: '#fff' },
             decision:   { main: '#F0B429', border: '#D9A21E', text: '#333' },
