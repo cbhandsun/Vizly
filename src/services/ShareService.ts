@@ -53,6 +53,13 @@ export interface AddCollaboratorResult {
     error?: string;
 }
 
+export interface SharedDiagramRecord {
+    id: string;
+    title: string;
+    updated_at?: string;
+    content: ReturnType<typeof coerceRemoteDiagramContent>;
+}
+
 // === Token 生成 ===
 
 function generateToken(): string {
@@ -79,8 +86,8 @@ function normalizeInviteEmail(email: string): string | null {
     return normalized;
 }
 
-function coerceSharedDiagram(diagram: any): any | null {
-    if (!diagram || !diagram.content) return null;
+function coerceSharedDiagram(diagram: unknown): SharedDiagramRecord | null {
+    if (!isRecord(diagram) || !diagram.content) return null;
 
     try {
         const id = String(diagram.id || 'shared-diagram');
@@ -275,7 +282,7 @@ class ShareService {
      */
     async getSharedDiagram(token: string): Promise<{
         share: ShareRecord;
-        diagram: any;
+        diagram: SharedDiagramRecord;
     } | null> {
         const normalizedToken = token.trim();
         if (!isValidShareToken(normalizedToken)) return null;

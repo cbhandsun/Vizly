@@ -3,8 +3,8 @@
 import { cloneConfigValue } from './ConfigValueBoundary';
 
 export interface CloudStorageAdapter {
-  syncWithCloud(onConfigLoaded: (key: string, value: any) => void): Promise<void>;
-  saveConfig(key: string, data: any): Promise<void>;
+  syncWithCloud(onConfigLoaded: (key: string, value: Record<string, unknown>) => void): Promise<void>;
+  saveConfig(key: string, data: Record<string, unknown>): Promise<void>;
 }
 
 export enum ConfigLayer {

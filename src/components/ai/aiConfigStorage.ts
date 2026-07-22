@@ -251,8 +251,8 @@ export const getAIConfig = (userId?: string | null): AIConfigState => {
     try {
         let keyToUse = getAIConfigKey(userId);
         if (!userId) {
-            if (typeof window !== 'undefined' && (window as any).__currentUserId) {
-                keyToUse = getAIConfigKey((window as any).__currentUserId);
+            if (typeof window !== 'undefined' && window.__currentUserId) {
+                keyToUse = getAIConfigKey(window.__currentUserId);
             }
         }
 

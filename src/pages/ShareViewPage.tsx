@@ -78,10 +78,7 @@ const ShareViewPage: React.FC = () => {
                 const diagramId = `shared-${shareToken}`;
                 const { dataService } = await import('@/services/DataService');
                 if (cancelled) return;
-                const contentForRegistration =
-                    typeof rawContent === 'object' && rawContent !== null && !Array.isArray(rawContent)
-                        ? { ...(rawContent as Record<string, unknown>), id: diagramId }
-                        : rawContent;
+                const contentForRegistration = { ...rawContent, id: diagramId };
                 const content = dataService.registerRemoteDiagram(contentForRegistration, {
                     id: diagramId,
                     title: result.diagram.title || 'Shared Diagram',

@@ -1,6 +1,7 @@
 import { isStandardPresetId } from '@/data/standardized/presetMetadata';
 import { configureApplicationDiagramRuntime } from '@/core/ports/applicationDiagramRuntime';
 import { configureMindMapAIRuntime } from '@/core/ports/mindMapAIRuntime';
+import type { MindMapAIChatResponse } from '@/core/ports/mindMapAIRuntime';
 
 configureApplicationDiagramRuntime({
   isStandardPresetId: (id) => isStandardPresetId(typeof id === 'string' ? id : undefined),
@@ -33,7 +34,7 @@ configureMindMapAIRuntime({
   loadConfig: async () => import('@/components/ai/aiConfigStorage').then(({ getAIConfig }) => getAIConfig()),
   requestChatCompletionJson: async (provider, request) => {
     const { requestAIChatCompletionJson } = await import('@/services/ai/aiProviderClient');
-    return requestAIChatCompletionJson(provider, request);
+    return requestAIChatCompletionJson<MindMapAIChatResponse>(provider, request);
   },
   formatRequestError: async (error, maxLength) => {
     const { formatAIProviderRequestError } = await import('@/services/ai/aiProviderClient');

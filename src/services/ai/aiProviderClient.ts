@@ -292,7 +292,7 @@ export async function requestAIModels(
     });
 }
 
-export async function requestAIChatCompletionJson<T = any>(
+export async function requestAIChatCompletionJson<T = unknown>(
     provider: AIProviderRequestConfig,
     body: unknown,
     options: AIProviderRequestOptions = {}

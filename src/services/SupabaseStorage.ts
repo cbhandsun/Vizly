@@ -183,7 +183,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
     }
 
     // === Config specific to Supabase user configs ===
-    async saveConfig(key: string, value: any, user_id: string) {
+    async saveConfig(key: string, value: unknown, user_id: string) {
         const userId = await this.requireAuthenticatedUser(user_id);
         const normalizedKey = normalizeCloudConfigKey(key);
         if (!normalizedKey) throw new Error('Unsupported cloud config key');
