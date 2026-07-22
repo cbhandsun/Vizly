@@ -14,12 +14,19 @@ export function resolveGlobalNodeOverlapsSimple(
   iterations: number = 3
 ): ReactFlowNode[] {
   const EXCLUDE = new Set(['subGroup','titleGroup','group','domain'])
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb
-  const getW = (n: ReactFlowNode) => num(((n as any)?.measured?.width ?? (n as any)?.style?.width ?? (n as any)?.width), 0)
-  const getH = (n: ReactFlowNode) => num(((n as any)?.measured?.height ?? (n as any)?.style?.height ?? (n as any)?.height), 0)
-  const getX = (n: ReactFlowNode) => num(((n as any)?.position?.x), 0)
-  const getY = (n: ReactFlowNode) => num(((n as any)?.position?.y), 0)
-  const updated = nodes.map(n => ({ ...n }))
+  const num = (value: unknown, fallback: number) => (
+    typeof value === 'number' && Number.isFinite(value) ? value : fallback
+  )
+  const getW = (n: ReactFlowNode) => num(n.measured?.width ?? n.style?.width ?? n.width, 0)
+  const getH = (n: ReactFlowNode) => num(n.measured?.height ?? n.style?.height ?? n.height, 0)
+  const getX = (n: ReactFlowNode) => num(n.position?.x, 0)
+  const getY = (n: ReactFlowNode) => num(n.position?.y, 0)
+  const safeGapH = Math.max(0, num(gapH, 0))
+  const safeGapV = Math.max(0, num(gapV, 0))
+  const updated = nodes.map(n => ({
+    ...n,
+    position: { x: getX(n), y: getY(n) },
+  }))
   const biz = updated.filter(n => !EXCLUDE.has(String(n.type || '')))
   const rounds = Math.max(1, Math.min(10, Math.floor(num(iterations, 3))))
   for (let r = 0; r < rounds; r++) {
@@ -29,12 +36,12 @@ export function resolveGlobalNodeOverlapsSimple(
         const b = biz[j];
         const ax = getX(a), ay = getY(a), aw = getW(a), ah = getH(a)
         const bx = getX(b), by = getY(b), bw = getW(b), bh = getH(b)
-        const overlapX = Math.min(ax + aw + gapH, bx + bw + gapH) - Math.max(ax - gapH, bx - gapH)
-        const overlapY = Math.min(ay + ah + gapV, by + bh + gapV) - Math.max(ay - gapV, by - gapV)
+        const overlapX = Math.min(ax + aw + safeGapH, bx + bw + safeGapH) - Math.max(ax - safeGapH, bx - safeGapH)
+        const overlapY = Math.min(ay + ah + safeGapV, by + bh + safeGapV) - Math.max(ay - safeGapV, by - safeGapV)
         const intersects = overlapX > 0 && overlapY > 0
         if (!intersects) continue
-        const sepX = Math.max(0, Math.floor(gapH))
-        const sepY = Math.max(0, Math.floor(gapV))
+        const sepX = Math.floor(safeGapH)
+        const sepY = Math.floor(safeGapV)
         const centerAX = ax + aw / 2, centerAY = ay + ah / 2
         const centerBX = bx + bw / 2, centerBY = by + bh / 2
         const dx = centerAX - centerBX
@@ -42,8 +49,8 @@ export function resolveGlobalNodeOverlapsSimple(
         const moveX = Math.abs(overlapX) >= Math.abs(overlapY)
         const signX = dx >= 0 ? 1 : -1
         const signY = dy >= 0 ? 1 : -1
-        ;(a as any).position = { x: ax + (moveX ? signX * sepX : 0), y: ay + (!moveX ? signY * sepY : 0) } as any
-        ;(b as any).position = { x: bx - (moveX ? signX * sepX : 0), y: by - (!moveX ? signY * sepY : 0) } as any
+        a.position = { x: ax + (moveX ? signX * sepX : 0), y: ay + (!moveX ? signY * sepY : 0) }
+        b.position = { x: bx - (moveX ? signX * sepX : 0), y: by - (!moveX ? signY * sepY : 0) }
       }
     }
   }
