@@ -24,31 +24,31 @@ const PRODUCTION_LOG_LEVEL = LogLevel.ERROR;
  * 在生产环境中根据配置决定是否输出
  */
 export const safeLog = {
-  debug: (...args: any[]) => {
+  debug: (...args: unknown[]) => {
     if (isDevelopment || PRODUCTION_LOG_LEVEL <= LogLevel.DEBUG) {
       console.debug(...args);
     }
   },
 
-  info: (...args: any[]) => {
+  info: (...args: unknown[]) => {
     if (isDevelopment || PRODUCTION_LOG_LEVEL <= LogLevel.INFO) {
       console.info(...args);
     }
   },
 
-  warn: (...args: any[]) => {
+  warn: (...args: unknown[]) => {
     if (isDevelopment || PRODUCTION_LOG_LEVEL <= LogLevel.WARN) {
       console.warn(...args);
     }
   },
 
-  error: (...args: any[]) => {
+  error: (...args: unknown[]) => {
     if (isDevelopment || PRODUCTION_LOG_LEVEL <= LogLevel.ERROR) {
       console.error(...args);
     }
   },
 
-  log: (...args: any[]) => {
+  log: (...args: unknown[]) => {
     if (isDevelopment) {
       console.log(...args);
     }
@@ -93,7 +93,7 @@ export const debugUtils = {
   /**
    * 条件日志输出
    */
-  logIf: (condition: boolean, ...args: any[]) => {
+  logIf: (condition: boolean, ...args: unknown[]) => {
     if (isDevelopment && condition) {
       console.log(...args);
     }
@@ -102,7 +102,7 @@ export const debugUtils = {
   /**
    * 对象深度检查
    */
-  inspect: (obj: any, label?: string) => {
+  inspect: (obj: unknown, label?: string) => {
     if (isDevelopment) {
       console.group(label || 'Object Inspection');
       console.log('Type:', typeof obj);
@@ -118,10 +118,13 @@ export const debugUtils = {
   /**
    * 函数执行追踪
    */
-  trace: (fn: (...args: any[]) => any, context?: string) => {
+  trace: <TArgs extends unknown[], TResult>(
+    fn: (...args: TArgs) => TResult,
+    context?: string,
+  ): ((...args: TArgs) => TResult) => {
     if (!isDevelopment) return fn;
 
-    return function (this: any, ...args: any[]) {
+    return function (this: unknown, ...args: TArgs): TResult {
       console.log(`🔍 ${context || fn.name || 'Anonymous'} called with:`, args);
       const result = fn.apply(this, args);
       console.log(`✅ ${context || fn.name || 'Anonymous'} returned:`, result);
@@ -197,18 +200,18 @@ export const initDevConsoleFilters = () => {
     });
 
     // 代理常规日志，仅在 isDebugMode 开启时输出
-    console.log = (...args: any[]) => {
+    console.log = (...args: unknown[]) => {
       if (isDebugMode) originalLog.apply(console, args);
     };
-    console.info = (...args: any[]) => {
+    console.info = (...args: unknown[]) => {
       if (isDebugMode) originalInfo.apply(console, args);
     };
-    console.debug = (...args: any[]) => {
+    console.debug = (...args: unknown[]) => {
       if (isDebugMode) originalDebug.apply(console, args);
     };
 
     // 原本的特殊错误和警告过滤逻辑
-    console.error = (...args: any[]) => {
+    console.error = (...args: unknown[]) => {
       const msg = args.map(String).join(' ');
 
       // 过滤 iepose.cn 或 localhost WebSocket 连接失败的噪音
@@ -239,7 +242,7 @@ export const initDevConsoleFilters = () => {
 
     // 同时过滤 console.warn 中的相关噪音
     const originalWarn = console.warn;
-    console.warn = (...args: any[]) => {
+    console.warn = (...args: unknown[]) => {
       const msg = args.map(String).join(' ');
       if (msg.includes('WebSocket connection to') && msg.includes('iepose.cn')) {
         return;
