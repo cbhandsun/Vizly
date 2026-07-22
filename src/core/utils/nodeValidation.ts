@@ -3,134 +3,103 @@
  * 用于确保节点数据中的尺寸与位置是“可用的安全数值”，避免 NaN/Infinity 传播到视图与 MiniMap。
  */
 
-/**
- * 验证并修正节点的 measured 属性
- */
-/**
- * 验证并修正节点的 measured 属性
- * - 仅用于尺寸数据：宽高必须为正数
- * - 若缺失则从 `style/width,height` 或默认值创建
- */
-export function validateAndFixNodeMeasured(node: any): any {
-  if (!node) return node;
+type SafeRecord = Record<string, unknown>;
+type ValidatedNodeFields = {
+  position: { x: number; y: number };
+  style: SafeRecord;
+  measured: SafeRecord & { width: number; height: number };
+};
 
-  // 如果没有 measured 属性，尝试从 style 或默认值创建
-  if (!node.measured) {
-    const width = extractValidNumber(node.style?.width || node.width, 200);
-    const height = extractValidNumber(node.style?.height || node.height, 100);
-    
-    node.measured = { width, height };
-    return node;
-  }
+const isRecord = (value: unknown): value is SafeRecord => (
+  Boolean(
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)
+  )
+);
 
-  // 验证并修正 measured 属性中的数值
-  const safeWidth = extractValidNumber(node.measured.width, 200);
-  const safeHeight = extractValidNumber(node.measured.height, 100);
-
-  node.measured = {
-    ...node.measured,
-    width: safeWidth,
-    height: safeHeight
-  };
-
-  return node;
-}
-
-/**
- * 批量验证并修正节点数组
- */
-export function validateAndFixNodes(nodes: any[]): any[] {
-  if (!Array.isArray(nodes)) return [];
-  // 使用完整验证，确保 position、style、measured 都是有效数字
-  return nodes.map(validateCompleteNode);
-}
-
-/**
- * 从任意值中提取“正数”，用于宽高等尺寸场景
- * 注意：此函数不适用于坐标（坐标可为负值）
- */
-export function extractValidNumber(value: any, defaultValue: number): number {
-  // 如果是有效数字且大于0，直接返回
-  if (typeof value === 'number' && !isNaN(value) && isFinite(value) && value > 0) {
-    return value;
-  }
-  
-  // 如果是字符串，尝试解析
+/** 从任意值中提取正数，用于宽高等尺寸。 */
+export function extractValidNumber(value: unknown, defaultValue: number): number {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
   if (typeof value === 'string') {
-    const parsed = parseFloat(value);
-    if (!isNaN(parsed) && isFinite(parsed) && parsed > 0) {
-      return parsed;
-    }
-  }
-  
-  // 返回默认值
-  return defaultValue;
-}
-
-/**
- * 提取“有限数值”（允许负数与 0），用于坐标等可为负的场景
- */
-export function extractFiniteNumber(value: any, defaultValue: number): number {
-  if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
-    return value;
-  }
-  if (typeof value === 'string') {
-    const parsed = parseFloat(value);
-    if (!isNaN(parsed) && isFinite(parsed)) {
-      return parsed;
-    }
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
   }
   return defaultValue;
 }
 
-/**
- * 验证节点位置数据
- */
-export function validateNodePosition(position: any): { x: number; y: number } {
+/** 提取有限数值（允许负数与 0），用于坐标。 */
+export function extractFiniteNumber(value: unknown, defaultValue: number): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return defaultValue;
+}
+
+export function validateNodePosition(position: unknown): { x: number; y: number } {
+  const record = isRecord(position) ? position : {};
   return {
-    // 允许负坐标，避免非 flow 布局被错误归零导致堆叠
-    x: extractFiniteNumber(position?.x, 0),
-    y: extractFiniteNumber(position?.y, 0)
+    x: extractFiniteNumber(record.x, 0),
+    y: extractFiniteNumber(record.y, 0),
   };
 }
 
-/**
- * 验证节点样式数据
- */
-export function validateNodeStyle(style: any): any {
-  if (!style || typeof style !== 'object') {
-    return {};
-  }
-
-  const validatedStyle = { ...style };
-  
-  if ('width' in style) {
-    // 宽度必须为正数
-    validatedStyle.width = extractValidNumber(style.width, 200);
-  }
-  
-  if ('height' in style) {
-    // 高度必须为正数
-    validatedStyle.height = extractValidNumber(style.height, 100);
-  }
-
+export function validateNodeStyle(style: unknown): SafeRecord {
+  if (!isRecord(style)) return {};
+  const validatedStyle: SafeRecord = { ...style };
+  if ('width' in style) validatedStyle.width = extractValidNumber(style.width, 200);
+  if ('height' in style) validatedStyle.height = extractValidNumber(style.height, 100);
   return validatedStyle;
 }
 
-/**
- * 完整的节点数据验证
- * - 位置：采用 extractFiniteNumber 允许负坐标
- * - 样式/尺寸：保持为正数
- */
-export function validateCompleteNode(node: any): any {
-  if (!node) return null;
+export function validateAndFixNodeMeasured<T extends object>(node: T): T & { measured: ValidatedNodeFields['measured'] };
+export function validateAndFixNodeMeasured(node: null): null;
+export function validateAndFixNodeMeasured(node: undefined): undefined;
+export function validateAndFixNodeMeasured(node: unknown): unknown {
+  if (node == null) return node;
+  if (!isRecord(node)) return null;
 
+  const style = isRecord(node.style) ? node.style : {};
+  const measuredValue = node.measured;
+  const hasMeasured = isRecord(measuredValue);
+  const measured: SafeRecord = isRecord(measuredValue) ? measuredValue : {};
+  const width = extractValidNumber(
+    measured.width,
+    hasMeasured ? 200 : extractValidNumber(style.width ?? node.width, 200),
+  );
+  const height = extractValidNumber(
+    measured.height,
+    hasMeasured ? 100 : extractValidNumber(style.height ?? node.height, 100),
+  );
+
+  return {
+    ...node,
+    measured: { ...measured, width, height },
+  };
+}
+
+export function validateCompleteNode<T extends object>(node: T): T & ValidatedNodeFields;
+export function validateCompleteNode(node: null): null;
+export function validateCompleteNode(node: undefined): undefined;
+export function validateCompleteNode(node: unknown): unknown {
+  if (node == null) return node;
+  if (!isRecord(node)) return null;
   const validatedNode = {
     ...node,
     position: validateNodePosition(node.position),
-    style: validateNodeStyle(node.style)
+    style: validateNodeStyle(node.style),
   };
-
-  // 确保 measured 属性有效
   return validateAndFixNodeMeasured(validatedNode);
+}
+
+export function validateAndFixNodes<T extends object>(nodes: T[]): Array<T & ValidatedNodeFields>;
+export function validateAndFixNodes(nodes: unknown): SafeRecord[];
+export function validateAndFixNodes(nodes: unknown): SafeRecord[] {
+  if (!Array.isArray(nodes)) return [];
+  return nodes
+    .map(node => validateCompleteNode(node))
+    .filter(isRecord) as SafeRecord[];
 }
