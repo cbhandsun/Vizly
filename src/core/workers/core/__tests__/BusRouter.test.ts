@@ -204,8 +204,8 @@ describe('BusRouter', () => {
 
         it('should apply constraintsMap priority sorting (lower priority is inner/earlier)', () => {
             const constraints: Record<string, EdgeConstraint> = {
-                e1: { priority: 2 },
-                e3: { priority: 1 }
+                e1: { routingType: 'bus', obstacleBehavior: 'strict', priority: 2 },
+                e3: { routingType: 'bus', obstacleBehavior: 'strict', priority: 1 }
             };
             const sorted = sortEdgesByLane(edgeList, true, 'hub', 'target', mockNodes, 'LR', constraints);
             expect(sorted.map(e => e.id)).toEqual(['e3', 'e1']);

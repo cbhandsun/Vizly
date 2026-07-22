@@ -52,7 +52,7 @@ describe('useDiagramControls', () => {
   it('passes explicit React Flow snapshots to export actions', async () => {
     const { useDiagramControls } = await import('../useDiagramControls');
     const getReactFlowSnapshot = vi.fn(() => ({
-      nodes: [{ id: 'n1' }],
+      nodes: [{ id: 'n1', position: { x: 0, y: 0 }, data: {} }],
       edges: [],
       viewport: { x: 1, y: 2, zoom: 1.5 },
     }));

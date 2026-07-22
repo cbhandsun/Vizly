@@ -148,9 +148,16 @@ describe('mermaidConverter', () => {
             `;
             const { nodes } = fromMermaid(code);
             const nodeA = nodes.find(n => n.id === 'A');
-            expect(nodeA?.data.theme.main).toBe('#ff0000');
-            expect(nodeA?.data.theme.border).toBe('#000000');
-            expect(nodeA?.data.theme.text).toBe('#ffffff');
+            const theme = nodeA?.data.theme;
+            expect(theme).toEqual(expect.any(Object));
+            if (!theme || typeof theme !== 'object' || Array.isArray(theme)) {
+                throw new Error('Expected a parsed node theme');
+            }
+            expect(theme).toMatchObject({
+                main: '#ff0000',
+                border: '#000000',
+                text: '#ffffff',
+            });
         });
 
         it('should reject oversized Mermaid imports', () => {

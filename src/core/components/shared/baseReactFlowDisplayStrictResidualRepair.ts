@@ -706,9 +706,6 @@ export const repairFinalResidualStrictCrossings = <T extends Edge[]>(edges: T, n
           && visualPolishHardQualityDoesNotRegress(baselineQuality, obstacleCleanedQuality)
         ) {
           best = obstacleCleaned;
-          bestQuality = obstacleCleanedQuality;
-          bestDisplayStrict = obstacleCleanedDisplayStrict;
-          bestObstacleHits = obstacleCleanedHits;
         }
       }
     }
@@ -732,9 +729,6 @@ export const repairFinalResidualStrictCrossings = <T extends Edge[]>(edges: T, n
         )
       ) {
         best = strictBypassCandidate;
-        bestQuality = strictBypassQuality;
-        bestDisplayStrict = strictBypassDisplayStrict;
-        bestObstacleHits = strictBypassObstacleHits;
       }
     }
 

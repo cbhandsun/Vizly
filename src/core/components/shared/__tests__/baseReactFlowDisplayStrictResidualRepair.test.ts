@@ -11,7 +11,6 @@ import { repairFinalResidualStrictCrossings } from '../baseReactFlowDisplayStric
 import { buildNodeBoundaryAdjacentLaneCandidates } from '../baseReactFlowDisplayNodeBoundaryLaneCandidates';
 import { buildStrictEndpointDetourCandidates } from '../baseReactFlowDisplayStrictEndpointDetourCandidates';
 import {
-  strictPathCrossings,
   withAbsoluteNodePositions,
 } from './baseReactFlowDisplayEdges.testUtils';
 import { tmsResidualStrictPaths } from './fixtures/tmsResidualStrictPaths';

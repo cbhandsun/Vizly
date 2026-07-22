@@ -19,8 +19,18 @@ describe('diagramViewerSwitchGuard', () => {
     });
 
     it('opens a destructive confirmation modal and resolves based on user action', async () => {
-        const confirmApprove = vi.fn(({ onOk }: { onOk?: () => void }) => onOk?.());
-        const confirmReject = vi.fn(({ onCancel }: { onCancel?: () => void }) => onCancel?.());
+        type ConfirmFunction = NonNullable<
+            Parameters<typeof confirmDiagramTemplateSwitch>[0]['confirmModal']
+        >['confirm'];
+        const modalResult = () => ({ destroy: vi.fn(), update: vi.fn() });
+        const confirmApprove = vi.fn<ConfirmFunction>((options) => {
+            void options.onOk?.();
+            return modalResult();
+        });
+        const confirmReject = vi.fn<ConfirmFunction>((options) => {
+            void options.onCancel?.();
+            return modalResult();
+        });
 
         await expect(confirmDiagramTemplateSwitch({
             nodeCount: 3,
@@ -38,8 +48,12 @@ describe('diagramViewerSwitchGuard', () => {
             cancelText: '取消',
             okButtonProps: { danger: true },
         }));
-        expect(confirmApprove.mock.calls[0]?.[0]?.content).toContain('3 个节点');
-        expect(confirmReject.mock.calls[0]?.[0]?.content).toContain('2 个节点');
+        expect(confirmApprove).toHaveBeenCalledWith(expect.objectContaining({
+            content: expect.stringContaining('3 个节点'),
+        }));
+        expect(confirmReject).toHaveBeenCalledWith(expect.objectContaining({
+            content: expect.stringContaining('2 个节点'),
+        }));
     });
 
     it('checks current node count and delegates to the confirmation step', async () => {

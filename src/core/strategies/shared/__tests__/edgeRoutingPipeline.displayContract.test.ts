@@ -11,7 +11,7 @@ const node = (
   y: number,
   width: number,
   height: number,
-): Node => ({
+): Node & { positionAbsolute: { x: number; y: number } } => ({
   id,
   type,
   position: { x, y },

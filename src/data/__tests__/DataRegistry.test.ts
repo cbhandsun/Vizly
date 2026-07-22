@@ -47,7 +47,7 @@ describe('DataRegistry local diagram normalization', () => {
         padding: { horizontal: 40, vertical: 32 },
         generateDomainGroups: true,
       },
-    }) as StandardDiagramData;
+    }) as unknown as StandardDiagramData;
 
     const diagram = normalizeLocalDiagramForRegistry(makeLocalDiagram({
       id: 'built-in',

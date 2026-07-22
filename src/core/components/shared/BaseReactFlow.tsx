@@ -222,10 +222,15 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const internalNodeGeometrySignature = useStore(useCallback((state: any) => (
     computeBaseReactFlowInternalNodeGeometrySignature(visibleNodeIds, state.nodeLookup)
   ), [visibleNodeIds]));
-  const internalFlowNodes = useMemo(() => collectBaseReactFlowInternalNodes(
-    visibleNodeIds,
-    (rfStore.getState() as any).nodeLookup,
-  ), [visibleNodeIds, internalNodeGeometrySignature, rfStore]);
+  const internalFlowNodes = useMemo(() => {
+    // The store signature is an explicit invalidation token for geometry held
+    // outside React props; reading it keeps measured-node updates observable.
+    void internalNodeGeometrySignature;
+    return collectBaseReactFlowInternalNodes(
+      visibleNodeIds,
+      (rfStore.getState() as any).nodeLookup,
+    );
+  }, [visibleNodeIds, internalNodeGeometrySignature, rfStore]);
   const routingNodes = useMemo(() => (
     mergeBaseReactFlowMeasuredNodes(visibleNodes, internalFlowNodes)
   ), [visibleNodes, internalFlowNodes]);
@@ -238,12 +243,13 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     });
   }, [visibleNodes.length, edges.length, performanceConfig]);
 
-  const routingGeometryReady = useMemo(() => (
-    isLargeGraph || areBaseReactFlowInternalNodesReadyForRouting(
+  const routingGeometryReady = useMemo(() => {
+    void internalNodeGeometrySignature;
+    return isLargeGraph || areBaseReactFlowInternalNodesReadyForRouting(
       visibleNodeIds,
       (rfStore.getState() as any).nodeLookup,
-    )
-  ), [internalNodeGeometrySignature, isLargeGraph, rfStore, visibleNodeIds]);
+    );
+  }, [internalNodeGeometrySignature, isLargeGraph, rfStore, visibleNodeIds]);
 
   /**
    * 启用 React Flow 虚拟化选项（函数级注释）

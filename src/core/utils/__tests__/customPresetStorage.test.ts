@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { StandardDiagramData } from '../../models/DiagramModels';
 import {
     addCustomPreset,
     coerceCustomPresetMap,
@@ -21,13 +22,20 @@ vi.mock('../consoleCleanup', () => ({
     safeLog: safeLogState,
 }));
 
-const makePreset = (id: string) => ({
+const makePreset = (id: string): StandardDiagramData => ({
     id,
     name: id,
     type: 'flowchart',
     version: '1.0.0',
     nodes: [{ id: 'n1', description: 'Node', type: 'flowchart', domain: 'default' }],
     edges: [],
+    layout: {
+        type: 'custom',
+        direction: 'TB',
+        spacing: { horizontal: 80, vertical: 60 },
+        padding: { horizontal: 24, vertical: 16 },
+    },
+    theme: { name: 'default', displayName: 'Default', domains: {} },
 });
 
 describe('customPresetStorage', () => {

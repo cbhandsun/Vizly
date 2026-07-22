@@ -63,7 +63,7 @@ describe('UnifiedStorageService', () => {
             diagramId: 'diagram-1',
             snapshotData: { nodes: [] },
             message: 'local fallback',
-            createdAt: '2026-06-24T00:00:00.000Z',
+            createdAt: Date.parse('2026-06-24T00:00:00.000Z'),
             authorId: 'local-user',
         };
         saveVersionMock.mockResolvedValueOnce(localVersion);
@@ -87,7 +87,7 @@ describe('UnifiedStorageService', () => {
             diagramId: 'diagram-2',
             snapshotData: { nodes: [{ id: 'n1' }] },
             message: 'cached',
-            createdAt: '2026-06-24T00:00:00.000Z',
+            createdAt: Date.parse('2026-06-24T00:00:00.000Z'),
             authorId: 'local-user',
         }];
         const localVersion = localVersions[0];

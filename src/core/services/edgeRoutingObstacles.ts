@@ -5,7 +5,11 @@ import {
     type EdgeRoutingObstacleNode,
 } from './edgeRoutingNodeObstacles';
 
-export type EdgeRoutingObstacleRectInput = Partial<Rectangle> & {
+export type EdgeRoutingObstacleRectInput = {
+    x?: unknown;
+    y?: unknown;
+    width?: unknown;
+    height?: unknown;
     edgeId?: string;
     ownerId?: string;
 };

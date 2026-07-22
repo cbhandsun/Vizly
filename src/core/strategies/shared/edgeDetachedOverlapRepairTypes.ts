@@ -1,6 +1,6 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
-import type { Point, Rect } from './edgeDetachedOverlapCandidates';
+import type { Point } from './edgeDetachedOverlapCandidates';
 
 export type RoutingObstacleGate = (
   baselinePaths: Point[][],

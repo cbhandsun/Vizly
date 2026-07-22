@@ -26,9 +26,9 @@ describe('flowchartSummaryInsert', () => {
     const takeSnapshot = vi.fn();
     const appendNode = vi.fn();
     const applySelection = vi.fn();
-    let scheduled: (() => void) | null = null;
+    const scheduled: { callback?: () => void } = {};
     const scheduleSelection = vi.fn((callback: () => void) => {
-      scheduled = callback;
+      scheduled.callback = callback;
     });
 
     const summaryNode = runFlowchartSummaryInsert({
@@ -57,7 +57,7 @@ describe('flowchartSummaryInsert', () => {
     expect(scheduleSelection).toHaveBeenCalledTimes(1);
     expect(applySelection).not.toHaveBeenCalled();
 
-    scheduled?.();
+    scheduled.callback?.();
     expect(applySelection).toHaveBeenCalledWith(summaryNode!.id);
     expect(takeSnapshot.mock.invocationCallOrder[0]).toBeLessThan(appendNode.mock.invocationCallOrder[0]);
   });

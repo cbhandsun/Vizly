@@ -12,16 +12,27 @@ vi.mock('../consoleCleanup', () => ({
   safeLog: safeLogState,
 }));
 
+const originalGetContext = HTMLCanvasElement.prototype.getContext;
+
 describe('EnhancedTextMeasurement', () => {
   beforeEach(() => {
     vi.resetModules();
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-      font: '',
-      measureText: (text: string) => ({ width: text.length * 8 }),
-    } as unknown as CanvasRenderingContext2D);
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      configurable: true,
+      writable: true,
+      value: vi.fn(() => ({
+        font: '',
+        measureText: (text: string) => ({ width: text.length * 8 }),
+      })),
+    });
   });
 
   afterEach(() => {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      configurable: true,
+      writable: true,
+      value: originalGetContext,
+    });
     Object.values(safeLogState).forEach(mock => mock.mockReset());
     vi.restoreAllMocks();
   });

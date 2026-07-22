@@ -19,7 +19,7 @@ describe('LocalDB', () => {
                 request.error = new Error('Authorization: Bearer sk-live-secret');
                 (request.onerror as ((event: { target: typeof request }) => void) | undefined)?.({ target: request });
             });
-            return request as IDBOpenDBRequest;
+            return request as unknown as IDBOpenDBRequest;
         });
         vi.stubGlobal('indexedDB', { open: openMock });
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

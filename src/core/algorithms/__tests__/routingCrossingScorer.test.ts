@@ -569,7 +569,7 @@ describe('refineOrthogonalWaypointsDetailed', () => {
                 { x: 633, y: 806, width: 216, height: 96 },
             ],
             buddyGroups: [
-                { type: 'o2m', edgeIds: ['e5', 'e6'] },
+                { type: 'o2m', edgeIds: new Set(['e5', 'e6']) },
             ],
             fixedEdgeIds: new Set(['e5']),
         });

@@ -105,22 +105,24 @@ describe('cleanAndValidateTree', () => {
     expect(cleaned.direction).toBe(3);
     expect(cleaned.nodeData.id).toBe('root');
     expect(cleaned.nodeData.branchColor).toBeUndefined();
-    expect(cleaned.nodeData.shapeClass).toBeUndefined();
+    expect(cleaned.nodeData).not.toHaveProperty('shapeClass');
     expect(cleaned.nodeData.style).toEqual({ color: '#123456', fontSize: '48px' });
     expect(cleaned.nodeData.image).toBeUndefined();
-    expect(cleaned.nodeData.boundary).toEqual({
+    expect(cleaned.nodeData).toHaveProperty('boundary', {
       color: '#818cf8',
       title: 'g'.repeat(MINDMAP_MAX_TOPIC_LENGTH),
     });
-    expect(cleaned.nodeData.children?.[0]?.id).toBe('safe-1');
-    expect(cleaned.nodeData.children?.[0]?.branchColor).toBe('#abcdef');
-    expect(cleaned.nodeData.children?.[0]?.shapeClass).toBe('diamond');
-    expect(cleaned.nodeData.children?.[0]?.branchWidth).toBe(12);
-    expect(cleaned.nodeData.children?.[0]?.image).toEqual({
-      url: 'https://images.example.com/photo.png',
-      width: 2048,
-      height: 1,
-      fit: 'cover',
+    expect(cleaned.nodeData.children?.[0]).toMatchObject({
+      id: 'safe-1',
+      branchColor: '#abcdef',
+      shapeClass: 'diamond',
+      branchWidth: 12,
+      image: {
+        url: 'https://images.example.com/photo.png',
+        width: 2048,
+        height: 1,
+        fit: 'cover',
+      },
     });
     expect(Object.hasOwn(cleaned.nodeData, 'constructor')).toBe(false);
     expect(Object.prototype).not.toHaveProperty('polluted');

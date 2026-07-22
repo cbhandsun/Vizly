@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { finalizeFailClosedDisplayTransaction } from '../baseReactFlowDisplayFinalTransaction';
 
-const nodes = [
+const nodes: Array<Node & { positionAbsolute: { x: number; y: number } }> = [
   {
     id: 'source',
     position: { x: 0, y: 0 },
@@ -22,7 +22,7 @@ const nodes = [
     measured: { width: 100, height: 100 },
     data: {},
   },
-] as Node[];
+];
 
 const edgeWithPath = (computedPath: Array<{ x: number; y: number }>): Edge[] => [{
   id: 'edge',

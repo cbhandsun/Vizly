@@ -1,7 +1,7 @@
 import { Position } from '../types/flow';
 import type { PortSelectionConfig } from '../types/routing';
 import type { Rectangle, Point } from './pathfinding';
-import { generateSimplePath, isPathBlocked } from './pathfinding';
+import { isPathBlocked } from './pathfinding';
 import type { SpatialIndex } from './SpatialIndex';
 import type { NodeLike } from './smartEdgeGeometryCore';
 import { getNodePosition } from './smartEdgeGeometryCore';

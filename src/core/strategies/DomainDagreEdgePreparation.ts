@@ -1,6 +1,6 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import type { LayoutOptions } from '../types/layout';
-import { decideEdgeRouting, separateParallelEdges, assignGlobalPorts } from '../utils/HandlePicker';
+import { decideEdgeRouting, assignGlobalPorts } from '../utils/HandlePicker';
 import { expandHandle, normalizeHandle } from '../routing/utils/handleUtils';
 import { logDomainDagreMissingNodeHandle } from './layoutLogging';
 import { repairSharedTrunkAwareCrossings } from './shared/edgeRoutingPipeline';

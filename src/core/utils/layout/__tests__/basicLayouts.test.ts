@@ -20,7 +20,7 @@ describe('basicLayouts', () => {
     describe('calculateGridLayout', () => {
         it('should calculate positions correctly with default options', () => {
             const items = [{}, {}, {}];
-            const options: LayoutOptions = {}; // columns will be Math.ceil(sqrt(3)) = 2
+            const options: LayoutOptions = { type: LayoutType.GRID }; // columns will be Math.ceil(sqrt(3)) = 2
             const positions = calculateGridLayout(items, options);
 
             expect(positions).toHaveLength(3);
@@ -36,6 +36,7 @@ describe('basicLayouts', () => {
         it('should respect custom columns, spacing and padding options', () => {
             const items = [{}, {}, {}];
             const options: LayoutOptions = {
+                type: LayoutType.GRID,
                 columns: 3,
                 spacing: { horizontal: 50, vertical: 60 },
                 padding: { top: 10, right: 10, bottom: 10, left: 20 },
@@ -56,6 +57,7 @@ describe('basicLayouts', () => {
     describe('calculateHorizontalLayout', () => {
         const items = [{}, {}, {}];
         const baseOptions: LayoutOptions = {
+            type: LayoutType.HORIZONTAL,
             spacing: { horizontal: 50, vertical: 0 },
             padding: { top: 20, right: 20, bottom: 20, left: 20 },
             itemSize: { width: 100, height: 40 },
@@ -111,6 +113,7 @@ describe('basicLayouts', () => {
     describe('calculateVerticalLayout', () => {
         const items = [{}, {}, {}];
         const baseOptions: LayoutOptions = {
+            type: LayoutType.VERTICAL,
             spacing: { horizontal: 0, vertical: 30 },
             padding: { top: 20, right: 20, bottom: 20, left: 20 },
             itemSize: { width: 100, height: 40 },
@@ -159,6 +162,7 @@ describe('basicLayouts', () => {
 
     describe('calculateCenteredLayout', () => {
         const baseOptions: LayoutOptions = {
+            type: LayoutType.CENTERED,
             containerSize: { width: 500, height: 400 },
             itemSize: { width: 100, height: 50 },
             spacing: { horizontal: 20, vertical: 20 }
@@ -196,6 +200,7 @@ describe('basicLayouts', () => {
     describe('calculateLayout', () => {
         const items = [{}, {}, {}];
         const options: LayoutOptions = {
+            type: LayoutType.GRID,
             spacing: { horizontal: 100, vertical: 120 },
             padding: { top: 50, right: 50, bottom: 50, left: 50 },
             itemSize: { width: 280, height: 120 }

@@ -21,7 +21,13 @@ const plugin = (id: string, onAIAction?: DiagramTypePlugin['onAIAction']): Diagr
   name: id,
   version: '1.0.0',
   description: `${id} plugin`,
-  diagramTypes: [],
+  parseData: () => ({ nodes: [], edges: [] }),
+  serializeData: () => ({}),
+  getEmptyState: () => ({ nodes: [], edges: [] }),
+  getSupportedLayouts: () => [],
+  getDefaultLayout: () => 'default',
+  getNodeTypes: () => ({}),
+  getEdgeTypes: () => ({}),
   onAIAction,
 });
 

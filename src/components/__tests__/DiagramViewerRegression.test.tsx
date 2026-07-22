@@ -4,14 +4,29 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-const canvasOpsMock = vi.fn(() => ({}));
-const importAIDiagramJsonToBridgeMock = vi.fn();
+type CanvasOpsOptions = {
+    diagramId?: string;
+    onExportPNG?: unknown;
+    onExportPDF?: unknown;
+    onExportSVG?: unknown;
+    onExportGIF?: unknown;
+};
+type DiagramControlsOptions = {
+    getReactFlowSnapshot: () => { nodes: unknown[]; edges: unknown[] };
+};
+
+const canvasOpsMock = vi.fn((_options: CanvasOpsOptions) => ({}));
+const importAIDiagramJsonToBridgeMock = vi.fn((..._args: unknown[]) => undefined);
 const handleToggleFullscreenMock = vi.fn();
 const exportToPNGMock = vi.fn();
 const exportToPDFMock = vi.fn();
 const exportToSVGMock = vi.fn();
 const exportToGIFMock = vi.fn();
-const useDiagramControlsMock = vi.fn(() => ({
+const useDiagramControlsMock = vi.fn((
+    _diagramId: string,
+    _ready: boolean,
+    _options: DiagramControlsOptions,
+) => ({
     handleFitDiagram: vi.fn(),
     handleBackToTop: vi.fn(),
     handleToggleFullscreen: handleToggleFullscreenMock,
@@ -22,12 +37,16 @@ const useDiagramControlsMock = vi.fn(() => ({
 }));
 
 vi.mock('../diagramViewerAiBridge', () => ({
-    createDiagramViewerCanvasOps: (...args: unknown[]) => canvasOpsMock(...args),
+    createDiagramViewerCanvasOps: (options: CanvasOpsOptions) => canvasOpsMock(options),
     importAIDiagramJsonToBridge: (...args: unknown[]) => importAIDiagramJsonToBridgeMock(...args),
 }));
 
 vi.mock('@/core/hooks/useDiagramControls', () => ({
-    useDiagramControls: (...args: unknown[]) => useDiagramControlsMock(...args),
+    useDiagramControls: (
+        diagramId: string,
+        ready: boolean,
+        options: DiagramControlsOptions,
+    ) => useDiagramControlsMock(diagramId, ready, options),
 }));
 
 vi.mock('@/core/hooks/useDiagramHostStorage', () => ({
@@ -266,7 +285,7 @@ describe('DiagramViewer regression', () => {
 
         expect(screen.getByTestId('diagram')).toBeInTheDocument();
         expect(canvasOpsMock).toHaveBeenCalledTimes(1);
-        const callArg = canvasOpsMock.mock.calls[0]?.[0] as { onExportPNG?: unknown; onExportPDF?: unknown; onExportSVG?: unknown; onExportGIF?: unknown };
+        const callArg = canvasOpsMock.mock.calls[0]?.[0];
         expect(callArg?.onExportPNG).toBe(exportToPNGMock);
         expect(callArg?.onExportPDF).toBe(exportToPDFMock);
         expect(callArg?.onExportSVG).toBe(exportToSVGMock);
@@ -290,10 +309,8 @@ describe('DiagramViewer regression', () => {
                 getReactFlowSnapshot: expect.any(Function),
             }),
         );
-        const options = useDiagramControlsMock.mock.calls[0]?.[2] as {
-            getReactFlowSnapshot: () => { nodes: unknown[]; edges: unknown[] };
-        };
-        expect(options.getReactFlowSnapshot()).toEqual({
+        const options = useDiagramControlsMock.mock.calls[0]?.[2];
+        expect(options?.getReactFlowSnapshot()).toEqual({
             nodes: [
                 { id: 'node-1', position: { x: 0, y: 0 }, data: { label: 'A' } },
                 { id: 'node-2', position: { x: 120, y: 0 }, data: { label: 'B' } },

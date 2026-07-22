@@ -4,11 +4,17 @@ import { repairSameNodeInOutCrossings } from '../edgeSameNodeRoleRepair';
 
 type Point = { x: number; y: number };
 
-function node(id: string, x: number, y: number, width = 420, height = 236): ReactFlowNode {
+function node(
+  id: string,
+  x: number,
+  y: number,
+  width = 420,
+  height = 236,
+): ReactFlowNode & { positionAbsolute: Point } {
   return {
     id,
     position: { x, y },
-    positionAbsolute: { x, y } as any,
+    positionAbsolute: { x, y },
     measured: { width, height } as any,
     style: { width, height },
     data: {},

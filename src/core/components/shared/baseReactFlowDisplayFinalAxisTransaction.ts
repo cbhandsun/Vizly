@@ -19,7 +19,6 @@ export type FinalAxisTransactionResult<T extends Edge[]> = {
 };
 
 export const runFinalAxisTransaction = <T extends Edge[]>({
-  attachedCandidate,
   orthogonalCandidate,
   attachedReport,
   repairNodes,

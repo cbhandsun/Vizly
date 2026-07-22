@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it, vi } from 'vitest';
+import type { FlowDataBridgeEntry } from '@/core/utils/flowDataBridge';
 
 import {
   createDiagramViewerSaveCopy,
@@ -26,7 +27,9 @@ describe('diagramViewerSave', () => {
   });
 
   it('creates and syncs cloud save copies', () => {
-    const bridge = { id: 'old', name: 'Old', nodes: [], metadata: { foo: 'bar' } };
+    const bridge: FlowDataBridgeEntry = {
+      id: 'old', name: 'Old', nodes: [], metadata: { foo: 'bar' },
+    };
     const saveCopy = createDiagramViewerSaveCopy({
       bridge,
       name: 'New Name',
@@ -45,7 +48,7 @@ describe('diagramViewerSave', () => {
     });
 
     expect(bridge.id).toBe('cloud-id');
-    expect(bridge.metadata.cloud).toEqual({
+    expect(bridge.metadata?.cloud).toEqual({
       provider: 'supabase',
       id: 'cloud-id',
       title: 'Cloud Name',
@@ -53,7 +56,7 @@ describe('diagramViewerSave', () => {
   });
 
   it('saves a cloud replica and updates bridge metadata', async () => {
-    const bridge = { id: 'old', name: 'Old', nodes: [], metadata: {} };
+    const bridge: FlowDataBridgeEntry = { id: 'old', name: 'Old', nodes: [], metadata: {} };
     const saveDiagram = vi.fn().mockResolvedValue(undefined);
     const invalidatePreview = vi.fn();
 
@@ -74,7 +77,7 @@ describe('diagramViewerSave', () => {
     expect(newId).toBe('new-id');
     expect(saveDiagram).toHaveBeenCalledTimes(1);
     expect(invalidatePreview).toHaveBeenCalledWith('new-id');
-    expect(bridge.metadata.cloud.provider).toBe('supabase');
+    expect(bridge.metadata?.cloud?.provider).toBe('supabase');
   });
 
   it('saves direct cloud updates when cloud metadata exists', async () => {

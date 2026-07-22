@@ -151,8 +151,9 @@ describe('DiagramConfigManager', () => {
       }
     }`)).toBe(true);
 
-    expect(manager.getConfig().edge.handleWeights.safe).toBe(1);
-    expect(Object.hasOwn(manager.getConfig().edge.handleWeights, 'constructor')).toBe(false);
+    const importedWeights = manager.getConfig().edge.handleWeights;
+    expect(importedWeights?.safe).toBe(1);
+    expect(Object.hasOwn(importedWeights ?? {}, 'constructor')).toBe(false);
     expect(Object.prototype).not.toHaveProperty('polluted');
 
     manager.updateConfig({
@@ -164,8 +165,9 @@ describe('DiagramConfigManager', () => {
       },
     } as any);
 
-    expect(manager.getConfig().edge.handleWeights.allowed).toBe(2);
-    expect(Object.hasOwn(manager.getConfig().edge.handleWeights, 'prototype')).toBe(false);
+    const updatedWeights = manager.getConfig().edge.handleWeights;
+    expect(updatedWeights?.allowed).toBe(2);
+    expect(Object.hasOwn(updatedWeights ?? {}, 'prototype')).toBe(false);
     expect(Object.prototype).not.toHaveProperty('polluted');
   });
 

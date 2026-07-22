@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it, vi } from 'vitest';
+import { createAutoSavePayload, type AutoSavePayload } from '@/core/utils/autoSaveStorage';
 import {
     finalizeDiagramSeedNavigation,
     needsStandardDiagramSeedConversion,
@@ -98,10 +99,12 @@ describe('diagramViewerSeedNavigation', () => {
             callback(0);
             return 1;
         });
-        const createPayload = vi.fn(() => ({
+        const createPayload = vi.fn((
+            params: Parameters<typeof createAutoSavePayload>[0],
+        ): AutoSavePayload => ({
             diagramId: 'diagram-b',
-            nodes: [{ id: 'n1' }],
-            edges: [],
+            nodes: params.nodes,
+            edges: params.edges,
             version: '1.0',
             isFreshSeed: true,
         }));

@@ -74,6 +74,13 @@ describe('flowchartImportApply', () => {
         version: '1.0.0',
         nodes: [],
         edges: [],
+        layout: {
+          type: 'custom',
+          direction: 'TB',
+          spacing: { horizontal: 80, vertical: 60 },
+          padding: { horizontal: 24, vertical: 16 },
+        },
+        theme: { name: 'default', displayName: 'Default', domains: {} },
       },
       title: 'Imported',
     };
@@ -87,6 +94,10 @@ describe('flowchartImportApply', () => {
       onStandardReloadQueued,
       onReactFlowSuccess: vi.fn(),
     });
+
+    if (plan.kind !== 'standard-reload') {
+      throw new Error('Expected standard-reload plan');
+    }
 
     expect(registerStandardReload).toHaveBeenCalledWith({
       normalized: plan.normalized,

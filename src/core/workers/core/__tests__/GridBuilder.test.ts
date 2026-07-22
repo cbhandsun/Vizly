@@ -60,7 +60,7 @@ describe('GridBuilder', () => {
   });
 
   it('queries spatial indexes for relevant obstacles during bounds and rasterization', () => {
-    const query = vi.fn(() => [{ x: 40, y: -10, width: 20, height: 20 }]);
+    const query = vi.fn((_bounds: unknown) => [{ x: 40, y: -10, width: 20, height: 20 }]);
     const grid = new GridBuilder(config).buildGrid(
       { query } as never,
       { startX: 0, startY: 0, endX: 100, endY: 0 },

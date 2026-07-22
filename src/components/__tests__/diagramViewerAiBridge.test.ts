@@ -107,13 +107,26 @@ describe('diagramViewerAiBridge', () => {
     });
 
     it('creates bridge-backed canvas operations plus theme and presentation handlers', () => {
-        const addNode = vi.fn(() => 'node-1');
-        const deleteNodes = vi.fn();
-        const connectNodes = vi.fn();
-        const triggerLayout = vi.fn();
-        const onGroupNodes = vi.fn();
-        const onAnalyze = vi.fn(() => ({ summary: 'ok', nodes: [{ id: 'n1' }], issues: [] }));
-        const animatePath = vi.fn();
+        const addNode = vi.fn((_payload: unknown) => 'node-1');
+        const deleteNodes = vi.fn((_nodeIds: string[]) => undefined);
+        const connectNodes = vi.fn((_payload: unknown) => undefined);
+        const triggerLayout = vi.fn((_strategy?: string) => undefined);
+        const onGroupNodes = vi.fn((_nodeIds: string[], _groupName: string) => undefined);
+        const onAnalyze = vi.fn(() => ({
+            summary: 'ok',
+            issues: [],
+            stats: {
+                nodeCount: 1,
+                edgeCount: 0,
+                orphanCount: 1,
+                connectedComponents: 1,
+                maxDepth: 0,
+            },
+        }));
+        const animatePath = vi.fn((
+            _edgeIds: string[],
+            _options?: { duration?: number; loop?: boolean },
+        ) => undefined);
         const onExportPNG = vi.fn();
         const onExportPDF = vi.fn();
         const onExportSVG = vi.fn();
@@ -155,7 +168,17 @@ describe('diagramViewerAiBridge', () => {
         ops.onConnectNodes?.('n1', 'n2', 'link');
         ops.onAutoLayout?.('elk');
         ops.onGroupNodes?.(['n1', 'n2'], 'Group A');
-        expect(ops.onAnalyze?.()).toEqual({ summary: 'ok', nodes: [{ id: 'n1' }], issues: [] });
+        expect(ops.onAnalyze?.()).toEqual({
+            summary: 'ok',
+            issues: [],
+            stats: {
+                nodeCount: 1,
+                edgeCount: 0,
+                orphanCount: 1,
+                connectedComponents: 1,
+                maxDepth: 0,
+            },
+        });
         ops.onExport?.('png');
         ops.onExport?.('pdf');
         ops.onExport?.('svg');

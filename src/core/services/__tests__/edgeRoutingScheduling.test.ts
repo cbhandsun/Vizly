@@ -34,7 +34,7 @@ describe('edgeRoutingScheduling', () => {
         const clearTimer = vi.fn();
         const setPendingTimeout = vi.fn();
         const triggerBatchRouting = vi.fn();
-        let scheduledCallback: (() => void) | null = null;
+        const scheduledCallback: { current?: () => void } = {};
 
         const scheduled = scheduleEdgeRoutingBatch({
             isFrozen: false,
@@ -42,7 +42,7 @@ describe('edgeRoutingScheduling', () => {
             pendingTimeout: 'old-handle',
             clearTimer,
             scheduleTimer: (callback, delayMs) => {
-                scheduledCallback = callback;
+                scheduledCallback.current = callback;
                 expect(delayMs).toBe(EDGE_ROUTING_BATCH_DELAY_MS.dragging);
                 return 'new-handle';
             },
@@ -54,7 +54,7 @@ describe('edgeRoutingScheduling', () => {
         expect(clearTimer).toHaveBeenCalledWith('old-handle');
         expect(setPendingTimeout).toHaveBeenCalledWith('new-handle');
 
-        scheduledCallback?.();
+        scheduledCallback.current?.();
         expect(setPendingTimeout).toHaveBeenLastCalledWith(null);
         expect(triggerBatchRouting).toHaveBeenCalledOnce();
     });

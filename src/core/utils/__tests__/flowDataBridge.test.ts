@@ -18,7 +18,11 @@ describe('flowDataBridge', () => {
         expect(getFlowDataBridgeRegistry()).toBeUndefined();
         expect(getFlowDataBridge('diagram-a')).toBeUndefined();
 
-        (window as Window & { __flowDataBridge?: unknown }).__flowDataBridge = 'bad';
+        Object.defineProperty(window, '__flowDataBridge', {
+            configurable: true,
+            writable: true,
+            value: 'bad',
+        });
         expect(getFlowDataBridgeRegistry()).toBeUndefined();
     });
 
