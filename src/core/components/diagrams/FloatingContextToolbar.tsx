@@ -52,6 +52,9 @@ const DOMAIN_OPTIONS = [
     { value: 'infra', label: '基础设施域 (Infra)', color: '#424242' },
 ];
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    Boolean(value && typeof value === 'object' && !Array.isArray(value));
+
 // ─── Types (preserved for backward compatibility) ────────────────────────────
 
 export type ToolbarFeature = 'color' | 'opacity' | 'shape' | 'domain' | 'align' | 'layer' | 'border' | 'copyStyle';
@@ -125,7 +128,7 @@ const ShapePanel: React.FC<{ onChangeShape: (shape: FlowchartShape) => void }> =
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--toolbar-btn-hover-bg)'}
                 onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
             >
-                <div style={{ lineHeight: 0 }}><ShapePreview shape={s.shape as any} size={24} color="#64748b" /></div>
+                <div style={{ lineHeight: 0 }}><ShapePreview shape={s.shape} size={24} color="#64748b" /></div>
             </div>
         ))}
     </div>
@@ -203,8 +206,14 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
         return acc + op;
     }, 0) / selectedNodes.length;
 
-    const currentColor = (selectedNodes[0]?.data?.style as any)?.backgroundColor ||
-        (selectedNodes[0]?.data?.theme as any)?.main || '#ffffff';
+    const selectedNodeData = selectedNodes[0]?.data;
+    const selectedDataStyle = isRecord(selectedNodeData?.style) ? selectedNodeData.style : {};
+    const selectedDataTheme = isRecord(selectedNodeData?.theme) ? selectedNodeData.theme : {};
+    const currentColor = typeof selectedDataStyle.backgroundColor === 'string'
+        ? selectedDataStyle.backgroundColor
+        : typeof selectedDataTheme.main === 'string'
+          ? selectedDataTheme.main
+          : '#ffffff';
 
     const currentStrokeWidth = Number(selectedNodes[0]?.style?.strokeWidth || 1);
     const isDashed = selectedNodes[0]?.style?.strokeDasharray === '4,4';

@@ -13,11 +13,11 @@ export interface IconNodeData extends FlowchartNodeData {
 export type IconNodeProps = NodeProps<Node<IconNodeData>>;
 
 const IconNode = ({ data, selected, id }: IconNodeProps) => {
-    const nodeData = useStore((s: any) => s.nodeLookup?.get(id) || s.nodeInternals?.get(id));
+    const nodeData = useStore(s => s.nodeLookup.get(id));
 
     // Support NodeResizer dimensions
-    const _nodeWidth = (nodeData?.measured?.width || (nodeData as any)?.width || 100) as number;
-    const _nodeHeight = (nodeData?.measured?.height || (nodeData as any)?.height || 100) as number;
+    const _nodeWidth = nodeData?.measured?.width || nodeData?.width || 100;
+    const _nodeHeight = nodeData?.measured?.height || nodeData?.height || 100;
 
     const {
         isHovered,

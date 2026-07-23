@@ -2,6 +2,14 @@ import { useCallback } from 'react';
 import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { PluginContext, DiagramTypePlugin } from '../../../types/plugin';
 
+type AlignmentType = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
+type DistributionType = 'horizontal' | 'vertical';
+
+const ALIGNMENT_TYPES = new Set<AlignmentType>(['left', 'center', 'right', 'top', 'middle', 'bottom']);
+const DISTRIBUTION_TYPES = new Set<DistributionType>(['horizontal', 'vertical']);
+const isAlignmentType = (value: string): value is AlignmentType => ALIGNMENT_TYPES.has(value as AlignmentType);
+const isDistributionType = (value: string): value is DistributionType => DISTRIBUTION_TYPES.has(value as DistributionType);
+
 interface UseDiagramActionsProps {
     nodes: Node[];
     edges: Edge[];
@@ -222,7 +230,9 @@ export const useDiagramActions = ({
         
         const updateFn = (e: Edge) => {
             if (e.id !== targetId) return e;
-            const originalType = (e.data as any)?.originalType || 'smart';
+            const originalType = typeof e.data?.originalType === 'string'
+                ? e.data.originalType
+                : 'smart';
             return {
                 ...e,
                 type: originalType,
@@ -343,12 +353,14 @@ export const useDiagramActions = ({
     const onContextMenuAction = useCallback((action: string, targetId?: string) => {
         // 对齐操作
         if (action.startsWith('align:')) {
-            handleAlign(action.replace('align:', '') as any);
+            const alignment = action.slice('align:'.length);
+            if (isAlignmentType(alignment)) handleAlign(alignment);
             return;
         }
         // 分布操作
         if (action.startsWith('distribute:')) {
-            handleDistribute(action.replace('distribute:', '') as any);
+            const distribution = action.slice('distribute:'.length);
+            if (isDistributionType(distribution)) handleDistribute(distribution);
             return;
         }
         // 统一尺寸

@@ -17,6 +17,7 @@ import {
     clearFlowchartCanvas,
 } from '../flowchartClearCanvas';
 import { runFlowchartSmartOptimize } from '../flowchartSmartOptimize';
+import type { NodeDataUpdate } from '../../../types/diagram-updates';
 
 type TemplateApplyOptions = Parameters<typeof applyFlowchartTemplate>[0];
 
@@ -41,7 +42,7 @@ interface UseFlowchartCanvasCommandsOptions {
     viewport: TemplateApplyOptions['viewport'];
     createFromTemplate: TemplateApplyOptions['createFromTemplate'];
     selectedNodes: Node[];
-    updateNodesBatch: (ids: string[], updates: any) => void;
+    updateNodesBatch: (ids: string[], updates: NodeDataUpdate) => void;
 }
 
 export function useFlowchartCanvasCommands({
@@ -131,8 +132,8 @@ export function useFlowchartCanvasCommands({
     const handleExportMermaid = useCallback(async () => {
         try {
             await exportFlowchartAsMermaid({ nodes: getNodes(), edges: getEdges(), downloadFile });
-        } catch (error: any) {
-            appMessage.error(error.message);
+        } catch (error: unknown) {
+            appMessage.error(error instanceof Error ? error.message : String(error));
         }
     }, [getEdges, getNodes]);
 
@@ -145,8 +146,8 @@ export function useFlowchartCanvasCommands({
                 writeText: content => navigator.clipboard.writeText(content),
             });
             appMessage.success(t('designer.flowchart.mermaidCopied'));
-        } catch (error: any) {
-            appMessage.error(error.message);
+        } catch (error: unknown) {
+            appMessage.error(error instanceof Error ? error.message : String(error));
         }
     }, [getEdges, getNodes, t]);
 
