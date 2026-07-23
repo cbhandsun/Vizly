@@ -5,6 +5,7 @@ import { ensureReadableText } from '../../../utils/colorUtils';
 import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v2';
 import { getQueryOrHashParamFromLocation } from '../../../utils/inputBoundary';
+import type { ThemeColor } from '../../../themes/types/ThemeTypes';
 
 const DEFAULT_FONT_STACK = '"Microsoft YaHei", "PingFang SC", "Helvetica Neue", Helvetica, Arial, sans-serif';
 
@@ -124,10 +125,29 @@ const mixHexOverBase = (hex: string, amount: number, base: [number, number, numb
 
 export interface UseCustomNodeStyleResolutionProps {
     id: string;
-    data: any;
+    data: CustomNodeStyleData;
     selected: boolean;
     hovered: boolean;
     nodeWidth?: number;
+}
+
+export interface CustomNodeStyleData extends Record<string, unknown> {
+    label?: string;
+    description?: string;
+    domain?: string;
+    domainClass?: string;
+    fontFamily?: string;
+    fontSize?: number | string;
+    fontWeight?: React.CSSProperties['fontWeight'];
+    lineHeight?: React.CSSProperties['lineHeight'];
+    icon?: React.ReactNode;
+    status?: string;
+    statusKind?: string;
+    baseZIndex?: number;
+    join?: boolean;
+    padding?: { horizontal?: number; vertical?: number };
+    theme?: Partial<ThemeColor>;
+    customStyle?: React.CSSProperties;
 }
 
 export const useCustomNodeStyleResolution = ({
@@ -203,7 +223,7 @@ export const useCustomNodeStyleResolution = ({
     const finalPadV = basePadV + extraPadV;
 
     // Background & Borders
-    const isDarkTheme = (theme as any)?.name === 'dark' || (theme as any)?.mode === 'dark';
+    const isDarkTheme = theme?.name === 'dark' || theme?.mode === 'dark';
     const hasExplicitDomainColor = !!(d?.domainClass && domainTheme?.background) || !!d?.theme?.background;
     const bgPolicy = preset?.node?.backgroundPolicy ?? 'theme';
     const radiusToken = preset?.node?.radius ?? 16;
@@ -225,8 +245,8 @@ export const useCustomNodeStyleResolution = ({
     };
 
     const safeCustomStyle = { ...(d.customStyle || {}) } as React.CSSProperties;
-    if ('backgroundColor' in safeCustomStyle) delete (safeCustomStyle as any).backgroundColor;
-    if ('border' in safeCustomStyle) delete (safeCustomStyle as any).border;
+    delete safeCustomStyle.backgroundColor;
+    delete safeCustomStyle.border;
     const getVisualBackgroundColor = () => {
         if (selected) return hexToRgba(themeMain, 0.06);
         if (bgPolicy === 'white' && !hasExplicitDomainColor) return '#FFFFFF';

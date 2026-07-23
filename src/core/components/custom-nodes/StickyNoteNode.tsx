@@ -3,13 +3,15 @@ import { NodeProps, Node } from '@xyflow/react';
 import { useNodeUpdate } from '../diagrams/useNodeUpdate';
 import { useDiagramStylePreset_v2 } from '../../hooks/useDiagramStylePreset_v2';
 import './StickyNoteNode.css';
+import type { NodeDataUpdate } from '../../types/diagram-updates';
+import type { ToolbarFeature } from '../diagrams/FloatingContextToolbar';
 
 export interface StickyNoteData {
     label?: string;
     noteColor?: 'yellow' | 'pink' | 'blue' | 'green' | 'orange' | 'purple';
     locked?: boolean;
     isEditing?: boolean;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 const colorMap = {
@@ -127,7 +129,10 @@ const StickyNoteNode: React.FC<NodeProps<Node<StickyNoteData, 'sticky-note'>>> =
 };
 
 // 🌟 Extend the floating toolbar dynamically for this specific node
-const StickyNoteToolbarExtension: React.FC<{ node: Node<StickyNoteData>, updateNodesBatch: (ids: string[], data: any) => void }> = ({ node, updateNodesBatch }) => {
+const StickyNoteToolbarExtension: React.FC<{
+    node: Node<StickyNoteData>;
+    updateNodesBatch: (ids: string[], data: NodeDataUpdate) => void;
+}> = ({ node, updateNodesBatch }) => {
     const handleColorChange = (color: keyof typeof colorMap) => {
         updateNodesBatch([node.id], { data: { ...node.data, noteColor: color } });
     };
@@ -148,9 +153,14 @@ const StickyNoteToolbarExtension: React.FC<{ node: Node<StickyNoteData>, updateN
 };
 
 const MemoizedStickyNoteNode = memo(StickyNoteNode);
+type StickyNoteNodeWithToolbar = typeof MemoizedStickyNoteNode & {
+    ToolbarFeatureExclusions: ToolbarFeature[];
+    ToolbarExtension: typeof StickyNoteToolbarExtension;
+};
+const StickyNoteNodeComponent = MemoizedStickyNoteNode as StickyNoteNodeWithToolbar;
 
 // Exclude generic features from the global floating toolbar since they don't apply well to sticky notes
-(MemoizedStickyNoteNode as any).ToolbarFeatureExclusions = ['color', 'shape', 'domain', 'border', 'align', 'opacity', 'copyStyle'];
-(MemoizedStickyNoteNode as any).ToolbarExtension = StickyNoteToolbarExtension;
+StickyNoteNodeComponent.ToolbarFeatureExclusions = ['color', 'shape', 'domain', 'border', 'align', 'opacity', 'copyStyle'];
+StickyNoteNodeComponent.ToolbarExtension = StickyNoteToolbarExtension;
 
-export default MemoizedStickyNoteNode;
+export default StickyNoteNodeComponent;
