@@ -24,8 +24,18 @@ import {
   type DisplayEdgesWorkerResponse,
 } from './baseReactFlowDisplayWorkerProtocol';
 
+interface DisplayEdgesWorkerScope {
+  postMessage: (response: DisplayEdgesWorkerResponse) => void;
+  onmessage: ((event: MessageEvent<unknown>) => void) | null;
+}
+
+const displayEdgesWorkerScope = typeof self !== 'undefined'
+  && !('document' in self)
+  ? self as unknown as DisplayEdgesWorkerScope
+  : null;
+
 const postDisplayEdgesResponse = (response: DisplayEdgesWorkerResponse): void => {
-  (self as any).postMessage(response);
+  displayEdgesWorkerScope?.postMessage(response);
 };
 
 const doesDisplayCandidateMatchSourceGraph = (
@@ -154,12 +164,8 @@ export const handleBaseReactFlowDisplayWorkerMessage = (
   return computeBaseReactFlowDisplayEdgesWorkerResponse(request, onBoundedCandidate);
 };
 
-const isDisplayEdgesWorkerScope = typeof self !== 'undefined'
-  && typeof (self as any).postMessage === 'function'
-  && typeof (self as any).document === 'undefined';
-
-if (isDisplayEdgesWorkerScope) {
-  (self as any).onmessage = (event: MessageEvent<unknown>) => {
+if (displayEdgesWorkerScope) {
+  displayEdgesWorkerScope.onmessage = (event: MessageEvent<unknown>) => {
     const requestId = readDisplayEdgesWorkerRequestId(event.data) ?? 'invalid-request';
     try {
       const response = handleBaseReactFlowDisplayWorkerMessage(

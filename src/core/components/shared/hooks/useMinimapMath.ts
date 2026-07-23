@@ -9,13 +9,23 @@ export interface MinimapBounds {
   totalHeight: number;
 }
 
+export interface MinimapNode {
+  id: string;
+  parentId?: string;
+  position?: { x?: unknown; y?: unknown };
+  measured?: { width?: unknown; height?: unknown };
+  width?: unknown;
+  height?: unknown;
+  style?: { width?: unknown; height?: unknown };
+}
+
 /**
  * 安全数值验证函数，确保数值有效性
  * @param value - 待验证的数值
  * @param defaultValue - 默认值
  * @returns 有效的数值
  */
-export const safeNumber = (value: any, defaultValue: number = 0): number => {
+export const safeNumber = (value: unknown, defaultValue: number = 0): number => {
   return typeof value === 'number' && !isNaN(value) && isFinite(value) ? value : defaultValue;
 };
 
@@ -24,7 +34,7 @@ export const safeNumber = (value: any, defaultValue: number = 0): number => {
  * 确保渲染、点击导航、拖动导航三者使用完全一致的坐标基准
  */
 export const computeMinimapBounds = (
-  nodes: any[],
+  nodes: readonly MinimapNode[],
   viewport: { x: number; y: number; zoom: number },
   visiblePixelWidth: number,
   visiblePixelHeight: number
@@ -32,12 +42,12 @@ export const computeMinimapBounds = (
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
   // Build lookup map for parentId chain traversal
-  const nodeMap = new Map<string, any>();
+  const nodeMap = new Map<string, MinimapNode>();
   nodes.forEach(n => nodeMap.set(n.id, n));
 
   // Compute absolute position by walking the parentId chain.
   // internals.positionAbsolute is unavailable here (external API returns relative positions).
-  const getAbsPos = (node: any): { x: number; y: number } => {
+  const getAbsPos = (node: MinimapNode): { x: number; y: number } => {
     let x = safeNumber(node.position?.x, 0);
     let y = safeNumber(node.position?.y, 0);
     let curr = node;

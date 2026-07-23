@@ -29,6 +29,16 @@ export interface PoolStats {
     averageTaskTime: number;
 }
 
+interface WrappedPathFindingResult {
+    result: PathFindingResult;
+    jobId?: string;
+}
+
+type PathFindingBatchItem = PathFindingResult | WrappedPathFindingResult;
+
+const getErrorMessage = (error: unknown): string =>
+    error instanceof Error ? error.message : String(error);
+
 // Global counter for uniqueness
 let fileIdCounter = 0;
 const WORKER_TASK_TIMEOUT_MS = 10000;
@@ -228,9 +238,10 @@ export class PathfindingWorkerPool {
                     graph: graph
                 });
 
-                (batchResults as any[]).forEach(wrapper => {
-                    const res = (wrapper.result || wrapper) as PathFindingResult;
-                    const jobId = wrapper.jobId || (res as any).jobId || (res as any).edgeId;
+                batchResults.forEach(item => {
+                    const wrapper = item as Partial<WrappedPathFindingResult>;
+                    const res = wrapper.result ?? item as PathFindingResult;
+                    const jobId = wrapper.jobId || res.jobId || res.edgeId;
 
                     // O(1) lookup instead of O(N) findIndex
                     const originalIdx = idToIdx.get(res.edgeId) ?? idToIdx.get(jobId) ?? -1;
@@ -262,7 +273,7 @@ export class PathfindingWorkerPool {
     /**
      * Execute a BATCH task on an available worker
      */
-    private async executeBatchTask(payload: { jobs: PathFindingJob[], graph: SharedGraphContext }, priority = 1): Promise<PathFindingResult[]> {
+    private async executeBatchTask(payload: { jobs: PathFindingJob[], graph: SharedGraphContext }, priority = 1): Promise<PathFindingBatchItem[]> {
         // [H-8] Use priority-aware acquisition: interactive jobs (priority 0) jump the queue
         const workerIndex = await this.acquireWorkerWithPriority(priority);
         this.activeTasks.set(workerIndex, { job: payload.jobs[0], graph: payload.graph, priority: 0 });
@@ -317,8 +328,8 @@ export class PathfindingWorkerPool {
                     tasks: payload.jobs,
                     context: payload.graph
                 });
-            } catch (error: any) {
-                logPathfindingWorkerPostMessageError({ message: error.message });
+            } catch (error: unknown) {
+                logPathfindingWorkerPostMessageError({ message: getErrorMessage(error) });
                 worker.removeEventListener('message', messageHandler);
                 worker.removeEventListener('error', errorHandler);
                 this.releaseWorker(workerIndex);
