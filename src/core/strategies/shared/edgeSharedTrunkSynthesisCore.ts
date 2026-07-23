@@ -21,6 +21,11 @@ export const HEMISPHERE_ESCAPE_RATIO = 1.25;
 export const HEMISPHERE_ESCAPE_MIN = 50;
 const MAX_COORDINATE = 10_000_000;
 const MAX_PATH_POINTS = 10_000;
+const asRecord = (value: unknown): Record<string, unknown> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
 
 export function normalizeSharedTrunkEdges(value: unknown): Edge[] {
   if (!Array.isArray(value)) return [];
@@ -45,11 +50,15 @@ export function normalizeSharedTrunkOptions(
 }
 
 export function getEdgePath(edge: Edge): Point[] {
-  const raw = (edge.data as any)?.computedPath || (edge.data as any)?.treeRouting?.points || [];
+  const treeRouting = asRecord(edge.data?.treeRouting);
+  const raw = edge.data?.computedPath || treeRouting.points || [];
   if (!Array.isArray(raw)) return [];
   return raw
     .slice(0, MAX_PATH_POINTS)
-    .map((point: any) => ({ x: Number(point?.x), y: Number(point?.y) }))
+    .map(point => {
+      const candidate = asRecord(point);
+      return { x: Number(candidate.x), y: Number(candidate.y) };
+    })
     .filter((point: Point) => Number.isFinite(point.x) && Number.isFinite(point.y))
     .map(point => ({
       x: Math.min(MAX_COORDINATE, Math.max(-MAX_COORDINATE, point.x)),
@@ -58,9 +67,10 @@ export function getEdgePath(edge: Edge): Point[] {
 }
 
 export function withComputedPath(edge: Edge, path: Point[]): Edge {
-  const data: any = { ...(edge.data || {}), computedPath: path, sharedTrunkSynthesized: true };
-  if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-    data.treeRouting = { ...data.treeRouting, points: path };
+  const data: Record<string, unknown> = { ...(edge.data || {}), computedPath: path, sharedTrunkSynthesized: true };
+  const updatedTreeRouting = asRecord(data.treeRouting);
+  if (Array.isArray(updatedTreeRouting.points)) {
+    data.treeRouting = { ...updatedTreeRouting, points: path };
   }
   return { ...edge, data };
 }

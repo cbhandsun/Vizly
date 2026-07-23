@@ -17,6 +17,11 @@ interface PerformanceMetrics {
 
 // 全局性能监控存储
 const performanceStore = new Map<string, PerformanceMetrics>();
+type BrowserMemoryInfo = {
+  usedJSHeapSize: number;
+  totalJSHeapSize: number;
+  jsHeapSizeLimit: number;
+};
 
 /**
  * 组件渲染性能监控 Hook
@@ -73,7 +78,8 @@ export const useMemoryMonitor = (enabled: boolean = process.env.NODE_ENV === 'de
   const checkMemory = useCallback(() => {
     if (!enabled || !('memory' in performance)) return null;
 
-    const memory = (performance as any).memory;
+    const memory = (performance as Performance & { memory?: BrowserMemoryInfo }).memory;
+    if (!memory) return null;
     return {
       used: Math.round(memory.usedJSHeapSize / 1048576), // MB
       total: Math.round(memory.totalJSHeapSize / 1048576), // MB
@@ -103,7 +109,7 @@ export const useMemoryMonitor = (enabled: boolean = process.env.NODE_ENV === 'de
  * @param callback 回调函数
  * @param delay 延迟时间（毫秒）
  */
-export const useDebounce = <T extends (...args: any[]) => any>(
+export const useDebounce = <T extends (...args: never[]) => unknown>(
   callback: T,
   delay: number
 ): T => {
@@ -125,7 +131,7 @@ export const useDebounce = <T extends (...args: any[]) => any>(
  * @param callback 回调函数
  * @param delay 延迟时间（毫秒）
  */
-export const useThrottle = <T extends (...args: any[]) => any>(
+export const useThrottle = <T extends (...args: never[]) => unknown>(
   callback: T,
   delay: number
 ): T => {

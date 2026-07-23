@@ -198,8 +198,8 @@ export function straightenAlignedLocalDogleg(
 
     const rects = Array.isArray(obstacles)
         ? obstacles.map(obs => ({ x: obs.x, y: obs.y, width: obs.width, height: obs.height }))
-        : typeof (obstacles as any).getAll === 'function'
-            ? (obstacles as any).getAll().map((obs: any) => ({ x: obs.x, y: obs.y, width: obs.width, height: obs.height }))
+        : typeof obstacles.getAll === 'function'
+            ? obstacles.getAll().map(obs => ({ x: obs.x, y: obs.y, width: obs.width, height: obs.height }))
             : [];
 
     if (isPathBlocked(direct, rects, -1)) return points;
@@ -231,7 +231,9 @@ export function removeCrossAxisDetour(
 
     const rects = Array.isArray(obstacles)
         ? obstacles.map(obs => ({ x: obs.x, y: obs.y, width: obs.width, height: obs.height }))
-        : typeof (obstacles as any).getAll === 'function' ? (obstacles as any).getAll().map((obs: any) => ({ x: obs.x, y: obs.y, width: obs.width, height: obs.height })) : [];
+        : typeof obstacles.getAll === 'function'
+            ? obstacles.getAll().map(obs => ({ x: obs.x, y: obs.y, width: obs.width, height: obs.height }))
+            : [];
 
     const isBlocked = (a: Point, b: Point): boolean => {
         const CLEAR = 8;
@@ -239,7 +241,7 @@ export function removeCrossAxisDetour(
         const maxX = Math.max(a.x, b.x) + CLEAR;
         const minY = Math.min(a.y, b.y) - CLEAR;
         const maxY = Math.max(a.y, b.y) + CLEAR;
-        return rects.some((obs: any) =>
+        return rects.some(obs =>
             obs.x < maxX && obs.x + obs.width > minX &&
             obs.y < maxY && obs.y + obs.height > minY
         );

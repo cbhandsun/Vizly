@@ -1,6 +1,11 @@
 import { SpatialIndex } from './SpatialIndex';
 import type { LineObstacle, Point, Rectangle } from './pathfindingTypes';
 
+const obstaclePadding = (obstacle: Rectangle, fallback: number): number => {
+    const value = (obstacle as Rectangle & { padding?: unknown }).padding;
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+};
+
 export function isPointInRectangle(x: number, y: number, rect: Rectangle, padding: number = 0): boolean {
     return (
         x >= rect.x - padding &&
@@ -76,18 +81,18 @@ export function isPathBlocked(path: Point[], obstacles: Rectangle[] | SpatialInd
 
             if (Math.abs(p1.y - p2.y) < 0.1) { // Horizontal
                 for (const obs of candidates) {
-                    const dynamicPadding = (obs as any).padding ?? padding;
+                    const dynamicPadding = obstaclePadding(obs, padding);
                     if (isHLineIntersectingRect(p1.y, p1.x, p2.x, obs, dynamicPadding)) return true;
                 }
             } else if (Math.abs(p1.x - p2.x) < 0.1) { // Vertical
                 for (const obs of candidates) {
-                    const dynamicPadding = (obs as any).padding ?? padding;
+                    const dynamicPadding = obstaclePadding(obs, padding);
                     if (isVLineIntersectingRect(p1.x, p1.y, p2.y, obs, dynamicPadding)) return true;
                 }
             } else {
                 // [FIX] Diagonal Line Check
                 for (const obs of candidates) {
-                    const dynamicPadding = (obs as any).padding ?? padding;
+                    const dynamicPadding = obstaclePadding(obs, padding);
                     // Check endpoints
                     if (isPointInRectangle(p1.x, p1.y, obs, dynamicPadding) || isPointInRectangle(p2.x, p2.y, obs, dynamicPadding)) return true;
 
@@ -112,20 +117,20 @@ export function isPathBlocked(path: Point[], obstacles: Rectangle[] | SpatialInd
             // Standard Linear Scan
             if (Math.abs(p1.y - p2.y) < 0.1) { // Horizontal
                 for (const obs of obstacles) {
-                    const dynamicPadding = (obs as any).padding ?? padding;
+                    const dynamicPadding = obstaclePadding(obs, padding);
                     if (isHLineIntersectingRect(p1.y, p1.x, p2.x, obs, dynamicPadding)) return true;
                 }
             }
             else if (Math.abs(p1.x - p2.x) < 0.1) { // Vertical
                 for (const obs of obstacles) {
-                    const dynamicPadding = (obs as any).padding ?? padding;
+                    const dynamicPadding = obstaclePadding(obs, padding);
                     if (isVLineIntersectingRect(p1.x, p1.y, p2.y, obs, dynamicPadding)) return true;
                 }
             }
             else {
                 // [FIX] Diagonal Line Check (Linear Scan)
                 for (const obs of obstacles) {
-                    const dynamicPadding = (obs as any).padding ?? padding;
+                    const dynamicPadding = obstaclePadding(obs, padding);
                     // Check endpoints
                     if (isPointInRectangle(p1.x, p1.y, obs, dynamicPadding) || isPointInRectangle(p2.x, p2.y, obs, dynamicPadding)) return true;
 

@@ -20,9 +20,14 @@ import {
 } from './geometryUtils';
 import { SpatialIndex } from './SpatialIndex';
 
-function isSpatialIndex(obs: any): obs is SpatialIndex {
-    return obs && typeof (obs as SpatialIndex).query === 'function';
+function isSpatialIndex(obs: unknown): obs is SpatialIndex {
+    return typeof obs === 'object' && obs !== null && typeof (obs as SpatialIndex).query === 'function';
 }
+
+const rectanglePadding = (rect: Rectangle, fallback: number): number => {
+    const value = (rect as Rectangle & { padding?: unknown }).padding;
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+};
 
 /**
  * 可见性图数据结构
@@ -63,7 +68,7 @@ export function buildVisibilityGraph(
     const vertexToObstacle = new Map<number, number>();
 
     obstacleList.forEach((rect, obstacleIdx) => {
-        const dynamicPadding = (rect as any).padding ?? obstacleOffset;
+        const dynamicPadding = rectanglePadding(rect, obstacleOffset);
         const expandedRect = {
             x: rect.x - dynamicPadding,
             y: rect.y - dynamicPadding,
@@ -171,7 +176,7 @@ export function isVisible(
 
     for (const obstacle of potentialObstacles) {
         // [FIX] Read padding from obstacle, defaulting to the passed tolerance/offset
-        const dynamicPadding = (obstacle as any).padding ?? tolerance;
+        const dynamicPadding = rectanglePadding(obstacle, tolerance);
         
         const expandedObstacle = {
             x: obstacle.x - dynamicPadding,
@@ -463,7 +468,7 @@ function isLocalTangent(p1: Point, p2: Point, rect: Rectangle, padding: number):
         y: p1.y + (dy / len) * smallStep
     };
 
-    const dynamicPadding = (rect as any).padding ?? padding;
+    const dynamicPadding = rectanglePadding(rect, padding);
     const rx = rect.x - dynamicPadding;
     const ry = rect.y - dynamicPadding;
     const rw = rect.width + dynamicPadding * 2;

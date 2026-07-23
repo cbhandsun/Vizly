@@ -16,7 +16,7 @@
  * @module OneBendVisibilityGraph
  */
 
-import { Point, Rectangle } from '../types/routing';
+import { Point, Rectangle, type LineObstacle } from '../types/routing';
 import { isPathBlocked } from './pathfinding';
 
 /**
@@ -80,7 +80,7 @@ export class OneBendVisibilityGraph {
         source: Point,
         target: Point,
         obstacles: Rectangle[],
-        lineObstacles?: any[]
+        lineObstacles?: LineObstacle[]
     ): OneBendPathResult | null {
         // 策略1: 尝试直接路径（0-bend）
         const directPath = this.tryDirectPath(source, target, obstacles, lineObstacles);
@@ -106,7 +106,7 @@ export class OneBendVisibilityGraph {
         source: Point,
         target: Point,
         obstacles: Rectangle[],
-        lineObstacles?: any[]
+        lineObstacles?: LineObstacle[]
     ): OneBendPathResult | null {
         const path = [source, target];
 
@@ -128,7 +128,7 @@ export class OneBendVisibilityGraph {
         source: Point,
         target: Point,
         obstacles: Rectangle[],
-        lineObstacles?: any[]
+        lineObstacles?: LineObstacle[]
     ): OneBendPathResult | null {
         // 尝试两种弯折方向
         const hFirst = this.tryHorizontalFirst(source, target, obstacles, lineObstacles);
@@ -149,7 +149,7 @@ export class OneBendVisibilityGraph {
         source: Point,
         target: Point,
         obstacles: Rectangle[],
-        lineObstacles?: any[]
+        lineObstacles?: LineObstacle[]
     ): OneBendPathResult | null {
         const bendPoint: Point = { x: target.x, y: source.y };
 
@@ -185,7 +185,7 @@ export class OneBendVisibilityGraph {
         source: Point,
         target: Point,
         obstacles: Rectangle[],
-        lineObstacles?: any[]
+        lineObstacles?: LineObstacle[]
     ): OneBendPathResult | null {
         const bendPoint: Point = { x: source.x, y: target.y };
 
@@ -243,7 +243,7 @@ export function tryOneBendPath(
     target: Point,
     obstacles: Rectangle[],
     config?: OneBendConfig,
-    lineObstacles?: any[]
+    lineObstacles?: LineObstacle[]
 ): Point[] | null {
     const optimizer = new OneBendVisibilityGraph(config);
     const result = optimizer.findPath(source, target, obstacles, lineObstacles);

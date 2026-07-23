@@ -51,7 +51,7 @@ export const CONFIG_DEFINITIONS: Record<string, ConfigDefinition> = {
     key: 'theme.mode',
     defaultValue: 'light',
     description: '主题模式',
-    validator: (value: string) => ['light', 'dark', 'auto'].includes(value),
+    validator: (value: unknown) => typeof value === 'string' && ['light', 'dark', 'auto'].includes(value),
     persistent: true,
     group: 'theme'
   },
@@ -59,7 +59,7 @@ export const CONFIG_DEFINITIONS: Record<string, ConfigDefinition> = {
     key: 'theme.primaryColor',
     defaultValue: '#1890ff',
     description: '主色调',
-    validator: (value: string) => /^#[0-9A-Fa-f]{6}$/.test(value),
+    validator: (value: unknown) => typeof value === 'string' && /^#[0-9A-Fa-f]{6}$/.test(value),
     persistent: true,
     group: 'theme'
   },
@@ -75,7 +75,7 @@ export const CONFIG_DEFINITIONS: Record<string, ConfigDefinition> = {
     key: 'theme.currentId',
     defaultValue: '',
     description: '当前选择的主题 ID',
-    validator: (value: string) => typeof value === 'string',
+    validator: (value: unknown) => typeof value === 'string',
     persistent: true,
     group: 'theme'
   },
@@ -84,7 +84,7 @@ export const CONFIG_DEFINITIONS: Record<string, ConfigDefinition> = {
     key: 'theme.customThemes',
     defaultValue: [],
     description: '用户自定义主题列表',
-    validator: (value: any) => Array.isArray(value),
+    validator: (value: unknown) => Array.isArray(value),
     persistent: true,
     group: 'theme'
   },
@@ -93,7 +93,7 @@ export const CONFIG_DEFINITIONS: Record<string, ConfigDefinition> = {
     key: 'theme.presets',
     defaultValue: {},
     description: '主题预设集合',
-    validator: (value: any) => value !== null && typeof value === 'object' && !Array.isArray(value),
+    validator: (value: unknown) => value !== null && typeof value === 'object' && !Array.isArray(value),
     persistent: true,
     group: 'theme'
   },
@@ -102,7 +102,7 @@ export const CONFIG_DEFINITIONS: Record<string, ConfigDefinition> = {
     key: 'theme.domainAugmentationEnabled',
     defaultValue: false,
     description: '启用域主题增强（域颜色与样式联动）',
-    validator: (value: boolean) => typeof value === 'boolean',
+    validator: (value: unknown) => typeof value === 'boolean',
     persistent: true,
     group: 'theme'
   },
@@ -112,7 +112,7 @@ export const CONFIG_DEFINITIONS: Record<string, ConfigDefinition> = {
     key: 'layout.spacing.node',
     defaultValue: 100,
     description: '节点间距',
-    validator: (value: number) => Number.isFinite(value) && value > 0 && value <= 500,
+    validator: (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 500,
     persistent: true,
     group: 'layout'
   },
@@ -120,7 +120,7 @@ export const CONFIG_DEFINITIONS: Record<string, ConfigDefinition> = {
     key: 'layout.spacing.level',
     defaultValue: 150,
     description: '层级间距',
-    validator: (value: number) => Number.isFinite(value) && value > 0 && value <= 500,
+    validator: (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 500,
     persistent: true,
     group: 'layout'
   },
@@ -128,7 +128,7 @@ export const CONFIG_DEFINITIONS: Record<string, ConfigDefinition> = {
     key: 'layout.spacing.domain',
     defaultValue: 200,
     description: '域间距',
-    validator: (value: number) => Number.isFinite(value) && value > 0 && value <= 500,
+    validator: (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 500,
     persistent: true,
     group: 'layout'
   },
@@ -136,7 +136,7 @@ export const CONFIG_DEFINITIONS: Record<string, ConfigDefinition> = {
     key: 'layout.containmentPolicy',
     defaultValue: 'elastic',
     description: '域包含策略 (strict, soft, elastic)',
-    validator: (value: string) => ['strict', 'soft', 'elastic'].includes(value),
+    validator: (value: unknown) => typeof value === 'string' && ['strict', 'soft', 'elastic'].includes(value),
     persistent: true,
     group: 'layout'
   },
@@ -144,7 +144,7 @@ export const CONFIG_DEFINITIONS: Record<string, ConfigDefinition> = {
     key: 'layout.rankMode',
     defaultValue: 'elk',
     description: '层级排序模式 (elk, dagre_like)',
-    validator: (value: string) => ['elk', 'dagre_like'].includes(value),
+    validator: (value: unknown) => typeof value === 'string' && ['elk', 'dagre_like'].includes(value),
     persistent: true,
     group: 'layout'
   },
@@ -161,7 +161,7 @@ export const CONFIG_DEFINITIONS: Record<string, ConfigDefinition> = {
     key: 'performance.maxNodes',
     defaultValue: 1000,
     description: '最大节点数',
-    validator: (value: number) => Number.isFinite(value) && value > 0 && value <= 10000,
+    validator: (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 10000,
     persistent: true,
     group: 'performance'
   },
@@ -171,7 +171,7 @@ export const CONFIG_DEFINITIONS: Record<string, ConfigDefinition> = {
     key: 'export.defaultFormat',
     defaultValue: 'png',
     description: '默认导出格式',
-    validator: (value: string) => ['png', 'jpg', 'svg', 'pdf'].includes(value),
+    validator: (value: unknown) => typeof value === 'string' && ['png', 'jpg', 'svg', 'pdf'].includes(value),
     persistent: true,
     group: 'export'
   },
@@ -179,7 +179,7 @@ export const CONFIG_DEFINITIONS: Record<string, ConfigDefinition> = {
     key: 'export.quality',
     defaultValue: 1.0,
     description: '导出质量',
-    validator: (value: number) => Number.isFinite(value) && value > 0 && value <= 3,
+    validator: (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 3,
     persistent: true,
     group: 'export'
   },

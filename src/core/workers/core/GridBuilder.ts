@@ -11,6 +11,12 @@ import type { SpatialIndex } from '../../algorithms/SpatialIndex';
 import type { UnifiedRoutingConfig } from '../../types/routing';
 import { logGridBuilderMassiveGrid } from '../../utils/routingLogging';
 
+type RoutingRectangle = Rectangle & {
+    id?: string;
+    padding?: number;
+    isSoftZone?: boolean;
+};
+
 export class GridBuilder {
     private config: UnifiedRoutingConfig;
 
@@ -41,7 +47,8 @@ export class GridBuilder {
         let maxX_raw = Math.max(bounds.startX, bounds.endX) + GRID_PADDING;
         let maxY_raw = Math.max(bounds.startY, bounds.endY) + GRID_PADDING;
 
-        const isSpatialIndex = (obs: any): obs is SpatialIndex => typeof (obs as SpatialIndex).query === 'function';
+        const isSpatialIndex = (obs: Rectangle[] | SpatialIndex): obs is SpatialIndex =>
+            typeof (obs as SpatialIndex).query === 'function';
         let relevantObstacles: Rectangle[];
 
         if (isSpatialIndex(obstacles)) {
@@ -63,7 +70,7 @@ export class GridBuilder {
             // Expand bounds to fully enclose any obstacle that touches our initial grid
             for (const obs of relevantObstacles) {
                 // Skip source/target node to prevent over-expansion or weird behavior
-                const nodeObs = obs as any;
+                const nodeObs = obs as RoutingRectangle;
                 if (nodeObs.id && (nodeObs.id === sourceId || nodeObs.id === targetId)) continue;
 
                 const intersects = !(obs.x > maxX_raw || obs.x + obs.width < minX_raw || obs.y > maxY_raw || obs.y + obs.height < minY_raw);
@@ -124,7 +131,7 @@ export class GridBuilder {
         sourceId?: string,
         targetId?: string
     ): void {
-        const isSpatialIndex = (obs: any): obs is SpatialIndex =>
+        const isSpatialIndex = (obs: Rectangle[] | SpatialIndex): obs is SpatialIndex =>
             typeof (obs as SpatialIndex).query === 'function';
 
         const bufferDistanceClose = gridSize * 1.0;
@@ -147,7 +154,7 @@ export class GridBuilder {
 
         // Rasterize each obstacle with graduated buffer zones
         for (const obs of relevantObstacles) {
-            const nodeObs = obs as any;
+            const nodeObs = obs as RoutingRectangle;
             if (nodeObs.id && (nodeObs.id === sourceId || nodeObs.id === targetId)) {
                 // Buffer = 0 (no padding), Cost = OBSTACLE
                 this.rasterizeRect(obs, 0, this.config.costs.obstacle, costs, minX, minY, cols, rows, gridSize);
