@@ -5,6 +5,7 @@ import { autoMindMapLayout, calculateSummaryGeometry, calculateSubtreeBounds } f
 import { MIND_MAP_PALETTE } from './mindMapOrchestratorCommands';
 
 const PALETTE = MIND_MAP_PALETTE;
+type SummaryBracket = { minY: number; maxY: number; dir: string };
 
 export function createMindMapLayoutSignature(nodes: Node[], edges: Edge[]): string {
     const structHashParts: string[] = [];
@@ -61,7 +62,7 @@ export function useMindMapAutoLayout(
             edgeMap.set(`${e.source}->${e.target}`, e);
         }
 
-        const nodeUpdates = new Map<string, any>();
+        const nodeUpdates = new Map<string, Record<string, unknown>>();
         const newPositions = new Map<string, { x: number, y: number }>();
         const nodesToHide = new Set<string>();
         const edgesToHide = new Set<string>();
@@ -160,7 +161,7 @@ export function useMindMapAutoLayout(
 
         // --- Pass 3: Summary Node Calculation ---
         const summaryNodes = nodes.filter(n => n.data?.isSummary);
-        const summaryUpdates = new Map<string, { x: number, y: number, bracket?: any }>();
+        const summaryUpdates = new Map<string, { x: number, y: number, bracket?: SummaryBracket }>();
         const firstRoot = rootNodes[0];
         const globalDir = firstRoot?.data?.direction as string || 'LR';
 

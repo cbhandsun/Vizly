@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo, useEffect, useState, useCallback, memo } from 'react';
-import { Node, Edge, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
+import { Node, Edge, applyNodeChanges, applyEdgeChanges, type NodeTypes } from '@xyflow/react';
 import BaseReactFlow from '../../shared/BaseReactFlow';
 import { useFlowStyles } from '../../../hooks/useFlowStyles';
 import CustomNode from '../../custom-nodes/CustomNode';
@@ -67,11 +67,11 @@ export interface EnhancedBaseDiagramProps extends Omit<DiagramComponentProps, 'c
   configIntegration?: ConfigIntegration;
   themeId?: string;
   enablePerformanceOptimization?: boolean;
-  onConfigChange?: (key: string, value: any) => void;
+  onConfigChange?: (key: string, value: unknown) => void;
   onThemeChange?: (theme: Theme) => void;
 }
 
-const nodeTypes: any = {
+const nodeTypes: NodeTypes = {
   custom: CustomNode,
   titleGroup: TitleGroupNode,
   subGroup: SubGroupNode,

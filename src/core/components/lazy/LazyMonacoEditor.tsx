@@ -5,7 +5,7 @@
 
 import { lazy, Suspense, useState, useEffect } from 'react';
 import { Spin } from 'antd';
-import { loader } from '@monaco-editor/react';
+import { loader, type EditorProps } from '@monaco-editor/react';
 import { logLazyMonacoCdnRaceFailure } from '../shared/componentFallbackLogging';
 
 // 移除全量本地引用，使得打包彻底瘦身 4MB！
@@ -45,17 +45,8 @@ const probeMonacoCdn = async (cdn: string): Promise<string> => {
     }
 };
 
-export interface LazyMonacoEditorProps {
-    value?: string;
-    defaultValue?: string;
-    language?: string;
-    theme?: string;
-    onChange?: (value: string | undefined) => void;
-    options?: any;
-    height?: string | number;
-    width?: string | number;
+export interface LazyMonacoEditorProps extends Omit<EditorProps, 'loading'> {
     loading?: React.ReactNode;
-    [key: string]: any;
 }
 
 export const LazyMonacoEditor: React.FC<LazyMonacoEditorProps> = ({

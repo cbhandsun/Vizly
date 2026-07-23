@@ -48,7 +48,7 @@ export default function MindMapYjsIntegration() {
         }
 
         // Listen to local mindmap operations
-        const handleLocalOperation = (_operation: any) => {
+        const handleLocalOperation = (_operation: unknown) => {
             if (isRemoteUpdating.current) return;
             try {
                 const currentData = serializeLocalMindMapYjsData(instance.getData());
@@ -64,7 +64,7 @@ export default function MindMapYjsIntegration() {
         instance.bus.addListener('operation', handleLocalOperation);
 
         // Listen to remote changes
-        const handleRemoteChange = (event: Y.YMapEvent<any>) => {
+        const handleRemoteChange = (event: Y.YMapEvent<unknown>) => {
             if (event.transaction.local) return; // Ignore our own changes
 
             if (event.keysChanged.has('nodeData')) {

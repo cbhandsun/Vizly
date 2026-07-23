@@ -31,10 +31,10 @@ interface PropertyPanelProps {
 }
 
 // Debounce实用函数
-function useDebouncedCallback<T extends (...args: any[]) => void>(
-    callback: T,
+function useDebouncedCallback<TArgs extends unknown[]>(
+    callback: (...args: TArgs) => void,
     delay: number
-): T {
+): (...args: TArgs) => void {
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     const callbackRef = useRef(callback);
 
@@ -42,10 +42,10 @@ function useDebouncedCallback<T extends (...args: any[]) => void>(
         callbackRef.current = callback;
     }, [callback]);
 
-    const debouncedCallback = useCallback((...args: any[]) => {
+    const debouncedCallback = useCallback((...args: TArgs) => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         timeoutRef.current = setTimeout(() => callbackRef.current(...args), delay);
-    }, [delay]) as T;
+    }, [delay]);
 
     useEffect(() => () => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);

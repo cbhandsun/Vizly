@@ -1,10 +1,17 @@
 import { useState, useMemo } from 'react';
 import { Node, Edge } from '@xyflow/react';
+import type { QuickConnectOption } from '../QuickConnectMenu';
+
+interface QuickAddMenuState {
+    visible: boolean;
+    sourceNodeId?: string;
+    sourceHandleId?: string | null;
+}
 
 export interface UseDesignerGhostNodesProps {
     layerSyncedNodes: Node[];
     enhancedEdges: Edge[];
-    quickAddMenu: any;
+    quickAddMenu: QuickAddMenuState | null;
     getFlowPosition: () => { x: number; y: number };
 }
 
@@ -14,7 +21,7 @@ export function useDesignerGhostNodes({
     quickAddMenu,
     getFlowPosition
 }: UseDesignerGhostNodesProps) {
-    const [quickConnectPreview, setQuickConnectPreview] = useState<any | null>(null);
+    const [quickConnectPreview, setQuickConnectPreview] = useState<QuickConnectOption | null>(null);
 
     const nodesWithGhost = useMemo(() => {
         if (!quickAddMenu?.visible || !quickConnectPreview) return layerSyncedNodes;

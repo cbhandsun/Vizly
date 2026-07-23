@@ -265,13 +265,13 @@ const MindElixirToolbar: React.FC = () => {
         if (!mind) return;
         try {
             if (_isFocused) {
-                (mind as any).cancelFocus?.();
+                (mind as typeof mind & { cancelFocus?: () => void }).cancelFocus?.();
                 _isFocused = false;
             } else {
                 // Focus on currently selected node or root
                 const tpcEl = mind.currentNode ?? mind.findEle(mind.getData().nodeData.id);
                 if (tpcEl) {
-                    (mind as any).focusNode?.(tpcEl);
+                    (mind as typeof mind & { focusNode?: (node: Element) => void }).focusNode?.(tpcEl);
                     _isFocused = true;
                 }
             }
