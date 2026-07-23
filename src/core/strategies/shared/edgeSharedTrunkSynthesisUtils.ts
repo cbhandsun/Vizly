@@ -3,6 +3,10 @@ import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 export type Point = { x: number; y: number };
 export type Rect = { x: number; y: number; width: number; height: number };
 export type Side = 'top' | 'bottom' | 'left' | 'right';
+type PositionedNode = ReactFlowNode & {
+  positionAbsolute?: Point;
+  computed?: { positionAbsolute?: Point };
+};
 
 export const EPS = 0.5;
 export const MIN_BRANCH_SPAN = 24;
@@ -45,25 +49,29 @@ function absoluteNodePosition(
   nodeById?: Map<string, ReactFlowNode>,
 ): Point {
   if (!node) return { x: 0, y: 0 };
-  const explicit = (node as any).positionAbsolute ?? (node as any).computed?.positionAbsolute;
+  const positionedNode = node as PositionedNode;
+  const explicit = positionedNode.positionAbsolute ?? positionedNode.computed?.positionAbsolute;
   if (explicit) {
     return {
-      x: num((explicit as any).x, 0),
-      y: num((explicit as any).y, 0),
+      x: num(explicit.x, 0),
+      y: num(explicit.y, 0),
     };
   }
 
-  let x = num((node.position as any)?.x, 0);
-  let y = num((node.position as any)?.y, 0);
+  let x = num(node.position.x, 0);
+  let y = num(node.position.y, 0);
   let current = node;
   const seen = new Set<string>();
   while (nodeById && current.parentId && !seen.has(current.parentId)) {
     seen.add(current.parentId);
     const parent = nodeById.get(current.parentId);
     if (!parent) break;
-    const parentPosition = (parent as any).positionAbsolute ?? (parent as any).computed?.positionAbsolute ?? parent.position;
-    x += num((parentPosition as any)?.x, 0);
-    y += num((parentPosition as any)?.y, 0);
+    const positionedParent = parent as PositionedNode;
+    const parentPosition = positionedParent.positionAbsolute
+      ?? positionedParent.computed?.positionAbsolute
+      ?? parent.position;
+    x += num(parentPosition.x, 0);
+    y += num(parentPosition.y, 0);
     current = parent;
   }
   return { x, y };
@@ -75,8 +83,8 @@ export function nodeRect(
 ): Rect | null {
   if (!node) return null;
   const position = absoluteNodePosition(node, nodeById);
-  const width = num((node as any).measured?.width ?? node.width ?? (node.style as any)?.width, 0);
-  const height = num((node as any).measured?.height ?? node.height ?? (node.style as any)?.height, 0);
+  const width = num(node.measured?.width ?? node.width ?? node.style?.width, 0);
+  const height = num(node.measured?.height ?? node.height ?? node.style?.height, 0);
   if (width <= 1 || height <= 1) return null;
   return {
     x: position.x,

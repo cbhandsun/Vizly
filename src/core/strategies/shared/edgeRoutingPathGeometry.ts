@@ -3,6 +3,13 @@ import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 export type EdgeRoutingPoint = { x: number; y: number };
 export type EdgeRoutingSegment = { a: EdgeRoutingPoint; b: EdgeRoutingPoint };
 export type EdgeRoutingRect = { x: number; y: number; width: number; height: number };
+type PositionedRoutingNode = ReactFlowNode & { positionAbsolute?: EdgeRoutingPoint };
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
 
 export const finiteNumberOrFallback = (value: unknown, fallback: number): number => (
   typeof value === 'number' && isFinite(value) ? value : fallback
@@ -15,8 +22,8 @@ export function computeAbsolutePosition(
   node: ReactFlowNode,
   nodeMap: Map<string, ReactFlowNode>,
 ): { x: number; y: number } {
-  let x = (node.position as any)?.x ?? 0;
-  let y = (node.position as any)?.y ?? 0;
+  let x = node.position.x ?? 0;
+  let y = node.position.y ?? 0;
   let current = node;
   let depth = 0;
   const visited = new Set<string>();
@@ -26,8 +33,8 @@ export function computeAbsolutePosition(
     if (visited.has(current.parentId)) break;
     const parent = nodeMap.get(current.parentId);
     if (!parent) break;
-    x += (parent.position as any)?.x ?? 0;
-    y += (parent.position as any)?.y ?? 0;
+    x += parent.position.x ?? 0;
+    y += parent.position.y ?? 0;
     visited.add(parent.id);
     current = parent;
     depth++;
@@ -43,13 +50,13 @@ export function setAbsolutePositions(nodes: ReactFlowNode[]): void {
   const nodeMap = new Map<string, ReactFlowNode>(nodes.map(node => [node.id, node] as const));
   for (const node of nodes) {
     const absolutePosition = computeAbsolutePosition(node, nodeMap);
-    (node as any).positionAbsolute = absolutePosition;
+    (node as PositionedRoutingNode).positionAbsolute = absolutePosition;
   }
 }
 
 /** Handle 方向到锚点的映射。 */
 export function handleToAnchor(
-  position: any,
+  position: EdgeRoutingPoint,
   width: number,
   height: number,
   handle: string | null | undefined,
@@ -77,11 +84,14 @@ export function handleToAnchor(
   }
 }
 
-export function getEdgePath(edge: any): EdgeRoutingPoint[] {
-  const raw = edge?.data?.computedPath || edge?.data?.elkPath || [];
+export function getEdgePath(edge: Edge): EdgeRoutingPoint[] {
+  const raw = edge.data?.computedPath || edge.data?.elkPath || [];
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((point: any) => ({ x: Number(point?.x), y: Number(point?.y) }))
+    .map(point => {
+      const candidate = asRecord(point);
+      return { x: Number(candidate.x), y: Number(candidate.y) };
+    })
     .filter((point: EdgeRoutingPoint) => Number.isFinite(point.x) && Number.isFinite(point.y));
 }
 
@@ -198,9 +208,10 @@ export function withComputedPath(
   path: EdgeRoutingPoint[],
   flags: Record<string, unknown> = {},
 ): Edge {
-  const data: any = { ...(edge.data || {}), ...flags, computedPath: path };
-  if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-    data.treeRouting = { ...data.treeRouting, points: path };
+  const data: Record<string, unknown> = { ...(edge.data || {}), ...flags, computedPath: path };
+  const treeRouting = asRecord(data.treeRouting);
+  if (Array.isArray(treeRouting.points)) {
+    data.treeRouting = { ...treeRouting, points: path };
   }
   return { ...edge, data };
 }
@@ -217,9 +228,7 @@ export function lockComputedPathsForDisplay(edges: Edge[]): Edge[] {
         computedPath: path,
         layoutPathLocked: true,
         runtimeHandleLock: {
-          ...((((edge.data as any)?.runtimeHandleLock) && typeof (edge.data as any).runtimeHandleLock === 'object')
-            ? (edge.data as any).runtimeHandleLock
-            : {}),
+          ...asRecord(edge.data?.runtimeHandleLock),
           source: true,
           target: true,
         },
@@ -342,13 +351,14 @@ export function getRoutingObstacles(nodes: ReactFlowNode[]): Map<string, EdgeRou
   const ignoredTypes = new Set(['titleGroup', 'subGroup', 'group', 'domain']);
   for (const node of nodes) {
     if (ignoredTypes.has(String(node.type || ''))) continue;
-    const position = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
+    const positionedNode = node as PositionedRoutingNode;
+    const position = positionedNode.positionAbsolute ?? node.position;
     const width = finiteNumberOrFallback(
-      (node as any).measured?.width ?? node.width ?? (node.style as any)?.width,
+      node.measured?.width ?? node.width ?? node.style?.width,
       100,
     );
     const height = finiteNumberOrFallback(
-      (node as any).measured?.height ?? node.height ?? (node.style as any)?.height,
+      node.measured?.height ?? node.height ?? node.style?.height,
       60,
     );
     result.set(node.id, { x: position.x, y: position.y, width, height });

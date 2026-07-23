@@ -18,16 +18,27 @@ import { createRoutingObstacleEvaluationContext } from './edgeWaypointCandidateR
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
 type Side = 'top' | 'bottom' | 'left' | 'right';
+type PositionedNode = ReactFlowNode & { positionAbsolute?: Point };
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
 
 const EPS = 0.5;
 const MAX_RESTORE_CANDIDATES = 8;
 const MAX_SIDE_BYPASS_CANDIDATES = 12;
 
 function getEdgePath(edge: Edge): Point[] {
-  const raw = (edge.data as any)?.computedPath || (edge.data as any)?.treeRouting?.points || (edge.data as any)?.elkPath || [];
+  const treeRouting = asRecord(edge.data?.treeRouting);
+  const raw = edge.data?.computedPath || treeRouting.points || edge.data?.elkPath || [];
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((point: any) => ({ x: Number(point?.x), y: Number(point?.y) }))
+    .map(point => {
+      const candidate = asRecord(point);
+      return { x: Number(candidate.x), y: Number(candidate.y) };
+    })
     .filter((point: Point) => Number.isFinite(point.x) && Number.isFinite(point.y));
 }
 
@@ -83,13 +94,13 @@ const num = (value: unknown, fallback: number): number => (
 
 function getNodeRect(node: ReactFlowNode | undefined): Rect | null {
   if (!node) return null;
-  const position = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-  const width = num((node as any).measured?.width ?? node.width ?? (node.style as any)?.width, 0);
-  const height = num((node as any).measured?.height ?? node.height ?? (node.style as any)?.height, 0);
+  const position = (node as PositionedNode).positionAbsolute ?? node.position;
+  const width = num(node.measured?.width ?? node.width ?? node.style?.width, 0);
+  const height = num(node.measured?.height ?? node.height ?? node.style?.height, 0);
   if (width <= 1 || height <= 1) return null;
   return {
-    x: num((position as any).x, 0),
-    y: num((position as any).y, 0),
+    x: num(position.x, 0),
+    y: num(position.y, 0),
     width,
     height,
   };
@@ -341,14 +352,15 @@ function resolveRawTerminalHandle(
 }
 
 function withRawPathCandidate(edge: Edge, rawEdge: Edge, path: Point[], sourceHandle?: Side): Edge {
-  const data: any = {
+  const data: Record<string, unknown> = {
     ...(edge.data || {}),
     computedPath: path,
     readableRawPathRestored: true,
-    runtimeHandleLock: (rawEdge.data as any)?.runtimeHandleLock,
+    runtimeHandleLock: rawEdge.data?.runtimeHandleLock,
   };
-  if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-    data.treeRouting = { ...data.treeRouting, points: path };
+  const treeRouting = asRecord(data.treeRouting);
+  if (Array.isArray(treeRouting.points)) {
+    data.treeRouting = { ...treeRouting, points: path };
   }
   if (data.runtimeHandleLock === undefined) delete data.runtimeHandleLock;
   return {

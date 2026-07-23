@@ -9,6 +9,13 @@ import {
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
 type Axis = 'h' | 'v';
+type PositionedNode = ReactFlowNode & { positionAbsolute?: Point };
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
 
 const EPS = 0.5;
 const HAIRPIN_BRIDGE = 140;
@@ -29,13 +36,17 @@ function finiteNumber(value: unknown, fallback = 0): number {
 }
 
 function getPath(edge: Edge): Point[] {
-  const raw = (edge.data as any)?.computedPath
-    || (edge.data as any)?.treeRouting?.points
-    || (edge.data as any)?.elkPath
+  const treeRouting = asRecord(edge.data?.treeRouting);
+  const raw = edge.data?.computedPath
+    || treeRouting.points
+    || edge.data?.elkPath
     || [];
   if (!Array.isArray(raw)) return [];
   return compactPath(raw
-    .map((point: any) => ({ x: Number(point?.x), y: Number(point?.y) }))
+    .map(point => {
+      const candidate = asRecord(point);
+      return { x: Number(candidate.x), y: Number(candidate.y) };
+    })
     .filter((point: Point) => Number.isFinite(point.x) && Number.isFinite(point.y)));
 }
 
@@ -82,13 +93,13 @@ function allSegmentsOrthogonal(path: Point[]): boolean {
 }
 
 function nodeRect(node: ReactFlowNode): Rect | null {
-  const position = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-  const width = finiteNumber((node as any).measured?.width ?? node.width ?? (node.style as any)?.width);
-  const height = finiteNumber((node as any).measured?.height ?? node.height ?? (node.style as any)?.height);
+  const position = (node as PositionedNode).positionAbsolute ?? node.position;
+  const width = finiteNumber(node.measured?.width ?? node.width ?? node.style?.width);
+  const height = finiteNumber(node.measured?.height ?? node.height ?? node.style?.height);
   if (width <= 1 || height <= 1) return null;
   return {
-    x: finiteNumber((position as any).x),
-    y: finiteNumber((position as any).y),
+    x: finiteNumber(position.x),
+    y: finiteNumber(position.y),
     width,
     height,
   };
@@ -105,9 +116,14 @@ function routingObstacles(nodes: ReactFlowNode[]): Map<string, Rect> {
 }
 
 function withComputedPath(edge: Edge, path: Point[]): Edge {
-  const data = { ...(edge.data || {}), computedPath: path, hairpinBridgeWidened: true } as any;
-  if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-    data.treeRouting = { ...data.treeRouting, points: path };
+  const data: Record<string, unknown> = {
+    ...(edge.data || {}),
+    computedPath: path,
+    hairpinBridgeWidened: true,
+  };
+  const treeRouting = asRecord(data.treeRouting);
+  if (Array.isArray(treeRouting.points)) {
+    data.treeRouting = { ...treeRouting, points: path };
   }
   return { ...edge, data };
 }
