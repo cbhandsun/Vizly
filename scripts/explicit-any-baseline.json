@@ -133,7 +133,6 @@
     "src/core/strategies/DomainDagreEdgePreparation.ts": 90,
     "src/core/strategies/DomainDagreLayoutStrategy.ts": 30,
     "src/core/strategies/DomainElkLayoutStrategy.ts": 56,
-    "src/core/strategies/DomainHorizontalLayoutStrategy.ts": 258,
     "src/core/strategies/DomainVerticalLayoutStrategy.ts": 70,
     "src/core/strategies/nodeLayoutStrategy/DagreLayoutStrategy.ts": 9,
     "src/core/strategies/shared/LayoutRefinement.ts": 9,
