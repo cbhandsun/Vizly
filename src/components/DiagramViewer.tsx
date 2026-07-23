@@ -136,13 +136,6 @@ const DiagramViewer: React.FC = () => {
         enabled: isCollabEnabled
     });
 
-    // Provide client ID to window for UI badge tracking
-    useEffect(() => {
-        if (provider?.awareness?.clientID) {
-            (window as any)._yjsClientId = provider.awareness.clientID;
-        }
-    }, [provider?.awareness?.clientID]);
-
     const { saveToCloud, shareDialogOpen, closeShareDialog, ensureSaved } = useCloudSave(selectedDiagramId);
     
     // --- Phase 6: Mermaid Import Logic ---

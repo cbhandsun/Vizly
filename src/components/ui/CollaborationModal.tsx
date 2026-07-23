@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { Modal, Input, Button, List, Typography, Badge, Avatar } from 'antd';
 import { CopyOutlined, TeamOutlined } from '@ant-design/icons';
 import { buildCollaborationShareUrl } from './collaborationUrl';
+import type { ActiveCollaborator } from '../diagrams/collaboration/YjsProviderHooks';
 
 export interface CollaborationModalProps {
     open: boolean;
     onClose: () => void;
-    activeUsers: any[];
+    activeUsers: ActiveCollaborator[];
     roomName: string;
 }
 
@@ -90,7 +91,7 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({
                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                         {item.user?.name || 'Unknown User'}
                                     </span>
-                                    {item.clientId === (window as any)._yjsClientId && (
+                                    {item.isLocal && (
                                         <Badge count="你" style={{ backgroundColor: '#52c41a' }} />
                                     )}
                                 </div>
