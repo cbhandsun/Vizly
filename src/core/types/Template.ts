@@ -44,8 +44,8 @@ export interface DiagramTemplate {
 
     // 模板数据
     diagramData: {
-        nodes: any[];                    // 节点数据（使用any以兼容不同节点类型）
-        edges: any[];                    // 边数据
+        nodes: unknown[];                // 节点数据（由消费边界解析为具体节点类型）
+        edges: unknown[];                // 边数据（由消费边界解析为具体边类型）
         viewport?: {                     // 视口位置（可选）
             x: number;
             y: number;
