@@ -1,11 +1,20 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
+import type { Node, XYPosition } from '@xyflow/react';
 import { clampDiagramFullFitZoom, MIN_DIAGRAM_FULL_FIT_ZOOM } from './diagramControlFit';
 import { logDiagramControlBridgeFailure } from './diagramControlLogging';
 
 interface DiagramControlBridgeProps {
   diagramId?: string;
 }
+
+const getAbsoluteNodePosition = (node: Node): XYPosition | undefined => {
+  const positionedNode = node as Node & {
+    positionAbsolute?: XYPosition;
+    computed?: { positionAbsolute?: XYPosition };
+  };
+  return positionedNode.positionAbsolute ?? positionedNode.computed?.positionAbsolute;
+};
 
 // 统一桥接：监听标题栏/外层触发的视图控制事件，并作用于当前图的 ReactFlow 实例
 const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }) => {
@@ -30,12 +39,13 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
 
   // 将React Flow实例暴露到window对象，方便调试
   useEffect(() => {
+    const runtimeWindow = window as Window & { reactFlowInstance?: typeof rf };
     if (rf) {
-      (window as any).reactFlowInstance = rf;
+      runtimeWindow.reactFlowInstance = rf;
     }
     return () => {
-      if ((window as any).reactFlowInstance === rf) {
-        delete (window as any).reactFlowInstance;
+      if (runtimeWindow.reactFlowInstance === rf) {
+        delete runtimeWindow.reactFlowInstance;
       }
     };
   }, [rf]);
@@ -100,7 +110,7 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           nodes.forEach((n) => {
             const w = (n.width as number) ?? (n.style?.width as number) ?? 220;
             const h = (n.height as number) ?? (n.style?.height as number) ?? 120;
-            const abs = (n as any).positionAbsolute ?? (n as any).computed?.positionAbsolute;
+            const abs = getAbsoluteNodePosition(n);
             let xVal = abs?.x;
             let yVal = abs?.y;
             if (typeof xVal !== 'number' || isNaN(xVal) || !isFinite(xVal) || typeof yVal !== 'number' || isNaN(yVal) || !isFinite(yVal)) {
@@ -240,7 +250,7 @@ const DiagramControlBridge: React.FC<DiagramControlBridgeProps> = ({ diagramId }
           nodes.forEach((n) => {
             const w = (n.width as number) ?? (n.style?.width as number) ?? 220;
             const h = (n.height as number) ?? (n.style?.height as number) ?? 120;
-            const abs = (n as any).positionAbsolute ?? (n as any).computed?.positionAbsolute;
+            const abs = getAbsoluteNodePosition(n);
             let xVal = abs?.x;
             let yVal = abs?.y;
             if (typeof xVal !== 'number' || isNaN(xVal) || !isFinite(xVal) || typeof yVal !== 'number' || isNaN(yVal) || !isFinite(yVal)) {

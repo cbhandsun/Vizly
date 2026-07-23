@@ -25,18 +25,18 @@ import {
 import { exportRenderSceneToSvgDataUrl } from '../export/svgExport';
 
 // 防抖函数类型
-type DebouncedFunction<T extends (...args: any[]) => any> = {
-  callback: (...args: Parameters<T>) => void;
+type DebouncedFunction<TArgs extends unknown[]> = {
+  callback: (...args: TArgs) => void;
   cancel: () => void;
 };
 
 /**
  * 创建防抖函数
  */
-function useDebounce<T extends (...args: any[]) => any>(
-  func: T,
+function useDebounce<TArgs extends unknown[]>(
+  func: (...args: TArgs) => unknown,
   delay: number
-): DebouncedFunction<T> {
+): DebouncedFunction<TArgs> {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const cancel = useCallback(() => {
@@ -46,7 +46,7 @@ function useDebounce<T extends (...args: any[]) => any>(
     }
   }, []);
 
-  const callback = useCallback((...args: Parameters<T>) => {
+  const callback = useCallback((...args: TArgs) => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
@@ -62,19 +62,19 @@ function useDebounce<T extends (...args: any[]) => any>(
 /**
  * 创建节流函数
  */
-function useThrottle<T extends (...args: any[]) => any>(
-  func: T,
+function useThrottle<TArgs extends unknown[], TResult>(
+  func: (...args: TArgs) => TResult,
   delay: number
-): T {
+): (...args: TArgs) => TResult | undefined {
   const lastCallRef = useRef<number>(0);
 
-  return useCallback((...args: Parameters<T>) => {
+  return useCallback((...args: TArgs) => {
     const now = Date.now();
     if (now - lastCallRef.current >= delay) {
       lastCallRef.current = now;
       return func(...args);
     }
-  }, [func, delay]) as T;
+  }, [func, delay]);
 }
 
 /**
@@ -123,7 +123,7 @@ export const useOptimizedDiagramControls = (
    * @param name 事件名：diagramExportStart / diagramExportComplete / diagramExportError
    * @param detail 附带数据：包含 diagramId、type 等
    */
-  const dispatchExportEvent = (name: string, detail: any) => {
+  const dispatchExportEvent = (name: string, detail: unknown) => {
     try {
       window.dispatchEvent(new CustomEvent(name, { detail }));
     } catch (error) {

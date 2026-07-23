@@ -14,6 +14,7 @@ import {
     ArrowDownOutlined
 } from '@ant-design/icons';
 import { NodeDataUpdate } from '../../types/diagram-updates';
+import type { ArrowTimelineEvent, ArrowTimelineNodeData } from './nodes/ArrowTimelineNode';
 
 interface ArrowTimelineEventsEditorProps {
     selectedNodes: Node[];
@@ -22,7 +23,7 @@ interface ArrowTimelineEventsEditorProps {
     disabled?: boolean;
 }
 
-const DEFAULT_ARROW_EVENTS = [
+const DEFAULT_ARROW_EVENTS: ArrowTimelineEvent[] = [
     { date: '2024.02.19', color: '#52c41a' },
     { date: '2024.04.07', color: '#a0d911' },
     { date: '2025.05.07', color: '#fadb14' },
@@ -43,11 +44,12 @@ export const ArrowTimelineEventsEditor: React.FC<ArrowTimelineEventsEditorProps>
 }) => {
     if (selectedNodes.length === 0) return null;
     const node = selectedNodes[0];
-    const events = (node.data as any).events && (node.data as any).events.length > 0
-        ? (node.data as any).events
+    const timelineData = node.data as unknown as ArrowTimelineNodeData;
+    const events = timelineData.events && timelineData.events.length > 0
+        ? timelineData.events
         : DEFAULT_ARROW_EVENTS;
 
-    const onChangeEvent = (index: number, field: string, value: any) => {
+    const onChangeEvent = (index: number, field: keyof ArrowTimelineEvent, value: string) => {
         armSnapshot();
         const newEvents = [...events];
         newEvents[index] = { ...newEvents[index], [field]: value };
@@ -75,11 +77,11 @@ export const ArrowTimelineEventsEditor: React.FC<ArrowTimelineEventsEditorProps>
 
     const onRemoveEvent = (index: number) => {
         armSnapshot();
-        const newEvents = events.filter((_: any, i: number) => i !== index);
+        const newEvents = events.filter((_, i) => i !== index);
         updateNodes({ events: newEvents });
     };
 
-    const variant = (node.data as any).variant || 'arrow';
+    const variant = timelineData.variant || 'arrow';
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 400, overflowY: 'auto', paddingRight: 4 }}>
@@ -95,7 +97,7 @@ export const ArrowTimelineEventsEditor: React.FC<ArrowTimelineEventsEditorProps>
                 <Radio.Button value="arrow" style={{ flex: 1, textAlign: 'center' }}>箭头序列</Radio.Button>
                 <Radio.Button value="dot" style={{ flex: 1, textAlign: 'center' }}>极简原点</Radio.Button>
             </Radio.Group>
-            {events.map((evt: any, i: number) => (
+            {events.map((evt, i) => (
                 <div key={i} style={{ border: '1px solid #f0f0f0', padding: 8, borderRadius: 6, position: 'relative' }}>
                     <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
                         <ColorPicker size="small" value={evt.color} onChange={(c) => onChangeEvent(i, 'color', c.toHexString())} disabled={disabled} />

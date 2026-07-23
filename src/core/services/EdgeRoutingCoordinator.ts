@@ -59,6 +59,23 @@ import { EdgeRoutingIncrementalState } from './edgeRoutingIncrementalState';
 import { EdgeRoutingResultContext } from './edgeRoutingResultContext';
 import { EdgeRoutingDebugState, refreshDebugRoutingRequestEndpoints } from './edgeRoutingDebugState';
 import { buildEdgeRoutingCacheParams } from './edgeRoutingCacheParams';
+import { coerceEdgeRoutingSnapshotNodes } from './edgeRoutingNodeChangeDetection';
+
+type RoutingDebugWindow = Window & {
+    __vizly_coordinator__?: EdgeRoutingCoordinator;
+    __vizly_routing__?: {
+        clearCache: () => void;
+        coordinator: () => EdgeRoutingCoordinator;
+    };
+};
+
+const finiteMetadataNumber = (
+    metadata: PathFindingResult['metadata'],
+    key: string
+): number | undefined => {
+    const value = metadata?.[key];
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+};
 
 /**
  * [P0-2] Main coordination service for edge routing.
@@ -180,7 +197,9 @@ export class EdgeRoutingCoordinator {
             EdgeRoutingCoordinator.instance = new EdgeRoutingCoordinator();
             // [DEBUG] Expose globally for console debugging
             // Usage: window.__vizly_coordinator__.forceClearAllCaches()
-            try { (window as any).__vizly_coordinator__ = EdgeRoutingCoordinator.instance; } catch {}
+            try {
+                (window as RoutingDebugWindow).__vizly_coordinator__ = EdgeRoutingCoordinator.instance;
+            } catch {}
         }
         return EdgeRoutingCoordinator.instance;
     }
@@ -374,7 +393,7 @@ export class EdgeRoutingCoordinator {
                 assignBusRoutingMetadata(fallbackJobs, fallbackGraph),
             assignSameSidePortSeparation: this.assignSameSidePortSeparation.bind(this),
             assignGlobalChannels: this.assignGlobalChannels.bind(this),
-            calculatePath: (job, currentGraph) => this.workerPool.calculatePath(job, currentGraph as any),
+            calculatePath: (job, currentGraph) => this.workerPool.calculatePath(job, currentGraph),
         });
     }
 
@@ -571,8 +590,8 @@ export class EdgeRoutingCoordinator {
                     cacheHit: false,
                     workerTime: result.metadata?.executionTime,
                     strategy: result.metadata?.strategy,
-                    bendCount: (result.metadata as any)?.bendCount,
-                    efficiencyRatio: (result.metadata as any)?.efficiencyRatio,
+                    bendCount: finiteMetadataNumber(result.metadata, 'bendCount'),
+                    efficiencyRatio: finiteMetadataNumber(result.metadata, 'efficiencyRatio'),
                 });
                 this.debugState.emitResult(request.edgeId, result, job, group.graph.config?.debug);
                 this.resultContext.storePath(request.edgeId, result, group.graphKey);
@@ -601,7 +620,9 @@ export class EdgeRoutingCoordinator {
      */
     public async routeIncremental(context: SharedGraphContext): Promise<Map<string, PathFindingResult>> {
         // [FIX C-9] 浣跨敤鐪熷疄鐨勮妭鐐瑰彉鍖栨娴嬶紙鍙栦唬鍘熸潵鐨勭┖鍑芥暟锛?
-        const changedNodeIds = this.incrementalState.detectChangedNodes(context.nodes as any[]);
+        const changedNodeIds = this.incrementalState.detectChangedNodes(
+            coerceEdgeRoutingSnapshotNodes(context.nodes)
+        );
         if (changedNodeIds.length > 0) {
             // 灏嗘娴嬪埌鐨勭Щ鍔ㄨ妭鐐规爣璁颁负 dirty锛屼娇澶栭儴鏃犻渶鎵嬪姩璋冪敤 markNodesChanged
             this.markNodesChanged(changedNodeIds);
@@ -787,7 +808,7 @@ export class EdgeRoutingCoordinator {
 
 // [DEV] Debug tools on window object (dev mode only)
 if (typeof window !== 'undefined' && import.meta.env.DEV) {
-    (window as any).__vizly_routing__ = {
+    (window as RoutingDebugWindow).__vizly_routing__ = {
         /** Clear all routing caches and force full re-route */
         clearCache: () => EdgeRoutingCoordinator.getInstance().clearAllCaches(),
         /** Get Coordinator instance */
