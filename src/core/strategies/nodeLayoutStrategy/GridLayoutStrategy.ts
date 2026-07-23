@@ -1,9 +1,37 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
+import type { ElkNode } from 'elkjs';
 import type { StandardNodeData } from '../../models/DiagramModels';
 import { diagramConfigManager } from '../../config/DiagramConfig';
 import type { LayoutOptions } from '../../types/layout';
 import { ILayoutStrategy } from '../LayoutStrategyManager';
 import { calculateGridLayout, applySubGrouping, assignChildrenToSubGroupsBySemantic, applyDomainGrouping, resolveSubGroupOverlaps, enforceDomainContainerStrictContainment, resolveDomainContainerOverlaps } from '../../utils/layoutUtils';
+
+type LayoutNode = ReactFlowNode<Record<string, unknown>>;
+const asRecord = (value: unknown): Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+const finiteNumber = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+const nodeX = (node: LayoutNode): number => finiteNumber(node.position.x, 0);
+const nodeY = (node: LayoutNode): number => finiteNumber(node.position.y, 0);
+const nodeWidth = (node: LayoutNode, fallback: number): number =>
+  finiteNumber(node.measured?.width ?? node.style?.width ?? node.width, fallback);
+const nodeHeight = (node: LayoutNode, fallback: number): number =>
+  finiteNumber(node.measured?.height ?? node.style?.height ?? node.height, fallback);
+const nodeChildren = (node: LayoutNode): string[] =>
+  Array.isArray(node.data.children)
+    ? node.data.children.filter((child): child is string => typeof child === 'string')
+    : [];
+const setNodeDimensions = (node: LayoutNode, width: number, height: number): void => {
+  node.style = { ...node.style, width, height };
+  node.measured = { ...node.measured, width, height };
+};
+const configuredNodeStrategy = (): unknown => {
+  const config = asRecord(diagramConfigManager.getConfig());
+  return asRecord(asRecord(config.diagram).layout).nodeStrategy
+    ?? asRecord(config.layout).nodeStrategy;
+};
 
 /**
  * 网格布局策略
@@ -37,44 +65,48 @@ export class GridLayoutStrategy implements ILayoutStrategy {
    * - 当 options.nodeLayout 映射为 'elk' 时，使用 elkjs layered 对普通节点进行分层排布
    * - 否则沿用通用网格布局算法
    */
-  async calculateLayout(nodes: ReactFlowNode[], edges: Edge[], options: LayoutOptions): Promise<{ nodes: ReactFlowNode[]; edges: Edge[] }> {
+  async calculateLayout(nodes: LayoutNode[], edges: Edge[], options: LayoutOptions): Promise<{ nodes: LayoutNode[]; edges: Edge[] }> {
     // 函数级注释：依据选项控制域/子域容器生成，并进行网格定位
-    let nodesWithGroups: ReactFlowNode[] = nodes as ReactFlowNode[];
+    let nodesWithGroups: LayoutNode[] = nodes;
     if (options?.generateDomainGroups) {
-      const domainWhitelist = (options as any)?.domainWhitelist || (options as any)?.domainWhiteList;
+      const domainWhitelist = options.domainWhitelist
+        ?? asRecord(options).domainWhiteList as string[] | undefined;
       nodesWithGroups = applyDomainGrouping(nodesWithGroups, domainWhitelist);
     }
     const shouldGenSub = Boolean(options?.generateSubDomainGroups);
-    const subWhitelist = (options as any)?.subDomainWhitelist as string[] | undefined;
+    const subWhitelist = options.subDomainWhitelist;
     nodesWithGroups = shouldGenSub
       ? assignChildrenToSubGroupsBySemantic(applySubGrouping(nodesWithGroups as unknown as ReactFlowNode<StandardNodeData>[], subWhitelist)) as ReactFlowNode[]
       : assignChildrenToSubGroupsBySemantic(nodesWithGroups) as ReactFlowNode[];
     const EXCLUDE_TYPES = new Set(['subGroup', 'titleGroup', 'group', 'domain']);
-    const layoutCandidates: ReactFlowNode[] = nodesWithGroups.filter(n => !EXCLUDE_TYPES.has(String(n.type || '')));
+    const layoutCandidates: LayoutNode[] = nodesWithGroups.filter(n => !EXCLUDE_TYPES.has(String(n.type ?? '')));
 
-    const nodeLayoutRaw: any = (options as any)?.nodeLayout;
+    const nodeLayoutRaw = options.nodeLayout;
     const s = String(nodeLayoutRaw || '').toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '');
-    const useElk = s.includes('elk') || String(((diagramConfigManager.getConfig() as any)?.diagram?.layout?.nodeStrategy || '')).toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '') === 'elk';
+    const useElk = s.includes('elk') || String(configuredNodeStrategy() ?? '').toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '') === 'elk';
     let positions: { x: number; y: number }[];
     if (useElk) {
-      const left = Math.max(40, Number(((options as any)?.padding?.left)) || 40);
-      const top = Math.max(40, Number(((options as any)?.padding?.top)) || 40);
-      const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-      const getW = (n: ReactFlowNode) => num((((n as any)?.measured?.width ?? (n as any)?.style?.width ?? (n as any)?.width)), Math.max(120, (diagramConfigManager.getLayoutConfig() as any)?.NODE_MIN_WIDTH || 120));
-      const getH = (n: ReactFlowNode) => num((((n as any)?.measured?.height ?? (n as any)?.style?.height ?? (n as any)?.height)), (diagramConfigManager.getConfig() as any)?.node?.height || 80);
+      const left = Math.max(40, finiteNumber(options.padding?.left, 40));
+      const top = Math.max(40, finiteNumber(options.padding?.top, 40));
+      const layoutConfig = asRecord(diagramConfigManager.getLayoutConfig());
+      const fullConfig = asRecord(diagramConfigManager.getConfig());
+      const nodeConfig = asRecord(fullConfig.node);
+      const nodeGap = asRecord(nodeConfig.gap);
+      const getW = (n: LayoutNode) => nodeWidth(n, Math.max(120, finiteNumber(layoutConfig.NODE_MIN_WIDTH, 120)));
+      const getH = (n: LayoutNode) => nodeHeight(n, finiteNumber(nodeConfig.height, 80));
       const scopedEdges = (edges || []).filter(e => layoutCandidates.some(n => n.id === e.source) && layoutCandidates.some(n => n.id === e.target));
       try {
         const { default: ELK } = await import('elkjs');
         const elk = new ELK();
-        const dirRaw = String(((options as any)?.direction || '')).toUpperCase();
+        const dirRaw = String(options.direction ?? '').toUpperCase();
         const elkDir = dirRaw === 'LR' ? 'RIGHT' : 'DOWN';
-        const graph: any = {
+        const graph: ElkNode = {
           id: 'elk-gls',
           layoutOptions: {
             'elk.algorithm': 'layered',
             'elk.direction': elkDir,
-            'elk.spacing.nodeNode': Math.max(40, num(((diagramConfigManager.getConfig() as any)?.node?.gap?.horizontal), 80)),
-            'elk.layered.spacing.nodeNodeBetweenLayers': Math.max(40, num(((diagramConfigManager.getConfig() as any)?.node?.gap?.vertical), 56)),
+            'elk.spacing.nodeNode': String(Math.max(40, finiteNumber(nodeGap.horizontal, 80))),
+            'elk.layered.spacing.nodeNodeBetweenLayers': String(Math.max(40, finiteNumber(nodeGap.vertical, 56))),
             
           },
           children: layoutCandidates.map(n => ({ id: n.id, width: getW(n), height: getH(n) })),
@@ -86,40 +118,42 @@ export class GridLayoutStrategy implements ILayoutStrategy {
         positions = layoutCandidates.map(n => idToPos[n.id] || { x: left, y: top });
         
       } catch {
-        positions = calculateGridLayout(layoutCandidates as any, options) as any;
+        positions = calculateGridLayout(layoutCandidates, options);
       }
     } else {
       // 函数级注释：网格布局的实际尺寸对齐
       // - 背景：默认 calculateGridLayout 使用固定 itemSize，若节点实际 measured/width 高于默认值，会造成网格列内重叠
       // - 行为：以候选节点的最大宽/高作为网格单元尺寸，并从配置提取水平/垂直间距，避免重叠
-      const cfg: any = (() => { try { return diagramConfigManager.getConfig(); } catch { return {}; } })();
-      const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-      const getW = (n: ReactFlowNode) => num((((n as any)?.measured?.width ?? (n as any)?.style?.width ?? (n as any)?.width)), Math.max(120, (diagramConfigManager.getLayoutConfig() as any)?.NODE_MIN_WIDTH || 120));
-      const getH = (n: ReactFlowNode) => num((((n as any)?.measured?.height ?? (n as any)?.style?.height ?? (n as any)?.height)), (cfg?.node?.height ?? 80));
-      const maxW = layoutCandidates.length ? Math.max(...layoutCandidates.map(getW)) : Math.max(120, (diagramConfigManager.getLayoutConfig() as any)?.NODE_MIN_WIDTH || 120);
-      const maxH = layoutCandidates.length ? Math.max(...layoutCandidates.map(getH)) : (cfg?.node?.height ?? 80);
-      const H_GAP = num((cfg?.node?.gap?.horizontal), 80);
-      const V_GAP = num((cfg?.node?.gap?.vertical), 56);
+      const cfg = asRecord((() => { try { return diagramConfigManager.getConfig(); } catch { return {}; } })());
+      const layoutConfig = asRecord(diagramConfigManager.getLayoutConfig());
+      const nodeConfig = asRecord(cfg.node);
+      const nodeGap = asRecord(nodeConfig.gap);
+      const getW = (n: LayoutNode) => nodeWidth(n, Math.max(120, finiteNumber(layoutConfig.NODE_MIN_WIDTH, 120)));
+      const getH = (n: LayoutNode) => nodeHeight(n, finiteNumber(nodeConfig.height, 80));
+      const maxW = layoutCandidates.length ? Math.max(...layoutCandidates.map(getW)) : Math.max(120, finiteNumber(layoutConfig.NODE_MIN_WIDTH, 120));
+      const maxH = layoutCandidates.length ? Math.max(...layoutCandidates.map(getH)) : finiteNumber(nodeConfig.height, 80);
+      const H_GAP = finiteNumber(nodeGap.horizontal, 80);
+      const V_GAP = finiteNumber(nodeGap.vertical, 56);
       const pad = {
-        top: num(((options as any)?.padding?.top), 50),
-        right: num(((options as any)?.padding?.right), 50),
-        bottom: num(((options as any)?.padding?.bottom), 50),
-        left: num(((options as any)?.padding?.left), 50),
+        top: finiteNumber(options.padding?.top, 50),
+        right: finiteNumber(options.padding?.right, 50),
+        bottom: finiteNumber(options.padding?.bottom, 50),
+        left: finiteNumber(options.padding?.left, 50),
       };
       const calcOpts = {
         ...options,
         itemSize: { width: maxW, height: maxH },
         spacing: { horizontal: H_GAP, vertical: V_GAP },
         padding: pad,
-        columns: (options as any)?.columns ?? Math.ceil(Math.sqrt(layoutCandidates.length)),
-      } as any;
-      positions = calculateGridLayout(layoutCandidates as any, calcOpts) as any;
+        columns: options.columns ?? Math.ceil(Math.sqrt(layoutCandidates.length)),
+      };
+      positions = calculateGridLayout(layoutCandidates, calcOpts);
     }
     const updatedNodes = nodesWithGroups.map(n => n);
     layoutCandidates.forEach((n, idx) => {
       const pos = positions[idx];
       if (!pos) return;
-      n.position = { x: pos.x, y: pos.y } as any;
+      n.position = { x: pos.x, y: pos.y };
     });
     
 
@@ -132,31 +166,29 @@ export class GridLayoutStrategy implements ILayoutStrategy {
         : rawTop;
       const padBottom = layoutCfg.SUB_GROUP_PADDING?.V_BOTTOM ?? 20;
 
-      const idMap = new Map<string, ReactFlowNode>(updatedNodes.map(n => [n.id, n] as const));
-      const getW = (n: ReactFlowNode): number => (n as any)?.measured?.width ?? (n.style as any)?.width ?? 240;
-      const getH = (n: ReactFlowNode): number => (n as any)?.measured?.height ?? (n.style as any)?.height ?? 120;
+      const idMap = new Map<string, LayoutNode>(updatedNodes.map(n => [n.id, n] as const));
+      const getW = (n: LayoutNode): number => nodeWidth(n, 240);
+      const getH = (n: LayoutNode): number => nodeHeight(n, 120);
 
       updatedNodes.filter(n => String(n.type || '') === 'subGroup').forEach(sg => {
-        const children = Array.isArray((sg.data as any)?.children) ? (sg.data as any).children as string[] : [];
+        const children = nodeChildren(sg);
         const childNodes = children
           .map(id => idMap.get(id))
-          .filter((cn): cn is ReactFlowNode => !!cn)
+          .filter((cn): cn is LayoutNode => cn !== undefined)
           .filter(cn => !EXCLUDE_TYPES.has(String(cn.type || '')));
         if (childNodes.length === 0) return;
 
-        const minX = Math.min(...childNodes.map(c => (c.position as any).x));
-        const minY = Math.min(...childNodes.map(c => (c.position as any).y));
-        const maxX = Math.max(...childNodes.map(c => (c.position as any).x + getW(c)));
-        const maxY = Math.max(...childNodes.map(c => (c.position as any).y + getH(c)));
+        const minX = Math.min(...childNodes.map(c => nodeX(c)));
+        const minY = Math.min(...childNodes.map(c => nodeY(c)));
+        const maxX = Math.max(...childNodes.map(c => nodeX(c) + getW(c)));
+        const maxY = Math.max(...childNodes.map(c => nodeY(c) + getH(c)));
 
         const newPos = { x: minX - padH, y: minY - padTop };
         const newW = (maxX - minX) + padH * 2;
         const newH = (maxY - minY) + padTop + padBottom;
 
-        sg.position = newPos as any;
-        (sg.style as any).width = newW;
-        (sg.style as any).height = newH;
-        (sg as any).measured = { width: newW, height: newH };
+        sg.position = newPos;
+        setNodeDimensions(sg, newW, newH);
         sg.zIndex = typeof sg.zIndex === 'number' ? sg.zIndex : -5;
       });
     } catch {}
@@ -164,12 +196,12 @@ export class GridLayoutStrategy implements ILayoutStrategy {
     // 子域容器防重叠（增强“严格包含且不重叠”约束）
     let finalNodes = resolveSubGroupOverlaps(updatedNodes);
     // 域容器严格包含与防重叠（若存在域容器），当管线所有权为 node 或域尚未最终化时才执行
-    const hasDomainContainers = (finalNodes as ReactFlowNode[]).some((n: ReactFlowNode) => String(n.type || '') === 'titleGroup');
+    const hasDomainContainers = finalNodes.some(n => String(n.type ?? '') === 'titleGroup');
     if (hasDomainContainers) {
-      const cfgFull: any = diagramConfigManager.getConfig() || {};
-      const policy = String(cfgFull?.layout?.domainProcessingOwner || 'hierarchy').toLowerCase();
+      const cfgFull = asRecord(diagramConfigManager.getConfig());
+      const policy = String(asRecord(cfgFull.layout).domainProcessingOwner ?? 'hierarchy').toLowerCase();
       const tgs = finalNodes.filter(n => String(n.type || '') === 'titleGroup');
-      const needs = tgs.some(t => !(((t as any)?.data)||{})?.finalizedDomain);
+      const needs = tgs.some(t => t.data.finalizedDomain !== true);
       if (policy !== 'hierarchy' || needs) {
         finalNodes = enforceDomainContainerStrictContainment(finalNodes);
         finalNodes = resolveDomainContainerOverlaps(finalNodes);
