@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { BackgroundVariant } from '@xyflow/react';
 
 import type { DiffResult } from '../../../utils/diagramDiff';
+import type { PresentationSlide } from '../../../hooks/usePresentationSlides';
 import { readFlowchartOnboardingDismissed } from '../flowchartOnboardingStorage';
 
 export interface FlowchartThemeGridState {
@@ -51,7 +52,7 @@ export function useFlowchartShellState(themeGrid: unknown) {
     const [commandPaletteVisible, setCommandPaletteVisible] = useState(false);
     const [shortcutHelpVisible, setShortcutHelpVisible] = useState(false);
     const [showShortcuts, setShowShortcutsModal] = useState(false);
-    const [presentationSlides, setPresentationSlides] = useState<any[]>([]);
+    const [presentationSlides, setPresentationSlides] = useState<PresentationSlide[]>([]);
     const [, setHighlightedNodeId] = useState<string | null>(null);
     const [onboardingDismissed, setOnboardingDismissed] = useState(readFlowchartOnboardingDismissed);
     const [showGrid, setShowGrid] = useState(true);

@@ -36,4 +36,5 @@ export interface FlowchartNodeData extends Record<string, unknown> {
   textAlign?: 'left' | 'center' | 'right';
   isEditing?: boolean;
   businessKey?: string;
+  layer?: string;
 }

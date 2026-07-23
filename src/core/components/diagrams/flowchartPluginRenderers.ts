@@ -1,5 +1,4 @@
-import type { ComponentType } from 'react';
-import type { NodeTypes } from '@xyflow/react';
+import type { EdgeTypes, NodeTypes } from '@xyflow/react';
 
 import type { DiagramTypePlugin } from '../../types/plugin';
 import CustomNode from '../custom-nodes/CustomNode';
@@ -18,7 +17,7 @@ import MindMapEdge from '../edges/MindMapEdge';
 import { RelationshipEdge } from '../custom-edges/RelationshipEdge';
 import { createStableFlowchartRendererMapResolver } from './flowchartPluginRuntimeModel';
 
-type EdgeRendererTypes = Record<string, ComponentType<any>>;
+type EdgeRendererTypes = EdgeTypes;
 type FlowchartRendererPlugin = Pick<DiagramTypePlugin, 'getNodeTypes' | 'getEdgeTypes'>;
 
 const DEFAULT_NODE_TYPES: NodeTypes = {

@@ -4,7 +4,12 @@ import { useNodeUpdate } from '../../diagrams/useNodeUpdate';
 
 export interface UseCustomNodeInteractionsProps {
     id: string;
-    data: any;
+    data: Record<string, unknown> & {
+        description?: string;
+        measured?: { width?: number };
+        style?: { width?: number };
+        onLabelChange?: (id: string, label: string) => void;
+    };
     propsWidth?: number;
 }
 

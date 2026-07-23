@@ -274,7 +274,7 @@ export const createNode = (
   id: string,
   label: string,
   position: { x: number; y: number },
-  additionalData: any = {}
+  additionalData: Record<string, unknown> = {}
 ): Node => {
   const fontConfig = diagramConfigManager.getConfig().node.font;
   

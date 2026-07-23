@@ -5,7 +5,7 @@ export type UpdateNodesBatchFn = (ids: string[], data: NodeDataUpdate, options?:
 
 export interface NodeUpdateContextValue {
     updateNodesBatch: UpdateNodesBatchFn;
-    businessData?: Record<string, any>;
+    businessData?: Record<string, unknown>;
 }
 
 export const NodeUpdateContext = createContext<NodeUpdateContextValue | undefined>(undefined);

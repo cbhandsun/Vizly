@@ -74,7 +74,7 @@ export const applyFlowchartTemplate = ({
     appendEdges: (edges: Edge[]) => void;
 }): { nodes: Node[]; edges: Edge[] } => {
     const plan = buildFlowchartTemplateApplyPlan({
-        template: template as any,
+        template,
         viewport,
         createFromTemplate,
     });
