@@ -359,7 +359,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
         copyStyle, pasteStyle, hasCopiedStyle, saveAsTemplate,
         toggleGroupCollapse
     });
-    const handlePaneClick = useCallback((_event: React.MouseEvent) => {
+    const handlePaneClick = useCallback((_event?: React.MouseEvent) => {
         // 先关闭可能存在的 Context Menu
         contextMenuPaneClick();
 

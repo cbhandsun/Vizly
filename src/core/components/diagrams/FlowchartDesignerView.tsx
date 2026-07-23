@@ -35,6 +35,11 @@ interface FlowchartDesignerViewProps {
     model: FlowchartDesignerViewModel;
 }
 
+interface NodePositionUpdate {
+    id: string;
+    position: { x: number; y: number };
+}
+
 /**
  * Presentation-only half of FlowchartDesigner. State ownership and event wiring
  * remain in the controller component so this extraction cannot alter layout.
@@ -447,7 +452,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     onConnectStart={onConnectStart}
                                     onConnectEnd={enhancedOnConnectEnd}
                                     onSelectionChange={onSelectionChange}
-                                    onPaneClick={() => handlePaneClick({ clientX: 0, clientY: 0 } as any)}
+                                    onPaneClick={handlePaneClick}
                                     onPaneMouseMove={onPaneMouseMove}
                                     onPaneMouseLeave={onPaneMouseLeave}
                                     onPaneDoubleClick={onPaneDoubleClick}
@@ -496,11 +501,11 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                             isConnecting,
                                             updateNodesBatch,
                                             updateEdgesBatch,
-                                            onUpdateNodes: (updates: any[]) => {
+                                            onUpdateNodes: (updates: NodePositionUpdate[]) => {
                                                 takeSnapshot(nodesRef.current, edgesRef.current);
-                                                const updatesMap = new Map(updates.map((update: any) => [update.id, update]));
+                                                const updatesMap = new Map(updates.map(update => [update.id, update]));
                                                 setNodes((currentNodes: Node[]) => currentNodes.map((node) => {
-                                                    const update = updatesMap.get(node.id) as any;
+                                                    const update = updatesMap.get(node.id);
                                                     return (update && update.position) ? { ...node, position: update.position } : node;
                                                 }));
                                             },
@@ -518,7 +523,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                         annotations={{
                                             items: annotations,
                                             mode: annotationMode,
-                                            onAdd: (annotation: any) => addAnnotation(annotation.x, annotation.y, annotation.label || annotation.text),
+                                            onAdd: addAnnotation,
                                             onUpdate: updateAnnotation,
                                             onDelete: deleteAnnotation,
                                             onToggleResolved: toggleResolved,

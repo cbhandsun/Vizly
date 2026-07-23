@@ -495,6 +495,15 @@ export class EdgeRoutingCoordinator {
         return this.cache.get(key) ?? null;
     }
 
+    public getCachedDebugPayload(edgeId: string): Record<string, unknown> | null {
+        const entry = this.latestRequests.get(edgeId);
+        if (!entry) return null;
+        const result = this.getCachedResult(entry.request);
+        return result
+            ? this.debugState.buildPayload(edgeId, result, entry.request.job)
+            : null;
+    }
+
     /**
      * [P1.2] Simplified graph key using version number.
      * Since graphVersion increments on every topology change,

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
+import type { Node } from '@xyflow/react';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { Button, Tooltip, Divider, Popover, InputNumber, ColorPicker, Input } from 'antd';
 import { PlusOutlined, SwapOutlined, DatabaseOutlined, ExpandAltOutlined, AppstoreOutlined, DeleteOutlined, EllipsisOutlined } from '@ant-design/icons';
+import type { NodeDataUpdate } from '../../../types/diagram-updates';
 
 export interface ArrowTimelineEvent {
     date: string;
@@ -10,7 +12,7 @@ export interface ArrowTimelineEvent {
     color: string;
 }
 
-export interface ArrowTimelineNodeData {
+export interface ArrowTimelineNodeData extends Record<string, unknown> {
     events?: ArrowTimelineEvent[];
     variant?: 'arrow' | 'dot';
     spacing?: number;
@@ -358,7 +360,12 @@ function ArrowTimelineNode({ id, data, selected, isDragging }: { id: string, dat
 }
 
 // ⭐ Component Isolation: Exporting the toolbar extensions directly attached to the Component!
-const ArrowTimelineToolbarExtension = ({ node, updateNodesBatch }: any) => {
+interface ArrowTimelineToolbarExtensionProps {
+    node: Node<ArrowTimelineNodeData>;
+    updateNodesBatch: (nodeIds: string[], updates: NodeDataUpdate, options?: { snapshot?: boolean }) => void;
+}
+
+const ArrowTimelineToolbarExtension: React.FC<ArrowTimelineToolbarExtensionProps> = ({ node, updateNodesBatch }) => {
     const isDot = node.data?.variant === 'dot';
     const events = node.data?.events !== undefined ? node.data.events : DEFAULT_EVENTS;
     const spacing = node.data?.spacing !== undefined ? node.data.spacing : (isDot ? 120 : 100);
@@ -372,7 +379,7 @@ const ArrowTimelineToolbarExtension = ({ node, updateNodesBatch }: any) => {
             </div>
             
             <div className="custom-datascroll" style={{ padding: '8px 0', overflowY: 'auto', flex: 1, maxHeight: 300 }}>
-                {events.map((evt: any, i: number) => (
+                {events.map((evt, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderBottom: '1px solid #f8f8f8', transition: 'background 0.2s' }} className="data-row-hover">
                         <ColorPicker size="small" value={evt.color} onChangeComplete={(color) => {
                             const newEvents = [...events];
@@ -404,7 +411,7 @@ const ArrowTimelineToolbarExtension = ({ node, updateNodesBatch }: any) => {
                     const newEvent = events.length > 0
                         ? { ...events[events.length - 1], date: events[events.length - 1].date + ' (新)' }
                         : { date: 'New Date', color: '#1890ff', label: '' };
-                    updateNodesBatch([node.id], { events: [...events, newEvent] } as any);
+                    updateNodesBatch([node.id], { events: [...events, newEvent] });
                 }}>
                     添加事件节点
                 </Button>
@@ -496,12 +503,17 @@ const ArrowTimelineToolbarExtension = ({ node, updateNodesBatch }: any) => {
 
 // ⭐ 标准规范：必须先 memo() 再挂载静态属性以防止吞没现象
 const MemoizedArrowTimelineNode = React.memo(ArrowTimelineNode);
+type ArrowTimelineNodeWithToolbar = typeof MemoizedArrowTimelineNode & {
+    ToolbarExtension: typeof ArrowTimelineToolbarExtension;
+    OverrideDefaultToolbar: boolean;
+};
+const ArrowTimelineNodeComponent = MemoizedArrowTimelineNode as ArrowTimelineNodeWithToolbar;
 
 // 挂载独立工具栏组件
-(MemoizedArrowTimelineNode as any).ToolbarExtension = ArrowTimelineToolbarExtension;
+ArrowTimelineNodeComponent.ToolbarExtension = ArrowTimelineToolbarExtension;
 
 // 通过这两个配置告知上游提取胶囊工具栏：
 // 设置为 true 使其独立享受胶囊包裹，彻底替换默认排版工具栏，实现针对性的时间线美化！
-(MemoizedArrowTimelineNode as any).OverrideDefaultToolbar = true;
+ArrowTimelineNodeComponent.OverrideDefaultToolbar = true;
 
-export default MemoizedArrowTimelineNode;
+export default ArrowTimelineNodeComponent;

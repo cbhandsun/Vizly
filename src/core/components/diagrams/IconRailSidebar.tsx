@@ -16,6 +16,7 @@ import {
 } from './iconRailSidebarStorage';
 import type { NodeTemplate } from './hooks/useNodeTemplates';
 import type { LayerConfig } from './hooks/useLayerManagement';
+import type { DataNode } from 'antd/es/tree';
 import './IconRailSidebar.css';
 
 const { Text } = Typography;
@@ -61,6 +62,12 @@ interface IconRailSidebarProps {
 }
 
 type _NodeConfig = Record<string, unknown>;
+type NavigatorNode = Node & { children: NavigatorNode[] };
+interface NavigatorTreeNode extends DataNode {
+    node: NavigatorNode;
+    children?: NavigatorTreeNode[];
+    isMatched: boolean;
+}
 
 export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
     nodes = [],
@@ -96,14 +103,15 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
         // ⭐ 性能大优化：如果面板未打开，直接跳过庞大的树计算（拖拽节点时触发会导致卡顿）
         if (activePanel !== 'navigator' || !nodes || nodes.length === 0) return { treeData: [], expandedKeys: [] };
 
-        const nodeMap = new Map<string, any>();
+        const nodeMap = new Map<string, NavigatorNode>();
         nodes.forEach(n => nodeMap.set(n.id, { ...n, children: [] }));
 
-        const roots: any[] = [];
+        const roots: NavigatorNode[] = [];
         nodes.forEach(n => {
             const nodeWithChildren = nodeMap.get(n.id);
+            if (!nodeWithChildren) return;
             if (n.parentId && nodeMap.has(n.parentId)) {
-                nodeMap.get(n.parentId).children.push(nodeWithChildren);
+                nodeMap.get(n.parentId)?.children.push(nodeWithChildren);
             } else {
                 roots.push(nodeWithChildren);
             }
@@ -112,31 +120,31 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
         const expandedKeys: string[] = [];
         const term = searchTerm.toLowerCase();
 
-        const filterTree = (nodesToFilter: any[]): any[] => {
-            return nodesToFilter.map(item => {
-                const data = item.data;
-                const label = data?.label || item.id;
+        const filterTree = (nodesToFilter: NavigatorNode[]): NavigatorTreeNode[] => {
+            return nodesToFilter.flatMap(item => {
+                const data = item.data as Partial<FlowchartNodeData>;
+                const label = typeof data.label === 'string' ? data.label : item.id;
                 const selfMatch = !term || label.toLowerCase().includes(term);
                 
                 const filteredChildren = filterTree(item.children || []);
                 const hasMatchingChildren = filteredChildren.length > 0;
 
                 if (!selfMatch && !hasMatchingChildren) {
-                    return null;
+                    return [];
                 }
 
                 if (term && hasMatchingChildren) {
                     expandedKeys.push(item.id);
                 }
 
-                return {
+                return [{
                     key: item.id,
                     title: label,
                     node: item,
                     children: filteredChildren,
                     isMatched: selfMatch,
-                };
-            }).filter(Boolean);
+                }];
+            });
         };
 
         return { treeData: filterTree(roots), expandedKeys };
@@ -257,10 +265,11 @@ export const IconRailSidebar: React.FC<IconRailSidebarProps> = ({
                                     autoExpandParent={autoExpandParent}
                                     onExpand={onExpand}
                                     onSelect={(selectedKeys, info) => {
-                                        const node = (info.node as any).node;
+                                        const node = (info.node as NavigatorTreeNode).node;
                                         if (node) onFocusNode?.(node);
                                     }}
-                                    titleRender={(treeNode: any) => {
+                                    titleRender={(rawTreeNode) => {
+                                        const treeNode = rawTreeNode as NavigatorTreeNode;
                                         const node = treeNode.node;
                                         const data = node.data as Partial<FlowchartNodeData>;
                                         const label = data?.label || node.id;

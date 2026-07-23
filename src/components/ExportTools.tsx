@@ -15,6 +15,7 @@ import { getFlowDataBridge, getStandardFlowDataBridge } from '@/core/utils/flowD
 import { logCloudSaveEnsureFailure, logCloudSaveFailure } from '@/components/diagrams/hooks/diagramStorageLogging';
 import { downloadFile } from '@/core/utils/downloadUtils';
 import { escapeMarkdownInlineText, escapeMarkdownTableCell, escapeMermaidLabel, toMermaidNodeId } from '@/core/utils/exportTextSecurity';
+import type { StandardDiagramData } from '@/core/models/DiagramModels';
 
 const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
 const CloudStorageManagerModal = React.lazy(() => import('@/components/storage/CloudStorageManagerModal').then(async (m) => {
@@ -39,7 +40,7 @@ interface ExportToolsProps {
   variant?: 'overlay' | 'inline' | 'compact';
   enableMainFlowAnimation?: boolean; // 主流程动线控制参数
   /** 如果提供，云端图表将在设计器中打开 */
-  onOpenInDesigner?: (data: any) => void;
+  onOpenInDesigner?: (data: StandardDiagramData) => void;
 }
 
 /**
@@ -251,13 +252,14 @@ ${mermaid}
         const nodes = reactFlowInstance.getNodes();
         const edges = reactFlowInstance.getEdges();
         if (nodes.length > 0) {
+          const { canvasToStandardData } = await import('@/core/components/diagrams/designerUtils');
+          diagram = canvasToStandardData(nodes, edges, diagramName || diagramId);
           diagram = {
+            ...diagram,
             id: diagramId,
             name: diagramName || diagramId,
-            nodes,
-            edges,
-            metadata: { title: diagramName || diagramId },
-          } as any;
+            metadata: { ...diagram.metadata, title: diagramName || diagramId },
+          };
         }
       }
 
@@ -271,7 +273,7 @@ ${mermaid}
             id: bridgeData.id || diagramId,
             name: diagramName || bridgeData.name || diagramId,
             metadata: { ...(bridgeData.metadata || {}), title: diagramName || bridgeData.metadata?.title || diagramId },
-          } as any;
+          };
         }
       }
 
@@ -312,7 +314,7 @@ ${mermaid}
       // 回写到 dataService（GenericStandardDiagram 场景）
       const currentDiagram = dataService.getDiagram(diagramId);
       if (currentDiagram) {
-        (currentDiagram as any).metadata = { ...((currentDiagram as any).metadata || {}), cloud: cloudInfo };
+        currentDiagram.metadata = { ...(currentDiagram.metadata || {}), cloud: cloudInfo };
       }
 
       appMessage.success(t('export.cloudSaveSuccess'));

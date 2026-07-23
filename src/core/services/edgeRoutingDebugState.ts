@@ -151,14 +151,22 @@ export class EdgeRoutingDebugState {
   public emitResult(
     edgeId: string,
     result: PathFindingResult,
-    job: PathFindingJob | undefined,
+    job: Partial<PathFindingJob> | undefined,
     graphDebug: boolean | undefined,
   ): void {
     if (!this.dataListener || !(this.selectedEdgeId === edgeId || job?.debug || graphDebug)) return;
     this.invokeListener(
       this.dataListener,
-      buildRoutingDebugPayload(edgeId, result, this.trunkData.get(edgeId), job),
+      this.buildPayload(edgeId, result, job),
     );
+  }
+
+  public buildPayload(
+    edgeId: string,
+    result: PathFindingResult,
+    job: Partial<PathFindingJob> | undefined,
+  ): Record<string, unknown> {
+    return buildRoutingDebugPayload(edgeId, result, this.trunkData.get(edgeId), job);
   }
 
   private invokeListener<T>(listener: ((value: T) => void) | null, value: T): void {

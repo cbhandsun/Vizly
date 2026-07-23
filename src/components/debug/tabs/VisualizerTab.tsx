@@ -6,10 +6,12 @@ import Switch from 'antd/es/switch';
 import Space from 'antd/es/space';
 import Tooltip from 'antd/es/tooltip';
 import { theme } from 'antd';
+import type { GlobalToken } from 'antd/es/theme/interface';
 import { useTranslation } from 'react-i18next';
 import { EdgeRoutingCoordinator } from '@/core/services/EdgeRoutingCoordinator';
 import {
     calculateVisualizerFit,
+    extractVisualizerScanFields,
     type DebugPayload,
 } from './visualizerModel';
 import { drawVisualizerCanvas } from './visualizerCanvasRenderer';
@@ -22,12 +24,13 @@ interface DebuggableCoordinator {
     setDebugEdge(id: string | null): void;
     forceDebugReRoute(id: string | null): void;
     notifyGraphChange(): void;
+    getCachedDebugPayload(edgeId: string): Record<string, unknown> | null;
 }
 
 interface ScanRowItemProps {
     row: { edgeId: string; port: string; strategy: string; geo: string; isM2O: boolean; anomaly: boolean };
     geoColor: (geo: string) => string;
-    token: any;
+    token: GlobalToken;
     onClick: () => void;
 }
 const ScanRowItem: React.FC<ScanRowItemProps> = ({ row, geoColor, token, onClick }) => {
@@ -247,20 +250,16 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
     // [UX] Extract strategy info + quality metrics for HUD display
     const hudInfo = (() => {
         if (!debugData) return null;
-        const ad = debugData.algorithmDebug && typeof debugData.algorithmDebug === 'object'
-            ? (debugData.algorithmDebug as Record<string, any>) : null;
-        const ps = ad?.portSelection;
-        const dataAny = debugData as unknown as Record<string, any>;
-        const strategy = debugData.metadata?.strategy ?? ad?.strategy ?? '?';
-        const s = dataAny.selectedSourcePos ?? ps?.selected?.source ?? '?';
-        const tt = dataAny.selectedTargetPos ?? ps?.selected?.target ?? '?';
-        const geo = ps?.geometry ?? ps?.detectedGeometry ?? '?';
+        const fields = extractVisualizerScanFields(debugData);
+        const strategy = fields.strategy;
+        const s = fields.source;
+        const tt = fields.target;
+        const geo = fields.geometry;
         const ms = debugData.metadata?.duration?.toFixed(1) ?? '?';
         // [路径质量] 从 metadata 提取弯折数/长度/效率比
-        const meta = debugData.metadata as any;
-        const bendCount: number | undefined = meta?.bendCount;
-        const pathLength: number | undefined = meta?.pathLength;
-        const efficiencyRatio: number | undefined = meta?.efficiencyRatio;
+        const bendCount = debugData.metadata?.bendCount;
+        const pathLength = debugData.metadata?.pathLength;
+        const efficiencyRatio = debugData.metadata?.efficiencyRatio;
         return { strategy, portStr: `${s} → ${tt}`, geo, ms, bendCount, pathLength, efficiencyRatio };
     })();
 
@@ -419,33 +418,16 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
 
         // [提速] 尝试从缓存读取每个边的路由结果，避免强制重路由
         // 如果缓存命中则直接提取元数据；不命中再 fallback 到强制重路由
-        const cacheCoord = coordinator as any;
-        const hasGetCached = typeof cacheCoord.getCachedResult === 'function';
-
         for (const eid of edgeIds) {
             // 尝试从 latestRequests 构建请求对象然后读缓存
-            let cachedMeta: any = null;
-            if (hasGetCached) {
-                const entry = cacheCoord.latestRequests?.get(eid);
-                if (entry) {
-                    const cached = cacheCoord.getCachedResult(entry.request);
-                    if (cached) cachedMeta = cached;
-                }
-            }
+            const cachedMeta = coordinator.getCachedDebugPayload(eid);
 
-            if (cachedMeta && cachedMeta.algorithmDebug) {
+            if (cachedMeta) {
                 // 缓存命中 — 直接提取元数据
-                const data = cachedMeta as any;
-                const ad = data.algorithmDebug && typeof data.algorithmDebug === 'object'
-                    ? data.algorithmDebug as Record<string, any> : null;
-                const ps = ad?.portSelection;
-                const dataAny = data as Record<string, any>;
-                const strategy = data.metadata?.strategy ?? ad?.strategy ?? 'Unknown';
-                const s = dataAny.selectedSourcePos ?? ps?.selected?.source ?? '?';
-                const tt = dataAny.selectedTargetPos ?? ps?.selected?.target ?? '?';
-                const geo = ps?.geometry ?? ps?.detectedGeometry ?? '?';
-                const isM2O = ps?.isManyToOne === true;
-                const layoutDir = ps?.layoutDirection ?? '';
+                const fields = extractVisualizerScanFields(cachedMeta);
+                const { strategy, source: s, target: tt, geometry: geo } = fields;
+                const isM2O = fields.isManyToOne;
+                const layoutDir = fields.layoutDirection;
                 const backward = typeof geo === 'string' && geo.includes('backward');
                 const tbMismatch = layoutDir === 'TB' && (s === 'left' || s === 'right' || tt === 'left' || tt === 'right');
                 const lrMismatch = (layoutDir === 'LR' || layoutDir === 'RL') && (s === 'top' || s === 'bottom' || tt === 'top' || tt === 'bottom');
@@ -454,16 +436,10 @@ export const VisualizerTab: React.FC<{ customHeight?: string }> = ({ customHeigh
                 // 缓存未命中 — fallback 到强制重路由
                 await new Promise<void>((resolve) => {
                     const onDebug = (data: DebugPayload) => {
-                        const ad = data.algorithmDebug && typeof data.algorithmDebug === 'object'
-                            ? (data.algorithmDebug as Record<string, any>) : null;
-                        const ps = ad?.portSelection;
-                        const dataAny = data as unknown as Record<string, any>;
-                        const strategy = data.metadata?.strategy ?? ad?.strategy ?? 'Unknown';
-                        const s = dataAny.selectedSourcePos ?? ps?.selected?.source ?? '?';
-                        const tt = dataAny.selectedTargetPos ?? ps?.selected?.target ?? '?';
-                        const geo = ps?.geometry ?? ps?.detectedGeometry ?? '?';
-                        const isM2O = ps?.isManyToOne === true;
-                        const layoutDir = ps?.layoutDirection ?? '';
+                        const fields = extractVisualizerScanFields(data);
+                        const { strategy, source: s, target: tt, geometry: geo } = fields;
+                        const isM2O = fields.isManyToOne;
+                        const layoutDir = fields.layoutDirection;
                         const backward = typeof geo === 'string' && geo.includes('backward');
                         const tbMismatch = layoutDir === 'TB' && (s === 'left' || s === 'right' || tt === 'left' || tt === 'right');
                         const lrMismatch = (layoutDir === 'LR' || layoutDir === 'RL') && (s === 'top' || s === 'bottom' || tt === 'top' || tt === 'bottom');

@@ -183,7 +183,7 @@ export const buildRoutingDebugPayload = (
   edgeId: string,
   result: PathFindingResult,
   trunkData: TrunkDebugEntryLike | undefined,
-  rawJob: PathFindingJob | undefined,
+  rawJob: Partial<PathFindingJob> | undefined,
 ): Record<string, unknown> => {
   const job = rawJob as (PathFindingJob & {
     peerGroupMembers?: string[];

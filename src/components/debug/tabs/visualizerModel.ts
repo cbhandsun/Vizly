@@ -70,6 +70,41 @@ export interface VisualizerViewport {
     height: number;
 }
 
+export interface VisualizerScanFields {
+    strategy: string;
+    source: string;
+    target: string;
+    geometry: string;
+    isManyToOne: boolean;
+    layoutDirection: string;
+}
+
+const asRecord = (value: unknown): Record<string, unknown> | null => (
+    value && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : null
+);
+
+const displayString = (value: unknown, fallback: string): string => (
+    typeof value === 'string' && value ? value : fallback
+);
+
+export function extractVisualizerScanFields(data: unknown): VisualizerScanFields {
+    const record = asRecord(data);
+    const algorithmDebug = asRecord(record?.algorithmDebug);
+    const portSelection = asRecord(algorithmDebug?.portSelection);
+    const selected = asRecord(portSelection?.selected);
+    const metadata = asRecord(record?.metadata);
+    return {
+        strategy: displayString(metadata?.strategy ?? algorithmDebug?.strategy, 'Unknown'),
+        source: displayString(record?.selectedSourcePos ?? selected?.source, '?'),
+        target: displayString(record?.selectedTargetPos ?? selected?.target, '?'),
+        geometry: displayString(portSelection?.geometry ?? portSelection?.detectedGeometry, '?'),
+        isManyToOne: portSelection?.isManyToOne === true,
+        layoutDirection: displayString(portSelection?.layoutDirection, ''),
+    };
+}
+
 function isFiniteNumber(value: unknown): value is number {
     return typeof value === 'number' && Number.isFinite(value);
 }

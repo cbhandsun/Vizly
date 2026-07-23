@@ -1,9 +1,49 @@
 import { describe, expect, it } from 'vitest';
 import {
     calculateVisualizerFit,
+    extractVisualizerScanFields,
     normalizeVisibilityGraph,
     type DebugPayload,
 } from '../visualizerModel';
+
+describe('extractVisualizerScanFields', () => {
+    it('extracts typed scan metadata from nested runtime diagnostics', () => {
+        expect(extractVisualizerScanFields({
+            metadata: { strategy: 'orthogonal' },
+            selectedSourcePos: 'left',
+            algorithmDebug: {
+                portSelection: {
+                    selected: { target: 'right' },
+                    geometry: 'forward-horizontal',
+                    isManyToOne: true,
+                    layoutDirection: 'LR',
+                },
+            },
+        })).toEqual({
+            strategy: 'orthogonal',
+            source: 'left',
+            target: 'right',
+            geometry: 'forward-horizontal',
+            isManyToOne: true,
+            layoutDirection: 'LR',
+        });
+    });
+
+    it('falls back safely for malformed runtime diagnostics', () => {
+        expect(extractVisualizerScanFields({
+            metadata: null,
+            algorithmDebug: { portSelection: { selected: 'invalid', geometry: 42 } },
+        })).toEqual({
+            strategy: 'Unknown',
+            source: '?',
+            target: '?',
+            geometry: '?',
+            isManyToOne: false,
+            layoutDirection: '',
+        });
+        expect(extractVisualizerScanFields(null).strategy).toBe('Unknown');
+    });
+});
 
 describe('normalizeVisibilityGraph', () => {
     it('normalizes tuple and object edge formats', () => {
