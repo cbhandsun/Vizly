@@ -34,7 +34,7 @@ interface LayoutCacheEntry<T = LayoutCacheResult> {
 interface LayoutCacheResult {
     positions: Position[];
     nodeRanks?: Map<string, number>;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
 }
 
 interface CacheConfig {
@@ -66,7 +66,7 @@ const DEFAULT_CONFIG: CacheConfig = {
 export class LayoutCacheManager {
     private static instance: LayoutCacheManager;
 
-    private cache = new Map<string, LayoutCacheEntry>();
+    private cache = new Map<string, LayoutCacheEntry<unknown>>();
     private config: CacheConfig;
     private stats = { hits: 0, misses: 0 };
 
@@ -91,14 +91,14 @@ export class LayoutCacheManager {
     public createKey(
         nodes: Node[],
         edges: Edge[],
-        options?: Record<string, any>
+        options?: Record<string, unknown>
     ): string {
         try {
             // 节点签名：ID + 尺寸（位置变化时通常需要重新布局，但某些场景只需缓存结构）
             const nodesSig = nodes
                 .map(n => {
-                    const w = (n as any).measured?.width ?? (n.style as any)?.width ?? 200;
-                    const h = (n as any).measured?.height ?? (n.style as any)?.height ?? 100;
+                    const w = n.measured?.width ?? n.style?.width ?? 200;
+                    const h = n.measured?.height ?? n.style?.height ?? 100;
                     return `${n.id}:${w}:${h}`;
                 })
                 .sort()
@@ -129,7 +129,7 @@ export class LayoutCacheManager {
         nodes: Node[],
         edges: Edge[],
         layoutType: string,
-        options?: Record<string, any>
+        options?: Record<string, unknown>
     ): string {
         try {
             const nodeIds = nodes.map(n => n.id).sort().join(',');
@@ -182,7 +182,7 @@ export class LayoutCacheManager {
         }
 
         this.cache.set(key, {
-            result: result as any,
+            result,
             timestamp: Date.now(),
             accessCount: 1,
             lastAccess: Date.now(),
@@ -321,7 +321,7 @@ export const getLayoutCache = (): LayoutCacheManager => {
 export function cachedLayout<T>(
     nodes: Node[],
     edges: Edge[],
-    options: Record<string, any> | undefined,
+    options: Record<string, unknown> | undefined,
     layoutType: string,
     compute: () => T
 ): T {

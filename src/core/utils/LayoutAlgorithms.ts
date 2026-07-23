@@ -69,8 +69,8 @@ export function treeLayout(
 
     // 获取节点尺寸
     const getSize = (n: Node) => ({
-        width: n.measured?.width ?? (n as any).width ?? 150,
-        height: n.measured?.height ?? (n as any).height ?? 50,
+        width: n.measured?.width ?? n.width ?? 150,
+        height: n.measured?.height ?? n.height ?? 50,
     });
 
     // 建立邻接表
@@ -183,8 +183,8 @@ export function symmetricMindMapLayout(
     if (nodes.length === 0) return positions;
 
     const getSize = (n: Node) => ({
-        width: n.measured?.width ?? (n as any).width ?? 150,
-        height: n.measured?.height ?? (n as any).height ?? 50,
+        width: n.measured?.width ?? n.width ?? 150,
+        height: n.measured?.height ?? n.height ?? 50,
     });
 
     const nodeMap = externalMaps?.nodeMap || new Map<string, Node>();
@@ -328,8 +328,8 @@ export function directionalMindMapLayout(
     if (nodes.length === 0) return positions;
 
     const getSize = (n: Node) => ({
-        width: n.measured?.width ?? (n as any).width ?? 150,
-        height: n.measured?.height ?? (n as any).height ?? 50,
+        width: n.measured?.width ?? n.width ?? 150,
+        height: n.measured?.height ?? n.height ?? 50,
     });
 
     const nodeMap = externalMaps?.nodeMap || new Map<string, Node>();
@@ -459,8 +459,8 @@ export function treeMapLayout(
     if (nodes.length === 0) return positions;
 
     const getSize = (n: Node) => ({
-        width: n.measured?.width ?? (n as any).width ?? 150,
-        height: n.measured?.height ?? (n as any).height ?? 50,
+        width: n.measured?.width ?? n.width ?? 150,
+        height: n.measured?.height ?? n.height ?? 50,
     });
 
     const nodeMap = externalMaps?.nodeMap || new Map<string, Node>();
@@ -549,8 +549,8 @@ export function fishboneLayout(
     if (nodes.length === 0) return positions;
 
     const getSize = (n: Node) => ({
-        width: n.measured?.width ?? (n as any).width ?? 140,
-        height: n.measured?.height ?? (n as any).height ?? 40,
+        width: n.measured?.width ?? n.width ?? 140,
+        height: n.measured?.height ?? n.height ?? 40,
     });
 
     const nodeMap = externalMaps?.nodeMap || new Map<string, Node>();

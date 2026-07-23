@@ -1,6 +1,5 @@
 import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
 import type { LayoutOptions } from '../types/layout';
-import type { StandardNodeData } from '../models/DiagramModels';
 import { ILayoutStrategy } from './LayoutStrategyManager';
 import { diagramConfigManager } from '../config/DiagramConfig';
 import {
@@ -119,15 +118,15 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
         };
         // 应用域/子域分组和白名单过滤 (使用归一化后的节点以确保尺寸一致)
         let processedNodes: ReactFlowNode[] = normalizedNodes as ReactFlowNode[];
-        processedNodes = applyDomainGrouping(processedNodes as any, domainWhitelist) as any;
-        processedNodes = applySubGrouping(processedNodes as unknown as ReactFlowNode<StandardNodeData>[], subWhitelist) as any;
-        processedNodes = assignChildrenToSubGroupsBySemantic(processedNodes as any) as ReactFlowNode[];
+        processedNodes = applyDomainGrouping(processedNodes, domainWhitelist);
+        processedNodes = applySubGrouping(processedNodes, subWhitelist);
+        processedNodes = assignChildrenToSubGroupsBySemantic(processedNodes);
         processedNodes = ensureMeasuredForNodes(processedNodes);
         processedNodes = normalizeSubGroupDomainByChildren(processedNodes);
 
         // 应用显隐性控制
         processedNodes = processedNodes.map(n => {
-            const clone: any = { ...n, data: { ...(n as any).data } };
+            const clone: ReactFlowNode = { ...n, data: { ...n.data } };
             if (String(n.type || '') === 'subGroup') {
                 const key = String((clone.data?.subDomain || '')).trim();
                 const inWhite = Array.isArray(subWhitelist) ? subWhitelist.includes(key) : false;
@@ -244,16 +243,16 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
             if (!isFinite(maxRight) || !isFinite(maxBottom)) return;
 
-            const curW = num((domain as any).style?.width ?? (domain as any).measured?.width, 0);
-            const curH = num((domain as any).style?.height ?? (domain as any).measured?.height, 0);
+            const curW = num(domain.style?.width ?? domain.measured?.width, 0);
+            const curH = num(domain.style?.height ?? domain.measured?.height, 0);
             const needW = maxRight - domain.position.x + dPadHEffective;
             const needH = maxBottom - domain.position.y + dPadV + bottomSafe + bottomSafeGap;
             const finalW = Math.max(curW, needW);
             const finalH = Math.max(curH, needH);
 
             if (finalW > curW || finalH > curH) {
-                (domain as any).measured = { width: finalW, height: finalH };
-                (domain as any).style = { ...(domain as any).style, width: finalW, height: finalH };
+                domain.measured = { width: finalW, height: finalH };
+                domain.style = { ...domain.style, width: finalW, height: finalH };
             }
         };
 
@@ -281,16 +280,16 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 }
 
                 const targetY = Math.min(
-                    ...domainSubGroups.map(sg => num((sg as any)?.position?.y, domain.position.y + dTitleH + titleSafe + dPadV))
+                    ...domainSubGroups.map(sg => num(sg.position.y, domain.position.y + dTitleH + titleSafe + dPadV))
                 );
                 let cursorX = domain.position.x + dPadHEffective;
 
                 for (const sg of domainSubGroups) {
-                    const deltaX = cursorX - num((sg as any)?.position?.x, cursorX);
-                    const deltaY = targetY - num((sg as any)?.position?.y, targetY);
+                    const deltaX = cursorX - num(sg.position.x, cursorX);
+                    const deltaY = targetY - num(sg.position.y, targetY);
                     moveSubGroupWithChildren(sg, deltaX, deltaY);
 
-                    const sgWidth = num((sg as any)?.style?.width ?? (sg as any)?.measured?.width, 0);
+                    const sgWidth = num(sg.style?.width ?? sg.measured?.width, 0);
                     cursorX += sgWidth + nodeGapH;
                 }
 
@@ -338,12 +337,12 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
                 const bounds = calculateBounds(sgChildren, getNodeDimensions, widthCompensation);
                 const nextWidth = bounds.width + sdPadHEffective * 2;
                 const nextHeight = bounds.height + sdTitleH + titleSafe + sdPadV * 2 + bottomSafe;
-                const curWidth = num((sg as any).style?.width ?? (sg as any).measured?.width, 0);
-                const curHeight = num((sg as any).style?.height ?? (sg as any).measured?.height, 0);
+                const curWidth = num(sg.style?.width ?? sg.measured?.width, 0);
+                const curHeight = num(sg.style?.height ?? sg.measured?.height, 0);
                 const finalWidth = Math.max(curWidth, nextWidth);
                 const finalHeight = Math.max(curHeight, nextHeight);
-                (sg as any).measured = { width: finalWidth, height: finalHeight };
-                (sg as any).style = { ...(sg as any).style, width: finalWidth, height: finalHeight };
+                sg.measured = { width: finalWidth, height: finalHeight };
+                sg.style = { ...sg.style, width: finalWidth, height: finalHeight };
             });
         };
 
@@ -435,16 +434,16 @@ export class DomainDagreLayoutStrategy implements ILayoutStrategy {
 
                 if (!isFinite(maxRight)) continue;
 
-                const curW = num((domain as any).style?.width, 0);
-                const curH = num((domain as any).style?.height, 0);
+                const curW = num(domain.style?.width, 0);
+                const curH = num(domain.style?.height, 0);
                 const needW = maxRight - dx + dPadHEffective;
                 const needH = maxBottom - dy + dPadV + bottomSafe + bottomSafeGap;
 
                 if (needW > curW || needH > curH) {
                     const finalW = Math.max(curW, needW);
                     const finalH = Math.max(curH, needH);
-                    (domain as any).measured = { width: finalW, height: finalH };
-                    (domain as any).style = { ...(domain as any).style, width: finalW, height: finalH };
+                    domain.measured = { width: finalW, height: finalH };
+                    domain.style = { ...domain.style, width: finalW, height: finalH };
                 }
             }
         }

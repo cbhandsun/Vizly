@@ -8,7 +8,10 @@ import {
     Position,
     BatchPathFindingJob,
     PathFindingTaskResult,
+    PathFindingResult,
     PathfindingContext,
+    Point,
+    Rectangle,
     UnifiedRoutingConfig,
     createDefaultRoutingConfig
 } from '../types/routing';
@@ -34,7 +37,7 @@ import type { LineObstacle } from '../types/routing';
 interface WorkerGraphCache {
     version: number;
     spatialIndex: QuadTree | null;
-    visibilityGraph: any | null;
+    visibilityGraph: VisibilityGraph | null;
     gridSize: number;
     grid: PathfindingGrid | null;
     gridBounds: { startX: number; startY: number; endX: number; endY: number } | null;
@@ -49,12 +52,23 @@ let globalCache: WorkerGraphCache = {
     gridBounds: null
 };
 
-const getNodeXY = (n: any): { x: number; y: number } => {
-    const abs = n?.computed?.positionAbsolute || n?.positionAbsolute || n?.absolutePosition;
-    const pos = abs || n?.position;
+const finiteNumberOr = (value: unknown, fallback = 0): number =>
+    typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const getNodeXY = (value: unknown): Point => {
+    const node = isRecord(value) ? value : {};
+    const computed = isRecord(node.computed) ? node.computed : {};
+    const absolute = isRecord(computed.positionAbsolute)
+        ? computed.positionAbsolute
+        : isRecord(node.positionAbsolute)
+            ? node.positionAbsolute
+            : isRecord(node.absolutePosition)
+                ? node.absolutePosition
+                : undefined;
+    const position = absolute ?? (isRecord(node.position) ? node.position : {});
     return {
-        x: pos?.x ?? n?.x ?? 0,
-        y: pos?.y ?? n?.y ?? 0
+        x: finiteNumberOr(position.x, finiteNumberOr(node.x)),
+        y: finiteNumberOr(position.y, finiteNumberOr(node.y))
     };
 };
 
@@ -65,6 +79,39 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 const hasString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
 
 const hasFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
+const getNodeDimension = (value: unknown, dimension: 'width' | 'height', fallback = 0): number => {
+    if (!isRecord(value)) return fallback;
+    const measured = isRecord(value.measured) ? value.measured : {};
+    return finiteNumberOr(measured[dimension], finiteNumberOr(value[dimension], fallback));
+};
+
+const nodeCenter = (value: unknown): Point => {
+    const position = getNodeXY(value);
+    return {
+        x: position.x + getNodeDimension(value, 'width') / 2,
+        y: position.y + getNodeDimension(value, 'height') / 2
+    };
+};
+
+const getNodeId = (value: unknown): string | undefined =>
+    isRecord(value) && hasString(value.id) ? value.id : undefined;
+
+const getNodeType = (value: unknown): string | undefined =>
+    isRecord(value) && hasString(value.type) ? value.type : undefined;
+
+const isRectangle = (value: unknown): value is Rectangle =>
+    isRecord(value)
+    && hasFiniteNumber(value.x)
+    && hasFiniteNumber(value.y)
+    && hasFiniteNumber(value.width)
+    && hasFiniteNumber(value.height);
+
+const readBorderRadius = (value: unknown): number =>
+    isRecord(value) && hasFiniteNumber(value.borderRadius) ? value.borderRadius : 8;
+
+const getErrorMessage = (error: unknown, fallback: string): string =>
+    error instanceof Error && error.message ? error.message : fallback;
 
 const isValidWorkerJob = (value: unknown): value is PathFindingJob => {
     if (!isRecord(value)) return false;
@@ -117,7 +164,7 @@ const postInvalidWorkerMessage = (jobId: string | undefined, error: string, batc
  * Core Pathfinding Execution Logic
  * Delegates to the modular EdgeRoutingWorker
  */
-export const executeEdgePathfinding = (context: PathfindingContext): any => {
+export const executeEdgePathfinding = (context: PathfindingContext): PathFindingResult => {
     return EdgeRoutingWorker.execute(context);
 };
 
@@ -152,12 +199,12 @@ self.onmessage = (e: MessageEvent) => {
         };
         // [FIX] Force borderRadius to 8px (Hyper-Glass V3 standard)
         // Shallow merge above cannot propagate flat config.borderRadius into postProcessing.
-        unifiedConfig.postProcessing.borderRadius = (context.config as any)?.borderRadius ?? 8;
+        unifiedConfig.postProcessing.borderRadius = readBorderRadius(context.config);
 
 
         // [Imp-8] Caching Logic
         let spatialIndex: QuadTree;
-        let visibilityGraphCache: any;
+        let visibilityGraphCache: VisibilityGraph | undefined | null;
         let grid: PathfindingGrid;
 
         const currentVersion = context.graphVersion;
@@ -168,10 +215,10 @@ self.onmessage = (e: MessageEvent) => {
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
         if (context.nodes?.length) {
-            context.nodes.forEach((n: any) => {
+            context.nodes.forEach(n => {
                 const { x: nx, y: ny } = getNodeXY(n);
-                const width = n.measured?.width || n.width || 0;
-                const height = n.measured?.height || n.height || 0;
+                const width = getNodeDimension(n, 'width');
+                const height = getNodeDimension(n, 'height');
                 if (nx < minX) minX = nx;
                 if (nx + width > maxX) maxX = nx + width;
                 if (ny < minY) minY = ny;
@@ -210,14 +257,15 @@ self.onmessage = (e: MessageEvent) => {
             const CONTAINER_TYPES = new Set(['subGroup', 'titleGroup', 'group', 'swimlane', 'domain']);
 
             // Re-map node obstacles
-            const nodeObstacles = context.nodes?.filter((n: any) => {
-                if (n.type && CONTAINER_TYPES.has(n.type)) return false;
+            const nodeObstacles = context.nodes?.filter(n => {
+                const nodeType = getNodeType(n);
+                if (nodeType && CONTAINER_TYPES.has(nodeType)) return false;
                 return true;
-            }).map((n: any) => ({
-                id: n.id,
+            }).map(n => ({
+                id: getNodeId(n),
                 ...getNodeXY(n),
-                width: n.measured?.width || n.width || 150,
-                height: n.measured?.height || n.height || 80
+                width: getNodeDimension(n, 'width', 150),
+                height: getNodeDimension(n, 'height', 80)
             })) || [];
 
             const allObstacles = [...(context.obstacles || []), ...nodeObstacles];
@@ -247,7 +295,7 @@ self.onmessage = (e: MessageEvent) => {
                 globalCache = {
                     version: currentVersion,
                     spatialIndex,
-                    visibilityGraph: visibilityGraphCache,
+                    visibilityGraph: visibilityGraphCache ?? null,
                     gridSize: effectiveGridSize,
                     grid,
                     gridBounds
@@ -268,12 +316,15 @@ self.onmessage = (e: MessageEvent) => {
         // we encourage the A* algorithm (with MERGE_PATH cost) to bundle edges together.
 
         // A. Pre-process Priorities
-        const outgoing = new Map<string, any[]>();
-        const incoming = new Map<string, any[]>();
-        const nodeLookup = new Map<string, any>();
+        const outgoing = new Map<string, PathFindingJob[]>();
+        const incoming = new Map<string, PathFindingJob[]>();
+        const nodeLookup = new Map<string, unknown>();
 
         if (context.nodes) {
-            context.nodes.forEach((n: any) => nodeLookup.set(n.id, n));
+            context.nodes.forEach(n => {
+                const nodeId = getNodeId(n);
+                if (nodeId) nodeLookup.set(nodeId, n);
+            });
         }
 
         tasks.forEach(t => {
@@ -322,20 +373,22 @@ self.onmessage = (e: MessageEvent) => {
                 // 1-to-N: Sort by Target Position
                 // Determine dominant flow direction of the source
                 // For simplicity, just check relative position of targets
-                return (tA.y + tA.height / 2) - (tB.y + tB.height / 2); // Top-to-Bottom default
+                return nodeCenter(tA).y - nodeCenter(tB).y; // Top-to-Bottom default
             }
             if (sameTarget) {
                 // N-to-1: Sort by Source Position
-                return (sA.y + sA.height / 2) - (sB.y + sB.height / 2);
+                return nodeCenter(sA).y - nodeCenter(sB).y;
             }
 
             // Fallback: Default Deviation Sort
-            const getDeviation = (t: any, s: any, tgt: any) => {
-                const dy = Math.abs((s.y + s.height / 2) - (tgt.y + tgt.height / 2));
-                const dx = Math.abs((s.x + s.width / 2) - (tgt.x + tgt.width / 2));
+            const getDeviation = (source: unknown, target: unknown) => {
+                const sourceCenter = nodeCenter(source);
+                const targetCenter = nodeCenter(target);
+                const dy = Math.abs(sourceCenter.y - targetCenter.y);
+                const dx = Math.abs(sourceCenter.x - targetCenter.x);
                 return Math.min(dy, dx);
             };
-            return getDeviation(a, sA, tA) - getDeviation(b, sB, tB);
+            return getDeviation(sA, tA) - getDeviation(sB, tB);
         });
 
         // C. Sequential Execution with Guide Line Accumulation
@@ -346,12 +399,12 @@ self.onmessage = (e: MessageEvent) => {
         const portUsageMap: Record<string, number> = {};
 
         // [Imp-9] Prepare Global Debug Data (VG/SpatialIndex)
-        const debugDataExtras: any = {};
+        const debugDataExtras: Record<string, unknown> = {};
         if (unifiedConfig.debug) {
             // Serialize VG
             if (visibilityGraphCache) {
                 const vg = visibilityGraphCache as VisibilityGraph;
-                const debugEdges: any[] = [];
+                const debugEdges: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
                 if (vg && vg.edges) {
                     vg.edges.forEach((neighbors, u) => {
                         const uPt = vg.vertices[u];
@@ -371,8 +424,12 @@ self.onmessage = (e: MessageEvent) => {
             if (spatialIndex && typeof spatialIndex.getDebugBounds === 'function') {
                 debugDataExtras.spatialIndex = { bounds: spatialIndex.getDebugBounds() };
                 if (typeof spatialIndex.getAll === 'function') {
-                    debugDataExtras.obstacles = spatialIndex.getAll().map((o: any) => ({
-                        x: o.x, y: o.y, width: o.width, height: o.height, id: o.id
+                    debugDataExtras.obstacles = spatialIndex.getAll().map(o => ({
+                        x: o.x,
+                        y: o.y,
+                        width: o.width,
+                        height: o.height,
+                        id: isRecord(o) ? o.id : undefined
                     }));
                 }
             }
@@ -400,7 +457,7 @@ self.onmessage = (e: MessageEvent) => {
 
 
             // Execute with new PathfindingContext
-            let result: any;
+            let result: PathFindingResult;
             try {
                 result = executeEdgePathfinding({
                     job: task,
@@ -409,13 +466,13 @@ self.onmessage = (e: MessageEvent) => {
                     runtime: {
                         prebuiltGrid: grid,
                         spatialIndex: spatialIndex,
-                        visibilityGraphCache: visibilityGraphCache,
+                        visibilityGraphCache: visibilityGraphCache ?? undefined,
                         guideLines: relevantGuideLines,
                         portUsage: portUsageMap,
                         congestionGrid: congestionGrid // [NEW]
                     }
                 });
-            } catch (err: any) {
+            } catch (err: unknown) {
                 logPathfindingWorkerTaskExecutionFailure(task.edgeId, err);
                 // Provide a safe fallback result so the batch doesn't crash completely
                 const sx = Number.isFinite(task.sourceX) ? task.sourceX! : 0;
@@ -429,7 +486,7 @@ self.onmessage = (e: MessageEvent) => {
                     points: [{ x: sx, y: sy }, { x: tx, y: ty }],
                     labelX: (sx + tx) / 2,
                     labelY: (sy + ty) / 2,
-                    error: err.message || 'Worker task crashed'
+                    error: getErrorMessage(err, 'Worker task crashed')
                 };
             }
 
@@ -443,7 +500,7 @@ self.onmessage = (e: MessageEvent) => {
             //   - Same approach   → MERGE  (e.g. two edges from above entering Top → bundle)
             //   - Cross approach  → DIVERGE (e.g. edge from left + edge from above both at Top → conflict)
             if (result && result.sourcePos && result.targetPos) {
-                const posToDir = (pos: any) => {
+                const posToDir = (pos: Position | undefined) => {
                     if (pos === Position.Top) return 'top';
                     if (pos === Position.Bottom) return 'bottom';
                     if (pos === Position.Left) return 'left';
@@ -493,13 +550,24 @@ self.onmessage = (e: MessageEvent) => {
             if (unifiedConfig.debug && debugDataExtras) {
                 if (!result.debugInfo) result.debugInfo = { algorithmDebug: {} };
                 if (!result.debugInfo.algorithmDebug) result.debugInfo.algorithmDebug = {};
-                Object.assign(result.debugInfo.algorithmDebug as any, debugDataExtras);
+                const existingAlgorithmDebug = isRecord(result.debugInfo.algorithmDebug)
+                    ? result.debugInfo.algorithmDebug
+                    : {};
+                result.debugInfo.algorithmDebug = {
+                    ...existingAlgorithmDebug,
+                    ...debugDataExtras
+                };
             }
 
             // [FIX] Ensure Metadata exists
             if (!result.metadata) {
                 logPathfindingWorkerMissingMetadata(task.edgeId);
-                result.metadata = { strategy: (result as any).debugInfo?.algorithmDebug?.strategy || 'Recovered' };
+                const algorithmDebug = isRecord(result.debugInfo?.algorithmDebug)
+                    ? result.debugInfo.algorithmDebug
+                    : {};
+                result.metadata = {
+                    strategy: hasString(algorithmDebug.strategy) ? algorithmDebug.strategy : 'Recovered'
+                };
             }
 
 
@@ -600,12 +668,12 @@ self.onmessage = (e: MessageEvent) => {
                 results: sanitizedResults
             });
     
-        } catch (err: any) {
+        } catch (err: unknown) {
             logPathfindingWorkerSerializationFailure(err);
             self.postMessage({
                 type: 'BATCH_RESULT',
                 batchId,
-                error: 'Serialization Failed: ' + err.message
+                error: 'Serialization Failed: ' + getErrorMessage(err, 'Unknown error')
             });
         }
     } else {
@@ -616,13 +684,24 @@ self.onmessage = (e: MessageEvent) => {
 
         // [P2-3] Legacy / Single Mode Handling
         // Detect if we're receiving a PathFindingRequest { job, graph } or legacy flat data
-        const isNewRequest = (data as any).job && (data as any).graph;
+        const isNewRequest = isRecord(data.job) && isRecord(data.graph);
 
-        const jobData = isNewRequest ? (data as any).job : data;
-        const graphData = isNewRequest ? (data as any).graph : data;
+        const jobData = isNewRequest ? data.job : data;
+        const graphData = isNewRequest ? data.graph : data;
+        if (!isRecord(jobData) || !isRecord(graphData) || !isValidWorkerJob(jobData)) {
+            postInvalidWorkerMessage(hasString(data.jobId) ? data.jobId : undefined, 'Invalid pathfinding request');
+            return;
+        }
 
         // Construct context from appropriate source
-        const { nodes, edges, obstacles, config } = graphData;
+        const nodes = Array.isArray(graphData.nodes) ? graphData.nodes : [];
+        const edges = Array.isArray(graphData.edges) ? graphData.edges : [];
+        const obstacles = Array.isArray(graphData.obstacles)
+            ? graphData.obstacles.filter(isRectangle)
+            : [];
+        const config = isRecord(graphData.config)
+            ? graphData.config as Partial<UnifiedRoutingConfig>
+            : {};
 
         // TaskData should focus ONLY on edge-specific fields
         // If it's legacy, we strip out graph fields to avoid pollution
@@ -634,18 +713,19 @@ self.onmessage = (e: MessageEvent) => {
 
         // [FIX] Ensure Nodes are treated as Obstacles in Single Mode too
         const CONTAINER_TYPES = new Set(['subGroup', 'titleGroup', 'group', 'swimlane', 'domain']);
-        const nodeObstacles = nodes?.filter((n: any) => {
+        const nodeObstacles = nodes.filter(n => {
             // [FIX] Unconditionally exclude container types from obstacles
             // Containers should never be obstacles in this context
-            if (n.type && CONTAINER_TYPES.has(n.type)) {
+            const nodeType = getNodeType(n);
+            if (nodeType && CONTAINER_TYPES.has(nodeType)) {
                 return false;
             }
             return true;
-        }).map((n: any) => ({
+        }).map(n => ({
             ...getNodeXY(n),
-            width: n.measured?.width || n.width || 150,
-            height: n.measured?.height || n.height || 80
-        })) || [];
+            width: getNodeDimension(n, 'width', 150),
+            height: getNodeDimension(n, 'height', 80)
+        }));
         const allObstacles = [...(obstacles || []), ...nodeObstacles];
 
         const context = { nodes, edges, obstacles: allObstacles, config };
@@ -656,7 +736,7 @@ self.onmessage = (e: MessageEvent) => {
             ...(config || {})
         };
         // [FIX] Force borderRadius to 8px (Hyper-Glass V3 standard)
-        unifiedConfig.postProcessing.borderRadius = (config as any)?.borderRadius ?? 8;
+        unifiedConfig.postProcessing.borderRadius = readBorderRadius(config);
         const visibilityGraphEnabled = unifiedConfig.algorithm.useVisibilityGraph &&
             allObstacles.length >= (unifiedConfig.algorithm.visibilityGraphThreshold ?? 6);
         const shouldBuildSpatialIndex = allObstacles.length > 0 && (visibilityGraphEnabled || allObstacles.length > 50);
@@ -696,7 +776,17 @@ self.onmessage = (e: MessageEvent) => {
             ? buildVisibilityGraph(spatialIndex || allObstacles)
             : undefined;
 
-        const job: PathFindingJob = edgeProps as PathFindingJob;
+        const job: PathFindingJob = {
+            ...edgeProps,
+            jobId: jobData.jobId,
+            edgeId: jobData.edgeId,
+            source: jobData.source,
+            target: jobData.target,
+            sourceX: jobData.sourceX,
+            sourceY: jobData.sourceY,
+            targetX: jobData.targetX,
+            targetY: jobData.targetY
+        };
 
         // No prebuilt grid (findPath will build it internally)
         try {
@@ -714,9 +804,9 @@ self.onmessage = (e: MessageEvent) => {
             } else {
                 self.postMessage(result);
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             logPathfindingWorkerCriticalFailure(err);
-            self.postMessage({ jobId: job.edgeId, error: err.message });
+            self.postMessage({ jobId: job.edgeId, error: getErrorMessage(err, 'Worker execution failed') });
         }
     }
 };
@@ -726,7 +816,7 @@ self.onmessage = (e: MessageEvent) => {
  */
 function rasterizePathToGrid(
     targetGrid: Int32Array,
-    points: any[],
+    points: Point[],
     cost: number,
     gridSpec: { minX: number, minY: number, cols: number, rows: number, size: number, maxIndex: number }
 ) {
