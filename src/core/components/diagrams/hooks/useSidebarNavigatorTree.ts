@@ -9,52 +9,51 @@ export interface NavigatorTreeNode {
     isMatched: boolean;
 }
 
+type NavigatorSourceNode = Node & { children: NavigatorSourceNode[] };
+
 export function useSidebarNavigatorTree(nodes: Node[], searchTerm: string) {
     const { treeData, expandedKeys: searchExpandedKeys } = useMemo(() => {
         if (!nodes || nodes.length === 0) return { treeData: [], expandedKeys: [] };
 
-        const nodeMap = new Map<string, any>();
-        nodes.forEach(n => nodeMap.set(n.id, { ...n, children: [] }));
+        const nodeMap = new Map<string, NavigatorSourceNode>();
+        nodes.forEach(node => nodeMap.set(node.id, { ...node, children: [] }));
 
-        const roots: any[] = [];
-        nodes.forEach(n => {
-            const nodeWithChildren = nodeMap.get(n.id);
-            if (n.parentId && nodeMap.has(n.parentId)) {
-                nodeMap.get(n.parentId).children.push(nodeWithChildren);
-            } else {
-                roots.push(nodeWithChildren);
+        const roots: NavigatorSourceNode[] = [];
+        nodes.forEach(node => {
+            const nodeWithChildren = nodeMap.get(node.id);
+            if (!nodeWithChildren) return;
+            if (node.parentId) {
+                const parent = nodeMap.get(node.parentId);
+                if (parent) {
+                    parent.children.push(nodeWithChildren);
+                    return;
+                }
             }
+            roots.push(nodeWithChildren);
         });
 
         const expandedKeys: string[] = [];
         const term = searchTerm.toLowerCase();
 
-        const filterTree = (nodesToFilter: any[]): any[] => {
-            return nodesToFilter.map(item => {
-                const data = item.data;
-                const label = data?.label || item.id;
+        const filterTree = (nodesToFilter: NavigatorSourceNode[]): NavigatorTreeNode[] => (
+            nodesToFilter.flatMap(item => {
+                const label = typeof item.data?.label === 'string' ? item.data.label : item.id;
                 const selfMatch = !term || label.toLowerCase().includes(term);
-
-                const filteredChildren = filterTree(item.children || []);
+                const filteredChildren = filterTree(item.children);
                 const hasMatchingChildren = filteredChildren.length > 0;
 
-                if (!selfMatch && !hasMatchingChildren) {
-                    return null;
-                }
+                if (!selfMatch && !hasMatchingChildren) return [];
+                if (term && hasMatchingChildren) expandedKeys.push(item.id);
 
-                if (term && hasMatchingChildren) {
-                    expandedKeys.push(item.id);
-                }
-
-                return {
+                return [{
                     key: item.id,
                     title: label,
                     node: item,
                     children: filteredChildren,
                     isMatched: selfMatch,
-                };
-            }).filter(Boolean);
-        };
+                }];
+            })
+        );
 
         return { treeData: filterTree(roots), expandedKeys };
     }, [nodes, searchTerm]);

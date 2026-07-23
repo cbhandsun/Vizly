@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import { autoMindMapLayout } from '../../../utils/LayoutAlgorithms';
-import { parseIndentedText } from '../../../utils/textTreeParser';
+import { parseIndentedText, type ParsedTreeNode } from '../../../utils/textTreeParser';
 import {
     MIND_MAP_PALETTE,
     collectMindMapSubtree,
@@ -22,6 +22,7 @@ export const PALETTE: readonly string[] = MIND_MAP_PALETTE;
 export { exportMindMapToMarkdown } from './mindMapMarkdown';
 
 let mindmapClipboard: MindMapClipboard | null = null;
+let skipNextSystemPaste = false;
 
 export function useMindMapOrchestrator(
     nodes: Node[],
@@ -300,6 +301,7 @@ export function useMindMapOrchestrator(
                     if (!payload) return;
 
                     takeSnapshot();
+                    skipNextSystemPaste = true;
                     setEdges(eds => [...eds, ...payload.edges]);
                     setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...payload.nodes]);
                 }
@@ -325,7 +327,10 @@ export function useMindMapOrchestrator(
             // [T-1] If there's a mindmap subtree in our internal clipboard, the Ctrl+V
             // handler in handleKeyDown above will handle it. Bail out here so we
             // don't also try to parse the system clipboard text as indented structure.
-            if (mindmapClipboard && (e as any)._mindmapHandled) return;
+            if (skipNextSystemPaste) {
+                skipNextSystemPaste = false;
+                return;
+            }
 
             const clipboardData = e.clipboardData;
             if (!clipboardData) return;
@@ -354,7 +359,7 @@ export function useMindMapOrchestrator(
 
                 let nodeIdCounter = Date.now();
 
-                const traverseAndCreate = (parsedNode: any, parentId: string, currentDepth: number) => {
+                const traverseAndCreate = (parsedNode: ParsedTreeNode, parentId: string, currentDepth: number) => {
                     const newId = `mindmap-node-${nodeIdCounter++}`;
                     
                     const nDesc: Node = {
@@ -381,8 +386,7 @@ export function useMindMapOrchestrator(
                             strokeWidth: Math.max(1.5, 4 - currentDepth * 0.8),
                             stroke: branchColor || (currentDepth === 1 ? '#6366f1' : '#94a3b8')
                         },
-                        data: { kind: 'mindmap' },
-                        markerEnd: '' as any
+                        data: { kind: 'mindmap' }
                     };
                     newEdges.push(eDesc);
 
@@ -567,7 +571,7 @@ export function useMindMapOrchestrator(
                           strokeWidth: Math.max(1.5, 4 - (targetDepthInTree - 1) * 0.8),
                           stroke: newColor || '#6366f1'
                       },
-                      markerEnd: '' as any
+                      markerEnd: undefined
                   };
              }
              return edge;

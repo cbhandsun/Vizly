@@ -6,13 +6,23 @@ import ERDatabaseNode from '../components/custom-nodes/ERDatabaseNode';
 import { DatabaseOutlined, TableOutlined, LinkOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
+interface ERTableTemplate {
+    tableName: string;
+    themeColor: string;
+    columns: Array<{
+        name: string;
+        type: string;
+        isPrimary?: boolean;
+        isForeign?: boolean;
+    }>;
+}
 
 export class ERDiagramPlugin implements DiagramTypePlugin {
     id = 'er-diagram';
     name = '实体关系图 (ER)';
     version = '1.0';
 
-    async migrate(data: any, _fromVersion: string | undefined): Promise<any> {
+    async migrate<T>(data: T, _fromVersion: string | undefined): Promise<T> {
         return data;
     }
 
@@ -98,7 +108,7 @@ export class ERDiagramPlugin implements DiagramTypePlugin {
 
 // ====== 侧边栏面板 ======
 const ERPalette: React.FC = () => {
-    const onDragStart = (event: React.DragEvent, tableDef: any) => {
+    const onDragStart = (event: React.DragEvent, tableDef: ERTableTemplate) => {
         event.dataTransfer.setData('application/reactflow', JSON.stringify({
             typeName: 'erNode',
             label: tableDef.tableName,
@@ -107,7 +117,7 @@ const ERPalette: React.FC = () => {
         event.dataTransfer.effectAllowed = 'move';
     };
 
-    const templates = [
+    const templates: ERTableTemplate[] = [
         {
             tableName: 'users',
             themeColor: '#10b981',

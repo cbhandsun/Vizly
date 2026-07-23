@@ -7,6 +7,64 @@
 
 import { analyzeDiagram } from '@/utils/diagramAnalyzer';
 
+interface PromptDiagramNode {
+  id: string;
+  type?: string;
+  data?: { label?: string; description?: string; domainClass?: string };
+}
+
+interface PromptDiagramEdge {
+  id: string;
+  source: string;
+  target: string;
+  label?: string;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
+const cleanPromptText = (value: unknown, maxLength = 200): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const clean = value.replace(/\s+/g, ' ').trim().slice(0, maxLength);
+  return clean || undefined;
+};
+
+const coercePromptNodes = (values: readonly unknown[]): PromptDiagramNode[] => (
+  values.slice(0, 1000).flatMap(value => {
+    if (!isRecord(value)) return [];
+    const id = cleanPromptText(value.id, 120);
+    if (!id) return [];
+    const rawData = isRecord(value.data) ? value.data : {};
+    return [{
+      id,
+      type: cleanPromptText(value.type, 120),
+      data: {
+        label: cleanPromptText(rawData.label),
+        description: cleanPromptText(rawData.description),
+        domainClass: cleanPromptText(rawData.domainClass, 120),
+      },
+    }];
+  })
+);
+
+const coercePromptEdges = (values: readonly unknown[]): PromptDiagramEdge[] => (
+  values.slice(0, 2000).flatMap((value, index) => {
+    if (!isRecord(value)) return [];
+    const source = cleanPromptText(value.source, 120);
+    const target = cleanPromptText(value.target, 120);
+    if (!source || !target) return [];
+    return [{
+      id: cleanPromptText(value.id, 120) ?? `edge-${index}`,
+      source,
+      target,
+      label: typeof value.label === 'number'
+        ? String(value.label)
+        : cleanPromptText(value.label),
+    }];
+  })
+);
+
 /**
  * 主要 System Prompt — 架构图 AI 助手
  * 当用户请求生成/修改图表时，AI 应返回标准 JSON 格式
@@ -308,9 +366,11 @@ export function enhanceWithSlashCommand(input: string): string {
  * 这让 AI 了解当前画布上有哪些节点和连线
  */
 export function buildDiagramContext(
-  nodes: Array<{ id: string; type?: string; data?: any }>,
-  edges: any[]
+  rawNodes: readonly unknown[],
+  rawEdges: readonly unknown[]
 ): string {
+  const nodes = coercePromptNodes(rawNodes);
+  const edges = coercePromptEdges(rawEdges);
   if (nodes.length === 0) return '';
 
   const nodeList = nodes
@@ -337,9 +397,11 @@ ${edgeList}${edges.length > 30 ? `\n  ... 还有 ${edges.length - 30} 条连线`
  * 为 /analyze 命令注入图表分析结果
  */
 export function buildAnalysisContext(
-  nodes: any[],
-  edges: any[]
+  rawNodes: readonly unknown[],
+  rawEdges: readonly unknown[]
 ): string {
+  const nodes = coercePromptNodes(rawNodes);
+  const edges = coercePromptEdges(rawEdges);
   if (nodes.length === 0) return '';
 
   const result = analyzeDiagram(nodes, edges);

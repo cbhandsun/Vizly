@@ -19,6 +19,23 @@ import {
 import { useTopologyLinter } from '../hooks/useTopologyLinter';
 import { useDiagramStore } from '../store/useDiagramStore';
 
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
+const migrateArchitectureNode = (value: unknown): unknown => {
+  if (!isRecord(value)) return value;
+  const data = isRecord(value.data) ? value.data : {};
+  return {
+    ...value,
+    data: {
+      ...data,
+      type: typeof data.type === 'string' && data.type ? data.type : 'component',
+      status: typeof data.status === 'string' && data.status ? data.status : 'normal',
+    },
+  };
+};
+
 // ====== 插件定义 ======
 export class ArchitecturePlugin implements DiagramTypePlugin {
   id = 'architecture-diagram';
@@ -30,19 +47,13 @@ export class ArchitecturePlugin implements DiagramTypePlugin {
   tags = ['Enterprise', 'Architecture', 'Governance'];
   brandColor = '#722ed1';
 
-  async migrate(data: any, fromVersion: string | undefined): Promise<any> {
+  async migrate(data: unknown, fromVersion: string | undefined): Promise<unknown> {
+    if (!isRecord(data)) return data;
     const migratedData = { ...data };
     if (!fromVersion) {
       // Legacy data: ensure all architecture nodes have a type field
       if (Array.isArray(migratedData.nodes)) {
-        migratedData.nodes = migratedData.nodes.map((n: any) => ({
-          ...n,
-          data: {
-            ...n.data,
-            type: n.data?.type || 'component',
-            status: n.data?.status || 'normal',
-          }
-        }));
+        migratedData.nodes = migratedData.nodes.map(migrateArchitectureNode);
       }
     }
     return migratedData;
@@ -303,14 +314,14 @@ const ArchitectureToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
         const nodes = ctx.getNodes();
         const selected = nodes.filter(n => n.selected);
         if (selected.length === 2) {
-            const newEdge = {
+            const newEdge: Edge = {
                 id: `arch-e-${Date.now()}`,
                 source: selected[0].id,
                 target: selected[1].id,
                 type: 'archEdge',
                 data: { semantic: 'dependency', label: '依赖' }
             };
-            ctx.setEdges(eds => [...eds, newEdge as any]);
+            ctx.setEdges(eds => [...eds, newEdge]);
             
             // Trigger smart layout after a tiny delay so state resolves
             setTimeout(() => {
