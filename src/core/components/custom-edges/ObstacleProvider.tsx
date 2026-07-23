@@ -14,7 +14,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useStore } from '@xyflow/react';
 import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import { ObstacleContext } from './obstacleContext';
-import type { ObstacleContextValue, NodeBBox } from './obstacleContext';
+import type { ObstacleContextValue, NodeBBox, ObstacleNode } from './obstacleContext';
 
 // ==================== 工具函数 ====================
 
@@ -24,14 +24,14 @@ const IGNORE_TYPES = new Set(['annotation', 'background']);
 /**
  * 获取节点边界框
  */
-const getAbsolutePosition = (n: any, nodeMap: Map<string, any>, visited?: Set<string>): { x: number; y: number } => {
-    const abs = n?.computed?.positionAbsolute ?? n?.positionAbsolute;
+const getAbsolutePosition = (n: ObstacleNode, nodeMap: ReadonlyMap<string, ObstacleNode>, visited?: Set<string>): { x: number; y: number } => {
+    const abs = n.computed?.positionAbsolute ?? n.positionAbsolute;
     if (abs) return abs;
-    const base = n?.position || { x: n?.x ?? 0, y: n?.y ?? 0 };
-    const parentId = n?.parentId || n?.parentNode;
+    const base = n.position || { x: n.x ?? 0, y: n.y ?? 0 };
+    const parentId = n.parentId || n.parentNode;
     if (!parentId) return base;
     const v = visited || new Set<string>();
-    const id = String(n?.id ?? '');
+    const id = n.id;
     if (id && v.has(id)) return base;
     if (id) v.add(id);
     const parent = nodeMap.get(String(parentId));
@@ -40,13 +40,13 @@ const getAbsolutePosition = (n: any, nodeMap: Map<string, any>, visited?: Set<st
     return { x: pAbs.x + (base.x ?? 0), y: pAbs.y + (base.y ?? 0) };
 };
 
-const getNodeBBox = (n: any, nodeMap: Map<string, any>): NodeBBox => {
+const getNodeBBox = (n: ObstacleNode, nodeMap: ReadonlyMap<string, ObstacleNode>): NodeBBox => {
     const pos = getAbsolutePosition(n, nodeMap);
     const x = pos?.x ?? 0;
     const y = pos?.y ?? 0;
-    const width = typeof n?.width === 'number' ? n.width : (n?.measured?.width ?? n?.style?.width ?? 0);
-    const height = typeof n?.height === 'number' ? n.height : (n?.measured?.height ?? n?.style?.height ?? 0);
-    return { id: n?.id ?? '', x, y, width: Number(width) || 0, height: Number(height) || 0, type: n?.type };
+    const width = typeof n.width === 'number' ? n.width : (n.measured?.width ?? n.style?.width ?? 0);
+    const height = typeof n.height === 'number' ? n.height : (n.measured?.height ?? n.style?.height ?? 0);
+    return { id: n.id, x, y, width: Number(width) || 0, height: Number(height) || 0, type: n.type };
 };
 
 /**
@@ -55,19 +55,19 @@ const getNodeBBox = (n: any, nodeMap: Map<string, any>): NodeBBox => {
  * 新写法：djb2 滚动哈希 = O(N)，无中间字符串，与 edgeTopologySig 同一模式。
  * 坐标量化到 4px 单元，过滤 sub-pixel 噪声，减少不必要的 debounce 触发。
  */
-const makeSignature = (nodes: any[]): number => {
+const makeSignature = (nodes: ObstacleNode[]): number => {
     try {
-        const nodeMap = new Map<string, any>();
+        const nodeMap = new Map<string, ObstacleNode>();
         for (const n of nodes || []) {
             if (!n) continue;
-            if (n?.id != null) nodeMap.set(String(n.id), n);
+            nodeMap.set(n.id, n);
         }
         let h = 5381;
         for (const n of nodes || []) {
             if (!n) continue;
-            const t = String(n?.type || '');
+            const t = String(n.type || '');
             if (IGNORE_TYPES.has(t)) continue;
-            const hidden = !!((n?.data || {}) as any)?.hidden;
+            const hidden = n.data.hidden === true;
             if (hidden) continue;
             const bb = getNodeBBox(n, nodeMap);
             // 量化到 4px 单元，消除 sub-pixel 噪声
@@ -76,8 +76,8 @@ const makeSignature = (nodes: any[]): number => {
             const w = Math.round(bb.width / 4);
             const hh = Math.round(bb.height / 4);
             // djb2 哈希：散列 id + 位置 + 尺寸
-            for (let i = 0; i < (n.id?.length ?? 0); i++) {
-                h = ((h * 33) ^ (n.id as string).charCodeAt(i)) >>> 0;
+            for (let i = 0; i < n.id.length; i++) {
+                h = ((h * 33) ^ n.id.charCodeAt(i)) >>> 0;
             }
             h = ((h * 33) ^ x) >>> 0;
             h = ((h * 33) ^ y) >>> 0;
@@ -100,19 +100,19 @@ const POOL_CONTAINER_TYPES = new Set([
 /**
  * 过滤出业务节点（排除容器）
  */
-const filterBusinessNodes = (nodes: any[]): NodeBBox[] => {
+const filterBusinessNodes = (nodes: ObstacleNode[]): NodeBBox[] => {
     const result: NodeBBox[] = [];
-    const nodeMap = new Map<string, any>();
+    const nodeMap = new Map<string, ObstacleNode>();
     for (const n of nodes || []) {
         if (!n) continue;
-        if (n?.id != null) nodeMap.set(String(n.id), n);
+        nodeMap.set(n.id, n);
     }
 
     for (const n of nodes || []) {
         if (!n) continue;
 
-        const t = String(n?.type || '');
-        const hidden = !!((n?.data || {}) as any)?.hidden;
+        const t = String(n.type || '');
+        const hidden = n.data.hidden === true;
         if (hidden) continue;
 
         // [FIX N-3] 通过 type 集合识别 Pool/Lane 容器，不再用字符串匹配
@@ -121,7 +121,7 @@ const filterBusinessNodes = (nodes: any[]): NodeBBox[] => {
         }
 
         // 显式控制优先
-        const isObstacle = n?.data?.isObstacle;
+        const isObstacle = n.data.isObstacle;
         if (typeof isObstacle === 'boolean') {
             if (isObstacle) result.push(getNodeBBox(n, nodeMap));
             continue;
@@ -129,7 +129,7 @@ const filterBusinessNodes = (nodes: any[]): NodeBBox[] => {
 
         // 容器节点处理: 仅当收起(collapsed)时视为障碍物
         if (CONTAINER_TYPES.has(t)) {
-            const isCollapsed = n?.data?.collapsed === true || n?.data?.expanded === false;
+            const isCollapsed = n.data.collapsed === true || n.data.expanded === false;
             // 如果容器已收起，它就是一个实心障碍物
             if (isCollapsed) {
                 result.push(getNodeBBox(n, nodeMap));
@@ -143,7 +143,7 @@ const filterBusinessNodes = (nodes: any[]): NodeBBox[] => {
         }
 
         // 默认所有剩余业务节点参与避障 (除非被明确禁用或 zIndex < 0)
-        const z = typeof n?.zIndex === 'number' ? n.zIndex : (typeof n?.style?.zIndex === 'number' ? n.style.zIndex : 0);
+        const z = typeof n.zIndex === 'number' ? n.zIndex : (typeof n.style?.zIndex === 'number' ? n.style.zIndex : 0);
         if (typeof z === 'number' && z < 0) continue;
 
         result.push(getNodeBBox(n, nodeMap));
@@ -162,7 +162,7 @@ export const ObstacleProvider: React.FC<ObstacleProviderProps> = ({
     children,
     debounceMs
 }) => {
-    const nodes = useStore((s: any) => s.nodes || []);
+    const nodes = useStore((state) => state.nodes as ObstacleNode[]);
 
     // 计算原始签名
     const rawSignature = useMemo(() => makeSignature(nodes), [nodes]);
@@ -193,7 +193,7 @@ export const ObstacleProvider: React.FC<ObstacleProviderProps> = ({
         let ms = debounceMs;
         if (typeof ms !== 'number') {
             try {
-                ms = Number((diagramConfigManager.getConfig() as any)?.performance?.debounceMs ?? 100);
+                ms = Number(diagramConfigManager.getConfig().performance?.debounceMs ?? 100);
             } catch {
                 ms = 100;
             }
@@ -211,7 +211,7 @@ export const ObstacleProvider: React.FC<ObstacleProviderProps> = ({
     // 基于稳定签名计算共享数据
     const value = useMemo<ObstacleContextValue>(() => {
         // 构建节点 Map (O(1) 查找)
-        const nodeMap = new Map<string, any>();
+        const nodeMap = new Map<string, ObstacleNode>();
         for (const n of stableNodes) {
             if (n?.id) nodeMap.set(n.id, n);
         }

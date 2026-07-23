@@ -1,4 +1,5 @@
 import type { RoutingNodeRect } from '../../../algorithms/containerHeaderSkimRepair';
+import type { ObstacleNode } from '../obstacleContext';
 
 export type PathPoint = { x: number; y: number };
 
@@ -30,14 +31,14 @@ export const snapSimpleOrthogonalPath = (path: string): string => {
     return commands.map(point => `${point.cmd} ${point.x} ${point.y}`).join(' ');
 };
 
-const getNodeAbsPosition = (nodeLike: any, nodeMap: Map<string, any>, visited?: Set<string>): PathPoint => {
-    const abs = nodeLike?.internals?.positionAbsolute || nodeLike?.computed?.positionAbsolute || nodeLike?.positionAbsolute;
+const getNodeAbsPosition = (nodeLike: ObstacleNode, nodeMap: ReadonlyMap<string, ObstacleNode>, visited?: Set<string>): PathPoint => {
+    const abs = nodeLike.internals?.positionAbsolute || nodeLike.computed?.positionAbsolute || nodeLike.positionAbsolute;
     if (abs) return { x: abs.x ?? 0, y: abs.y ?? 0 };
-    const base = nodeLike?.position || { x: nodeLike?.x ?? 0, y: nodeLike?.y ?? 0 };
-    const parentId = nodeLike?.parentId || nodeLike?.parentNode;
+    const base = nodeLike.position || { x: nodeLike.x ?? 0, y: nodeLike.y ?? 0 };
+    const parentId = nodeLike.parentId || nodeLike.parentNode;
     if (!parentId) return { x: base.x ?? 0, y: base.y ?? 0 };
     const v = visited || new Set<string>();
-    const id = String(nodeLike?.id ?? '');
+    const id = nodeLike.id;
     if (id && v.has(id)) return { x: base.x ?? 0, y: base.y ?? 0 };
     if (id) v.add(id);
     const parent = nodeMap.get(String(parentId));
@@ -46,10 +47,9 @@ const getNodeAbsPosition = (nodeLike: any, nodeMap: Map<string, any>, visited?: 
     return { x: parentAbs.x + (base.x ?? 0), y: parentAbs.y + (base.y ?? 0) };
 };
 
-export const collectRoutingNodeRects = (nodeMap: Map<string, any>): RoutingNodeRect[] => {
+export const collectRoutingNodeRects = (nodeMap: ReadonlyMap<string, ObstacleNode>): RoutingNodeRect[] => {
     const rects: RoutingNodeRect[] = [];
-    nodeMap.forEach((node: any) => {
-        if (!node?.id) return;
+    nodeMap.forEach((node) => {
         const pos = getNodeAbsPosition(node, nodeMap);
         const width = Number(node.width ?? node.measured?.width ?? node.style?.width ?? 0);
         const height = Number(node.height ?? node.measured?.height ?? node.style?.height ?? 0);
