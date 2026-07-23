@@ -46,14 +46,14 @@ export interface FloatingPositionResult {
 
 // ─── 从 ReactFlow Store 计算选中节点的 bounds ─────────────────────────────────
 export function useSelectedNodeBounds(selectedNodeIds: string[]): WorldBounds | null {
-    return useStore((s: any) => {
+    return useStore(s => {
         if (selectedNodeIds.length === 0) return null;
 
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         for (const id of selectedNodeIds) {
-            const n = s.nodeLookup?.get(id) || s.nodeInternals?.get(id);
+            const n = s.nodeLookup.get(id);
             if (!n) continue;
-            const abs = n.internals?.positionAbsolute || n.positionAbsolute || n.position;
+            const abs = n.internals.positionAbsolute || n.position;
             const x = abs?.x ?? 0;
             const y = abs?.y ?? 0;
             const w = n.measured?.width ?? n.width ?? 0;
@@ -71,7 +71,7 @@ export function useSelectedNodeBounds(selectedNodeIds: string[]): WorldBounds | 
 
 // ─── 判断是否在拖拽中 ────────────────────────────────────────────────────────
 export function useNodesDragging(): boolean {
-    return useStore((s: any) => !!s.nodesDragging);
+    return useStore(s => s.nodes.some(node => node.dragging));
 }
 
 // ─── 核心定位 Hook ───────────────────────────────────────────────────────────

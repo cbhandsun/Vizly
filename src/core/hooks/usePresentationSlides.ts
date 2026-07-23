@@ -5,6 +5,7 @@
  * 每个 slide 聚焦一个域，包含该域下的所有子节点
  */
 import { useMemo } from 'react';
+import type { Node } from '@xyflow/react';
 import { getDescendantIds, buildChildrenMap } from '../components/diagrams/hooks/useCollapsibleGroups';
 
 export interface PresentationSlide {
@@ -36,7 +37,8 @@ export function generateSlides(
   direction: 'vertical' | 'horizontal' = 'vertical'
 ): PresentationSlide[] {
   // 构建子节点关系查找表（支持 explicit parentId 和 semantic domain/subDomain 映射）
-  const childrenMap = buildChildrenMap(nodes as any);
+  const reactFlowNodes = nodes as unknown as Node[];
+  const childrenMap = buildChildrenMap(reactFlowNodes);
 
   // 第一步：找到所有主容器（titleGroup / group / subGroup / swimlane）
   const containers = nodes.filter(
@@ -70,7 +72,7 @@ export function generateSlides(
     const title = container.data?.label || container.data?.description || container.id;
 
     // 找到该容器下的所有子代节点（深度递归）
-    const descendantIds = getDescendantIds(nodes as any, container.id, childrenMap);
+    const descendantIds = getDescendantIds(reactFlowNodes, container.id, childrenMap);
 
     // 过滤出子代中也是容器的节点，作为 containerIds
     const nestedContainerIds = nodes

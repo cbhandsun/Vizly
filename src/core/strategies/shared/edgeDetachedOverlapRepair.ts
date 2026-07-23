@@ -445,8 +445,8 @@ export function separateDetachedParallelOverlaps(
         const edge = edges[segment.edgeIndex];
         const otherSegment = segment === hit.a ? hit.b : hit.a;
         const otherEdge = edges[otherSegment.edgeIndex];
-        const protectedSharedTrunk = (edge?.data as any)?.sharedTrunkSynthesized === true
-          && (otherEdge?.data as any)?.sharedTrunkSynthesized !== true
+        const protectedSharedTrunk = edge?.data?.sharedTrunkSynthesized === true
+          && otherEdge?.data?.sharedTrunkSynthesized !== true
           && sharesAnyEndpoint(segment, otherSegment, edges)
           && !segmentsRunOppositeDirections(segment, otherSegment);
         if (protectedSharedTrunk) continue;

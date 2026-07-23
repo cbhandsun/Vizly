@@ -159,8 +159,10 @@ export function useTopologyLinter(nodes: Node[], edges: Edge[], options: Topolog
             const isValidType = (t: string | undefined) => t === 'architectureNode' || t === 'networkNode';
             if (!isValidType(sType) || !isValidType(tType)) return;
 
-            const stypeAttr = (sourceNode.data as any).type as string;
-            const ttypeAttr = (targetNode.data as any).type as string;
+            const sourceData = sourceNode.data as Record<string, unknown>;
+            const targetData = targetNode.data as Record<string, unknown>;
+            const stypeAttr = typeof sourceData.type === 'string' ? sourceData.type : '';
+            const ttypeAttr = typeof targetData.type === 'string' ? targetData.type : '';
 
             for (const rule of allRules) {
                 // 如果 rule.targetTypes 为空，说明是节点级规则，跳过

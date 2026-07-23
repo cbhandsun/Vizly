@@ -14,8 +14,13 @@ const ROUTED_LABEL_MAX_WIDTH = 220;
 const ROUTED_LABEL_HEIGHT = 26;
 
 export function getGraphEdgeLabelText(edgeId: string, graph: SharedGraphContext): string {
-    const edge = (graph.edges ?? []).find((entry: any) => entry?.id === edgeId) as any;
-    const raw = edge?.label ?? edge?.data?.label;
+    const edge = (graph.edges ?? []).find((entry): entry is Record<string, unknown> =>
+        Boolean(entry && typeof entry === 'object' && 'id' in entry && entry.id === edgeId)
+    );
+    const data = edge?.data && typeof edge.data === 'object'
+        ? edge.data as Record<string, unknown>
+        : undefined;
+    const raw = edge?.label ?? data?.label;
     return typeof raw === 'string' ? raw.replace(/<[^>]+>/g, '').trim() : '';
 }
 

@@ -21,7 +21,7 @@ import { logBaseReactFlowConfigReadFailure, logBaseReactFlowFitWidthTopFailure }
 type ContainerSize = { width: number; height: number };
 
 interface UseBaseReactFlowFitControllerParams {
-  rfInstance: ReactFlowInstance<any, any>;
+  rfInstance: Pick<ReactFlowInstance<Node, Edge>, 'fitView' | 'getNodes' | 'setViewport'>;
   renderNodes: Node[];
   visibleNodeCount: number;
   edges: Edge[];

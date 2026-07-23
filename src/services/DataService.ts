@@ -112,6 +112,10 @@ class MemoryCacheManager implements CacheManager {
   size(): number {
     return this.cache.size;
   }
+
+  keys(): string[] {
+    return Array.from(this.cache.keys());
+  }
 }
 
 // === 数据验证器 ===
@@ -166,7 +170,7 @@ class DataValidator {
 
 // === 数据适配器基类 ===
 
-abstract class BaseDataAdapter<T = any> implements DataAdapter<T> {
+abstract class BaseDataAdapter<T = unknown> implements DataAdapter<T> {
   abstract toStandard(rawData: T): StandardDiagramData;
   abstract fromStandard(standardData: StandardDiagramData): T;
 
@@ -187,7 +191,7 @@ abstract class BaseDataAdapter<T = any> implements DataAdapter<T> {
  */
 export class DataService {
   private static instance: DataService;
-  private cache: CacheManager;
+  private cache: MemoryCacheManager;
   private adapters = new Map<DiagramType, DataAdapter>();
   private dataRegistry = new Map<string, StandardDiagramData>();
   private queryCacheKeys = new Set<string>();
@@ -428,7 +432,7 @@ export class DataService {
   getCacheStats(): { size: number; keys: string[] } {
     return {
       size: this.cache.size(),
-      keys: Array.from((this.cache as any).cache.keys())
+      keys: this.cache.keys()
     };
   }
 

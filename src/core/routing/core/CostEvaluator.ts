@@ -139,7 +139,7 @@ export class CostEvaluator {
         const bboxMaxX = Math.max(sa.x, ta.x);
         const bboxMinY = Math.min(sa.y, ta.y);
         const bboxMaxY = Math.max(sa.y, ta.y);
-        const hasAnyInBbox = (obstacles as any[]).some((obs: any) =>
+        const hasAnyInBbox = obstacles.some(obs =>
             obs.x < bboxMaxX && obs.x + obs.width > bboxMinX &&
             obs.y < bboxMaxY && obs.y + obs.height > bboxMinY
         );

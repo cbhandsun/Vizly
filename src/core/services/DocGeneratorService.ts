@@ -1,5 +1,5 @@
 import { Node, Edge } from '@xyflow/react';
-import { analyzeDiagram } from '../../utils/diagramAnalyzer';
+import { analyzeDiagram, type AnalysisEdge, type AnalysisNode } from '../../utils/diagramAnalyzer';
 import i18n from '@/i18n';
 
 export interface DocGenOptions {
@@ -37,7 +37,10 @@ export class DocGeneratorService {
         md += i18n.t('services.docGen.overviewDesc', { nodeCount: leafNodes.length, containerCount: containers.length }) + '\n\n';
 
         if (includeAnalysis) {
-            const analysis = analyzeDiagram(nodes as any, edges as any);
+            const analysis = analyzeDiagram(
+                nodes as unknown as AnalysisNode[],
+                edges as unknown as AnalysisEdge[],
+            );
             md += `### ${i18n.t('services.docGen.healthSummary')}\n\n`;
             md += analysis.summary.split('\n').map(line => `- ${line}`).join('\n') + '\n\n';
             

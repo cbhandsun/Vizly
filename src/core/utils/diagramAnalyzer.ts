@@ -31,7 +31,7 @@ export interface AnalysisResult {
   summary: string;
 }
 
-interface AnalysisNode {
+export interface AnalysisNode {
   id: string;
   type?: string;
   position?: { x: number; y: number };
@@ -39,7 +39,7 @@ interface AnalysisNode {
   parentId?: string;
 }
 
-interface AnalysisEdge {
+export interface AnalysisEdge {
   id: string;
   source: string;
   target: string;

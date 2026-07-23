@@ -15,7 +15,7 @@ export const shouldResetBaseReactFlowInitialization = ({
   nodeCount: number;
 }): boolean => currentSignature !== previousSignature && nodeCount > 0;
 
-export const scheduleBaseReactFlowInitializationReset = ({
+export const scheduleBaseReactFlowInitializationReset = <TBBox, TContainer>({
   setHasInitialized,
   prevBBoxRef,
   prevContainerRef,
@@ -25,8 +25,8 @@ export const scheduleBaseReactFlowInitializationReset = ({
   now = Date.now(),
 }: {
   setHasInitialized: (value: boolean) => void;
-  prevBBoxRef: MutableRefObject<any>;
-  prevContainerRef: MutableRefObject<any>;
+  prevBBoxRef: MutableRefObject<TBBox | null>;
+  prevContainerRef: MutableRefObject<TContainer | null>;
   cooldownUntilRef: MutableRefObject<number>;
   lastZoomRef: MutableRefObject<number | null>;
   initAtRef: MutableRefObject<number>;
