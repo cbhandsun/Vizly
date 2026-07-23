@@ -3,6 +3,7 @@ import type { BuddyGroup } from '../../algorithms/globalChannelRouting';
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
+type PositionedNode = ReactFlowNode & { positionAbsolute?: Point };
 type Segment = { a: Point; b: Point };
 type PaddedRectBounds = { x1: number; y1: number; x2: number; y2: number };
 
@@ -74,11 +75,11 @@ function toSegments(points: Point[]): Segment[] {
 }
 
 function nodeRect(node: ReactFlowNode): Rect | null {
-  const pos = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-  const width = num((node as any).measured?.width ?? node.width ?? (node.style as any)?.width, 0);
-  const height = num((node as any).measured?.height ?? node.height ?? (node.style as any)?.height, 0);
+  const pos = (node as PositionedNode).positionAbsolute ?? node.position;
+  const width = num(node.measured?.width ?? node.width ?? node.style?.width, 0);
+  const height = num(node.measured?.height ?? node.height ?? node.style?.height, 0);
   if (width <= 1 || height <= 1) return null;
-  return { x: num((pos as any).x, 0), y: num((pos as any).y, 0), width, height };
+  return { x: num(pos.x, 0), y: num(pos.y, 0), width, height };
 }
 
 function isContainerNode(node: ReactFlowNode): boolean {

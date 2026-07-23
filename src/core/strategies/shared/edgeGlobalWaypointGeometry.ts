@@ -5,6 +5,7 @@ export type Rect = { x: number; y: number; width: number; height: number };
 export type Segment = { a: Point; b: Point };
 export type Direction = 'L' | 'R' | 'U' | 'D';
 export type Side = 't' | 'b' | 'l' | 'r';
+type PositionedNode = ReactFlowNode & { positionAbsolute?: Point };
 
 export const EPS = 0.5;
 export const MIN_ENDPOINT_STUB = 48;
@@ -222,13 +223,13 @@ export function toSegments(path: Point[]): Segment[] {
 }
 
 export function getNodeRect(node: ReactFlowNode): Rect | null {
-  const position = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-  const width = num((node as any).measured?.width ?? node.width ?? (node.style as any)?.width, 0);
-  const height = num((node as any).measured?.height ?? node.height ?? (node.style as any)?.height, 0);
+  const position = (node as PositionedNode).positionAbsolute ?? node.position;
+  const width = num(node.measured?.width ?? node.width ?? node.style?.width, 0);
+  const height = num(node.measured?.height ?? node.height ?? node.style?.height, 0);
   if (width <= 1 || height <= 1) return null;
   return {
-    x: num((position as any).x, 0),
-    y: num((position as any).y, 0),
+    x: num(position.x, 0),
+    y: num(position.y, 0),
     width,
     height,
   };

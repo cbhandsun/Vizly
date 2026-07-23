@@ -30,6 +30,11 @@ type EdgePathContext = {
   detachedTargetEndpoint?: boolean;
 };
 type EndpointKind = 'source' | 'target';
+const asRecord = (value: unknown): Record<string, unknown> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
 type EndpointRepairContext = {
   edgeKey: string;
   endpoint: EndpointKind;
@@ -46,17 +51,26 @@ type EndpointRepairContext = {
 };
 
 function getEdgePath(edge: Edge): Point[] {
-  const raw = (edge.data as any)?.computedPath;
+  const raw = edge.data?.computedPath;
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((point: any) => ({ x: Number(point?.x), y: Number(point?.y) }))
+    .map(point => {
+      const candidate = asRecord(point);
+      return { x: Number(candidate.x), y: Number(candidate.y) };
+    })
     .filter((point: Point) => Number.isFinite(point.x) && Number.isFinite(point.y));
 }
 
 function withComputedPath(edge: Edge, path: Point[], extraData: Record<string, unknown> = {}): Edge {
-  const data: any = { ...(edge.data || {}), ...extraData, computedPath: path, endpointOrthogonalRepaired: true };
-  if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-    data.treeRouting = { ...data.treeRouting, points: path };
+  const data: Record<string, unknown> = {
+    ...(edge.data || {}),
+    ...extraData,
+    computedPath: path,
+    endpointOrthogonalRepaired: true,
+  };
+  const treeRouting = asRecord(data.treeRouting);
+  if (Array.isArray(treeRouting.points)) {
+    data.treeRouting = { ...treeRouting, points: path };
   }
   return { ...edge, data };
 }
@@ -580,7 +594,7 @@ function straightenNearlyAlignedEndpointPath(
   edgePaths: EdgePathContext[],
 ): Point[] | null {
   if (path.length < 3) return null;
-  if ((edge.data as any)?.sharedTrunkSynthesized === true) return null;
+  if (edge.data?.sharedTrunkSynthesized === true) return null;
   const sourceRect = nodeRect(nodeById.get(edge.source));
   const targetRect = nodeRect(nodeById.get(edge.target));
   if (!sourceRect || !targetRect) return null;
@@ -753,9 +767,9 @@ export function repairEndpointOrthogonalPaths(edges: Edge[], nodes: ReactFlowNod
     changed = true;
     return withComputedPath(edge, repaired, {
       detachedSourceEndpointReanchored: sourceContext?.detachedEndpoint === true
-        || ((edge.data as any)?.detachedSourceEndpointReanchored === true),
+        || edge.data?.detachedSourceEndpointReanchored === true,
       detachedTargetEndpointReanchored: targetContext?.detachedEndpoint === true
-        || ((edge.data as any)?.detachedTargetEndpointReanchored === true),
+        || edge.data?.detachedTargetEndpointReanchored === true,
     });
   });
   return changed ? repairedEdges : edges;

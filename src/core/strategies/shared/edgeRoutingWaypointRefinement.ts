@@ -1,4 +1,5 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
+type PositionedNode = ReactFlowNode & { positionAbsolute?: EdgeRoutingPoint };
 
 import { repairEdgeCrossingViolations } from '../../algorithms/edgeCrossingRepair';
 import { repairHardObstacleViolations } from '../../algorithms/hardObstaclePathRepair';
@@ -145,19 +146,19 @@ export function repairSharedTrunkAwareObstacles(
 }
 
 function getNodeRect(node: ReactFlowNode): EdgeRoutingRect | null {
-  const position = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
+  const position = (node as PositionedNode).positionAbsolute ?? node.position;
   const width = finiteNumberOrFallback(
-    (node as any).measured?.width ?? node.width ?? (node.style as any)?.width,
+    node.measured?.width ?? node.width ?? node.style?.width,
     0,
   );
   const height = finiteNumberOrFallback(
-    (node as any).measured?.height ?? node.height ?? (node.style as any)?.height,
+    node.measured?.height ?? node.height ?? node.style?.height,
     0,
   );
   if (width <= 1 || height <= 1) return null;
   return {
-    x: finiteNumberOrFallback((position as any).x, 0),
-    y: finiteNumberOrFallback((position as any).y, 0),
+    x: finiteNumberOrFallback(position.x, 0),
+    y: finiteNumberOrFallback(position.y, 0),
     width,
     height,
   };

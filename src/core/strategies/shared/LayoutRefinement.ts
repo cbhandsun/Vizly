@@ -604,7 +604,7 @@ function syncContainerNodes(
   const refinedById = new Map(refinedBusiness.map(n => [n.id, n]));
   const parentChildren = new Map<string, Node[]>();
   for (const n of refinedBusiness) {
-    const pid = (n as any).parentId;
+    const pid = n.parentId;
     if (!pid) continue;
     if (!parentChildren.has(pid)) parentChildren.set(pid, []);
     parentChildren.get(pid)!.push(n);
@@ -614,6 +614,9 @@ function syncContainerNodes(
   // 域布局策略设置的 padding 大约为：top=70, right=20, bottom=20, left=20
   // 如果容器有 style.padding 我们优先使用，否则用默认值
   const DEFAULT_PADDING = { top: 70, right: 20, bottom: 20, left: 20 };
+  const dimension = (value: unknown, fallback: number): number => (
+    typeof value === 'number' && Number.isFinite(value) ? value : fallback
+  );
 
   const adjustedContainers = containers.map(c => {
     const children = parentChildren.get(c.id) || [];
@@ -625,8 +628,8 @@ function syncContainerNodes(
     for (const child of children) {
       const cx = child.position.x;
       const cy = child.position.y;
-      const cw = (child as any).width || (child as any).measured?.width || (child.style as any)?.width || 200;
-      const ch = (child as any).height || (child as any).measured?.height || (child.style as any)?.height || 100;
+      const cw = dimension(child.width ?? child.measured?.width ?? child.style?.width, 200);
+      const ch = dimension(child.height ?? child.measured?.height ?? child.style?.height, 100);
       if (cx < minX) minX = cx;
       if (cy < minY) minY = cy;
       if (cx + cw > maxX) maxX = cx + cw;
@@ -637,7 +640,7 @@ function syncContainerNodes(
     if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return c;
 
     // 读取容器原始 style 中的 padding（如果有）
-    const style = (c.style || {}) as Record<string, any>;
+    const style = (c.style || {}) as Record<string, unknown>;
     const padLeft = typeof style.paddingLeft === 'number' ? style.paddingLeft : DEFAULT_PADDING.left;
     const padTop = typeof style.paddingTop === 'number' ? style.paddingTop : DEFAULT_PADDING.top;
     const padRight = typeof style.paddingRight === 'number' ? style.paddingRight : DEFAULT_PADDING.right;
@@ -674,7 +677,10 @@ function syncContainerNodes(
 
     // 只在实际有变化时才更新容器
     const posChanged = Math.abs(newPos.x - c.position.x) > 0.5 || Math.abs(newPos.y - c.position.y) > 0.5;
-    const sizeChanged = Math.abs(newWidth - (style.width || 0)) > 0.5 || Math.abs(newHeight - (style.height || 0)) > 0.5;
+    const currentWidth = dimension(style.width, 0);
+    const currentHeight = dimension(style.height, 0);
+    const sizeChanged = Math.abs(newWidth - currentWidth) > 0.5
+      || Math.abs(newHeight - currentHeight) > 0.5;
 
     if (!posChanged && !sizeChanged) return c;
 
@@ -683,8 +689,8 @@ function syncContainerNodes(
       position: newPos,
       style: {
         ...style,
-        width: Math.max(newWidth, style.width || 0),
-        height: Math.max(newHeight, style.height || 0),
+        width: Math.max(newWidth, currentWidth),
+        height: Math.max(newHeight, currentHeight),
       },
     };
   });
@@ -710,7 +716,7 @@ export function extractNodeGroups(nodes: Node[]): Map<string, string[]> {
     // 跳过容器节点自身
     if (containerTypes.has(n.type || '')) continue;
 
-    const parentId = (n as any).parentId;
+    const parentId = n.parentId;
     if (!parentId) continue;
 
     if (!groups.has(parentId)) groups.set(parentId, []);
