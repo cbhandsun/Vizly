@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import { LayoutType } from '../../types/layout';
+import type { StandardDiagramData } from '../../models/DiagramModels';
 import DomainDagreLayoutStrategy from '../DomainDagreLayoutStrategy';
 import { reorderDomainDagrePortAnchors } from '../domainDagrePortAnchorOrdering';
 import demandAllocation from '../../../data/standardized/DeamndAllocation.json';
@@ -16,6 +17,14 @@ import {
     createBaseReactFlowDisplayEdges,
 } from '../../components/shared/baseReactFlowDisplayEdges';
 import { detectLocalDoglegRisks } from '../../algorithms/localDoglegQuality';
+
+type PathPoint = { x: number; y: number };
+
+const fixtureData = (value: unknown): StandardDiagramData => value as StandardDiagramData;
+const computedPathOf = (edge: Edge | undefined): PathPoint[] => {
+    const path = edge?.data?.computedPath;
+    return Array.isArray(path) ? path as PathPoint[] : [];
+};
 
 vi.hoisted(() => {
     Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
@@ -32,7 +41,7 @@ const makeNode = (id: string, domain: string, subDomain: string): ReactFlowNode 
     type: 'default',
     position: { x: 0, y: 0 },
     style: { width: 180, height: 72 },
-    measured: { width: 180, height: 72 } as any,
+    measured: { width: 180, height: 72 },
     data: {
         id,
         label: id,
@@ -43,21 +52,21 @@ const makeNode = (id: string, domain: string, subDomain: string): ReactFlowNode 
 });
 
 const sizeOf = (node: ReactFlowNode) => ({
-    width: Number((node as any).style?.width ?? (node as any).measured?.width ?? 0),
-    height: Number((node as any).style?.height ?? (node as any).measured?.height ?? 0),
+    width: Number(node.style?.width ?? node.measured?.width ?? 0),
+    height: Number(node.style?.height ?? node.measured?.height ?? 0),
 });
 
 const absolutePositionOf = (node: ReactFlowNode, nodes: ReactFlowNode[]) => {
     const byId = new Map(nodes.map(n => [n.id, n] as const));
-    let x = Number((node.position as any)?.x ?? 0);
-    let y = Number((node.position as any)?.y ?? 0);
+    let x = Number(node.position.x ?? 0);
+    let y = Number(node.position.y ?? 0);
     let current = node;
     let depth = 0;
     while (current.parentId && depth < 10) {
         const parent = byId.get(current.parentId);
         if (!parent) break;
-        x += Number((parent.position as any)?.x ?? 0);
-        y += Number((parent.position as any)?.y ?? 0);
+        x += Number(parent.position.x ?? 0);
+        y += Number(parent.position.y ?? 0);
         current = parent;
         depth++;
     }
@@ -121,11 +130,11 @@ describe('DomainDagreLayoutStrategy', () => {
 
         reorderDomainDagrePortAnchors(edges, new Map(nodes.map(node => [node.id, node])));
 
-        expect((edges[0].data as any).computedPath.slice(0, 2)).toEqual([
+        expect(computedPathOf(edges[0]).slice(0, 2)).toEqual([
             { x: 50, y: 80 },
             { x: 50, y: 112 },
         ]);
-        expect((edges[1].data as any).computedPath.slice(0, 2)).toEqual([
+        expect(computedPathOf(edges[1]).slice(0, 2)).toEqual([
             { x: 90, y: 80 },
             { x: 90, y: 112 },
         ]);
@@ -152,14 +161,14 @@ describe('DomainDagreLayoutStrategy', () => {
                 'first-domain': ['inbound', 'storage'],
                 'second-domain': ['pick', 'pack'],
             },
-        } as any);
+        } as unknown as import('../../types/layout').LayoutOptions);
 
         for (const domainKey of ['first-domain', 'second-domain']) {
-            const domain = result.nodes.find(n => String(n.type) === 'titleGroup' && (n.data as any).domain === domainKey);
+            const domain = result.nodes.find(n => String(n.type) === 'titleGroup' && n.data.domain === domainKey);
             expect(domain).toBeTruthy();
 
             const subGroups = result.nodes
-                .filter(n => String(n.type) === 'subGroup' && (n.data as any).domain === domainKey)
+                .filter(n => String(n.type) === 'subGroup' && n.data.domain === domainKey)
                 .sort((a, b) => a.position.x - b.position.x);
 
             expect(subGroups).toHaveLength(2);
@@ -205,7 +214,7 @@ describe('DomainDagreLayoutStrategy', () => {
             subDomainOrder: {
                 '策略计算': ['数据准备', '初分逻辑'],
             },
-        } as any);
+        } as unknown as import('../../types/layout').LayoutOptions);
 
         const routed = result.edges.find(e => e.id === 'e3')!;
         const source = result.nodes.find(n => n.id === 'calc-theory-ratio')!;
@@ -214,7 +223,7 @@ describe('DomainDagreLayoutStrategy', () => {
         const targetAbs = absolutePositionOf(target, result.nodes);
         const sourceSize = sizeOf(source);
         const _targetSize = sizeOf(target);
-        const computedPath = ((routed.data as any)?.computedPath ?? []) as Array<{ x: number; y: number }>;
+        const computedPath = computedPathOf(routed);
 
         expect(routed.sourceHandle).toBe('right');
         expect(routed.targetHandle).toBe('left');
@@ -224,55 +233,57 @@ describe('DomainDagreLayoutStrategy', () => {
     });
 
     it('respects standard data group visibility options before laying out system interaction diagrams', async () => {
-        const canvas = await standardDataToCanvas(systemsInteractionStandardData as any);
-        const expectedSubDomains = new Set((systemsInteractionStandardData as any).layout.subDomainWhitelist);
+        const systemsFixture = fixtureData(systemsInteractionStandardData);
+        const canvas = await standardDataToCanvas(systemsFixture);
+        const expectedSubDomains = new Set(systemsFixture.layout?.subDomainWhitelist);
 
         const domainGroups = canvas.nodes.filter(
             node => String(node.type) === 'titleGroup'
         );
         const visibleSubGroups = canvas.nodes.filter(
-            node => String(node.type) === 'subGroup' && !(node.data as any)?.hidden
+            node => String(node.type) === 'subGroup' && node.data.hidden !== true
         );
         const hiddenGroups = canvas.nodes.filter(
-            node => ['titleGroup', 'subGroup'].includes(String(node.type || '')) && (node.data as any)?.hidden
+            node => ['titleGroup', 'subGroup'].includes(String(node.type || '')) && node.data.hidden === true
         );
         const hiddenGroupIds = new Set(hiddenGroups.map(node => node.id));
         const visibleNodesParentedToHiddenGroups = canvas.nodes.filter(
-            node => !(node as any).hidden && node.parentId && hiddenGroupIds.has(String(node.parentId))
+            node => !node.hidden && node.parentId && hiddenGroupIds.has(String(node.parentId))
         );
 
         expect(domainGroups).toHaveLength(0);
         expect(hiddenGroups).toHaveLength(0);
         expect(visibleNodesParentedToHiddenGroups).toEqual([]);
-        expect(new Set(visibleSubGroups.map(node => String((node.data as any)?.subDomain || '')))).toEqual(expectedSubDomains);
-        expect(canvas.edges).toHaveLength((systemsInteractionStandardData as any).edges.length);
+        expect(new Set(visibleSubGroups.map(node => String(node.data.subDomain || '')))).toEqual(expectedSubDomains);
+        expect(canvas.edges).toHaveLength(systemsFixture.edges.length);
     }, 15_000);
 
     it('keeps large standard conversions layout-compatible in interactive edge-routing mode', async () => {
-        const canvas = await standardDataToCanvas(wmsProcessFlowStandardData as any, undefined, {
+        const wmsFixture = fixtureData(wmsProcessFlowStandardData);
+        const canvas = await standardDataToCanvas(wmsFixture, undefined, {
             edgeRoutingQuality: 'interactive',
         });
 
         const hiddenGroups = canvas.nodes.filter(
-            node => ['titleGroup', 'subGroup'].includes(String(node.type || '')) && (node.data as any)?.hidden
+            node => ['titleGroup', 'subGroup'].includes(String(node.type || '')) && node.data.hidden === true
         );
-        const interactiveEdges = canvas.edges.filter(edge => (edge.data as any)?.algorithm === 'domain-dagre-interactive');
+        const interactiveEdges = canvas.edges.filter(edge => edge.data?.algorithm === 'domain-dagre-interactive');
         const fanOutSources = new Set(['order-input', 'allocation', 'task-generate', 'task-group', 'operation']);
         const fanOutEdges = canvas.edges.filter(edge => fanOutSources.has(edge.source));
-        const sharedTrunkFanOutEdges = fanOutEdges.filter(edge => (edge.data as any)?.sharedTrunkSynthesized === true);
+        const sharedTrunkFanOutEdges = fanOutEdges.filter(edge => edge.data?.sharedTrunkSynthesized === true);
 
-        expect(canvas.nodes.length).toBeGreaterThanOrEqual((wmsProcessFlowStandardData as any).nodes.length);
-        expect(canvas.edges).toHaveLength((wmsProcessFlowStandardData as any).edges.length);
+        expect(canvas.nodes.length).toBeGreaterThanOrEqual(wmsFixture.nodes.length);
+        expect(canvas.edges).toHaveLength(wmsFixture.edges.length);
         expect(hiddenGroups).toHaveLength(0);
         expect(interactiveEdges).toHaveLength(canvas.edges.length);
-        expect(canvas.edges.every(edge => (edge.data as any)?.trunkPolishVersion === 2)).toBe(true);
+        expect(canvas.edges.every(edge => edge.data?.trunkPolishVersion === 2)).toBe(true);
         expect(sharedTrunkFanOutEdges.length).toBeGreaterThan(0);
-        expect(canvas.edges.every(edge => Array.isArray((edge.data as any)?.computedPath))).toBe(true);
-        expect(canvas.edges.every(edge => (edge.data as any)?.layoutPathLocked === true)).toBe(true);
+        expect(canvas.edges.every(edge => Array.isArray(edge.data?.computedPath))).toBe(true);
+        expect(canvas.edges.every(edge => edge.data?.layoutPathLocked === true)).toBe(true);
     }, 15_000);
 
     it('keeps reverse systems-interaction feedback off the forward target trunk in interactive mode', async () => {
-        const canvas = await standardDataToCanvas(systemsInteractionStandardData as any, undefined, {
+        const canvas = await standardDataToCanvas(fixtureData(systemsInteractionStandardData), undefined, {
             edgeRoutingQuality: 'interactive',
         });
         const feedback = canvas.edges.find(edge => edge.id === 'edge-tms-execution-wms-outbound');
@@ -284,8 +295,9 @@ describe('DomainDagreLayoutStrategy', () => {
     }, 15_000);
 
     it('keeps WMS quota fan-out on the vertical process axis in horizontal subdomain dagre', async () => {
-        const canvas = await standardDataToCanvas(demandAllocation as any);
-        const presetLayout = (demandAllocation as any).layout;
+        const demandFixture = fixtureData(demandAllocation);
+        const canvas = await standardDataToCanvas(demandFixture);
+        const presetLayout = demandFixture.layout;
 
         const result = await new DomainDagreLayoutStrategy().calculateLayout(canvas.nodes, canvas.edges, {
             type: LayoutType.DAGRE,
@@ -297,7 +309,7 @@ describe('DomainDagreLayoutStrategy', () => {
             subDomainNodeDirection: 'TB',
             domainOrder: presetLayout.domainOrder,
             subDomainOrder: presetLayout.subDomainOrder,
-        } as any);
+        } as unknown as import('../../types/layout').LayoutOptions);
 
         const fixQuota = result.nodes.find(n => n.id === 'fix-quota')!;
         const outgoing = result.edges.filter(e => e.source === 'fix-quota');
@@ -305,10 +317,10 @@ describe('DomainDagreLayoutStrategy', () => {
         expect(outgoing.map(e => e.id).sort()).toEqual(['e10', 'e16']);
 
         for (const edge of outgoing) {
-            const path = ((edge.data as any)?.computedPath ?? []) as Array<{ x: number; y: number }>;
+            const path = computedPathOf(edge);
             expect(edge.sourceHandle).toBe('bottom');
-            expect((edge.data as any)?.layoutPathLocked).toBe(true);
-            expect((edge.data as any)?.runtimeHandleLock).toMatchObject({ source: true, target: true });
+            expect(edge.data?.layoutPathLocked).toBe(true);
+            expect(edge.data?.runtimeHandleLock).toMatchObject({ source: true, target: true });
             expect(path.length).toBeGreaterThanOrEqual(2);
 
             const sourceAbs = absolutePositionOf(fixQuota, result.nodes);
@@ -325,13 +337,14 @@ describe('DomainDagreLayoutStrategy', () => {
         }
 
         const poolAEdge = result.edges.find(e => e.id === 'e5')!;
-        const poolAPath = ((poolAEdge.data as any)?.computedPath ?? []) as Array<{ x: number; y: number }>;
+        const poolAPath = computedPathOf(poolAEdge);
         expect(detectLocalDoglegRisks(poolAPath)).toEqual([]);
     }, 15_000);
 
     it('keeps WMS quota fan-out entering lower resource nodes from the top', async () => {
-        const canvas = await standardDataToCanvas(demandAllocation as any);
-        const presetLayout = (demandAllocation as any).layout;
+        const demandFixture = fixtureData(demandAllocation);
+        const canvas = await standardDataToCanvas(demandFixture);
+        const presetLayout = demandFixture.layout;
 
         const result = await new DomainDagreLayoutStrategy().calculateLayout(canvas.nodes, canvas.edges, {
             type: LayoutType.DAGRE,
@@ -343,14 +356,14 @@ describe('DomainDagreLayoutStrategy', () => {
             subDomainNodeDirection: 'TB',
             domainOrder: presetLayout.domainOrder,
             subDomainOrder: presetLayout.subDomainOrder,
-        } as any);
+        } as unknown as import('../../types/layout').LayoutOptions);
 
         for (const edgeId of ['e10', 'e16']) {
             const edge = result.edges.find(e => e.id === edgeId)!;
             const target = result.nodes.find(n => n.id === edge.target)!;
             const targetAbs = absolutePositionOf(target, result.nodes);
             const targetSize = sizeOf(target);
-            const path = ((edge.data as any)?.computedPath ?? []) as Array<{ x: number; y: number }>;
+            const path = computedPathOf(edge);
             const beforeEnd = path[path.length - 2];
             const end = path[path.length - 1];
 
@@ -366,8 +379,9 @@ describe('DomainDagreLayoutStrategy', () => {
     }, 15_000);
 
     it('separates Logistics TMS support and yard lanes after dagre routing', async () => {
-        const canvas = await standardDataToCanvas(logisticsStandardData as any);
-        const presetLayout = (logisticsStandardData as any).layout;
+        const logisticsFixture = fixtureData(logisticsStandardData);
+        const canvas = await standardDataToCanvas(logisticsFixture);
+        const presetLayout = logisticsFixture.layout;
 
         const result = await new DomainDagreLayoutStrategy().calculateLayout(canvas.nodes, canvas.edges, {
             type: LayoutType.DAGRE,
@@ -379,7 +393,7 @@ describe('DomainDagreLayoutStrategy', () => {
             subDomainNodeDirection: 'TB',
             domainOrder: presetLayout.domainOrder,
             subDomainOrder: presetLayout.subDomainOrder,
-        } as any);
+        } as unknown as import('../../types/layout').LayoutOptions);
 
         const tmsBms = pathFor(result.edges, 'edge-tms-bms');
         const tmsYms = pathFor(result.edges, 'edge-tms-yms');
@@ -391,7 +405,7 @@ describe('DomainDagreLayoutStrategy', () => {
     }, 15_000);
 
     it('keeps Logistics explicit hub lanes displayable after standard conversion', async () => {
-        const canvas = await standardDataToCanvas(logisticsStandardData as any);
+        const canvas = await standardDataToCanvas(fixtureData(logisticsStandardData));
         const displayEdges = createBaseReactFlowDisplayEdges({
             edges: canvas.edges,
             nodes: canvas.nodes,
@@ -409,7 +423,7 @@ describe('DomainDagreLayoutStrategy', () => {
             const edge = canvas.edges.find(item => item.id === edgeId);
             expect(edge, edgeId).toBeTruthy();
             expect(pathFor(canvas.edges, edgeId).length, edgeId).toBeGreaterThanOrEqual(2);
-            expect((edge?.data as any)?.layoutPathLocked, edgeId).toBe(true);
+            expect(edge?.data?.layoutPathLocked, edgeId).toBe(true);
             expect(displayById.get(edgeId)?.type, edgeId).toBe('stablePath');
         }
 
@@ -421,8 +435,9 @@ describe('DomainDagreLayoutStrategy', () => {
     }, 15_000);
 
     it('separates opposite-role Transport hub lanes after dagre routing', async () => {
-        const canvas = await standardDataToCanvas(transportDrivenStandardData as any);
-        const presetLayout = (transportDrivenStandardData as any).layout;
+        const transportFixture = fixtureData(transportDrivenStandardData);
+        const canvas = await standardDataToCanvas(transportFixture);
+        const presetLayout = transportFixture.layout;
 
         const result = await new DomainDagreLayoutStrategy().calculateLayout(canvas.nodes, canvas.edges, {
             type: LayoutType.DAGRE,
@@ -434,7 +449,7 @@ describe('DomainDagreLayoutStrategy', () => {
             subDomainNodeDirection: 'TB',
             domainOrder: presetLayout.domainOrder,
             subDomainOrder: presetLayout.subDomainOrder,
-        } as any);
+        } as unknown as import('../../types/layout').LayoutOptions);
 
         const inbound = pathFor(result.edges, 'edge-oms-wms-inbound');
         const status = pathFor(result.edges, 'edge-wms-oms-status');
@@ -452,7 +467,7 @@ describe('DomainDagreLayoutStrategy', () => {
     }, 15_000);
 
     it('keeps Transport opposite-role repaired lanes displayable after standard conversion', async () => {
-        const canvas = await standardDataToCanvas(transportDrivenStandardData as any);
+        const canvas = await standardDataToCanvas(fixtureData(transportDrivenStandardData));
         const inbound = pathFor(canvas.edges, 'edge-oms-wms-inbound');
         const status = pathFor(canvas.edges, 'edge-wms-oms-status');
         const masterDataTms = pathFor(canvas.edges, 'edge-master-data-tms');
@@ -471,7 +486,7 @@ describe('DomainDagreLayoutStrategy', () => {
         expect(masterDataWms[1].x).toBeCloseTo(masterDataWms[0].x, 1);
         expect(masterDataWms[1].y).toBeGreaterThan(masterDataWms[0].y);
 
-        expect((canvas.edges.find(edge => edge.id === 'edge-oms-wms-inbound')?.data as any)).toEqual(expect.objectContaining({
+        expect(canvas.edges.find(edge => edge.id === 'edge-oms-wms-inbound')?.data).toEqual(expect.objectContaining({
             layoutPathLocked: true,
         }));
 
@@ -496,7 +511,7 @@ describe('DomainDagreLayoutStrategy', () => {
 
 function pathFor(edges: Edge[], edgeId: string): Array<{ x: number; y: number }> {
     const edge = edges.find(e => e.id === edgeId);
-    return (((edge?.data as any)?.computedPath ?? []) as Array<{ x: number; y: number }>);
+    return computedPathOf(edge);
 }
 
 function maxParallelOverlap(a: Array<{ x: number; y: number }>, b: Array<{ x: number; y: number }>): number {
