@@ -22,7 +22,7 @@ const MarkdownMessage = React.lazy(() => import('./MarkdownMessage'));
 
 interface MessageItemProps {
     item: Message;
-    t: any;
+    t: (key: string) => string;
     onPreviewJson?: (json: string) => void;
     onApplyJson?: (json: string) => void;
     handleSaveDiagramTo?: (json: string, target: 'local' | 's3' | 'supabase') => void;

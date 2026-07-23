@@ -70,7 +70,7 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
             await provider.saveDiagram({
                 id: finalId!,
                 title: finalTitle!,
-                content: { ...snap.diagram, id: finalId, name: finalTitle } as any,
+                content: { ...snap.diagram, id: finalId, name: finalTitle },
                 updated_at: new Date().toISOString(),
                 user_id: 'anonymous',
             });

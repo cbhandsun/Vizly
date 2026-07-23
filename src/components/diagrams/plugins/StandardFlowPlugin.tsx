@@ -81,7 +81,7 @@ export class StandardFlowPlugin implements DiagramTypePlugin {
   }
 
   // ====== AI Actions (GAP-10 Phase 2) ======
-  async onAIAction(action: string, params: any, ctx: PluginContext): Promise<boolean> {
+  async onAIAction(action: string, params: unknown, ctx: PluginContext): Promise<boolean> {
     
     switch (action) {
       case 'smart-optimize':
@@ -97,13 +97,17 @@ export class StandardFlowPlugin implements DiagramTypePlugin {
         return true;
 
       case 'add-service':
+        if (!params || typeof params !== 'object' || Array.isArray(params)) return false;
+        {
+          const safeParams = params as Record<string, unknown>;
         // 假设 AI 想专门添加一个微服务节点
         ctx.addNode('customNode', { 
-          label: params.label || 'New Service', 
-          domainClass: params.domainClass || 'mid',
+          label: typeof safeParams.label === 'string' ? safeParams.label.slice(0, 1000) : 'New Service',
+          domainClass: typeof safeParams.domainClass === 'string' ? safeParams.domainClass.slice(0, 100) : 'mid',
           type: 'microservice'
         });
         return true;
+        }
 
       default:
         return false; // 继续由系统默认处理

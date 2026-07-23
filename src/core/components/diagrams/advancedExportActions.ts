@@ -12,7 +12,7 @@ import { downloadImage, type ExportOptions } from '../../utils/imageExporter';
 
 export interface RunAdvancedExportOptions {
   diagramId?: string;
-  nodes: any[];
+  nodes: Parameters<typeof downloadImage>[0];
   format: ExportOptions['format'];
   pixelRatio: number;
   includeBackground: boolean;

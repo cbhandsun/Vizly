@@ -274,7 +274,7 @@ export const AIChatView: React.FC<Omit<AIChatPanelProps, 'open'>> = ({ onClose, 
                 ]
             };
             
-            const renderCategory = (title: string, cmds: any[]) => 
+            const renderCategory = (title: string, cmds: AIChatSlashCommand[]) =>
                 `### ${title}\n` + cmds.map(c => `- **${c.label}**: ${c.description}`).join('\n');
 
             const helpMarkdown = `
