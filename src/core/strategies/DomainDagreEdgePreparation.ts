@@ -1,6 +1,6 @@
-import type { Node as ReactFlowNode, Edge } from '@xyflow/react';
+import type { Node as ReactFlowNode, Edge, XYPosition } from '@xyflow/react';
 import type { LayoutOptions } from '../types/layout';
-import { decideEdgeRouting, assignGlobalPorts } from '../utils/HandlePicker';
+import { decideEdgeRouting, assignGlobalPorts, type RoutingConfig } from '../utils/HandlePicker';
 import { expandHandle, normalizeHandle } from '../routing/utils/handleUtils';
 import { logDomainDagreMissingNodeHandle } from './layoutLogging';
 import { repairSharedTrunkAwareCrossings } from './shared/edgeRoutingPipeline';
@@ -17,13 +17,69 @@ import {
     synthesizeSharedEndpointTrunks,
 } from './shared/edgeSharedTrunkSynthesis';
 
+type RoutingNode = ReactFlowNode<Record<string, unknown>> & {
+    positionAbsolute?: XYPosition;
+};
+
+type RoutingEdgeData = Record<string, unknown>;
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {};
+
+const finiteNumber = (value: unknown, fallback: number): number => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value !== 'string') return fallback;
+    const parsed = Number(value.trim().replace(/px$/i, ''));
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const nodeSize = (
+    node: RoutingNode,
+    fallbackWidth = 200,
+    fallbackHeight = 80,
+): { width: number; height: number } => ({
+    width: finiteNumber(node.measured?.width ?? node.style?.width ?? node.width, fallbackWidth),
+    height: finiteNumber(node.measured?.height ?? node.style?.height ?? node.height, fallbackHeight),
+});
+
+const nodeAbsolutePosition = (node: RoutingNode): XYPosition =>
+    node.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
+
+const directionalHandlePolicy = (
+    value: unknown,
+): 'prefer' | 'force' | 'off' =>
+    value === 'force' || value === 'off' ? value : 'prefer';
+
+const manualHandleSides = (data: RoutingEdgeData): string[] =>
+    Array.isArray(data.manualHandleSides)
+        ? data.manualHandleSides.map(side => String(side).toLowerCase())
+        : [];
+
+const withAutoHandleData = (
+    edge: Edge,
+    autoSource: boolean | undefined,
+    autoTarget: boolean | undefined,
+): void => {
+    const auto: string[] = [];
+    if (autoSource) auto.push('source');
+    if (autoTarget) auto.push('target');
+    edge.data = {
+        ...asRecord(edge.data),
+        autoSource: Boolean(autoSource),
+        autoTarget: Boolean(autoTarget),
+        auto,
+    };
+};
+
 export interface DomainDagreEdgePreparationInput {
-    nodes: ReactFlowNode[];
+    nodes: RoutingNode[];
     edges: Edge[];
     options: LayoutOptions;
-    config: any;
-    nodeById: Map<string, ReactFlowNode>;
-    leafNodes: ReactFlowNode[];
+    config: unknown;
+    nodeById: Map<string, RoutingNode>;
+    leafNodes: RoutingNode[];
 }
 
 export async function prepareDomainDagreEdges({
@@ -33,7 +89,7 @@ export async function prepareDomainDagreEdges({
     config: cfg,
     nodeById: idMap,
 }: DomainDagreEdgePreparationInput): Promise<Edge[]> {
-    const getAbsPos = (n: ReactFlowNode): { x: number, y: number } => {
+    const getAbsPos = (n: RoutingNode): { x: number, y: number } => {
         let x = n.position.x;
         let y = n.position.y;
         let current = n;
@@ -52,18 +108,18 @@ export async function prepareDomainDagreEdges({
     // 确保所有节点有 positionAbsolute、width、height 和 measured
     updatedNodes.forEach(n => {
         const absPos = getAbsPos(n);
-        (n as any).positionAbsolute = absPos;
+        n.positionAbsolute = absPos;
 
         // [FIX] 忽略 React Flow 的 measured（它可能在不同渲染周期有不同值），只使用 ensureMeasuredForNodes 写入的 style
-        const w = (n as any).style?.width || (n as any).width || 200;
-        const h = (n as any).style?.height || (n as any).height || 80;
-        (n as any).width = w;
-        (n as any).height = h;
-        (n as any).measured = { width: w, height: h };
+        const w = finiteNumber(n.style?.width ?? n.width, 200);
+        const h = finiteNumber(n.style?.height ?? n.height, 80);
+        n.width = w;
+        n.height = h;
+        n.measured = { width: w, height: h };
     });
 
-    const cfgEdge = cfg?.edge || {};
-    const routingConfig = {
+    const cfgEdge = asRecord(asRecord(cfg).edge);
+    const routingConfig: RoutingConfig = {
         mode: 'advanced-smart' as const,
         globalPath: (cfgEdge.pathType || 'step') as string,
         autoPathSelection: true,
@@ -72,7 +128,7 @@ export async function prepareDomainDagreEdges({
         // [FIX] 增大搜索范围，让 A* 算法能寻找到绕行空旷区域的路径
         obstacleScopePadding: Number(cfgEdge.obstacleScopePadding ?? 300),
         corridorObstacleThreshold: Number(cfgEdge.corridorObstacleThreshold ?? 6),
-        directionalHandlePolicy: String(cfgEdge.directionalHandlePolicy || 'prefer') as any,
+        directionalHandlePolicy: directionalHandlePolicy(cfgEdge.directionalHandlePolicy),
         verticalBiasThreshold: Number(cfgEdge.verticalBiasThreshold ?? 1.2),
         // [FIX] 增大障碍物膨胀，让节点周围有更大禁区，迫使连线绕行空旷区域
         obstaclePadding: Number(cfgEdge.obstaclePadding ?? 80),
@@ -81,13 +137,13 @@ export async function prepareDomainDagreEdges({
         // [FIX] 增大 A* 扩展次数，允许搜索更远的绕行路径
         gridAStarMaxExpansions: Number(cfgEdge.gridAStarMaxExpansions ?? 600),
         // [FIX] 减小网格尺寸，提高绕行精度
-        gridAStarGridSize: Number(cfgEdge.gridAStarGridSize ?? 30)
+        gridAStarGridSize: Number(cfgEdge.gridAStarGridSize ?? 30),
+        preAssignedPortPolicy: 'prefer',
     };
 
     // Enforce strict direction for Dagre to ensure stability
     if (routingConfig.mode === 'advanced-smart') {
         routingConfig.directionalHandlePolicy = 'force';
-        (routingConfig as any).preAssignedPortPolicy = 'prefer';
     }
 
     // [FIX] 确保传入 decideEdgeRouting 的节点数组顺序是确定性的
@@ -109,20 +165,14 @@ export async function prepareDomainDagreEdges({
             return a.target.localeCompare(b.target);
         });
 
-    const edgeRoutingQuality = String((options as any)?.edgeRoutingQuality || 'full');
+    const edgeRoutingQuality = String(options.edgeRoutingQuality ?? 'full');
     if (edgeRoutingQuality === 'interactive') {
         const layoutDir = String(options.direction || 'TB').toUpperCase();
-        const pickInteractiveHandles = (source: ReactFlowNode, target: ReactFlowNode) => {
-            const sourcePos = (source as any).positionAbsolute ?? source.position ?? { x: 0, y: 0 };
-            const targetPos = (target as any).positionAbsolute ?? target.position ?? { x: 0, y: 0 };
-            const sourceSize = {
-                width: (source as any).measured?.width || (source as any).style?.width || (source as any).width || 200,
-                height: (source as any).measured?.height || (source as any).style?.height || (source as any).height || 80,
-            };
-            const targetSize = {
-                width: (target as any).measured?.width || (target as any).style?.width || (target as any).width || 200,
-                height: (target as any).measured?.height || (target as any).style?.height || (target as any).height || 80,
-            };
+        const pickInteractiveHandles = (source: RoutingNode, target: RoutingNode) => {
+            const sourcePos = nodeAbsolutePosition(source);
+            const targetPos = nodeAbsolutePosition(target);
+            const sourceSize = nodeSize(source);
+            const targetSize = nodeSize(target);
             const dx = (targetPos.x + targetSize.width / 2) - (sourcePos.x + sourceSize.width / 2);
             const dy = (targetPos.y + targetSize.height / 2) - (sourcePos.y + sourceSize.height / 2);
             if (layoutDir === 'LR' || layoutDir === 'RL' || Math.abs(dx) > Math.abs(dy) * 1.35) {
@@ -186,9 +236,7 @@ export async function prepareDomainDagreEdges({
                 trunkPolishVersion: 2,
                 layoutPathLocked: true,
                 runtimeHandleLock: {
-                    ...(((edge.data as any)?.runtimeHandleLock && typeof (edge.data as any).runtimeHandleLock === 'object')
-                        ? (edge.data as any).runtimeHandleLock
-                        : {}),
+                    ...asRecord(asRecord(edge.data).runtimeHandleLock),
                     source: true,
                     target: true,
                 },
@@ -202,7 +250,7 @@ export async function prepareDomainDagreEdges({
     // P1: Edge-Edge Avoidance - 收集已路由边的路径
     const routedPaths: Array<{ points: Array<{ x: number; y: number }> }> = [];
     const isAutoHandle = (edge: Edge, side: 'source' | 'target') => {
-        const data = (edge.data ?? {}) as Record<string, any>;
+        const data = asRecord(edge.data);
         const auto = Array.isArray(data.auto) ? data.auto : [];
         return Boolean(data[side === 'source' ? 'autoSource' : 'autoTarget']) || auto.includes(side);
     };
@@ -222,8 +270,8 @@ export async function prepareDomainDagreEdges({
     });
     const getRolePortForce = (
         edge: Edge,
-        source: ReactFlowNode,
-        target: ReactFlowNode,
+        source: RoutingNode,
+        target: RoutingNode,
         edgePorts?: { source?: string; target?: string }
     ) => {
         if (!edgePorts) return { sourceFanOut: false, targetFanIn: false };
@@ -232,16 +280,10 @@ export async function prepareDomainDagreEdges({
         const isHorizontalFlow = layoutDir === 'LR' || layoutDir === 'RL';
         const sourcePre = normalizeHandle(edgePorts.source);
         const targetPre = normalizeHandle(edgePorts.target);
-        const sPos = (source as any).positionAbsolute ?? source.position ?? { x: 0, y: 0 };
-        const tPos = (target as any).positionAbsolute ?? target.position ?? { x: 0, y: 0 };
-        const sDims = {
-            width: (source as any).measured?.width || (source as any).style?.width || 200,
-            height: (source as any).measured?.height || (source as any).style?.height || 80,
-        };
-        const tDims = {
-            width: (target as any).measured?.width || (target as any).style?.width || 200,
-            height: (target as any).measured?.height || (target as any).style?.height || 80,
-        };
+        const sPos = nodeAbsolutePosition(source);
+        const tPos = nodeAbsolutePosition(target);
+        const sDims = nodeSize(source);
+        const tDims = nodeSize(target);
         const dx = (tPos.x + tDims.width / 2) - (sPos.x + sDims.width / 2);
         const dy = (tPos.y + tDims.height / 2) - (sPos.y + sDims.height / 2);
         const sourceFanOut = (sourceOutCounts.get(edge.source) || 0) > 1;
@@ -296,17 +338,16 @@ export async function prepareDomainDagreEdges({
 
         const sUsage = nodeUsage[source.id] || {};
         const tUsage = nodeUsage[target.id] || {};
-        const edgeDataForManual = (edge.data ?? {}) as Record<string, any>;
-        const manualSides = Array.isArray(edgeDataForManual.manualHandleSides)
-            ? edgeDataForManual.manualHandleSides.map((side: any) => String(side).toLowerCase())
-            : [];
+        const edgeDataForManual = asRecord(edge.data);
+        const manualSides = manualHandleSides(edgeDataForManual);
         const manualHandles = edgeDataForManual.manualHandles ?? edgeDataForManual._manualHandles;
+        const manualHandleRecord = asRecord(manualHandles);
         const hasManualSourceHandle = manualSides.includes('source')
             || manualHandles === true
-            || Boolean(manualHandles && typeof manualHandles === 'object' && manualHandles.source);
+            || Boolean(manualHandleRecord.source);
         const hasManualTargetHandle = manualSides.includes('target')
             || manualHandles === true
-            || Boolean(manualHandles && typeof manualHandles === 'object' && manualHandles.target);
+            || Boolean(manualHandleRecord.target);
 
         let explicitSourceHandle = edge.sourceHandle && hasManualSourceHandle && !isAutoHandle(edge, 'source')
             ? normalizeHandle(edge.sourceHandle)
@@ -321,10 +362,10 @@ export async function prepareDomainDagreEdges({
         // causing a huge U-turn loop). Detect this and DROP the explicit handles,
         // letting globalPorts + geometry choose the optimal ports.
         if (explicitSourceHandle && explicitTargetHandle) {
-            const sAbsPos = (source as any).positionAbsolute || source.position;
-            const tAbsPos = (target as any).positionAbsolute || target.position;
-            const sDims = { width: (source as any).measured?.width || (source as any).style?.width || 200, height: (source as any).measured?.height || (source as any).style?.height || 80 };
-            const tDims = { width: (target as any).measured?.width || (target as any).style?.width || 200, height: (target as any).measured?.height || (target as any).style?.height || 80 };
+            const sAbsPos = nodeAbsolutePosition(source);
+            const tAbsPos = nodeAbsolutePosition(target);
+            const sDims = nodeSize(source);
+            const tDims = nodeSize(target);
             const oCenterDx = (tAbsPos.x + tDims.width / 2) - (sAbsPos.x + sDims.width / 2);
             const oCenterDy = (tAbsPos.y + tDims.height / 2) - (sAbsPos.y + sDims.height / 2);
             const OVERSHOOT_PX = 40;
@@ -391,14 +432,14 @@ export async function prepareDomainDagreEdges({
             };
         }
 
-        const routingConfigForEdge = {
+        const routingConfigForEdge: RoutingConfig = {
             ...routingConfig,
             preAssignedPorts: mergedPorts
         };
         const rolePortForce = getRolePortForce(edge, source, target, edgePorts);
         const forceRolePorts = rolePortForce.sourceFanOut || rolePortForce.targetFanIn;
         if (forceRolePorts) {
-            (routingConfigForEdge as any).preAssignedPortPolicy = 'force';
+            routingConfigForEdge.preAssignedPortPolicy = 'force';
             if (rolePortForce.sourceFanOut && edgePorts?.source && !explicitTargetHandle) {
                 mergedPorts[target.id] = {
                     ...mergedPorts[target.id],
@@ -436,13 +477,7 @@ export async function prepareDomainDagreEdges({
         edge.type = routingResult.type;
         edge.sourceHandle = sourceHandle;
         edge.targetHandle = targetHandle;
-        if (!edge.data) edge.data = {} as any;
-        (edge.data as any).autoSource = Boolean(routingResult.autoSource);
-        (edge.data as any).autoTarget = Boolean(routingResult.autoTarget);
-        const autoList: string[] = [];
-        if (routingResult.autoSource) autoList.push('source');
-        if (routingResult.autoTarget) autoList.push('target');
-        (edge.data as any).auto = autoList;
+        withAutoHandleData(edge, routingResult.autoSource, routingResult.autoTarget);
 
         const computedPathForEdge = resolveRoutingResultPath({
             routingResult,
@@ -458,15 +493,13 @@ export async function prepareDomainDagreEdges({
             routedPaths.push({ points: computedPathForEdge });
         } else {
             // Fallback: 使用起点终点
-            const sPos = (source as any).positionAbsolute ?? (source as any).position ?? { x: 0, y: 0 };
-            const tPos = (target as any).positionAbsolute ?? (target as any).position ?? { x: 0, y: 0 };
-            const sW = (source as any)?.measured?.width ?? 100;
-            const sH = (source as any)?.measured?.height ?? 50;
-            const tW = (target as any)?.measured?.width ?? 100;
-            const tH = (target as any)?.measured?.height ?? 50;
+            const sPos = nodeAbsolutePosition(source);
+            const tPos = nodeAbsolutePosition(target);
+            const { width: sW, height: sH } = nodeSize(source, 100, 50);
+            const { width: tW, height: tH } = nodeSize(target, 100, 50);
 
             // 根据 handle 计算锚点
-            const handleToAnchor = (pos: any, w: number, h: number, handle: string) => {
+            const handleToAnchor = (pos: XYPosition, w: number, h: number, handle: string) => {
                 switch (handle) {
                     case 'l': case 'left': return { x: pos.x, y: pos.y + h / 2 };
                     case 'r': case 'right': return { x: pos.x + w, y: pos.y + h / 2 };
@@ -523,23 +556,20 @@ export async function prepareDomainDagreEdges({
  * 应用智能边路由
  */
 export function applyDomainDagreEdgeRouting(
-    nodes: ReactFlowNode[],
+    nodes: RoutingNode[],
     edges: Edge[],
-    idMap: Map<string, ReactFlowNode>,
-    cfg: any,
+    idMap: Map<string, RoutingNode>,
+    cfg: unknown,
     options: LayoutOptions
 ): void {
-    const getNodeSize = (n: ReactFlowNode): { width: number; height: number } => {
-        const w = (n as any).style?.width ?? (n as any).measured?.width ?? (n as any).width ?? 120;
-        const h = (n as any).style?.height ?? (n as any).measured?.height ?? (n as any).height ?? 60;
-        return { width: w, height: h };
-    };
-    const getNodeCenter = (n: ReactFlowNode): { cx: number; cy: number } => {
-        const pos = (n as any).positionAbsolute || n.position || { x: 0, y: 0 };
+    const getNodeSize = (n: RoutingNode): { width: number; height: number } =>
+        nodeSize(n, 120, 60);
+    const getNodeCenter = (n: RoutingNode): { cx: number; cy: number } => {
+        const pos = nodeAbsolutePosition(n);
         const size = getNodeSize(n);
         return { cx: pos.x + size.width / 2, cy: pos.y + size.height / 2 };
     };
-    const getDominantHandle = (centerNode: ReactFlowNode, relatives: ReactFlowNode[]): string => {
+    const getDominantHandle = (centerNode: RoutingNode, relatives: RoutingNode[]): string => {
         if (relatives.length === 0) return 'bottom';
         const c = getNodeCenter(centerNode);
         let sumX = 0;
@@ -574,7 +604,7 @@ export function applyDomainDagreEdgeRouting(
         return 'bottom';
     };
 
-    const getAbsPos = (n: ReactFlowNode): { x: number, y: number } => {
+    const getAbsPos = (n: RoutingNode): { x: number, y: number } => {
         let x = n.position.x;
         let y = n.position.y;
         let current = n;
@@ -591,11 +621,11 @@ export function applyDomainDagreEdgeRouting(
     };
 
     nodes.forEach(n => {
-        (n as any).positionAbsolute = getAbsPos(n);
+        n.positionAbsolute = getAbsPos(n);
     });
 
-    const cfgEdge = cfg?.edge || {};
-    const routingConfig = {
+    const cfgEdge = asRecord(asRecord(cfg).edge);
+    const routingConfig: RoutingConfig = {
         mode: 'advanced-smart' as const,
         globalPath: (cfgEdge.pathType || 'step') as string,
         autoPathSelection: true,
@@ -603,7 +633,7 @@ export function applyDomainDagreEdgeRouting(
         bezierDistanceThreshold: Number(cfgEdge.bezierDistanceThreshold ?? 280),
         obstacleScopePadding: Number(cfgEdge.obstacleScopePadding ?? 160),
         corridorObstacleThreshold: Number(cfgEdge.corridorObstacleThreshold ?? 6),
-        directionalHandlePolicy: String(cfgEdge.directionalHandlePolicy || 'prefer') as any,
+        directionalHandlePolicy: directionalHandlePolicy(cfgEdge.directionalHandlePolicy),
         verticalBiasThreshold: Number(cfgEdge.verticalBiasThreshold ?? 1.2),
         obstaclePadding: Number(cfgEdge.obstaclePadding ?? 24),
         ignoreContainers: Boolean(cfgEdge.ignoreContainers ?? false),
@@ -630,7 +660,9 @@ export function applyDomainDagreEdgeRouting(
         if (edgeList.length > 1) {
             const targetNode = idMap.get(targetId);
             if (!targetNode) continue;
-            const sources = edgeList.map(e => idMap.get(e.source)).filter(Boolean) as ReactFlowNode[];
+            const sources = edgeList
+                .map(e => idMap.get(e.source))
+                .filter((node): node is RoutingNode => node !== undefined);
             const unifiedHandle = getDominantHandle(targetNode, sources);
             manyToOneTargetHandle[targetId] = unifiedHandle;
         }
@@ -643,7 +675,9 @@ export function applyDomainDagreEdgeRouting(
         if (edgeList.length > 1) {
             const sourceNode = idMap.get(sourceId);
             if (!sourceNode) continue;
-            const targets = edgeList.map(e => idMap.get(e.target)).filter(Boolean) as ReactFlowNode[];
+            const targets = edgeList
+                .map(e => idMap.get(e.target))
+                .filter((node): node is RoutingNode => node !== undefined);
             const unifiedHandle = getDominantHandle(sourceNode, targets);
             oneToManySourceHandle[sourceId] = unifiedHandle;
         }
@@ -664,22 +698,20 @@ export function applyDomainDagreEdgeRouting(
         // 检查是否需要使用预定的统一端口
         const unifiedSourceHandle = oneToManySourceHandle[source.id];
         const unifiedTargetHandle = manyToOneTargetHandle[target.id];
-        const edgeData = (edge.data ?? {}) as Record<string, any>;
-        const manualSides = Array.isArray(edgeData.manualHandleSides)
-            ? edgeData.manualHandleSides.map((side: any) => String(side).toLowerCase())
-            : [];
-        const sourceDomain = String((source.data as any)?.domain || '').trim();
-        const targetDomain = String((target.data as any)?.domain || '').trim();
-        const sourceSubDomain = String((source.data as any)?.subDomain || '').trim();
-        const targetSubDomain = String((target.data as any)?.subDomain || '').trim();
+        const edgeData = asRecord(edge.data);
+        const manualSides = manualHandleSides(edgeData);
+        const sourceDomain = String(source.data.domain ?? '').trim();
+        const targetDomain = String(target.data.domain ?? '').trim();
+        const sourceSubDomain = String(source.data.subDomain ?? '').trim();
+        const targetSubDomain = String(target.data.subDomain ?? '').trim();
         const isHorizontalSubDomainEdge = sourceDomain
             && targetDomain
             && sourceDomain === targetDomain
             && sourceSubDomain
             && targetSubDomain
             && sourceSubDomain !== targetSubDomain;
-        const sourceParentId = String((source as any).parentId || '');
-        const targetParentId = String((target as any).parentId || '');
+        const sourceParentId = String(source.parentId ?? '');
+        const targetParentId = String(target.parentId ?? '');
         const isCrossContainerEdge = Boolean(sourceParentId && targetParentId && sourceParentId !== targetParentId);
         if (
             (isHorizontalSubDomainEdge || isCrossContainerEdge) &&
@@ -688,9 +720,9 @@ export function applyDomainDagreEdgeRouting(
             ['top', 'bottom', 't', 'b'].includes(String(edge.sourceHandle || '').toLowerCase()) &&
             ['top', 'bottom', 't', 'b'].includes(String(edge.targetHandle || '').toLowerCase())
         ) {
-            const sPos = (source as any).positionAbsolute ?? source.position ?? { x: 0 };
-            const tPos = (target as any).positionAbsolute ?? target.position ?? { x: 0 };
-            if ((tPos.x ?? 0) >= (sPos.x ?? 0)) {
+            const sPos = nodeAbsolutePosition(source);
+            const tPos = nodeAbsolutePosition(target);
+            if (tPos.x >= sPos.x) {
                 edge.sourceHandle = 'right';
                 edge.targetHandle = 'left';
             } else {
@@ -747,13 +779,7 @@ export function applyDomainDagreEdgeRouting(
         edge.type = routingResult.type;
         edge.sourceHandle = sourceHandle;
         edge.targetHandle = targetHandle;
-        if (!edge.data) edge.data = {} as any;
-        (edge.data as any).autoSource = Boolean(routingResult.autoSource);
-        (edge.data as any).autoTarget = Boolean(routingResult.autoTarget);
-        const autoList: string[] = [];
-        if (routingResult.autoSource) autoList.push('source');
-        if (routingResult.autoTarget) autoList.push('target');
-        (edge.data as any).auto = autoList;
+        withAutoHandleData(edge, routingResult.autoSource, routingResult.autoTarget);
 
         lockComputedPathOnEdge(edge, resolveRoutingResultPath({
             routingResult: {
