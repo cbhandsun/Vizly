@@ -53,7 +53,7 @@ export const isLayeredConfigValueType = (
 };
 
 // 配置变更事件
-export interface LayeredConfigChangeEvent<T = any> {
+export interface LayeredConfigChangeEvent<T = unknown> {
   key: string;
   oldValue: T;
   newValue: T;
@@ -63,7 +63,9 @@ export interface LayeredConfigChangeEvent<T = any> {
 }
 
 // 配置监听器
-export type LayeredConfigListener<T = any> = (event: LayeredConfigChangeEvent<T>) => void;
+export type LayeredConfigListener<T = unknown> = {
+  bivarianceHack(event: LayeredConfigChangeEvent<T>): void;
+}['bivarianceHack'];
 
 export const createLayeredConfigChangeEvent = <T>(
   key: string,
@@ -81,14 +83,14 @@ export const createLayeredConfigChangeEvent = <T>(
 });
 
 // 配置验证器
-export interface ConfigValidator<T = any> {
-  validate: (value: T) => boolean | string;
-  sanitize?: (value: T) => T;
+export interface ConfigValidator<T = unknown> {
+  validate(value: T): boolean | string;
+  sanitize?(value: T): T;
   description?: string;
 }
 
 // 配置模式定义
-export interface ConfigSchema<T = any> {
+export interface ConfigSchema<T = unknown> {
   key: string;
   type: 'string' | 'number' | 'boolean' | 'object' | 'array';
   defaultValue: T;
@@ -104,7 +106,7 @@ export interface ConfigSchema<T = any> {
 // 配置层数据
 export interface ConfigLayerData {
   layer: ConfigLayer;
-  data: Map<string, any>;
+  data: Map<string, unknown>;
   metadata: {
     lastModified: number;
     source: string;

@@ -274,14 +274,14 @@ export class LayeredConfigManager {
 
     for (const [, layerData] of sortedLayers) {
       if (layerData.data.has(key)) {
-        effectiveValue = layerData.data.get(key);
+        effectiveValue = layerData.data.get(key) as T | undefined;
       }
     }
 
     // 使用默认值
     if (effectiveValue === undefined) {
       const schema = this.schemas.get(key);
-      effectiveValue = schema?.defaultValue ?? fallback;
+      effectiveValue = (schema?.defaultValue as T | undefined) ?? fallback;
     }
 
     // 验证配置值
@@ -539,7 +539,7 @@ export class LayeredConfigManager {
       if (schema.validator.sanitize) {
         const sanitizedValue = cloneConfigValue(schema.validator.sanitize(safeValue));
         return isLayeredConfigValueType(sanitizedValue, schema.type)
-          ? sanitizedValue
+          ? sanitizedValue as T
           : undefined;
       }
 

@@ -111,7 +111,8 @@ export function useFlowchartPluginRuntime({
                 if (isMobile) onMobileNodeAdded();
                 return id;
             },
-            getPluginState: () => useDiagramStore.getState().pluginStates[pluginId],
+            getPluginState: <T,>() =>
+                useDiagramStore.getState().pluginStates[pluginId] as T | undefined,
             setPluginState: (patch) => useDiagramStore.getState().setPluginState(pluginId, patch),
         };
 

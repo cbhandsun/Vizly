@@ -10,7 +10,7 @@ export enum ConfigSource {
 }
 
 // 配置变更事件
-export interface ConfigChangeEvent<T = any> {
+export interface ConfigChangeEvent<T = unknown> {
   key: string;
   oldValue: T;
   newValue: T;
@@ -19,13 +19,17 @@ export interface ConfigChangeEvent<T = any> {
 }
 
 // 配置监听器
-export type ConfigListener<T = any> = (event: ConfigChangeEvent<T>) => void;
+export type ConfigListener<T = unknown> = {
+  bivarianceHack(event: ConfigChangeEvent<T>): void;
+}['bivarianceHack'];
 
 // 配置验证器
-export type ConfigValidator<T = any> = (value: T) => boolean | string;
+export type ConfigValidator<T = unknown> = {
+  bivarianceHack(value: T): boolean | string;
+}['bivarianceHack'];
 
 // 配置项定义
-export interface ConfigDefinition<T = any> {
+export interface ConfigDefinition<T = unknown> {
   /** 配置键名 */
   key: string;
   /** 默认值 */
