@@ -5,6 +5,7 @@ import type { Edge, Node, ReactFlowInstance } from '@xyflow/react';
 
 import { PluginRegistry } from '../../../services/PluginRegistry';
 import type { DiagramTypePlugin, PluginContext } from '../../../types/plugin';
+import type { EdgeDataUpdate, NodeDataUpdate } from '../../../types/diagram-updates';
 import { useDiagramStore } from '../../../store/useDiagramStore';
 import {
     createFlowchartPluginNodeId,
@@ -24,8 +25,8 @@ interface UseFlowchartPluginRuntimeOptions {
     getEdges: () => Edge[];
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
-    updateNodesBatch: (ids: string[], updates: any, options?: { snapshot?: boolean }) => void;
-    updateEdgesBatch: (ids: string[], updates: any) => void;
+    updateNodesBatch: (ids: string[], updates: NodeDataUpdate, options?: { snapshot?: boolean }) => void;
+    updateEdgesBatch: (ids: string[], updates: EdgeDataUpdate) => void;
     takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
     reactFlowInstance: ReactFlowInstance | null;
     reactFlowWrapper: React.RefObject<HTMLDivElement | null>;

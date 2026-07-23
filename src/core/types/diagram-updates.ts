@@ -45,6 +45,9 @@ export interface EdgeDataUpdate {
 
     // Marker properties  
     markerEnd?: Edge['markerEnd'];
+    markerStart?: Edge['markerStart'];
+
+    animated?: boolean;
 
     // Edge type
     type?: string;

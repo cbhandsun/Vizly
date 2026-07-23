@@ -1,4 +1,5 @@
 /** NodeFactory 的公共输入与验证模型。 */
+import type { CSSProperties } from 'react';
 
 /**
  * 节点类型枚举
@@ -21,7 +22,7 @@ export interface NodeConfig {
   position: { x: number; y: number };
   description: string;
   draggable?: boolean;
-  theme?: any; // 暂时使用any类型
+  theme?: unknown;
   /**
    * 函数级注释：域类标识（强制）
    * - 新数据必须显式提供，用于唯一域主题解析。
@@ -38,10 +39,10 @@ export interface NodeConfig {
   zIndex?: number;
   width?: number;
   height?: number;
-  style?: Record<string, any>;
-  data?: Record<string, any>;
+  style?: CSSProperties;
+  data?: Record<string, unknown>;
   shape?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 /**

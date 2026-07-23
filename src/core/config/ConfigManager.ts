@@ -35,7 +35,7 @@ export {
 
 export class ConfigManager {
   private static instance: ConfigManager;
-  private configs = new Map<string, any>();
+  private configs = new Map<string, unknown>();
   private listeners = new Map<string, Set<ConfigListener>>();
   private definitions = new Map<string, ConfigDefinition>();
   private configLogger = logger.createChild('ConfigManager');
@@ -110,7 +110,7 @@ export class ConfigManager {
   /**
    * 验证配置值
    */
-  private validateConfig(key: string, value: any): boolean {
+  private validateConfig(key: string, value: unknown): boolean {
     const definition = this.definitions.get(key);
     if (!definition) return false;
 
@@ -126,12 +126,12 @@ export class ConfigManager {
     return true;
   }
 
-  private normalizeKnownConfigRecord(configs: unknown): Record<string, any> {
+  private normalizeKnownConfigRecord(configs: unknown): Record<string, unknown> {
     if (!isPlainConfigObject(configs)) {
       throw new Error('配置必须是对象');
     }
 
-    const knownConfigs: Record<string, any> = {};
+    const knownConfigs: Record<string, unknown> = {};
     Object.entries(configs).forEach(([key, value]) => {
       if (this.definitions.has(key)) {
         knownConfigs[key] = sanitizeConfigValue(value);
@@ -148,7 +148,7 @@ export class ConfigManager {
   /**
    * 持久化配置
    */
-  private persistConfig(key: string, value: any): void {
+  private persistConfig(key: string, value: unknown): void {
     const definition = this.definitions.get(key);
     if (!definition || !definition.persistent) return;
     const storage = getConfigLocalStorage();
@@ -190,7 +190,7 @@ export class ConfigManager {
   /**
    * 获取配置值
    */
-  public get<T = any>(key: string, fallback?: T): T {
+  public get<T = unknown>(key: string, fallback?: T): T {
     if (this.configs.has(key)) {
       return cloneConfigValue(this.configs.get(key)) as T;
     }
@@ -219,7 +219,7 @@ export class ConfigManager {
   /**
    * 设置配置值
    */
-  public set<T = any>(key: string, value: T, source: ConfigSource = ConfigSource.USER_OVERRIDE): void {
+  public set<T = unknown>(key: string, value: T, source: ConfigSource = ConfigSource.USER_OVERRIDE): void {
     const oldValue = this.configs.get(key);
     let nextValue: T;
 
@@ -267,9 +267,9 @@ export class ConfigManager {
   /**
    * 批量设置配置
    */
-  public setMultiple(configs: Record<string, any>, source: ConfigSource = ConfigSource.USER_OVERRIDE): void {
-    const changes: Array<{ key: string; oldValue: any; newValue: any }> = [];
-    const sanitizedConfigs: Record<string, any> = {};
+  public setMultiple(configs: Record<string, unknown>, source: ConfigSource = ConfigSource.USER_OVERRIDE): void {
+    const changes: Array<{ key: string; oldValue: unknown; newValue: unknown }> = [];
+    const sanitizedConfigs: Record<string, unknown> = {};
 
     // 验证所有配置
     for (const [key, value] of Object.entries(configs)) {
@@ -351,7 +351,7 @@ export class ConfigManager {
   /**
    * 添加配置监听器
    */
-  public addListener<T = any>(key: string, listener: ConfigListener<T>): void {
+  public addListener<T = unknown>(key: string, listener: ConfigListener<T>): void {
     if (!this.listeners.has(key)) {
       this.listeners.set(key, new Set());
     }
@@ -361,7 +361,7 @@ export class ConfigManager {
   /**
    * 移除配置监听器
    */
-  public removeListener<T = any>(key: string, listener: ConfigListener<T>): void {
+  public removeListener<T = unknown>(key: string, listener: ConfigListener<T>): void {
     const listeners = this.listeners.get(key);
     if (listeners) {
       listeners.delete(listener);
@@ -390,8 +390,8 @@ export class ConfigManager {
   /**
    * 获取配置分组
    */
-  public getGroup(group: string): Record<string, any> {
-    const result: Record<string, any> = {};
+  public getGroup(group: string): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
     
     this.definitions.forEach((definition, key) => {
       if (definition.group === group) {
@@ -405,8 +405,8 @@ export class ConfigManager {
   /**
    * 获取所有配置
    */
-  public getAll(): Record<string, any> {
-    const result: Record<string, any> = {};
+  public getAll(): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
     
     this.configs.forEach((value, key) => {
       const definition = this.definitions.get(key);
@@ -422,7 +422,7 @@ export class ConfigManager {
    * 导出配置
    */
   public exportConfig(includeDefaults: boolean = false): string {
-    const config: Record<string, any> = {};
+    const config: Record<string, unknown> = {};
 
     this.definitions.forEach((definition, key) => {
       if (definition.sensitive) return;
@@ -464,7 +464,7 @@ export class ConfigManager {
   /**
    * 获取配置统计
    */
-  public getStats(): Record<string, any> {
+  public getStats(): Record<string, unknown> {
     const stats = {
       total: this.definitions.size,
       byGroup: {} as Record<string, number>,
@@ -540,15 +540,15 @@ export class ConfigManager {
 export const configManager = ConfigManager.getInstance();
 
 // 便捷函数
-export const getConfig = <T = any>(key: string, fallback?: T): T => {
+export const getConfig = <T = unknown>(key: string, fallback?: T): T => {
   return configManager.get(key, fallback);
 };
 
-export const setConfig = <T = any>(key: string, value: T): void => {
+export const setConfig = <T = unknown>(key: string, value: T): void => {
   configManager.set(key, value);
 };
 
-export const onConfigChange = <T = any>(key: string, listener: ConfigListener<T>): void => {
+export const onConfigChange = <T = unknown>(key: string, listener: ConfigListener<T>): void => {
   configManager.addListener(key, listener);
 };
 

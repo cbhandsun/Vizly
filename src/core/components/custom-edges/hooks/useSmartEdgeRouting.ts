@@ -24,6 +24,8 @@ import {
     parseRenderedPathPoints,
 } from './smartEdgeRoutingRenderedGeometry';
 import { resolveRenderedSmartEdgePath } from './smartEdgeRoutingRenderedPath';
+import type { SimpleNodeData } from '../../../hooks/useNodeMap';
+import type { CenteredCoords, EdgeData } from './useSmartPathWorker';
 
 export { __smartEdgeRoutingTestUtils } from './smartEdgeRoutingRenderedRepairs';
 
@@ -39,10 +41,11 @@ export interface UseSmartEdgeRoutingReturn {
   shouldRenderPortHeatmap: boolean;
   isStale: boolean;
   workerSmartPoints: { x: number; y: number }[] | null;
-  obstacles: any[];
+  obstacles: ReturnType<typeof useObstaclesForEdge>;
   isBusEdge: boolean;
-  centeredCoords: any;
-  workerSmartLabelPos: any;
+  centeredCoords: CenteredCoords;
+  workerSmartLabelPos: { x: number; y: number } | null;
+  simpleNodeMap: Map<string, SimpleNodeData>;
 }
 
 export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn {
@@ -52,35 +55,43 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
 
   useSharedObstacles();
   const obstacles = useObstaclesForEdge(source, target);
-  const zoomLevel = useStore((s: any) => s.transform[2]);
+  const zoomLevel = useStore((state) => state.transform[2]);
   const isLayoutStable = useLayoutStability();
 
-  const edgeData = props.data as Record<string, any> | undefined;
+  const edgeData = props.data as EdgeData | undefined;
   const safeFallbackPositions = useMemo(() => ({
       sourcePos: fallbackPositions?.sourcePos || Position.Right,
       targetPos: fallbackPositions?.targetPos || Position.Left,
   }), [fallbackPositions?.sourcePos, fallbackPositions?.targetPos]);
 
-  const safeObstacles = (Array.isArray(obstacles) ? obstacles : []) as any[];
-  const safeSimpleNodeMap = simpleNodeMap as any;
+  const safeObstacles = Array.isArray(obstacles)
+      ? obstacles.map(({ id: obstacleId, x, y, width, height, type }) => ({
+          id: obstacleId,
+          x,
+          y,
+          width,
+          height,
+          type,
+      }))
+      : [];
   const routingNodeRects = useMemo(
-      () => collectRoutingNodeRects(safeSimpleNodeMap),
-      [safeSimpleNodeMap]
+      () => collectRoutingNodeRects(simpleNodeMap),
+      [simpleNodeMap]
   );
   const renderedBusinessObstacles = useMemo(
       () => getRenderedBusinessObstacles(routingNodeRects, source, target),
       [routingNodeRects, source, target]
   );
   const hasSameSourceFanOut = useMemo(() => {
-      return (storeEdges as any[]).some(edge => edge?.id !== id && edge?.source === source);
+      return storeEdges.some(edge => edge.id !== id && edge.source === source);
   }, [storeEdges, id, source]);
 
   // 1. Worker Calculation
-  const { path: workerPath, smartLabelPos: workerSmartLabelPos, smartPoints: workerSmartPoints, isLoading, workerUsedPositions } = useSmartPathWorker({
+  const { path: workerPath, smartLabelPos: workerSmartLabelPos, smartPoints: workerSmartPoints, isLoading } = useSmartPathWorker({
       id, source, target, centeredCoords,
       fallbackPositions: safeFallbackPositions,
       obstacles: safeObstacles,
-      simpleNodeMap: safeSimpleNodeMap,
+      simpleNodeMap,
       storeEdges,
       edgeConfig,
       layoutDirection,
@@ -90,7 +101,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       isReverseEdge,
       nodesDragging,
       sourceHandleId, targetHandleId,
-      edgeData: edgeData as any,
+      edgeData: edgeData ?? {},
       multiEdgeInfo,
       isLayoutStable
   });
@@ -134,8 +145,8 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       return () => clearTimeout(timer);
   }, [hasCacheOnMount, id, nodesDragging]);
   const isSharedTrunkEdge = !!(
-      (multiEdgeInfo as any)?.isOneToMany ||
-      (multiEdgeInfo as any)?.isManyToOne ||
+      multiEdgeInfo?.isOneToMany ||
+      multiEdgeInfo?.isManyToOne ||
       edgeData?.isTreeBus
   );
   const isBusEdge = !!(
@@ -144,7 +155,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
   );
   const isLayoutPathLocked = !!(
       edgeData?.layoutPathLocked ||
-      (edgeData as any)?._layoutPathLocked
+      edgeData?._layoutPathLocked
   );
   const renderCornerRadius = structuralCornerRadius;
 
@@ -162,14 +173,6 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
       if (!workerSmartPoints || workerSmartPoints.length < 2 || !workerPath) return false;
       if (!isLoading && !nodesDragging) return false;
 
-      if ((workerUsedPositions as any)?.sourceCenter && (centeredCoords as any)?.sourceCenter) {
-          const sxDiff = Math.abs((workerUsedPositions as any).sourceCenter.x - (centeredCoords as any).sourceCenter.x);
-          const syDiff = Math.abs((workerUsedPositions as any).sourceCenter.y - (centeredCoords as any).sourceCenter.y);
-          const txDiff = Math.abs((workerUsedPositions as any).targetCenter.x - (centeredCoords as any).targetCenter.x);
-          const tyDiff = Math.abs((workerUsedPositions as any).targetCenter.y - (centeredCoords as any).targetCenter.y);
-          return sxDiff > 100 || syDiff > 100 || txDiff > 100 || tyDiff > 100;
-      }
-
       const firstPt = workerSmartPoints[0];
       const lastPt = workerSmartPoints[workerSmartPoints.length - 1];
       if (respectSourceHandle || respectTargetHandle) {
@@ -184,7 +187,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
              Math.abs(firstPt.y - props.sourceY) > 150 || 
              Math.abs(lastPt.x - props.targetX) > 150 || 
              Math.abs(lastPt.y - props.targetY) > 150;
-  }, [workerSmartPoints, workerPath, props.sourceX, props.sourceY, props.targetX, props.targetY, isLoading, nodesDragging, workerUsedPositions, centeredCoords, respectSourceHandle, respectTargetHandle]);
+  }, [workerSmartPoints, workerPath, props.sourceX, props.sourceY, props.targetX, props.targetY, isLoading, nodesDragging, centeredCoords, respectSourceHandle, respectTargetHandle]);
   const loadedInCurrentRender = !isLoading && !isStale;
   const hasLoadedCandidate = hasLoadedOnce || loadedInCurrentRender;
   useEffect(() => {
@@ -345,9 +348,9 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
           const points = workerSmartPoints;
           if (!points || points.length < 2) return null;
 
-          const info = multiEdgeInfo as any;
-          let idx = info.incomingIndex ?? info.outgoingIndex ?? info.index ?? 0;
-          let cnt = info.incomingCount ?? info.outgoingCount ?? info.count ?? 1;
+          const info = multiEdgeInfo;
+          let idx = info.incomingIndex ?? info.outgoingIndex ?? 0;
+          let cnt = info.incomingCount ?? info.outgoingCount ?? 1;
 
           if (info.isManyToOne && typeof info.incomingCount === 'number') {
               idx = info.incomingIndex;
@@ -468,6 +471,7 @@ export function useSmartEdgeRouting(props: EdgeProps): UseSmartEdgeRoutingReturn
     obstacles,
     isBusEdge,
     centeredCoords,
-    workerSmartLabelPos
+    workerSmartLabelPos,
+    simpleNodeMap,
   };
 }

@@ -111,7 +111,7 @@ describe('ConfigManager', () => {
     expect(localStorage.getItem('config_theme.primaryColor')).toBe(JSON.stringify('#00ffaa'));
 
     expect(() => manager.set('theme.primaryColor', 'blue')).toThrow('配置值验证失败: theme.primaryColor');
-    expect(() => manager.set('layout.spacing.node', '100' as any)).toThrow('配置值验证失败: layout.spacing.node');
+    expect(() => manager.set('layout.spacing.node', '100')).toThrow('配置值验证失败: layout.spacing.node');
     expect(() => manager.set('layout.spacing.node', Number.NaN)).toThrow('配置值验证失败: layout.spacing.node');
     expect(() => manager.set('layout.spacing.node', Number.POSITIVE_INFINITY)).toThrow(
       '配置值验证失败: layout.spacing.node'
@@ -121,13 +121,14 @@ describe('ConfigManager', () => {
   it('returns owned values and isolates listener event payloads', () => {
     manager.set('theme.current', { palette: { primary: '#123456' } });
 
-    const value = manager.get<any>('theme.current');
+    type ThemeValue = { palette: { primary: string } };
+    const value = manager.get<ThemeValue>('theme.current');
     value.palette.primary = '#ffffff';
     const all = manager.getAll();
-    all['theme.current'].palette.primary = '#000000';
+    (all['theme.current'] as ThemeValue).palette.primary = '#000000';
 
     const secondListener = vi.fn();
-    manager.addListener<any>('theme.current', event => {
+    manager.addListener<ThemeValue>('theme.current', event => {
       event.newValue.palette.primary = '#abcdef';
     });
     manager.addListener('theme.current', secondListener);

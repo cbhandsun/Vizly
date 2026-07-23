@@ -66,7 +66,7 @@ export class LayeredConfigManager {
   private globalListeners = new Set<LayeredConfigListener>();
 
   // 缓存
-  private effectiveConfigCache = new Map<string, any>();
+  private effectiveConfigCache = new Map<string, unknown>();
   private cacheVersion = 0;
 
   private cloudAdapter: CloudStorageAdapter | null = null;
@@ -177,7 +177,7 @@ export class LayeredConfigManager {
   /**
    * 设置配置层数据
    */
-  private setLayerData(layer: ConfigLayer, data: Record<string, any>, source: string): void {
+  private setLayerData(layer: ConfigLayer, data: Record<string, unknown>, source: string): void {
     const layerData = this.layers.get(layer);
     if (!layerData) return;
 
@@ -242,14 +242,14 @@ export class LayeredConfigManager {
   /**
    * 获取配置值 (别名方法，兼容旧接口)
    */
-  public getConfig<T = any>(key: string, fallback?: T): T {
+  public getConfig<T = unknown>(key: string, fallback?: T): T {
     return this.get(key, fallback);
   }
 
   /**
    * 设置配置值 (别名方法，兼容旧接口)
    */
-  public setConfig<T = any>(
+  public setConfig<T = unknown>(
     key: string,
     value: T,
     layer: ConfigLayer = ConfigLayer.USER
@@ -260,7 +260,7 @@ export class LayeredConfigManager {
   /**
    * 获取配置值
    */
-  public get<T = any>(key: string, fallback?: T): T {
+  public get<T = unknown>(key: string, fallback?: T): T {
     // 检查缓存
     const cacheKey = `${key}:${this.cacheVersion}`;
     if (this.effectiveConfigCache.has(cacheKey)) {
@@ -304,7 +304,7 @@ export class LayeredConfigManager {
   /**
    * 设置配置值
    */
-  public set<T = any>(
+  public set<T = unknown>(
     key: string,
     value: T,
     layer: ConfigLayer = ConfigLayer.USER
@@ -375,7 +375,7 @@ export class LayeredConfigManager {
    * 批量设置配置
    */
   public setMultiple(
-    configs: Record<string, any>,
+    configs: Record<string, unknown>,
     layer: ConfigLayer = ConfigLayer.USER
   ): void {
     const layerData = this.getLayerDataOrThrow(layer);
@@ -383,9 +383,9 @@ export class LayeredConfigManager {
     const normalizedConfigs = this.normalizeConfigRecord(configs, { requireKnown: true, invalidValueMode: 'throw' });
     const changes: Array<{
       key: string;
-      oldValue: any;
-      newValue: any;
-      effectiveValue: any;
+      oldValue: unknown;
+      newValue: unknown;
+      effectiveValue: unknown;
     }> = [];
 
     // 收集所有变更
@@ -419,11 +419,11 @@ export class LayeredConfigManager {
   /**
    * 获取配置层的所有配置
    */
-  public getLayer(layer: ConfigLayer): Record<string, any> {
+  public getLayer(layer: ConfigLayer): Record<string, unknown> {
     const layerData = this.layers.get(layer);
     if (!layerData) return {};
 
-    const result: Record<string, any> = {};
+    const result: Record<string, unknown> = {};
     layerData.data.forEach((value, key) => {
       result[key] = cloneConfigValue(value);
     });
@@ -433,8 +433,8 @@ export class LayeredConfigManager {
   /**
    * 获取有效配置（合并所有层）
    */
-  public getEffectiveConfig(): Record<string, any> {
-    const result: Record<string, any> = {};
+  public getEffectiveConfig(): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
 
     // 收集所有配置键
     const allKeys = new Set<string>();
@@ -480,7 +480,7 @@ export class LayeredConfigManager {
   /**
    * 添加配置监听器
    */
-  public addListener<T = any>(key: string, listener: LayeredConfigListener<T>): void {
+  public addListener<T = unknown>(key: string, listener: LayeredConfigListener<T>): void {
     if (!this.listeners.has(key)) {
       this.listeners.set(key, new Set());
     }
@@ -497,7 +497,7 @@ export class LayeredConfigManager {
   /**
    * 移除配置监听器
    */
-  public removeListener<T = any>(key: string, listener: LayeredConfigListener<T>): void {
+  public removeListener<T = unknown>(key: string, listener: LayeredConfigListener<T>): void {
     const keyListeners = this.listeners.get(key);
     if (keyListeners) {
       keyListeners.delete(listener);
@@ -565,12 +565,12 @@ export class LayeredConfigManager {
   private normalizeConfigRecord(
     configs: unknown,
     options: { requireKnown: boolean; invalidValueMode: 'throw' | 'drop' }
-  ): Record<string, any> {
+  ): Record<string, unknown> {
     if (!isPlainConfigObject(configs)) {
       throw new Error('配置必须是对象');
     }
 
-    const normalized: Record<string, any> = {};
+    const normalized: Record<string, unknown> = {};
     Object.entries(configs).forEach(([key, value]) => {
       if (!this.schemas.has(key)) return;
       const validatedValue = this.validateAndSanitize(key, value);
@@ -599,7 +599,7 @@ export class LayeredConfigManager {
       const layerData = this.layers.get(layer);
       if (!layerData) return;
 
-      const data: Record<string, any> = {};
+      const data: Record<string, unknown> = {};
       layerData.data.forEach((value, key) => {
         data[key] = cloneConfigValue(value);
       });
@@ -690,7 +690,7 @@ export class LayeredConfigManager {
    */
   public exportConfig(layers?: ConfigLayer[]): string {
     const targetLayers = layers || Object.values(ConfigLayer);
-    const exportData: Record<string, any> = {};
+    const exportData: Record<string, unknown> = {};
 
     targetLayers.forEach(layer => {
       exportData[layer] = this.getLayer(layer);
@@ -716,7 +716,7 @@ export class LayeredConfigManager {
 
       // 如果是分层数据，先完成所有层的校验，避免部分写入。
       if (Object.keys(data).some(isConfigLayer)) {
-        const normalizedByLayer = new Map<ConfigLayer, Record<string, any>>();
+        const normalizedByLayer = new Map<ConfigLayer, Record<string, unknown>>();
         Object.entries(data).forEach(([layer, configs]) => {
           if (!isConfigLayer(layer)) return;
           const normalized = this.normalizeConfigRecord(configs, { requireKnown: false, invalidValueMode: 'throw' });
@@ -744,9 +744,14 @@ export class LayeredConfigManager {
   /**
    * 获取配置统计信息
    */
-  public getStats(): Record<string, any> {
-    const stats: Record<string, any> = {
-      layers: {},
+  public getStats(): Record<string, unknown> {
+    const layers: Record<string, {
+      configCount: number;
+      lastModified: number;
+      source: string;
+    }> = {};
+    const stats = {
+      layers,
       schemas: this.schemas.size,
       listeners: this.listeners.size,
       globalListeners: this.globalListeners.size,
@@ -755,7 +760,7 @@ export class LayeredConfigManager {
     };
 
     this.layers.forEach((layerData, layer) => {
-      stats.layers[layer] = {
+      layers[layer] = {
         configCount: layerData.data.size,
         lastModified: layerData.metadata.lastModified,
         source: layerData.metadata.source
@@ -770,11 +775,11 @@ export class LayeredConfigManager {
 export const layeredConfigManager = LayeredConfigManager.getInstance();
 
 // 便捷函数
-export const getLayeredConfig = <T = any>(key: string, fallback?: T): T => {
+export const getLayeredConfig = <T = unknown>(key: string, fallback?: T): T => {
   return layeredConfigManager.get(key, fallback);
 };
 
-export const setLayeredConfig = <T = any>(
+export const setLayeredConfig = <T = unknown>(
   key: string,
   value: T,
   layer: ConfigLayer = ConfigLayer.USER
@@ -782,7 +787,7 @@ export const setLayeredConfig = <T = any>(
   layeredConfigManager.set(key, value, layer);
 };
 
-export const onLayeredConfigChange = <T = any>(
+export const onLayeredConfigChange = <T = unknown>(
   key: string,
   listener: LayeredConfigListener<T>
 ): void => {

@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import { analyzeDiagram, type AnalysisResult } from '../../../utils/diagramAnalyzer';
 
 const stripHtml = (value: string): string => value.replace(/<[^>]*>?/gm, '');
 
@@ -68,3 +69,23 @@ export const projectDesignerStandardEdges = (edges: Edge[]): Array<Record<string
     manualHandleSides: edge.data?.manualHandleSides,
   },
 }));
+
+export const analyzeDesignerCanvas = (nodes: Node[], edges: Edge[]): AnalysisResult => analyzeDiagram(
+  nodes.map((node) => ({
+    id: node.id,
+    type: node.type,
+    position: node.position,
+    parentId: node.parentId,
+    data: {
+      label: typeof node.data?.label === 'string' ? node.data.label : undefined,
+      description: typeof node.data?.description === 'string' ? node.data.description : undefined,
+      domainClass: typeof node.data?.domainClass === 'string' ? node.data.domainClass : undefined,
+    },
+  })),
+  edges.map((edge) => ({
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    label: typeof edge.label === 'string' ? edge.label : undefined,
+  })),
+);

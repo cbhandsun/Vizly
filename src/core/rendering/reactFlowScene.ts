@@ -8,6 +8,33 @@ const MAX_TABLE_COLUMNS = 24;
 const MAX_COLUMN_TEXT_CHARS = 80;
 const DEFAULT_WIDTH = 220;
 const DEFAULT_HEIGHT = 120;
+
+type RenderFlowNode = Node & {
+  positionAbsolute?: unknown;
+  internals?: { positionAbsolute?: unknown };
+  measured?: { width?: unknown; height?: unknown };
+  width?: unknown;
+  height?: unknown;
+  label?: unknown;
+  zIndex?: unknown;
+};
+
+type RenderFlowEdge = Edge & {
+  markerStart?: unknown;
+  markerEnd?: unknown;
+  zIndex?: unknown;
+};
+
+interface GlobalReactFlowInstance {
+  getNodes?: () => Node[];
+  getEdges?: () => Edge[];
+  getViewport?: () => { x?: unknown; y?: unknown; zoom?: unknown };
+}
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 export interface ReactFlowRenderSnapshot {
   nodes: readonly Node[];
   edges: readonly Edge[];
@@ -86,13 +113,15 @@ const normalizeTableColumns = (value: unknown): RenderNodeGeometry['tableColumns
 };
 
 const nodePosition = (node: Node): RenderPoint => {
-  const raw = (node as any).positionAbsolute ?? (node as any).internals?.positionAbsolute ?? node.position;
+  const renderNode = node as RenderFlowNode;
+  const raw = renderNode.positionAbsolute ?? renderNode.internals?.positionAbsolute ?? node.position;
   return normalizeRenderPoint(raw) ?? { x: 0, y: 0 };
 };
 
 const nodeDimension = (node: Node, key: 'width' | 'height', fallback: number): number => {
-  const style = node.style as Record<string, unknown> | undefined;
-  const raw = (node as any).measured?.[key] ?? (node as any)[key] ?? style?.[key];
+  const renderNode = node as RenderFlowNode;
+  const style = asRecord(node.style);
+  const raw = renderNode.measured?.[key] ?? renderNode[key] ?? style[key];
   return typeof raw === 'number' && Number.isFinite(raw) && raw > 0
     ? coerceRenderNumber(raw, fallback, 1, 12_000)
     : fallback;
@@ -165,7 +194,9 @@ const normalizeBorderRadius = (style: unknown, shape: string | undefined): numbe
 };
 
 const buildNode = (node: Node): RenderNodeGeometry | null => {
-  if (!node?.id || node.hidden || (node.style as any)?.display === 'none') return null;
+  const renderNode = node as RenderFlowNode;
+  const nodeStyle = asRecord(node.style);
+  if (!node?.id || node.hidden || nodeStyle.display === 'none') return null;
   const position = nodePosition(node);
   const width = nodeDimension(node, 'width', DEFAULT_WIDTH);
   const height = nodeDimension(node, 'height', DEFAULT_HEIGHT);
@@ -173,7 +204,7 @@ const buildNode = (node: Node): RenderNodeGeometry | null => {
   const shape = normalizeShape(node, data);
   const dataStyle = data?.style as Record<string, unknown> | undefined;
   const tableColumns = normalizeTableColumns(data?.columns);
-  const label = firstText(data?.tableName, data?.title, data?.label, data?.description, (node as any).label, node.id);
+  const label = firstText(data?.tableName, data?.title, data?.label, data?.description, renderNode.label, node.id);
   const subtitle = firstText(data?.subtitle, data?.caption, data?.description);
   const container = normalizeContainerMetadata(node, data, shape);
   return {
@@ -183,7 +214,7 @@ const buildNode = (node: Node): RenderNodeGeometry | null => {
     width,
     height,
     hidden: false,
-    zIndex: coerceRenderNumber((node as any).zIndex, 0, -10_000, 10_000),
+    zIndex: coerceRenderNumber(renderNode.zIndex, 0, -10_000, 10_000),
     label,
     subtitle: subtitle && subtitle !== label ? subtitle : undefined,
     icon: iconTextFromUnknown(data?.icon),
@@ -194,11 +225,11 @@ const buildNode = (node: Node): RenderNodeGeometry | null => {
     stroke: dataStyleColor(data, node.style, 'borderColor', defaultTheme.nodeStroke),
     textColor: dataStyleColor(data, node.style, 'color', defaultTheme.textColor),
     strokeDasharray: shape === 'group'
-      ? (normalizeSvgStrokeDasharray((node.style as any)?.strokeDasharray) || normalizeSvgStrokeDasharray(dataStyle?.strokeDasharray) || '6 4')
-      : (normalizeSvgStrokeDasharray((node.style as any)?.strokeDasharray) || normalizeSvgStrokeDasharray(dataStyle?.strokeDasharray)),
+      ? (normalizeSvgStrokeDasharray(nodeStyle.strokeDasharray) || normalizeSvgStrokeDasharray(dataStyle?.strokeDasharray) || '6 4')
+      : (normalizeSvgStrokeDasharray(nodeStyle.strokeDasharray) || normalizeSvgStrokeDasharray(dataStyle?.strokeDasharray)),
     borderRadius: normalizeBorderRadius(node.style ?? dataStyle, shape),
-    fontSize: coerceRenderNumber((node.style as any)?.fontSize ?? dataStyle?.fontSize, 13, 8, 48),
-    fontWeight: normalizeSvgFontWeight((node.style as any)?.fontWeight) || normalizeSvgFontWeight(dataStyle?.fontWeight),
+    fontSize: coerceRenderNumber(nodeStyle.fontSize ?? dataStyle?.fontSize, 13, 8, 48),
+    fontWeight: normalizeSvgFontWeight(nodeStyle.fontWeight) || normalizeSvgFontWeight(dataStyle?.fontWeight),
     tableColumns,
     container,
   };
@@ -229,6 +260,7 @@ const edgePointsFromData = (edge: Edge): RenderPoint[] => {
 };
 
 const buildEdge = (edge: Edge, nodesById: Map<string, RenderNodeGeometry>, warnings: string[]): RenderEdgeGeometry | null => {
+  const renderEdge = edge as RenderFlowEdge;
   const source = nodesById.get(String(edge.source));
   const target = nodesById.get(String(edge.target));
   if (!source || !target) {
@@ -241,7 +273,8 @@ const buildEdge = (edge: Edge, nodesById: Map<string, RenderNodeGeometry>, warni
   const sourcePoint = portPoint(source, edge.sourceHandle, 'source');
   const targetPoint = portPoint(target, edge.targetHandle, 'target');
   const dataPoints = edgePointsFromData(edge);
-  const pathType = String((edge.data as any)?.pathType ?? edge.type ?? '').toLowerCase();
+  const edgeData = asRecord(edge.data);
+  const pathType = String(edgeData.pathType ?? edge.type ?? '').toLowerCase();
   const path = dataPoints.length >= 2
     ? pointsToSvgPath(dataPoints)
     : pathType.includes('bezier')
@@ -258,14 +291,14 @@ const buildEdge = (edge: Edge, nodesById: Map<string, RenderNodeGeometry>, warni
     targetHandle: 'unknown',
     points: dataPoints.length >= 2 ? dataPoints : [sourcePoint, targetPoint],
     path,
-    label: firstText(edge.label, (edge.data as any)?.label),
+    label: firstText(edge.label, edgeData.label),
     stroke,
     strokeWidth: coerceRenderNumber(style.strokeWidth, 1.5, 0.5, 24),
     strokeDasharray: normalizeSvgStrokeDasharray(style.strokeDasharray),
     opacity: coerceRenderNumber(style.opacity, 1, 0, 1),
-    markerStart: resolveEdgeMarker((edge as any).markerStart, stroke),
-    markerEnd: resolveEdgeMarker((edge as any).markerEnd, stroke),
-    zIndex: coerceRenderNumber((edge as any).zIndex, 0, -10_000, 10_000),
+    markerStart: resolveEdgeMarker(renderEdge.markerStart, stroke),
+    markerEnd: resolveEdgeMarker(renderEdge.markerEnd, stroke),
+    zIndex: coerceRenderNumber(renderEdge.zIndex, 0, -10_000, 10_000),
   };
 };
 
@@ -317,7 +350,10 @@ export const buildRenderSceneFromReactFlow = (
 const MAX_SAFE_COORDINATE = 1_000_000;
 
 export const buildRenderSceneFromGlobalReactFlow = (options: BuildRenderSceneOptions = {}): DiagramRenderScene => {
-  const rf = typeof window === 'undefined' ? null : (window as any).reactFlowInstance;
+  const globalWindow = typeof window === 'undefined'
+    ? null
+    : window as Window & { reactFlowInstance?: GlobalReactFlowInstance };
+  const rf = globalWindow?.reactFlowInstance;
   const nodes = typeof rf?.getNodes === 'function' ? rf.getNodes() : [];
   const edges = typeof rf?.getEdges === 'function' ? rf.getEdges() : [];
   const viewport = typeof rf?.getViewport === 'function' ? rf.getViewport() : options.viewport;

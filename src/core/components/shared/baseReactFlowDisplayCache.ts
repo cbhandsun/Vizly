@@ -1,4 +1,4 @@
-import type { Edge, Node } from '@xyflow/react';
+import type { Edge, Node, XYPosition } from '@xyflow/react';
 import { EDGE_ROUTING_CACHE_VERSION } from '../../routing/routingVersion';
 import { edgeRoutingQualityIntentToken } from '../../strategies/shared/edgeRoutingQualityIntent';
 import { visitBaseReactFlowDisplayInputIdentity } from './baseReactFlowDisplayInputIdentity';
@@ -27,6 +27,17 @@ export type BaseReactFlowDisplayEdgesCacheEntry = {
 };
 
 const displayEdgesMemoryCache = new Map<string, BaseReactFlowDisplayEdgesCacheEntry>();
+
+type DisplayNode = Node & {
+  positionAbsolute?: XYPosition;
+  measured?: { width?: number; height?: number };
+};
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
 
 const rememberDisplayEdgesInMemory = (
   signature: string,
@@ -180,17 +191,19 @@ const endpointGeometryKeyPart = (value: unknown): string => {
 
 export const computeBaseReactFlowEndpointGeometryKey = (nodes: Node[]): string => (
   nodes.map((node) => {
-    const hasAbsolutePosition = Boolean((node as any).positionAbsolute);
+    const displayNode = node as DisplayNode;
+    const hasAbsolutePosition = Boolean(displayNode.positionAbsolute);
     const position = hasAbsolutePosition
-      ? (node as any).positionAbsolute
+      ? displayNode.positionAbsolute
       : node.position;
-    const measured = (node as any).measured;
-    const width = measured?.width ?? node.width ?? (node.style as any)?.width ?? 0;
-    const height = measured?.height ?? node.height ?? (node.style as any)?.height ?? 0;
+    const measured = displayNode.measured;
+    const style = asRecord(node.style);
+    const width = measured?.width ?? node.width ?? style.width ?? 0;
+    const height = measured?.height ?? node.height ?? style.height ?? 0;
     return [
       node.id,
       node.type,
-      (node as any).parentId,
+      node.parentId,
       hasAbsolutePosition ? 'absolute' : 'relative',
       Number(position?.x ?? 0),
       Number(position?.y ?? 0),
@@ -227,20 +240,22 @@ export const computeBaseDisplayInputSignature = ({
   feed(isLargeGraph);
   feed(BASE_DISPLAY_ROUTING_VERSION);
   nodes.forEach((node) => {
-    const pos = (node as any)?.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-    const measured = (node as any).measured;
+    const displayNode = node as DisplayNode;
+    const pos = displayNode.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
+    const measured = displayNode.measured;
+    const style = asRecord(node.style);
     const data = (node.data && typeof node.data === 'object')
       ? node.data as Record<string, unknown>
       : {};
     feed(node.id);
     feed(node.type);
-    feed((node as any).parentId);
-    feed(Boolean((node as any).positionAbsolute));
+    feed(node.parentId);
+    feed(Boolean(displayNode.positionAbsolute));
     feed(data.layoutDirection);
     feed(Math.round(Number(pos.x || 0)));
     feed(Math.round(Number(pos.y || 0)));
-    feed(Math.round(Number(measured?.width ?? node.width ?? (node.style as any)?.width ?? 0)));
-    feed(Math.round(Number(measured?.height ?? node.height ?? (node.style as any)?.height ?? 0)));
+    feed(Math.round(Number(measured?.width ?? node.width ?? style.width ?? 0)));
+    feed(Math.round(Number(measured?.height ?? node.height ?? style.height ?? 0)));
   });
   edges.forEach((edge) => {
     const data = (edge.data && typeof edge.data === 'object')
@@ -362,13 +377,15 @@ export const computeBaseReactFlowDisplayEdgeEpoch = ({
 
   feed(BASE_DISPLAY_ROUTING_VERSION);
   nodes.forEach((node) => {
-    const pos = (node as any)?.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-    const measured = (node as any).measured;
+    const displayNode = node as DisplayNode;
+    const pos = displayNode.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
+    const measured = displayNode.measured;
+    const style = asRecord(node.style);
     feed(node.id);
     feed(Math.round(Number(pos.x || 0)));
     feed(Math.round(Number(pos.y || 0)));
-    feed(Math.round(Number(measured?.width ?? node.width ?? (node.style as any)?.width ?? 0)));
-    feed(Math.round(Number(measured?.height ?? node.height ?? (node.style as any)?.height ?? 0)));
+    feed(Math.round(Number(measured?.width ?? node.width ?? style.width ?? 0)));
+    feed(Math.round(Number(measured?.height ?? node.height ?? style.height ?? 0)));
   });
 
   edges.forEach((edge) => {
@@ -629,14 +646,14 @@ export const writeBaseReactFlowDisplayEdgesCache = (
 export const isBaseDisplayFinalized = (edges: Edge[], signature: string): boolean => (
   edges.length > 0
   && edges.every((edge) => {
-    const data = (edge.data || {}) as Record<string, any>;
+    const data = asRecord(edge.data);
     return data[BASE_DISPLAY_FINALIZED_SIGNATURE] === signature;
   })
 );
 
 export const markBaseDisplayFinalized = <T extends Edge[]>(edges: T, signature: string): T => (
   edges.map((edge) => {
-    const data = (edge.data || {}) as Record<string, any>;
+    const data = asRecord(edge.data);
     if (data[BASE_DISPLAY_FINALIZED_SIGNATURE] === signature) return edge;
     return {
       ...edge,

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { theme, Input, Tooltip, Popconfirm } from 'antd';
+import type { InputRef } from 'antd';
 import { PlusOutlined, CloseOutlined } from '@ant-design/icons';
 import type { DiagramPage } from './hooks/useMultiPage';
 
@@ -21,7 +22,7 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
     const { token } = theme.useToken();
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
-    const inputRef = useRef<any>(null);
+    const inputRef = useRef<InputRef>(null);
 
     const handleStartRename = useCallback((page: DiagramPage) => {
         setEditingId(page.id);
@@ -133,8 +134,8 @@ export const PageTabs: React.FC<PageTabsProps> = React.memo(({
                                             borderRadius: 2,
                                             transition: 'color 0.15s',
                                         }}
-                                        onMouseEnter={(e: any) => e.currentTarget.style.color = token.colorError}
-                                        onMouseLeave={(e: any) => e.currentTarget.style.color = token.colorTextQuaternary}
+                                        onMouseEnter={(e) => { e.currentTarget.style.color = token.colorError; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.color = token.colorTextQuaternary; }}
                                     />
                                 </Popconfirm>
                             )}

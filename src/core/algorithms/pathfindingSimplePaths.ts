@@ -7,6 +7,10 @@ import {
 } from './pathfindingCollision';
 import type { LineObstacle, Point, Rectangle } from './pathfindingTypes';
 
+const isSpatialIndex = (value: Rectangle[] | SpatialIndex): value is SpatialIndex => (
+    !Array.isArray(value) && typeof value.queryLine === 'function'
+);
+
 /** Generates a direct, L-shaped, or Z-shaped path when geometry permits. */
 export function generateSimplePath(
     start: Point,
@@ -115,9 +119,8 @@ export function generateSimplePath(
 
         // [FIX] Ensure we also test critical gap lines formed by obstacles
         // This guarantees narrow corridors are found even if step resolution misses them entirely
-        const isSpIdx = (obs: any): obs is SpatialIndex => typeof obs.queryLine === 'function';
         let localObstacles = obstacles as Rectangle[];
-        if (isSpIdx(obstacles)) {
+        if (isSpatialIndex(obstacles)) {
             localObstacles = obstacles.query({
                 x: Math.min(start.x, end.x), y: Math.min(start.y, end.y),
                 width: Math.abs(dx), height: Math.abs(dy)
@@ -240,7 +243,17 @@ export function generateSmartCShapePath(
         gridSize?: number;
         detourFactor?: number;
         debug?: boolean;
-        debugOut?: any;
+        debugOut?: {
+            visited?: Point[];
+            grid?: {
+                minX: number;
+                minY: number;
+                cols: number;
+                rows: number;
+                size: number;
+                data: Int32Array;
+            };
+        };
     } = {}
 ): Point[] | null {
     const { gridSize = 20, debug = false } = options;

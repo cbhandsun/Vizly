@@ -104,6 +104,7 @@ export interface UnifiedRoutingConfig {
         visibilityGraphThreshold: number;  // default: 6 (lowered from 10 in P1)
         enableJPS: boolean;                // default: false (future optimization)
         enableThetaStar?: boolean;         // [NEW]
+        portOffset?: number;               // Legacy distributed-port stub offset
     };
 
     // Cost system
@@ -177,6 +178,7 @@ export interface UnifiedRoutingConfig {
 
     // Debug
     debug: boolean;                        // default: false
+    verboseConsole?: boolean;
 
     // [P0 OPTIMIZATION] Experimental Features
     experimental?: {
@@ -388,6 +390,13 @@ export interface PathFindingJob {
     trunkOrderIndex?: number;
     trunkOrderCount?: number;
     trunkBranchCoord?: number;
+    trunkPort?: unknown;
+    trunkPortTangent?: number;
+    busIndex?: number;
+    peerGroupMembers?: string[];
+    peerGroupKey?: string;
+    o2mPeerGroupKey?: string;
+    m2oPeerGroupKey?: string;
 
     // [ELK-Refactor] Typed bus routing plan — replaces (job as any).xxx
     busRoutingPlan?: BusRoutingPlan;

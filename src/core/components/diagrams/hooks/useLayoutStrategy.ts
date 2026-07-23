@@ -8,6 +8,8 @@ import { dispatchDiagramControl } from '../../shared/diagramControl';
 import { applyLayout, forceDirectedLayout, treeLayout } from '../../../utils/LayoutAlgorithms';
 import { coerceDiagramId, getQueryOrHashParamFromLocation } from '../../../utils/inputBoundary';
 import { refreshDomainLayoutEdgeForRender } from './layoutEdgeRefresh';
+import type { ILayoutStrategy } from '../../../types/layout-strategy';
+import type { LayoutOptions } from '../../../types/layout';
 import {
     logLayoutNoLayoutableNodes,
     logLayoutOrphanEdgeDropped,
@@ -21,14 +23,39 @@ interface UseLayoutStrategyParams {
     nodesRef: MutableRefObject<Node[]>;
     edgesRef: MutableRefObject<Edge[]>;
     takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
-    reactFlowInstance: ReactFlowInstance<any, any> | null;
+    reactFlowInstance: ReactFlowInstance | null;
     diagramId?: string;
     loadLayoutPresetMap?: () => Promise<Record<string, unknown>>;
 }
 
+const asRecord = (value: unknown): Record<string, unknown> => (
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {}
+);
+
+const coerceStringArray = (value: unknown): string[] | undefined => {
+    if (!Array.isArray(value)) return undefined;
+    const strings = value.filter((item): item is string => typeof item === 'string');
+    return strings.length === value.length ? strings : undefined;
+};
+
+const coerceStringArrayRecord = (value: unknown): Record<string, string[]> | undefined => {
+    const record = asRecord(value);
+    const entries = Object.entries(record);
+    if (entries.length === 0) return undefined;
+    const result: Record<string, string[]> = {};
+    for (const [key, entryValue] of entries) {
+        const strings = coerceStringArray(entryValue);
+        if (!strings) return undefined;
+        result[key] = strings;
+    }
+    return result;
+};
+
 const getNodeDataString = (node: Node, key: string): string => (
-    typeof (node.data as any)?.[key] === 'string'
-        ? String((node.data as any)[key]).trim()
+    typeof asRecord(node.data)[key] === 'string'
+        ? String(asRecord(node.data)[key]).trim()
         : ''
 );
 
@@ -41,7 +68,7 @@ const isGeneratedSubGroupNode = (node: Node): boolean => (
 );
 
 const isHiddenLayoutNode = (node: Node): boolean => (
-    node.hidden === true || (node.data as any)?.hidden === true
+    node.hidden === true || asRecord(node.data).hidden === true
 );
 
 const uniqueVisibleDataValues = (nodes: Node[], predicate: (node: Node) => boolean, key: string): string[] | undefined => {
@@ -52,9 +79,10 @@ const uniqueVisibleDataValues = (nodes: Node[], predicate: (node: Node) => boole
     return values.length ? Array.from(new Set(values)) : undefined;
 };
 
-export const resolveLayoutStrategyGeneratedGroupOptions = (preset: any, currentNodes: Node[] = []) => {
-    const layout = preset?.layout as any;
-    if (!layout && currentNodes.length > 0) {
+export const resolveLayoutStrategyGeneratedGroupOptions = (preset: unknown, currentNodes: Node[] = []) => {
+    const presetRecord = asRecord(preset);
+    const layout = asRecord(presetRecord.layout);
+    if (Object.keys(layout).length === 0 && currentNodes.length > 0) {
         const hasGeneratedContainers = currentNodes.some(node => (
             isGeneratedTitleGroupNode(node) || isGeneratedSubGroupNode(node)
         ));
@@ -72,8 +100,8 @@ export const resolveLayoutStrategyGeneratedGroupOptions = (preset: any, currentN
     return {
         generateDomainGroups: layout?.generateDomainGroups !== false,
         generateSubDomainGroups: layout?.generateSubDomainGroups !== false,
-        domainWhitelist: Array.isArray(layout?.domainWhitelist) ? layout.domainWhitelist : undefined,
-        subDomainWhitelist: Array.isArray(layout?.subDomainWhitelist) ? layout.subDomainWhitelist : undefined,
+        domainWhitelist: coerceStringArray(layout.domainWhitelist),
+        subDomainWhitelist: coerceStringArray(layout.subDomainWhitelist),
     };
 };
 
@@ -87,9 +115,9 @@ export const stripHiddenGeneratedLayoutNodes = (nodes: Node[], groupOptions?: Re
 );
 
 export const resolveLayoutStrategyPresetFromCandidates = (
-    presetMap: Record<string, any>,
+    presetMap: Record<string, unknown>,
     candidates: Array<string | undefined>,
-): { id?: string; preset?: any } => {
+): { id?: string; preset?: unknown } => {
     for (const candidate of candidates) {
         const id = coerceDiagramId(candidate || '');
         if (!id) continue;
@@ -156,7 +184,10 @@ export function sanitizeLayoutEdges(resultNodes: Node[], resultEdges: Edge[], di
     const normalizeComputedPath = (raw: unknown): Array<{ x: number; y: number }> | undefined => {
         if (!Array.isArray(raw) || raw.length < 2) return undefined;
         const points = raw
-            .map((p: any) => ({ x: Number(p?.x), y: Number(p?.y) }))
+            .map((point: unknown) => {
+                const record = asRecord(point);
+                return { x: Number(record.x), y: Number(record.y) };
+            })
             .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
         if (points.length < 2) return undefined;
 
@@ -310,13 +341,13 @@ export function useLayoutStrategy({
             const toAbsolutePosition = (node: Node): { x: number; y: number } => {
                 let x = node.position?.x ?? 0;
                 let y = node.position?.y ?? 0;
-                let pid = (node as any).parentId;
+                let pid = node.parentId;
                 while (pid) {
                     const parent = nodeById.get(pid);
                     if (!parent) break;
                     x += parent.position?.x ?? 0;
                     y += parent.position?.y ?? 0;
-                    pid = (parent as any).parentId;
+                    pid = parent.parentId;
                 }
                 return { x, y };
             };
@@ -432,19 +463,22 @@ export function useLayoutStrategy({
                     );
                     const preset = candidate.preset;
                     if (preset) {
+                        const presetRecord = asRecord(preset);
+                        const presetLayout = asRecord(presetRecord.layout);
                         generatedGroupOptions = resolveLayoutStrategyGeneratedGroupOptions(preset, allNodes);
                         // 优先显式配置
-                        domainOrder = (preset as any).layout?.domainOrder;
-                        subDomainOrder = (preset as any).layout?.subDomainOrder;
+                        domainOrder = coerceStringArray(presetLayout.domainOrder);
+                        subDomainOrder = coerceStringArrayRecord(presetLayout.subDomainOrder);
                         // 回退：从节点出现顺序推导
-                        if (!domainOrder && Array.isArray((preset as any).nodes)) {
+                        if (!domainOrder && Array.isArray(presetRecord.nodes)) {
                             const implicitOrder: string[] = [];
                             const implicitSubOrder: Record<string, string[]> = {};
-                            for (const n of (preset as any).nodes) {
-                                const d = String(n.domain || '').trim();
+                            for (const rawNode of presetRecord.nodes) {
+                                const presetNode = asRecord(rawNode);
+                                const d = String(presetNode.domain || '').trim();
                                 if (!d || d === '默认域' || d === 'default') continue;
                                 if (!implicitOrder.includes(d)) implicitOrder.push(d);
-                                const s = String(n.subDomain || '').trim();
+                                const s = String(presetNode.subDomain || '').trim();
                                 if (s) {
                                     if (!implicitSubOrder[d]) implicitSubOrder[d] = [];
                                     if (!implicitSubOrder[d].includes(s)) implicitSubOrder[d].push(s);
@@ -458,7 +492,7 @@ export function useLayoutStrategy({
                     }
                 } catch { /* ignore */ }
 
-                let strategy: any;
+                let strategy: ILayoutStrategy;
                 // [FIX] domain-dagre 始终走 DomainDagreLayoutStrategy（唯一支持 domainOrder 的策略）
                 if (isDomainDagre) {
                     const { DomainDagreLayoutStrategy } = await import('../../../strategies/DomainDagreLayoutStrategy');
@@ -480,10 +514,13 @@ export function useLayoutStrategy({
                     strategy = new DomainVerticalLayoutStrategy();
                 }
 
-                const result = await strategy.calculateLayout(layoutNodes, layoutEdges, {
-                    type: strategy.getName() as any,
+                const layoutOptions: LayoutOptions & {
+                    domainSubGroupDirection: 'TB' | 'LR';
+                    subDomainNodeDirection: 'TB' | 'LR';
+                } = {
+                    type: strategy.getName() as LayoutOptions['type'],
                     direction: dir,
-                    nodeLayout: finalNodeLayout as any,
+                    nodeLayout: finalNodeLayout as LayoutOptions['nodeLayout'],
                     spacing: { horizontal: 50, vertical: 50 },
                     padding: { top: 40, right: 20, bottom: 20, left: 20 },
                     ...generatedGroupOptions,
@@ -492,11 +529,12 @@ export function useLayoutStrategy({
                     subDomainOrder,
                     domainSubGroupDirection: isDomainDagreSubHorizontal ? 'LR' : dir,
                     subDomainNodeDirection: dir,
-                } as any);
+                };
+                const result = await strategy.calculateLayout(layoutNodes, layoutEdges, layoutOptions);
 
                 if (result.nodes.length > 0) {
                     // [FIX] 保留非流程图节点（mindmap、sticky-note 等）：布局算法不处理它们，但不能丢弃
-                    const resultNodeIds = new Set(result.nodes.map((n: any) => n.id));
+                    const resultNodeIds = new Set(result.nodes.map(node => node.id));
                     const preservedNodes = allNodes.filter(n => nonLayoutTypes.has(n.type || '') && !resultNodeIds.has(n.id));
                     const finalNodes = stripHiddenGeneratedLayoutNodes(
                         [...result.nodes, ...preservedNodes],

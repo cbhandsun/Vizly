@@ -1,7 +1,18 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import type { Node, Edge } from '@xyflow/react';
+import type { Node, Edge, XYPosition } from '@xyflow/react';
 import { EdgeRoutingCoordinator } from '../../../../services/EdgeRoutingCoordinator';
 import { LayeredConfigManager } from '../../../../config/LayeredConfigManager';
+
+type StabilityNode = Node & {
+  computed?: { positionAbsolute?: XYPosition };
+  positionAbsolute?: XYPosition;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
 
 /**
  * 计算节点集合的轻量签名
@@ -10,7 +21,8 @@ import { LayeredConfigManager } from '../../../../config/LayeredConfigManager';
  */
 export const calcNodeSignature = (list: Node[]): string => {
   const rows = list.map(n => {
-    const abs = ((n as any)?.computed?.positionAbsolute ?? (n as any)?.positionAbsolute ?? n.position ?? { x: 0, y: 0 }) as { x?: number; y?: number };
+    const stabilityNode = n as StabilityNode;
+    const abs = stabilityNode.computed?.positionAbsolute ?? stabilityNode.positionAbsolute ?? n.position ?? { x: 0, y: 0 };
     const x = Math.round((abs?.x ?? 0) as number);
     const y = Math.round((abs?.y ?? 0) as number);
     let wRaw = 0;
@@ -24,8 +36,9 @@ export const calcNodeSignature = (list: Node[]): string => {
     else if (typeof n.style?.height === 'number') hRaw = n.style.height as number;
     const h = Math.round(hRaw);
     const type = String(n.type || '');
-    const shape = String((n.data as any)?.shape || '');
-    const label = String((n.data as any)?.label || '');
+    const data = asRecord(n.data);
+    const shape = String(data.shape || '');
+    const label = String(data.label || '');
     return `${n.id}:${x}:${y}:${w}:${h}:${type}:${shape}:${label}`;
   }).sort();
   return rows.join('|');
@@ -49,11 +62,11 @@ export const calcEdgeSignature = (list: Edge[]): string => {
   };
   const rows = list
     .map(e => {
-      const d = (e as any)?.data as any;
-      const elk = pointsSig(d?.elkPath);
-      const computed = pointsSig(d?.computedPath);
-      const waypoints = pointsSig(d?.waypoints);
-      const algo = typeof d?.algorithm === 'string' ? d.algorithm : '';
+      const data = asRecord(e.data);
+      const elk = pointsSig(data.elkPath);
+      const computed = pointsSig(data.computedPath);
+      const waypoints = pointsSig(data.waypoints);
+      const algo = typeof data.algorithm === 'string' ? data.algorithm : '';
       return `${e.id}:${e.source}:${e.target}:${String(e.type || '')}:${String(e.sourceHandle || '')}:${String(e.targetHandle || '')}:${elk}:${computed}:${waypoints}:${algo}`;
     })
     .sort();
@@ -63,7 +76,7 @@ export const calcEdgeSignature = (list: Edge[]): string => {
 export interface DiagramStabilityParams {
     rfNodes: Node[];
     rfEdges: Edge[];
-    layoutStrategy: any;
+    layoutStrategy: unknown;
     nodeLayoutStrategy: string | undefined;
     latestEdgesRef: React.MutableRefObject<Edge[]>;
     setRfEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
@@ -88,7 +101,8 @@ export function useDiagramStability({
         let maxX = Number.NEGATIVE_INFINITY;
         let maxY = Number.NEGATIVE_INFINITY;
         rfNodes.forEach((n) => {
-            const abs = ((n as any)?.computed?.positionAbsolute ?? (n as any)?.positionAbsolute ?? n.position ?? { x: 0, y: 0 }) as { x?: number; y?: number };
+            const stabilityNode = n as StabilityNode;
+            const abs = stabilityNode.computed?.positionAbsolute ?? stabilityNode.positionAbsolute ?? n.position ?? { x: 0, y: 0 };
             const x = abs?.x ?? 0;
             const y = abs?.y ?? 0;
             const w = (typeof n.measured?.width === 'number' && isFinite(n.measured.width))
@@ -169,7 +183,7 @@ export function useDiagramStability({
             setRfEdges(nextEdges.map(e => ({
                 ...e,
                 data: {
-                    ...(e.data as any),
+                    ...asRecord(e.data),
                     elkPath: undefined,
                     computedPath: undefined,
                     algorithm: undefined

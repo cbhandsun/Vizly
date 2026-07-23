@@ -108,7 +108,15 @@ if (writeBaseline) {
       `Typecheck baseline gate failed: ${comparison.additions.length} new or increased diagnostic fingerprint(s).\n`,
     );
     for (const addition of comparison.additions.slice(0, 50)) {
-      const location = addition.file ?? '<global>';
+      const matchingDiagnostic = projectDiagnostics[addition.projectName].find((diagnostic) => (
+        diagnostic.file === addition.file
+        && diagnostic.code === addition.code
+        && diagnostic.messageHash === addition.messageHash
+      ));
+      const position = matchingDiagnostic?.line
+        ? `:${matchingDiagnostic.line}:${matchingDiagnostic.column ?? 1}`
+        : '';
+      const location = `${addition.file ?? '<global>'}${position}`;
       process.stderr.write(
         `  - ${addition.projectName}: ${location} TS${addition.code} ${addition.messageHash.slice(0, 12)} (+${addition.delta})\n`,
       );

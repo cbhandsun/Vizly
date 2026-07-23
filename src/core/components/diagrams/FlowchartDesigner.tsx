@@ -528,7 +528,7 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     });
 
     const { commandPaletteItems } = useDesignerCommands({
-        reactFlowInstance: reactFlowInstance as any, 
+        reactFlowInstance,
         handleFitView, 
         handleGridRotate, 
         setAutoRoutingEnabled,
@@ -581,8 +581,8 @@ const FlowchartDesigner: React.FC<DiagramComponentProps> = ({
     }, [takeSnapshot, nodesRef, edgesRef]);
 
     // 🚀 P2 性能优化：稳定的 onInit 回调，避?CanvasShell memo 失效
-    const handleReactFlowInit = useCallback((instance: ReactFlowInstance<any, any>) => {
-        setReactFlowInstance(instance as unknown as ReactFlowInstance);
+    const handleReactFlowInit = useCallback((instance: ReactFlowInstance) => {
+        setReactFlowInstance(instance);
         scheduleFlowchartInitialFit({
             reactFlowInstance: instance,
             dispatchFit: () => dispatchDiagramControl('fit', id),

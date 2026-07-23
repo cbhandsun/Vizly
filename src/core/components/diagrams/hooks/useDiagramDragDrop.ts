@@ -51,6 +51,8 @@ export const useDiagramDragDrop = ({
     const dragTargetIdRef = useRef<string | null>(null);
     const dragRafIdRef = useRef<number | null>(null); // ⭐ P4: onNodeDrag RAF 节流
     const smartGuideRafRef = useRef<number | null>(null); // 🚀 P3: SmartGuides RAF 节流
+    const lastActiveSnapDeltaRef = useRef<SnapDelta | null>(null);
+    const lastMindmapDropPosRef = useRef<'above' | 'below' | 'inside' | null>(null);
 
     const onDragOver = useCallback((event: React.DragEvent) => {
         event.preventDefault();
@@ -305,9 +307,7 @@ export const useDiagramDragDrop = ({
                     if (sig !== lastSnapSigRef.current) {
                         lastSnapSigRef.current = sig;
                         // [FIX] Save the delta for drop persistence
-                        if (typeof window !== 'undefined') {
-                            (window as any)._lastActiveSnapDelta = snapDelta;
-                        }
+                        lastActiveSnapDeltaRef.current = snapDelta;
 
                         setNodes(nds => nds.map(n => {
                             if (n.id !== capturedNode.id) return n;
@@ -323,9 +323,7 @@ export const useDiagramDragDrop = ({
                 } else {
                     // 无吸附时清空签名，允许下次吸附
                     lastSnapSigRef.current = '';
-                    if (typeof window !== 'undefined') {
-                        (window as any)._lastActiveSnapDelta = null;
-                    }
+                    lastActiveSnapDeltaRef.current = null;
                 }
             });
         }
@@ -410,7 +408,10 @@ export const useDiagramDragDrop = ({
             }
 
             // 使用 CSS 类名替代 React 状态更新，避免抖动
-            if (newTargetId !== dragTargetIdRef.current || (typeof window !== 'undefined' && dropPosition !== (window as any)._lastMindmapDropPos)) {
+            if (
+                newTargetId !== dragTargetIdRef.current
+                || dropPosition !== lastMindmapDropPosRef.current
+            ) {
                 // 移除旧高亮
                 if (dragTargetIdRef.current) {
                     const oldElement = document.querySelector(`[data-id="${dragTargetIdRef.current}"]`);
@@ -423,16 +424,14 @@ export const useDiagramDragDrop = ({
                     newElement?.classList.add('drop-target-highlight');
                     if (dropPosition) {
                          newElement?.classList.add(`drop-${dropPosition}`);
-                         if (typeof window !== 'undefined') {
-                             (window as any)._lastMindmapDropPos = dropPosition;
-                         }
-                    } else if (typeof window !== 'undefined') {
-                         (window as any)._lastMindmapDropPos = null;
+                         lastMindmapDropPosRef.current = dropPosition;
+                    } else {
+                         lastMindmapDropPosRef.current = null;
                     }
                 }
                 
-                if (!newTargetId && typeof window !== 'undefined') {
-                    (window as any)._lastMindmapDropPos = null;
+                if (!newTargetId) {
+                    lastMindmapDropPosRef.current = null;
                 }
 
                 dragTargetIdRef.current = newTargetId;
@@ -455,10 +454,8 @@ export const useDiagramDragDrop = ({
         // [FIX] Capture the active snapDelta before clearing guides so we can cement the drop location
         // React Flow natively enforces snapToGrid when the drag drops, which discards our custom snapDelta
         // causing the node to jump back to strict grid coordinates upon release.
-        const finalSnapDelta = typeof window !== 'undefined' ? (window as any)._lastActiveSnapDelta : null;
-        if ((window as any)._lastActiveSnapDelta) {
-            (window as any)._lastActiveSnapDelta = null;
-        }
+        const finalSnapDelta = lastActiveSnapDeltaRef.current;
+        lastActiveSnapDeltaRef.current = null;
 
         setIsDragging(false);
         clearGuides();
@@ -523,11 +520,11 @@ export const useDiagramDragDrop = ({
             // [DDD] Mind Map Domain Event (Delegate reparenting to Orchestrator)
             if (node.type === 'mindmap' && parentCandidate.type === 'mindmap') {
                 if (typeof window !== 'undefined') {
-                    const finalPosition = (window as any)._lastMindmapDropPos || 'inside';
+                    const finalPosition = lastMindmapDropPosRef.current || 'inside';
                     window.dispatchEvent(new CustomEvent('mindmap:reparent', {
                         detail: { nodeId: node.id, targetId: parentCandidate.id, position: finalPosition }
                     }));
-                    (window as any)._lastMindmapDropPos = null;
+                    lastMindmapDropPosRef.current = null;
                 }
                 return; // Stop standard Group parenting execution
             }

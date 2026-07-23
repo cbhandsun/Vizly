@@ -127,8 +127,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     };
 
     // --- Provider Actions ---
-    const toggleProvider = (id: string, checked: boolean, e: React.MouseEvent) => {
-        e.stopPropagation();
+    const toggleProvider = (id: string, checked: boolean, event: React.SyntheticEvent<HTMLButtonElement>) => {
+        event.stopPropagation();
         setConfig(prev => ({
             ...prev,
             providers: prev.providers.map(p => {
@@ -274,7 +274,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 messages: [{ role: 'user', content: 'Hello, please reply with "OK".' }]
             }, { timeoutMs: 30_000 });
             appMessage.success(t('aiConfig.testSuccess'));
-        } catch (error: any) {
+        } catch (error) {
             logAIConfigRequestFailure('testConnection', provider.name, error);
             appMessage.error(t('aiConfig.testError', { message: formatAIProviderRequestError(error, 100) }));
         } finally {
@@ -372,7 +372,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             } else {
                 appMessage.error(t('aiConfig.fetchModelsInvalidData'));
             }
-        } catch (error: any) {
+        } catch (error) {
             logAIConfigRequestFailure('fetchModels', provider.name, error);
             appMessage.error(t('aiConfig.testError', { message: formatAIProviderRequestError(error, 100) }));
         } finally {
@@ -455,7 +455,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                     <Switch
                                         size="small"
                                         checked={item.enabled}
-                                        onClick={(c, e) => toggleProvider(item.id, c, e as any)}
+                                        onClick={(checked, event) => toggleProvider(item.id, checked, event)}
                                     />
                                 </div>
                             ))}

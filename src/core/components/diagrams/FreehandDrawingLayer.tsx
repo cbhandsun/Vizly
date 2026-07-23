@@ -32,10 +32,15 @@ const defaultOptions: DrawingOptions = {
 export interface FreehandDrawingLayerProps {
     isDrawingMode: boolean;
     currentColor?: string;
-    onDrawEnd?: (stroke: any) => void;
+    onDrawEnd?: (stroke: FreehandStroke) => void;
     // zoom and pan data if available from ReactFlow viewport
     zoom?: number;
     pan?: { x: number; y: number };
+}
+
+export interface FreehandStroke {
+    points: number[][];
+    color: string;
 }
 
 export const FreehandDrawingLayer: React.FC<FreehandDrawingLayerProps> = ({
@@ -48,7 +53,7 @@ export const FreehandDrawingLayer: React.FC<FreehandDrawingLayerProps> = ({
     // Current ongoing stroke
     const [currentStroke, setCurrentStroke] = useState<number[][]>([]);
     // All completed strokes (for local rendering until passed up)
-    const [strokes, setStrokes] = useState<{ points: number[][]; color: string }[]>([]);
+    const [strokes, setStrokes] = useState<FreehandStroke[]>([]);
 
     const handlePointerDown = (e: React.PointerEvent) => {
         if (!isDrawingMode) return;

@@ -78,14 +78,14 @@ export const validateNodeConfig = (value: unknown): NodeValidationResult => {
   return { isValid: errors.length === 0, errors, warnings };
 };
 
-const cloneNodeRecord = (record: Record<string, unknown>): Record<string, unknown> => {
+const cloneNodeRecord = <T extends object>(record: T): T => {
   const owned: Record<string, unknown> = {};
   Object.entries(record).forEach(([key, nestedValue]) => {
     if (nestedValue !== undefined) {
       owned[key] = cloneConfigValue(nestedValue);
     }
   });
-  return owned;
+  return owned as T;
 };
 
 /** 获取 NodeFactory 输入中所有可变记录的所有权。 */

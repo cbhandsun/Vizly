@@ -1,4 +1,4 @@
-import type { Edge, Node } from '@xyflow/react';
+import type { Edge, Node, XYPosition } from '@xyflow/react';
 
 import { EDGE_ROUTING_CACHE_VERSION } from '../../routing/routingVersion';
 
@@ -11,6 +11,17 @@ export type BaseReactFlowDisplayInputIdentity = {
 };
 
 type IdentityFeed = (value: unknown) => void;
+
+type DisplayNode = Node & {
+  positionAbsolute?: XYPosition;
+  measured?: { width?: number; height?: number };
+};
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
 
 const isFiniteIdentityPoint = (value: unknown): value is { x: number; y: number } => {
   if (!value || typeof value !== 'object') return false;
@@ -59,20 +70,22 @@ export const visitBaseReactFlowDisplayInputIdentity = (
   feed(Number.isFinite(smartEdgePadding) ? Math.round(smartEdgePadding) : 'invalid-padding');
   feed(isLargeGraph);
   nodes.forEach((node) => {
-    const pos = (node as any)?.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-    const measured = (node as any).measured;
+    const displayNode = node as DisplayNode;
+    const pos = displayNode.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
+    const measured = displayNode.measured;
+    const style = asRecord(node.style);
     const data = (node.data && typeof node.data === 'object')
       ? node.data as Record<string, unknown>
       : {};
     feed(node.id);
     feed(node.type);
-    feed((node as any).parentId);
-    feed(Boolean((node as any).positionAbsolute));
+    feed(node.parentId);
+    feed(Boolean(displayNode.positionAbsolute));
     feed(data.layoutDirection);
     feedGeometry(pos.x ?? 0);
     feedGeometry(pos.y ?? 0);
-    feedGeometry(measured?.width ?? node.width ?? (node.style as any)?.width ?? 0);
-    feedGeometry(measured?.height ?? node.height ?? (node.style as any)?.height ?? 0);
+    feedGeometry(measured?.width ?? node.width ?? style.width ?? 0);
+    feedGeometry(measured?.height ?? node.height ?? style.height ?? 0);
   });
   edges.forEach((edge) => {
     const data = (edge.data && typeof edge.data === 'object')
@@ -84,7 +97,7 @@ export const visitBaseReactFlowDisplayInputIdentity = (
     feed(edge.sourceHandle);
     feed(edge.targetHandle);
     feed(edge.type);
-    feed((edge as any).label);
+    feed(edge.label);
     feed(data.label);
     feed(data.layoutDirection);
     feed(data.layoutPathLocked);
@@ -165,7 +178,7 @@ export const visitBaseReactFlowDisplayInputIdentity = (
     const treeRouting = (data.treeRouting && typeof data.treeRouting === 'object')
       ? data.treeRouting as Record<string, unknown>
       : {};
-    // Hard-quality scoring distinguishes an absent treeRouting value from any
+    // Hard-quality scoring distinguishes an absent treeRouting value from every
     // present (including empty) routing object. Keep the cache/precompiled
     // identity aligned with that intent token so an empty tree declaration
     // cannot replay a report produced for an unrelated ordinary edge.

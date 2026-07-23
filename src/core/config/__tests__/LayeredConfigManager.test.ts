@@ -115,12 +115,13 @@ describe('LayeredConfigManager', () => {
     });
     defaultValue.nested.enabled = false;
 
-    const cachedValue = manager.get<any>('custom.options');
+    type CustomOptions = { nested: { enabled: boolean } };
+    const cachedValue = manager.get<CustomOptions>('custom.options');
     cachedValue.nested.enabled = false;
     expect(manager.get('custom.options')).toEqual({ nested: { enabled: true } });
 
     const secondListener = vi.fn();
-    manager.addListener<any>('custom.options', event => {
+    manager.addListener<CustomOptions>('custom.options', event => {
       event.newValue.nested.enabled = false;
       event.effectiveValue.nested.enabled = false;
     });
@@ -128,7 +129,7 @@ describe('LayeredConfigManager', () => {
     manager.set('custom.options', { nested: { enabled: true } });
 
     const layerSnapshot = manager.getLayer(module.ConfigLayer.USER);
-    layerSnapshot['custom.options'].nested.enabled = false;
+    (layerSnapshot['custom.options'] as { nested: { enabled: boolean } }).nested.enabled = false;
     expect(secondListener).toHaveBeenCalledWith(expect.objectContaining({
       newValue: { nested: { enabled: true } },
       effectiveValue: { nested: { enabled: true } },
@@ -143,7 +144,7 @@ describe('LayeredConfigManager', () => {
       defaultValue: 5,
     });
 
-    expect(() => manager.set('custom.limit', '5' as any)).toThrow('配置值验证失败: custom.limit');
+    expect(() => manager.set('custom.limit', '5')).toThrow('配置值验证失败: custom.limit');
     expect(() => manager.set('custom.limit', Number.NaN)).toThrow('配置值验证失败: custom.limit');
     expect(() => manager.registerSchema({
       key: 'custom.invalid-default',
@@ -228,7 +229,7 @@ describe('LayeredConfigManager', () => {
 
   it('ignores invalid cloud layer payloads without blocking later valid rows', async () => {
     const adapter = {
-      syncWithCloud: vi.fn(async (onConfigLoaded: (key: string, value: any) => void) => {
+      syncWithCloud: vi.fn(async (onConfigLoaded: (key: string, value: unknown) => void) => {
         onConfigLoaded('layered-config-user', null);
         onConfigLoaded('layered-config-user', {
           'diagram.node.width': 277,
@@ -248,7 +249,12 @@ describe('LayeredConfigManager', () => {
   });
 
   it('redacts cloud sync failures before logging', async () => {
-    (manager as any).cloudAdapter = {
+    (manager as unknown as {
+      cloudAdapter: {
+        syncWithCloud: () => Promise<void>;
+        saveConfig: () => Promise<void>;
+      };
+    }).cloudAdapter = {
       syncWithCloud: vi.fn(async () => {
         throw new Error('Authorization: Bearer cloud-secret');
       }),

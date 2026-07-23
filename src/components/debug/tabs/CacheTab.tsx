@@ -6,14 +6,9 @@ export const CacheTab: React.FC = () => {
 
     useEffect(() => {
         const timer = setInterval(() => {
-            // We need to expose a stats getter in Coordinator or just rely on what we have.
-            // For now, let's assume Coordinator has a debug helper or we just show static info if not available.
-            // Ideally, we'd add 'getStats()' to Coordinator.
-            // Let's implement a safe check.
             const coordinator = EdgeRoutingCoordinator.getInstance();
-            // Access private members via casting for debug
-            const cacheSize = (coordinator as any).cache?.cache?.size || 0;
-            const graphVersion = (coordinator as any).graphVersion || 0;
+            const cacheSize = coordinator.getOptimizationStats().cache.size;
+            const graphVersion = coordinator.getGraphVersion();
 
             setStats({ size: cacheSize, version: graphVersion });
         }, 1000);

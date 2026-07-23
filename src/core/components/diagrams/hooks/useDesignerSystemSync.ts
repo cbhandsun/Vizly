@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Node, Edge } from '@xyflow/react';
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { MarkerType, type Edge, type Node, type ReactFlowInstance } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import { useAutoSave } from './useAutoSave';
 import { PluginRegistry } from '../../../services/PluginRegistry';
-import { analyzeDiagram } from '@/utils/diagramAnalyzer';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { cancelLayoutTransition, suspendLayoutTransitions } from '../../../utils/animateLayoutTransition';
 import { readReactFlowCanvasSize } from '../../../utils/domViewport';
@@ -24,7 +23,13 @@ import {
     mergePresetExplicitEdgeHandles,
     recalculateAutosaveNodeSizes,
 } from './designerSystemSyncPersistence';
-import { projectDesignerStandardEdges, projectDesignerStandardNodes } from './designerFlowDataBridgeProjection';
+import {
+    analyzeDesignerCanvas,
+    projectDesignerStandardEdges,
+    projectDesignerStandardNodes,
+} from './designerFlowDataBridgeProjection';
+import type { FlowDataBridgeEntry } from '../../../utils/flowDataBridge';
+import type { StandardDiagramData } from '../../../models/DiagramModels';
 
 const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
 
@@ -38,9 +43,9 @@ export interface UseDesignerSystemSyncProps {
     diagramIdForExport: string;
     nodes: Node[];
     edges: Edge[];
-    setNodes: any;
-    setEdges: any;
-    reactFlowInstance: any;
+    setNodes: Dispatch<SetStateAction<Node[]>>;
+    setEdges: Dispatch<SetStateAction<Edge[]>>;
+    reactFlowInstance: ReactFlowInstance<Node, Edge> | null;
     isDragging: boolean;
     pluginId: string;
     messageApi?: MessageInstance;
@@ -50,7 +55,6 @@ export function useDesignerSystemSync({
     id, diagramIdForExport, nodes, edges, setNodes, setEdges,
     reactFlowInstance, isDragging, pluginId, messageApi
 }: UseDesignerSystemSyncProps) {
-
     // 使用 ref 持有最新的 nodes/edges，避免 __flowDataBridge Effect 因每次编辑重建整个 API 对象
     const nodesRef = useRef(nodes);
     const edgesRef = useRef(edges);
@@ -60,11 +64,11 @@ export function useDesignerSystemSync({
     useEffect(() => { reactFlowRef.current = reactFlowInstance; }, [reactFlowInstance]);
 
     useEffect(() => {
-        if (!(window as any).__flowDataBridge) {
-            (window as any).__flowDataBridge = {};
+        if (!window.__flowDataBridge) {
+            window.__flowDataBridge = {};
         }
 
-        const standardData: any = {
+        const standardData: FlowDataBridgeEntry = {
             id: `diagram-${Date.now()}`,
             name: diagramIdForExport,
             type: 'architecture',
@@ -109,7 +113,7 @@ export function useDesignerSystemSync({
             // 附加 importData 特权方法供外部组件（如 AI 对话面板）应用生成的 JSON数据
             Object.defineProperty(standardData, 'importData', {
                 enumerable: false, // Prevents serialization issues in JSON.stringify
-                value: async (newData: any, _options?: { keepHistory?: boolean }) => {
+                value: async (newData: unknown, _options?: { keepHistory?: boolean }) => {
                     try {
                         const { coerceStandardDiagramImport } = await import('@/core/utils/diagramJsonImport');
                         const safeData = coerceStandardDiagramImport(newData, {
@@ -172,7 +176,7 @@ export function useDesignerSystemSync({
 
                     // 默认类型映射逻辑
                     let nodeType = incomingType || (pluginId === 'architecture-diagram' ? 'architectureNode' : 'flowchart');
-                    let architectureType: any = undefined;
+                    let architectureType: string | undefined;
 
                     // 如果是在架构图模式下，或者指令明确要求 architecture 类型
                     if (nodeType === 'architectureNode' || pluginId === 'architecture-diagram') {
@@ -211,7 +215,7 @@ export function useDesignerSystemSync({
                         style: { width }
                     };
 
-                    setNodes((nds: any) => {
+                    setNodes((nds) => {
                         const nextNodes = [...nds, newNode];
                         
                         // Phase 5: 自动调整父容器尺寸
@@ -246,8 +250,8 @@ export function useDesignerSystemSync({
             Object.defineProperty(standardData, 'deleteNodes', {
                 enumerable: false,
                 value: async (ids: string[]) => {
-                    setNodes((nds: any) => nds.filter((n: any) => !ids.includes(n.id)));
-                    setEdges((eds: any) => eds.filter((e: any) => !ids.includes(e.source) && !ids.includes(e.target)));
+                    setNodes((nds) => nds.filter((node) => !ids.includes(node.id)));
+                    setEdges((eds) => eds.filter((edge) => !ids.includes(edge.source) && !ids.includes(edge.target)));
                 }
             });
 
@@ -263,32 +267,33 @@ export function useDesignerSystemSync({
                         target,
                         type,
                         label,
-                        markerEnd: { type: 'arrowclosed' as any }
+                        markerEnd: { type: MarkerType.ArrowClosed }
                     };
 
-                    setEdges((eds: any) => [...eds, newEdge]);
+                    setEdges((eds) => [...eds, newEdge]);
                     return id;
                 }
             });
 
             Object.defineProperty(standardData, 'updateNode', {
                 enumerable: false,
-                value: async (id: string, data: any) => {
-                    const layoutOptimizer = data.label
+                value: async (id: string, data: Record<string, unknown>) => {
+                    const label = typeof data.label === 'string' ? data.label : undefined;
+                    const layoutOptimizer = label
                         ? (await import('../../layout/LayoutOptimizer')).LayoutOptimizer.getInstance()
                         : null;
-                    setNodes((nds: any) => nds.map((n: any) => {
+                    setNodes((nds) => nds.map((n) => {
                         if (n.id === id) {
                             const newData = { ...n.data, ...data };
-                            if (data.label && !data.description) {
-                                newData.description = `<b>${data.label}</b>`;
+                            if (label && !data.description) {
+                                newData.description = `<b>${label}</b>`;
                             }
                             
                             // Re-calculate width if label changed
                             let width = n.width;
                             let style = n.style;
-                            if (data.label && layoutOptimizer) {
-                                const width_val = layoutOptimizer.calculateNodeWidth(data.label);
+                            if (label && layoutOptimizer) {
+                                const width_val = layoutOptimizer.calculateNodeWidth(label);
                                 width = width_val;
                                 style = { ...style, width: width_val };
                             }
@@ -312,13 +317,13 @@ export function useDesignerSystemSync({
                 value: async (nodeIds: string[], groupName?: string) => {
                     if (nodeIds.length === 0) return;
                     
-                    setNodes((nds: any) => {
-                        const targetNodes = nds.filter((n: any) => nodeIds.includes(n.id));
+                    setNodes((nds) => {
+                        const targetNodes = nds.filter((node) => nodeIds.includes(node.id));
                         if (targetNodes.length === 0) return nds;
 
                         // Calculate BBox
                         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                        targetNodes.forEach((n: any) => {
+                        targetNodes.forEach((n) => {
                             const x = n.position.x;
                             const y = n.position.y;
                             const w = n.measured?.width || n.width || 120;
@@ -348,12 +353,12 @@ export function useDesignerSystemSync({
                         };
 
                         const nodeIdSet = new Set(nodeIds);
-                        const nextNodes = nds.map((n: any) => {
+                        const nextNodes = nds.map((n) => {
                             if (nodeIdSet.has(n.id)) {
                                 return {
                                     ...n,
                                     parentId: groupId,
-                                    extent: 'parent',
+                                    extent: 'parent' as const,
                                     position: {
                                         x: n.position.x - (minX - padding),
                                         y: n.position.y - (minY - padding)
@@ -371,7 +376,7 @@ export function useDesignerSystemSync({
             Object.defineProperty(standardData, 'analyze', {
                 enumerable: false,
                 value: () => {
-                    return analyzeDiagram(nodesRef.current as any, edgesRef.current as any);
+                    return analyzeDesignerCanvas(nodesRef.current, edgesRef.current);
                 }
             });
 
@@ -382,7 +387,7 @@ export function useDesignerSystemSync({
                     const duration = options?.duration || 2000;
                     
                     // 1. 开始动画
-                    setEdges((eds: any) => eds.map((e: any) => {
+                    setEdges((eds) => eds.map((e) => {
                         if (edgeIds.includes(e.id)) {
                             return { ...e, animated: true };
                         }
@@ -392,7 +397,7 @@ export function useDesignerSystemSync({
                     // 2. 如果不是循环模式，则在 duration 后关闭
                     if (!options?.loop) {
                         setTimeout(() => {
-                            setEdges((eds: any) => eds.map((e: any) => {
+                            setEdges((eds) => eds.map((e) => {
                                 if (edgeIds.includes(e.id)) {
                                     return { ...e, animated: false };
                                 }
@@ -403,15 +408,15 @@ export function useDesignerSystemSync({
                 }
             });
 
-            (window as any).__flowDataBridge[diagramIdForExport] = standardData;
+            window.__flowDataBridge[diagramIdForExport] = standardData;
         return () => {
-            delete (window as any).__flowDataBridge?.[diagramIdForExport];
+            delete window.__flowDataBridge?.[diagramIdForExport];
         };
     // 仅在 diagramIdForExport/id/pluginId 变化时重建，nodes/edges 通过 ref 访问
     }, [diagramIdForExport, id, setNodes, setEdges, pluginId, messageApi]);
 
     useEffect(() => {
-        (window as any).__flowDesignerOpenCloud = async (data: any) => {
+        window.__flowDesignerOpenCloud = async (data: StandardDiagramData) => {
             const { standardDataToCanvas } = await import('../designerUtils');
             const { nodes: newNodes, edges: newEdges } = await standardDataToCanvas(data);
             if (newNodes.length > 0) {
@@ -421,7 +426,7 @@ export function useDesignerSystemSync({
             }
         };
         return () => {
-            delete (window as any).__flowDesignerOpenCloud;
+            delete window.__flowDesignerOpenCloud;
         };
     }, [setNodes, setEdges, reactFlowInstance]);
 
@@ -435,9 +440,6 @@ export function useDesignerSystemSync({
         }
     }, [performanceMode]);
 
-    // performanceMode = nodes.length > 300 || isDragging
-    // nodes.length > 300 && !performanceMode 永远为 false，无需 Effect
-
     const [autosaveEnabled, setAutosaveEnabled] = useState(false);
 
     const { loadSaved, clearSaved, saveNow } = useAutoSave(nodes, edges, {
@@ -449,11 +451,7 @@ export function useDesignerSystemSync({
         onSaveError: (error) => logDesignerSystemSyncAutoSaveFailure(error)
     });
 
-    // [FIX-AUTOSAVE] 节点/边变化后 3 秒防抖保存（补充 beforeunload 之前的兜底）。
-    // 用 skipCountRef 跳过前 2 次 effect 触发：
-    //   第 1 次 = 初始 mount（nodes/edges 可能为空或来自 reactflow 初始化）
-    //   第 2 次 = autosave 恢复后 setNodes/setEdges 触发（此时数据刚从 localStorage 读回，保存毫无意义）
-    // 从第 3 次开始 = 用户真正的操作，才需要防抖保存。
+    // 节点/边变化后 3 秒防抖保存；跳过 mount 与 autosave 恢复的前两次触发。
     const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const skipCountRef = useRef(0);
     const isMountedRef = useRef(true);
@@ -479,11 +477,10 @@ export function useDesignerSystemSync({
         };
     }, [nodes, edges, saveNow, autosaveEnabled]);
 
-
     const hasRestoredAutoSave = useRef(false);
     const needsInitialFitView = useRef(false);
     const processedDiagramId = useRef(id);
-    const [presetLookup, setPresetLookup] = useState<{ id?: string; ready: boolean; preset: any | null }>({
+    const [presetLookup, setPresetLookup] = useState<{ id?: string; ready: boolean; preset: StandardDiagramData | null }>({
         id,
         ready: false,
         preset: null,
@@ -558,7 +555,7 @@ export function useDesignerSystemSync({
                 // 导致 autosave 数据存在但负载失败，画布被重置。
                 const isCanvasData = isFreshAndValid || (saved.nodes !== undefined && (
                     saved.nodes.length === 0 ||
-                    saved.nodes.some((n: any) => n.data !== undefined)
+                    saved.nodes.some((node) => node.data !== undefined)
                 ));
                 
                 // If the isFreshSeed flag is stale (crash remnant), strip it from storage
@@ -667,7 +664,7 @@ export function useDesignerSystemSync({
             const triggerRoutingAfterMeasure = () => {
                 const currentNodes = reactFlowInstance.getNodes();
                 const allMeasured = currentNodes.length > 0 &&
-                    currentNodes.every((n: any) => (n.measured?.width && n.measured.width > 0) || n.width);
+                    currentNodes.every((node) => (node.measured?.width && node.measured.width > 0) || node.width);
 
                 if (allMeasured) {
                     // 节点已被 RF 测量，解冻路由器 → 积压请求立即批量计算

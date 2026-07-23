@@ -32,7 +32,6 @@ import { Node, Edge } from '@xyflow/react';
 import { logDiagramContextMenuFailure } from './diagramContextMenuLogging';
 
 export interface ContextMenuProps {
-  id: string;
   top: number;
   left: number;
   right?: number;

@@ -7,14 +7,27 @@ const PRESET_MAP: Record<string, StandardDiagramData> = {};
 const PRESET_OPTIONS: { title: string; category?: string; tags?: string[]; key: string; value: string; label: string }[] = [];
 const ALL_TAGS = new Set<string>();
 
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+
+const presetMetadata = (data: StandardDiagramData): Record<string, unknown> =>
+  asRecord(data.metadata);
+
+const stringTags = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter((tag): tag is string => typeof tag === 'string')
+    : [];
+
 Object.entries(PRESET_MODULES).forEach(([path, mod]) => {
   const data = mod.default ?? mod;
   const file = path.split('/').pop() || path;
   const key = file.replace(/\.json$/i, '');
-  const title = String((data as any)?.metadata?.title || (data as any)?.name || key);
+  const metadata = presetMetadata(data);
+  const title = String(metadata.title || data.name || key);
   
-  const metadata = (data as any)?.metadata || {};
-  const tags: string[] = Array.isArray(metadata.tags) ? metadata.tags : [];
+  const tags = stringTags(metadata.tags);
   tags.forEach(t => ALL_TAGS.add(t));
   
   PRESET_MAP[key] = data;
@@ -27,7 +40,7 @@ Object.entries(PRESET_MODULES).forEach(([path, mod]) => {
     key, 
     value: key, 
     label: title, 
-    category: metadata.category || 'other',
+    category: typeof metadata.category === 'string' ? metadata.category : 'other',
     tags
   });
 });
@@ -40,8 +53,9 @@ const customMap = typeof localStorage !== 'undefined'
 
 Object.entries(customMap).forEach(([name, data]) => {
   const key = `custom:${name}`;
-  const title = String((data as any)?.metadata?.title || (data as any)?.name || name);
-  const tags: string[] = Array.isArray((data as any)?.metadata?.tags) ? (data as any).metadata.tags : [];
+  const metadata = presetMetadata(data);
+  const title = String(metadata.title || data.name || name);
+  const tags = stringTags(metadata.tags);
 
   PRESET_MAP[key] = data;
   tags.forEach(t => ALL_TAGS.add(t));
@@ -51,7 +65,7 @@ Object.entries(customMap).forEach(([name, data]) => {
     key,
     value: key,
     label: title,
-    category: (data as any)?.metadata?.category || 'other',
+    category: typeof metadata.category === 'string' ? metadata.category : 'other',
     tags
   });
 });

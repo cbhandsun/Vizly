@@ -109,7 +109,7 @@ export class EdgeRoutingWorker {
         let pathPoints: Point[] | null = null;
         let strategyName = 'Unknown';
         const shouldCollectDebugData = job.debug === true;
-        const shouldLogRouteDebug = config.debug === true && (config as any).verboseConsole === true;
+        const shouldLogRouteDebug = config.debug === true && config.verboseConsole === true;
         const debugData: WorkerRouteDebugData = {};
 
         // [总线主干道] Check if trunk routing should be applied
@@ -151,8 +151,13 @@ export class EdgeRoutingWorker {
                 // [FIX-cross-domain] Force port alignment with trunkPort if provided
                 let skipTrunkDueToSelfCross = false;
                 // [FIX-dual] 双身份边分别处理 O2M source port 和 M2O target port
-                const o2mPort = job.busRoutingPlan?.o2mTrunkPort ?? (job as any).o2mTrunkPort ?? ((job as any).trunkPort && job.isOneToMany && !job.isManyToOne ? (job as any).trunkPort : null);
-                const m2oPort = job.busRoutingPlan?.m2oTrunkPort ?? (job as any).m2oTrunkPort ?? ((job as any).trunkPort && job.isManyToOne && !job.isOneToMany ? (job as any).trunkPort : null);
+                const legacyTrunkPort = parseWorkerHandleDirection(job.trunkPort);
+                const o2mPort = job.busRoutingPlan?.o2mTrunkPort
+                    ?? job.o2mTrunkPort
+                    ?? (legacyTrunkPort && job.isOneToMany && !job.isManyToOne ? legacyTrunkPort : null);
+                const m2oPort = job.busRoutingPlan?.m2oTrunkPort
+                    ?? job.m2oTrunkPort
+                    ?? (legacyTrunkPort && job.isManyToOne && !job.isOneToMany ? legacyTrunkPort : null);
                 const hasAnyTrunkPort = !!(o2mPort || m2oPort);
                 if (hasAnyTrunkPort) {
                     const sCx = sRect.x + sRect.width / 2;
@@ -199,17 +204,17 @@ export class EdgeRoutingWorker {
                         const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, job.outgoingCount || 1);
                         const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, job.incomingCount || 1);
                         
-                        (startPt as any).x = newStartPt.x;
-                        (startPt as any).y = newStartPt.y;
-                        (endPt as any).x = newEndPt.x;
-                        (endPt as any).y = newEndPt.y;
+                        startPt.x = newStartPt.x;
+                        startPt.y = newStartPt.y;
+                        endPt.x = newEndPt.x;
+                        endPt.y = newEndPt.y;
 
                         const sOffset = getPortOffsetPoint(newStartPt.x, newStartPt.y, startPos, config.offsets.source);
                         const tOffset = getPortOffsetPoint(newEndPt.x, newEndPt.y, endPos, config.offsets.target);
-                        (startWithOffset as any).x = sOffset.x;
-                        (startWithOffset as any).y = sOffset.y;
-                        (endWithOffset as any).x = tOffset.x;
-                        (endWithOffset as any).y = tOffset.y;
+                        startWithOffset.x = sOffset.x;
+                        startWithOffset.y = sOffset.y;
+                        endWithOffset.x = tOffset.x;
+                        endWithOffset.y = tOffset.y;
                     }
                 }
 
@@ -351,7 +356,7 @@ export class EdgeRoutingWorker {
                         if (!preservePortsWhenSkippingTrunk && !hasExplicitSource && !hasExplicitTarget) {
                             const newStartPt = portSelector.getDistributedPortPoint(sRect, startPos, job.outgoingIndex || 0, job.outgoingCount || 1);
                             const newEndPt = portSelector.getDistributedPortPoint(tRect, endPos, job.incomingIndex || 0, job.incomingCount || 1);
-                            const portOffset: number = (config.algorithm as any).portOffset ?? 40;
+                            const portOffset = config.algorithm.portOffset ?? 40;
                             (startPt as { x: number; y: number }).x = newStartPt.x;
                             (startPt as { x: number; y: number }).y = newStartPt.y;
                             (endPt as { x: number; y: number }).x = newEndPt.x;

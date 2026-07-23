@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import { Node, useViewport } from '@xyflow/react';
+import { Node, useViewport, type Edge, type NodeTypes } from '@xyflow/react';
 import { useDiagramStore } from '../../store/useDiagramStore';
-import { FloatingContextToolbar } from './FloatingContextToolbar';
+import { FloatingContextToolbar, type ToolbarFeature } from './FloatingContextToolbar';
 import { ContextualEdgeToolbar } from './ContextualEdgeToolbar';
 import { NodeDataUpdate, EdgeDataUpdate } from '../../types/diagram-updates';
 
@@ -9,7 +9,7 @@ interface HoverToolbarsOverlayProps {
     quickAddMenuVisible: boolean;
     isContextToolbarHidden: boolean;
     isConnecting?: boolean;
-    nodeTypes: any;
+    nodeTypes: NodeTypes;
     pluginCtx?: import('../../types/plugin').PluginContext;
     activePlugin?: import('../../types/plugin').DiagramTypePlugin | null;
     
@@ -29,6 +29,32 @@ interface HoverToolbarsOverlayProps {
     pasteStyle: (ids: string[]) => void;
     hasCopiedStyle: boolean;
 }
+
+interface NodeToolbarExtensionProps {
+    node: Node;
+    updateNodesBatch: HoverToolbarsOverlayProps['updateNodesBatch'];
+    onDelete: () => void;
+    onDuplicate: () => void;
+    onLock: () => void;
+}
+
+interface NodeToolbarMetadata {
+    ToolbarExtension?: React.ElementType<NodeToolbarExtensionProps>;
+    ToolbarFeatureExclusions?: ToolbarFeature[];
+    OverrideDefaultToolbar?: boolean;
+}
+
+const readNodeToolbarMetadata = (nodeTypes: NodeTypes, node: Node | undefined): NodeToolbarMetadata => {
+    if (!node?.type || !nodeTypes[node.type]) return {};
+    const metadata = nodeTypes[node.type] as unknown as Record<string, unknown>;
+    return {
+        ToolbarExtension: metadata.ToolbarExtension as React.ElementType<NodeToolbarExtensionProps> | undefined,
+        ToolbarFeatureExclusions: Array.isArray(metadata.ToolbarFeatureExclusions)
+            ? metadata.ToolbarFeatureExclusions.filter((item): item is ToolbarFeature => typeof item === 'string')
+            : undefined,
+        OverrideDefaultToolbar: metadata.OverrideDefaultToolbar === true,
+    };
+};
 
 export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
     quickAddMenuVisible,
@@ -50,14 +76,15 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
     pluginCtx,
     activePlugin
 }) => {
-    const contextMenu = useDiagramStore((s: any) => s.contextMenu);
-    const selectedNodes = useDiagramStore((s: any) => s.selectedNodes);
-    const selectedEdges = useDiagramStore((s: any) => s.selectedEdges);
-    const isDragging = useDiagramStore((s: any) => s.isDragging);
+    const contextMenu = useDiagramStore((state) => state.contextMenu);
+    const selectedNodes = useDiagramStore((state) => state.selectedNodes);
+    const selectedEdges = useDiagramStore((state) => state.selectedEdges);
+    const isDragging = useDiagramStore((state) => state.isDragging);
     // 🚀 P3 性能优化: 移除全局 useViewport，防止缩放/平移导致所有工具栏和父组件 (HoverToolbarsOverlay) 60FPS 重渲染
     
     // Hide global toolbar if a mindmap node is selected because they have their own integrated tool island
-    const isMindMapSelected = selectedNodes.some((n: any) => n.type === 'mindmap');
+    const isMindMapSelected = selectedNodes.some((node) => node.type === 'mindmap');
+    const nodeToolbar = readNodeToolbarMetadata(nodeTypes, selectedNodes.length === 1 ? selectedNodes[0] : undefined);
 
     return (
         <>
@@ -69,21 +96,21 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
                     onDuplicate={handleDuplicateWithToast}
                     onChangeColor={(color) => {
                         // Real-time preview (disable snapshot to prevent flooding the undo/redo stack)
-                        updateNodesBatch(selectedNodes.map((n: any) => n.id), {
+                        updateNodesBatch(selectedNodes.map((node) => node.id), {
                             theme: { main: color, border: color, text: '#fff' }
                         }, { snapshot: false });
                     }}
                     onChangeColorComplete={(color) => {
                         // Commit the final color and take a single history snapshot
-                        updateNodesBatch(selectedNodes.map((n: any) => n.id), {
+                        updateNodesBatch(selectedNodes.map((node) => node.id), {
                             theme: { main: color, border: color, text: '#fff' }
                         });
                     }}
                     onChangeShape={(shape) => {
-                        updateNodesBatch(selectedNodes.map((n: any) => n.id), { shape } as any);
+                        updateNodesBatch(selectedNodes.map((node) => node.id), { shape });
                     }}
                     onChangeDomainClass={(domainClass) => {
-                        updateNodesBatch(selectedNodes.map((n: any) => n.id), {
+                        updateNodesBatch(selectedNodes.map((node) => node.id), {
                             domainClass: domainClass === 'none' ? undefined : domainClass
                         });
                     }}
@@ -93,16 +120,16 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
                     onBringToFront={() => handleBringToFront(selectedNodes[0]?.id)}
                     onSendToBack={() => handleSendToBack(selectedNodes[0]?.id)}
                     onUpdateStyle={(style) => {
-                        updateNodesBatch(selectedNodes.map((n: any) => n.id), { style });
+                        updateNodesBatch(selectedNodes.map((node) => node.id), { style });
                     }}
                     extraToolbarContent={
                         (pluginCtx && activePlugin?.contributeHoverActions) ||
-                        (selectedNodes.length === 1 && selectedNodes[0].type && nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes] && (nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes] as any).ToolbarExtension)
+                        nodeToolbar.ToolbarExtension
                         ? (
                             <>
                                 {pluginCtx && activePlugin?.contributeHoverActions && activePlugin.contributeHoverActions(selectedNodes, selectedEdges, pluginCtx)}
-                                {selectedNodes.length === 1 && selectedNodes[0].type && nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes] && (nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes] as any).ToolbarExtension && (
-                                    React.createElement((nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes] as any).ToolbarExtension, {
+                                {nodeToolbar.ToolbarExtension && (
+                                    React.createElement(nodeToolbar.ToolbarExtension, {
                                         node: selectedNodes[0],
                                         updateNodesBatch,
                                         onDelete: handleDeleteWithToast,
@@ -114,17 +141,13 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
                         ) : undefined
                     }
                     excludeToolbarFeatures={
-                        selectedNodes.length === 1 && selectedNodes[0].type && nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes]
-                            ? (nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes] as any).ToolbarFeatureExclusions
-                            : undefined
+                        nodeToolbar.ToolbarFeatureExclusions
                     }
                     overrideDefaultToolbar={
-                        selectedNodes.length === 1 && selectedNodes[0].type && nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes]
-                            ? (nodeTypes[selectedNodes[0].type as keyof typeof nodeTypes] as any).OverrideDefaultToolbar
-                            : undefined
+                        nodeToolbar.OverrideDefaultToolbar
                     }
                     onCopyStyle={() => copyStyle(selectedNodes[0])}
-                    onPasteStyle={() => pasteStyle(selectedNodes.map((n: any) => n.id))}
+                    onPasteStyle={() => pasteStyle(selectedNodes.map((node) => node.id))}
                     hasCopiedStyle={hasCopiedStyle}
                 />
             )}
@@ -141,13 +164,13 @@ export const HoverToolbarsOverlay: React.FC<HoverToolbarsOverlayProps> = ({
 };
 
 // 封装独立组件，将 useViewport () 的 60FPS 重绘隔离到尽可能小的 DOM 树中
-const IsolatedEdgeToolbar: React.FC<{ edge: any, onUpdateEdge: (id: string, updates: any) => void }> = ({ edge, onUpdateEdge }) => {
-    const nodes = useDiagramStore((s: any) => s.nodes);
+const IsolatedEdgeToolbar: React.FC<{ edge: Edge; onUpdateEdge: (id: string, updates: EdgeDataUpdate) => void }> = ({ edge, onUpdateEdge }) => {
+    const nodes = useDiagramStore((state) => state.nodes);
     const viewport = useViewport();
 
     const position = useMemo(() => {
-        const sourceNode = nodes.find((n: any) => n.id === edge.source);
-        const targetNode = nodes.find((n: any) => n.id === edge.target);
+        const sourceNode = nodes.find((node) => node.id === edge.source);
+        const targetNode = nodes.find((node) => node.id === edge.target);
         if(!sourceNode || !targetNode) return null;
 
         const sx = sourceNode.position.x + (sourceNode.measured?.width ?? 120) / 2;

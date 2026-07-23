@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { EdgeType } from '../types/edgeType';
 
 /**
@@ -59,8 +59,8 @@ export interface EdgeConfig {
    * 当值为 false 时，不设置 markerStart。
    */
   markerStart?: boolean;
-  style?: Record<string, any>;
-  data?: Record<string, any>;
+  style?: CSSProperties;
+  data?: Record<string, unknown>;
 }
 
 /**

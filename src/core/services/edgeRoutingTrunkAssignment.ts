@@ -34,17 +34,6 @@ export interface BusTrunkAssignmentResult {
   orderedEdgeIds: string[];
 }
 
-type LegacyBusJob = PathFindingJob & {
-  busIndex?: number;
-  peerGroupMembers?: string[];
-  peerGroupKey?: string;
-  o2mPeerGroupKey?: string;
-  m2oPeerGroupKey?: string;
-  peerGroupSize?: number;
-  trunkPort?: RoutingSide;
-  trunkPortTangent?: number;
-};
-
 const finiteNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
 
@@ -164,7 +153,7 @@ export const assignBusTrunkGeometry = ({
   const orderByEdgeId = new Map(
     orderedEdgeIds.map((edgeId, index) => [edgeId, index]),
   );
-  const jobByEdgeId = new Map<string, LegacyBusJob>();
+  const jobByEdgeId = new Map<string, PathFindingJob>();
   for (const job of jobs) {
     const edgeId = endpointKey(job.edgeId);
     if (edgeId && !jobByEdgeId.has(edgeId)) jobByEdgeId.set(edgeId, job);

@@ -1,8 +1,19 @@
 import type { Edge, Node } from '@xyflow/react';
 import { EDGE_ROUTING_CACHE_VERSION } from '../../../routing/routingVersion';
+import { coerceStandardDiagramImport } from '../../../utils/diagramJsonImport';
 
 export type CanvasData = { nodes: Node[]; edges: Edge[] };
-export type StandardPresetCanvasConverter = (preset: any) => Promise<CanvasData>;
+export interface StandardPresetInput {
+    id?: unknown;
+    name?: unknown;
+    nodes?: unknown;
+    edges?: unknown;
+    groups?: unknown;
+    layout?: unknown;
+    theme?: unknown;
+    metadata?: unknown;
+}
+export type StandardPresetCanvasConverter = (preset: StandardPresetInput) => Promise<CanvasData>;
 
 export const STANDARD_PRESET_CANVAS_CACHE_VERSION = EDGE_ROUTING_CACHE_VERSION;
 const STANDARD_PRESET_TRUNK_POLISH_VERSION = 2;
@@ -10,9 +21,9 @@ const STORAGE_KEY_PREFIX = 'vizly:standard-preset-canvas';
 const INTERACTIVE_EDGE_ROUTING_NODE_THRESHOLD = 36;
 const INTERACTIVE_EDGE_ROUTING_EDGE_THRESHOLD = 36;
 
-export const resolveStandardPresetEdgeRoutingQuality = (preset: any): 'full' | 'interactive' => {
-    const nodeCount = Array.isArray(preset?.nodes) ? preset.nodes.length : 0;
-    const edgeCount = Array.isArray(preset?.edges) ? preset.edges.length : 0;
+export const resolveStandardPresetEdgeRoutingQuality = (preset: StandardPresetInput): 'full' | 'interactive' => {
+    const nodeCount = Array.isArray(preset.nodes) ? preset.nodes.length : 0;
+    const edgeCount = Array.isArray(preset.edges) ? preset.edges.length : 0;
     return nodeCount > INTERACTIVE_EDGE_ROUTING_NODE_THRESHOLD
         || edgeCount > INTERACTIVE_EDGE_ROUTING_EDGE_THRESHOLD
         ? 'interactive'
@@ -21,7 +32,11 @@ export const resolveStandardPresetEdgeRoutingQuality = (preset: any): 'full' | '
 
 const defaultStandardPresetCanvasConverter: StandardPresetCanvasConverter = async (preset) => {
     const { standardDataToCanvas } = await import('../designerUtils');
-    return standardDataToCanvas(preset, undefined, {
+    const safePreset = coerceStandardDiagramImport(preset, {
+        id: typeof preset.id === 'string' ? preset.id : 'standard-preset',
+        title: typeof preset.name === 'string' ? preset.name : 'Standard preset',
+    });
+    return standardDataToCanvas(safePreset, undefined, {
         edgeRoutingQuality: resolveStandardPresetEdgeRoutingQuality(preset),
     });
 };
@@ -36,13 +51,13 @@ export const cloneCanvasData = (canvas: CanvasData): CanvasData => {
         nodes: canvas.nodes.map((node) => ({
             ...node,
             position: node.position ? { ...node.position } : node.position,
-            measured: (node as any).measured ? { ...(node as any).measured } : (node as any).measured,
-            style: node.style ? { ...(node.style as any) } : node.style,
-            data: node.data && typeof node.data === 'object' ? { ...(node.data as any) } : node.data,
+            measured: node.measured ? { ...node.measured } : node.measured,
+            style: node.style ? { ...node.style } : node.style,
+            data: node.data ? { ...node.data } : node.data,
         })),
         edges: canvas.edges.map((edge) => ({
             ...edge,
-            data: edge.data && typeof edge.data === 'object' ? { ...(edge.data as any) } : edge.data,
+            data: edge.data ? { ...edge.data } : edge.data,
         })),
     };
 };
@@ -56,16 +71,16 @@ const hashString = (input: string): string => {
     return (hash >>> 0).toString(36);
 };
 
-const createPresetSignature = (id: string, preset: any): string => {
+const createPresetSignature = (id: string, preset: StandardPresetInput): string => {
     let serialized: string;
     try {
         serialized = JSON.stringify({
-            nodes: preset?.nodes,
-            edges: preset?.edges,
-            groups: preset?.groups,
-            layout: preset?.layout,
-            theme: preset?.theme,
-            metadata: preset?.metadata,
+            nodes: preset.nodes,
+            edges: preset.edges,
+            groups: preset.groups,
+            layout: preset.layout,
+            theme: preset.theme,
+            metadata: preset.metadata,
         });
     } catch {
         serialized = String(id || '');
@@ -82,7 +97,7 @@ const getStorage = (): Storage | null => {
     }
 };
 
-const isRecord = (value: unknown): value is Record<string, any> => (
+const isRecord = (value: unknown): value is Record<string, unknown> => (
     !!value && typeof value === 'object' && !Array.isArray(value)
 );
 
@@ -120,8 +135,8 @@ const parseCachedCanvasData = (raw: string | null): CanvasData | null => {
 };
 
 const getNodeDataString = (node: Node, key: string): string => (
-    typeof (node.data as any)?.[key] === 'string'
-        ? String((node.data as any)[key]).trim()
+    typeof node.data?.[key] === 'string'
+        ? String(node.data[key]).trim()
         : ''
 );
 
@@ -133,17 +148,17 @@ const isPersistedSubGroupNode = (node: Node): boolean => (
     String(node.type || '') === 'subGroup' || String(node.id || '').startsWith('subgroup-')
 );
 
-const isPersistedCanvasCompatibleWithPreset = (canvas: CanvasData, preset: any): boolean => {
-    const layout = preset?.layout as any;
+const isPersistedCanvasCompatibleWithPreset = (canvas: CanvasData, preset: StandardPresetInput): boolean => {
+    const layout = isRecord(preset.layout) ? preset.layout : {};
     const nodes = canvas.nodes;
-    if (layout?.generateDomainGroups === false && nodes.some(isPersistedTitleGroupNode)) {
+    if (layout.generateDomainGroups === false && nodes.some(isPersistedTitleGroupNode)) {
         return false;
     }
-    if (layout?.generateSubDomainGroups === false && nodes.some(isPersistedSubGroupNode)) {
+    if (layout.generateSubDomainGroups === false && nodes.some(isPersistedSubGroupNode)) {
         return false;
     }
 
-    if (Array.isArray(layout?.domainWhitelist)) {
+    if (Array.isArray(layout.domainWhitelist)) {
         const allowedDomains = new Set(layout.domainWhitelist.map((item: unknown) => String(item).trim()));
         const hasOutOfContractDomain = nodes.some(node => (
             isPersistedTitleGroupNode(node)
@@ -152,7 +167,7 @@ const isPersistedCanvasCompatibleWithPreset = (canvas: CanvasData, preset: any):
         if (hasOutOfContractDomain) return false;
     }
 
-    if (Array.isArray(layout?.subDomainWhitelist)) {
+    if (Array.isArray(layout.subDomainWhitelist)) {
         const allowedSubDomains = new Set(layout.subDomainWhitelist.map((item: unknown) => String(item).trim()));
         const hasOutOfContractSubDomain = nodes.some(node => (
             isPersistedSubGroupNode(node)
@@ -163,8 +178,8 @@ const isPersistedCanvasCompatibleWithPreset = (canvas: CanvasData, preset: any):
 
     if (resolveStandardPresetEdgeRoutingQuality(preset) === 'interactive') {
         const hasLegacyFullEdgeRouting = canvas.edges.some(edge => (
-            ((edge.data || {}) as Record<string, any>).algorithm !== 'domain-dagre-interactive'
-            || ((edge.data || {}) as Record<string, any>).trunkPolishVersion !== STANDARD_PRESET_TRUNK_POLISH_VERSION
+            edge.data?.algorithm !== 'domain-dagre-interactive'
+            || edge.data?.trunkPolishVersion !== STANDARD_PRESET_TRUNK_POLISH_VERSION
         ));
         if (hasLegacyFullEdgeRouting) return false;
     }
@@ -172,7 +187,7 @@ const isPersistedCanvasCompatibleWithPreset = (canvas: CanvasData, preset: any):
     return true;
 };
 
-const readPersistedCanvas = (storageKey: string, preset: any): CanvasData | null => {
+const readPersistedCanvas = (storageKey: string, preset: StandardPresetInput): CanvasData | null => {
     const storage = getStorage();
     if (!storage) return null;
     const parsed = parseCachedCanvasData(storage.getItem(storageKey));
@@ -199,7 +214,7 @@ export const createStandardPresetCanvasLoader = (
 ) => {
     const cache = new Map<string, Promise<CanvasData>>();
 
-    return async (id: string, preset: any): Promise<CanvasData> => {
+    return async (id: string, preset: StandardPresetInput): Promise<CanvasData> => {
         const signature = createPresetSignature(id, preset);
         const cacheKey = `${STORAGE_KEY_PREFIX}:${STANDARD_PRESET_CANVAS_CACHE_VERSION}:${signature}`;
         const persisted = readPersistedCanvas(cacheKey, preset);

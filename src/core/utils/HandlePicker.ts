@@ -11,13 +11,17 @@ import {
     EdgeRoutingWeights,
     RoutingConfig,
     PortUsage,
-    CostContext
+    CostContext,
+    type Rectangle,
 } from '../routing';
 
 import { EdgeType } from '../types/edgeType';
 import { diagramConfigManager } from '../config/DiagramConfig';
 import { analyzeGeometry } from '../algorithms/geometry-classifier';
-import { configureEdgeRoutingDecision } from '../routing/utils/EdgeRoutingHelpers';
+import {
+    configureEdgeRoutingDecision,
+    type CompatibleRoutingConfig,
+} from '../routing/utils/EdgeRoutingHelpers';
 
 // Re-export types for compatibility
 export { EdgeType, EDGE_ROUTING_PRESETS };
@@ -26,6 +30,49 @@ export type { EdgeRoutingWeights, CostContext, RoutingConfig, PortUsage };
 // Export helpers (P1, P4, P6, P8 features)
 export * from '../routing/utils/EdgeRoutingHelpers';
 export * from '../routing/utils/AdvancedRouting';
+
+export interface HandleRoutingNode {
+    id: string;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    measured?: { width?: number; height?: number };
+    style?: { width?: unknown; height?: unknown };
+    position?: { x: number; y: number };
+    positionAbsolute?: { x: number; y: number };
+    computed?: { positionAbsolute?: { x: number; y: number } };
+    parentId?: string;
+    parentNode?: string;
+    type?: string;
+    data?: Record<string, unknown>;
+}
+
+export interface HandleRoutingEdge {
+    id: string;
+    source: string;
+    target: string;
+}
+
+type RoutingObstacle = Rectangle & {
+    padding?: number;
+    isSoftZone?: boolean;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {};
+
+const finiteNumber = (value: unknown, fallback = 0): number => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value !== 'string') return fallback;
+    const parsed = Number(value.trim().replace(/px$/i, ''));
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const isLayoutDirection = (value: string): value is 'LR' | 'RL' | 'TB' | 'BT' =>
+    value === 'LR' || value === 'RL' || value === 'TB' || value === 'BT';
 
 /**
  * 获取权重预设
@@ -66,12 +113,19 @@ export function registerRoutingPlugin(name: string, fn: CostPluginFn) {
  * 3. 优先使用相对的面作为连接点 (例如 A 在 B 上方，则 A 用 Bottom，B 用 Top)
  * 4. 收集所有边的推荐把手并返回，供 LayoutStrategy 应用到 Edge 对象上
  */
-export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record<string, { source?: string; target?: string }> {
+export function assignGlobalPorts(
+    nodes: HandleRoutingNode[],
+    edges: HandleRoutingEdge[],
+    _cfg: { layoutDirection?: string },
+): Record<string, { source?: string; target?: string }> {
     const result: Record<string, { source?: string; target?: string }> = {};
     if (!Array.isArray(nodes) || !Array.isArray(edges)) return result;
 
-    const nodeMap = new Map<string, any>(nodes.map(n => [n.id, n]));
-    const getAbsolutePosition = (node: any, visited?: Set<string>): { x: number; y: number } => {
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+    const getAbsolutePosition = (
+        node: HandleRoutingNode,
+        visited?: Set<string>,
+    ): { x: number; y: number } => {
         const abs = node?.computed?.positionAbsolute || node?.positionAbsolute;
         if (abs) return abs;
         const base = node?.position || { x: node?.x ?? 0, y: node?.y ?? 0 };
@@ -88,8 +142,8 @@ export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record
     };
 
     // 1. 聚合边信息 (Aggregation)
-    const outEdges = new Map<string, any[]>();
-    const inEdges = new Map<string, any[]>();
+    const outEdges = new Map<string, HandleRoutingEdge[]>();
+    const inEdges = new Map<string, HandleRoutingEdge[]>();
 
     for (const edge of edges) {
         if (!outEdges.has(edge.source)) outEdges.set(edge.source, []);
@@ -102,12 +156,12 @@ export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record
     }
 
     // 2. 辅助函数：计算单侧端口 (Hub Logic)
-    const getBounds = (n: any) => {
+    const getBounds = (n: HandleRoutingNode) => {
         const pos = getAbsolutePosition(n);
         const x = (pos?.x ?? 0);
         const y = (pos?.y ?? 0);
-        const w = (n.measured?.width ?? n.width ?? (n.style?.width as any) ?? 100);
-        const h = (n.measured?.height ?? n.height ?? (n.style?.height as any) ?? 50);
+        const w = finiteNumber(n.measured?.width ?? n.width ?? n.style?.width, 100);
+        const h = finiteNumber(n.measured?.height ?? n.height ?? n.style?.height, 50);
         return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
     };
 
@@ -115,7 +169,7 @@ export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record
      * 计算一组节点相对于中心节点的“重心方向”
      * 返回建议的端口: 'top' | 'bottom' | 'left' | 'right'
      */
-    const getDominantSide = (centerNode: any, relatives: any[]): string => {
+    const getDominantSide = (centerNode: HandleRoutingNode, relatives: HandleRoutingNode[]): string => {
         if (relatives.length === 0) return 'bottom';
         const c = getBounds(centerNode);
 
@@ -172,7 +226,7 @@ export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record
     const dir = String(_cfg?.layoutDirection || '').toUpperCase();
     const isH = dir === 'LR' || dir === 'RL';
 
-    const getSideSign = (center: any, target: any) => {
+    const getSideSign = (center: HandleRoutingNode, target: HandleRoutingNode) => {
         const c = getBounds(center);
         const t = getBounds(target);
         if (isH) {
@@ -195,7 +249,7 @@ export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record
             const tgtSign = getSideSign(src, tgt);
             const targets = srcOut
                 .map(e => nodeMap.get(e.target))
-                .filter(Boolean)
+                .filter((node): node is HandleRoutingNode => !!node)
                 .filter(t => getSideSign(src, t) === tgtSign);
             return getDominantSide(src, targets);
           }
@@ -212,7 +266,7 @@ export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record
             const srcSign = getSideSign(tgt, src);
             const sources = tgtIn
                 .map(e => nodeMap.get(e.source))
-                .filter(Boolean)
+                .filter((node): node is HandleRoutingNode => !!node)
                 .filter(s => getSideSign(tgt, s) === srcSign);
             return getDominantSide(tgt, sources);
           }
@@ -265,22 +319,22 @@ export function assignGlobalPorts(nodes: any[], edges: any[], _cfg: any): Record
  * (Proxy to EdgeRouter)
  */
 export function decideEdgeRouting(
-    sNode: any,
-    tNode: any,
-    allNodes: any[], // 新系统暂不需要 allNodes 进行 A*，除非在后续阶段启用
-    cfg: any, // Use any for broad compatibility due to legacy config shapes
+    sNode: HandleRoutingNode,
+    tNode: HandleRoutingNode,
+    allNodes: HandleRoutingNode[],
+    cfg: CompatibleRoutingConfig,
     usage?: { source?: Record<string, number>; target?: Record<string, number> },
     _preferDistinctSides: boolean = true
 ): { type: EdgeType; sourceHandle: string; targetHandle: string; autoSource: boolean; autoTarget: boolean; computedPath: Array<{ x: number; y: number }> } {
 
-    const nodeMap = new Map<string, any>();
+    const nodeMap = new Map<string, HandleRoutingNode>();
     const parentMap = new Map<string, string>();
     if (Array.isArray(allNodes)) {
         for (const n of allNodes) {
             if (n?.id != null) nodeMap.set(String(n.id), n);
             const type = String(n?.type || '');
             if (type === 'subGroup' || type === 'domain' || type === 'group' || type === 'titleGroup') {
-                const children = n?.data?.children;
+                const children = asRecord(n.data).children;
                 if (Array.isArray(children)) {
                     for (const cid of children) {
                         if (cid) parentMap.set(String(cid), String(n.id));
@@ -292,7 +346,10 @@ export function decideEdgeRouting(
             }
         }
     }
-    const getAbsolutePosition = (node: any, visited?: Set<string>): { x: number; y: number } => {
+    const getAbsolutePosition = (
+        node: HandleRoutingNode,
+        visited?: Set<string>,
+    ): { x: number; y: number } => {
         const abs = node?.computed?.positionAbsolute || node?.positionAbsolute;
         if (abs) return abs;
         const base = node?.position || { x: node?.x ?? 0, y: node?.y ?? 0 };
@@ -313,26 +370,26 @@ export function decideEdgeRouting(
     const sPos = getAbsolutePosition(sNode);
     const tPos = getAbsolutePosition(tNode);
     const sDim = {
-        width: sNode.width || sNode.measured?.width || sNode.style?.width || 0,
-        height: sNode.height || sNode.measured?.height || sNode.style?.height || 0
+        width: finiteNumber(sNode.width ?? sNode.measured?.width ?? sNode.style?.width),
+        height: finiteNumber(sNode.height ?? sNode.measured?.height ?? sNode.style?.height)
     };
     const tDim = {
-        width: tNode.width || tNode.measured?.width || tNode.style?.width || 0,
-        height: tNode.height || tNode.measured?.height || tNode.style?.height || 0
+        width: finiteNumber(tNode.width ?? tNode.measured?.width ?? tNode.style?.width),
+        height: finiteNumber(tNode.height ?? tNode.measured?.height ?? tNode.style?.height)
     };
 
     const sGeo = {
         id: sNode.id,
         position: sPos,
         dimensions: sDim,
-        data: sNode.data
+        data: asRecord(sNode.data)
     };
 
     const tGeo = {
         id: tNode.id,
         position: tPos,
         dimensions: tDim,
-        data: tNode.data
+        data: asRecord(tNode.data)
     };
 
     // [FIX] Prepare Obstacles for A*
@@ -346,7 +403,7 @@ export function decideEdgeRouting(
         }
     }
 
-    const obstacles = (allNodes || [])
+    const obstacles: RoutingObstacle[] = (allNodes || [])
         .filter(n => n.id !== sNode.id && n.id !== tNode.id)
         .filter(n => {
             // Exclude explicit containers AND implied containers (parents)
@@ -358,8 +415,8 @@ export function decideEdgeRouting(
         .map(n => ({
             x: getAbsolutePosition(n).x ?? 0,
             y: getAbsolutePosition(n).y ?? 0,
-            width: n.width ?? n.measured?.width ?? n.style?.width ?? 100,
-            height: n.height ?? n.measured?.height ?? n.style?.height ?? 50,
+            width: finiteNumber(n.width ?? n.measured?.width ?? n.style?.width, 100),
+            height: finiteNumber(n.height ?? n.measured?.height ?? n.style?.height, 50),
             // [FIX] Use 10px hard clearance to prevent blocking narrow gaps between vertically adjacent nodes.
             // Soft buffer zones (20px/40px) in buildPathfindingGrid will still keep lines 40px away when possible.
             padding: 10,
@@ -372,17 +429,17 @@ export function decideEdgeRouting(
     const dy = tCenter.y - sCenter.y;
     const geometry = analyzeGeometry(dx, dy, { sourceSize: sDim, targetSize: tDim });
     const fallbackDir = String(cfg?.layoutDirection || cfgEdge?.layoutDirection || '').toUpperCase();
-    const fallbackIsValid = fallbackDir === 'LR' || fallbackDir === 'RL' || fallbackDir === 'TB' || fallbackDir === 'BT';
+    const fallbackIsValid = isLayoutDirection(fallbackDir);
     let inferredLayoutDirection: 'LR' | 'RL' | 'TB' | 'BT';
     if (geometry === 'horizontal-forward') inferredLayoutDirection = 'LR';
     else if (geometry === 'horizontal-reverse') inferredLayoutDirection = 'RL';
     else if (geometry === 'vertical-forward') inferredLayoutDirection = 'TB';
     else if (geometry === 'vertical-reverse') inferredLayoutDirection = 'BT';
-    else if (geometry === 'collocated') inferredLayoutDirection = fallbackIsValid ? (fallbackDir as any) : 'LR';
+    else if (geometry === 'collocated') inferredLayoutDirection = fallbackIsValid ? fallbackDir : 'LR';
     else if (Math.abs(dx) >= Math.abs(dy)) inferredLayoutDirection = dx >= 0 ? 'LR' : 'RL';
     else inferredLayoutDirection = dy >= 0 ? 'TB' : 'BT';
     const smoothFallback = cfg?.smoothFallback ?? cfgEdge.smoothFallback;
-    let effectiveMode = cfg?.mode;
+    let effectiveMode: RoutingConfig['mode'] = cfg.mode ?? 'advanced-smart';
     let effectiveGlobalPath = cfg?.globalPath;
     if (typeof effectiveGlobalPath === 'string' && effectiveGlobalPath.includes('smooth') && smoothFallback) {
         if (smoothFallback === 'native') {
@@ -418,11 +475,17 @@ export function decideEdgeRouting(
 
         // Only add soft zone for true cross-domain edges, not intra-domain subdomain crossings
         if (!isIntraDomain) {
-            const tParentNode = (allNodes || []).find((n: any) => n.id === tParentId);
+            const tParentNode = (allNodes || []).find(n => n.id === tParentId);
             if (tParentNode) {
                 const tParentPos = getAbsolutePosition(tParentNode);
-                const tParentW = tParentNode.width ?? tParentNode.measured?.width ?? tParentNode.style?.width ?? 400;
-                const tParentH = tParentNode.height ?? tParentNode.measured?.height ?? tParentNode.style?.height ?? 300;
+                const tParentW = finiteNumber(
+                    tParentNode.width ?? tParentNode.measured?.width ?? tParentNode.style?.width,
+                    400,
+                );
+                const tParentH = finiteNumber(
+                    tParentNode.height ?? tParentNode.measured?.height ?? tParentNode.style?.height,
+                    300,
+                );
                 // Mark as soft zone: A* sees it as expensive but not impossible to traverse.
                 // This makes A* prefer going AROUND the container boundary first, then enter
                 // from the correct handle side near the target node.
@@ -433,12 +496,12 @@ export function decideEdgeRouting(
                     height: tParentH,
                     padding: 40, // Increased padding to ensure visible distance from group border
                     isSoftZone: true, // signals PathFinder to treat as high-cost, not blocked
-                } as any);
+                });
             }
         }
     }
 
-    const layoutDir = fallbackIsValid ? (fallbackDir as any) : inferredLayoutDirection;
+    const layoutDir = fallbackIsValid ? fallbackDir : inferredLayoutDirection;
 
     const enrichedCfg = {
         ...cfg,

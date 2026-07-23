@@ -9,7 +9,21 @@ import { Rectangle } from '../../algorithms/geometryUtils';
 import { UnifiedRoutingConfig, Position } from '../../types/routing';
 import { SpatialIndex } from '../../algorithms/SpatialIndex';
 import { getNodePosition } from '../../algorithms/smartEdgeUtils';
+import type { NodeLike } from '../../algorithms/smartEdgeUtils';
 import { countObstaclesInDirection } from '../core/GraphBuilder';
+
+export interface BusGraphNode extends NodeLike {
+    id: string;
+    [key: string]: unknown;
+}
+
+export interface BusGraphEdge {
+    id: string;
+    source: string;
+    target: string;
+    type?: string;
+    [key: string]: unknown;
+}
 
 export interface BusOrientation {
     busDir: string;
@@ -20,6 +34,11 @@ export interface ConsensusResult {
     position: Position;
     hasFixed: boolean;
 }
+
+const finiteDimension = (primary: unknown, measured: unknown): number => {
+    if (typeof primary === 'number' && Number.isFinite(primary)) return primary;
+    return typeof measured === 'number' && Number.isFinite(measured) ? measured : 0;
+};
 
 export class BusDetector {
     private config: UnifiedRoutingConfig;
@@ -35,17 +54,17 @@ export class BusDetector {
     resolveBusOrientation(
         isManyToOne: boolean,
         focusNodeId: string,
-        allEdges: any[],
-        allNodes: any[],
+        allEdges: BusGraphEdge[],
+        allNodes: BusGraphNode[],
         globalDir: string,
-        nodeMap?: Map<string, any>  // [H-6] Optional O(1) lookup map to avoid O(N) find() per edge
+        nodeMap?: Map<string, BusGraphNode>  // [H-6] Optional O(1) lookup map to avoid O(N) find() per edge
     ): BusOrientation {
         if (!focusNodeId || !allEdges || !allNodes) {
             return { busDir: globalDir, isHorz: globalDir === 'LR' || globalDir === 'RL' };
         }
 
         // [H-6] Build nodeMap lazily if not provided (for backwards compatibility)
-        const nMap = nodeMap ?? new Map<string, any>(allNodes.map((n: any) => [n.id, n]));
+        const nMap = nodeMap ?? new Map(allNodes.map(n => [n.id, n]));
 
         let horzVotes = 0;
         let vertVotes = 0;
@@ -60,10 +79,10 @@ export class BusDetector {
             if (s && t) {
                 const sPos = getNodePosition(s);
                 const tPos = getNodePosition(t);
-                const sw = (s.width || s.measured?.width || 0) as number;
-                const sh = (s.height || s.measured?.height || 0) as number;
-                const tw = (t.width || t.measured?.width || 0) as number;
-                const th = (t.height || t.measured?.height || 0) as number;
+                const sw = finiteDimension(s.width, s.measured?.width);
+                const sh = finiteDimension(s.height, s.measured?.height);
+                const tw = finiteDimension(t.width, t.measured?.width);
+                const th = finiteDimension(t.height, t.measured?.height);
                 const dx = Math.abs((tPos.x + tw / 2) - (sPos.x + sw / 2));
                 const dy = Math.abs((tPos.y + th / 2) - (sPos.y + sh / 2));
                 
@@ -90,14 +109,14 @@ export class BusDetector {
         eId: string,
         originId: string,
         isSource: boolean,
-        nodes: any[],
-        edges: any[]
+        nodes: BusGraphNode[],
+        edges: BusGraphEdge[]
     ): number {
-        const e = edges.find((ed: any) => ed.id === eId);
+        const e = edges.find(ed => ed.id === eId);
         if (!e) return -1;
-        const originNode = nodes.find((n: any) => n.id === originId);
+        const originNode = nodes.find(n => n.id === originId);
         const otherId = isSource ? e.target : e.source;
-        const otherNode = nodes.find((n: any) => n.id === otherId);
+        const otherNode = nodes.find(n => n.id === otherId);
 
         if (!originNode || !otherNode) return -1;
 
@@ -105,12 +124,12 @@ export class BusDetector {
         const otherPos = getNodePosition(otherNode);
 
         const originCenter = {
-            x: originPos.x + (originNode.width || originNode.measured?.width || 0) / 2,
-            y: originPos.y + (originNode.height || originNode.measured?.height || 0) / 2
+            x: originPos.x + finiteDimension(originNode.width, originNode.measured?.width) / 2,
+            y: originPos.y + finiteDimension(originNode.height, originNode.measured?.height) / 2
         };
         const otherCenter = {
-            x: otherPos.x + (otherNode.width || otherNode.measured?.width || 0) / 2,
-            y: otherPos.y + (otherNode.height || otherNode.measured?.height || 0) / 2
+            x: otherPos.x + finiteDimension(otherNode.width, otherNode.measured?.width) / 2,
+            y: otherPos.y + finiteDimension(otherNode.height, otherNode.measured?.height) / 2
         };
         const dx = otherCenter.x - originCenter.x;
         const dy = otherCenter.y - originCenter.y;
@@ -123,27 +142,30 @@ export class BusDetector {
      * Filter peers by quadrant consistency
      */
     filterPeersByQuadrant(
-        peerList: any[],
+        peerList: BusGraphEdge[],
         originId: string,
         isSource: boolean,
         targetQuad: number,
-        nodes: any[],
-        edges: any[],
+        nodes: BusGraphNode[],
+        edges: BusGraphEdge[],
         layoutDirection: string,
         edgeId: string,
-        nodeMap?: Map<string, any>  // [T4] O(1) 查找
-    ): any[] {
+        nodeMap?: Map<string, BusGraphNode>  // [T4] O(1) 查找
+    ): BusGraphEdge[] {
         if (targetQuad === -1) {
             const currentEdge = peerList.find(e => e.id === edgeId);
             return currentEdge ? [currentEdge] : [];
         }
 
         // [T4] 构建或复用 nodeMap
-        const nMap = nodeMap ?? new Map<string, any>(nodes.map((n: any) => [n.id, n]));
+        const nMap = nodeMap ?? new Map(nodes.map(n => [n.id, n]));
 
         const originNode = nMap.get(originId);
-        const refEdge = edges.find((e: any) => e.id === edgeId);
-        if (!originNode || !refEdge) return [peerList.find(e => e.id === edgeId)].filter(Boolean);
+        const refEdge = edges.find(e => e.id === edgeId);
+        if (!originNode || !refEdge) {
+            const currentEdge = peerList.find(e => e.id === edgeId);
+            return currentEdge ? [currentEdge] : [];
+        }
 
         const originPos = getNodePosition(originNode);
         const otherId = isSource ? refEdge.target : refEdge.source;
@@ -152,25 +174,33 @@ export class BusDetector {
         let isHorz = true;
         if (targetNode) {
             const targetPos = getNodePosition(targetNode);
-            const cDx = (targetPos.x + (targetNode.width || 0) / 2) - (originPos.x + (originNode.width || 0) / 2);
-            const cDy = (targetPos.y + (targetNode.height || 0) / 2) - (originPos.y + (originNode.height || 0) / 2);
+            const cDx = (
+                targetPos.x + finiteDimension(targetNode.width, targetNode.measured?.width) / 2
+            ) - (
+                originPos.x + finiteDimension(originNode.width, originNode.measured?.width) / 2
+            );
+            const cDy = (
+                targetPos.y + finiteDimension(targetNode.height, targetNode.measured?.height) / 2
+            ) - (
+                originPos.y + finiteDimension(originNode.height, originNode.measured?.height) / 2
+            );
             isHorz = Math.abs(cDx) >= Math.abs(cDy);
         }
 
-        return peerList.filter((e: any) => {
+        return peerList.filter(e => {
             if (e.id === edgeId) return true;
             const peerOtherId = isSource ? e.target : e.source;
             const peerOtherNode = nMap.get(peerOtherId);  // [T4] O(1)
             if (!peerOtherNode) return false;
 
             const oC = {
-                x: originPos.x + (originNode.width || originNode.measured?.width || 0) / 2,
-                y: originPos.y + (originNode.height || originNode.measured?.height || 0) / 2
+                x: originPos.x + finiteDimension(originNode.width, originNode.measured?.width) / 2,
+                y: originPos.y + finiteDimension(originNode.height, originNode.measured?.height) / 2
             };
             const pPos = getNodePosition(peerOtherNode);
             const tC = {
-                x: pPos.x + (peerOtherNode.width || peerOtherNode.measured?.width || 0) / 2,
-                y: pPos.y + (peerOtherNode.height || peerOtherNode.measured?.height || 0) / 2
+                x: pPos.x + finiteDimension(peerOtherNode.width, peerOtherNode.measured?.width) / 2,
+                y: pPos.y + finiteDimension(peerOtherNode.height, peerOtherNode.measured?.height) / 2
             };
             const dx = tC.x - oC.x;
             const dy = tC.y - oC.y;
@@ -196,15 +226,15 @@ export class BusDetector {
      * Sort edges within a bus
      */
     sortEdges(
-        edgeList: any[],
+        edgeList: BusGraphEdge[],
         isOutgoing: boolean,
-        nodes: any[],
-        _edges: any[],
-        nodeMap?: Map<string, any>  // [T2] O(1) 查找
-    ): any[] {
-        const nMap = nodeMap ?? new Map<string, any>(nodes.map((n: any) => [n.id, n]));
-        const upstream: any[] = [];
-        const downstream: any[] = [];
+        nodes: BusGraphNode[],
+        _edges: BusGraphEdge[],
+        nodeMap?: Map<string, BusGraphNode>  // [T2] O(1) 查找
+    ): BusGraphEdge[] {
+        const nMap = nodeMap ?? new Map(nodes.map(n => [n.id, n]));
+        const upstream: BusGraphEdge[] = [];
+        const downstream: BusGraphEdge[] = [];
         const map = new Map<string, number>();
 
         edgeList.forEach(e => {
@@ -225,9 +255,9 @@ export class BusDetector {
      */
     // [T2] 将参数改为 Map，O(1) 查找替换原来的 nodes.find() O(N)
     private getSignedDist(
-        e: any,
+        e: BusGraphEdge,
         isOutgoing: boolean,
-        nodeMap: Map<string, any>
+        nodeMap: Map<string, BusGraphNode>
     ): number {
         const hubId = isOutgoing ? e.source : e.target;
         const otherId = isOutgoing ? e.target : e.source;
@@ -236,8 +266,16 @@ export class BusDetector {
 
         if (!hub || !other) return 0;
 
-        const hC = { x: hub.x + (hub.width || 0) / 2, y: hub.y + (hub.height || 0) / 2 };
-        const oC = { x: other.x + (other.width || 0) / 2, y: other.y + (other.height || 0) / 2 };
+        const hubPosition = getNodePosition(hub);
+        const otherPosition = getNodePosition(other);
+        const hC = {
+            x: hubPosition.x + finiteDimension(hub.width, hub.measured?.width) / 2,
+            y: hubPosition.y + finiteDimension(hub.height, hub.measured?.height) / 2
+        };
+        const oC = {
+            x: otherPosition.x + finiteDimension(other.width, other.measured?.width) / 2,
+            y: otherPosition.y + finiteDimension(other.height, other.measured?.height) / 2
+        };
         const dx = oC.x - hC.x;
         const dy = oC.y - hC.y;
 
@@ -250,8 +288,8 @@ export class BusDetector {
     calculateBusConsensus(
         isManyToOne: boolean,
         nodeRect: Rectangle,
-        peerEdges: any[],
-        nodes: any[],
+        peerEdges: BusGraphEdge[],
+        nodes: BusGraphNode[],
         spatialIndex: SpatialIndex | null,
         obstacles: Rectangle[],
         existingPos: Position,
@@ -267,15 +305,15 @@ export class BusDetector {
 
         const peerRects: Rectangle[] = [];
         let validPeers = 0;
-        const centroid = peerEdges.reduce((acc: any, e: any) => {
+        const centroid = peerEdges.reduce<{ x: number; y: number }>((acc, e) => {
             const otherId = isManyToOne ? e.source : e.target;
             const otherNode = nodes.find(n => n.id === otherId);
             if (!otherNode) return acc;
 
             validPeers++;
             const pos = getNodePosition(otherNode);
-            const width = otherNode.width || (otherNode.measured?.width) || 0;
-            const height = otherNode.height || (otherNode.measured?.height) || 0;
+            const width = finiteDimension(otherNode.width, otherNode.measured?.width);
+            const height = finiteDimension(otherNode.height, otherNode.measured?.height);
             peerRects.push({
                 x: pos.x,
                 y: pos.y,

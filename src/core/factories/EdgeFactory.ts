@@ -10,6 +10,7 @@ import {
   validateEdgeConfig
 } from './EdgeFactoryBoundary';
 import { EdgeStyleType, type EdgeConfig } from './EdgeFactoryTypes';
+import type { ThemeColor } from '../themes/types/ThemeTypes';
 
 // Compatibility exports: callers historically imported these from the factory.
 export { EdgeType } from '../types/edgeType';
@@ -19,6 +20,20 @@ export {
   type EdgeConfig,
   type EdgeValidationResult
 } from './EdgeFactoryTypes';
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
+
+const readString = (value: unknown): string | undefined => (
+  typeof value === 'string' && value.trim() ? value : undefined
+);
+
+const readNativeEdgeLabel = (value: unknown): string | number | undefined => (
+  typeof value === 'string' || typeof value === 'number' ? value : undefined
+);
 
 /**
  * 边缘工厂类 - 统一管理边缘的创建和配置
@@ -62,14 +77,15 @@ export class EdgeFactory {
     const id = config.id || this.generateEdgeId(config.source, config.target);
 
     // 获取样式配置（接入主题管理器，按域/边类型动态取色）
+    const configData = asRecord(config.data);
     const styleConfig = this.getStyleConfig(
       config.styleType || EdgeStyleType.MAIN,
       {
-        sourceDomain: (config.data as any)?.sourceDomain,
-        targetDomain: (config.data as any)?.targetDomain,
-        sourceDomainClass: (config.data as any)?.sourceDomainClass,
-        targetDomainClass: (config.data as any)?.targetDomainClass,
-        edgeKind: (config.data as any)?.edgeType || config.styleType
+        sourceDomain: readString(configData.sourceDomain),
+        targetDomain: readString(configData.targetDomain),
+        sourceDomainClass: readString(configData.sourceDomainClass),
+        targetDomainClass: readString(configData.targetDomainClass),
+        edgeKind: readString(configData.edgeType) || config.styleType
       }
     );
 
@@ -93,8 +109,14 @@ export class EdgeFactory {
     const theme = getConfigIntegration()?.getThemeManager?.()?.getCurrentTheme?.();
     const _labelBg = theme?.diagram?.canvas?.background || '#fff';
     const labelFontSize = theme?.typography?.fontSize?.sm || '0.85rem';
-    const labelFontFamily = theme?.typography?.fontFamily;
-    const strokeColor = (edgeStyle as any)?.stroke || (config.strokeColor) || '#64748b';
+    const fontFamilyToken = theme?.typography?.fontFamily;
+    const fontFamilyRecord = asRecord(fontFamilyToken);
+    const labelFontFamily = typeof fontFamilyToken === 'string'
+      ? fontFamilyToken
+      : Array.isArray(fontFamilyRecord.sans)
+        ? fontFamilyRecord.sans.filter((font): font is string => typeof font === 'string').join(', ')
+        : undefined;
+    const strokeColor = String(edgeStyle.stroke || config.strokeColor || '#64748b');
 
     const finalType = (config.type || EdgeType.DEFAULT);
     const isSmartType = (
@@ -118,10 +140,10 @@ export class EdgeFactory {
         ...(labelFontFamily ? { fontFamily: labelFontFamily } : {}),
         fontSize: labelFontSize,
         color: strokeColor
-      } as any,
+      },
       // 为避免视觉上“连线被截断”，默认关闭原生标签背景（即使开启也仅对原生生效）
       labelShowBg: false,
-      labelBgPadding: [0, 0] as any,
+      labelBgPadding: [0, 0],
       labelBgBorderRadius: 0,
       labelBgStyle: { fill: 'transparent' }
     };
@@ -147,13 +169,13 @@ export class EdgeFactory {
     // - 默认仅设置终点箭头，以减少路径视觉干扰；
     // - 起点箭头需显式通过 config.markerStart === true 开启。
     const cfg = diagramConfigManager.getConfig();
-    const markerCfg = (cfg?.edge as any)?.markerEnd;
+    const markerCfg = cfg?.edge?.markerEnd;
     const presetArrow = (() => {
       try {
         const p = diagramStyleManager.getPreset();
         const t = (config.styleType === EdgeStyleType.DEPENDENCY) ? p?.edges?.dependency : (config.styleType === EdgeStyleType.DATA) ? p?.edges?.data : (config.styleType === EdgeStyleType.SUPPORT) ? p?.edges?.support : p?.edges?.main;
         return t?.arrow;
-      } catch { return undefined as any; }
+      } catch { return undefined; }
     })();
     const markerW = typeof presetArrow?.width === 'number' ? presetArrow!.width : (typeof markerCfg?.width === 'number' ? markerCfg.width : 10);
     const markerH = typeof presetArrow?.height === 'number' ? presetArrow!.height : (typeof markerCfg?.height === 'number' ? markerCfg.height : 10);
@@ -162,20 +184,20 @@ export class EdgeFactory {
     if (config.markerEnd !== false) {
       edge.markerEnd = {
         type: MarkerType.ArrowClosed,
-        color: (presetArrow?.color || (edgeStyle as any)?.stroke || (config.strokeColor) || '#64748b'),
+        color: String(presetArrow?.color || edgeStyle.stroke || config.strokeColor || '#64748b'),
         width: markerW,
         height: markerH,
-      } as any;
+      };
     }
     // 起点：默认关闭；仅当显式设置为 true 时开启
     const enableStartMarker = config.markerStart === true;
     if (enableStartMarker) {
-      (edge as any).markerStart = {
+      edge.markerStart = {
         type: MarkerType.ArrowClosed,
-        color: (presetArrow?.color || (edgeStyle as any)?.stroke || (config.strokeColor) || '#64748b'),
+        color: String(presetArrow?.color || edgeStyle.stroke || config.strokeColor || '#64748b'),
         width: markerW,
         height: markerH,
-      } as any;
+      };
     }
 
     return edge;
@@ -366,14 +388,14 @@ export class EdgeFactory {
     const updatedEdge = { ...ownEdgeConfigRecords(edge) };
 
     if (updates.type) {
-      const previousNativeLabel = (edge as any)?.label;
+      const previousNativeLabel = edge.label;
       updatedEdge.type = updates.type;
       // 同步更新 data.pathType，确保渲染组件识别 smart/native 路径类型
       const newPathType = this.getPathTypeFromEdgeType(updates.type);
       updatedEdge.data = {
         ...updatedEdge.data,
         pathType: newPathType,
-      } as any;
+      };
 
       // 为智能边类型注入默认的路径规划参数（若未设置）
       if (
@@ -382,11 +404,11 @@ export class EdgeFactory {
         updates.type === EdgeType.SMART_STEP
       ) {
         const defaults = this.getDefaultConfigForType(updates.type);
-        const defaultData = (defaults as any)?.data || {};
+        const defaultData = defaults.data || {};
         updatedEdge.data = {
           ...defaultData,
           ...updatedEdge.data,
-        } as any;
+        };
       }
 
       // 类型切换时，同步处理 React Flow 的 label：
@@ -399,29 +421,27 @@ export class EdgeFactory {
         updatedEdge.type === EdgeType.ADVANCED_SMART_STEP
       );
       if (nowSmart) {
-        const existingDataLabel = (updatedEdge as any)?.data?.label;
+        const existingDataLabel = updatedEdge.data?.label;
         if (typeof existingDataLabel === 'undefined' && typeof previousNativeLabel !== 'undefined') {
           updatedEdge.data = {
-            ...(updatedEdge.data as any),
+            ...updatedEdge.data,
             label: previousNativeLabel,
-          } as any;
+          };
         }
         // 切到智能连线：移除原生 label，避免与自定义标签重复
-        (updatedEdge as any).label = undefined;
+        updatedEdge.label = undefined;
       } else {
         // 切到原生连线：把 data.label 同步给原生 label
-        const text = (updatedEdge as any)?.data?.label;
-        if (typeof text !== 'undefined') {
-          (updatedEdge as any).label = text as any;
-        }
+        updatedEdge.label = readNativeEdgeLabel(updatedEdge.data?.label);
       }
     }
 
     if (updates.styleType) {
+      const updatedData = asRecord(updatedEdge.data);
       const styleConfig = this.getStyleConfig(updates.styleType, {
-        sourceDomain: (updatedEdge.data as any)?.sourceDomain,
-        targetDomain: (updatedEdge.data as any)?.targetDomain,
-        edgeKind: (updatedEdge.data as any)?.edgeType || updates.styleType
+        sourceDomain: readString(updatedData.sourceDomain),
+        targetDomain: readString(updatedData.targetDomain),
+        edgeKind: readString(updatedData.edgeType) || updates.styleType
       });
       updatedEdge.style = {
         ...updatedEdge.style,
@@ -430,27 +450,27 @@ export class EdgeFactory {
         strokeDasharray: updates.strokeDasharray || styleConfig.strokeDasharray
       };
       // 同步标签颜色为描边色
-      (updatedEdge as any).labelStyle = {
-        ...((updatedEdge as any).labelStyle || {}),
-        color: (updatedEdge.style as any)?.stroke
+      updatedEdge.labelStyle = {
+        ...updatedEdge.labelStyle,
+        color: updatedEdge.style?.stroke
       };
     }
 
     if (updates.sourceHandle !== undefined) {
       // 规范化把手ID，统一映射到节点实际注册的全称 handle。
-      (updatedEdge as any).sourceHandle = normalizeEdgeHandleId(updates.sourceHandle);
+      updatedEdge.sourceHandle = normalizeEdgeHandleId(updates.sourceHandle);
     }
 
     if (updates.targetHandle !== undefined) {
       // 规范化把手ID，统一映射到节点实际注册的全称 handle。
-      (updatedEdge as any).targetHandle = normalizeEdgeHandleId(updates.targetHandle);
+      updatedEdge.targetHandle = normalizeEdgeHandleId(updates.targetHandle);
     }
 
     if (updates.label !== undefined) {
       updatedEdge.data = {
         ...updatedEdge.data,
         label: updates.label
-      } as any;
+      };
       // 仅当不是智能连线时，同步给 React Flow 的原生 label
       const isSmart = (
         updatedEdge.type === EdgeType.SMART_BEZIER ||
@@ -458,13 +478,13 @@ export class EdgeFactory {
         updatedEdge.type === EdgeType.SMART_STEP
       );
       if (!isSmart) {
-        (updatedEdge as any).label = updates.label as any;
+        updatedEdge.label = updates.label;
       } else {
-        (updatedEdge as any).label = undefined;
+        updatedEdge.label = undefined;
       }
       // 始终关闭原生标签背景
-      (updatedEdge as any).labelShowBg = false;
-      (updatedEdge as any).labelBgStyle = { fill: 'transparent' } as any;
+      updatedEdge.labelShowBg = false;
+      updatedEdge.labelBgStyle = { fill: 'transparent' };
     }
 
     if (updates.animated !== undefined) {
@@ -487,8 +507,8 @@ export class EdgeFactory {
         ...(updates.strokeDasharray ? { strokeDasharray: updates.strokeDasharray } : {})
       };
       if (updates.strokeColor) {
-        (updatedEdge as any).labelStyle = {
-          ...((updatedEdge as any).labelStyle || {}),
+        updatedEdge.labelStyle = {
+          ...updatedEdge.labelStyle,
           color: updates.strokeColor
         };
       }
@@ -505,18 +525,22 @@ export class EdgeFactory {
     // 函数级注释：
     // - 某些页面可能直接覆写 markerEnd 仅设置 color；这里保证宽高统一
     const cfg = diagramConfigManager.getConfig();
-    const markerCfg = (cfg?.edge as any)?.markerEnd;
+    const markerCfg = cfg?.edge?.markerEnd;
     const markerW = typeof markerCfg?.width === 'number' ? markerCfg.width : 10;
     const markerH = typeof markerCfg?.height === 'number' ? markerCfg.height : 10;
-    if ((updatedEdge as any).markerEnd) {
-      const me: any = (updatedEdge as any).markerEnd;
-      if (typeof me.width !== 'number') me.width = markerW;
-      if (typeof me.height !== 'number') me.height = markerH;
+    if (updatedEdge.markerEnd && typeof updatedEdge.markerEnd !== 'string') {
+      updatedEdge.markerEnd = {
+        ...updatedEdge.markerEnd,
+        width: typeof updatedEdge.markerEnd.width === 'number' ? updatedEdge.markerEnd.width : markerW,
+        height: typeof updatedEdge.markerEnd.height === 'number' ? updatedEdge.markerEnd.height : markerH,
+      };
     }
-    if ((updatedEdge as any).markerStart) {
-      const ms: any = (updatedEdge as any).markerStart;
-      if (typeof ms.width !== 'number') ms.width = markerW;
-      if (typeof ms.height !== 'number') ms.height = markerH;
+    if (updatedEdge.markerStart && typeof updatedEdge.markerStart !== 'string') {
+      updatedEdge.markerStart = {
+        ...updatedEdge.markerStart,
+        width: typeof updatedEdge.markerStart.width === 'number' ? updatedEdge.markerStart.width : markerW,
+        height: typeof updatedEdge.markerStart.height === 'number' ? updatedEdge.markerStart.height : markerH,
+      };
     }
 
     return updatedEdge;
@@ -546,7 +570,7 @@ export class EdgeFactory {
     const config = diagramConfigManager.getConfig();
     const integration = getConfigIntegration();
     const themeManager = integration?.getThemeManager();
-    const preset = (() => { try { return diagramStyleManager.getPreset(); } catch { return undefined as any; } })();
+    const preset = (() => { try { return diagramStyleManager.getPreset(); } catch { return undefined; } })();
 
     const baseConfig = {
       strokeWidth: config.edge.strokeWidth,
@@ -554,9 +578,10 @@ export class EdgeFactory {
     };
 
     // 安全获取主题颜色工具
-    const pickColor = (tc?: any): string | undefined => {
+    const pickColor = (tc?: ThemeColor | string): string | undefined => {
       if (!tc) return undefined;
-      return tc.stroke || tc.border || tc.main || tc.text;
+      if (typeof tc === 'string') return tc;
+      return tc.border || tc.main || tc.text;
     };
 
     const getDomainColor = (domainClass?: string, _domain?: string): string | undefined => {
@@ -567,8 +592,8 @@ export class EdgeFactory {
        * 再从当前主题的 diagram.domains 中读取颜色对象。
        */
       const theme = themeManager.getCurrentTheme?.();
-      const key = resolveThemeDomainKey(theme as any, { domainClass });
-      const tc = (theme?.diagram?.domains || {})[key] as any;
+      const key = resolveThemeDomainKey(theme, { domainClass });
+      const tc = theme?.diagram?.domains?.[key];
       return pickColor(tc);
     };
 
@@ -592,7 +617,7 @@ export class EdgeFactory {
         const stroke = token?.color || sourceColor || getEdgeThemeColor('primary') || '#FF5722';
         const width = typeof token?.width === 'number' ? token.width : 3;
         const dash = token?.dash;
-        return { strokeWidth: width, stroke, ...(dash ? { strokeDasharray: dash } : {}) } as any;
+        return { strokeWidth: width, stroke, ...(dash ? { strokeDasharray: dash } : {}) };
       }
       case EdgeStyleType.DEPENDENCY: {
         const token = preset?.edges?.dependency;

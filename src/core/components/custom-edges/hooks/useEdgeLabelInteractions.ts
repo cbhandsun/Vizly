@@ -2,6 +2,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { EdgeProps } from '@xyflow/react';
 import { useEdgeUpdate } from '../../diagrams/useEdgeUpdate';
+import type { EdgeLabelStyle } from '../../diagrams/EdgeLabelStyleMenu';
+
+interface EdgeLabelInteractionData {
+  label?: unknown;
+  labelOffset?: { x: number; y: number };
+}
 
 /**
  * Interface returned by useEdgeLabelInteractions
@@ -15,7 +21,7 @@ export interface UseEdgeLabelInteractionsReturn {
   handleLabelBlur: () => void;
   handleLabelMouseDown: (e: React.MouseEvent) => void;
   handleLabelContextMenu: (e: React.MouseEvent) => void;
-  handleStyleChange: (edgeId: string, style: any) => void;
+  handleStyleChange: (edgeId: string, style: EdgeLabelStyle) => void;
   handleResetPosition: () => void;
 }
 
@@ -29,7 +35,8 @@ export function useEdgeLabelInteractions(props: EdgeProps): UseEdgeLabelInteract
 
   // ---------- Editing State ----------
   const [isEditing, setIsEditing] = useState(false);
-  const initialLabel = label ?? (props.data as any)?.label;
+  const edgeData = props.data as EdgeLabelInteractionData | undefined;
+  const initialLabel = label ?? edgeData?.label;
   const [editText, setEditText] = useState('');
 
   const handleLabelDoubleClick = (e: React.MouseEvent) => {
@@ -48,7 +55,7 @@ export function useEdgeLabelInteractions(props: EdgeProps): UseEdgeLabelInteract
   // ---------- Label Drag State ----------
   const [isDraggingLabel, setIsDraggingLabel] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
-  const rawLabelOffset = (props.data as any)?.labelOffset;
+  const rawLabelOffset = edgeData?.labelOffset;
   const labelOffset = useMemo(() => {
     return rawLabelOffset || { x: 0, y: 0 };
   }, [rawLabelOffset]);
@@ -98,7 +105,7 @@ export function useEdgeLabelInteractions(props: EdgeProps): UseEdgeLabelInteract
     // Dropdown automatically handles menu display; just prevent default outline behaviors
   };
 
-  const handleStyleChange = (edgeId: string, style: any) => {
+  const handleStyleChange = (edgeId: string, style: EdgeLabelStyle) => {
     edgeCallbacks.onLabelStyleChange(edgeId, style);
   };
 

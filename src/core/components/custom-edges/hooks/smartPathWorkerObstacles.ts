@@ -22,7 +22,6 @@ export interface SmartPathSimpleNode {
   style?: { zIndex?: number; [key: string]: unknown };
   zIndex?: number;
   computed?: { positionAbsolute?: { x: number; y: number }; [key: string]: unknown };
-  [key: string]: unknown;
 }
 
 export interface SmartPathObstacleItem {

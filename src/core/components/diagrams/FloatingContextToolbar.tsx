@@ -15,6 +15,7 @@ import {
 import { FaArrowUp, FaArrowDown, FaPercentage } from 'react-icons/fa';
 import { useAlignment } from './hooks/useAlignment';
 import { ShapePreview } from './ShapePreview';
+import type { FlowchartShape } from '../../types/flowchart-node';
 import {
     ToolbarContainer,
     ToolbarButton,
@@ -29,7 +30,7 @@ import {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const POPULAR_SHAPES = [
+const POPULAR_SHAPES: Array<{ shape: FlowchartShape; label: string }> = [
     { shape: 'rectangle', label: 'Process' },
     { shape: 'pill', label: 'Start/End' },
     { shape: 'diamond', label: 'Decision' },
@@ -69,7 +70,7 @@ export interface FloatingContextToolbarProps {
     onUpdateNodes: (updates: { id: string, position: { x: number, y: number } }[]) => void;
     layers?: LayerConfig[];
     onMoveToLayer?: (layerId: string) => void;
-    onChangeShape?: (shape: string) => void;
+    onChangeShape?: (shape: FlowchartShape) => void;
     /** 保存选中节点为组件模板 */
     onSaveAsComponent?: () => void;
     /** 业务域变更 */
@@ -110,7 +111,7 @@ const AlignPanel: React.FC<{
     </div>
 );
 
-const ShapePanel: React.FC<{ onChangeShape: (shape: string) => void }> = ({ onChangeShape }) => (
+const ShapePanel: React.FC<{ onChangeShape: (shape: FlowchartShape) => void }> = ({ onChangeShape }) => (
     <div style={{ padding: 8, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, width: 180 }}>
         {POPULAR_SHAPES.map(s => (
             <div

@@ -2,19 +2,31 @@ export type DiagramBridgeLike = {
   id?: string;
   name?: string;
   nodes?: unknown[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 } & Record<string, unknown>;
+
+type CloudDiagramPayload = {
+  id: string;
+  title: string;
+  content: Record<string, unknown>;
+  updated_at: string;
+  user_id: string;
+};
 
 type CloudProviderLike = {
   isConfigured: () => boolean;
-  saveDiagram: (payload: {
-    id: string;
-    title: string;
-    content: any;
-    updated_at: string;
-    user_id: string;
-  }) => Promise<unknown>;
+  saveDiagram: (payload: CloudDiagramPayload) => Promise<unknown>;
 };
+
+type DiagramSnapshotAttacher<TDiagram extends DiagramBridgeLike> = (
+  diagram: TDiagram,
+  selectedDiagramId: string,
+) => Promise<{ diagram: unknown }>;
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 
 export type DiagramViewerCloudProviderName = 's3' | 'supabase';
 
@@ -36,12 +48,12 @@ export const isDiagramViewerBridgeSavable = (
   Boolean(bridge && Array.isArray(bridge.nodes) && bridge.nodes.length >= 0)
 );
 
-export const createDiagramViewerSaveCopy = ({
+export const createDiagramViewerSaveCopy = <TDiagram extends DiagramBridgeLike>({
   bridge,
   name,
   createId,
 }: {
-  bridge: DiagramBridgeLike;
+  bridge: TDiagram;
   name: string;
   createId: () => string;
 }) => ({
@@ -73,7 +85,7 @@ export const syncDiagramViewerBridgeCloudReplica = ({
   };
 };
 
-export const saveDiagramViewerCloudReplica = async ({
+export const saveDiagramViewerCloudReplica = async <TDiagram extends DiagramBridgeLike>({
   bridge,
   selectedDiagramId,
   providerName,
@@ -83,12 +95,12 @@ export const saveDiagramViewerCloudReplica = async ({
   invalidatePreview,
   createId,
 }: {
-  bridge: DiagramBridgeLike;
+  bridge: TDiagram;
   selectedDiagramId: string;
   providerName: DiagramViewerCloudProviderName;
   title: string;
   getProvider: (provider: DiagramViewerCloudProviderName) => Promise<CloudProviderLike>;
-  attachSnapshot: (diagram: any, selectedDiagramId: string) => Promise<{ diagram: any }>;
+  attachSnapshot: DiagramSnapshotAttacher<TDiagram>;
   invalidatePreview: (id: string) => void;
   createId: () => string;
 }) => {
@@ -109,7 +121,7 @@ export const saveDiagramViewerCloudReplica = async ({
   await provider.saveDiagram({
     id: saveCopy.id,
     title: safeTitle,
-    content: { ...snapshot.diagram, id: saveCopy.id, name: safeTitle } as any,
+    content: { ...asRecord(snapshot.diagram), id: saveCopy.id, name: safeTitle },
     updated_at: new Date().toISOString(),
     user_id: 'anonymous',
   });
@@ -125,20 +137,20 @@ export const saveDiagramViewerCloudReplica = async ({
   return saveCopy.id;
 };
 
-export const saveDiagramViewerDirectCloud = async ({
+export const saveDiagramViewerDirectCloud = async <TDiagram extends DiagramBridgeLike>({
   bridge,
   selectedDiagramId,
   getProvider,
   attachSnapshot,
   invalidatePreview,
 }: {
-  bridge: DiagramBridgeLike;
+  bridge: TDiagram;
   selectedDiagramId: string;
   getProvider: (provider: DiagramViewerCloudProviderName) => Promise<CloudProviderLike>;
-  attachSnapshot: (diagram: any, selectedDiagramId: string) => Promise<{ diagram: any }>;
+  attachSnapshot: DiagramSnapshotAttacher<TDiagram>;
   invalidatePreview: (id: string) => void;
 }) => {
-  const cloudMeta = bridge?.metadata?.cloud;
+  const cloudMeta = asRecord(bridge.metadata?.cloud);
   if (!cloudMeta?.provider || !cloudMeta?.title) {
     return null;
   }
@@ -157,7 +169,7 @@ export const saveDiagramViewerDirectCloud = async ({
   await provider.saveDiagram({
     id: targetId,
     title,
-    content: { ...snapshot.diagram, id: targetId } as any,
+    content: { ...asRecord(snapshot.diagram), id: targetId },
     updated_at: new Date().toISOString(),
     user_id: 'anonymous',
   });

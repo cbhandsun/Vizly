@@ -5,12 +5,17 @@ import { logPathfindingMassiveGrid } from '../utils/routingLogging';
 const MAX_ABSOLUTE_COORDINATE = 10_000_000;
 const MAX_GRID_CELLS = 2_000_000;
 
+interface RoutingRectangle extends Rectangle {
+    padding?: number;
+    isSoftZone?: boolean;
+}
+
 const boundedCoordinate = (value: unknown): number => {
     if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
     return Math.max(-MAX_ABSOLUTE_COORDINATE, Math.min(MAX_ABSOLUTE_COORDINATE, value));
 };
 
-const isBoundedRectangle = (value: unknown): value is Rectangle => {
+const isBoundedRectangle = (value: unknown): value is RoutingRectangle => {
     if (!value || typeof value !== 'object') return false;
     const rectangle = value as Rectangle;
     return Number.isFinite(rectangle.x)
@@ -22,7 +27,13 @@ const isBoundedRectangle = (value: unknown): value is Rectangle => {
         && Math.abs(rectangle.x) <= MAX_ABSOLUTE_COORDINATE
         && Math.abs(rectangle.y) <= MAX_ABSOLUTE_COORDINATE
         && rectangle.width <= MAX_ABSOLUTE_COORDINATE * 2
-        && rectangle.height <= MAX_ABSOLUTE_COORDINATE * 2;
+        && rectangle.height <= MAX_ABSOLUTE_COORDINATE * 2
+        && (!('padding' in rectangle)
+            || (typeof rectangle.padding === 'number'
+                && Number.isFinite(rectangle.padding)
+                && rectangle.padding >= 0
+                && rectangle.padding <= MAX_ABSOLUTE_COORDINATE))
+        && (!('isSoftZone' in rectangle) || typeof rectangle.isSoftZone === 'boolean');
 };
 
 const isSpatialIndex = (value: unknown): value is SpatialIndex =>
@@ -98,7 +109,7 @@ export function buildPathfindingGrid(
     let maxX_raw = Math.max(sX, eX) + GRID_PADDING;
     let maxY_raw = Math.max(sY, eY) + GRID_PADDING;
 
-    let expansionObstacles: Rectangle[];
+    let expansionObstacles: RoutingRectangle[];
 
     if (isSpatialIndex(obstacles)) {
         expansionObstacles = obstacles.query({
@@ -189,7 +200,7 @@ export function buildPathfindingGrid(
     // }
 
     // Apply Obstacles
-    const relevantObstacles: Rectangle[] = isSpatialIndex(obstacles) ? (() => {
+    const relevantObstacles: RoutingRectangle[] = isSpatialIndex(obstacles) ? (() => {
         // Query obstacles intersecting the grid area (plus buffer for safety)
         const buffer = bufferDistanceFar;
         const queryRange = {
@@ -203,8 +214,8 @@ export function buildPathfindingGrid(
 
     for (const obs of relevantObstacles) {
         // [FIX] Extract custom padding and soft zone flags from obstacle
-        const customPadding = (obs as any).padding ?? 0;
-        const isSoftZone = (obs as any).isSoftZone === true;
+        const customPadding = obs.padding ?? 0;
+        const isSoftZone = obs.isSoftZone === true;
 
         if (isSoftZone) {
             // Soft zone applies a graduated high cost but does not block pathing

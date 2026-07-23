@@ -12,13 +12,24 @@ export type NodeRect = {
 
 export type AnchorSide = 'left' | 'right' | 'top' | 'bottom';
 
+type DisplayNode = Node & {
+  positionAbsolute?: { x: number; y: number };
+  measured?: { width?: number; height?: number };
+};
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
+
 export const isVerticalHandle = (handle?: string | null) => {
   const side = normalizeHandle(handle);
   return side === 't' || side === 'b';
 };
 
 export const getNodeX = (node: Node | undefined) => {
-  const pos = (node as any)?.positionAbsolute ?? node?.position ?? { x: 0 };
+  const pos = (node as DisplayNode | undefined)?.positionAbsolute ?? node?.position ?? { x: 0 };
   return Number(pos.x || 0);
 };
 
@@ -27,23 +38,25 @@ const getNodePosition = (
   nodeById?: Map<string, Node>,
 ): { x: number; y: number } | null => {
   if (!node) return null;
-  const hasAbsolutePosition = Boolean((node as any).positionAbsolute);
-  const pos = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
+  const displayNode = node as DisplayNode;
+  const hasAbsolutePosition = Boolean(displayNode.positionAbsolute);
+  const pos = displayNode.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
   let x = Number(pos.x || 0);
   let y = Number(pos.y || 0);
   if (!hasAbsolutePosition && nodeById) {
     const visited = new Set<string>();
-    let parentId = (node as any).parentId;
+    let parentId = node.parentId;
     while (parentId && !visited.has(parentId)) {
       visited.add(parentId);
       const parent = nodeById.get(parentId);
       if (!parent) break;
-      const parentHasAbsolutePosition = Boolean((parent as any).positionAbsolute);
-      const parentPos = (parent as any).positionAbsolute ?? parent.position ?? { x: 0, y: 0 };
+      const displayParent = parent as DisplayNode;
+      const parentHasAbsolutePosition = Boolean(displayParent.positionAbsolute);
+      const parentPos = displayParent.positionAbsolute ?? parent.position ?? { x: 0, y: 0 };
       x += Number(parentPos.x || 0);
       y += Number(parentPos.y || 0);
       if (parentHasAbsolutePosition) break;
-      parentId = (parent as any).parentId;
+      parentId = parent.parentId;
     }
   }
   return { x, y };
@@ -52,8 +65,10 @@ const getNodePosition = (
 export const getNodeRect = (node: Node | undefined, nodeById?: Map<string, Node>): NodeRect | null => {
   const pos = getNodePosition(node, nodeById);
   if (!node || !pos) return null;
-  const width = (node as any).measured?.width ?? node.width ?? (node.style as any)?.width ?? 0;
-  const height = (node as any).measured?.height ?? node.height ?? (node.style as any)?.height ?? 0;
+  const displayNode = node as DisplayNode;
+  const style = asRecord(node.style);
+  const width = displayNode.measured?.width ?? node.width ?? style.width ?? 0;
+  const height = displayNode.measured?.height ?? node.height ?? style.height ?? 0;
   return {
     x: pos.x,
     y: pos.y,
@@ -130,7 +145,7 @@ export const synthesizeStableFallbackPath = ({
   edge: Edge;
   nodeById: Map<string, Node>;
 }): Edge => {
-  const data = ((edge.data || {}) as Record<string, any>);
+  const data = asRecord(edge.data);
   if (String(edge.type || '').toLowerCase() !== 'stablepath') return edge;
   if (Array.isArray(data.computedPath) && data.computedPath.length >= 2 && data.computedPath.every(isFinitePoint)) {
     return edge;
@@ -185,7 +200,7 @@ export const isNearPoint = (
 ) => Math.abs(a.x - b.x) <= tolerance && Math.abs(a.y - b.y) <= tolerance;
 
 export const hasLockedComputedPath = (edge: Edge): boolean => {
-  const data = ((edge.data || {}) as Record<string, any>);
+  const data = asRecord(edge.data);
   const isStablePath = String(edge.type || '').toLowerCase() === 'stablepath';
   return (data.layoutPathLocked === true || data._layoutPathLocked === true || isStablePath)
     && Array.isArray(data.computedPath)

@@ -22,6 +22,37 @@ interface Candidate {
     cost: number;
 }
 
+export interface AdvancedRoutingNode {
+    id: string;
+    position?: Point;
+    positionAbsolute?: Point;
+    measured?: { width?: number; height?: number };
+}
+
+interface AdvancedRoutingEdge {
+    id: string;
+    source: string;
+    target: string;
+    data?: Record<string, unknown>;
+}
+
+interface BundleInfo {
+    bundleId: string;
+    bundleSize: number;
+    bundleIndex: number;
+    bundleCenterX: number;
+    bundleCenterY: number;
+    bundleDirection: string;
+}
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {};
+
+const finiteNumber = (value: unknown, fallback: number): number =>
+    typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
 /** 所有合法的 source→target handle 组合 */
 const HANDLES = ['l', 'r', 't', 'b'] as const;
 const candidateCombos: { source: string; target: string }[] = HANDLES.flatMap(
@@ -44,10 +75,10 @@ function segmentsIntersect(p1: Point, p2: Point, p3: Point, p4: Point): boolean 
 }
 
 // 获取节点锚点
-function getAnchor(node: any, handle: string | null | undefined): Point {
+function getAnchor(node: AdvancedRoutingNode, handle: string | null | undefined): Point {
     const pos = node.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-    const w = node?.measured?.width ?? 100;
-    const h = node?.measured?.height ?? 50;
+    const w = finiteNumber(node.measured?.width, 100);
+    const h = finiteNumber(node.measured?.height, 50);
 
     // 如果 handle 为空，默认中心 (用于部分逻辑)
     if (!handle) return { x: pos.x + w / 2, y: pos.y + h / 2 };
@@ -62,10 +93,10 @@ function getAnchor(node: any, handle: string | null | undefined): Point {
 }
 
 // 获取节点边界
-function getNodeBounds(node: any): { x: number; y: number; w: number; h: number } {
+function getNodeBounds(node: AdvancedRoutingNode): { x: number; y: number; w: number; h: number } {
     const pos = node.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-    const w = node?.measured?.width ?? 100;
-    const h = node?.measured?.height ?? 50;
+    const w = finiteNumber(node.measured?.width, 100);
+    const h = finiteNumber(node.measured?.height, 50);
     return { x: pos.x, y: pos.y, w, h };
 }
 
@@ -82,9 +113,13 @@ function rectsOverlap(
 // P2: Global Routing Optimization
 // ===================================
 
-export function globalOptimizeEdgeRouting<T extends { id: string; source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null; type?: string; data?: any }>(
+export function globalOptimizeEdgeRouting<T extends AdvancedRoutingEdge & {
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
+    type?: string;
+}>(
     edges: T[],
-    nodes: any[],
+    nodes: AdvancedRoutingNode[],
     cfg: {
         mode: 'advanced-smart' | 'native';
         globalPath?: string;
@@ -99,7 +134,7 @@ export function globalOptimizeEdgeRouting<T extends { id: string; source: string
     if (edges.length === 0) return edges;
 
     const topK = cfg.topK ?? 4;
-    const idMap = new Map<string, any>(nodes.map(n => [n.id, n]));
+    const idMap = new Map(nodes.map(n => [n.id, n]));
 
     type EdgeCandidate = Candidate;
 
@@ -293,9 +328,19 @@ export function globalOptimizeEdgeRouting<T extends { id: string; source: string
     }
 
     // Bus Constraint Post-Processing
-    const edgeCfg = (() => { try { return (diagramConfigManager.getConfig() as any)?.edge || {}; } catch { return {}; } })();
+    const edgeCfg = (() => {
+        try {
+            return asRecord(diagramConfigManager.getConfig().edge);
+        } catch {
+            return {};
+        }
+    })();
     if (edgeCfg.busEnabled !== false) {
-        const resolvePreferredHandle = (centerNode: any, relatedNodes: any[], preferSource: boolean): string => {
+        const resolvePreferredHandle = (
+            centerNode: AdvancedRoutingNode,
+            relatedNodes: AdvancedRoutingNode[],
+            preferSource: boolean,
+        ): string => {
             if (!centerNode || relatedNodes.length === 0) return preferSource ? 'r' : 'l';
             const center = getAnchor(centerNode, null);
             let sumDx = 0;
@@ -354,7 +399,9 @@ export function globalOptimizeEdgeRouting<T extends { id: string; source: string
                 if (subGroup.length < 2) continue;
                 const preferredSourceHandle = resolvePreferredHandle(
                     srcNode,
-                    subGroup.map(idx => idMap.get(edges[idx].target)).filter(Boolean),
+                    subGroup
+                        .map(idx => idMap.get(edges[idx].target))
+                        .filter((node): node is AdvancedRoutingNode => !!node),
                     true
                 );
                 const handleCounts = new Map<string, number>();
@@ -402,9 +449,9 @@ export function globalOptimizeEdgeRouting<T extends { id: string; source: string
             ...edge,
             sourceHandle: cand.sourceHandle,
             targetHandle: cand.targetHandle,
-            type: nextType as any,
+            type: nextType,
             data: { ...(edge.data || {}), globalOptimized: true }
-        };
+        } as T;
     });
 }
 
@@ -412,9 +459,9 @@ export function globalOptimizeEdgeRouting<T extends { id: string; source: string
 // P4: Advanced Edge Bundling
 // ===================================
 
-export function bundleEdges<T extends { id: string; source: string; target: string; data?: any }>(
+export function bundleEdges<T extends AdvancedRoutingEdge>(
     edges: T[],
-    nodes: any[],
+    nodes: AdvancedRoutingNode[],
     options: {
         enabled?: boolean;
         regionSize?: number;
@@ -426,7 +473,7 @@ export function bundleEdges<T extends { id: string; source: string; target: stri
     const { enabled = true, regionSize = 200, minBundleSize = 2, bundleSpacing = 8, layoutDirection = 'LR' } = options;
     if (!enabled || edges.length < 2) return edges;
 
-    const idMap = new Map<string, any>(nodes.map(n => [n.id, n]));
+    const idMap = new Map(nodes.map(n => [n.id, n]));
     const layoutDir = String(layoutDirection).toUpperCase();
     const isHorizontal = layoutDir.includes('LR') || layoutDir.includes('RL');
 
@@ -465,7 +512,7 @@ export function bundleEdges<T extends { id: string; source: string; target: stri
         group.centerY += (srcCenter.y + tgtCenter.y) / 2;
     });
 
-    const bundleInfo = new Map<number, any>();
+    const bundleInfo = new Map<number, BundleInfo>();
     let bundleIdCounter = 0;
 
     for (const group of bundleGroups.values()) {
@@ -515,15 +562,15 @@ export function bundleEdges<T extends { id: string; source: string; target: stri
 // P5: Layer-based Edge Routing
 // ===================================
 
-export function layerBasedEdgeRouting<T extends { id: string; source: string; target: string; data?: any }>(
+export function layerBasedEdgeRouting<T extends AdvancedRoutingEdge>(
     edges: T[],
-    nodes: any[],
+    nodes: AdvancedRoutingNode[],
     options: { enabled?: boolean; layerThreshold?: number; maxControlPoints?: number; layoutDirection?: string } = {}
 ): T[] {
     const { enabled = true, layerThreshold = 400, maxControlPoints = 3, layoutDirection = 'LR' } = options;
     if (!enabled || edges.length === 0) return edges;
 
-    const idMap = new Map<string, any>(nodes.map(n => [n.id, n]));
+    const idMap = new Map(nodes.map(n => [n.id, n]));
     const isHorizontal = String(layoutDirection).toUpperCase().includes('LR') || String(layoutDirection).toUpperCase().includes('RL');
     const getNodeCenter = (nodeId: string) => {
         const node = idMap.get(nodeId);
@@ -567,19 +614,23 @@ export function layerBasedEdgeRouting<T extends { id: string; source: string; ta
 // P6: Edge Label Optimization
 // ===================================
 
-export function optimizeEdgeLabelPositions<T extends { id: string; source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null; label?: any; data?: any }>(
+export function optimizeEdgeLabelPositions<T extends AdvancedRoutingEdge & {
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
+    label?: unknown;
+}>(
     edges: T[],
-    nodes: any[],
+    nodes: AdvancedRoutingNode[],
     options: { enabled?: boolean; labelPadding?: number; labelWidth?: number; labelHeight?: number } = {}
 ): T[] {
     const { enabled = true, labelPadding = 8, labelWidth = 60, labelHeight = 20 } = options;
     if (!enabled || edges.length === 0) return edges;
 
-    const idMap = new Map<string, any>(nodes.map(n => [n.id, n]));
+    const idMap = new Map(nodes.map(n => [n.id, n]));
     const placedLabels: { x: number; y: number; w: number; h: number }[] = [];
 
     return edges.map(edge => {
-        const hasLabel = edge.label || (edge.data as any)?.label;
+        const hasLabel = edge.label || edge.data?.label;
         if (!hasLabel) return edge;
 
         const srcNode = idMap.get(edge.source);
@@ -642,15 +693,18 @@ export function optimizeEdgeLabelPositions<T extends { id: string; source: strin
 // P7: Orthogonal Edge Beautification
 // ===================================
 
-export function beautifyOrthogonalEdges<T extends { id: string; source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null; data?: any }>(
+export function beautifyOrthogonalEdges<T extends AdvancedRoutingEdge & {
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
+}>(
     edges: T[],
-    nodes: any[],
+    nodes: AdvancedRoutingNode[],
     options: { enabled?: boolean; minSegmentLength?: number; straightenThreshold?: number } = {}
 ): T[] {
     const { enabled = true, minSegmentLength = 20, straightenThreshold = 5 } = options;
     if (!enabled || edges.length === 0) return edges;
 
-    const idMap = new Map<string, any>(nodes.map(n => [n.id, n]));
+    const idMap = new Map(nodes.map(n => [n.id, n]));
 
     return edges.map(edge => {
         const srcNode = idMap.get(edge.source);

@@ -6,6 +6,7 @@ import { ConfigProvider } from 'antd';
 import { CommandPalette } from '@/core/components/ui/CommandPalette';
 import type { CommandItem } from '@/core/types/plugin';
 import type { DiagramExportFormat } from '@/core/types/diagram-components';
+import type { DiagramComponentProps } from '@/core/types/diagram-components';
 import DiagramControlBridge from '@/core/components/shared/DiagramControlBridge';
 import { DiagramThemeProvider } from '@/core/themes/DiagramThemeProvider';
 import { appMessage } from '@/core/utils/antdStaticBridge';
@@ -66,15 +67,14 @@ interface DiagramViewerViewProps {
     setCollabModalVisible: (open: boolean) => void;
     activeUsers: CollaborationModalProps['activeUsers'];
     roomName: string;
-    SelectedDiagramComponent: React.ElementType | null;
+    SelectedDiagramComponent: React.ComponentType<DiagramComponentProps> | null;
     refreshNonce: number;
     onExportPermissionCheck: (format: DiagramExportFormat) => boolean;
     isYjsSynced: boolean;
-    pushLocalChangesToYjs: unknown;
-    provider: { awareness?: unknown } | null;
-    saveToCloud: unknown;
+    pushLocalChangesToYjs: NonNullable<DiagramComponentProps['onSyncPush']>;
+    provider: { awareness?: DiagramComponentProps['yAwareness'] } | null;
+    saveToCloud: DiagramComponentProps['onCloudSave'];
     handleDirectSave: () => Promise<void>;
-    handleSaveTo: (target: 's3' | 'supabase' | 'local') => Promise<void>;
     isSettingsOpen: boolean;
     setIsSettingsOpen: (open: boolean) => void;
     settingsPanel: React.ReactNode;
@@ -136,7 +136,6 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
     provider,
     saveToCloud,
     handleDirectSave,
-    handleSaveTo,
     isSettingsOpen,
     setIsSettingsOpen,
     settingsPanel,
@@ -243,10 +242,8 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                         </div>
                                     }
                                 >
-                                    {SelectedDiagramComponent && (() => {
-                                        const DynamicComponent: any = SelectedDiagramComponent;
-                                        return (
-                                            <DynamicComponent
+                                    {SelectedDiagramComponent && (
+                                            <SelectedDiagramComponent
                                                 key={`${selectedDiagramId}-${refreshNonce}`}
                                                 id={selectedDiagramId}
                                                 edgeMode={edgeMode}
@@ -266,7 +263,6 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                 onCloudSave={saveToCloud}
                                                 onDirectSave={handleDirectSave}
                                                 isDirectSaveDisabled={false}
-                                                onSaveAsTo={handleSaveTo}
                                                 onOpenSettings={() => setIsSettingsOpen(true)}
                                                 loadLayoutPresetMap={loadLayoutPresetMap}
                                                 renderVersionHistoryPanel={renderVersionHistoryPanel}
@@ -278,8 +274,8 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                             diagramId={selectedDiagramId}
                                                             onPreviewJson={handlePreviewAIJson}
                                                             onApplyJson={handleApplyAIJson}
-                                                            diagramNodesRef={aiNodesRef as any}
-                                                            diagramEdgesRef={aiEdgesRef as any}
+                                                            diagramNodesRef={aiNodesRef}
+                                                            diagramEdgesRef={aiEdgesRef}
                                                             canvasOps={aiCanvasOps}
                                                             onClose={() => {
                                                                 const aiBtn = document.querySelector<HTMLElement>('.toolbar-button-ai');
@@ -312,8 +308,7 @@ export const DiagramViewerView: React.FC<DiagramViewerViewProps> = ({
                                                     </Suspense>
                                                 ) : null}
                                             />
-                                        );
-                                    })()}
+                                    )}
                                 </Suspense>
 
                                 {isSettingsOpen && (

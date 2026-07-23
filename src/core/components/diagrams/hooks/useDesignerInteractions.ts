@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import { Node, Edge, Connection, reconnectEdge, SelectionMode, MarkerType } from '@xyflow/react';
+import { Node, Edge, Connection, reconnectEdge, SelectionMode, MarkerType, type EdgeChange, type NodeChange, type OnConnect, type ReactFlowInstance } from '@xyflow/react';
 import { useLayeredVirtualization } from './useLayeredVirtualization';
 import { useDesignerEdgeCallbacks } from './useDesignerEdgeCallbacks';
 import { useDiagramDragDrop } from './useDiagramDragDrop';
@@ -13,41 +13,45 @@ import { useQuickAdd } from './useQuickAdd';
 import { useDesignerGhostNodes } from './useDesignerGhostNodes';
 import { useConnectionMicrointeractions } from './useConnectionMicrointeractions';
 import { useConnectionValidation } from './useConnectionValidation';
+import type { DiagramTypePlugin, PluginContext } from '../../../types/plugin';
+import type { FlowStylePreset } from '../../shared/DiagramStyleManager';
+import type { LayerConfig } from './useLayerManagement';
+import type { CommentThread } from '../../../store/useDiagramStore';
 
 export interface UseDesignerInteractionsProps {
     nodes: Node[];
     edges: Edge[];
-    setNodes: any;
-    setEdges: any;
+    setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
+    setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
     selectedNodes: Node[];
-    setSelectedNodes: any;
-    takeSnapshot: any;
-    reactFlowInstance: any;
+    setSelectedNodes: React.Dispatch<React.SetStateAction<Node[]>>;
+    takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
+    reactFlowInstance: ReactFlowInstance | null;
     isDragging: boolean;
     setIsDragging: (val: boolean) => void;
-    activePlugin: any;
-    pluginCtx: any;
-    onNodesChange: any;
-    onEdgesChange: any;
-    virtualizedNodes: any;
-    edgesWithCollapseState: any;
-    onConnect: any;
-    preset: any;
+    activePlugin?: DiagramTypePlugin;
+    pluginCtx: PluginContext | null;
+    onNodesChange: (changes: NodeChange<Node>[]) => void;
+    onEdgesChange: (changes: EdgeChange<Edge>[]) => void;
+    virtualizedNodes: Node[];
+    edgesWithCollapseState: Edge[];
+    onConnect: OnConnect;
+    preset: FlowStylePreset;
     showOnlyMainFlow: boolean;
     highlightMainFlow: boolean;
     
     // Lifted Layer Management Props
-    layers: any[];
+    layers: LayerConfig[];
     activeLayerId: string | null;
-    setActiveLayerId: any;
-    createLayer: any;
-    deleteLayer: any;
-    toggleVisibility: any;
-    toggleLock: any;
-    renameLayer: any;
-    reorderLayers: any;
-    getLayer: any;
-    setLayerColor: any;
+    setActiveLayerId: (layerId: string) => void;
+    createLayer: (name: string) => void;
+    deleteLayer: (layerId: string) => void;
+    toggleVisibility: (layerId: string) => void;
+    toggleLock: (layerId: string) => void;
+    renameLayer: (layerId: string, name: string) => void;
+    reorderLayers: (fromIndex: number, toIndex: number) => void;
+    getLayer: (layerId: string) => LayerConfig | undefined;
+    setLayerColor: (layerId: string, color: string | undefined) => void;
 }
 
 const ANNOTATION_COLORS = ['#facc15', '#f87171', '#60a5fa', '#34d399', '#c084fc', '#fb923c'];
@@ -96,11 +100,11 @@ export function useDesignerInteractions({
 
     const { handleAlign, handleDistribute, canAlign, canDistribute } = useAlignment({
         selectedNodes,
-        onUpdateNodes: (updates: any) => {
+        onUpdateNodes: (updates) => {
             takeSnapshot(nodes, edges);
-            setNodes((nds: any) => {
-                return nds.map((n: any) => {
-                    const update = updates.find((u: any) => u.id === n.id);
+            setNodes((nds) => {
+                return nds.map((n) => {
+                    const update = updates.find((candidate) => candidate.id === n.id);
                     return update ? { ...n, position: update.position } : n;
                 });
             });
@@ -136,9 +140,8 @@ export function useDesignerInteractions({
     });
 
     const isMainEdge = useCallback((e: Edge) => {
-        const data = e.data as any;
-        const k1 = String(data?.edgeType ?? '').toLowerCase();
-        const k2 = String(data?.kind ?? '').toLowerCase();
+        const k1 = String(e.data?.edgeType ?? '').toLowerCase();
+        const k2 = String(e.data?.kind ?? '').toLowerCase();
         return k1 === 'main' || k1.includes('main') || k1 === 'core' || k1.includes('core') ||
                k2 === 'main' || k2.includes('main') || k2.includes('core') || k2.includes('core');
     }, []);
@@ -146,7 +149,7 @@ export function useDesignerInteractions({
     const finalEdgesWithGhost = useMemo(() => {
         if (!showOnlyMainFlow && !highlightMainFlow) return edgesWithGhost;
         const base = showOnlyMainFlow ? edgesWithGhost.filter(isMainEdge) : edgesWithGhost;
-        return base.map((e: any) => {
+        return base.map((e) => {
             if (highlightMainFlow && isMainEdge(e)) return { ...e, animated: true };
             return e;
         });
@@ -156,7 +159,13 @@ export function useDesignerInteractions({
         nodes, setEdges, onConnect, onConnectEnd: quickAddOnConnectEnd, reactFlowInstance
     });
 
-    const { isValidConnection } = useConnectionValidation(nodes, edges, pluginCtx, activePlugin, {});
+    const { isValidConnection } = useConnectionValidation(
+        nodes,
+        edges,
+        pluginCtx ?? undefined,
+        activePlugin,
+        {},
+    );
 
     const reconnectNodesRef = useRef(nodes);
     const reconnectEdgesRef = useRef(edges);
@@ -167,11 +176,11 @@ export function useDesignerInteractions({
 
     const handleReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
         takeSnapshot(reconnectNodesRef.current, reconnectEdgesRef.current);
-        setEdges((eds: any) => reconnectEdge(oldEdge, newConnection, eds));
+        setEdges((eds) => reconnectEdge(oldEdge, newConnection, eds));
     }, [setEdges, takeSnapshot]);
 
-    const handleReconnectStart = useCallback((_event: any, _edge: Edge, _handleType: 'source' | 'target') => {}, []);
-    const handleReconnectEnd = useCallback((_event: any, _edge: Edge) => {}, []);
+    const handleReconnectStart = useCallback((_event: MouseEvent | React.MouseEvent | TouchEvent | React.TouchEvent, _edge: Edge, _handleType: 'source' | 'target') => {}, []);
+    const handleReconnectEnd = useCallback((_event: MouseEvent | React.MouseEvent | TouchEvent | React.TouchEvent, _edge: Edge) => {}, []);
 
     const { onDragOver, onDrop, onNodeDragStart, onNodeDrag, onNodeDragStop: originalOnNodeDragStop } = useDiagramDragDrop({
         nodes, edges, setNodes, setEdges, takeSnapshot, reactFlowInstance, setIsDragging, onSmartNodeDrag, clearGuides,
@@ -224,11 +233,11 @@ export function useDesignerInteractions({
         });
     }, [addComment]);
 
-    const updateAnnotation = useCallback((id: string, updates: any) => updateComment(id, updates), [updateComment]);
+    const updateAnnotation = useCallback((id: string, updates: Partial<CommentThread>) => updateComment(id, updates), [updateComment]);
     const deleteAnnotation = useCallback((id: string) => removeComment(id), [removeComment]);
     const toggleResolved = useCallback((id: string) => {
         // 通过 getState() 避免将 comments 加入 deps，防止每条评论变化时重建回调
-        const c = useDiagramStore.getState().comments.find((x: any) => x.id === id);
+        const c = useDiagramStore.getState().comments.find((comment) => comment.id === id);
         if (c) updateComment(id, { isResolved: !c.isResolved });
     }, [updateComment]);
 

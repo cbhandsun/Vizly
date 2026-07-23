@@ -1,5 +1,5 @@
 import React from 'react';
-import { Node, Edge, BackgroundVariant, ReactFlowInstance, SelectionMode, NodeTypes, EdgeTypes, NodeChange, EdgeChange, Connection, OnConnectStart, OnConnectEnd, ConnectionMode, ConnectionLineType, type OnReconnect } from '@xyflow/react';
+import { Node, Edge, BackgroundVariant, ReactFlowInstance, SelectionMode, NodeTypes, EdgeTypes, NodeChange, EdgeChange, Connection, OnConnectStart, OnConnectEnd, ConnectionMode, ConnectionLineType, type IsValidConnection, type OnReconnect } from '@xyflow/react';
 import BaseReactFlow from '../shared/BaseReactFlow';
 import { useConnectionMicrointeractions } from './hooks/useConnectionMicrointeractions';
 
@@ -8,7 +8,7 @@ export interface FlowchartCanvasShellProps {
     displayEdges: Edge[];
     nodeTypes: NodeTypes;
     edgeTypes?: EdgeTypes; // [NEW] Allows custom edge types
-    onInit: (instance: ReactFlowInstance<any, any>) => void;
+    onInit: (instance: ReactFlowInstance) => void;
     onNodesChange: (changes: NodeChange[]) => void;
     onEdgesChange: (changes: EdgeChange[]) => void;
     onConnect: (connection: Connection) => void;
@@ -40,7 +40,7 @@ export interface FlowchartCanvasShellProps {
     connectPreview: ReturnType<typeof useConnectionMicrointeractions>['connectPreview'];
     connectionMode: ConnectionMode;
     isDragging: boolean;
-    isValidConnection?: (connection: any) => boolean;
+    isValidConnection?: IsValidConnection<Edge>;
     disableZoomCompensation?: boolean;
     selectionOnDrag?: boolean;
     panOnDrag?: boolean;

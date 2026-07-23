@@ -75,6 +75,8 @@ import { useDiagramViewerSaveActions } from './useDiagramViewerSaveActions';
 import { DiagramViewerView } from './DiagramViewerView';
 import { ensureDiagramViewerExportAllowed } from './diagramViewerExportPolicy';
 import type { DiagramExportFormat } from '@/core/types/diagram-components';
+import type { DiagramComponentProps } from '@/core/types/diagram-components';
+import { coerceClipboardData } from '@/core/utils/flowchartClipboard';
 
 const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
 
@@ -86,7 +88,7 @@ const loadFlowchartDesigner = async (pluginId?: string, presetId?: string) => {
     ]);
 
     return {
-        default: (props: any) => React.createElement(
+        default: (props: DiagramComponentProps) => React.createElement(
             FlowchartDesigner,
             pluginId ? { ...props, pluginId } : props
         )
@@ -163,17 +165,22 @@ const DiagramViewer: React.FC = () => {
     const [cloudManagerVisible, setCloudManagerVisible] = useState(false);
     const [mermaidModalVisible, setMermaidModalVisible] = useState(false);
 
+    const readBridgeSnapshot = useCallback(() => coerceClipboardData({
+        nodes: getFlowDataBridgeNodes(selectedDiagramId),
+        edges: getFlowDataBridgeEdges(selectedDiagramId),
+    }) ?? { nodes: [], edges: [] }, [selectedDiagramId]);
+
     const aiNodesRef = useMemo(() => ({
         get current() {
-            return getFlowDataBridgeNodes(selectedDiagramId);
+            return readBridgeSnapshot().nodes;
         }
-    }), [selectedDiagramId]);
+    }), [readBridgeSnapshot]);
 
     const aiEdgesRef = useMemo(() => ({
         get current() {
-            return getFlowDataBridgeEdges(selectedDiagramId);
+            return readBridgeSnapshot().edges;
         }
-    }), [selectedDiagramId]);
+    }), [readBridgeSnapshot]);
     // =======================================================
 
 
@@ -210,10 +217,7 @@ const DiagramViewer: React.FC = () => {
         isFullscreen,
         handleToggleFullscreen
     } = useUIState(panelRef);
-    const getReactFlowSnapshot = useCallback(() => ({
-        nodes: getFlowDataBridgeNodes(selectedDiagramId) as any[],
-        edges: getFlowDataBridgeEdges(selectedDiagramId) as any[],
-    }), [selectedDiagramId]);
+    const getReactFlowSnapshot = useCallback(() => readBridgeSnapshot(), [readBridgeSnapshot]);
     const {
         handleToggleFullscreen: handleFsControl,
         exportToPNG,
@@ -312,7 +316,7 @@ const DiagramViewer: React.FC = () => {
             return next;
         });
     }, [setSearchParams]);
-    const { handleSaveTo, handleDirectSave } = useDiagramViewerSaveActions({
+    const { handleDirectSave } = useDiagramViewerSaveActions({
         selectedDiagramId,
         t,
         onCloudReplicaSaved: handleCloudReplicaSaved,
@@ -605,7 +609,6 @@ const DiagramViewer: React.FC = () => {
             provider={provider ?? null}
             saveToCloud={saveToCloud}
             handleDirectSave={handleDirectSave}
-            handleSaveTo={handleSaveTo}
             isSettingsOpen={isSettingsOpen}
             setIsSettingsOpen={setIsSettingsOpen}
             settingsPanel={settingsPanel}
@@ -613,8 +616,8 @@ const DiagramViewer: React.FC = () => {
             setAiConfigVisible={setAiConfigVisible}
             handlePreviewAIJson={handlePreviewAIJson}
             handleApplyAIJson={handleApplyAIJson}
-            aiNodesRef={aiNodesRef as any}
-            aiEdgesRef={aiEdgesRef as any}
+            aiNodesRef={aiNodesRef}
+            aiEdgesRef={aiEdgesRef}
             aiCanvasOps={aiCanvasOps}
             handleAiTabIntercept={handleAiTabIntercept}
             shareDialogOpen={shareDialogOpen}

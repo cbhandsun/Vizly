@@ -56,6 +56,14 @@ export interface EdgeData {
     computedPath?: SmartPathPoint[];
     algorithm?: string;
     labelPosition?: { x: number; y: number };
+    labelOffset?: { x: number; y: number };
+    absoluteLabelX?: number;
+    absoluteLabelY?: number;
+    label?: unknown;
+    isTreeBus?: boolean;
+    treeRouting?: boolean;
+    layoutPathLocked?: boolean;
+    _layoutPathLocked?: boolean;
     _layoutEpoch?: number;
     [key: string]: unknown;
 }
@@ -209,7 +217,6 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
     }, [centeredCoords, edgeData, isBus, respectSourceHandle, respectTargetHandle]);
 
     // [REMOVED] Internal useStore for dragging. Passed via props now.
-    // const nodesDragging = useStore((state: any) => state.nodesDragging);
 
     useEffect(() => {
         pathRef.current = path;

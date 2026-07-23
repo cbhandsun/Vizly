@@ -219,7 +219,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     filterBaseReactFlowVisibleNodes(renderNodes)
   ), [renderNodes]);
   const visibleNodeIds = useMemo(() => visibleNodes.map(node => node.id), [visibleNodes]);
-  const internalNodeGeometrySignature = useStore(useCallback((state: any) => (
+  const internalNodeGeometrySignature = useStore(useCallback((state) => (
     computeBaseReactFlowInternalNodeGeometrySignature(visibleNodeIds, state.nodeLookup)
   ), [visibleNodeIds]));
   const internalFlowNodes = useMemo(() => {
@@ -228,7 +228,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     void internalNodeGeometrySignature;
     return collectBaseReactFlowInternalNodes(
       visibleNodeIds,
-      (rfStore.getState() as any).nodeLookup,
+      rfStore.getState().nodeLookup,
     );
   }, [visibleNodeIds, internalNodeGeometrySignature, rfStore]);
   const routingNodes = useMemo(() => (
@@ -247,7 +247,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     void internalNodeGeometrySignature;
     return isLargeGraph || areBaseReactFlowInternalNodesReadyForRouting(
       visibleNodeIds,
-      (rfStore.getState() as any).nodeLookup,
+      rfStore.getState().nodeLookup,
     );
   }, [internalNodeGeometrySignature, isLargeGraph, rfStore, visibleNodeIds]);
 
@@ -367,9 +367,9 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 
   const nodeInternalsRefreshKey = useMemo(() => {
     return visibleNodes.map((node) => {
-      const measured = (node as any).measured;
-      const width = measured?.width ?? node.width ?? (node.style as any)?.width ?? '';
-      const height = measured?.height ?? node.height ?? (node.style as any)?.height ?? '';
+      const measured = node.measured;
+      const width = measured?.width ?? node.width ?? node.style?.width ?? '';
+      const height = measured?.height ?? node.height ?? node.style?.height ?? '';
       return `${node.id}:${node.position?.x ?? 0}:${node.position?.y ?? 0}:${width}:${height}`;
     }).join('|');
   }, [visibleNodes]);
@@ -424,20 +424,20 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     const { onStart, onStop } = createBaseReactFlowExportStateHandlers({
       setHidden: setHideBackgroundDuringExport,
     });
-    window.addEventListener('diagramExportStart', onStart as any);
-    window.addEventListener('diagramExportComplete', onStop as any);
-    window.addEventListener('diagramExportError', onStop as any);
+    window.addEventListener('diagramExportStart', onStart);
+    window.addEventListener('diagramExportComplete', onStop);
+    window.addEventListener('diagramExportError', onStop);
     return () => {
-      window.removeEventListener('diagramExportStart', onStart as any);
-      window.removeEventListener('diagramExportComplete', onStop as any);
-      window.removeEventListener('diagramExportError', onStop as any);
+      window.removeEventListener('diagramExportStart', onStart);
+      window.removeEventListener('diagramExportComplete', onStop);
+      window.removeEventListener('diagramExportError', onStop);
     };
   }, []);
 
   // 调试辅助线由独立渲染器读取开关和节点快照。
 
   // 处理初始化
-  const handleInit = useCallback((instance: ReactFlowInstance<any, any>) => {
+  const handleInit = useCallback((instance: ReactFlowInstance) => {
     restoreBaseReactFlowViewportOnInit({
       instance,
       fitMode,

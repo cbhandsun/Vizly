@@ -75,8 +75,8 @@ export const resolveWorkerEndpoints = ({
   const busOrientation = busDetector.resolveBusOrientation(
     !!job.isManyToOne,
     job.isManyToOne ? job.target : job.source,
-    graph.edges,
-    graph.nodes,
+    [...edgeMap.values()],
+    nodes,
     job.layoutDirection || 'LR',
     nodeMap,
   );

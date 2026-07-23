@@ -1,4 +1,4 @@
-import type { Edge, Node } from '@xyflow/react';
+import type { Edge, Node, XYPosition } from '@xyflow/react';
 
 import {
   compactOrthogonalPath,
@@ -38,18 +38,31 @@ const displayNodeNumber = (value: unknown, fallback = 0): number => (
   typeof value === 'number' && Number.isFinite(value) ? value : fallback
 );
 
+type DisplayNode = Node & {
+  positionAbsolute?: XYPosition;
+  measured?: { width?: number; height?: number };
+};
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
+
 export const isDisplayContainerNode = (node: Node): boolean => (
   DISPLAY_CONTAINER_NODE_TYPES.has(String(node.type ?? ''))
 );
 
 export const getDisplayNodeRect = (node: Node): DisplayRect | null => {
-  const position = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-  const width = displayNodeNumber((node as any).measured?.width ?? node.width ?? (node.style as any)?.width);
-  const height = displayNodeNumber((node as any).measured?.height ?? node.height ?? (node.style as any)?.height);
+  const displayNode = node as DisplayNode;
+  const position = displayNode.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
+  const style = asRecord(node.style);
+  const width = displayNodeNumber(displayNode.measured?.width ?? node.width ?? style.width);
+  const height = displayNodeNumber(displayNode.measured?.height ?? node.height ?? style.height);
   if (width <= 1 || height <= 1) return null;
   return {
-    x: displayNodeNumber((position as any).x),
-    y: displayNodeNumber((position as any).y),
+    x: displayNodeNumber(position.x),
+    y: displayNodeNumber(position.y),
     width,
     height,
   };
@@ -83,7 +96,7 @@ export const buildDisplayRoutingObstacles = (nodes: Node[]): Map<string, Display
 export const compactDisplayEdgePaths = <T extends Edge[]>(edges: T): T => {
   let changed = false;
   const compactedEdges = edges.map((edge) => {
-    const data = (edge.data || {}) as Record<string, any>;
+    const data = asRecord(edge.data);
     const path = data.computedPath;
     if (!Array.isArray(path) || path.length < 3 || !path.every(isFinitePoint)) return edge;
     const compacted = compactOrthogonalPath(path);
@@ -98,8 +111,8 @@ export const compactDisplayEdgePaths = <T extends Edge[]>(edges: T): T => {
       data: {
         ...data,
         computedPath: compacted,
-        treeRouting: data.treeRouting && Array.isArray(data.treeRouting.points)
-          ? { ...data.treeRouting, points: compacted }
+        treeRouting: Array.isArray(asRecord(data.treeRouting).points)
+          ? { ...asRecord(data.treeRouting), points: compacted }
           : data.treeRouting,
       },
     };
@@ -108,20 +121,21 @@ export const compactDisplayEdgePaths = <T extends Edge[]>(edges: T): T => {
 };
 
 export const getDisplayComputedPath = (edge: Edge): DisplayPoint[] => {
-  const path = (edge.data as any)?.computedPath;
+  const path = asRecord(edge.data).computedPath;
   return Array.isArray(path) && path.every(isFinitePoint) ? path : [];
 };
 
 export const withDisplayComputedPath = (edge: Edge, path: DisplayPoint[]): Edge => {
   const compactedPath = compactOrthogonalPath(path);
-  const treeRouting = (edge.data as any)?.treeRouting;
+  const treeRouting = asRecord(edge.data).treeRouting;
+  const treeRoutingRecord = asRecord(treeRouting);
   return {
     ...edge,
     data: {
       ...(edge.data || {}),
       computedPath: compactedPath,
-      treeRouting: treeRouting && Array.isArray(treeRouting.points)
-        ? { ...treeRouting, points: compactedPath }
+      treeRouting: Array.isArray(treeRoutingRecord.points)
+        ? { ...treeRoutingRecord, points: compactedPath }
         : treeRouting,
     },
   };

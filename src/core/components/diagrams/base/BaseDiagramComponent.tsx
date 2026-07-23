@@ -18,6 +18,11 @@ import { LayoutStabilityContext } from '../../../context/LayoutStabilityContext'
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { prepareBaseDiagramDisplayEdges } from './baseDiagramEdgePreparation';
 
+type NodeWithAbsolutePosition = Node & {
+  computed?: { positionAbsolute?: { x: number; y: number } };
+  positionAbsolute?: { x: number; y: number };
+};
+
 // Domain Hooks
 import { useDiagramStability, calcNodeSignature, calcEdgeSignature } from './hooks/useDiagramStability';
 import { useDiagramDragOrchestration } from './hooks/useDiagramDragOrchestration';
@@ -171,14 +176,13 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
     })();
     if (fromLayered === 'advanced-smart' || fromLayered === 'native') return fromLayered as 'advanced-smart' | 'native';
     const fromCfg = (() => {
-      try { return String((diagramConfigManager.getConfig() as any)?.edge?.mode ?? '').toLowerCase(); } catch { return ''; }
+      try { return String(diagramConfigManager.getConfig()?.edge?.mode ?? '').toLowerCase(); } catch { return ''; }
     })();
     if (fromCfg === 'advanced-smart' || fromCfg === 'native') return fromCfg as 'advanced-smart' | 'native';
     for (const e of rfEdges) {
       const t = String(e.type || '').toLowerCase();
       const p = (() => {
-        const d = (e as any)?.data;
-        const raw = (d && typeof d === 'object' ? (d as any).pathType : undefined) ?? (e as any)?.pathType ?? '';
+        const raw = e.data?.pathType;
         return String(raw || '').toLowerCase();
       })();
       if (t.startsWith('advanced-smart') || t.startsWith('smart-') || t === 'smart') return 'advanced-smart';
@@ -225,8 +229,8 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
     centeredGroupsRef.current.clear();
     Promise.resolve().then(() => {
       setRfNodes(prev => {
-        const prevSig = calcNodeSignature(prev as any[]);
-        const nextSig = calcNodeSignature(newNodes as any[]);
+        const prevSig = calcNodeSignature(prev);
+        const nextSig = calcNodeSignature(newNodes);
         if (prevSig === nextSig) return prev;
 
         const prevMap = new Map(prev.map(n => [n.id, n]));
@@ -234,8 +238,10 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
         for (const n of newNodes) {
           const old = prevMap.get(n.id);
           if (!old) { changedIds.push(n.id); continue; }
-          const nAbs = (n as any)?.computed?.positionAbsolute ?? (n as any)?.positionAbsolute ?? n.position;
-          const oAbs = (old as any)?.computed?.positionAbsolute ?? (old as any)?.positionAbsolute ?? old.position;
+          const positionedNode = n as NodeWithAbsolutePosition;
+          const positionedOldNode = old as NodeWithAbsolutePosition;
+          const nAbs = positionedNode.computed?.positionAbsolute ?? positionedNode.positionAbsolute ?? n.position;
+          const oAbs = positionedOldNode.computed?.positionAbsolute ?? positionedOldNode.positionAbsolute ?? old.position;
           if (Math.round(nAbs?.x ?? 0) !== Math.round(oAbs?.x ?? 0) || Math.round(nAbs?.y ?? 0) !== Math.round(oAbs?.y ?? 0)) {
             changedIds.push(n.id);
           }
@@ -258,8 +264,8 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
   useEffect(() => {
     Promise.resolve().then(() => {
       setRfEdges(prev => {
-        const prevSig = calcEdgeSignature(prev as any[]);
-        const nextSig = calcEdgeSignature(edges as any[]);
+        const prevSig = calcEdgeSignature(prev);
+        const nextSig = calcEdgeSignature(edges);
         if (prevSig !== nextSig) {
           EdgeRoutingCoordinator.getInstance().initializeEdges(edges);
           return edges;
@@ -269,20 +275,21 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
     });
   }, [edges]);
 
-  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+  const handleNodesChange = useCallback((changes: NodeChange<Node>[]) => {
     setRfNodes((nds) => {
       const updated = applyNodeChanges(changes, nds);
       for (const c of changes) {
         if (c.type !== 'dimensions') continue;
-        const id = (c as any).id as string | undefined;
+        const id = c.id;
         if (!id || !id.startsWith('titlegroup-')) continue;
         if (centeredGroupsRef.current.has(id)) continue;
-        const dim = (c as any).dimensions as { width?: number; height?: number } | undefined;
+        const dim = c.dimensions;
         if (!dim?.width) continue;
         const idx = updated.findIndex(n => n.id === id);
         if (idx === -1) continue;
-        const node = updated[idx] as any;
-        const styleW = typeof node.style?.width === 'number' ? node.style.width : 0;
+        const node = updated[idx];
+        const nodeStyle = node.style as React.CSSProperties | undefined;
+        const styleW = typeof nodeStyle?.width === 'number' ? nodeStyle.width : 0;
         if (styleW <= 0 || dim.width <= styleW + 1) continue;
         const expansion = dim.width - styleW;
         const shiftLeft = Math.round(expansion / 2);
@@ -299,10 +306,10 @@ export const BaseDiagramComponent: React.FC<BaseDiagramProps> = memo(({
     });
 
     const changedNodeIds = changes.reduce<string[]>((acc, change) => {
-      const id = (change as any).id as string | undefined;
+      const id = 'id' in change ? change.id : undefined;
       if (!id) return acc;
       if (change.type === 'position') {
-        if ((change as any).position) acc.push(id);
+        if (change.position) acc.push(id);
         return acc;
       }
       if (change.type === 'dimensions') {

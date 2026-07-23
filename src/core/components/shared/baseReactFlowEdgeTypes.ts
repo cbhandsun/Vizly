@@ -1,15 +1,14 @@
-import type { ComponentType } from 'react';
 import type { EdgeTypes } from '@xyflow/react';
 
 type BaseReactFlowEdgeTypeComponents = {
-  advancedSmartStepEdge: ComponentType<any>;
-  advancedSmartBezierEdge: ComponentType<any>;
-  advancedSmartStraightEdge: ComponentType<any>;
-  smartOrthogonalEdge: ComponentType<any>;
-  elkEdge: ComponentType<any>;
-  stablePathEdge: ComponentType<any>;
-  canvasRefEdge: ComponentType<any>;
-  editableEdge: ComponentType<any>;
+  advancedSmartStepEdge: React.ElementType;
+  advancedSmartBezierEdge: React.ElementType;
+  advancedSmartStraightEdge: React.ElementType;
+  smartOrthogonalEdge: React.ElementType;
+  elkEdge: React.ElementType;
+  stablePathEdge: React.ElementType;
+  canvasRefEdge: React.ElementType;
+  editableEdge: React.ElementType;
 };
 
 export const createBaseReactFlowMergedEdgeTypes = ({
@@ -19,7 +18,7 @@ export const createBaseReactFlowMergedEdgeTypes = ({
   edgeTypes?: EdgeTypes;
   components: BaseReactFlowEdgeTypeComponents;
 }): EdgeTypes => {
-  const smartEdges: Partial<EdgeTypes> = {
+  const smartEdges = {
     'advanced-smart': components.advancedSmartStepEdge,
     'advanced-smart-step': components.advancedSmartStepEdge,
     'advanced-smart-bezier': components.advancedSmartBezierEdge,
@@ -38,5 +37,5 @@ export const createBaseReactFlowMergedEdgeTypes = ({
     'canvas-ref': components.canvasRefEdge,
     editable: components.editableEdge,
     ...(edgeTypes || {}),
-  } as EdgeTypes;
+  } as unknown as EdgeTypes;
 };

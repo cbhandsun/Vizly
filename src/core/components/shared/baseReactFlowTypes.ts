@@ -45,7 +45,7 @@ export interface BaseReactFlowProps {
   miniMapStyle?: React.CSSProperties;
   miniMapZoomable?: boolean;
   miniMapPannable?: boolean;
-  onInit?: (instance: ReactFlowInstance<any, any>) => void;
+  onInit?: (instance: ReactFlowInstance) => void;
   panOnDrag?: boolean;
   zoomOnScroll?: boolean;
   zoomOnPinch?: boolean;

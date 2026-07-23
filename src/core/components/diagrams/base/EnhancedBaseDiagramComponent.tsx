@@ -120,14 +120,14 @@ function useEnhancedConfig(
     // 加载配置
     const loadConfig = async () => {
       try {
-        const nodeWidth = layeredConfig.get('diagram.node.width');
-        const nodeHeight = layeredConfig.get('diagram.node.height');
-        const spacingH = layeredConfig.get('diagram.spacing.horizontal');
-        const spacingV = layeredConfig.get('diagram.spacing.vertical');
-        const groupPadding = layeredConfig.get('diagram.group.padding');
-        const performanceOpt = layeredConfig.get('diagram.performance.enabled');
-        const themeCaching = layeredConfig.get('theme.caching.enabled');
-        const validation = layeredConfig.get('diagram.validation.enabled');
+        const nodeWidth = layeredConfig.get<number>('diagram.node.width');
+        const nodeHeight = layeredConfig.get<number>('diagram.node.height');
+        const spacingH = layeredConfig.get<number>('diagram.spacing.horizontal');
+        const spacingV = layeredConfig.get<number>('diagram.spacing.vertical');
+        const groupPadding = layeredConfig.get<number>('diagram.group.padding');
+        const performanceOpt = layeredConfig.get<boolean>('diagram.performance.enabled');
+        const themeCaching = layeredConfig.get<boolean>('theme.caching.enabled');
+        const validation = layeredConfig.get<boolean>('diagram.validation.enabled');
 
         setConfig({
           NODE_WIDTH: nodeWidth || DEFAULT_ENHANCED_CONFIG.NODE_WIDTH,

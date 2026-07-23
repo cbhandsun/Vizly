@@ -1,5 +1,20 @@
 import type { RoutingNodeRect } from '../../../algorithms/containerHeaderSkimRepair';
-import type { ObstacleNode } from '../obstacleContext';
+interface RoutingNodeLike {
+    id: string;
+    type?: string;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    parentId?: string;
+    parentNode?: string;
+    position?: PathPoint;
+    positionAbsolute?: PathPoint;
+    computed?: { positionAbsolute?: PathPoint };
+    internals?: { positionAbsolute?: PathPoint };
+    measured?: { width?: number; height?: number };
+    style?: { width?: unknown; height?: unknown };
+}
 
 export type PathPoint = { x: number; y: number };
 
@@ -31,7 +46,7 @@ export const snapSimpleOrthogonalPath = (path: string): string => {
     return commands.map(point => `${point.cmd} ${point.x} ${point.y}`).join(' ');
 };
 
-const getNodeAbsPosition = (nodeLike: ObstacleNode, nodeMap: ReadonlyMap<string, ObstacleNode>, visited?: Set<string>): PathPoint => {
+const getNodeAbsPosition = (nodeLike: RoutingNodeLike, nodeMap: ReadonlyMap<string, RoutingNodeLike>, visited?: Set<string>): PathPoint => {
     const abs = nodeLike.internals?.positionAbsolute || nodeLike.computed?.positionAbsolute || nodeLike.positionAbsolute;
     if (abs) return { x: abs.x ?? 0, y: abs.y ?? 0 };
     const base = nodeLike.position || { x: nodeLike.x ?? 0, y: nodeLike.y ?? 0 };
@@ -47,7 +62,7 @@ const getNodeAbsPosition = (nodeLike: ObstacleNode, nodeMap: ReadonlyMap<string,
     return { x: parentAbs.x + (base.x ?? 0), y: parentAbs.y + (base.y ?? 0) };
 };
 
-export const collectRoutingNodeRects = (nodeMap: ReadonlyMap<string, ObstacleNode>): RoutingNodeRect[] => {
+export const collectRoutingNodeRects = (nodeMap: ReadonlyMap<string, RoutingNodeLike>): RoutingNodeRect[] => {
     const rects: RoutingNodeRect[] = [];
     nodeMap.forEach((node) => {
         const pos = getNodeAbsPosition(node, nodeMap);

@@ -1,5 +1,9 @@
-import type { StandardDiagramData } from '../models/DiagramModels';
 import { exportFullDiagramToPngDataUrl } from '../components/shared/exportUtils';
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 
 const loadImage = (src: string): Promise<HTMLImageElement> => {
   return new Promise((resolve, reject) => {
@@ -36,11 +40,11 @@ const resizeToJpegDataUrl = async (
   return { dataUrl, width: outW, height: outH };
 };
 
-export const tryAttachDiagramSnapshot = async (
-  diagram: StandardDiagramData,
+export const tryAttachDiagramSnapshot = async <TDiagram extends { metadata?: unknown }>(
+  diagram: TDiagram,
   renderDiagramId: string,
   opts?: { maxWidth?: number; maxHeight?: number; quality?: number; paddingPx?: number; pixelRatio?: number }
-): Promise<{ diagram: StandardDiagramData; warning?: string }> => {
+): Promise<{ diagram: TDiagram; warning?: string }> => {
   const maxWidth = opts?.maxWidth ?? 3840;
   const maxHeight = opts?.maxHeight ?? 2160;
   const quality = opts?.quality ?? 0.8;
@@ -50,10 +54,10 @@ export const tryAttachDiagramSnapshot = async (
   try {
     const png = await exportFullDiagramToPngDataUrl(renderDiagramId, paddingPx, pixelRatio);
     const resized = await resizeToJpegDataUrl(png, { maxWidth, maxHeight, quality });
-    const next: StandardDiagramData = {
+    const next = {
       ...diagram,
       metadata: {
-        ...(diagram.metadata || {}),
+        ...asRecord(diagram.metadata),
         preview: {
           mime: 'image/jpeg',
           dataUrl: resized.dataUrl,
@@ -62,7 +66,7 @@ export const tryAttachDiagramSnapshot = async (
           generatedAt: new Date().toISOString()
         }
       }
-    };
+    } as TDiagram;
     return { diagram: next };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

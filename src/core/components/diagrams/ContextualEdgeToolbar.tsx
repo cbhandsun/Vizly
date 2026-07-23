@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Edge } from '@xyflow/react';
+import type { EdgeDataUpdate } from '../../types/diagram-updates';
 import {
     LineOutlined,
     DashOutlined,
@@ -20,7 +21,7 @@ import {
 
 interface ContextualEdgeToolbarProps {
     edge: Edge;
-    onUpdateEdge: (edgeId: string, updates: Partial<Edge>) => void;
+    onUpdateEdge: (edgeId: string, updates: EdgeDataUpdate) => void;
 }
 
 // 箭头样式循环列表
@@ -126,8 +127,8 @@ export const ContextualEdgeToolbar: React.FC<ContextualEdgeToolbarProps> = ({ ed
         
         const next = ARROW_STYLES[(currentIdx + 1) % ARROW_STYLES.length];
         onUpdateEdge(edge.id, {
-            markerEnd: next.markerEnd as any,
-            markerStart: next.markerStart as any,
+            markerEnd: next.markerEnd,
+            markerStart: next.markerStart,
         });
     };
 

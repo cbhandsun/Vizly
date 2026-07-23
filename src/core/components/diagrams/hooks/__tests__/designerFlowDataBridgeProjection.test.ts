@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { projectDesignerStandardEdges, projectDesignerStandardNodes } from '../designerFlowDataBridgeProjection';
+import {
+  analyzeDesignerCanvas,
+  projectDesignerStandardEdges,
+  projectDesignerStandardNodes,
+} from '../designerFlowDataBridgeProjection';
 
 describe('designer flow data bridge projection', () => {
+  it('projects React Flow data into the bounded analyzer contract', () => {
+    const result = analyzeDesignerCanvas(
+      [{ id: 'node-a', position: { x: 0, y: 0 }, data: { label: 'A', unsafe: { nested: true } } }],
+      [],
+    );
+
+    expect(result.stats.nodeCount).toBe(1);
+    expect(result.issues.some(issue => issue.type === 'orphan_node')).toBe(true);
+  });
+
   it('separates groups from standard nodes with bounded defaults', () => {
     const projected = projectDesignerStandardNodes([
       { id: 'node', position: { x: 1, y: 2 }, data: { label: 'Node' } },
