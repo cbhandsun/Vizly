@@ -25,7 +25,7 @@
     "verify:static:fast": "npm run check:artifacts && npm run check:precompiled-routes && npm run check:secrets && npm run check:dom-sinks && npm run check:source-size && npm run check:explicit-any && npm run check:architecture && npm run check:test-ci-coverage && npm run typecheck && npm run lint",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:changed": "vitest run --changed HEAD --pool=threads --maxWorkers=1 --no-isolate --passWithNoTests",
+    "test:changed": "vitest run --changed HEAD --pool=threads --maxWorkers=2 --passWithNoTests",
     "test:ci": "npm run check:test-ci-coverage && node scripts/run-test-ci.mjs",
     "test:ci:fast": "npm run check:test-ci-coverage && node scripts/run-test-ci.mjs fast",
     "test:ci:slow": "npm run check:test-ci-coverage && node scripts/run-test-ci.mjs slow",
