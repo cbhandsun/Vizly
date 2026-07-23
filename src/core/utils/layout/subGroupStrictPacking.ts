@@ -10,50 +10,95 @@ import {
   syncDagreChildPositions,
 } from './subGroupLayoutConfiguredFacade';
 
+type LayoutNode = ReactFlowNode<Record<string, unknown>>;
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+
+const finiteNumber = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const nodeWidth = (node: LayoutNode, fallback: number): number =>
+  finiteNumber(node.measured?.width ?? node.style?.width ?? node.width, fallback);
+
+const nodeHeight = (node: LayoutNode, fallback: number): number =>
+  finiteNumber(node.measured?.height ?? node.style?.height ?? node.height, fallback);
+
+const nodeX = (node: LayoutNode): number => finiteNumber(node.position.x, 0);
+const nodeY = (node: LayoutNode): number => finiteNumber(node.position.y, 0);
+const nodeDomain = (node: LayoutNode): string => String(node.data.domain ?? '');
+const isHiddenNode = (node: LayoutNode): boolean => node.data.hidden === true;
+const isGhostNode = (node: LayoutNode): boolean => node.data.ghost === true;
+
+const nodeChildren = (node: LayoutNode): string[] =>
+  Array.isArray(node.data.children)
+    ? node.data.children.filter((child): child is string => typeof child === 'string')
+    : [];
+
+const setNodePosition = (node: LayoutNode | undefined, x: number, y: number): void => {
+  if (node) node.position = { x, y };
+};
+
 export const packSubGroupChildrenGridStrict = (
-  nodes: ReactFlowNode[]
-): ReactFlowNode[] => {
-  const cfgFull = diagramConfigManager.getConfig() as any;
-  const layoutCfg = diagramConfigManager.getLayoutConfig() as any;
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-  const H_GAP = num(layoutCfg?.NODE_H_GAP, 120);
-  const V_GAP = num(layoutCfg?.NODE_V_GAP, 80);
-  const SUB_H = num((cfgFull?.subDomain?.padding?.horizontal ?? layoutCfg?.SUB_GROUP_PADDING?.H), 30);
-  const titleH = num((cfgFull?.subDomain?.title?.height ?? layoutCfg?.SUB_GROUP_TITLE_HEIGHT), 28);
-  const titleV = num((cfgFull?.subDomain?.title?.padding?.vertical ?? layoutCfg?.SUB_GROUP_TITLE_SAFE_GAP), 8);
-  const DEFAULT_TOP_PAD = Math.max(titleH + titleV, num((cfgFull?.subDomain?.padding?.top ?? layoutCfg?.SUB_GROUP_TITLE_CLEARANCE), titleH + titleV));
+  nodes: LayoutNode[]
+): LayoutNode[] => {
+  const cfgFull = asRecord(diagramConfigManager.getConfig());
+  const subDomain = asRecord(cfgFull.subDomain);
+  const subDomainPadding = asRecord(subDomain.padding);
+  const subDomainTitle = asRecord(subDomain.title);
+  const subDomainTitlePadding = asRecord(subDomainTitle.padding);
+  const nodeConfig = asRecord(cfgFull.node);
+  const layoutCfg = asRecord(diagramConfigManager.getLayoutConfig());
+  const subGroupPadding = asRecord(layoutCfg.SUB_GROUP_PADDING);
+  const H_GAP = finiteNumber(layoutCfg.NODE_H_GAP, 120);
+  const V_GAP = finiteNumber(layoutCfg.NODE_V_GAP, 80);
+  const SUB_H = finiteNumber(subDomainPadding.horizontal ?? subGroupPadding.H, 30);
+  const titleH = finiteNumber(subDomainTitle.height ?? layoutCfg.SUB_GROUP_TITLE_HEIGHT, 28);
+  const titleV = finiteNumber(
+    subDomainTitlePadding.vertical ?? layoutCfg.SUB_GROUP_TITLE_SAFE_GAP,
+    8
+  );
+  const DEFAULT_TOP_PAD = Math.max(
+    titleH + titleV,
+    finiteNumber(
+      subDomainPadding.top ?? layoutCfg.SUB_GROUP_TITLE_CLEARANCE,
+      titleH + titleV
+    )
+  );
   const updated = nodes.map(n => ({ ...n }));
-  const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
-  const getW = (n: ReactFlowNode) => num(((n as any)?.measured?.width ?? (n as any)?.style?.width ?? (n as any)?.width), num(layoutCfg?.NODE_MIN_WIDTH, 120));
-  const getH = (n: ReactFlowNode) => num(((n as any)?.measured?.height ?? (n as any)?.style?.height ?? (n as any)?.height), num(cfgFull?.node?.height, 80));
-  const sgs = updated.filter(n => String(n.type || '') === 'subGroup');
+  const idMap = new Map<string, LayoutNode>(updated.map(n => [n.id, n] as const));
+  const getW = (node: LayoutNode) =>
+    nodeWidth(node, finiteNumber(layoutCfg.NODE_MIN_WIDTH, 120));
+  const getH = (node: LayoutNode) =>
+    nodeHeight(node, finiteNumber(nodeConfig.height, 80));
+  const sgs = updated.filter(n => String(n.type ?? '') === 'subGroup');
   for (const sg of sgs) {
-    const pos = (sg as any).position || { x: 0, y: 0 };
-    const w = num(((sg as any)?.measured?.width ?? (sg as any)?.style?.width ?? (sg as any)?.width), 0);
-    const innerLeft = num(pos.x, 0) + SUB_H;
-    const innerRight = num(pos.x, 0) + Math.max(1, w) - SUB_H;
+    const w = nodeWidth(sg, 0);
+    const innerLeft = nodeX(sg) + SUB_H;
+    const innerRight = nodeX(sg) + Math.max(1, w) - SUB_H;
     const innerWidth = Math.max(1, innerRight - innerLeft);
-    const isGhost = Boolean(((sg as any)?.data || {})?.ghost);
-    const ghostTopPad = Math.max(8, num(layoutCfg?.SUB_GROUP_GHOST_TOP_PAD, 12));
-    const innerTop = num(pos.y, 0) + (isGhost ? ghostTopPad : DEFAULT_TOP_PAD);
-    const chIds = Array.isArray(((sg as any)?.data || {})?.children) ? ((((sg as any).data).children as string[])) : [];
-    const list = chIds.map(id => idMap.get(id)).filter((n): n is ReactFlowNode => !!n);
+    const ghostTopPad = Math.max(8, finiteNumber(layoutCfg.SUB_GROUP_GHOST_TOP_PAD, 12));
+    const innerTop = nodeY(sg) + (isGhostNode(sg) ? ghostTopPad : DEFAULT_TOP_PAD);
+    const chIds = nodeChildren(sg);
+    const list = chIds.map(id => idMap.get(id)).filter((n): n is LayoutNode => n !== undefined);
     if (list.length <= 1) continue;
     const items = list.slice().sort((a, b) => {
-      const saRaw = (a.data as any)?.sequence ?? (a.data as any)?.order;
-      const sbRaw = (b.data as any)?.sequence ?? (b.data as any)?.order;
-      const sa = typeof saRaw === 'number' ? saRaw : parseFloat(saRaw);
-      const sb = typeof sbRaw === 'number' ? sbRaw : parseFloat(sbRaw);
-      const hasA = isFinite(sa);
-      const hasB = isFinite(sb);
+      const saRaw = a.data.sequence ?? a.data.order;
+      const sbRaw = b.data.sequence ?? b.data.order;
+      const sa = typeof saRaw === 'number' ? saRaw : Number.parseFloat(String(saRaw ?? ''));
+      const sb = typeof sbRaw === 'number' ? sbRaw : Number.parseFloat(String(sbRaw ?? ''));
+      const hasA = Number.isFinite(sa);
+      const hasB = Number.isFinite(sb);
       if (hasA && hasB) return sa - sb;
       if (hasA) return -1;
       if (hasB) return 1;
       // Fallback to original order (chIds order) instead of width
       return 0;
     });
-    const rows: ReactFlowNode[][] = [];
-    let currentRow: ReactFlowNode[] = [];
+    const rows: LayoutNode[][] = [];
+    let currentRow: LayoutNode[] = [];
     let currentWidth = 0;
     for (const n of items) {
       const w0 = getW(n);
@@ -78,8 +123,7 @@ export const packSubGroupChildrenGridStrict = (
         const n = row[i];
         const w0 = widths[i];
         const ix = Math.min(Math.max(cx, innerLeft), Math.max(innerLeft, innerRight - w0));
-        const idx = updated.findIndex(m => m.id === n.id);
-        if (idx >= 0) (updated[idx] as any).position = { x: Math.round(ix), y: Math.round(cy) } as any;
+        setNodePosition(updated.find(node => node.id === n.id), Math.round(ix), Math.round(cy));
         cx = ix + w0 + Math.max(12, H_GAP);
         rowMaxH = Math.max(rowMaxH, getH(n));
       }
@@ -90,35 +134,56 @@ export const packSubGroupChildrenGridStrict = (
 };
 
 export const enforceSubGroupNoOverlapStrict = (
-  nodes: ReactFlowNode[],
+  nodes: LayoutNode[],
   hGap?: number,
   vGap?: number,
   iterations: number = 3
-): ReactFlowNode[] => {
-  const cfgFull = diagramConfigManager.getConfig() as any;
-  const layoutCfg = diagramConfigManager.getLayoutConfig() as any;
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-  const H_G = (typeof hGap === 'number' && isFinite(hGap)) ? (hGap as number) : num(layoutCfg?.NODE_H_GAP, 120);
-  const V_G = (typeof vGap === 'number' && isFinite(vGap)) ? (vGap as number) : num(layoutCfg?.NODE_V_GAP, 80);
-  const SUB_H = num((cfgFull?.subDomain?.padding?.horizontal ?? layoutCfg?.SUB_GROUP_PADDING?.H), 30);
-  const titleH = num((cfgFull?.subDomain?.title?.height ?? layoutCfg?.SUB_GROUP_TITLE_HEIGHT), 28);
-  const titleV = num((cfgFull?.subDomain?.title?.padding?.vertical ?? layoutCfg?.SUB_GROUP_TITLE_SAFE_GAP), 8);
-  const DEFAULT_TOP_PAD = Math.max(titleH + titleV, num((cfgFull?.subDomain?.padding?.top ?? layoutCfg?.SUB_GROUP_TITLE_CLEARANCE), titleH + titleV));
-  const SUB_BOTTOM = num((cfgFull?.subDomain?.padding?.bottom ?? layoutCfg?.SUB_GROUP_PADDING?.V_BOTTOM), 20);
+): LayoutNode[] => {
+  const cfgFull = asRecord(diagramConfigManager.getConfig());
+  const subDomain = asRecord(cfgFull.subDomain);
+  const subDomainPadding = asRecord(subDomain.padding);
+  const subDomainTitle = asRecord(subDomain.title);
+  const subDomainTitlePadding = asRecord(subDomainTitle.padding);
+  const nodeConfig = asRecord(cfgFull.node);
+  const layoutCfg = asRecord(diagramConfigManager.getLayoutConfig());
+  const subGroupPadding = asRecord(layoutCfg.SUB_GROUP_PADDING);
+  const H_G = finiteNumber(hGap, finiteNumber(layoutCfg.NODE_H_GAP, 120));
+  const V_G = finiteNumber(vGap, finiteNumber(layoutCfg.NODE_V_GAP, 80));
+  const SUB_H = finiteNumber(subDomainPadding.horizontal ?? subGroupPadding.H, 30);
+  const titleH = finiteNumber(subDomainTitle.height ?? layoutCfg.SUB_GROUP_TITLE_HEIGHT, 28);
+  const titleV = finiteNumber(
+    subDomainTitlePadding.vertical ?? layoutCfg.SUB_GROUP_TITLE_SAFE_GAP,
+    8
+  );
+  const DEFAULT_TOP_PAD = Math.max(
+    titleH + titleV,
+    finiteNumber(
+      subDomainPadding.top ?? layoutCfg.SUB_GROUP_TITLE_CLEARANCE,
+      titleH + titleV
+    )
+  );
+  const SUB_BOTTOM = finiteNumber(subDomainPadding.bottom ?? subGroupPadding.V_BOTTOM, 20);
   const updated = nodes.map(n => ({ ...n }));
-  const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
-  const getW = (n: ReactFlowNode) => num(((n as any)?.measured?.width ?? (n as any)?.style?.width ?? (n as any)?.width), num(layoutCfg?.NODE_MIN_WIDTH, 120));
-  const getH = (n: ReactFlowNode) => num(((n as any)?.measured?.height ?? (n as any)?.style?.height ?? (n as any)?.height), num(cfgFull?.node?.height, 80));
-  const rect = (n: ReactFlowNode) => ({ x: num(((n as any)?.position?.x), 0), y: num(((n as any)?.position?.y), 0), w: getW(n), h: getH(n) });
+  const idMap = new Map<string, LayoutNode>(updated.map(n => [n.id, n] as const));
+  const getW = (node: LayoutNode) =>
+    nodeWidth(node, finiteNumber(layoutCfg.NODE_MIN_WIDTH, 120));
+  const getH = (node: LayoutNode) =>
+    nodeHeight(node, finiteNumber(nodeConfig.height, 80));
+  const rect = (node: LayoutNode) => ({
+    x: nodeX(node),
+    y: nodeY(node),
+    w: getW(node),
+    h: getH(node)
+  });
 
-  const sgs = updated.filter(n => String(n.type || '') === 'subGroup');
+  const sgs = updated.filter(n => String(n.type ?? '') === 'subGroup');
   for (const sg of sgs) {
     const pos = rect(sg);
-    const isGhost = Boolean(((sg as any)?.data || {})?.ghost);
-    const ghostTopPad = Math.max(8, num(layoutCfg?.SUB_GROUP_GHOST_TOP_PAD, 12));
-    const inner = { left: pos.x + SUB_H, right: pos.x + Math.max(1, pos.w) - SUB_H, top: pos.y + (isGhost ? ghostTopPad : DEFAULT_TOP_PAD), bottom: pos.y + Math.max(1, pos.h) - SUB_BOTTOM };
-    const chIds = Array.isArray(((sg as any)?.data || {})?.children) ? ((((sg as any).data).children as string[])) : [];
-    const list = chIds.map(id => idMap.get(id)).filter((n): n is ReactFlowNode => !!n);
+    const ghostTopPad = Math.max(8, finiteNumber(layoutCfg.SUB_GROUP_GHOST_TOP_PAD, 12));
+    const inner = { left: pos.x + SUB_H, right: pos.x + Math.max(1, pos.w) - SUB_H, top: pos.y + (isGhostNode(sg) ? ghostTopPad : DEFAULT_TOP_PAD), bottom: pos.y + Math.max(1, pos.h) - SUB_BOTTOM };
+    const list = nodeChildren(sg)
+      .map(id => idMap.get(id))
+      .filter((n): n is LayoutNode => n !== undefined);
     if (list.length <= 1) continue;
     for (let iter = 0; iter < Math.max(1, iterations); iter++) {
       for (let i = 0; i < list.length; i++) {
@@ -136,13 +201,13 @@ export const enforceSubGroupNoOverlapStrict = (
           if (axis === 'x') {
             const na = Math.max(inner.left, Math.min(inner.right - ra.w, ax - delta));
             const nb = Math.max(inner.left, Math.min(inner.right - rb.w, bx + delta));
-            (a as any).position = { x: Math.round(na), y: Math.round(ay) } as any;
-            (b as any).position = { x: Math.round(nb), y: Math.round(by) } as any;
+            setNodePosition(a, Math.round(na), Math.round(ay));
+            setNodePosition(b, Math.round(nb), Math.round(by));
           } else {
             const na = Math.max(inner.top, Math.min(inner.bottom - ra.h, ay - delta));
             const nb = Math.max(inner.top, Math.min(inner.bottom - rb.h, by + delta));
-            (a as any).position = { x: Math.round(ax), y: Math.round(na) } as any;
-            (b as any).position = { x: Math.round(bx), y: Math.round(nb) } as any;
+            setNodePosition(a, Math.round(ax), Math.round(na));
+            setNodePosition(b, Math.round(bx), Math.round(nb));
           }
         }
       }
@@ -151,7 +216,7 @@ export const enforceSubGroupNoOverlapStrict = (
         const r = rect(n);
         const nx = Math.min(Math.max(r.x, inner.left), Math.max(inner.left, inner.right - r.w));
         const ny = Math.min(Math.max(r.y, inner.top), Math.max(inner.top, inner.bottom - r.h));
-        (n as any).position = { x: Math.round(nx), y: Math.round(ny) } as any;
+        setNodePosition(n, Math.round(nx), Math.round(ny));
       }
     }
   }
@@ -159,29 +224,26 @@ export const enforceSubGroupNoOverlapStrict = (
 };
 
 export const strengthenSubGroupsInDomainWithGridStrict = (
-  nodes: ReactFlowNode[],
+  nodes: LayoutNode[],
   domainKey: string,
   hGap: number,
   vGap: number,
   iterations: number = 6
-): ReactFlowNode[] => {
+): LayoutNode[] => {
   const updated = nodes.map(n => ({ ...n }));
-  const belongsToDomain = (n: ReactFlowNode) => {
-    const d = String((((n as any)?.data || {}) as any)?.domain || '');
-    return d === domainKey;
-  };
+  const belongsToDomain = (node: LayoutNode) => nodeDomain(node) === domainKey;
   // 只重排该域内的子域。
-  const sgs = updated.filter(n => String(n.type || '') === 'subGroup' && belongsToDomain(n));
+  const sgs = updated.filter(n => String(n.type ?? '') === 'subGroup' && belongsToDomain(n));
   if (!sgs.length) return updated;
   let tmp = packSubGroupChildrenGridStrict(updated);
   tmp = enforceSubGroupNoOverlapStrict(tmp, hGap, vGap, Math.max(1, iterations));
-  tmp = recomputeSubGroupContainersBasic(tmp) as any;
-  tmp = enforceSubGroupStrictContainmentByChildren(tmp) as any;
+  tmp = recomputeSubGroupContainersBasic(tmp);
+  tmp = enforceSubGroupStrictContainmentByChildren(tmp);
   // After container size adjustments, synchronize child positions based on __dagreRel
-  tmp = syncDagreChildPositions(tmp) as any;
-  tmp = finalizeSubGroupWidthsByProjectionPreserveAnchor(tmp) as any;
-  tmp = finalizeSubGroupHeightsByProjectionPreserveAnchor(tmp) as any;
-  return tmp as any;
+  tmp = syncDagreChildPositions(tmp);
+  tmp = finalizeSubGroupWidthsByProjectionPreserveAnchor(tmp);
+  tmp = finalizeSubGroupHeightsByProjectionPreserveAnchor(tmp);
+  return tmp;
 };
 
 export const resolveSubGroupOverlaps = (
@@ -211,49 +273,55 @@ export const packSubGroupsVerticallySymmetric = (
 };
 
 export const fitSubGroupsToDomainSymmetric = (
-  nodes: ReactFlowNode[]
-): ReactFlowNode[] => {
-  const cfgFull = diagramConfigManager.getConfig() as any;
-  const layoutCfg = diagramConfigManager.getLayoutConfig() as any;
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
+  nodes: LayoutNode[]
+): LayoutNode[] => {
+  const cfgFull = asRecord(diagramConfigManager.getConfig());
+  const domainConfig = asRecord(cfgFull.domain);
+  const domainPadding = asRecord(domainConfig.padding);
+  const subDomain = asRecord(cfgFull.subDomain);
+  const subDomainPadding = asRecord(subDomain.padding);
+  const layoutCfg = asRecord(diagramConfigManager.getLayoutConfig());
+  const subGroupPadding = asRecord(layoutCfg.SUB_GROUP_PADDING);
   const updated = nodes.map(n => ({ ...n }));
-  const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
-  const padH = num(cfgFull?.domain?.padding?.horizontal, 24);
-  const sideSafe = Math.max(0, num(cfgFull?.domain?.sideSafeGap, 8));
-  const subPadHDefault = num(layoutCfg?.SUB_GROUP_PADDING?.H, Math.max(16, Math.floor(padH * 0.8)));
-  const domains = updated.filter(n => String(n.type || '') === 'titleGroup');
+  const idMap = new Map<string, LayoutNode>(updated.map(n => [n.id, n] as const));
+  const padH = finiteNumber(domainPadding.horizontal, 24);
+  const sideSafe = Math.max(0, finiteNumber(domainConfig.sideSafeGap, 8));
+  const subPadHDefault = finiteNumber(
+    subGroupPadding.H,
+    Math.max(16, Math.floor(padH * 0.8))
+  );
+  const domains = updated.filter(n => String(n.type ?? '') === 'titleGroup');
   for (const dc of domains) {
-    const dId = String((((dc as any).data?.domain || '')));
+    const dId = nodeDomain(dc);
     if (!dId) continue;
-    const tx = num(((dc as any)?.position?.x), 0);
-    const tw = num((((dc as any)?.measured?.width ?? (dc as any)?.style?.width)), 0);
+    const tx = nodeX(dc);
+    const tw = nodeWidth(dc, 0);
     const innerLeft = tx + padH;
     const innerRight = tx + Math.max(1, tw) - padH;
-    const sgs = updated.filter(n => String(n.type || '') === 'subGroup' && String(((n.data as any)?.domain || '')) === dId && !(((n as any)?.data) || {})?.hidden);
+    const sgs = updated.filter(
+      n => String(n.type ?? '') === 'subGroup' && nodeDomain(n) === dId && !isHiddenNode(n)
+    );
     for (let i = 0; i < updated.length; i++) {
       const sg = updated[i];
       if (!sgs.some(n => n.id === sg.id)) continue;
-      const subPadH = num((((cfgFull?.subDomain || {}) as any)?.padding?.horizontal), subPadHDefault);
-      const oldX = num(((sg as any)?.position?.x), innerLeft - subPadH);
+      const subPadH = finiteNumber(subDomainPadding.horizontal, subPadHDefault);
+      const oldX = finiteNumber(sg.position.x, innerLeft - subPadH);
       // 严格嵌套模式：不再向左偏移内边距，而是严格从 sideSafe 开始
       const newX = Math.round(innerLeft + sideSafe);
-      const keepH = num((((sg as any)?.measured?.height ?? (sg as any)?.style?.height)), 0);
+      const keepH = nodeHeight(sg, 0);
       const contentW = Math.max(0, innerRight - innerLeft - 2 * sideSafe);
       // 严格嵌套模式：宽度仅为内容宽，不再加倍内边距
       const newW = Math.max(1, Math.round(contentW));
       const dx = newX - oldX;
-      (sg as any).position = { x: newX, y: num(((sg as any)?.position?.y), 0) } as any;
-      ((sg as any).style || ((sg as any).style = {})).width = newW;
-      ((sg as any).style || ((sg as any).style = {})).height = keepH;
-      (sg as any).measured = { width: newW, height: keepH } as any;
-      const children = Array.isArray((sg as any)?.data?.children) ? (sg as any).data.children as string[] : [];
+      setNodePosition(sg, newX, nodeY(sg));
+      sg.style = { ...sg.style, width: newW, height: keepH };
+      sg.measured = { ...sg.measured, width: newW, height: keepH };
+      const children = nodeChildren(sg);
       if (dx !== 0 && children.length) {
         for (const cid of children) {
           const child = idMap.get(cid);
           if (!child) continue;
-          const cx = num(((child as any)?.position?.x), 0);
-          const cy = num(((child as any)?.position?.y), 0);
-          (child as any).position = { x: Math.round(cx + dx), y: cy } as any;
+          setNodePosition(child, Math.round(nodeX(child) + dx), nodeY(child));
         }
       }
     }
@@ -269,30 +337,33 @@ export const equalizeSubGroupVerticalMarginsByProjection = (
 };
 
 export const unifySubGroupLeftAnchorsStrict = (
-  nodes: ReactFlowNode[]
-): ReactFlowNode[] => {
-  const cfgFull = diagramConfigManager.getConfig() as any;
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
+  nodes: LayoutNode[]
+): LayoutNode[] => {
+  const cfgFull = asRecord(diagramConfigManager.getConfig());
+  const domainConfig = asRecord(cfgFull.domain);
+  const domainPadding = asRecord(domainConfig.padding);
   const updated = nodes.map(n => ({ ...n }));
-  const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
-  const padH = num(cfgFull?.domain?.padding?.horizontal, 24);
-  const sideSafe = Math.max(0, num(cfgFull?.domain?.sideSafeGap, 8));
+  const idMap = new Map<string, LayoutNode>(updated.map(n => [n.id, n] as const));
+  const padH = finiteNumber(domainPadding.horizontal, 24);
+  const sideSafe = Math.max(0, finiteNumber(domainConfig.sideSafeGap, 8));
 
-  const tgs = updated.filter(n => String(n.type || '') === 'titleGroup');
+  const tgs = updated.filter(n => String(n.type ?? '') === 'titleGroup');
   for (const tg of tgs) {
-    const dId = String((((tg as any).data?.domain || '')));
+    const dId = nodeDomain(tg);
     if (!dId) continue;
-    const tx = num(((tg as any)?.position?.x), 0);
+    const tx = nodeX(tg);
     const innerLeft = tx + padH;
 
-    const sgs = updated.filter(n => String(n.type || '') === 'subGroup' && String(((n.data as any)?.domain || '')) === dId && !(((n as any)?.data) || {})?.hidden);
+    const sgs = updated.filter(
+      n => String(n.type ?? '') === 'subGroup' && nodeDomain(n) === dId && !isHiddenNode(n)
+    );
 
     for (let i = 0; i < updated.length; i++) {
       const sg = updated[i];
       if (!sgs.some(n => n.id === sg.id)) continue;
 
-      const oldX = num(((sg as any)?.position?.x), 0);
-      const oldY = num(((sg as any)?.position?.y), 0);
+      const oldX = nodeX(sg);
+      const oldY = nodeY(sg);
 
       // 严格使用 innerLeft + sideSafe 作为起点，不回退 padding
       const targetX = innerLeft + sideSafe;
@@ -300,15 +371,14 @@ export const unifySubGroupLeftAnchorsStrict = (
       const dxShift = Math.round(targetX - oldX);
       if (dxShift === 0) continue;
 
-      (updated[i] as any).position = { x: targetX, y: oldY } as any;
-      const children = Array.isArray((sg as any)?.data?.children) ? (sg as any).data.children as string[] : [];
+      setNodePosition(updated[i], targetX, oldY);
+      const children = nodeChildren(sg);
       if (children.length) {
         for (const cid of children) {
           const child = idMap.get(cid);
           if (!child) continue;
-          const cx = num(((child as any)?.position?.x), innerLeft);
-          const cy = num(((child as any)?.position?.y), 0);
-          (child as any).position = { x: Math.round(cx + dxShift), y: cy } as any;
+          const cx = finiteNumber(child.position.x, innerLeft);
+          setNodePosition(child, Math.round(cx + dxShift), nodeY(child));
         }
       }
     }
