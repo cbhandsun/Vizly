@@ -12,6 +12,7 @@ import { getMindElixirInstance } from './mindElixirStore';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { templateToNodeObj, type TemplateNode } from './mindmapTemplateModel';
 import { logMindmapTemplateInsertFailure } from './mindmapPanelLogging';
+import type { MindElixirInstance, NodeObj } from 'mind-elixir';
 
 
 // ─── Template definitions ─────────────────────────────────────────────────────
@@ -24,6 +25,8 @@ interface Template {
     mode: 'replace' | 'insert';  // replace = new map, insert = add under selection
     tree: TemplateNode;
 }
+type RootNodeObj = NodeObj & { root?: boolean };
+type MindWithHistory = MindElixirInstance & { clearHistory?: () => void };
 
 const TEMPLATES: Template[] = [
     {
@@ -145,14 +148,14 @@ const MindMapTemplates: React.FC = () => {
             // Replace entire map with template structure
             const nodeData = templateToNodeObj(tpl.tree);
             nodeData.id = 'root';
-            (nodeData as any).root = true;
+            (nodeData as RootNodeObj).root = true;
             mind.refresh({ nodeData, direction: MindElixir.SIDE as 0 | 1 | 2 });
             mind.toCenter();
-            (mind as any).clearHistory?.();
+            (mind as MindWithHistory).clearHistory?.();
             appMessage.success(`已载入模板：${tpl.label}`);
         } else {
             // Insert template subtree under currently selected node
-            const selId = (mind.currentNode as any)?.id ?? (mind.currentNodes?.[0] as any)?.id;
+            const selId = mind.currentNode?.id ?? mind.currentNodes?.[0]?.id;
             if (!selId) { appMessage.info('请先选中一个节点再插入模板'); return; }
             try {
                 const parentTpc = mind.findEle(selId);

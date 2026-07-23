@@ -113,7 +113,7 @@ export async function expandNodeWithAI(options: AIExpandOptions): Promise<AIExpa
         }
 
         return { topics };
-    } catch (e: any) {
+    } catch (e: unknown) {
         return { topics: [], error: await formatMindMapAIRequestError(e) };
     }
 }
@@ -179,7 +179,7 @@ interface NodeObj {
         const parsed = JSON.parse(content);
         const nodeData = cleanAndValidateTree(parsed, true);
         return { nodeData };
-    } catch (e: any) {
+    } catch (e: unknown) {
         return { error: await formatMindMapAIRequestError(e) };
     }
 }
@@ -216,7 +216,7 @@ ${childrenTopics.map(t => `- ${t}`).join('\n')}
         let topic = (data.choices?.[0]?.message?.content ?? '').trim();
         topic = topic.replace(/^["'“‘]/, '').replace(/["'”’]$/, '').trim();
         return { topic: cleanMindMapTopic(topic || nodeTopic, nodeTopic) };
-    } catch (e: any) {
+    } catch (e: unknown) {
         return { error: await formatMindMapAIRequestError(e) };
     }
 }
@@ -336,7 +336,7 @@ JSON 结构中只能包含以下可选字段：
 
         const parsed = JSON.parse(content);
         return sanitizeAICustomActionResult(parsed);
-    } catch (e: any) {
+    } catch (e: unknown) {
         return { error: await formatMindMapAIRequestError(e) };
     }
 }
@@ -387,7 +387,7 @@ ${safeChildText ? `此节点包含的子概念/大纲："${safeChildText}"` : ''
         ], { max_tokens: 400, temperature: 0.7 });
         const notes = cleanSpeakerNotes(data.choices?.[0]?.message?.content);
         return { notes };
-    } catch (e: any) {
+    } catch (e: unknown) {
         return { error: await formatMindMapAIRequestError(e) };
     }
 }
@@ -426,7 +426,7 @@ export async function analyzeNodesRelationship(
         // 清洗掉可能的引号
         relationText = relationText.replace(/^["'“‘]/, '').replace(/["'”’]$/, '').trim();
         return { relationText };
-    } catch (e: any) {
+    } catch (e: unknown) {
         return { error: await formatMindMapAIRequestError(e) };
     }
 }
@@ -477,7 +477,7 @@ ${JSON.stringify(tasks, null, 2)}
             return { error: 'AI 未返回可用的任务分类结果' };
         }
         return { classifications };
-    } catch (e: any) {
+    } catch (e: unknown) {
         return { error: await formatMindMapAIRequestError(e) };
     }
 }

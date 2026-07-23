@@ -37,3 +37,7 @@ export function isMindMapV2(data: unknown): data is VizlyMindMapV2Data {
         && typeof data.nodeData.topic === 'string'
         && (data.direction === 0 || data.direction === 1 || data.direction === 2 || data.direction === 3);
 }
+
+export function isMindMapV1(data: unknown): data is VizlyMindMapV1Data {
+    return isRecord(data) && Array.isArray(data.nodes) && Array.isArray(data.edges);
+}

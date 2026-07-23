@@ -66,7 +66,7 @@ const EditableTitle: React.FC<EditableTitleProps> = ({
 };
 
 export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
-    const { getNodes, getEdges, reactFlowInstance, setNodes, updateNode } = ctx as any;
+    const { getNodes, getEdges, reactFlowInstance, setNodes } = ctx;
 
     const nodes = getNodes();
     const edges = getEdges();
@@ -91,19 +91,13 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
         if (!editingId) return;
         const trimmed = editingValue.trim();
         if (trimmed && trimmed !== originalLabelRef.current) {
-            // updateNode is the React Flow API for patching a single node's data
-            if (typeof updateNode === 'function') {
-                updateNode(editingId, { data: { label: trimmed } });
-            } else {
-                // Fallback: setNodes patch
-                setNodes((nds: any[]) => nds.map(n =>
-                    n.id === editingId ? { ...n, data: { ...n.data, label: trimmed } } : n
-                ));
-            }
+            setNodes(nds => nds.map(n =>
+                n.id === editingId ? { ...n, data: { ...n.data, label: trimmed } } : n
+            ));
         }
         setEditingId(null);
         setEditingValue('');
-    }, [editingId, editingValue, updateNode, setNodes]);
+    }, [editingId, editingValue, setNodes]);
 
     const cancelEdit = useCallback(() => {
         setEditingId(null);
@@ -113,8 +107,8 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
     // [Search] Build flat list of all (nodeId, label) for search matching
     const allNodeLabels = useMemo<Array<{ id: string; label: string }>>(() => {
         return nodes
-            .filter((n: any) => n.type === 'mindmap')
-            .map((n: any) => ({
+            .filter(n => n.type === 'mindmap')
+            .map(n => ({
                 id: n.id,
                 label: ((n.data?.label as string) || '').replace(/<[^>]+>/g, '').trim()
             }));
@@ -131,7 +125,7 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
 
         // Build parent map
         const parentMap = new Map<string, string>();
-        edges.forEach((e: any) => { if (e.type !== 'relationshipEdge') parentMap.set(e.target, e.source); });
+        edges.forEach(e => { if (e.type !== 'relationshipEdge') parentMap.set(e.target, e.source); });
 
         const matched = allNodeLabels
             .filter(n => n.label.toLowerCase().includes(value.toLowerCase()))
@@ -151,11 +145,11 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
     }, [allNodeLabels, edges]);
 
     const treeData = useMemo((): DataNode[] => {
-        const roots = nodes.filter((n: any) => n.type === 'mindmap' && n.data?.depth === 0);
+        const roots = nodes.filter(n => n.type === 'mindmap' && n.data?.depth === 0);
         if (roots.length === 0) return [];
 
         const childrenMap = new Map<string, string[]>();
-        const structureEdges = edges.filter((e: any) => e.type !== 'relationshipEdge');
+        const structureEdges = edges.filter(e => e.type !== 'relationshipEdge');
 
         for (const e of structureEdges) {
             if (!childrenMap.has(e.source)) childrenMap.set(e.source, []);
@@ -163,16 +157,16 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
         }
 
         // [S-2] O(N) nodeMap — avoids O(N²) lookups in buildNode
-        const nodeMap = new Map(nodes.map((n: any) => [n.id, n]));
+        const nodeMap = new Map(nodes.map(n => [n.id, n]));
 
         const buildNode = (nodeId: string): DataNode => {
-            const node = nodeMap.get(nodeId) as any;
+            const node = nodeMap.get(nodeId);
             const rawTitle = (node?.data?.label as string) || 'Untitled';
             const cleanLabel = rawTitle.replace(/<[^>]+>/g, '').trim() || 'Untitled';
 
-        const childrenIds = (childrenMap.get(nodeId) || []).sort((a: string, b: string) => {
-                const na = nodeMap.get(a) as any;
-                const nb = nodeMap.get(b) as any;
+            const childrenIds = (childrenMap.get(nodeId) || []).sort((a, b) => {
+                const na = nodeMap.get(a);
+                const nb = nodeMap.get(b);
                 return (na?.position?.y ?? 0) - (nb?.position?.y ?? 0);
             });
 
@@ -202,12 +196,12 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
             };
         };
 
-        return roots.map((root: any) => buildNode(root.id));
+        return roots.map(root => buildNode(root.id));
     // editingId/editingValue/searchText are included so title renders update when edit/search mode changes
     }, [nodes, edges, editingId, editingValue, searchText, startEdit, commitEdit, cancelEdit]);
 
     const selectedKeys = useMemo(() => {
-        return nodes.filter((n: any) => n.selected).map((n: any) => n.id);
+        return nodes.filter(n => n.selected).map(n => n.id);
     }, [nodes]);
 
     if (treeData.length === 0) {
@@ -217,7 +211,7 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
     const onSelect = (selectedKeys: React.Key[]) => {
         if (selectedKeys.length > 0 && reactFlowInstance) {
             const nodeId = selectedKeys[0] as string;
-            const node = getNodes().find((n: any) => n.id === nodeId);
+            const node = getNodes().find(n => n.id === nodeId);
 
             if (node && node.measured?.width) {
                 const w = node.measured.width;
@@ -227,7 +221,7 @@ export const MindMapOutlinePanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) =
                 reactFlowInstance.setCenter(node.position.x, node.position.y, { zoom: 1.15, duration: 600 });
             }
 
-            setNodes((nds: any[]) => nds.map(n => ({ ...n, selected: n.id === nodeId })));
+            setNodes(nds => nds.map(n => ({ ...n, selected: n.id === nodeId })));
         }
     };
 

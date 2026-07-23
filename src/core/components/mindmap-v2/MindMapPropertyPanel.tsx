@@ -54,10 +54,25 @@ import {
 
 const { Text } = Typography;
 const { TextArea } = Input;
+type ExtendedMindMapNode = NodeObj & {
+    shapeClass?: string;
+    branchWidth?: number;
+    task?: MindMapTaskMeta;
+};
+type MindMapNodePatch = Partial<NodeObj> & Partial<Pick<ExtendedMindMapNode, 'shapeClass' | 'branchWidth' | 'task'>>;
+
+const errorMessage = (error: unknown, fallback: string): string =>
+    error instanceof Error && error.message ? error.message : fallback;
+
+const tagBorderColor = (tag: TagObj): string => {
+    const style = tag.style as Record<string, unknown> | undefined;
+    return typeof style?.borderColor === 'string' ? style.borderColor : '#e2e8f0';
+};
 
 // ─── Node Property Panel ───────────────────────────────────────────────────────
 const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
     const mind = getMindElixirInstance();
+    const extendedNode = node as ExtendedMindMapNode;
     const [topic, setTopic] = useState(cleanMindMapTopic(node.topic, ''));
     const parseFontSize = (n: NodeObj) => parseInt(n.style?.fontSize ?? '14', 10) || 14;
     const [fontSize, setFontSize] = useState(() => parseFontSize(node));
@@ -73,8 +88,8 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
     });
     const [tagInput, setTagInput] = useState('');
     // ─ Shape & Line width ──────────────────────────────────────────────────────────
-    const [shapeClass, setShapeClass] = useState<string>((node as any).shapeClass ?? '');
-    const [branchWidth, setBranchWidth] = useState<number>((node as any).branchWidth ?? 0);
+    const [shapeClass, setShapeClass] = useState<string>(extendedNode.shapeClass ?? '');
+    const [branchWidth, setBranchWidth] = useState<number>(extendedNode.branchWidth ?? 0);
     const initialTask = getTaskMeta(node);
     const [taskStatus, setTaskStatus] = useState<TaskStatus>(initialTask.status);
     const [taskPriority, setTaskPriority] = useState<TaskPriority>(initialTask.priority);
@@ -93,8 +108,8 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
         setImageUrl(node.image?.url ?? '');
         setIcons(cleanMindMapIcons(node.icons) ?? []);
         setTags(cleanMindMapTagObjects(node.tags) ?? []);
-        setShapeClass((node as any).shapeClass ?? '');
-        setBranchWidth((node as any).branchWidth ?? 0);
+        setShapeClass(extendedNode.shapeClass ?? '');
+        setBranchWidth(extendedNode.branchWidth ?? 0);
         const task = getTaskMeta(node);
         setTaskStatus(task.status);
         setTaskPriority(task.priority);
@@ -104,7 +119,7 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [node.id]);
 
-    const reshape = useCallback((patch: Partial<NodeObj>) => {
+    const reshape = useCallback((patch: MindMapNodePatch) => {
         if (!mind) return;
         try {
             const tpcEl = mind.findEle(node.id);
@@ -167,16 +182,16 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
         const draft = {
             ...node,
             tags: [...(node.tags ?? [])],
-            task: { ...((node as any).task ?? {}) },
-        } as NodeObj & { task?: MindMapTaskMeta };
+            task: { ...(extendedNode.task ?? {}) },
+        } as ExtendedMindMapNode;
         const next = applyTaskMeta(draft, patch);
         setTaskStatus(next.status ?? 'todo');
         setTaskPriority(next.priority ?? '无');
         setTaskDueDate(next.dueDate ?? '');
         setTaskAssignee(next.assignee ?? '');
         setTaskProgress(next.progress ?? 0);
-        reshape({ ...({ task: draft.task, tags: draft.tags } as any) });
-    }, [node, reshape]);
+        reshape({ task: draft.task, tags: draft.tags });
+    }, [extendedNode, node, reshape]);
 
     const isRoot = !node.parent;
 
@@ -198,8 +213,8 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
             const result = await expandNodeWithAI({ node, ancestorPath, count: 5, mapTitle });
             if (result.error) { setAiError(result.error); }
             else { setAiSuggestions(result.topics); }
-        } catch (e: any) {
-            setAiError(e?.message ?? '未知错误');
+        } catch (e: unknown) {
+            setAiError(errorMessage(e, '未知错误'));
         } finally {
             setAiExpanding(false);
         }
@@ -210,7 +225,7 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
         setAiSummarizing(true);
         setAiError('');
         try {
-            const childrenTopics = node.children.map((c: any) => c.topic || '');
+            const childrenTopics = node.children.map(child => child.topic || '');
             const result = await summarizeNodeWithAI(node.topic, childrenTopics);
             if ('error' in result) {
                 setAiError(result.error);
@@ -221,8 +236,8 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                     mind.setNodeTopic(tpcEl, cleanMindMapTopic(result.topic));
                 }
             }
-        } catch (e: any) {
-            setAiError(e?.message ?? '归纳失败');
+        } catch (e: unknown) {
+            setAiError(errorMessage(e, '归纳失败'));
             setAiSuggestions(['error']);
         } finally {
             setAiSummarizing(false);
@@ -390,7 +405,7 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                     {PRESET_TAGS.map(pt => (
                         <button key={pt.text} onClick={() => handleTagAdd(pt)}
                             style={{ ...(pt.style as React.CSSProperties ?? {}),
-                                border: `1px solid ${(pt.style as any)?.borderColor ?? '#e2e8f0'}`,
+                                border: `1px solid ${tagBorderColor(pt)}`,
                                 borderRadius: 4, fontSize: 11, padding: '1px 7px',
                                 cursor: 'pointer', opacity: tags.some(t => t.text === pt.text) ? 0.4 : 1 }}>
                             {pt.text}
@@ -498,7 +513,7 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                             title={label}
                             onClick={() => {
                                 setShapeClass(key);
-                                reshape({ ...({ shapeClass: key || undefined } as any) });
+                                reshape({ shapeClass: key || undefined });
                             }}
                             style={{
                                 flex: 1, padding: '4px 2px', borderRadius: 6, cursor: 'pointer',
@@ -525,7 +540,7 @@ const NodePropertyPanel: React.FC<{ node: NodeObj }> = ({ node }) => {
                     {[0, 1, 2, 4, 6].map(w => (
                         <button key={w}
                             title={w === 0 ? '默认' : `${w}px`}
-                            onClick={() => { setBranchWidth(w); reshape({ ...({ branchWidth: w || undefined } as any) }); }}
+                            onClick={() => { setBranchWidth(w); reshape({ branchWidth: w || undefined }); }}
                             style={{
                                 flex: 1, height: 28, borderRadius: 5, cursor: 'pointer',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',

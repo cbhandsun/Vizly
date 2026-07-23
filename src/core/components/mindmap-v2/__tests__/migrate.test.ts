@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NodeObj } from 'mind-elixir';
 import { downloadText, markdownToNodeObj, migrateV1ToV2, nodeObjToFlowchartJson, nodeObjToMarkdown, nodeObjToOpml, opmlToNodeObj } from '../migrate';
-import { isMindMapV2 } from '../types';
+import { isMindMapV1, isMindMapV2 } from '../types';
 import { MINDMAP_TASK_ASSIGNEE_MAX_LENGTH } from '../mindmapTaskModel';
 import {
     MINDMAP_MAX_CHILDREN_PER_NODE,
@@ -162,6 +162,13 @@ describe('nodeObjToMarkdown', () => {
         expect(migrated.nodeData.topic).toBe('Root');
         expect(isMindMapV2({ _version: 'mindmap-v2' })).toBe(false);
         expect(isMindMapV2(migrated)).toBe(true);
+    });
+
+    it('recognizes only complete legacy map containers', () => {
+        expect(isMindMapV1({ nodes: [], edges: [] })).toBe(true);
+        expect(isMindMapV1({ nodes: [] })).toBe(false);
+        expect(isMindMapV1({ nodes: {}, edges: [] })).toBe(false);
+        expect(isMindMapV1(null)).toBe(false);
     });
 
     it('bounds markdown import size, text, and child fan-out', () => {

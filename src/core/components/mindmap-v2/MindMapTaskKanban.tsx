@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import type { NodeObj } from 'mind-elixir';
+import type { NodeObj, Topic } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir, subscribeKanban, toggleKanban } from './mindElixirStore';
 import { classifyTasksWithAI, type TaskItemInput } from './mindmapAIService';
 import { Button, Checkbox, Tooltip, message, Tag } from 'antd';
@@ -15,6 +15,7 @@ import { Clock } from 'lucide-react';
 import {
     applyTaskMeta,
     getTaskMeta,
+    type MindMapTaskMeta,
     type TaskPriority,
     type TaskStatus,
 } from './mindmapTaskModel';
@@ -32,6 +33,16 @@ interface KanbanTask {
     progress?: number;
     ancestors: string[];
 }
+type TaskNode = NodeObj & { task?: MindMapTaskMeta };
+
+const reshapeTaskNode = (
+    mind: NonNullable<ReturnType<typeof getMindElixirInstance>>,
+    element: Topic,
+    node: TaskNode,
+): void => {
+    const patch = cleanMindMapNodePatch({ task: node.task, tags: node.tags });
+    mind.reshapeNode(element, { ...node, ...patch } as NodeObj);
+};
 
 export const MindMapTaskKanban: React.FC = () => {
     const [open, setOpen] = useState(false);
@@ -47,7 +58,7 @@ export const MindMapTaskKanban: React.FC = () => {
     // 深度遍历，找出叶子节点及祖先路径
     const extractTasksFromTree = useCallback((node: NodeObj, ancestors: string[] = []): KanbanTask[] => {
         const currentAncestors = [...ancestors, node.topic];
-        const hasTaskMeta = !!(node as any).task;
+        const hasTaskMeta = Boolean((node as TaskNode).task);
         const isLeaf = !node.children || node.children.length === 0;
 
         if (isLeaf || hasTaskMeta) {
@@ -109,8 +120,9 @@ export const MindMapTaskKanban: React.FC = () => {
         if (!node) return;
 
         const prio = targetPriority !== undefined ? targetPriority : (tasks.find(t => t.id === taskId)?.priority || '无');
-        applyTaskMeta(node, { status: targetStatus, priority: prio });
-        mind.reshapeNode(tpcEl, cleanMindMapNodePatch({ task: (node as any).task, tags: node.tags }) as any);
+        const taskNode = node as TaskNode;
+        applyTaskMeta(taskNode, { status: targetStatus, priority: prio });
+        reshapeTaskNode(mind, tpcEl, taskNode);
         mind.bus.fire('operation', {
             name: 'reshapeNode',
             obj: node,
@@ -169,8 +181,9 @@ export const MindMapTaskKanban: React.FC = () => {
                     const data = mind.getData();
                     const node = mind.getObjById(item.id, data.nodeData);
                     if (node) {
-                        applyTaskMeta(node, { status: item.status, priority: item.priority });
-                        mind.reshapeNode(tpcEl, cleanMindMapNodePatch({ task: (node as any).task, tags: node.tags }) as any);
+                        const taskNode = node as TaskNode;
+                        applyTaskMeta(taskNode, { status: item.status, priority: item.priority });
+                        reshapeTaskNode(mind, tpcEl, taskNode);
                         updatedCount++;
                     }
                 }

@@ -25,7 +25,7 @@ import './MindElixirWrapper.css';
 import { PluginContext } from '../../types/plugin';
 import { VIZLY_HYPER_THEME, VIZLY_HYPER_DARK_THEME, VIZLY_THEMES } from './theme';
 import { migrateV1ToV2, directionStringToInt, findNodeById } from './migrate';
-import { isMindMapV2 } from './types';
+import { isMindMapV1, isMindMapV2 } from './types';
 import { registerMindElixirInstance, unregisterMindElixirInstance } from './mindElixirStore';
 import { MindElixirContext } from './MindElixirContext';
 import MindMapContextMenu, { type CtxPos } from './MindMapContextMenu';
@@ -65,28 +65,28 @@ import { projectMindMapTreeToBridge } from './mindmapBridgeProjection';
 import { bindMindElixirOperationEffects } from './mindElixirOperationEffects';
 import { applyMindElixirPalette, clearMindElixirPalette } from './mindElixirThemeDom';
 import { useMindElixirFileDrop } from './useMindElixirFileDrop';
+import type { FlowDataBridgeEntry } from '../../utils/flowDataBridge';
 
 // ─── Default data shown for a fresh mindmap ──────────────────────────────────
 const DEFAULT_DATA: MindElixirData = {
     nodeData: {
         id: 'root',
         topic: '中心主题',
-        // 'root' is not in NodeObj type but mind-elixir uses it at runtime for the root node
-        ...({ root: true } as any),
+        root: true,
         children: [
             { id: 'b1', topic: '分支一', children: [] },
             { id: 'b2', topic: '分支二', children: [] },
             { id: 'b3', topic: '分支三', children: [] },
         ],
-    },
+    } as NodeObj & { root: true },
     direction: MindElixir.SIDE as 0 | 1 | 2,
 };
 
 // ─── Load / Save helpers ──────────────────────────────────────────────────────
 function loadData(ctx: PluginContext): MindElixirData {
     try {
-        const nodes = (ctx as any).getNodes?.() ?? [];
-        const edges = (ctx as any).getEdges?.() ?? [];
+        const nodes = ctx.getNodes();
+        const edges = ctx.getEdges();
 
         // Restore persisted direction from localStorage (user may have changed it)
         const { directionStringToInt: d2i } = { directionStringToInt };
@@ -99,7 +99,7 @@ function loadData(ctx: PluginContext): MindElixirData {
         };
 
         // Detect v2 format stored in a special "meta" node
-        const metaNode = nodes.find((n: any) => n.id === '__mindmap_meta__');
+        const metaNode = nodes.find(node => node.id === '__mindmap_meta__');
         if (metaNode?.data?.mindmapV2) {
             const v2 = metaNode.data.mindmapV2;
             if (isMindMapV2(v2)) {
@@ -114,15 +114,15 @@ function loadData(ctx: PluginContext): MindElixirData {
         }
 
         // Fallback: migrate from v1 (RF nodes/edges)
-        const mindmapNodes = nodes.filter((n: any) => n.type === 'mindmap');
+        const mindmapNodes = nodes.filter(node => node.type === 'mindmap');
         if (mindmapNodes.length === 0) return {
             ...DEFAULT_DATA,
             direction: persistedDir ?? DEFAULT_DATA.direction,
         };
 
         // If only the root node exists with no children edges, treat as fresh mindmap
-        const childEdges = edges.filter((e: any) => e.type !== 'relationshipEdge');
-        const realNodes = mindmapNodes.filter((n: any) => n.id !== '__mindmap_meta__');
+        const childEdges = edges.filter(edge => edge.type !== 'relationshipEdge');
+        const realNodes = mindmapNodes.filter(node => node.id !== '__mindmap_meta__');
         if (realNodes.length === 1 && childEdges.length === 0) {
             const rootLabel = (realNodes[0].data?.label as string) || '中心主题';
             return {
@@ -149,12 +149,9 @@ function saveData(ctx: PluginContext, mind: MindElixirInstance): void {
         const themeKey = resolveMindMapThemeKey();
         const v2Payload = createSafeMindMapV2Payload(mind.getData(), themeKey, MindElixir.SIDE as 0 | 1 | 2 | 3);
 
-        const setNodes = (ctx as any).setNodes;
-        if (!setNodes) return;
-
-        setNodes((prev: any[]) => {
+        ctx.setNodes(prev => {
             // Remove old meta node if present
-            const filtered = prev.filter((n: any) => n.id !== '__mindmap_meta__');
+            const filtered = prev.filter(node => node.id !== '__mindmap_meta__');
             return [
                 ...filtered,
                 {
@@ -273,8 +270,8 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             if (!tpc) return;
             // me-tpc elements have a data-nodeid or we can find the id from mind.currentNode
             const nodeId = tpc.getAttribute('data-nodeid')
-                || (mind.currentNode as any)?.id
-                || (mind.currentNodes?.[0] as any)?.id;
+                || mind.currentNode?.id
+                || mind.currentNodes?.[0]?.id;
             if (!nodeId) return;
             try {
                 const obj = mind.getObjById(nodeId, mind.getData().nodeData);
@@ -298,7 +295,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             const wrapper = tpc.closest('me-wrapper') as HTMLElement | null;
             const nodeId = tpc.getAttribute('data-nodeid')
                 || wrapper?.getAttribute('data-nodeid')
-                || (mind.currentNode as any)?.id
+                || mind.currentNode?.id
                 || null;
             if (!nodeId) return;
             setCtxMenu({ visible: true, x: e.clientX, y: e.clientY, nodeId });
@@ -328,7 +325,10 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             const target = mind.currentNode;
             if (!target || nodes.length === 0) return;
             try {
-                mind.copyNodes(nodes.map(nodeObj => ({ nodeObj })) as any, target);
+                const copiedNodes = nodes.map(nodeObj => ({ nodeObj })) as Parameters<
+                    MindElixirInstance['copyNodes']
+                >[0];
+                mind.copyNodes(copiedNodes, target);
             } catch (err) {
                 logMindmapWrapperSafePasteFailure(err);
             }
@@ -385,7 +385,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             // Ctrl+Shift+C — copy selected node topic to clipboard
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
                 try {
-                    const currentNode = (mind as any).currentNode as HTMLElement | null;
+                    const currentNode = mind.currentNode;
                     const nodeId = currentNode?.dataset?.nodeid ?? '';
                     if (!nodeId) return;
                     const obj = findNodeById(mind.getData().nodeData, nodeId);
@@ -480,8 +480,8 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         const diagramId = ctx.diagramId;
         if (!diagramId) return;
 
-        if (!(window as any).__flowDataBridge) {
-            (window as any).__flowDataBridge = {};
+        if (!window.__flowDataBridge) {
+            window.__flowDataBridge = {};
         }
 
         const bridgeObj = {
@@ -495,12 +495,17 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                 const data = mindRef.current.getData();
                 return projectMindMapTreeToBridge(data.nodeData).edges;
             },
-            importData: async (newData: any) => {
+            importData: async (newData: unknown) => {
                 if (!mindRef.current) return;
                 try {
-                    const v2 = isMindMapV2(newData) || newData?.nodeData
+                    const hasNodeData = typeof newData === 'object'
+                        && newData !== null
+                        && 'nodeData' in newData;
+                    const v2 = isMindMapV2(newData) || hasNodeData
                         ? newData
-                        : migrateV1ToV2(newData);
+                        : isMindMapV1(newData)
+                            ? migrateV1ToV2(newData)
+                            : newData;
                     const safeData = cleanMindMapData(v2);
                     mindRef.current.refresh({
                         ...safeData,
@@ -511,7 +516,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     logMindmapWrapperAiBridgeFailure('importData', err);
                 }
             },
-            addNode: async (args: { label: string; shape?: string }) => {
+            addNode: async (args: unknown) => {
                 if (!mindRef.current) return;
                 try {
                     const parentId = mindRef.current.currentNode?.id || 'root';
@@ -526,9 +531,11 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     logMindmapWrapperAiBridgeFailure('addNode', err);
                 }
             },
-            addChild: async (args: { parentId: string; label: string; side?: 'left' | 'right' }) => {
+            addChild: async (args: unknown) => {
                 if (!mindRef.current) return;
                 try {
+                    if (typeof args !== 'object' || args === null || !('parentId' in args)
+                        || typeof args.parentId !== 'string') return;
                     const parent = mindRef.current.findEle(args.parentId);
                     if (parent) {
                         const newId = `node_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
@@ -564,12 +571,12 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     logMindmapWrapperAiBridgeFailure('collapse', err);
                 }
             }
-        };
+        } satisfies FlowDataBridgeEntry;
 
-        (window as any).__flowDataBridge[diagramId] = bridgeObj;
+        window.__flowDataBridge[diagramId] = bridgeObj;
 
         return () => {
-            delete (window as any).__flowDataBridge?.[diagramId];
+            delete window.__flowDataBridge?.[diagramId];
         };
     }, [ctx, instance]);
 
