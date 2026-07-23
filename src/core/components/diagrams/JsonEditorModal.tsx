@@ -19,7 +19,7 @@ export interface JsonEditorModalProps {
     edges: Edge[];
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
-    reactFlowInstance: ReactFlowInstance<any, any>;
+    reactFlowInstance: ReactFlowInstance<Node, Edge>;
     /** 外部注入的初始 JSON 内容（可选，例如 AI 生成后直接注入） */
     initialContent?: string;
     diagramId?: string;
@@ -71,7 +71,7 @@ export const JsonEditorModal: React.FC<JsonEditorModalProps> = ({
                                     nodes: fullData.nodes,
                                     edges: fullData.edges,
                                     groups: fullData.groups
-                                } as any;
+                                } as typeof fullData;
                             }
                         } catch (e) {
                             logJsonEditorExistingDiagramMergeFailure(e);

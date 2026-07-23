@@ -8,7 +8,7 @@
  *  - 替换后自动导航到下一匹配
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Input } from 'antd';
+import { Input, type InputRef } from 'antd';
 import { SearchOutlined, CloseOutlined, UpOutlined, DownOutlined } from '@ant-design/icons';
 import type { NodeObj } from 'mind-elixir';
 import { getMindElixirInstance } from './mindElixirStore';
@@ -52,10 +52,12 @@ function clearSearchHighlights() {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 interface MindMapSearchProps { open: boolean; onClose: () => void; }
+type MindElixirInstance = NonNullable<ReturnType<typeof getMindElixirInstance>>;
+type ReshapeNodeTarget = Parameters<MindElixirInstance['reshapeNode']>[0];
 
 const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
     const mind = getMindElixirInstance();
-    const inputRef = useRef<any>(null);
+    const inputRef = useRef<InputRef>(null);
 
     const [query, setQuery] = useState('');
     const [replaceText, setReplaceText] = useState('');
@@ -163,7 +165,7 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
             const tpc = mind.findEle(id);
             if (!tpc) return;
             const newTopic = obj.topic.replace(new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), replaceText);
-            mind.reshapeNode(tpc as any, { ...obj, ...cleanMindMapNodePatch({ topic: newTopic }) });
+            mind.reshapeNode(tpc as ReshapeNodeTarget, { ...obj, ...cleanMindMapNodePatch({ topic: newTopic }) });
             setReplaceCount(1);
             // Move to next after replacing
             setTimeout(() => goNext(), 60);
@@ -184,7 +186,7 @@ const MindMapSearch: React.FC<MindMapSearchProps> = ({ open, onClose }) => {
                 if (!tpc) continue;
                 const newTopic = obj.topic.replace(regex, replaceText);
                 if (newTopic !== obj.topic) {
-                    mind.reshapeNode(tpc as any, { ...obj, ...cleanMindMapNodePatch({ topic: newTopic }) });
+                    mind.reshapeNode(tpc as ReshapeNodeTarget, { ...obj, ...cleanMindMapNodePatch({ topic: newTopic }) });
                     count++;
                 }
             } catch (error) {

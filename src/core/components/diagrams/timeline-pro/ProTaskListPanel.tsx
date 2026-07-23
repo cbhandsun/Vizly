@@ -4,6 +4,7 @@ import { Dropdown, Select, Tooltip } from 'antd';
 import { CaretRightOutlined, CaretDownOutlined, CalendarOutlined, FlagFilled, ClockCircleOutlined, FolderOpenOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { todayDateOnly } from '../../../utils/dateOnly';
+import type { Theme } from '../../../themes/types/ThemeTypes';
 
 export interface ProTaskListPanelProps {
     tasks: ProGanttTask[];
@@ -25,7 +26,7 @@ export interface ProTaskListPanelProps {
 const ROW_HEIGHT = 42;
 const HEADER_HEIGHT = 52;
 
-const getTypeIcons = (theme: any): Record<string, React.ReactNode> => ({
+const getTypeIcons = (theme: Theme | null): Record<string, React.ReactNode> => ({
     phase:     <CalendarOutlined style={{ fontSize: 13, color: theme?.palette?.success?.main || '#52c41a' }} />,
     event:     <ClockCircleOutlined style={{ fontSize: 13, color: theme?.palette?.primary?.main || '#1890ff' }} />,
     milestone: <FlagFilled style={{ fontSize: 13, color: theme?.palette?.error?.main || '#cf1322' }} />,
@@ -133,7 +134,10 @@ export default function ProTaskListPanel({
                 } else if (field === 'assignee') {
                     onTaskUpdate?.(id, { assignee: editValue.trim() || undefined });
                 } else if (field === 'priority') {
-                    onTaskUpdate?.(id, { priority: (editValue || undefined) as any });
+                    const priority = editValue === 'high' || editValue === 'medium' || editValue === 'low'
+                        ? editValue
+                        : undefined;
+                    onTaskUpdate?.(id, { priority });
                 }
             }
         }
@@ -304,7 +308,9 @@ export default function ProTaskListPanel({
                                                 { key: 'milestone', icon: <FlagFilled />, label: '添加里程碑 (Milestone)' }
                                             ],
                                             onClick: ({ key }) => {
-                                                if (onTaskAdd) onTaskAdd(task.id, key as any);
+                                                if (onTaskAdd && (key === 'phase' || key === 'milestone')) {
+                                                    onTaskAdd(task.id, key);
+                                                }
                                             }
                                         }}
                                         trigger={['click']}

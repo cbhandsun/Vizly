@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
-import { useNodes, useEdges, useReactFlow } from '@xyflow/react';
+import { useNodes, useEdges, useReactFlow, type Node } from '@xyflow/react';
 import { 
   useProTimelineEngine, 
   calculateSwimlanes, 
@@ -180,7 +180,7 @@ export default function ProTimelineCanvas() {
          const endD = addDaysToDateOnly(startD, 1);
 
          const newId = `tl-event-${Date.now()}`;
-         const newNode = {
+         const newNode: Node = {
              id: newId,
              type: 'timelineNode',
              position: { x: 0, y: 0 },
@@ -194,7 +194,7 @@ export default function ProTimelineCanvas() {
              }
          };
 
-         setNodes(ns => [...ns, newNode as any]);
+         setNodes(ns => [...ns, newNode]);
          
          // 自动选中新创建的节点以呼出属性面板
          setTimeout(() => {
@@ -317,7 +317,7 @@ export default function ProTimelineCanvas() {
   }, [nodes, applyAutoScheduling]);
 
   const onTaskUpdate = useCallback((taskId: string, updates: Partial<ProGanttTask>) => {
-      const rfUpdates: any = {};
+      const rfUpdates: Record<string, unknown> = {};
       let dateChanged = false;
       let targetStart = '';
       let targetEnd = '';
@@ -448,7 +448,7 @@ export default function ProTimelineCanvas() {
             endD = addDaysToDateOnly(startD, 1);
         }
 
-        const newNode = {
+        const newNode: Node = {
             id: newId,
             type: 'timelineNode',
             position: { x: 0, y: 0 },
@@ -463,7 +463,7 @@ export default function ProTimelineCanvas() {
             }
         };
 
-        setNodes(ns => [...ns, newNode as any]);
+        setNodes(ns => [...ns, newNode]);
         
         // Auto-expand parent
         if (parentId) {
