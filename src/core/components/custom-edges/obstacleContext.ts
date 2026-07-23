@@ -1,4 +1,5 @@
 import { createContext, useContext, useMemo } from 'react';
+import type { Node } from '@xyflow/react';
 
 export interface NodeBBox {
     id: string;
@@ -13,7 +14,7 @@ export interface ObstacleContextValue {
     /** 所有业务节点的边界框（已过滤容器节点） */
     businessNodes: NodeBBox[];
     /** 节点 ID -> 节点的快速查找 Map */
-    nodeMap: Map<string, any>;
+    nodeMap: Map<string, Node>;
     /** 原始签名（djb2 哈希数字），用于检测变化 */
     signature: number;
     /** 上下文是否就绪 */

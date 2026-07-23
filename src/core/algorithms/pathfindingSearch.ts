@@ -164,7 +164,7 @@ export function findPath(
     }
     const { minX, minY, maxX, maxY, cols, rows, maxIndex, size, data: costs } = grid;
     const needsRestore = prebuiltGrid && grid === prebuiltGrid;
-    const savedCells: { idx: number; val: number }[] = needsRestore ? [] : (undefined as any);
+    const savedCells: { idx: number; val: number }[] = [];
     const saveCost = (idx: number) => {
         if (needsRestore && idx >= 0 && idx < maxIndex) {
             savedCells.push({ idx, val: costs[idx] });

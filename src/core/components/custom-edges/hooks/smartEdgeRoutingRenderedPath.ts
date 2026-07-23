@@ -44,10 +44,10 @@ interface ResolveRenderedSmartEdgePathOptions {
     finalPath: string;
     isLayoutPathLocked: boolean;
     canUseFreshWorkerPath: boolean;
-    edgeData: Record<string, any> | undefined;
+    edgeData: { isTreeBus?: boolean; treeRouting?: boolean } | undefined;
     nodesDragging: boolean;
     isLoading: boolean;
-    edgeConfig: Record<string, any>;
+    edgeConfig: { strictOrthogonal?: boolean };
     visualCornerRadius: number;
     renderCornerRadius: number;
     safeObstacles: Array<{ x: number; y: number; width: number; height: number }>;

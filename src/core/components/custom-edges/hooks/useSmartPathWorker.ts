@@ -428,7 +428,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
 
             // Nodes & Edges for Worker
              
-            const nodesArr = Array.from(simpleNodeMap.values()).map((n: any) => {
+            const nodesArr = Array.from(simpleNodeMap.values()).map((n) => {
                 // [FIX] If this is source or target, use the FRESH node we created above!
                 if (n.id === source && sourceNode) return sourceNode;
                 if (n.id === target && targetNode) return targetNode;
