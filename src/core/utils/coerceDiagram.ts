@@ -15,7 +15,7 @@ export interface CoerceReport {
 const coerceDescription = (value: unknown): string => {
   if (typeof value === 'string') return value;
   if (value && typeof value === 'object') {
-    const v = value as any;
+    const v = value as Record<string, unknown>;
     if (typeof v.title === 'string' && typeof v.details === 'string') {
       return `${v.title}\n${v.details}`;
     }
@@ -128,7 +128,8 @@ export const coerceToStandardDiagramDataWithReport = (
 ): CoerceReport => {
   const issues: CoerceIssue[] = [];
   const isObject = isPlainRecord(input);
-  const raw: Record<string, any> = sanitizeRecord(input) ?? {};
+  const raw = sanitizeRecord(input) ?? {};
+  const rawMetadata = sanitizeRecord(raw.metadata);
 
   if (!isObject) {
     issues.push({ level: 'error', message: 'content is not an object' });
@@ -138,7 +139,7 @@ export const coerceToStandardDiagramDataWithReport = (
   const name =
     coerceBoundedString(raw.name, '', 160) ||
     coerceBoundedString(raw.title, '', 160) ||
-    coerceBoundedString(raw.metadata?.title, '', 160) ||
+    coerceBoundedString(rawMetadata?.title, '', 160) ||
     fallback.title ||
     id;
   const type = coerceBoundedString(raw.type, 'custom') as StandardDiagramData['type'];
@@ -150,7 +151,7 @@ export const coerceToStandardDiagramDataWithReport = (
   const nodeIds = new Set(nodes.map(node => node.id));
   const edges = edgesRaw.map((edge, index) => coerceEdge(edge, index, nodeIds)).filter(Boolean) as StandardEdgeData[];
 
-  if (!(typeof raw.name === 'string' && raw.name) && !(typeof raw.title === 'string' && raw.title) && !(typeof raw.metadata?.title === 'string' && raw.metadata.title)) {
+  if (!(typeof raw.name === 'string' && raw.name) && !(typeof raw.title === 'string' && raw.title) && !(typeof rawMetadata?.title === 'string' && rawMetadata.title)) {
     issues.push({ level: 'warn', message: 'missing name/title' });
   }
   if (!(typeof raw.type === 'string' && raw.type)) {
@@ -176,7 +177,7 @@ export const coerceToStandardDiagramDataWithReport = (
   } else {
     const emptyDesc = nodes.filter(n => !String(n.description || '').trim()).length;
     if (emptyDesc > 0) issues.push({ level: 'warn', message: `nodes missing description: ${emptyDesc}` });
-    const defaultDomain = nodes.filter(n => String((n as any).domain) === 'default').length;
+    const defaultDomain = nodes.filter(n => String(n.domain) === 'default').length;
     if (defaultDomain > 0) issues.push({ level: 'warn', message: `nodes missing domain: ${defaultDomain}` });
   }
 
@@ -193,7 +194,7 @@ export const coerceToStandardDiagramDataWithReport = (
   const version = coerceBoundedString(raw.version, '1.0.0');
   const layout = isPlainRecord(raw.layout) ? ({ ...defaultLayout(), ...raw.layout } as LayoutMetadata) : defaultLayout();
   const theme = isPlainRecord(raw.theme) ? ({ ...defaultTheme(), ...raw.theme } as ThemeMetadata) : defaultTheme();
-  const metadata = sanitizeRecord(raw.metadata);
+  const metadata = rawMetadata;
   const config = sanitizeRecord(raw.config);
 
   const diagram = {

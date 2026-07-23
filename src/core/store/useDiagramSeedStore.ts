@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 
 interface DiagramSeedState {
-    seedData: any | null;
+    seedData: unknown;
     seedId: string | null;
-    setSeed: (id: string, data: any) => void;
-    consumeSeed: (id: string) => any | null;
+    setSeed: (id: string, data: unknown) => void;
+    consumeSeed: (id: string) => unknown;
 }
 
 export const useDiagramSeedStore = create<DiagramSeedState>((set, get) => ({

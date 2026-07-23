@@ -55,6 +55,11 @@ import {
   displayReportOnlyNeedsTerminalAnchoring,
 } from './baseReactFlowDisplayReportPolicy';
 
+const readDisplayLayoutDirection = (edge: Edge | undefined): string => {
+  const direction = edge?.data?.layoutDirection;
+  return typeof direction === "string" && direction ? direction : "TB";
+};
+
 export const createBaseReactFlowPreDisplayFinalEdges = (args: {
   edges: Edge[];
   nodes: Node[];
@@ -275,10 +280,7 @@ export const createBaseReactFlowPreDisplayFinalEdges = (args: {
     const terminalBoundedDetachedObstacle = repairDisplayObstacleHits(
       terminalBoundedDetachedStrict,
       repairNodes,
-      String(
-        (terminalBoundedDetachedStrict[0]?.data as any)?.layoutDirection ||
-          "TB",
-      ),
+      readDisplayLayoutDirection(terminalBoundedDetachedStrict[0]),
       {
         maxEdges: 4,
         maxCandidatesPerEdge: 32,
@@ -341,7 +343,7 @@ export const createBaseReactFlowPreDisplayFinalEdges = (args: {
   const terminalObstacleCleaned = repairDisplayObstacleHits(
     terminalStrictBypassRaw,
     repairNodes,
-    String((terminalStrictBypassRaw[0]?.data as any)?.layoutDirection || "TB"),
+    readDisplayLayoutDirection(terminalStrictBypassRaw[0]),
     {
       ...DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS,
       maxCandidatesPerEdge: 32,
@@ -553,7 +555,7 @@ export const createBaseReactFlowPreDisplayFinalEdges = (args: {
   const finalObstacleSelected = repairDisplayObstacleHits(
     finalStrictSelected,
     repairNodes,
-    String((finalStrictSelected[0]?.data as any)?.layoutDirection || "TB"),
+    readDisplayLayoutDirection(finalStrictSelected[0]),
     {
       maxEdges: 1,
       maxCandidatesPerEdge: 12,
