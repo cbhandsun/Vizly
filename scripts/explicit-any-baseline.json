@@ -176,7 +176,6 @@
     "src/core/utils/domainKey.ts": 2,
     "src/core/utils/elkEdgeRouter.ts": 9,
     "src/core/utils/imageExporter.ts": 3,
-    "src/core/utils/layout/domainContainers.ts": 155,
     "src/core/utils/layoutRecommender.ts": 1,
     "src/core/utils/performanceUtils.ts": 5,
     "src/core/utils/useIncrementalEdgeRouting.ts": 1,
