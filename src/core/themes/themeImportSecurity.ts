@@ -53,7 +53,7 @@ const coerceFiniteNumber = (value: unknown, field: string, min: number, max: num
   return Math.min(max, Math.max(min, value));
 };
 
-const isSafeCssColor = (value: string): boolean => {
+export const isSafeCssColor = (value: string): boolean => {
   const text = value.trim();
   if (text.length > 80) return false;
   if (/^#[0-9a-f]{3,8}$/i.test(text)) return true;

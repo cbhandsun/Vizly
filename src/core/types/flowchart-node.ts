@@ -5,7 +5,8 @@ export type FlowchartShape =
   | 'ellipse' | 'triangle' | 'hexagon' | 'star'
   | 'document' | 'cloud' | 'manual-input' | 'preparation' | 'delay' | 'display'
   | 'trapezoid' | 'predefined-process' | 'multi-document' | 'off-page' | 'internal-storage'
-  | 'circle' | 'note';
+  | 'circle' | 'note'
+  | 'underline' | 'box';
 
 /** Portable flowchart node contract shared by editors, renderers, and update APIs. */
 export interface FlowchartNodeData extends Record<string, unknown> {

@@ -8,7 +8,7 @@
  */
 import React, { useEffect, useState, useRef } from 'react';
 import { Tooltip, Popover, Input } from 'antd';
-import type { NodeObj } from 'mind-elixir';
+import type { NodeObj, Topic } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { findNodeById } from './migrate';
 import { expandNodeWithAI, getAncestorPath, summarizeNodeWithAI, processNodeWithAICustomAction } from './mindmapAIService';
@@ -28,6 +28,17 @@ const QUICK_COLORS = [
 
 // ─── Position tracking ────────────────────────────────────────────────────────
 interface BarPos { x: number; y: number; nodeId: string; }
+type ExtendedMindMapNode = NodeObj & {
+    shapeClass?: string;
+    boundary?: { color: string; title: string };
+};
+interface LegacyUnselectBus {
+    addListener: (type: 'unselectNode', handler: () => void) => void;
+    removeListener: (type: 'unselectNode', handler: () => void) => void;
+}
+
+const errorMessage = (error: unknown, fallback: string): string =>
+    error instanceof Error && error.message ? error.message : fallback;
 
 const MindMapFloatingBar: React.FC = () => {
     // 订阅 store，确保 mind 实例异步注册后触发重渲染
@@ -75,18 +86,20 @@ const MindMapFloatingBar: React.FC = () => {
         const onDeselect = () => {
             setPos(null); setColorOpen(false); setShapeOpen(false); setNoteOpen(false); setAiOpen(false);
         };
+        const onSelectNewNode = (node: NodeObj) => onSelect([node]);
+        const legacyBus = mind.bus as unknown as LegacyUnselectBus;
 
         // mind-elixir v5: fires 'selectNodes' (array) and 'selectNewNode'
-        mind.bus.addListener('selectNodes', onSelect as any);
-        mind.bus.addListener('selectNewNode', (node: NodeObj) => onSelect([node] as any));
+        mind.bus.addListener('selectNodes', onSelect);
+        mind.bus.addListener('selectNewNode', onSelectNewNode);
         // Clicking canvas background fires 'unselectNodes'
         mind.bus.addListener('unselectNodes', onDeselect);
-        mind.bus.addListener('unselectNode' as any, onDeselect);  // legacy fallback
+        legacyBus.addListener('unselectNode', onDeselect);
         // When map refreshes, deselect
         mind.bus.addListener('operation', () => {
             // Delay to let DOM update, then refresh position
             setTimeout(() => {
-                const currentNode = (mind as any).currentNode as HTMLElement | null;
+                const currentNode = mind.currentNode;
                 if (!currentNode) { setPos(null); return; }
                 const nodeId = currentNode.dataset?.nodeid ?? '';
                 if (!nodeId) { setPos(null); return; }
@@ -96,10 +109,10 @@ const MindMapFloatingBar: React.FC = () => {
         });
 
         return () => {
-            mind.bus.removeListener('selectNodes', onSelect as any);
-            mind.bus.removeListener('selectNewNode', onSelect as any);
+            mind.bus.removeListener('selectNodes', onSelect);
+            mind.bus.removeListener('selectNewNode', onSelectNewNode);
             mind.bus.removeListener('unselectNodes', onDeselect);
-            mind.bus.removeListener('unselectNode' as any, onDeselect);
+            legacyBus.removeListener('unselectNode', onDeselect);
         };
     }, [mind]);
 
@@ -130,13 +143,14 @@ const MindMapFloatingBar: React.FC = () => {
             return null;
         }
     };
-    const reshapeNodePatch = (tpc: unknown, baseObj: NodeObj | null | undefined, patch: Partial<NodeObj> & Record<string, unknown>) => {
+    const reshapeNodePatch = (tpc: Topic, baseObj: NodeObj | null | undefined, patch: Partial<NodeObj> & Record<string, unknown>) => {
         if (!baseObj) return;
-        mind.reshapeNode(tpc as any, { ...baseObj, ...cleanMindMapNodePatch(patch) } as NodeObj);
+        mind.reshapeNode(tpc, { ...baseObj, ...cleanMindMapNodePatch(patch) } as NodeObj);
     };
 
     const obj = getObj();
     if (!obj) return null;
+    const extendedObj = obj as ExtendedMindMapNode;
 
     const isRoot = pos.nodeId === mind.getData()?.nodeData?.id;
     const hasChildren = (obj.children?.length ?? 0) > 0;
@@ -165,8 +179,8 @@ const MindMapFloatingBar: React.FC = () => {
             const result = await expandNodeWithAI({ node: obj, ancestorPath, count: 4, mapTitle });
             if (result.error) { setAiError(result.error); }
             else { setAiSuggestions(result.topics); }
-        } catch (e: any) {
-            setAiError(e?.message ?? '未知错误');
+        } catch (e: unknown) {
+            setAiError(errorMessage(e, '未知错误'));
         } finally {
             setAiExpanding(false);
         }
@@ -177,8 +191,8 @@ const MindMapFloatingBar: React.FC = () => {
         try {
             const tpcEl = getTpc();
             if (!tpcEl) return;
-            mind.selectNode(tpcEl as any);
-            await mind.addChild(tpcEl as any, cleanMindMapChildNode({ label: topic }, mind.generateNewObj?.().id ?? `n_${Date.now()}`));
+            mind.selectNode(tpcEl);
+            await mind.addChild(tpcEl, cleanMindMapChildNode({ label: topic }, mind.generateNewObj?.().id ?? `n_${Date.now()}`));
         } catch (error) {
             logMindMapFloatingActionFailure('applySuggestion', error);
         }
@@ -189,19 +203,19 @@ const MindMapFloatingBar: React.FC = () => {
         setAiSummarizing(true);
         setAiError('');
         try {
-            const childrenTopics = obj.children.map((c: any) => c.topic || '');
+            const childrenTopics = obj.children.map(child => child.topic || '');
             const result = await summarizeNodeWithAI(obj.topic, childrenTopics);
             if ('error' in result) {
                 setAiError(result.error);
             } else if (result.topic && result.topic !== obj.topic) {
                 const tpcEl = getTpc();
                 if (tpcEl) {
-                    mind.setNodeTopic(tpcEl as any, cleanMindMapTopic(result.topic));
+                    mind.setNodeTopic(tpcEl, cleanMindMapTopic(result.topic));
                 }
                 setAiOpen(false);
             }
-        } catch (e: any) {
-            setAiError(e?.message ?? '归纳失败');
+        } catch (e: unknown) {
+            setAiError(errorMessage(e, '归纳失败'));
         } finally {
             setAiSummarizing(false);
         }
@@ -230,7 +244,7 @@ const MindMapFloatingBar: React.FC = () => {
                 const tpcEl = getTpc();
                 if (tpcEl) {
                     if (result.topic) {
-                        mind.setNodeTopic(tpcEl as any, cleanMindMapTopic(result.topic));
+                        mind.setNodeTopic(tpcEl, cleanMindMapTopic(result.topic));
                     }
 
                     const nodeInTree = findNodeById(data.nodeData, pos.nodeId);
@@ -268,8 +282,8 @@ const MindMapFloatingBar: React.FC = () => {
                     setAiOpen(false);
                 }
             }
-        } catch (e: any) {
-            setAiError(e?.message ?? '运行失败');
+        } catch (e: unknown) {
+            setAiError(errorMessage(e, '运行失败'));
         } finally {
             setAiCustomLoading(false);
         }
@@ -468,7 +482,7 @@ const MindMapFloatingBar: React.FC = () => {
                 content={
                     <div className={styles.shapeGrid}>
                         {SHAPES.map(({ key, label, preview }) => {
-                            const current = (obj as any).shapeClass ?? '';
+                            const current = extendedObj.shapeClass ?? '';
                             return (
                                 <button key={key || 'default'}
                                     title={label}
@@ -561,11 +575,11 @@ const MindMapFloatingBar: React.FC = () => {
             </Popover>
 
             {/* Boundary Toggle */}
-            <Btn icon="📌" tip={(obj as any).boundary ? '取消外框分组' : '添加外框分组'}
+            <Btn icon="📌" tip={extendedObj.boundary ? '取消外框分组' : '添加外框分组'}
                 onClick={() => act(() => { 
                     const tpc = getTpc(); 
                     if (tpc) {
-                        const newBoundary = (obj as any).boundary ? undefined : { color: '#818cf8', title: '新建分组' };
+                        const newBoundary = extendedObj.boundary ? undefined : { color: '#818cf8', title: '新建分组' };
                         reshapeNodePatch(tpc, obj, { boundary: newBoundary });
                     }
                 })} 
