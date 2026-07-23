@@ -24,7 +24,8 @@ export class PluginRegistry {
       PluginRegistry.instance = new PluginRegistry();
       // ⭐ [GAP-12] DX: 暴露至控制台用于实时调试
       if (typeof window !== 'undefined') {
-        (window as any).__vizly_plugins = PluginRegistry.instance;
+        const runtimeWindow = window as Window & { __vizly_plugins?: PluginRegistry };
+        runtimeWindow.__vizly_plugins = PluginRegistry.instance;
       }
     }
     return PluginRegistry.instance;
@@ -134,7 +135,7 @@ export class PluginRegistry {
   /**
    * [GAP-10] 指令分发器：执行特定插件的 AI 动作
    */
-  public async executeAIAction(pluginId: string, action: string, params: any, ctx: PluginContext): Promise<boolean> {
+  public async executeAIAction(pluginId: string, action: string, params: unknown, ctx: PluginContext): Promise<boolean> {
     if (!this.isSafeAIToken(pluginId) || !this.isSafeAIToken(action)) {
       safeLog.warn('[PluginRegistry] Rejected unsafe AI action target:', redactSensitiveLogValue({ pluginId, action }));
       return false;

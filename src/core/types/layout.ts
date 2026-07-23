@@ -235,7 +235,7 @@ export interface LayoutOptions {
   /** 顺序提示边开关（none/subgroup/domain） */
   sequenceHints?: 'none' | 'subgroup' | 'domain';
   /** 边布局配置（用于传递给布局策略） */
-  edge?: any;
+  edge?: Record<string, unknown>;
 }
 
 // 布局节点接口
