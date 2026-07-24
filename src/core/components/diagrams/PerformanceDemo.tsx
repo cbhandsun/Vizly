@@ -6,8 +6,9 @@ import {
     Background,
     Controls,
     MiniMap,
-    _Position,
     MarkerType,
+    type Edge,
+    type Node,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -60,10 +61,12 @@ const edgeTypes = {
     smart: AdvancedSmartStepEdge,
 };
 
+type WorkerPoolStats = ReturnType<WorkerPool['getStats']>;
+
 export const PerformanceDemo: React.FC = () => {
-    const [nodes, setNodes, onNodesChange] = useNodesState<any>([]);
-    const [edges, setEdges, onEdgesChange] = useEdgesState<any>([]);
-    const [stats, setStats] = useState<any>({});
+    const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+    const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+    const [stats, setStats] = useState<WorkerPoolStats | null>(null);
 
     // Initial generation
     useEffect(() => {
@@ -105,9 +108,9 @@ export const PerformanceDemo: React.FC = () => {
                 <button onClick={handleForceRelayout}>Force Re-render (Check Cache)</button>
                 <button onClick={handleModifyGraph}>Regenerate Graph (Invalidate Cache)</button>
                 <div style={{ marginLeft: 20 }}>
-                    <strong>Workers:</strong> {stats.poolSize || 0} |
-                    <strong> Busy:</strong> {stats.busyCount || 0} |
-                    <strong> Queue:</strong> {stats.queueLength || 0}
+                    <strong>Workers:</strong> {stats?.poolSize || 0} |
+                    <strong> Busy:</strong> {stats?.busyCount || 0} |
+                    <strong> Queue:</strong> {stats?.queueLength || 0}
                 </div>
             </div>
             <div style={{ flex: 1, position: 'relative' }}>

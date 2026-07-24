@@ -24,7 +24,13 @@ const HANDLE_SIDES = [
 
 export interface CustomNodeGraphicsProps {
     id: string;
-    data: any;
+    data: Record<string, unknown> & {
+        icon?: unknown;
+        domainClass?: string;
+        baseZIndex?: number;
+        description?: string;
+        isLegend?: boolean;
+    };
     selected: boolean;
     setHovered: (hovered: boolean) => void;
     
@@ -68,7 +74,6 @@ const parseNodeContent = (raw: string): { title: string; body: string } => {
 };
 
 const CustomNodeGraphicsComponent: React.FC<CustomNodeGraphicsProps> = ({
-    _id,
     data: d,
     selected,
     setHovered,

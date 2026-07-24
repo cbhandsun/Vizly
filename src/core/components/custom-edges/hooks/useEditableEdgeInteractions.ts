@@ -1,8 +1,14 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Position } from '@xyflow/react';
-import { generateOrthogonalPath, Waypoint as OrthogonalWaypoint } from '../../../utils/orthogonalPath';
+import {
+    generateOrthogonalPath,
+    Waypoint as OrthogonalWaypoint,
+    type OrthogonalPathResult,
+    type Segment,
+} from '../../../utils/orthogonalPath';
 import { getUiScale } from '../../shared/viewportStore';
 import type { Waypoint } from '../EditableEdge';
+type BendPoint = OrthogonalPathResult['bendPoints'][number];
 
 export interface UseEditableEdgeInteractionsProps {
     id: string;
@@ -113,7 +119,7 @@ export function useEditableEdgeInteractions({
         return { x: (last.start.x + last.end.x) / 2, y: (last.start.y + last.end.y) / 2 };
     }, [segments, sourceX, sourceY, targetX, targetY]);
 
-    const handleBendPointPointerDown = useCallback((index: number, bp: any, e: React.PointerEvent<Element>) => {
+    const handleBendPointPointerDown = useCallback((index: number, _bp: BendPoint, e: React.PointerEvent<Element>) => {
         e.preventDefault();
         e.stopPropagation();
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -159,7 +165,7 @@ export function useEditableEdgeInteractions({
         }
     }, [draggingIndex, localWaypoints, edgeCallbacks, id]);
 
-    const handleSegmentPointerDown = useCallback((index: number, seg: any, e: React.PointerEvent<Element>) => {
+    const handleSegmentPointerDown = useCallback((index: number, seg: Segment, e: React.PointerEvent<Element>) => {
         e.preventDefault();
         e.stopPropagation();
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -322,7 +328,7 @@ export function useEditableEdgeInteractions({
     }, [segments, edgeCallbacks, id]);
 
 
-    const handleDeleteWaypoint = useCallback((bp: any, e: React.MouseEvent) => {
+    const handleDeleteWaypoint = useCallback((bp: BendPoint, e: React.MouseEvent) => {
         e.stopPropagation();
         if (bp.waypointIndex !== undefined && edgeCallbacks?.onWaypointsChange) {
             const newWaypoints = waypoints.filter((_: Waypoint, i: number) => i !== bp.waypointIndex);
@@ -330,7 +336,7 @@ export function useEditableEdgeInteractions({
         }
     }, [waypoints, edgeCallbacks, id]);
     
-    const handleAddWaypointToSegment = useCallback((index: number, seg: any, e: React.MouseEvent) => {
+    const handleAddWaypointToSegment = useCallback((index: number, seg: Segment, e: React.MouseEvent) => {
         e.stopPropagation();
         const allPoints: Waypoint[] = [];
         if (segments.length > 0) {

@@ -6,6 +6,10 @@ export interface MindMapBridgeNodeArgs {
     side?: unknown;
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
 export function cleanMindMapBridgeSide(value: unknown): 'left' | 'right' | undefined {
     return value === 'left' || value === 'right' ? value : undefined;
 }
@@ -14,14 +18,15 @@ export function createSafeMindMapNodeId(prefix = 'node'): string {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
 }
 
-export function cleanMindMapChildNode(args: MindMapBridgeNodeArgs = {}, id = createSafeMindMapNodeId()): NodeObj {
+export function cleanMindMapChildNode(args: unknown = {}, id = createSafeMindMapNodeId()): NodeObj {
+    const input: MindMapBridgeNodeArgs = isRecord(args) ? args : {};
     const node: NodeObj = {
         id,
-        topic: cleanMindMapTopic(args.label, '新节点'),
+        topic: cleanMindMapTopic(input.label, '新节点'),
         children: [],
     };
     const clean = cleanAndValidateTree(node, false) as NodeObj & { side?: 'left' | 'right' };
-    const side = cleanMindMapBridgeSide(args.side);
+    const side = cleanMindMapBridgeSide(input.side);
     if (side) clean.side = side;
     return clean;
 }

@@ -29,7 +29,7 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
     const nodeData = freshNode ? freshNode.data : null;
     const isGanttTask = nodeData && ['phase', 'milestone', 'summary', 'event'].includes(nodeData.type as string);
 
-    const updateNodeData = useCallback((key: string, value: any) => {
+    const updateNodeData = useCallback((key: string, value: unknown) => {
         if (!selectedNodes || !selectedNodes[0]) return;
         const nodeId = selectedNodes[0].id;
         const setNodes = ctx?.setNodes;
@@ -196,7 +196,7 @@ export const ProTimelinePropertyPanel: React.FC<ProTimelinePropertyPanelProps> =
                             />
                         </div>
                     )}
-                    {nodeData?.baselineStartDate && (
+                    {Boolean(nodeData?.baselineStartDate) && (
                         <>
                             <Divider style={{ margin: '12px 0' }} />
                             <div>

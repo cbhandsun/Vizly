@@ -4,6 +4,11 @@ export interface TemplateMenuItem {
   category?: unknown;
 }
 
+export interface TemplateMenuLeafOption {
+  value: string;
+  label: string;
+}
+
 export type TemplateRootGroup = 'system-templates' | 's3' | 'supabase' | 'local-workspace';
 
 const MAX_MENU_TEXT_LENGTH = 120;
@@ -37,6 +42,25 @@ export const normalizeTemplateItem = (item: TemplateMenuItem): { id: string; tit
   const category = normalizeTemplateMenuText(item.category, '其他行业') || '其他行业';
   return { id, title, category };
 };
+
+export const buildTemplateMenuLeafOptions = (
+  items: readonly TemplateMenuItem[],
+): TemplateMenuLeafOption[] => items.flatMap((item) => {
+  const id = normalizeTemplateMenuId(item.id);
+  if (!id) return [];
+
+  return [{
+    value: id,
+    label: normalizeTemplateMenuText(item.title, id) || id,
+  }];
+});
+
+export const buildCustomTemplateMenuLeafOptions = (
+  keys: readonly unknown[],
+): TemplateMenuLeafOption[] => keys.flatMap((key) => {
+  const id = normalizeTemplateMenuId(key);
+  return id ? [{ value: `custom:${id}`, label: id }] : [];
+});
 
 export const coerceCascaderPath = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];

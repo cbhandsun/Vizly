@@ -1,5 +1,12 @@
 import type { Theme, ThemeColor } from '../themes/types/ThemeTypes';
 
+type ThemeWithLegacyDomains = Theme & {
+  domains?: Record<string, ThemeColor>;
+};
+
+const getThemeDomains = (theme: Theme | null | undefined): Record<string, ThemeColor> =>
+  theme?.diagram?.domains || (theme as ThemeWithLegacyDomains | null | undefined)?.domains || {};
+
 export interface NodeDomainSource {
   /**
    * 函数级注释：domainClass
@@ -167,7 +174,7 @@ const ALT_KEYS: Record<string, string[]> = {
 const hasDomainKey = (theme: Theme | null | undefined, key?: string): boolean => {
   if (!theme || !key) return false;
   // 兼容老图表结构 theme.domains 和新版 theme.diagram.domains
-  const domainsSource = theme.diagram?.domains || (theme as any).domains || {};
+  const domainsSource = getThemeDomains(theme);
   return Object.prototype.hasOwnProperty.call(domainsSource, key);
 };
 
@@ -257,7 +264,7 @@ export function getDomainTheme(
       domainClass: source.domainClass, 
       domain: source.domain 
   });
-  const domainsSource = theme?.diagram?.domains || (theme as any)?.domains || {};
+  const domainsSource = getThemeDomains(theme);
   return domainsSource[key];
 }
 

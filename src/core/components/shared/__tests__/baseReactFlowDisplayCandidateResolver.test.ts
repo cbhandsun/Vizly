@@ -32,16 +32,39 @@ afterEach(() => {
 });
 
 describe('baseReactFlowDisplayCandidateResolver', () => {
-  it('prefers a persistent candidate without loading an artifact', async () => {
+  it('prefers a precompiled artifact over a persistent candidate', async () => {
     const load = vi.fn(async () => candidateEdges);
+    await expect(resolveBaseReactFlowDisplayCandidate({
+      input,
+      persistentCandidateEdges: [{ ...candidateEdges[0], sourceHandle: 'left' }],
+      signal: new AbortController().signal,
+      isCurrent: () => true,
+      loadPrecompiledCandidate: load,
+    })).resolves.toEqual({ candidateEdges, source: 'precompiled' });
+    expect(load).toHaveBeenCalledOnce();
+  });
+
+  it('falls back to a persistent candidate on an artifact miss or bounded timeout', async () => {
     await expect(resolveBaseReactFlowDisplayCandidate({
       input,
       persistentCandidateEdges: candidateEdges,
       signal: new AbortController().signal,
       isCurrent: () => true,
-      loadPrecompiledCandidate: load,
+      loadPrecompiledCandidate: vi.fn(async () => null),
     })).resolves.toEqual({ candidateEdges, source: 'persistent' });
-    expect(load).not.toHaveBeenCalled();
+
+    vi.useFakeTimers();
+    const pending = resolveBaseReactFlowDisplayCandidate({
+      input,
+      persistentCandidateEdges: candidateEdges,
+      signal: new AbortController().signal,
+      isCurrent: () => true,
+      loadPrecompiledCandidate: () => new Promise(() => {}),
+      loadTimeoutMs: 1_000,
+    });
+    const resolved = expect(pending).resolves.toEqual({ candidateEdges, source: 'persistent' });
+    await vi.advanceTimersByTimeAsync(1_000);
+    await resolved;
   });
 
   it('returns a lazy artifact hit and converts misses or failures to full-route resolutions', async () => {

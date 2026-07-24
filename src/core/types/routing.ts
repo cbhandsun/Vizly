@@ -72,6 +72,8 @@ export interface PortSelectionConfig {
     // [NEW] Weighted Preference for Bus/Trunk Routing
     preferredSourcePort?: Position;
     preferredTargetPort?: Position;
+    constrainedSourcePos?: Position;
+    constrainedTargetPos?: Position;
 
     // [P3] Advanced Tuning & Context (Merged from costAwarePorts.ts)
     bendPenalty?: number;      // Cost per bend (default: 50)
@@ -102,6 +104,7 @@ export interface UnifiedRoutingConfig {
         visibilityGraphThreshold: number;  // default: 6 (lowered from 10 in P1)
         enableJPS: boolean;                // default: false (future optimization)
         enableThetaStar?: boolean;         // [NEW]
+        portOffset?: number;               // Legacy distributed-port stub offset
     };
 
     // Cost system
@@ -175,6 +178,7 @@ export interface UnifiedRoutingConfig {
 
     // Debug
     debug: boolean;                        // default: false
+    verboseConsole?: boolean;
 
     // [P0 OPTIMIZATION] Experimental Features
     experimental?: {
@@ -386,6 +390,13 @@ export interface PathFindingJob {
     trunkOrderIndex?: number;
     trunkOrderCount?: number;
     trunkBranchCoord?: number;
+    trunkPort?: unknown;
+    trunkPortTangent?: number;
+    busIndex?: number;
+    peerGroupMembers?: string[];
+    peerGroupKey?: string;
+    o2mPeerGroupKey?: string;
+    m2oPeerGroupKey?: string;
 
     // [ELK-Refactor] Typed bus routing plan — replaces (job as any).xxx
     busRoutingPlan?: BusRoutingPlan;
@@ -398,6 +409,11 @@ export interface PathFindingJob {
     // Bidirectional Edge Separation
     bidirectionalChannel?: number;
     bidirectionalSpacing?: number;
+    bidirectionalCount?: number;
+
+    // Legacy flat group metadata retained at the worker protocol boundary while
+    // callers migrate to busRoutingPlan.
+    peerGroupSize?: number;
 
     isReverseEdge?: boolean;
     debug?: boolean;

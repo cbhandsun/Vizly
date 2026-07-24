@@ -15,6 +15,7 @@ import {
 import { FaArrowUp, FaArrowDown, FaPercentage } from 'react-icons/fa';
 import { useAlignment } from './hooks/useAlignment';
 import { ShapePreview } from './ShapePreview';
+import type { FlowchartShape } from '../../types/flowchart-node';
 import {
     ToolbarContainer,
     ToolbarButton,
@@ -25,12 +26,11 @@ import {
     useFloatingPosition,
     useSelectedNodeBounds,
     useNodesDragging,
-    type _OverflowItem,
 } from '../shared/FloatingToolbar';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const POPULAR_SHAPES = [
+const POPULAR_SHAPES: Array<{ shape: FlowchartShape; label: string }> = [
     { shape: 'rectangle', label: 'Process' },
     { shape: 'pill', label: 'Start/End' },
     { shape: 'diamond', label: 'Decision' },
@@ -52,6 +52,9 @@ const DOMAIN_OPTIONS = [
     { value: 'infra', label: '基础设施域 (Infra)', color: '#424242' },
 ];
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    Boolean(value && typeof value === 'object' && !Array.isArray(value));
+
 // ─── Types (preserved for backward compatibility) ────────────────────────────
 
 export type ToolbarFeature = 'color' | 'opacity' | 'shape' | 'domain' | 'align' | 'layer' | 'border' | 'copyStyle';
@@ -70,7 +73,7 @@ export interface FloatingContextToolbarProps {
     onUpdateNodes: (updates: { id: string, position: { x: number, y: number } }[]) => void;
     layers?: LayerConfig[];
     onMoveToLayer?: (layerId: string) => void;
-    onChangeShape?: (shape: string) => void;
+    onChangeShape?: (shape: FlowchartShape) => void;
     /** 保存选中节点为组件模板 */
     onSaveAsComponent?: () => void;
     /** 业务域变更 */
@@ -87,8 +90,8 @@ export interface FloatingContextToolbarProps {
 // ─── Popover Content Components ──────────────────────────────────────────────
 
 const AlignPanel: React.FC<{
-    onAlign: (dir: string) => void;
-    onDistribute: (dir: string) => void;
+    onAlign: (dir: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
+    onDistribute: (dir: 'horizontal' | 'vertical') => void;
     canAlign: boolean;
     canDistribute: boolean;
 }> = ({ onAlign, onDistribute, canAlign, canDistribute }) => (
@@ -111,7 +114,7 @@ const AlignPanel: React.FC<{
     </div>
 );
 
-const ShapePanel: React.FC<{ onChangeShape: (shape: string) => void }> = ({ onChangeShape }) => (
+const ShapePanel: React.FC<{ onChangeShape: (shape: FlowchartShape) => void }> = ({ onChangeShape }) => (
     <div style={{ padding: 8, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, width: 180 }}>
         {POPULAR_SHAPES.map(s => (
             <div
@@ -125,7 +128,7 @@ const ShapePanel: React.FC<{ onChangeShape: (shape: string) => void }> = ({ onCh
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--toolbar-btn-hover-bg)'}
                 onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
             >
-                <div style={{ lineHeight: 0 }}><ShapePreview shape={s.shape as any} size={24} color="#64748b" /></div>
+                <div style={{ lineHeight: 0 }}><ShapePreview shape={s.shape} size={24} color="#64748b" /></div>
             </div>
         ))}
     </div>
@@ -156,6 +159,7 @@ const DomainClassPanel: React.FC<{ onChangeDomainClass: (domainClass: string) =>
 
 export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = React.memo(({
     selectedNodes, onDelete, onDuplicate, onChangeColor,
+    onChangeColorComplete,
     onLock, onOpacity, onBringToFront, onSendToBack, onUpdateStyle, onUpdateNodes,
     layers, onMoveToLayer, onChangeShape, onSaveAsComponent, onChangeDomainClass,
     onCopyStyle, onPasteStyle, hasCopiedStyle, extraToolbarContent, excludeToolbarFeatures,
@@ -202,8 +206,14 @@ export const FloatingContextToolbar: React.FC<FloatingContextToolbarProps> = Rea
         return acc + op;
     }, 0) / selectedNodes.length;
 
-    const currentColor = (selectedNodes[0]?.data?.style as any)?.backgroundColor ||
-        (selectedNodes[0]?.data?.theme as any)?.main || '#ffffff';
+    const selectedNodeData = selectedNodes[0]?.data;
+    const selectedDataStyle = isRecord(selectedNodeData?.style) ? selectedNodeData.style : {};
+    const selectedDataTheme = isRecord(selectedNodeData?.theme) ? selectedNodeData.theme : {};
+    const currentColor = typeof selectedDataStyle.backgroundColor === 'string'
+        ? selectedDataStyle.backgroundColor
+        : typeof selectedDataTheme.main === 'string'
+          ? selectedDataTheme.main
+          : '#ffffff';
 
     const currentStrokeWidth = Number(selectedNodes[0]?.style?.strokeWidth || 1);
     const isDashed = selectedNodes[0]?.style?.strokeDasharray === '4,4';

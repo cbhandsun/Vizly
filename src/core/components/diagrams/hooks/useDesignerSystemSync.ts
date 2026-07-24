@@ -1,15 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Node, Edge } from '@xyflow/react';
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { MarkerType, type Edge, type Node, type ReactFlowInstance } from '@xyflow/react';
 import type { MessageInstance } from 'antd/es/message/interface';
 import { useAutoSave } from './useAutoSave';
 import { PluginRegistry } from '../../../services/PluginRegistry';
-import { analyzeDiagram } from '@/utils/diagramAnalyzer';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
-import { isStandardPresetId } from '@/data/standardized/presetMetadata';
-import { loadStandardPresetById } from '@/data/standardized/presetLoader';
 import { cancelLayoutTransition, suspendLayoutTransitions } from '../../../utils/animateLayoutTransition';
-import { expandHandle } from '../../../routing/utils/handleUtils';
-import { parseAutoSavePayload } from '../../../utils/autoSaveStorage';
 import { readReactFlowCanvasSize } from '../../../utils/domViewport';
 import { loadStandardPresetCanvas } from './standardPresetCanvasCache';
 import {
@@ -17,12 +12,24 @@ import {
     logDesignerSystemSyncAutosaveRecalculationFailure,
     logDesignerSystemSyncDataRegistryImportFailure,
     logDesignerSystemSyncDataRegistryWriteFailure,
-    logDesignerSystemSyncFreshSeedClearFailure,
     logDesignerSystemSyncImportDataFailure,
     logDesignerSystemSyncPresetLoadFailure,
     logDesignerSystemSyncStaleAutosaveDetected,
     logDesignerSystemSyncStandardDataToCanvasFailure,
 } from './designerSystemSyncLogging';
+import { getApplicationDiagramRuntime } from '../../../ports/applicationDiagramRuntime';
+import {
+    clearDesignerFreshSeedFlag,
+    mergePresetExplicitEdgeHandles,
+    recalculateAutosaveNodeSizes,
+} from './designerSystemSyncPersistence';
+import {
+    analyzeDesignerCanvas,
+    projectDesignerStandardEdges,
+    projectDesignerStandardNodes,
+} from './designerFlowDataBridgeProjection';
+import type { FlowDataBridgeEntry } from '../../../utils/flowDataBridge';
+import type { StandardDiagramData } from '../../../models/DiagramModels';
 
 const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
 
@@ -31,142 +38,23 @@ const getPluginEmptyState = (pluginId: string) => {
     return plugin?.getEmptyState();
 };
 
-const stripHtml = (value: string) => value ? value.replace(/<[^>]*>?/gm, '') : '';
-
-const clearFreshSeedFlagInStorage = (storageKey: string) => {
-    try {
-        const parsed = parseAutoSavePayload(localStorage.getItem(storageKey));
-        if (!parsed?.isFreshSeed) return;
-        const next = { ...parsed };
-        delete next.isFreshSeed;
-        localStorage.setItem(storageKey, JSON.stringify(next));
-    } catch (error) {
-        logDesignerSystemSyncFreshSeedClearFailure(storageKey, error);
-    }
-};
-
 export interface UseDesignerSystemSyncProps {
     id?: string;
     diagramIdForExport: string;
     nodes: Node[];
     edges: Edge[];
-    setNodes: any;
-    setEdges: any;
-    reactFlowInstance: any;
+    setNodes: Dispatch<SetStateAction<Node[]>>;
+    setEdges: Dispatch<SetStateAction<Edge[]>>;
+    reactFlowInstance: ReactFlowInstance<Node, Edge> | null;
     isDragging: boolean;
     pluginId: string;
     messageApi?: MessageInstance;
 }
 
-const mergePresetExplicitEdgeHandles = (saved: any, preset: any) => {
-    if (!saved || !Array.isArray(saved.edges)) return saved;
-    const presetById = new Map<string, any>();
-    if (preset && Array.isArray(preset.edges)) {
-        for (const edge of preset.edges) {
-            if (edge?.id && (edge.sourceHandle || edge.targetHandle)) presetById.set(String(edge.id), edge);
-        }
-    }
-    const nodeById = new Map<string, any>((saved.nodes || []).map((node: any) => [String(node.id), node]));
-
-    const edges = saved.edges.map((edge: Edge) => {
-        const presetEdge = presetById.get(String(edge.id));
-        const expandedExistingSourceHandle = edge.sourceHandle ? expandHandle(String(edge.sourceHandle)) : edge.sourceHandle;
-        const expandedExistingTargetHandle = edge.targetHandle ? expandHandle(String(edge.targetHandle)) : edge.targetHandle;
-        const sourceNode = nodeById.get(String(edge.source));
-        const targetNode = nodeById.get(String(edge.target));
-        const sourceDomain = sourceNode?.domain ?? sourceNode?.data?.domain;
-        const targetDomain = targetNode?.domain ?? targetNode?.data?.domain;
-        const sourceSubDomain = sourceNode?.subDomain ?? sourceNode?.data?.subDomain;
-        const targetSubDomain = targetNode?.subDomain ?? targetNode?.data?.subDomain;
-        const isCrossSubDomainEdge = Boolean(
-            sourceDomain &&
-            targetDomain &&
-            sourceDomain === targetDomain &&
-            sourceSubDomain &&
-            targetSubDomain &&
-            sourceSubDomain !== targetSubDomain
-        );
-        if (!presetEdge && !isCrossSubDomainEdge) {
-            if (expandedExistingSourceHandle === edge.sourceHandle && expandedExistingTargetHandle === edge.targetHandle) return edge;
-            return {
-                ...edge,
-                sourceHandle: expandedExistingSourceHandle,
-                targetHandle: expandedExistingTargetHandle,
-            };
-        }
-        const sourceHandle = presetEdge?.sourceHandle ? expandHandle(String(presetEdge.sourceHandle)) : (isCrossSubDomainEdge ? 'right' : expandedExistingSourceHandle);
-        const targetHandle = presetEdge?.targetHandle ? expandHandle(String(presetEdge.targetHandle)) : (isCrossSubDomainEdge ? 'left' : expandedExistingTargetHandle);
-        const manualHandleSides = [
-            ...(sourceHandle ? ['source'] : []),
-            ...(targetHandle ? ['target'] : []),
-        ];
-        const prevAuto = Array.isArray((edge.data as any)?.auto) ? (edge.data as any).auto : [];
-        const auto = prevAuto.filter((side: string) => !manualHandleSides.includes(side));
-        return {
-            ...edge,
-            sourceHandle,
-            targetHandle,
-            data: {
-                ...(edge.data as any),
-                auto,
-                autoSource: manualHandleSides.includes('source') ? false : (edge.data as any)?.autoSource,
-                autoTarget: manualHandleSides.includes('target') ? false : (edge.data as any)?.autoTarget,
-                manualHandleSides: manualHandleSides.length > 0 ? manualHandleSides : (edge.data as any)?.manualHandleSides,
-            }
-        };
-    });
-    return { ...saved, edges };
-};
-
-const recalculateAutosaveNodeSizes = async (nodes: Node[]) => {
-    const containerTypes = new Set(['titleGroup', 'subGroup', 'swimlane', 'group']);
-    const toFiniteNumber = (value: unknown) => {
-        const parsed = typeof value === 'string' ? parseFloat(value) : Number(value);
-        return Number.isFinite(parsed) ? parsed : 0;
-    };
-    const hasUsableSize = (node: Node) => {
-        if (containerTypes.has(node.type || '')) return true;
-        const width = toFiniteNumber(node.width || (node as any).measured?.width || (node.style as any)?.width);
-        const height = toFiniteNumber(node.height || (node as any).measured?.height || (node.style as any)?.height);
-        return width > 0 && height > 0;
-    };
-
-    if (nodes.every(hasUsableSize)) return nodes;
-
-    const { LayoutOptimizer } = await import('../../layout/LayoutOptimizer');
-    const layoutOptimizer = LayoutOptimizer.getInstance();
-
-    return nodes.map((node: Node) => {
-        if (containerTypes.has(node.type || '')) return node;
-
-        const desc = String(node.data?.description || node.data?.label || '');
-        if (!desc) return node;
-
-        const calculatedWidth = layoutOptimizer.calculateNodeWidth(desc);
-        const calculatedHeight = layoutOptimizer.calculateNodeHeight(desc);
-        const contentWidth = Math.max(
-            calculatedWidth,
-            toFiniteNumber(node.width || (node as any).measured?.width || (node.style as any)?.width)
-        );
-        const contentHeight = Math.max(
-            calculatedHeight,
-            toFiniteNumber(node.height || (node as any).measured?.height || (node.style as any)?.height)
-        );
-        return {
-            ...node,
-            width: contentWidth,
-            height: contentHeight,
-            style: { ...node.style, width: contentWidth, height: contentHeight },
-            measured: { ...(node as any).measured, width: contentWidth, height: contentHeight },
-        };
-    });
-};
-
 export function useDesignerSystemSync({
     id, diagramIdForExport, nodes, edges, setNodes, setEdges,
     reactFlowInstance, isDragging, pluginId, messageApi
 }: UseDesignerSystemSyncProps) {
-
     // 使用 ref 持有最新的 nodes/edges，避免 __flowDataBridge Effect 因每次编辑重建整个 API 对象
     const nodesRef = useRef(nodes);
     const edgesRef = useRef(edges);
@@ -176,74 +64,11 @@ export function useDesignerSystemSync({
     useEffect(() => { reactFlowRef.current = reactFlowInstance; }, [reactFlowInstance]);
 
     useEffect(() => {
-        if (!(window as any).__flowDataBridge) {
-            (window as any).__flowDataBridge = {};
+        if (!window.__flowDataBridge) {
+            window.__flowDataBridge = {};
         }
 
-        const toStandardNodes = () => {
-            const standardNodes: any[] = [];
-            const groups: any[] = [];
-            nodesRef.current.forEach((node: any) => {
-                const nodeData = node.data || {};
-                const rawLabel = nodeData.label as string || '';
-                const description = (nodeData.description as string) || `<b>${rawLabel}</b>`;
-                const canvasMetadata = {
-                    canvasPosition: node.position,
-                    width: node.measured?.width ?? node.width ?? 100,
-                    height: node.measured?.height ?? node.height ?? 50,
-                    parentId: node.parentId,
-                    shape: nodeData.shape,
-                    icon: nodeData.icon,
-                    style: node.style,
-                    theme: nodeData.theme,
-                    sequence: nodeData.sequence || '1',
-                };
-                const baseNode = {
-                    id: node.id,
-                    description,
-                    domain: nodeData.domain || nodeData.domainClass || '业务域',
-                    subDomain: nodeData.subDomain || undefined,
-                    domainClass: nodeData.domainClass || 'core',
-                    type: 'custom',
-                    metadata: canvasMetadata,
-                };
-
-                if (node.type === 'titleGroup' || node.type === 'subGroup') {
-                    groups.push({
-                        ...baseNode,
-                        type: 'group',
-                        label: rawLabel || stripHtml(description),
-                        isGroup: true,
-                        measured: { width: canvasMetadata.width, height: canvasMetadata.height },
-                        position: node.position,
-                        themeColor: nodeData.themeColor,
-                        data: nodeData,
-                    });
-                } else {
-                    standardNodes.push(baseNode);
-                }
-            });
-            return { standardNodes, groups };
-        };
-
-        const toStandardEdges = () => edgesRef.current.map((edge: any) => ({
-            id: edge.id,
-            source: edge.source,
-            target: edge.target,
-            type: (edge.type === 'smart-step' || edge.type === 'smart') ? 'main' : edge.type || 'main',
-            label: edge.label || edge.data?.label,
-            markerEnd: edge.markerEnd,
-            style: edge.style,
-            metadata: {
-                sourceHandle: edge.sourceHandle,
-                targetHandle: edge.targetHandle,
-                autoHandles: edge.data?.auto,
-                manualHandles: Boolean(edge.data?.manualHandles),
-                manualHandleSides: edge.data?.manualHandleSides,
-            },
-        }));
-
-        const standardData: any = {
+        const standardData: FlowDataBridgeEntry = {
             id: `diagram-${Date.now()}`,
             name: diagramIdForExport,
             type: 'architecture',
@@ -273,22 +98,22 @@ export function useDesignerSystemSync({
         Object.defineProperties(standardData, {
             nodes: {
                 enumerable: true,
-                get: () => toStandardNodes().standardNodes,
+                get: () => projectDesignerStandardNodes(nodesRef.current).standardNodes,
             },
             groups: {
                 enumerable: true,
-                get: () => toStandardNodes().groups,
+                get: () => projectDesignerStandardNodes(nodesRef.current).groups,
             },
             edges: {
                 enumerable: true,
-                get: () => toStandardEdges(),
+                get: () => projectDesignerStandardEdges(edgesRef.current),
             },
         });
             
             // 附加 importData 特权方法供外部组件（如 AI 对话面板）应用生成的 JSON数据
             Object.defineProperty(standardData, 'importData', {
                 enumerable: false, // Prevents serialization issues in JSON.stringify
-                value: async (newData: any, _options?: { keepHistory?: boolean }) => {
+                value: async (newData: unknown, _options?: { keepHistory?: boolean }) => {
                     try {
                         const { coerceStandardDiagramImport } = await import('@/core/utils/diagramJsonImport');
                         const safeData = coerceStandardDiagramImport(newData, {
@@ -300,9 +125,7 @@ export function useDesignerSystemSync({
                         
                         // 写回 DataRegistry 中
                         try {
-                            const { dataRegistry } = await import('@/data/DataRegistry');
-                            const localSvc = dataRegistry.getDataService();
-                            localSvc.registerRemoteDiagram(safeData, {
+                            await getApplicationDiagramRuntime().registerDiagram(safeData, {
                                 id: diagramIdForExport,
                                 title: diagramIdForExport,
                             }, true, {
@@ -353,7 +176,7 @@ export function useDesignerSystemSync({
 
                     // 默认类型映射逻辑
                     let nodeType = incomingType || (pluginId === 'architecture-diagram' ? 'architectureNode' : 'flowchart');
-                    let architectureType: any = undefined;
+                    let architectureType: string | undefined;
 
                     // 如果是在架构图模式下，或者指令明确要求 architecture 类型
                     if (nodeType === 'architectureNode' || pluginId === 'architecture-diagram') {
@@ -392,7 +215,7 @@ export function useDesignerSystemSync({
                         style: { width }
                     };
 
-                    setNodes((nds: any) => {
+                    setNodes((nds) => {
                         const nextNodes = [...nds, newNode];
                         
                         // Phase 5: 自动调整父容器尺寸
@@ -427,8 +250,8 @@ export function useDesignerSystemSync({
             Object.defineProperty(standardData, 'deleteNodes', {
                 enumerable: false,
                 value: async (ids: string[]) => {
-                    setNodes((nds: any) => nds.filter((n: any) => !ids.includes(n.id)));
-                    setEdges((eds: any) => eds.filter((e: any) => !ids.includes(e.source) && !ids.includes(e.target)));
+                    setNodes((nds) => nds.filter((node) => !ids.includes(node.id)));
+                    setEdges((eds) => eds.filter((edge) => !ids.includes(edge.source) && !ids.includes(edge.target)));
                 }
             });
 
@@ -444,32 +267,33 @@ export function useDesignerSystemSync({
                         target,
                         type,
                         label,
-                        markerEnd: { type: 'arrowclosed' as any }
+                        markerEnd: { type: MarkerType.ArrowClosed }
                     };
 
-                    setEdges((eds: any) => [...eds, newEdge]);
+                    setEdges((eds) => [...eds, newEdge]);
                     return id;
                 }
             });
 
             Object.defineProperty(standardData, 'updateNode', {
                 enumerable: false,
-                value: async (id: string, data: any) => {
-                    const layoutOptimizer = data.label
+                value: async (id: string, data: Record<string, unknown>) => {
+                    const label = typeof data.label === 'string' ? data.label : undefined;
+                    const layoutOptimizer = label
                         ? (await import('../../layout/LayoutOptimizer')).LayoutOptimizer.getInstance()
                         : null;
-                    setNodes((nds: any) => nds.map((n: any) => {
+                    setNodes((nds) => nds.map((n) => {
                         if (n.id === id) {
                             const newData = { ...n.data, ...data };
-                            if (data.label && !data.description) {
-                                newData.description = `<b>${data.label}</b>`;
+                            if (label && !data.description) {
+                                newData.description = `<b>${label}</b>`;
                             }
                             
                             // Re-calculate width if label changed
                             let width = n.width;
                             let style = n.style;
-                            if (data.label && layoutOptimizer) {
-                                const width_val = layoutOptimizer.calculateNodeWidth(data.label);
+                            if (label && layoutOptimizer) {
+                                const width_val = layoutOptimizer.calculateNodeWidth(label);
                                 width = width_val;
                                 style = { ...style, width: width_val };
                             }
@@ -493,13 +317,13 @@ export function useDesignerSystemSync({
                 value: async (nodeIds: string[], groupName?: string) => {
                     if (nodeIds.length === 0) return;
                     
-                    setNodes((nds: any) => {
-                        const targetNodes = nds.filter((n: any) => nodeIds.includes(n.id));
+                    setNodes((nds) => {
+                        const targetNodes = nds.filter((node) => nodeIds.includes(node.id));
                         if (targetNodes.length === 0) return nds;
 
                         // Calculate BBox
                         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                        targetNodes.forEach((n: any) => {
+                        targetNodes.forEach((n) => {
                             const x = n.position.x;
                             const y = n.position.y;
                             const w = n.measured?.width || n.width || 120;
@@ -529,12 +353,12 @@ export function useDesignerSystemSync({
                         };
 
                         const nodeIdSet = new Set(nodeIds);
-                        const nextNodes = nds.map((n: any) => {
+                        const nextNodes = nds.map((n) => {
                             if (nodeIdSet.has(n.id)) {
                                 return {
                                     ...n,
                                     parentId: groupId,
-                                    extent: 'parent',
+                                    extent: 'parent' as const,
                                     position: {
                                         x: n.position.x - (minX - padding),
                                         y: n.position.y - (minY - padding)
@@ -552,7 +376,7 @@ export function useDesignerSystemSync({
             Object.defineProperty(standardData, 'analyze', {
                 enumerable: false,
                 value: () => {
-                    return analyzeDiagram(nodesRef.current as any, edgesRef.current as any);
+                    return analyzeDesignerCanvas(nodesRef.current, edgesRef.current);
                 }
             });
 
@@ -563,7 +387,7 @@ export function useDesignerSystemSync({
                     const duration = options?.duration || 2000;
                     
                     // 1. 开始动画
-                    setEdges((eds: any) => eds.map((e: any) => {
+                    setEdges((eds) => eds.map((e) => {
                         if (edgeIds.includes(e.id)) {
                             return { ...e, animated: true };
                         }
@@ -573,7 +397,7 @@ export function useDesignerSystemSync({
                     // 2. 如果不是循环模式，则在 duration 后关闭
                     if (!options?.loop) {
                         setTimeout(() => {
-                            setEdges((eds: any) => eds.map((e: any) => {
+                            setEdges((eds) => eds.map((e) => {
                                 if (edgeIds.includes(e.id)) {
                                     return { ...e, animated: false };
                                 }
@@ -584,15 +408,15 @@ export function useDesignerSystemSync({
                 }
             });
 
-            (window as any).__flowDataBridge[diagramIdForExport] = standardData;
+            window.__flowDataBridge[diagramIdForExport] = standardData;
         return () => {
-            delete (window as any).__flowDataBridge?.[diagramIdForExport];
+            delete window.__flowDataBridge?.[diagramIdForExport];
         };
     // 仅在 diagramIdForExport/id/pluginId 变化时重建，nodes/edges 通过 ref 访问
     }, [diagramIdForExport, id, setNodes, setEdges, pluginId, messageApi]);
 
     useEffect(() => {
-        (window as any).__flowDesignerOpenCloud = async (data: any) => {
+        window.__flowDesignerOpenCloud = async (data: StandardDiagramData) => {
             const { standardDataToCanvas } = await import('../designerUtils');
             const { nodes: newNodes, edges: newEdges } = await standardDataToCanvas(data);
             if (newNodes.length > 0) {
@@ -602,7 +426,7 @@ export function useDesignerSystemSync({
             }
         };
         return () => {
-            delete (window as any).__flowDesignerOpenCloud;
+            delete window.__flowDesignerOpenCloud;
         };
     }, [setNodes, setEdges, reactFlowInstance]);
 
@@ -616,9 +440,6 @@ export function useDesignerSystemSync({
         }
     }, [performanceMode]);
 
-    // performanceMode = nodes.length > 300 || isDragging
-    // nodes.length > 300 && !performanceMode 永远为 false，无需 Effect
-
     const [autosaveEnabled, setAutosaveEnabled] = useState(false);
 
     const { loadSaved, clearSaved, saveNow } = useAutoSave(nodes, edges, {
@@ -630,11 +451,7 @@ export function useDesignerSystemSync({
         onSaveError: (error) => logDesignerSystemSyncAutoSaveFailure(error)
     });
 
-    // [FIX-AUTOSAVE] 节点/边变化后 3 秒防抖保存（补充 beforeunload 之前的兜底）。
-    // 用 skipCountRef 跳过前 2 次 effect 触发：
-    //   第 1 次 = 初始 mount（nodes/edges 可能为空或来自 reactflow 初始化）
-    //   第 2 次 = autosave 恢复后 setNodes/setEdges 触发（此时数据刚从 localStorage 读回，保存毫无意义）
-    // 从第 3 次开始 = 用户真正的操作，才需要防抖保存。
+    // 节点/边变化后 3 秒防抖保存；跳过 mount 与 autosave 恢复的前两次触发。
     const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const skipCountRef = useRef(0);
     const isMountedRef = useRef(true);
@@ -660,11 +477,10 @@ export function useDesignerSystemSync({
         };
     }, [nodes, edges, saveNow, autosaveEnabled]);
 
-
     const hasRestoredAutoSave = useRef(false);
     const needsInitialFitView = useRef(false);
     const processedDiagramId = useRef(id);
-    const [presetLookup, setPresetLookup] = useState<{ id?: string; ready: boolean; preset: any | null }>({
+    const [presetLookup, setPresetLookup] = useState<{ id?: string; ready: boolean; preset: StandardDiagramData | null }>({
         id,
         ready: false,
         preset: null,
@@ -672,14 +488,14 @@ export function useDesignerSystemSync({
 
     useEffect(() => {
         let cancelled = false;
-        if (!isStandardPresetId(id)) {
+        if (!getApplicationDiagramRuntime().isStandardPresetId(id)) {
             setPresetLookup({ id, ready: true, preset: null });
             return () => { cancelled = true; };
         }
 
         setPresetLookup({ id, ready: false, preset: null });
 
-        void loadStandardPresetById(id).then((preset) => {
+        void getApplicationDiagramRuntime().loadStandardPreset(id).then((preset) => {
             if (!cancelled) setPresetLookup({ id, ready: true, preset });
         }).catch((error) => {
             logDesignerSystemSyncPresetLoadFailure(error);
@@ -739,12 +555,12 @@ export function useDesignerSystemSync({
                 // 导致 autosave 数据存在但负载失败，画布被重置。
                 const isCanvasData = isFreshAndValid || (saved.nodes !== undefined && (
                     saved.nodes.length === 0 ||
-                    saved.nodes.some((n: any) => n.data !== undefined)
+                    saved.nodes.some((node) => node.data !== undefined)
                 ));
                 
                 // If the isFreshSeed flag is stale (crash remnant), strip it from storage
                 if (saved.isFreshSeed && !isFreshAndValid) {
-                    clearFreshSeedFlagInStorage(`flowchart-autosave-v2-${id || 'default'}`);
+                    clearDesignerFreshSeedFlag(`flowchart-autosave-v2-${id || 'default'}`);
                     saved = { ...saved, isFreshSeed: false };
                 }
                 
@@ -771,7 +587,7 @@ export function useDesignerSystemSync({
                 // so that subsequent autosave cycles are no longer blocked by the guard.
                 if (saved.isFreshSeed) {
                     messageApi?.success('加载模板成功');
-                    clearFreshSeedFlagInStorage(`flowchart-autosave-v2-${id || 'default'}`);
+                    clearDesignerFreshSeedFlag(`flowchart-autosave-v2-${id || 'default'}`);
                 } else {
                     messageApi?.info('已恢复上次编辑内容');
                 }
@@ -803,10 +619,7 @@ export function useDesignerSystemSync({
                 hasRestoredAutoSave.current = true;
             } else {
                 // Try DataRegistry for imported/general templates before falling back to empty state
-                import('@/data/DataRegistry').then(async ({ dataRegistry }) => {
-                    await dataRegistry.initialize();
-                    const localSvc = dataRegistry.getDataService();
-                    const existing = localSvc.getDiagram(id || '');
+                getApplicationDiagramRuntime().loadDiagram(id || '', { initialize: true }).then(async (existing) => {
                     if (existing) {
                         import('../designerUtils').then(({ standardDataToCanvas }) => {
                             standardDataToCanvas(existing).then(({ nodes: newNodes, edges: newEdges }) => {
@@ -851,7 +664,7 @@ export function useDesignerSystemSync({
             const triggerRoutingAfterMeasure = () => {
                 const currentNodes = reactFlowInstance.getNodes();
                 const allMeasured = currentNodes.length > 0 &&
-                    currentNodes.every((n: any) => (n.measured?.width && n.measured.width > 0) || n.width);
+                    currentNodes.every((node) => (node.measured?.width && node.measured.width > 0) || node.width);
 
                 if (allMeasured) {
                     // 节点已被 RF 测量，解冻路由器 → 积压请求立即批量计算
@@ -876,7 +689,7 @@ export function useDesignerSystemSync({
 
     return {
         performanceMode,
-        isInitialDiagramLoading: isStandardPresetId(id) && (!presetLookup.ready || !hasRestoredAutoSave.current)
+        isInitialDiagramLoading: getApplicationDiagramRuntime().isStandardPresetId(id) && (!presetLookup.ready || !hasRestoredAutoSave.current)
     };
 }
 

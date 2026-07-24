@@ -351,7 +351,12 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
       let bestScore = obstacleRepairScore(baselineQuality, baselineObstacleHits);
 
       const candidatePool = getCandidatePool(entry.edgeIndex, edge, path);
-      const rawCandidates = [
+      const rawCandidates: Array<{
+        path: DisplayPoint[];
+        priority: number;
+        hits?: number;
+        length?: number;
+      }> = [
         ...candidatePool.scored,
         ...generateWaypointCandidates(path, layoutDirection, nodes, edge, {
           includeNodeAwareLanes: true,
@@ -361,14 +366,12 @@ export const repairDisplayObstacleHits = <T extends Edge[]>(
       ];
       const seenCandidatePaths = new Set<string>();
       const candidates = rawCandidates
-        .map(candidate => ('hits' in candidate
-          ? candidate
-          : {
-            path: compactOrthogonalPath(candidate.path),
-            priority: candidate.priority,
-            hits: undefined,
-            length: undefined,
-          }))
+        .map(candidate => ({
+          path: compactOrthogonalPath(candidate.path),
+          priority: candidate.priority,
+          hits: candidate.hits,
+          length: candidate.length,
+        }))
         .filter(candidate => candidate.path.length >= 2)
         .filter((candidate) => {
           const key = candidate.path.map(point => `${Math.round(point.x)},${Math.round(point.y)}`).join('|');

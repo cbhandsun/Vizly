@@ -1,63 +1,28 @@
-import React, { Suspense, useState, useRef, useEffect, lazy, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, lazy, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-// import Button from 'antd/es/button';
-import Spin from 'antd/es/spin';
-// import Result from 'antd/es/result';
-// import Avatar from 'antd/es/avatar';
-import { ConfigProvider } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useDiagramControls } from '@/core/hooks/useDiagramControls';
 import { useUIState } from '@/core/hooks/useUIState';
 import { diagramDefinitions } from '../data/diagram-definitions';
 import { DiagramSettingsPanel } from './ui/DiagramSettingsPanel';
-import { EnhancedThemeSelector } from './ui/EnhancedThemeSelector';
-import { DiagramThemeProvider } from '@/core/themes/DiagramThemeProvider';
 import { useConfigIntegration, useConfigValue } from '@/core/hooks/useConfigIntegration';
 import { useDiagramHostStorage } from '@/core/hooks/useDiagramHostStorage';
-import { readFavoriteDiagramIds, readRecentDiagramIds, writeFavoriteDiagramIds } from '@/core/hooks/diagramHostStorage';
 import { useSubscription } from '../context/useSubscription';
 
-const RoutingDebugPanel = React.lazy(() => import('./debug/RoutingDebugPanel').then(m => ({ default: m.RoutingDebugPanel })));
 import { LayeredConfigManager, ConfigLayer } from '@/core/config/LayeredConfigManager';
-import { DiagramLayout } from './layout/DiagramLayout';
-import { CommandPalette, type CommandItem } from '@/core/components/ui/CommandPalette';
-import { readRecentCommandIds } from '@/core/components/ui/commandPaletteStorage';
 import { useYjsCollaboration } from './diagrams/collaboration/YjsProviderHooks';
 import { useCloudSave } from './diagrams/hooks/useCloudSave';
-const ShortcutsHelpModal = React.lazy(() => import('@/core/components/ui/ShortcutsHelpModal'));
-const CollaborationModal = React.lazy(() => import('./ui/CollaborationModal').then(m => ({ default: m.CollaborationModal })));
-const AIConfigModal = React.lazy(() => import('./ai/AIConfigModal'));
-const AIChatView = React.lazy(() => import('./ai/AIChatPanel').then(m => ({ default: m.AIChatView })));
-const ShareDialog = React.lazy(() => import('@/components/diagrams/ShareDialog'));
 import { parseAIDiagramJson } from './ai/aiDiagramImport';
-import {      Input } from 'antd';
 import {
     logDiagramViewerBridgeCleanupFailure,
-    logDiagramViewerCommandPaletteStateFailure,
-    logDiagramViewerDirectSaveFailure,
     logDiagramViewerDocTypeDetectionFailure,
     logDiagramViewerEdgeModeInitializationFailure,
-    logDiagramViewerFullscreenExitFailure,
     logDiagramViewerMermaidImportFailure,
-    logDiagramViewerOpenNewTabFailure,
     logDiagramViewerRemoteLoadFailure,
-    logDiagramViewerSaveAsFailure,
     logDiagramViewerStandardDataLayoutFallbackFailure,
     logDiagramViewerSwitchConfirmationFailure,
 } from './diagramViewerLogging';
-import {
-    clearBlankTemplateLocalState,
-} from './diagramViewerStorage';
-const CloudStorageManagerModal = React.lazy(() => import('./storage/CloudStorageManagerModal').then(m => ({ default: m.CloudStorageManagerModal })));
-const MermaidImportModal = React.lazy(() => import('./ui/MermaidImportModal').then(m => ({ default: m.MermaidImportModal })));
-import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
-import { invalidateRemoteDiagramPreview } from '@/core/utils/remoteDiagramPreview';
-import DiagramControlBridge from '@/core/components/shared/DiagramControlBridge';
-
-
-
-const DraggableSettingsPanel = React.lazy(() => import('./ui/DraggableSettingsPanel').then(m => ({ default: m.DraggableSettingsPanel })));
-const TemplateCascaderMenu = React.lazy(() => import('./diagrams/ui/TemplateCascaderMenu').then(m => ({ default: m.TemplateCascaderMenu })));
+import { clearBlankTemplateLocalState } from './diagramViewerStorage';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { resolvePluginId } from '@/core/plugins/registry';
 import { ensureBuiltInPlugins } from '@/core/plugins/builtInPlugins';
@@ -65,7 +30,7 @@ import { getStandardPresetDocTypeById } from '@/data/standardized/presetMetadata
 import { loadStandardPresetById } from '@/data/standardized/presetLoader';
 import { getDiagramDocTypeFromStorage } from '@/core/utils/diagramTypeStorage';
 import { createAutoSavePayload } from '@/core/utils/autoSaveStorage';
-import { addCustomPreset, getCustomPreset } from '@/core/utils/customPresetStorage';
+import { getCustomPreset } from '@/core/utils/customPresetStorage';
 import {
     getFlowDataBridge,
     getFlowDataBridgeEdges,
@@ -82,34 +47,36 @@ import {
     setDiagramSearchParam,
 } from './diagramViewerLocation';
 import {
-    createDiagramViewerCommandItems,
-    getDiagramViewerCommandModifierLabel,
-} from './diagramViewerCommandItems';
-import {
-    openDiagramViewerInNewTab,
     seedAutoSaveAndNavigateDiagram,
     selectDiagramInViewer,
 } from './diagramViewerNavigation';
 import {
-    isDiagramViewerBridgeSavable,
-    saveDiagramViewerCloudReplica,
-    saveDiagramViewerDirectCloud,
-} from './diagramViewerSave';
-import { createDiagramViewerGlobalKeydownHandler } from './diagramViewerKeyboard';
-import {
+    coerceDiagramSeedData,
     finalizeDiagramSeedNavigation,
     normalizeDiagramSeedData,
 } from './diagramViewerSeedNavigation';
 import { ensureDiagramSwitchConfirmed } from './diagramViewerSwitchGuard';
 import { parseRemoteDiagramContent } from '@/services/remoteDiagramContent';
+import { coerceToStandardDiagramData } from '@/core/utils/coerceDiagram';
+import { importMermaidGraphToBridge } from './diagramViewerMermaidImport';
 import {
     normalizeCollaborationRoomName,
     normalizeCollaborationServerUrl,
     normalizeCollaborationToken,
 } from './diagrams/collaboration/collaborationSecurity';
 
-import { ErrorBoundary } from './ui/ErrorBoundary';
-import { appModal } from '@/core/utils/antdStaticBridge';
+import {
+    coerceRemoteDiagramSelection,
+    selectDiagramViewerTemplate,
+    type DiagramViewerTemplateData,
+} from './diagramViewerTemplateSelection';
+import { useDiagramViewerCommands } from './useDiagramViewerCommands';
+import { useDiagramViewerSaveActions } from './useDiagramViewerSaveActions';
+import { DiagramViewerView } from './DiagramViewerView';
+import { ensureDiagramViewerExportAllowed } from './diagramViewerExportPolicy';
+import type { DiagramExportFormat } from '@/core/types/diagram-components';
+import type { DiagramComponentProps } from '@/core/types/diagram-components';
+import { coerceClipboardData } from '@/core/utils/flowchartClipboard';
 
 const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
 
@@ -121,7 +88,7 @@ const loadFlowchartDesigner = async (pluginId?: string, presetId?: string) => {
     ]);
 
     return {
-        default: (props: any) => React.createElement(
+        default: (props: DiagramComponentProps) => React.createElement(
             FlowchartDesigner,
             pluginId ? { ...props, pluginId } : props
         )
@@ -171,42 +138,19 @@ const DiagramViewer: React.FC = () => {
         enabled: isCollabEnabled
     });
 
-    // Provide client ID to window for UI badge tracking
-    useEffect(() => {
-        if (provider?.awareness?.clientID) {
-            (window as any)._yjsClientId = provider.awareness.clientID;
-        }
-    }, [provider?.awareness?.clientID]);
-
     const { saveToCloud, shareDialogOpen, closeShareDialog, ensureSaved } = useCloudSave(selectedDiagramId);
     
     // --- Phase 6: Mermaid Import Logic ---
-    const handleImportMermaidNodes = useCallback(async (nodes: any[], edges: any[]) => {
+    const handleImportMermaidNodes = useCallback(async (nodes: unknown[], edges: unknown[]) => {
         const bridge = getFlowDataBridge(selectedDiagramId);
-        if (!bridge) {
+        const addNode = bridge?.addNode;
+        if (!bridge || !addNode) {
             appMessage.error(t('diagramViewer.canvasNotFound'));
             return;
         }
 
         try {
-            // 1. 批量创建节点 (利用更新后的 addNode 支持自定义 ID)
-            for (const n of nodes) {
-                await bridge.addNode({
-                    id: n.id,
-                    label: n.data.label,
-                    type: n.data.type,
-                    shape: n.data.shape,
-                    parentId: n.parentId,
-                    position: n.position
-                });
-            }
-
-            // 2. 批量连接
-            for (const e of edges) {
-                if (bridge.connectNodes) {
-                    bridge.connectNodes({ source: e.source, target: e.target, label: e.label });
-                }
-            }
+            await importMermaidGraphToBridge({ bridge: { addNode, connectNodes: bridge.connectNodes }, nodes, edges });
 
             // 3. 自动触发智能布局
             setTimeout(() => {
@@ -221,17 +165,22 @@ const DiagramViewer: React.FC = () => {
     const [cloudManagerVisible, setCloudManagerVisible] = useState(false);
     const [mermaidModalVisible, setMermaidModalVisible] = useState(false);
 
+    const readBridgeSnapshot = useCallback(() => coerceClipboardData({
+        nodes: getFlowDataBridgeNodes(selectedDiagramId),
+        edges: getFlowDataBridgeEdges(selectedDiagramId),
+    }) ?? { nodes: [], edges: [] }, [selectedDiagramId]);
+
     const aiNodesRef = useMemo(() => ({
         get current() {
-            return getFlowDataBridgeNodes(selectedDiagramId);
+            return readBridgeSnapshot().nodes;
         }
-    }), [selectedDiagramId]);
+    }), [readBridgeSnapshot]);
 
     const aiEdgesRef = useMemo(() => ({
         get current() {
-            return getFlowDataBridgeEdges(selectedDiagramId);
+            return readBridgeSnapshot().edges;
         }
-    }), [selectedDiagramId]);
+    }), [readBridgeSnapshot]);
     // =======================================================
 
 
@@ -268,10 +217,7 @@ const DiagramViewer: React.FC = () => {
         isFullscreen,
         handleToggleFullscreen
     } = useUIState(panelRef);
-    const getReactFlowSnapshot = useCallback(() => ({
-        nodes: getFlowDataBridgeNodes(selectedDiagramId) as any[],
-        edges: getFlowDataBridgeEdges(selectedDiagramId) as any[],
-    }), [selectedDiagramId]);
+    const getReactFlowSnapshot = useCallback(() => readBridgeSnapshot(), [readBridgeSnapshot]);
     const {
         handleToggleFullscreen: handleFsControl,
         exportToPNG,
@@ -363,110 +309,18 @@ const DiagramViewer: React.FC = () => {
     const [isPresentationMode, setIsPresentationMode] = useState<boolean>(false);
 
 
-    /** 更强大的多端另存为统筹逻辑 */
-    const handleSaveTo = useCallback(async (target: 's3' | 'supabase' | 'local') => {
-        const bridge = getFlowDataBridge(selectedDiagramId);
-        if (!isDiagramViewerBridgeSavable(bridge)) {
-            appMessage.error('未找到图表数据，无法保存');
-            return;
-        }
-
-        const defaultName = bridge.metadata?.title || bridge.name || selectedDiagramId;
-
-        let newName = defaultName;
-        // 使用简易模态交互提供命名的机会
-        appModal.confirm({
-            title: t('diagramViewer.saveAs.title', { target: target.toUpperCase() }),
-            content: (
-                <div style={{ marginTop: 16 }}>
-                    <p style={{ marginBottom: 8, color: '#666' }}>{t('diagramViewer.saveAs.namePlaceholder')}</p>
-                    <Input
-                        defaultValue={defaultName}
-                        onChange={e => newName = e.target.value} />
-                </div>
-            ),
-            onOk: async () => {
-                if (!newName || !newName.trim()) {
-                    appMessage.error(t('diagramViewer.saveAs.nameRequired'));
-                    return;
-                }
-                const nameStr = newName.trim();
-                const hide = appMessage.loading(t('diagramViewer.saveAs.saving', { target }), 0);
-                try {
-                    const dataToSave = {
-                        ...bridge,
-                        id: crypto.randomUUID(), // 作为全新文件存储
-                        name: nameStr,
-                        metadata: {
-                            ...(bridge.metadata || {}),
-                            title: nameStr
-                        }
-                    };
-
-                    if (target === 'local') {
-                        const savedPreset = addCustomPreset(nameStr, dataToSave);
-                        if (!savedPreset) throw new Error('本地模板数据无效');
-                        appMessage.success(t('diagramViewer.saveAs.localSuccess'));
-
-                        // Sync current
-                        // selectedDiagramId && dispatchDiagramControl('loadLocalJson', { json: JSON.stringify(dataToSave) });
-                    } else {
-                        const savedId = await saveDiagramViewerCloudReplica({
-                            bridge,
-                            selectedDiagramId,
-                            providerName: target,
-                            title: nameStr,
-                            getProvider: async (providerName) => {
-                                const { unifiedStorage } = await import('@/services/UnifiedStorageService');
-                                return unifiedStorage.getProvider(providerName);
-                            },
-                            attachSnapshot: tryAttachDiagramSnapshot,
-                            invalidatePreview: invalidateRemoteDiagramPreview,
-                            createId: () => crypto.randomUUID(),
-                        });
-
-                        // URL 刷新指引
-                        setSearchParams(prev => { prev.set('diagram', savedId); return prev; });
-                        appMessage.success(t('diagramViewer.saveAs.cloudSuccess'));
-                    }
-                } catch (e: any) {
-                    logDiagramViewerSaveAsFailure(target, e);
-                    appMessage.error(t('diagramViewer.saveAs.error', { message: e.message || String(e) }));
-                } finally {
-                    hide();
-                }
-            }
+    const handleCloudReplicaSaved = useCallback((savedId: string) => {
+        setSearchParams(previous => {
+            const next = new URLSearchParams(previous);
+            next.set('diagram', savedId);
+            return next;
         });
-    }, [selectedDiagramId, setSearchParams, t]);
-
-    /** 同源直接覆盖保护机制 */
-    const handleDirectSave = useCallback(async () => {
-        const bridge = getFlowDataBridge(selectedDiagramId);
-        const cloudMeta = bridge?.metadata?.cloud;
-        if (cloudMeta && cloudMeta.provider && cloudMeta.title) {
-            // 已存在云记录，静默同名同 id 覆盖更新
-            const hide = appMessage.loading(t('diagramViewer.directSave.saving', { provider: cloudMeta.provider }), 0);
-            try {
-                await saveDiagramViewerDirectCloud({
-                    bridge,
-                    selectedDiagramId,
-                    getProvider: async (providerName) => {
-                        const { unifiedStorage } = await import('@/services/UnifiedStorageService');
-                        return unifiedStorage.getProvider(providerName as any);
-                    },
-                    attachSnapshot: tryAttachDiagramSnapshot,
-                    invalidatePreview: invalidateRemoteDiagramPreview,
-                });
-                appMessage.success(t('diagramViewer.directSave.success'));
-            } catch (e: any) {
-                logDiagramViewerDirectSaveFailure(String(cloudMeta.provider), e);
-                appMessage.error(t('diagramViewer.directSave.error', { message: e.message }));
-            } finally { hide(); }
-        } else {
-            // 首次未知归属文件强制另存为至 supabase 后端
-            handleSaveTo('supabase');
-        }
-    }, [selectedDiagramId, handleSaveTo, t]);
+    }, [setSearchParams]);
+    const { handleDirectSave } = useDiagramViewerSaveActions({
+        selectedDiagramId,
+        t,
+        onCloudReplicaSaved: handleCloudReplicaSaved,
+    });
 
     /* Removed renderOverflowContent and helper functions - moved to DiagramSettingsPanel */
 
@@ -479,9 +333,9 @@ const DiagramViewer: React.FC = () => {
         });
     }, [setSearchParams, addRecentDiagram]);
 
-    const seedAutoSaveAndNavigate = useCallback(async (data: any, id: string) => {
+    const seedAutoSaveAndNavigate = useCallback(async (data: unknown, id: string) => {
         await seedAutoSaveAndNavigateDiagram({
-            data,
+            data: coerceDiagramSeedData(data),
             id,
             ensureSwitchConfirmed: () => ensureDiagramSwitchConfirmed({
                 getCurrentNodeCount: async () => {
@@ -494,7 +348,11 @@ const DiagramViewer: React.FC = () => {
                 data: seedData,
                 convertStandardDataToCanvas: async (normalizedSeedData) => {
                     const { standardDataToCanvas } = await import('@/core/components/diagrams/designerUtils');
-                    return standardDataToCanvas(normalizedSeedData);
+                    const standardData = coerceToStandardDiagramData(normalizedSeedData, {
+                        id,
+                        title: typeof normalizedSeedData.name === 'string' ? normalizedSeedData.name : id,
+                    });
+                    return standardDataToCanvas(standardData);
                 },
                 logLayoutFallbackFailure: logDiagramViewerStandardDataLayoutFallbackFailure,
             }),
@@ -511,41 +369,9 @@ const DiagramViewer: React.FC = () => {
             }),
         });
     }, [saveSelectedDiagramId, selectedDiagramId]);
-    // 构建通过 IoC 模式下发的商业级高级操作菜单
-    const extraExportItems = useMemo(() => [
-        {
-            key: 'pro-export-pdf',
-            label: (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', minWidth: '140px' }}>
-                    <span>{t('diagramViewer.export.pdf')}</span>
-                    <span style={{ fontSize: '14px', marginLeft: 8 }} title={t('common.proFeature')}>👑</span>
-                </div>
-            ),
-            onClick: () => {
-                if (!hasFeature('export-pdf')) {
-                    showUpgradeModal(t('diagramViewer.export.pdf'));
-                } else {
-                    // TODO: 真正的云渲染
-                }
-            }
-        },
-        {
-            key: 'pro-export-svg',
-            label: (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', minWidth: '140px' }}>
-                    <span>{t('diagramViewer.export.svg')}</span>
-                    <span style={{ fontSize: '14px', marginLeft: 8 }} title={t('common.proFeature')}>👑</span>
-                </div>
-            ),
-            onClick: () => {
-                if (!hasFeature('export-hd-svg')) {
-                    showUpgradeModal(t('diagramViewer.export.svg'));
-                } else {
-                    // TODO: 真正的云渲染
-                }
-            }
-        }
-    ], [hasFeature, showUpgradeModal, t]);
+    const handleExportPermissionCheck = useCallback((format: DiagramExportFormat) => (
+        ensureDiagramViewerExportAllowed(format, hasFeature, showUpgradeModal)
+    ), [hasFeature, showUpgradeModal]);
 
     // 同步 selectedDiagramId → localStorage（供命令面板等非 reload 路径使用）
     // 注意：seedAutoSaveAndNavigate 中有直接写 localStorage 的逻辑（用于 reload 前持久化），
@@ -567,14 +393,6 @@ const DiagramViewer: React.FC = () => {
         document.addEventListener('fullscreenchange', onFsChange);
         return () => document.removeEventListener('fullscreenchange', onFsChange);
     }, [selectedDiagramId]);
-
-    const [showDebugPanel, setShowDebugPanel] = useState(false);
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [isCommandOpen, setIsCommandOpen] = useState(false);
-    const [commandFavorites, setCommandFavorites] = useState<string[]>([]);
-    const [commandRecent, setCommandRecent] = useState<string[]>([]);
-    const [commandRecentOps, setCommandRecentOps] = useState<string[]>([]);
-    const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
 
     const handlePreviewAIJson = useCallback((json: string) => {
         importAIDiagramJsonToBridge({
@@ -619,63 +437,6 @@ const DiagramViewer: React.FC = () => {
         exportToSVG,
         exportToGIF,
     ]);
-
-    useEffect(() => {
-        if (!isCommandOpen) return;
-        const read = () => {
-            try {
-                const favorites = readFavoriteDiagramIds();
-                const recent = readRecentDiagramIds();
-                const recentOps = readRecentCommandIds(8).filter(id => id.startsWith('op:'));
-                queueMicrotask(() => {
-                    setCommandFavorites(favorites);
-                    setCommandRecent(recent);
-                    setCommandRecentOps(recentOps.slice(0, 8));
-                });
-            } catch (error) {
-                logDiagramViewerCommandPaletteStateFailure(error);
-            }
-        };
-
-        read();
-        const onFav = () => read();
-        window.addEventListener('diagramMenuFavoritesChanged', onFav as EventListener);
-        window.addEventListener('diagramMenuRecentChanged', onFav as EventListener);
-        window.addEventListener('commandPaletteRecentChanged', onFav as EventListener);
-        return () => {
-            window.removeEventListener('diagramMenuFavoritesChanged', onFav as EventListener);
-            window.removeEventListener('diagramMenuRecentChanged', onFav as EventListener);
-            window.removeEventListener('commandPaletteRecentChanged', onFav as EventListener);
-        };
-    }, [isCommandOpen]);
-
-    // ESC 优化：一步退出全屏并回到主视图
-    useEffect(() => {
-        const onKeyDown = createDiagramViewerGlobalKeydownHandler({
-            isPresentationMode,
-            isFullscreenActive: () => Boolean(document.fullscreenElement),
-            exitFullscreen: () => handleFsControl(),
-            onFullscreenExitFailure: (error) => logDiagramViewerFullscreenExitFailure(error),
-            toggleDebugPanel: () => setShowDebugPanel(prev => !prev),
-            openCommandPalette: () => setIsCommandOpen(true),
-            openSettings: () => setIsSettingsOpen(true),
-            triggerEditorCommand: (action) => window.dispatchEvent(new CustomEvent('editor:command', { detail: { action } })),
-            triggerAi: () => {
-                const aiBtn = document.querySelector('[data-id="toolbar-ai-btn"]') || document.querySelector('.toolbar-button-ai');
-                if (aiBtn) (aiBtn as HTMLButtonElement).click();
-            },
-            triggerTheme: () => {
-                const themeBtn = document.querySelector('[data-id="toolbar-theme-btn"]');
-                if (themeBtn) (themeBtn as HTMLButtonElement).click();
-            },
-            exitPresentation: () => {
-                setIsPresentationMode(false);
-                appMessage.info(t('diagramViewer.presentation.exit'));
-            },
-        });
-        window.addEventListener('keydown', onKeyDown);
-        return () => window.removeEventListener('keydown', onKeyDown);
-    }, [handleFsControl, isPresentationMode, t]);
 
     /**
      * 函数级注释：初始化连线模式的默认值
@@ -735,15 +496,6 @@ const DiagramViewer: React.FC = () => {
         />
     );
 
-    const openDiagramInNewTab = useCallback((id: string) => {
-        openDiagramViewerInNewTab({
-            id,
-            currentHref: window.location.href,
-            openWindow: (url, target, features) => window.open(url, target, features),
-            logFailure: logDiagramViewerOpenNewTabFailure,
-        });
-    }, []);
-
     const handleAiTabIntercept = useCallback(() => {
         if (!hasFeature('ai-assistant')) {
             showUpgradeModal(t('diagramViewer.aiAssistant'));
@@ -752,342 +504,134 @@ const DiagramViewer: React.FC = () => {
         return true;
     }, [hasFeature, showUpgradeModal, t]);
 
-    const commandItems: CommandItem[] = useMemo(() => {
-        const modifierLabel = getDiagramViewerCommandModifierLabel({
-            platform: typeof navigator !== 'undefined' ? navigator.platform || '' : '',
+    const handleTemplateChange = useCallback(async (_value: string[], leafKey: string, rootGroup: string) => {
+        await selectDiagramViewerTemplate(leafKey, rootGroup, {
+            loadRemoteDiagram: async (providerName, id) => {
+                const { unifiedStorage } = await import('@/services/UnifiedStorageService');
+                const savedDiagram = await unifiedStorage.getProvider(providerName).loadDiagram(id);
+                return coerceRemoteDiagramSelection(savedDiagram, id);
+            },
+            loadSystemTemplate: async (id) => {
+                const { supabase } = await import('@/services/supabase');
+                if (!supabase) return null;
+                const { data, error } = await supabase
+                    .from('system_templates')
+                    .select('content, title, id')
+                    .eq('id', id)
+                    .single();
+                if (error) throw error;
+                return coerceRemoteDiagramSelection(data, id);
+            },
+            loadStandardPreset: async (id) => {
+                const { PRESET_MAP } = await import('@/data/standardized');
+                return (PRESET_MAP[id] ?? null) as unknown as DiagramViewerTemplateData | null;
+            },
+            getLocalPreset: (id) => getCustomPreset(id) as unknown as DiagramViewerTemplateData | null,
+            parseRemoteContent: (content, fallback) => parseRemoteDiagramContent(
+                typeof content === 'string' ? content : JSON.stringify(content),
+                { id: fallback.id, title: fallback.title ?? fallback.id },
+            ) as unknown as DiagramViewerTemplateData,
+            seedAndNavigate: seedAutoSaveAndNavigate,
+            clearBlankTemplate: (id) => clearBlankTemplateLocalState(localStorage, id),
+            selectDiagram: handleSelectDiagram,
+            showLoading: (message) => appMessage.loading(message, 0),
+            showError: (message) => appMessage.error(message),
+            logFailure: logDiagramViewerRemoteLoadFailure,
+            translate: (key, values) => {
+                if (key === 'storage.manager.downloading') return t('storage.manager.downloading');
+                if (key === 'storage.manager.noContent') return t('storage.manager.noContent');
+                return t('diagramViewer.cloudLoad.error', { message: values?.message ?? '' });
+            },
         });
+    }, [handleSelectDiagram, seedAutoSaveAndNavigate, t]);
 
-        return createDiagramViewerCommandItems({
-            t,
-            modifierLabel,
-            isFullscreen,
-            commandFavorites,
-            commandRecent,
-            commandRecentOps,
-            diagramDefinitions,
-            setIsShortcutsOpen,
-            setIsSettingsOpen,
-            setMermaidModalVisible,
-            handleToggleFullscreen,
-            handleSelectDiagram,
-            openDiagramInNewTab,
-            navigate,
-            triggerEditorCommand: (action) => window.dispatchEvent(new CustomEvent('editor:command', { detail: { action } })),
-            triggerAiButton: () => {
-                const aiBtn = document.querySelector('[data-id="toolbar-ai-btn"]') || document.querySelector('.toolbar-button-ai');
-                if (aiBtn) (aiBtn as HTMLButtonElement).click();
-            },
-            triggerThemeButton: () => {
-                const themeBtn = document.querySelector('[data-id="toolbar-theme-btn"]');
-                if (themeBtn) (themeBtn as HTMLButtonElement).click();
-            },
-            clearFavorites: () => {
-                writeFavoriteDiagramIds([]);
-                window.dispatchEvent(new CustomEvent('diagramMenuFavoritesChanged'));
-            },
-        });
-    }, [commandFavorites, commandRecent, commandRecentOps, handleSelectDiagram, handleToggleFullscreen, isFullscreen, navigate, openDiagramInNewTab, t]);
+    const exitPresentation = useCallback(() => {
+        setIsPresentationMode(false);
+        appMessage.info(t('diagramViewer.presentation.exit'));
+    }, [t]);
+    const {
+        commandItems,
+        isCommandOpen,
+        setIsCommandOpen,
+        isSettingsOpen,
+        setIsSettingsOpen,
+        isShortcutsOpen,
+        setIsShortcutsOpen,
+        showDebugPanel,
+        setShowDebugPanel,
+    } = useDiagramViewerCommands({
+        t,
+        isFullscreen,
+        isPresentationMode,
+        handleToggleFullscreen,
+        exitFullscreen: handleFsControl,
+        handleSelectDiagram,
+        navigate,
+        setMermaidModalVisible,
+        exitPresentation,
+    });
 
     return (
-        <DiagramThemeProvider>
-            <DiagramLayout
-                isPresentationMode={isPresentationMode}
-                toolbarProps={{
-                    diagramId: selectedDiagramId,
-                    diagramName: selectedDiagram?.titleKey ? t(selectedDiagram.titleKey) : (selectedDiagram?.name || 'Diagram'),
-                    title: selectedDiagram?.titleKey ? t(selectedDiagram.titleKey) : (selectedDiagram?.name || 'Diagram'),
-                    edgeMode: edgeMode || 'advanced-smart',
-                    onEdgeModeChange: (mode: 'advanced-smart' | 'native') => setEdgeMode(mode),
-                    isFullscreen: isFullscreen,
-                    onToggleFullscreen: handleToggleFullscreen,
-                    setIsCommandOpen: setIsCommandOpen,
-                    showExport: true,
-                    showThemeSelector: false,
-                    showStyleSwitcher: false,
-                    hideCenterIsland: resolvedPluginId === 'mindmap',
-                    leftChildren: (
-                        <>
-                            <div className="flex items-center max-w-[240px]">
-                                <TemplateCascaderMenu
-                                    style={{ width: '100%', minWidth: 160 }}
-                                    onChange={async (val, leafKey, rootGroup) => {
-                                        if (!leafKey) return;
-
-                                        if (rootGroup === 's3' || rootGroup === 'cloud' || rootGroup === 'supabase') {
-                                            const providerName = rootGroup === 's3' ? 's3' : 'supabase';
-                                            const messageKey = appMessage.loading(t('storage.manager.downloading'), 0);
-                                            try {
-                                                const { unifiedStorage } = await import('@/services/UnifiedStorageService');
-                                                const provider = unifiedStorage.getProvider(providerName);
-                                                const savedDiagram = await provider.loadDiagram(leafKey);
-                                                if (savedDiagram && savedDiagram.content) {
-                                                    const parsedContent = parseRemoteDiagramContent(savedDiagram.content, {
-                                                        id: savedDiagram.id,
-                                                        title: savedDiagram.title,
-                                                    });
-                                                    const normalized = {
-                                                        ...parsedContent,
-                                                        id: savedDiagram.id,
-                                                        name: savedDiagram.title || parsedContent.name,
-                                                        metadata: {
-                                                            ...(parsedContent.metadata || {}),
-                                                            title: savedDiagram.title,
-                                                            cloud: { provider: providerName, id: savedDiagram.id, title: savedDiagram.title }
-                                                        }
-                                                    };
-                                                    seedAutoSaveAndNavigate(normalized, savedDiagram.id);
-                                                } else {
-                                                    appMessage.error(t('storage.manager.noContent'));
-                                                }
-                                            } catch (e: any) {
-                                                logDiagramViewerRemoteLoadFailure(providerName, String(leafKey), e);
-                                                appMessage.error(t('diagramViewer.cloudLoad.error', { message: e.message }));
-                                            } finally {
-                                                messageKey();
-                                            }
-                                        } else if (rootGroup === 'system-templates') {
-                                            const messageKey = appMessage.loading('正在加载云端模板...', 0);
-                                            try {
-                                                const { supabase } = await import('@/services/supabase');
-                                                if (supabase) {
-                                                    const { data, error } = await supabase.from('system_templates').select('content, title, id').eq('id', leafKey).single();
-                                                    if (!error && data && data.content) {
-                                                        const parsedContent = parseRemoteDiagramContent(data.content, { id: data.id, title: data.title });
-                                                        const baseData = {
-                                                            ...parsedContent,
-                                                            id: data.id,
-                                                            name: data.title || parsedContent.name,
-                                                            metadata: {
-                                                                ...(parsedContent.metadata || {}),
-                                                                title: data.title
-                                                            }
-                                                        };
-                                                        const normalized = baseData;
-                                                        seedAutoSaveAndNavigate(normalized, data.id);
-                                                    } else {
-                                                        appMessage.error('模板内容为空');
-                                                    }
-                                                }
-                                            } catch (e: any) {
-                                                logDiagramViewerRemoteLoadFailure('system-templates', String(leafKey), e);
-                                                appMessage.error(`加载失败: ${e.message}`);
-                                            } finally {
-                                                messageKey();
-                                            }
-                                        } else {
-                                            if (rootGroup === 'local-workspace') {
-                                                const found = getCustomPreset(leafKey);
-                                                if (found) {
-                                                    const trueId = found.id || leafKey;
-                                                    seedAutoSaveAndNavigate(found, trueId);
-                                                    return;
-                                                }
-                                            }
-                                            
-                                            const { PRESET_MAP } = await import('@/data/standardized');
-                                            const preset = PRESET_MAP[leafKey];
-                                            if (preset) {
-                                                const trueId = preset.id || leafKey;
-                                                seedAutoSaveAndNavigate({
-                                                    ...preset,
-                                                    id: trueId,
-                                                    metadata: { ...preset.metadata, title: preset.name }
-                                                }, trueId);
-                                            } else {
-                                                // If there's no preset, this is a blank template or direct URL load via UI menu.
-                                                // We must clear any potentially poisoned autosave data before navigating to force a new blank/default canvas.
-                                                clearBlankTemplateLocalState(localStorage, leafKey);
-                                                handleSelectDiagram(leafKey);
-                                            }
-                                        }
-                                    }}
-                                />
-                            </div>
-                        </>
-                    ),
-                    centerChildren: null,
-                    rightChildren: null
-                }}
-                showMenu={false}
-            >
-                {/* Host actions are now unified in the designer's internal toolbar islands */}
-
-                <CommandPalette
-                    open={isCommandOpen}
-                    onClose={() => setIsCommandOpen(false)}
-                    items={commandItems}
-                    getContainer={() => document.getElementById('app-root-layout') || document.body}
-                />
-                {isShortcutsOpen && (
-                    <Suspense fallback={null}>
-                        <ShortcutsHelpModal
-                            open={isShortcutsOpen}
-                            onClose={() => setIsShortcutsOpen(false)}
-                            getContainer={() => document.getElementById('app-root-layout') || document.body}
-                        />
-                    </Suspense>
-                )}
-                {collabModalVisible && (
-                    <Suspense fallback={null}>
-                        <CollaborationModal
-                            open={collabModalVisible}
-                            onClose={() => setCollabModalVisible(false)}
-                            activeUsers={activeUsers || []}
-                            roomName={roomName}
-                        />
-                    </Suspense>
-                )}
-                <DiagramControlBridge />
-
-                {/* Main Content Area */}
-                <div id={`diagram-${selectedDiagramId}`} className={`flex-1 flex flex-col relative bg-surface ${isFullscreen ? 'fixed inset-0 z-[1000]' : ''}`} style={{ height: '100%', width: '100%' }}>
-                    <ConfigProvider
-                        getPopupContainer={(trigger) => {
-                            if (isFullscreen) {
-                                return document.getElementById(`diagram-${selectedDiagramId}`) || document.body;
-                            }
-                            return trigger?.parentElement || document.body;
-                        }}
-                    >
-                        <div className="flex-1 w-full relative min-h-0 overflow-hidden" style={{ height: '100%', width: '100%' }}>
-                            <ErrorBoundary
-                                title={t('designer.viewer.renderFailed')}
-                                subTitle={t('designer.viewer.renderFailedSubtitle')}
-                            >
-                                <Suspense
-                                    fallback={
-                                        <div className="flex items-center justify-center h-full text-slate-400">
-                                            <Spin size="large" />
-                                        </div>
-                                    }
-                                >
-                                    {SelectedDiagramComponent && (() => {
-                                        const DynamicComponent: any = SelectedDiagramComponent;
-                                        return (
-                                            <DynamicComponent
-                                                key={`${selectedDiagramId}-${refreshNonce}`}
-                                                id={selectedDiagramId}
-                                                edgeMode={edgeMode}
-                                                layoutStrategy={layoutStrategy}
-                                                nodeLayoutStrategy={nodeLayoutStrategy}
-                                                elkAlgorithm={elkAlgorithm}
-                                                showOnlyMainFlow={showOnlyMainFlow}
-                                                onShowOnlyMainFlowChange={setShowOnlyMainFlow}
-                                                onMainFlowAnimationChange={setMainFlowAnimationEnabled}
-                                                highlightMainFlow={mainFlowAnimationEnabled}
-                                                isReadonly={isReadonly}
-                                                extraExportItems={extraExportItems}
-                                                isYjsSynced={isYjsSynced}
-                                                onSyncPush={pushLocalChangesToYjs}
-                                                activeUsers={activeUsers || []}
-                                                yAwareness={provider?.awareness}
-                                                onCloudSave={saveToCloud}
-                                                onDirectSave={handleDirectSave}
-                                                isDirectSaveDisabled={false}
-                                                onSaveAsTo={handleSaveTo}
-                                                onOpenSettings={() => setIsSettingsOpen(true)}
-                                                renderAIChatPanel={() => (
-                                                    <Suspense fallback={<div className="p-4 text-center text-gray-500">Loading AI...</div>}>
-                                                        <AIChatView
-                                                            onOpenConfig={() => setAiConfigVisible(true)}
-                                                            pluginId={resolvedPluginId || 'flowchart-diagram'}
-                                                            diagramId={selectedDiagramId}
-                                                            onPreviewJson={handlePreviewAIJson}
-                                                            onApplyJson={handleApplyAIJson}
-                                                            diagramNodesRef={aiNodesRef as any}
-                                                            diagramEdgesRef={aiEdgesRef as any}
-                                                            canvasOps={aiCanvasOps}
-                                                            onClose={() => {
-                                                                const aiBtn = document.querySelector('.toolbar-button-ai');
-                                                                if (aiBtn) aiBtn.click();
-                                                            }}
-                                                        />
-                                                    </Suspense>
-                                                )}
-                                                onAiTabIntercept={handleAiTabIntercept}
-                                                renderThemeSelector={
-                                                    <EnhancedThemeSelector />
-                                                }
-                                                renderAIConfigModal={aiConfigVisible ? (
-                                                    <Suspense fallback={<div />}>
-                                                        <AIConfigModal
-                                                            open={aiConfigVisible}
-                                                            onCancel={() => setAiConfigVisible(false)}
-                                                            onSave={() => setAiConfigVisible(false)}
-                                                        />
-                                                    </Suspense>
-                                                ) : null}
-                                                renderShareDialog={shareDialogOpen ? (
-                                                    <Suspense fallback={null}>
-                                                        <ShareDialog
-                                                            open={shareDialogOpen}
-                                                            onClose={closeShareDialog}
-                                                            diagramId={selectedDiagramId}
-                                                            onEnsureSaved={ensureSaved}
-                                                        />
-                                                    </Suspense>
-                                                ) : null}
-                                            />
-                                        );
-                                    })()}
-                                </Suspense>
-
-                                {isSettingsOpen && (
-                                    <Suspense fallback={null}>
-                                        <DraggableSettingsPanel 
-                                            title={t('designer.commandItems.settings', '配置面板 / Settings')}
-                                            onClose={() => setIsSettingsOpen(false)}
-                                        >
-                                            {settingsPanel}
-                                        </DraggableSettingsPanel>
-                                    </Suspense>
-                                )}
-
-                                {/* 演示模式退出提示层 */}
-                                {isPresentationMode && (
-                                    <div 
-                                        className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[3000] px-6 py-2.5 bg-black/70 hover:bg-black/90 backdrop-blur-md text-white text-xs font-semibold rounded-full cursor-pointer transition-all border border-white/20 shadow-2xl animate-bounce-subtle"
-                                        onClick={() => {
-                                            setIsPresentationMode(false);
-                                            appMessage.info('演示模式已退出');
-                                        }}
-                                    >
-                                        🎬 点击或按 ESC 退出演示模式
-                                    </div>
-                                )}
-                            </ErrorBoundary>
-
-                            {cloudManagerVisible && (
-                                <Suspense fallback={null}>
-                                    <CloudStorageManagerModal
-                                        open={cloudManagerVisible}
-                                        onCancel={() => setCloudManagerVisible(false)}
-                                        onSelect={(data) => {
-                                            seedAutoSaveAndNavigate(data, data.id);
-                                        }}
-                                    />
-                                </Suspense>
-                            )}
-
-                            {mermaidModalVisible && (
-                                <Suspense fallback={null}>
-                                    <MermaidImportModal
-                                        visible={mermaidModalVisible}
-                                        onClose={() => setMermaidModalVisible(false)}
-                                        onImport={handleImportMermaidNodes}
-                                    />
-                                </Suspense>
-                            )}
-                        </div>
-                    </ConfigProvider>
-                </div>
-
-                {/* Routing Debug Panel */}
-                {showDebugPanel && (
-                    <RoutingDebugPanel onClose={() => setShowDebugPanel(false)} />
-                )}
-            </DiagramLayout>
-        </DiagramThemeProvider>
+        <DiagramViewerView
+            t={t}
+            selectedDiagramId={selectedDiagramId}
+            selectedDiagram={selectedDiagram}
+            edgeMode={edgeMode || 'advanced-smart'}
+            setEdgeMode={setEdgeMode}
+            layoutStrategy={String(layoutStrategy || '')}
+            nodeLayoutStrategy={String(nodeLayoutStrategy || '')}
+            elkAlgorithm={String(elkAlgorithm || '')}
+            showOnlyMainFlow={showOnlyMainFlow}
+            setShowOnlyMainFlow={setShowOnlyMainFlow}
+            mainFlowAnimationEnabled={mainFlowAnimationEnabled}
+            setMainFlowAnimationEnabled={setMainFlowAnimationEnabled}
+            isReadonly={isReadonly}
+            isPresentationMode={isPresentationMode}
+            setIsPresentationMode={setIsPresentationMode}
+            isFullscreen={isFullscreen}
+            handleToggleFullscreen={handleToggleFullscreen}
+            resolvedPluginId={resolvedPluginId}
+            handleTemplateChange={handleTemplateChange}
+            commandItems={commandItems}
+            isCommandOpen={isCommandOpen}
+            setIsCommandOpen={setIsCommandOpen}
+            isShortcutsOpen={isShortcutsOpen}
+            setIsShortcutsOpen={setIsShortcutsOpen}
+            collabModalVisible={collabModalVisible}
+            setCollabModalVisible={setCollabModalVisible}
+            activeUsers={activeUsers || []}
+            roomName={roomName}
+            SelectedDiagramComponent={SelectedDiagramComponent}
+            refreshNonce={refreshNonce}
+            onExportPermissionCheck={handleExportPermissionCheck}
+            isYjsSynced={isYjsSynced}
+            pushLocalChangesToYjs={pushLocalChangesToYjs}
+            provider={provider ?? null}
+            saveToCloud={saveToCloud}
+            handleDirectSave={handleDirectSave}
+            isSettingsOpen={isSettingsOpen}
+            setIsSettingsOpen={setIsSettingsOpen}
+            settingsPanel={settingsPanel}
+            aiConfigVisible={aiConfigVisible}
+            setAiConfigVisible={setAiConfigVisible}
+            handlePreviewAIJson={handlePreviewAIJson}
+            handleApplyAIJson={handleApplyAIJson}
+            aiNodesRef={aiNodesRef}
+            aiEdgesRef={aiEdgesRef}
+            aiCanvasOps={aiCanvasOps}
+            handleAiTabIntercept={handleAiTabIntercept}
+            shareDialogOpen={shareDialogOpen}
+            closeShareDialog={closeShareDialog}
+            ensureSaved={ensureSaved}
+            cloudManagerVisible={cloudManagerVisible}
+            setCloudManagerVisible={setCloudManagerVisible}
+            seedAutoSaveAndNavigate={seedAutoSaveAndNavigate}
+            mermaidModalVisible={mermaidModalVisible}
+            setMermaidModalVisible={setMermaidModalVisible}
+            handleImportMermaidNodes={handleImportMermaidNodes}
+            showDebugPanel={showDebugPanel}
+            setShowDebugPanel={setShowDebugPanel}
+        />
     );
 };
 

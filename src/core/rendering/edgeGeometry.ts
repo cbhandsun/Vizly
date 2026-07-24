@@ -1,4 +1,4 @@
-import type { EdgeMarkerType, EdgeProps, Position } from '@xyflow/react';
+import type { EdgeProps, Position } from '@xyflow/react';
 import { normalizeSvgPaint, normalizeSvgStrokeDasharray } from './styleTokens';
 import type { RenderEdgeGeometry, RenderEdgeMarker, RenderHandlePosition, RenderPoint } from './types';
 
@@ -121,7 +121,8 @@ const markerKindFromUnknown = (marker: unknown): RenderEdgeMarker['kind'] => {
     if (lower.includes('arrow')) return 'arrow';
     return 'none';
   }
-  const value = marker as Partial<EdgeMarkerType> & { kind?: unknown };
+  if (typeof marker !== 'object' || Array.isArray(marker)) return 'none';
+  const value = marker as Record<string, unknown>;
   const raw = String(value.type ?? value.kind ?? '').toLowerCase();
   if (raw.includes('open')) return 'openArrow';
   if (raw.includes('diamond')) return 'diamond';
@@ -132,7 +133,12 @@ const markerKindFromUnknown = (marker: unknown): RenderEdgeMarker['kind'] => {
 
 export const resolveEdgeMarker = (marker: unknown, stroke = DEFAULT_STROKE): RenderEdgeMarker => ({
   kind: markerKindFromUnknown(marker),
-  color: normalizeSvgPaint((marker as any)?.color, normalizeSvgPaint(stroke, DEFAULT_STROKE)),
+  color: normalizeSvgPaint(
+    marker && typeof marker === 'object' && !Array.isArray(marker)
+      ? (marker as Record<string, unknown>).color
+      : undefined,
+    normalizeSvgPaint(stroke, DEFAULT_STROKE),
+  ),
 });
 
 const normalizeHandle = (value: unknown): RenderHandlePosition => {
@@ -175,6 +181,6 @@ export const createRenderEdgeGeometryFromEdgeProps = (
     opacity: coerceRenderNumber(style.opacity, 1, 0, 1),
     markerStart: resolveEdgeMarker(props.markerStart, stroke),
     markerEnd: resolveEdgeMarker(props.markerEnd, stroke),
-    zIndex: coerceRenderNumber((props as any).zIndex, 0, -10_000, 10_000),
+    zIndex: coerceRenderNumber((props as typeof props & { zIndex?: unknown }).zIndex, 0, -10_000, 10_000),
   };
 };

@@ -2,6 +2,8 @@ import { Position } from '../../types/routing';
 import { Rectangle } from '../../algorithms/pathfinding';
 import { QuadTree, SpatialIndex } from '../../algorithms/SpatialIndex';
 
+export { calculateAdaptiveGridSize } from '../../algorithms/adaptiveGridSize';
+
 /**
  * GraphBuilder: Logic for setting up the pathfinding environment (Grid, Obstacles, Spatial Index).
  */
@@ -64,7 +66,8 @@ export function countObstaclesInDirection(
     }
 
     // [OPTIMIZATION] Use Spatial Index if available
-    const isSpatialIndex = (obs: any): obs is SpatialIndex => typeof (obs as SpatialIndex).query === 'function';
+    const isSpatialIndex = (obs: Rectangle[] | SpatialIndex): obs is SpatialIndex =>
+        !Array.isArray(obs) && typeof obs.query === 'function';
 
     if (isSpatialIndex(obstacles)) {
         const candidates = obstacles.query(scanArea);
@@ -87,32 +90,6 @@ export function countObstaclesInDirection(
 
     return count;
 }
-
-/**
- * Calculates dynamic grid size based on Euclidean distance.
- * Faster/Coarser grid for long distances, finer grid for short exact routing.
- */
-export const calculateAdaptiveGridSize = (sX: number, sY: number, tX: number, tY: number, baseConfigGrid: number): number => {
-    const dist = Math.hypot(tX - sX, tY - sY);
-    // Base Strategy:
-    // < 500px: Use config (default 10-20)
-    // > 500px: Increase grid size
-    // Max cap: 40px (Too large grids lose precision for final docking)
-
-    let adaptive = baseConfigGrid || 10;
-
-    // [NEW] Short distance high precision mode (Hanan-lite support)
-    // If nodes are very close, 20px grid is too coarse.
-    if (dist < 400) {
-        return 10; // Force finer grid
-    }
-
-    if (dist > 2000) adaptive = Math.max(adaptive, 30);
-    else if (dist > 1000) adaptive = Math.max(adaptive, 20);
-    else if (dist > 500) adaptive = Math.max(adaptive, 15);
-
-    return Math.min(40, adaptive);
-};
 
 /**
  * Builds or retrieves a SpatialIndex for high-performance collision detection.

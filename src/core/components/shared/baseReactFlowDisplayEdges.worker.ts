@@ -12,6 +12,11 @@ import { repairBaseReactFlowMeasuredDisplayEdgesWithReport } from './baseReactFl
 import { baseReactFlowDisplayHardQualityIsClean } from './baseReactFlowDisplayQualityGates';
 import { createBaseReactFlowInteractiveDisplayEdges } from './baseReactFlowDisplayQualitySeedPipeline';
 import { createBaseReactFlowPreDisplayFinalEdges } from './baseReactFlowDisplayPreDisplayPipeline';
+import { sanitizeBaseReactFlowPrecompiledRoutePatches } from './baseReactFlowPrecompiledRouteArtifact';
+import {
+  mergeBaseReactFlowDisplayEdgePatches,
+  sanitizeBaseReactFlowDisplayCachePatches,
+} from './baseReactFlowDisplayRoutingTransaction';
 import {
   parseDisplayEdgesWorkerRequest,
   readDisplayEdgesWorkerRequestId,
@@ -19,8 +24,18 @@ import {
   type DisplayEdgesWorkerResponse,
 } from './baseReactFlowDisplayWorkerProtocol';
 
+interface DisplayEdgesWorkerScope {
+  postMessage: (response: DisplayEdgesWorkerResponse) => void;
+  onmessage: ((event: MessageEvent<unknown>) => void) | null;
+}
+
+const displayEdgesWorkerScope = typeof self !== 'undefined'
+  && !('document' in self)
+  ? self as unknown as DisplayEdgesWorkerScope
+  : null;
+
 const postDisplayEdgesResponse = (response: DisplayEdgesWorkerResponse): void => {
-  (self as any).postMessage(response);
+  displayEdgesWorkerScope?.postMessage(response);
 };
 
 const doesDisplayCandidateMatchSourceGraph = (
@@ -52,15 +67,26 @@ export const computeBaseReactFlowDisplayEdgesWorkerResponse = (
       routeResolution: 'repair',
     };
   }
+  const safeCandidatePatches = request.operation === 'validate-or-route'
+    && request.candidatePatches
+    ? (request.candidateSource === 'precompiled'
+      ? sanitizeBaseReactFlowPrecompiledRoutePatches(request.edges, request.candidatePatches)
+      : sanitizeBaseReactFlowDisplayCachePatches(request.edges, request.candidatePatches))
+    : null;
+  const candidateEdges = request.operation === 'validate-or-route'
+    ? (request.candidateEdges
+      ?? (safeCandidatePatches
+        ? mergeBaseReactFlowDisplayEdgePatches(request.edges, safeCandidatePatches)
+        : null))
+    : null;
   if (
-    request.operation === 'validate-or-route'
-    && request.candidateEdges
-    && doesDisplayCandidateMatchSourceGraph(request.edges, request.candidateEdges)
-    && baseReactFlowDisplayHardQualityIsClean(request.candidateEdges, request.nodes)
+    candidateEdges
+    && doesDisplayCandidateMatchSourceGraph(request.edges, candidateEdges)
+    && baseReactFlowDisplayHardQualityIsClean(candidateEdges, request.nodes)
   ) {
     return {
       requestId: request.requestId,
-      edges: request.candidateEdges,
+      edges: candidateEdges,
       hardClean: true,
       routeResolution: 'validated-candidate',
     };
@@ -138,12 +164,8 @@ export const handleBaseReactFlowDisplayWorkerMessage = (
   return computeBaseReactFlowDisplayEdgesWorkerResponse(request, onBoundedCandidate);
 };
 
-const isDisplayEdgesWorkerScope = typeof self !== 'undefined'
-  && typeof (self as any).postMessage === 'function'
-  && typeof (self as any).document === 'undefined';
-
-if (isDisplayEdgesWorkerScope) {
-  (self as any).onmessage = (event: MessageEvent<unknown>) => {
+if (displayEdgesWorkerScope) {
+  displayEdgesWorkerScope.onmessage = (event: MessageEvent<unknown>) => {
     const requestId = readDisplayEdgesWorkerRequestId(event.data) ?? 'invalid-request';
     try {
       const response = handleBaseReactFlowDisplayWorkerMessage(

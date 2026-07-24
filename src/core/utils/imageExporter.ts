@@ -1,7 +1,13 @@
-import { getNodesBounds } from '@xyflow/react';
+import { getNodesBounds, type Node } from '@xyflow/react';
 import { sanitizeDownloadFileName } from './downloadUtils';
 import { safeLog } from './consoleCleanup';
 import { redactSensitiveLogValue } from './logSecurity';
+
+export interface ExportNode {
+    id: string;
+    position?: { x?: number; y?: number };
+    measured?: { width?: number; height?: number };
+}
 
 export interface ExportOptions {
     format: 'png' | 'svg' | 'pdf' | 'jpg' | 'json';
@@ -31,7 +37,7 @@ const escapeXmlText = (value: string): string => value
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-export const isSafeImageExportDataUrl = (dataUrl: unknown): dataUrl is string => {
+export const isSafeImageExportDataUrl = (dataUrl: unknown): boolean => {
     if (typeof dataUrl !== 'string' || dataUrl.length > MAX_IMAGE_DATA_URL_CHARS) return false;
     return EXPORT_IMAGE_DATA_URL_PATTERN.test(dataUrl) || EXPORT_SVG_DATA_URL_PATTERN.test(dataUrl);
 };
@@ -90,14 +96,14 @@ const downloadHref = (href: string, filename: string): void => {
 };
 
 export const downloadImage = async (
-    nodes: { id: string; position?: { x: number; y: number }; measured?: { width: number; height: number }; [key: string]: unknown }[],
+    nodes: ExportNode[],
     options: ExportOptions = { format: 'png' }
 ) => {
     const { format = 'png', includeBackground = true, embedMetadata = true } = options;
     const pixelRatio = clampNumber(options.pixelRatio, 0.5, MAX_EXPORT_PIXEL_RATIO, 1);
     // 1. Calculate Bounding Box
-    // We want to export the VALID nodes only (not hidden ones if any)
-    const bounds = getNodesBounds(nodes as any);
+    // We want to export only valid nodes (excluding hidden nodes when present).
+    const bounds = getNodesBounds(nodes as Node[]);
 
     // 2. Viewport Transform
     // We want to shift the viewport so the nodes are centered/visible with padding.
@@ -131,7 +137,7 @@ export const downloadImage = async (
     const filename = `vizly-diagram-${new Date().getTime()}`;
 
     // 辅助函数：注入元数据 (PNG/SVG)
-    const injectMetadata = async (dataUrl: string, rawData: any) => {
+    const injectMetadata = async (dataUrl: string, rawData: unknown) => {
         if (!embedMetadata) return dataUrl;
         
         const stateJson = JSON.stringify({
@@ -234,7 +240,7 @@ export const downloadImage = async (
 /**
  * 拷贝图表到剪贴板 (Phase 10)
  */
-export const copyImageToClipboard = async (_nodes: any[]) => {
+export const copyImageToClipboard = async (_nodes: readonly ExportNode[]) => {
     const viewportElem = document.querySelector('.react-flow__viewport') as HTMLElement;
     if (!viewportElem) return;
 

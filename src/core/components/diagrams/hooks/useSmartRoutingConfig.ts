@@ -4,7 +4,7 @@
  * 统一了设计器 (FlowchartDesigner) 和通用标准流程图 (GenericStandardDiagram)
  * 的路由参数设置与 autoPathSelection 同步逻辑。
  */
-import { diagramConfigManager, type EdgeConfig, type DiagramConfig } from '../../config/DiagramConfig';
+import { diagramConfigManager, type EdgeConfig, type DiagramConfig } from '@/core/config/DiagramConfig';
 import { LayeredConfigManager, ConfigLayer } from '../../../config/LayeredConfigManager';
 import {
     logSmartRoutingConfigLayerSyncFailure,

@@ -22,7 +22,9 @@ export const TemplateCard: React.FC<TemplateCardProps> = React.memo(({
     const { t } = useTranslation();
 
     // 获取React Icon组件
-    const IconComponent = template.icon ? (Icons as any)[template.icon] : Icons.FaFileAlt;
+    const IconComponent = template.icon && template.icon in Icons
+        ? Icons[template.icon as keyof typeof Icons]
+        : Icons.FaFileAlt;
 
     // 卡片操作按钮
     const actions: React.ReactNode[] = [

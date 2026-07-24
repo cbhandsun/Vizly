@@ -1,7 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import {
-    OrbitControls, _Environment, PerspectiveCamera, ContactShadows, Sky,
+    OrbitControls, PerspectiveCamera, ContactShadows, Sky,
     AdaptiveDpr, AdaptiveEvents, Bvh
 } from '@react-three/drei';
 
@@ -16,7 +16,7 @@ export interface SceneProps {
 
 const Scene: React.FC<SceneProps> = ({ onReady }) => {
     const { autoRotate, resetViewTrigger } = useWarehouse3D();
-    const controlsRef = useRef<{ reset: () => void } | null>(null);
+    const controlsRef = useRef<React.ElementRef<typeof OrbitControls>>(null);
 
     useEffect(() => {
         if (controlsRef.current) {

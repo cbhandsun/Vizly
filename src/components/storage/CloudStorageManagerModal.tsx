@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/useAuth';
 import { coerceToStandardDiagramDataWithReport } from '@/core/utils/coerceDiagram';
 import RemoteDiagramCover from '@/components/shared/RemoteDiagramCover';
-import { shareService } from '@/services/ShareService';
+import { shareService, type SharedWithMeRecord } from '@/services/ShareService';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import {
     logCloudStorageManagerBatchDeleteFailure,
@@ -50,7 +50,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
     const { user } = useAuth();
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [cloudDiagrams, setCloudDiagrams] = useState<DiagramMetadata[]>([]);
-    const [sharedDiagrams, setSharedDiagrams] = useState<any[]>([]);
+    const [sharedDiagrams, setSharedDiagrams] = useState<SharedWithMeRecord[]>([]);
     const [loading, setLoading] = useState(false);
     const [sharedLoading, setSharedLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -155,7 +155,7 @@ export const CloudStorageManagerModal: React.FC<CloudStorageManagerModalProps> =
                 });
                 // 在设计器中打开时不注册到 dataService，避免触发 GenericStandardDiagram 布局
                 // 检测：全局回调存在 OR 明确的 onOpenInDesigner prop
-                const designerCallback = onOpenInDesigner || (window as any).__flowDesignerOpenCloud;
+                const designerCallback = onOpenInDesigner || window.__flowDesignerOpenCloud;
                 if (designerCallback) {
                     localService.deleteDiagram(normalized.id, false);
                 }

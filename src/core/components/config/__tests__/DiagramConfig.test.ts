@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiagramConfig } from '../DiagramConfig';
 
@@ -80,6 +82,61 @@ describe('DiagramConfigManager', () => {
     expect(manager.getConfig().node.height).toBe(120);
   });
 
+  it('rejects known fields with invalid structure transactionally', async () => {
+    const { DiagramConfigManager } = await importFreshDiagramConfig();
+    const manager = new DiagramConfigManager();
+    const before = manager.exportConfig();
+
+    expect(() => manager.updateConfig({ node: 'broken' } as any)).toThrow('config.node必须是对象');
+    expect(() => manager.updateConfig({ canvas: { zoom: [] } } as any)).toThrow('config.canvas.zoom必须是对象');
+    expect(() => manager.updateConfig({ edge: { nodePortConstraints: [] } } as any)).toThrow(
+      'config.edge.nodePortConstraints必须是对象'
+    );
+    expect(() => manager.updateConfig({ domain: { gap: 'wide' } } as any)).toThrow('config.domain.gap类型无效');
+    expect(manager.importConfig('{"layout":{"layerVerticalGap":"large"}}')).toBe(false);
+
+    expect(manager.exportConfig()).toBe(before);
+  });
+
+  it('returns owned snapshots without exposing manager state or defaults', async () => {
+    const { DiagramConfigManager, defaultConfig } = await importFreshDiagramConfig();
+    const manager = new DiagramConfigManager();
+    const snapshot = manager.getConfig();
+    const performance = manager.getPerformanceConfig();
+
+    snapshot.node.padding.horizontal = 999;
+    snapshot.edge.markerEnd!.width = 999;
+    performance.virtualization!.padding = 999;
+
+    expect(manager.getConfig().node.padding.horizontal).toBe(defaultConfig.node.padding.horizontal);
+    expect(manager.getConfig().edge.markerEnd!.width).toBe(defaultConfig.edge.markerEnd!.width);
+    expect(manager.getPerformanceConfig().virtualization!.padding).toBe(
+      defaultConfig.performance.virtualization!.padding
+    );
+    expect(Object.isFrozen(defaultConfig)).toBe(true);
+    expect(Object.isFrozen(defaultConfig.node.padding)).toBe(true);
+  });
+
+  it('isolates listener snapshots from each other and from internal state', async () => {
+    const { DiagramConfigManager } = await importFreshDiagramConfig();
+    const manager = new DiagramConfigManager();
+    const secondListener = vi.fn();
+
+    manager.addConfigChangeListener(config => {
+      config.node.padding.horizontal = 999;
+    });
+    manager.addConfigChangeListener(secondListener);
+    manager.updateConfig({ node: { height: 120 } } as any);
+
+    expect(secondListener).toHaveBeenCalledWith(expect.objectContaining({
+      node: expect.objectContaining({
+        height: 120,
+        padding: expect.objectContaining({ horizontal: 12 }),
+      }),
+    }));
+    expect(manager.getConfig().node.padding.horizontal).toBe(12);
+  });
+
   it('strips dangerous keys from imported and directly updated nested config', async () => {
     const { DiagramConfigManager } = await importFreshDiagramConfig();
     const manager = new DiagramConfigManager();
@@ -94,8 +151,9 @@ describe('DiagramConfigManager', () => {
       }
     }`)).toBe(true);
 
-    expect(manager.getConfig().edge.handleWeights.safe).toBe(1);
-    expect(Object.hasOwn(manager.getConfig().edge.handleWeights, 'constructor')).toBe(false);
+    const importedWeights = manager.getConfig().edge.handleWeights;
+    expect(importedWeights?.safe).toBe(1);
+    expect(Object.hasOwn(importedWeights ?? {}, 'constructor')).toBe(false);
     expect(Object.prototype).not.toHaveProperty('polluted');
 
     manager.updateConfig({
@@ -107,8 +165,9 @@ describe('DiagramConfigManager', () => {
       },
     } as any);
 
-    expect(manager.getConfig().edge.handleWeights.allowed).toBe(2);
-    expect(Object.hasOwn(manager.getConfig().edge.handleWeights, 'prototype')).toBe(false);
+    const updatedWeights = manager.getConfig().edge.handleWeights;
+    expect(updatedWeights?.allowed).toBe(2);
+    expect(Object.hasOwn(updatedWeights ?? {}, 'prototype')).toBe(false);
     expect(Object.prototype).not.toHaveProperty('polluted');
   });
 

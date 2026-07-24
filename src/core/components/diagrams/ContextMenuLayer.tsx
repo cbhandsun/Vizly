@@ -11,16 +11,16 @@ interface ContextMenuLayerProps {
   pluginCtx?: PluginContext;
 }
 
-const EMPTY_ARRAY: any[] = [];
+const EMPTY_NODES: Node[] = [];
 
 export const ContextMenuLayer: React.FC<ContextMenuLayerProps> = ({ onAction, activePlugin, pluginCtx }) => {
-  const contextMenu = useDiagramStore((state: any) => state.contextMenu);
-  const setContextMenu = useDiagramStore((state: any) => state.setContextMenu);
-  const selectedNodes = useDiagramStore((state: any) => state.selectedNodes);
-  const selectedEdges = useDiagramStore((state: any) => state.selectedEdges);
+  const contextMenu = useDiagramStore((state) => state.contextMenu);
+  const setContextMenu = useDiagramStore((state) => state.setContextMenu);
+  const selectedNodes = useDiagramStore((state) => state.selectedNodes);
+  const selectedEdges = useDiagramStore((state) => state.selectedEdges);
   
   // ⭐ 性能优化：当菜单未打开时，切断对完整 nodes 数组的订阅，防止拖拽节点时引发该组件以 60FPS 重绘
-  const nodes = useDiagramStore((state: any) => contextMenu ? state.nodes : EMPTY_ARRAY);
+  const nodes = useDiagramStore((state) => contextMenu ? state.nodes : EMPTY_NODES);
   const extraItems = React.useMemo(() => {
     if (!contextMenu || !activePlugin?.contributeContextMenu || !pluginCtx) return [];
     

@@ -1,9 +1,15 @@
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
-import { normalizeHandle } from '../../routing/utils/handleUtils';
-
-type Point = { x: number; y: number };
-type Rect = { x: number; y: number; width: number; height: number };
-type Side = 't' | 'b' | 'l' | 'r';
+import {
+  ENDPOINT_SIDE_MATCH_TOLERANCE as SIDE_MATCH_TOLERANCE,
+  clampEndpointValue as clamp,
+  endpointNodeRect as nodeRect,
+  endpointPointIsOnSide as pointOnSide,
+  inferEndpointSide as inferSide,
+  projectEndpointPointToSide as projectPointToSide,
+  type EndpointPoint as Point,
+  type EndpointRect as Rect,
+  type EndpointSide as Side,
+} from './edgeEndpointGeometry';
 
 const EPS = 0.5;
 const MIN_CONSTRAINED_STUB = 18;
@@ -12,7 +18,6 @@ const MIN_PREFERRED_STUB = 48;
 const MAX_STUB = 96;
 const MAX_DETACHED_ENDPOINT_STUB = 144;
 const MAX_SHARED_STUB_OVERLAP = 22;
-const SIDE_MATCH_TOLERANCE = 8;
 const MIN_NEAR_ALIGNED_ENDPOINT_DELTA = 16;
 const MAX_NEAR_ALIGNED_ENDPOINT_DELTA = 64;
 const NEAR_ALIGNED_ENDPOINT_SIDE_RATIO = 0.18;
@@ -25,6 +30,11 @@ type EdgePathContext = {
   detachedTargetEndpoint?: boolean;
 };
 type EndpointKind = 'source' | 'target';
+const asRecord = (value: unknown): Record<string, unknown> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
 type EndpointRepairContext = {
   edgeKey: string;
   endpoint: EndpointKind;
@@ -40,100 +50,29 @@ type EndpointRepairContext = {
   detachedEndpoint?: boolean;
 };
 
-const num = (value: unknown, fallback: number): number => (
-  typeof value === 'number' && Number.isFinite(value) ? value : fallback
-);
-
 function getEdgePath(edge: Edge): Point[] {
-  const raw = (edge.data as any)?.computedPath;
+  const raw = edge.data?.computedPath;
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((point: any) => ({ x: Number(point?.x), y: Number(point?.y) }))
+    .map(point => {
+      const candidate = asRecord(point);
+      return { x: Number(candidate.x), y: Number(candidate.y) };
+    })
     .filter((point: Point) => Number.isFinite(point.x) && Number.isFinite(point.y));
 }
 
 function withComputedPath(edge: Edge, path: Point[], extraData: Record<string, unknown> = {}): Edge {
-  const data: any = { ...(edge.data || {}), ...extraData, computedPath: path, endpointOrthogonalRepaired: true };
-  if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-    data.treeRouting = { ...data.treeRouting, points: path };
+  const data: Record<string, unknown> = {
+    ...(edge.data || {}),
+    ...extraData,
+    computedPath: path,
+    endpointOrthogonalRepaired: true,
+  };
+  const treeRouting = asRecord(data.treeRouting);
+  if (Array.isArray(treeRouting.points)) {
+    data.treeRouting = { ...treeRouting, points: path };
   }
   return { ...edge, data };
-}
-
-function nodeRect(node: ReactFlowNode | undefined): Rect | null {
-  if (!node) return null;
-  const position = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-  const width = num((node as any).measured?.width ?? node.width ?? (node.style as any)?.width, 0);
-  const height = num((node as any).measured?.height ?? node.height ?? (node.style as any)?.height, 0);
-  if (width <= 1 || height <= 1) return null;
-  return {
-    x: num((position as any).x, 0),
-    y: num((position as any).y, 0),
-    width,
-    height,
-  };
-}
-
-function fallbackSide(handle: unknown): Side | null {
-  const normalized = normalizeHandle(String(handle || ''));
-  if (normalized === 't' || normalized === 'b' || normalized === 'l' || normalized === 'r') return normalized;
-  return null;
-}
-
-function inferSide(point: Point, rect: Rect, handle: unknown): Side | null {
-  const handleSide = fallbackSide(handle);
-  const distances: Array<{ side: Side; distance: number }> = [
-    { side: 't', distance: Math.abs(point.y - rect.y) },
-    { side: 'b', distance: Math.abs(point.y - (rect.y + rect.height)) },
-    { side: 'l', distance: Math.abs(point.x - rect.x) },
-    { side: 'r', distance: Math.abs(point.x - (rect.x + rect.width)) },
-  ].sort((a, b) => a.distance - b.distance);
-  const nearest = distances[0];
-  const handleDistance = handleSide ? distances.find(item => item.side === handleSide)?.distance : undefined;
-
-  if (handleSide && typeof handleDistance === 'number' && handleDistance <= SIDE_MATCH_TOLERANCE) {
-    return handleSide;
-  }
-  if (nearest && nearest.distance <= SIDE_MATCH_TOLERANCE) return nearest.side;
-  return handleSide ?? nearest?.side ?? null;
-}
-
-function pointOnSide(point: Point, rect: Rect, side: Side, tolerance = SIDE_MATCH_TOLERANCE): boolean {
-  switch (side) {
-    case 't':
-      return Math.abs(point.y - rect.y) <= tolerance
-        && point.x >= rect.x - tolerance
-        && point.x <= rect.x + rect.width + tolerance;
-    case 'b':
-      return Math.abs(point.y - (rect.y + rect.height)) <= tolerance
-        && point.x >= rect.x - tolerance
-        && point.x <= rect.x + rect.width + tolerance;
-    case 'l':
-      return Math.abs(point.x - rect.x) <= tolerance
-        && point.y >= rect.y - tolerance
-        && point.y <= rect.y + rect.height + tolerance;
-    case 'r':
-      return Math.abs(point.x - (rect.x + rect.width)) <= tolerance
-        && point.y >= rect.y - tolerance
-        && point.y <= rect.y + rect.height + tolerance;
-  }
-}
-
-function projectPointToSide(point: Point, rect: Rect, side: Side): Point {
-  const centerX = rect.x + rect.width / 2;
-  const centerY = rect.y + rect.height / 2;
-  const farX = point.x < rect.x - rect.width * 0.25 || point.x > rect.x + rect.width * 1.25;
-  const farY = point.y < rect.y - rect.height * 0.25 || point.y > rect.y + rect.height * 1.25;
-  switch (side) {
-    case 't':
-      return { x: farX ? centerX : clamp(point.x, rect.x, rect.x + rect.width), y: rect.y };
-    case 'b':
-      return { x: farX ? centerX : clamp(point.x, rect.x, rect.x + rect.width), y: rect.y + rect.height };
-    case 'l':
-      return { x: rect.x, y: farY ? centerY : clamp(point.y, rect.y, rect.y + rect.height) };
-    case 'r':
-      return { x: rect.x + rect.width, y: farY ? centerY : clamp(point.y, rect.y, rect.y + rect.height) };
-  }
 }
 
 function normalizeEndpointAnchors(
@@ -249,10 +188,6 @@ function isInwardSameAxisEndpointSegment(anchor: Point, adjacent: Point, side: S
   if (verticalSide && Math.abs(anchor.x - adjacent.x) > EPS) return false;
   if (!verticalSide && Math.abs(anchor.y - adjacent.y) > EPS) return false;
   return projectedDistance(anchor, side, adjacent) < -EPS;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }
 
 function preferredStubLength(path: Point[], endpointRect?: Rect | null): number {
@@ -659,7 +594,7 @@ function straightenNearlyAlignedEndpointPath(
   edgePaths: EdgePathContext[],
 ): Point[] | null {
   if (path.length < 3) return null;
-  if ((edge.data as any)?.sharedTrunkSynthesized === true) return null;
+  if (edge.data?.sharedTrunkSynthesized === true) return null;
   const sourceRect = nodeRect(nodeById.get(edge.source));
   const targetRect = nodeRect(nodeById.get(edge.target));
   if (!sourceRect || !targetRect) return null;
@@ -832,9 +767,9 @@ export function repairEndpointOrthogonalPaths(edges: Edge[], nodes: ReactFlowNod
     changed = true;
     return withComputedPath(edge, repaired, {
       detachedSourceEndpointReanchored: sourceContext?.detachedEndpoint === true
-        || ((edge.data as any)?.detachedSourceEndpointReanchored === true),
+        || edge.data?.detachedSourceEndpointReanchored === true,
       detachedTargetEndpointReanchored: targetContext?.detachedEndpoint === true
-        || ((edge.data as any)?.detachedTargetEndpointReanchored === true),
+        || edge.data?.detachedTargetEndpointReanchored === true,
     });
   });
   return changed ? repairedEdges : edges;

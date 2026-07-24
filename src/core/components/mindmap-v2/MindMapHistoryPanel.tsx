@@ -46,8 +46,9 @@ const MindMapHistoryPanel: React.FC = () => {
 
             // 触发 operation，以使修改被保存，并写入新的历史快照记录中
             mind.bus.fire('operation', { 
-                name: 'restore_version', 
-                obj: oldNodeData 
+                name: 'reshapeNode',
+                obj: oldNodeData,
+                origin: oldNodeData,
             });
 
             message.success(`已恢复至 ${record.time} 的历史版本`);

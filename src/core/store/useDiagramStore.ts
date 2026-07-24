@@ -3,6 +3,9 @@ import { Node, Edge, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges 
 
 import { ContextMenuProps } from '../components/diagrams/DiagramContextMenu';
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value && typeof value === 'object' && !Array.isArray(value));
+
 export interface ContextMenuState {
     top: number;
     left: number;
@@ -57,7 +60,7 @@ interface DiagramState {
   };
   
   // ⭐ [GAP-12] 插件沙盒状态存储
-  pluginStates: Record<string, any>;
+  pluginStates: Record<string, unknown>;
   
   // Actions
   setNodes: (nodes: Node[] | ((nds: Node[]) => Node[])) => void;
@@ -76,7 +79,7 @@ interface DiagramState {
   setActiveCommentId: (id: string | null) => void; // ⭐ [GAP-02] 设置选中
   
   // ⭐ [GAP-12] 插件状态管理 Action
-  setPluginState: (pluginId: string, state: any | ((prev: any) => any)) => void;
+  setPluginState: (pluginId: string, state: unknown) => void;
   
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -145,10 +148,12 @@ export const useDiagramStore = create<DiagramState>((set, _get) => ({
   setActiveCommentId: (id) => set({ activeCommentId: id }),
 
   setPluginState: (pluginId, stateOrUpdater) => set((state) => {
-    const currentPluginState = state.pluginStates[pluginId] || {};
+    const currentPluginState = state.pluginStates[pluginId] ?? {};
     const newState = typeof stateOrUpdater === 'function' 
         ? stateOrUpdater(currentPluginState) 
-        : { ...currentPluginState, ...stateOrUpdater };
+        : isRecord(currentPluginState) && isRecord(stateOrUpdater)
+          ? { ...currentPluginState, ...stateOrUpdater }
+          : stateOrUpdater;
     
     return {
       pluginStates: {

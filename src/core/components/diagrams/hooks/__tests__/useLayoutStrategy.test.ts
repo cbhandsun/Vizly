@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 import {
+  loadLayoutStrategyPresetFromCandidates,
   normalizeLayoutVisibilityNodes,
   resolveLayoutStrategyGeneratedGroupOptions,
   resolveLayoutStrategyPresetFromCandidates,
@@ -155,6 +156,31 @@ describe('resolveLayoutStrategyPresetFromCandidates', () => {
       id: 'SystemsInteractionStandardData',
       preset,
     });
+  });
+});
+
+describe('loadLayoutStrategyPresetFromCandidates', () => {
+  it('loads the preset map through the application-provided port', async () => {
+    const preset = { layout: { domainOrder: ['业务域'] } };
+
+    await expect(loadLayoutStrategyPresetFromCandidates(
+      async () => ({ standard: preset }),
+      ['missing', 'standard'],
+    )).resolves.toEqual({ id: 'standard', preset });
+  });
+
+  it('returns no preset when the optional port is not configured', async () => {
+    await expect(loadLayoutStrategyPresetFromCandidates(undefined, ['standard']))
+      .resolves.toEqual({});
+  });
+
+  it('propagates provider failures to the layout error boundary', async () => {
+    const failure = new Error('preset provider unavailable');
+
+    await expect(loadLayoutStrategyPresetFromCandidates(
+      async () => { throw failure; },
+      ['standard'],
+    )).rejects.toBe(failure);
   });
 });
 

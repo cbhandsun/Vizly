@@ -20,8 +20,8 @@ interface DesignerRightSidebarProps {
     setAiChatVisible: (v: boolean) => void;
     selectedNodes: Node[];
     selectedEdges: Edge[];
-    updateNodesBatch: (ids: string[], data: any, options?: { snapshot?: boolean }) => void;
-    updateEdgesBatch: (ids: string[], data: any) => void;
+    updateNodesBatch: (ids: string[], data: Record<string, unknown>, options?: { snapshot?: boolean }) => void;
+    updateEdgesBatch: (ids: string[], data: Record<string, unknown>) => void;
     onBeforeUpdate: () => void;
     isDraggingNode: boolean;
     renderAIChatPanel?: () => React.ReactNode;

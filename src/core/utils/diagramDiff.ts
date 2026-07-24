@@ -5,11 +5,13 @@
  * 输出 DiffResult 供 DiffOverlay 消费。
  */
 
+import type { Edge, Node } from '@xyflow/react';
+
 /** 单个属性的差异 */
 export interface PropertyDiff {
   key: string;
-  oldValue: any;
-  newValue: any;
+  oldValue: unknown;
+  newValue: unknown;
 }
 
 /** 节点/边快照（用于显示已删除的元素） */
@@ -17,7 +19,7 @@ export interface ElementSnapshot {
   id: string;
   label?: string;
   position?: { x: number; y: number };
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /** Diff 结果 */
@@ -47,35 +49,39 @@ const IGNORED_EDGE_KEYS = new Set([
 /**
  * 深度比较两个值
  */
-function deepEqual(a: any, b: any): boolean {
+function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a == null || b == null) return a === b;
   if (typeof a !== typeof b) return false;
   if (typeof a !== 'object') return false;
 
-  const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
+  const recordA = a as Record<string, unknown>;
+  const recordB = b as Record<string, unknown>;
+  const keysA = Object.keys(recordA);
+  const keysB = Object.keys(recordB);
   if (keysA.length !== keysB.length) return false;
 
-  return keysA.every(key => deepEqual(a[key], b[key]));
+  return keysA.every(key => deepEqual(recordA[key], recordB[key]));
 }
 
 /**
  * 比较两个对象，返回差异属性列表
  */
 function diffObject(
-  before: Record<string, any>,
-  after: Record<string, any>,
+  before: object,
+  after: object,
   ignoredKeys: Set<string>
 ): PropertyDiff[] {
   const diffs: PropertyDiff[] = [];
-  const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  const beforeRecord = before as Record<string, unknown>;
+  const afterRecord = after as Record<string, unknown>;
+  const allKeys = new Set([...Object.keys(beforeRecord), ...Object.keys(afterRecord)]);
 
   for (const key of allKeys) {
     if (ignoredKeys.has(key)) continue;
 
-    const oldVal = before[key];
-    const newVal = after[key];
+    const oldVal = beforeRecord[key];
+    const newVal = afterRecord[key];
 
     if (!deepEqual(oldVal, newVal)) {
       diffs.push({ key, oldValue: oldVal, newValue: newVal });
@@ -89,8 +95,8 @@ function diffObject(
  * 主函数：比较两个图表快照
  */
 export function diffDiagrams(
-  before: { nodes: any[]; edges: any[] },
-  after: { nodes: any[]; edges: any[] }
+  before: { nodes: Node[]; edges: Edge[] },
+  after: { nodes: Node[]; edges: Edge[] }
 ): DiffResult {
   const result: DiffResult = {
     addedNodes: [],
@@ -118,7 +124,7 @@ export function diffDiagrams(
     if (!afterNodeMap.has(node.id)) {
       result.removedNodes.push({
         id: node.id,
-        label: node.data?.label,
+        label: typeof node.data?.label === 'string' ? node.data.label : undefined,
         position: node.position,
       });
     }
@@ -132,7 +138,7 @@ export function diffDiagrams(
       if (changes.length > 0) {
         result.modifiedNodes.push({
           id: node.id,
-          label: node.data?.label,
+          label: typeof node.data?.label === 'string' ? node.data.label : undefined,
           changes,
         });
       }
@@ -153,7 +159,7 @@ export function diffDiagrams(
     if (!afterEdgeMap.has(edge.id)) {
       result.removedEdges.push({
         id: edge.id,
-        label: edge.label,
+        label: typeof edge.label === 'string' ? edge.label : undefined,
       });
     }
   }

@@ -15,10 +15,33 @@ export interface AICommandRejection {
 }
 
 export interface AICommandExtractionResult {
-    commands: Record<string, unknown>[];
+    commands: AIValidatedCommand[];
     rejected: AICommandRejection[];
     truncated: boolean;
 }
+
+export type AIValidatedCommand =
+    | {
+        action: 'addNode' | 'addChild';
+        label?: string;
+        shape?: string;
+        type?: string;
+        parentId?: string;
+        side?: string;
+    }
+    | { action: 'connectNodes'; source: string; target: string; label?: string }
+    | { action: 'layout' | 'triggerLayout'; strategy?: string }
+    | { action: 'groupNodes'; ids: string[]; name?: string; label?: string }
+    | { action: 'updateTheme'; style: Record<string, unknown> }
+    | { action: 'presentation'; active?: boolean }
+    | {
+        action: 'animatePath';
+        ids: string[];
+        params: { edgeIds: string[]; options: { duration?: number; loop?: boolean } };
+        duration?: number;
+        loop?: boolean;
+    }
+    | { action: 'collapse'; id: string; collapsed?: boolean };
 
 const COMMAND_PREFIX = '[COMMAND:';
 
@@ -46,7 +69,7 @@ const optionalNumber = (value: unknown): number | undefined => (
     typeof value === 'number' && Number.isFinite(value) ? value : undefined
 );
 
-export const sanitizeValidatedAICommand = (cmd: unknown): Record<string, unknown> | null => {
+export const sanitizeValidatedAICommand = (cmd: unknown): AIValidatedCommand | null => {
     const policy = validateAutonomousAICommand(cmd);
     if (!policy.allowed || !isRecord(cmd)) return null;
 
@@ -64,13 +87,17 @@ export const sanitizeValidatedAICommand = (cmd: unknown): Record<string, unknown
                 ...(optionalString(cmd.parentId) ? { parentId: optionalString(cmd.parentId) } : {}),
                 ...(optionalString(cmd.side) ? { side: optionalString(cmd.side) } : {}),
             };
-        case 'connectNodes':
+        case 'connectNodes': {
+            const source = optionalString(cmd.source);
+            const target = optionalString(cmd.target);
+            if (!source || !target) return null;
             return {
                 action,
-                source: optionalString(cmd.source),
-                target: optionalString(cmd.target),
+                source,
+                target,
                 ...(optionalString(cmd.label) ? { label: optionalString(cmd.label) } : {}),
             };
+        }
         case 'layout':
         case 'triggerLayout':
             return {
@@ -79,9 +106,10 @@ export const sanitizeValidatedAICommand = (cmd: unknown): Record<string, unknown
             };
         case 'groupNodes': {
             const ids = getAICommandIds(cmd);
+            if (!ids) return null;
             return {
                 action,
-                ids: ids || [],
+                ids,
                 ...(optionalString(cmd.name) ? { name: optionalString(cmd.name) } : {}),
                 ...(optionalString(cmd.label) ? { label: optionalString(cmd.label) } : {}),
             };
@@ -98,13 +126,14 @@ export const sanitizeValidatedAICommand = (cmd: unknown): Record<string, unknown
             };
         case 'animatePath': {
             const ids = getAICommandIds(cmd);
+            if (!ids) return null;
             const params = isRecord(cmd.params) ? cmd.params : {};
             const options = isRecord(params.options) ? params.options : {};
             return {
                 action,
-                ...(ids ? { ids } : {}),
+                ids,
                 params: {
-                    ...(ids ? { edgeIds: ids } : {}),
+                    edgeIds: ids,
                     options: {
                         ...(optionalNumber(cmd.duration ?? options.duration) !== undefined
                             ? { duration: optionalNumber(cmd.duration ?? options.duration) }
@@ -122,12 +151,15 @@ export const sanitizeValidatedAICommand = (cmd: unknown): Record<string, unknown
                     : {}),
             };
         }
-        case 'collapse':
+        case 'collapse': {
+            const id = optionalString(cmd.id);
+            if (!id) return null;
             return {
                 action,
-                id: optionalString(cmd.id),
+                id,
                 ...(optionalBoolean(cmd.collapsed) !== undefined ? { collapsed: optionalBoolean(cmd.collapsed) } : {}),
             };
+        }
         default:
             return null;
     }

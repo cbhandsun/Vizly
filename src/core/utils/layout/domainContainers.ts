@@ -1,6 +1,51 @@
-import type { Edge, Node as ReactFlowNode, XYPosition } from '@xyflow/react';
-import { diagramConfigManager } from '../../components/config/DiagramConfig';
+import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
+import { diagramConfigManager } from '../../config/DiagramConfig';
 import { calculateBoundingBox, countRectOverlaps } from './geometryUtils';
+
+type LayoutNode = ReactFlowNode<Record<string, unknown>>;
+
+const GROUP_TYPES = new Set(['subGroup', 'titleGroup', 'group', 'domain']);
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+
+const finiteNumber = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const nodeDomain = (node: LayoutNode | undefined): string =>
+  String(node?.data.domain ?? '');
+
+const nodeChildren = (node: LayoutNode): string[] =>
+  Array.isArray(node.data.children)
+    ? node.data.children.filter((child): child is string => typeof child === 'string')
+    : [];
+
+const nodeWidth = (node: LayoutNode, fallback: number): number =>
+  finiteNumber(node.measured?.width ?? node.style?.width ?? node.width, fallback);
+
+const nodeHeight = (node: LayoutNode, fallback: number): number =>
+  finiteNumber(node.measured?.height ?? node.style?.height ?? node.height, fallback);
+
+const nodeX = (node: LayoutNode, fallback = 0): number =>
+  finiteNumber(node.position.x, fallback);
+
+const nodeY = (node: LayoutNode, fallback = 0): number =>
+  finiteNumber(node.position.y, fallback);
+
+const isHiddenNode = (node: LayoutNode): boolean => node.data.hidden === true;
+
+const setNodePosition = (node: LayoutNode | undefined, x: number, y: number): void => {
+  if (node) node.position = { x, y };
+};
+
+const setNodeDimensions = (node: LayoutNode, width: number, height: number): void => {
+  node.style = { ...node.style, width, height };
+  node.measured = { ...node.measured, width, height };
+  node.width = width;
+  node.height = height;
+};
 
 /**
  * @file 统一布局工具函数
@@ -12,46 +57,54 @@ import { calculateBoundingBox, countRectOverlaps } from './geometryUtils';
  * 函数级注释：当提供 `whitelist` 时，仅为白名单中的域创建 titleGroup，否则为全部域创建。
  */
 export const applyDomainGrouping = (
-  nodes: ReactFlowNode[],
+  nodes: LayoutNode[],
   whitelist?: string[]
-): ReactFlowNode[] => {
-  const cfgFull = diagramConfigManager.getConfig() as any;
-  const domainCfg = cfgFull?.domain || {};
-  const padH = Number(domainCfg?.padding?.horizontal) || 24;
-  const _padV = Number(domainCfg?.padding?.vertical) || 16;
-  const titleH = Number(domainCfg?.title?.height) || 50;
-  const titleVPad = Number(domainCfg?.title?.padding?.vertical) || 12;
-  const titleSafe = Number(domainCfg?.title?.safeGap) || 16;
-  const bottomSafe = Number((domainCfg as any)?.bottomSafeGap ?? (domainCfg as any)?.padding?.bottom ?? (titleVPad + titleSafe));
-  const layoutCfgStrict = diagramConfigManager.getLayoutConfig() as any;
-  const autoScaleHStrict = Number((cfgFull?.layout?.autoGapScale?.h)) || 1;
-  const baseHGapStrict = Number((layoutCfgStrict?.NODE_H_GAP)) || 120;
+): LayoutNode[] => {
+  const cfgFull = asRecord(diagramConfigManager.getConfig());
+  const domainCfg = asRecord(cfgFull.domain);
+  const domainPadding = asRecord(domainCfg.padding);
+  const domainTitle = asRecord(domainCfg.title);
+  const domainTitlePadding = asRecord(domainTitle.padding);
+  const fullLayoutCfg = asRecord(cfgFull.layout);
+  const autoGapScale = asRecord(fullLayoutCfg.autoGapScale);
+  const padH = finiteNumber(domainPadding.horizontal, 24);
+  const _padV = finiteNumber(domainPadding.vertical, 16);
+  const titleH = finiteNumber(domainTitle.height, 50);
+  const titleVPad = finiteNumber(domainTitlePadding.vertical, 12);
+  const titleSafe = finiteNumber(domainTitle.safeGap, 16);
+  const bottomSafe = finiteNumber(
+    domainCfg.bottomSafeGap ?? domainPadding.bottom,
+    titleVPad + titleSafe
+  );
+  const layoutCfgStrict = asRecord(diagramConfigManager.getLayoutConfig());
+  const autoScaleHStrict = finiteNumber(autoGapScale.h, 1);
+  const baseHGapStrict = finiteNumber(layoutCfgStrict.NODE_H_GAP, 120);
   const _hGapEffStrict = Math.max(8, Math.floor(baseHGapStrict * Math.min(1.0, autoScaleHStrict)));
-  const layoutCfg = diagramConfigManager.getLayoutConfig() as any;
-  const autoScaleH = Number((cfgFull?.layout?.autoGapScale?.h)) || 1;
-  const baseHGap = Number((layoutCfg?.NODE_H_GAP)) || 120;
+  const layoutCfg = asRecord(diagramConfigManager.getLayoutConfig());
+  const autoScaleH = finiteNumber(autoGapScale.h, 1);
+  const baseHGap = finiteNumber(layoutCfg.NODE_H_GAP, 120);
   const hGapEff = Math.max(8, Math.floor(baseHGap * Math.min(1.0, autoScaleH)));
 
   const existingTitleGroups = new Set(
     nodes
       .filter(n => String(n.type || '') === 'titleGroup')
-      .map(n => String((n.data as any)?.domain || ''))
+      .map(nodeDomain)
   );
 
   const groupedByDomain = nodes.reduce((acc, n) => {
-    const d = (n.data as any)?.domain as string | undefined;
+    const d = nodeDomain(n);
     if (!d) return acc;
     // 跳过容器类节点的自身参与计算，避免重复包含
     const t = String(n.type || '');
     if (new Set(['titleGroup', 'subGroup', 'group', 'domain']).has(t)) return acc;
-    if (!acc[d]) acc[d] = [] as ReactFlowNode[];
+    if (!acc[d]) acc[d] = [];
     acc[d].push(n);
     return acc;
-  }, {} as Record<string, ReactFlowNode[]>);
+  }, {} as Record<string, LayoutNode[]>);
 
   if (!Object.keys(groupedByDomain).length) return nodes;
 
-  const result: ReactFlowNode[] = [...nodes];
+  const result: LayoutNode[] = [...nodes];
 
   for (const d of Object.keys(groupedByDomain)) {
     if (existingTitleGroups.has(d)) continue; // 宸插瓨鍦ㄥ垯璺宠繃
@@ -67,20 +120,22 @@ export const applyDomainGrouping = (
 
     // 依据子节点的 domainClass 多数值，作为容器的 domainClass
     const childClasses = children
-      .map(c => (c.data as any)?.domainClass)
-      .filter(Boolean) as string[];
+      .map(c => c.data.domainClass)
+      .filter((value): value is string => typeof value === 'string' && value.length > 0);
     const majorityClass = childClasses.length
       ? Array.from(childClasses.reduce((m, v) => m.set(v, (m.get(v) || 0) + 1), new Map<string, number>()).entries()).sort((a, b) => b[1] - a[1])[0][0]
       : undefined;
 
     // 尝试从第一个子节点获取 domainShape 配置（常由 orchestrator 注入到 metadata 或 data 中）
-    const domainShape = (children[0].data as any)?.domainShape ?? (children[0].data as any)?.metadata?.domainShape;
+    const firstChild = children[0];
+    const domainShape = firstChild?.data.domainShape
+      ?? asRecord(firstChild?.data.metadata).domainShape;
 
-    const node: ReactFlowNode<any> = {
+    const node: LayoutNode = {
       id: `titlegroup-${d}`,
       type: 'titleGroup',
       position: { x, y },
-      style: { width, height, zIndex: -10 } as any,
+      style: { width, height, zIndex: -10 },
       data: {
         // 显示标题使用 description，等同于域键
         description: d,
@@ -94,7 +149,7 @@ export const applyDomainGrouping = (
         shape: domainShape, // 浼犻€掑舰鐘跺睘鎬?
       },
       zIndex: -10,
-      measured: { width, height } as any,
+      measured: { width, height },
       draggable: false, // 锁定自动生成的域容器
     };
 
@@ -124,42 +179,49 @@ export const applyDomainGrouping = (
  * - 若某域没有可识别的内容（无显式节点/子域容器），则跳过该域的校正。
  */
 export const enforceDomainContainerStrictContainment = (
-  nodes: ReactFlowNode[]
-): ReactFlowNode[] => {
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-  const cfgFull = diagramConfigManager.getConfig() as any;
-    const domainCfg = cfgFull?.domain || {};
-  const padH = Number(domainCfg?.padding?.horizontal) || 24;
-  const _padV = Number(domainCfg?.padding?.vertical) || 16;
-  const titleH = Number(domainCfg?.title?.height) || 50;
-  const titleVPad = Number(domainCfg?.title?.padding?.vertical) || 12;
-  const titleSafe = Number(domainCfg?.title?.safeGap) || 16;
-  const _bottomSafe = Number((domainCfg as any)?.bottomSafeGap ?? (domainCfg as any)?.padding?.bottom ?? (titleVPad + titleSafe));
-  const layoutCfgStrict = diagramConfigManager.getLayoutConfig() as any;
-  const autoScaleHStrict = Number((cfgFull?.layout?.autoGapScale?.h)) || 1;
-  const baseHGapStrict = Number((layoutCfgStrict?.NODE_H_GAP)) || 120;
+  nodes: LayoutNode[]
+): LayoutNode[] => {
+  const cfgFull = asRecord(diagramConfigManager.getConfig());
+  const domainCfg = asRecord(cfgFull.domain);
+  const domainPadding = asRecord(domainCfg.padding);
+  const domainTitle = asRecord(domainCfg.title);
+  const domainTitlePadding = asRecord(domainTitle.padding);
+  const fullLayoutCfg = asRecord(cfgFull.layout);
+  const autoGapScale = asRecord(fullLayoutCfg.autoGapScale);
+  const padH = finiteNumber(domainPadding.horizontal, 24);
+  const _padV = finiteNumber(domainPadding.vertical, 16);
+  const titleH = finiteNumber(domainTitle.height, 50);
+  const titleVPad = finiteNumber(domainTitlePadding.vertical, 12);
+  const titleSafe = finiteNumber(domainTitle.safeGap, 16);
+  const _bottomSafe = finiteNumber(
+    domainCfg.bottomSafeGap ?? domainPadding.bottom,
+    titleVPad + titleSafe
+  );
+  const layoutCfgStrict = asRecord(diagramConfigManager.getLayoutConfig());
+  const autoScaleHStrict = finiteNumber(autoGapScale.h, 1);
+  const baseHGapStrict = finiteNumber(layoutCfgStrict.NODE_H_GAP, 120);
   const hGapEffStrict = Math.max(8, Math.floor(baseHGapStrict * Math.min(1.0, autoScaleHStrict)));
   const safeEdgeW = Math.max(6, Math.floor(hGapEffStrict * 0.25));
 
-  const isGroupType = (t: any) => new Set(['subGroup', 'titleGroup', 'group', 'domain']).has(String(t || ''));
+  const isGroupType = (type: unknown) => GROUP_TYPES.has(String(type ?? ''));
 
-  const updated: ReactFlowNode[] = nodes.map(n => ({ ...n }));
+  const updated: LayoutNode[] = nodes.map(n => ({ ...n }));
   const titleGroups = updated.filter(n => String(n.type || '') === 'titleGroup');
   if (!titleGroups.length) return updated;
 
   for (let i = 0; i < titleGroups.length; i++) {
     const tg = titleGroups[i];
-    const domainKey = String(((tg.data as any)?.domain || ''));
+    const domainKey = nodeDomain(tg);
     if (!domainKey) continue;
     const dk = String(domainKey).trim();
-    const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
-    const majorityDomainOfChildren = (sg: ReactFlowNode): string | undefined => {
-      const children = Array.isArray((sg.data as any)?.children) ? ((sg.data as any).children as string[]) : [];
+    const idMap = new Map<string, LayoutNode>(updated.map(n => [n.id, n] as const));
+    const majorityDomainOfChildren = (sg: LayoutNode): string | undefined => {
+      const children = nodeChildren(sg);
       if (!children.length) return undefined;
       const counts: Record<string, number> = {};
       for (const cid of children) {
         const c = idMap.get(cid);
-        const dom = String(((c as any)?.data?.domain || '')).trim();
+        const dom = nodeDomain(c).trim();
         if (!dom) continue;
         counts[dom] = (counts[dom] || 0) + 1;
       }
@@ -168,9 +230,9 @@ export const enforceDomainContainerStrictContainment = (
     };
 
     // 鏀堕泦璇ュ煙鐨勪笟鍔¤妭鐐逛笌瀛愬煙瀹瑰櫒
-    const widthBySubOnly = Boolean(((diagramConfigManager.getConfig() as any)?.layout?.domainWidthBySubGroupsOnly !== false));
+    const widthBySubOnly = fullLayoutCfg.domainWidthBySubGroupsOnly !== false;
     const childrenCandidates = updated.filter(n => {
-      const d1 = String(((n.data as any)?.domain || '')).trim();
+      const d1 = nodeDomain(n).trim();
       let belongs = !!dk && (d1 === dk);
       const typeStr = String(n.type || '');
       if (!belongs && typeStr === 'subGroup') {
@@ -182,20 +244,19 @@ export const enforceDomainContainerStrictContainment = (
       if (typeStr === 'titleGroup') return false;
       if (typeStr === 'subGroup') return true; // 子域容器参与包围框
       if (widthBySubOnly) return false; // 仅按子域计算宽度时，业务节点不参与
-      const isHidden = !!(((n as any)?.data || {}) as any)?.hidden;
-      if (isHidden) return false;
+      if (isHiddenNode(n)) return false;
       return !isGroupType(typeStr);
     });
     if (!childrenCandidates.length) continue;
 
-    const layoutCfgStrict = diagramConfigManager.getLayoutConfig() as any;
-    const autoScaleHStrict = Number((cfgFull?.layout?.autoGapScale?.h)) || 1;
-    const baseHGapStrict = Number((layoutCfgStrict?.NODE_H_GAP)) || 120;
+    const layoutCfgStrict = asRecord(diagramConfigManager.getLayoutConfig());
+    const autoScaleHStrict = finiteNumber(autoGapScale.h, 1);
+    const baseHGapStrict = finiteNumber(layoutCfgStrict.NODE_H_GAP, 120);
     const _hGapEffStrict = Math.max(8, Math.floor(baseHGapStrict * Math.min(1.0, autoScaleHStrict)));
     const bbox = calculateBoundingBox(childrenCandidates);
     const contentHStrict = Math.max(0, bbox.height);
     const _childCountStrict = childrenCandidates.length;
-    const bottomSafeEff = Number((domainCfg as any)?.bottomSafeGap ?? (titleVPad + titleSafe));
+    const bottomSafeEff = finiteNumber(domainCfg.bottomSafeGap, titleVPad + titleSafe);
     const width = bbox.width + padH * 2 + safeEdgeW;
     const height = contentHStrict + titleH + titleVPad + titleSafe + bottomSafeEff;
     const x = bbox.x - padH;
@@ -207,24 +268,24 @@ export const enforceDomainContainerStrictContainment = (
       const old = updated[idx];
       // 依据该域的子内容（业务节点与子域容器）计算多数值 domainClass
       const childClasses = childrenCandidates
-        .map(n => (n.data as any)?.domainClass)
-        .filter(Boolean) as string[];
+        .map(n => n.data.domainClass)
+        .filter((value): value is string => typeof value === 'string' && value.length > 0);
       const majorityClass = childClasses.length
         ? Array.from(childClasses.reduce((m, v) => m.set(v, (m.get(v) || 0) + 1), new Map<string, number>()).entries()).sort((a, b) => b[1] - a[1])[0][0]
         : undefined;
 
-      const _curW = num(((old as any)?.measured?.width ?? (old as any)?.style?.width), 0);
-      const _curH = num(((old as any)?.measured?.height ?? (old as any)?.style?.height), 0);
+      const _curW = nodeWidth(old, 0);
+      const _curH = nodeHeight(old, 0);
       const finalW = width; // 浠ユ渶缁堟姇褰变负鍑嗭紝鍏佽鏀剁缉
       const finalH = height;
-      const anchoredX = num(((old as any)?.position?.x), x);
-      const next: ReactFlowNode<any> = {
+      const anchoredX = nodeX(old, x);
+      const next: LayoutNode = {
         ...old,
         position: { x: Math.round(anchoredX), y },
-        style: { ...(old.style as any), width: finalW, height: finalH, zIndex: -10 } as any,
-        data: { ...(old.data as any), domain: domainKey, domainClass: majorityClass ?? (old.data as any)?.domainClass, titleBarHeight: titleH, baseZIndex: -10 } as any,
+        style: { ...old.style, width: finalW, height: finalH, zIndex: -10 },
+        data: { ...old.data, domain: domainKey, domainClass: majorityClass ?? old.data.domainClass, titleBarHeight: titleH, baseZIndex: -10 },
         zIndex: -10,
-        measured: { width: finalW, height: finalH } as any
+        measured: { width: finalW, height: finalH }
       };
       updated[idx] = next;
     }
@@ -254,24 +315,24 @@ export const enforceDomainContainerStrictContainment = (
  * - 锚定容器：对 `anchorLocked` 的容器跳过水平避让；若检测到仍需水平避让，则打印警告定位。
  */
 export const resolveDomainContainerOverlaps = (
-  nodes: ReactFlowNode[],
+  nodes: LayoutNode[],
   gapOverride?: number
-): ReactFlowNode[] => {
-  const cfg = diagramConfigManager.getConfig() as any;
-  const domainGap = typeof gapOverride === 'number' && isFinite(gapOverride)
-    ? (gapOverride as number)
-    : (Number(cfg?.domain?.gap) || 48);
+): LayoutNode[] => {
+  const cfg = asRecord(diagramConfigManager.getConfig());
+  const domainGap = finiteNumber(
+    gapOverride,
+    finiteNumber(asRecord(cfg.domain).gap, 48)
+  );
 
-  const containers = nodes.filter(n => String(n.type || '') === 'titleGroup');
-  const isLocked = (n: ReactFlowNode) => Boolean(((n.data as any)?.anchorLocked));
+  const containers = nodes.filter(n => String(n.type ?? '') === 'titleGroup');
+  const isLocked = (node: LayoutNode) => node.data.anchorLocked === true;
   if (containers.length <= 1) return nodes;
 
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-  const getRect = (n: ReactFlowNode) => {
-    const w = num((n as any)?.measured?.width ?? (n.style as any)?.width, 0);
-    const h = num((n as any)?.measured?.height ?? (n.style as any)?.height, 0);
-    const x = num(n.position?.x, 0);
-    const y = num(n.position?.y, 0);
+  const getRect = (n: LayoutNode) => {
+    const w = nodeWidth(n, 0);
+    const h = nodeHeight(n, 0);
+    const x = nodeX(n);
+    const y = nodeY(n);
     return { x, y, w, h };
   };
   const intersects = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => {
@@ -285,18 +346,23 @@ export const resolveDomainContainerOverlaps = (
   const translateDomain = (domain: string, dx: number, dy: number) => {
     for (let i = 0; i < updated.length; i++) {
       const n = updated[i];
-      const d = String(((n.data as any)?.domain || ''));
+      const d = nodeDomain(n);
       if (d === domain) {
-        const px = num(n.position?.x, 0);
-        const py = num(n.position?.y, 0);
-        const newPos = { x: Math.round(px + dx), y: Math.round(py + dy) } as XYPosition;
-        updated[i] = { ...n, position: newPos } as any;
+        const px = nodeX(n);
+        const py = nodeY(n);
+        const translated = { ...n, position: { x: Math.round(px + dx), y: Math.round(py + dy) } };
         // 若节点数据中存在 position 字段，顺带修正（兼容旧约定）
-        const nd: any = { ...(n.data || {}) };
-        if (nd.position && typeof nd.position === 'object') {
-          nd.position = { x: Math.round(num(nd.position.x, 0) + dx), y: Math.round(num(nd.position.y, 0) + dy) };
-          (updated[i] as any).data = nd;
+        const dataPosition = asRecord(n.data.position);
+        if (Object.keys(dataPosition).length > 0) {
+          translated.data = {
+            ...n.data,
+            position: {
+              x: Math.round(finiteNumber(dataPosition.x, 0) + dx),
+              y: Math.round(finiteNumber(dataPosition.y, 0) + dy)
+            }
+          };
         }
+        updated[i] = translated;
       }
     }
     return updated;
@@ -306,7 +372,7 @@ export const resolveDomainContainerOverlaps = (
   const byY = containers.slice().sort((a, b) => getRect(a).y - getRect(b).y);
   const placedY: Array<{ domain: string; rect: { x: number; y: number; w: number; h: number } }> = [];
   for (const c of byY) {
-    const d = String(((c.data as any)?.domain || ''));
+    const d = nodeDomain(c);
     const r = getRect(c);
     let shiftY = 0;
     for (const p of placedY) {
@@ -329,7 +395,7 @@ export const resolveDomainContainerOverlaps = (
   const byX = containersAfterY.slice().sort((a, b) => getRect(a).x - getRect(b).x);
   const placedX: Array<{ domain: string; rect: { x: number; y: number; w: number; h: number } }> = [];
   for (const c of byX) {
-    const d = String(((c.data as any)?.domain || ''));
+    const d = nodeDomain(c);
     const r = getRect(c);
     let shiftX = 0;
     if (isLocked(c)) {
@@ -362,7 +428,7 @@ export const resolveDomainContainerOverlaps = (
   const finals = updated.filter(n => String(n.type || '') === 'titleGroup');
   let iteration = 0;
   const maxIter = 6;
-  const rectOf = (n: ReactFlowNode) => getRect(n);
+  const rectOf = (n: LayoutNode) => getRect(n);
   const idxOf = (id: string) => updated.findIndex(n => n.id === id);
   while (iteration < maxIter) {
     let hasOverlap = false;
@@ -372,7 +438,7 @@ export const resolveDomainContainerOverlaps = (
         const b = rectOf(finals[j]);
         if (intersects(a, b)) {
           hasOverlap = true;
-          const ad = String(((finals[i].data as any)?.domain || ''));
+          const ad = nodeDomain(finals[i]);
           if (!isLocked(finals[i])) {
             // 小步平移增强：避免剧烈但更有效的避让；锚定时仅告警重叠，不做水平位移
             translateDomain(ad, Math.ceil(domainGap * 0.35), 0);
@@ -405,30 +471,33 @@ export const resolveDomainContainerOverlaps = (
  * 目标：在同一域内，将子域容器与普通业务节点视为块，并按最小块间距进行收敛，减少不必要留白。
  */
 export const compactDomainBlocks = (
-  nodes: ReactFlowNode[],
+  nodes: LayoutNode[],
   nodeHGap?: number,
   nodeVGap?: number
-): ReactFlowNode[] => {
-  const cfg = diagramConfigManager.getLayoutConfig() as any;
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-  const vGap = num(nodeVGap, num(cfg?.NODE_V_GAP, 80));
+): LayoutNode[] => {
+  const cfg = asRecord(diagramConfigManager.getLayoutConfig());
+  const vGap = finiteNumber(nodeVGap, finiteNumber(cfg.NODE_V_GAP, 80));
   const updated = nodes.map(n => ({ ...n }));
-  const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
+  const idMap = new Map<string, LayoutNode>(updated.map(n => [n.id, n] as const));
   const EXCLUDE = new Set(['subGroup', 'titleGroup', 'group', 'domain']);
-  const getH = (n: ReactFlowNode) => num(((n as any)?.measured?.height ?? (n.style as any)?.height), 120);
-  const getY = (n: ReactFlowNode) => num(((n.position as any)?.y), 0);
-  const setY = (n: ReactFlowNode, y: number) => { (n as any).position = { x: num(((n.position as any)?.x), 0), y } as any; };
+  const getH = (node: LayoutNode) => nodeHeight(node, 120);
+  const getY = (node: LayoutNode) => nodeY(node);
+  const setY = (node: LayoutNode, y: number) => setNodePosition(node, nodeX(node), y);
 
-  const domains = Array.from(new Set(updated.map(n => String(((n.data as any)?.domain || ''))).filter(Boolean)));
+  const domains = Array.from(new Set(updated.map(nodeDomain).filter(Boolean)));
   for (const d of domains) {
-    const sgs = updated.filter(n => String(n.type || '') === 'subGroup' && String(((n.data as any)?.domain || '')) === d);
-    const leftovers = updated.filter(n => !EXCLUDE.has(String(n.type || '')) && String(((n.data as any)?.domain || '')) === d && !sgs.some(sg => Array.isArray((sg.data as any)?.children) && ((sg.data as any).children as string[]).includes(n.id)));
-    type Block = { ref?: ReactFlowNode; top: number; bottom: number; applyDy: (dy: number) => void };
+    const sgs = updated.filter(n => String(n.type ?? '') === 'subGroup' && nodeDomain(n) === d);
+    const leftovers = updated.filter(n =>
+      !EXCLUDE.has(String(n.type ?? ''))
+      && nodeDomain(n) === d
+      && !sgs.some(sg => nodeChildren(sg).includes(n.id))
+    );
+    type Block = { ref?: LayoutNode; top: number; bottom: number; applyDy: (dy: number) => void };
     const blocks: Block[] = [];
     for (const sg of sgs) {
       const top = getY(sg);
       const h = getH(sg);
-      const children = Array.isArray((sg.data as any)?.children) ? (sg.data as any).children as string[] : [];
+      const children = nodeChildren(sg);
       blocks.push({
         ref: sg,
         top,
@@ -446,7 +515,7 @@ export const compactDomainBlocks = (
     if (leftovers.length) {
       const minYLeft = Math.min(...leftovers.map(n => getY(n)));
       const maxYLeft = Math.max(...leftovers.map(n => getY(n) + getH(n)));
-      blocks.push({ top: isFinite(minYLeft) ? minYLeft : 0, bottom: isFinite(maxYLeft) ? maxYLeft : 1, applyDy: (dy: number) => { for (const n of leftovers) setY(n, getY(n) + dy); } });
+      blocks.push({ top: Number.isFinite(minYLeft) ? minYLeft : 0, bottom: Number.isFinite(maxYLeft) ? maxYLeft : 1, applyDy: (dy: number) => { for (const n of leftovers) setY(n, getY(n) + dy); } });
     }
     blocks.sort((a, b) => a.top - b.top);
     for (let i = 1; i < blocks.length; i++) {
@@ -474,44 +543,49 @@ export const compactDomainBlocks = (
  * 目标：在同一域内，若子域块的子节点存在来自上方节点的相邻关系，则将该子域整体上收至“上邻节点底部 + vGap”，在不与上一块相邻且不越过域标题安全区前提下。
  */
 export const pullUpSubGroupsByIncomingEdges = (
-  nodes: ReactFlowNode[],
+  nodes: LayoutNode[],
   edges: Edge[],
   nodeVGap?: number
-): ReactFlowNode[] => {
-  const cfgFull = diagramConfigManager.getConfig() as any;
-  const layoutCfg = diagramConfigManager.getLayoutConfig() as any;
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-  const vGap = num(nodeVGap, num(layoutCfg?.NODE_V_GAP, 80));
-  const titleH = num(cfgFull?.domain?.title?.height, 40);
-  const titleV = num(cfgFull?.domain?.title?.padding?.vertical, 12);
-  const titleSafe = num(cfgFull?.domain?.title?.safeGap, 16);
-  const _sideSafe = Math.max(12, num(cfgFull?.domain?.sideSafeGap, 8));
+): LayoutNode[] => {
+  const cfgFull = asRecord(diagramConfigManager.getConfig());
+  const domainConfig = asRecord(cfgFull.domain);
+  const domainTitle = asRecord(domainConfig.title);
+  const domainTitlePadding = asRecord(domainTitle.padding);
+  const layoutCfg = asRecord(diagramConfigManager.getLayoutConfig());
+  const vGap = finiteNumber(nodeVGap, finiteNumber(layoutCfg.NODE_V_GAP, 80));
+  const titleH = finiteNumber(domainTitle.height, 40);
+  const titleV = finiteNumber(domainTitlePadding.vertical, 12);
+  const titleSafe = finiteNumber(domainTitle.safeGap, 16);
+  const _sideSafe = Math.max(12, finiteNumber(domainConfig.sideSafeGap, 8));
 
   const updated = nodes.map(n => ({ ...n }));
-  const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
+  const idMap = new Map<string, LayoutNode>(updated.map(n => [n.id, n] as const));
   const EXCLUDE = new Set(['subGroup', 'titleGroup', 'group', 'domain']);
-  const getH = (n: ReactFlowNode) => num(((n as any)?.measured?.height ?? (n.style as any)?.height), 120);
-  const getX = (n: ReactFlowNode) => num(((n.position as any)?.x), 0);
-  const getY = (n: ReactFlowNode) => num(((n.position as any)?.y), 0);
-  const setY = (n: ReactFlowNode, y: number) => { (n as any).position = { x: getX(n), y } as any; };
+  const getH = (node: LayoutNode) => nodeHeight(node, 120);
+  const getY = (node: LayoutNode) => nodeY(node);
+  const setY = (node: LayoutNode, y: number) => setNodePosition(node, nodeX(node), y);
 
-  const domains = Array.from(new Set(updated.map(n => String(((n.data as any)?.domain || ''))).filter(Boolean)));
+  const domains = Array.from(new Set(updated.map(nodeDomain).filter(Boolean)));
   for (const d of domains) {
-    const tg = updated.find(n => String(n.type || '') === 'titleGroup' && String(((n.data as any)?.domain || '')) === d);
+    const tg = updated.find(n => String(n.type ?? '') === 'titleGroup' && nodeDomain(n) === d);
     const domainTopSafe = tg ? (getY(tg) + titleH + titleV + titleSafe) : 0;
-    const sgs = updated.filter(n => String(n.type || '') === 'subGroup' && String(((n.data as any)?.domain || '')) === d);
-    type Block = { ref?: ReactFlowNode; top: number; bottom: number };
+    const sgs = updated.filter(n => String(n.type ?? '') === 'subGroup' && nodeDomain(n) === d);
+    type Block = { ref?: LayoutNode; top: number; bottom: number };
     const blocks: Block[] = [];
     for (const sg of sgs) { blocks.push({ ref: sg, top: getY(sg), bottom: getY(sg) + getH(sg) }); }
-    const leftovers = updated.filter(n => !EXCLUDE.has(String(n.type || '')) && String(((n.data as any)?.domain || '')) === d && !sgs.some(sg => Array.isArray((sg.data as any)?.children) && ((sg.data as any).children as string[]).includes(n.id)));
+    const leftovers = updated.filter(n =>
+      !EXCLUDE.has(String(n.type ?? ''))
+      && nodeDomain(n) === d
+      && !sgs.some(sg => nodeChildren(sg).includes(n.id))
+    );
     if (leftovers.length) {
       const minYLeft = Math.min(...leftovers.map(n => getY(n)));
       const maxYLeft = Math.max(...leftovers.map(n => getY(n) + getH(n)));
-      blocks.push({ top: isFinite(minYLeft) ? minYLeft : 0, bottom: isFinite(maxYLeft) ? maxYLeft : 1 });
+      blocks.push({ top: Number.isFinite(minYLeft) ? minYLeft : 0, bottom: Number.isFinite(maxYLeft) ? maxYLeft : 1 });
     }
     blocks.sort((a, b) => a.top - b.top);
     const childrenBySub = new Map<string, string[]>();
-    for (const sg of sgs) childrenBySub.set(sg.id, Array.isArray((sg.data as any)?.children) ? ((sg.data as any).children as string[]) : []);
+    for (const sg of sgs) childrenBySub.set(sg.id, nodeChildren(sg));
     for (let i = 0; i < blocks.length; i++) {
       const blk = blocks[i];
       const sg = blk.ref;
@@ -557,15 +631,14 @@ export const pullUpSubGroupsByIncomingEdges = (
  * 函数级注释：统计域容器之间的重叠数量
  */
 export const countDomainContainerOverlaps = (
-  nodes: ReactFlowNode[]
+  nodes: LayoutNode[]
 ): number => {
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-  const tgs = nodes.filter(n => String(n.type || '') === 'titleGroup');
+  const tgs = nodes.filter(n => String(n.type ?? '') === 'titleGroup');
   const rects = tgs.map(n => ({
-    x: num(((n as any)?.position?.x), 0),
-    y: num(((n as any)?.position?.y), 0),
-    width: num(((n as any)?.measured?.width ?? (n as any)?.style?.width), 0),
-    height: num(((n as any)?.measured?.height ?? (n as any)?.style?.height), 0)
+    x: nodeX(n),
+    y: nodeY(n),
+    width: nodeWidth(n, 0),
+    height: nodeHeight(n, 0)
   }));
   return countRectOverlaps(rects);
 };
@@ -579,43 +652,50 @@ export const countDomainContainerOverlaps = (
  * 鐩爣锛氭寜鍩熷唴鎴愬憳锛堝瓙鍩熷鍣?+ 鏅€氳妭鐐癸級鐨勬按骞虫姇褰辩簿纭绠楀煙瀹瑰櫒瀹藉害锛涗繚鐣欏煙宸﹂敋涓嶅彉锛屼粎鍐欏洖瀹藉害銆?
  */
 export const finalizeDomainWidthsByProjection = (
-  nodes: ReactFlowNode[]
-): ReactFlowNode[] => {
-  const cfgFull = diagramConfigManager.getConfig() as any;
-    const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
+  nodes: LayoutNode[]
+): LayoutNode[] => {
+  const cfgFull = asRecord(diagramConfigManager.getConfig());
+  const domainConfig = asRecord(cfgFull.domain);
+  const domainPadding = asRecord(domainConfig.padding);
+  const subDomainConfig = asRecord(cfgFull.subDomain);
+  const subDomainPadding = asRecord(subDomainConfig.padding);
+  const legacySubGroupPadding = asRecord(asRecord(cfgFull.subGroup).padding);
+  const layoutConfig = asRecord(diagramConfigManager.getLayoutConfig());
+  const layoutSubGroupPadding = asRecord(layoutConfig.SUB_GROUP_PADDING);
+  const fullLayoutConfig = asRecord(cfgFull.layout);
   const updated = nodes.map(n => ({ ...n }));
-  const padH = num(cfgFull?.domain?.padding?.horizontal, 24);
-  const sideSafe = Math.max(12, num(cfgFull?.domain?.sideSafeGap, 8));
-  const _subPadH = num((cfgFull?.subDomain?.padding?.horizontal ?? cfgFull?.subGroup?.padding?.horizontal ?? (diagramConfigManager.getLayoutConfig() as any)?.SUB_GROUP_PADDING?.H), 30);
-  const domains = updated.filter(n => String(n.type || '') === 'titleGroup');
-  const widthBySubOnly = Boolean(((diagramConfigManager.getConfig() as any)?.layout?.domainWidthBySubGroupsOnly !== false));
+  const padH = finiteNumber(domainPadding.horizontal, 24);
+  const sideSafe = Math.max(12, finiteNumber(domainConfig.sideSafeGap, 8));
+  const _subPadH = finiteNumber(
+    subDomainPadding.horizontal ?? legacySubGroupPadding.horizontal ?? layoutSubGroupPadding.H,
+    30
+  );
+  const domains = updated.filter(n => String(n.type ?? '') === 'titleGroup');
+  const widthBySubOnly = fullLayoutConfig.domainWidthBySubGroupsOnly !== false;
   for (const dc of domains) {
-    const dId = String((((dc as any).data?.domain || '')));
+    const dId = nodeDomain(dc);
     if (!dId) continue;
-    const xOld = num(((dc as any)?.position?.x), 0);
+    const xOld = nodeX(dc);
     const innerLeftOld = xOld + padH;
     let minLeft = Infinity;
     let maxRight = -Infinity;
     for (const n of updated) {
-      const tp = String(n.type || '');
-      const belongs = String(((n.data as any)?.domain || '')) === dId;
+      const tp = String(n.type ?? '');
+      const belongs = nodeDomain(n) === dId;
       if (!belongs || tp === 'titleGroup') continue;
       if (widthBySubOnly && tp !== 'subGroup') continue;
-      const hidden = !!((((n as any)?.data) || {}) as any)?.hidden;
-      if (hidden) continue;
-      const nx = num(((n as any)?.position?.x), innerLeftOld);
-      const nw = num((((n as any)?.measured?.width ?? (n as any)?.style?.width)), 0);
+      if (isHiddenNode(n)) continue;
+      const nx = nodeX(n, innerLeftOld);
+      const nw = nodeWidth(n, 0);
       const left = nx;
       const right = nx + nw;
       minLeft = Math.min(minLeft, left);
       maxRight = Math.max(maxRight, right);
     }
-    if (isFinite(maxRight) && isFinite(minLeft)) {
+    if (Number.isFinite(maxRight) && Number.isFinite(minLeft)) {
       const contentW = Math.max(0, maxRight - minLeft);
       const newW = contentW + padH * 2 + sideSafe * 2;
-      ((dc as any).style || ((dc as any).style = {})).width = newW;
-      (dc as any).measured = { width: newW, height: num((((dc as any)?.measured?.height ?? (dc as any)?.style?.height)), 0) } as any;
-      (dc as any).width = newW;
+      setNodeDimensions(dc, newW, nodeHeight(dc, 0));
       // 保持左锚：不更新 position.x
     }
   }
@@ -634,40 +714,40 @@ export const finalizeDomainWidthsByProjection = (
  * 鐩爣锛氭寜鍩熷唴鎴愬憳锛堝瓙鍩熷鍣?+ 鏅€氳妭鐐癸級鐨勫瀭鐩存姇褰辩簿纭绠楀煙瀹瑰櫒楂樺害锛涗繚鐣欏煙宸?涓婇敋涓嶅彉锛屼粎鍐欏洖楂樺害銆?
  */
 export const finalizeDomainHeightsByProjection = (
-  nodes: ReactFlowNode[]
-): ReactFlowNode[] => {
-  const cfgFull = diagramConfigManager.getConfig() as any;
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
+  nodes: LayoutNode[]
+): LayoutNode[] => {
+  const cfgFull = asRecord(diagramConfigManager.getConfig());
+  const domainConfig = asRecord(cfgFull.domain);
+  const domainPadding = asRecord(domainConfig.padding);
+  const domainTitle = asRecord(domainConfig.title);
+  const domainTitlePadding = asRecord(domainTitle.padding);
   const updated = nodes.map(n => ({ ...n }));
-  const padH = num(cfgFull?.domain?.padding?.horizontal, 24);
-  const titleH = num(cfgFull?.domain?.title?.height, 40);
-  const titleV = num(cfgFull?.domain?.title?.padding?.vertical, 12);
-  const titleSafe = num(cfgFull?.domain?.title?.safeGap, 16);
-  const bottomSafe = num((cfgFull?.domain as any)?.bottomSafeGap ?? (cfgFull?.domain as any)?.padding?.bottom ?? padH, padH);
-  const domains = updated.filter(n => String(n.type || '') === 'titleGroup');
+  const padH = finiteNumber(domainPadding.horizontal, 24);
+  const titleH = finiteNumber(domainTitle.height, 40);
+  const titleV = finiteNumber(domainTitlePadding.vertical, 12);
+  const titleSafe = finiteNumber(domainTitle.safeGap, 16);
+  const bottomSafe = finiteNumber(domainConfig.bottomSafeGap ?? domainPadding.bottom, padH);
+  const domains = updated.filter(n => String(n.type ?? '') === 'titleGroup');
   for (const dc of domains) {
-    const dId = String((((dc as any).data?.domain || '')));
+    const dId = nodeDomain(dc);
     if (!dId) continue;
-    const _x = num(((dc as any)?.position?.x), 0);
-    const y = num(((dc as any)?.position?.y), 0);
+    const _x = nodeX(dc);
+    const y = nodeY(dc);
     const innerTop = y + titleH + titleV + titleSafe;
     let maxBottom = innerTop;
     for (const n of updated) {
-      const tp = String(n.type || '');
-      const belongs = String(((n.data as any)?.domain || '')) === dId;
+      const tp = String(n.type ?? '');
+      const belongs = nodeDomain(n) === dId;
       if (!belongs || tp === 'titleGroup') continue;
-      const hidden = !!((((n as any)?.data) || {}) as any)?.hidden;
-      if (hidden) continue;
-      const ny = num(((n as any)?.position?.y), innerTop);
-      const nh = num((((n as any)?.measured?.height ?? (n as any)?.style?.height)), 80);
+      if (isHiddenNode(n)) continue;
+      const ny = nodeY(n, innerTop);
+      const nh = nodeHeight(n, 80);
       maxBottom = Math.max(maxBottom, ny + nh);
     }
     const contentH = Math.max(0, maxBottom - innerTop);
-    const keepW = num((((dc as any)?.measured?.width ?? (dc as any)?.style?.width)), 0);
+    const keepW = nodeWidth(dc, 0);
     const newH = titleH + titleV + titleSafe + contentH + bottomSafe;
-    (dc as any).style = { ...((dc as any).style || {}), width: keepW, height: newH } as any;
-    (dc as any).measured = { width: keepW, height: newH } as any;
-    (dc as any).height = newH;
+    setNodeDimensions(dc, keepW, newH);
   }
   return updated;
 };
@@ -680,38 +760,39 @@ export const finalizeDomainHeightsByProjection = (
  * 鍩熷鍣ㄩ珮搴﹀畨鍏ㄩ挸鍒讹細淇濊瘉鍩熼珮搴︿笉浣庝簬鍚屽煙瀛愬煙瀹瑰櫒鐨勬渶澶ч珮搴︼紙鍚爣棰樺尯/搴曢儴瀹夊叏鍖猴級銆?
  */
 export const clampDomainHeightsToSubGroups = (
-  nodes: ReactFlowNode[]
-): ReactFlowNode[] => {
-  const cfgFull = diagramConfigManager.getConfig() as any;
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
+  nodes: LayoutNode[]
+): LayoutNode[] => {
+  const cfgFull = asRecord(diagramConfigManager.getConfig());
+  const domainConfig = asRecord(cfgFull.domain);
+  const domainPadding = asRecord(domainConfig.padding);
+  const domainTitle = asRecord(domainConfig.title);
+  const domainTitlePadding = asRecord(domainTitle.padding);
   const updated = nodes.map(n => ({ ...n }));
-  const titleH = num(cfgFull?.domain?.title?.height, 40);
-  const titleV = num(cfgFull?.domain?.title?.padding?.vertical, 12);
-  const titleSafe = num(cfgFull?.domain?.title?.safeGap, 16);
-  const bottomSafe = num((cfgFull?.domain as any)?.bottomSafeGap ?? (cfgFull?.domain as any)?.padding?.bottom ?? 24, 24);
-  const domains = updated.filter(n => String(n.type || '') === 'titleGroup');
+  const titleH = finiteNumber(domainTitle.height, 40);
+  const titleV = finiteNumber(domainTitlePadding.vertical, 12);
+  const titleSafe = finiteNumber(domainTitle.safeGap, 16);
+  const bottomSafe = finiteNumber(domainConfig.bottomSafeGap ?? domainPadding.bottom, 24);
+  const domains = updated.filter(n => String(n.type ?? '') === 'titleGroup');
   for (const dc of domains) {
-    const dId = String((((dc as any).data?.domain || '')));
+    const dId = nodeDomain(dc);
     if (!dId) continue;
-    const dy = num(((dc as any)?.position?.y), 0);
+    const dy = nodeY(dc);
     const innerTop = dy + titleH + titleV + titleSafe;
     let maxBottom = innerTop;
     for (const n of updated) {
-      const nd = String(((n.data as any)?.domain || ''));
-      const tp = String(n.type || '');
+      const nd = nodeDomain(n);
+      const tp = String(n.type ?? '');
       if (nd !== dId || tp !== 'subGroup') continue;
-      const ny = num(((n as any)?.position?.y), innerTop - 1);
-      const nh = num((((n as any)?.measured?.height ?? (n as any)?.style?.height)), 0);
+      const ny = nodeY(n, innerTop - 1);
+      const nh = nodeHeight(n, 0);
       maxBottom = Math.max(maxBottom, ny + nh);
     }
     const contentH = Math.max(0, maxBottom - innerTop);
     const requiredH = titleH + titleV + titleSafe + contentH + bottomSafe;
-    const keepW = num((((dc as any)?.measured?.width ?? (dc as any)?.style?.width)), 0);
-    const curH = num((((dc as any)?.measured?.height ?? (dc as any)?.style?.height)), requiredH);
+    const keepW = nodeWidth(dc, 0);
+    const curH = nodeHeight(dc, requiredH);
     const finalH = Math.max(curH, requiredH);
-    (dc as any).style = { ...((dc as any).style || {}), width: keepW, height: finalH } as any;
-    (dc as any).measured = { width: keepW, height: finalH } as any;
-    (dc as any).height = finalH;
+    setNodeDimensions(dc, keepW, finalH);
   }
   return updated;
 };
@@ -729,178 +810,4 @@ export const clampDomainHeightsToSubGroups = (
  * - 域容器（titleGroup）：左右使用 `domain.padding.horizontal`，顶部使用 `title.height + title.padding.vertical + title.safeGap`，底部使用 `domain.bottomSafeGap`；
  * - 钳制不改变节点尺寸，仅移动位置；当节点尺寸超过内容边界时，位置钳制为内容区左上角。
 */
-export const clampNodesToContainers = (
-  nodes: ReactFlowNode[]
-): ReactFlowNode[] => {
-  const cfgFull = diagramConfigManager.getConfig() as any;
-  const layoutCfg = diagramConfigManager.getLayoutConfig() as any;
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-
-  const updated = nodes.map(n => ({ ...n }));
-  const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
-
-  const getSize = (n: ReactFlowNode): { w: number; h: number } => {
-    const w = num(((n as any)?.measured?.width ?? (n.style as any)?.width ?? (n as any)?.width), 0);
-    const h = num(((n as any)?.measured?.height ?? (n.style as any)?.height ?? (n as any)?.height), 0);
-    return { w, h };
-  };
-
-  // 子域容器钳制
-  const subCfg = cfgFull?.subDomain || {};
-  const subPad = {
-    H: num(subCfg?.padding?.horizontal, 25),
-    top: num(subCfg?.padding?.top, 35),
-    bottom: num(subCfg?.padding?.bottom, 20)
-  };
-  const ensureTitleClearanceGlobal = !!layoutCfg?.ENSURE_SUB_GROUP_TITLE_CLEARANCE;
-  const titleClearance = num(layoutCfg?.SUB_GROUP_TITLE_CLEARANCE, subPad.top);
-  updated.filter(n => String(n.type || '') === 'subGroup').forEach(sg => {
-    // dagre 模式检测：检查子域自身的 __dagreSized 标记
-    const dagreSized = (sg.data as any)?.__dagreSized;
-    if (dagreSized && typeof dagreSized.h === 'number' && dagreSized.h > 0) {
-      return; // 跳过此子域的钳制（使用 dagre 精确尺寸）
-    }
-
-    const pos = sg.position || { x: 0, y: 0 } as any;
-    const size = getSize(sg);
-    const ensureTitleClearanceLocal = ((): boolean => {
-      const v = (((sg as any).data || {}) as any)?.ensureTitleClearance;
-      if (typeof v === 'boolean') return v;
-      return ensureTitleClearanceGlobal;
-    })();
-    const innerLeft = num(pos.x, 0) + subPad.H;
-    let innerRight = num(pos.x, 0) + size.w - subPad.H;
-    const innerTop = num(pos.y, 0) + (ensureTitleClearanceLocal ? Math.max(subPad.top, titleClearance) : subPad.top);
-    let innerBottom = num(pos.y, 0) + size.h - subPad.bottom;
-    const childIds = Array.isArray((sg.data as any)?.children) ? (sg.data as any).children as string[] : [];
-    for (const cid of childIds) {
-      const child = idMap.get(cid);
-      if (!child) continue;
-      if (((child as any)?.data || {})?.hidden) continue;
-      const cpos = child.position || { x: 0, y: 0 } as any;
-      const csize = getSize(child);
-      const H_GAP_CONF = num((diagramConfigManager.getLayoutConfig() as any)?.NODE_H_GAP, 120);
-      const finalSafeTotalH = Math.max(Math.floor(H_GAP_CONF * 0.15), Math.floor(subPad.H * 0.5));
-      const safeLeftH = Math.floor(finalSafeTotalH / 2);
-      const safeRightH = finalSafeTotalH - safeLeftH;
-      const availW = Math.max(0, innerRight - innerLeft);
-      const availH = Math.max(0, innerBottom - innerTop);
-      if (csize.w > availW) {
-        const newW = csize.w + subPad.H * 2 + safeLeftH + safeRightH;
-        const newPosX = num(pos.x, 0) - safeLeftH;
-        (sg as any).position = { x: newPosX, y: num(pos.y, 0) } as any;
-        ((sg as any).style || ((sg as any).style = {})).width = newW;
-        (sg as any).measured = { ...(sg as any).measured, width: newW } as any;
-        innerRight = newPosX + newW - subPad.H;
-      }
-      if (csize.h > availH) {
-        const newH = csize.h + subPad.top + subPad.bottom;
-        ((sg as any).style || ((sg as any).style = {})).height = newH;
-        (sg as any).measured = { ...(sg as any).measured, height: newH } as any;
-        innerBottom = num(pos.y, 0) + newH - subPad.bottom;
-      }
-      const minX = innerLeft;
-      const maxX = Math.max(innerLeft, innerRight - safeRightH - csize.w);
-      const minY = innerTop;
-      const maxY = Math.max(innerTop, innerBottom - csize.h);
-      const nx = Math.min(Math.max(num(cpos.x, 0), minX), maxX);
-      const ny = Math.min(Math.max(num(cpos.y, 0), minY), maxY);
-      child.position = { x: nx, y: ny } as any;
-      const idx = updated.findIndex(n => n.id === child.id);
-      if (idx >= 0) updated[idx] = { ...child } as any;
-    }
-  });
-
-  // 鍩熷鍣ㄩ挸鍒?
-  const domainPadH = num(cfgFull?.domain?.padding?.horizontal, 24);
-  const titleH = num(cfgFull?.domain?.title?.height, 40);
-  const titleV = num(cfgFull?.domain?.title?.padding?.vertical, 12);
-  const titleSafe = num(cfgFull?.domain?.title?.safeGap, 16);
-  const bottomSafe = num(cfgFull?.domain?.bottomSafeGap, titleV + titleSafe);
-  const tgs = updated.filter(n => String(n.type || '') === 'titleGroup');
-  for (const tg of tgs) {
-    const domainKey = String(((tg.data as any)?.domain || ''));
-    if (!domainKey) continue;
-    const pos = tg.position || { x: 0, y: 0 } as any;
-    const size = getSize(tg);
-    const innerLeft = num(pos.x, 0) + domainPadH;
-    let innerRight = num(pos.x, 0) + size.w - domainPadH;
-    const innerTop = num(pos.y, 0) + titleH + titleV + titleSafe;
-    const contentHDom = Math.max(0, size.h - (titleH + titleV + titleSafe) - bottomSafe);
-    let bottomSafeEff = Math.max(6, Math.floor((titleV + titleSafe) * 0.5));
-    bottomSafeEff = Math.max(bottomSafeEff, Math.floor(bottomSafe * 0.7));
-    bottomSafeEff = Math.min(bottomSafeEff, Math.floor(contentHDom * 0.12));
-    const innerBottom = num(pos.y, 0) + size.h - bottomSafeEff;
-    const idMapLocal = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
-    const majorityDomainOfChildren = (sg: ReactFlowNode): string | undefined => {
-      const children = Array.isArray((sg.data as any)?.children) ? ((sg.data as any).children as string[]) : [];
-      if (!children.length) return undefined;
-      const counts: Record<string, number> = {};
-      for (const cid of children) {
-        const c = idMapLocal.get(cid);
-        const dom = String(((c as any)?.data?.domain || '')).trim();
-        if (!dom) continue;
-        counts[dom] = (counts[dom] || 0) + 1;
-      }
-      const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-      return entries.length ? entries[0][0] : undefined;
-    };
-    const members = updated.filter(n => {
-      const d1 = String(((n.data as any)?.domain || '')).trim();
-      const typeStr = String(n.type || '');
-      if (typeStr === 'titleGroup') return false;
-      if (d1 === domainKey) return true;
-      if (typeStr === 'subGroup') {
-        const maj = majorityDomainOfChildren(n);
-        return !!maj && String(maj).trim() === String(domainKey).trim();
-      }
-      return false;
-    });
-    for (const m of members) {
-      const mpos = m.position || { x: 0, y: 0 } as any;
-      const msize = getSize(m);
-      const availWDom = Math.max(0, innerRight - innerLeft);
-      if (msize.w > availWDom) {
-        const targetW = msize.w + domainPadH * 2;
-        ((tg as any).style || ((tg as any).style = {})).width = targetW;
-        (tg as any).measured = { ...(tg as any).measured, width: targetW } as any;
-        // 閲嶆柊璁＄畻鍙崇晫
-        const newSize = getSize(tg);
-        innerRight = num(pos.x, 0) + newSize.w - domainPadH;
-      }
-      const minX = innerLeft;
-      const maxX = Math.max(innerLeft, innerRight - msize.w);
-      const minY = innerTop;
-      const maxY = Math.max(innerTop, innerBottom - msize.h);
-      const nx = Math.min(Math.max(num(mpos.x, 0), minX), maxX);
-      const ny = Math.min(Math.max(num(mpos.y, 0), minY), maxY);
-      m.position = { x: nx, y: ny } as any;
-      const idx = updated.findIndex(n => n.id === m.id);
-      if (idx >= 0) updated[idx] = { ...m } as any;
-    }
-  }
-
-  /**
-   * 函数级注释：按归属将域内自由节点归并到最近子域
-   * 规则：同域下，节点中心点落入某子域的矩形内容区（含内边距）则加入该子域的 children
-   */
-  return updated;
-};
-
-/**
- * 函数级注释：子域容器在域内水平居中
- * 目标：在域宽与子域最终宽度确定后，使每个子域容器在所属域内部可用宽度内水平居中，保证左右留白对称。
- * 规则：
- * - 域内部边界：innerLeft = domain.x + padH；innerRight = domain.x + domain.w - padH；
- * - 子域居中：sgX = innerLeft + floor((availW - sgW)/2) - subPadH；同步平移 children；
- * - 钳制：确保 sgX ∈ [innerLeft - subPadH, innerRight - subPadH - sgW]。
- */
-
-/**
- * 函数级注释：子域容器宽度扩展以填满域内可用宽度（仅扩展不收缩）
- * 目标：将同域内每个可见子域容器的宽度扩展到“域内部可用宽度 availW”，并将其左锚对齐到 `innerLeft - subPadH`；两侧留白仅为子域自身水平内边距，避免相对域右侧过大空白。
- * 规则：
- * - 仅当 `availW > curW` 时扩展；避免内容被压缩导致换行或溢出；
- * - 不更新 children 的位置与尺寸，仅扩展容器包围框；
- * - 写回 `style.width/measured.width/width` 与 `position.x`。
- */
+export { clampNodesToContainers } from './domainContainerClamping';

@@ -2,6 +2,7 @@
  * migrate.ts — Convert legacy React Flow mindmap data (v1) to mind-elixir format (v2)
  */
 import type { NodeObj } from 'mind-elixir';
+import type { Edge, Node } from '@xyflow/react';
 import type { VizlyMindMapV1Data, VizlyMindMapV2Data } from './types';
 import { VIZLY_HYPER_THEME } from './theme';
 import { applyTaskMeta, getTaskMeta, normalizeTags, type TaskPriority, type TaskStatus } from './mindmapTaskModel';
@@ -24,6 +25,43 @@ const MAX_IMPORT_LINES = 5000;
 interface WalkContext {
     count: number;
 }
+
+interface LegacyMindMapNode {
+    id: string;
+    type: string;
+    data: Record<string, unknown>;
+    positionY: number;
+}
+
+interface LegacyMindMapEdge {
+    source: string;
+    target: string;
+    type?: string;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    Boolean(value && typeof value === 'object' && !Array.isArray(value))
+);
+
+const coerceLegacyNode = (value: unknown): LegacyMindMapNode | null => {
+    if (!isRecord(value) || typeof value.id !== 'string' || typeof value.type !== 'string') return null;
+    const position = isRecord(value.position) ? value.position : {};
+    return {
+        id: value.id,
+        type: value.type,
+        data: isRecord(value.data) ? value.data : {},
+        positionY: typeof position.y === 'number' && Number.isFinite(position.y) ? position.y : 0,
+    };
+};
+
+const coerceLegacyEdge = (value: unknown): LegacyMindMapEdge | null => {
+    if (!isRecord(value) || typeof value.source !== 'string' || typeof value.target !== 'string') return null;
+    return {
+        source: value.source,
+        target: value.target,
+        type: typeof value.type === 'string' ? value.type : undefined,
+    };
+};
 
 /** Strip HTML tags from a label string */
 function stripHtml(html: string): string {
@@ -66,8 +104,8 @@ function cleanTaskText(value: unknown): string | undefined {
  * Map Vizly's direction string to mind-elixir direction integer
  * MindElixir.LEFT=3, MindElixir.RIGHT=1, MindElixir.SIDE=2, MindElixir.ROOT=0
  */
-export function directionStringToInt(dir: string): number {
-    const map: Record<string, number> = {
+export function directionStringToInt(dir: string): 0 | 1 | 2 | 3 {
+    const map: Record<string, 0 | 1 | 2 | 3> = {
         LR: 2,  // SIDE — root in center, branches left and right
         R: 1,   // RIGHT
         L: 3,   // LEFT
@@ -80,85 +118,92 @@ export function directionStringToInt(dir: string): number {
 
 /** Convert from React Flow nodes/edges mindmap-v1 → mind-elixir NodeObj tree */
 export function migrateV1ToV2(v1: VizlyMindMapV1Data): VizlyMindMapV2Data {
-    const nodes = Array.isArray(v1.nodes) ? v1.nodes.slice(0, MINDMAP_MAX_NODES) : [];
-    const edges = Array.isArray(v1.edges) ? v1.edges : [];
+    const nodes = (Array.isArray(v1.nodes) ? v1.nodes : [])
+        .map(coerceLegacyNode)
+        .filter((node): node is LegacyMindMapNode => Boolean(node))
+        .slice(0, MINDMAP_MAX_NODES);
+    const edges = (Array.isArray(v1.edges) ? v1.edges : [])
+        .map(coerceLegacyEdge)
+        .filter((edge): edge is LegacyMindMapEdge => Boolean(edge));
 
     // Build children map from edges
     const childrenMap = new Map<string, string[]>();
-    edges.forEach((e: any) => {
+    edges.forEach((e) => {
         if (e.type === 'relationshipEdge') return; // skip relationship lines
         if (!childrenMap.has(e.source)) childrenMap.set(e.source, []);
         childrenMap.get(e.source)!.push(e.target);
     });
 
     // Find root node (not targeted by any edge, and type === 'mindmap')
-    const targetIds = new Set(edges.map((e: any) => e.target));
+    const targetIds = new Set(edges.map((e) => e.target));
     const rootNode = nodes.find(
-        (n: any) => n.type === 'mindmap' && !targetIds.has(n.id)
-    ) ?? nodes.find((n: any) => n.type === 'mindmap' && n.data?.depth === 0);
+        (n) => n.type === 'mindmap' && !targetIds.has(n.id)
+    ) ?? nodes.find((n) => n.type === 'mindmap' && n.data.depth === 0);
 
     if (!rootNode) {
         // Fallback: return a blank tree
         return {
             _version: 'mindmap-v2',
-            nodeData: { id: 'root', topic: '中心主题', root: true, children: [] },
+            nodeData: { id: 'root', topic: '中心主题', children: [] },
             direction: 2,
             theme: VIZLY_HYPER_THEME,
         };
     }
 
-    const nodeMap = new Map<string, any>(nodes.map((n: any) => [n.id, n]));
+    const nodeMap = new Map<string, LegacyMindMapNode>(nodes.map((n) => [n.id, n]));
 
     const ctx: WalkContext = { count: 0 };
 
-    function convertNode(rfNode: any, depth = 0): NodeObj | null {
+    function convertNode(rfNode: LegacyMindMapNode | undefined, depth = 0): NodeObj | null {
         if (!rfNode || !canVisit(ctx, depth)) return null;
         ctx.count += 1;
 
-        const label = stripHtml((rfNode.data?.label as string) || '');
+        const label = stripHtml(typeof rfNode.data.label === 'string' ? rfNode.data.label : '');
         const childIds = (childrenMap.get(rfNode.id) || []).sort((a: string, b: string) => {
             const na = nodeMap.get(a);
             const nb = nodeMap.get(b);
-            return (na?.position?.y ?? 0) - (nb?.position?.y ?? 0);
+            return (na?.positionY ?? 0) - (nb?.positionY ?? 0);
         }).slice(0, MINDMAP_MAX_CHILDREN_PER_NODE);
 
         const nodeObj: NodeObj = {
             id: cleanMindMapTopic(rfNode.id, genId()),
             topic: label,
-            expanded: !rfNode.data?.collapsed,
+            expanded: rfNode.data.collapsed !== true,
             children: childIds.map(id => convertNode(nodeMap.get(id), depth + 1)).filter(Boolean) as NodeObj[],
         };
 
         // Migrate note
-        const note = rfNode.data?.note || rfNode.data?.description;
+        const note = typeof rfNode.data.note === 'string'
+            ? rfNode.data.note
+            : typeof rfNode.data.description === 'string' ? rfNode.data.description : undefined;
         if (note) {
             nodeObj.note = cleanMindMapNote(stripHtml(note));
         }
 
         // Migrate hyperlink
-        const url = rfNode.data?.url || rfNode.data?.hyperLink;
+        const url = rfNode.data.url ?? rfNode.data.hyperLink;
         if (url) {
             const safeUrl = toSafeExternalUrl(String(url));
             if (safeUrl) nodeObj.hyperLink = safeUrl;
         }
 
         // Migrate icon/icons
-        const icon = rfNode.data?.icon;
+        const icon = rfNode.data.icon;
         if (icon) {
             nodeObj.icons = cleanMindMapIcons([icon]);
-        } else if (rfNode.data?.icons) {
+        } else if (rfNode.data.icons) {
             nodeObj.icons = cleanMindMapIcons(rfNode.data.icons);
         }
 
         // Migrate style
-        const branchColor = cleanMindMapColor(rfNode.data?.branchColor);
+        const branchColor = cleanMindMapColor(rfNode.data.branchColor);
         if (branchColor) {
             nodeObj.style = { color: branchColor };
         }
 
         // Migrate tags
-        const tags = rfNode.data?.tags as string[] | undefined;
-        if (tags && tags.length > 0) {
+        const tags = Array.isArray(rfNode.data.tags) ? rfNode.data.tags : [];
+        if (tags.length > 0) {
             nodeObj.tags = cleanMindMapTags(tags);
         }
 
@@ -166,12 +211,12 @@ export function migrateV1ToV2(v1: VizlyMindMapV1Data): VizlyMindMapV2Data {
     }
 
     const direction = directionStringToInt(
-        (rootNode.data?.direction as string) || 'LR'
+        typeof rootNode.data.direction === 'string' ? rootNode.data.direction : 'LR'
     );
 
     return {
         _version: 'mindmap-v2',
-        nodeData: { ...(convertNode(rootNode) ?? { id: 'root', topic: '中心主题', children: [] }), root: true },
+        nodeData: convertNode(rootNode) ?? { id: 'root', topic: '中心主题', children: [] },
         direction,
         theme: VIZLY_HYPER_THEME,
     };
@@ -254,8 +299,8 @@ export function downloadText(filename: string, content: string, mimeType = 'text
 
 /** Convert mind-elixir NodeObj to Vizly Flowchart JSON */
 export function nodeObjToFlowchartJson(root: NodeObj): string {
-    const nodes: any[] = [];
-    const edges: any[] = [];
+    const nodes: Node[] = [];
+    const edges: Edge[] = [];
     let yCounter = 0;
     const ctx: WalkContext = { count: 0 };
 

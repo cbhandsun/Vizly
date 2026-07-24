@@ -5,6 +5,6 @@ export const useNodeUpdate = (): UpdateNodesBatchFn | undefined => {
     return useContext(NodeUpdateContext)?.updateNodesBatch;
 };
 
-export const useBusinessData = (): Record<string, any> | undefined => {
+export const useBusinessData = (): Record<string, unknown> | undefined => {
     return useContext(NodeUpdateContext)?.businessData;
 };

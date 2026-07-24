@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { StandardDiagramData } from '@/core/models/DiagramModels';
 
 const mockSupabase = vi.hoisted(() => ({
     auth: {
@@ -272,6 +273,7 @@ describe('SupabaseStorageProvider', () => {
         const provider = new SupabaseStorageProvider();
 
         const saved = await provider.loadDiagram('diagram-1');
+        const savedContent = saved.content as StandardDiagramData;
 
         expect(saved.title).toBe('Metadata Title');
         expect(saved.content).toEqual(expect.objectContaining({
@@ -280,10 +282,10 @@ describe('SupabaseStorageProvider', () => {
             type: 'custom',
             version: '1.0.0',
         }));
-        expect(saved.content.nodes).toEqual([
+        expect(savedContent.nodes).toEqual([
             expect.objectContaining({ id: 'n1', description: 'Node 1', domain: 'ops' }),
         ]);
-        expect(Object.hasOwn(saved.content.nodes[0], 'constructor')).toBe(false);
+        expect(Object.hasOwn(savedContent.nodes[0], 'constructor')).toBe(false);
     });
 
     it('filters malformed Supabase diagram metadata rows', async () => {
@@ -455,6 +457,8 @@ describe('SupabaseStorageProvider', () => {
         const inserted = table.insert.mock.calls[0][0];
         expect(inserted.message).toBe('Saved');
         expect(inserted.snapshot_data.nodes[0].data).toEqual({ label: 'Node', nested: { ok: true } });
+        expect(version.snapshotData).not.toBeNull();
+        if (!version.snapshotData) throw new Error('Expected saved snapshot data.');
         expect(version.snapshotData.nodes[0].data).toEqual({ label: 'Node', nested: { ok: true } });
         expect(Object.prototype).not.toHaveProperty('polluted');
     });
@@ -497,6 +501,8 @@ describe('SupabaseStorageProvider', () => {
             '22222222-2222-4222-8222-222222222222'
         );
 
+        expect(version?.snapshotData).not.toBeNull();
+        if (!version?.snapshotData) throw new Error('Expected loaded snapshot data.');
         expect(version?.snapshotData.nodes[0].data).toEqual({ label: 'Node', nested: { ok: true } });
     });
 

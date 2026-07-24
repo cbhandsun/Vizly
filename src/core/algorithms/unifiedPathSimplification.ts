@@ -27,7 +27,6 @@ export function unifiedPathSimplification(
     const {
         minSegmentLength = 20,
         obstacles = [],
-        _preserveEndpoints = true
     } = options;
 
     if (points.length < 3) return points;

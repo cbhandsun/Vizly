@@ -1,7 +1,10 @@
+// @vitest-environment jsdom
+
 import type { Node } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  coerceFlowchartEditorCommandDetail,
   createFlowchartEditorCommandEventHandler,
   createViewportCenteredNode,
   findFlowchartEditorCommandExportButton,
@@ -26,6 +29,33 @@ describe('flowchartEditorCommand', () => {
     expect(resolveFlowchartLayoutDirection('rl')).toBe('LR');
     expect(resolveFlowchartLayoutDirection('tb')).toBe('TB');
     expect(resolveFlowchartLayoutDirection(undefined)).toBe('TB');
+  });
+
+  it('coerces command event detail at the window event boundary', () => {
+    expect(coerceFlowchartEditorCommandDetail({
+      action: 'apply-layout',
+      strategy: ' Domain Vertical Layout ',
+      nodeLayout: ' grid ',
+      direction: ' LR ',
+    })).toEqual({
+      action: 'apply-layout',
+      strategy: 'Domain Vertical Layout',
+      nodeLayout: 'grid',
+      direction: 'LR',
+    });
+
+    expect(coerceFlowchartEditorCommandDetail(null)).toBeNull();
+    expect(coerceFlowchartEditorCommandDetail([])).toBeNull();
+    expect(coerceFlowchartEditorCommandDetail({})).toBeNull();
+    expect(coerceFlowchartEditorCommandDetail({ action: 'unknown' })).toBeNull();
+    expect(coerceFlowchartEditorCommandDetail({
+      action: 'apply-layout',
+      strategy: 'x'.repeat(81),
+    })).toBeNull();
+    expect(coerceFlowchartEditorCommandDetail({
+      action: 'apply-layout',
+      nodeLayout: '<script>',
+    })).toBeNull();
   });
 
   it('creates a viewport-centered node using the first available plugin node type', () => {
@@ -196,6 +226,35 @@ describe('flowchartEditorCommand', () => {
 
     expect(handled).toBe(true);
     expect(handleStrategyLayout).toHaveBeenCalledWith('domain-horizontal', 'tree', 'TB');
+  });
+
+  it('rejects empty, malformed, and type-confused custom event detail without side effects', () => {
+    const handleSmartLayout = vi.fn();
+    const handleStrategyLayout = vi.fn();
+    const setNodes = vi.fn();
+    const handler = createFlowchartEditorCommandEventHandler({
+      handleSmartLayout,
+      handleStrategyLayout,
+      handleExport: vi.fn(),
+      findToolbarExportButton: () => null,
+      setAiChatVisible: vi.fn(),
+      setActiveRightTab: vi.fn(),
+      reactFlowInstance: null,
+      setNodes,
+      newNodeLabel: 'New Node',
+      windowWidth: 1200,
+      windowHeight: 800,
+      confirmClearCanvas: vi.fn(),
+    });
+
+    expect(handler({})).toBe(false);
+    expect(handler({ detail: null })).toBe(false);
+    expect(handler({ detail: 'smart-layout' })).toBe(false);
+    expect(handler({ detail: { action: { toString: () => 'smart-layout' } } })).toBe(false);
+
+    expect(handleSmartLayout).not.toHaveBeenCalled();
+    expect(handleStrategyLayout).not.toHaveBeenCalled();
+    expect(setNodes).not.toHaveBeenCalled();
   });
 
   it('reads the editor command environment from the window and toolbar DOM', () => {

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Layout, Input, Collapse, Typography, theme, Tooltip, Flex, Popover, Slider, Button, Tabs, Empty, Tree } from 'antd';
 import {
-    FaPlay, _FaSquare, _FaStop, _FaDatabase, _FaQuestion,
+    FaPlay,
     FaLayerGroup, FaBox, FaThLarge, FaImage,
-    _FaKeyboard, FaSearch, FaChevronRight, FaChevronLeft, FaSearchPlus, FaSearchMinus,
+    FaSearch, FaChevronRight, FaChevronLeft, FaSearchPlus, FaSearchMinus,
     FaCompass, FaShapes, FaStream, FaStar,
     FaServer, FaNetworkWired, FaLock, FaPlug, FaUser, FaEnvelope, FaBell, FaCog, FaCode, FaTerminal
 } from 'react-icons/fa';
@@ -17,7 +17,7 @@ import { NodeTemplatePanel } from './NodeTemplatePanel';
 import { IconLibraryPanel } from './IconLibraryPanel';
 import type { NodeTemplate } from './hooks/useNodeTemplates';
 import type { LayerConfig } from './hooks/useLayerManagement';
-import { useSidebarNavigatorTree } from './hooks/useSidebarNavigatorTree';
+import { useSidebarNavigatorTree, type NavigatorTreeNode } from './hooks/useSidebarNavigatorTree';
 const { Sider } = Layout;
 const { Text } = Typography;
 
@@ -388,17 +388,17 @@ export const ModernFlowchartSidebar: React.FC<FlowchartSidebarProps> = ({
                                     children: (
                                         <div style={{ padding: '0 8px', overflowY: 'auto', flex: 1 }}>
                                             {navigatorTreeData.length > 0 ? (
-                                                <Tree
+                                                <Tree<NavigatorTreeNode>
                                                     treeData={navigatorTreeData}
                                                     blockNode
                                                     expandedKeys={expandedKeys}
                                                     autoExpandParent={autoExpandParent}
                                                     onExpand={onExpand}
                                                     onSelect={(selectedKeys, info) => {
-                                                        const node = (info.node as any).node;
+                                                        const node = info.node.node;
                                                         if (node) onFocusNode?.(node);
                                                     }}
-                                                    titleRender={(treeNode: any) => {
+                                                    titleRender={(treeNode: NavigatorTreeNode) => {
                                                         const node = treeNode.node;
                                                         const data = node.data as Partial<FlowchartNodeData>;
                                                         const label = data?.label || node.id;

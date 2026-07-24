@@ -1,11 +1,12 @@
 import React from 'react';
 import { Dropdown } from 'antd';
 import { getEdgeLabelStyleMenuItems } from '../../diagrams/EdgeLabelStyleMenu';
+import type { EdgeLabelStyle } from '../../diagrams/EdgeLabelStyleMenu';
 
 interface EdgeLabelDropdownProps {
     edgeId: string;
-    currentStyle: Record<string, any>;
-    onStyleChange: (edgeId: string, style: any) => void;
+    currentStyle: EdgeLabelStyle;
+    onStyleChange: (edgeId: string, style: EdgeLabelStyle) => void;
     onResetPosition: () => void;
     children: React.ReactNode;
 }

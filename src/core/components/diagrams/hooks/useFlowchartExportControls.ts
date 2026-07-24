@@ -1,10 +1,13 @@
 import { useCallback } from 'react';
-import type { ReactFlowInstance } from '@xyflow/react';
+import type { Edge, Node, ReactFlowInstance } from '@xyflow/react';
 import { useDiagramControls } from '../../../hooks/useDiagramControls';
+import type { DiagramExportFormat } from '../../../types/diagram-components';
+import { runPermittedFlowchartExport } from '../flowchartExportAccess';
 
 export const useFlowchartExportControls = (
   diagramId: string,
-  reactFlowInstance: ReactFlowInstance<any, any> | null | undefined,
+  reactFlowInstance: ReactFlowInstance<Node, Edge> | null | undefined,
+  permissionCheck?: (format: DiagramExportFormat) => boolean,
 ) => {
   const getReactFlowSnapshot = useCallback(() => {
     if (!reactFlowInstance) return null;
@@ -15,8 +18,18 @@ export const useFlowchartExportControls = (
     };
   }, [reactFlowInstance]);
 
+  const controls = useDiagramControls(diagramId, false, { getReactFlowSnapshot });
+  const exportToSVG = useCallback(() => runPermittedFlowchartExport(
+    'svg', permissionCheck, controls.exportToSVG,
+  ), [controls.exportToSVG, permissionCheck]);
+  const exportToPDF = useCallback(() => runPermittedFlowchartExport(
+    'pdf', permissionCheck, controls.exportToPDF,
+  ), [controls.exportToPDF, permissionCheck]);
+
   return {
-    ...useDiagramControls(diagramId, false, { getReactFlowSnapshot }),
+    ...controls,
+    exportToSVG,
+    exportToPDF,
     getReactFlowSnapshot,
   };
 };

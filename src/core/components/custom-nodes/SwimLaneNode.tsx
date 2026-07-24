@@ -20,7 +20,7 @@ const SwimLaneNode: React.FC<NodeProps<Node<SwimLaneNodeData>>> = ({ id, data, s
     const direction = data.direction || 'horizontal';
 
     // Resize Logic
-    const onResize = useCallback((event: any, params: { width: number; height: number }) => {
+    const onResize = useCallback((_event: unknown, params: { width: number; height: number }) => {
         const { width, height } = params;
         const headerH = 36;
         const contentW = width;

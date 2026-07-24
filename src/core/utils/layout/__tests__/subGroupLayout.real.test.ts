@@ -1,4 +1,7 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it, vi } from 'vitest';
+import type { Node as ReactFlowNode } from '@xyflow/react';
 
 const safeLogState = vi.hoisted(() => ({
   debug: vi.fn(),
@@ -22,7 +25,7 @@ vi.hoisted(() => {
   });
 });
 
-vi.mock('../../../components/config/DiagramConfig', () => ({
+vi.mock('../../../config/DiagramConfig', () => ({
   diagramConfigManager: {
     getConfig: () => ({
       domain: {
@@ -68,6 +71,8 @@ import {
   enforceSubGroupTitleClearance,
   expandSubGroupContainersBySemantic,
   expandSubGroupsToDomainWidth,
+  equalizeSubGroupVerticalMarginsByProjection,
+  fitSubGroupsToDomainSymmetric,
   finalizeSubGroupHeightsByProjection,
   finalizeSubGroupHeightsByProjectionPreserveAnchor,
   finalizeSubGroupWidthsByProjectionPreserveAnchor,
@@ -78,6 +83,7 @@ import {
   packSubGroupChildrenRigid,
   packSubGroupChildrenGridStrict,
   packSubGroupsInDomain,
+  packSubGroupsVerticallySymmetric,
   recomputeSubGroupContainersBasic,
   rankSnapDomainFreeNodes,
   rankSnapSubGroupChildren,
@@ -95,10 +101,18 @@ import {
   strengthenDomainsAggressive,
   strengthenSubGroupsInDomainWithGridStrict,
   unifySubGroupLeftAnchors,
+  unifySubGroupLeftAnchorsStrict,
   writeSubGroupChildrenRelativeOffsets,
 } from '../subGroupLayout';
 
-const child = (id: string, x: number, y: number, data: any = {}) => ({
+type TestNode = ReactFlowNode<Record<string, unknown>>;
+
+const child = (
+  id: string,
+  x: number,
+  y: number,
+  data: Record<string, unknown> = {},
+): TestNode => ({
   id,
   position: { x, y },
   measured: { width: 60, height: 30 },
@@ -106,7 +120,7 @@ const child = (id: string, x: number, y: number, data: any = {}) => ({
   data: { domain: 'D', subDomain: 'S', ...data },
 });
 
-const sg = (children: string[] = ['a', 'b', 'c'], width = 400, height = 250) => ({
+const sg = (children: string[] = ['a', 'b', 'c'], width = 400, height = 250): TestNode => ({
   id: 'sg',
   type: 'subGroup',
   position: { x: 100, y: 100 },
@@ -115,7 +129,7 @@ const sg = (children: string[] = ['a', 'b', 'c'], width = 400, height = 250) => 
   data: { domain: 'D', subDomain: 'S', children },
 });
 
-const domain = (width = 500, height = 360) => ({
+const domain = (width = 500, height = 360): TestNode => ({
   id: 'domain',
   type: 'titleGroup',
   position: { x: 0, y: 0 },
@@ -124,7 +138,14 @@ const domain = (width = 500, height = 360) => ({
   data: { domain: 'D' },
 });
 
-const sgNode = (id: string, x: number, y: number, width = 120, height = 100, children: string[] = []) => ({
+const sgNode = (
+  id: string,
+  x: number,
+  y: number,
+  width = 120,
+  height = 100,
+  children: string[] = [],
+): TestNode => ({
   id,
   type: 'subGroup',
   position: { x, y },
@@ -133,14 +154,22 @@ const sgNode = (id: string, x: number, y: number, width = 120, height = 100, chi
   data: { domain: 'D', subDomain: id, children },
 });
 
-const byId = (nodes: any[], id: string) => nodes.find(n => n.id === id) as any;
-const rectOf = (node: any) => ({
+const byId = (nodes: TestNode[], id: string): TestNode => {
+  const node = nodes.find(candidate => candidate.id === id);
+  if (!node) throw new Error(`Missing test node: ${id}`);
+  return node;
+};
+const dimension = (node: TestNode, key: 'width' | 'height'): number => {
+  const value = node.measured?.[key] ?? node.style?.[key] ?? node[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+};
+const rectOf = (node: TestNode) => ({
   x: node.position.x,
   y: node.position.y,
-  w: node.measured?.width ?? node.style?.width ?? node.width,
-  h: node.measured?.height ?? node.style?.height ?? node.height,
+  w: dimension(node, 'width'),
+  h: dimension(node, 'height'),
 });
-const overlaps = (a: any, b: any) => {
+const overlaps = (a: TestNode, b: TestNode) => {
   const ra = rectOf(a);
   const rb = rectOf(b);
   return ra.x < rb.x + rb.w && ra.x + ra.w > rb.x && ra.y < rb.y + rb.h && ra.y + ra.h > rb.y;
@@ -154,7 +183,7 @@ describe('subGroup layout helpers', () => {
       child('b', 300, 115, { subDomain: undefined }),
     ] as never);
 
-    const xs = result.filter(n => ['a', 'b'].includes(n.id)).map(n => (n as any).position.x).sort((a, b) => a - b);
+    const xs = result.filter(n => ['a', 'b'].includes(n.id)).map(n => n.position.x).sort((a, b) => a - b);
     expect(xs).toEqual([115, 225]);
   });
 
@@ -166,15 +195,15 @@ describe('subGroup layout helpers', () => {
       child('c', 180, 200),
     ] as never);
 
-    const a = result.find(n => n.id === 'a') as any;
-    const b = result.find(n => n.id === 'b') as any;
-    const c = result.find(n => n.id === 'c') as any;
-    const packed = result.find(n => n.id === 'sg') as any;
+    const a = byId(result, 'a');
+    const b = byId(result, 'b');
+    const c = byId(result, 'c');
+    const packed = byId(result, 'sg');
 
     expect(a.position.y).toBe(140);
     expect(b.position.y).toBe(140);
     expect(c.position.y).toBeGreaterThan(a.position.y);
-    expect(packed.measured.height).toBeGreaterThan(100);
+    expect(dimension(packed, 'height')).toBeGreaterThan(100);
   });
 
   it('rank-snaps subgroup children and free domain nodes into stable layers', () => {
@@ -188,7 +217,7 @@ describe('subGroup layout helpers', () => {
     expect(byId(rankedSub, 'a').position.y).toBe(140);
     expect(byId(rankedSub, 'b').position.y).toBe(140);
     expect(byId(rankedSub, 'c').position.y).toBeGreaterThan(byId(rankedSub, 'a').position.y);
-    expect(byId(rankedSub, 'sg').measured.height).toBeGreaterThan(110);
+    expect(dimension(byId(rankedSub, 'sg'), 'height')).toBeGreaterThan(110);
 
     const rankedFree = rankSnapDomainFreeNodes([
       domain(420, 300),
@@ -207,13 +236,13 @@ describe('subGroup layout helpers', () => {
       child('a', 0, 0, { subDomain: undefined }),
       child('b', 10, 5, { subDomain: undefined }),
       child('c', 260, 0, { domain: 'E', subDomain: undefined }),
-    ] as any[];
+    ] as TestNode[];
 
-    const global = resolveAllNodeOverlapsGlobal(base as never, 20, 20) as any[];
+    const global = resolveAllNodeOverlapsGlobal(base, 20, 20);
     expect(overlaps(byId(global, 'a'), byId(global, 'b'))).toBe(false);
     expect(byId(global, 'c').position).toEqual({ x: 260, y: 0 });
 
-    const strict = enforceGlobalNoOverlapStrict(base as never, 20, 20, 2) as any[];
+    const strict = enforceGlobalNoOverlapStrict(base, 20, 20, 2);
     expect(overlaps(byId(strict, 'a'), byId(strict, 'b'))).toBe(false);
 
     const domainOnly = resolveFreeNodeOverlapsInDomain([
@@ -221,7 +250,7 @@ describe('subGroup layout helpers', () => {
       child('a', 20, 100, { subDomain: undefined }),
       child('b', 30, 105, { subDomain: undefined }),
       child('c', 30, 105, { domain: 'E', subDomain: undefined }),
-    ] as never, 20, 20) as any[];
+    ] as TestNode[], 20, 20);
     expect(overlaps(byId(domainOnly, 'a'), byId(domainOnly, 'b'))).toBe(false);
     expect(byId(domainOnly, 'c').position).toEqual({ x: 30, y: 105 });
   });
@@ -233,22 +262,22 @@ describe('subGroup layout helpers', () => {
       child('c', 20, 20, { subDomain: undefined }),
       child('x', 500, 0, { domain: 'E', subDomain: undefined }),
       child('y', 510, 10, { domain: 'E', subDomain: undefined }),
-    ] as any[];
+    ] as TestNode[];
 
-    const grid = packDomainNodesGrid(loose as never, 'D', 30, 30) as any[];
+    const grid = packDomainNodesGrid(loose, 'D', 30, 30);
     expect(byId(grid, 'b').position.y).toBeGreaterThanOrEqual(40);
     expect(byId(grid, 'x').position).toEqual({ x: 500, y: 0 });
 
-    const strict = enforceDomainNoOverlapStrict(loose as never, 'D', 20, 20, 2) as any[];
+    const strict = enforceDomainNoOverlapStrict(loose, 'D', 20, 20, 2);
     expect(overlaps(byId(strict, 'a'), byId(strict, 'b'))).toBe(false);
 
-    const strengthened = strengthenDomainsAggressive(loose as never, ['D'], 20, 20) as any[];
+    const strengthened = strengthenDomainsAggressive(loose, ['D'], 20, 20);
     expect(overlaps(byId(strengthened, 'a'), byId(strengthened, 'b'))).toBe(false);
 
-    const ghost = layoutNodesByGhostDomainColumns(loose as never) as any[];
+    const ghost = layoutNodesByGhostDomainColumns(loose);
     expect(byId(ghost, 'x').position.x).toBeGreaterThan(byId(ghost, 'a').position.x);
 
-    const lanes = laneGridPackByDomain(loose as never, 30, 30, 'vertical') as any[];
+    const lanes = laneGridPackByDomain(loose, 30, 30, 'vertical');
     expect(byId(lanes, 'x').position.x).toBeGreaterThan(byId(lanes, 'a').position.x);
   });
 
@@ -260,26 +289,26 @@ describe('subGroup layout helpers', () => {
       child('c', 120, 150, { sequence: 2 }),
       child('d', 120, 150, { sequence: 4 }),
       child('e', 120, 150, { sequence: 5 }),
-    ] as any[];
+    ] as TestNode[];
 
-    const grid = packSubGroupChildrenGridStrict(dense as never) as any[];
+    const grid = packSubGroupChildrenGridStrict(dense);
     expect(byId(grid, 'b').position.x).toBeLessThanOrEqual(byId(grid, 'c').position.x);
     expect(byId(grid, 'd').position.y).toBeGreaterThanOrEqual(byId(grid, 'b').position.y);
 
-    const separated = enforceSubGroupNoOverlapStrict(dense as never, 20, 20, 3) as any[];
+    const separated = enforceSubGroupNoOverlapStrict(dense, 20, 20, 3);
     expect(byId(separated, 'a').position).not.toEqual(byId(dense, 'a').position);
     expect(byId(separated, 'b').position.x).toBeGreaterThanOrEqual(byId(separated, 'sg').position.x + 20);
 
-    const strict = resolveSubGroupChildrenOverlapsStrict(dense as never, 20, 20) as any[];
+    const strict = resolveSubGroupChildrenOverlapsStrict(dense, 20, 20);
     expect(byId(strict, 'a').position.y).toBeGreaterThanOrEqual(byId(strict, 'sg').position.y + 40);
 
-    const split = splitDenseRowsInSubGroupsAdaptive(dense as never, 2) as any[];
+    const split = splitDenseRowsInSubGroupsAdaptive(dense, 2);
     const childYs = ['a', 'b', 'c', 'd', 'e'].map(id => byId(split, id).position.y);
     expect(new Set(childYs).size).toBeGreaterThan(1);
-    expect(byId(split, 'sg').measured.height).toBeGreaterThan(byId(dense, 'sg').measured.height);
+    expect(dimension(byId(split, 'sg'), 'height')).toBeGreaterThan(dimension(byId(dense, 'sg'), 'height'));
 
-    const strengthened = strengthenSubGroupsInDomainWithGridStrict(dense as never, 'D', 20, 20, 2) as any[];
-    expect(byId(strengthened, 'sg').measured.width).toBeGreaterThan(0);
+    const strengthened = strengthenSubGroupsInDomainWithGridStrict(dense, 'D', 20, 20, 2);
+    expect(dimension(byId(strengthened, 'sg'), 'width')).toBeGreaterThan(0);
     expect(byId(strengthened, 'a').position.y).toBeGreaterThanOrEqual(byId(strengthened, 'sg').position.y);
   });
 
@@ -290,7 +319,7 @@ describe('subGroup layout helpers', () => {
       child('b', 240, 200),
     ] as never);
 
-    const aWithRel = withOffsets.find(n => n.id === 'a') as any;
+    const aWithRel = byId(withOffsets, 'a');
     expect(aWithRel.data.__rel).toEqual({ x: 30, y: 24 });
 
     const packed = packSubGroupChildrenRigid(
@@ -303,7 +332,7 @@ describe('subGroup layout helpers', () => {
       35,
     );
 
-    const [, a, b] = packed as any[];
+    const [, a, b] = packed;
     expect(a.position.x).toBe(120);
     expect(b.position.x).toBe(210);
     expect(a.position.y).toBe(180);
@@ -320,7 +349,7 @@ describe('subGroup layout helpers', () => {
       35,
     );
 
-    const [, a, b] = result as any[];
+    const [, a, b] = result;
     expect(a.id).toBe('a');
     expect(a.position.x).toBe(220);
     expect(a.position.y).toBe(180);
@@ -331,7 +360,7 @@ describe('subGroup layout helpers', () => {
     const result = syncDagreChildPositions([
       sg(['a'], 300, 220),
       child('a', 0, 0, { __dagreRel: { x: 10, y: 0 } }),
-    ] as never) as any[];
+    ] as TestNode[]);
 
     const syncedChild = byId(result, 'a');
     expect(syncedChild.position.x).toBe(130);
@@ -349,12 +378,12 @@ describe('subGroup layout helpers', () => {
     ] as never;
 
     const centered = centerSubGroupChildrenHorizontally(base);
-    expect((centered.find(n => n.id === 'a') as any).position.x).toBe(165);
-    expect((centered.find(n => n.id === 'b') as any).position.x).toBe(275);
+    expect(byId(centered, 'a').position.x).toBe(165);
+    expect(byId(centered, 'b').position.x).toBe(275);
 
     const leftAligned = leftAlignSubGroupChildrenHorizontally(base);
-    expect((leftAligned.find(n => n.id === 'a') as any).position.x).toBe(120);
-    expect((leftAligned.find(n => n.id === 'b') as any).position.x).toBe(230);
+    expect(byId(leftAligned, 'a').position.x).toBe(120);
+    expect(byId(leftAligned, 'b').position.x).toBe(230);
   });
 
   it('expands and strictly contains subgroup containers from semantic children', () => {
@@ -365,15 +394,15 @@ describe('subGroup layout helpers', () => {
     ] as never;
 
     const expanded = expandSubGroupContainersBySemantic(base);
-    const expandedSg = expanded.find(n => n.id === 'sg') as any;
+    const expandedSg = byId(expanded, 'sg');
     expect(expandedSg.position.x).toBe(180);
     expect(expandedSg.position.y).toBe(140);
-    expect(expandedSg.measured.width).toBeGreaterThan(200);
+    expect(dimension(expandedSg, 'width')).toBeGreaterThan(200);
 
     const contained = enforceSubGroupStrictContainmentByChildren(base);
-    const containedSg = contained.find(n => n.id === 'sg') as any;
-    expect(containedSg.measured.width).toBe(220);
-    expect(containedSg.measured.height).toBe(134);
+    const containedSg = byId(contained, 'sg');
+    expect(dimension(containedSg, 'width')).toBe(220);
+    expect(dimension(containedSg, 'height')).toBe(134);
   });
 
   it('resolves subgroup overlaps and keeps child positions translated with their container', () => {
@@ -385,8 +414,8 @@ describe('subGroup layout helpers', () => {
     ] as never, 20, 30);
 
     expect(countSubGroupOverlapsByDomain(result as never)).toBe(0);
-    expect((result.find(n => n.id === 'sg-b') as any).position.y).toBeGreaterThan(100);
-    expect((result.find(n => n.id === 'b') as any).position.y).toBeGreaterThan(130);
+    expect(byId(result, 'sg-b').position.y).toBeGreaterThan(100);
+    expect(byId(result, 'b').position.y).toBeGreaterThan(130);
   });
 
   it('recomputes subgroup containers and projection dimensions from child bounds', () => {
@@ -395,10 +424,10 @@ describe('subGroup layout helpers', () => {
       child('a', 200, 180),
       child('b', 320, 260),
     ] as never);
-    const recomputedSg = recomputed.find(n => n.id === 'sg') as any;
+    const recomputedSg = byId(recomputed, 'sg');
     expect(recomputedSg.position).toEqual({ x: 178, y: 100 });
-    expect(recomputedSg.measured.width).toBeGreaterThan(180);
-    expect(recomputedSg.measured.height).toBeGreaterThanOrEqual(200);
+    expect(dimension(recomputedSg, 'width')).toBeGreaterThan(180);
+    expect(dimension(recomputedSg, 'height')).toBeGreaterThanOrEqual(200);
 
     const heights = finalizeSubGroupHeightsByProjection([
       domain(),
@@ -406,22 +435,22 @@ describe('subGroup layout helpers', () => {
       child('a', 140, 180),
       child('b', 240, 260),
     ] as never);
-    expect((heights.find(n => n.id === 'sg') as any).measured.height).toBe(210);
+    expect(byId(heights, 'sg').measured?.height).toBe(210);
 
     const preserveHeight = finalizeSubGroupHeightsByProjectionPreserveAnchor([
       sg(['a'], 300, 80),
       child('a', 140, 240),
     ] as never);
-    expect((preserveHeight.find(n => n.id === 'sg') as any).position).toEqual({ x: 100, y: 100 });
-    expect((preserveHeight.find(n => n.id === 'sg') as any).measured.height).toBe(190);
+    expect(byId(preserveHeight, 'sg').position).toEqual({ x: 100, y: 100 });
+    expect(byId(preserveHeight, 'sg').measured?.height).toBe(190);
 
     const preserveWidth = finalizeSubGroupWidthsByProjectionPreserveAnchor([
       sg(['a', 'b'], 300, 80),
       child('a', 140, 180),
       child('b', 280, 180),
     ] as never);
-    expect((preserveWidth.find(n => n.id === 'sg') as any).position.x).toBe(100);
-    expect((preserveWidth.find(n => n.id === 'sg') as any).measured.width).toBe(240);
+    expect(byId(preserveWidth, 'sg').position.x).toBe(100);
+    expect(byId(preserveWidth, 'sg').measured?.width).toBe(240);
   });
 
   it('packs, centers, anchors, and stacks subgroups within a domain while moving children', () => {
@@ -434,8 +463,8 @@ describe('subGroup layout helpers', () => {
     ] as never;
 
     const packed = packSubGroupsInDomain(base);
-    expect((packed.find(n => n.id === 'sg-a') as any).position.y).toBe(62);
-    expect((packed.find(n => n.id === 'a') as any).position.y).toBe(92);
+    expect(byId(packed, 'sg-a').position.y).toBe(62);
+    expect(byId(packed, 'a').position.y).toBe(92);
 
     const centered = centerSubGroupsInDomain([
       domain(500, 360),
@@ -444,16 +473,16 @@ describe('subGroup layout helpers', () => {
       sgNode('sg-b', 160, 80, 100, 80, ['b']),
       child('b', 180, 110, { subDomain: 'sg-b' }),
     ] as never);
-    expect((centered.find(n => n.id === 'sg-a') as any).position.x).toBe(140);
-    expect((centered.find(n => n.id === 'a') as any).position.x).toBe(160);
+    expect(byId(centered, 'sg-a').position.x).toBe(140);
+    expect(byId(centered, 'a').position.x).toBe(160);
 
     const anchored = unifySubGroupLeftAnchors([
       domain(500, 360),
       sgNode('sg-a', 200, 80, 100, 80, ['a']),
       child('a', 220, 110, { subDomain: 'sg-a' }),
     ] as never);
-    expect((anchored.find(n => n.id === 'sg-a') as any).position.x).toBe(8);
-    expect((anchored.find(n => n.id === 'a') as any).position.x).toBe(28);
+    expect(byId(anchored, 'sg-a').position.x).toBe(8);
+    expect(byId(anchored, 'a').position.x).toBe(28);
 
     const stacked = stackSubGroupsVertically([
       domain(500, 360),
@@ -462,9 +491,9 @@ describe('subGroup layout helpers', () => {
       { ...sgNode('sg-a', 100, 120, 100, 80, ['a']), data: { domain: 'D', subDomain: 'sg-a', children: ['a'], sequence: 1 } },
       child('a', 120, 150, { subDomain: 'sg-a' }),
     ] as never);
-    expect((stacked.find(n => n.id === 'sg-a') as any).position.y).toBe(62);
-    expect((stacked.find(n => n.id === 'sg-b') as any).position.y).toBe(182);
-    expect((stacked.find(n => n.id === 'b') as any).position.y).toBe(212);
+    expect(byId(stacked, 'sg-a').position.y).toBe(62);
+    expect(byId(stacked, 'sg-b').position.y).toBe(182);
+    expect(byId(stacked, 'b').position.y).toBe(212);
   });
 
   it('enforces title clearance and expands subgroups to domain width', () => {
@@ -472,7 +501,7 @@ describe('subGroup layout helpers', () => {
       sg(['a'], 220, 160),
       child('a', 50, 90),
     ] as never);
-    const a = cleared.find(n => n.id === 'a') as any;
+    const a = byId(cleared, 'a');
     expect(a.position.x).toBe(120);
     expect(a.position.y).toBe(180);
 
@@ -480,9 +509,9 @@ describe('subGroup layout helpers', () => {
       domain(500, 360),
       sgNode('sg-a', 140, 120, 100, 80),
     ] as never);
-    const widened = expanded.find(n => n.id === 'sg-a') as any;
+    const widened = byId(expanded, 'sg-a');
     expect(widened.position.x).toBe(0);
-    expect(widened.measured.width).toBe(460);
+    expect(dimension(widened, 'width')).toBe(460);
   });
 
   it('scales same-domain content horizontally to fit available domain width', () => {
@@ -492,11 +521,37 @@ describe('subGroup layout helpers', () => {
       child('a', 250, 140),
     ] as never);
 
-    const scaledSg = result.find(n => n.id === 'sg-a') as any;
-    const scaledChild = result.find(n => n.id === 'a') as any;
+    const scaledSg = byId(result, 'sg-a');
+    const scaledChild = byId(result, 'a');
     expect(scaledSg.position.x).toBe(28);
-    expect(scaledSg.measured.width).toBeGreaterThan(100);
-    expect(scaledChild.position.x).toBeGreaterThan(scaledSg.position.x + scaledSg.measured.width);
-    expect(scaledChild.measured.width).toBeGreaterThan(60);
+    expect(dimension(scaledSg, 'width')).toBeGreaterThan(100);
+    expect(scaledChild.position.x).toBeGreaterThan(scaledSg.position.x + dimension(scaledSg, 'width'));
+    expect(dimension(scaledChild, 'width')).toBeGreaterThan(60);
+  });
+
+  it('keeps strict domain fitting and compatibility no-op stages deterministic', () => {
+    const base = [
+      domain(500, 360),
+      sgNode('sg-a', 100, 120, 100, 80, ['a']),
+      child('a', 120, 150, { subDomain: 'sg-a' }),
+    ] as never;
+
+    const fitted = fitSubGroupsToDomainSymmetric(base);
+    expect(byId(fitted, 'sg-a')).toMatchObject({
+      position: { x: 28, y: 120 },
+      measured: { width: 444, height: 80 },
+    });
+    expect(byId(fitted, 'a').position.x).toBe(48);
+
+    const anchored = unifySubGroupLeftAnchorsStrict(base);
+    expect(byId(anchored, 'sg-a').position.x).toBe(28);
+    expect(byId(anchored, 'a').position.x).toBe(48);
+
+    const verticalNoop = packSubGroupsVerticallySymmetric(base, Number.POSITIVE_INFINITY);
+    const marginNoop = equalizeSubGroupVerticalMarginsByProjection(base);
+    expect(verticalNoop).toEqual(base);
+    expect(marginNoop).toEqual(base);
+    expect(verticalNoop).not.toBe(base);
+    expect(marginNoop).not.toBe(base);
   });
 });

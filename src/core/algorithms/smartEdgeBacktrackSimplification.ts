@@ -1,6 +1,5 @@
 import { Position } from '../types/flow';
 import type { Rectangle, Point } from './pathfinding';
-import { isPathBlocked } from './pathfinding';
 import type { SpatialIndex } from './SpatialIndex';
 
 

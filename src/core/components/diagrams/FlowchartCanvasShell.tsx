@@ -1,5 +1,5 @@
 import React from 'react';
-import { Node, Edge, BackgroundVariant, ReactFlowInstance, SelectionMode, NodeTypes, EdgeTypes, NodeChange, EdgeChange, Connection, OnConnectStart, OnConnectEnd, ConnectionMode, ConnectionLineType, type OnReconnect } from '@xyflow/react';
+import { Node, Edge, BackgroundVariant, ReactFlowInstance, SelectionMode, NodeTypes, EdgeTypes, NodeChange, EdgeChange, Connection, OnConnectStart, OnConnectEnd, ConnectionMode, ConnectionLineType, type IsValidConnection, type OnNodeDrag, type OnReconnect } from '@xyflow/react';
 import BaseReactFlow from '../shared/BaseReactFlow';
 import { useConnectionMicrointeractions } from './hooks/useConnectionMicrointeractions';
 
@@ -8,7 +8,7 @@ export interface FlowchartCanvasShellProps {
     displayEdges: Edge[];
     nodeTypes: NodeTypes;
     edgeTypes?: EdgeTypes; // [NEW] Allows custom edge types
-    onInit: (instance: ReactFlowInstance<any, any>) => void;
+    onInit: (instance: ReactFlowInstance) => void;
     onNodesChange: (changes: NodeChange[]) => void;
     onEdgesChange: (changes: EdgeChange[]) => void;
     onConnect: (connection: Connection) => void;
@@ -19,9 +19,9 @@ export interface FlowchartCanvasShellProps {
     showMinimap: boolean;
     showGrid: boolean;
     gridVariant: BackgroundVariant;
-    onNodeDrag: (event: React.MouseEvent, node: Node, nodes: Node[]) => void;
-    onNodeDragStart: (event: React.MouseEvent, node: Node, nodes: Node[]) => void;
-    onNodeDragStop?: (event: React.MouseEvent, node: Node, nodes: Node[]) => void;
+    onNodeDrag: OnNodeDrag<Node>;
+    onNodeDragStart: OnNodeDrag<Node>;
+    onNodeDragStop?: OnNodeDrag<Node>;
     onSelectionChange: (params: { nodes: Node[]; edges: Edge[] }) => void;
     onViewportChange?: (viewport: { x: number; y: number; zoom: number }) => void;
     onPaneClick: () => void;
@@ -40,7 +40,7 @@ export interface FlowchartCanvasShellProps {
     connectPreview: ReturnType<typeof useConnectionMicrointeractions>['connectPreview'];
     connectionMode: ConnectionMode;
     isDragging: boolean;
-    isValidConnection?: (connection: any) => boolean;
+    isValidConnection?: IsValidConnection<Edge>;
     disableZoomCompensation?: boolean;
     selectionOnDrag?: boolean;
     panOnDrag?: boolean;
@@ -66,7 +66,6 @@ export const FlowchartCanvasShell: React.FC<FlowchartCanvasShellProps> = React.m
     onConnect,
     onConnectStart,
     onConnectEnd,
-    _autoRoutingEnabled,
     enableSmartEdges,
     showMinimap,
     showGrid,

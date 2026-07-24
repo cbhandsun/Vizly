@@ -1,15 +1,30 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { StandardDiagramData } from '@/core/models/DiagramModels';
+import type { IStorageProvider } from '@/services/storage/types';
 import {
     executeAIChatDiagramSave,
     prepareAIChatDiagramSave,
     resolveAIChatCloudDiagramId,
 } from '../aiChatSave';
 
-const makeDiagram = (overrides: Record<string, unknown> = {}) => ({
+const makeDiagram = (overrides: Partial<StandardDiagramData> = {}): StandardDiagramData => ({
     id: 'diagram-id',
+    name: 'AI Diagram',
     type: 'flowchart',
+    version: '1.0.0',
     nodes: [],
     edges: [],
+    layout: {
+        type: 'flow',
+        direction: 'TB',
+        spacing: { horizontal: 80, vertical: 80 },
+        padding: { horizontal: 24, vertical: 24 },
+    },
+    theme: {
+        name: 'default',
+        displayName: 'Default',
+        domains: {},
+    },
     metadata: {
         title: 'AI Diagram',
     },
@@ -98,12 +113,19 @@ describe('aiChatSave', () => {
     });
 
     it('saves cloud AI diagrams with regenerated supabase ids when required', async () => {
-        const saveDiagram = vi.fn(async (payload) => payload);
-        const getProvider = vi.fn(() => ({
+        const saveDiagram = vi.fn<IStorageProvider['saveDiagram']>(async payload => payload);
+        const provider: IStorageProvider = {
+            id: 'supabase',
             name: 'Supabase Cloud',
             isConfigured: () => true,
             saveDiagram,
-        }));
+            listDiagrams: async () => [],
+            loadDiagram: async id => ({
+                id, title: '', content: {}, updated_at: '', user_id: '',
+            }),
+            deleteDiagram: async () => undefined,
+        };
+        const getProvider = vi.fn(() => provider);
 
         const result = await executeAIChatDiagramSave({
             jsonContent: '{"nodes":[]}',
@@ -151,9 +173,15 @@ describe('aiChatSave', () => {
             persistLocalIndex: vi.fn(),
             loadUnifiedStorage: async () => ({
                 getProvider: () => ({
+                    id: 's3' as const,
                     name: 'S3 Compatible Storage',
                     isConfigured: () => false,
-                    saveDiagram: vi.fn(),
+                    saveDiagram: vi.fn<IStorageProvider['saveDiagram']>(async payload => payload),
+                    listDiagrams: async () => [],
+                    loadDiagram: async id => ({
+                        id, title: '', content: {}, updated_at: '', user_id: '',
+                    }),
+                    deleteDiagram: async () => undefined,
                 }),
             }),
         })).rejects.toThrow('S3 Compatible Storage 未配置');

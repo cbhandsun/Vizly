@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ReactFlowInstance } from '@xyflow/react';
+import type { Edge, Node, ReactFlowInstance } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { FaEdit, FaTrash, FaCopy, FaSave, FaFolderOpen, FaSearchPlus, FaSearchMinus, FaExpand, FaProjectDiagram } from 'react-icons/fa';
 import { useCommandRegistry } from './useCommandRegistry';
@@ -8,7 +8,7 @@ import { PluginContext, DiagramTypePlugin } from '../../../types/plugin';
 
 interface UseDesignerCommandsProps {
     // View
-    reactFlowInstance: ReactFlowInstance<any, any> | null;
+    reactFlowInstance: ReactFlowInstance | null;
     handleFitView: () => void;
     handleGridRotate: () => void;
     setAutoRoutingEnabled: React.Dispatch<React.SetStateAction<boolean>>;
@@ -28,12 +28,12 @@ interface UseDesignerCommandsProps {
     // 隐藏功能暴露
     handleMatchSize?: (mode: 'width' | 'height' | 'both') => void;
     handleReverseEdge?: (targetId?: string) => void;
-    copyStyle?: (node: any) => void;
+    copyStyle?: (node: Node) => void;
     pasteStyle?: (nodeIds: string[]) => void;
     hasCopiedStyle?: boolean;
-    saveAsTemplate?: (node: any, label: string) => void;
-    selectedNodes?: any[];
-    selectedEdges?: any[];
+    saveAsTemplate?: (node: Node, label: string) => void;
+    selectedNodes?: Node[];
+    selectedEdges?: Edge[];
     /** 折叠/展开选中容器组 */
     toggleGroupCollapse?: (groupId: string) => void;
     // File
@@ -170,7 +170,7 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
             // --- 格式刷 (Style Painter) ---
             { id: 'style.copy', label: '复制样式 (Copy Style) - Ctrl+Alt+C', category: 'Nodes', keywords: ['copy', 'style', 'format', 'painter', '格式刷', '样式'], icon: <FaCopy />, enabled: (selectedNodes?.length ?? 0) === 1, action: () => selectedNodes?.[0] && copyStyle?.(selectedNodes[0]) },
             { id: 'style.paste', label: '粘贴样式 (Paste Style) - Ctrl+Alt+V', category: 'Nodes', keywords: ['paste', 'style', 'format', 'painter', '格式刷', '样式'], icon: <FaCopy />, enabled: !!hasCopiedStyle && (selectedNodes?.length ?? 0) > 0, action: () => pasteStyle?.(selectedNodes?.map(n => n.id) ?? []) },
-            { id: 'style.saveTemplate', label: '保存为模板 (Save as Template) - Ctrl+Alt+S', category: 'Nodes', keywords: ['save', 'template', 'style', '模板', '保存'], icon: <FaSave />, enabled: (selectedNodes?.length ?? 0) === 1, action: () => { const n = selectedNodes?.[0]; if (n) saveAsTemplate?.(n, (n.data as any)?.label ?? '未命名'); } },
+            { id: 'style.saveTemplate', label: '保存为模板 (Save as Template) - Ctrl+Alt+S', category: 'Nodes', keywords: ['save', 'template', 'style', '模板', '保存'], icon: <FaSave />, enabled: (selectedNodes?.length ?? 0) === 1, action: () => { const n = selectedNodes?.[0]; if (n) saveAsTemplate?.(n, typeof n.data?.label === 'string' ? n.data.label : '未命名'); } },
 
             // --- 折叠/展开 组容器 ---
             { 
@@ -276,7 +276,6 @@ export function useDesignerCommands(props: UseDesignerCommandsProps) {
             if (pluginCommands?.length) {
                 base.push(...pluginCommands.map(cmd => ({
                     ...cmd,
-                    group: 'plugin' as any,
                     meta: [activePlugin?.name || 'Plugin', ...(cmd.meta || [])]
                 })));
             }

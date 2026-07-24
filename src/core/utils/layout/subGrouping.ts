@@ -1,8 +1,36 @@
 import type { Node as ReactFlowNode } from '@xyflow/react';
 import type { GroupNodeData, StandardNodeData } from '../../models/DiagramModels';
-import { diagramConfigManager } from '../../components/config/DiagramConfig';
+import { diagramConfigManager } from '../../config/DiagramConfig';
 import { deriveDomainClassFromDomain } from '../domainKey';
 import { calculateBoundingBox } from './geometryUtils';
+
+const GROUP_TYPES = new Set(['subGroup', 'titleGroup', 'group', 'domain']);
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+
+const nodeData = (node: ReactFlowNode): Record<string, unknown> => asRecord(node.data);
+const metadataData = (data: Record<string, unknown>): Record<string, unknown> =>
+  asRecord(data.metadata);
+const isGroupType = (type: unknown): boolean => GROUP_TYPES.has(String(type || ''));
+const cloneNodeData = (node: ReactFlowNode): ReactFlowNode => ({
+  ...node,
+  data: { ...nodeData(node) },
+});
+const stringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+const stringValues = (values: unknown[]): string[] =>
+  values.filter((value): value is string => typeof value === 'string' && value.length > 0);
+const subDomainOf = (data: Record<string, unknown>): string =>
+  String(data.subDomain ?? data.subdomain ?? metadataData(data).subDomain ?? '').trim();
+const majority = (values: string[]): string | undefined => {
+  if (values.length === 0) return undefined;
+  const counts = new Map<string, number>();
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+  return [...counts.entries()].sort((left, right) => right[1] - left[1])[0]?.[0];
+};
 
 /**
  * @file 统一布局工具函数
@@ -25,9 +53,9 @@ export const applySubGrouping = (
   const groupedByDomainAndSub: Record<string, ReactFlowNode[]> = {};
   const keyOf = (domain: string, sub: string) => `${domain}__${sub}`;
   nodes.forEach(node => {
-    const d: any = node.data || {};
-    const domain = String(d?.domain || '').trim();
-    const subDomain = String(((d?.subDomain ?? d?.subdomain) ?? d?.metadata?.subDomain) || '').trim();
+    const data = nodeData(node);
+    const domain = String(data.domain || '').trim();
+    const subDomain = subDomainOf(data);
     if (!subDomain) return;
     if (Array.isArray(whitelist) && whitelist.length > 0 && !whitelist.includes(subDomain)) return;
     if (!domain) return;
@@ -42,8 +70,9 @@ export const applySubGrouping = (
   for (const k of Object.keys(groupedByDomainAndSub)) {
     const children = groupedByDomainAndSub[k];
     if (!children.length) continue;
-    const domain = String(((children[0].data as any)?.domain || '')).trim();
-    const subDomain = String((((children[0].data as any)?.subDomain ?? (children[0].data as any)?.subdomain) ?? (children[0].data as any)?.metadata?.subDomain) || '').trim();
+    const firstChildData = nodeData(children[0]);
+    const domain = String(firstChildData.domain || '').trim();
+    const subDomain = subDomainOf(firstChildData);
 
     const bbox = calculateBoundingBox(children);
     const width = bbox.width + SUB_GROUP_PADDING.H * 2;
@@ -55,15 +84,13 @@ export const applySubGrouping = (
     // domainClass 只影响主题颜色，不影响域和子域的归属
     const domainClass = (() => {
       const childClasses = children
-        .map(c => (c.data as any)?.domainClass)
-        .filter(Boolean) as string[];
-      if (childClasses.length) {
-        const count = new Map<string, number>();
-        for (const c of childClasses) count.set(c, (count.get(c) || 0) + 1);
-        return Array.from(count.entries()).sort((a, b) => b[1] - a[1])[0][0];
+        .map(c => nodeData(c).domainClass);
+      const normalizedChildClasses = stringValues(childClasses);
+      if (normalizedChildClasses.length) {
+        return majority(normalizedChildClasses);
       }
       // 回退：若子节点都没有 domainClass，尝试从 domain 推导
-      try { return deriveDomainClassFromDomain(domain) as any; } catch { return undefined; }
+      try { return deriveDomainClassFromDomain(domain); } catch { return undefined; }
     })();
 
     const subGroupNode: ReactFlowNode<GroupNodeData> = {
@@ -84,11 +111,11 @@ export const applySubGrouping = (
         domainClass,
         hidden: Array.isArray(whitelist) && whitelist.length > 0 ? !whitelist.includes(subDomain) : false,
       },
-      measured: { width, height } as any,
+      measured: { width, height },
       zIndex: -1,
       draggable: false, // 锁定自动生成的子域
     };
-    result.push(subGroupNode as any);
+    result.push(subGroupNode);
   }
 
   return result;
@@ -112,28 +139,22 @@ export const applySubGrouping = (
 export const assignChildrenToSubGroups = (
   nodes: ReactFlowNode[]
 ): ReactFlowNode[] => {
-  const num = (v: any, fallback: number) => (typeof v === 'number' && isFinite(v) && v > 0) ? v : fallback;
-  const { NODE_WIDTH, NODE_HEIGHT } = diagramConfigManager.getLayoutConfig() as any;
-  const _defW = num(NODE_WIDTH, 240);
-  const _defH = num(NODE_HEIGHT, 120);
-
-  const isGroupType = (t: any) => new Set(['subGroup', 'titleGroup', 'group', 'domain']).has(String(t || ''));
-
   const updated = nodes.map(n => n);
   const candidates = updated.filter(n => !isGroupType(n.type));
   const subGroups = updated.filter(n => String(n.type || '') === 'subGroup');
 
   for (const sg of subGroups) {
-    const data: any = sg.data || {};
-    const existingChildren = Array.isArray(data.children) && data.children.length > 0 ? data.children as string[] : null;
+    const data = nodeData(sg);
+    const parsedChildren = stringArray(data.children);
+    const existingChildren = parsedChildren.length > 0 ? parsedChildren : null;
     const childIds: string[] = existingChildren ? existingChildren.slice() : [];
     if (!existingChildren) {
       const key = String((data?.subDomain || '')).trim();
       const dKey = String((data?.domain || '')).trim();
       for (const c of candidates) {
-        const cData: any = c.data || {};
-        const cSub = String(((cData?.subDomain ?? cData?.subdomain) ?? (cData?.metadata?.subDomain)) ?? '').trim();
-        const cDom = String((cData?.domain || '')).trim();
+        const cData = nodeData(c);
+        const cSub = subDomainOf(cData);
+        const cDom = String(cData.domain || '').trim();
         if (!key) continue;
         if (cSub === key && (!dKey || cDom === dKey)) childIds.push(c.id);
       }
@@ -143,24 +164,20 @@ export const assignChildrenToSubGroups = (
     if (!data.domain) {
       const childDomains = updated
         .filter(n => childIds.includes(n.id))
-        .map(n => (n.data as any)?.domain)
-        .filter(Boolean) as string[];
-      if (childDomains.length) {
-        const count = new Map<string, number>();
-        for (const d of childDomains) count.set(d, (count.get(d) || 0) + 1);
-        data.domain = Array.from(count.entries()).sort((a, b) => b[1] - a[1])[0][0];
+        .map(n => nodeData(n).domain);
+      const normalizedChildDomains = stringValues(childDomains);
+      if (normalizedChildDomains.length) {
+        data.domain = majority(normalizedChildDomains);
       }
     }
     // 函数级注释：补充 domainClass（若缺失），仅从子节点的 domainClass 多数值获取
     if (!data.domainClass) {
       const childClasses = updated
         .filter(n => childIds.includes(n.id))
-        .map(n => (n.data as any)?.domainClass)
-        .filter(Boolean) as string[];
-      if (childClasses.length) {
-        const count = new Map<string, number>();
-        for (const c of childClasses) count.set(c, (count.get(c) || 0) + 1);
-        data.domainClass = Array.from(count.entries()).sort((a, b) => b[1] - a[1])[0][0];
+        .map(n => nodeData(n).domainClass);
+      const normalizedChildClasses = stringValues(childClasses);
+      if (normalizedChildClasses.length) {
+        data.domainClass = majority(normalizedChildClasses);
       }
     }
 
@@ -196,13 +213,12 @@ export const assignChildrenToSubGroupsBySemantic = (
    * - 修改：用户明确要求“有指定认指定”，因此移除 aggressive normalization。
    */
   const normalizeKey = (s: string) => s.trim();
-  const updated = nodes.map(n => ({ ...n, data: { ...(n.data as any) } }));
-  const isGroupType = (t: any) => new Set(['subGroup', 'titleGroup', 'group', 'domain']).has(String(t || ''));
+  const updated = nodes.map(cloneNodeData);
   const candidates = updated.filter(n => !isGroupType(n.type));
   for (let i = 0; i < updated.length; i++) {
     const sg = updated[i];
     if (String(sg.type || '') !== 'subGroup') continue;
-    const data: any = sg.data || {};
+    const data = nodeData(sg);
     const keyRaw = (() => {
       const k1 = String((data?.subDomain || '')).trim();
       if (k1) return k1;
@@ -213,9 +229,9 @@ export const assignChildrenToSubGroupsBySemantic = (
     const dKey = String((data?.domain || '')).trim();
     const childIds: string[] = [];
     for (const c of candidates) {
-      const cd: any = c.data || {};
-      const cSub = normalizeKey(String(((cd?.subDomain ?? cd?.subdomain) ?? (cd?.metadata?.subDomain)) ?? '').trim());
-      const cDom = String((cd?.domain || '')).trim();
+      const cd = nodeData(c);
+      const cSub = normalizeKey(subDomainOf(cd));
+      const cDom = String(cd.domain || '').trim();
       if (!key) continue;
       if (key === normalizeKey('__virtual__')) {
         if (!cSub && (!dKey || cDom === dKey)) childIds.push(c.id);
@@ -230,17 +246,15 @@ export const assignChildrenToSubGroupsBySemantic = (
     if (!data.domainClass) {
       const childClasses = updated
         .filter(n => childIds.includes(n.id))
-        .map(n => (n.data as any)?.domainClass)
-        .filter(Boolean) as string[];
-      if (childClasses.length) {
-        const count = new Map<string, number>();
-        for (const c of childClasses) count.set(c, (count.get(c) || 0) + 1);
-        data.domainClass = Array.from(count.entries()).sort((a, b) => b[1] - a[1])[0][0];
+        .map(n => nodeData(n).domainClass);
+      const normalizedChildClasses = stringValues(childClasses);
+      if (normalizedChildClasses.length) {
+        data.domainClass = majority(normalizedChildClasses);
       }
     }
 
     sg.data = data;
-    updated[i] = sg as any;
+    updated[i] = sg;
   }
   return updated;
 };
@@ -266,13 +280,12 @@ export const purgeSubGroupChildrenBySemantic = (
    * - 目的：仅去除首尾空白，保留原始大小写与空格，严格遵从用户输入。
    */
   const normalizeKey = (s: string) => s.trim();
-  const updated = nodes.map(n => ({ ...n, data: { ...(n.data as any) } }));
-  const isGroupType = (t: any) => new Set(['subGroup', 'titleGroup', 'group', 'domain']).has(String(t || ''));
+  const updated = nodes.map(cloneNodeData);
   const idMap = new Map<string, ReactFlowNode>(updated.map(n => [n.id, n] as const));
   for (let i = 0; i < updated.length; i++) {
     const sg = updated[i];
     if (String(sg.type || '') !== 'subGroup') continue;
-    const data: any = sg.data || {};
+    const data = nodeData(sg);
     const keyRaw = (() => {
       const k1 = String((data?.subDomain || '')).trim();
       if (k1) return k1;
@@ -281,13 +294,13 @@ export const purgeSubGroupChildrenBySemantic = (
     })();
     const key = normalizeKey(keyRaw);
     const dKey = String((data?.domain || '')).trim();
-    const children = Array.isArray(data.children) ? (data.children as string[]) : [];
+    const children = stringArray(data.children);
     const filtered = children.filter(cid => {
       const node = idMap.get(cid);
       if (!node || isGroupType(node.type)) return false;
-      const nd: any = node.data || {};
-      const sub = normalizeKey(String(((nd?.subDomain ?? nd?.subdomain) ?? (nd?.metadata?.subDomain)) ?? '').trim());
-      const dom = String((nd?.domain || '')).trim();
+      const nd = nodeData(node);
+      const sub = normalizeKey(subDomainOf(nd));
+      const dom = String(nd.domain || '').trim();
       if (!key) return false;
       if (key === normalizeKey('__virtual__')) {
         if (sub) return false;
@@ -299,7 +312,7 @@ export const purgeSubGroupChildrenBySemantic = (
     });
     data.children = filtered;
     sg.data = data;
-    updated[i] = sg as any;
+    updated[i] = sg;
   }
   return updated;
 };
@@ -330,17 +343,17 @@ export const normalizeSubGroupDomainByChildren = (
   for (let i = 0; i < updated.length; i++) {
     const sg = updated[i];
     if (String(sg.type || '') !== 'subGroup') continue;
-    const data: any = sg.data || {};
-    const children = Array.isArray(data.children) ? (data.children as string[]) : [];
+    const data = nodeData(sg);
+    const children = stringArray(data.children);
     const domains = children
       .map(id => idMap.get(id))
       .filter((n): n is ReactFlowNode => !!n && !EXCLUDE.has(String(n.type || '')))
-      .map(n => String(((n.data as any)?.domain || '')))
-      .filter(Boolean) as string[];
-    const majority = pickMajority(domains);
-    if (majority) {
-      if (!data.domain) data.domain = majority;
-      (sg as any).data = data;
+      .map(n => String(nodeData(n).domain || ''))
+      .filter(value => value.length > 0);
+    const majorityDomain = pickMajority(domains);
+    if (majorityDomain) {
+      if (!data.domain) data.domain = majorityDomain;
+      sg.data = data;
     }
   }
   return updated;
@@ -365,28 +378,27 @@ export const normalizeSubGroupDomainByChildren = (
 export const auditAndFixSubGroupChildrenBindings = (
   nodes: ReactFlowNode[]
 ): ReactFlowNode[] => {
-  const _num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
   const updated = nodes.map(n => ({ ...n }));
   const subGroups = updated.filter(n => String(n.type || '') === 'subGroup');
   const bizNodes = updated.filter(n => {
     const t = String(n.type || '');
     return !['titleGroup', 'subGroup', 'group', 'domain', 'swimlane'].includes(t);
   });
-  const pickKey = (dt: any): string => {
-    const k1 = String((dt?.subDomain ?? dt?.metadata?.subDomain ?? '')).trim();
+  const pickKey = (data: Record<string, unknown>): string => {
+    const k1 = String(data.subDomain ?? metadataData(data).subDomain ?? '').trim();
     if (k1) return k1;
-    const k2 = String((dt?.description ?? '')).trim();
+    const k2 = String(data.description ?? '').trim();
     return k2;
   };
   const sgKey = (sg: ReactFlowNode): string => {
-    const dt: any = (sg as any)?.data || {};
-    const base = String((dt?.domain ?? '')).trim();
+    const dt = nodeData(sg);
+    const base = String(dt.domain ?? '').trim();
     const sub = pickKey(dt);
     return `${base}::${sub}`;
   };
   const bnKey = (bn: ReactFlowNode): string => {
-    const dt: any = (bn as any)?.data || {};
-    const base = String((dt?.domain ?? '')).trim();
+    const dt = nodeData(bn);
+    const base = String(dt.domain ?? '').trim();
     const sub = pickKey(dt);
     return `${base}::${sub}`;
   };
@@ -410,7 +422,7 @@ export const auditAndFixSubGroupChildrenBindings = (
     const key = sgKey(n);
     const set = childrenOf.get(key) || new Set<string>();
     const list = Array.from(set);
-    ((updated[i] as any).data || ((updated[i] as any).data = {})).children = list;
+    updated[i].data = { ...nodeData(updated[i]), children: list };
   }
   return updated;
 };
@@ -429,20 +441,22 @@ export const auditAndFixSubGroupChildrenBindings = (
 export const normalizeMissingNodeSubDomainByDomain = (
   nodes: ReactFlowNode[]
 ): ReactFlowNode[] => {
-  const updated = nodes.map(n => ({ ...n, data: { ...(n.data as any) } }));
-  const isGroupType = (t: any) => new Set(['subGroup', 'titleGroup', 'group', 'domain']).has(String(t || ''));
+  const updated = nodes.map(cloneNodeData);
   for (let i = 0; i < updated.length; i++) {
     const n = updated[i];
     if (isGroupType(n.type)) continue;
-    const dt: any = (n as any).data || {};
-    const d = String((dt?.domain || '')).trim();
-    const subRaw = String(((dt?.subDomain ?? dt?.subdomain) ?? '')).trim();
+    const dt = nodeData(n);
+    const d = String(dt.domain || '').trim();
+    const subRaw = String(dt.subDomain ?? dt.subdomain ?? '').trim();
     if (d && !subRaw) {
       dt.subDomain = d;
-      if (dt.metadata && typeof dt.metadata === 'object' && !String(((dt.metadata as any)?.subDomain ?? '')).trim()) {
-        (dt.metadata as any).subDomain = d;
+      if (dt.metadata && typeof dt.metadata === 'object') {
+        const metadata = metadataData(dt);
+        if (!String(metadata.subDomain ?? '').trim()) {
+          dt.metadata = { ...metadata, subDomain: d };
+        }
       }
-      (updated[i] as any).data = dt;
+      updated[i].data = dt;
     }
   }
   return updated;

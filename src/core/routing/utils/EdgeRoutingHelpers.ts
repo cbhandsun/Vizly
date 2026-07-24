@@ -3,8 +3,60 @@
  * 
  * 包含从 HandlePicker 迁移过来的实用工具函数，用于边路由的后处理和优化。
  */
-import { decideEdgeRouting } from '../../utils/HandlePicker';
 import { expandHandle } from './handleUtils';
+import type { RoutingConfig } from '../types/routing';
+
+export interface RoutingNodeLike {
+    id: string;
+    width?: number;
+    height?: number;
+    measured?: { width?: number; height?: number };
+    position?: { x: number; y: number };
+    positionAbsolute?: { x: number; y: number };
+}
+
+export type CompatibleRoutingConfig = Partial<RoutingConfig> & {
+    smoothFallback?: 'bezier' | 'straight' | 'step' | 'native';
+};
+
+interface RoutingEdgeLike {
+    source: string;
+    target: string;
+    data?: Record<string, unknown>;
+}
+
+const finiteNumber = (value: unknown, fallback = 0): number =>
+    typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+export interface EdgeRoutingDecision {
+    (
+        sourceNode: RoutingNodeLike,
+        targetNode: RoutingNodeLike,
+        allNodes: RoutingNodeLike[],
+        config: CompatibleRoutingConfig,
+    ): {
+        sourceHandle: string;
+        targetHandle: string;
+        type: string;
+    };
+}
+
+let edgeRoutingDecision: EdgeRoutingDecision | null = null;
+
+/**
+ * Registers the legacy routing decision adapter without coupling this utility
+ * module back to the compatibility facade that re-exports it.
+ */
+export function configureEdgeRoutingDecision(decision: EdgeRoutingDecision): void {
+    edgeRoutingDecision = decision;
+}
+
+const getEdgeRoutingDecision = (): EdgeRoutingDecision => {
+    if (!edgeRoutingDecision) {
+        throw new Error('Edge routing decision adapter has not been configured.');
+    }
+    return edgeRoutingDecision;
+};
 
 // Types
 interface EdgeRoutingCacheEntry {
@@ -35,7 +87,7 @@ export class EdgeRoutingCache {
         this.edgesByNode.clear();
     }
 
-    updateNodeSnapshots(nodes: any[]): Set<string> {
+    updateNodeSnapshots(nodes: RoutingNodeLike[]): Set<string> {
         const changedNodeIds = new Set<string>();
         for (const node of nodes) {
             const pos = node.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
@@ -44,10 +96,10 @@ export class EdgeRoutingCache {
 
             const newSnapshot: NodeSnapshot = {
                 id: node.id,
-                x: pos.x,
-                y: pos.y,
-                width: w,
-                height: h
+                x: finiteNumber(pos.x),
+                y: finiteNumber(pos.y),
+                width: finiteNumber(w, 100),
+                height: finiteNumber(h, 50)
             };
 
             const oldSnapshot = this.nodeSnapshots.get(node.id);
@@ -129,11 +181,11 @@ export function incrementalEdgeRouting<T extends {
     sourceHandle?: string | null;
     targetHandle?: string | null;
     type?: string;
-    data?: any
+    data?: Record<string, unknown>
 }>(
     edges: T[],
-    nodes: any[],
-    cfg: any,
+    nodes: RoutingNodeLike[],
+    cfg: CompatibleRoutingConfig,
     forceFullRecalc: boolean = false
 ): T[] {
     if (edges.length === 0) return edges;
@@ -143,7 +195,7 @@ export function incrementalEdgeRouting<T extends {
         : edgeRoutingCache.updateNodeSnapshots(nodes);
 
     const affectedEdgeIds = edgeRoutingCache.getAffectedEdgeIds(changedNodeIds);
-    const idMap = new Map<string, any>(nodes.map(n => [n.id, n]));
+    const idMap = new Map(nodes.map(n => [n.id, n]));
 
     return edges.map(edge => {
         if (!forceFullRecalc && edgeRoutingCache.hasValidCache(edge.id, affectedEdgeIds)) {
@@ -166,7 +218,7 @@ export function incrementalEdgeRouting<T extends {
         const tgtNode = idMap.get(edge.target);
         if (!srcNode || !tgtNode) return edge;
 
-        const routingResult = decideEdgeRouting(srcNode, tgtNode, nodes, cfg);
+        const routingResult = getEdgeRoutingDecision()(srcNode, tgtNode, nodes, cfg);
 
         edgeRoutingCache.setCache(edge.id, {
             sourceHandle: routingResult.sourceHandle,
@@ -200,10 +252,10 @@ export function getEdgeRoutingCacheStats() {
 /**
  * 并行边分离
  */
-export function separateParallelEdges<T extends { source: string; target: string; data?: any }>(
+export function separateParallelEdges<T extends RoutingEdgeLike>(
     edges: T[],
     spacing: number = 12,
-    ..._args: any[]
+    ..._args: unknown[]
 ): T[] {
     const groups = new Map<string, T[]>();
 
@@ -263,7 +315,10 @@ export function separateParallelEdges<T extends { source: string; target: string
 /**
  * 兼容旧API：纯几何把手选择
  */
-export function pickHandlesByGeometry(sNode: any, tNode: any) {
+export function pickHandlesByGeometry(
+    sNode: Pick<RoutingNodeLike, 'position' | 'positionAbsolute'>,
+    tNode: Pick<RoutingNodeLike, 'position' | 'positionAbsolute'>,
+) {
     const s = sNode.positionAbsolute || sNode.position || { x: 0, y: 0 };
     const t = tNode.positionAbsolute || tNode.position || { x: 0, y: 0 };
     const dx = t.x - s.x;
@@ -299,13 +354,17 @@ export function applyParallelOffset(
  * 则连线 Source->A 应分配在端口的最左侧，Source->C 在最右侧。
  * 这能显著减少出端口时的交叉。
  */
-export function distributePortConnections(edges: any[], nodes: any[], ..._args: any[]) {
+export function distributePortConnections<T extends RoutingEdgeLike>(
+    edges: T[],
+    nodes: RoutingNodeLike[],
+    ..._args: unknown[]
+): T[] {
     if (!edges || !nodes) return edges;
-    const nodeMap = new Map<string, any>(nodes.map(n => [n.id, n]));
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
 
     // 1. Group edges by Source and Target
-    const sourceGroups = new Map<string, any[]>();
-    const targetGroups = new Map<string, any[]>();
+    const sourceGroups = new Map<string, T[]>();
+    const targetGroups = new Map<string, T[]>();
 
     for (const edge of edges) {
         if (!sourceGroups.has(edge.source)) sourceGroups.set(edge.source, []);
@@ -358,9 +417,13 @@ export function distributePortConnections(edges: any[], nodes: any[], ..._args: 
 
         // 3. 将排序信息写入 Edge Data (供后续 Routing 消费)
         group.forEach((edge, index) => {
-            if (!edge.data) edge.data = {};
-            edge.data._orderIndexSource = index;
-            edge.data._orderTotalSource = group.length;
+            Object.assign(edge, {
+                data: {
+                    ...(edge.data ?? {}),
+                    _orderIndexSource: index,
+                    _orderTotalSource: group.length,
+                },
+            });
             // 可选：写入 explicit port offset 提示
             // edge.data.portOffsetSource = ...
         });
@@ -398,9 +461,13 @@ export function distributePortConnections(edges: any[], nodes: any[], ..._args: 
         });
 
         group.forEach((edge, index) => {
-            if (!edge.data) edge.data = {};
-            edge.data._orderIndexTarget = index;
-            edge.data._orderTotalTarget = group.length;
+            Object.assign(edge, {
+                data: {
+                    ...(edge.data ?? {}),
+                    _orderIndexTarget: index,
+                    _orderTotalTarget: group.length,
+                },
+            });
         });
     }
 

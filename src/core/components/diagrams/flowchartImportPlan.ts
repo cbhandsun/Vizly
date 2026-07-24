@@ -12,7 +12,7 @@ type ParsedPluginGraph = {
     edges?: Edge[];
 } | null;
 
-type FlowchartImportPlugin = {
+export type FlowchartImportPlugin = {
     parseData?: (data: StandardDiagramData) => ParsedPluginGraph;
 };
 

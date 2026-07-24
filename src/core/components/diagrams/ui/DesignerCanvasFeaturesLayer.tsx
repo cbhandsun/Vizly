@@ -7,85 +7,80 @@ import { AnnotationLayer } from '../AnnotationLayer';
 import { PageTabs } from '../PageTabs';
 import { HistoryPanel } from '../HistoryPanel';
 import { CanvasSearchBar } from '../CanvasSearchBar';
-import type { Node } from '@xyflow/react';
-import { PluginContext } from '../../../types/plugin';
+
+type QuickConnectProps = React.ComponentProps<typeof QuickConnectMenu>;
+type HoverToolbarProps = React.ComponentProps<typeof HoverToolbarsOverlay>;
+type SmartGuideProps = React.ComponentProps<typeof SmartGuideRenderer>;
+type AnnotationProps = React.ComponentProps<typeof AnnotationLayer>;
+type PageTabsProps = React.ComponentProps<typeof PageTabs>;
+type HistoryProps = React.ComponentProps<typeof HistoryPanel>;
+type SearchProps = React.ComponentProps<typeof CanvasSearchBar>;
 
 export interface DesignerCanvasFeaturesLayerProps {
-    quickConnect: {
-        visible: boolean;
-        x: number;
-        y: number;
-        sourceNodeId?: string;
-        onSelect: any;
-        onClose: any;
-        onPreview: any;
-    };
+    quickConnect: Pick<
+        QuickConnectProps,
+        'visible' | 'x' | 'y' | 'sourceNodeId' | 'onSelect' | 'onClose' | 'onPreview'
+    >;
 
-    hoverToolbar: {
-        nodeTypes: Record<string, React.ComponentType<any>>;
-        pluginCtx: PluginContext;
-        activePlugin: any;
-        quickAddMenuVisible: boolean;
-        isContextToolbarHidden: boolean;
-        isConnecting: boolean;
-        updateNodesBatch: any;
-        updateEdgesBatch: any;
-        onUpdateNodes: any;
-        handleDeleteWithToast: any;
-        handleDuplicateWithToast: any;
-        handleLock: any;
-        handleOpacity: any;
-        handleBringToFront: any;
-        handleSendToBack: any;
-        copyStyle: any;
-        pasteStyle: any;
-        hasCopiedStyle: boolean;
-    };
+    hoverToolbar: Pick<
+        HoverToolbarProps,
+        | 'nodeTypes'
+        | 'pluginCtx'
+        | 'activePlugin'
+        | 'quickAddMenuVisible'
+        | 'isContextToolbarHidden'
+        | 'isConnecting'
+        | 'updateNodesBatch'
+        | 'updateEdgesBatch'
+        | 'onUpdateNodes'
+        | 'handleDeleteWithToast'
+        | 'handleDuplicateWithToast'
+        | 'handleLock'
+        | 'handleOpacity'
+        | 'handleBringToFront'
+        | 'handleSendToBack'
+        | 'copyStyle'
+        | 'pasteStyle'
+        | 'hasCopiedStyle'
+    >;
 
-    smartGuides: {
-        guides: any[];
-    };
+    smartGuides: Pick<SmartGuideProps, 'guides'>;
 
     annotations: {
-        items: any[];
-        mode: boolean;
-        onAdd: (ann: any) => void;
-        onUpdate: (id: string, updates: any) => void;
-        onDelete: (id: string) => void;
-        onToggleResolved: (id: string) => void;
-        activePageId: string;
-        colors: string[];
+        items: AnnotationProps['annotations'];
+        mode: AnnotationProps['annotationMode'];
+        onAdd: AnnotationProps['onAdd'];
+        onUpdate: AnnotationProps['onUpdate'];
+        onDelete: AnnotationProps['onDelete'];
+        onToggleResolved: AnnotationProps['onToggleResolved'];
+        activePageId: AnnotationProps['activePageId'];
+        colors: AnnotationProps['colors'];
     };
 
     pages: {
-        items: any[];
-        activePageId: string;
-        onSwitchPage: (id: string) => void;
-        onAddPage: () => void;
-        onDeletePage: (id: string) => void;
-        onRenamePage: (id: string, name: string) => void;
+        items: PageTabsProps['pages'];
+        activePageId: PageTabsProps['activePageId'];
+        onSwitchPage: PageTabsProps['onSwitchPage'];
+        onAddPage: PageTabsProps['onAddPage'];
+        onDeletePage: PageTabsProps['onDeletePage'];
+        onRenamePage: PageTabsProps['onRenamePage'];
     };
 
-    history: {
-        visible: boolean;
-        onClose: () => void;
-        pastEntries: any[];
-        canUndo: boolean;
-        canRedo: boolean;
-        onUndo: () => void;
-        onRedo: () => void;
-        onJumpTo: (index: number) => void;
-    };
+    history: Pick<
+        HistoryProps,
+        'visible' | 'onClose' | 'pastEntries' | 'canUndo' | 'canRedo' | 'onUndo' | 'onRedo' | 'onJumpTo'
+    >;
 
-    search: {
-        visible: boolean;
-        onClose: () => void;
-        nodes: Node[];
-        onHighlightNode: (id: string | null) => void;
-        onReplaceNode?: (nodeId: string, newLabel: string) => void;
-        onReplaceAll?: (matchIds: string[], newLabel: string) => void;
-        onBeforeReplace?: () => void;
-    };
+    search: Pick<
+        SearchProps,
+        | 'visible'
+        | 'onClose'
+        | 'nodes'
+        | 'onHighlightNode'
+        | 'onReplaceNode'
+        | 'onReplaceAll'
+        | 'onBeforeReplace'
+    >;
 }
 
 export const DesignerCanvasFeaturesLayer = React.memo(

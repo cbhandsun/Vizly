@@ -1,4 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
+import { MarkerType } from '@xyflow/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const safeLogState = vi.hoisted(() => ({
@@ -114,7 +115,7 @@ describe('useOptimizedDiagramControls', () => {
         { id: 'b', position: { x: 160, y: 0 }, measured: { width: 100, height: 50 }, data: { label: 'Explicit B' } },
       ],
       edges: [
-        { id: 'e1', source: 'a', target: 'b', markerEnd: { type: 'arrowclosed' }, label: 'Explicit edge' },
+        { id: 'e1', source: 'a', target: 'b', markerEnd: { type: MarkerType.ArrowClosed }, label: 'Explicit edge' },
       ],
       viewport: { x: 1, y: 2, zoom: 1.5 },
     }));

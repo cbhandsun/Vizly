@@ -151,7 +151,6 @@ export class IncrementalVisibilityGraph {
         // 2. Soft-delete vertices (mark as deleted, don't reindex)
         for (const vIdx of vertexIndices) {
             this.deletedVertices.add(vIdx);
-            this.graph.vertices[vIdx] = null as any; // Mark as deleted
         }
 
         // 3. Recompute visibility for remaining vertices

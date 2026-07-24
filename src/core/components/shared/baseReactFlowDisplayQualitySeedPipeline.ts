@@ -144,7 +144,9 @@ export const createBaseReactFlowInteractiveDisplayEdges = ({
       displayEdgeEpoch,
     })).map((edge) => synthesizeStableFallbackPath({ edge, nodeById })),
   );
-  const layoutDirection = String((normalizedEdges[0]?.data as any)?.layoutDirection || 'TB');
+  const layoutDirection = typeof normalizedEdges[0]?.data?.layoutDirection === 'string'
+    ? normalizedEdges[0].data.layoutDirection
+    : 'TB';
   const interactiveEdges = createInteractiveDisplayQualityEdges(
     normalizedEdges,
     repairNodes,

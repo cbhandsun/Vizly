@@ -58,10 +58,19 @@ type SharedTargetEntrySegment = {
 const SHARED_TARGET_ENTRY_EPS = 0.5;
 
 const getSharedTargetEntryPath = (edge: Edge): SharedTargetEntryPoint[] => {
-  const raw = (edge.data as any)?.computedPath || (edge.data as any)?.treeRouting?.points || [];
+  const data = edge.data;
+  const treeRouting = data?.treeRouting;
+  const raw = data?.computedPath
+    || (treeRouting && typeof treeRouting === 'object' && 'points' in treeRouting
+      ? treeRouting.points
+      : []);
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((point: any) => ({ x: Number(point?.x), y: Number(point?.y) }))
+    .map((point: unknown) => {
+      if (!point || typeof point !== 'object') return { x: Number.NaN, y: Number.NaN };
+      const candidate = point as Record<string, unknown>;
+      return { x: Number(candidate.x), y: Number(candidate.y) };
+    })
     .filter((point: SharedTargetEntryPoint) => (
       Number.isFinite(point.x) && Number.isFinite(point.y)
     ));

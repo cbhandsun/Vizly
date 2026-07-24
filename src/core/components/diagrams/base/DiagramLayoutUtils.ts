@@ -1,6 +1,6 @@
 import { Node } from '@xyflow/react';
 import { enhancedTextMeasurement } from '../../../utils/EnhancedTextMeasurement';
-import { diagramConfigManager } from '../../config/DiagramConfig';
+import { diagramConfigManager } from '@/core/config/DiagramConfig';
 
 /**
  * 布局配置接口
@@ -274,7 +274,7 @@ export const createNode = (
   id: string,
   label: string,
   position: { x: number; y: number },
-  additionalData: any = {}
+  additionalData: Record<string, unknown> = {}
 ): Node => {
   const fontConfig = diagramConfigManager.getConfig().node.font;
   

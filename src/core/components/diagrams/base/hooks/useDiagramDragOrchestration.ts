@@ -6,12 +6,16 @@ export interface DragOrchestrationParams {
   rfNodes: Node[];
 }
 
+type AbsolutePositionNode = Node & {
+  positionAbsolute?: { x: number; y: number };
+};
+
 export function useDiagramDragOrchestration({ rfNodes }: DragOrchestrationParams) {
   const [dragUpdateCounter, setDragUpdateCounter] = useState(0);
   const livePositionsRef = useRef<Record<string, { x: number; y: number }>>({});
   const [draggingNodeIds, setDraggingNodeIds] = useState<string[]>([]);
 
-  const handleNodeDrag = useCallback((_event: React.MouseEvent, node: Node, nodes: Node[]) => {
+  const handleNodeDrag = useCallback((_event: MouseEvent | TouchEvent, node: Node, nodes: Node[]) => {
     const currentIds: Set<string> = new Set();
     const draggedNodesMap = new Map<string, Node>();
 
@@ -27,17 +31,17 @@ export function useDiagramDragOrchestration({ rfNodes }: DragOrchestrationParams
         if (n.parentId) {
           const parent = rfNodes.find(pn => pn.id === n.parentId);
           if (parent) {
-            const parentAbs = (parent as any).positionAbsolute || parent.position || { x: 0, y: 0 };
+            const parentAbs = (parent as AbsolutePositionNode).positionAbsolute || parent.position || { x: 0, y: 0 };
             currentNewAbsPos = {
               x: parentAbs.x + (n.position?.x ?? 0),
               y: parentAbs.y + (n.position?.y ?? 0)
             };
           } else {
-            const pos = (n as any).positionAbsolute || n.position;
+            const pos = (n as AbsolutePositionNode).positionAbsolute || n.position;
             if (pos) currentNewAbsPos = { ...pos };
           }
         } else {
-          const pos = (n as any).positionAbsolute || n.position;
+          const pos = (n as AbsolutePositionNode).positionAbsolute || n.position;
           if (pos) currentNewAbsPos = { ...pos };
         }
       }

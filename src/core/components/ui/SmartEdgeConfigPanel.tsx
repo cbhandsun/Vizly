@@ -1,5 +1,6 @@
 import React from 'react';
-import { diagramConfigManager } from '../config/DiagramConfig';
+import { diagramConfigManager } from '@/core/config/DiagramConfig';
+import type { EdgeConfig } from '@/core/config/DiagramConfig';
 import { logSmartEdgeConfigSyncFailure } from './smartEdgeConfigLogging';
 
 export interface SmartEdgeSettings {
@@ -219,7 +220,7 @@ const SmartEdgeConfigPanel: React.FC<SmartEdgeConfigPanelProps> = ({
             // 函数级注释：同步高级参数到全局 edge 配置
             // 行为：仅更新 edge 分支，不影响其他配置段
             try {
-              const payload: any = {
+              const payload: Partial<EdgeConfig> = {
                 laneClamp: !!value.laneClamp,
                 ignoreContainers: !!value.ignoreContainers,
                 obstacleScopePadding: Number(value.obstacleScopePadding ?? 160),
@@ -230,14 +231,16 @@ const SmartEdgeConfigPanel: React.FC<SmartEdgeConfigPanelProps> = ({
               // 使用 window 事件传达更新意图或直接回调到父层由其写入，这里复用 onApplyGlobal 语义进行边分支更新
               // 实际更新在父层完成功能更明确；如未提供父层处理，则尝试直接全局更新
               try {
-                (onApplyGlobal as any)?.(value.edgeMode, value.pathType, value.smoothFallback);
+                onApplyGlobal?.(value.edgeMode, value.pathType, value.smoothFallback);
               } catch (error) {
                 logSmartEdgeConfigSyncFailure('applyGlobal', error);
               }
               // 附加：将高级参数写入全局 edge
               // 直接访问全局管理器，确保独立于父层也能生效
               try {
-                diagramConfigManager.updateConfig({ edge: payload });
+                diagramConfigManager.updateConfig({
+                  edge: { ...diagramConfigManager.getConfig().edge, ...payload },
+                });
               } catch (error) {
                 logSmartEdgeConfigSyncFailure('updateAdvancedConfig', error);
               }

@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { Edge } from '@xyflow/react';
+import type React from 'react';
 
 /**
  * 边属性变更回调集合（标签偏移、标签样式、Waypoint、标签文本）
@@ -18,13 +19,13 @@ export function useDesignerEdgeCallbacks(
     }, [setEdges]);
 
     // 标签样式变更回调
-    const handleLabelStyleChange = useCallback((edgeId: string, style: any) => {
+    const handleLabelStyleChange = useCallback((edgeId: string, style: React.CSSProperties) => {
         setEdges(edges => edges.map(edge =>
             edge.id === edgeId
                 ? {
                     ...edge,
                     data: { ...edge.data, labelStyle: style },
-                    labelStyle: { ...(edge.labelStyle as any), ...style } // 同步到edge的labelStyle属性
+                    labelStyle: { ...(edge.labelStyle || {}), ...style } // 同步到edge的labelStyle属性
                 }
                 : edge
         ));

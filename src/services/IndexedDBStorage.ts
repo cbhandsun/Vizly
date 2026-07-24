@@ -51,7 +51,7 @@ export class LocalDB {
         return this.initPromise;
     }
 
-    async saveVersion(diagramId: string, snapshotData: any, message?: string): Promise<DiagramVersion> {
+    async saveVersion(diagramId: string, snapshotData: unknown, message?: string): Promise<DiagramVersion> {
         if (!isSafeVersionId(diagramId)) {
             throw new Error('Invalid diagram id for version history.');
         }
@@ -120,7 +120,7 @@ export class LocalDB {
     }
 
     // --- Diagram Storage Methods ---
-    async saveDiagram(diagram: any): Promise<void> {
+    async saveDiagram(diagram: unknown): Promise<void> {
         await this.init();
         return new Promise((resolve, reject) => {
             const transaction = this.db!.transaction([DIAGRAMS_STORE], 'readwrite');
@@ -131,7 +131,7 @@ export class LocalDB {
         });
     }
 
-    async loadDiagram(id: string): Promise<any | null> {
+    async loadDiagram(id: string): Promise<unknown | null> {
         await this.init();
         return new Promise((resolve, reject) => {
             const transaction = this.db!.transaction([DIAGRAMS_STORE], 'readonly');
@@ -142,7 +142,7 @@ export class LocalDB {
         });
     }
 
-    async listDiagrams(): Promise<any[]> {
+    async listDiagrams(): Promise<unknown[]> {
         await this.init();
         return new Promise((resolve, reject) => {
             const transaction = this.db!.transaction([DIAGRAMS_STORE], 'readonly');

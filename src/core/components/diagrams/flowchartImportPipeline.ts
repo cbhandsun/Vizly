@@ -1,15 +1,24 @@
+import type { Edge, Node } from '@xyflow/react';
+
+import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import { parseDiagramJson } from '@/core/utils/diagramJsonImport';
 
 import { logFlowchartDesignerMermaidImportFailure } from './flowchartDesignerLogging';
 import { applyFlowchartJsonImportPlan, applyFlowchartMermaidImportPlan, createFlowchartImportFallbackId } from './flowchartImportApply';
-import { buildFlowchartJsonImportPlan } from './flowchartImportPlan';
+import { buildFlowchartJsonImportPlan, type FlowchartImportPlugin } from './flowchartImportPlan';
 import { buildFlowchartMermaidImportPlan } from './flowchartMermaidImport';
 
 type ImportKind = 'json' | 'mermaid';
 
-type FlowchartImportPlugin = {
-    parseData?: (data: unknown) => { nodes: unknown[]; edges?: unknown[] } | null;
+const readImportedDiagramTitle = (data: unknown, fallbackTitle: string): string => {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return fallbackTitle;
+    const name = (data as Record<string, unknown>).name;
+    return typeof name === 'string' ? name : fallbackTitle;
 };
+
+const readImportErrorMessage = (error: unknown, fallbackMessage: string): string => (
+    error instanceof Error ? error.message : fallbackMessage
+);
 
 export const runFlowchartImportPipeline = async ({
     content,
@@ -39,16 +48,16 @@ export const runFlowchartImportPipeline = async ({
     diagramId?: string;
     fallbackTitle: string;
     openedAt: string;
-    setNodes: (nodes: any[]) => void;
-    setEdges: (edges: any[]) => void;
+    setNodes: (nodes: Node[]) => void;
+    setEdges: (edges: Edge[]) => void;
     onStandardPluginSuccess: (count: number) => void;
     registerStandardReload: (payload: {
-        normalized: any;
+        normalized: StandardDiagramData;
         currentId: string;
         title: string;
     }) => Promise<void>;
     onStandardReloadQueued: (currentId: string) => void;
-    onReactFlowSuccess: (payload: { nodes: any[]; edges: any[] }) => void;
+    onReactFlowSuccess: (payload: { nodes: Node[]; edges: Edge[] }) => void;
     onJsonImportFailure: (message: string) => void;
     onMermaidSuccess: () => void;
     onMermaidLayoutHint: (delayMs: number) => void;
@@ -65,7 +74,7 @@ export const runFlowchartImportPipeline = async ({
                 data,
                 activePlugin,
                 fallbackId: currentId,
-                fallbackTitle: typeof (data as any)?.name === 'string' ? (data as any).name : fallbackTitle,
+                fallbackTitle: readImportedDiagramTitle(data, fallbackTitle),
                 openedAt,
                 invalidFormatMessage,
             });
@@ -78,8 +87,8 @@ export const runFlowchartImportPipeline = async ({
                 onStandardReloadQueued,
                 onReactFlowSuccess,
             });
-        } catch (error: any) {
-            onJsonImportFailure(error.message);
+        } catch (error: unknown) {
+            onJsonImportFailure(readImportErrorMessage(error, invalidFormatMessage));
         }
         return;
     }

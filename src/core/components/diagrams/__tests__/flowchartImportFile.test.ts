@@ -65,7 +65,10 @@ describe('flowchartImportFile', () => {
         onload: null,
         onerror: null,
         readAsText() {
-          this.onerror?.();
+          this.onerror?.call(
+            this as unknown as FileReader,
+            { type: 'error', target: this } as unknown as ProgressEvent<FileReader>,
+          );
         },
       })
     )).rejects.toThrow('Failed to read import file.');

@@ -27,6 +27,10 @@ import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGa
 import { DISPLAY_FINAL_OVERLAP_OBSTACLE_REPAIR_OPTIONS } from './baseReactFlowDisplayRenderPipeline';
 import { getBaseReactFlowMeasuredRepairNeeds } from './baseReactFlowDisplayMeasuredRepairPlan';
 import { repairSharedPortAndTinyTerminalLanes } from './baseReactFlowDisplaySharedPortLaneRepair';
+import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
+import { repairDisplayLoopShortcuts } from './baseReactFlowDisplayLoopShortcutRepair';
+import { repairDisplayMicroArtifacts } from '../../strategies/shared/edgeDisplayMicroCleanup';
+import { createBaseReactFlowDisplayMicroSafetyContext } from './baseReactFlowDisplayMicroSafety';
 
 export type BaseReactFlowMeasuredDisplayInitialEvaluation = Readonly<{
   edges: Edge[];
@@ -100,7 +104,9 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
   let currentReport = compactedReport;
   if (currentReport.hardClean) return outcomeFor(current, current, currentReport);
 
-  const layoutDirection = String((compacted[0]?.data as any)?.layoutDirection || 'TB');
+  const layoutDirection = typeof compacted[0]?.data?.layoutDirection === 'string'
+    ? compacted[0].data.layoutDirection
+    : 'TB';
   const stageCandidates: Edge[][] = [];
   const acceptStage = (candidate: Edge[]): boolean => {
     const nextReport = reportFor(candidate, current, currentReport);
@@ -143,8 +149,80 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
   }
   if (getBaseReactFlowMeasuredRepairNeeds(currentReport).terminal) {
     const beforeTerminal = current;
+    const terminalRoleBudget = Math.min(512, Math.max(64, current.length * 12));
+    if (acceptStage(compactDisplayEdgePaths(
+      repairAxisMismatchedTerminalsWithBoundedPortRoles(
+        current,
+        repairNodes,
+        terminalRoleBudget,
+      ),
+    ))) return outcomeFor(current, current, currentReport);
     if (acceptStage(repairTerminalHandleAxisCrossings(current, repairNodes))) {
       return outcomeFor(current, current, currentReport);
+    }
+    if (
+      currentReport.quality.reverseOverlap > 0
+      || currentReport.quality.unexplainedRelatedOverlap > 0
+      || currentReport.quality.tinyInteriorDoglegs > 0
+      || currentReport.quality.hairpins > 0
+    ) {
+      if (acceptStage(repairSharedPortAndTinyTerminalLanes(current, repairNodes, 12))) {
+        return outcomeFor(current, current, currentReport);
+      }
+    }
+    if (getBaseReactFlowMeasuredRepairNeeds(currentReport).overlap) {
+      if (acceptStage(repairResidualDisplayOverlaps(
+        current,
+        repairNodes,
+        DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS,
+        DISPLAY_BOUNDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
+      ))) return outcomeFor(current, current, currentReport);
+    }
+    const terminalSafeCandidate = keepNodeAnchoredTerminalCandidates(
+      repairFastDisplayHardSafety(current, repairNodes),
+      current,
+      repairNodes,
+    );
+    if (acceptStage(terminalSafeCandidate)) {
+      return outcomeFor(current, current, currentReport);
+    }
+    if (getBaseReactFlowMeasuredRepairNeeds(currentReport).terminal) {
+      if (acceptStage(compactDisplayEdgePaths(
+        repairAxisMismatchedTerminalsWithBoundedPortRoles(
+          current,
+          repairNodes,
+          terminalRoleBudget,
+        ),
+      ))) return outcomeFor(current, current, currentReport);
+    }
+    for (let closurePass = 0; closurePass < 2; closurePass += 1) {
+      const passStart = current;
+      if (getBaseReactFlowMeasuredRepairNeeds(currentReport).overlap) {
+        if (acceptStage(repairResidualDisplayOverlaps(
+          current,
+          repairNodes,
+          DISPLAY_BOUNDED_DETACHED_OVERLAP_REPAIR_OPTIONS,
+          DISPLAY_BOUNDED_RESIDUAL_OVERLAP_REPAIR_OPTIONS,
+        ))) return outcomeFor(current, current, currentReport);
+      }
+      const closureSafeCandidate = keepNodeAnchoredTerminalCandidates(
+        repairFastDisplayHardSafety(current, repairNodes),
+        current,
+        repairNodes,
+      );
+      if (acceptStage(closureSafeCandidate)) {
+        return outcomeFor(current, current, currentReport);
+      }
+      if (getBaseReactFlowMeasuredRepairNeeds(currentReport).terminal) {
+        if (acceptStage(compactDisplayEdgePaths(
+          repairAxisMismatchedTerminalsWithBoundedPortRoles(
+            current,
+            repairNodes,
+            terminalRoleBudget,
+          ),
+        ))) return outcomeFor(current, current, currentReport);
+      }
+      if (sameEdgeReferences(current, passStart)) break;
     }
     if (
       !sameEdgeReferences(current, beforeTerminal)
@@ -156,10 +234,10 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
     }
   }
 
-  const fastRepaired = repairFastDisplayHardSafety(compacted, repairNodes);
+  const fastRepaired = repairFastDisplayHardSafety(current, repairNodes);
   const fastAnchoredRepaired = keepNodeAnchoredTerminalCandidates(
     fastRepaired,
-    compacted,
+    current,
     repairNodes,
   );
   const fastStrictRepaired = compactDisplayEdgePaths(
@@ -186,6 +264,62 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
     compacted,
     compactedReport,
   );
+  if (
+    displayEdgesHaveNodeAttachedTerminals(anchoredSelected, repairNodes)
+    && (
+      anchoredSelectedReport.quality.strictCrossings > 0
+      || anchoredSelectedReport.quality.hairpins > 0
+      || anchoredSelectedReport.quality.tinyInteriorDoglegs > 0
+      || anchoredSelectedReport.quality.unexplainedRelatedOverlap > 0
+    )
+  ) {
+    const loopClosed = repairDisplayLoopShortcuts(
+      anchoredSelected,
+      repairNodes,
+      128,
+    );
+    const fastClosed = repairFastDisplayHardSafety(loopClosed, repairNodes);
+    const microClosed = repairDisplayMicroArtifacts(
+      fastClosed,
+      createBaseReactFlowDisplayMicroSafetyContext(fastClosed, repairNodes),
+    );
+    const residualClosed = repairSharedPortAndTinyTerminalLanes(
+      microClosed,
+      repairNodes,
+      Math.min(32, Math.max(8, anchoredSelected.length)),
+    );
+    const residualClosedReport = reportFor(residualClosed);
+    if (residualClosedReport.hardClean) {
+      return outcomeFor(residualClosed, residualClosed, residualClosedReport);
+    }
+    const baselineQuality = anchoredSelectedReport.quality;
+    const residualQuality = residualClosedReport.quality;
+    const hardDefectsDoNotRegress = residualClosedReport.obstacleHits <= anchoredSelectedReport.obstacleHits
+      && Number(!residualClosedReport.terminalsAttached) <= Number(!anchoredSelectedReport.terminalsAttached)
+      && Number(!residualClosedReport.terminalsAnchored) <= Number(!anchoredSelectedReport.terminalsAnchored)
+      && residualQuality.nonOrthogonalSegments <= baselineQuality.nonOrthogonalSegments
+      && residualQuality.strictCrossings <= baselineQuality.strictCrossings
+      && residualQuality.reverseOverlap <= baselineQuality.reverseOverlap
+      && residualQuality.unrelatedOverlap <= baselineQuality.unrelatedOverlap
+      && residualQuality.unexplainedRelatedOverlap <= baselineQuality.unexplainedRelatedOverlap
+      && residualQuality.shortEndpointStubs <= baselineQuality.shortEndpointStubs
+      && residualQuality.tinyInteriorDoglegs <= baselineQuality.tinyInteriorDoglegs
+      && residualQuality.hairpins <= baselineQuality.hairpins;
+    const hardDefectsImprove = residualClosedReport.obstacleHits < anchoredSelectedReport.obstacleHits
+      || Number(!residualClosedReport.terminalsAttached) < Number(!anchoredSelectedReport.terminalsAttached)
+      || Number(!residualClosedReport.terminalsAnchored) < Number(!anchoredSelectedReport.terminalsAnchored)
+      || residualQuality.nonOrthogonalSegments < baselineQuality.nonOrthogonalSegments
+      || residualQuality.strictCrossings < baselineQuality.strictCrossings
+      || residualQuality.reverseOverlap < baselineQuality.reverseOverlap
+      || residualQuality.unrelatedOverlap < baselineQuality.unrelatedOverlap
+      || residualQuality.unexplainedRelatedOverlap < baselineQuality.unexplainedRelatedOverlap
+      || residualQuality.shortEndpointStubs < baselineQuality.shortEndpointStubs
+      || residualQuality.tinyInteriorDoglegs < baselineQuality.tinyInteriorDoglegs
+      || residualQuality.hairpins < baselineQuality.hairpins;
+    if (hardDefectsDoNotRegress && hardDefectsImprove) {
+      return outcomeFor(residualClosed, residualClosed, residualClosedReport);
+    }
+  }
   if (displayEdgesHaveNodeAttachedTerminals(anchoredSelected, repairNodes)) {
     return outcomeFor(anchoredSelected, anchoredSelected, anchoredSelectedReport);
   }

@@ -51,13 +51,24 @@ export {
   synthesizeStableFallbackPath,
 } from './baseReactFlowDisplayEdgeGeometry';
 
+type DisplayNode = Node & {
+  positionAbsolute?: XYPosition;
+  measured?: { width?: number; height?: number };
+};
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
+
 const clearComputedLayoutData = ({
   edge,
   data,
   displayEdgeEpoch,
 }: {
   edge: Edge;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   displayEdgeEpoch: number;
 }): Edge => ({
   ...edge,
@@ -89,9 +100,9 @@ const normalizeTreeBusHandles = ({
   edge: Edge;
   displayEdgeEpoch: number;
 }): Edge => {
-  const data = ((edge.data || {}) as Record<string, any>);
+  const data = asRecord(edge.data);
   if (!data.isTreeBus && !data.treeRouting) return edge;
-  const treeRouting = data.treeRouting && typeof data.treeRouting === 'object' ? data.treeRouting : {};
+  const treeRouting = asRecord(data.treeRouting);
   const sourceHandle = expandHandle(String(treeRouting.effectiveSourceHandle || edge.sourceHandle || ''));
   const targetHandle = expandHandle(String(treeRouting.effectiveTargetHandle || edge.targetHandle || ''));
   if (!sourceHandle && !targetHandle) return edge;
@@ -143,7 +154,7 @@ const normalizeStaleComputedPath = ({
   nodeById: Map<string, Node>;
   displayEdgeEpoch: number;
 }): Edge => {
-  const data = ((edge.data || {}) as Record<string, any>);
+  const data = asRecord(edge.data);
   const path = data.computedPath;
   if (!Array.isArray(path) || path.length < 2) return edge;
   if (hasLockedComputedPath(edge)) return edge;
@@ -154,8 +165,8 @@ const normalizeStaleComputedPath = ({
     return edge;
   }
 
-  const first = path[0];
-  const last = path[path.length - 1];
+  const first = asRecord(path[0]);
+  const last = asRecord(path[path.length - 1]);
   if (
     !first
     || !last
@@ -173,7 +184,9 @@ const normalizeStaleComputedPath = ({
 
   const sourceAnchor = anchorForHandle(sourceRect, edge.sourceHandle);
   const targetAnchor = anchorForHandle(targetRect, edge.targetHandle);
-  if (isNearPoint(first, sourceAnchor) && isNearPoint(last, targetAnchor)) return edge;
+  const firstPoint = { x: Number(first.x), y: Number(first.y) };
+  const lastPoint = { x: Number(last.x), y: Number(last.y) };
+  if (isNearPoint(firstPoint, sourceAnchor) && isNearPoint(lastPoint, targetAnchor)) return edge;
 
   return clearComputedLayoutData({
     edge,
@@ -192,9 +205,9 @@ const normalizeCrossContainerManualHandles = ({
   displayEdgeEpoch: number;
 }): Edge => {
   if (hasLockedComputedPath(edge)) return edge;
-  const data = ((edge.data || {}) as Record<string, any>);
+  const data = asRecord(edge.data);
   const manualSides = Array.isArray(data.manualHandleSides)
-    ? data.manualHandleSides.map((side: any) => String(side).toLowerCase())
+    ? data.manualHandleSides.map((side: unknown) => String(side).toLowerCase())
     : [];
   if (!manualSides.includes('source') || !manualSides.includes('target')) return edge;
   if (!isVerticalHandle(edge.sourceHandle) || !isVerticalHandle(edge.targetHandle)) return edge;
@@ -233,14 +246,14 @@ const normalizeAutoReverseSideHandles = ({
   displayEdgeEpoch: number;
 }): Edge => {
   if (hasLockedComputedPath(edge)) return edge;
-  const data = ((edge.data || {}) as Record<string, any>);
+  const data = asRecord(edge.data);
   if (data.isTreeBus || data.treeRouting) return edge;
 
   const autoSides = Array.isArray(data.auto)
-    ? data.auto.map((side: any) => String(side).toLowerCase())
+    ? data.auto.map((side: unknown) => String(side).toLowerCase())
     : [];
   const manualSides = Array.isArray(data.manualHandleSides)
-    ? data.manualHandleSides.map((side: any) => String(side).toLowerCase())
+    ? data.manualHandleSides.map((side: unknown) => String(side).toLowerCase())
     : [];
   const autoSource = autoSides.includes('source') || data.autoSource === true;
   const autoTarget = autoSides.includes('target') || data.autoTarget === true;
@@ -250,15 +263,19 @@ const normalizeAutoReverseSideHandles = ({
   const targetNode = nodeById.get(edge.target);
   if (!sourceNode || !targetNode) return edge;
 
-  const sourcePos = (sourceNode as any).positionAbsolute ?? sourceNode.position ?? { x: 0, y: 0 };
-  const targetPos = (targetNode as any).positionAbsolute ?? targetNode.position ?? { x: 0, y: 0 };
-  const sourceW = (sourceNode as any).measured?.width ?? sourceNode.width ?? (sourceNode.style as any)?.width ?? 0;
-  const sourceH = (sourceNode as any).measured?.height ?? sourceNode.height ?? (sourceNode.style as any)?.height ?? 0;
-  const targetW = (targetNode as any).measured?.width ?? targetNode.width ?? (targetNode.style as any)?.width ?? 0;
-  const targetH = (targetNode as any).measured?.height ?? targetNode.height ?? (targetNode.style as any)?.height ?? 0;
+  const displaySourceNode = sourceNode as DisplayNode;
+  const displayTargetNode = targetNode as DisplayNode;
+  const sourceStyle = asRecord(sourceNode.style);
+  const targetStyle = asRecord(targetNode.style);
+  const sourcePos = displaySourceNode.positionAbsolute ?? sourceNode.position ?? { x: 0, y: 0 };
+  const targetPos = displayTargetNode.positionAbsolute ?? targetNode.position ?? { x: 0, y: 0 };
+  const sourceW = displaySourceNode.measured?.width ?? sourceNode.width ?? sourceStyle.width ?? 0;
+  const sourceH = displaySourceNode.measured?.height ?? sourceNode.height ?? sourceStyle.height ?? 0;
+  const targetW = displayTargetNode.measured?.width ?? targetNode.width ?? targetStyle.width ?? 0;
+  const targetH = displayTargetNode.measured?.height ?? targetNode.height ?? targetStyle.height ?? 0;
   const dx = (Number(targetPos.x || 0) + Number(targetW || 0) / 2) - (Number(sourcePos.x || 0) + Number(sourceW || 0) / 2);
   const dy = (Number(targetPos.y || 0) + Number(targetH || 0) / 2) - (Number(sourcePos.y || 0) + Number(sourceH || 0) / 2);
-  const layoutDir = String(data.layoutDirection || (sourceNode.data as any)?.layoutDirection || 'TB').toUpperCase();
+  const layoutDir = String(data.layoutDirection || asRecord(sourceNode.data).layoutDirection || 'TB').toUpperCase();
   const isVerticalReverseWithSideRoom =
     ((layoutDir.includes('TB') && dy < 0) || (layoutDir.includes('BT') && dy > 0))
     && Math.abs(dx) > Math.abs(dy) * 0.35;
@@ -284,7 +301,7 @@ const normalizeAutoReverseSideHandles = ({
     data: {
       ...data,
       runtimeHandleLock: {
-        ...(data.runtimeHandleLock && typeof data.runtimeHandleLock === 'object' ? data.runtimeHandleLock : {}),
+        ...asRecord(data.runtimeHandleLock),
         source: true,
         target: true,
       },
@@ -329,16 +346,17 @@ export const withDisplayAbsolutePositions = (nodes: Node[], nodeById: Map<string
     typeof value === 'number' && Number.isFinite(value) ? value : fallback
   );
   const resolvePosition = (node: Node, seen = new Set<string>()): XYPosition => {
-    const parentId = (node as any).parentId;
-    const localPosition = node.position ?? (node as any).positionAbsolute ?? { x: 0, y: 0 };
+    const displayNode = node as DisplayNode;
+    const parentId = node.parentId;
+    const localPosition = node.position ?? displayNode.positionAbsolute ?? { x: 0, y: 0 };
     const local = {
-      x: finiteNumber((localPosition as any).x, 0),
-      y: finiteNumber((localPosition as any).y, 0),
+      x: finiteNumber(localPosition.x, 0),
+      y: finiteNumber(localPosition.y, 0),
     };
     if (!parentId || seen.has(parentId)) {
-      const absolute = (node as any).positionAbsolute;
+      const absolute = displayNode.positionAbsolute;
       return absolute
-        ? { x: finiteNumber((absolute as any).x, local.x), y: finiteNumber((absolute as any).y, local.y) }
+        ? { x: finiteNumber(absolute.x, local.x), y: finiteNumber(absolute.y, local.y) }
         : local;
     }
     const parent = nodeById.get(parentId);

@@ -13,6 +13,8 @@ import { logFlowchartShapesDragPreviewFailure } from './flowchartShapesLogging';
 
 const { Text } = Typography;
 type NodeConfig = Record<string, unknown>;
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
 // ---- 拖拽节点图库配置区 ----
 export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
@@ -48,8 +50,9 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
             const ctxCanvas = canvas.getContext('2d');
             if (ctxCanvas) {
                 ctxCanvas.scale(dpr, dpr);
-                const themeColor = (config as any)?.theme?.main || '#3b82f6';
-                const shape = (config as any)?.shape || 'rectangle';
+                const theme = isRecord(config.theme) ? config.theme : {};
+                const themeColor = typeof theme.main === 'string' ? theme.main : '#3b82f6';
+                const shape = typeof config.shape === 'string' ? config.shape : 'rectangle';
 
                 const hexToRgba = (hex: string, alpha: number) => {
                     const c = hex.replace('#', '');
@@ -142,7 +145,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                 };
                 drawShape();
 
-                const textColor = (config as any)?.theme?.text || '#fff';
+                const textColor = typeof theme.text === 'string' ? theme.text : '#fff';
                 ctxCanvas.fillStyle = themeColor;
                 ctxCanvas.globalAlpha = 0.9;
                 ctxCanvas.font = `bold 12px Inter, system-ui, sans-serif`;

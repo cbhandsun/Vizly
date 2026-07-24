@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EdgeRoutingCoordinator } from '../EdgeRoutingCoordinator';
 import { Position } from '../../types/routing';
-import type { PathFindingJob, Rectangle } from '../../types/routing';
+import {
+    createDefaultRoutingConfig,
+    type PathFindingJob,
+    type Rectangle,
+} from '../../types/routing';
 import { TrunkCalculator } from '../../workers/core/TrunkCalculator';
+import { processBusRoutingGroup } from '../edgeRoutingBusGroupProcessing';
 
 // Mock worker pools since these tests only cover synchronous coordinator partitioning logic.
 vi.mock('../../workers/WorkerPool', () => {
@@ -247,7 +252,6 @@ describe('EdgeRoutingCoordinator: assignSameSidePortSeparation', () => {
     });
 
     it('keeps lower-left WMS fan-outs grouped on the bottom source port', () => {
-        const coordinator = EdgeRoutingCoordinator.getInstance();
         const rects = new Map<string, Rectangle>([
             ['fix-quota', { x: 1102, y: 294, width: 252, height: 96 }],
             ['greedy-spec', { x: 114, y: 1478, width: 204, height: 96 }],
@@ -272,24 +276,17 @@ describe('EdgeRoutingCoordinator: assignSameSidePortSeparation', () => {
             isManyToOne: false,
         }));
 
-        (coordinator as any).processBusGroups(
-            'fix-quota',
-            jobs,
+        processBusRoutingGroup({
+            hubId: 'fix-quota',
+            busGroupJobs: jobs,
             globalPeers,
-            (id: string) => rects.get(id),
-            new TrunkCalculator(),
-            {
-                bus: {
-                    trunkBase: 40,
-                    trunkMultiplier: 10,
-                    parallelTrunkSpacing: 60,
-                    parallelTrunkStrategy: 'count-based',
-                },
-            },
-            'LR',
-            false,
-            [...rects.values()],
-        );
+            getNodeRect: (id: string) => rects.get(id),
+            trunkCalculator: new TrunkCalculator(),
+            config: createDefaultRoutingConfig(),
+            layoutDirection: 'LR',
+            isManyToOne: false,
+            obstacles: [...rects.values()],
+        });
 
         for (const job of jobs) {
             expect((job as any).o2mTrunkPort).toBe(Position.Bottom);

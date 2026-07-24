@@ -53,7 +53,7 @@ const coerceFiniteNumber = (value: unknown, field: string, min: number, max: num
   return Math.min(max, Math.max(min, value));
 };
 
-const isSafeCssColor = (value: string): boolean => {
+export const isSafeCssColor = (value: string): boolean => {
   const text = value.trim();
   if (text.length > 80) return false;
   if (/^#[0-9a-f]{3,8}$/i.test(text)) return true;
@@ -130,7 +130,7 @@ const coerceTypography = (value: unknown): ThemeTypography => {
   };
 };
 
-const coerceNumberRecord = <T extends Record<string, number>>(value: unknown, keys: Array<keyof T>, field: string, min: number, max: number): T => {
+const coerceNumberRecord = <T extends object>(value: unknown, keys: Array<keyof T>, field: string, min: number, max: number): T => {
   if (!isRecord(value)) throw new Error(`${field} must be an object`);
   return keys.reduce((acc, key) => {
     acc[key] = coerceFiniteNumber(value[key as string], `${field}.${String(key)}`, min, max) as T[keyof T];
@@ -192,17 +192,22 @@ export const coerceThemeImport = (value: unknown, fallbackId?: string): Theme =>
   if (!isRecord(value.diagram) || !isRecord(value.diagram.canvas) || !isRecord(value.diagram.canvas.grid) || !isRecord(value.diagram.edges) || !isRecord(value.diagram.nodes)) {
     throw new Error('theme.diagram is invalid');
   }
+  const diagram = value.diagram;
+  const canvas = diagram.canvas as Record<string, unknown>;
+  const grid = canvas.grid as Record<string, unknown>;
+  const diagramEdges = diagram.edges as Record<string, unknown>;
+  const diagramNodes = diagram.nodes as Record<string, unknown>;
   const id = fallbackId || coerceString(value.id, 'theme.id', MAX_ID_LENGTH);
   const mode = value.mode === 'dark' ? 'dark' : value.mode === 'light' ? 'light' : null;
   if (!mode) throw new Error('theme.mode is invalid');
 
   const edges = EDGE_KEYS.reduce((acc, key) => {
-    acc[key] = coerceThemeColor(value.diagram.edges[key], `theme.diagram.edges.${key}`);
+    acc[key] = coerceThemeColor(diagramEdges[key], `theme.diagram.edges.${key}`);
     return acc;
   }, {} as Theme['diagram']['edges']);
 
   const nodes = NODE_KEYS.reduce((acc, key) => {
-    acc[key] = coerceThemeColor(value.diagram.nodes[key], `theme.diagram.nodes.${key}`);
+    acc[key] = coerceThemeColor(diagramNodes[key], `theme.diagram.nodes.${key}`);
     return acc;
   }, {} as Theme['diagram']['nodes']);
 
@@ -218,14 +223,14 @@ export const coerceThemeImport = (value: unknown, fallbackId?: string): Theme =>
     shadow: coerceShadow(value.shadow),
     animation: coerceAnimation(value.animation),
     diagram: {
-      domains: coerceColorRecord(value.diagram.domains, 'theme.diagram.domains'),
+      domains: coerceColorRecord(diagram.domains, 'theme.diagram.domains'),
       edges,
       canvas: {
-        background: coerceCssColor(value.diagram.canvas.background, 'theme.diagram.canvas.background'),
+        background: coerceCssColor(canvas.background, 'theme.diagram.canvas.background'),
         grid: {
-          color: coerceCssColor(value.diagram.canvas.grid.color, 'theme.diagram.canvas.grid.color'),
-          size: coerceFiniteNumber(value.diagram.canvas.grid.size, 'theme.diagram.canvas.grid.size', 1, 200),
-          opacity: coerceFiniteNumber(value.diagram.canvas.grid.opacity, 'theme.diagram.canvas.grid.opacity', 0, 1),
+          color: coerceCssColor(grid.color, 'theme.diagram.canvas.grid.color'),
+          size: coerceFiniteNumber(grid.size, 'theme.diagram.canvas.grid.size', 1, 200),
+          opacity: coerceFiniteNumber(grid.opacity, 'theme.diagram.canvas.grid.opacity', 0, 1),
         },
       },
       nodes,

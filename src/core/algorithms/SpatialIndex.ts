@@ -8,7 +8,7 @@
  * - 静态构建 (适合一次构建多次查询的场景)
  */
 
-import { Rectangle } from './pathfinding';
+import type { Rectangle } from './pathfindingTypes';
 
 export interface SpatialIndex {
     insert(item: Rectangle): void;

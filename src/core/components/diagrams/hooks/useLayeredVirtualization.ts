@@ -1,13 +1,14 @@
 import { useMemo, useRef, useEffect, useCallback } from 'react';
 import { Node, Edge, NodeChange, EdgeChange } from '@xyflow/react';
+import type { LayerConfig } from './useLayerManagement';
 
 export interface UseLayeredVirtualizationProps {
     nodes: Node[];
     edges: Edge[];
     virtualizedNodes: Node[];
     edgesWithCollapseState: Edge[];
-    layers: any[];
-    getLayer: (id: string) => any | undefined;
+    layers: LayerConfig[];
+    getLayer: (id: string) => LayerConfig | undefined;
     isDragging: boolean;
     onNodesChange: (changes: NodeChange[]) => void;
     onEdgesChange: (changes: EdgeChange[]) => void;
@@ -20,7 +21,6 @@ export function useLayeredVirtualization({
     edgesWithCollapseState,
     layers: _layers,
     getLayer,
-    _isDragging,
     onNodesChange,
     onEdgesChange
 }: UseLayeredVirtualizationProps) {

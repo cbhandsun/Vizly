@@ -2,23 +2,22 @@ import React, { memo } from 'react';
 import { Handle, Position, NodeProps, NodeResizer, Node, useStore } from '@xyflow/react';
 import { useFlowchartNodeInteractions } from './hooks/useFlowchartNodeInteractions';
 import { Icon } from '@iconify/react';
+import type { FlowchartNodeData } from '../../types/flowchart-node';
 import './FlowchartNode.css';
 
-export interface IconNodeData {
+export interface IconNodeData extends FlowchartNodeData {
     icon: string;       // e.g. "logos:react" or "mdi:aws"
     color?: string;     // override color if the icon supports it (e.g. mdi)
-    label?: string;     // optional label positioned under the icon
-    locked?: boolean;
 }
 
 export type IconNodeProps = NodeProps<Node<IconNodeData>>;
 
 const IconNode = ({ data, selected, id }: IconNodeProps) => {
-    const nodeData = useStore((s: any) => s.nodeLookup?.get(id) || s.nodeInternals?.get(id));
+    const nodeData = useStore(s => s.nodeLookup.get(id));
 
     // Support NodeResizer dimensions
-    const _nodeWidth = (nodeData?.measured?.width || (nodeData as any)?.width || 100) as number;
-    const _nodeHeight = (nodeData?.measured?.height || (nodeData as any)?.height || 100) as number;
+    const _nodeWidth = nodeData?.measured?.width || nodeData?.width || 100;
+    const _nodeHeight = nodeData?.measured?.height || nodeData?.height || 100;
 
     const {
         isHovered,

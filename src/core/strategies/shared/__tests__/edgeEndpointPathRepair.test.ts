@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 import { repairEndpointOrthogonalPaths } from '../edgeEndpointPathRepair';
+import {
+  endpointNodeRect,
+  inferEndpointSide,
+  projectEndpointPointToSide,
+} from '../edgeEndpointGeometry';
 
 function node(id: string, x: number, y: number, width = 100, height = 50): ReactFlowNode {
   return {
@@ -13,6 +18,21 @@ function node(id: string, x: number, y: number, width = 100, height = 50): React
 }
 
 describe('repairEndpointOrthogonalPaths', () => {
+  it('normalizes runtime node geometry and terminal sides at the boundary', () => {
+    const runtimeNode: ReactFlowNode = {
+      id: 'runtime',
+      position: { x: 10, y: 20 },
+      style: { width: '120px', height: '80px' },
+      data: {},
+    };
+    const rect = endpointNodeRect(runtimeNode);
+
+    expect(rect).toEqual({ x: 10, y: 20, width: 120, height: 80 });
+    expect(inferEndpointSide({ x: 70, y: 20 }, rect!, 'invalid')).toBe('t');
+    expect(projectEndpointPointToSide({ x: 500, y: 60 }, rect!, 't')).toEqual({ x: 70, y: 20 });
+    expect(endpointNodeRect({ ...runtimeNode, style: { width: 'bad', height: 80 } })).toBeNull();
+  });
+
   it('forces a locked bottom endpoint path to leave the source orthogonally', () => {
     const edges: Edge[] = [{
       id: 'source-to-target',

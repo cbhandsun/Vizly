@@ -26,12 +26,7 @@ import {
     AppstoreOutlined,
     AlignLeftOutlined,
     AlignCenterOutlined,
-    AlignRightOutlined,
-    _PlusOutlined,
-    _DeleteOutlined,
-    _ArrowUpOutlined,
-    _ArrowDownOutlined,
-    _SearchOutlined
+    AlignRightOutlined
 } from '@ant-design/icons';
 import { FaSearch } from 'react-icons/fa';
 import { Clock } from 'lucide-react';
@@ -59,13 +54,22 @@ export interface UseNodePropertyItemsParams {
     setLocalDesc: (v: string) => void;
     localDomain: string;
     setLocalDomain: (v: string) => void;
-    debouncedUpdateLabel: (value: string) => void;
-    debouncedUpdateDesc: (value: string) => void;
-    debouncedUpdateDomain: (value: string) => void;
+    debouncedUpdateLabel: DebouncedUpdater;
+    debouncedUpdateDesc: DebouncedUpdater;
+    debouncedUpdateDomain: DebouncedUpdater;
     onShowIconExplorer?: () => void;
 }
 
+type DebouncedUpdater = ((value: string) => void) & { cancel?: () => void };
+interface TimelineNodeData extends Record<string, unknown> {
+    status?: string;
+    date?: string;
+    progress?: number;
+    type?: string;
+}
+
 const getNodeData = (node: Node) => node.data as FlowchartNodeData;
+const getTimelineNodeData = (node: Node) => node.data as TimelineNodeData;
 
 /**
  * 节点属性编辑 items — 返回 Collapse items 数组
@@ -140,7 +144,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                 <Form.Item label={t('propertyPanel.label')}>
                     <Input value={localLabel}
                         onChange={e => { setLocalLabel(e.target.value); debouncedUpdateLabel(e.target.value); }}
-                        onBlur={() => { (debouncedUpdateLabel as any).cancel?.(); updateNodes({ label: localLabel }); }}
+                        onBlur={() => { debouncedUpdateLabel.cancel?.(); updateNodes({ label: localLabel }); }}
                         onFocus={armSnapshot}
                         placeholder={nodeCount > 1 && commonNodeLabel === undefined ? mixedLabel : selectLabel}
                         allowClear disabled={disabled} />
@@ -148,7 +152,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                 <Form.Item label={t('propertyPanel.description')}>
                     <TextArea value={localDesc}
                         onChange={e => { setLocalDesc(e.target.value); debouncedUpdateDesc(e.target.value); }}
-                        onBlur={() => { (debouncedUpdateDesc as any).cancel?.(); updateNodes({ description: localDesc }); }}
+                        onBlur={() => { debouncedUpdateDesc.cancel?.(); updateNodes({ description: localDesc }); }}
                         onFocus={armSnapshot} rows={2}
                         placeholder={nodeCount > 1 && commonNodeDesc === undefined ? mixedLabel : selectLabel}
                         disabled={disabled} />
@@ -191,7 +195,7 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
                     <Form.Item label={t('propertyPanel.domainName')}>
                         <Input value={localDomain}
                             onChange={e => { setLocalDomain(e.target.value); debouncedUpdateDomain(e.target.value); }}
-                            onBlur={() => { (debouncedUpdateDomain as any).cancel?.(); updateNodes({ domain: localDomain }); }}
+                            onBlur={() => { debouncedUpdateDomain.cancel?.(); updateNodes({ domain: localDomain }); }}
                             onFocus={armSnapshot}
                             placeholder={commonDomain === undefined ? mixedLabel : selectLabel}
                             allowClear disabled={disabled} />
@@ -352,10 +356,10 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
 
     // --- Timeline specific properties ---
     if (isAllTimelineNodes) {
-        const commonTimelineStatus = getCommonValue(selectedNodes, (n) => (n.data as any)?.status);
-        const commonTimelineDate = getCommonValue(selectedNodes, (n) => (n.data as any)?.date);
-        const commonTimelineProgress = getCommonValue(selectedNodes, (n) => (n.data as any)?.progress);
-        const hasPhase = selectedNodes.some(n => (n.data as any)?.type === 'phase');
+        const commonTimelineStatus = getCommonValue(selectedNodes, (n) => getTimelineNodeData(n).status);
+        const commonTimelineDate = getCommonValue(selectedNodes, (n) => getTimelineNodeData(n).date);
+        const commonTimelineProgress = getCommonValue(selectedNodes, (n) => getTimelineNodeData(n).progress);
+        const hasPhase = selectedNodes.some(n => getTimelineNodeData(n).type === 'phase');
 
         items.push({
             key: 'timelineSettings',
@@ -445,8 +449,11 @@ export function useNodePropertyItems(params: UseNodePropertyItemsParams): Collap
 
                     <Form.Item label="节点形状 (Node Shape)">
                         <Select 
-                            value={commonShape as string}
-                            onChange={val => { armSnapshot(); updateNodes({ data: { shape: val as any } }); }}
+                            value={commonShape}
+                            onChange={(val: FlowchartNodeData['shape']) => {
+                                armSnapshot();
+                                updateNodes({ data: { shape: val } });
+                            }}
                             placeholder={commonShape === undefined ? mixedLabel : selectLabel}
                             disabled={disabled}
                             allowClear

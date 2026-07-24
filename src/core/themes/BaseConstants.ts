@@ -9,7 +9,7 @@ import type {
   ThemeBorderRadius,
   ThemeShadow,
   ThemeAnimation
-} from '../types/ThemeTypes';
+} from './types/ThemeTypes';
 
 const isRecord = (value: unknown): value is Record<PropertyKey, unknown> => (
   typeof value === 'object' && value !== null

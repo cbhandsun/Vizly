@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
@@ -6,7 +8,10 @@ import wmsStandardData from '../../../../data/standardized/WmsStandardData.json'
 import { standardDataToCanvas } from '../../diagrams/designerUtils';
 import { calculateEdgePathQualityScore } from '../../../strategies/shared/edgeStrictCrossingGuard';
 import { countDisplayObstacleHits } from '../baseReactFlowDisplayEvaluation';
-import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from '../baseReactFlowDisplayTerminalPortRepair';
+import {
+  repairAxisMismatchedTerminalsWithBoundedPortRoles,
+  repairTerminalHandleHemisphereHairpins,
+} from '../baseReactFlowDisplayTerminalPortRepair';
 import { repairRenderSafeTerminalAxes } from '../baseReactFlowRenderTerminalSafety';
 import {
   buildBoundedSharedPortLaneSchedule,
@@ -36,6 +41,56 @@ const displayEdge = (
 });
 
 describe('baseReactFlowDisplayTerminalPortRepair', () => {
+  it('repairs a handle hemisphere hairpin and keeps tree routing in sync', () => {
+    const computedPath = [
+      { x: 0, y: 0 },
+      { x: 0, y: 20 },
+      { x: 60, y: 20 },
+      { x: 60, y: -20 },
+      { x: 120, y: -20 },
+    ];
+    const edges: Edge[] = [{
+      id: 'hemisphere-hairpin',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: {
+        computedPath,
+        treeRouting: { points: computedPath, version: 1 },
+      },
+    }];
+
+    const repaired = repairTerminalHandleHemisphereHairpins(edges, []);
+    const repairedData = repaired[0].data as Record<string, any>;
+
+    expect(repaired).not.toBe(edges);
+    expect(repairedData.terminalHandleHemisphereRepaired).toBe(true);
+    expect(repairedData.treeRouting).toMatchObject({ version: 1 });
+    expect(repairedData.treeRouting.points).toEqual(repairedData.computedPath);
+    expect(calculateEdgePathQualityScore(repaired).hairpins).toBe(0);
+  });
+
+  it('preserves the edge array when no hemisphere repair applies', () => {
+    const edges: Edge[] = [{
+      id: 'straight',
+      source: 'source',
+      target: 'target',
+      sourceHandle: 'right',
+      targetHandle: 'left',
+      data: {
+        computedPath: [
+          { x: 0, y: 0 },
+          { x: 60, y: 0 },
+          { x: 120, y: 0 },
+          { x: 180, y: 0 },
+        ],
+      },
+    }];
+
+    expect(repairTerminalHandleHemisphereHairpins(edges, [])).toBe(edges);
+  });
+
   it('replaces a rendered boundary trunk with a direct declared target stub', () => {
     const nodes: Node[] = [
       node('l-oms', 826.5, 534, 179, 118),
@@ -184,7 +239,7 @@ describe('baseReactFlowDisplayTerminalPortRepair', () => {
     );
   });
 
-  it('repairs an axis-mismatched terminal without crossing nearby execution trunks or its blocker', () => {
+  it('rejects an obstacle-only improvement that leaves the declared terminal axis invalid', () => {
     const nodes: Node[] = [
       node('operation', 3495.6, 776.5, 216, 73),
       node('loading-handover', 4042.6, 1223, 130, 60),
@@ -223,11 +278,11 @@ describe('baseReactFlowDisplayTerminalPortRepair', () => {
     const repaired = repairAxisMismatchedTerminalsWithBoundedPortRoles(edges, nodes, 16);
     const repairedQuality = calculateEdgePathQualityScore(repaired);
 
-    expect(displayEdgesHaveNodeAnchoredTerminals([repaired[0]], nodes)).toBe(true);
+    expect(repaired[0]).toBe(loading);
     expect(
       countDisplayObstacleHits(repaired, nodes),
       JSON.stringify((repaired[0].data as any)?.computedPath, null, 2),
-    ).toBeLessThan(baselineObstacleHits);
+    ).toBeLessThanOrEqual(baselineObstacleHits);
     expect(repairedQuality.nonOrthogonalSegments).toBeLessThanOrEqual(baselineQuality.nonOrthogonalSegments);
     expect(repairedQuality.strictCrossings).toBeLessThanOrEqual(baselineQuality.strictCrossings);
     expect(repairedQuality.reverseOverlap).toBeLessThanOrEqual(baselineQuality.reverseOverlap);
@@ -507,6 +562,28 @@ describe('baseReactFlowDisplayTerminalPortRepair', () => {
       { reverseOverlap: 0, unexplainedRelatedOverlap: 0 },
     ]);
 
+    const exactTargetLockedEdges = edges.map((edge, index) => (
+      index === 0
+        ? {
+          ...edge,
+          targetHandle: 'task-group-right-port-3',
+          data: {
+            ...(edge.data || {}),
+            manualHandles: { target: true },
+          },
+        }
+        : edge
+    ));
+    const exactTargetLockedRepair = repairSharedPortAndTinyTerminalLanes(
+      exactTargetLockedEdges,
+      nodes,
+      8,
+    );
+    const exactTargetLockedPath = (exactTargetLockedRepair[0].data as any)
+      .computedPath as Array<{ x: number; y: number }>;
+    expect(exactTargetLockedRepair[0].targetHandle).toBe('task-group-right-port-3');
+    expect(exactTargetLockedPath.at(-1)).toEqual({ x: 2795.2, y: 1253 });
+
     const nodesWithBridgeBlocker: Node[] = [
       ...nodes,
       node('bridge-blocker-source', 2809, 1100, 20, 20),
@@ -595,5 +672,63 @@ describe('baseReactFlowDisplayTerminalPortRepair', () => {
       'numeric-2', 'shared-2',
       'numeric-3', 'numeric-4',
     ]);
+  });
+
+  it('collapses paired terminal micro-stairs before spending the bounded lane budget', () => {
+    const edge = (
+      id: string,
+      source: string,
+      target: string,
+      sourceHandle: string,
+      targetHandle: string,
+      computedPath: Array<{ x: number; y: number }>,
+    ): Edge => ({
+      id,
+      source,
+      target,
+      sourceHandle,
+      targetHandle,
+      type: 'advanced-smart-step',
+      data: { computedPath, layoutDirection: 'TB' },
+    });
+    const edges = [
+      edge('loms-tms', 'loms', 'tms', 'bottom', 'top', [
+        { x: 1323, y: 802 }, { x: 1323, y: 962 },
+      ]),
+      edge('loms-wms', 'loms', 'wms', 'bottom', 'right', [
+        { x: 1323, y: 802 }, { x: 1323, y: 899 }, { x: 1306, y: 899 },
+        { x: 1306, y: 923 }, { x: 510, y: 923 }, { x: 510, y: 1080 },
+        { x: 462, y: 1080 },
+      ]),
+      edge('tms-carrier', 'tms', 'carrier', 'top', 'bottom', [
+        { x: 1306, y: 962 }, { x: 1306, y: 865 }, { x: 1323, y: 865 },
+        { x: 1323, y: 889 }, { x: 1769, y: 889 }, { x: 1769, y: 277 },
+      ]),
+    ];
+    const nodes = [
+      node('loms', 1120.25, 605, 406, 197),
+      node('tms', 1113.25, 962, 420, 236),
+      node('wms', 42, 962, 420, 236),
+      node('carrier', 1608.5, 80, 322, 197),
+    ];
+
+    expect(calculateEdgePathQualityScore(edges)).toMatchObject({
+      tinyInteriorDoglegs: 2,
+      hairpins: 1,
+    });
+
+    const repaired = repairSharedPortAndTinyTerminalLanes(edges, nodes, 8);
+
+    expect(displayEdgesHaveNodeAnchoredTerminals(repaired, nodes)).toBe(true);
+    expect(calculateEdgePathQualityScore(repaired)).toMatchObject({
+      nonOrthogonalSegments: 0,
+      strictCrossings: 0,
+      reverseOverlap: 0,
+      unrelatedOverlap: 0,
+      unexplainedRelatedOverlap: 0,
+      shortEndpointStubs: 0,
+      tinyInteriorDoglegs: 0,
+      hairpins: 0,
+    });
   });
 });

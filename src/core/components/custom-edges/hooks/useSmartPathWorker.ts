@@ -9,6 +9,19 @@ import {
     logSmartPathWorkerFailure,
     logSmartPathWorkerMissingNode,
 } from './smartPathWorkerLogging';
+import {
+    getSmartPathAbsolutePosition,
+    useSmartPathObstacles,
+    type SmartPathObstacleItem as ObstacleItem,
+    type SmartPathSimpleNode as SimpleNode,
+} from './smartPathWorkerObstacles';
+import {
+    getComputedPoints,
+    isComputedPathCompatibleWithHandles,
+    isRoutingResultCompatibleWithHandles,
+    pointsToOrthogonalPath,
+    type SmartPathPoint,
+} from './smartPathCompatibility';
 // import WorkerPool from '../../../workers/WorkerPool'; // Replaced by Coordinator
 
 // Define types locally to avoid circular deps
@@ -39,73 +52,21 @@ export interface SmartEdgeOptions {
 }
 
 export interface EdgeData {
-    elkPath?: Point2D[];
-    computedPath?: Point2D[];
+    elkPath?: SmartPathPoint[];
+    computedPath?: SmartPathPoint[];
     algorithm?: string;
     labelPosition?: { x: number; y: number };
+    labelOffset?: { x: number; y: number };
+    absoluteLabelX?: number;
+    absoluteLabelY?: number;
+    label?: unknown;
+    isTreeBus?: boolean;
+    treeRouting?: boolean;
+    layoutPathLocked?: boolean;
+    _layoutPathLocked?: boolean;
     _layoutEpoch?: number;
     [key: string]: unknown;
 }
-
-type Point2D = { x: number; y: number };
-
-const pointsToOrthogonalPath = (points: Point2D[]): string => {
-    if (!Array.isArray(points) || points.length === 0) return '';
-    return points
-        .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
-        .join(' ');
-};
-
-const _getElkPoints = (edgeData: EdgeData): Point2D[] | null => {
-    if (!edgeData?.elkPath || !Array.isArray(edgeData.elkPath) || edgeData.elkPath.length <= 1) return null;
-    const path = edgeData.elkPath as unknown[];
-    if (!path.every(p => typeof (p as Point2D).x === 'number' && typeof (p as Point2D).y === 'number')) return null;
-    return edgeData.elkPath;
-};
-
-const getComputedPoints = (edgeData: EdgeData): Point2D[] | null => {
-    if (!edgeData?.computedPath || !Array.isArray(edgeData.computedPath) || edgeData.computedPath.length <= 1) return null;
-    const path = edgeData.computedPath as unknown[];
-    if (!path.every(p => {
-        const pt = p as Point2D;
-        return typeof pt.x === 'number' && typeof pt.y === 'number' && !Number.isNaN(pt.x) && !Number.isNaN(pt.y);
-    })) return null;
-    return edgeData.computedPath;
-};
-
-const isPointNear = (a: Point2D, b: Point2D, tolerance = 40): boolean => {
-    return Math.abs(a.x - b.x) <= tolerance && Math.abs(a.y - b.y) <= tolerance;
-};
-
-const isComputedPathCompatibleWithHandles = (
-    points: Point2D[] | null,
-    centeredCoords: CenteredCoords,
-    respectSourceHandle: boolean,
-    respectTargetHandle: boolean
-): boolean => {
-    if (!points || points.length < 2) return false;
-    const first = points[0];
-    const last = points[points.length - 1];
-
-    if (respectSourceHandle && !isPointNear(first, { x: centeredCoords.sourceX, y: centeredCoords.sourceY })) {
-        return false;
-    }
-    if (respectTargetHandle && !isPointNear(last, { x: centeredCoords.targetX, y: centeredCoords.targetY })) {
-        return false;
-    }
-    return true;
-};
-
-const isRoutingResultCompatibleWithHandles = (
-    result: { points?: Point2D[]; path?: string } | null | undefined,
-    centeredCoords: CenteredCoords,
-    respectSourceHandle: boolean,
-    respectTargetHandle: boolean
-): boolean => {
-    if (!respectSourceHandle && !respectTargetHandle) return true;
-    if (!result?.points || result.points.length < 2) return false;
-    return isComputedPathCompatibleWithHandles(result.points, centeredCoords, respectSourceHandle, respectTargetHandle);
-};
 
 const useLayoutStabilityReset = (
     isLayoutStable: boolean,
@@ -139,48 +100,6 @@ export interface MultiEdgeInfo {
     [key: string]: unknown;
 }
 
-// [FIX] Define explicit interface for SimpleNode to replace 'any'
-interface SimpleNode {
-    id: string;
-    type?: string;
-    x: number;
-    y: number;
-    width?: number;
-    height?: number;
-    parentId?: string;
-    parentNode?: string;
-    position?: { x: number; y: number };
-    positionAbsolute?: { x: number; y: number };
-    measured?: { width: number; height: number };
-    data?: {
-        collapsed?: boolean;
-        expanded?: boolean;
-        hidden?: boolean;
-        isObstacle?: boolean;
-        [key: string]: unknown;
-    };
-    style?: {
-        zIndex?: number;
-        [key: string]: unknown;
-    };
-    zIndex?: number;
-    computed?: {
-        positionAbsolute?: { x: number; y: number };
-        [key: string]: unknown;
-    };
-    [key: string]: unknown;
-}
-
-interface ObstacleItem {
-    id?: string;
-    x?: number;
-    y?: number;
-    width?: number;
-    height?: number;
-    type?: string;
-    [key: string]: unknown;
-}
-
 export interface UseSmartPathWorkerProps {
     id: string;
     source: string;
@@ -203,127 +122,6 @@ export interface UseSmartPathWorkerProps {
     isLayoutStable?: boolean;
     nodesDragging?: boolean;
 }
-/**
- * [P3.3] Compute absolute position for a node, recursing through parents.
- */
-const getAbsolutePosition = (node: SimpleNode, nodeMap: Map<string, SimpleNode>, visited?: Set<string>): { x: number; y: number } => {
-    const abs = node.computed?.positionAbsolute || node.positionAbsolute;
-    if (abs) return abs;
-    const base = node.position || { x: node.x ?? 0, y: node.y ?? 0 };
-    const parentId = node.parentId || node.parentNode;
-    if (!parentId) return base;
-    const v = visited || new Set<string>();
-    if (v.has(String(node.id))) return base;
-    v.add(String(node.id));
-    const parent = nodeMap.get(String(parentId));
-    if (!parent) return base;
-    const pAbs = getAbsolutePosition(parent, nodeMap, v);
-    return { x: pAbs.x + (base.x ?? 0), y: pAbs.y + (base.y ?? 0) };
-};
-
-/** Node types that are NOT routing obstacles */
-const IGNORED_OBSTACLE_TYPES = new Set([
-    'group', 'subGroup', 'titleGroup',
-    'domain', 'subDomain',
-    'swimlane',
-    'annotation', 'background',
-    'sticky', 'comment'
-]);
-
-/** Container types that serve as soft boundaries */
-const CONTAINER_TYPES = new Set(['group', 'subGroup', 'titleGroup', 'swimlane', 'domain', 'subDomain']);
-
-interface ObstacleRect { id?: string; x: number; y: number; width: number; height: number; padding?: number; isSoftZone?: boolean; }
-
-/**
- * [P3.3] Extracted obstacle building into independent useMemo.
- * Only recomputes when node map, obstacles list, or source/target change.
- */
-const useObstacles = (
-    simpleNodeMap: Map<string, SimpleNode>,
-    obstacles: ObstacleItem[],
-    source: string,
-    target: string
-): { obstacleRects: ObstacleRect[]; containerBounds: ObstacleRect[] } => {
-    return useMemo(() => {
-        const obstacleRects: ObstacleRect[] = [];
-        const containerBounds: ObstacleRect[] = [];
-
-        const addObstacle = (rect: ObstacleRect, isContainer: boolean = false) => {
-            if (rect.width <= 0 || rect.height <= 0) return;
-            if (isContainer) {
-                containerBounds.push(rect);
-            } else {
-                // [FIX] DO NOT PRE-PAD OBSTACLES! Send the exact physical geometries to the Worker.
-                // The Worker algorithms (A*, SimplePath, etc.) use their own finely-tuned clearance 
-                // parameters (like bufferDistance=5). Pre-swelling the geometry by 10px here
-                // defeats those tuned parameters and permanently seals shut tight 20px corridors.
-                obstacleRects.push({
-                    id: rect.id,
-                    x: rect.x,
-                    y: rect.y,
-                    width: rect.width,
-                    height: rect.height,
-                    padding: rect.padding,
-                    isSoftZone: rect.isSoftZone
-                });
-            }
-        };
-
-        const hasProvidedObstacles = Array.isArray(obstacles) && obstacles.length > 0;
-        if (hasProvidedObstacles) {
-            for (const obs of obstacles) {
-                const node = obs?.id ? simpleNodeMap.get(obs.id) as SimpleNode : undefined;
-                const type = (obs as SimpleNode).type || node?.type || '';
-
-                if (IGNORED_OBSTACLE_TYPES.has(String(type))) {
-                    if (CONTAINER_TYPES.has(String(type))) {
-                        addObstacle({
-                            id: obs?.id,
-                            x: obs?.x ?? 0,
-                            y: obs?.y ?? 0,
-                            width: obs?.width ?? 0,
-                            height: obs?.height ?? 0
-                        }, true);
-                    }
-                    continue;
-                }
-                addObstacle({ id: obs?.id, x: obs?.x ?? 0, y: obs?.y ?? 0, width: obs?.width ?? 0, height: obs?.height ?? 0 });
-            }
-        } else {
-            simpleNodeMap.forEach((n: SimpleNode) => {
-                if (n.id === source || n.id === target) return;
-                const t = String(n?.type || '');
-
-                if (IGNORED_OBSTACLE_TYPES.has(t)) {
-                    if (CONTAINER_TYPES.has(t)) {
-                        const pos = getAbsolutePosition(n, simpleNodeMap);
-                        const w = n.measured?.width || n.width || 0;
-                        const h = n.measured?.height || n.height || 0;
-                        addObstacle({ id: n.id, x: pos.x, y: pos.y, width: w, height: h }, true);
-                    }
-                    return;
-                }
-
-                if (n?.data?.hidden) return;
-                if (typeof n?.data?.isObstacle === 'boolean' && !n.data.isObstacle) return;
-
-                const z = typeof n?.zIndex === 'number' ? n.zIndex : (typeof n?.style?.zIndex === 'number' ? n.style.zIndex : 0);
-                if (typeof z === 'number' && z < 0) return;
-
-                const w = n.measured?.width || n.width || 0;
-                const h = n.measured?.height || n.height || 0;
-                if (w <= 0 || h <= 0) return;
-
-                const pos = getAbsolutePosition(n, simpleNodeMap);
-                addObstacle({ id: n.id, x: pos.x, y: pos.y, width: w, height: h });
-            });
-        }
-
-        return { obstacleRects, containerBounds };
-    }, [simpleNodeMap, obstacles, source, target]);
-};
-
 interface LastArgs {
     sx: number;
     sy: number;
@@ -404,7 +202,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
     );
 
     // [P3.3] Pre-compute obstacles via memoized hook (only recalculates when topology changes)
-    const obstacleData = useObstacles(simpleNodeMap, obstacles as ObstacleItem[], source, target);
+    const obstacleData = useSmartPathObstacles(simpleNodeMap, obstacles as ObstacleItem[], source, target);
     const { obstacleRects, containerBounds } = obstacleData;
 
     const elkPoints = useMemo(() => {
@@ -412,14 +210,13 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
     }, []);
     const computedPoints = useMemo(() => {
         if (isBus) return null;
-        const points = getComputedPoints(edgeData);
+        const points = getComputedPoints(edgeData.computedPath);
         return isComputedPathCompatibleWithHandles(points, centeredCoords, respectSourceHandle, respectTargetHandle)
             ? points
             : null;
     }, [centeredCoords, edgeData, isBus, respectSourceHandle, respectTargetHandle]);
 
     // [REMOVED] Internal useStore for dragging. Passed via props now.
-    // const nodesDragging = useStore((state: any) => state.nodesDragging);
 
     useEffect(() => {
         pathRef.current = path;
@@ -552,7 +349,8 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                 return n;
             };
 
-            const getAbsPos = (node: SimpleNode, visited?: Set<string>) => getAbsolutePosition(node, simpleNodeMap, visited);
+            const getAbsPos = (node: SimpleNode, visited?: Set<string>) =>
+                getSmartPathAbsolutePosition(node, simpleNodeMap, visited);
 
 
             const sourceNode = getFreshNode(source, centeredCoords.sourceNodeOrigin);
@@ -571,7 +369,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                 return;
             }
 
-            // [P3.3] Use pre-built obstacles from useObstacles memo
+            // [P3.3] Use pre-built obstacles from the dedicated obstacle hook.
             // Only inner bodies of source/target need to be added dynamically
             const obstacleRectsForRequest = [...obstacleRects];
             const containerBoundsForRequest = [...containerBounds];
@@ -637,7 +435,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
 
             // Nodes & Edges for Worker
              
-            const nodesArr = Array.from(simpleNodeMap.values()).map((n: any) => {
+            const nodesArr = Array.from(simpleNodeMap.values()).map((n) => {
                 // [FIX] If this is source or target, use the FRESH node we created above!
                 if (n.id === source && sourceNode) return sourceNode;
                 if (n.id === target && targetNode) return targetNode;

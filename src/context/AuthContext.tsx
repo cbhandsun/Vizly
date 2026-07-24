@@ -8,6 +8,13 @@ import {
     logAuthRuntimeStateClearFailure,
     logCloudAdapterConfigurationFailure,
 } from './authLogging';
+import { clearAuthSensitiveRuntimeState } from './authSensitiveRuntime';
+
+declare global {
+    interface Window {
+        __currentUserId?: string | null;
+    }
+}
 
 const noSupabaseError = { error: { message: 'Supabase is not configured', name: 'AuthError', status: 0 } as unknown as AuthError };
 
@@ -67,11 +74,15 @@ const configureCloudAdapter = async (session: Session | null) => {
     ]);
 
     LayeredConfigManager.getInstance().setCloudAdapter({
-        syncWithCloud: async (onConfigLoaded: (key: string, value: any) => void) => {
+        syncWithCloud: async (onConfigLoaded) => {
             const cloudConfigs = await storageService.loadAllConfigs();
-            cloudConfigs.forEach(({ key, value }: { key: string; value: any }) => onConfigLoaded(key, value));
+            cloudConfigs.forEach(({ key, value }) => {
+                if (value && typeof value === 'object' && !Array.isArray(value)) {
+                    onConfigLoaded(key, value as Record<string, unknown>);
+                }
+            });
         },
-        saveConfig: async (key: string, data: any) => {
+        saveConfig: async (key, data) => {
             await storageService.saveConfig(key, data, session.user.id);
         }
     });
@@ -84,17 +95,7 @@ const clearSensitiveRuntimeState = async (
     if (!userId) return;
 
     try {
-        const [{ CryptoService }, { clearRuntimeAIConfig }] = await Promise.all([
-            import('@/core/utils/CryptoService'),
-            import('@/components/ai/aiConfigStorage')
-        ]);
-
-        clearRuntimeAIConfig(userId);
-        if (options.removeLocalSecret) {
-            CryptoService.clearUserSecret(userId);
-        } else {
-            CryptoService.clearKeyCache();
-        }
+        await clearAuthSensitiveRuntimeState(userId, options);
     } catch (error) {
         logAuthRuntimeStateClearFailure(error);
     }
@@ -118,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (typeof window !== 'undefined') {
-            (window as any).__currentUserId = nextUserId;
+            window.__currentUserId = nextUserId;
         }
         setLoading(false);
         if (session?.user) {

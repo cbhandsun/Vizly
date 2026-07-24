@@ -240,23 +240,26 @@ export class ThemeColorUtil {
 /**
  * 主题验证工具函数
  */
-export function validateTheme(theme: any): theme is Theme {
+export function validateTheme(theme: unknown): theme is Theme {
   if (!theme || typeof theme !== 'object') {
     return false;
   }
+  const candidate = theme as Record<string, unknown>;
   
   const requiredFields = ['id', 'name', 'mode', 'palette', 'typography', 'spacing', 'borderRadius', 'shadow', 'animation', 'diagram'];
   for (const field of requiredFields) {
-    if (!(field in theme)) {
+    if (!(field in candidate)) {
       logThemeValidationMissingField(field);
       return false;
     }
   }
   
   // 验证必需的颜色字段
+  const palette = candidate.palette;
+  if (!palette || typeof palette !== 'object') return false;
   const requiredColors = ['primary', 'secondary', 'success', 'warning', 'error', 'info', 'neutral'];
   for (const color of requiredColors) {
-    if (!(color in theme.palette)) {
+    if (!(color in palette)) {
       logThemeValidationMissingPaletteColor(color);
       return false;
     }

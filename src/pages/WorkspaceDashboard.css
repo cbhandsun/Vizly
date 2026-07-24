@@ -3,9 +3,6 @@
    Inspired by: Figma Home, Notion, Linear, Vercel Dashboard
    ========================================================================== */
 
-/* ---------- Google Font Import ---------- */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
 /* ---------- Root Variables ---------- */
 .workspace-dashboard {
   --vz-brand-from: #6366f1;
@@ -1228,4 +1225,3 @@ html[data-theme='dark'] .diagram-context-menu {
   background: var(--vz-border);
   margin: 4px 8px;
 }
-

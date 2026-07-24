@@ -18,14 +18,14 @@ interface WorkerNode {
     y: number;
     width: number;
     height: number;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 interface WorkerEdge {
     id: string;
     source: string;
     target: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 /**

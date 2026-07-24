@@ -44,12 +44,15 @@ const StorageConfigPage: React.FC = () => {
 
             await storageService.testConnection(values);
             appMessage.success(t('storageConfig.testSuccess'));
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const safeError = error instanceof Error ? error : new Error(String(error));
             const redactedError = redactSensitiveValue({
-                name: error.name,
-                message: error.message,
-                metadata: error.$metadata,
-                stack: error.stack
+                name: safeError.name,
+                message: safeError.message,
+                metadata: error && typeof error === 'object' && '$metadata' in error
+                    ? error.$metadata
+                    : undefined,
+                stack: safeError.stack
             });
             safeLog.error('S3 connection test failed', redactedError);
             const errorDetails = JSON.stringify(redactedError, null, 2);
@@ -59,7 +62,7 @@ const StorageConfigPage: React.FC = () => {
                 width: 600,
                 content: (
                     <div>
-                        {(error.message === 'Failed to fetch' || error.name === 'TypeError') && (
+                        {(safeError.message === 'Failed to fetch' || safeError.name === 'TypeError') && (
                             <div style={{ background: '#fff2f0', border: '1px solid #ffccc7', padding: '8px 12px', borderRadius: 4, marginBottom: 16 }}>
                                 <Paragraph type="danger" style={{ margin: 0, fontWeight: 'bold' }}>
                                     {t('storageConfig.testFail.corsTitle')}

@@ -1,4 +1,4 @@
-import type { Edge, Node } from '@xyflow/react';
+import type { Edge, Node, XYPosition } from '@xyflow/react';
 import { isBaseReactFlowNodeHidden } from './baseReactFlowRenderableNodes';
 
 type Bounds = {
@@ -20,6 +20,17 @@ const isFiniteNumber = (value: unknown): value is number => (
 
 const resolveNodeDimension = (value: unknown, fallback: number): number => (
   isFiniteNumber(value) ? value : fallback
+);
+
+type DisplayNode = Node & {
+  positionAbsolute?: XYPosition;
+  computed?: { positionAbsolute?: XYPosition };
+};
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
 );
 
 export const computeBaseReactFlowMinorResizeThreshold = ({
@@ -70,16 +81,18 @@ export const computeBaseReactFlowNodeBounds = (nodes: Node[]): Bounds | null => 
   let maxY = Number.NEGATIVE_INFINITY;
 
   for (const node of visibleNodes) {
+    const style = asRecord(node.style);
     const width = resolveNodeDimension(
-      node.measured?.width ?? node.width ?? (node.style as any)?.width,
+      node.measured?.width ?? node.width ?? style.width,
       DEFAULT_NODE_WIDTH,
     );
     const height = resolveNodeDimension(
-      node.measured?.height ?? node.height ?? (node.style as any)?.height,
+      node.measured?.height ?? node.height ?? style.height,
       DEFAULT_NODE_HEIGHT,
     );
 
-    const abs = (node as any).positionAbsolute ?? (node as any).computed?.positionAbsolute;
+    const displayNode = node as DisplayNode;
+    const abs = displayNode.positionAbsolute ?? displayNode.computed?.positionAbsolute;
     let xVal = abs?.x;
     let yVal = abs?.y;
 
@@ -127,9 +140,10 @@ export const expandBaseReactFlowBoundsForEdges = ({
     if (strokeWidth > maxStrokeWidth) {
       maxStrokeWidth = strokeWidth;
     }
-    const label = (edge as any)?.data?.label ?? (edge as any)?.label;
+    const data = asRecord(edge.data);
+    const label = data.label ?? edge.label;
     if (label) hasEdgeLabel = true;
-    const pathType = ((edge.data && typeof edge.data === 'object' && (edge.data as any).pathType) || (edge as any).pathType || edge.type || '').toString().toLowerCase();
+    const pathType = String(data.pathType || edge.type || '').toLowerCase();
     if (pathType.includes('smart')) hasSmartEdge = true;
   }
 

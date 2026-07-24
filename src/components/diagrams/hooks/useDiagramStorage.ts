@@ -110,7 +110,7 @@ export function useDiagramStorage() {
     const hide = appMessage.loading(`正在从 ${sourceGroup === 's3' ? 'S3' : 'Supabase'} 加载...`, 0);
     try {
       const unifiedStorage = await loadUnifiedStorage();
-      const provider = unifiedStorage.getProvider(sourceGroup as any);
+      const provider = unifiedStorage.getProvider(sourceGroup);
       const saved = await provider.loadDiagram(key);
       if (saved && saved.content) {
         return parseRemoteDiagramContent(saved.content, {

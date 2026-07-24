@@ -9,9 +9,11 @@ interface EdgeLabelStyleMenuProps {
         color?: string;
         fontSize?: number;
     };
-    onStyleChange: (edgeId: string, style: any) => void;
+    onStyleChange: (edgeId: string, style: EdgeLabelStyle) => void;
     onResetPosition: () => void;
 }
+
+export type EdgeLabelStyle = NonNullable<EdgeLabelStyleMenuProps['currentStyle']>;
 
 export const getEdgeLabelStyleMenuItems = (props: EdgeLabelStyleMenuProps): MenuProps['items'] => {
     const { edgeId, currentStyle = {}, onStyleChange, onResetPosition } = props;

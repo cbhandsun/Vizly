@@ -9,6 +9,7 @@ lerna-debug.log*
 
 # Dependencies and build output
 node_modules
+.eslintcache
 dist
 dist-ssr
 coverage/
@@ -17,7 +18,8 @@ test-results/
 
 # Local environment
 *.local
-.env.local
+.env*
+!.env.example
 
 # Editor directories and files
 .vscode/*
@@ -31,6 +33,7 @@ test-results/
 *.sw?
 
 # Local workspace artifacts
+.codex/
 .gemini
 docs
 scratch/

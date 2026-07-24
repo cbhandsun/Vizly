@@ -52,8 +52,8 @@ export function useConnectionValidation(
         // "pill" 形状(Start/End) 作为 source 时需要检查是否有 label 暗示是 End
         const sourceNode = nodes.find(n => n.id === source);
         if (sourceNode) {
-            const shape = (sourceNode.data as any)?.shape;
-            const label = String((sourceNode.data as any)?.label || '').toLowerCase();
+            const shape = sourceNode.data?.shape;
+            const label = String(sourceNode.data?.label || '').toLowerCase();
             // pill 形状 + label 包含 end/stop/结束 视为终止节点
             if (shape === 'pill' && /end|stop|结束|终止/.test(label)) {
                 return false;

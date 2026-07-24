@@ -1,61 +1,28 @@
-import { useEffect, useCallback, useLayoutEffect } from 'react';
-import { Node, Edge } from '@xyflow/react';
-import { autoMindMapLayout, calculateSummaryGeometry, calculateSubtreeBounds } from '../../../utils/LayoutAlgorithms';
-import { useRef } from 'react';
-import { parseIndentedText } from '../../../utils/textTreeParser';
-import { appMessage } from '../../../utils/antdStaticBridge';
-import { downloadFile } from '../../../utils/downloadUtils';
+import { useEffect, useCallback } from 'react';
+import type { Node, Edge } from '@xyflow/react';
+import { autoMindMapLayout } from '../../../utils/LayoutAlgorithms';
+import { parseIndentedText, type ParsedTreeNode } from '../../../utils/textTreeParser';
+import {
+    MIND_MAP_PALETTE,
+    collectMindMapSubtree,
+    createMindMapPastePayload,
+    createMindMapQuickAdd,
+    type MindMapClipboard,
+} from './mindMapOrchestratorCommands';
+import { downloadMindMapMarkdown } from './mindMapMarkdown';
+import { useMindMapAutoLayout } from './useMindMapAutoLayout';
+import { useMindMapSupplementalCommands } from './useMindMapSupplementalCommands';
+import {
+    collapseAllMindMapBranches,
+    expandAllMindMapNodes,
+    toggleMindMapNodeCollapse,
+} from './mindMapCollapseState';
 
-// XMind-inspired premium palette: vibrant yet harmonious branch colors
-export const PALETTE = ['#e85d4a', '#f0872a', '#c27af5', '#2dd4bf', '#3b82f6', '#f59e0b', '#10b981'];
+export const PALETTE: readonly string[] = MIND_MAP_PALETTE;
+export { exportMindMapToMarkdown } from './mindMapMarkdown';
 
-// ─── T-1: Module-level mindmap clipboard (subtree copy/paste) ───────────────
-// Stored at module scope so it persists across renders without triggering re-renders.
-interface MindMapClipboard {
-    nodes: Node[];
-    edges: Edge[];
-    rootId: string;
-}
 let mindmapClipboard: MindMapClipboard | null = null;
-
-// ─── T-2: Markdown export utility ───────────────────────────────────────────
-/**
- * Exports a mindmap to Markdown format (XMind-compatible indented structure).
- * Root becomes # heading, children become nested - list items.
- */
-export function exportMindMapToMarkdown(nodes: Node[], edges: Edge[]): string {
-    const nodeMap = new Map(nodes.map(n => [n.id, n]));
-    const childrenMap = new Map<string, string[]>();
-    for (const e of edges) {
-        if (e.type === 'relationshipEdge') continue;
-        if (!childrenMap.has(e.source)) childrenMap.set(e.source, []);
-        childrenMap.get(e.source)!.push(e.target);
-    }
-    const root = nodes.find(n => n.type === 'mindmap' && (n.data?.depth === 0 || n.data?.depth === undefined));
-    if (!root) return '';
-
-    const lines: string[] = [];
-    function dfs(nodeId: string, depth: number) {
-        const node = nodeMap.get(nodeId);
-        if (!node) return;
-        // Strip HTML tags from label for clean Markdown output
-        const label = ((node.data?.label as string) || 'Untitled').replace(/<[^>]+>/g, '').trim();
-        lines.push(depth === 0 ? `# ${label}` : `${'  '.repeat(depth - 1)}- ${label}`);
-        const children = (childrenMap.get(nodeId) || []).sort((a, b) => {
-            const na = nodeMap.get(a);
-            const nb = nodeMap.get(b);
-            return (na?.position?.y ?? 0) - (nb?.position?.y ?? 0);
-        });
-        children.forEach(c => dfs(c, depth + 1));
-    }
-    dfs(root.id, 0);
-    return lines.join('\n');
-}
-
-/** Triggers a browser file download with the given text content */
-function downloadTextFile(filename: string, content: string, mimeType = 'text/plain') {
-    downloadFile(content, filename, mimeType);
-}
+let skipNextSystemPaste = false;
 
 export function useMindMapOrchestrator(
     nodes: Node[],
@@ -64,313 +31,7 @@ export function useMindMapOrchestrator(
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>,
     takeSnapshot: () => void
 ) {
-    const prevRootDataRef = useRef<Record<string, string>>({});
-
-    useLayoutEffect(() => {
-        // --- STEP 1: Lightweight Structural Signature ---
-        // We calculate a cheap hash first to see if we can skip map building.
-        // HASH includes: set of IDs, collapsed state, measured dimensions (if available)
-        const structHashParts: string[] = [];
-        for (const n of nodes) {
-            if (n.type === 'mindmap') {
-                structHashParts.push(`${n.id}:${n.data?.collapsed ? 'C' : 'O'}`);
-            }
-        }
-        const edgeHashParts: string[] = [];
-        for (const e of edges) {
-            if (e.type !== 'relationshipEdge') {
-                edgeHashParts.push(`${e.source}->${e.target}`);
-            }
-        }
-        const currentSignature = `${structHashParts.join('|')}#${edgeHashParts.join('|')}`;
-
-        // Check if any root properties changed (including branchColor changes propagated from children)
-        const rootNodes = nodes.filter(n => n.type === 'mindmap' && (n.data?.depth === 0 || (n.data?.depth === undefined && n.data?.direction !== undefined)));
-        const rootDataParts: string[] = [];
-        for (const root of rootNodes) {
-             rootDataParts.push(`${root.id}:${root.data?.direction || 'LR'}:${root.data?.pathStyle || 'bezier'}:${root.data?.shape || 'pill'}`);
-        }
-        // Also watch branchColor on ALL mindmap nodes (color picker changes must trigger re-render)
-        const colorSigParts: string[] = [];
-        for (const n of nodes) {
-            if (n.type === 'mindmap' && n.data?.branchColor) {
-                colorSigParts.push(`${n.id}:${n.data.branchColor}`);
-            }
-        }
-        const rootSignature = rootDataParts.join('|') + '#C#' + colorSigParts.join('|');
-        const finalSignature = `${currentSignature}##${rootSignature}`;
-
-        if (prevRootDataRef.current['__global_sig__'] === finalSignature) {
-            return;
-        }
-        prevRootDataRef.current['__global_sig__'] = finalSignature;
-
-        // --- STEP 2: Lookup Acceleration (Map Building) ---
-        // Only run when something meaningful changed.
-        const nodeMap = new Map<string, Node>();
-        nodes.forEach(n => nodeMap.set(n.id, n));
-        
-        const childrenMap = new Map<string, string[]>();
-        const edgeMap = new Map<string, Edge>();
-        const structureEdges = edges.filter(e => e.type !== 'relationshipEdge');
-
-        for (const e of structureEdges) {
-            if (!childrenMap.has(e.source)) childrenMap.set(e.source, []);
-            childrenMap.get(e.source)!.push(e.target);
-            edgeMap.set(`${e.source}->${e.target}`, e);
-        }
-
-        const nodeUpdates = new Map<string, any>();
-        const newPositions = new Map<string, { x: number, y: number }>();
-        const nodesToHide = new Set<string>();
-        const edgesToHide = new Set<string>();
-
-        // --- Pass 1: Tree Layout ---
-        for (const root of rootNodes) {
-            const direction = (root.data?.direction as string) || 'LR';
-            const pathStyle = (root.data?.pathStyle as string) || 'bezier';
-            const shape = (root.data?.shape as string) || 'pill';
-
-            const subtreeNodes: Node[] = [];
-            const subtreeEdges: Edge[] = [];
-
-            const queue = [{ id: root.id, hideKids: false, inheritedColor: undefined as string | undefined }];
-            while (queue.length > 0) {
-                const { id: currId, hideKids, inheritedColor } = queue.shift()!;
-                const currNode = nodeMap.get(currId);
-                const kids = childrenMap.get(currId) || [];
-                
-                let effectiveColor = inheritedColor;
-                if (currId === root.id) {
-                    effectiveColor = undefined;
-                } else if (!effectiveColor) {
-                    if (currNode?.data?.branchColor) {
-                        effectiveColor = currNode.data.branchColor as string;
-                    } else {
-                        const rootKids = childrenMap.get(root.id) || [];
-                        const branchIndex = Math.max(0, rootKids.indexOf(currId));
-                        effectiveColor = PALETTE[branchIndex % PALETTE.length];
-                    }
-                }
-
-                if (currNode) {
-                    if (hideKids) {
-                        nodesToHide.add(currId);
-                    } else {
-                        subtreeNodes.push(currNode);
-                    }
-                    nodeUpdates.set(currId, { 
-                        direction, 
-                        pathStyle, 
-                        shape, 
-                        childrenCount: kids.length, 
-                        branchColor: currId !== root.id ? effectiveColor : undefined 
-                    });
-                }
-                
-                const isCollapsed = currNode?.data?.collapsed === true;
-                const nextHideKids = hideKids || isCollapsed;
-                
-                for (const k of kids) {
-                    queue.push({ id: k, hideKids: nextHideKids, inheritedColor: effectiveColor });
-                    const e = edgeMap.get(`${currId}->${k}`);
-                    if (e) {
-                         if (nextHideKids) edgesToHide.add(e.id);
-                         else subtreeEdges.push(e);
-                    }
-                }
-            }
-
-            if (subtreeNodes.length > 0) {
-                const pos = autoMindMapLayout(subtreeNodes, subtreeEdges, direction, {
-                    nodeSpacing: 48,
-                    levelSpacing: 140
-                }, { nodeMap, childrenMap });
-                for (const [nid, p] of pos.entries()) {
-                    newPositions.set(nid, p);
-                }
-            }
-        }
-
-        // --- Pass 2: Boundary Calculation ---
-        const boundaryNodes = nodes.filter(n => n.type === 'mindmap-boundary');
-        const boundaryUpdates = new Map<string, { x: number, y: number, width: number, height: number }>();
-
-        // Combined position map for child-relative calculations
-        const combinedPosMap = new Map<string, { x: number, y: number }>();
-        for (const n of nodes) combinedPosMap.set(n.id, n.position);
-        for (const [nid, p] of newPositions.entries()) combinedPosMap.set(nid, p);
-
-        for (const bNode of boundaryNodes) {
-            const targetId = bNode.data?.targetSubtreeId as string;
-            if (!targetId) continue;
-
-            const bounds = calculateSubtreeBounds(targetId, combinedPosMap, nodeMap, childrenMap);
-            if (bounds) {
-                const padding = 30;
-                boundaryUpdates.set(bNode.id, {
-                    x: bounds.x - padding,
-                    y: bounds.y - padding,
-                    width: bounds.width + padding * 2,
-                    height: bounds.height + padding * 2
-                });
-            }
-        }
-
-        // --- Pass 3: Summary Node Calculation ---
-        const summaryNodes = nodes.filter(n => n.data?.isSummary);
-        const summaryUpdates = new Map<string, { x: number, y: number, bracket?: any }>();
-        const firstRoot = rootNodes[0];
-        const globalDir = firstRoot?.data?.direction as string || 'LR';
-
-        for (const sNode of summaryNodes) {
-            const targets = (sNode.data?.summaryTargetIds || sNode.data?.summaryTargets) as string[];
-            if (!targets || targets.length === 0) continue;
-
-            const bounds = calculateSummaryGeometry(targets, combinedPosMap, nodeMap, globalDir);
-            if (bounds) {
-                const summaryW = sNode.measured?.width || 100;
-                const summaryH = sNode.measured?.height || 40;
-                const margin = 50; 
-                
-                const newX = bounds.dir === 'L' ? bounds.x - margin - summaryW : bounds.x + margin;
-                const newY = (bounds.minY + bounds.maxY) / 2 - summaryH / 2;
-                
-                const centerY = newY + summaryH / 2;
-                const bracket = { 
-                    minY: bounds.minY - centerY, 
-                    maxY: bounds.maxY - centerY, 
-                    dir: bounds.dir 
-                };
-                
-                summaryUpdates.set(sNode.id, { x: newX, y: newY, bracket });
-            }
-        }
-        
-        // --- Pass 2.5: Boundary Reconciliation (Self-Healing) ---
-        // Ensure that nodes with data.hasBoundary=true actually HAVE a boundary node,
-        // and remove boundaries for nodes that turned it off.
-        const nodesThatShouldHaveBoundary = new Set(nodes.filter(n => n.type === 'mindmap' && n.data?.hasBoundary).map(n => n.id));
-        const existingBoundaryTargets = new Set(boundaryNodes.map(n => n.data?.targetSubtreeId as string).filter(Boolean));
-        
-        const boundariesToAdd: Node[] = [];
-        const boundariesToRemove = new Set<string>();
-
-        // Find missing boundaries
-        for (const targetId of nodesThatShouldHaveBoundary) {
-            if (!existingBoundaryTargets.has(targetId)) {
-                const targetNode = nodeMap.get(targetId);
-                if (targetNode) {
-                    boundariesToAdd.push({
-                        id: `boundary-${targetId}-${Date.now()}`,
-                        type: 'mindmap-boundary',
-                        position: { x: targetNode.position.x, y: targetNode.position.y },
-                        data: { targetSubtreeId: targetId, label: 'Boundary' },
-                        selectable: false,
-                        zIndex: -1
-                    });
-                }
-            }
-        }
-
-        // Find stale boundaries
-        for (const bNode of boundaryNodes) {
-            const tId = bNode.data?.targetSubtreeId as string;
-            if (!nodesThatShouldHaveBoundary.has(tId)) {
-                boundariesToRemove.add(bNode.id);
-            }
-        }
-
-        // --- Final State Update ---
-        setNodes(nds => {
-            let changed = false;
-            // 1. Remove stale boundaries
-            let nextNodes = nds;
-            if (boundariesToRemove.size > 0) {
-                nextNodes = nextNodes.filter(n => !boundariesToRemove.has(n.id));
-                changed = true;
-            }
-
-            // 2. Update existing nodes
-            const updatedNodes = nextNodes.map(n => {
-                let nChanged = false;
-                let nextPos = { ...n.position };
-                const nextData = { ...n.data };
-                let nextHidden = n.hidden;
-
-                // Position & Layout
-                if (n.type === 'mindmap') {
-                    const targetPos = newPositions.get(n.id);
-                    if (targetPos && (Math.abs(targetPos.x - n.position.x) > 0.5 || Math.abs(targetPos.y - n.position.y) > 0.5)) {
-                        nextPos = targetPos;
-                        nChanged = true;
-                    }
-
-                    const update = nodeUpdates.get(n.id);
-                    if (update) {
-                        for (const key in update) {
-                            if (nextData[key] !== update[key]) {
-                                nextData[key] = update[key];
-                                nChanged = true;
-                            }
-                        }
-                    }
-
-                    const shouldBeHidden = nodesToHide.has(n.id);
-                    if (n.hidden !== shouldBeHidden) {
-                        nextHidden = shouldBeHidden;
-                        nChanged = true;
-                    }
-                }
-
-                // Boundary Geometry
-                if (n.type === 'mindmap-boundary') {
-                    const bUpdate = boundaryUpdates.get(n.id);
-                    if (bUpdate) {
-                        if (Math.abs(n.position.x - bUpdate.x) > 0.5 || Math.abs(n.position.y - bUpdate.y) > 0.5) {
-                            nextPos = { x: bUpdate.x, y: bUpdate.y };
-                            nChanged = true;
-                        }
-                        if (n.data?.width !== bUpdate.width || n.data?.height !== bUpdate.height) {
-                            nextData.width = bUpdate.width;
-                            nextData.height = bUpdate.height;
-                            nChanged = true;
-                        }
-                    }
-                }
-
-                // Summary Geometry
-                if (n.data?.isSummary) {
-                    const sUpdate = summaryUpdates.get(n.id);
-                    if (sUpdate) {
-                        if (Math.abs(n.position.x - sUpdate.x) > 0.5 || Math.abs(n.position.y - sUpdate.y) > 0.5) {
-                            nextPos = { x: sUpdate.x, y: sUpdate.y };
-                            nChanged = true;
-                        }
-                        if (JSON.stringify(n.data?.summaryBracket) !== JSON.stringify(sUpdate.bracket)) {
-                            nextData.summaryBracket = sUpdate.bracket;
-                            nChanged = true;
-                        }
-                    }
-                }
-
-                if (nChanged) {
-                    changed = true;
-                    return { ...n, position: nextPos, data: nextData, hidden: nextHidden };
-                }
-                return n;
-            });
-
-            // 3. Add new boundaries
-            if (boundariesToAdd.length > 0) {
-                return [...updatedNodes, ...boundariesToAdd];
-            }
-
-            return changed ? updatedNodes : nds;
-        });
-
-    }, [nodes, edges, setNodes]);
-
+    useMindMapAutoLayout(nodes, edges, setNodes);
     const handleQuickAdd = useCallback((e: Event) => {
         const detail = (e as CustomEvent).detail;
         if (!detail || !detail.parentId) return;
@@ -380,50 +41,17 @@ export function useMindMapOrchestrator(
         // 1. Take a snapshot for undo/redo before structural changes
         takeSnapshot();
 
-        // 2. Generate new node ID
-        const newChildId = `mindmap-node-${Date.now()}`;
-
-        // 3. Determine Color (Inherit or Assign new)
-        let branchColor: string | undefined;
-        if (depth === 0) {
-            // It's a new root branch
-            const siblingCount = edges.filter(ed => ed.source === parentId).length;
-            branchColor = PALETTE[siblingCount % PALETTE.length];
-        } else {
-            // Inherit from parent
-            // [M-5] Use setNodes functional update's snapshot via nodes closure (already updated by the time callback runs)
-            const parentNode = nodes.find(n => n.id === parentId);
-            branchColor = parentNode?.data?.branchColor as string | undefined;
-        }
-
-        // 4. Create the new Node object
-        const newNode: Node = {
-            id: newChildId,
-            type: 'mindmap',
-            position: { x: 0, y: 0 }, 
-            data: {
-                label: '',
-                depth: depth + 1,
-                direction: direction,
-                branchColor: branchColor,
-                isNew: true
-            },
-        };
-
-        // 5. Create proper semantic edge
-        const newEdge: Edge = {
-            id: `edge-${parentId}-${newChildId}`,
-            source: parentId,
-            target: newChildId,
-            type: 'mindmapEdge', // Pure MindMap Custom Edge
-            animated: false, 
-            style: { 
-                strokeWidth: Math.max(1.5, 4 - depth * 0.8), 
-                stroke: branchColor || (depth === 0 ? '#6366f1' : '#94a3b8') 
-            },
-            data: { kind: 'mindmap' },
-            markerEnd: '' as any // Explicitly remove default arrowheads
-        };
+        const siblingCount = edges.filter((edge) => edge.source === parentId).length;
+        const parentBranchColor = nodes.find((node) => node.id === parentId)
+            ?.data?.branchColor as string | undefined;
+        const { node: newNode, edge: newEdge } = createMindMapQuickAdd({
+            parentId,
+            direction: typeof direction === 'string' ? direction : 'LR',
+            depth: typeof depth === 'number' ? depth : 0,
+            siblingCount,
+            parentBranchColor,
+            idSeed: Date.now(),
+        });
 
         // 6. Use functional updates ensuring exact latest state.
         setEdges(currentEdges => {
@@ -655,23 +283,7 @@ export function useMindMapOrchestrator(
                 const selectedMindNodes = nodes.filter(n => n.selected && n.type === 'mindmap');
                 if (selectedMindNodes.length === 1) {
                     const copyRoot = selectedMindNodes[0];
-                    // DFS collect entire subtree
-                    const subtreeNodeIds = new Set<string>();
-                    const stack = [copyRoot.id];
-                    const edgeChildMap = new Map<string, string[]>();
-                    for (const ed of edges) {
-                        if (ed.type === 'relationshipEdge') continue;
-                        if (!edgeChildMap.has(ed.source)) edgeChildMap.set(ed.source, []);
-                        edgeChildMap.get(ed.source)!.push(ed.target);
-                    }
-                    while (stack.length > 0) {
-                        const cur = stack.pop()!;
-                        subtreeNodeIds.add(cur);
-                        (edgeChildMap.get(cur) || []).forEach(c => stack.push(c));
-                    }
-                    const subtreeNodes = nodes.filter(n => subtreeNodeIds.has(n.id));
-                    const subtreeEdges = edges.filter(ed => subtreeNodeIds.has(ed.source) && subtreeNodeIds.has(ed.target));
-                    mindmapClipboard = { nodes: subtreeNodes, edges: subtreeEdges, rootId: copyRoot.id };
+                    mindmapClipboard = collectMindMapSubtree(nodes, edges, copyRoot.id);
                     // Also write plain text label to system clipboard for cross-app paste
                     try { navigator.clipboard?.writeText((copyRoot.data?.label as string) || ''); } catch { /* ignore */ }
                     e.stopPropagation(); // Don't let designer's copy handler fire
@@ -685,59 +297,20 @@ export function useMindMapOrchestrator(
                     e.preventDefault();
                     e.stopPropagation();
                     const target = targetNodes[0];
-                    const clip = mindmapClipboard;
+                    const payload = createMindMapPastePayload(mindmapClipboard, target.id, Date.now());
+                    if (!payload) return;
 
                     takeSnapshot();
-
-                    // Remap IDs to avoid collisions
-                    const idMap = new Map<string, string>();
-                    const ts = Date.now();
-                    clip.nodes.forEach((n, i) => { idMap.set(n.id, `mindmap-paste-${ts}-${i}`); });
-
-                    const pastedNodes: Node[] = clip.nodes.map(n => ({
-                        ...n,
-                        id: idMap.get(n.id)!,
-                        position: {
-                            x: n.position.x + 40,
-                            y: n.position.y + 40,
-                        },
-                        selected: n.id === clip.rootId,
-                        data: { ...n.data }
-                    }));
-                    const pastedEdges: Edge[] = [
-                        // Edge connecting target -> paste root
-                        {
-                            id: `edge-${target.id}-${idMap.get(clip.rootId)}`,
-                            source: target.id,
-                            target: idMap.get(clip.rootId)!,
-                            type: 'mindmapEdge',
-                            animated: false,
-                            markerEnd: '' as any,
-                            data: { kind: 'mindmap' }
-                        },
-                        // Internal subtree edges with remapped IDs
-                        ...clip.edges.map(ed => ({
-                            ...ed,
-                            id: `edge-${idMap.get(ed.source)}-${idMap.get(ed.target)}`,
-                            source: idMap.get(ed.source)!,
-                            target: idMap.get(ed.target)!
-                        }))
-                    ];
-
-                    setEdges(eds => [...eds, ...pastedEdges]);
-                    setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...pastedNodes]);
+                    skipNextSystemPaste = true;
+                    setEdges(eds => [...eds, ...payload.edges]);
+                    setNodes(nds => [...nds.map(n => ({ ...n, selected: false })), ...payload.nodes]);
                 }
             }
 
             // ── T-2: Ctrl+Shift+E — Export current mindmap as Markdown ─────────
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'e') {
                 e.preventDefault();
-                const md = exportMindMapToMarkdown(nodes, edges);
-                if (md) {
-                    const rootLabel = nodes.find(n => n.type === 'mindmap' && n.data?.depth === 0)?.data?.label as string || 'mindmap';
-                    const safeFilename = rootLabel.replace(/[^a-zA-Z0-9一-龥]/g, '_').substring(0, 40);
-                    downloadTextFile(`${safeFilename}.md`, md, 'text/markdown');
-                }
+                downloadMindMapMarkdown(nodes, edges);
             }
         };
 
@@ -754,7 +327,10 @@ export function useMindMapOrchestrator(
             // [T-1] If there's a mindmap subtree in our internal clipboard, the Ctrl+V
             // handler in handleKeyDown above will handle it. Bail out here so we
             // don't also try to parse the system clipboard text as indented structure.
-            if (mindmapClipboard && (e as any)._mindmapHandled) return;
+            if (skipNextSystemPaste) {
+                skipNextSystemPaste = false;
+                return;
+            }
 
             const clipboardData = e.clipboardData;
             if (!clipboardData) return;
@@ -783,7 +359,7 @@ export function useMindMapOrchestrator(
 
                 let nodeIdCounter = Date.now();
 
-                const traverseAndCreate = (parsedNode: any, parentId: string, currentDepth: number) => {
+                const traverseAndCreate = (parsedNode: ParsedTreeNode, parentId: string, currentDepth: number) => {
                     const newId = `mindmap-node-${nodeIdCounter++}`;
                     
                     const nDesc: Node = {
@@ -810,8 +386,7 @@ export function useMindMapOrchestrator(
                             strokeWidth: Math.max(1.5, 4 - currentDepth * 0.8),
                             stroke: branchColor || (currentDepth === 1 ? '#6366f1' : '#94a3b8')
                         },
-                        data: { kind: 'mindmap' },
-                        markerEnd: '' as any
+                        data: { kind: 'mindmap' }
                     };
                     newEdges.push(eDesc);
 
@@ -857,106 +432,13 @@ export function useMindMapOrchestrator(
         return () => window.removeEventListener('paste', handlePaste, { capture: true });
     }, [edges, nodes, setEdges, setNodes, takeSnapshot]);
 
-    const handleToggleCollapse = useCallback((e: Event) => {
-        const detail = (e as CustomEvent).detail;
-        if (!detail || !detail.nodeId) return;
-        const { nodeId } = detail;
-
+    const handleToggleCollapse = useCallback((event: Event) => {
+        const detail = (event as CustomEvent<unknown>).detail;
+        if (!detail || typeof detail !== 'object') return;
+        const nodeId = Reflect.get(detail, 'nodeId');
+        if (typeof nodeId !== 'string' || !nodeId) return;
         takeSnapshot();
-
-        setNodes(currentNodes => {
-            const targetNode = currentNodes.find(n => n.id === nodeId);
-            if (!targetNode) return currentNodes;
-
-            const isCurrentlyCollapsed = !!targetNode.data?.collapsed;
-            
-            // 1. Toggle collapse state on target
-            let nextNodes = currentNodes.map(n => {
-                if (n.id === nodeId) {
-                    return { ...n, data: { ...n.data, collapsed: !isCurrentlyCollapsed } };
-                }
-                return n;
-            });
-
-            // 2. Compute visibility for all nodes based on tree structure
-            const childrenMap = new Map<string, string[]>();
-            const parentSet = new Set<string>();
-            edges.forEach(e => {
-                if (!childrenMap.has(e.source)) childrenMap.set(e.source, []);
-                childrenMap.get(e.source)!.push(e.target);
-                parentSet.add(e.target);
-            });
-
-            // [M-5] Build O(1) lookup map for nextNodes to avoid O(N) find() inside traverse().
-            // Previous: nextNodes.find() inside each recursive call = O(N²) for large trees.
-            const nextNodeMap = new Map<string, Node>(nextNodes.map(n => [n.id, n]));
-
-            const roots = nextNodes.filter(n => n.type === 'mindmap' && !parentSet.has(n.id));
-            const visibilityMap = new Map<string, { hidden: boolean, count: number }>();
-
-            function traverse(currentId: string, parentHidden: boolean, parentCollapsed: boolean): number {
-                // [M-5] O(1) map lookup instead of O(N) find()
-                const node = nextNodeMap.get(currentId);
-                const selfCollapsed = !!node?.data?.collapsed;
-                const isHidden = parentHidden || parentCollapsed;
-                
-                let descendants = 0;
-                const children = childrenMap.get(currentId) || [];
-                for (const childId of children) {
-                    descendants += 1; 
-                    const childDescendants = traverse(childId, isHidden, selfCollapsed);
-                    descendants += childDescendants;
-                }
-
-                visibilityMap.set(currentId, { hidden: isHidden, count: children.length });
-                return descendants;
-            }
-
-            roots.forEach(root => traverse(root.id, false, false));
-
-            // Apply visibility
-            nextNodes = nextNodes.map(n => {
-                if (n.type === 'mindmap') {
-                    const viz = visibilityMap.get(n.id);
-                    if (viz) {
-                        return { 
-                            ...n, 
-                            hidden: viz.hidden, 
-                            data: { ...n.data, childrenCount: viz.count }
-                        };
-                    }
-                }
-                return n;
-            });
-
-            // Note: edge hidden-state sync is handled by React Flow natively —
-            // RF auto-hides edges whose source or target node is hidden.
-
-            // Applying layout to nodes directly within setNodes
-            const visibleNodes = nextNodes.filter(n => n.type === 'mindmap' && !n.hidden);
-            const visibleEdges = edges.map(e => {
-                const viz = visibilityMap.get(e.target);
-                return viz ? { ...e, hidden: viz.hidden } : e;
-            }).filter(e => !e.hidden);
-
-            const rootNode = visibleNodes.find(n => n.data?.depth === 0);
-            const direction = rootNode?.data?.direction as string || 'LR';
-
-            const positions = autoMindMapLayout(visibleNodes, visibleEdges, direction, {
-                nodeSpacing: 48,
-                levelSpacing: 140
-            });
-
-            return nextNodes.map(n => {
-                if (n.type === 'mindmap' && positions.has(n.id)) {
-                    return { ...n, position: positions.get(n.id)! };
-                }
-                return n;
-            });
-        });
-
-
-
+        setNodes(currentNodes => toggleMindMapNodeCollapse(currentNodes, edges, nodeId));
     }, [edges, setNodes, takeSnapshot]);
 
     useEffect(() => {
@@ -964,40 +446,14 @@ export function useMindMapOrchestrator(
         return () => window.removeEventListener('mindmap:toggle-collapse', handleToggleCollapse);
     }, [handleToggleCollapse]);
 
-    // ── Collapse ALL non-root nodes ────────────────────────────────────────────
     const handleCollapseAll = useCallback(() => {
         takeSnapshot();
-        setNodes(currentNodes => {
-            const edgeChildMap = new Map<string, string[]>();
-            edges.forEach(e => {
-                if (e.type === 'relationshipEdge') return;
-                if (!edgeChildMap.has(e.source)) edgeChildMap.set(e.source, []);
-                edgeChildMap.get(e.source)!.push(e.target);
-            });
-
-            // Only collapse depth-1 nodes (direct children of root) — collapses whole subtrees
-            return currentNodes.map(n => {
-                if (n.type !== 'mindmap') return n;
-                const d = n.data?.depth as number | undefined;
-                const isRoot = d === 0 || (d === undefined && n.data?.direction !== undefined);
-                if (isRoot) return n;
-                const hasKids = (edgeChildMap.get(n.id) || []).length > 0;
-                if (!hasKids) return n;
-                return { ...n, data: { ...n.data, collapsed: true } };
-            });
-        });
+        setNodes(currentNodes => collapseAllMindMapBranches(currentNodes, edges));
     }, [edges, setNodes, takeSnapshot]);
 
-    // ── Expand ALL nodes ───────────────────────────────────────────────────────
     const handleExpandAll = useCallback(() => {
         takeSnapshot();
-        setNodes(currentNodes =>
-            currentNodes.map(n => {
-                if (n.type !== 'mindmap') return n;
-                if (!n.data?.collapsed) return n;
-                return { ...n, data: { ...n.data, collapsed: false }, hidden: false };
-            })
-        );
+        setNodes(currentNodes => expandAllMindMapNodes(currentNodes));
     }, [setNodes, takeSnapshot]);
 
     useEffect(() => {
@@ -1115,7 +571,7 @@ export function useMindMapOrchestrator(
                           strokeWidth: Math.max(1.5, 4 - (targetDepthInTree - 1) * 0.8),
                           stroke: newColor || '#6366f1'
                       },
-                      markerEnd: '' as any
+                      markerEnd: undefined
                   };
              }
              return edge;
@@ -1181,148 +637,5 @@ export function useMindMapOrchestrator(
         return () => window.removeEventListener('mindmap:reparent', handleReparent);
     }, [handleReparent]);
 
-    const handleAddSummary = useCallback((e: Event) => {
-        const detail = (e as CustomEvent).detail;
-        if (!detail || !detail.sourceIds) return;
-
-        takeSnapshot();
-        const newId = `summary-${Date.now()}`;
-        const newNode: Node = {
-            id: newId,
-            type: 'mindmap',
-            position: { x: 0, y: 0 },
-            data: {
-                label: '概要总结',
-                isSummary: true,
-                summaryTargetIds: detail.sourceIds,
-                depth: 10,
-            }
-        };
-
-        setNodes(nds => [...nds, newNode]);
-    }, [setNodes, takeSnapshot]);
-
-    const handleAddBoundary = useCallback((e: Event) => {
-        const detail = (e as CustomEvent).detail;
-        const nodeId = detail?.sourceId || detail?.nodeId;
-        const nodeIds = detail?.nodeIds || (nodeId ? [nodeId] : []);
-        
-        if (nodeIds.length === 0) return;
-
-        takeSnapshot();
-        const newId = `boundary-${Date.now()}`;
-        const newNode: Node = {
-            id: newId,
-            type: 'mindmap-boundary',
-            position: { x: 0, y: 0 }, // Will be calculated by orchestrator
-            data: {
-                targetSubtreeId: nodeIds[0],
-                label: '逻辑外框',
-                width: 100,
-                height: 100,
-            }
-        };
-
-        setNodes(nds => [...nds, newNode]);
-    }, [setNodes, takeSnapshot]);
-
-    const handleCreateRelationship = useCallback((e: Event) => {
-        // Since we can't easily trigger connection programmatically across hooks without exposing internal RF state,
-        // we use a message to guide the user. Professional tools often use this "mode" state.
-        const detail = (e as CustomEvent).detail;
-        if (detail?.sourceId) {
-            // Highlighting the source node to guide the user
-            setNodes(nds => nds.map(n => n.id === detail.sourceId ? { ...n, className: 'relationship-hint' } : n));
-            setTimeout(() => {
-                setNodes(nds => nds.map(n => n.id === detail.sourceId ? { ...n, className: '' } : n));
-            }, 2000);
-            
-            appMessage.info('请拖动节点右侧红色手柄到目标节点');
-        }
-    }, [setNodes]);
-
-    const handleSmartDelete = useCallback((e: Event) => {
-        const detail = (e as CustomEvent).detail;
-        const targetIds = detail?.nodeIds || [];
-        if (targetIds.length === 0) return;
-
-        takeSnapshot();
-
-        const nodeIdsToDelete = new Set<string>(targetIds);
-        
-        setEdges(currentEdges => {
-            const nextEdges: Edge[] = [];
-            const edgesToTransfer: { source: string, target: string, color?: string }[] = [];
-
-            // 1. Identify edges to preserve and edges to "repair"
-            currentEdges.forEach(edge => {
-                const isSourceDeleted = nodeIdsToDelete.has(edge.source);
-                const isTargetDeleted = nodeIdsToDelete.has(edge.target);
-
-                if (isTargetDeleted) {
-                    // Edge going to a deleted node -> ignore it, but check its children
-                    return;
-                }
-
-                if (isSourceDeleted) {
-                    // Edge coming from a deleted node -> this child is now orphaned
-                    // Find the deleted node's parent to re-graft
-                    const deletedNodeId = edge.source;
-                    const parentEdge = currentEdges.find(ed => ed.target === deletedNodeId && ed.type !== 'relationshipEdge');
-                    
-                    if (parentEdge) {
-                        // Re-graft to grandparent
-                        edgesToTransfer.push({ 
-                            source: parentEdge.source, 
-                            target: edge.target,
-                            color: edge.style?.stroke as string
-                        });
-                    }
-                    return;
-                }
-
-                nextEdges.push(edge);
-            });
-
-            // 2. Add repaired edges
-            edgesToTransfer.forEach(({ source, target, color }) => {
-                const newId = `re-edge-${source}-${target}-${Date.now()}`;
-                const targetNode = nodes.find(n => n.id === target);
-                const depth = targetNode?.data?.depth as number ?? 1;
-                
-                nextEdges.push({
-                    id: newId,
-                    source,
-                    target,
-                    type: 'mindmapEdge',
-                    style: {
-                        strokeWidth: Math.max(1.5, 4 - (depth - 1) * 0.8),
-                        stroke: color || '#6366f1'
-                    },
-                    data: { kind: 'mindmap' }
-                });
-            });
-
-            // 3. Filter Nodes
-            setNodes(currentNodes => {
-                const nextNodes = currentNodes.filter(n => !nodeIdsToDelete.has(n.id));
-                return nextNodes;
-            });
-
-            return nextEdges;
-        });
-    }, [nodes, setEdges, setNodes, takeSnapshot]);
-
-    useEffect(() => {
-        window.addEventListener('mindmap:smart-delete', handleSmartDelete);
-        window.addEventListener('editor:add-summary-node', handleAddSummary);
-        window.addEventListener('editor:add-boundary-node', handleAddBoundary);
-        window.addEventListener('editor:create-relationship-edge', handleCreateRelationship);
-        return () => {
-            window.removeEventListener('mindmap:smart-delete', handleSmartDelete);
-            window.removeEventListener('editor:add-summary-node', handleAddSummary);
-            window.removeEventListener('editor:add-boundary-node', handleAddBoundary);
-            window.removeEventListener('editor:create-relationship-edge', handleCreateRelationship);
-        };
-    }, [handleSmartDelete, handleAddSummary, handleAddBoundary, handleCreateRelationship]);
+    useMindMapSupplementalCommands(nodes, setNodes, setEdges, takeSnapshot);
 }

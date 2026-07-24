@@ -1,7 +1,20 @@
-import { ComponentType } from 'react';
-import { ILayoutStrategy } from '../strategies/LayoutStrategyManager';
+import type { ComponentType } from 'react';
+import type { MenuProps } from 'antd';
+import type { Edge, Node } from '@xyflow/react';
+import type { ILayoutStrategy } from './layout-strategy';
 import { NodeData, EdgeData, DiagramConfig } from './common';
 import { LayoutType } from './layout';
+
+export type DiagramExportFormat = 'pdf' | 'svg';
+
+export interface DiagramBusinessData extends Record<string, unknown> {
+  id?: string;
+}
+
+export interface DiagramCollaborationAwareness {
+  clientID?: unknown;
+  setLocalStateField: (field: string, value: unknown) => void;
+}
 
 export interface ResolvedEdgeConfig {
   mode: 'advanced-smart' | 'native';
@@ -61,9 +74,11 @@ export interface DiagramComponentProps {
   onShowOnlyMainFlowChange?: (enabled: boolean) => void;
   /** 是否开启全局只读与防拖拽挂锁模式 */
   isReadonly?: boolean;
-  businessData?: Record<string, any>;
+  businessData?: DiagramBusinessData;
   /** 供特定 SaaS 端游离于主代码外的增强导出菜单，通过 ContextMenuProps 等传入 */
-  extraExportItems?: any[];
+  extraExportItems?: MenuProps['items'];
+  /** (IoC) 由宿主校验商业导出权限；返回 false 时阻止导出动作。 */
+  onExportPermissionCheck?: (format: DiagramExportFormat) => boolean;
 
   // ==========================================
   // 商业化/SaaS 层控制反转 (IoC) Props (Phase 5)
@@ -71,11 +86,11 @@ export interface DiagramComponentProps {
   /** (IoC) YJS/云同步是否已连接 */
   isYjsSynced?: boolean;
   /** (IoC) 本地状态改变时推送给云协作端 */
-  onSyncPush?: (nodes: any[], edges: any[]) => void;
+  onSyncPush?: (nodes: Node[], edges: Edge[]) => void;
   /** (IoC) Active remote users for cursors */
-  activeUsers?: any[];
+  activeUsers?: unknown[];
   /** (IoC) Yjs Awareness for local cursor tracking */
-  yAwareness?: any;
+  yAwareness?: DiagramCollaborationAwareness;
   /** (IoC) 触发云端保存 (Legacy) */
   onCloudSave?: () => Promise<void>;
   /** (IoC) 触发直接覆盖保存 */
@@ -121,6 +136,14 @@ export interface DiagramComponentProps {
   isVersionHistoryOpen?: boolean;
   /** (IoC) 关闭版本历史面板回调 */
   onVersionHistoryClose?: () => void;
+  /** (IoC) 应用层提供版本历史实现，核心画布不直接依赖存储/UI 适配器 */
+  renderVersionHistoryPanel?: (props: {
+    diagramId: string;
+    isOpen: boolean;
+    onClose: () => void;
+  }) => React.ReactNode;
+  /** (IoC) 应用层按需提供标准布局预设，核心布局逻辑不直接依赖数据注册表 */
+  loadLayoutPresetMap?: () => Promise<Record<string, unknown>>;
 }
 
 // 图表数据接口
@@ -152,7 +175,7 @@ export interface DiagramDefinition {
   /** 图表标签 */
   tags?: string[];
   /** 图标 */
-  icon?: any;
+  icon?: ComponentType | string;
   /** 是否支持布局策略切换（主视图顶栏启用条件） */
   supportsLayoutSwitch?: boolean;
   /** 是否支持“仅显示主流程（动线）”开关（更多菜单启用条件） */

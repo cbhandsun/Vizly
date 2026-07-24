@@ -20,7 +20,6 @@ const createPlugin = (overrides: Partial<DiagramTypePlugin> = {}): DiagramTypePl
   getDefaultLayout: () => 'default',
   getNodeTypes: () => ({}),
   getEdgeTypes: () => ({}),
-  addNode: undefined as never,
   ...overrides,
 });
 

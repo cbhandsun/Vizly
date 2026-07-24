@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
     FaFileExport, FaFolderOpen, FaShareAlt, FaCloudUploadAlt, FaSave,
     FaPlay, FaImage, FaFileCode, FaFilePdf, FaFilm, FaProjectDiagram,
-    FaCode, FaHistory, FaExchangeAlt, _FaBars, FaCog, FaLock, FaUnlock,
+    FaCode, FaHistory, FaExchangeAlt, FaCog, FaLock, FaUnlock,
     FaMagic, FaRegComment, FaEllipsisH, FaRobot
 } from 'react-icons/fa';
 import { CollaborationAvatars } from './ui/CollaborationAvatars';
@@ -113,7 +113,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
         { type: 'divider' as const },
         { key: 'json', label: '导出为 JSON', icon: <FaFileExport />, onClick: onExportJSON },
         { key: 'mermaid', label: '导出为 Mermaid', icon: <FaProjectDiagram />, onClick: onExportMermaid, disabled: !onExportMermaid },
-        ...((extraExportItems && (extraExportItems as any[]).length > 0) ? [{ type: 'divider' as const }, ...(extraExportItems as any[])] : [])
+        ...((extraExportItems && extraExportItems.length > 0) ? [{ type: 'divider' as const }, ...extraExportItems] : [])
     ], [onExportPNG, onExportSVG, onExportPDF, onExportGIF, onExportJSON, onExportMermaid, extraExportItems]);
 
     const moreMenu: MenuProps['items'] = useMemo(() => [
@@ -135,7 +135,7 @@ export const TopActionButtons: React.FC<TopActionButtonsProps> = ({
             icon: <FaHistory />,
             onClick: onShowHistory,
         }] : []),
-        ...((extraMoreItems && (extraMoreItems as any[]).length > 0) ? [{ type: 'divider' as const }, ...(extraMoreItems as any[])] : [])
+        ...((extraMoreItems && extraMoreItems.length > 0) ? [{ type: 'divider' as const }, ...extraMoreItems] : [])
     ], [onEditJson, onShowDiff, onShowHistory, extraMoreItems, t]);
 
     const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);

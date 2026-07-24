@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { NodeProps } from '@xyflow/react';
+import type { Node } from '@xyflow/react';
 import { useCustomNodeInteractions } from './hooks/useCustomNodeInteractions';
-import { useCustomNodeStyleResolution } from './hooks/useCustomNodeStyleResolution';
+import {
+    useCustomNodeStyleResolution,
+    type CustomNodeStyleData,
+} from './hooks/useCustomNodeStyleResolution';
 import { CustomNodeGraphics } from './renderers/CustomNodeGraphics';
 import './PremiumNodeStyles.css';
 
-export interface CustomNodeProps extends Partial<NodeProps<any>> {
-    data: any;
+export interface CustomNodeProps extends Partial<NodeProps<Node<CustomNodeStyleData>>> {
+    data: CustomNodeStyleData;
     width?: number;
     height?: number;
 }
@@ -101,8 +105,10 @@ const arePropsEqual = (prevProps: CustomNodeProps, nextProps: CustomNodeProps) =
         const k1 = Object.keys(s1);
         const k2 = Object.keys(s2);
         if (k1.length !== k2.length) return false;
+        const style1 = s1 as unknown as Record<string, unknown>;
+        const style2 = s2 as unknown as Record<string, unknown>;
         for (const key of k1) {
-            if (s1[key] !== s2[key]) return false;
+            if (style1[key] !== style2[key]) return false;
         }
     }
 

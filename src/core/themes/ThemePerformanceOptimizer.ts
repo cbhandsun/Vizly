@@ -6,6 +6,12 @@
 import { Theme, ThemePerformanceOptions } from './types/ThemeTypes';
 import { logThemeOptimizationStrategyFailure } from './themePerformanceLogging';
 
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value && typeof value === 'object' && !Array.isArray(value))
+);
+
+const entriesOf = (value: object): Array<[string, unknown]> => Object.entries(value);
+
 export interface PerformanceMetrics {
   themeLoadTime: number;
   cssUpdateTime: number;
@@ -109,8 +115,12 @@ class PerformanceMonitor {
 
   updateMemoryUsage(): void {
     if ('memory' in performance) {
-      const memory = (performance as any).memory;
-      this.metrics.memoryUsage = memory.usedJSHeapSize / 1024 / 1024; // MB
+      const memory = (performance as Performance & { memory?: unknown }).memory;
+      if (isRecord(memory)
+        && typeof memory.usedJSHeapSize === 'number'
+        && Number.isFinite(memory.usedJSHeapSize)) {
+        this.metrics.memoryUsage = memory.usedJSHeapSize / 1024 / 1024; // MB
+      }
     }
   }
 
@@ -170,10 +180,10 @@ class CSSVariableExtractor {
     return variables;
   }
 
-  private extractPaletteVariables(palette: any, variables: Record<string, string>): void {
-    Object.entries(palette).forEach(([key, color]: [string, any]) => {
-      if (typeof color === 'object' && color !== null) {
-        Object.entries(color).forEach(([prop, value]: [string, unknown]) => {
+  private extractPaletteVariables(palette: Theme['palette'], variables: Record<string, string>): void {
+    entriesOf(palette).forEach(([key, color]) => {
+      if (isRecord(color)) {
+        entriesOf(color).forEach(([prop, value]) => {
           if (typeof value === 'string') {
             variables[`--color-${key}-${prop}`] = value;
           }
@@ -186,58 +196,55 @@ class CSSVariableExtractor {
    * 提取版式相关的 CSS 变量
    * 兼容对象结构的 fontFamily，并对缺失的数值做健壮处理。
    */
-  private extractTypographyVariables(typography: any, variables: Record<string, string>): void {
-    const fontFamily = (() => {
-      const ff = typography?.fontFamily;
-      if (!ff) return '';
-      // 支持 { sans: string[]; mono: string[] } 或直接字符串
-      if (Array.isArray(ff?.sans)) return ff.sans.join(', ');
-      if (typeof ff === 'string') return ff;
-      return '';
-    })();
-    variables['--font-family'] = fontFamily;
+  private extractTypographyVariables(typography: Theme['typography'], variables: Record<string, string>): void {
+    const fontFamily = typography.fontFamily as unknown;
+    variables['--font-family'] = typeof fontFamily === 'string'
+      ? fontFamily
+      : isRecord(fontFamily) && Array.isArray(fontFamily.sans)
+        ? fontFamily.sans.filter((value): value is string => typeof value === 'string').join(', ')
+        : '';
 
-    Object.entries(typography?.fontSize || {}).forEach(([key, value]: [string, unknown]) => {
+    entriesOf(typography.fontSize).forEach(([key, value]) => {
       const num = typeof value === 'number' ? value : 0;
       variables[`--font-size-${key}`] = `${num}px`;
     });
 
-    Object.entries(typography?.fontWeight || {}).forEach(([key, value]: [string, unknown]) => {
+    entriesOf(typography.fontWeight).forEach(([key, value]) => {
       const v = typeof value === 'number' || typeof value === 'string' ? String(value) : '';
       variables[`--font-weight-${key}`] = v;
     });
 
-    Object.entries(typography?.lineHeight || {}).forEach(([key, value]: [string, unknown]) => {
+    entriesOf(typography.lineHeight).forEach(([key, value]) => {
       const v = typeof value === 'number' || typeof value === 'string' ? String(value) : '';
       variables[`--line-height-${key}`] = v;
     });
   }
 
-  private extractSpacingVariables(spacing: any, variables: Record<string, string>): void {
-    Object.entries(spacing).forEach(([key, value]) => {
-      variables[`--spacing-${key}`] = `${value}px`;
+  private extractSpacingVariables(spacing: Theme['spacing'], variables: Record<string, string>): void {
+    entriesOf(spacing).forEach(([key, value]) => {
+      if (typeof value === 'number' && Number.isFinite(value)) variables[`--spacing-${key}`] = `${value}px`;
     });
   }
 
-  private extractBorderRadiusVariables(borderRadius: any, variables: Record<string, string>): void {
-    Object.entries(borderRadius).forEach(([key, value]) => {
-      variables[`--border-radius-${key}`] = `${value}px`;
+  private extractBorderRadiusVariables(borderRadius: Theme['borderRadius'], variables: Record<string, string>): void {
+    entriesOf(borderRadius).forEach(([key, value]) => {
+      if (typeof value === 'number' && Number.isFinite(value)) variables[`--border-radius-${key}`] = `${value}px`;
     });
   }
 
-  private extractShadowVariables(shadow: any, variables: Record<string, string>): void {
-    Object.entries(shadow).forEach(([key, value]) => {
-      variables[`--shadow-${key}`] = value as string;
+  private extractShadowVariables(shadow: Theme['shadow'], variables: Record<string, string>): void {
+    entriesOf(shadow).forEach(([key, value]) => {
+      if (typeof value === 'string') variables[`--shadow-${key}`] = value;
     });
   }
 
-  private extractAnimationVariables(animation: any, variables: Record<string, string>): void {
-    Object.entries(animation.duration).forEach(([key, value]) => {
-      variables[`--animation-duration-${key}`] = `${value}ms`;
+  private extractAnimationVariables(animation: Theme['animation'], variables: Record<string, string>): void {
+    entriesOf(animation.duration).forEach(([key, value]) => {
+      if (typeof value === 'number' && Number.isFinite(value)) variables[`--animation-duration-${key}`] = `${value}ms`;
     });
     
-    Object.entries(animation.easing).forEach(([key, value]) => {
-      variables[`--animation-easing-${key}`] = value as string;
+    entriesOf(animation.easing).forEach(([key, value]) => {
+      if (typeof value === 'string') variables[`--animation-easing-${key}`] = value;
     });
   }
 
@@ -245,36 +252,39 @@ class CSSVariableExtractor {
    * 提取图表相关的 CSS 变量
    * 为缺失字段提供默认值，避免运行时读取 undefined.toString 造成的错误。
    */
-  private extractDiagramVariables(diagram: any, variables: Record<string, string>): void {
+  private extractDiagramVariables(diagram: Theme['diagram'], variables: Record<string, string>): void {
     if (!diagram) return;
     // 域变量
-    Object.entries(diagram?.domains || {}).forEach(([domain, color]: [string, any]) => {
-      Object.entries(color).forEach(([prop, value]: [string, unknown]) => {
-        variables[`--diagram-domain-${domain}-${prop}`] = value as string;
+    entriesOf(diagram.domains).forEach(([domain, color]) => {
+      if (!isRecord(color)) return;
+      entriesOf(color).forEach(([prop, value]) => {
+        if (typeof value === 'string') variables[`--diagram-domain-${domain}-${prop}`] = value;
       });
     });
 
     // 边缘变量
-    Object.entries(diagram?.edges || {}).forEach(([type, color]: [string, any]) => {
-      Object.entries(color).forEach(([prop, value]: [string, unknown]) => {
-        variables[`--diagram-edge-${type}-${prop}`] = value as string;
+    entriesOf(diagram.edges).forEach(([type, color]) => {
+      if (!isRecord(color)) return;
+      entriesOf(color).forEach(([prop, value]) => {
+        if (typeof value === 'string') variables[`--diagram-edge-${type}-${prop}`] = value;
       });
     });
 
     // 节点变量
-    Object.entries(diagram?.nodes || {}).forEach(([state, color]: [string, any]) => {
-      Object.entries(color).forEach(([prop, value]: [string, unknown]) => {
-        variables[`--diagram-node-${state}-${prop}`] = value as string;
+    entriesOf(diagram.nodes).forEach(([state, color]) => {
+      if (!isRecord(color)) return;
+      entriesOf(color).forEach(([prop, value]) => {
+        if (typeof value === 'string') variables[`--diagram-node-${state}-${prop}`] = value;
       });
     });
 
     // 画布变量
-    const canvas = diagram?.canvas || {};
-    const grid = canvas?.grid || {};
+    const canvas = diagram.canvas;
+    const grid = canvas.grid;
     const gridSize = typeof grid.size === 'number' ? grid.size : 0;
     const gridOpacity = typeof grid.opacity === 'number' ? grid.opacity : 1;
-    variables['--diagram-canvas-background'] = canvas.background || '';
-    variables['--diagram-grid-color'] = grid.color || '';
+    variables['--diagram-canvas-background'] = canvas.background;
+    variables['--diagram-grid-color'] = grid.color;
     variables['--diagram-grid-size'] = `${gridSize}px`;
     variables['--diagram-grid-opacity'] = String(gridOpacity);
   }
@@ -614,8 +624,9 @@ export class ThemePerformanceOptimizer {
     }
 
     // 触发垃圾回收（如果可用）
-    if ('gc' in window && typeof (window as any).gc === 'function') {
-      (window as any).gc();
+    const gc = (window as Window & { gc?: unknown }).gc;
+    if (typeof gc === 'function') {
+      gc();
     }
   }
 

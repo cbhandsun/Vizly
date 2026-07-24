@@ -14,9 +14,7 @@ import Checkbox from 'antd/es/checkbox';
 import {
     PlusOutlined,
     DeleteOutlined,
-    _RobotOutlined,
     RocketOutlined,
-    _GlobalOutlined,
     SettingOutlined,
     CheckCircleFilled,
     AppstoreOutlined,
@@ -48,6 +46,7 @@ import {
     logAIConfigModalCloudLoadFailure,
     logAIConfigRequestFailure,
 } from './aiLogging';
+import { filterAIModels, filterAIProviders, groupAIModels } from './aiConfigModelCollections';
 
 const { Text, Title, Paragraph } = Typography;
 const loadStorageService = async () => (await import('@/services/SupabaseStorage')).storageService;
@@ -128,8 +127,8 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     };
 
     // --- Provider Actions ---
-    const toggleProvider = (id: string, checked: boolean, e: React.MouseEvent) => {
-        e.stopPropagation();
+    const toggleProvider = (id: string, checked: boolean, event: React.SyntheticEvent<HTMLButtonElement>) => {
+        event.stopPropagation();
         setConfig(prev => ({
             ...prev,
             providers: prev.providers.map(p => {
@@ -246,20 +245,11 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
     const selectedProvider = config.providers.find(p => p.id === selectedProviderId);
 
     // Derived state for rendering
-    const filteredProviders = config.providers.filter(p =>
-        p.name.toLowerCase().includes(searchText.toLowerCase())
-    );
+    const filteredProviders = filterAIProviders(config.providers, searchText);
 
     // Group models by 'group' field
     const groupedModels = useMemo(() => {
-        if (!selectedProvider) return {};
-        const groups: Record<string, AIModel[]> = {};
-        selectedProvider.models.forEach(m => {
-            const key = m.group || 'Other';
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(m);
-        });
-        return groups;
+        return groupAIModels(selectedProvider?.models ?? []);
     }, [selectedProvider]);
 
     // --- Test Connection ---
@@ -284,7 +274,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                 messages: [{ role: 'user', content: 'Hello, please reply with "OK".' }]
             }, { timeoutMs: 30_000 });
             appMessage.success(t('aiConfig.testSuccess'));
-        } catch (error: any) {
+        } catch (error) {
             logAIConfigRequestFailure('testConnection', provider.name, error);
             appMessage.error(t('aiConfig.testError', { message: formatAIProviderRequestError(error, 100) }));
         } finally {
@@ -332,20 +322,9 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
         }
     };
 
-    const filteredDiscoveredModels = discoveredModels.filter(m => 
-        m.id.toLowerCase().includes(discoverySearchText.toLowerCase()) || 
-        m.name.toLowerCase().includes(discoverySearchText.toLowerCase())
-    );
-
     const groupedDiscoveredModels = useMemo(() => {
-        const groups: Record<string, AIModel[]> = {};
-        filteredDiscoveredModels.forEach(m => {
-            const key = m.group || 'Other';
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(m);
-        });
-        return groups;
-    }, [filteredDiscoveredModels]);
+        return groupAIModels(filterAIModels(discoveredModels, discoverySearchText));
+    }, [discoveredModels, discoverySearchText]);
 
     const handleFetchModels = async (provider: AIProviderConfig) => {
         if (!provider.baseUrl) {
@@ -393,7 +372,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
             } else {
                 appMessage.error(t('aiConfig.fetchModelsInvalidData'));
             }
-        } catch (error: any) {
+        } catch (error) {
             logAIConfigRequestFailure('fetchModels', provider.name, error);
             appMessage.error(t('aiConfig.testError', { message: formatAIProviderRequestError(error, 100) }));
         } finally {
@@ -476,7 +455,7 @@ const AIConfigModal: React.FC<AIConfigModalProps> = ({ open, onCancel, onSave })
                                     <Switch
                                         size="small"
                                         checked={item.enabled}
-                                        onClick={(c, e) => toggleProvider(item.id, c, e as any)}
+                                        onClick={(checked, event) => toggleProvider(item.id, checked, event)}
                                     />
                                 </div>
                             ))}

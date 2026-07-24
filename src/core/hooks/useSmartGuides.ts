@@ -249,7 +249,7 @@ export const useSmartGuides = ({ threshold = 5 }: UseSmartGuidesProps = {}) => {
     const snapDeltaRef = useRef<SnapDelta | null>(null);
 
     const onSmartNodeDrag = useCallback(
-        (_e: React.MouseEvent, node: Node, nodes: Node[]): SnapDelta | null => {
+        (_event: MouseEvent | TouchEvent, node: Node, nodes: Node[]): SnapDelta | null => {
             const result = computeAlignment(node, nodes, threshold);
 
             snapDeltaRef.current = result.snapDelta;

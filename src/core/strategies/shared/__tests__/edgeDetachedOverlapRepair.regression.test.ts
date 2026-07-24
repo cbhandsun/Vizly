@@ -2,16 +2,12 @@ import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
 import {
-  createDetachedOverlapStateEvaluationContext,
-  edgesWithPaths,
-  scoreDetachedOverlapState,
   separateDetachedParallelOverlaps,
 } from '../edgeDetachedOverlapRepair';
 import { repairDetachedStrictCrossingBypasses } from '../edgeDetachedStrictCrossingRepair';
 import {
   calculateEdgePathQualityScore,
   countStrictEdgeCrossings,
-  createEdgePathQualityEvaluationContext,
 } from '../edgeStrictCrossingGuard';
 
 function node(id: string, x: number, y: number, width = 80, height = 48): Node {
@@ -582,43 +578,4 @@ function segmentDirection(a: { x: number; y: number }, b: { x: number; y: number
   if (Math.abs(a.x - b.x) < 1) return Math.sign(b.y - a.y);
   if (Math.abs(a.y - b.y) < 1) return Math.sign(b.x - a.x);
   return 0;
-}
-
-function hasStrictCrossing(a: Array<{ x: number; y: number }>, b: Array<{ x: number; y: number }>): boolean {
-  for (let i = 0; i < a.length - 1; i += 1) {
-    for (let j = 0; j < b.length - 1; j += 1) {
-      const crossing = strictSegmentCrossing(a[i], a[i + 1], b[j], b[j + 1]);
-      if (crossing) return true;
-    }
-  }
-  return false;
-}
-
-function strictSegmentCrossing(
-  a1: { x: number; y: number },
-  a2: { x: number; y: number },
-  b1: { x: number; y: number },
-  b2: { x: number; y: number },
-): boolean {
-  const aHorizontal = Math.abs(a1.y - a2.y) < 1 && Math.abs(a1.x - a2.x) > 1;
-  const aVertical = Math.abs(a1.x - a2.x) < 1 && Math.abs(a1.y - a2.y) > 1;
-  const bHorizontal = Math.abs(b1.y - b2.y) < 1 && Math.abs(b1.x - b2.x) > 1;
-  const bVertical = Math.abs(b1.x - b2.x) < 1 && Math.abs(b1.y - b2.y) > 1;
-  if (aHorizontal && bVertical) return segmentCrosses(a1, a2, b1, b2);
-  if (aVertical && bHorizontal) return segmentCrosses(b1, b2, a1, a2);
-  return false;
-}
-
-function segmentCrosses(
-  horizontalA: { x: number; y: number },
-  horizontalB: { x: number; y: number },
-  verticalA: { x: number; y: number },
-  verticalB: { x: number; y: number },
-): boolean {
-  const x = verticalA.x;
-  const y = horizontalA.y;
-  return x > Math.min(horizontalA.x, horizontalB.x) + 1
-    && x < Math.max(horizontalA.x, horizontalB.x) - 1
-    && y > Math.min(verticalA.y, verticalB.y) + 1
-    && y < Math.max(verticalA.y, verticalB.y) - 1;
 }

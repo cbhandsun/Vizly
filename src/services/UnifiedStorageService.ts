@@ -97,7 +97,7 @@ class LazyStorageProvider implements IStorageProvider {
         return (await this.provider()).deleteDiagram(id);
     }
 
-    async saveVersion(diagramId: string, data: any, message?: string): Promise<DiagramVersion> {
+    async saveVersion(diagramId: string, data: unknown, message?: string): Promise<DiagramVersion> {
         const provider = await this.provider();
         if (!provider.saveVersion) {
             throw new Error(`${this.name} does not support version history.`);
@@ -200,7 +200,7 @@ export class UnifiedStorageService implements IStorageProvider {
     }
 
     // === Versioning Methods with Local Fallback ===
-    async saveVersion(diagramId: string, data: any, message?: string): Promise<DiagramVersion> {
+    async saveVersion(diagramId: string, data: unknown, message?: string): Promise<DiagramVersion> {
         try {
             if (this.activeProvider.saveVersion) {
                 return await this.activeProvider.saveVersion(diagramId, data, message);

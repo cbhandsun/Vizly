@@ -57,49 +57,31 @@ export async function loadThemePreset(themeId: string): Promise<ThemePreset | nu
     // 动态导入主题模块
     const module = await loader();
 
-    // 获取主题预设对象
-    let themePreset: ThemePreset;
+    const moduleExports = module as Record<string, unknown>;
+    const isThemePreset = (value: unknown): value is ThemePreset =>
+      Boolean(value && typeof value === 'object' && 'id' in value && 'theme' in value);
+    const preferredExportNames = [
+      'lightThemePreset',
+      'darkThemePreset',
+      'oceanThemePreset',
+      'forestThemePreset',
+      'highContrastThemePreset',
+      'sunsetThemePreset',
+      'monoThemePreset',
+      'originalThemePreset',
+      'blueprintThemePreset',
+      'sketchThemePreset',
+      'corporateThemePreset',
+      'default',
+    ] as const;
+    const themePreset = preferredExportNames
+      .map(exportName => moduleExports[exportName])
+      .find(isThemePreset)
+      ?? Object.values(moduleExports).find(isThemePreset);
 
-    // 根据不同的导出方式获取主题预设
-    const moduleExports = module as Record<string, any>;
-
-    if ('lightThemePreset' in moduleExports) {
-      themePreset = moduleExports.lightThemePreset;
-    } else if ('darkThemePreset' in moduleExports) {
-      themePreset = moduleExports.darkThemePreset;
-    } else if ('oceanThemePreset' in moduleExports) {
-      themePreset = moduleExports.oceanThemePreset;
-    } else if ('forestThemePreset' in moduleExports) {
-      themePreset = moduleExports.forestThemePreset;
-    } else if ('highContrastThemePreset' in moduleExports) {
-      themePreset = moduleExports.highContrastThemePreset;
-    } else if ('sunsetThemePreset' in moduleExports) {
-      themePreset = moduleExports.sunsetThemePreset;
-    } else if ('monoThemePreset' in moduleExports) {
-      themePreset = moduleExports.monoThemePreset;
-    } else if ('originalThemePreset' in moduleExports) {
-      themePreset = moduleExports.originalThemePreset;
-    } else if ('blueprintThemePreset' in moduleExports) {
-      themePreset = moduleExports.blueprintThemePreset;
-    } else if ('sketchThemePreset' in moduleExports) {
-      themePreset = moduleExports.sketchThemePreset;
-    } else if ('corporateThemePreset' in moduleExports) {
-      themePreset = moduleExports.corporateThemePreset;
-    } else if ('default' in moduleExports && moduleExports.default) {
-      themePreset = moduleExports.default;
-    } else {
-      // 获取模块中的第一个导出
-      const presetExport = Object.values(moduleExports).find(
-        (value): value is ThemePreset =>
-          value && typeof value === 'object' && 'id' in value && 'theme' in value
-      );
-
-      if (!presetExport) {
-        logThemePresetModuleFormatInvalid(themeId);
-        return null;
-      }
-
-      themePreset = presetExport;
+    if (!themePreset) {
+      logThemePresetModuleFormatInvalid(themeId);
+      return null;
     }
 
     // 验证主题预设

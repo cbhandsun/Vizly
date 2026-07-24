@@ -1,6 +1,6 @@
-import { Node as ReactFlowNode } from '@xyflow/react';
-import { Position, Rectangle } from '../../types/common';
-import { diagramConfigManager } from '../../components/config/DiagramConfig';
+import type { Node as ReactFlowNode } from '@xyflow/react';
+import type { Position, Rectangle } from '../../types/common';
+import { diagramConfigManager } from '../../config/DiagramConfig';
 import { LayoutOptimizer } from '../../components/layout/LayoutOptimizer';
 
 /**
@@ -8,18 +8,57 @@ import { LayoutOptimizer } from '../../components/layout/LayoutOptimizer';
  * @description 整合所有图表的布局计算逻辑，避免重复代码
  */
 
+const GROUP_NODE_TYPES = new Set(['subGroup', 'titleGroup', 'group', 'domain']);
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value && typeof value === 'object' && !Array.isArray(value))
+);
+
+const finiteNumber = (value: unknown, fallback: number): number => (
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback
+);
+
+const sortableNumber = (value: unknown): number => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : Number.NaN;
+  if (typeof value !== 'string' || value.trim() === '') return Number.NaN;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+};
+
+const nodeData = (node: ReactFlowNode): Record<string, unknown> => (
+  isRecord(node.data) ? node.data : {}
+);
+
+const nodeDomain = (node: ReactFlowNode): string => {
+  const domain = nodeData(node).domain;
+  return typeof domain === 'string' ? domain.trim() : '';
+};
+
+const nodePosition = (node: ReactFlowNode): Position => ({
+  x: finiteNumber(node.position?.x, 0),
+  y: finiteNumber(node.position?.y, 0),
+});
+
+const nodeWidth = (node: ReactFlowNode, fallback = 0): number => (
+  finiteNumber(node.measured?.width ?? node.style?.width ?? node.width, fallback)
+);
+
+const nodeHeight = (node: ReactFlowNode, fallback = 0): number => (
+  finiteNumber(node.measured?.height ?? node.style?.height ?? node.height, fallback)
+);
+
 /**
  * 辅助函数：行内节点排序（语义优先）
  * 优先级：data.sequence > data.order > x 坐标 (从左到右)
  */
 export const sortNodesInRow = (nodes: ReactFlowNode[]): ReactFlowNode[] => {
   return nodes.sort((a, b) => {
-    const seqARaw = (a.data as any)?.sequence ?? (a.data as any)?.order;
-    const seqBRaw = (b.data as any)?.sequence ?? (b.data as any)?.order;
-    const seqA = typeof seqARaw === 'number' ? seqARaw : parseFloat(seqARaw);
-    const seqB = typeof seqBRaw === 'number' ? seqBRaw : parseFloat(seqBRaw);
-    const hasSeqA = isFinite(seqA);
-    const hasSeqB = isFinite(seqB);
+    const dataA = nodeData(a);
+    const dataB = nodeData(b);
+    const seqA = sortableNumber(dataA.sequence ?? dataA.order);
+    const seqB = sortableNumber(dataB.sequence ?? dataB.order);
+    const hasSeqA = Number.isFinite(seqA);
+    const hasSeqB = Number.isFinite(seqB);
 
     if (hasSeqA && hasSeqB) {
       return seqA - seqB;
@@ -94,35 +133,35 @@ function _isLineIntersectingRect(
 export const ensureMeasuredForNodes = (
   nodes: ReactFlowNode[]
 ): ReactFlowNode[] => {
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-  const layoutCfg: any = diagramConfigManager.getLayoutConfig() || {};
-  const minW = num(layoutCfg?.NODE_MIN_WIDTH, 120);
+  const layoutCfg = diagramConfigManager.getLayoutConfig();
+  const minW = finiteNumber(layoutCfg.NODE_MIN_WIDTH, 120);
   const opt = LayoutOptimizer.getInstance();
-  const isGroupType = (t: any) => new Set(['subGroup', 'titleGroup', 'group', 'domain']).has(String(t || ''));
-  const updated = nodes.map(n => ({ ...n }));
+  const updated = nodes.map(n => ({
+    ...n,
+    ...(n.style ? { style: { ...n.style } } : {}),
+    ...(n.measured ? { measured: { ...n.measured } } : {}),
+  }));
   for (let i = 0; i < updated.length; i++) {
-    const n = updated[i] as any;
+    const n = updated[i];
     const tp = String(n.type || '');
-    if (isGroupType(tp)) {
-      const w = num((n?.measured?.width ?? n?.style?.width ?? n?.width), 0);
-      const h = num((n?.measured?.height ?? n?.style?.height ?? n?.height), 0);
+    if (GROUP_NODE_TYPES.has(tp)) {
+      const w = nodeWidth(n);
+      const h = nodeHeight(n);
       n.measured = { width: w, height: h };
       if (!n.style) n.style = {};
-      if (!(n.style.width > 0)) n.style.width = w;
-      if (!(n.style.height > 0)) n.style.height = h;
-      updated[i] = n as ReactFlowNode;
+      if (finiteNumber(n.style.width, 0) <= 0) n.style.width = w;
+      if (finiteNumber(n.style.height, 0) <= 0) n.style.height = h;
       continue;
     }
-    const dt: any = (n.data || {}) as any;
-    const desc = String((dt.description ?? dt.label ?? '')).trim();
+    const data = nodeData(n);
+    const desc = String(data.description ?? data.label ?? '').trim();
     const wCalc = opt.calculateNodeWidth(desc);
     const hCalc = opt.calculateNodeHeight(desc);
-    const w = Math.max(minW, num(wCalc, minW));
-    const h = Math.max(24, num(hCalc, 60));
+    const w = Math.max(minW, finiteNumber(wCalc, minW));
+    const h = Math.max(24, finiteNumber(hCalc, 60));
     if (!n.style) n.style = {};
     n.style.width = w; n.style.height = h;
     n.measured = { width: w, height: h };
-    updated[i] = n as ReactFlowNode;
   }
   return updated;
 };
@@ -148,11 +187,12 @@ export const calculateBoundingBox = (nodes: ReactFlowNode[]): Rectangle => {
   let maxY = -Infinity;
 
   for (const node of nodes) {
-    const x = node.position?.x ?? 0;
-    const y = node.position?.y ?? 0;
-    const wBase = (node.measured?.width ?? (node.style as any)?.width ?? (node as any)?.width ?? 0) as number;
-    const hBase = (node.measured?.height ?? (node.style as any)?.height ?? (node as any)?.height ?? 0) as number;
-    const borderRaw = String((((node.data as any)?.customStyle?.border) ?? ((node.style as any)?.border) ?? ''));
+    const { x, y } = nodePosition(node);
+    const wBase = nodeWidth(node);
+    const hBase = nodeHeight(node);
+    const customStyleValue = nodeData(node).customStyle;
+    const customStyle = isRecord(customStyleValue) ? customStyleValue : {};
+    const borderRaw = String(customStyle.border ?? node.style?.border ?? '');
     const borderPxMatch = /([0-9]*\.?[0-9]+)px/i.exec(borderRaw);
     const borderW = borderPxMatch ? Math.max(0, Number(borderPxMatch[1])) : 0;
     const extraW = borderW * 2;
@@ -197,32 +237,31 @@ export const scatterNodesAtSamePoint = (
   gap: number,
   tolerance: number = 2
 ): void => {
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-  const tol = Math.max(1, Math.floor(num(tolerance, 2)));
+  const tol = Math.max(1, Math.floor(finiteNumber(tolerance, 2)));
   const keyOf = (p: { x: number; y: number }) => `${Math.round(p.x / tol)}:${Math.round(p.y / tol)}`;
   const buckets = new Map<string, ReactFlowNode[]>();
   for (const n of list) {
-    const p = (n as any).position || { x: 0, y: 0 } as any;
+    const p = nodePosition(n);
     const k = keyOf(p);
     const arr = buckets.get(k) || [];
     arr.push(n); buckets.set(k, arr);
   }
-  const step = Math.max(12, Math.floor(num(gap, 12)));
+  const step = Math.max(12, Math.floor(finiteNumber(gap, 12)));
   for (const [, arr] of buckets.entries()) {
     if (arr.length <= 1) continue;
-    const pivot = (arr[0] as any).position || { x: 0, y: 0 } as any;
+    const pivot = nodePosition(arr[0]);
     const half = Math.floor(arr.length / 2);
     const ordered = arr.slice().sort((a, b) => String(a.id).localeCompare(String(b.id)));
     for (let i = 0; i < ordered.length; i++) {
       const offset = (i - half) * step;
       if (axis === 'x') {
-        const ny = Math.round(((ordered[i] as any).position?.y) || pivot.y);
+        const ny = Math.round(nodePosition(ordered[i]).y);
         const nx = Math.round(pivot.x + offset);
-        (ordered[i] as any).position = { x: nx, y: ny } as any;
+        ordered[i].position = { x: nx, y: ny };
       } else {
-        const nx = Math.round(((ordered[i] as any).position?.x) || pivot.x);
+        const nx = Math.round(nodePosition(ordered[i]).x);
         const ny = Math.round(pivot.y + offset);
-        (ordered[i] as any).position = { x: nx, y: ny } as any;
+        ordered[i].position = { x: nx, y: ny };
       }
     }
   }
@@ -262,22 +301,21 @@ export const countRectOverlaps = (
 export const countNodeOverlapsByDomain = (
   nodes: ReactFlowNode[]
 ): number => {
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
   const EXCLUDE = new Set(['subGroup', 'titleGroup', 'group', 'domain']);
-  const getW = (n: ReactFlowNode) => num(((n as any)?.measured?.width ?? (n.style as any)?.width), 240);
-  const getH = (n: ReactFlowNode) => num(((n as any)?.measured?.height ?? (n.style as any)?.height), 120);
-  const getX = (n: ReactFlowNode) => num(((n.position as any)?.x), 0);
-  const getY = (n: ReactFlowNode) => num(((n.position as any)?.y), 0);
   let total = 0;
   const domainsSet = new Set<string>();
   for (const n of nodes) {
-    const d = String((((n as any)?.data && (n as any).data.domain) || '')).trim();
+    const d = nodeDomain(n);
     if (d) domainsSet.add(d);
   }
   const domains = Array.from(domainsSet);
   for (const d of domains) {
-    const biz = nodes.filter(n => !EXCLUDE.has(String(n.type || '')) && String(((n.data as any)?.domain || '')) === d);
-    const rects = biz.map(n => ({ x: getX(n), y: getY(n), width: getW(n), height: getH(n) }));
+    const biz = nodes.filter(n => !EXCLUDE.has(String(n.type || '')) && nodeDomain(n) === d);
+    const rects = biz.map(n => ({
+      ...nodePosition(n),
+      width: nodeWidth(n, 240),
+      height: nodeHeight(n, 120),
+    }));
     total += countRectOverlaps(rects);
   }
   return total;
@@ -295,53 +333,44 @@ export const countNodeOverlapsByDomain = (
  */
 export const pushFreeNodesBelowSubGroupRow = (nodes: ReactFlowNode[]): ReactFlowNode[] => {
   const updated = nodes.map(n => ({ ...n }));
-  const num = (v: any, fb: number) => (typeof v === 'number' && isFinite(v)) ? v : fb;
-  const cfgFull = diagramConfigManager.getConfig() as any;
-  const cfgLayout = diagramConfigManager.getLayoutConfig() as any;
-  const padH = num(cfgFull?.domain?.padding?.horizontal, 24);
-  const titleH = num(cfgFull?.domain?.title?.height, 40);
-  const titleV = num(cfgFull?.domain?.title?.padding?.vertical, 12);
-  const titleSafe = num(cfgFull?.domain?.title?.safeGap, 16);
-  const sideSafe = Math.max(0, num(cfgFull?.domain?.sideSafeGap, 8));
-  const vGap = num(cfgLayout?.NODE_V_GAP, 80);
-
-  const getW = (n: ReactFlowNode) => num(((n as any)?.measured?.width ?? (n as any)?.style?.width ?? (n as any)?.width), 0);
-  const getH = (n: ReactFlowNode) => num(((n as any)?.measured?.height ?? (n as any)?.style?.height ?? (n as any)?.height), 0);
+  const cfgFull = diagramConfigManager.getConfig();
+  const cfgLayout = diagramConfigManager.getLayoutConfig();
+  const padH = finiteNumber(cfgFull.domain.padding.horizontal, 24);
+  const titleH = finiteNumber(cfgFull.domain.title.height, 40);
+  const titleV = finiteNumber(cfgFull.domain.title.padding.vertical, 12);
+  const titleSafe = finiteNumber(cfgFull.domain.title.safeGap, 16);
+  const sideSafe = Math.max(0, finiteNumber(cfgFull.domain.sideSafeGap, 8));
+  const vGap = finiteNumber(cfgLayout.NODE_V_GAP, 80);
 
   const domains = updated.filter(n => String(n.type || '') === 'titleGroup');
   for (const tg of domains) {
-    const dId = String(((tg.data as any)?.domain || ''));
+    const dId = nodeDomain(tg);
     if (!dId) continue;
-    const tx = num(((tg as any)?.position?.x), 0);
-    const ty = num(((tg as any)?.position?.y), 0);
-    const tw = num((((tg as any)?.measured?.width ?? (tg as any)?.style?.width)), 0);
+    const { x: tx, y: ty } = nodePosition(tg);
+    const tw = nodeWidth(tg);
     const innerLeft = tx + padH + sideSafe;
     const innerRight = tx + Math.max(0, tw) - padH - sideSafe;
     const innerTop = ty + titleH + titleV + titleSafe;
-    const sgs = updated.filter(n => String(n.type || '') === 'subGroup' && String(((n.data as any)?.domain || '')) === dId);
+    const sgs = updated.filter(n => String(n.type || '') === 'subGroup' && nodeDomain(n) === dId);
     let maxBottom = innerTop;
     for (const sg of sgs) {
-      const _sx = num(((sg as any)?.position?.x), 0);
-      const sy = num(((sg as any)?.position?.y), 0);
-      const sh = getH(sg);
+      const sy = nodePosition(sg).y;
+      const sh = nodeHeight(sg);
       maxBottom = Math.max(maxBottom, sy + sh);
     }
     const members = updated.filter(n => {
       const tp = String(n.type || '');
       if (tp === 'titleGroup' || tp === 'subGroup') return false;
-      const d1 = String(((n.data as any)?.domain || '')).trim();
-      return d1 === dId;
+      return nodeDomain(n) === dId;
     });
     for (const m of members) {
-      const mx = num(((m as any)?.position?.x), 0);
-      const my = num(((m as any)?.position?.y), 0);
-      const mw = getW(m);
-      const _mh = getH(m);
+      const { x: mx, y: my } = nodePosition(m);
+      const mw = nodeWidth(m);
       const targetY = Math.max(my, maxBottom + vGap);
       const minX = innerLeft;
       const maxX = Math.max(innerLeft, innerRight - mw);
       const nx = Math.min(Math.max(mx, minX), maxX);
-      (m as any).position = { x: nx, y: targetY } as any;
+      m.position = { x: nx, y: targetY };
     }
   }
   return updated;

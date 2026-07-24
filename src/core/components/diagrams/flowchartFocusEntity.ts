@@ -17,6 +17,64 @@ export type FlowchartFocusEntityDetail = {
     zoom?: number;
 };
 
+const FLOWCHART_ENTITY_ID_MAX_CHARS = 256;
+const FLOWCHART_FOCUS_MIN_ZOOM = 0.1;
+const FLOWCHART_FOCUS_MAX_ZOOM = 4;
+
+const containsControlCharacter = (value: string): boolean => (
+    Array.from(value).some((character) => {
+        const codePoint = character.codePointAt(0) ?? 0;
+        return codePoint <= 0x1F || codePoint === 0x7F;
+    })
+);
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+);
+
+const coerceEntityId = (value: unknown): string | undefined => {
+    if (typeof value !== 'string') return undefined;
+    const normalized = value.trim();
+    if (
+        !normalized
+        || normalized.length > FLOWCHART_ENTITY_ID_MAX_CHARS
+        || containsControlCharacter(normalized)
+    ) {
+        return undefined;
+    }
+    return normalized;
+};
+
+export const coerceFlowchartFocusEntityDetail = (value: unknown): FlowchartFocusEntityDetail | null => {
+    if (!isRecord(value)) return null;
+
+    const nodeId = coerceEntityId(value.nodeId);
+    const edgeId = coerceEntityId(value.edgeId);
+    if ((nodeId ? 1 : 0) + (edgeId ? 1 : 0) !== 1) return null;
+
+    if (value.preserveZoom !== undefined && typeof value.preserveZoom !== 'boolean') return null;
+
+    let zoom: number | undefined;
+    if (value.zoom !== undefined) {
+        if (
+            typeof value.zoom !== 'number'
+            || !Number.isFinite(value.zoom)
+            || value.zoom < FLOWCHART_FOCUS_MIN_ZOOM
+            || value.zoom > FLOWCHART_FOCUS_MAX_ZOOM
+        ) {
+            return null;
+        }
+        zoom = value.zoom;
+    }
+
+    return {
+        ...(nodeId ? { nodeId } : {}),
+        ...(edgeId ? { edgeId } : {}),
+        ...(typeof value.preserveZoom === 'boolean' ? { preserveZoom: value.preserveZoom } : {}),
+        ...(zoom !== undefined ? { zoom } : {}),
+    };
+};
+
 const getTargetZoom = (
     reactFlowInstance: ReactFlowFocusApi | null | undefined,
     detail: FlowchartFocusEntityDetail
@@ -115,34 +173,37 @@ export const handleFlowchartFocusEntity = ({
     reactFlowInstance: ReactFlowFocusApi | null | undefined;
     nodes: Node[];
     edges: Edge[];
-    detail: FlowchartFocusEntityDetail;
+    detail: unknown;
     setSelectedNodes: (nodes: Node[]) => void;
     setSelectedEdges: (edges: Edge[]) => void;
 }): boolean => {
-    if (detail.nodeId) {
+    const safeDetail = coerceFlowchartFocusEntityDetail(detail);
+    if (!safeDetail) return false;
+
+    if (safeDetail.nodeId) {
         return focusFlowchartNode({
             reactFlowInstance,
             nodes,
-            nodeId: detail.nodeId,
+            nodeId: safeDetail.nodeId,
             setSelectedNodes,
             setSelectedEdges,
             duration: 600,
-            zoom: getTargetZoom(reactFlowInstance, detail),
-            preserveZoom: detail.preserveZoom,
+            zoom: getTargetZoom(reactFlowInstance, safeDetail),
+            preserveZoom: safeDetail.preserveZoom,
         });
     }
 
-    if (detail.edgeId) {
+    if (safeDetail.edgeId) {
         return focusFlowchartEdge({
             reactFlowInstance,
             nodes,
             edges,
-            edgeId: detail.edgeId,
+            edgeId: safeDetail.edgeId,
             setSelectedNodes,
             setSelectedEdges,
             duration: 600,
-            zoom: getTargetZoom(reactFlowInstance, detail),
-            preserveZoom: detail.preserveZoom,
+            zoom: getTargetZoom(reactFlowInstance, safeDetail),
+            preserveZoom: safeDetail.preserveZoom,
         });
     }
 
@@ -162,7 +223,7 @@ export const createFlowchartFocusEntityEventHandler = ({
     setSelectedNodes: (nodes: Node[]) => void;
     setSelectedEdges: (edges: Edge[]) => void;
 }) => (
-    event: Pick<CustomEvent<FlowchartFocusEntityDetail>, 'detail'>
+    event: { detail?: unknown }
 ): boolean => handleFlowchartFocusEntity({
     reactFlowInstance,
     nodes,

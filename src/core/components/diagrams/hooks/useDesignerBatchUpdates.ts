@@ -55,14 +55,30 @@ export function useDesignerBatchUpdates({
 
                     // 3. Handle Theme (explicit nested)
                     if ('theme' in partialData && partialData.theme) {
-                        updated.data = { ...(updated.data as Record<string, unknown>), theme: { ...((updated.data as any)?.theme || {}), ...partialData.theme } };
+                        const currentTheme = updated.data?.theme;
+                        updated.data = {
+                            ...updated.data,
+                            theme: {
+                                ...(currentTheme && typeof currentTheme === 'object' && !Array.isArray(currentTheme)
+                                    ? currentTheme as Record<string, unknown>
+                                    : {}),
+                                ...partialData.theme,
+                            },
+                        };
                     }
 
                     // 4. Handle Legacy/Implicit Data properties
-                    const { style: _style, data: _data, theme: _theme, position: _position, ...rest } = partialData as any;
+                    const { style: _style, data: _data, theme: _theme, position: _position, ...rest } = partialData;
                     
-                    if (_position !== undefined) {
-                        updated.position = _position;
+                    if (
+                        _position
+                        && typeof _position === 'object'
+                        && 'x' in _position
+                        && 'y' in _position
+                        && typeof _position.x === 'number'
+                        && typeof _position.y === 'number'
+                    ) {
+                        updated.position = { x: _position.x, y: _position.y };
                     }
 
                     if (Object.keys(rest).length > 0) {

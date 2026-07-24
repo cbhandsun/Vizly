@@ -17,6 +17,7 @@ const report = (
     strictCrossings: 0,
     reverseOverlap: 0,
     unrelatedOverlap: 0,
+    relatedOverlap: 0,
     unexplainedRelatedOverlap: 0,
     shortEndpointStubs: 0,
     tinyInteriorDoglegs: 0,

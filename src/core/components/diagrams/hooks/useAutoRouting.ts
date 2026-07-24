@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Edge, ReactFlowInstance } from '@xyflow/react';
-import { diagramConfigManager, EdgeConfig } from '../../config/DiagramConfig';
+import { Edge, Node, ReactFlowInstance } from '@xyflow/react';
+import { diagramConfigManager, EdgeConfig } from '@/core/config/DiagramConfig';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import { useLayoutStrategy } from './useLayoutStrategy';
 import { syncAutoPathSelection, applyRoutingProfile, DESIGNER_ROUTING_PROFILE } from './useSmartRoutingConfig';
 
 interface UseAutoRoutingOptions {
-    setNodes: React.Dispatch<React.SetStateAction<any[]>>;
+    setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
     setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
-    nodesRef: React.MutableRefObject<any[]>;
+    nodesRef: React.MutableRefObject<Node[]>;
     edgesRef: React.MutableRefObject<Edge[]>;
-    takeSnapshot: (nodes: any[], edges: Edge[]) => void;
-    reactFlowInstance: ReactFlowInstance<any, any>;
+    takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
+    reactFlowInstance: ReactFlowInstance | null;
     diagramId?: string;
+    loadLayoutPresetMap?: () => Promise<Record<string, unknown>>;
 }
 
 /**
@@ -27,6 +28,7 @@ export function useAutoRouting({
     takeSnapshot,
     reactFlowInstance,
     diagramId,
+    loadLayoutPresetMap,
 }: UseAutoRoutingOptions) {
     // [FIX] Read initial value from DiagramConfig instead of hardcoding false.
     // When autoRoutingEnabled starts as false, BaseReactFlow converts 'advanced-smart-step'
@@ -51,6 +53,7 @@ export function useAutoRouting({
         takeSnapshot,
         reactFlowInstance,
         diagramId,
+        loadLayoutPresetMap,
     });
 
     // 布局时自动启用 autoRouting + 管理稳定性标记

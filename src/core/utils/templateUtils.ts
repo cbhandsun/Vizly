@@ -53,11 +53,11 @@ const toDate = (value: unknown): Date | null => {
 /**
  * 验证模板数据完整性
  */
-export const validateTemplate = (template: any): template is DiagramTemplate => {
-    if (!template || typeof template !== 'object') return false;
+export const validateTemplate = (template: unknown): template is DiagramTemplate => {
+    if (!isRecord(template)) return false;
     if (!template.id || !template.name || !template.category) return false;
-    if (!TEMPLATE_CATEGORIES.has(template.category)) return false;
-    if (!template.diagramData || !Array.isArray(template.diagramData.nodes)) return false;
+    if (typeof template.category !== 'string' || !TEMPLATE_CATEGORIES.has(template.category)) return false;
+    if (!isRecord(template.diagramData) || !Array.isArray(template.diagramData.nodes)) return false;
     if (!Array.isArray(template.diagramData.edges)) return false;
     return true;
 };
@@ -110,7 +110,7 @@ export const parseStoredTemplates = (raw: string | null | undefined): DiagramTem
     }
 };
 
-export const serializeStoredTemplates = (templates: DiagramTemplate[]): string => {
+export const serializeStoredTemplates = (templates: readonly unknown[]): string => {
     const normalized = templates
         .slice(0, MAX_STORED_TEMPLATES)
         .map(coerceStoredTemplate)
@@ -124,17 +124,27 @@ export const serializeStoredTemplates = (templates: DiagramTemplate[]): string =
  * 动态计算包围盒并生成基础样式的 SVG
  */
 export const generateTemplateThumbnail = async (
-    nodes: any[],
-    edges: any[]
+    nodes: unknown[],
+    edges: unknown[]
 ): Promise<string | null> => {
     try {
         if (!Array.isArray(nodes) || nodes.length === 0 || !Array.isArray(edges)) return null;
 
-        const safeNodes = nodes
+        type ThumbnailNode = {
+            id: string;
+            data: Record<string, unknown>;
+            position: { x: number; y: number };
+            width: number;
+            height: number;
+        };
+        const safeNodes: ThumbnailNode[] = nodes
             .slice(0, MAX_THUMBNAIL_NODES)
-            .filter((node): node is Record<string, any> => isRecord(node) && isRecord(node.position))
+            .filter((node): node is Record<string, unknown> & { position: Record<string, unknown> } => (
+                isRecord(node) && isRecord(node.position)
+            ))
             .map(node => ({
-                ...node,
+                id: typeof node.id === 'string' ? node.id : '',
+                data: isRecord(node.data) ? node.data : {},
                 position: {
                     x: finiteNumber(node.position.x, 0),
                     y: finiteNumber(node.position.y, 0),
@@ -142,11 +152,11 @@ export const generateTemplateThumbnail = async (
                 width: finiteNumber(node.width, 150),
                 height: finiteNumber(node.height, 50),
             }))
-            .filter(node => node.width > 0 && node.height > 0);
+            .filter(node => node.id && node.width > 0 && node.height > 0);
 
         const safeEdges = edges
             .slice(0, MAX_THUMBNAIL_EDGES)
-            .filter((edge): edge is Record<string, any> => isRecord(edge));
+            .filter((edge): edge is Record<string, unknown> => isRecord(edge));
 
         if (safeNodes.length === 0) return null;
 

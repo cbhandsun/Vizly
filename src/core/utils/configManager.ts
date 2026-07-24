@@ -1,5 +1,14 @@
 import { DiagramConfig } from '../types/common';
 
+interface DiagramConfigSource {
+  NODE: { WIDTH: number; HEIGHT: number; TITLE_BAR_HEIGHT: number };
+  SPACING: { HORIZONTAL: number; VERTICAL: number; GROUP_PADDING: { H: number } };
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
 /**
  * 统一配置管理器
  * 整合所有图表的配置，避免重复定义
@@ -148,7 +157,7 @@ export class ConfigManager {
     this.registerConfig('systems-interaction', this.createDiagramConfig(ARCHITECTURE_CONFIGS.SYSTEMS_INTERACTION));
   }
   
-  private createDiagramConfig(config: any): DiagramConfig {
+  private createDiagramConfig(config: DiagramConfigSource): DiagramConfig {
     return {
       NODE_WIDTH: config.NODE.WIDTH,
       NODE_HEIGHT: config.NODE.HEIGHT,
@@ -182,18 +191,20 @@ export class ConfigManager {
     return this.deepMerge(baseConfig, overrides);
   }
   
-  private deepMerge(target: any, source: any): any {
-    const result = { ...target };
+  private deepMerge<T extends object>(target: T, source: Partial<T>): T {
+    const targetRecord = target as Record<string, unknown>;
+    const result: Record<string, unknown> = { ...targetRecord };
     
-    for (const key in source) {
-      if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-        result[key] = this.deepMerge(target[key] || {}, source[key]);
+    for (const [key, value] of Object.entries(source)) {
+      if (isRecord(value)) {
+        const targetValue = isRecord(targetRecord[key]) ? targetRecord[key] : {};
+        result[key] = this.deepMerge(targetValue, value);
       } else {
-        result[key] = source[key];
+        result[key] = value;
       }
     }
     
-    return result;
+    return result as T;
   }
   
   public createCustomConfig(baseConfigName: string, customizations: Partial<DiagramConfig>): DiagramConfig {

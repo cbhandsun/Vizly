@@ -10,11 +10,11 @@ export interface NetworkNodeData extends Record<string, unknown> {
 }
 
 const NetworkNode: React.FC<NodeProps<Node<NetworkNodeData>>> = ({ id, data, selected }) => {
-    const nodeData = useStore((s: any) => s.nodeLookup?.get(id) || s.nodeInternals?.get(id));
+    const nodeData = useStore(s => s.nodeLookup.get(id));
     
     // 获取尺寸，支持 NodeResizer 的变更
-    const _width = (nodeData?.measured?.width || (nodeData as any)?.width || 60) as number;
-    const _height = (nodeData?.measured?.height || (nodeData as any)?.height || 60) as number;
+    const _width = nodeData?.measured?.width || nodeData?.width || 60;
+    const _height = nodeData?.measured?.height || nodeData?.height || 60;
 
     const themeColor = data.themeColor || '#3b82f6';
 

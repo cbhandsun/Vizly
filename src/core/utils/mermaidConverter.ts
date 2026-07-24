@@ -30,8 +30,14 @@ const SHAPE_TO_MERMAID: Record<string, [string, string]> = {
 export const MERMAID_EXPORT_MAX_NODES = 1_000;
 export const MERMAID_EXPORT_MAX_EDGES = 2_000;
 
+const asRecord = (value: unknown): Record<string, unknown> =>
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {};
+
 function getNodeShape(node: Node): [string, string] {
-    const shape = (node.data as any)?.shape as string | undefined;
+    const rawShape = asRecord(node.data).shape;
+    const shape = typeof rawShape === 'string' ? rawShape : undefined;
     if (node.type === 'iconNode') return ['((', '))']; // 图标节点渲染为圆形
     return SHAPE_TO_MERMAID[shape || 'rectangle'] || ['[', ']'];
 }
@@ -63,7 +69,7 @@ export function toMermaid(
     // Map children by parentId
     const childrenByParent = new Map<string, Node[]>();
     safeNodes.forEach(n => {
-        const pId = (n as any).parentId;
+        const pId = n.parentId;
         if (pId) {
             const list = childrenByParent.get(pId) || [];
             list.push(n);
@@ -77,11 +83,13 @@ export function toMermaid(
     const renderNodeOrGroup = (node: Node, indent = 4): string[] => {
         const spaces = ' '.repeat(indent);
         const subLines: string[] = [];
+        const data = asRecord(node.data);
+        const theme = asRecord(data.theme);
         
         if (containerTypes.has(node.type || '')) {
             const mId = toMermaidNodeId(node.id);
-            const label = (node.data as any)?.description || (node.data as any)?.label || node.id;
-            subLines.push(`${spaces}subgraph ${mId}["${escapeMermaidLabel(label)}"]`);
+            const label = data.description || data.label || node.id;
+            subLines.push(`${spaces}subgraph ${mId}["${escapeMermaidLabel(String(label))}"]`);
             
             const children = childrenByParent.get(node.id) || [];
             children.forEach(child => {
@@ -91,17 +99,17 @@ export function toMermaid(
             subLines.push(`${spaces}end`);
 
             // Apply style if available
-            const color = toSafeMermaidColor((node.data as any)?.themeColor || (node.data as any)?.theme?.main);
+            const color = toSafeMermaidColor(data.themeColor || theme.main);
             if (color) {
                 subLines.push(`${spaces}style ${mId} fill:${color}15,stroke:${color},stroke-width:2px`);
             }
         } else {
             const mId = toMermaidNodeId(node.id);
-            let label = (node.data as any)?.description || (node.data as any)?.label || node.id;
+            let label = data.description || data.label || node.id;
             
             // 特殊处理 IconNode
             if (node.type === 'iconNode') {
-                const icon = (node.data as any)?.icon || 'icon';
+                const icon = data.icon || 'icon';
                 label = `Icon: ${icon} | ${label}`;
             }
 
@@ -109,8 +117,8 @@ export function toMermaid(
             subLines.push(`${spaces}${mId}${open}"${escapeMermaidLabel(String(label))}"${close}`);
             
             // Node style
-            const color = toSafeMermaidColor((node.data as any)?.theme?.main || (node.data as any)?.color);
-            const textColor = toSafeMermaidColor((node.data as any)?.theme?.text);
+            const color = toSafeMermaidColor(theme.main || data.color);
+            const textColor = toSafeMermaidColor(theme.text);
             if (color) {
                 subLines.push(`${spaces}style ${mId} fill:${color},stroke:${color},color:${textColor || '#fff'}`);
             }
@@ -119,7 +127,7 @@ export function toMermaid(
     };
 
     // Render top-level nodes (no parentId)
-    const topLevelNodes = safeNodes.filter(n => !(n as any).parentId);
+    const topLevelNodes = safeNodes.filter(n => !n.parentId);
     topLevelNodes.forEach(n => {
         lines.push(...renderNodeOrGroup(n));
     });
@@ -129,7 +137,7 @@ export function toMermaid(
         const srcId = toMermaidNodeId(e.source);
         const tgtId = toMermaidNodeId(e.target);
         const arrow = getEdgeStyleMarker(e);
-        const label = (e.data as any)?.label || e.label;
+        const label = asRecord(e.data).label || e.label;
         
         const edgeLine = label 
             ? `    ${srcId} ${arrow}|"${escapeMermaidLabel(String(label))}"| ${tgtId}`
@@ -213,7 +221,22 @@ function parseNodeDef(text: string): { id: string; label: string; shape: string 
     return { id, label: sanitizeMermaidLabel(bracketPart), shape: 'rectangle' };
 }
 
-function parseEdgeLine(line: string): { source: string; target: string; label?: string; style: Partial<Edge> } | null {
+interface ParsedNodeInfo {
+    id: string;
+    label: string;
+    shape: string;
+}
+
+interface ParsedEdgeLine {
+    source: string;
+    target: string;
+    label?: string;
+    style: Partial<Edge>;
+    _sourceNode?: ParsedNodeInfo;
+    _targetNode?: ParsedNodeInfo;
+}
+
+function parseEdgeLine(line: string): ParsedEdgeLine | null {
     // 基础边缘定义：A[label] -->|edgeLabel| B[label]
     // 匹配流程：
     // 1. 查找箭头操作符
@@ -250,10 +273,10 @@ function parseEdgeLine(line: string): { source: string; target: string; label?: 
     const edgeStyle: Partial<Edge> = {};
     if (isDashed) edgeStyle.style = { strokeDasharray: '5 5' };
     if (hasArrow || operator === '-->') {
-        (edgeStyle as any).markerEnd = { type: MarkerType.ArrowClosed };
+        edgeStyle.markerEnd = { type: MarkerType.ArrowClosed };
     }
     if (isBidirectional) {
-        (edgeStyle as any).markerStart = { type: MarkerType.ArrowClosed };
+        edgeStyle.markerStart = { type: MarkerType.ArrowClosed };
     }
 
     return { 
@@ -264,7 +287,7 @@ function parseEdgeLine(line: string): { source: string; target: string; label?: 
         // 附加提取到的节点信息，供 fromMermaid 使用
         _sourceNode: sourceInfo.label ? sourceInfo : undefined,
         _targetNode: targetInfo.label ? targetInfo : undefined
-    } as any;
+    };
 }
 
 export function fromMermaid(code: string): ParsedGraph {
@@ -273,7 +296,12 @@ export function fromMermaid(code: string): ParsedGraph {
     const headerIdx = lines.findIndex(l => /^(flowchart|graph)\s+(TB|TD|LR|RL|BT)/i.test(l));
     const bodyLines = headerIdx >= 0 ? lines.slice(headerIdx + 1) : lines;
 
-    const nodeMap = new Map<string, { label: string; shape: string; parentId?: string; styles?: any }>();
+    const nodeMap = new Map<string, {
+        label: string;
+        shape: string;
+        parentId?: string;
+        styles?: Record<string, string>;
+    }>();
     const edges: Edge[] = [];
     const subgraphStack: string[] = [];
     let currentSubgraph: string | null = null;
@@ -305,7 +333,7 @@ export function fromMermaid(code: string): ParsedGraph {
         if (styleMatch) {
             const id = styleMatch[1];
             const stylePairs = styleMatch[2].split(',');
-            const styles: any = {};
+            const styles: Record<string, string> = {};
             stylePairs.forEach(p => {
                 const [k, v] = p.split(':');
                 if (k && v) styles[k.trim()] = v.trim();
@@ -320,10 +348,10 @@ export function fromMermaid(code: string): ParsedGraph {
         }
 
         // Edge
-        const edge: any = parseEdgeLine(line);
+        const edge = parseEdgeLine(line);
         if (edge) {
             // Auto-register nodes from edge if not yet seen or if more info provided
-            const registerNode = (id: string, info?: any) => {
+            const registerNode = (id: string, info?: ParsedNodeInfo) => {
                 if (!id) return;
                 const existing = nodeMap.get(id);
                 if (info && info.label) {

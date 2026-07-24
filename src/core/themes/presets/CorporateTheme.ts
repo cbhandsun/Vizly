@@ -7,7 +7,6 @@ import { ThemePreset } from '../types/ThemeTypes';
 import {
   baseTypography,
   baseSpacing,
-  _baseBorderRadius,
   baseShadow,
   baseAnimation
 } from '../constants/BaseConstants';

@@ -13,10 +13,30 @@ export const STORAGE_KEY_NAME = 'vizly_collaborator_name';
 export const STORAGE_KEY_COLOR = 'vizly_collaborator_color';
 const COLLABORATOR_COLORS = ['#f43f5e', '#f97316', '#eab308', '#10b981', '#0ea5e9', '#6366f1', '#d946ef'];
 
-interface CollaboratorIdentity {
+export interface CollaboratorIdentity {
     name: string;
     color: string;
 }
+
+export interface ActiveCollaborator {
+    clientId: number;
+    isLocal: boolean;
+    user?: CollaboratorIdentity;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+);
+
+export const parseCollaboratorIdentity = (value: unknown): CollaboratorIdentity | undefined => {
+    if (!isRecord(value) || typeof value.name !== 'string' || typeof value.color !== 'string') {
+        return undefined;
+    }
+
+    const name = value.name.trim().slice(0, 100);
+    const color = value.color.trim().slice(0, 100);
+    return name && color ? { name, color } : undefined;
+};
 
 const getRandomIndex = (max: number): number => {
     if (max <= 0) return 0;
@@ -57,24 +77,27 @@ export const persistCollaboratorIdentity = (identity: CollaboratorIdentity): voi
 };
 
 // Lightweight, performant strict equality check designed specifically for React Flow elements
-const isElementEqual = (a: any, b: any): boolean => {
+const isElementEqual = (a: Node | Edge, b: Node | Edge): boolean => {
     if (a === b) return true;
     if (!a || !b) return false;
     if (a.id !== b.id || a.type !== b.type || a.selected !== b.selected || a.hidden !== b.hidden) return false;
     
     // Compare positions if they exist (Nodes)
-    if (a.position && b.position) {
+    if ('position' in a && 'position' in b) {
         if (a.position.x !== b.position.x || a.position.y !== b.position.y) return false;
     }
 
     // Compare measured dimensions if they exist
-    if (a.measured && b.measured) {
+    if ('measured' in a && 'measured' in b && a.measured && b.measured) {
          if (a.measured.width !== b.measured.width || a.measured.height !== b.measured.height) return false;
     }
     
     // Compare source/target properties if they exist (Edges)
-    if (a.source !== b.source || a.target !== b.target) return false;
-    if (a.sourceHandle !== b.sourceHandle || a.targetHandle !== b.targetHandle) return false;
+    if ('source' in a || 'source' in b) {
+        if (!('source' in a) || !('source' in b)) return false;
+        if (a.source !== b.source || a.target !== b.target) return false;
+        if (a.sourceHandle !== b.sourceHandle || a.targetHandle !== b.targetHandle) return false;
+    }
 
     // Fast check for data payload changes
     // Using simple reference check first, then shallow/key-level comparison for top level
@@ -110,7 +133,7 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
     const reactFlowInstance = useReactFlow();
     
     const [synced, setSynced] = useState(false);
-    const [activeUsers, setActiveUsers] = useState<any[]>([]);
+    const [activeUsers, setActiveUsers] = useState<ActiveCollaborator[]>([]);
     const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
     const [localUser] = useState<CollaboratorIdentity>(() => {
         const storedIdentity = readStoredCollaboratorIdentity();
@@ -163,7 +186,11 @@ export function useYjsCollaboration(options: YjsCollaborationOptions) {
 
         const handleAwarenessChange = () => {
             const states = Array.from(provider.awareness.getStates().entries());
-            setActiveUsers(states.map(([clientId, state]) => ({ clientId, ...state })));
+            setActiveUsers(states.map(([clientId, state]) => ({
+                clientId,
+                isLocal: clientId === provider.awareness.clientID,
+                user: parseCollaboratorIdentity(state.user),
+            })));
         };
         provider.awareness.on('change', handleAwarenessChange);
 

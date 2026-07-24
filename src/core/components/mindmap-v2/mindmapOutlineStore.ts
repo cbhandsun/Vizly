@@ -7,8 +7,10 @@ export function emitToggleOutline() {
     _isOpen = !_isOpen;
     listeners.forEach(fn => fn(_isOpen));
 }
-export function subscribeOutline(fn: Listener) {
+export function subscribeOutline(fn: Listener): () => void {
     listeners.add(fn);
-    return () => listeners.delete(fn);
+    return () => {
+        listeners.delete(fn);
+    };
 }
 export function getOutlineOpen() { return _isOpen; }

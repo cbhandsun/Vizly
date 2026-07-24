@@ -21,7 +21,9 @@ const Probe = () => {
       <button
         type="button"
         onClick={() => {
-          void auth.signInWithEmail('user@example.test').then(({ error }) => {
+          void auth.signInWithEmail('user@example.test').then(({
+            error,
+          }: { error: { message: string } | null }) => {
             document.body.dataset.authError = error?.message || '';
           });
         }}

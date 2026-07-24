@@ -6,45 +6,11 @@ import { hexToRgba } from '../../shared/layoutUtils';
 import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v2';
 import { useBusinessData } from '../../diagrams/useNodeUpdate';
 import { Icon as IconifyIcon } from '@iconify/react';
+import type { FlowchartNodeData } from '../../../types/flowchart-node';
+
+export type { FlowchartNodeData, FlowchartShape } from '../../../types/flowchart-node';
 
 import { FaPlay, FaSquare, FaCog, FaStop, FaDatabase, FaQuestion, FaArrowRight, FaLayerGroup, FaBox, FaThLarge, FaImage, FaEye, FaKeyboard, FaCircle, FaStar, FaFileAlt, FaCloud, FaClock, FaDesktop, FaStickyNote, FaHandPaper, FaDrawPolygon, FaServer, FaNetworkWired, FaLock, FaPlug, FaUser, FaEnvelope, FaBell, FaCode, FaTerminal } from 'react-icons/fa';
-
-export type FlowchartShape =
-    | 'rectangle' | 'diamond' | 'pill' | 'parallelogram' | 'database'
-    | 'ellipse' | 'triangle' | 'hexagon' | 'star'
-    | 'document' | 'cloud' | 'manual-input' | 'preparation' | 'delay' | 'display'
-    | 'trapezoid' | 'predefined-process' | 'multi-document' | 'off-page' | 'internal-storage'
-    | 'circle' | 'note';
-
-export interface FlowchartNodeData extends Record<string, unknown> {
-    label: string;
-    description?: string;
-    collapsed?: boolean;  // 🆕 内容折叠状态
-    shape?: FlowchartShape;
-    domainClass?: string;
-    domain?: string;
-    theme?: {
-        main?: string;
-        border?: string;
-        background?: string;
-        text?: string;
-    };
-    icon?: React.ReactNode | string;
-    style?: {
-        strokeDasharray?: string;
-        gradient?: { from: string; to: string; direction?: 'vertical' | 'horizontal' | 'diagonal' };
-        shadow?: 'none' | 'soft' | 'medium' | 'strong' | 'glow';
-        opacity?: number; // 0-1
-        borderStyle?: 'solid' | 'dashed' | 'dotted' | 'double';
-        [key: string]: unknown;
-    };
-    locked?: boolean;
-    sequence?: number;
-    themeColor?: string;
-    textAlign?: 'left' | 'center' | 'right';
-    isEditing?: boolean; // 控制是否处于内联编辑态
-    businessKey?: string; // 外部业务数据关联的键值
-}
 
 export const DOMAIN_CLASSES = [
     { key: 'ch', label: '渠道', color: '#2196F3' },
@@ -148,13 +114,24 @@ export function useFlowchartNodeStyleResolution({ data, selected }: ResolutionPa
         if (!textColor) {
             if (isHighlyTransparent) {
                 // For highly transparent node backgrounds, rely on the app theme mode instead of the raw tint
-                textColor = theme.mode === 'dark' ? '#E5E7EB' : '#111111';
+                textColor = theme?.mode === 'dark' ? '#E5E7EB' : '#111111';
             } else {
                 textColor = pickReadableTextColor(finalBgColor, '#FFFFFF', '#333333');
             }
         }
 
-        const businessState = data.businessKey && businessData ? businessData[data.businessKey] : null;
+        const businessStateCandidate =
+            data.businessKey && businessData ? businessData[data.businessKey] : null;
+        const businessState =
+            businessStateCandidate && typeof businessStateCandidate === 'object'
+                ? {
+                    ...businessStateCandidate,
+                    status: 'status' in businessStateCandidate
+                        && typeof businessStateCandidate.status === 'string'
+                        ? businessStateCandidate.status
+                        : undefined,
+                }
+                : null;
 
         if (businessState) {
             if (businessState.status === 'error') {

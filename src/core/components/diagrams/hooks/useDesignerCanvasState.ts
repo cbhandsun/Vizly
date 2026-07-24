@@ -1,16 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { MarkerType } from '@xyflow/react';
+import { MarkerType, type Edge, type Node, type ReactFlowInstance } from '@xyflow/react';
 import { useDiagramStylePreset_v2 } from '../../../hooks/useDiagramStylePreset_v2';
 import { diagramStyleManager } from '../../shared/DiagramStyleManager';
 import { useTheme } from '../../../themes/useCoreTheme';
 import { useFlowchartState } from './useFlowchartState';
 import { subscribeViewport } from '../../shared/viewportStore';
-import { appMessage } from '@/core/utils/antdStaticBridge';
 import { logDiagramGlobalThemeSyncFailure } from '../diagramThemeLogging';
 
 
 export interface UseDesignerCanvasStateProps {
-    id?: string;
     externalReadonly?: boolean;
     externalEdgeMode?: 'advanced-smart' | 'native';
     externalShowOnlyMainFlow?: boolean;
@@ -18,12 +16,10 @@ export interface UseDesignerCanvasStateProps {
     onReadonlyChange?: (isReadonly: boolean) => void;
     onMainFlowAnimationChange?: (highlight: boolean) => void;
     onShowOnlyMainFlowChange?: (showOnly: boolean) => void;
-    onOpenSettings?: () => void;
-    onSyncPush?: (nodes: any[], edges: any[]) => void;
+    onSyncPush?: (nodes: Node[], edges: Edge[]) => void;
 }
 
 export function useDesignerCanvasState({
-    _id,
     externalReadonly = false,
     externalEdgeMode = 'advanced-smart',
     externalShowOnlyMainFlow = false,
@@ -31,11 +27,10 @@ export function useDesignerCanvasState({
     onReadonlyChange,
     onMainFlowAnimationChange,
     onShowOnlyMainFlowChange,
-    onOpenSettings,
     onSyncPush,
 }: UseDesignerCanvasStateProps) {
     const preset = useDiagramStylePreset_v2();
-    const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+    const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
     const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
 
     const [internalReadonly, setInternalReadonly] = useState(externalReadonly);
@@ -82,14 +77,6 @@ export function useDesignerCanvasState({
         if (onMainFlowAnimationChange) onMainFlowAnimationChange(next);
     }, [internalHighlightMainFlow, onMainFlowAnimationChange]);
 
-    const handleOpenSettings = useCallback(() => {
-        if (onOpenSettings) {
-            onOpenSettings();
-        } else {
-            appMessage.info('当前独立设计器模式未挂载高级首选项面板，请在主视图中或按快捷键 Ctrl+Shift+, 打开。');
-        }
-    }, [onOpenSettings]);
-
     useEffect(() => {
         // 静态 import，避免动态异步导入导致组件卸载时 unsubscribe 丢失内存泄漏
         const unsubscribe = subscribeViewport((vp) => setViewport(vp));
@@ -99,8 +86,10 @@ export function useDesignerCanvasState({
     const [theme, setTheme] = useTheme({ autoInitialize: true });
     
     useEffect(() => {
-        const handleGlobalThemeChanged = (e: any) => {
-            const newThemeId = e.detail;
+        const handleGlobalThemeChanged = (event: Event) => {
+            const newThemeId = event instanceof CustomEvent && typeof event.detail === 'string'
+                ? event.detail
+                : '';
             if (newThemeId && newThemeId !== theme?.id) {
                 setTheme(newThemeId).catch((error) => {
                     logDiagramGlobalThemeSyncFailure('useDesignerCanvasState', newThemeId, error);
@@ -197,14 +186,14 @@ export function useDesignerCanvasState({
             setNodes((nds) => {
                 let changed = false;
                 const nextNodes = nds.map(n => {
-                    const data = n.data as any;
-                    if (data?.theme?.main === '#2196F3') {
+                    const nodeTheme = n.data?.theme;
+                    if (nodeTheme && typeof nodeTheme === 'object' && !Array.isArray(nodeTheme) && 'main' in nodeTheme && nodeTheme.main === '#2196F3') {
                         changed = true;
                         return {
                             ...n,
                             data: {
-                                ...data,
-                                theme: { ...data.theme, main: undefined, border: undefined }
+                                ...n.data,
+                                theme: { ...nodeTheme, main: undefined, border: undefined }
                             }
                         };
                     }
@@ -238,8 +227,6 @@ export function useDesignerCanvasState({
         highlightMainFlow,
         handleToggleShowOnlyMainFlow,
         handleToggleHighlightMainFlow,
-        
-        handleOpenSettings,
         
         theme,
         canvasBg,

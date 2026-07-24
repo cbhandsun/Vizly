@@ -6,11 +6,8 @@
  */
 
 import { EdgeType } from '../../types/edgeType';
-import { diagramConfigManager } from '../../components/config/DiagramConfig';
+import { diagramConfigManager } from '../../config/DiagramConfig';
 import { Point } from '../types/routing';
-import { repairEdgeCrossingViolations } from '../../algorithms/edgeCrossingRepair';
-import { RoutingCrossingScorer } from '../../algorithms/routingCrossingScorer';
-import type { BuddyGroup } from '../../algorithms/globalChannelRouting';
 
 // ============================================================================
 // 本地类型与常量
@@ -24,6 +21,37 @@ interface Candidate {
     path: Point[];
     cost: number;
 }
+
+export interface AdvancedRoutingNode {
+    id: string;
+    position?: Point;
+    positionAbsolute?: Point;
+    measured?: { width?: number; height?: number };
+}
+
+interface AdvancedRoutingEdge {
+    id: string;
+    source: string;
+    target: string;
+    data?: Record<string, unknown>;
+}
+
+interface BundleInfo {
+    bundleId: string;
+    bundleSize: number;
+    bundleIndex: number;
+    bundleCenterX: number;
+    bundleCenterY: number;
+    bundleDirection: string;
+}
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {};
+
+const finiteNumber = (value: unknown, fallback: number): number =>
+    typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 
 /** 所有合法的 source→target handle 组合 */
 const HANDLES = ['l', 'r', 't', 'b'] as const;
@@ -46,311 +74,11 @@ function segmentsIntersect(p1: Point, p2: Point, p3: Point, p4: Point): boolean 
     return t >= 0 && t <= 1 && u >= 0 && u <= 1;
 }
 
-function axisOf(a: Point, b: Point): 'h' | 'v' | null {
-    if (Math.abs(a.y - b.y) <= 1.5 && Math.abs(a.x - b.x) > 1.5) return 'h';
-    if (Math.abs(a.x - b.x) <= 1.5 && Math.abs(a.y - b.y) > 1.5) return 'v';
-    return null;
-}
-
-function compactOrthogonalPath(points: Point[]): Point[] {
-    const rounded: Point[] = [];
-    for (const point of points) {
-        const p = { x: Math.round(point.x), y: Math.round(point.y) };
-        const prev = rounded[rounded.length - 1];
-        if (!prev || Math.abs(prev.x - p.x) > 1 || Math.abs(prev.y - p.y) > 1) {
-            rounded.push(p);
-        }
-    }
-
-    const orthogonal: Point[] = [];
-    for (let i = 0; i < rounded.length; i++) {
-        const point = rounded[i];
-        const prev = orthogonal[orthogonal.length - 1];
-        if (prev && Math.abs(prev.x - point.x) > 1.5 && Math.abs(prev.y - point.y) > 1.5) {
-            const next = rounded[i + 1];
-            const hv = { x: point.x, y: prev.y };
-            const vh = { x: prev.x, y: point.y };
-            const hvScore = (next && axisOf(hv, point) !== axisOf(point, next) ? 1 : 0)
-                + (Math.min(Math.abs(prev.x - hv.x), Math.abs(hv.y - point.y)) < 8 ? 2 : 0);
-            const vhScore = (next && axisOf(vh, point) !== axisOf(point, next) ? 1 : 0)
-                + (Math.min(Math.abs(prev.y - vh.y), Math.abs(vh.x - point.x)) < 8 ? 2 : 0);
-            orthogonal.push(hvScore <= vhScore ? hv : vh);
-        }
-        orthogonal.push(point);
-    }
-
-    let simplified = RoutingCrossingScorer.simplifyOrthogonalPoints(orthogonal);
-    let changed = true;
-    while (changed) {
-        changed = false;
-        for (let i = 1; i < simplified.length - 1; i++) {
-            const prev = simplified[i - 1];
-            const cur = simplified[i];
-            const next = simplified[i + 1];
-            const shortIn = RoutingCrossingScorer.manhattanDistance(prev, cur) < 8;
-            const shortOut = RoutingCrossingScorer.manhattanDistance(cur, next) < 8;
-            if ((shortIn || shortOut) && axisOf(prev, next)) {
-                simplified = [...simplified.slice(0, i), ...simplified.slice(i + 1)];
-                changed = true;
-                break;
-            }
-        }
-    }
-    return RoutingCrossingScorer.simplifyOrthogonalPoints(simplified);
-}
-
-function roundPath(points: Point[]): Point[] {
-    return points.map(point => ({ x: Math.round(point.x), y: Math.round(point.y) }));
-}
-
-function edgePath(edge: { data?: any }): Point[] {
-    const raw = edge.data?.treeRouting?.points || edge.data?.computedPath || edge.data?.elkPath || [];
-    if (!Array.isArray(raw)) return [];
-    return raw
-        .map((p: any) => ({ x: Number(p?.x), y: Number(p?.y) }))
-        .filter((p: Point) => Number.isFinite(p.x) && Number.isFinite(p.y));
-}
-
-function samePath(a: Point[], b: Point[]): boolean {
-    return a.length === b.length && a.every((p, i) =>
-        Math.abs(p.x - b[i]?.x) <= 1 && Math.abs(p.y - b[i]?.y) <= 1
-    );
-}
-
-function withPath<T extends { data?: any }>(edge: T, path: Point[], flags: Record<string, unknown> = {}): T {
-    const data = { ...(edge.data || {}), ...flags, computedPath: path };
-    if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-        data.treeRouting = { ...data.treeRouting, points: path };
-    }
-    return { ...edge, data };
-}
-
-function buildBuddyGroups<T extends { id: string; source: string; target: string }>(edges: T[]): BuddyGroup[] {
-    const out = new Map<string, Set<string>>();
-    const incoming = new Map<string, Set<string>>();
-    for (const edge of edges) {
-        if (!out.has(edge.source)) out.set(edge.source, new Set());
-        out.get(edge.source)!.add(edge.id);
-        if (!incoming.has(edge.target)) incoming.set(edge.target, new Set());
-        incoming.get(edge.target)!.add(edge.id);
-    }
-    const groups: BuddyGroup[] = [];
-    for (const ids of out.values()) {
-        if (ids.size >= 2) groups.push({ type: 'o2m', edgeIds: ids });
-    }
-    for (const ids of incoming.values()) {
-        if (ids.size >= 2) groups.push({ type: 'm2o', edgeIds: ids });
-    }
-    return groups;
-}
-
-function pathMapFromEdges<T extends { id: string; data?: any }>(edges: T[]): Map<string, Point[]> {
-    const paths = new Map<string, Point[]>();
-    for (const edge of edges) {
-        const path = edge.data?.treeRouting ? roundPath(edgePath(edge)) : compactOrthogonalPath(edgePath(edge));
-        if (path.length >= 2) paths.set(edge.id, path);
-    }
-    return paths;
-}
-
-function applyPathMap<T extends { id: string; data?: any }>(edges: T[], paths: Map<string, Point[]>, flags: Record<string, unknown>): T[] {
-    return edges.map(edge => {
-        const path = paths.get(edge.id);
-        if (!path) return edge;
-        const original = edgePath(edge);
-        if (samePath(original, path)) return edge;
-        return withPath(edge, path, flags);
-    });
-}
-
-function collectTreeOutGroups<T extends { id: string; data?: any }>(edges: T[]): Array<{ trunkId: string; edgeIds: string[] }> {
-    const groups = new Map<string, string[]>();
-    for (const edge of edges) {
-        const routing = edge.data?.treeRouting;
-        if (routing?.type !== 'tree-out' || !routing.trunkId) continue;
-        if (!groups.has(routing.trunkId)) groups.set(routing.trunkId, []);
-        groups.get(routing.trunkId)!.push(edge.id);
-    }
-    return Array.from(groups.entries())
-        .filter(([, edgeIds]) => edgeIds.length >= 2)
-        .map(([trunkId, edgeIds]) => ({ trunkId, edgeIds }));
-}
-
-function perpendicularCandidateValues(paths: Map<string, Point[]>, groupEdgeIds: string[], axis: 'h' | 'v', original: number): number[] {
-    const values = new Set<number>();
-    const groupSet = new Set(groupEdgeIds);
-    const spacing = 24;
-
-    for (const edgeId of groupEdgeIds) {
-        const path = paths.get(edgeId);
-        if (!path || path.length < 3) continue;
-        const trunkA = path[1];
-        const trunkB = path[2];
-        const minMain = axis === 'h' ? Math.min(trunkA.x, trunkB.x) : Math.min(trunkA.y, trunkB.y);
-        const maxMain = axis === 'h' ? Math.max(trunkA.x, trunkB.x) : Math.max(trunkA.y, trunkB.y);
-
-        for (const [otherId, otherPath] of paths) {
-            if (groupSet.has(otherId)) continue;
-            for (let i = 0; i < otherPath.length - 1; i++) {
-                const a = otherPath[i];
-                const b = otherPath[i + 1];
-                if (axis === 'h' && axisOf(a, b) === 'v') {
-                    const x = a.x;
-                    const minY = Math.min(a.y, b.y);
-                    const maxY = Math.max(a.y, b.y);
-                    if (x > minMain + 2 && x < maxMain - 2 && original > minY + 2 && original < maxY - 2) {
-                        values.add(Math.round(minY - spacing));
-                        values.add(Math.round(maxY + spacing));
-                        values.add(Math.round(minY - spacing * 2));
-                        values.add(Math.round(maxY + spacing * 2));
-                    }
-                }
-                if (axis === 'v' && axisOf(a, b) === 'h') {
-                    const y = a.y;
-                    const minX = Math.min(a.x, b.x);
-                    const maxX = Math.max(a.x, b.x);
-                    if (y > minMain + 2 && y < maxMain - 2 && original > minX + 2 && original < maxX - 2) {
-                        values.add(Math.round(minX - spacing));
-                        values.add(Math.round(maxX + spacing));
-                        values.add(Math.round(minX - spacing * 2));
-                        values.add(Math.round(maxX + spacing * 2));
-                    }
-                }
-            }
-        }
-    }
-
-    return Array.from(values).filter(value => Number.isFinite(value) && Math.abs(value - original) >= 12);
-}
-
-function treeOutFallbackCandidateValues(paths: Map<string, Point[]>, groupEdgeIds: string[], axis: 'h' | 'v', original: number): number[] {
-    const values = new Set<number>();
-    const firstPath = paths.get(groupEdgeIds[0]);
-    if (!firstPath || firstPath.length < 4) return [];
-
-    if (axis === 'h') {
-        const sourceY = firstPath[0].y;
-        const targetYs = groupEdgeIds
-            .map(edgeId => paths.get(edgeId))
-            .filter((path): path is Point[] => !!path && path.length >= 4)
-            .map(path => path[path.length - 1].y);
-        if (targetYs.length === 0) return [];
-        const direction = Math.sign((targetYs.reduce((sum, y) => sum + y, 0) / Math.max(1, targetYs.length)) - sourceY) || Math.sign(original - sourceY) || 1;
-        values.add(Math.round(sourceY + direction * 120));
-        values.add(Math.round(sourceY + direction * 220));
-        values.add(Math.round((direction > 0 ? Math.min(...targetYs) : Math.max(...targetYs)) - direction * 80));
-        values.add(Math.round((direction > 0 ? Math.min(...targetYs) : Math.max(...targetYs)) - direction * 140));
-    } else {
-        const sourceX = firstPath[0].x;
-        const targetXs = groupEdgeIds
-            .map(edgeId => paths.get(edgeId))
-            .filter((path): path is Point[] => !!path && path.length >= 4)
-            .map(path => path[path.length - 1].x);
-        if (targetXs.length === 0) return [];
-        const direction = Math.sign((targetXs.reduce((sum, x) => sum + x, 0) / Math.max(1, targetXs.length)) - sourceX) || Math.sign(original - sourceX) || 1;
-        values.add(Math.round(sourceX + direction * 120));
-        values.add(Math.round(sourceX + direction * 220));
-        values.add(Math.round((direction > 0 ? Math.min(...targetXs) : Math.max(...targetXs)) - direction * 80));
-        values.add(Math.round((direction > 0 ? Math.min(...targetXs) : Math.max(...targetXs)) - direction * 140));
-    }
-
-    return Array.from(values).filter(value => Number.isFinite(value) && Math.abs(value - original) >= 12);
-}
-
-function isTreeTrunkScoreBetter(
-    candidate: ReturnType<RoutingCrossingScorer['score']>,
-    current: ReturnType<RoutingCrossingScorer['score']>,
-    scorer: RoutingCrossingScorer
-): boolean {
-    if (candidate.hardCrossings !== current.hardCrossings) return candidate.hardCrossings < current.hardCrossings;
-    if (candidate.buddyCrossings !== current.buddyCrossings) return candidate.buddyCrossings < current.buddyCrossings;
-    return scorer.isBetter(candidate, current);
-}
-
-function moveTreeOutGroup(paths: Map<string, Point[]>, edgeIds: string[], axis: 'h' | 'v', value: number): Map<string, Point[]> {
-    const moved = new Map(paths);
-    for (const edgeId of edgeIds) {
-        const path = paths.get(edgeId);
-        if (!path || path.length < 4) continue;
-        const candidate = path.map(point => ({ ...point }));
-        if (axis === 'h') {
-            candidate[1].y = value;
-            candidate[2].y = value;
-        } else {
-            candidate[1].x = value;
-            candidate[2].x = value;
-        }
-        moved.set(edgeId, roundPath(candidate));
-    }
-    return moved;
-}
-
-function optimizeTreeOutTrunkAxes<T extends { id: string; source: string; target: string; data?: any }>(
-    edges: T[],
-    paths: Map<string, Point[]>,
-    buddyGroups: BuddyGroup[]
-): Map<string, Point[]> {
-    const scorer = new RoutingCrossingScorer({ buddyGroups, parallelOverlapMinLength: 24 });
-    let bestPaths = paths;
-    let bestScore = scorer.score(bestPaths);
-
-    for (let pass = 0; pass < 3; pass++) {
-        let changed = false;
-        for (const group of collectTreeOutGroups(edges)) {
-            const firstPath = bestPaths.get(group.edgeIds[0]);
-            if (!firstPath || firstPath.length < 4) continue;
-            const trunkAxis = axisOf(firstPath[1], firstPath[2]);
-            if (!trunkAxis) continue;
-            const original = trunkAxis === 'h' ? firstPath[1].y : firstPath[1].x;
-            const candidates = [
-                ...perpendicularCandidateValues(bestPaths, group.edgeIds, trunkAxis, original),
-                ...treeOutFallbackCandidateValues(bestPaths, group.edgeIds, trunkAxis, original),
-            ];
-            for (const value of candidates) {
-                const trial = moveTreeOutGroup(bestPaths, group.edgeIds, trunkAxis, value);
-                const score = scorer.score(trial);
-                if (isTreeTrunkScoreBetter(score, bestScore, scorer)) {
-                    bestPaths = trial;
-                    bestScore = score;
-                    changed = true;
-                }
-            }
-        }
-        if (!changed) break;
-    }
-
-    return bestPaths;
-}
-
-function postProcessTreeBusRouting<T extends { id: string; source: string; target: string; data?: any }>(edges: T[]): T[] {
-    const buddyGroups = buildBuddyGroups(edges);
-    let paths = pathMapFromEdges(edges);
-    if (paths.size < 2) return applyPathMap(edges, paths, { orthogonalSanitized: true });
-
-    paths = optimizeTreeOutTrunkAxes(edges, paths, buddyGroups);
-    const mutableEdgeIds = new Set(edges
-        .filter(edge => !edge.data?.treeRouting)
-        .map(edge => edge.id));
-    paths = repairEdgeCrossingViolations(paths, {
-        spacing: 12,
-        maxIterations: 8,
-        buddyGroups,
-        mutableEdgeIds,
-    });
-
-    const repaired = new Map<string, Point[]>();
-    paths.forEach((path, edgeId) => {
-        const edge = edges.find(item => item.id === edgeId);
-        repaired.set(edgeId, edge?.data?.treeRouting ? roundPath(path) : compactOrthogonalPath(path));
-    });
-    return applyPathMap(edges, repaired, { orthogonalSanitized: true, sharedTrunkAware: true });
-}
-
 // 获取节点锚点
-function getAnchor(node: any, handle: string | null | undefined): Point {
+function getAnchor(node: AdvancedRoutingNode, handle: string | null | undefined): Point {
     const pos = node.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-    const w = node?.measured?.width ?? 100;
-    const h = node?.measured?.height ?? 50;
+    const w = finiteNumber(node.measured?.width, 100);
+    const h = finiteNumber(node.measured?.height, 50);
 
     // 如果 handle 为空，默认中心 (用于部分逻辑)
     if (!handle) return { x: pos.x + w / 2, y: pos.y + h / 2 };
@@ -365,10 +93,10 @@ function getAnchor(node: any, handle: string | null | undefined): Point {
 }
 
 // 获取节点边界
-function getNodeBounds(node: any): { x: number; y: number; w: number; h: number } {
+function getNodeBounds(node: AdvancedRoutingNode): { x: number; y: number; w: number; h: number } {
     const pos = node.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-    const w = node?.measured?.width ?? 100;
-    const h = node?.measured?.height ?? 50;
+    const w = finiteNumber(node.measured?.width, 100);
+    const h = finiteNumber(node.measured?.height, 50);
     return { x: pos.x, y: pos.y, w, h };
 }
 
@@ -385,9 +113,13 @@ function rectsOverlap(
 // P2: Global Routing Optimization
 // ===================================
 
-export function globalOptimizeEdgeRouting<T extends { id: string; source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null; type?: string; data?: any }>(
+export function globalOptimizeEdgeRouting<T extends AdvancedRoutingEdge & {
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
+    type?: string;
+}>(
     edges: T[],
-    nodes: any[],
+    nodes: AdvancedRoutingNode[],
     cfg: {
         mode: 'advanced-smart' | 'native';
         globalPath?: string;
@@ -402,7 +134,7 @@ export function globalOptimizeEdgeRouting<T extends { id: string; source: string
     if (edges.length === 0) return edges;
 
     const topK = cfg.topK ?? 4;
-    const idMap = new Map<string, any>(nodes.map(n => [n.id, n]));
+    const idMap = new Map(nodes.map(n => [n.id, n]));
 
     type EdgeCandidate = Candidate;
 
@@ -596,9 +328,19 @@ export function globalOptimizeEdgeRouting<T extends { id: string; source: string
     }
 
     // Bus Constraint Post-Processing
-    const edgeCfg = (() => { try { return (diagramConfigManager.getConfig() as any)?.edge || {}; } catch { return {}; } })();
+    const edgeCfg = (() => {
+        try {
+            return asRecord(diagramConfigManager.getConfig().edge);
+        } catch {
+            return {};
+        }
+    })();
     if (edgeCfg.busEnabled !== false) {
-        const resolvePreferredHandle = (centerNode: any, relatedNodes: any[], preferSource: boolean): string => {
+        const resolvePreferredHandle = (
+            centerNode: AdvancedRoutingNode,
+            relatedNodes: AdvancedRoutingNode[],
+            preferSource: boolean,
+        ): string => {
             if (!centerNode || relatedNodes.length === 0) return preferSource ? 'r' : 'l';
             const center = getAnchor(centerNode, null);
             let sumDx = 0;
@@ -657,7 +399,9 @@ export function globalOptimizeEdgeRouting<T extends { id: string; source: string
                 if (subGroup.length < 2) continue;
                 const preferredSourceHandle = resolvePreferredHandle(
                     srcNode,
-                    subGroup.map(idx => idMap.get(edges[idx].target)).filter(Boolean),
+                    subGroup
+                        .map(idx => idMap.get(edges[idx].target))
+                        .filter((node): node is AdvancedRoutingNode => !!node),
                     true
                 );
                 const handleCounts = new Map<string, number>();
@@ -705,9 +449,9 @@ export function globalOptimizeEdgeRouting<T extends { id: string; source: string
             ...edge,
             sourceHandle: cand.sourceHandle,
             targetHandle: cand.targetHandle,
-            type: nextType as any,
+            type: nextType,
             data: { ...(edge.data || {}), globalOptimized: true }
-        };
+        } as T;
     });
 }
 
@@ -715,9 +459,9 @@ export function globalOptimizeEdgeRouting<T extends { id: string; source: string
 // P4: Advanced Edge Bundling
 // ===================================
 
-export function bundleEdges<T extends { id: string; source: string; target: string; data?: any }>(
+export function bundleEdges<T extends AdvancedRoutingEdge>(
     edges: T[],
-    nodes: any[],
+    nodes: AdvancedRoutingNode[],
     options: {
         enabled?: boolean;
         regionSize?: number;
@@ -729,7 +473,7 @@ export function bundleEdges<T extends { id: string; source: string; target: stri
     const { enabled = true, regionSize = 200, minBundleSize = 2, bundleSpacing = 8, layoutDirection = 'LR' } = options;
     if (!enabled || edges.length < 2) return edges;
 
-    const idMap = new Map<string, any>(nodes.map(n => [n.id, n]));
+    const idMap = new Map(nodes.map(n => [n.id, n]));
     const layoutDir = String(layoutDirection).toUpperCase();
     const isHorizontal = layoutDir.includes('LR') || layoutDir.includes('RL');
 
@@ -768,7 +512,7 @@ export function bundleEdges<T extends { id: string; source: string; target: stri
         group.centerY += (srcCenter.y + tgtCenter.y) / 2;
     });
 
-    const bundleInfo = new Map<number, any>();
+    const bundleInfo = new Map<number, BundleInfo>();
     let bundleIdCounter = 0;
 
     for (const group of bundleGroups.values()) {
@@ -818,15 +562,15 @@ export function bundleEdges<T extends { id: string; source: string; target: stri
 // P5: Layer-based Edge Routing
 // ===================================
 
-export function layerBasedEdgeRouting<T extends { id: string; source: string; target: string; data?: any }>(
+export function layerBasedEdgeRouting<T extends AdvancedRoutingEdge>(
     edges: T[],
-    nodes: any[],
+    nodes: AdvancedRoutingNode[],
     options: { enabled?: boolean; layerThreshold?: number; maxControlPoints?: number; layoutDirection?: string } = {}
 ): T[] {
     const { enabled = true, layerThreshold = 400, maxControlPoints = 3, layoutDirection = 'LR' } = options;
     if (!enabled || edges.length === 0) return edges;
 
-    const idMap = new Map<string, any>(nodes.map(n => [n.id, n]));
+    const idMap = new Map(nodes.map(n => [n.id, n]));
     const isHorizontal = String(layoutDirection).toUpperCase().includes('LR') || String(layoutDirection).toUpperCase().includes('RL');
     const getNodeCenter = (nodeId: string) => {
         const node = idMap.get(nodeId);
@@ -870,19 +614,23 @@ export function layerBasedEdgeRouting<T extends { id: string; source: string; ta
 // P6: Edge Label Optimization
 // ===================================
 
-export function optimizeEdgeLabelPositions<T extends { id: string; source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null; label?: any; data?: any }>(
+export function optimizeEdgeLabelPositions<T extends AdvancedRoutingEdge & {
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
+    label?: unknown;
+}>(
     edges: T[],
-    nodes: any[],
+    nodes: AdvancedRoutingNode[],
     options: { enabled?: boolean; labelPadding?: number; labelWidth?: number; labelHeight?: number } = {}
 ): T[] {
     const { enabled = true, labelPadding = 8, labelWidth = 60, labelHeight = 20 } = options;
     if (!enabled || edges.length === 0) return edges;
 
-    const idMap = new Map<string, any>(nodes.map(n => [n.id, n]));
+    const idMap = new Map(nodes.map(n => [n.id, n]));
     const placedLabels: { x: number; y: number; w: number; h: number }[] = [];
 
     return edges.map(edge => {
-        const hasLabel = edge.label || (edge.data as any)?.label;
+        const hasLabel = edge.label || edge.data?.label;
         if (!hasLabel) return edge;
 
         const srcNode = idMap.get(edge.source);
@@ -945,15 +693,18 @@ export function optimizeEdgeLabelPositions<T extends { id: string; source: strin
 // P7: Orthogonal Edge Beautification
 // ===================================
 
-export function beautifyOrthogonalEdges<T extends { id: string; source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null; data?: any }>(
+export function beautifyOrthogonalEdges<T extends AdvancedRoutingEdge & {
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
+}>(
     edges: T[],
-    nodes: any[],
+    nodes: AdvancedRoutingNode[],
     options: { enabled?: boolean; minSegmentLength?: number; straightenThreshold?: number } = {}
 ): T[] {
     const { enabled = true, minSegmentLength = 20, straightenThreshold = 5 } = options;
     if (!enabled || edges.length === 0) return edges;
 
-    const idMap = new Map<string, any>(nodes.map(n => [n.id, n]));
+    const idMap = new Map(nodes.map(n => [n.id, n]));
 
     return edges.map(edge => {
         const srcNode = idMap.get(edge.source);
@@ -995,359 +746,4 @@ export function beautifyOrthogonalEdges<T extends { id: string; source: string; 
 // P8: Tree-style Bus Routing
 // ===================================
 
-export function optimizeTreeBusRouting<T extends {
-    id: string;
-    source: string;
-    target: string;
-    sourceHandle?: string | null;
-    targetHandle?: string | null;
-    data?: any
-}>(
-    edges: T[],
-    nodes: any[],
-    options: {
-        enabled?: boolean;
-        minBusSize?: number;
-        trunkLength?: number;
-        branchSpacing?: number;
-        layoutDirection?: string;
-    } = {}
-): T[] {
-    const { enabled = true, minBusSize = 2, trunkLength = 40, layoutDirection = 'TB' } = options;
-    if (!enabled || edges.length === 0) return edges;
-
-    const idMap = new Map<string, any>(nodes.map(n => [n.id, n]));
-    const layoutDir = String(layoutDirection).toUpperCase();
-    const _isHorizontal = layoutDir.includes('LR') || layoutDir.includes('RL');
-
-    const parentMap = new Map<string, string>();
-    nodes.forEach(n => {
-        const type = String(n.type || '');
-        if (type === 'subGroup' || type === 'domain' || type === 'titleGroup') {
-            const children = n.data?.children;
-            if (Array.isArray(children)) {
-                children.forEach(cid => {
-                    if (cid) parentMap.set(String(cid), n.id);
-                });
-            }
-        }
-        if (n.parentId) {
-            parentMap.set(n.id, n.parentId);
-        }
-    });
-
-    const getAnchorLocal = (nodeId: string, handle: string | null | undefined): { x: number; y: number } | null => {
-        const node = idMap.get(nodeId);
-        if (!node) return null;
-        const pos = node.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-        const w = node?.measured?.width ?? 100;
-        const h = node?.measured?.height ?? 50;
-        if (!handle) return { x: pos.x + w / 2, y: pos.y + h / 2 };
-        switch (handle) {
-            case 'l': case 'left': return { x: pos.x, y: pos.y + h / 2 };
-            case 'r': case 'right': return { x: pos.x + w, y: pos.y + h / 2 };
-            case 't': case 'top': return { x: pos.x + w / 2, y: pos.y };
-            case 'b': case 'bottom': return { x: pos.x + w / 2, y: pos.y + h };
-            default: return { x: pos.x + w / 2, y: pos.y + h / 2 };
-        }
-    };
-
-    const outGroups = new Map<string, T[]>();
-    const inGroups = new Map<string, T[]>();
-
-    edges.forEach(edge => {
-        if (!outGroups.has(edge.source)) outGroups.set(edge.source, []);
-        outGroups.get(edge.source)?.push(edge);
-        if (!inGroups.has(edge.target)) inGroups.set(edge.target, []);
-        inGroups.get(edge.target)?.push(edge);
-    });
-
-    const treeRoutingMap = new Map<string, any>();
-
-    // 1-to-N
-    outGroups.forEach((groupEdges, sourceId) => {
-        if (groupEdges.length < minBusSize) return;
-        const sourceNode = idMap.get(sourceId);
-        if (!sourceNode) return;
-
-        const sourceCenter = getAnchorLocal(sourceId, null);
-        if (!sourceCenter) return;
-
-        // Calculate average offset to determine dominant flow direction dynamically
-        let sumX = 0;
-        let sumY = 0;
-        let validOffsetsCount = 0;
-        const targetOffsets = groupEdges.map(edge => {
-            const targetCenter = getAnchorLocal(edge.target, null);
-            if (!targetCenter) return null;
-            sumX += targetCenter.x - sourceCenter.x;
-            sumY += targetCenter.y - sourceCenter.y;
-            validOffsetsCount++;
-            return {
-                edge,
-                deltaX: targetCenter.x - sourceCenter.x,
-                deltaY: targetCenter.y - sourceCenter.y
-            };
-        }).filter((offset): offset is { edge: T; deltaX: number; deltaY: number } => offset !== null);
-
-        if (targetOffsets.length < minBusSize) return;
-
-        const avgX = validOffsetsCount > 0 ? sumX / validOffsetsCount : 0;
-        const avgY = validOffsetsCount > 0 ? sumY / validOffsetsCount : 0;
-
-        // Default fallback to configured layout direction if average offset is tiny/ambiguous
-        let dynamicDir: 'TB' | 'BT' | 'LR' | 'RL' = 'TB';
-        if (layoutDir.includes('BT')) dynamicDir = 'BT';
-        else if (layoutDir.includes('LR')) dynamicDir = 'LR';
-        else if (layoutDir.includes('RL')) dynamicDir = 'RL';
-
-        if (Math.abs(avgX) >= 10 || Math.abs(avgY) >= 10) {
-            if (Math.abs(avgY) >= Math.abs(avgX)) {
-                dynamicDir = avgY >= 0 ? 'TB' : 'BT';
-            } else {
-                dynamicDir = avgX >= 0 ? 'LR' : 'RL';
-            }
-        }
-
-        const isGroupHorizontal = dynamicDir === 'LR' || dynamicDir === 'RL';
-
-        const alignedEdges: typeof groupEdges = [];
-        targetOffsets.forEach(o => {
-            let isAligned = false;
-            if (dynamicDir === 'TB') isAligned = o.deltaY > -5;
-            else if (dynamicDir === 'BT') isAligned = o.deltaY < 5;
-            else if (dynamicDir === 'LR') isAligned = o.deltaX > -5;
-            else if (dynamicDir === 'RL') isAligned = o.deltaX < 5;
-            
-            if (isAligned) alignedEdges.push(o.edge);
-        });
-
-        if (alignedEdges.length < minBusSize) return;
-
-        // Treat all aligned edges as a single tree bus trunk group instead of partitioning by subdomain domainKey
-        const domainEdges = alignedEdges;
-        const domainKey = 'all';
-
-        const firstEdge = domainEdges[0];
-        let effectiveSourceHandle = firstEdge.sourceHandle;
-        if (!effectiveSourceHandle) {
-            if (dynamicDir === 'TB') effectiveSourceHandle = 'b';
-            else if (dynamicDir === 'BT') effectiveSourceHandle = 't';
-            else if (dynamicDir === 'LR') effectiveSourceHandle = 'r';
-            else if (dynamicDir === 'RL') effectiveSourceHandle = 'l';
-            else effectiveSourceHandle = 'b';
-        } else {
-            if (dynamicDir === 'TB' || dynamicDir === 'BT') {
-                if (effectiveSourceHandle === 'l' || effectiveSourceHandle === 'r' || effectiveSourceHandle === 'left' || effectiveSourceHandle === 'right') {
-                    effectiveSourceHandle = dynamicDir === 'TB' ? 'b' : 't';
-                }
-            } else {
-                if (effectiveSourceHandle === 't' || effectiveSourceHandle === 'b' || effectiveSourceHandle === 'top' || effectiveSourceHandle === 'bottom') {
-                    effectiveSourceHandle = dynamicDir === 'LR' ? 'r' : 'l';
-                }
-            }
-        }
-
-        const srcAnchor = getAnchorLocal(sourceId, effectiveSourceHandle);
-        if (!srcAnchor) return;
-
-        let dirX = 0, dirY = 0;
-        if (effectiveSourceHandle === 'r' || effectiveSourceHandle === 'right') dirX = 1;
-        else if (effectiveSourceHandle === 'l' || effectiveSourceHandle === 'left') dirX = -1;
-        else if (effectiveSourceHandle === 'b' || effectiveSourceHandle === 'bottom') dirY = 1;
-        else if (effectiveSourceHandle === 't' || effectiveSourceHandle === 'top') dirY = -1;
-
-        const branchPoint = { x: srcAnchor.x + dirX * trunkLength, y: srcAnchor.y + dirY * trunkLength };
-
-        domainEdges.forEach(edge => {
-            let effectiveTargetHandle = edge.targetHandle;
-            if (!effectiveTargetHandle) {
-                if (dynamicDir === 'TB') effectiveTargetHandle = 't';
-                else if (dynamicDir === 'BT') effectiveTargetHandle = 'b';
-                else if (dynamicDir === 'LR') effectiveTargetHandle = 'l';
-                else if (dynamicDir === 'RL') effectiveTargetHandle = 'r';
-                else effectiveTargetHandle = 't';
-            } else {
-                if (dynamicDir === 'TB' || dynamicDir === 'BT') {
-                    if (effectiveTargetHandle === 'l' || effectiveTargetHandle === 'r' || effectiveTargetHandle === 'left' || effectiveTargetHandle === 'right') {
-                        effectiveTargetHandle = dynamicDir === 'TB' ? 't' : 'b';
-                    }
-                } else {
-                    if (effectiveTargetHandle === 't' || effectiveTargetHandle === 'b' || effectiveTargetHandle === 'top' || effectiveTargetHandle === 'bottom') {
-                        effectiveTargetHandle = dynamicDir === 'LR' ? 'l' : 'r';
-                    }
-                }
-            }
-
-            const tgtAnchor = getAnchorLocal(edge.target, effectiveTargetHandle);
-            if (!tgtAnchor) return;
-
-            const points: Array<{ x: number, y: number }> = [];
-            points.push({ x: Math.round(srcAnchor.x), y: Math.round(srcAnchor.y) });
-            points.push({ x: Math.round(branchPoint.x), y: Math.round(branchPoint.y) });
-
-            if (!isGroupHorizontal) {
-                points.push({ x: Math.round(tgtAnchor.x), y: Math.round(branchPoint.y) });
-                points.push({ x: Math.round(tgtAnchor.x), y: Math.round(tgtAnchor.y) });
-            } else {
-                points.push({ x: Math.round(branchPoint.x), y: Math.round(tgtAnchor.y) });
-                points.push({ x: Math.round(tgtAnchor.x), y: Math.round(tgtAnchor.y) });
-            }
-
-            treeRoutingMap.set(edge.id, {
-                type: 'tree-out', points, trunkId: `trunk-out-${sourceId}-${domainKey}`,
-                effectiveSourceHandle, effectiveTargetHandle
-            });
-        });
-    });
-
-    // N-to-1
-    inGroups.forEach((groupEdges, targetId) => {
-        if (groupEdges.length < minBusSize) return;
-        const validEdges = groupEdges.filter(e => !treeRoutingMap.has(e.id));
-        if (validEdges.length < minBusSize) return;
-
-        const targetCenter = getAnchorLocal(targetId, null);
-        if (!targetCenter) return;
-
-        // Calculate average offset to determine dominant flow direction dynamically
-        let sumX = 0;
-        let sumY = 0;
-        let validOffsetsCount = 0;
-        const sourceOffsets = validEdges.map(edge => {
-            const sourceCenter = getAnchorLocal(edge.source, null);
-            if (!sourceCenter) return null;
-            sumX += sourceCenter.x - targetCenter.x;
-            sumY += sourceCenter.y - targetCenter.y;
-            validOffsetsCount++;
-            return {
-                edge,
-                deltaX: sourceCenter.x - targetCenter.x,
-                deltaY: sourceCenter.y - targetCenter.y
-            };
-        }).filter((offset): offset is { edge: T; deltaX: number; deltaY: number } => offset !== null);
-
-        if (sourceOffsets.length < minBusSize) return;
-
-        const avgX = validOffsetsCount > 0 ? sumX / validOffsetsCount : 0;
-        const avgY = validOffsetsCount > 0 ? sumY / validOffsetsCount : 0;
-
-        // Default fallback to configured layout direction if average offset is tiny/ambiguous
-        let dynamicDir: 'TB' | 'BT' | 'LR' | 'RL' = 'TB';
-        if (layoutDir.includes('BT')) dynamicDir = 'BT';
-        else if (layoutDir.includes('LR')) dynamicDir = 'LR';
-        else if (layoutDir.includes('RL')) dynamicDir = 'RL';
-
-        if (Math.abs(avgX) >= 10 || Math.abs(avgY) >= 10) {
-            // Note: For incoming edges, target is at the center, so delta = source - target.
-            // If deltaY > 0, source is below target, meaning the flow is BT (source -> target).
-            // If deltaY < 0, source is above target, meaning the flow is TB (source -> target).
-            if (Math.abs(avgY) >= Math.abs(avgX)) {
-                dynamicDir = avgY >= 0 ? 'BT' : 'TB';
-            } else {
-                dynamicDir = avgX >= 0 ? 'RL' : 'LR';
-            }
-        }
-
-        const isGroupHorizontal = dynamicDir === 'LR' || dynamicDir === 'RL';
-
-        const alignedEdges: typeof validEdges = [];
-        sourceOffsets.forEach(o => {
-            let isAligned = false;
-            if (dynamicDir === 'TB') isAligned = o.deltaY < 5;
-            else if (dynamicDir === 'BT') isAligned = o.deltaY > -5;
-            else if (dynamicDir === 'LR') isAligned = o.deltaX < 5;
-            else if (dynamicDir === 'RL') isAligned = o.deltaX > -5;
-            
-            if (isAligned) alignedEdges.push(o.edge);
-        });
-
-        if (alignedEdges.length < minBusSize) return;
-
-        // Treat all aligned edges as a single tree bus trunk group instead of partitioning by subdomain domainKey
-        const domainEdges = alignedEdges;
-        const domainKey = 'all';
-
-        const firstEdge = domainEdges[0];
-        let effectiveTargetHandle = firstEdge.targetHandle;
-        if (!effectiveTargetHandle) {
-            if (dynamicDir === 'TB') effectiveTargetHandle = 't';
-            else if (dynamicDir === 'BT') effectiveTargetHandle = 'b';
-            else if (dynamicDir === 'LR') effectiveTargetHandle = 'l';
-            else if (dynamicDir === 'RL') effectiveTargetHandle = 'r';
-            else effectiveTargetHandle = 't';
-        } else {
-            if (dynamicDir === 'TB' || dynamicDir === 'BT') {
-                if (effectiveTargetHandle === 'l' || effectiveTargetHandle === 'r' || effectiveTargetHandle === 'left' || effectiveTargetHandle === 'right') {
-                    effectiveTargetHandle = dynamicDir === 'TB' ? 't' : 'b';
-                }
-            } else {
-                if (effectiveTargetHandle === 't' || effectiveTargetHandle === 'b' || effectiveTargetHandle === 'top' || effectiveTargetHandle === 'bottom') {
-                    effectiveTargetHandle = dynamicDir === 'LR' ? 'l' : 'r';
-                }
-            }
-        }
-
-        const tgtAnchor = getAnchorLocal(targetId, effectiveTargetHandle);
-        if (!tgtAnchor) return;
-
-        let dirX = 0, dirY = 0;
-        if (effectiveTargetHandle === 'l' || effectiveTargetHandle === 'left') dirX = -1;
-        else if (effectiveTargetHandle === 'r' || effectiveTargetHandle === 'right') dirX = 1;
-        else if (effectiveTargetHandle === 't' || effectiveTargetHandle === 'top') dirY = -1;
-        else if (effectiveTargetHandle === 'b' || effectiveTargetHandle === 'bottom') dirY = 1;
-
-        const mergePoint = { x: tgtAnchor.x + dirX * trunkLength, y: tgtAnchor.y + dirY * trunkLength };
-
-        domainEdges.forEach(edge => {
-            let effectiveSourceHandle = edge.sourceHandle;
-            if (!effectiveSourceHandle) {
-                if (dynamicDir === 'TB') effectiveSourceHandle = 'b';
-                else if (dynamicDir === 'BT') effectiveSourceHandle = 't';
-                else if (dynamicDir === 'LR') effectiveSourceHandle = 'r';
-                else if (dynamicDir === 'RL') effectiveSourceHandle = 'l';
-                else effectiveSourceHandle = 'b';
-            } else {
-                if (dynamicDir === 'TB' || dynamicDir === 'BT') {
-                    if (effectiveSourceHandle === 'l' || effectiveSourceHandle === 'r' || effectiveSourceHandle === 'left' || effectiveSourceHandle === 'right') {
-                        effectiveSourceHandle = dynamicDir === 'TB' ? 'b' : 't';
-                    }
-                } else {
-                    if (effectiveSourceHandle === 't' || effectiveSourceHandle === 'b' || effectiveSourceHandle === 'top' || effectiveSourceHandle === 'bottom') {
-                        effectiveSourceHandle = dynamicDir === 'LR' ? 'r' : 'l';
-                    }
-                }
-            }
-
-            const srcAnchor = getAnchorLocal(edge.source, effectiveSourceHandle);
-            if (!srcAnchor) return;
-
-            const points: Array<{ x: number, y: number }> = [];
-            points.push({ x: Math.round(srcAnchor.x), y: Math.round(srcAnchor.y) });
-
-            if (!isGroupHorizontal) points.push({ x: Math.round(srcAnchor.x), y: Math.round(mergePoint.y) });
-            else points.push({ x: Math.round(mergePoint.x), y: Math.round(srcAnchor.y) });
-
-            points.push({ x: Math.round(mergePoint.x), y: Math.round(mergePoint.y) });
-            points.push({ x: Math.round(tgtAnchor.x), y: Math.round(tgtAnchor.y) });
-
-            treeRoutingMap.set(edge.id, {
-                type: 'tree-in', points, trunkId: `trunk-in-${targetId}-${domainKey}`,
-                effectiveSourceHandle, effectiveTargetHandle
-            });
-        });
-    });
-
-    const routedEdges = edges.map(edge => {
-        const info = treeRoutingMap.get(edge.id);
-        if (!info) return edge;
-        return {
-            ...edge,
-            sourceHandle: info.effectiveSourceHandle || edge.sourceHandle,
-            targetHandle: info.effectiveTargetHandle || edge.targetHandle,
-            data: { ...(edge.data || {}), treeRouting: info, isTreeBus: true, computedPath: info.points }
-        };
-    });
-
-    return postProcessTreeBusRouting(routedEdges);
-}
+export { optimizeTreeBusRouting } from './advancedTreeBusRouting';

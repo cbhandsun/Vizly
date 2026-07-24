@@ -1,15 +1,46 @@
 import { useMemo } from 'react';
 import { Edge, Node } from '@xyflow/react';
 import { decideEdgeRouting } from '../utils/HandlePicker';
-import { diagramConfigManager } from '../components/config/DiagramConfig';
+import { diagramConfigManager } from '../config/DiagramConfig';
+import type { DiagramConfig } from '../config/DiagramConfig';
 
 export interface EdgeNormalizationOptions {
   enableSmartRouting?: boolean; // Default: true. If false, bypasses smart routing.
   layoutDirection?: 'TB' | 'BT' | 'LR' | 'RL'; // Default: 'TB'
-  overrideConfig?: any; // Optional config object to override global diagram config
+  overrideConfig?: { edge?: Partial<DiagramConfig['edge']> }; // Optional config object to override global diagram config
 }
 
-const EMPTY_EDGE_CONFIG: Record<string, any> = {};
+type NormalizationNode = Node & {
+  x?: number;
+  y?: number;
+  positionAbsolute?: { x: number; y: number };
+  computed?: { positionAbsolute?: { x: number; y: number } };
+  parentNode?: string;
+};
+
+const EMPTY_EDGE_CONFIG: DiagramConfig['edge'] = {
+  strokeWidth: 1,
+  animated: false,
+  type: 'default',
+};
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+
+const finiteCoordinate = (value: unknown): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value !== 'string') return 0;
+  const normalized = value.trim().replace(/px$/i, '');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const lowerCaseStringList = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string').map(item => item.toLowerCase())
+    : [];
 
 /**
  * P1 Single Source of Truth for Edge Properties
@@ -66,23 +97,29 @@ export function useEdgeNormalization(
       return edges;
     }
 
-    const nodeMap = new Map<string, any>();
+    const nodeMap = new Map<string, NormalizationNode>();
     nodes.forEach(n => nodeMap.set(String(n.id), n));
 
-    const getAbsolutePosition = (node: any, visited?: Set<string>): { x: number; y: number } => {
+    const getAbsolutePosition = (
+      node: NormalizationNode,
+      visited?: Set<string>,
+    ): { x: number; y: number } => {
       const abs = node?.computed?.positionAbsolute || node?.positionAbsolute;
-      if (abs) return abs;
-      const base = node?.position || { x: node?.x ?? 0, y: node?.y ?? 0 };
-      const parentId = node?.parentId || node?.parentNode;
+      if (abs) return { x: finiteCoordinate(abs.x), y: finiteCoordinate(abs.y) };
+      const base = node.position || { x: node.x ?? 0, y: node.y ?? 0 };
+      const parentId = node.parentId || node.parentNode;
       if (!parentId) return base;
       const v = visited || new Set<string>();
-      const id = String(node?.id ?? '');
+      const id = String(node.id ?? '');
       if (id && v.has(id)) return base;
       if (id) v.add(id);
       const parent = nodeMap.get(String(parentId));
       if (!parent) return base;
       const pAbs = getAbsolutePosition(parent, v);
-      return { x: pAbs.x + (base.x ?? 0), y: pAbs.y + (base.y ?? 0) };
+      return {
+        x: pAbs.x + finiteCoordinate(base.x),
+        y: pAbs.y + finiteCoordinate(base.y),
+      };
     };
 
     const normalizeHandle = (h?: string | null): 't' | 'b' | 'l' | 'r' | undefined => {
@@ -102,22 +139,26 @@ export function useEdgeNormalization(
     };
 
     const readAutoFlags = (edge: Edge): { source: boolean; target: boolean } => {
-      const d: any = (edge as any).data || {};
-      const list = Array.isArray(d.auto) ? d.auto.map((x: any) => String(x).toLowerCase()) : [];
+      const d = asRecord(edge.data);
+      const list = lowerCaseStringList(d.auto);
       const autoSource = Boolean(d.autoSource) || list.includes('source');
       const autoTarget = Boolean(d.autoTarget) || list.includes('target');
       return { source: autoSource, target: autoTarget };
     };
 
     const readManualFlags = (edge: Edge): { source: boolean; target: boolean } => {
-      const d: any = (edge as any).data || {};
+      const d = asRecord(edge.data);
       if (Array.isArray(d.manualHandleSides)) {
-        const list = d.manualHandleSides.map((x: any) => String(x).toLowerCase());
+        const list = lowerCaseStringList(d.manualHandleSides);
         return { source: list.includes('source'), target: list.includes('target') };
       }
       if (d.manualHandles === true) return { source: true, target: true };
-      if (d.manualHandles && typeof d.manualHandles === 'object') {
-        return { source: Boolean(d.manualHandles.source), target: Boolean(d.manualHandles.target) };
+      const manualHandles = asRecord(d.manualHandles);
+      if (Object.keys(manualHandles).length > 0) {
+        return {
+          source: Boolean(manualHandles.source),
+          target: Boolean(manualHandles.target),
+        };
       }
       return { source: false, target: false };
     };
@@ -146,15 +187,15 @@ export function useEdgeNormalization(
 
       const routingResult = decideEdgeRouting(sourceNode, targetNode, nodes, routingConfig);
 
-      const existingSH = normalizeHandle(edge.sourceHandle as any);
-      const existingTH = normalizeHandle(edge.targetHandle as any);
+      const existingSH = normalizeHandle(edge.sourceHandle);
+      const existingTH = normalizeHandle(edge.targetHandle);
 
-      const sAbs = getAbsolutePosition(sourceNode as any);
-      const tAbs = getAbsolutePosition(targetNode as any);
-      const sW = (sourceNode.measured?.width ?? (sourceNode as any).width ?? (sourceNode as any).style?.width ?? 0) as number;
-      const sH = (sourceNode.measured?.height ?? (sourceNode as any).height ?? (sourceNode as any).style?.height ?? 0) as number;
-      const tW = (targetNode.measured?.width ?? (targetNode as any).width ?? (targetNode as any).style?.width ?? 0) as number;
-      const tH = (targetNode.measured?.height ?? (targetNode as any).height ?? (targetNode as any).style?.height ?? 0) as number;
+      const sAbs = getAbsolutePosition(sourceNode);
+      const tAbs = getAbsolutePosition(targetNode);
+      const sW = finiteCoordinate(sourceNode.measured?.width ?? sourceNode.width ?? sourceNode.style?.width);
+      const sH = finiteCoordinate(sourceNode.measured?.height ?? sourceNode.height ?? sourceNode.style?.height);
+      const tW = finiteCoordinate(targetNode.measured?.width ?? targetNode.width ?? targetNode.style?.width);
+      const tH = finiteCoordinate(targetNode.measured?.height ?? targetNode.height ?? targetNode.style?.height);
       const dx = (tAbs.x + tW / 2) - (sAbs.x + sW / 2);
       const dy = (tAbs.y + tH / 2) - (sAbs.y + sH / 2);
 
@@ -183,16 +224,16 @@ export function useEdgeNormalization(
         type: routingResult.type,
         sourceHandle: finalSourceHandle,
         targetHandle: finalTargetHandle,
-        data: ({
-          ...(edge.data as any),
+        data: {
+          ...asRecord(edge.data),
           auto: autoList,
           autoSource: nextAuto.source,
           autoTarget: nextAuto.target,
-          manualHandles: (edge.data as any)?.manualHandles,
-          manualHandleSides: (edge.data as any)?.manualHandleSides,
+          manualHandles: asRecord(edge.data).manualHandles,
+          manualHandleSides: asRecord(edge.data).manualHandleSides,
           _routingMode: routingConfig.mode,
           _generatedType: routingResult.type
-        } as any)
+        }
       };
     });
 

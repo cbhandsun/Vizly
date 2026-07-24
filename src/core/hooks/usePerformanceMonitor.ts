@@ -4,12 +4,38 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
-import { 
+import {
   performanceMonitor, 
   recordComponentRender, 
   recordInteraction,
   recordError 
 } from '../utils/performanceMonitor';
+
+export interface PerformanceMemory {
+  usedJSHeapSize: number;
+  totalJSHeapSize: number;
+  jsHeapSizeLimit: number;
+}
+
+const isFiniteNonNegativeNumber = (value: unknown): value is number => (
+  typeof value === 'number' && Number.isFinite(value) && value >= 0
+);
+
+export const coercePerformanceMemory = (value: unknown): PerformanceMemory | null => {
+  if (!value || typeof value !== 'object') return null;
+  const memory = value as Partial<PerformanceMemory>;
+  const { usedJSHeapSize, totalJSHeapSize, jsHeapSizeLimit } = memory;
+  if (!isFiniteNonNegativeNumber(usedJSHeapSize)
+    || !isFiniteNonNegativeNumber(totalJSHeapSize)
+    || !isFiniteNonNegativeNumber(jsHeapSizeLimit)) return null;
+  if (jsHeapSizeLimit === 0) return null;
+  return { usedJSHeapSize, totalJSHeapSize, jsHeapSizeLimit };
+};
+
+const getPerformanceMemory = (): PerformanceMemory | null => {
+  const memory = (performance as Performance & { memory?: unknown }).memory;
+  return coercePerformanceMemory(memory);
+};
 
 /**
  * 组件性能监控Hook
@@ -108,7 +134,7 @@ export function useInteractionPerformance() {
  */
 export function useErrorMonitoring(componentName: string) {
   // 记录组件错误
-  const logError = useCallback((error: Error, additionalData?: Record<string, any>) => {
+  const logError = useCallback((error: Error, additionalData?: Record<string, unknown>) => {
     recordError(error, {
       component: componentName,
       ...additionalData
@@ -129,7 +155,7 @@ export function useErrorMonitoring(componentName: string) {
   }, [logError]);
 
   // 包装异步函数，自动错误处理
-  const wrapAsync = useCallback(<T extends any[], R>(
+  const wrapAsync = useCallback(<T extends unknown[], R>(
     fn: (...args: T) => Promise<R>,
     errorContext?: string
   ) => {
@@ -210,8 +236,8 @@ export function useMemoryMonitoring(componentName: string) {
   useEffect(() => {
     // 定期检查内存使用情况
     memoryCheckInterval.current = setInterval(() => {
-      if ('memory' in performance) {
-        const memory = (performance as any).memory;
+      const memory = getPerformanceMemory();
+      if (memory) {
         const memoryUsage = {
           usedJSHeapSize: memory.usedJSHeapSize,
           totalJSHeapSize: memory.totalJSHeapSize,
@@ -239,8 +265,8 @@ export function useMemoryMonitoring(componentName: string) {
 
   // 手动检查内存使用
   const checkMemoryUsage = useCallback(() => {
-    if ('memory' in performance) {
-      const memory = (performance as any).memory;
+    const memory = getPerformanceMemory();
+    if (memory) {
       return {
         usedJSHeapSize: memory.usedJSHeapSize,
         totalJSHeapSize: memory.totalJSHeapSize,

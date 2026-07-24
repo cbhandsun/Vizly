@@ -2,6 +2,11 @@ import type { Edge } from '@xyflow/react';
 
 export type Point = { x: number; y: number };
 export type Axis = 'h' | 'v';
+const asRecord = (value: unknown): Record<string, unknown> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
 export type SegmentRef = {
   edgeIndex: number;
   segmentIndex: number;
@@ -54,17 +59,21 @@ export const MAX_HAIRPIN_COLLAPSE_BRIDGE = 104;
 export const MAX_MICRO_CANDIDATES_PER_EDGE = 72;
 
 export function getEdgePath(edge: Edge): Point[] {
-  const raw = (edge.data as any)?.computedPath || (edge.data as any)?.elkPath || [];
+  const raw = edge.data?.computedPath || edge.data?.elkPath || [];
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((point: any) => ({ x: Number(point?.x), y: Number(point?.y) }))
+    .map(point => {
+      const candidate = asRecord(point);
+      return { x: Number(candidate.x), y: Number(candidate.y) };
+    })
     .filter((point: Point) => Number.isFinite(point.x) && Number.isFinite(point.y));
 }
 
 export function withComputedPath(edge: Edge, path: Point[]): Edge {
-  const data: any = { ...(edge.data || {}), computedPath: path, displayMicroCleaned: true };
-  if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-    data.treeRouting = { ...data.treeRouting, points: path };
+  const data: Record<string, unknown> = { ...(edge.data || {}), computedPath: path, displayMicroCleaned: true };
+  const treeRouting = asRecord(data.treeRouting);
+  if (Array.isArray(treeRouting.points)) {
+    data.treeRouting = { ...treeRouting, points: path };
   }
   return { ...edge, data };
 }
@@ -254,7 +263,7 @@ export function allSegmentsOrthogonal(points: Point[]): boolean {
 }
 
 export function hasSharedTrunkIntent(edge: Edge): boolean {
-  const data = (edge.data || {}) as any;
+  const data = edge.data || {};
   return data.sharedTrunkSynthesized === true
     || data.sharedTrunkAware === true
     || data.isTreeBus === true

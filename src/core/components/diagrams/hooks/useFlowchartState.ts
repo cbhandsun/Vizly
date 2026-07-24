@@ -45,7 +45,7 @@ export const useFlowchartState = (edgeMode: 'advanced-smart' | 'native' = 'advan
             let shouldSnapshot = false;
 
             // Check for deletions
-            const deletedNodeIds = changes.filter(change => change.type === 'remove').map((change: any) => change.id);
+            const deletedNodeIds = changes.flatMap(change => change.type === 'remove' ? [change.id] : []);
             if (deletedNodeIds.length > 0) {
                 shouldSnapshot = true;
                 

@@ -1,5 +1,4 @@
 import { Position } from '../types/flow';
-import type { PortSelectionConfig } from '../types/routing';
 import type { Node, Edge } from '@xyflow/react';
 import type { Rectangle, Point } from './pathfinding';
 import { generateSimplePath, isPathBlocked } from './pathfinding';

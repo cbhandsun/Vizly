@@ -16,6 +16,8 @@ import { getDisplayHardQualityGateReport } from './baseReactFlowDisplayQualityGa
 import { repairAxisMismatchedTerminalsWithBoundedPortRoles } from './baseReactFlowDisplayTerminalPortRepair';
 import { repairDeclaredTerminalRolesWithHardGate } from './baseReactFlowDeclaredTerminalRoleRepair';
 import { repairRenderSafeTerminalAxes } from './baseReactFlowRenderTerminalSafety';
+import { repairSharedPortAndTinyTerminalLanes } from './baseReactFlowDisplaySharedPortLaneRepair';
+import { repairFinalResidualStrictCrossings } from './baseReactFlowDisplayStrictResidualRepair';
 
 export type BaseReactFlowDisplayExactReport = Readonly<{
   inputNodes: Node[];
@@ -36,6 +38,23 @@ const needsOuterPortTransaction = (
   || report.quality.reverseOverlap > 0
   || report.quality.strictCrossings > 0
 );
+
+const hasOnlyDeclaredTerminalAxisDefect = (
+  report: BaseDisplayBoundedCandidateReport,
+): boolean => {
+  const quality = report.quality;
+  return report.terminalsAttached
+    && !report.terminalsAnchored
+    && report.obstacleHits === 0
+    && quality.nonOrthogonalSegments === 0
+    && quality.strictCrossings === 0
+    && quality.reverseOverlap === 0
+    && quality.unrelatedOverlap === 0
+    && quality.unexplainedRelatedOverlap === 0
+    && quality.shortEndpointStubs === 0
+    && quality.tinyInteriorDoglegs === 0
+    && quality.hairpins === 0;
+};
 
 export const createBaseReactFlowDisplayExactReport = (
   edges: Edge[],
@@ -88,6 +107,33 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
   );
   let hasAtomicOuterPortHardBaseline = false;
 
+  // A candidate that is already geometrically clean should not enter the
+  // broader measured-repair pipeline merely because one declared port axis is
+  // stale. The broader pipeline may legitimately re-anchor several terminals,
+  // which expands a one-edge defect into new loop/stair defects. Keep this
+  // bounded transaction first and commit it only when the exact whole-graph
+  // hard gate is clean.
+  if (hasOnlyDeclaredTerminalAxisDefect(routedReport)) {
+    const directAxisCandidate = compactDisplayEdgePaths(
+      repairAxisMismatchedTerminalsWithBoundedPortRoles(
+        routedEdges,
+        repairNodes,
+        Math.min(128, Math.max(32, routedEdges.length * 4)),
+      ),
+    ) as T;
+    if (directAxisCandidate !== routedEdges) {
+      const directAxisReport = getDisplayHardQualityGateReport(
+        directAxisCandidate,
+        repairNodes,
+        'polished',
+      );
+      if (directAxisReport.hardClean) {
+        routedEdges = directAxisCandidate;
+        routedReport = directAxisReport;
+      }
+    }
+  }
+
   if (!routedReport.hardClean) {
     const measuredSeed = routedEdges;
     const measuredOutcome = repairBaseReactFlowMeasuredDisplayEdgesWithReport(
@@ -102,6 +148,37 @@ export const finalizeBaseReactFlowDisplayEdgesWithReport = <T extends Edge[]>(
     );
     routedEdges = measuredOutcome.edges as T;
     routedReport = measuredOutcome.report;
+  }
+
+  if (
+    !routedReport.hardClean
+    && (
+      routedReport.quality.tinyInteriorDoglegs > 0
+      || routedReport.quality.hairpins > 0
+    )
+  ) {
+    const residualLaneCandidate = compactDisplayEdgePaths(
+      repairFinalResidualStrictCrossings(
+        repairSharedPortAndTinyTerminalLanes(
+          routedEdges,
+          repairNodes,
+          Math.min(32, Math.max(8, routedEdges.length)),
+          { allowTransientStrictCrossing: true },
+        ),
+        repairNodes,
+      ),
+    ) as T;
+    if (residualLaneCandidate !== routedEdges) {
+      const residualLaneReport = getDisplayHardQualityGateReport(
+        residualLaneCandidate,
+        repairNodes,
+        'polished',
+      );
+      if (residualLaneReport.hardClean) {
+        routedEdges = residualLaneCandidate;
+        routedReport = residualLaneReport;
+      }
+    }
   }
 
   if (routedReport.terminalsAttached && !routedReport.terminalsAnchored) {

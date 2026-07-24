@@ -7,6 +7,15 @@ import { safeLog } from './consoleCleanup';
 import { redactSensitiveLogValue } from './logSecurity';
 
 const LOCAL_SECRET_PREFIX = 'DiagramView.CryptoSecret.v2';
+const LOCAL_SECRET_PATTERN = /^[A-Za-z0-9+/]{43}=$/;
+const MAX_USER_ID_LENGTH = 256;
+const containsControlCharacter = (value: string): boolean => {
+    for (let index = 0; index < value.length; index += 1) {
+        const code = value.charCodeAt(index);
+        if (code <= 31 || code === 127) return true;
+    }
+    return false;
+};
 
 export class CryptoService {
     private static readonly LEGACY_SALT = new TextEncoder().encode('DiagramView.CryptoSalt.v1');
@@ -15,8 +24,29 @@ export class CryptoService {
     // Cache derived keys in memory to avoid recalculating on every call
     private static keyCache: Map<string, CryptoKey> = new Map();
 
+    private static requireValidUserId(userId: string): string {
+        if (
+            typeof userId !== 'string'
+            || userId.length === 0
+            || userId.length > MAX_USER_ID_LENGTH
+            || containsControlCharacter(userId)
+        ) {
+            throw new Error('A valid userId is required for encryption');
+        }
+        return userId;
+    }
+
     private static getSecretStorageKey(userId: string): string {
-        return `${LOCAL_SECRET_PREFIX}_${userId}`;
+        return `${LOCAL_SECRET_PREFIX}_${this.requireValidUserId(userId)}`;
+    }
+
+    private static isValidLocalSecret(value: string): boolean {
+        if (!LOCAL_SECRET_PATTERN.test(value)) return false;
+        try {
+            return window.atob(value).length === 32;
+        } catch {
+            return false;
+        }
     }
 
     static clearKeyCache(): void {
@@ -24,7 +54,12 @@ export class CryptoService {
     }
 
     static clearUserSecret(userId: string): void {
-        if (!userId) return;
+        if (
+            typeof userId !== 'string'
+            || userId.length === 0
+            || userId.length > MAX_USER_ID_LENGTH
+            || containsControlCharacter(userId)
+        ) return;
         if (typeof localStorage !== 'undefined') {
             localStorage.removeItem(this.getSecretStorageKey(userId));
         }
@@ -33,13 +68,10 @@ export class CryptoService {
     }
 
     private static getOrCreateLocalSecret(userId: string): string {
-        if (!userId) {
-            throw new Error("userId is required for encryption");
-        }
-
         const storageKey = this.getSecretStorageKey(userId);
         const existing = localStorage.getItem(storageKey);
-        if (existing) return existing;
+        if (existing && this.isValidLocalSecret(existing)) return existing;
+        if (existing) localStorage.removeItem(storageKey);
 
         const secretBytes = window.crypto.getRandomValues(new Uint8Array(32));
         const secret = this.arrayBufferToBase64(secretBytes);
@@ -49,6 +81,10 @@ export class CryptoService {
 
     /**
      * Derive an AES-GCM key from a per-user local secret.
+     *
+     * Threat boundary: the local secret prevents cloud ciphertext from being
+     * decrypted with a public user id alone. It does not protect against
+     * already-executing same-origin script, which can access browser storage.
      */
     static async deriveKey(userId: string): Promise<CryptoKey> {
         const cacheKey = `v2:${userId}`;

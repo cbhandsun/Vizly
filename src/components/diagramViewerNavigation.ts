@@ -34,18 +34,18 @@ export const openDiagramViewerInNewTab = ({
   }
 };
 
-export const seedAutoSaveAndNavigateDiagram = async ({
+export const seedAutoSaveAndNavigateDiagram = async <TInput, TProcessed>({
   data,
   id,
   ensureSwitchConfirmed,
   normalizeSeedData,
   finalizeNavigation,
 }: {
-  data: any;
+  data: TInput;
   id: string;
   ensureSwitchConfirmed: () => Promise<boolean>;
-  normalizeSeedData: (data: any) => Promise<any>;
-  finalizeNavigation: (processedData: any, id: string) => void;
+  normalizeSeedData: (data: TInput) => Promise<TProcessed>;
+  finalizeNavigation: (processedData: TProcessed, id: string) => void;
 }) => {
   const confirmed = await ensureSwitchConfirmed();
   if (!confirmed) {

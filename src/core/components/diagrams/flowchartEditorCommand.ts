@@ -2,6 +2,17 @@ import type { Node } from '@xyflow/react';
 
 type LayoutDirection = 'LR' | 'TB';
 
+const FLOWCHART_COMMAND_TEXT_MAX_CHARS = 80;
+const FLOWCHART_COMMAND_TEXT_PATTERN = /^[A-Za-z0-9 _+.-]+$/;
+const FLOWCHART_EDITOR_ACTIONS: ReadonlySet<string> = new Set([
+    'smart-layout',
+    'apply-layout',
+    'export-png',
+    'toggle-ai-chat',
+    'add-node',
+    'clear-canvas',
+]);
+
 type ReactFlowViewportApi = {
     getViewport: () => {
         x: number;
@@ -19,10 +30,48 @@ type ToolbarExportButton = {
 };
 
 export type FlowchartEditorCommandDetail = {
-    action?: string;
-    strategy?: unknown;
+    action: string;
+    strategy?: string;
     nodeLayout?: string | undefined;
-    direction?: unknown;
+    direction?: string;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+);
+
+const coerceCommandText = (value: unknown): string | undefined => {
+    if (typeof value !== 'string') return undefined;
+    const normalized = value.trim();
+    if (
+        !normalized
+        || normalized.length > FLOWCHART_COMMAND_TEXT_MAX_CHARS
+        || !FLOWCHART_COMMAND_TEXT_PATTERN.test(normalized)
+    ) {
+        return undefined;
+    }
+    return normalized;
+};
+
+export const coerceFlowchartEditorCommandDetail = (value: unknown): FlowchartEditorCommandDetail | null => {
+    if (!isRecord(value)) return null;
+
+    const action = coerceCommandText(value.action);
+    if (!action || !FLOWCHART_EDITOR_ACTIONS.has(action)) return null;
+
+    const strategy = coerceCommandText(value.strategy);
+    const nodeLayout = coerceCommandText(value.nodeLayout);
+    const direction = coerceCommandText(value.direction);
+    if (value.strategy !== undefined && !strategy) return null;
+    if (value.nodeLayout !== undefined && !nodeLayout) return null;
+    if (value.direction !== undefined && !direction) return null;
+
+    return {
+        action,
+        ...(strategy ? { strategy } : {}),
+        ...(nodeLayout ? { nodeLayout } : {}),
+        ...(direction ? { direction } : {}),
+    };
 };
 
 export const readFlowchartEditorCommandWindowSize = (): { width: number; height: number } => ({
@@ -39,11 +88,13 @@ const defaultCreateNodeId = (): string => (
 );
 
 const normalizeStrategyName = (strategy: unknown): string => (
-    String(strategy || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '')
+    typeof strategy === 'string'
+        ? strategy.trim().toLowerCase().replace(/\s+/g, '').replace(/[+_-]/g, '')
+        : ''
 );
 
 export const resolveFlowchartLayoutDirection = (direction: unknown): LayoutDirection => {
-    const rawDirection = String(direction || '').trim().toUpperCase();
+    const rawDirection = typeof direction === 'string' ? direction.trim().toUpperCase() : '';
     return rawDirection === 'LR' || rawDirection === 'RL' ? 'LR' : 'TB';
 };
 
@@ -118,7 +169,7 @@ export const handleFlowchartEditorCommand = ({
     windowHeight,
     confirmClearCanvas,
 }: {
-    detail: FlowchartEditorCommandDetail;
+    detail: unknown;
     handleSmartLayout: () => void;
     handleStrategyLayout: (engineName: string, nodeLayout: string | undefined, direction: LayoutDirection) => void;
     handleExport: () => void;
@@ -133,7 +184,10 @@ export const handleFlowchartEditorCommand = ({
     windowHeight: number;
     confirmClearCanvas: () => void;
 }): boolean => {
-    const action = typeof detail.action === 'string' ? detail.action : '';
+    const safeDetail = coerceFlowchartEditorCommandDetail(detail);
+    if (!safeDetail) return false;
+
+    const action = safeDetail.action;
 
     if (action === 'smart-layout') {
         handleSmartLayout();
@@ -142,9 +196,9 @@ export const handleFlowchartEditorCommand = ({
 
     if (action === 'apply-layout') {
         handleStrategyLayout(
-            resolveFlowchartLayoutEngine(detail.strategy),
-            detail.nodeLayout,
-            resolveFlowchartLayoutDirection(detail.direction)
+            resolveFlowchartLayoutEngine(safeDetail.strategy),
+            safeDetail.nodeLayout,
+            resolveFlowchartLayoutDirection(safeDetail.direction)
         );
         return true;
     }
@@ -205,7 +259,7 @@ export const createFlowchartEditorCommandEventHandler = ({
     windowHeight,
     confirmClearCanvas,
 }: Omit<Parameters<typeof handleFlowchartEditorCommand>[0], 'detail'>) => (
-    event: Pick<CustomEvent<FlowchartEditorCommandDetail>, 'detail'>
+    event: { detail?: unknown }
 ): boolean => handleFlowchartEditorCommand({
     detail: event.detail,
     handleSmartLayout,

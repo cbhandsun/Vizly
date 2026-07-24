@@ -1,171 +1,191 @@
-import type { Node } from '@xyflow/react'
+import type { Node } from '@xyflow/react';
 
 export interface Bounds { x: number; y: number; width: number; height: number }
 export interface ValidationOptions { padding?: number; minGap?: number }
+export interface ValidationViolation {
+  type: string;
+  id: string;
+  info: Record<string, unknown>;
+}
 export interface ValidationReport {
-  domainBounds: Record<string, Bounds>
-  subDomainBounds: Record<string, Bounds>
-  nodeBounds: Record<string, Bounds>
-  violations: Array<{ type: string; id: string; info: any }>
+  domainBounds: Record<string, Bounds>;
+  subDomainBounds: Record<string, Bounds>;
+  nodeBounds: Record<string, Bounds>;
+  violations: ValidationViolation[];
 }
 
-/**
- * computeNodeBounds（函数级注释）
- * - 根据节点 position 与尺寸（优先 measured，次选 style）计算边界框
- */
-export function computeNodeBounds(n: Node): Bounds {
-  const w = typeof (n as any)?.measured?.width === 'number' ? (n as any).measured.width : (typeof (n.style as any)?.width === 'number' ? (n.style as any).width : 180)
-  const h = typeof (n as any)?.measured?.height === 'number' ? (n as any).measured.height : (typeof (n.style as any)?.height === 'number' ? (n.style as any).height : 80)
-  const x = (n.position?.x || 0)
-  const y = (n.position?.y || 0)
-  return { x, y, width: Math.max(1, w), height: Math.max(1, h) }
+const finiteNumber = (value: unknown, fallback: number): number => (
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback
+);
+
+const positiveDimension = (value: unknown, fallback: number): number => (
+  Math.max(1, finiteNumber(value, fallback))
+);
+
+const dataText = (node: Node, key: 'domain' | 'subDomain'): string | undefined => {
+  const value = node.data?.[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+};
+
+const boundsRecord = (entries: ReadonlyMap<string, Bounds>): Record<string, Bounds> => (
+  Object.fromEntries(entries)
+);
+
+export function computeNodeBounds(node: Node): Bounds {
+  return {
+    x: finiteNumber(node.position?.x, 0),
+    y: finiteNumber(node.position?.y, 0),
+    width: positiveDimension(node.measured?.width ?? node.style?.width ?? node.width, 180),
+    height: positiveDimension(node.measured?.height ?? node.style?.height ?? node.height, 80),
+  };
 }
 
-/**
- * expandBounds（函数级注释）
- * - 对边界框应用内边距与安全间距扩展
- */
-export function expandBounds(b: Bounds, pad: number): Bounds {
-  return { x: b.x - pad, y: b.y - pad, width: b.width + pad * 2, height: b.height + pad * 2 }
+export function expandBounds(bounds: Bounds, padding: number): Bounds {
+  const safePadding = Math.max(0, finiteNumber(padding, 0));
+  return {
+    x: bounds.x - safePadding,
+    y: bounds.y - safePadding,
+    width: bounds.width + safePadding * 2,
+    height: bounds.height + safePadding * 2,
+  };
 }
 
-/**
- * unionBounds（函数级注释）
- * - 计算一组边界框的并集
- */
-export function unionBounds(list: Bounds[], pad = 0): Bounds {
-  const xs = list.map(b => b.x)
-  const ys = list.map(b => b.y)
-  const xe = list.map(b => b.x + b.width)
-  const ye = list.map(b => b.y + b.height)
-  const minX = Math.min(...xs), minY = Math.min(...ys)
-  const maxX = Math.max(...xe), maxY = Math.max(...ye)
-  return expandBounds({ x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) }, pad)
+export function unionBounds(list: Bounds[], padding = 0): Bounds {
+  if (list.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+  const minX = Math.min(...list.map(bounds => bounds.x));
+  const minY = Math.min(...list.map(bounds => bounds.y));
+  const maxX = Math.max(...list.map(bounds => bounds.x + bounds.width));
+  const maxY = Math.max(...list.map(bounds => bounds.y + bounds.height));
+  return expandBounds({
+    x: minX,
+    y: minY,
+    width: Math.max(1, maxX - minX),
+    height: Math.max(1, maxY - minY),
+  }, padding);
 }
 
-/**
- * overlapAmount（函数级注释）
- * - 返回两个边界框的重叠量（X/Y 方向），负值表示有间距
- */
 export function overlapAmount(a: Bounds, b: Bounds): { dx: number; dy: number } {
-  const dx = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)
-  const dy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y)
-  return { dx, dy }
+  return {
+    dx: Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x),
+    dy: Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y),
+  };
 }
 
-/**
- * validateHierarchy（函数级注释）
- * - 输入：已布局的节点集合；读取 node.data.domain/subDomain
- * - 输出：域/子域/节点的边界框与四类约束违反项
- */
-export function validateHierarchy(nodes: Node[], opt: ValidationOptions = {}): ValidationReport {
-  const pad = Math.max(0, opt.padding ?? 24)
-  const minGap = Math.max(0, opt.minGap ?? 16)
-  const nodeBounds: Record<string, Bounds> = {}
-  nodes.forEach(n => { nodeBounds[n.id] = computeNodeBounds(n) })
+const appendToMap = <T>(map: Map<string, T[]>, key: string, value: T): void => {
+  const entries = map.get(key) ?? [];
+  entries.push(value);
+  map.set(key, entries);
+};
 
-  const byDomain: Record<string, Node[]> = {}
-  const bySub: Record<string, Node[]> = {}
-  nodes.forEach(n => {
-    const d = String(((n as any).data?.domain) || 'default')
-    const sd = (n as any).data?.subDomain ? String((n as any).data?.subDomain) : undefined
-    if (!byDomain[d]) byDomain[d] = []
-    byDomain[d].push(n)
-    if (sd) {
-      const key = `${d}::${sd}`
-      if (!bySub[key]) bySub[key] = []
-      bySub[key].push(n)
-    }
-  })
+export function validateHierarchy(nodes: Node[], options: ValidationOptions = {}): ValidationReport {
+  const padding = Math.max(0, finiteNumber(options.padding, 24));
+  const minGap = Math.max(0, finiteNumber(options.minGap, 16));
+  const nodeBounds = new Map(nodes.map(node => [node.id, computeNodeBounds(node)] as const));
+  const byDomain = new Map<string, Node[]>();
+  const bySubDomain = new Map<string, Node[]>();
 
-  const subDomainBounds: Record<string, Bounds> = {}
-  Object.keys(bySub).forEach(key => {
-    const list = bySub[key].map(n => nodeBounds[n.id])
-    subDomainBounds[key] = unionBounds(list, pad)
-  })
+  for (const node of nodes) {
+    const domain = dataText(node, 'domain') ?? 'default';
+    const subDomain = dataText(node, 'subDomain');
+    appendToMap(byDomain, domain, node);
+    if (subDomain) appendToMap(bySubDomain, `${domain}::${subDomain}`, node);
+  }
 
-  const domainBounds: Record<string, Bounds> = {}
-  Object.keys(byDomain).forEach(d => {
-    const list = byDomain[d].map(n => nodeBounds[n.id])
-    const subs = Object.keys(subDomainBounds).filter(k => k.startsWith(`${d}::`)).map(k => subDomainBounds[k])
-    domainBounds[d] = unionBounds([...list, ...subs], pad)
-  })
+  const subDomainBounds = new Map<string, Bounds>();
+  for (const [key, groupedNodes] of bySubDomain) {
+    subDomainBounds.set(key, unionBounds(groupedNodes.map(node => nodeBounds.get(node.id)!), padding));
+  }
 
-  const violations: Array<{ type: string; id: string; info: any }> = []
+  const domainBounds = new Map<string, Bounds>();
+  for (const [domain, groupedNodes] of byDomain) {
+    const directBounds = groupedNodes.map(node => nodeBounds.get(node.id)!);
+    const nestedBounds = [...subDomainBounds]
+      .filter(([key]) => key.startsWith(`${domain}::`))
+      .map(([, bounds]) => bounds);
+    domainBounds.set(domain, unionBounds([...directBounds, ...nestedBounds], padding));
+  }
 
-  // 1) 子域必须完全包含其所有节点
-  Object.keys(bySub).forEach(key => {
-    const box = subDomainBounds[key]
-    for (const n of bySub[key]) {
-      const nb = nodeBounds[n.id]
-      const outside = nb.x < box.x || nb.y < box.y || (nb.x + nb.width) > (box.x + box.width) || (nb.y + nb.height) > (box.y + box.height)
-      if (outside) violations.push({ type: 'NodeOutsideSubDomain', id: n.id, info: { subKey: key, node: nb, sub: box } })
-    }
-  })
-
-  // 2) 域必须完全包含其所有子域
-  Object.keys(domainBounds).forEach(d => {
-    const box = domainBounds[d]
-    const subs = Object.keys(subDomainBounds).filter(k => k.startsWith(`${d}::`))
-    subs.forEach(k => {
-      const sb = subDomainBounds[k]
-      const outside = sb.x < box.x || sb.y < box.y || (sb.x + sb.width) > (box.x + box.width) || (sb.y + sb.height) > (box.y + box.height)
-      if (outside) violations.push({ type: 'SubDomainOutsideDomain', id: k, info: { domain: d, sub: sb, dom: box } })
-    })
-  })
-
-  // 3) 子域之间不允许重叠（同一域内）
-  const subsByDomain: Record<string, string[]> = {}
-  Object.keys(subDomainBounds).forEach(k => {
-    const d = k.split('::')[0]
-    if (!subsByDomain[d]) subsByDomain[d] = []
-    subsByDomain[d].push(k)
-  })
-  Object.keys(subsByDomain).forEach(d => {
-    const list = subsByDomain[d]
-    for (let i = 0; i < list.length; i++) {
-      for (let j = i + 1; j < list.length; j++) {
-        const a = subDomainBounds[list[i]]
-        const b = subDomainBounds[list[j]]
-        const { dx, dy } = overlapAmount(a, b)
-        if (dx > -minGap && dy > -minGap) violations.push({ type: 'SubDomainOverlap', id: `${list[i]}|${list[j]}`, info: { a, b } })
-      }
-    }
-  })
-
-  // 4) 域之间不允许重叠
-  const domains = Object.keys(domainBounds)
-  for (let i = 0; i < domains.length; i++) {
-    for (let j = i + 1; j < domains.length; j++) {
-      const a = domainBounds[domains[i]]
-      const b = domainBounds[domains[j]]
-      const { dx, dy } = overlapAmount(a, b)
-      if (dx > -minGap && dy > -minGap) violations.push({ type: 'DomainOverlap', id: `${domains[i]}|${domains[j]}`, info: { a, b } })
+  const violations: ValidationViolation[] = [];
+  for (const [key, groupedNodes] of bySubDomain) {
+    const box = subDomainBounds.get(key)!;
+    for (const node of groupedNodes) {
+      const bounds = nodeBounds.get(node.id)!;
+      const outside = bounds.x < box.x || bounds.y < box.y
+        || bounds.x + bounds.width > box.x + box.width
+        || bounds.y + bounds.height > box.y + box.height;
+      if (outside) violations.push({
+        type: 'NodeOutsideSubDomain',
+        id: node.id,
+        info: { subKey: key, node: bounds, sub: box },
+      });
     }
   }
 
-  return { domainBounds, subDomainBounds, nodeBounds, violations }
+  for (const [domain, box] of domainBounds) {
+    for (const [key, subBounds] of subDomainBounds) {
+      if (!key.startsWith(`${domain}::`)) continue;
+      const outside = subBounds.x < box.x || subBounds.y < box.y
+        || subBounds.x + subBounds.width > box.x + box.width
+        || subBounds.y + subBounds.height > box.y + box.height;
+      if (outside) violations.push({
+        type: 'SubDomainOutsideDomain',
+        id: key,
+        info: { domain, sub: subBounds, dom: box },
+      });
+    }
+  }
+
+  const subKeysByDomain = new Map<string, string[]>();
+  for (const key of subDomainBounds.keys()) appendToMap(subKeysByDomain, key.split('::')[0], key);
+  for (const keys of subKeysByDomain.values()) {
+    for (let left = 0; left < keys.length; left++) {
+      for (let right = left + 1; right < keys.length; right++) {
+        const a = subDomainBounds.get(keys[left])!;
+        const b = subDomainBounds.get(keys[right])!;
+        const { dx, dy } = overlapAmount(a, b);
+        if (dx > -minGap && dy > -minGap) violations.push({
+          type: 'SubDomainOverlap',
+          id: `${keys[left]}|${keys[right]}`,
+          info: { a, b },
+        });
+      }
+    }
+  }
+
+  const domains = [...domainBounds.keys()];
+  for (let left = 0; left < domains.length; left++) {
+    for (let right = left + 1; right < domains.length; right++) {
+      const a = domainBounds.get(domains[left])!;
+      const b = domainBounds.get(domains[right])!;
+      const { dx, dy } = overlapAmount(a, b);
+      if (dx > -minGap && dy > -minGap) violations.push({
+        type: 'DomainOverlap',
+        id: `${domains[left]}|${domains[right]}`,
+        info: { a, b },
+      });
+    }
+  }
+
+  return {
+    domainBounds: boundsRecord(domainBounds),
+    subDomainBounds: boundsRecord(subDomainBounds),
+    nodeBounds: boundsRecord(nodeBounds),
+    violations,
+  };
 }
 
-/**
- * analyzeFailureReasons（函数级注释）
- * - 根据违反项统计常见失败原因并输出建议
- */
 export function analyzeFailureReasons(report: ValidationReport): Array<{ cause: string; count: number; suggestion: string }> {
-  const map: Record<string, number> = {}
-  report.violations.forEach(v => { map[v.type] = (map[v.type] || 0) + 1 })
-  const res: Array<{ cause: string; count: number; suggestion: string }> = []
-  Object.keys(map).forEach(k => {
-    const count = map[k]
-    const suggestion = k === 'DomainOverlap'
+  const counts = new Map<string, number>();
+  report.violations.forEach(violation => counts.set(violation.type, (counts.get(violation.type) ?? 0) + 1));
+  return [...counts].map(([cause, count]) => ({
+    cause,
+    count,
+    suggestion: cause === 'DomainOverlap'
       ? '增大域层 spacing 或调整 laneOrder 以减少并列拥挤'
-      : k === 'SubDomainOverlap'
+      : cause === 'SubDomainOverlap'
         ? '子域内增加 padding/spacing 或启用行拆分'
-        : k === 'NodeOutsideSubDomain'
+        : cause === 'NodeOutsideSubDomain'
           ? '校准子域尺寸计算，确保含内边距，并检查节点位置来源是否正确'
-          : '增大域容器 padding 并检查边界计算是否包含子域'
-    res.push({ cause: k, count, suggestion })
-  })
-  return res
+          : '增大域容器 padding 并检查边界计算是否包含子域',
+  }));
 }
-

@@ -1,22 +1,38 @@
 import React from 'react';
 import { BaseEdge, EdgeLabelRenderer } from '@xyflow/react';
+import type { Segment } from '../../../utils/orthogonalPath';
+
+interface BendPoint {
+    x: number;
+    y: number;
+    isWaypoint: boolean;
+    waypointIndex?: number;
+}
+
+interface DraggingSegment {
+    segIndex: number;
+    isHorizontal: boolean;
+    startPointIdx: number;
+    endPointIdx: number;
+    initialMousePos: { x: number; y: number };
+}
 
 export interface EditableEdgeGraphicsProps {
     id: string;
     edgePath: string;
-    style: any;
+    style?: React.CSSProperties;
     markerEnd?: string;
     markerStart?: string;
     selected: boolean;
     viewportZoom: number;
-    bendPoints: any[];
-    segments: any[];
+    bendPoints: BendPoint[];
+    segments: Segment[];
     labelPos: { x: number; y: number };
     label?: string;
     
     // Interaction State
     draggingIndex: number | null;
-    draggingSegment: any | null;
+    draggingSegment: DraggingSegment | null;
     hoveredSegment: number | null;
     setHoveredSegment: (idx: number | null) => void;
     isEditingLabel: boolean;
@@ -25,15 +41,15 @@ export interface EditableEdgeGraphicsProps {
     setEditingLabelValue: (val: string) => void;
 
     // Handlers
-    onBendPointDown: (idx: number, bp: any, e: React.PointerEvent) => void;
+    onBendPointDown: (idx: number, bp: BendPoint, e: React.PointerEvent) => void;
     onBendPointMove: (e: React.PointerEvent) => void;
     onBendPointUp: (e: React.PointerEvent) => void;
-    onSegmentDown: (idx: number, seg: any, e: React.PointerEvent) => void;
+    onSegmentDown: (idx: number, seg: Segment, e: React.PointerEvent) => void;
     onSegmentMove: (e: React.PointerEvent) => void;
     onSegmentUp: (e: React.PointerEvent) => void;
     onEdgeClick: (e: React.MouseEvent<SVGPathElement>) => void;
-    onDeleteWaypoint: (bp: any, e: React.MouseEvent) => void;
-    onAddWaypointToSegment: (idx: number, seg: any, e: React.MouseEvent) => void;
+    onDeleteWaypoint: (bp: BendPoint, e: React.MouseEvent) => void;
+    onAddWaypointToSegment: (idx: number, seg: Segment, e: React.MouseEvent) => void;
     onLabelChangeSubmit: () => void;
 }
 

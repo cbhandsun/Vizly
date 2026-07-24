@@ -95,7 +95,9 @@ export const prepareBaseReactFlowFullRouteSeed = ({
   const normalizedEdges = routeSeedEdges
     .map((rawEdge) => normalizeBaseEdge({ edge: rawEdge, nodeById, displayEdgeEpoch }))
     .map((edge) => synthesizeStableFallbackPath({ edge, nodeById }));
-  const layoutDirection = String((normalizedEdges[0]?.data as any)?.layoutDirection || 'TB');
+  const layoutDirection = typeof normalizedEdges[0]?.data?.layoutDirection === 'string'
+    ? normalizedEdges[0].data.layoutDirection
+    : 'TB';
   const qualityBudget = resolveDisplayQualityBudget(normalizedEdges, repairNodes, isLargeGraph);
   const useBoundedLargeRepair = qualityBudget.mode === 'bounded'
     && (normalizedEdges.length > 24 || repairNodes.length > 36);

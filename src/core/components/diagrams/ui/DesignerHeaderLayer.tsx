@@ -2,21 +2,25 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaProjectDiagram, FaExchangeAlt } from 'react-icons/fa';
 
-import { PresenceHeader } from '../../../../components/diagrams/collaboration/PresenceHeader';
+import { PresenceHeader } from '../collaboration/PresenceHeader';
 
 import { TopActionButtons } from '../TopActionButtons';
 import { ModernFlowchartToolbar } from '../ModernFlowchartToolbar';
 import type { ReactFlowRenderSnapshot } from '../../../rendering/reactFlowScene';
+import type { CollaborationPresenceUser } from '../collaborationPresence';
+
+type TopActionProps = React.ComponentProps<typeof TopActionButtons>;
+type ToolbarProps = React.ComponentProps<typeof ModernFlowchartToolbar>;
 
 export interface DesignerHeaderLayerProps {
     diagramId?: string;
     
     topActions: {
         onExportJSON: () => void;
-        onExportPNG: () => any;
-        onExportSVG: () => any;
-        onExportPDF: () => any;
-        onExportGIF: () => any;
+        onExportPNG: TopActionProps['onExportPNG'];
+        onExportSVG: TopActionProps['onExportSVG'];
+        onExportPDF: TopActionProps['onExportPDF'];
+        onExportGIF: TopActionProps['onExportGIF'];
         onExportMermaid: () => void;
         onImportClick: () => void;
         onEditJson: () => void;
@@ -28,7 +32,7 @@ export interface DesignerHeaderLayerProps {
         isDirectSaveDisabled?: boolean;
         onShare?: () => void;
         rightOffset: number;
-        extraExportItems?: any[];
+        extraExportItems?: TopActionProps['extraExportItems'];
         isYjsSynced?: boolean;
         isReadonly: boolean;
         onReadonlyChange: (v: boolean) => void;
@@ -40,7 +44,7 @@ export interface DesignerHeaderLayerProps {
         handleToggleShowOnlyMainFlow: () => void;
         topActionArea?: React.ReactNode;
         pluginToolbar?: React.ReactNode;
-        activeUsers?: any[]; // ⭐ GAP-02
+        activeUsers?: CollaborationPresenceUser[]; // ⭐ GAP-02
 
         // ⭐ Phase 10: 状态提升
         exportModalVisible: boolean;
@@ -64,10 +68,10 @@ export interface DesignerHeaderLayerProps {
         autoRouting: boolean;
         toggleAutoRouting: () => void;
         showGrid: boolean;
-        gridVariant: any;
+        gridVariant: ToolbarProps['gridVariant'];
         toggleGrid: () => void;
         onShowShortcuts: () => void;
-        onStrategyLayout: (s: any) => void;
+        onStrategyLayout: ToolbarProps['onStrategyLayout'];
         lastDomainStrategy?: string;
         lastDomainDirection?: string;
         lastNodeLayout?: string;
@@ -203,7 +207,7 @@ export const DesignerHeaderLayer = React.memo(
                     gridVariant={toolbar.gridVariant}
                     toggleGrid={toolbar.toggleGrid}
                     onShowShortcuts={toolbar.onShowShortcuts}
-                    onStrategyLayout={toolbar.onStrategyLayout as any}
+                    onStrategyLayout={toolbar.onStrategyLayout}
                     lastDomainStrategy={toolbar.lastDomainStrategy}
                     lastDomainDirection={toolbar.lastDomainDirection as 'TB' | 'LR' | undefined}
                     lastNodeLayout={toolbar.lastNodeLayout}

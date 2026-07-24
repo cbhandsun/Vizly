@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import type { NodeTemplate } from './hooks/useNodeTemplates';
 
 import { readDomViewport, readReactFlowCanvasSize } from '../../utils/domViewport';
 import { buildFlowchartMermaidExport } from './flowchartMermaidExport';
@@ -14,10 +15,7 @@ type MermaidExportArtifact = {
     mimeType: string;
 };
 
-type NodeTemplateLike = {
-    id: string;
-    name: string;
-};
+type NodeTemplateLike = NodeTemplate;
 
 type ViewportLike = {
     x: number;
@@ -76,9 +74,9 @@ export const applyFlowchartTemplate = ({
     appendEdges: (edges: Edge[]) => void;
 }): { nodes: Node[]; edges: Edge[] } => {
     const plan = buildFlowchartTemplateApplyPlan({
-        template: template as any,
+        template,
         viewport,
-        createFromTemplate: createFromTemplate as any,
+        createFromTemplate,
     });
     appendNodes(plan.nodes);
     appendEdges(plan.edges);

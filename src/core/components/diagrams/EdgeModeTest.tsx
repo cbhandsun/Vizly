@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import BaseDiagramComponent from './base/BaseDiagramComponent';
 import SmartEdgeConfigPanel, { SmartEdgeSettings } from '../ui/SmartEdgeConfigPanel';
-import { diagramConfigManager } from '../config/DiagramConfig';
+import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import { LayeredConfigManager, ConfigLayer } from '../../config/LayeredConfigManager';
 import { useEdgeNormalization } from '../../hooks/useEdgeNormalization';
 
@@ -214,7 +214,7 @@ const EdgeModeTest: React.FC<EdgeModeTestProps> = ({
   // - 仅定义基础连接关系，类型与属性交由 useEdgeNormalization 统一处理
   const rawTestEdges: Edge[] = useMemo(() => {
     // Basic edge data that we want to preserve or use as input
-    const commonData: Record<string, any> = {
+    const commonData: Record<string, unknown> = {
       // label: will be set by hook or we can set a placeholder
       // pathType, routingStrategy etc will be handled by hook logic or defaults
     };
@@ -290,6 +290,7 @@ const EdgeModeTest: React.FC<EdgeModeTestProps> = ({
      */
     diagramConfigManager.updateConfig({
       edge: {
+        ...diagramConfigManager.getConfig().edge,
         mode,
         pathType,
         smoothFallback,
@@ -299,7 +300,7 @@ const EdgeModeTest: React.FC<EdgeModeTestProps> = ({
         ignoreContainers: smartSettings.ignoreContainers,
         obstacleScopePadding: smartSettings.obstacleScopePadding,
         directionalHandlePolicy: smartSettings.directionalHandlePolicy,
-      } as any
+      }
     });
   }, [smartSettings]);
 

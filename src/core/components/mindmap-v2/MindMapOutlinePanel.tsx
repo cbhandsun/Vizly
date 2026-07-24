@@ -3,12 +3,13 @@
  * XMind / Notion 风格：所有节点按树形缩进列出，点击定位，内置搜索过滤
  */
 import React, { useEffect, useState, useCallback } from 'react';
-import type { NodeObj } from 'mind-elixir';
+import type { MindElixirData, NodeObj } from 'mind-elixir';
 import { getMindElixirInstance, subscribeMindElixir } from './mindElixirStore';
 import { subscribeOutline } from './mindmapOutlineStore';
 import { nodeObjToMarkdown, downloadText, findNodeById } from './migrate';
 import { cleanMindMapData, cleanMindMapTopic } from './mindmapTreeSanitizer';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
+import { emitVizlyMindMapOperation, refreshVizlyMindMapData } from './mindmapOperationBridge';
 import {
     logMindmapOutlineAddFailure,
     logMindmapOutlineDeleteFailure,
@@ -95,28 +96,34 @@ const MindMapOutlinePanel: React.FC = () => {
         if (!mind || !open) return;
         const initialRefreshTimer = window.setTimeout(refresh, 0);
         const onOp = () => { setTimeout(refresh, 80); };
-        const onSelect = (nodeObj: NodeObj | null) => setActiveId((nodeObj as any)?.id ?? null);
-        const onDeselect = () => setActiveId(null);
+        const onSelectNodes = (selectedNodes: NodeObj[]) => setActiveId(selectedNodes[0]?.id ?? null);
+        const onSelectNewNode = (nodeObj: NodeObj) => setActiveId(nodeObj.id);
+        const onDeselect = (_selectedNodes: NodeObj[]) => setActiveId(null);
         mind.bus.addListener('operation', onOp);
-        mind.bus.addListener('selectNode', onSelect as any);
-        mind.bus.addListener('unselectNode', onDeselect);
+        mind.bus.addListener('selectNodes', onSelectNodes);
+        mind.bus.addListener('selectNewNode', onSelectNewNode);
+        mind.bus.addListener('unselectNodes', onDeselect);
         return () => {
             window.clearTimeout(initialRefreshTimer);
             mind.bus.removeListener('operation', onOp);
-            mind.bus.removeListener('selectNode', onSelect as any);
-            mind.bus.removeListener('unselectNode', onDeselect);
+            mind.bus.removeListener('selectNodes', onSelectNodes);
+            mind.bus.removeListener('selectNewNode', onSelectNewNode);
+            mind.bus.removeListener('unselectNodes', onDeselect);
         };
     }, [mind, open, refresh]);
 
-    const updateTreeAndSave = useCallback((updater: (data: any) => boolean) => {
+    const updateTreeAndSave = useCallback((updater: (data: MindElixirData) => boolean) => {
         if (!mind) return;
         try {
             const data = mind.getData();
             const success = updater(data);
             if (success) {
                 const cleanData = cleanMindMapData(data);
-                mind.refresh(cleanData);
-                mind.bus.fire('operation', { name: 'outline_structure_change', obj: cleanData.nodeData });
+                refreshVizlyMindMapData(mind, cleanData);
+                emitVizlyMindMapOperation(mind, {
+                    name: 'outline_structure_change',
+                    obj: cleanData.nodeData,
+                });
                 setTimeout(refresh, 80);
             }
         } catch (e) {

@@ -3,7 +3,6 @@ import type { MutableRefObject } from 'react';
 import {
   parseDisplayEdgesWorkerResponse,
   readDisplayEdgesWorkerRequestId,
-  DISPLAY_WORKER_MAX_COORDINATE_MAGNITUDE,
   type DisplayEdgesWorkerRequest,
   type DisplayEdgesWorkerResponse,
   type DisplayEdgesWorkerCandidateSource,
@@ -17,8 +16,11 @@ import {
   mergeBaseReactFlowDisplayEdgePatches,
   sanitizeBaseReactFlowDisplayCachePatches,
 } from './baseReactFlowDisplayRoutingTransaction';
+import { createDisplayWorkerFinalQualityError } from './baseReactFlowDisplayWorkerFailure';
+import { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
 
 export type { DisplayQualityMode } from './baseReactFlowDisplayWorkerProtocol';
+export { projectBaseReactFlowDisplayWorkerInput } from './baseReactFlowDisplayWorkerProjection';
 export {
   createBaseReactFlowDisplayEdgePatches,
   doBaseReactFlowDisplayRoutesMatchExactly,
@@ -34,7 +36,6 @@ export type DeferredDisplayEdges = {
   displayPatches: Edge[];
   hardClean: boolean;
 };
-
 export type BaseReactFlowDisplayWorkerResult = {
   edges: Edge[];
   hardClean: boolean;
@@ -42,11 +43,7 @@ export type BaseReactFlowDisplayWorkerResult = {
   /** Exact DTO edge baseline that produced the worker response. */
   projectedEdges: Edge[];
 };
-
-type BaseReactFlowDisplayWorkerResponseResult = Omit<
-  BaseReactFlowDisplayWorkerResult,
-  'projectedEdges'
->;
+type BaseReactFlowDisplayWorkerResponseResult = Omit<BaseReactFlowDisplayWorkerResult, 'projectedEdges'>;
 
 export type DisplayRoutingInput = {
   cacheSignature: string;
@@ -85,14 +82,12 @@ type DisplayRoutingDebugState = {
   outputRouteSignature?: string;
   routingVersion?: string;
   workerResolution?: DisplayEdgesWorkerRouteResolution;
+  terminalDiagnostics?: unknown;
 };
 
 const DISPLAY_WORKER_TIMEOUT_MS = 60_000;
 const COMPLEX_DISPLAY_WORKER_TIMEOUT_MS = 300_000;
 const INTERACTIVE_DISPLAY_WORKER_TIMEOUT_MS = 12_000;
-const DISPLAY_WORKER_VALUE_DEPTH = 8;
-const DISPLAY_WORKER_MAX_ARRAY_ITEMS = 2_000;
-const DISPLAY_WORKER_MAX_OBJECT_KEYS = 120;
 const LARGE_DISPLAY_NODE_THRESHOLD = 36;
 const LARGE_DISPLAY_EDGE_THRESHOLD = 36;
 const INTERACTIVE_DISPLAY_NODE_THRESHOLD = 30;
@@ -230,126 +225,6 @@ export const resolveBaseReactFlowDisplayedEdges = ({
   return policyMode === 'skip' ? immediate : [];
 };
 
-const finiteNumberOrUndefined = (value: unknown): number | undefined => (
-  typeof value === 'number' && Number.isFinite(value) ? value : undefined
-);
-
-const projectDisplayWorkerValue = (value: unknown, depth = 0): unknown => {
-  if (value == null) return value;
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
-  if (typeof value === 'string') return value.length <= 20_000 ? value : value.slice(0, 20_000);
-  if (Array.isArray(value)) {
-    if (depth >= DISPLAY_WORKER_VALUE_DEPTH || value.length > DISPLAY_WORKER_MAX_ARRAY_ITEMS) return undefined;
-    const next: unknown[] = [];
-    for (const item of value) {
-      const projected = projectDisplayWorkerValue(item, depth + 1);
-      if (typeof projected !== 'undefined') next.push(projected);
-    }
-    return next;
-  }
-  if (typeof value !== 'object' || depth >= DISPLAY_WORKER_VALUE_DEPTH) return undefined;
-  const entries = Object.entries(value as Record<string, unknown>);
-  if (entries.length > DISPLAY_WORKER_MAX_OBJECT_KEYS) return undefined;
-  const next: Record<string, unknown> = {};
-  for (const [key, item] of entries) {
-    if (key === '__proto__' || key === 'prototype' || key === 'constructor') continue;
-    const projected = projectDisplayWorkerValue(item, depth + 1);
-    if (typeof projected !== 'undefined') next[key] = projected;
-  }
-  return next;
-};
-
-const projectDisplayWorkerStyleDimension = (value: unknown): number | string | undefined => {
-  if (
-    typeof value === 'number'
-    && Number.isFinite(value)
-    && value >= 0
-    && value <= DISPLAY_WORKER_MAX_COORDINATE_MAGNITUDE
-  ) return value;
-  if (typeof value !== 'string' || value.length === 0 || value.length > 100) return undefined;
-  const match = value.trim().match(/^(?:\d+(?:\.\d+)?|\.\d+)(?:px|%)?$/i);
-  if (!match || Number.parseFloat(value) > DISPLAY_WORKER_MAX_COORDINATE_MAGNITUDE) return undefined;
-  return value;
-};
-
-const projectDisplayWorkerPosition = (value: unknown, fallback = { x: 0, y: 0 }) => {
-  const point = (value && typeof value === 'object') ? value as Record<string, unknown> : {};
-  return {
-    x: finiteNumberOrUndefined(point.x) ?? fallback.x,
-    y: finiteNumberOrUndefined(point.y) ?? fallback.y,
-  };
-};
-
-const projectDisplayWorkerNodes = (nodes: Node[]): Node[] => (
-  nodes.map((node) => {
-    const measured = (node as any).measured;
-    const style = (node.style && typeof node.style === 'object')
-      ? node.style as Record<string, unknown>
-      : {};
-    const data = (node.data && typeof node.data === 'object')
-      ? node.data as Record<string, unknown>
-      : {};
-    const projectedStyle = {
-      width: projectDisplayWorkerStyleDimension(style.width),
-      height: projectDisplayWorkerStyleDimension(style.height),
-    };
-    const projectedLayoutDirection = projectDisplayWorkerValue(data.layoutDirection);
-    const projected: Record<string, unknown> = {
-      id: node.id,
-      type: node.type,
-      parentId: (node as any).parentId,
-      position: projectDisplayWorkerPosition(node.position),
-      positionAbsolute: (node as any).positionAbsolute
-        ? projectDisplayWorkerPosition((node as any).positionAbsolute)
-        : undefined,
-      width: finiteNumberOrUndefined(node.width),
-      height: finiteNumberOrUndefined(node.height),
-      measured: measured && typeof measured === 'object'
-        ? {
-          width: finiteNumberOrUndefined(measured.width),
-          height: finiteNumberOrUndefined(measured.height),
-        }
-        : undefined,
-      style: Object.values(projectedStyle).some(value => typeof value !== 'undefined')
-        ? projectedStyle
-        : undefined,
-      data: typeof projectedLayoutDirection === 'undefined'
-        ? {}
-        : { layoutDirection: projectedLayoutDirection },
-    };
-    return projected as Node;
-  })
-);
-
-const projectDisplayWorkerEdges = (edges: Edge[]): Edge[] => (
-  edges.map((edge) => {
-    const projected: Record<string, unknown> = {
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
-      type: edge.type,
-      label: projectDisplayWorkerValue((edge as any).label),
-      animated: (edge as any).animated,
-      style: projectDisplayWorkerValue((edge as any).style),
-      markerStart: projectDisplayWorkerValue((edge as any).markerStart),
-      markerEnd: projectDisplayWorkerValue((edge as any).markerEnd),
-      data: projectDisplayWorkerValue(edge.data) ?? {},
-    };
-    return projected as Edge;
-  })
-);
-
-export const projectBaseReactFlowDisplayWorkerInput = ({
-  edges,
-  nodes,
-}: Pick<DisplayRoutingInput, 'edges' | 'nodes'>): Pick<DisplayRoutingInput, 'edges' | 'nodes'> => ({
-  edges: projectDisplayWorkerEdges(edges),
-  nodes: projectDisplayWorkerNodes(nodes),
-});
-
 const detachBaseReactFlowDisplayWorkerIdleListeners = (worker: Worker): void => {
   const listeners = displayWorkerIdleListeners.get(worker);
   if (!listeners) return;
@@ -413,6 +288,15 @@ const ensureBaseReactFlowDisplayWorker = (
 export const prewarmBaseReactFlowDisplayWorker = (
   workerRef: MutableRefObject<Worker | null>,
 ): boolean => ensureBaseReactFlowDisplayWorker(workerRef) !== null;
+
+/** Releases both request-idle guards and the worker owned by a canvas hook. */
+export const disposeBaseReactFlowDisplayWorker = (
+  workerRef: MutableRefObject<Worker | null>,
+): void => {
+  const worker = workerRef.current;
+  if (!worker) return;
+  terminateBaseReactFlowDisplayWorker(worker, workerRef);
+};
 
 export const doesBaseReactFlowDisplayWorkerResolutionMatchOperation = (
   operation: DisplayEdgesWorkerRequest['operation'],
@@ -509,13 +393,19 @@ const requestBaseReactFlowDisplayEdgesWorker = ({
           }, true);
           return;
         }
+        const submittedCandidateEdges = request.operation === 'validate-or-route'
+          ? (request.candidateEdges
+            ?? (request.candidatePatches
+              ? mergeBaseReactFlowDisplayEdgePatches(request.edges, request.candidatePatches)
+              : null))
+          : null;
         if (
           routeResolution === 'validated-candidate'
           && (
             request.operation !== 'validate-or-route'
-            || !request.candidateEdges
+            || !submittedCandidateEdges
             || !doBaseReactFlowDisplayRoutesMatchExactly(
-              request.candidateEdges,
+              submittedCandidateEdges,
               responseEdges,
             )
           )
@@ -648,11 +538,6 @@ export const computeBaseReactFlowDisplayEdgesInWorker = async ({
       ? sanitizeBaseReactFlowPrecompiledRoutePatches(edges, rawPrecompiledPatches)
       : sanitizeBaseReactFlowDisplayCachePatches(edges, cachedCandidateEdges))
     : null;
-  // Rebuild the cache candidate from the projected current graph so external
-  // cache fields can never replace labels, styles, markers, or business data.
-  const projectedCandidateEdges = safeCandidatePatches
-    ? mergeBaseReactFlowDisplayEdgePatches(projectedInput.edges, safeCandidatePatches)
-    : null;
   const routeRequest = {
     requestId,
     edges: projectedInput.edges,
@@ -665,11 +550,11 @@ export const computeBaseReactFlowDisplayEdgesInWorker = async ({
   };
   const result = await requestBaseReactFlowDisplayEdgesWorker({
     workerRef,
-    request: projectedCandidateEdges
+    request: safeCandidatePatches
       ? {
         ...routeRequest,
         operation: 'validate-or-route',
-        candidateEdges: projectedCandidateEdges,
+        candidatePatches: safeCandidatePatches,
         candidateSource: candidateSource === 'precompiled' ? 'precompiled' : 'persistent',
       }
       : { ...routeRequest, operation: 'route' },
@@ -710,7 +595,10 @@ export const repairBaseReactFlowDisplayEdgesInWorker = async ({
   });
   if (signal?.aborted) throw new Error('display-edge-worker-cancelled');
   if (result.hardClean !== true) {
-    throw new Error('display-edge-worker-final-quality-failed');
+    throw createDisplayWorkerFinalQualityError(
+      result.edges,
+      projectedInput.nodes,
+    );
   }
   return { ...result, projectedEdges: projectedInput.edges };
 };

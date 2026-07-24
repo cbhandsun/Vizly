@@ -79,6 +79,7 @@ export interface RoutingConfig {
     ignoreContainers?: boolean;
     layoutDirection?: string;
     routedPaths?: Array<{ points: Array<Point> }>;
+    obstacles?: Rectangle[];
     preAssignedPorts?: Record<string, { source?: string; target?: string }>;
     preAssignedPortPolicy?: 'prefer' | 'force';
     nodePortConstraints?: Record<string, { source?: string[]; target?: string[] }>;

@@ -87,7 +87,7 @@ self.onmessage = async (event) => {
     const layoutGraph = {
       ...graph,
       layoutOptions: {
-        ...graph.layoutOptions,
+        ...(isRecord(graph.layoutOptions) ? graph.layoutOptions : {}),
         ...options
       }
     };

@@ -24,10 +24,25 @@ import {
   STORAGE_KEY_COLOR,
   STORAGE_KEY_NAME,
   persistCollaboratorIdentity,
+  parseCollaboratorIdentity,
   readStoredCollaboratorIdentity,
 } from '../YjsProviderHooks';
 
 describe('YjsProviderHooks storage helpers', () => {
+  it('parses and bounds awareness identities', () => {
+    expect(parseCollaboratorIdentity({ name: ' Alice ', color: ' #123456 ' })).toEqual({
+      name: 'Alice',
+      color: '#123456',
+    });
+    expect(parseCollaboratorIdentity({ name: 'a'.repeat(120), color: '#fff' })?.name).toHaveLength(100);
+  });
+
+  it('rejects malformed awareness identities', () => {
+    expect(parseCollaboratorIdentity(null)).toBeUndefined();
+    expect(parseCollaboratorIdentity({ name: 42, color: '#fff' })).toBeUndefined();
+    expect(parseCollaboratorIdentity({ name: 'Alice', color: '' })).toBeUndefined();
+  });
+
   beforeEach(() => {
     Object.values(safeLogState).forEach(mock => mock.mockReset());
     sessionStorage.clear();

@@ -29,13 +29,16 @@ export function useContainerAutoLayout() {
     if (!container) return;
 
     // 收集子节点：通过 parentId 关系或 data.childIds
+    const rawChildIds = container.data?.childIds;
     const childIds = new Set<string>(
-      (container.data as any)?.childIds as string[] || []
+      Array.isArray(rawChildIds)
+        ? rawChildIds.filter((id): id is string => typeof id === 'string')
+        : []
     );
 
     // 也收集通过 React Flow parentId 关联的子节点
     allNodes.forEach(n => {
-      if ((n as any).parentId === containerId && !CONTAINER_TYPES.has(n.type || '')) {
+      if (n.parentId === containerId && !CONTAINER_TYPES.has(n.type || '')) {
         childIds.add(n.id);
       }
     });
@@ -64,8 +67,8 @@ export function useContainerAutoLayout() {
     let maxX = -Infinity, maxY = -Infinity;
     positions.forEach((pos, id) => {
       const node = childNodes.find(n => n.id === id);
-      const w = node?.measured?.width || (node as any)?.width || 150;
-      const h = node?.measured?.height || (node as any)?.height || 50;
+      const w = node?.measured?.width || node?.width || 150;
+      const h = node?.measured?.height || node?.height || 50;
       minX = Math.min(minX, pos.x);
       minY = Math.min(minY, pos.y);
       maxX = Math.max(maxX, pos.x + w);

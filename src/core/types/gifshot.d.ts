@@ -16,7 +16,7 @@ declare module 'gifshot' {
     background?: string;
     transparent?: boolean;
     /** 其他可选项 */
-    [key: string]: any;
+    [key: string]: unknown;
   }
 
   /**

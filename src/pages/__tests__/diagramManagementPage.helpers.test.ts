@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { StandardDiagramData } from '../../core/models/DiagramModels';
 import {
     coerceFilterView,
     createTemplateSeed,
@@ -40,8 +41,8 @@ describe('diagramManagementPage helpers', () => {
             title: '系统架构总览',
             raw: {
                 ...createItem().raw,
-                type: '',
-                metadata: { title: '系统架构总览', type: '' },
+                type: '' as StandardDiagramData['type'],
+                metadata: { title: '系统架构总览' },
             },
         }))).toBe('architecture');
 
@@ -50,7 +51,7 @@ describe('diagramManagementPage helpers', () => {
             raw: {
                 ...createItem().raw,
                 type: 'mindmap',
-                metadata: { title: 'Product Mind', type: 'mindmap' },
+                metadata: { title: 'Product Mind' },
             },
         }))).toBe('mindmap');
     });
@@ -59,7 +60,10 @@ describe('diagramManagementPage helpers', () => {
         expect(getNodeCount(createItem({
             raw: {
                 ...createItem().raw,
-                nodes: [{ id: 'n1' }, { id: 'n2' }],
+                nodes: [
+                    { id: 'n1', description: '', type: 'process', domain: 'test' },
+                    { id: 'n2', description: '', type: 'process', domain: 'test' },
+                ],
             },
         }))).toBe(2);
 
@@ -99,7 +103,7 @@ describe('diagramManagementPage helpers', () => {
                     id: 'diagram-2',
                     name: 'Architecture Board',
                     type: 'architecture',
-                    metadata: { title: 'Architecture Board', type: 'architecture' },
+                    metadata: { title: 'Architecture Board' },
                 },
             }),
             createItem({
@@ -111,7 +115,7 @@ describe('diagramManagementPage helpers', () => {
                     id: 'diagram-3',
                     name: 'Alpha Flow',
                     type: 'flowchart',
-                    metadata: { title: 'Alpha Flow', type: 'flowchart' },
+                    metadata: { title: 'Alpha Flow' },
                 },
             }),
         ];

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Modal, Button, Select, Space, Typography, Tooltip, List, Tag, Popconfirm, Spin, theme, Tabs, Input, Avatar, Empty, Alert } from 'antd';
 import { FaCopy, FaLink, FaTrash, FaUserPlus } from 'react-icons/fa';
 import { LinkOutlined, TeamOutlined, UserOutlined, CheckCircleFilled, SafetyOutlined } from '@ant-design/icons';
@@ -23,6 +23,7 @@ interface ShareDialogProps {
 }
 
 type ExpirationOption = 'never' | '1day' | '7days' | '30days';
+type InviteRole = 'viewer' | 'editor';
 
 function getExpiresAt(option: ExpirationOption): Date | null {
     const now = new Date();
@@ -66,10 +67,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
     const [collaborators, setCollaborators] = useState<CollaboratorRecord[]>([]);
     const [loadingCollabs, setLoadingCollabs] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
-    const [inviteRole, setInviteRole] = useState<'viewer' | 'editor'>('viewer');
+    const [inviteRole, setInviteRole] = useState<InviteRole>('viewer');
     const [inviting, setInviting] = useState(false);
     const [inviteStatus, setInviteStatus] = useState<'idle' | 'success' | 'error'>('idle');
-    const inviteInputRef = useRef<any>(null);
 
     // 云端 UUID（保存后获得，用于替代本地 diagramId）
     const [cloudDiagramId, setCloudDiagramId] = useState<string | null>(null);
@@ -167,10 +167,12 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                 setTimeout(() => setInviteStatus('idle'), 2000);
                 appMessage.error(t('share.inviteFailed', { error: res.error || 'Unknown' }));
             }
-        } catch (err: any) {
+        } catch (err) {
             setInviteStatus('error');
             setTimeout(() => setInviteStatus('idle'), 2000);
-            appMessage.error(t('share.inviteFailed', { error: err.message || String(err) }));
+            appMessage.error(t('share.inviteFailed', {
+                error: err instanceof Error ? err.message : String(err),
+            }));
         } finally {
             setInviting(false);
         }
@@ -203,14 +205,13 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ open, onClose, diagramId, onE
                 <div style={{ paddingTop: 8 }}>
                     <Space.Compact style={{ width: '100%', marginBottom: 24 }}>
                         <Input
-                            ref={inviteInputRef}
                             placeholder={t('share.inviteInput')}
                             value={inviteEmail}
                             onChange={(e) => setInviteEmail(e.target.value)}
                             onPressEnter={handleInvite}
                             style={inputBorderStyle}
                         />
-                        <Select value={inviteRole} onChange={setInviteRole as any} style={{ width: 120 }}>
+                        <Select<InviteRole> value={inviteRole} onChange={setInviteRole} style={{ width: 120 }}>
                             <Select.Option value="viewer">{t('share.roleViewer')}</Select.Option>
                             <Select.Option value="editor" disabled>{t('share.roleEditor')}</Select.Option>
                         </Select>

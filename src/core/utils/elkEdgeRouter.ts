@@ -20,6 +20,9 @@ interface Point {
     y: number;
 }
 
+const finiteDimension = (value: unknown, fallback: number): number =>
+    typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+
 /**
  * 使用 ELK 算法路由边
  * 
@@ -38,8 +41,7 @@ export async function routeEdgesWithELK(
     const {
         direction = 'TB',
         edgeNodeSpacing = 20,
-        edgeEdgeSpacing = 15,
-        _bendMinimization = true
+        edgeEdgeSpacing = 15
     } = options;
 
     const { default: ELK } = await import('elkjs');
@@ -50,15 +52,15 @@ export async function routeEdgesWithELK(
 
     // 计算节点的绝对位置（考虑父子嵌套）
     const getAbsolutePosition = (node: ReactFlowNode): { x: number; y: number } => {
-        let x = (node.position as any)?.x ?? 0;
-        let y = (node.position as any)?.y ?? 0;
+        let x = node.position?.x ?? 0;
+        let y = node.position?.y ?? 0;
         let current = node;
         let depth = 0;
         while (current.parentId && depth < 10) {
             const parent = nodeMap.get(current.parentId);
             if (!parent) break;
-            x += (parent.position as any)?.x ?? 0;
-            y += (parent.position as any)?.y ?? 0;
+            x += parent.position?.x ?? 0;
+            y += parent.position?.y ?? 0;
             current = parent;
             depth++;
         }
@@ -73,8 +75,8 @@ export async function routeEdgesWithELK(
     const elkNodes: ElkNode[] = leafNodes.map(n => {
         const pos = getAbsolutePosition(n);
         // [FIX] 忽略 React Flow 的 measured（异步填充，导致不稳定），只用 style
-        const w = (n as any)?.style?.width ?? (n as any)?.width ?? 100;
-        const h = (n as any)?.style?.height ?? (n as any)?.height ?? 50;
+        const w = finiteDimension(n.style?.width ?? n.width, 100);
+        const h = finiteDimension(n.style?.height ?? n.height, 50);
 
         return {
             id: n.id,
@@ -147,9 +149,7 @@ export async function routeEdgesWithELK(
             id: e.id || `${e.source}->${e.target}`,
             sources: [sourcePortId],
             targets: [targetPortId],
-            // 确保这些属性指向节点ID，这是ELK JSON格式的要求
-            container: 'elk-edge-routing'
-        } as any);
+        });
     });
 
     // 确定布局方向

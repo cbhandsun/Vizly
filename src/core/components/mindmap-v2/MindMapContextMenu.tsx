@@ -10,6 +10,7 @@ import { findNodeById } from './migrate';
 import { toSafeExternalUrl } from '../../utils/sanitizeHtml';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 import { cleanMindMapChildNode } from './mindmapBridgeSecurity';
+import type { NodeObj } from 'mind-elixir';
 import { logMindmapContextMenuFailure } from './mindmapInteractionLogging';
 
 interface CtxPos { visible: boolean; x: number; y: number; nodeId: string | null; }
@@ -80,7 +81,7 @@ const MindMapContextMenu: React.FC<Props> = ({ visible, x, y, nodeId, onClose })
     const isRoot = nodeId === mind.getData()?.nodeData?.id;
     const isExpanded = obj?.expanded !== false;
     const hasChildren = (obj?.children?.length ?? 0) > 0;
-    const currentShape = (obj as any)?.shapeClass ?? '';
+    const currentShape = (obj as NodeObj & { shapeClass?: string })?.shapeClass ?? '';
     const safeHyperLink = obj?.hyperLink ? toSafeExternalUrl(String(obj.hyperLink)) : null;
 
     // Clamp to viewport

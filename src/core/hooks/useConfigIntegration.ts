@@ -10,7 +10,7 @@ import { ConfigLayer } from '../config/LayeredConfigManager';
 import type { LayeredConfigChangeEvent } from '../config/LayeredConfigManager';
 import type { Theme } from '../themes/types/ThemeTypes';
 import type { PerformanceMetrics } from '../themes/ThemePerformanceOptimizer';
-import { diagramConfigManager } from '../components/config/DiagramConfig';
+import { diagramConfigManager } from '../config/DiagramConfig';
 import { safeLog } from '../utils/consoleCleanup';
 import { redactSensitiveLogValue } from '../utils/logSecurity';
 
@@ -411,7 +411,8 @@ export function usePerformanceMetrics(
         if (!prev && !currentMetrics) return null;
         if (prev && currentMetrics &&
           Object.keys(prev).length === Object.keys(currentMetrics).length &&
-          Object.keys(prev).every(k => prev[k] === currentMetrics[k])) {
+          (Object.keys(prev) as Array<keyof PerformanceMetrics>)
+            .every(key => prev[key] === currentMetrics[key])) {
           return prev;
         }
         return currentMetrics;

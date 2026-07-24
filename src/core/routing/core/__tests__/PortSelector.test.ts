@@ -18,13 +18,23 @@ describe('PortSelector', () => {
         length: 1,
         turn: 500,
         crossing: 1000,
+        lrBias: 0,
+        tbBias: 0,
         edgeCrossing: 80,
         wrongSign: 2000,
         lShapeBonus: 1500,
-        usagePenalty: 40
+        usagePenalty: 40,
+        overlapPenalty: 0,
+        exitContainerPenalty: 0,
+        crossDomainPenalty: 0,
+        detourPenalty: 0,
+        lastSegShort: 0,
+        alignmentBonus: 0,
+        flowBonus: 0,
     };
 
     const defaultConfig: RoutingConfig = {
+        mode: 'advanced-smart',
         layoutDirection: 'LR',
         directionalHandlePolicy: 'prefer'
     };

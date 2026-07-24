@@ -41,6 +41,8 @@ export interface LayoutOptions {
   type: LayoutType;
   /** 节点布局类型（用于域/子域内节点排布） */
   nodeLayout?: LayoutType;
+  /** 路由阶段质量：交互时允许更轻量的计算。 */
+  edgeRoutingQuality?: 'full' | 'interactive';
   /** 水平对齐方式 */
   horizontalAlign?: AlignmentType;
   /** 垂直对齐方式 */
@@ -133,6 +135,14 @@ export interface LayoutOptions {
     fanInDegree?: number;
     /** 当高扇入/扇出占比超过该阈值且边数充足时倾向 LR（默认 0.2） */
     fanScoreThreshold?: number;
+    /** 估算布局面积在方向评分中的权重（默认 0.55） */
+    areaWeight?: number;
+    /** 高扇入/扇出在方向评分中的权重（默认 0.25） */
+    fanWeight?: number;
+    /** 边密度在方向评分中的权重（默认 0.10） */
+    densityWeight?: number;
+    /** 层内节点不均衡在方向评分中的权重（默认 0.10） */
+    imbalanceWeight?: number;
   };
 
   /**
@@ -151,6 +161,10 @@ export interface LayoutOptions {
   subDomainOrder?: string[] | Record<string, string[]>;
   /** 是否适配域内容宽度（用于覆盖默认排序等行为） */
   fitDomainContent?: boolean;
+  /** 调试/诊断：在指定垂直布局阶段后停止，入口会规范化大小写和空白。 */
+  stopAfterPhase?: string;
+  /** 内部兼容开关：保持子域容器高度不被后续阶段改写。 */
+  __lockSubGroupHeights?: boolean;
 
   /** 泳道布局：域排列顺序 */
   laneOrder?: string[];
@@ -221,7 +235,7 @@ export interface LayoutOptions {
   /** 顺序提示边开关（none/subgroup/domain） */
   sequenceHints?: 'none' | 'subgroup' | 'domain';
   /** 边布局配置（用于传递给布局策略） */
-  edge?: any;
+  edge?: Record<string, unknown>;
 }
 
 // 布局节点接口

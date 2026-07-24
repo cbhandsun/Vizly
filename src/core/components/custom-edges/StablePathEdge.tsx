@@ -7,7 +7,7 @@
  * 完全绕过 React Flow 的自动路径计算。
  */
 import React, { memo } from 'react';
-import { BaseEdge, EdgeLabelRenderer, useStore, type EdgeProps } from '@xyflow/react';
+import { BaseEdge, EdgeLabelRenderer, useStore, type Edge, type EdgeProps } from '@xyflow/react';
 import { getSmartLabelPosition } from '../../algorithms/smartEdgeUtils';
 import { getEdgeLabelAutoOffset } from './edgeLabelAvoidance';
 
@@ -15,6 +15,27 @@ interface Point {
     x: number;
     y: number;
 }
+
+interface StablePathEdgeData {
+    computedPath?: unknown;
+    labelPosition?: unknown;
+    labelOffset?: unknown;
+    absoluteLabelX?: unknown;
+    absoluteLabelY?: unknown;
+}
+
+const isPoint = (value: unknown): value is Point => {
+    if (value === null || typeof value !== 'object') return false;
+    const point = value as Record<string, unknown>;
+    return typeof point.x === 'number'
+        && Number.isFinite(point.x)
+        && typeof point.y === 'number'
+        && Number.isFinite(point.y);
+};
+
+const readPoint = (value: unknown): Point | undefined => (
+    isPoint(value) ? value : undefined
+);
 
 /**
  * 将路径点数组转换为 SVG path 的 d 属性
@@ -88,8 +109,6 @@ const autoLabelOffset = (
 export const StablePathEdge = memo<EdgeProps>((props) => {
     const {
         id,
-        _source,
-        _target,
         sourceX,
         sourceY,
         targetX,
@@ -101,32 +120,27 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         markerStart,
         label,
         labelStyle,
-        _labelShowBg,
-        _labelBgStyle,
-        _labelBgPadding,
-        _labelBgBorderRadius,
     } = props;
-    const peerPaths = useStore((state: any) => (
+    const edgeData = data as StablePathEdgeData | undefined;
+    const peerPaths = useStore((state) => (
         Array.isArray(state.edges)
             ? state.edges
-                .filter((edge: any) => edge?.id !== id)
-                .map((edge: any) => (edge?.data as any)?.computedPath)
+                .filter((edge: Edge) => edge.id !== id)
+                .map((edge: Edge) => (edge.data as StablePathEdgeData | undefined)?.computedPath)
                 .filter((path: unknown): path is Point[] => (
                     Array.isArray(path)
                     && path.length >= 2
-                    && path.every((point: any) => (
-                        typeof point?.x === 'number'
-                        && Number.isFinite(point.x)
-                        && typeof point?.y === 'number'
-                        && Number.isFinite(point.y)
-                    ))
+                    && path.every(isPoint)
                 ))
             : []
     ));
 
     // ReactFlow perf check: we are completely safe from global node movement here
     // 读取预计算的路径点
-    const computedPath: Point[] | undefined = (data as any)?.computedPath;
+    const computedPath = Array.isArray(edgeData?.computedPath)
+        && edgeData.computedPath.every(isPoint)
+        ? edgeData.computedPath
+        : undefined;
 
     let edgePath: string;
     let labelX: number;
@@ -149,34 +163,28 @@ export const StablePathEdge = memo<EdgeProps>((props) => {
         labelY = pos.y;
     }
 
-    const dataLabelPosition = (data as any)?.labelPosition;
-    if (
-        dataLabelPosition
-        && typeof dataLabelPosition.x === 'number'
-        && Number.isFinite(dataLabelPosition.x)
-        && typeof dataLabelPosition.y === 'number'
-        && Number.isFinite(dataLabelPosition.y)
-    ) {
+    const dataLabelPosition = readPoint(edgeData?.labelPosition);
+    if (dataLabelPosition) {
         labelX = dataLabelPosition.x;
         labelY = dataLabelPosition.y;
     }
 
-    const labelOffset = (data as any)?.labelOffset;
+    const labelOffset = readPoint(edgeData?.labelOffset);
     const hasManualLabelPosition = !!labelOffset
-        || typeof (data as any)?.absoluteLabelX === 'number'
-        || typeof (data as any)?.absoluteLabelY === 'number';
+        || typeof edgeData?.absoluteLabelX === 'number'
+        || typeof edgeData?.absoluteLabelY === 'number';
 
     if (labelOffset) {
         labelX += Number(labelOffset.x) || 0;
         labelY += Number(labelOffset.y) || 0;
     }
 
-    if (typeof (data as any)?.absoluteLabelX === 'number' && Number.isFinite((data as any).absoluteLabelX)) {
-        labelX = (data as any).absoluteLabelX;
+    if (typeof edgeData?.absoluteLabelX === 'number' && Number.isFinite(edgeData.absoluteLabelX)) {
+        labelX = edgeData.absoluteLabelX;
     }
 
-    if (typeof (data as any)?.absoluteLabelY === 'number' && Number.isFinite((data as any).absoluteLabelY)) {
-        labelY = (data as any).absoluteLabelY;
+    if (typeof edgeData?.absoluteLabelY === 'number' && Number.isFinite(edgeData.absoluteLabelY)) {
+        labelY = edgeData.absoluteLabelY;
     }
 
     if (!hasManualLabelPosition && label && renderPath && renderPath.length >= 2) {

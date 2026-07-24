@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useMemo, memo } from 'react';
 import { createPortal } from 'react-dom';
 import {
-    FaUndo, FaRedo, FaSearchPlus, FaSearchMinus, FaCompressArrowsAlt, _FaArrowsAltH,
+    FaUndo, FaRedo, FaSearchPlus, FaSearchMinus, FaCompressArrowsAlt,
     FaMagic, FaTh, FaKeyboard, FaBorderAll, FaBorderNone,
     FaSitemap, FaObjectGroup, FaRegObjectGroup, FaRuler,
-    FaEllipsisH, FaTrashAlt, _FaProjectDiagram,
+    FaEllipsisH, FaTrashAlt,
     FaMagnet, FaPen, FaStickyNote, FaMousePointer,
-    FaFolderOpen, FaFileExport, FaMap, _FaRegComment,
-    _FaArrowsAlt
+    FaFolderOpen, FaFileExport, FaMap,
 } from 'react-icons/fa';
 import { 
     MdAlignHorizontalLeft, MdAlignHorizontalCenter, MdAlignHorizontalRight,
@@ -98,7 +97,7 @@ interface FlowchartToolbarProps {
 
 export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     canUndo, canRedo, onUndo, onRedo,
-    onZoomIn, onZoomOut, onFitView, _onFitWidth,
+    onZoomIn, onZoomOut, onFitView,
     autoRouting, toggleAutoRouting,
     showGrid, gridVariant, toggleGrid,
     onShowShortcuts,
@@ -110,25 +109,14 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     toggleRuler,
     showMinimap,
     toggleMinimap,
-    _onToggleAI,
-    _aiChatActive,
-    _showAiCrown,
-    _nodeCount,
-    _edgeCount,
     selectedNodesCount,
-    _selectedEdgesCount,
     zoomPercent,
     snapToGrid,
     onToggleSnap,
-    _highlightMainFlow,
-    _onToggleHighlightMainFlow,
-    _showOnlyMainFlow,
-    _onToggleShowOnlyMainFlow,
     children,
     hideZoomControls,
     hideLayoutControls,
     hideGridControls,
-    _hideFlowFocusControls,
     hideUndoRedoControls,
     isDrawingMode,
     isMarqueeActive,
@@ -139,8 +127,6 @@ export const ModernFlowchartToolbar: React.FC<FlowchartToolbarProps> = memo(({
     onAddMindMap,
     onImportClick,
     onExport,
-    _isCommentMode,
-    _setIsCommentMode,
     onShowHistory,
     historyCount,
     onAlign,

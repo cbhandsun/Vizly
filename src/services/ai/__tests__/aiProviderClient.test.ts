@@ -1,16 +1,22 @@
+// @vitest-environment jsdom
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+    AI_PROVIDER_REQUEST_BODY_MAX_CHARS,
     AIProviderHttpError,
+    AIProviderInvalidRequestError,
     AIProviderInvalidResponseError,
     AIProviderResponseTooLargeError,
     AIProviderTimeoutError,
     createAIProviderHeaders,
+    coerceAIProviderTimeoutMs,
     formatAIProviderRequestError,
     normalizeAIModelsResponse,
     requestAIChatCompletionJson,
     requestAIChatCompletion,
     requestAIModels,
     resolveAIProviderEndpoint,
+    serializeAIProviderRequestBody,
 } from '../aiProviderClient';
 
 const provider = {
@@ -152,6 +158,38 @@ describe('aiProviderClient', () => {
             { id: 'vendor/model-1' },
         ]);
         expect(normalizeAIModelsResponse({ data: { id: 'bad' } })).toEqual([]);
+    });
+
+    it('serializes only bounded JSON request bodies', () => {
+        expect(serializeAIProviderRequestBody({ model: 'gpt-4o', messages: [] }))
+            .toBe('{"model":"gpt-4o","messages":[]}');
+        expect(() => serializeAIProviderRequestBody(undefined))
+            .toThrow(AIProviderInvalidRequestError);
+        expect(() => serializeAIProviderRequestBody({ content: 'x'.repeat(AI_PROVIDER_REQUEST_BODY_MAX_CHARS) }))
+            .toThrow(/超过/);
+
+        const cyclic: Record<string, unknown> = {};
+        cyclic.self = cyclic;
+        expect(() => serializeAIProviderRequestBody(cyclic))
+            .toThrow(AIProviderInvalidRequestError);
+    });
+
+    it('accepts only finite positive bounded integer timeouts', () => {
+        expect(coerceAIProviderTimeoutMs(undefined)).toBe(60_000);
+        expect(coerceAIProviderTimeoutMs(50)).toBe(50);
+        for (const value of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 300_001, '1000']) {
+            expect(() => coerceAIProviderTimeoutMs(value)).toThrow(AIProviderInvalidRequestError);
+        }
+    });
+
+    it('rejects invalid request boundaries before issuing fetch', async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch');
+
+        await expect(requestAIChatCompletion(provider, undefined))
+            .rejects.toBeInstanceOf(AIProviderInvalidRequestError);
+        await expect(requestAIModels(provider, { timeoutMs: Number.NaN }))
+            .rejects.toBeInstanceOf(AIProviderInvalidRequestError);
+        expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it('aborts slow requests with a formatted timeout error', async () => {

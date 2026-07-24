@@ -17,6 +17,7 @@ interface CustomEdgeData extends Record<string, unknown> {
   absoluteLabelX?: number;
   /** 绝对锚定标签的 Y 坐标（函数级注释：用于强制固定纵坐标） */
   absoluteLabelY?: number;
+  onLabelChange?: (edgeId: string, label: string) => void;
 }
 
 interface CustomEdgeProps extends EdgeProps {
@@ -64,8 +65,8 @@ const CustomEdge: React.FC<CustomEdgeProps> = ({
   const handleLabelBlur = () => {
     setIsEditing(false);
     if (editText !== String(data?.label ?? '')) {
-      if (typeof (data as any)?.onLabelChange === 'function') {
-        (data as any).onLabelChange(id, editText);
+      if (typeof data?.onLabelChange === 'function') {
+        data.onLabelChange(id, editText);
       }
     }
   };

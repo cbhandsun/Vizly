@@ -3,7 +3,7 @@ import { NodeUpdateContext, type UpdateNodesBatchFn } from './NodeUpdateContextV
 
 export const NodeUpdateProvider: React.FC<{
     updateNodesBatch: UpdateNodesBatchFn;
-    businessData?: Record<string, any>;
+    businessData?: Record<string, unknown>;
     children: React.ReactNode;
 }> = ({ updateNodesBatch, businessData, children }) => {
     const value = useMemo(() => ({ updateNodesBatch, businessData }), [updateNodesBatch, businessData]);

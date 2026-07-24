@@ -1,19 +1,28 @@
 import { describe, it, expect } from 'vitest';
 import { costEvaluator, CostEvaluator } from '../CostEvaluator';
-import { CostContext, RoutingPlugin } from '../../types/routing';
+import type { CostContext, EdgeRoutingWeights, RoutingPlugin } from '../../types/routing';
 
 describe('CostEvaluator', () => {
     const sNode = { id: 's', position: { x: 0, y: 0 }, dimensions: { width: 100, height: 50 } };
     const tNode = { id: 't', position: { x: 200, y: 200 }, dimensions: { width: 100, height: 50 } };
 
-    const defaultWeights = {
+    const defaultWeights: EdgeRoutingWeights = {
         length: 1,
         turn: 500,
         crossing: 1000,
+        lrBias: 0,
+        tbBias: 0,
         edgeCrossing: 80,
         wrongSign: 2000,
         lShapeBonus: 1500,
-        usagePenalty: 40
+        usagePenalty: 40,
+        overlapPenalty: 0,
+        exitContainerPenalty: 0,
+        crossDomainPenalty: 0,
+        detourPenalty: 0,
+        lastSegShort: 0,
+        alignmentBonus: 0,
+        flowBonus: 0,
     };
 
     const baseContext: CostContext = {
@@ -23,8 +32,11 @@ describe('CostEvaluator', () => {
         tDir: 'l',
         dx: 100,
         dy: 150,
+        baseCost: 0,
+        obstacles: [],
         weights: defaultWeights,
         config: {
+            mode: 'advanced-smart',
             layoutDirection: 'LR',
             directionalHandlePolicy: 'prefer'
         }
@@ -168,7 +180,7 @@ describe('CostEvaluator', () => {
                 dy: 0,
                 config: {
                     ...baseContext.config,
-                    routedPaths: [{ id: '1', points: [{ x: 50, y: 25 }, { x: 150, y: 25 }] }]
+                    routedPaths: [{ points: [{ x: 50, y: 25 }, { x: 150, y: 25 }] }]
                 }
             };
             const res = costEvaluator.evaluate(context);
@@ -187,7 +199,7 @@ describe('CostEvaluator', () => {
                 dy: 200,
                 config: {
                     ...baseContext.config,
-                    routedPaths: [{ id: '1', points: [{ x: 350, y: 0 }, { x: 350, y: 300 }] }]
+                    routedPaths: [{ points: [{ x: 350, y: 0 }, { x: 350, y: 300 }] }]
                 }
             };
             const res1 = costEvaluator.evaluate(context1);
@@ -279,7 +291,7 @@ describe('CostEvaluator', () => {
                 dy: 200,
                 config: {
                     ...baseContext.config,
-                    routedPaths: [{ id: '1', points: [{ x: 120, y: 100 }, { x: 180, y: 100 }] }]
+                    routedPaths: [{ points: [{ x: 120, y: 100 }, { x: 180, y: 100 }] }]
                 }
             };
             const res = costEvaluator.evaluate(context);
@@ -299,7 +311,7 @@ describe('CostEvaluator', () => {
                 dy: 200,
                 config: {
                     ...baseContext.config,
-                    routedPaths: [{ id: '1', points: [{ x: 150, y: 100 }, { x: 150, y: 150 }] }]
+                    routedPaths: [{ points: [{ x: 150, y: 100 }, { x: 150, y: 150 }] }]
                 }
             };
             const res = costEvaluator.evaluate(context);

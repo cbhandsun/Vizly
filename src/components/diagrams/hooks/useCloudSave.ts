@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
 import { tryAttachDiagramSnapshot } from '@/core/utils/diagramSnapshot';
-import { invalidateRemoteDiagramPreview } from '@/core/utils/remoteDiagramPreview';
+import { invalidateRemoteDiagramPreview } from '@/services/remoteDiagramPreview';
 import type { StandardDiagramData } from '@/core/models/DiagramModels';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { getFlowDataBridge } from '@/core/utils/flowDataBridge';
+import { coerceToStandardDiagramData } from '@/core/utils/coerceDiagram';
 import { logCloudSaveEnsureFailure, logCloudSaveFailure } from './diagramStorageLogging';
 
 const loadUnifiedStorage = async () => (await import('@/services/UnifiedStorageService')).unifiedStorage;
@@ -31,15 +32,32 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
                 return;
             }
 
-            const diagram: StandardDiagramData = {
+            const bridgeCloud = bridge.metadata?.cloud;
+            const cloudProvider = bridgeCloud?.provider;
+            const normalizedCloud: NonNullable<StandardDiagramData['metadata']>['cloud'] = (
+                (cloudProvider === 'supabase' || cloudProvider === 's3')
+                && typeof bridgeCloud?.id === 'string'
+                && bridgeCloud.id.length > 0
+            ) ? {
+                provider: cloudProvider,
+                id: bridgeCloud.id,
+                title: typeof bridgeCloud.title === 'string' ? bridgeCloud.title : undefined,
+                openedAt: typeof bridgeCloud.openedAt === 'string' ? bridgeCloud.openedAt : undefined,
+            } : undefined;
+
+            const diagram = coerceToStandardDiagramData({
                 ...bridge,
                 id: bridge.id || diagramId,
                 name: diagramName || bridge.name || diagramId,
                 metadata: {
                     ...(bridge.metadata || {}),
                     title: diagramName || bridge.metadata?.title || diagramId,
+                    cloud: normalizedCloud,
                 },
-            };
+            }, {
+                id: bridge.id || diagramId,
+                title: diagramName || bridge.name || diagramId,
+            });
 
             const snap = await tryAttachDiagramSnapshot(diagram, diagramId);
             const provider = unifiedStorage.activeProvider;
@@ -52,7 +70,7 @@ export function useCloudSave(diagramId: string, diagramName?: string) {
             await provider.saveDiagram({
                 id: finalId!,
                 title: finalTitle!,
-                content: { ...snap.diagram, id: finalId, name: finalTitle } as any,
+                content: { ...snap.diagram, id: finalId, name: finalTitle },
                 updated_at: new Date().toISOString(),
                 user_id: 'anonymous',
             });

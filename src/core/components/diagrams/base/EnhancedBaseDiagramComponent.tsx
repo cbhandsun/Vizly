@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo, useEffect, useState, useCallback, memo } from 'react';
-import { Node, Edge, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
+import { Node, Edge, applyNodeChanges, applyEdgeChanges, type NodeTypes } from '@xyflow/react';
 import BaseReactFlow from '../../shared/BaseReactFlow';
 import { useFlowStyles } from '../../../hooks/useFlowStyles';
 import CustomNode from '../../custom-nodes/CustomNode';
@@ -67,11 +67,11 @@ export interface EnhancedBaseDiagramProps extends Omit<DiagramComponentProps, 'c
   configIntegration?: ConfigIntegration;
   themeId?: string;
   enablePerformanceOptimization?: boolean;
-  onConfigChange?: (key: string, value: any) => void;
+  onConfigChange?: (key: string, value: unknown) => void;
   onThemeChange?: (theme: Theme) => void;
 }
 
-const nodeTypes: any = {
+const nodeTypes: NodeTypes = {
   custom: CustomNode,
   titleGroup: TitleGroupNode,
   subGroup: SubGroupNode,
@@ -120,14 +120,14 @@ function useEnhancedConfig(
     // 加载配置
     const loadConfig = async () => {
       try {
-        const nodeWidth = layeredConfig.get('diagram.node.width');
-        const nodeHeight = layeredConfig.get('diagram.node.height');
-        const spacingH = layeredConfig.get('diagram.spacing.horizontal');
-        const spacingV = layeredConfig.get('diagram.spacing.vertical');
-        const groupPadding = layeredConfig.get('diagram.group.padding');
-        const performanceOpt = layeredConfig.get('diagram.performance.enabled');
-        const themeCaching = layeredConfig.get('theme.caching.enabled');
-        const validation = layeredConfig.get('diagram.validation.enabled');
+        const nodeWidth = layeredConfig.get<number>('diagram.node.width');
+        const nodeHeight = layeredConfig.get<number>('diagram.node.height');
+        const spacingH = layeredConfig.get<number>('diagram.spacing.horizontal');
+        const spacingV = layeredConfig.get<number>('diagram.spacing.vertical');
+        const groupPadding = layeredConfig.get<number>('diagram.group.padding');
+        const performanceOpt = layeredConfig.get<boolean>('diagram.performance.enabled');
+        const themeCaching = layeredConfig.get<boolean>('theme.caching.enabled');
+        const validation = layeredConfig.get<boolean>('diagram.validation.enabled');
 
         setConfig({
           NODE_WIDTH: nodeWidth || DEFAULT_ENHANCED_CONFIG.NODE_WIDTH,
@@ -231,12 +231,8 @@ export const EnhancedBaseDiagramComponent: React.FC<EnhancedBaseDiagramProps> = 
   config: customConfig,
   nodes,
   edges,
-  _edgeMode = 'native',
   className,
   style,
-  _miniMapPannable,
-  _miniMapZoomable,
-  _miniMapStyle,
   configIntegration,
   themeId,
   enablePerformanceOptimization = true,

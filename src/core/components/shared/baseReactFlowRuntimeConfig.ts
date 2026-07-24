@@ -4,6 +4,15 @@ type BaseReactFlowPerformanceConfig = {
   debounceMs: number;
 };
 
+const readNestedValue = (value: unknown, path: readonly string[]): unknown => {
+  let current = value;
+  for (const key of path) {
+    if (!current || typeof current !== 'object' || Array.isArray(current)) return undefined;
+    current = (current as Record<string, unknown>)[key];
+  }
+  return current;
+};
+
 export const DEFAULT_BASE_REACT_FLOW_PERFORMANCE_CONFIG: BaseReactFlowPerformanceConfig = {
   enableVirtualization: true,
   batchSize: 50,
@@ -14,11 +23,14 @@ export const readBaseReactFlowZoomSensitivity = ({
   readConfig,
   onReadFailure,
 }: {
-  readConfig: () => any;
+  readConfig: () => unknown;
   onReadFailure?: (error: unknown) => void;
 }): number => {
   try {
-    return readConfig()?.canvas?.zoom?.sensitivity ?? 1;
+    const sensitivity = readNestedValue(readConfig(), ['canvas', 'zoom', 'sensitivity']);
+    return typeof sensitivity === 'number' && Number.isFinite(sensitivity) && sensitivity > 0
+      ? sensitivity
+      : 1;
   } catch (error) {
     onReadFailure?.(error);
     return 1;
@@ -32,6 +44,12 @@ export const detectBaseReactFlowTouchDevice = ({
   hasTouchStart: boolean;
   maxTouchPoints: number;
 }): boolean => hasTouchStart || maxTouchPoints > 0;
+
+export const resolveBaseReactFlowReconnectRadius = (
+  value: number | undefined,
+): number | undefined => (
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+);
 
 export const resolveBaseReactFlowInteractionFlags = ({
   preventScrolling,
@@ -56,11 +74,26 @@ export const readBaseReactFlowPerformanceConfig = ({
   readConfig,
   onReadFailure,
 }: {
-  readConfig: () => any;
+  readConfig: () => unknown;
   onReadFailure?: (error: unknown) => void;
 }): BaseReactFlowPerformanceConfig => {
   try {
-    return readConfig()?.performance || DEFAULT_BASE_REACT_FLOW_PERFORMANCE_CONFIG;
+    const raw = readNestedValue(readConfig(), ['performance']);
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return DEFAULT_BASE_REACT_FLOW_PERFORMANCE_CONFIG;
+    }
+    const candidate = raw as Record<string, unknown>;
+    return {
+      enableVirtualization: typeof candidate.enableVirtualization === 'boolean'
+        ? candidate.enableVirtualization
+        : DEFAULT_BASE_REACT_FLOW_PERFORMANCE_CONFIG.enableVirtualization,
+      batchSize: typeof candidate.batchSize === 'number' && Number.isFinite(candidate.batchSize) && candidate.batchSize > 0
+        ? candidate.batchSize
+        : DEFAULT_BASE_REACT_FLOW_PERFORMANCE_CONFIG.batchSize,
+      debounceMs: typeof candidate.debounceMs === 'number' && Number.isFinite(candidate.debounceMs) && candidate.debounceMs >= 0
+        ? candidate.debounceMs
+        : DEFAULT_BASE_REACT_FLOW_PERFORMANCE_CONFIG.debounceMs,
+    };
   } catch (error) {
     onReadFailure?.(error);
     return DEFAULT_BASE_REACT_FLOW_PERFORMANCE_CONFIG;

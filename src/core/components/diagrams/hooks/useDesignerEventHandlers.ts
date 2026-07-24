@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { Node, Edge } from '@xyflow/react';
+import { Node, Edge, type ReactFlowInstance } from '@xyflow/react';
+import type { MessageInstance } from 'antd/es/message/interface';
+import type { NotificationInstance } from 'antd/es/notification/interface';
 import { useDesignerContextMenu } from './useDesignerContextMenu';
 import { useClipboard } from './useClipboard';
 import { useToastActions } from './useToastActions';
@@ -8,45 +10,47 @@ import { useKeyboardShortcuts } from '../useKeyboardShortcuts';
 import { useContainerAutoLayout } from './useContainerAutoLayout';
 import { useDiagramActions } from './useDiagramActions';
 import { useSpacePan } from './useSpacePan';
+import type { DiagramTypePlugin, PluginContext } from '../../../types/plugin';
+import type { LayerConfig } from './useLayerManagement';
 
 export interface UseDesignerEventHandlersProps {
     nodes: Node[];
     edges: Edge[];
-    setNodes: any;
-    setEdges: any;
+    setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
+    setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
     selectedNodes: Node[];
     selectedEdges: Edge[];
-    takeSnapshot: any;
-    undo: any;
-    redo: any;
-    reactFlowInstance: any;
-    reactFlowWrapper: React.RefObject<HTMLDivElement>;
+    takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
+    undo: () => void;
+    redo: () => void;
+    reactFlowInstance: ReactFlowInstance | null;
+    reactFlowWrapper: React.RefObject<HTMLDivElement | null>;
     isDragging: boolean;
-    pluginCtx: any;
-    activePlugin: any;
-    messageApi: any;
-    notificationApi: any;
+    pluginCtx: PluginContext | null;
+    activePlugin?: DiagramTypePlugin;
+    messageApi: MessageInstance;
+    notificationApi: NotificationInstance;
     
-    layers: any[];
-    setActiveLayerId: any;
-    toggleVisibility: any;
+    layers: LayerConfig[];
+    setActiveLayerId: (layerId: string) => void;
+    toggleVisibility: (layerId: string) => void;
     canAlign: boolean;
     canDistribute: boolean;
-    handleAlign: any;
-    handleDistribute: any;
+    handleAlign: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
+    handleDistribute: (direction: 'horizontal' | 'vertical') => void;
 
-    handleGroup: any;
-    handleUngroup: any;
+    handleGroup: () => void;
+    handleUngroup: () => void;
     nodesRef: React.MutableRefObject<Node[]>;
     edgesRef: React.MutableRefObject<Edge[]>;
     
     setCommandPaletteVisible: (visible: boolean) => void;
     setShortcutHelpVisible: (visible: boolean) => void;
     setCanvasSearchVisible: (visible: boolean) => void;
-    copyStyle: any;
-    pasteStyle: any;
+    copyStyle: (node: Node) => void;
+    pasteStyle: (nodeIds: string[]) => void;
     hasCopiedStyle: boolean;
-    saveAsTemplate: any;
+    saveAsTemplate: (node: Node, label: string) => void;
     /** 折叠/展开容器组 */
     toggleGroupCollapse?: (groupId: string) => void;
 }
@@ -87,7 +91,10 @@ export function useDesignerEventHandlers({
         handleReverseEdge,
     } = useDiagramActions({
         nodes, edges, setNodes, setEdges, selectedNodes, selectedEdges,
-        takeSnapshot, reactFlowInstance, pluginCtx, activePlugin
+        takeSnapshot,
+        reactFlowInstance,
+        pluginCtx: pluginCtx ?? undefined,
+        activePlugin,
     });
 
     const { handleCopy, handlePaste, handleCut } = useClipboard({
@@ -179,8 +186,10 @@ export function useDesignerEventHandlers({
         },
         onOpenCommandPalette: () => setCommandPaletteVisible(true),
         onShowShortcuts: () => setShortcutHelpVisible(true),
-        pluginShortcuts: activePlugin?.contributeShortcuts?.(pluginCtx),
-        pluginCtx,
+        pluginShortcuts: pluginCtx
+            ? activePlugin?.contributeShortcuts?.(pluginCtx)
+            : undefined,
+        pluginCtx: pluginCtx ?? undefined,
     });
 
     useEffect(() => {

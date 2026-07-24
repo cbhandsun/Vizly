@@ -1,10 +1,11 @@
 import { Node } from '@xyflow/react';
-import { diagramConfigManager } from '../components/config/DiagramConfig';
+import { diagramConfigManager } from '../config/DiagramConfig';
 import type { Theme } from '../themes/types/ThemeTypes';
 import { enhancedTextMeasurement } from '../utils/EnhancedTextMeasurement';
 import { LayoutOptimizer } from '../components/layout/LayoutOptimizer';
 import { getDomainTheme } from '../utils/domainKey';
 import { diagramStyleManager } from '../components/shared/DiagramStyleManager';
+import type { CSSProperties } from 'react';
 
 /**
  * 紧凑域缩放系数（模块级常量，保证 createNode 与 createNodes 一致）
@@ -15,58 +16,24 @@ const COMPACT_DOMAINS: Record<string, { fontScale: number; widthScale: number; p
   interface:{ fontScale: 0.85, widthScale: 0.85, paddingHScale: 0.85, paddingVScale: 0.85 },
 };
 
-/**
- * 节点类型枚举
- */
-export enum NodeType {
-  CUSTOM = 'custom',
-  SUB_GROUP = 'subGroup',
-  DOMAIN = 'domain',
-  INPUT = 'input',
-  OUTPUT = 'output',
-  DEFAULT = 'default'
-}
+import { ownNodeConfigRecords, validateNodeConfig } from './NodeFactoryBoundary';
+import { NodeType, type NodeConfig } from './NodeFactoryTypes';
 
-/**
- * 节点创建配置接口
- */
-export interface NodeConfig {
-  id: string;
-  type?: NodeType;
-  position: { x: number; y: number };
-  description: string;
-  draggable?: boolean;
-  theme?: any; // 暂时使用any类型
-  /**
-   * 函数级注释：域类标识（强制）
-   * - 新数据必须显式提供，用于唯一域主题解析。
-   */
-  domainClass?: string;
-  domain?: string;
-  /**
-   * 函数级注释：新增字段 subDomain
-   * - 目的：标准化数据中的顶层 `subDomain` 能被工厂透传到 `node.data.subDomain`
-   * - 背景：布局的 applySubGrouping 按 `node.data.subDomain` 聚合；若未透传则不会生成子域容器
-   */
-  subDomain?: string;
-  parentId?: string;
-  zIndex?: number;
-  width?: number;
-  height?: number;
-  style?: Record<string, any>;
-  data?: Record<string, any>;
-  shape?: string;
-  metadata?: any;
-}
+export {
+  NodeType,
+  type NodeConfig,
+  type NodeValidationResult
+} from './NodeFactoryTypes';
 
-/**
- * 节点验证结果接口
- */
-export interface NodeValidationResult {
-  isValid: boolean;
-  errors: string[];
-  warnings: string[];
-}
+const asRecord = (value: unknown): Record<string, unknown> => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
+
+const readOptionalString = (value: unknown): string | undefined => (
+  typeof value === 'string' && value.trim() ? value : undefined
+);
 
 /**
  * 节点工厂类 - 统一管理节点的创建和配置
@@ -109,16 +76,17 @@ export class NodeFactory {
      * - 主题解析：以 domainClass 优先命中主题键，缺失时由 domain 推导
      */
     // 验证配置
-    const validation = this.validateConfig(config);
+    const validation = validateNodeConfig(config);
     if (!validation.isValid) {
       throw new Error(`节点创建失败: ${validation.errors.join(', ')}`);
     }
+    config = ownNodeConfigRecords(config);
 
     // 规范化节点类型（函数级注释）
     // - 允许字符串类型并做别名映射：titlegroup -> titleGroup，subgroup -> subGroup
     // - 未注册或未知类型统一回退为 custom，确保使用已注册的自定义节点渲染
     const normalizedType = (() => {
-      const raw = (config.type as any);
+      const raw = config.type;
       if (typeof raw === 'string') {
         const s = raw.trim();
         const lowerS = s.toLowerCase();
@@ -141,7 +109,8 @@ export class NodeFactory {
      * 目标：在业务节点类型上强制要求 `domainClass` 存在；容器类节点跳过校验。
      */
     const mustHaveDomainClass = !new Set(['subGroup', 'titleGroup', 'domain', 'networkContainer']).has(String(normalizedType));
-    const dcPresent = String((config.domainClass ?? (config.data as any)?.domainClass ?? '')).trim().length > 0;
+    const configData = asRecord(config.data);
+    const dcPresent = String(config.domainClass ?? configData.domainClass ?? '').trim().length > 0;
     if (mustHaveDomainClass && !dcPresent) {
       throw new Error(`节点缺少 domainClass: ${config.id}`);
     }
@@ -155,8 +124,8 @@ export class NodeFactory {
     const layoutOptimizer = LayoutOptimizer.getInstance();
 
     // 读取业务域与域类（domainClass 优先）
-    const domainKey: string | undefined = (config as any).domain ?? ((config.data as any)?.domain);
-    const domainClass: string | undefined = (config as any).domainClass ?? ((config.data as any)?.domainClass);
+    const domainKey = config.domain ?? readOptionalString(configData.domain);
+    const domainClass = config.domainClass ?? readOptionalString(configData.domainClass);
 
     const isCompact = domainKey && COMPACT_DOMAINS[String(domainKey)] !== undefined;
     const fontSizeOverride = isCompact
@@ -281,9 +250,9 @@ export class NodeFactory {
     const theme = diagramTheme;
 
     // 以 domainClass 优先解析域主题颜色；若缺失则最小回退
-    const domainThemeColor = getDomainTheme(theme as any, {
+    const domainThemeColor = getDomainTheme(theme, {
       domainClass,
-    } as any);
+    });
 
     // 规范化文案字段：统一使用 description（函数级注释）
     // - 优先读取 config.description；其次读取 data.description；最后兜底为节点 id
@@ -291,11 +260,11 @@ export class NodeFactory {
     const normalizedDescription = (
       typeof config.description === 'string' && config.description.trim().length > 0
         ? config.description
-        : (config.data as any)?.description ?? config.id
+        : readOptionalString(configData.description) ?? config.id
     );
 
     // 构建节点数据（并保持传入 data 字段）
-    const nodeData: any = {
+    const nodeData: Record<string, unknown> = {
       id: config.id,
       description: normalizedDescription,
       theme: domainThemeColor, // 传递解析后的域主题颜色
@@ -306,7 +275,7 @@ export class NodeFactory {
        * - 优先使用顶层 `config.subDomain`，其次回退到 `config.data.subDomain`
        * - 这样布局阶段的 applySubGrouping(nodes, whitelist) 能正确读取并生成子域容器
        */
-      subDomain: (config as any).subDomain ?? (config.data as any)?.subDomain,
+      subDomain: config.subDomain ?? readOptionalString(configData.subDomain),
       // 形状字段回撤：不再为普通节点透传 shape
       fontSize: fontSizeOverride,
       padding: paddingOverride,
@@ -339,7 +308,7 @@ export class NodeFactory {
       }
     })();
 
-    const roleStyle: Record<string, any> = (() => {
+    const roleStyle: CSSProperties = (() => {
       const borderStyle = preset?.node?.borderStyle ?? 'solid';
       const borderWidth = preset?.node?.borderWidth ?? 1.5;
       const shadowToken = preset?.node?.shadow ?? 'medium';
@@ -381,7 +350,7 @@ export class NodeFactory {
     // 将角色样式写入 data.customStyle，并设置层级基准
     nodeData.baseZIndex = roleZIndex;
     nodeData.customStyle = {
-      ...(nodeData.customStyle || {}),
+      ...asRecord(nodeData.customStyle),
       ...roleStyle,
     };
 
@@ -400,7 +369,7 @@ export class NodeFactory {
     };
 
     // 创建节点
-    const node: Node<any> = {
+    const node: Node = {
       id: config.id,
       type: normalizedType || NodeType.CUSTOM,
       position: config.position,
@@ -433,7 +402,7 @@ export class NodeFactory {
   /**
    * 创建域群组节点
    */
-  createDomainGroup(domain: string, nodesInDomain: Node[], domainTheme: any, _options: any): Node {
+  createDomainGroup(domain: string, nodesInDomain: Node[], domainTheme: unknown, _options?: unknown): Node {
     const id = `domain-${domain}`;
     const nodeConfig: NodeConfig = {
       id,
@@ -455,7 +424,7 @@ export class NodeFactory {
   /**
    * 创建子域群组节点
    */
-  createSubDomainGroup(subDomain: string, nodesInSubDomain: Node[], domainTheme: any, _options?: { shape?: string }): Node {
+  createSubDomainGroup(subDomain: string, nodesInSubDomain: Node[], domainTheme: unknown, _options?: { shape?: string }): Node {
     const id = `subdomain-${subDomain}`;
     const nodeConfig: NodeConfig = {
       id,
@@ -480,7 +449,7 @@ export class NodeFactory {
   createNodes(configs: NodeConfig[], diagramTheme?: Theme): Node[] {
     // 1. 分组：根据测量参数（字体、内边距）对节点归类
     const groups = new Map<string, {
-      params: any,
+      params: NonNullable<Parameters<typeof enhancedTextMeasurement.measureMultipleNodes>[1]>,
       items: { config: NodeConfig, index: number }[]
     }>();
 
@@ -490,7 +459,7 @@ export class NodeFactory {
     configs.forEach((config, index) => {
       // 不跳过已有宽高的节点 — 始终根据内容重新计算宽度
 
-      const domainKey: string | undefined = (config as any).domain ?? ((config.data as any)?.domain);
+      const domainKey = config.domain ?? readOptionalString(asRecord(config.data).domain);
       const isCompact = domainKey && COMPACT_DOMAINS[String(domainKey)] !== undefined;
       const fontSizeOverride = isCompact
         ? Math.round(diagramConfig.node.font.size * COMPACT_DOMAINS[domainKey].fontScale)
@@ -549,7 +518,7 @@ export class NodeFactory {
     label: string;
     position: { x: number; y: number };
     size: { width: number; height: number };
-    theme?: any; // 暂时使用any类型
+    theme?: { border?: string };
     zIndex?: number;
     domain?: string; // 新增：所属域键，用于布局归属
     children?: string[]; // 新增：子组包含的子节点ID，用于布局策略计算包围盒
@@ -600,7 +569,7 @@ export class NodeFactory {
     label: string;
     position: { x: number; y: number };
     size: { width: number; height: number };
-    theme: any; // 暂时使用any类型
+    theme: unknown;
     zIndex?: number;
   }): Node {
     // 添加 NaN 值验证，确保 measured 属性中的数值有效
@@ -642,17 +611,17 @@ export class NodeFactory {
     type: NodeType,
     id: string,
     position: { x: number; y: number },
-    data: any,
-    style?: any
+    data: Record<string, unknown>,
+    style?: CSSProperties
   ): Node {
     const config: NodeConfig = {
       id,
       type,
       position,
-      description: data.description || id,
+      description: readOptionalString(data.description) || id,
       // Provide a fallback domainClass so the guard in createNode doesn't throw.
       // createNodeByType is a generic utility that doesn't operate in domain context.
-      domainClass: data.domainClass || 'generic',
+      domainClass: readOptionalString(data.domainClass) || 'generic',
       data,
       style
     };
@@ -705,10 +674,10 @@ export class NodeFactory {
           height: newHeight,
         };
         // 同步节点几何尺寸，确保 MiniMap 能立即渲染
-        (updatedNode as any).width = newWidth;
-        (updatedNode as any).height = newHeight;
+        updatedNode.width = newWidth;
+        updatedNode.height = newHeight;
         // 同步 measured，确保 MiniMap 与自适应计算准确
-        (updatedNode as any).measured = {
+        updatedNode.measured = {
           width: newWidth,
           height: newHeight,
         };
@@ -737,56 +706,6 @@ export class NodeFactory {
     }
 
     return updatedNode;
-  }
-
-  /**
-   * 验证节点配置
-   */
-  private validateConfig(config: NodeConfig): NodeValidationResult {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-
-    // 必填字段验证
-    if (!config.id) {
-      errors.push('节点ID不能为空');
-    }
-
-    if (!config.description) {
-      errors.push('节点描述不能为空');
-    }
-
-    if (!config.position) {
-      errors.push('节点位置不能为空');
-    } else {
-      if (typeof config.position.x !== 'number' || typeof config.position.y !== 'number') {
-        errors.push('节点位置必须是数字');
-      }
-    }
-
-    // ID格式验证
-    if (config.id && !/^[a-zA-Z0-9_-]+$/.test(config.id)) {
-      warnings.push('节点ID建议只包含字母、数字、下划线和连字符');
-    }
-
-    // 尺寸验证
-    if (config.width && config.width < 50) {
-      warnings.push('节点宽度过小，可能影响显示效果');
-    }
-
-    if (config.height && config.height < 30) {
-      warnings.push('节点高度过小，可能影响显示效果');
-    }
-
-    // zIndex验证
-    if (config.zIndex && config.zIndex < 0) {
-      warnings.push('负的zIndex可能导致节点被其他元素遮挡');
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      warnings
-    };
   }
 
   /**

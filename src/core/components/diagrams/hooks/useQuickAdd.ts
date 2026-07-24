@@ -24,7 +24,9 @@ export const useQuickAdd = (
 
     const onConnectEnd: OnConnectEnd = useCallback((event, connectionState) => {
         if (!connectionState.isValid && connectionState.fromNode && reactFlowInstance) {
-            const { clientX, clientY } = (event as MouseEvent | TouchEvent) as any;
+            const pointer = event instanceof MouseEvent ? event : event.changedTouches[0];
+            if (!pointer) return;
+            const { clientX, clientY } = pointer;
             // Use native reactFlowInstance.screenToFlowPosition which implicitly handles counter-zoom CSS scaling perfectly
             const projected = reactFlowInstance.screenToFlowPosition({ x: clientX, y: clientY });
             

@@ -106,7 +106,7 @@ describe('typeScriptDiagnosticBaseline', () => {
   });
 
   it('validates timeout and explicit baseline-refresh inputs', () => {
-    expect(parseTypecheckTimeoutMs(undefined)).toBe(300_000);
+    expect(parseTypecheckTimeoutMs(undefined)).toBe(600_000);
     expect(parseTypecheckTimeoutMs('120000')).toBe(120_000);
     expect(() => parseTypecheckTimeoutMs('999')).toThrow(/between 1000 and 900000/);
     expect(() => parseTypecheckTimeoutMs('Infinity')).toThrow(/between 1000 and 900000/);

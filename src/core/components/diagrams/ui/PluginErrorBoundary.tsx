@@ -1,7 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { WarningOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Button, Tooltip } from 'antd';
-import { logPluginBoundaryError } from '../../../../utils/errorBoundaryLogging';
+import { logPluginBoundaryError } from '../../../utils/errorBoundaryLogging';
 
 interface Props {
   pluginId: string;

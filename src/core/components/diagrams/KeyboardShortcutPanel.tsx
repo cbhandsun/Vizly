@@ -6,6 +6,8 @@ interface KeyboardShortcutPanelProps {
     onClose: () => void;
 }
 
+type ThemeToken = ReturnType<typeof theme.useToken>['token'];
+
 interface ShortcutItem {
     keys: string[];
     label: string;
@@ -62,7 +64,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     },
 ];
 
-const KeyBadge: React.FC<{ children: string; token: any }> = ({ children, token }) => (
+const KeyBadge: React.FC<{ children: string; token: ThemeToken }> = ({ children, token }) => (
     <span style={{
         display: 'inline-flex',
         alignItems: 'center',

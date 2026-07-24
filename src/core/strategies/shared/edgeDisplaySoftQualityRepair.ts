@@ -15,6 +15,13 @@ import {
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
+type PositionedNode = ReactFlowNode & { positionAbsolute?: Point };
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
 type Axis = 'h' | 'v';
 
 const EPS = 0.5;
@@ -24,12 +31,26 @@ const EXCESSIVE_BENDS = 6;
 const TARGET_ENTRY_CLEARANCES = [48, 72, 96, 120, 144, 168, 192];
 const DEFAULT_MAX_CANDIDATES_PER_EDGE = 1024;
 const DEFAULT_MAX_QUALITY_EVALUATIONS = 1024;
+const MAX_REPAIR_BUDGET = 100_000;
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
+function boundedInteger(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(value)));
+}
 
 function getEdgePath(edge: Edge): Point[] {
-  const raw = (edge.data as any)?.computedPath || (edge.data as any)?.treeRouting?.points || (edge.data as any)?.elkPath || [];
+  const treeRouting = asRecord(edge.data?.treeRouting);
+  const raw = edge.data?.computedPath || treeRouting.points || edge.data?.elkPath || [];
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((point: any) => ({ x: Number(point?.x), y: Number(point?.y) }))
+    .map(point => {
+      const candidate = asRecord(point);
+      return { x: Number(candidate.x), y: Number(candidate.y) };
+    })
     .filter((point: Point) => Number.isFinite(point.x) && Number.isFinite(point.y));
 }
 
@@ -116,11 +137,11 @@ const num = (value: unknown, fallback: number): number => (
 );
 
 function nodeRect(node: ReactFlowNode): Rect | null {
-  const pos = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-  const width = num((node as any).measured?.width ?? node.width ?? (node.style as any)?.width, 0);
-  const height = num((node as any).measured?.height ?? node.height ?? (node.style as any)?.height, 0);
+  const pos = (node as PositionedNode).positionAbsolute ?? node.position;
+  const width = num(node.measured?.width ?? node.width ?? node.style?.width, 0);
+  const height = num(node.measured?.height ?? node.height ?? node.style?.height, 0);
   if (width <= 1 || height <= 1) return null;
-  return { x: num((pos as any).x, 0), y: num((pos as any).y, 0), width, height };
+  return { x: num(pos.x, 0), y: num(pos.y, 0), width, height };
 }
 
 function routingObstacles(nodes: ReactFlowNode[]): Map<string, Rect> {
@@ -134,9 +155,15 @@ function routingObstacles(nodes: ReactFlowNode[]): Map<string, Rect> {
 }
 
 function withComputedPath(edge: Edge, path: Point[]): Edge {
-  const data = { ...((edge.data || {}) as Record<string, any>), computedPath: path, displaySoftQualityRepaired: true };
-  if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-    data.treeRouting = { ...data.treeRouting, points: path };
+  const sourceData = isRecord(edge.data) ? edge.data : {};
+  const data: Record<string, unknown> = {
+    ...sourceData,
+    computedPath: path,
+    displaySoftQualityRepaired: true,
+  };
+  const treeRouting = isRecord(data.treeRouting) ? data.treeRouting : null;
+  if (treeRouting && Array.isArray(treeRouting.points)) {
+    data.treeRouting = { ...treeRouting, points: path };
   }
   return { ...edge, data };
 }
@@ -164,7 +191,7 @@ function candidateImprovesVisualRisk(current: Point[], candidate: Point[]): bool
     && Math.max(0, candidate.length - 2) <= Math.max(0, current.length - 2);
 }
 
-function terminalClearanceVariants(original: Point[], candidate: Point[]): Point[] {
+function terminalClearanceVariants(original: Point[], candidate: Point[]): Point[][] {
   if (original.length < 4 || candidate.length < 4) return [];
   const start = candidate[0];
   const sourceJoin = candidate[1];
@@ -219,7 +246,12 @@ function buildSoftQualityCandidates(
   edge: Edge,
   options: { maxCandidates?: number } = {},
 ): Point[][] {
-  const maxCandidates = Math.max(1, Math.floor(options.maxCandidates ?? DEFAULT_MAX_CANDIDATES_PER_EDGE));
+  const maxCandidates = boundedInteger(
+    options.maxCandidates,
+    DEFAULT_MAX_CANDIDATES_PER_EDGE,
+    1,
+    MAX_REPAIR_BUDGET,
+  );
   const baseCandidates = generateWaypointCandidates(path, layoutDirection, nodes, edge, {
     includeNodeAwareLanes: true,
   });
@@ -258,9 +290,19 @@ export function repairDisplaySoftQualityRisks(
   const buddyGroups = buildPipelineBuddyGroups(edges);
   let currentEdges = edges;
   let processed = 0;
-  const maxEdges = options.maxEdges ?? 8;
-  const maxCandidatesPerEdge = options.maxCandidatesPerEdge ?? DEFAULT_MAX_CANDIDATES_PER_EDGE;
-  const maxQualityEvaluations = options.maxQualityEvaluations ?? DEFAULT_MAX_QUALITY_EVALUATIONS;
+  const maxEdges = boundedInteger(options.maxEdges, 8, 0, MAX_REPAIR_BUDGET);
+  const maxCandidatesPerEdge = boundedInteger(
+    options.maxCandidatesPerEdge,
+    DEFAULT_MAX_CANDIDATES_PER_EDGE,
+    1,
+    MAX_REPAIR_BUDGET,
+  );
+  const maxQualityEvaluations = boundedInteger(
+    options.maxQualityEvaluations,
+    DEFAULT_MAX_QUALITY_EVALUATIONS,
+    0,
+    MAX_REPAIR_BUDGET,
+  );
   let qualityEvaluations = 0;
 
   const riskEntries = edges

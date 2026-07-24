@@ -34,7 +34,7 @@ describe('streamDirectionalOuterLaneCandidateBatches', () => {
     expect(first.value?.candidates).toHaveLength(12);
     expect(first.value?.tier).toBe(0);
     expect(visitedCoordinates).toBe(12);
-    expect(first.value?.candidates.every(candidate => (
+    expect(first.value?.candidates.every((candidate: Candidate) => (
       candidate.lane < 4
       && candidate.sourceStub < 3
       && candidate.targetStub < 2

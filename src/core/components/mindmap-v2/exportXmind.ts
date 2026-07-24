@@ -65,7 +65,7 @@ function safeDimension(value: unknown, fallback: number): number {
 function taskNoteText(node: NodeObj): string {
     const task = getTaskMeta(node);
     const hasTask =
-        !!(node as any).task ||
+        !!(node as NodeObj & { task?: unknown }).task ||
         task.status !== 'todo' ||
         task.priority !== '无' ||
         !!task.assignee ||

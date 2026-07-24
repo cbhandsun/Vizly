@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 
 import { repairEndpointLaneCrossings } from '../edgeEndpointLaneNudgeRepair';
 
-const node = (id: string, x: number, y: number, width: number, height: number): Node => ({
+const node = (
+  id: string, x: number, y: number, width: number, height: number,
+): Node & { positionAbsolute: { x: number; y: number } } => ({
   id,
   position: { x, y },
   positionAbsolute: { x, y },

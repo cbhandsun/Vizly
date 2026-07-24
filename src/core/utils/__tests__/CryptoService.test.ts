@@ -57,6 +57,24 @@ describe('CryptoService', () => {
     await expect(CryptoService.decrypt(userTwoEncrypted, 'user-2')).resolves.toBe('user-two-secret');
   });
 
+  it('replaces malformed local key material before deriving a key', async () => {
+    const storageKey = 'DiagramView.CryptoSecret.v2_user-1';
+    localStorage.setItem(storageKey, 'malformed-secret');
+
+    const encrypted = await CryptoService.encrypt('secret', 'user-1');
+    const regeneratedSecret = localStorage.getItem(storageKey);
+
+    expect(regeneratedSecret).toMatch(/^[A-Za-z0-9+/]{43}=$/);
+    expect(regeneratedSecret).not.toBe('malformed-secret');
+    await expect(CryptoService.decrypt(encrypted, 'user-1')).resolves.toBe('secret');
+  });
+
+  it('rejects empty, oversized, and control-character user identifiers', async () => {
+    await expect(CryptoService.deriveKey('')).rejects.toThrow('valid userId');
+    await expect(CryptoService.deriveKey('x'.repeat(257))).rejects.toThrow('valid userId');
+    await expect(CryptoService.deriveKey('user\nadmin')).rejects.toThrow('valid userId');
+  });
+
   it('can still decrypt legacy ENC payloads for migration compatibility', async () => {
     const legacyEncrypted = await createLegacyEncryptedPayload('legacy-secret', 'user-1');
 

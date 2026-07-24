@@ -1,6 +1,6 @@
 // diagram-definitions.ts
 import { lazy, createElement } from 'react';
-import type { DiagramDefinition } from '@/core/types/diagram-components';
+import type { DiagramComponentProps, DiagramDefinition } from '@/core/types/diagram-components';
 import { ensureBuiltInPlugins } from '@/core/plugins/builtInPlugins';
 import {
   FaSitemap,
@@ -20,7 +20,7 @@ const loadFlowchartDesigner = async (pluginId?: string) => {
   ]);
 
   return {
-    default: (props: any) => createElement(
+    default: (props: DiagramComponentProps) => createElement(
       FlowchartDesigner,
       pluginId ? { ...props, pluginId } : props
     )
@@ -79,7 +79,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
           registry.register(new StandardFlowPlugin(), true);
         }
         return {
-          default: (props: any) =>
+          default: (props: DiagramComponentProps) =>
             createElement(designerModule.default, { ...props, pluginId: 'standard-flow' })
         };
       })
@@ -104,7 +104,7 @@ export const diagramDefinitions: DiagramDefinition[] = [
           registry.register(new HelloWorldPlugin());
         }
         return {
-          default: (props: any) =>
+          default: (props: DiagramComponentProps) =>
             createElement(designerModule.default, { ...props, pluginId: 'hello-world' })
         };
       })

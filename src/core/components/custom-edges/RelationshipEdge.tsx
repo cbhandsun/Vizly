@@ -7,7 +7,6 @@ import {
 } from '@xyflow/react';
 
 export const RelationshipEdge = ({
-    _id,
     sourceX,
     sourceY,
     targetX,

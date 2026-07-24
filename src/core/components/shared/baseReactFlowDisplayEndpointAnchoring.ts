@@ -16,6 +16,11 @@ import {
   sideForHandle,
 } from './baseReactFlowDisplayEdgeGeometry';
 
+type EndpointEdgeData = Record<string, unknown> & {
+  computedPath?: unknown;
+  treeRouting?: (Record<string, unknown> & { points?: unknown }) | null;
+};
+
 const LOCKED_ENDPOINT_MAX_CORRECTION = 80;
 const DISPLAY_ENDPOINT_BOUNDARY_TOLERANCE = 2;
 const DISPLAY_ENDPOINT_OUTWARD_STUB = 48;
@@ -418,7 +423,7 @@ const buildPreferredPortSideCandidate = (
   edge: Edge,
   nodeById: Map<string, Node>,
 ): Edge => {
-  const data = ((edge.data || {}) as Record<string, any>);
+  const data = (edge.data || {}) as EndpointEdgeData;
   const path = computedPathOf(edge);
   if (path.length < 4) return edge;
   const sourceRect = getNodeRect(nodeById.get(edge.source), nodeById);
@@ -491,7 +496,7 @@ const anchorComputedPathEndpoints = (
   edge: Edge,
   nodeById: Map<string, Node>,
 ): Edge => {
-  const data = ((edge.data || {}) as Record<string, any>);
+  const data = (edge.data || {}) as EndpointEdgeData;
   if (
     !Array.isArray(data.computedPath)
     || data.computedPath.length < 2
@@ -558,7 +563,7 @@ const addComputedPathEndpointStubs = (
   edge: Edge,
   nodeById: Map<string, Node>,
 ): Edge => {
-  const data = ((edge.data || {}) as Record<string, any>);
+  const data = (edge.data || {}) as EndpointEdgeData;
   if (
     !Array.isArray(data.computedPath)
     || data.computedPath.length < 3

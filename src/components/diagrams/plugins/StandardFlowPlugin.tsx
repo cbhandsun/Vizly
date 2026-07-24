@@ -7,9 +7,17 @@ import type { DiagramTypePlugin, PluginContext, SidebarPanel } from '@/core/type
 import { JsonEditorModal } from '@/core/components/diagrams/JsonEditorModal';
 import { FlowchartShapesPanel } from '@/core/components/diagrams/FlowchartShapesPanel';
 import { TemplateCascaderMenu } from '../ui/TemplateCascaderMenu';
-import { dataService } from '@/services/DataService';
 import { parseRemoteDiagramContent } from '@/services/remoteDiagramContent';
 import { PRESET_MAP, defaultStandardData } from '@/data/standardized';
+import { getCustomPreset } from '@/core/utils/customPresetStorage';
+import { appMessage } from '@/core/utils/antdStaticBridge';
+import type { StandardDiagramData } from '@/core/models/DiagramModels';
+import {
+  coerceRemoteDiagramSelection,
+  selectDiagramViewerTemplate,
+  type DiagramViewerTemplateData,
+} from '@/components/diagramViewerTemplateSelection';
+import { logStandardFlowTemplateLoadFailure } from './standardFlowPluginLogging';
 
 export class StandardFlowPlugin implements DiagramTypePlugin {
   id = 'standard-flow';
@@ -73,7 +81,7 @@ export class StandardFlowPlugin implements DiagramTypePlugin {
   }
 
   // ====== AI Actions (GAP-10 Phase 2) ======
-  async onAIAction(action: string, params: any, ctx: PluginContext): Promise<boolean> {
+  async onAIAction(action: string, params: unknown, ctx: PluginContext): Promise<boolean> {
     
     switch (action) {
       case 'smart-optimize':
@@ -89,13 +97,17 @@ export class StandardFlowPlugin implements DiagramTypePlugin {
         return true;
 
       case 'add-service':
+        if (!params || typeof params !== 'object' || Array.isArray(params)) return false;
+        {
+          const safeParams = params as Record<string, unknown>;
         // 假设 AI 想专门添加一个微服务节点
         ctx.addNode('customNode', { 
-          label: params.label || 'New Service', 
-          domainClass: params.domainClass || 'mid',
+          label: typeof safeParams.label === 'string' ? safeParams.label.slice(0, 1000) : 'New Service',
+          domainClass: typeof safeParams.domainClass === 'string' ? safeParams.domainClass.slice(0, 100) : 'mid',
           type: 'microservice'
         });
         return true;
+        }
 
       default:
         return false; // 继续由系统默认处理
@@ -114,52 +126,51 @@ const StandardTemplateToolbar: React.FC<{ ctx: PluginContext }> = ({ ctx }) => {
     setSelectedPath(val);
     if (!key) return;
 
-    // TODO: 这里应接入真正的加载逻辑（如调用 loadFromCloud 或解析 PRESET_MAP）
-    // 为了简化 Plugin 的状态，可以触发一个全局事件或暴露给父级，也可以直接解析设计器工具。
-    let data;
-    if (rootGroup === 's3' || rootGroup === 'supabase' || rootGroup === 'system-templates') {
-       // 需要通过 dataService 获取（如果有缓存）或后续再处理云加载
-       data = dataService.getDiagram(key);
-       
-       if (!data && rootGroup === 'system-templates') {
-           // Fallback for cloud system templates
-         import('@/services/supabase').then(async ({ supabase }) => {
-              if (supabase) {
-                 const { data: remoteData } = await supabase.from('system_templates').select('content, title, id').eq('id', key).single();
-                 if (remoteData && remoteData.content) {
-                     const parsedContent = parseRemoteDiagramContent(remoteData.content, {
-                         id: remoteData.id || key,
-                         title: remoteData.title || key,
-                     });
-                     import('@/core/components/diagrams/designerUtils').then(({ standardDataToCanvas }) => {
-                         standardDataToCanvas(parsedContent).then(({ nodes, edges }) => {
-                             ctx.setNodes(nodes);
-                             ctx.setEdges(edges);
-                             setTimeout(() => {
-                               ctx.reactFlowInstance?.fitView({ duration: 800, padding: 0.35, minZoom: 0.55 });
-                             }, 50);
-                         });
-                     });
-                 }
-              }
-           });
-           return;
-       }
-    } else {
-       data = PRESET_MAP[key] || defaultStandardData;
-    }
-
-    if (data) {
-      import('@/core/components/diagrams/designerUtils').then(({ standardDataToCanvas }) => {
-        standardDataToCanvas(data).then(({ nodes, edges }: { nodes: Node[], edges: Edge[] }) => {
-           ctx.setNodes(nodes);
-           ctx.setEdges(edges);
-           setTimeout(() => {
-             ctx.reactFlowInstance?.fitView({ duration: 800, padding: 0.35, minZoom: 0.55 });
-           }, 50);
-        });
-      });
-    }
+    await selectDiagramViewerTemplate(key, rootGroup, {
+      loadRemoteDiagram: async (providerName, id) => {
+        const { unifiedStorage } = await import('@/services/UnifiedStorageService');
+        const savedDiagram = await unifiedStorage.getProvider(providerName).loadDiagram(id);
+        return coerceRemoteDiagramSelection(savedDiagram, id);
+      },
+      loadSystemTemplate: async (id) => {
+        const { supabase } = await import('@/services/supabase');
+        if (!supabase) return null;
+        const { data, error } = await supabase
+          .from('system_templates')
+          .select('content, title, id')
+          .eq('id', id)
+          .single();
+        if (error) throw error;
+        return coerceRemoteDiagramSelection(data, id);
+      },
+      loadStandardPreset: async (id) => (
+        (PRESET_MAP[id] ?? defaultStandardData) as unknown as DiagramViewerTemplateData
+      ),
+      getLocalPreset: (id) => getCustomPreset(id) as unknown as DiagramViewerTemplateData | null,
+      parseRemoteContent: (content, fallback) => parseRemoteDiagramContent(content, {
+        id: fallback.id,
+        title: fallback.title ?? fallback.id,
+      }) as unknown as DiagramViewerTemplateData,
+      seedAndNavigate: async (data) => {
+        const { standardDataToCanvas } = await import('@/core/components/diagrams/designerUtils');
+        const { nodes, edges } = await standardDataToCanvas(data as unknown as StandardDiagramData);
+        ctx.setNodes(nodes);
+        ctx.setEdges(edges);
+        setTimeout(() => {
+          ctx.reactFlowInstance?.fitView({ duration: 800, padding: 0.35, minZoom: 0.55 });
+        }, 50);
+      },
+      clearBlankTemplate: () => undefined,
+      selectDiagram: () => undefined,
+      showLoading: (message) => appMessage.loading(message, 0),
+      showError: (message) => appMessage.error(message),
+      logFailure: (_source, _id, error) => logStandardFlowTemplateLoadFailure(error),
+      translate: (translationKey, values) => {
+        if (translationKey === 'storage.manager.downloading') return '正在加载云端模板...';
+        if (translationKey === 'storage.manager.noContent') return '模板内容为空';
+        return `模板加载失败: ${values?.message ?? '未知错误'}`;
+      },
+    });
   };
 
   return (

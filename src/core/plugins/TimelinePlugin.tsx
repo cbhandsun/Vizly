@@ -13,6 +13,22 @@ import { ProTimelinePropertyPanel } from '../components/diagrams/timeline-pro/Pr
 import { Calendar, Clock } from 'lucide-react';
 import { addDaysToDateOnly, parseDateOnlyTime, todayDateOnly } from '../utils/dateOnly';
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value && typeof value === 'object' && !Array.isArray(value));
+
+const migrateTimelineNode = (value: unknown): unknown => {
+  if (!isRecord(value)) return value;
+  const data = isRecord(value.data) ? value.data : {};
+  return {
+    ...value,
+    data: {
+      ...data,
+      status: typeof data.status === 'string' && data.status ? data.status : 'pending',
+      date: typeof data.date === 'string' && data.date ? data.date : todayDateOnly(),
+    },
+  };
+};
+
 export class TimelinePlugin implements DiagramTypePlugin {
   id = 'timeline-diagram';
   name = '项目级时间线图 (Pro)';
@@ -25,27 +41,19 @@ export class TimelinePlugin implements DiagramTypePlugin {
 
   hideDefaultSidebar = true;
   
-  async migrate(data: any, fromVersion: string | undefined): Promise<any> {
-      const migratedData = { ...data };
+  async migrate<T>(data: T, fromVersion: string | undefined): Promise<T> {
+      if (!isRecord(data)) return data;
+      const migratedData: Record<string, unknown> = { ...data };
       
       // Example Migration: From 1.0 (or undefined) to 1.1
       // Clean up legacy node properties or enforce new schema defaults
       if (!fromVersion || fromVersion === '1.0') {
           if (Array.isArray(migratedData.nodes)) {
-              migratedData.nodes = migratedData.nodes.map((n: any) => ({
-                  ...n,
-                  data: {
-                      ...n.data,
-                      // Ensure every timeline node has a status (legacy data might be missing it)
-                      status: n.data?.status || 'pending',
-                      // Ensure date strings are standardized if needed
-                      date: n.data?.date || todayDateOnly()
-                  }
-              }));
+              migratedData.nodes = migratedData.nodes.map(migrateTimelineNode);
           }
       }
 
-      return migratedData;
+      return migratedData as T;
   }
 
   parseData(_source: unknown) { return { nodes: [], edges: [] }; }

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 2,
+  "limits": {
+    "default": 800,
+    "component": 700,
+    "test": 1000,
+    "compositionRoot": 300
+  },
+  "oversizedFiles": {
+  }
+}

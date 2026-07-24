@@ -25,7 +25,7 @@ export const MindMapSpeakerNotes: React.FC = () => {
 
     // 缓存上一次请求的节点ID和语气，避免重复请求
     const lastRequestKeyRef = useRef<string>('');
-    const debounceTimerRef = useRef<any>(null);
+    const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // 订阅演示状态
     useEffect(() => {
@@ -130,11 +130,13 @@ export const MindMapSpeakerNotes: React.FC = () => {
             const nextNote = mergeSpeakerNotesIntoNodeNote(currentNode.note, notes);
             const cleanPatch = cleanMindMapNodePatch({ note: nextNote });
             await mind.reshapeNode(tpcEl, { ...currentNode, ...cleanPatch });
+            const changedNode = { ...currentNode, ...cleanPatch };
             mind.bus.fire('operation', {
-                name: 'saveSpeakerNotes',
-                obj: { ...currentNode, ...cleanPatch },
+                name: 'reshapeNode',
+                obj: changedNode,
+                origin: currentNode,
             });
-            setCurrentNode({ ...currentNode, ...cleanPatch });
+            setCurrentNode(changedNode);
             message.success('已保存到当前节点备注');
         } catch (err) {
             logMindmapSpeakerNotesSaveFailure(err);

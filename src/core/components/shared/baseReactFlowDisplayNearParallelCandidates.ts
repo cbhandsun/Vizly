@@ -1,0 +1,278 @@
+import type { Edge, Node } from '@xyflow/react';
+
+import {
+  compactOrthogonalPath,
+  isFinitePoint,
+} from './baseReactFlowDisplayEdgeCore';
+import {
+  buildDisplayRoutingObstacles,
+  displayAxisOf,
+  NEAR_PARALLEL_LANE_TOLERANCE,
+  OBSTACLE_REPAIR_NODE_PADDING,
+  RESIDUAL_PARALLEL_LANE_GAP,
+  sortedUniqueNumbers,
+  type DisplayPoint,
+  type DisplaySegment,
+} from './baseReactFlowDisplayGeometry';
+import { buildObstacleSkirtCandidates } from './baseReactFlowDisplayObstacleCandidates';
+
+const candidateSignature = (candidate: DisplayPoint[]): string => (
+  candidate.map(point => `${Math.round(point.x)}:${Math.round(point.y)}`).join('|')
+);
+
+export const buildNearParallelLaneNudgePaths = (
+  path: DisplayPoint[],
+  segment: DisplaySegment,
+  other: DisplaySegment,
+  otherPath: DisplayPoint[],
+  nodes: Node[],
+  edge: Edge,
+  allEdges: Edge[],
+): DisplayPoint[][] => {
+  if (segment.segmentIndex < 0 || segment.segmentIndex >= path.length - 1) return [];
+  const laneCandidates = new Set<number>();
+  const addLane = (lane: number) => {
+    if (Number.isFinite(lane)) laneCandidates.add(Math.round(lane));
+  };
+  [-1, 1].forEach((direction) => {
+    if (segment.axis === 'v') {
+      [
+        NEAR_PARALLEL_LANE_TOLERANCE + 1,
+        NEAR_PARALLEL_LANE_TOLERANCE * 2,
+        12,
+        RESIDUAL_PARALLEL_LANE_GAP,
+        RESIDUAL_PARALLEL_LANE_GAP * 2,
+        RESIDUAL_PARALLEL_LANE_GAP * 3,
+        RESIDUAL_PARALLEL_LANE_GAP * 4,
+      ].forEach(gap => addLane(other.a.x + direction * gap));
+    } else {
+      [
+        NEAR_PARALLEL_LANE_TOLERANCE + 1,
+        NEAR_PARALLEL_LANE_TOLERANCE * 2,
+        12,
+        RESIDUAL_PARALLEL_LANE_GAP,
+        RESIDUAL_PARALLEL_LANE_GAP * 2,
+        RESIDUAL_PARALLEL_LANE_GAP * 3,
+        RESIDUAL_PARALLEL_LANE_GAP * 4,
+      ].forEach(gap => addLane(other.a.y + direction * gap));
+    }
+  });
+
+  const segmentMainMin = segment.axis === 'h'
+    ? Math.min(segment.a.x, segment.b.x)
+    : Math.min(segment.a.y, segment.b.y);
+  const segmentMainMax = segment.axis === 'h'
+    ? Math.max(segment.a.x, segment.b.x)
+    : Math.max(segment.a.y, segment.b.y);
+  const blockingLaneValues: number[] = [];
+  [other.segmentIndex - 1, other.segmentIndex + 1].forEach((neighborIndex) => {
+    const neighborStart = otherPath[neighborIndex];
+    const neighborEnd = otherPath[neighborIndex + 1];
+    if (!neighborStart || !neighborEnd) return;
+    const neighborAxis = displayAxisOf(neighborStart, neighborEnd);
+    if (!neighborAxis || neighborAxis === segment.axis) return;
+    const neighborMain = segment.axis === 'h' ? neighborStart.x : neighborStart.y;
+    if (neighborMain < segmentMainMin - 0.5 || neighborMain > segmentMainMax + 0.5) return;
+    blockingLaneValues.push(
+      segment.axis === 'h' ? neighborStart.y : neighborStart.x,
+      segment.axis === 'h' ? neighborEnd.y : neighborEnd.x,
+    );
+  });
+  if (blockingLaneValues.length > 0) {
+    const minLane = Math.min(...blockingLaneValues);
+    const maxLane = Math.max(...blockingLaneValues);
+    [RESIDUAL_PARALLEL_LANE_GAP, 32, 48, 64].forEach((gap) => {
+      addLane(minLane - gap);
+      addLane(maxLane + gap);
+    });
+  }
+
+  const candidatePaths: DisplayPoint[][] = [];
+  const appendCandidate = (candidate: DisplayPoint[]) => {
+    const compacted = compactOrthogonalPath(candidate);
+    if (compacted.length >= 2 && compacted.every(isFinitePoint)) candidatePaths.push(compacted);
+  };
+
+  const isEndpointSegment = segment.segmentIndex <= 0 || segment.segmentIndex >= path.length - 2;
+  if (isEndpointSegment) {
+    const start = path[segment.segmentIndex];
+    const end = path[segment.segmentIndex + 1];
+    if (start && end) {
+      [...laneCandidates].forEach((lane) => {
+        if (segment.axis === 'v') {
+          if (Math.abs(lane - segment.a.x) <= NEAR_PARALLEL_LANE_TOLERANCE) return;
+          appendCandidate([
+            ...path.slice(0, segment.segmentIndex + 1),
+            { x: lane, y: start.y },
+            { x: lane, y: end.y },
+            ...path.slice(segment.segmentIndex + 1),
+          ]);
+        } else {
+          if (Math.abs(lane - segment.a.y) <= NEAR_PARALLEL_LANE_TOLERANCE) return;
+          appendCandidate([
+            ...path.slice(0, segment.segmentIndex + 1),
+            { x: start.x, y: lane },
+            { x: end.x, y: lane },
+            ...path.slice(segment.segmentIndex + 1),
+          ]);
+        }
+      });
+    }
+  }
+
+  if (isEndpointSegment) {
+    const seen = new Set<string>();
+    return candidatePaths.filter((candidate) => {
+      const key = candidateSignature(candidate);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  [...laneCandidates].forEach((lane) => {
+    const next = path.map(point => ({ ...point }));
+    if (segment.axis === 'v') {
+      if (Math.abs(lane - segment.a.x) <= NEAR_PARALLEL_LANE_TOLERANCE) return;
+      next[segment.segmentIndex].x = lane;
+      next[segment.segmentIndex + 1].x = lane;
+    } else {
+      if (Math.abs(lane - segment.a.y) <= NEAR_PARALLEL_LANE_TOLERANCE) return;
+      next[segment.segmentIndex].y = lane;
+      next[segment.segmentIndex + 1].y = lane;
+    }
+    appendCandidate(next);
+
+    const firstAnchor = Math.max(0, segment.segmentIndex - 3);
+    const segmentDirection = segment.direction || 1;
+    const exitOffsets = [0, 24, 32, 48, 64, 96, 128];
+    const exitMainCandidates = exitOffsets.map((offset) => (
+      segment.axis === 'v'
+        ? segment.b.y + segmentDirection * offset
+        : segment.b.x + segmentDirection * offset
+    ));
+    for (let anchorIndex = firstAnchor; anchorIndex < segment.segmentIndex; anchorIndex += 1) {
+      const anchor = path[anchorIndex];
+      if (!anchor) continue;
+      appendCandidate(segment.axis === 'v'
+        ? [
+          ...path.slice(0, anchorIndex + 1),
+          { x: lane, y: anchor.y },
+          { x: lane, y: segment.b.y },
+          ...path.slice(segment.segmentIndex + 2),
+        ]
+        : [
+          ...path.slice(0, anchorIndex + 1),
+          { x: anchor.x, y: lane },
+          { x: segment.b.x, y: lane },
+          ...path.slice(segment.segmentIndex + 2),
+        ]);
+      const exitContinuation = path[segment.segmentIndex + 2];
+      if (!exitContinuation) continue;
+      for (const exitMain of exitMainCandidates) {
+        appendCandidate(segment.axis === 'v'
+          ? [
+            ...path.slice(0, anchorIndex + 1),
+            { x: lane, y: anchor.y },
+            { x: lane, y: exitMain },
+            { x: exitContinuation.x, y: exitMain },
+            ...path.slice(segment.segmentIndex + 3),
+          ]
+          : [
+            ...path.slice(0, anchorIndex + 1),
+            { x: anchor.x, y: lane },
+            { x: exitMain, y: lane },
+            { x: exitMain, y: exitContinuation.y },
+            ...path.slice(segment.segmentIndex + 3),
+          ]);
+      }
+    }
+  });
+
+  for (const candidatePath of buildObstacleSkirtCandidates(path, nodes, edge, allEdges)) {
+    appendCandidate(candidatePath);
+  }
+
+  const obstacles = [...buildDisplayRoutingObstacles(nodes)]
+    .filter(([nodeId]) => nodeId !== edge.source && nodeId !== edge.target)
+    .map(([, rect]) => rect)
+    .sort((first, second) => {
+      const firstDistance = segment.axis === 'v'
+        ? Math.abs((first.x + first.width / 2) - segment.a.x)
+        : Math.abs((first.y + first.height / 2) - segment.a.y);
+      const secondDistance = segment.axis === 'v'
+        ? Math.abs((second.x + second.width / 2) - segment.a.x)
+        : Math.abs((second.y + second.height / 2) - segment.a.y);
+      return firstDistance - secondDistance;
+    })
+    .slice(0, 8);
+  const entry = path[segment.segmentIndex];
+  const suffixStart = segment.segmentIndex + 2;
+  for (const rect of obstacles) {
+    if (segment.axis === 'v') {
+      const laneValues = sortedUniqueNumbers([
+        rect.x - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP,
+        rect.x + rect.width + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP,
+        rect.x - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP * 2,
+        rect.x + rect.width + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP * 2,
+      ], segment.a.x);
+      const bypassValues = sortedUniqueNumbers([
+        rect.y - OBSTACLE_REPAIR_NODE_PADDING - 1,
+        rect.y + rect.height + OBSTACLE_REPAIR_NODE_PADDING + 1,
+        rect.y - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP,
+        rect.y + rect.height + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP,
+      ], segment.b.y);
+      for (const laneX of laneValues.slice(0, 4)) {
+        for (const bypassY of bypassValues.slice(0, 4)) {
+          for (let exitIndex = suffixStart; exitIndex < path.length; exitIndex += 1) {
+            const exit = path[exitIndex];
+            if (!entry || !exit) continue;
+            appendCandidate([
+              ...path.slice(0, segment.segmentIndex),
+              { x: laneX, y: entry.y },
+              { x: laneX, y: bypassY },
+              { x: exit.x, y: bypassY },
+              ...path.slice(exitIndex + 1),
+            ]);
+          }
+        }
+      }
+    } else {
+      const laneValues = sortedUniqueNumbers([
+        rect.y - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP,
+        rect.y + rect.height + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP,
+        rect.y - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP * 2,
+        rect.y + rect.height + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP * 2,
+      ], segment.a.y);
+      const bypassValues = sortedUniqueNumbers([
+        rect.x - OBSTACLE_REPAIR_NODE_PADDING - 1,
+        rect.x + rect.width + OBSTACLE_REPAIR_NODE_PADDING + 1,
+        rect.x - OBSTACLE_REPAIR_NODE_PADDING - RESIDUAL_PARALLEL_LANE_GAP,
+        rect.x + rect.width + OBSTACLE_REPAIR_NODE_PADDING + RESIDUAL_PARALLEL_LANE_GAP,
+      ], segment.b.x);
+      for (const laneY of laneValues.slice(0, 4)) {
+        for (const bypassX of bypassValues.slice(0, 4)) {
+          for (let exitIndex = suffixStart; exitIndex < path.length; exitIndex += 1) {
+            const exit = path[exitIndex];
+            if (!entry || !exit) continue;
+            appendCandidate([
+              ...path.slice(0, segment.segmentIndex),
+              { x: entry.x, y: laneY },
+              { x: bypassX, y: laneY },
+              { x: bypassX, y: exit.y },
+              ...path.slice(exitIndex + 1),
+            ]);
+          }
+        }
+      }
+    }
+  }
+
+  const seen = new Set<string>();
+  return candidatePaths.filter((candidate) => {
+    const key = candidateSignature(candidate);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};

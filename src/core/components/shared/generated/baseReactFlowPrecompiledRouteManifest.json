@@ -1,15 +1,15 @@
 {
   "schema": "vizly-precompiled-display-route-manifest-v1",
-  "routingVersion": "2026-07-14-terminal-policy-provenance-v118",
-  "identitySourceHash": "source-v1:2c4254a41e2e9025bba0d61dd66047d2ba32460f677808cd82c0bfad38c06fb2",
+  "routingVersion": "2026-07-20-measured-terminal-hard-gates-v119",
+  "identitySourceHash": "source-v1:f57ef87c4a6951afd03a876fb8ebdf5ddd9fd9308fdf915cc97e9c19f894d167",
   "entries": [
     {
       "sourcePath": "src/data/standardized/WmsProcessFlowStandardData.json",
-      "artifactFile": "route-2483073042.json",
+      "artifactFile": "route-466341211.json",
       "sourceHash": "source-v1:25907dec641afd53490cc910f19fbdadcd0c93b30d443e340272528f92f9ff42",
-      "inputSignature": "2483073042",
-      "inputGeometryDigest": "geometry-v1:980d6b2eec099102bcf5ef7c981b442e",
-      "outputRouteSignature": "route-v2:44:208:c245f0d5d0caa25f"
+      "inputSignature": "466341211",
+      "inputGeometryDigest": "geometry-v1:2980b043263f5e7f026de5a511095fdb",
+      "outputRouteSignature": "route-v2:44:207:3034ddf129502aeb"
     }
   ]
 }

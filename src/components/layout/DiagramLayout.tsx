@@ -6,7 +6,7 @@ import type { TopToolbarProps } from '../ui/TopToolbar';
 import ModernDiagramMenu from '../ModernDiagramMenu';
 import { ModernFlowchartSidebar } from '@/core/components/diagrams/ModernFlowchartSidebar';
 import type { DiagramDefinition } from '@/core/types/diagram-components';
-import { diagramConfigManager } from '@/core/components/config/DiagramConfig';
+import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import {
   readDesignerRightSidebarVisible,
   readDesignerRightSidebarWidth,

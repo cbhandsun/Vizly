@@ -29,7 +29,7 @@ export interface UseEdgePropertyItemsParams {
     selectLabel: string;
     localEdgeLabel: string;
     setLocalEdgeLabel: (v: string) => void;
-    debouncedUpdateEdgeLabel: (value: string) => void;
+    debouncedUpdateEdgeLabel: ((value: string) => void) & { cancel?: () => void };
     onColorChange: (color: Color, field: string) => void;
 }
 
@@ -89,7 +89,7 @@ export function useEdgePropertyItems(params: UseEdgePropertyItemsParams): Collap
                 <Form.Item label={t('propertyPanel.label')}>
                     <Input value={localEdgeLabel}
                         onChange={e => { setLocalEdgeLabel(e.target.value); debouncedUpdateEdgeLabel(e.target.value); }}
-                        onBlur={() => { (debouncedUpdateEdgeLabel as any).cancel?.(); updateEdges({ label: localEdgeLabel, data: { label: localEdgeLabel } }); }}
+                        onBlur={() => { debouncedUpdateEdgeLabel.cancel?.(); updateEdges({ label: localEdgeLabel, data: { label: localEdgeLabel } }); }}
                         onFocus={armSnapshot}
                         placeholder={edgeCount > 1 && commonEdgeLabel === undefined ? mixedLabel : selectLabel}
                         allowClear disabled={disabled} />

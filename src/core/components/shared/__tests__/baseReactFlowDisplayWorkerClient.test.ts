@@ -1,9 +1,12 @@
+// @vitest-environment jsdom
+
 import type { Edge } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   computeBaseReactFlowDisplayEdgesInWorker,
   createBaseReactFlowDisplayEdgePatches,
   doesBaseReactFlowDisplayWorkerResolutionMatchOperation,
+  disposeBaseReactFlowDisplayWorker,
   mergeBaseReactFlowDisplayEdgePatches,
   mergeBaseReactFlowDisplayRoutingTransactions,
   prewarmBaseReactFlowDisplayWorker,
@@ -20,6 +23,7 @@ type WorkerHarnessRequest = {
   operation: 'route' | 'repair' | 'validate-or-route';
   requestId: string;
   candidateEdges?: Array<Record<string, unknown>> | null;
+  candidatePatches?: Array<Record<string, unknown>> | null;
 };
 
 const installWorkerHarness = (
@@ -207,6 +211,24 @@ describe('baseReactFlowDisplayWorkerClient', () => {
       expect(harness.getWorkerCount()).toBe(2);
     },
   );
+
+  it('disposes an idle prewarmed worker and detaches its health listeners', () => {
+    const harness = installWorkerHarness(() => {});
+    const workerRef = { current: null };
+
+    expect(prewarmBaseReactFlowDisplayWorker(workerRef)).toBe(true);
+    expect(harness.getLatestListenerCount('error')).toBe(1);
+    expect(harness.getLatestListenerCount('messageerror')).toBe(1);
+
+    disposeBaseReactFlowDisplayWorker(workerRef);
+
+    expect(harness.terminate).toHaveBeenCalledOnce();
+    expect(workerRef.current).toBeNull();
+    expect(harness.getLatestListenerCount('error')).toBe(0);
+    expect(harness.getLatestListenerCount('messageerror')).toBe(0);
+    disposeBaseReactFlowDisplayWorker(workerRef);
+    expect(harness.terminate).toHaveBeenCalledOnce();
+  });
 
   it('fails prewarm closed when the worker constructor is blocked', () => {
     class BlockedWorker {

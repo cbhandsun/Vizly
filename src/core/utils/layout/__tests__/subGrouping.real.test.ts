@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => {
@@ -10,7 +12,7 @@ vi.hoisted(() => {
   });
 });
 
-vi.mock('../../../components/config/DiagramConfig', () => ({
+vi.mock('../../../config/DiagramConfig', () => ({
   diagramConfigManager: {
     getLayoutConfig: () => ({
       SUB_GROUP_PADDING: { H: 20, V_TOP: 30, V_BOTTOM: 40 },

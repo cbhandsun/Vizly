@@ -127,10 +127,10 @@ export const useTemplates = () => {
      */
     const saveAsTemplate = useCallback((
         options: SaveTemplateOptions,
-        nodes: any[],
-        edges: any[],
+        nodes: unknown[],
+        edges: unknown[],
         viewport?: { x: number; y: number; zoom: number },
-        config?: any
+        config?: DiagramTemplate['config']
     ): DiagramTemplate | null => {
         // 检查数量限制
         if (customTemplates.length >= MAX_CUSTOM_TEMPLATES) {

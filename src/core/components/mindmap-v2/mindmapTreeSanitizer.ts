@@ -1,4 +1,4 @@
-import type { NodeObj } from 'mind-elixir';
+import type { MindElixirData, MindElixirInstance, NodeObj } from 'mind-elixir';
 import { toSafeExternalUrl, toSafeImageUrl } from '../../utils/sanitizeHtml';
 
 export const MINDMAP_MAX_NODES = 500;
@@ -19,6 +19,17 @@ const MAX_IMAGE_DIMENSION = 2048;
 interface CleanContext {
     count: number;
 }
+
+type VizlyNodeObj = NodeObj & {
+    branchColor?: string;
+    branchWidth?: number;
+    boundary?: { color: string; title: string };
+    shapeClass?: string;
+};
+
+export type SanitizedMindMapData = Omit<MindElixirData, 'direction'> & {
+    direction?: 0 | 1 | 2 | 3;
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
     Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -147,7 +158,7 @@ export function cleanAndValidateTree(
     const input = isRecord(node) ? node : {};
     const id = makeNodeId(input.id, isRoot);
     const children = Array.isArray(input.children) ? input.children : [];
-    const clean: NodeObj = {
+    const clean: VizlyNodeObj = {
         id,
         topic: cleanMindMapTopic(input.topic),
         expanded: isRoot ? true : (input.expanded !== false),
@@ -184,12 +195,23 @@ export function cleanAndValidateTree(
     return clean;
 }
 
-export const cleanMindMapData = (value: unknown): { nodeData: NodeObj; direction?: number } => {
+export const cleanMindMapData = (value: unknown): SanitizedMindMapData => {
     const record = isRecord(value) ? value : {};
     const rawNode = record.nodeData ?? value;
     const cleaned = cleanAndValidateTree(rawNode, true);
     const direction = typeof record.direction === 'number' && Number.isFinite(record.direction)
-        ? Math.max(0, Math.min(3, Math.trunc(record.direction)))
+        ? Math.max(0, Math.min(3, Math.trunc(record.direction))) as 0 | 1 | 2 | 3
         : undefined;
     return direction === undefined ? { nodeData: cleaned } : { nodeData: cleaned, direction };
+};
+
+/**
+ * Mind Elixir exposes LEFT=3 at runtime, while its current MindElixirData
+ * declaration only lists 0..2. Keep the compatibility cast at this adapter.
+ */
+export const refreshMindElixirWithSanitizedData = (
+    mind: MindElixirInstance,
+    data: SanitizedMindMapData,
+): void => {
+    mind.refresh(data as MindElixirData);
 };

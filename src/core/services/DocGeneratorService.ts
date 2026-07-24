@@ -1,5 +1,5 @@
 import { Node, Edge } from '@xyflow/react';
-import { analyzeDiagram } from '../../utils/diagramAnalyzer';
+import { analyzeDiagram, type AnalysisEdge, type AnalysisNode } from '../../utils/diagramAnalyzer';
 import i18n from '@/i18n';
 
 export interface DocGenOptions {
@@ -37,7 +37,10 @@ export class DocGeneratorService {
         md += i18n.t('services.docGen.overviewDesc', { nodeCount: leafNodes.length, containerCount: containers.length }) + '\n\n';
 
         if (includeAnalysis) {
-            const analysis = analyzeDiagram(nodes as any, edges as any);
+            const analysis = analyzeDiagram(
+                nodes as unknown as AnalysisNode[],
+                edges as unknown as AnalysisEdge[],
+            );
             md += `### ${i18n.t('services.docGen.healthSummary')}\n\n`;
             md += analysis.summary.split('\n').map(line => `- ${line}`).join('\n') + '\n\n';
             
@@ -85,7 +88,7 @@ export class DocGeneratorService {
                 md += `| :--- | :--- | :--- | :--- |\n`;
                 domainNodes.forEach(n => {
                     const label = n.data?.label || n.id;
-                    const desc = (n.data?.description || 'No description provided').replace(/\n/g, '<br/>');
+                    const desc = String(n.data?.description || 'No description provided').replace(/\n/g, '<br/>');
                     const type = n.data?.type || n.type || 'Generic';
                     const status = n.data?.status || 'normal';
                     md += `| **${label}** | ${desc} | \`${type}\` | ${status} |\n`;

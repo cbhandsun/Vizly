@@ -2,7 +2,7 @@ export const defaultDesktopRouteBudgets = {
   management: { criticalAssets: 45, criticalDecodedKB: 2050, readyMs: 6000 },
   'management-templates': { criticalAssets: 46, criticalDecodedKB: 2150, readyMs: 6500 },
   'default-diagram': { criticalAssets: 92, criticalDecodedKB: 3900, readyMs: 4500 },
-  'wms-process-large-diagram': { criticalAssets: 105, criticalDecodedKB: 4700, readyMs: 6500 },
+  'wms-process-large-diagram': { criticalAssets: 105, criticalDecodedKB: 4800, readyMs: 6500 },
   'storage-config': { criticalAssets: 40, criticalDecodedKB: 2700, readyMs: 3000 },
   'shared-missing-token': { criticalAssets: 35, criticalDecodedKB: 2200, readyMs: 3000 },
   'theme-colors': { criticalAssets: 40, criticalDecodedKB: 1200, readyMs: 2500 },

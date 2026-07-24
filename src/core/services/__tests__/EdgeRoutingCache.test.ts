@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { EdgeRoutingCache } from '../EdgeRoutingCache';
-import type { PathFindingResult } from '../../../types/routing';
+import type { PathFindingResult } from '../../types/routing';
 
 const makeResult = (edgeId: string): PathFindingResult => ({
     jobId: edgeId,

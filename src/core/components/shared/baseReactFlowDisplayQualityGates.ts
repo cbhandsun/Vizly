@@ -20,6 +20,10 @@ import {
   type DisplayTerminalValidationSnapshot,
 } from './baseReactFlowTerminalAxisRepair';
 
+type DisplayEpochNode = Node & {
+  positionAbsolute?: { x: number; y: number };
+};
+
 const evaluateDisplayTerminalHardGates = (
   edges: Edge[],
   nodes: Node[],
@@ -36,8 +40,10 @@ const evaluateDisplayTerminalHardGates = (
     return terminalReport.allAnchored
       && edges.every((edge) => {
         const path = getDisplayComputedPath(edge);
-        const sourceRect = getDisplayNodeRect(nodeById.get(edge.source));
-        const targetRect = getDisplayNodeRect(nodeById.get(edge.target));
+        const sourceNode = nodeById.get(edge.source);
+        const targetNode = nodeById.get(edge.target);
+        const sourceRect = sourceNode ? getDisplayNodeRect(sourceNode) : null;
+        const targetRect = targetNode ? getDisplayNodeRect(targetNode) : null;
         return Boolean(
           sourceRect
           && targetRect
@@ -100,13 +106,14 @@ export const computeBaseReactFlowDisplayEdgeEpoch = ({
 
   feed(BASE_DISPLAY_ROUTING_VERSION);
   nodes.forEach((node) => {
-    const pos = (node as any)?.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-    const measured = (node as any).measured;
+    const displayNode = node as DisplayEpochNode;
+    const pos = displayNode.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
+    const measured = node.measured;
     feed(node.id);
     feed(Math.round(Number(pos.x || 0)));
     feed(Math.round(Number(pos.y || 0)));
-    feed(Math.round(Number(measured?.width ?? node.width ?? (node.style as any)?.width ?? 0)));
-    feed(Math.round(Number(measured?.height ?? node.height ?? (node.style as any)?.height ?? 0)));
+    feed(Math.round(Number(measured?.width ?? node.width ?? node.style?.width ?? 0)));
+    feed(Math.round(Number(measured?.height ?? node.height ?? node.style?.height ?? 0)));
   });
 
   edges.forEach((edge) => {

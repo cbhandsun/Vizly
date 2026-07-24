@@ -33,8 +33,8 @@ function areSmartEdgePropsEqual(prev: EdgeProps, next: EdgeProps) {
     }
 
     // 2. Comparison of Data
-    const prevData = prev.data as Record<string, any> | undefined;
-    const nextData = next.data as Record<string, any> | undefined;
+    const prevData = prev.data as Record<string, unknown> | undefined;
+    const nextData = next.data as Record<string, unknown> | undefined;
 
     if (prevData === nextData) return true;
     if (!prevData || !nextData) return false;

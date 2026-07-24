@@ -20,9 +20,14 @@ import {
 } from './geometryUtils';
 import { SpatialIndex } from './SpatialIndex';
 
-function isSpatialIndex(obs: any): obs is SpatialIndex {
-    return obs && typeof (obs as SpatialIndex).query === 'function';
+function isSpatialIndex(obs: unknown): obs is SpatialIndex {
+    return typeof obs === 'object' && obs !== null && typeof (obs as SpatialIndex).query === 'function';
 }
+
+const rectanglePadding = (rect: Rectangle, fallback: number): number => {
+    const value = (rect as Rectangle & { padding?: unknown }).padding;
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+};
 
 /**
  * 可见性图数据结构
@@ -63,7 +68,7 @@ export function buildVisibilityGraph(
     const vertexToObstacle = new Map<number, number>();
 
     obstacleList.forEach((rect, obstacleIdx) => {
-        const dynamicPadding = (rect as any).padding ?? obstacleOffset;
+        const dynamicPadding = rectanglePadding(rect, obstacleOffset);
         const expandedRect = {
             x: rect.x - dynamicPadding,
             y: rect.y - dynamicPadding,
@@ -171,7 +176,7 @@ export function isVisible(
 
     for (const obstacle of potentialObstacles) {
         // [FIX] Read padding from obstacle, defaulting to the passed tolerance/offset
-        const dynamicPadding = (obstacle as any).padding ?? tolerance;
+        const dynamicPadding = rectanglePadding(obstacle, tolerance);
         
         const expandedObstacle = {
             x: obstacle.x - dynamicPadding,
@@ -376,10 +381,14 @@ export function findPathOnVisibilityGraph(
     prebuiltGraph?: VisibilityGraph,
     options: { obstacleOffset?: number, lineObstacles?: LineSegment[] } = {}
 ): Point[] | null {
-    // 1. 快速检查：起终点直接可见
-    // FIXME: We don't check lineObstacles for direct visibility here to keep it fast.
-    // If it's a direct shot, we allow it.
-    if (isVisible(start, end, obstacles)) {
+    // 1. 快速检查：起终点直接可见且不会穿越已有连线。
+    // lineObstacles are a soft cost in A*, so a crossing direct segment must enter
+    // the graph search instead of bypassing the crossing penalty entirely.
+    const directSegment: LineSegment = { start, end };
+    const directCrossesExistingLine = options.lineObstacles?.some(line => (
+        lineSegmentsIntersect(directSegment, line, false)
+    )) ?? false;
+    if (isVisible(start, end, obstacles) && !directCrossesExistingLine) {
         return [start, end];
     }
 
@@ -389,7 +398,9 @@ export function findPathOnVisibilityGraph(
         // 复用已有图（浅拷贝，避免修改原图）
         graph = {
             vertices: [...prebuiltGraph.vertices],
-            edges: new Map(prebuiltGraph.edges),
+            edges: new Map(
+                Array.from(prebuiltGraph.edges, ([vertex, neighbors]) => [vertex, [...neighbors]])
+            ),
             edgeCosts: new Map(prebuiltGraph.edgeCosts),
             vertexToObstacle: new Map(prebuiltGraph.vertexToObstacle)
         };
@@ -457,7 +468,7 @@ function isLocalTangent(p1: Point, p2: Point, rect: Rectangle, padding: number):
         y: p1.y + (dy / len) * smallStep
     };
 
-    const dynamicPadding = (rect as any).padding ?? padding;
+    const dynamicPadding = rectanglePadding(rect, padding);
     const rx = rect.x - dynamicPadding;
     const ry = rect.y - dynamicPadding;
     const rw = rect.width + dynamicPadding * 2;

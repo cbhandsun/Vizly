@@ -193,7 +193,7 @@ export function useFlowchartNodeInteractions(id: string, data: FlowchartNodeData
                     ...(srcData.style && { style: srcData.style }),
                     ...(srcData.textAlign && { textAlign: srcData.textAlign }),
                     isEditing: true,
-                    layer: (srcData as any).layer || 'layer-0',
+                    layer: srcData.layer || 'layer-0',
                 },
                 selected: true,
             };

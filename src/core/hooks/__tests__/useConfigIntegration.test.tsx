@@ -23,7 +23,7 @@ vi.mock('../../config/ConfigIntegration', () => ({
   ConfigIntegration: class {},
 }));
 
-vi.mock('../../components/config/DiagramConfig', () => ({
+vi.mock('../../config/DiagramConfig', () => ({
   diagramConfigManager: {},
 }));
 

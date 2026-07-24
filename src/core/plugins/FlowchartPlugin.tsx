@@ -20,32 +20,42 @@ import { BaseDiagramPlugin } from '../sdk/BasePlugin';
 const { Text } = Typography;
 type NodeConfig = Record<string, unknown>;
 
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    Boolean(value && typeof value === 'object' && !Array.isArray(value))
+);
+
+const optionalString = (value: unknown): string | undefined => (
+    typeof value === 'string' ? value : undefined
+);
+
 export class FlowchartPlugin extends BaseDiagramPlugin implements DiagramTypePlugin {
     id = 'flowchart';
     name = '通用画布';
     version = '1.1.0';
     description = 'Vizly 的核心画布引擎，支持自由布局、智能连线与全量基础形状。适用于大多数通用绘图场景。';
     author = 'Vizly Core';
-    category = 'Core';
+    category = 'Core' as const;
     tags = ['General', 'Flowchart', 'Base'];
     brandColor = '#1890ff';
 
-    async migrate(data: any, fromVersion: string | undefined): Promise<any> {
+    async migrate<T>(data: T, fromVersion: string | undefined): Promise<T> {
         const migratedData = await super.migrate(data, fromVersion);
-        
-        if (!fromVersion || fromVersion === '1.0') {
-            if (Array.isArray(migratedData.nodes)) {
-                migratedData.nodes = migratedData.nodes.map((n: any) => {
-                    const metadata = n.metadata || {};
+
+        if ((!fromVersion || fromVersion === '1.0') && isRecord(migratedData) && Array.isArray(migratedData.nodes)) {
+            return {
+                ...migratedData,
+                nodes: migratedData.nodes.map((node) => {
+                    if (!isRecord(node)) return node;
+                    const metadata = isRecord(node.metadata) ? node.metadata : {};
                     return {
-                        ...n,
+                        ...node,
                         metadata: {
                             ...metadata,
-                            shape: metadata.shape || 'rectangle'
-                        }
+                            shape: optionalString(metadata.shape) || 'rectangle',
+                        },
                     };
-                });
-            }
+                }),
+            } as T;
         }
         return migratedData;
     }
@@ -71,7 +81,7 @@ export class FlowchartPlugin extends BaseDiagramPlugin implements DiagramTypePlu
         ];
     }
 
-    createNodeData(type: string): Record<string, any> {
+    createNodeData(type: string): Record<string, unknown> {
         const CATEGORY_COLORS: Record<string, { main: string; border: string; text: string }> = {
             default:    { main: '#4A90D9', border: '#3A78C2', text: '#fff' },
             decision:   { main: '#F0B429', border: '#D9A21E', text: '#333' },
@@ -168,8 +178,9 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
             const ctxCanvas = canvas.getContext('2d');
             if (ctxCanvas) {
                 ctxCanvas.scale(dpr, dpr);
-                const themeColor = (config as any)?.theme?.main || '#3b82f6';
-                const shape = (config as any)?.shape || 'rectangle';
+                const theme = isRecord(config.theme) ? config.theme : {};
+                const themeColor = optionalString(theme.main) || '#3b82f6';
+                const shape = optionalString(config.shape) || 'rectangle';
 
                 const hexToRgba = (hex: string, alpha: number) => {
                     const c = hex.replace('#', '');
@@ -262,7 +273,7 @@ export const FlowchartShapesPanel: React.FC<{ ctx: PluginContext }> = ({ ctx }) 
                 };
                 drawShape();
 
-                const textColor = (config as any)?.theme?.text || '#fff';
+                const textColor = optionalString(theme.text) || '#fff';
                 ctxCanvas.fillStyle = themeColor;
                 ctxCanvas.globalAlpha = 0.9;
                 ctxCanvas.font = `bold 12px Inter, system-ui, sans-serif`;

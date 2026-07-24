@@ -3,20 +3,14 @@ import {
   logRemoteDiagramPreviewInvalidationFailure,
 } from './remoteDiagramPreviewLogging';
 
-let unifiedStorageModulePromise: Promise<typeof import('@/services/UnifiedStorageService')> | null = null;
-
-const loadUnifiedStorage = async () => {
-  unifiedStorageModulePromise ??= import('@/services/UnifiedStorageService');
-  const { unifiedStorage } = await unifiedStorageModulePromise;
-  return unifiedStorage;
-};
-
 export type RemoteDiagramPreview = {
   mime: string;
   dataUrl: string;
   width: number;
   height: number;
 };
+
+export type LoadRemoteDiagramPreviewSource = (storageId: string) => Promise<unknown>;
 
 const MAX_STORAGE_ID_LENGTH = 512;
 const MAX_PREVIEW_DATA_URL_CHARS = 4 * 1024 * 1024;
@@ -70,7 +64,10 @@ export const invalidateRemoteDiagramPreview = (storageId: string) => {
   }
 };
 
-export const fetchRemoteDiagramPreview = async (storageId: string): Promise<RemoteDiagramPreview | null> => {
+export const fetchRemoteDiagramPreview = async (
+  storageId: string,
+  loadDiagram: LoadRemoteDiagramPreviewSource,
+): Promise<RemoteDiagramPreview | null> => {
   const key = normalizeRemoteDiagramStorageId(storageId);
   if (!key) return null;
   if (cache.has(key)) return cache.get(key) ?? null;
@@ -79,8 +76,7 @@ export const fetchRemoteDiagramPreview = async (storageId: string): Promise<Remo
 
   const p = (async () => {
     try {
-      const unifiedStorage = await loadUnifiedStorage();
-      const saved = await unifiedStorage.loadDiagram(key);
+      const saved = await loadDiagram(key);
       const preview = coerceRemoteDiagramPreview((saved as { content?: { metadata?: { preview?: unknown } } } | null)?.content?.metadata?.preview);
       cache.set(key, preview);
       return preview;

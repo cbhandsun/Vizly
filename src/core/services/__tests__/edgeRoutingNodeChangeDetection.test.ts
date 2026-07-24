@@ -1,11 +1,25 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    coerceEdgeRoutingSnapshotNodes,
     detectChangedEdgeRoutingNodes,
     EDGE_ROUTING_NODE_MOVE_THRESHOLD,
 } from '../edgeRoutingNodeChangeDetection';
 
 describe('edgeRoutingNodeChangeDetection', () => {
+    it('coerces runtime node records and drops invalid identities and coordinates', () => {
+        expect(coerceEdgeRoutingSnapshotNodes([
+            null,
+            { id: '' },
+            { id: 42, position: { x: 1, y: 2 } },
+            { id: 'valid', position: { x: 10, y: Number.POSITIVE_INFINITY } },
+            { id: 'absolute', computed: { positionAbsolute: { x: 30, y: 40 } } },
+        ])).toEqual([
+            { id: 'valid', position: { x: 10, y: undefined } },
+            { id: 'absolute', computed: { positionAbsolute: { x: 30, y: 40 } } },
+        ]);
+    });
+
     it('marks new nodes as changed and stores their positions', () => {
         const snapshot = new Map<string, { x: number; y: number }>();
 

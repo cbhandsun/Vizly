@@ -1,37 +1,43 @@
 import React from 'react';
 import { ConnectionMode, Node, SelectionMode } from '@xyflow/react';
 
-import { LiveCursors } from '../../../components/diagrams/collaboration/LiveCursors';
+import { LiveCursors } from './collaboration/LiveCursors';
 import { appMessage } from '@/core/utils/antdStaticBridge';
 import { LayoutStabilityContext } from '../../context/LayoutStabilityContext';
-import { PluginContext } from '../../types/plugin';
 import { diffDiagrams } from '../../utils/diagramDiff';
 import { dispatchDiagramControl } from '../shared/diagramControl';
 import { GestureOverlay } from '../shared/GestureOverlay';
-import { MobileBottomDock } from '../layout/MobileBottomDock';
 import { CanvasRuler, RulerCorner } from './CanvasRuler';
 import { ContextMenuLayer } from './ContextMenuLayer';
 import { DesignerCanvasFeaturesLayer } from './ui/DesignerCanvasFeaturesLayer';
 import { DesignerHeaderLayer } from './ui/DesignerHeaderLayer';
-import { DesignerOverlaysLayer } from './ui/DesignerOverlaysLayer';
-import { DesignerRightSidebar } from './DesignerRightSidebar';
 import { FlowchartCanvasShell } from './FlowchartCanvasShell';
 import { FlowchartEmptyState } from './FlowchartEmptyState';
 import { FlowchartOnboardingHint } from './FlowchartOnboardingHint';
 import { FreehandDrawingLayer } from './FreehandDrawingLayer';
-import { IconRailSidebar } from './IconRailSidebar';
-import { LaserPointer } from './LaserPointer';
 import { RemoteCursors } from './ui/RemoteCursors';
 import { UnifiedDesignerShell } from './UnifiedDesignerShell';
 import { generateSlides } from '../../hooks/usePresentationSlides';
 import { persistFlowchartOnboardingDismissed } from './flowchartOnboardingStorage';
+import {
+    resolveFlowchartPluginContribution,
+    type FlowchartDesignerViewModel,
+} from './flowchartDesignerViewModel';
+import {
+    FlowchartDesignerLeftSidebar,
+    FlowchartDesignerOverlaysRegion,
+    FlowchartDesignerRightSidebarRegion,
+} from './FlowchartDesignerShellRegions';
 
-const VersionHistoryPanel = React.lazy(() => import('../../../components/diagrams/ui/VersionHistoryPanel').then(m => ({ default: m.VersionHistoryPanel })));
-
-export type FlowchartDesignerViewModel = Record<string, any>;
+export type { FlowchartDesignerViewModel } from './flowchartDesignerViewModel';
 
 interface FlowchartDesignerViewProps {
     model: FlowchartDesignerViewModel;
+}
+
+interface NodePositionUpdate {
+    id: string;
+    position: { x: number; y: number };
 }
 
 /**
@@ -41,7 +47,6 @@ interface FlowchartDesignerViewProps {
 export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
     const {
         ANNOTATION_COLORS,
-        activeLayerId,
         activePlugin,
         activeRightTab,
         activeUsers,
@@ -55,17 +60,11 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         canvasBg,
         canvasSearchVisible,
         closeMenu,
-        commandPaletteItems,
-        commandPaletteVisible,
         connectPreview,
         copyStyle,
-        createLayer,
         currentZoom,
         deleteAnnotation,
-        deleteLayer,
-        deleteTemplate,
         diagramIdForExport,
-        diffResult,
         dynamicEdgeTypes,
         dynamicNodeTypes,
         edges,
@@ -83,14 +82,12 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         getReactFlowSnapshot,
         gridColor,
         gridVariant,
-        groupedTemplates,
         guides,
         handleAddMindMap,
         handleAddNode,
         handleAddStickyNote,
         handleAlign,
         handleBeforeReplace,
-        handleBeforeUpdate,
         handleBringToFront,
         handleContextMenuAction,
         handleDeleteWithToast,
@@ -100,7 +97,6 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         handleExport,
         handleExportMermaid,
         handleFitView,
-        handleFocusNode,
         handleGridRotate,
         handleImport,
         handleLock,
@@ -108,7 +104,6 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         handleOpenJsonEditor,
         handleOpenSettings,
         handlePaneClick,
-        handlePresentationFocus,
         handleReactFlowInit,
         handleReadonlyChange,
         handleReconnect,
@@ -123,7 +118,6 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         handleToggleShowOnlyMainFlow,
         handleTouchEnd,
         handleTouchStart,
-        handleUseTemplate,
         handleWrappedCloudSave,
         handleWrappedDirectSave,
         hasCopiedStyle,
@@ -135,31 +129,24 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         isContextToolbarHidden,
         isDirectSaveDisabled,
         isDragging,
-        isDraggingNode,
         isDrawingMode,
         isInitialDiagramLoading,
         isLayoutStable,
         isMarqueeActive,
-        isMobile,
         isReadonly,
         isSidebarHidden,
         isSpacePressed,
         isValidConnection,
-        isVersionHistoryOpen,
         isYjsSynced,
-        jsonEditorInitialContent,
         jsonEditorVisible,
         jumpTo,
-        laserEnabled,
         lastDomainDirection,
         lastDomainStrategy,
         lastNodeLayout,
         layerSyncedNodes,
-        layers,
         leftDrawerOpen,
         leftDrawerWidth,
         messageContextHolder,
-        mobilePropertyDrawerVisible,
         multiPage,
         nodes,
         nodesRef,
@@ -183,7 +170,6 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         onPaneMouseLeave,
         onPaneMouseMove,
         onSelectionChange,
-        onVersionHistoryClose,
         onboardingDismissed,
         pastEntries,
         pasteStyle,
@@ -191,74 +177,48 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
         pluginCtx,
         pluginId,
         pluginManagerVisible,
-        presentationActive,
-        presentationSlides,
         preset,
         quickAddMenu,
         reactFlowInstance,
         reactFlowWrapper,
         redo,
-        renameLayer,
-        renameTemplate,
-        renderAIChatPanel,
-        renderAIConfigModal,
-        renderShareDialog,
         renderThemeSelector,
-        reorderLayers,
         rightSidebarWidth,
-        saveState,
         selectedEdges,
         selectedNodes,
-        setActiveLayerId,
         setActiveRightTab,
         setAiChatVisible,
         setAutoRoutingEnabled,
         setCanvasSearchVisible,
         setCommandPaletteVisible,
         setDiffResult,
-        setEdges,
         setExportModalVisible,
         setHighlightedNodeId,
         setHistoryPanelVisible,
         setIsCommentMode,
         setIsDrawingMode,
         setIsMarqueeActive,
-        setJsonEditorVisible,
-        setLayerColor,
-        setLeftDrawerOpen,
-        setLeftDrawerWidth,
-        setMobileAddDrawerVisible,
-        setMobilePropertyDrawerVisible,
         setNodes,
         setOnboardingDismissed,
         setPluginManagerVisible,
         setPresentationActive,
         setPresentationSlides,
         setQuickConnectPreview,
-        setRightSidebarWidth,
-        setShortcutHelpVisible,
         setShowMinimap,
         setShowRuler,
         setShowShortcuts,
-        setShowShortcutsModal,
         setSnapEnabled,
-        shortcutHelpVisible,
         showAiCrown,
         showGrid,
         showMinimap,
         showOnlyMainFlow,
         showOverlay,
-        showPerformanceDashboard,
         showRuler,
-        showShortcuts,
         snapEnabled,
         t,
         takeSnapshot,
-        templates,
         theme,
-        toggleLock,
         toggleResolved,
-        toggleVisibility,
         topActionArea,
         undo,
         updateAnnotation,
@@ -294,37 +254,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                     title={t('designer.toolbar.import')}
                 />
             }
-            leftSidebar={
-                (() => {
-                    const pluginPanels = (activePlugin?.contributeSidebarPanels && pluginCtx) ? activePlugin.contributeSidebarPanels(pluginCtx) : [];
-                    if (isSidebarHidden || activePlugin?.hideDefaultSidebar) return null;
-                    return (
-                        <IconRailSidebar
-                            nodes={nodes}
-                            onFocusNode={(node: Node) => handleFocusNode(node.id)}
-                            layers={layers}
-                            activeLayerId={activeLayerId}
-                            onSetActiveLayer={setActiveLayerId}
-                            onToggleLayerVisibility={toggleVisibility}
-                            onToggleLayerLock={toggleLock}
-                            onRenameLayer={renameLayer}
-                            onCreateLayer={createLayer}
-                            onDeleteLayer={deleteLayer}
-                            onReorderLayers={reorderLayers}
-                            onSetLayerColor={setLayerColor}
-                            templates={templates}
-                            groupedTemplates={groupedTemplates}
-                            onUseTemplate={handleUseTemplate}
-                            onDeleteTemplate={deleteTemplate}
-                            onRenameTemplate={renameTemplate}
-                            onDrawerVisibleChange={setLeftDrawerOpen}
-                            onDrawerWidthChange={setLeftDrawerWidth}
-                            pluginPanels={pluginPanels}
-                            isMobile={isMobile}
-                        />
-                    );
-                })()
-            }
+            leftSidebar={<FlowchartDesignerLeftSidebar model={model} />}
             canvasArea={
                 <>
                     {showRuler && (
@@ -420,10 +350,13 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                 setPluginManagerVisible,
                                 isCommentMode,
                                 setIsCommentMode,
-                                pluginToolbar: (() => {
-                                    if (!pluginCtx || !activePlugin) return null;
-                                    return activePlugin?.contributeToolbar ? activePlugin.contributeToolbar(pluginCtx) : null;
-                                })(),
+                                pluginToolbar: resolveFlowchartPluginContribution(
+                                    'toolbar',
+                                    pluginCtx && activePlugin?.contributeToolbar
+                                        ? () => activePlugin.contributeToolbar(pluginCtx)
+                                        : null,
+                                    null,
+                                ),
                             }}
                             toolbar={{
                                 canUndo,
@@ -519,7 +452,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                     onConnectStart={onConnectStart}
                                     onConnectEnd={enhancedOnConnectEnd}
                                     onSelectionChange={onSelectionChange}
-                                    onPaneClick={() => handlePaneClick({ clientX: 0, clientY: 0 } as any)}
+                                    onPaneClick={handlePaneClick}
                                     onPaneMouseMove={onPaneMouseMove}
                                     onPaneMouseLeave={onPaneMouseLeave}
                                     onPaneDoubleClick={onPaneDoubleClick}
@@ -568,11 +501,11 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                             isConnecting,
                                             updateNodesBatch,
                                             updateEdgesBatch,
-                                            onUpdateNodes: (updates: any[]) => {
+                                            onUpdateNodes: (updates: NodePositionUpdate[]) => {
                                                 takeSnapshot(nodesRef.current, edgesRef.current);
-                                                const updatesMap = new Map(updates.map((update: any) => [update.id, update]));
+                                                const updatesMap = new Map(updates.map(update => [update.id, update]));
                                                 setNodes((currentNodes: Node[]) => currentNodes.map((node) => {
-                                                    const update = updatesMap.get(node.id) as any;
+                                                    const update = updatesMap.get(node.id);
                                                     return (update && update.position) ? { ...node, position: update.position } : node;
                                                 }));
                                             },
@@ -590,7 +523,7 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                         annotations={{
                                             items: annotations,
                                             mode: annotationMode,
-                                            onAdd: (annotation: any) => addAnnotation(annotation.x, annotation.y, annotation.label || annotation.text),
+                                            onAdd: addAnnotation,
                                             onUpdate: updateAnnotation,
                                             onDelete: deleteAnnotation,
                                             onToggleResolved: toggleResolved,
@@ -631,10 +564,13 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                                         pan={{ x: viewport.x, y: viewport.y }}
                                         currentColor={preset.name === 'sketch' ? '#555555' : '#000000'}
                                     />
-                                    {(() => {
-                                        if (!pluginCtx || !activePlugin) return null;
-                                        return activePlugin?.contributeCanvasComponents ? activePlugin.contributeCanvasComponents(pluginCtx) : null;
-                                    })()}
+                                    {resolveFlowchartPluginContribution(
+                                        'canvas',
+                                        pluginCtx && activePlugin?.contributeCanvasComponents
+                                            ? () => activePlugin.contributeCanvasComponents(pluginCtx)
+                                            : null,
+                                        null,
+                                    )}
                                     {activeUsers.length > 0 && yAwareness && (
                                         <LiveCursors activeUsers={activeUsers} yAwareness={yAwareness} />
                                     )}
@@ -644,123 +580,8 @@ export function FlowchartDesignerView({ model }: FlowchartDesignerViewProps) {
                     </div>
                 </>
             }
-            rightSidebar={
-                (() => {
-                    const ctx: PluginContext = pluginCtx;
-                    return (
-                        <DesignerRightSidebar
-                            activeTab={activeRightTab}
-                            onTabChange={setActiveRightTab}
-                            aiChatVisible={aiChatVisible}
-                            setAiChatVisible={setAiChatVisible}
-                            selectedNodes={selectedNodes}
-                            selectedEdges={selectedEdges}
-                            updateNodesBatch={updateNodesBatch}
-                            updateEdgesBatch={updateEdgesBatch}
-                            onBeforeUpdate={handleBeforeUpdate}
-                            isDraggingNode={isDraggingNode}
-                            renderAIChatPanel={renderAIChatPanel}
-                            onWidthChange={setRightSidebarWidth}
-                            showAiCrown={showAiCrown}
-                            onAiTabIntercept={onAiTabIntercept}
-                            activePlugin={activePlugin}
-                            pluginCtx={ctx}
-                            isMobile={isMobile}
-                        />
-                    );
-                })()
-            }
-            overlays={
-                <>
-                    <DesignerOverlaysLayer
-                        diagramId={diagramIdForExport}
-                        jsonEditor={{
-                            visible: jsonEditorVisible,
-                            setVisible: setJsonEditorVisible,
-                            nodes,
-                            edges,
-                            setNodes,
-                            setEdges,
-                            reactFlowInstance,
-                            initialContent: jsonEditorInitialContent,
-                        }}
-                        commandPalette={{
-                            visible: commandPaletteVisible,
-                            setVisible: setCommandPaletteVisible,
-                            items: commandPaletteItems,
-                        }}
-                        shortcuts={{
-                            panelVisible: shortcutHelpVisible,
-                            setPanelVisible: setShortcutHelpVisible,
-                            modalVisible: showShortcuts,
-                            setModalVisible: setShowShortcutsModal,
-                        }}
-                        status={{
-                            saveState,
-                            showPerformanceDashboard: !!showPerformanceDashboard,
-                            nodeCount: nodes.length,
-                            edgeCount: edges.length,
-                        }}
-                        presentation={{
-                            active: presentationActive,
-                            setActive: setPresentationActive,
-                            slides: presentationSlides,
-                            onFocusNodes: handlePresentationFocus,
-                        }}
-                        diff={{
-                            result: diffResult,
-                            setResult: setDiffResult,
-                        }}
-                        renderAIConfigModal={renderAIConfigModal}
-                        renderShareDialog={renderShareDialog}
-                    />
-                    {isVersionHistoryOpen && (
-                        <React.Suspense fallback={null}>
-                            <VersionHistoryPanel
-                                diagramId={id || 'default-diagram'}
-                                isOpen={isVersionHistoryOpen}
-                                onClose={() => {
-                                    if (onVersionHistoryClose) onVersionHistoryClose();
-                                }}
-                            />
-                        </React.Suspense>
-                    )}
-
-                    <LaserPointer active={presentationActive && laserEnabled} />
-
-                    {isMobile && (
-                        <MobileBottomDock
-                            activeTab={mobilePropertyDrawerVisible ? 'property' : (activeRightTab === 'ai' ? 'ai' : null)}
-                            selectedCount={selectedNodes.length + selectedEdges.length}
-                            onAddClick={() => {
-                                setLeftDrawerOpen(true);
-                                setMobileAddDrawerVisible(true);
-                            }}
-                            onPropertyClick={() => {
-                                setMobilePropertyDrawerVisible(!mobilePropertyDrawerVisible);
-                                if (!mobilePropertyDrawerVisible) setActiveRightTab('property');
-                            }}
-                            onLayerClick={() => {
-                                setLeftDrawerOpen(true);
-                            }}
-                            onAiClick={() => {
-                                if (activeRightTab === 'ai') {
-                                    setAiChatVisible(false);
-                                    setActiveRightTab('property');
-                                } else {
-                                    setActiveRightTab('ai');
-                                    setAiChatVisible(true);
-                                }
-                            }}
-                            onUndo={undo}
-                            onRedo={redo}
-                            canUndo={canUndo}
-                            canRedo={canRedo}
-                            onSettingsClick={onOpenSettings ? handleOpenSettings : undefined}
-                        />
-                    )}
-                </>
-            }
+            rightSidebar={<FlowchartDesignerRightSidebarRegion model={model} />}
+            overlays={<FlowchartDesignerOverlaysRegion model={model} />}
         />
     );
 }

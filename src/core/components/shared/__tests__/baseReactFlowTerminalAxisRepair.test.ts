@@ -10,8 +10,11 @@ import {
   keepNodeAnchoredTerminalCandidates,
   repairTerminalHandleAxisCrossings,
 } from '../baseReactFlowTerminalAxisRepair';
+import { readTerminalEdgePath } from '../baseReactFlowTerminalGeometry';
 
-const node = (id: string, x: number, y: number, width: number, height: number): Node => ({
+const node = (
+  id: string, x: number, y: number, width: number, height: number,
+): Node & { positionAbsolute: { x: number; y: number } } => ({
   id,
   position: { x, y },
   positionAbsolute: { x, y },
@@ -24,6 +27,39 @@ const edge = (id: string, source: string, target: string, computedPath: Array<{ 
   source,
   target,
   data: { computedPath },
+});
+
+describe('readTerminalEdgePath', () => {
+  it('coerces finite coordinates and rejects malformed external path points', () => {
+    const pathEdge = {
+      id: 'boundary',
+      source: 'a',
+      target: 'b',
+      data: {
+        computedPath: [
+          { x: '12.5', y: 4 },
+          { x: 7, y: '-3' },
+          null,
+          'invalid',
+          { x: '', y: 2 },
+          { x: Number.NaN, y: 2 },
+          { x: Number.POSITIVE_INFINITY, y: 2 },
+          { x: '1e999', y: 2 },
+          { x: {}, y: 2 },
+        ],
+      },
+    } as unknown as Edge;
+
+    expect(readTerminalEdgePath(pathEdge)).toEqual([
+      { x: 12.5, y: 4 },
+      { x: 7, y: -3 },
+    ]);
+    expect(readTerminalEdgePath({
+      ...pathEdge,
+      data: { computedPath: 'invalid', treeRouting: { points: [{ x: 1, y: 2 }] } },
+    } as unknown as Edge)).toEqual([{ x: 1, y: 2 }]);
+    expect(readTerminalEdgePath({ ...pathEdge, data: null } as unknown as Edge)).toEqual([]);
+  });
 });
 
 describe('repairTerminalHandleAxisCrossings', () => {

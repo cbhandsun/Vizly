@@ -2,12 +2,14 @@ import React, { useRef, useEffect, useMemo } from 'react';
 import rough from 'roughjs';
 import { hexToRgba } from '../../shared/layoutUtils';
 import type { FlowchartShape } from '../FlowchartNode';
+import type { FlowchartNodeData } from '../hooks/useFlowchartNodeStyleResolution';
+import type { FlowStylePreset } from '../../shared/DiagramStyleManager';
 
 export interface FlowchartNodeGraphicsProps {
     id: string;
     shape: FlowchartShape;
-    data: any;
-    preset: any;
+    data: FlowchartNodeData;
+    preset: FlowStylePreset;
     selected: boolean;
     isHovered: boolean;
     nodeWidth: number;

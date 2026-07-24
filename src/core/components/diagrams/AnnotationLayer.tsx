@@ -185,7 +185,7 @@ const AnnotationPin: React.FC<{
     onChangeColor: (color: string) => void;
     colors: string[];
     token: ReturnType<typeof theme.useToken>['token'];
-}> = ({ annotation, isActive, editText, onEditTextChange, onOpen, onSave, onClose, onDelete, onToggleResolved, onChangeColor, colors, token }) => {
+}> = ({ annotation, isActive, isHighlighted, editText, onEditTextChange, onOpen, onSave, onClose, onDelete, onToggleResolved, onChangeColor, colors, token }) => {
     const { x, y, color, content: text, isResolved: resolved } = annotation;
 
     return (

@@ -12,10 +12,13 @@ import {
   matchesThemePresetModule,
 } from './vite-plugins/buildChunkGroups'
 import { createDisplayRoutingChunkClassifier } from './vite-plugins/displayRoutingChunkClassifier'
+import coverageThresholds from './scripts/coverage-thresholds.json'
 
 const projectRoot = dirname(fileURLToPath(import.meta.url))
 const projectRealRoot = realpathSync(projectRoot)
 const displayRoutingChunks = createDisplayRoutingChunkClassifier(matchesAppSafeLoggingModule)
+const shardCoverageReportsDirectory = process.env.VIZLY_COVERAGE_REPORTS_DIR
+const isShardCoverage = process.env.TEST_CI_COVERAGE === '1'
 
 const vendorChunkRules: Array<[string, string[]]> = [
   ['vendor-react', ['react', 'react-dom', 'react-router', 'react-router-dom', 'react-error-boundary']],
@@ -92,8 +95,6 @@ const vendorChunkRules: Array<[string, string[]]> = [
     'd3-zoom',
   ]],
   ['vendor-layout-graph', ['dagre', 'graphlib', 'd3-force', 'd3-quadtree']],
-  ['vendor-layout-fcose', ['cytoscape-fcose', 'cose-base', 'layout-base']],
-  ['vendor-layout-cytoscape', ['cytoscape']],
   ['vendor-mindmap', ['mind-elixir']],
   ['vendor-motion', ['framer-motion', '@react-spring', 'motion-dom', 'motion-utils']],
   ['vendor-drawing', ['roughjs', 'perfect-freehand']],
@@ -328,11 +329,15 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // Windows process startup dominates this suite: a representative isolated
+    // jsdom shard dropped from 157.5s to 83.3s with threads. File isolation
+    // remains enabled because shared environments leak mocks and storage state.
+    pool: 'threads',
     coverage: {
       provider: 'v8',
       allowExternal: true,
-      reporter: ['text', 'html', 'json', 'lcov'],
-      reportsDirectory: './.coverage',
+      reporter: isShardCoverage ? ['json'] : ['text', 'html', 'json', 'lcov'],
+      reportsDirectory: shardCoverageReportsDirectory || './.coverage',
       exclude: [
         'dist/**',
         'coverage/**',
@@ -343,12 +348,7 @@ export default defineConfig({
         'src/main.tsx',
         'src/core/vite-env.d.ts',
       ],
-      thresholds: {
-        statements: 61,
-        branches: 48,
-        functions: 61,
-        lines: 63,
-      },
+      thresholds: isShardCoverage ? undefined : coverageThresholds,
     },
   },
   resolve: {

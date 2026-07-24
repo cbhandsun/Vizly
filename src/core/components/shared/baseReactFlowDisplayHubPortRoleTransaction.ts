@@ -172,7 +172,7 @@ const discoverHubRoles = (
 };
 
 const currentPortSide = (edge: Edge, role: SharedNodePortRole): SharedNodePortSide | null => (
-  fullDisplayPortSide(normalizeHandle(role === 'source' ? edge.sourceHandle : edge.targetHandle))
+  fullDisplayPortSide(normalizeHandle(role === 'source' ? edge.sourceHandle : edge.targetHandle)) ?? null
 );
 
 const facingPortSides = (
@@ -222,8 +222,10 @@ const buildRoleCandidates = (
   const edge = edges[hubRole.edgeIndex];
   const node = nodesById.get(hubRole.nodeId);
   const rect = node ? getDisplayNodeRect(node) : null;
-  const sourceRect = edge ? getDisplayNodeRect(nodesById.get(edge.source)) : null;
-  const targetRect = edge ? getDisplayNodeRect(nodesById.get(edge.target)) : null;
+  const sourceNode = edge ? nodesById.get(edge.source) : undefined;
+  const targetNode = edge ? nodesById.get(edge.target) : undefined;
+  const sourceRect = sourceNode ? getDisplayNodeRect(sourceNode) : null;
+  const targetRect = targetNode ? getDisplayNodeRect(targetNode) : null;
   const path = edge ? getDisplayComputedPath(edge) : [];
   const sourceSide = edge ? currentPortSide(edge, 'source') : null;
   const targetSide = edge ? currentPortSide(edge, 'target') : null;

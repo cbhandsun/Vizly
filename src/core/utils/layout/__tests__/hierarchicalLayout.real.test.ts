@@ -69,4 +69,30 @@ describe('hierarchicalLayout', () => {
       containerSize: { width: 300, height: 1000 },
     } as never)).toBe('TB');
   });
+
+  it('falls back to bounded defaults for unsafe heuristic numbers', () => {
+    const baseOptions = {
+      autoDirection: true,
+      levels: [['a'], ['b', 'c'], ['d']],
+      containerSize: { width: 900, height: 400 },
+    };
+    const expected = decideHierDirectionByFan(nodes as never, edges as never, baseOptions as never);
+
+    expect(decideHierDirectionByFan(nodes as never, edges as never, {
+      ...baseOptions,
+      autoDirectionHeuristics: {
+        aspectThresholdLR: Number.NaN,
+        aspectThresholdTB: Number.POSITIVE_INFINITY,
+        minLevelCountTB: -1,
+        minAvgPerLevelLR: Number.MAX_VALUE,
+        fanOutDegree: -1,
+        fanInDegree: Number.NEGATIVE_INFINITY,
+        fanScoreThreshold: 2,
+        areaWeight: Number.NaN,
+        fanWeight: -1,
+        densityWeight: Number.POSITIVE_INFINITY,
+        imbalanceWeight: Number.MAX_VALUE,
+      },
+    } as never)).toBe(expected);
+  });
 });

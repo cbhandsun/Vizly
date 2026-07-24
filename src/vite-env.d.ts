@@ -23,3 +23,9 @@ interface ImportMetaEnv {
 interface ImportMeta {
     readonly env: ImportMetaEnv
 }
+
+interface Window {
+    __flowDesignerOpenCloud?: (
+        data: import('./core/models/DiagramModels').StandardDiagramData,
+    ) => void | Promise<void>;
+}

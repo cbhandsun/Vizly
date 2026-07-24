@@ -20,13 +20,20 @@ const perfLog = {
       safeLog.warn(`Failed to measure ${name}:`, redactSensitiveLogValue(error));
     }
   },
-  log: (...args: any[]) => safeLog.info(...args),
+  log: (...args: unknown[]) => safeLog.info(...args),
 };
 
 const currentLogUrl = (): string => sanitizeUrlForLog(window.location.href);
 
-const sanitizeReportData = <T extends Record<string, any>>(report: T): T => {
+const sanitizeReportData = <T extends object>(report: T): T => {
   return redactSensitiveLogValue(report) as T;
+};
+
+type ResourceElement = HTMLElement & { src?: unknown; href?: unknown };
+
+const resourceUrl = (element: ResourceElement, key: 'src' | 'href'): string => {
+  const value = element[key];
+  return typeof value === 'string' ? sanitizeUrlForLog(value) : '';
 };
 
 // 性能指标接口
@@ -73,7 +80,7 @@ interface ErrorReport {
   url: string;
   userId?: string;
   sessionId: string;
-  additionalData?: Record<string, any>;
+  additionalData?: Record<string, unknown>;
 }
 
 // 性能报告接口
@@ -85,6 +92,7 @@ interface PerformanceReport {
   url: string;
   userId?: string;
   sessionId: string;
+  additionalData?: Record<string, unknown>;
 }
 
 /**
@@ -204,21 +212,24 @@ class PerformanceMonitor {
    * 处理资源加载错误
    */
   private handleResourceError(event: Event): void {
-    const target = event.target as HTMLElement;
-    if (target && target !== (window as any)) {
+    const target = event.target;
+    if (target instanceof HTMLElement) {
+      const resource = target as ResourceElement;
+      const src = resourceUrl(resource, 'src');
+      const href = resourceUrl(resource, 'href');
       const errorReport: ErrorReport = {
         id: this.generateErrorId(),
         timestamp: Date.now(),
         type: 'resource',
-        message: `Resource load failed: ${sanitizeUrlForLog((target as any).src || (target as any).href)}`,
+        message: `Resource load failed: ${src || href}`,
         userAgent: navigator.userAgent,
         url: currentLogUrl(),
         userId: this.userId,
         sessionId: this.sessionId,
         additionalData: {
           tagName: target.tagName,
-          src: sanitizeUrlForLog((target as any).src),
-          href: sanitizeUrlForLog((target as any).href)
+          src,
+          href,
         }
       };
 
@@ -268,8 +279,13 @@ class PerformanceMonitor {
       // FID观察器
       const fidObserver = new PerformanceObserver((list) => {
         const entries = list.getEntries();
-        entries.forEach((entry: any) => {
-          metrics.firstInputDelay = entry.processingStart - entry.startTime;
+        entries.forEach((entry) => {
+          const processingStart = 'processingStart' in entry
+            ? (entry as PerformanceEntry & { processingStart?: unknown }).processingStart
+            : undefined;
+          if (typeof processingStart === 'number' && Number.isFinite(processingStart)) {
+            metrics.firstInputDelay = processingStart - entry.startTime;
+          }
         });
       });
       fidObserver.observe({ entryTypes: ['first-input'] });
@@ -277,9 +293,15 @@ class PerformanceMonitor {
       // CLS观察器
       const clsObserver = new PerformanceObserver((list) => {
         let clsValue = 0;
-        list.getEntries().forEach((entry: any) => {
-          if (!entry.hadRecentInput) {
-            clsValue += entry.value;
+        list.getEntries().forEach((entry) => {
+          const layoutShift = entry as PerformanceEntry & {
+            hadRecentInput?: unknown;
+            value?: unknown;
+          };
+          if (layoutShift.hadRecentInput !== true
+            && typeof layoutShift.value === 'number'
+            && Number.isFinite(layoutShift.value)) {
+            clsValue += layoutShift.value;
           }
         });
         metrics.cumulativeLayoutShift = clsValue;
@@ -299,12 +321,22 @@ class PerformanceMonitor {
 
       // 内存使用情况
       if ('memory' in performance) {
-        const memory = (performance as any).memory;
-        metrics.memoryUsage = {
-          usedJSHeapSize: memory.usedJSHeapSize,
-          totalJSHeapSize: memory.totalJSHeapSize,
-          jsHeapSizeLimit: memory.jsHeapSizeLimit
-        };
+        const memory = (performance as Performance & { memory?: unknown }).memory;
+        if (memory && typeof memory === 'object') {
+          const values = memory as Record<string, unknown>;
+          if (typeof values.usedJSHeapSize === 'number'
+            && Number.isFinite(values.usedJSHeapSize)
+            && typeof values.totalJSHeapSize === 'number'
+            && Number.isFinite(values.totalJSHeapSize)
+            && typeof values.jsHeapSizeLimit === 'number'
+            && Number.isFinite(values.jsHeapSizeLimit)) {
+            metrics.memoryUsage = {
+              usedJSHeapSize: values.usedJSHeapSize,
+              totalJSHeapSize: values.totalJSHeapSize,
+              jsHeapSizeLimit: values.jsHeapSizeLimit,
+            };
+          }
+        }
       }
 
       this.addPerformanceReport(metrics);
@@ -343,7 +375,7 @@ class PerformanceMonitor {
   /**
    * 记录自定义错误
    */
-  public recordError(error: Error, additionalData?: Record<string, any>): void {
+  public recordError(error: Error, additionalData?: Record<string, unknown>): void {
     const errorReport: ErrorReport = {
       id: this.generateErrorId(),
       timestamp: Date.now(),
@@ -379,7 +411,7 @@ class PerformanceMonitor {
   /**
    * 添加性能报告
    */
-  private addPerformanceReport(metrics: PerformanceMetrics, additionalData?: Record<string, any>): void {
+  private addPerformanceReport(metrics: PerformanceMetrics, additionalData?: Record<string, unknown>): void {
     const report: PerformanceReport = {
       id: this.generateReportId(),
       timestamp: Date.now(),
@@ -388,7 +420,7 @@ class PerformanceMonitor {
       url: currentLogUrl(),
       userId: this.userId,
       sessionId: this.sessionId,
-      ...additionalData
+      additionalData: additionalData ? sanitizeReportData(additionalData) : undefined,
     };
 
     this.performanceQueue.push(sanitizeReportData(report));
@@ -521,7 +553,7 @@ export const performanceMonitor = PerformanceMonitor.getInstance();
 export type { PerformanceMetrics, ErrorReport, PerformanceReport };
 
 // 便捷函数
-export const recordError = (error: Error, additionalData?: Record<string, any>) => {
+export const recordError = (error: Error, additionalData?: Record<string, unknown>) => {
   performanceMonitor.recordError(error, additionalData);
 };
 

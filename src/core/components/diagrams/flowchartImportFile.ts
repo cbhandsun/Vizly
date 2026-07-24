@@ -47,10 +47,10 @@ export const validateFlowchartImportFile = (
     };
 };
 
-type BrowserFileReader = Pick<FileReader, 'readAsText'> & {
-    onload: ((event: Pick<ProgressEvent<FileReader>, 'target'>) => void) | null;
-    onerror: (() => void) | null;
-    result?: string | ArrayBuffer | null;
+type BrowserFileReader = {
+    readAsText: FileReader['readAsText'];
+    onload: FileReader['onload'];
+    onerror: FileReader['onerror'];
 };
 
 export const readFlowchartImportFileText = (

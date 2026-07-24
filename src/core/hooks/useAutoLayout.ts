@@ -3,6 +3,7 @@ import { Node, Edge, Position, ReactFlowInstance } from '@xyflow/react';
 import { animateLayoutTransition } from '../utils/animateLayoutTransition';
 import { safeLog } from '../utils/consoleCleanup';
 import { redactSensitiveLogValue } from '../utils/logSecurity';
+import type { LayoutOptions } from '../types/layout';
 
 export type LayoutDirection = 'TB' | 'LR';
 export type LayoutAlgorithm = 'dagre' | 'elk';
@@ -280,10 +281,10 @@ export const useAutoLayout = (instance: ReactFlowInstance | null) => {
                     return;
                 }
 
-                const layoutOptions = {
-                    type: resolvedName as any,
+                const layoutOptions: LayoutOptions = {
+                    type: resolvedName as LayoutOptions['type'],
                     direction,
-                    nodeLayout: options.nodeLayout as any,
+                    nodeLayout: options.nodeLayout as LayoutOptions['nodeLayout'],
                     spacing: { horizontal: 50, vertical: 50 },
                     padding: { top: 40, right: 20, bottom: 20, left: 20 },
                     generateDomainGroups: true,

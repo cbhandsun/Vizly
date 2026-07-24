@@ -1,6 +1,15 @@
-import type { Rectangle } from '../types/routing';
+import type { Rectangle, SharedGraphContext } from '../types/routing';
+import {
+    collectHardNodeObstacleRects,
+    collectSoftNodeObstacleRects,
+    type EdgeRoutingObstacleNode,
+} from './edgeRoutingNodeObstacles';
 
-export type EdgeRoutingObstacleRectInput = Partial<Rectangle> & {
+export type EdgeRoutingObstacleRectInput = {
+    x?: unknown;
+    y?: unknown;
+    width?: unknown;
+    height?: unknown;
     edgeId?: string;
     ownerId?: string;
 };
@@ -57,4 +66,26 @@ export function createEdgeRoutingObstacleCollector(
 
         target.push(normalized);
     };
+}
+
+export function collectSoftEdgeRoutingObstacles(
+    graph: SharedGraphContext,
+    routedLabelObstacles: readonly EdgeRoutingObstacleRectInput[],
+    excludedOwnerIds: ReadonlySet<string> = new Set()
+): Rectangle[] {
+    const soft: Rectangle[] = [];
+    const collect = createEdgeRoutingObstacleCollector(soft, { excludedOwnerIds });
+    (graph.softObstacles ?? []).forEach(collect);
+    (graph.routingLabels ?? []).forEach(collect);
+    routedLabelObstacles.forEach(collect);
+    collectSoftNodeObstacleRects((graph.nodes ?? []) as EdgeRoutingObstacleNode[]).forEach(collect);
+    return soft;
+}
+
+export function collectHardEdgeRoutingObstacles(graph: SharedGraphContext): Rectangle[] {
+    const hard: Rectangle[] = [];
+    const collect = createEdgeRoutingObstacleCollector(hard, { dedupe: true });
+    (graph.obstacles ?? []).forEach(collect);
+    collectHardNodeObstacleRects((graph.nodes ?? []) as EdgeRoutingObstacleNode[]).forEach(collect);
+    return hard;
 }

@@ -1,0 +1,15 @@
+@keyframes pro-task-tooltip-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pro-task-tooltip {
+  animation: pro-task-tooltip-fade 0.15s ease-out;
+}

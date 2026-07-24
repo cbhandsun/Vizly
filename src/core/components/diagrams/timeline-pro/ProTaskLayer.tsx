@@ -2,6 +2,9 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { ProGanttTask, useProTimelineEngine } from '../../../hooks/useProTimelineEngine';
 import { CalendarOutlined, ClockCircleOutlined, FlagFilled, CaretRightFilled } from '@ant-design/icons';
 import { useTheme } from '../../../themes/useCoreTheme';
+import type { ProjectedProTimelineTask } from './proTimelineTaskProjection';
+import { clampProTaskProgress, isProTaskSelected } from './proTaskPresentationModel';
+import { ProTaskTooltip } from './ProTaskTooltip';
 
 const getAvatarColor = (name: string) => {
     const colors = [
@@ -17,7 +20,7 @@ const getAvatarColor = (name: string) => {
 };
 
 export interface ProTaskLayerProps {
-    tasks: ProGanttTask[];
+    tasks: ProjectedProTimelineTask[];
     onTaskClick?: (taskId: string) => void;
     onTaskDragEnd?: (taskId: string, newStartDate: string, newEndDate: string) => void;
     hoveredTaskId?: string | null;
@@ -45,69 +48,6 @@ interface DragState {
     targetTaskId?: string | null;
 }
 
-// --- Tooltip Component ---
-function TaskTooltip({ task, x, y, theme }: { task: ProGanttTask; x: number; y: number; theme: any }) {
-    const duration = (() => {
-        if (!task.endDate || task.endDate === task.startDate) return null;
-        const d1 = new Date(task.startDate).getTime();
-        const d2 = new Date(task.endDate).getTime();
-        return Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
-    })();
-    const statusMap: Record<string, string> = { done: '✅ 已完成', active: '🔵 进行中', pending: '⏳ 待开始' };
-
-    const isDark = theme?.mode === 'dark';
-    const bg = isDark ? 'rgba(30, 30, 46, 0.95)' : 'rgba(255, 255, 255, 0.95)';
-    const textColor = isDark ? '#e8e8e8' : '#595959';
-    const titleColor = isDark ? '#fff' : '#262626';
-    const labelColor = isDark ? '#8c8c8c' : '#8c8c8c';
-    const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
-    const _primaryColor = theme?.palette?.primary?.main || '#1890ff';
-    const successColor = theme?.palette?.success?.main || '#52c41a';
-
-    return (
-        <div style={{
-            position: 'fixed', left: x + 16, top: y - 10,
-            background: bg, backdropFilter: 'blur(12px)',
-            color: textColor, borderRadius: 10, padding: '12px 16px',
-            fontSize: 12, lineHeight: 1.7, minWidth: 200, maxWidth: 280,
-            boxShadow: `0 8px 32px rgba(0,0,0,${isDark ? 0.25 : 0.12}), 0 0 0 1px ${borderColor}`,
-            zIndex: 1000, pointerEvents: 'none',
-            animation: 'tooltip-fade 0.15s ease-out',
-        }}>
-            <style>{`@keyframes tooltip-fade { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform: translateY(0); } }`}</style>
-            <div style={{ fontWeight: 700, fontSize: 13, color: titleColor, marginBottom: 6 }}>{task.name}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr', gap: '2px 8px' }}>
-                <span style={{ color: labelColor }}>开始</span>
-                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{task.startDate}</span>
-                {task.endDate && task.endDate !== task.startDate && <>
-                    <span style={{ color: '#8c8c8c' }}>结束</span>
-                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{task.endDate}</span>
-                </>}
-                {duration !== null && <>
-                    <span style={{ color: '#8c8c8c' }}>工期</span>
-                    <span>{duration} 天</span>
-                </>}
-                {task.progress !== undefined && <>
-                    <span style={{ color: '#8c8c8c' }}>进度</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{
-                            display: 'inline-flex', width: 60, height: 6, borderRadius: 3,
-                            background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', overflow: 'hidden',
-                        }}>
-                            <span style={{ width: `${task.progress}%`, background: task.color || successColor, borderRadius: 3 }} />
-                        </span>
-                        <span>{task.progress}%</span>
-                    </span>
-                </>}
-                {(task as any).status && <>
-                    <span style={{ color: '#8c8c8c' }}>状态</span>
-                    <span>{statusMap[(task as any).status] || (task as any).status}</span>
-                </>}
-            </div>
-        </div>
-    );
-}
-
 export default function ProTaskLayer({ 
     tasks, 
     onTaskClick, 
@@ -126,7 +66,7 @@ export default function ProTaskLayer({
     const [dragDeltaY, setDragDeltaY] = useState(0);
     const [dragDeltaW, setDragDeltaW] = useState(0);
     const [dragProgress, setDragProgress] = useState(0);
-    const [tooltipState, setTooltipState] = useState<{ task: ProGanttTask; x: number; y: number } | null>(null);
+    const [tooltipState, setTooltipState] = useState<{ task: ProjectedProTimelineTask; x: number; y: number } | null>(null);
     const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
     const [editingText, setEditingText] = useState('');
 
@@ -154,7 +94,7 @@ export default function ProTaskLayer({
         return { start: xToDate(x), end: xToDate(x + w) };
     }, [dragState, dragDeltaX, dragDeltaW, snapX, xToDate, pixelsPerDay]);
 
-    const handleTaskPointerDown = useCallback((e: React.PointerEvent, task: ProGanttTask, mode: DragState['mode']) => {
+    const handleTaskPointerDown = useCallback((e: React.PointerEvent, task: ProjectedProTimelineTask, mode: DragState['mode']) => {
         if (!task._computed) return;
         if (task.type === 'summary') return; // 汇总条不允许拖动
         e.stopPropagation();
@@ -165,13 +105,13 @@ export default function ProTaskLayer({
             taskId: task.id, mode, 
             startMouseX: e.clientX, startMouseY: e.clientY,
             origX: task._computed.x, origW: task._computed.w, 
-            origY, origProgress: task.progress ?? 0 
+            origY, origProgress: clampProTaskProgress(task.progress) ?? 0
         });
         setDragDeltaX(0);
         setDragDeltaY(0);
         setDragDeltaW(0);
         if (mode === 'progress') {
-            setDragProgress(task.progress ?? 0);
+            setDragProgress(clampProTaskProgress(task.progress) ?? 0);
         }
         setTooltipState(null);
     }, []);
@@ -220,7 +160,7 @@ export default function ProTaskLayer({
         setDragDeltaW(0);
     }, [dragState, dragDeltaX, dragDeltaW, dragProgress, snapX, xToDate, pixelsPerDay, onTaskDragEnd, onTaskUpdate, onTaskConnect]);
 
-    const handleTaskMouseEnter = useCallback((e: React.MouseEvent, task: ProGanttTask) => {
+    const handleTaskMouseEnter = useCallback((e: React.MouseEvent, task: ProjectedProTimelineTask) => {
         if (dragState) {
             if (dragState.mode === 'connect' && task.id !== dragState.taskId) {
                 setDragState(s => s ? { ...s, targetTaskId: task.id } : null);
@@ -231,7 +171,7 @@ export default function ProTaskLayer({
         setTooltipState({ task, x: e.clientX, y: e.clientY });
     }, [dragState, onHoverTask]);
 
-    const handleTaskMouseLeave = useCallback((e: React.MouseEvent, task: ProGanttTask) => {
+    const handleTaskMouseLeave = useCallback((e: React.MouseEvent, task: ProjectedProTimelineTask) => {
         if (dragState) {
             if (dragState.mode === 'connect' && dragState.targetTaskId === task.id) {
                 setDragState(s => s ? { ...s, targetTaskId: null } : null);
@@ -258,7 +198,7 @@ export default function ProTaskLayer({
                 const { laneIndex } = task._computed;
                 
                 const isDragging = dragState?.taskId === task.id;
-                let renderProgress = task.progress ?? 0;
+                let renderProgress = clampProTaskProgress(task.progress) ?? 0;
                 
                 if (isDragging) {
                     if (dragState.mode === 'move') x = snapX(dragState.origX + dragDeltaX);
@@ -267,7 +207,7 @@ export default function ProTaskLayer({
                 }
 
                 const y = HEADER_HEIGHT + laneIndex * ROW_HEIGHT + BAR_TOP_MARGIN;
-                const isSelected = (task as any)._rawSelected;
+                const isSelected = isProTaskSelected(task);
                 const isHovered = hoveredTaskId === task.id && !isDragging;
                 const type = task.type || 'phase';
                 
@@ -737,7 +677,7 @@ export default function ProTaskLayer({
             })()}
 
             {/* Tooltip */}
-            {tooltipState && !dragState && <TaskTooltip task={tooltipState.task} x={tooltipState.x} y={tooltipState.y} theme={theme} />}
+            {tooltipState && !dragState && <ProTaskTooltip task={tooltipState.task} x={tooltipState.x} y={tooltipState.y} theme={theme} />}
         </div>
     );
 }

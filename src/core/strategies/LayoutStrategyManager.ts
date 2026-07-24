@@ -1,20 +1,8 @@
-import type { Node, Edge } from '@xyflow/react';
-import { LayoutOptions } from '../types/layout';
+import type { Edge, Node } from '@xyflow/react';
+import type { ILayoutStrategy } from '../types/layout-strategy';
 import { logRegisteredLayoutStrategyMetadata } from './layoutLogging';
 
-
-export interface ILayoutStrategy {
-  calculateLayout(nodes: Node[], edges: Edge[], options?: LayoutOptions): Promise<{ nodes: Node[]; edges: Edge[] }> | { nodes: Node[]; edges: Edge[] };
-  getName(): string;
-  getDescription(): string;
-  isApplicable(nodes: Node[], edges: Edge[]): boolean;
-  /**
-   * 函数级注释：返回策略类别
-   * - 'hierarchy'：域/子域/整体编排类策略（如 DomainFirst/Hierarchical/Flow/MainBus/Swimlane 等）
-   * - 'node'：域/子域内部节点排布类策略（如 Grid/Horizontal/Vertical/Centered/ElkNode 等）
-   */
-  getCategory(): 'hierarchy' | 'node';
-}
+export type { ILayoutStrategy } from '../types/layout-strategy';
 
 type StrategyCategory = 'hierarchy' | 'node';
 type StrategyDescriptor = {

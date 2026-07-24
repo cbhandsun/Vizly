@@ -8,6 +8,10 @@ import { coerceRemoteDiagramContent } from './remoteDiagramContent';
 import { safeLog } from '@/core/utils/consoleCleanup';
 import { redactSensitiveLogValue } from '@/core/utils/logSecurity';
 
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+);
+
 // === 类型定义 ===
 
 export interface ShareRecord {
@@ -49,6 +53,13 @@ export interface AddCollaboratorResult {
     error?: string;
 }
 
+export interface SharedDiagramRecord {
+    id: string;
+    title: string;
+    updated_at?: string;
+    content: ReturnType<typeof coerceRemoteDiagramContent>;
+}
+
 // === Token 生成 ===
 
 function generateToken(): string {
@@ -75,8 +86,8 @@ function normalizeInviteEmail(email: string): string | null {
     return normalized;
 }
 
-function coerceSharedDiagram(diagram: any): any | null {
-    if (!diagram || !diagram.content) return null;
+function coerceSharedDiagram(diagram: unknown): SharedDiagramRecord | null {
+    if (!isRecord(diagram) || !diagram.content) return null;
 
     try {
         const id = String(diagram.id || 'shared-diagram');
@@ -271,7 +282,7 @@ class ShareService {
      */
     async getSharedDiagram(token: string): Promise<{
         share: ShareRecord;
-        diagram: any;
+        diagram: SharedDiagramRecord;
     } | null> {
         const normalizedToken = token.trim();
         if (!isValidShareToken(normalizedToken)) return null;
@@ -280,7 +291,7 @@ class ShareService {
             .rpc('get_shared_diagram_by_token', { p_share_token: normalizedToken })
             .maybeSingle();
 
-        if (!rpcError && rpcRow?.share && rpcRow?.diagram) {
+        if (!rpcError && isRecord(rpcRow) && rpcRow.share && rpcRow.diagram) {
             const share = coerceShareRecord(rpcRow.share, normalizedToken);
             if (!share) return null;
 

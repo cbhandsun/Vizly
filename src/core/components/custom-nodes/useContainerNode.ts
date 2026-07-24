@@ -21,7 +21,7 @@ interface UseContainerNodeOptions {
     childIds?: string[];
     description?: string;
     label?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   /** 折叠时缩小到的标题栏高度 */
   titleBarHeight?: number;
@@ -57,7 +57,7 @@ export function useContainerNode({
     if (trimmed && trimmed !== original) {
       setNodes((nds) => nds.map(n => {
         if (n.id !== id) return n;
-        const updates: Record<string, any> = { description: trimmed };
+        const updates: Record<string, unknown> = { description: trimmed };
         if (syncLabel) updates.label = trimmed;
         return { ...n, data: { ...n.data, ...updates } };
       }));

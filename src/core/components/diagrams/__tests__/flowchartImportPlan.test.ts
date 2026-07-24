@@ -71,7 +71,9 @@ describe('flowchartImportPlan', () => {
     }
     expect(plan.currentId).toBe('fallback-id');
     expect(plan.title).toBe('Imported Diagram');
-    expect(plan.normalized.metadata?.openedAt).toBe('2026-06-25T00:00:00.000Z');
+    expect(plan.normalized.metadata).toMatchObject({
+      openedAt: '2026-06-25T00:00:00.000Z',
+    });
   });
 
   it('coerces React Flow clipboard graphs directly when standard-data markers are absent', () => {

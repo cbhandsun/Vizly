@@ -26,8 +26,8 @@ export class ObstacleAnalyzer {
     ): boolean {
         if (!obstacles) return false;
         
-        const isSpatialIndex = (obs: any): obs is SpatialIndex =>
-            typeof (obs as SpatialIndex).query === 'function';
+        const isSpatialIndex = (obs: Rectangle[] | SpatialIndex): obs is SpatialIndex =>
+            !Array.isArray(obs) && typeof obs.query === 'function';
 
         const segment = { start, end };
         
@@ -140,8 +140,8 @@ export class ObstacleAnalyzer {
                 return 0;
         }
 
-        const isSpatialIndex = (obs: any): obs is SpatialIndex =>
-            typeof (obs as SpatialIndex).query === 'function';
+        const isSpatialIndex = (obs: Rectangle[] | SpatialIndex): obs is SpatialIndex =>
+            !Array.isArray(obs) && typeof obs.query === 'function';
 
         if (isSpatialIndex(obstacles)) {
             const candidates = obstacles.query(scanArea);

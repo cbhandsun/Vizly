@@ -1,3 +1,4 @@
+import type { Edge } from '@xyflow/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -6,10 +7,6 @@ const mocks = vi.hoisted(() => ({
     targetHandle: 'l',
     type: 'step',
   })),
-}));
-
-vi.mock('../../../utils/HandlePicker', () => ({
-  decideEdgeRouting: mocks.decideEdgeRouting,
 }));
 
 import {
@@ -21,6 +18,7 @@ import {
   incrementalEdgeRouting,
   pickHandlesByGeometry,
   separateParallelEdges,
+  configureEdgeRoutingDecision,
 } from '../EdgeRoutingHelpers';
 
 describe('EdgeRoutingCache', () => {
@@ -62,6 +60,7 @@ describe('EdgeRoutingHelpers', () => {
   beforeEach(() => {
     clearEdgeRoutingCache();
     mocks.decideEdgeRouting.mockClear();
+    configureEdgeRoutingDecision(mocks.decideEdgeRouting);
   });
 
   const nodes = [
@@ -92,11 +91,12 @@ describe('EdgeRoutingHelpers', () => {
   });
 
   it('separates parallel edges with capped offsets', () => {
-    const separated = separateParallelEdges([
+    const input: Edge[] = [
       { id: 'e1', source: 'a', target: 'b' },
       { id: 'e2', source: 'b', target: 'a' },
       { id: 'e3', source: 'a', target: 'c' },
-    ], 20);
+    ];
+    const separated = separateParallelEdges(input, 20);
 
     expect(separated[0].data).toMatchObject({ parallelOffset: -10, parallelIndex: 0, parallelTotal: 2 });
     expect(separated[1].data).toMatchObject({ parallelOffset: 10, parallelIndex: 1, parallelTotal: 2 });

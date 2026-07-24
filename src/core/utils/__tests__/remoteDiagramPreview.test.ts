@@ -1,12 +1,8 @@
+// @vitest-environment node
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const loadDiagram = vi.fn();
-
-vi.mock('@/services/UnifiedStorageService', () => ({
-  unifiedStorage: {
-    loadDiagram,
-  },
-}));
 
 describe('remoteDiagramPreview', () => {
   beforeEach(() => {
@@ -57,12 +53,12 @@ describe('remoteDiagramPreview', () => {
       },
     });
 
-    await expect(fetchRemoteDiagramPreview('diagram-1')).resolves.toEqual(safePreview);
-    await expect(fetchRemoteDiagramPreview('diagram-1')).resolves.toEqual(safePreview);
+    await expect(fetchRemoteDiagramPreview('diagram-1', loadDiagram)).resolves.toEqual(safePreview);
+    await expect(fetchRemoteDiagramPreview('diagram-1', loadDiagram)).resolves.toEqual(safePreview);
     expect(loadDiagram).toHaveBeenCalledTimes(1);
 
     invalidateRemoteDiagramPreview('diagram-1');
-    await expect(fetchRemoteDiagramPreview('diagram-1')).resolves.toEqual(safePreview);
+    await expect(fetchRemoteDiagramPreview('diagram-1', loadDiagram)).resolves.toEqual(safePreview);
     expect(loadDiagram).toHaveBeenCalledTimes(2);
   });
 
@@ -76,12 +72,12 @@ describe('remoteDiagramPreview', () => {
       },
     });
 
-    await expect(fetchRemoteDiagramPreview('bad-preview')).resolves.toBeNull();
-    await expect(fetchRemoteDiagramPreview('bad-preview')).resolves.toBeNull();
+    await expect(fetchRemoteDiagramPreview('bad-preview', loadDiagram)).resolves.toBeNull();
+    await expect(fetchRemoteDiagramPreview('bad-preview', loadDiagram)).resolves.toBeNull();
     expect(loadDiagram).toHaveBeenCalledTimes(1);
 
     loadDiagram.mockRejectedValueOnce(new Error('network down'));
-    await expect(fetchRemoteDiagramPreview('failed-preview')).resolves.toBeNull();
+    await expect(fetchRemoteDiagramPreview('failed-preview', loadDiagram)).resolves.toBeNull();
     expect(loadDiagram).toHaveBeenCalledTimes(2);
   });
 });

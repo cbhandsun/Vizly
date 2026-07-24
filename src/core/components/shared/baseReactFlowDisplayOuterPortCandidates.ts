@@ -169,8 +169,8 @@ const buildPortCandidates = (
   if (!sourceRect || !targetRect) return [];
   const externalSegments = baselineSegments
     .filter(segment => segment.edgeIndex !== edgeIndex && segment.edgeIndex !== pairIndex);
-  const declaredSourceSide = fullDisplayPortSide(normalizeHandle(edge.sourceHandle));
-  const declaredTargetSide = fullDisplayPortSide(normalizeHandle(edge.targetHandle));
+  const declaredSourceSide = fullDisplayPortSide(normalizeHandle(edge.sourceHandle)) ?? null;
+  const declaredTargetSide = fullDisplayPortSide(normalizeHandle(edge.targetHandle)) ?? null;
   const sidePairBuckets: PortCandidate[][] = [];
   for (const sourceSide of SIDES) {
     if (!displayTerminalSideCanSwitch(edge, 'source', sourceSide)) continue;

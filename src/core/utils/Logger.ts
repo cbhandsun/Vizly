@@ -664,11 +664,11 @@ export const createLogger = (source: string) => logger.createChild(source);
 
 // 性能监控装饰器
 export function logPerformance(operation?: string) {
-  return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {
-    const method = descriptor.value;
+  return function (target: object, propertyName: string, descriptor: PropertyDescriptor) {
+    const method = descriptor.value as (...args: unknown[]) => unknown;
     const operationName = operation || `${target.constructor.name}.${propertyName}`;
 
-    descriptor.value = function (...args: any[]) {
+    descriptor.value = function (...args: unknown[]) {
       const startTime = performance.now();
       const result = method.apply(this, args);
 

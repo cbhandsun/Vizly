@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { configureMindMapAIRuntime } from '../../../ports/mindMapAIRuntime';
 import {
   cleanAndValidateTree,
   cleanMindMapIcons,
@@ -12,7 +13,7 @@ import {
   MINDMAP_MAX_NOTE_LENGTH,
   MINDMAP_MAX_TOPIC_LENGTH,
 } from '../mindmapTreeSanitizer';
-import { sanitizeAICustomActionResult } from '../mindmapAIService';
+import { expandNodeWithAI, sanitizeAICustomActionResult } from '../mindmapAIService';
 
 describe('cleanAndValidateTree', () => {
   it('keeps only safe AI-generated hyperlinks', () => {
@@ -104,22 +105,24 @@ describe('cleanAndValidateTree', () => {
     expect(cleaned.direction).toBe(3);
     expect(cleaned.nodeData.id).toBe('root');
     expect(cleaned.nodeData.branchColor).toBeUndefined();
-    expect(cleaned.nodeData.shapeClass).toBeUndefined();
+    expect(cleaned.nodeData).not.toHaveProperty('shapeClass');
     expect(cleaned.nodeData.style).toEqual({ color: '#123456', fontSize: '48px' });
     expect(cleaned.nodeData.image).toBeUndefined();
-    expect(cleaned.nodeData.boundary).toEqual({
+    expect(cleaned.nodeData).toHaveProperty('boundary', {
       color: '#818cf8',
       title: 'g'.repeat(MINDMAP_MAX_TOPIC_LENGTH),
     });
-    expect(cleaned.nodeData.children?.[0]?.id).toBe('safe-1');
-    expect(cleaned.nodeData.children?.[0]?.branchColor).toBe('#abcdef');
-    expect(cleaned.nodeData.children?.[0]?.shapeClass).toBe('diamond');
-    expect(cleaned.nodeData.children?.[0]?.branchWidth).toBe(12);
-    expect(cleaned.nodeData.children?.[0]?.image).toEqual({
-      url: 'https://images.example.com/photo.png',
-      width: 2048,
-      height: 1,
-      fit: 'cover',
+    expect(cleaned.nodeData.children?.[0]).toMatchObject({
+      id: 'safe-1',
+      branchColor: '#abcdef',
+      shapeClass: 'diamond',
+      branchWidth: 12,
+      image: {
+        url: 'https://images.example.com/photo.png',
+        width: 2048,
+        height: 1,
+        fit: 'cover',
+      },
     });
     expect(Object.hasOwn(cleaned.nodeData, 'constructor')).toBe(false);
     expect(Object.prototype).not.toHaveProperty('polluted');
@@ -155,5 +158,40 @@ describe('cleanAndValidateTree', () => {
     expect(result.newChildren?.[0]?.children).toEqual([]);
     expect(Object.hasOwn(result.newChildren?.[0] || {}, 'constructor')).toBe(false);
     expect(Object.prototype).not.toHaveProperty('polluted');
+  });
+});
+
+describe('mind map AI runtime boundary', () => {
+  it('uses the application-provided runtime without importing outer layers', async () => {
+    configureMindMapAIRuntime({
+      loadConfig: async () => ({
+        activeModelKey: 'test:model-a',
+        providers: [{ id: 'test', enabled: true, baseUrl: 'https://ai.example.test/v1', apiKey: 'secret' }],
+      }),
+      requestChatCompletionJson: async () => ({
+        choices: [{ message: { content: '- 主题一\n2. 主题二' } }],
+      }),
+      formatRequestError: async () => 'safe error',
+    });
+
+    await expect(expandNodeWithAI({
+      node: { id: 'root', topic: '根主题' } as any,
+      count: 2,
+    })).resolves.toEqual({ topics: ['主题一', '主题二'] });
+  });
+
+  it('returns the runtime-provided sanitized error on request failure', async () => {
+    configureMindMapAIRuntime({
+      loadConfig: async () => ({
+        activeModelKey: 'test:model-a',
+        providers: [{ id: 'test', enabled: true, baseUrl: 'https://ai.example.test/v1', apiKey: 'secret' }],
+      }),
+      requestChatCompletionJson: async () => { throw new Error('Bearer sensitive-token'); },
+      formatRequestError: async () => 'request failed safely',
+    });
+
+    await expect(expandNodeWithAI({
+      node: { id: 'root', topic: '根主题' } as any,
+    })).resolves.toEqual({ topics: [], error: 'request failed safely' });
   });
 });

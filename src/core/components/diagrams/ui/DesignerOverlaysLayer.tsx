@@ -5,6 +5,9 @@ import { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import { CommandPalette as UiCommandPalette } from '../../ui/CommandPalette';
 import { SaveStatusIndicator } from '../SaveStatusIndicator';
 import { DiffResult } from '../../../utils/diagramDiff';
+import type { CommandItem } from '../../../types/plugin';
+import type { AutoSaveState } from '../../../hooks/useAutoSave';
+import type { PresentationSlide } from '../../../hooks/usePresentationSlides';
 
 const JsonEditorModal = React.lazy(() => import('../JsonEditorModal').then(module => ({
     default: module.JsonEditorModal,
@@ -30,17 +33,17 @@ export interface DesignerOverlaysLayerProps {
         setVisible: (v: boolean) => void;
         nodes: Node[];
         edges: Edge[];
-        setNodes: (val: any) => void;
-        setEdges: (val: any) => void;
+        setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
+        setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
         reactFlowInstance: ReactFlowInstance | null;
-        initialContent?: any;
+        initialContent?: string;
     };
 
     // Command Palette
     commandPalette: {
         visible: boolean;
         setVisible: (v: boolean) => void;
-        items: any[];
+        items: CommandItem[];
     };
 
     // Shortcuts Help
@@ -53,7 +56,7 @@ export interface DesignerOverlaysLayerProps {
 
     // Status & Performance
     status: {
-        saveState: 'saved' | 'saving' | 'error' | 'idle' | string;
+        saveState: AutoSaveState;
         showPerformanceDashboard: boolean;
         nodeCount: number;
         edgeCount: number;
@@ -63,7 +66,7 @@ export interface DesignerOverlaysLayerProps {
     presentation: {
         active: boolean;
         setActive: (v: boolean) => void;
-        slides: any[];
+        slides: PresentationSlide[];
         onFocusNodes: (ids: string[]) => void;
     };
 
@@ -91,7 +94,7 @@ export const DesignerOverlaysLayer: React.FC<DesignerOverlaysLayerProps> = ({
 }) => {
     return (
         <>
-            {jsonEditor.visible && (
+            {jsonEditor.visible && jsonEditor.reactFlowInstance && (
                 <React.Suspense fallback={null}>
                     <JsonEditorModal
                         visible={jsonEditor.visible}
@@ -100,7 +103,7 @@ export const DesignerOverlaysLayer: React.FC<DesignerOverlaysLayerProps> = ({
                         edges={jsonEditor.edges}
                         setNodes={jsonEditor.setNodes}
                         setEdges={jsonEditor.setEdges}
-                        reactFlowInstance={jsonEditor.reactFlowInstance as any}
+                        reactFlowInstance={jsonEditor.reactFlowInstance}
                         initialContent={jsonEditor.initialContent}
                         diagramId={diagramId}
                     />
@@ -147,7 +150,7 @@ export const DesignerOverlaysLayer: React.FC<DesignerOverlaysLayerProps> = ({
                 pointerEvents: 'none',
                 transition: 'right 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}>
-                <SaveStatusIndicator saveState={status.saveState as any} />
+                <SaveStatusIndicator saveState={status.saveState} />
             </div>
 
             {/* ⭐ 性能仪表盘 */}

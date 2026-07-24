@@ -1,6 +1,6 @@
 // Type definitions for diagram data updates
 import { Edge } from '@xyflow/react';
-import { FlowchartNodeData, FlowchartShape } from '../components/custom-nodes/FlowchartNode';
+import type { FlowchartNodeData, FlowchartShape } from './flowchart-node';
 
 /**
  * Type-safe interface for node data updates
@@ -45,6 +45,9 @@ export interface EdgeDataUpdate {
 
     // Marker properties  
     markerEnd?: Edge['markerEnd'];
+    markerStart?: Edge['markerStart'];
+
+    animated?: boolean;
 
     // Edge type
     type?: string;

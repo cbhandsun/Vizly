@@ -234,7 +234,7 @@ export const MindMapBeautifyPanel: React.FC<{ ctx: PluginContext, selectedNodes:
 
     // Layout fields (direction/pathStyle/shape) live on root node and propagate down
     // They must be updated on the ROOT, not on the selected node
-    const handleLayoutUpdate = (field: string, value: any) => {
+    const handleLayoutUpdate = (field: string, value: unknown) => {
         if (!rootNode) return;
         updateNodesBatch([rootNode.id], { [field]: value });
     };
@@ -252,7 +252,7 @@ export const MindMapBeautifyPanel: React.FC<{ ctx: PluginContext, selectedNodes:
     };
 
     // Per-node fields (priority, progress, url, icon, note) apply to selected nodes
-    const handleNodeUpdate = (field: string, value: any) => {
+    const handleNodeUpdate = (field: string, value: unknown) => {
         if (!activeNode) return;
         const targetIds = selectedNodes.map(n => n.id);
         updateNodesBatch(targetIds, { [field]: value });

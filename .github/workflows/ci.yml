@@ -12,10 +12,10 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    name: Verify and test
+  static:
+    name: Static, build, and smoke
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -27,8 +27,110 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Pin npm
+        run: npm install --global npm@12.0.1
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Run full verification
-        run: npm run verify:full
+      - name: Run static verification and build
+        run: npm run verify:static
+
+      - name: Run route smoke checks
+        run: npm run smoke:routes:budget
+
+      - name: Run mobile route smoke checks
+        run: npm run smoke:routes:mobile
+
+  tests:
+    name: Tests (${{ matrix.group }})
+    runs-on: windows-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [foundation, ui, flow, core, routing]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Pin npm
+        run: npm install --global npm@12.0.1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify test catalog
+        run: npm run check:test-ci-coverage
+
+      - name: Run test group
+        run: node scripts/run-test-ci.mjs
+        env:
+          TEST_CI_GROUP: ${{ matrix.group }}
+          TEST_CI_COVERAGE: 1
+
+      - name: Upload shard coverage
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.group }}
+          path: coverage/shards
+          if-no-files-found: error
+          retention-days: 1
+
+  coverage:
+    name: Coverage thresholds
+    needs: [tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Pin npm
+        run: npm install --global npm@12.0.1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download shard coverage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          path: coverage/shards
+          merge-multiple: true
+
+      - name: Merge coverage and enforce thresholds
+        run: npm run test:coverage:merge
+
+  verify:
+    name: Verify and test
+    if: ${{ always() }}
+    needs: [static, tests, coverage]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Require every verification job
+        env:
+          STATIC_RESULT: ${{ needs.static.result }}
+          TEST_RESULT: ${{ needs.tests.result }}
+          COVERAGE_RESULT: ${{ needs.coverage.result }}
+        run: |
+          test "$STATIC_RESULT" = "success"
+          test "$TEST_RESULT" = "success"
+          test "$COVERAGE_RESULT" = "success"

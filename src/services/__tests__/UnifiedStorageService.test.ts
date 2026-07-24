@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiagramVersion, IStorageProvider } from '../storage/types';
 
@@ -59,9 +61,9 @@ describe('UnifiedStorageService', () => {
         const localVersion: DiagramVersion = {
             id: 'local-version-1',
             diagramId: 'diagram-1',
-            snapshotData: { nodes: [] },
+            snapshotData: { nodes: [], edges: [] },
             message: 'local fallback',
-            createdAt: '2026-06-24T00:00:00.000Z',
+            createdAt: Date.parse('2026-06-24T00:00:00.000Z'),
             authorId: 'local-user',
         };
         saveVersionMock.mockResolvedValueOnce(localVersion);
@@ -83,9 +85,12 @@ describe('UnifiedStorageService', () => {
         const localVersions: DiagramVersion[] = [{
             id: 'local-version-2',
             diagramId: 'diagram-2',
-            snapshotData: { nodes: [{ id: 'n1' }] },
+            snapshotData: {
+                nodes: [{ id: 'n1', position: { x: 0, y: 0 }, data: {} }],
+                edges: [],
+            },
             message: 'cached',
-            createdAt: '2026-06-24T00:00:00.000Z',
+            createdAt: Date.parse('2026-06-24T00:00:00.000Z'),
             authorId: 'local-user',
         }];
         const localVersion = localVersions[0];

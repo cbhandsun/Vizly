@@ -112,7 +112,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
     }
 
     // === Version History (GAP-05) ===
-    async saveVersion(diagramId: string, data: any, message?: string) {
+    async saveVersion(diagramId: string, data: unknown, message?: string) {
         // Prevent UUID errors for string-based standard template IDs
         if (!UUID_REGEX.test(diagramId)) {
              throw new Error("Version history requires a saved Cloud Diagram (UUID format required).");
@@ -138,7 +138,9 @@ export class SupabaseStorageProvider implements IStorageProvider {
             .select()
             .single();
         if (error) throw error;
-        return this.coerceDiagramVersion(dbData, { includeSnapshot: true, requireSnapshot: true });
+        const version = this.coerceDiagramVersion(dbData, { includeSnapshot: true, requireSnapshot: true });
+        if (!version) throw new Error('Supabase returned an invalid version record.');
+        return version;
     }
 
     async listVersions(diagramId: string) {
@@ -181,7 +183,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
     }
 
     // === Config specific to Supabase user configs ===
-    async saveConfig(key: string, value: any, user_id: string) {
+    async saveConfig(key: string, value: unknown, user_id: string) {
         const userId = await this.requireAuthenticatedUser(user_id);
         const normalizedKey = normalizeCloudConfigKey(key);
         if (!normalizedKey) throw new Error('Unsupported cloud config key');
@@ -296,7 +298,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
         return {
             ...diagram,
             id,
-            title: content.title || content.metadata?.title || content.name || title,
+            title: content.metadata?.title || content.name || title,
             content,
             updated_at: timestamp?.iso || new Date().toISOString(),
             user_id: coerceString(diagram.user_id) || 'anonymous',

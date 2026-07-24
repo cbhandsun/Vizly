@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 
-import type { CommandItem } from '@/core/components/ui/CommandPalette';
+import type { CommandItem } from '@/core/types/plugin';
 
 type DiagramDefinitionLike = {
   id: string;
@@ -101,6 +101,8 @@ export const createDiagramViewerCommandItems = ({
     {
       id: 'op:triggerAi',
       group: 'actions',
+      title: t('designer.commandItems.triggerAi', 'AI 助手 / AI Assistant'),
+      keywords: ['ai', 'assistant', '助手', '生成'],
       onSelect: () => triggerAiButton(),
     },
     {

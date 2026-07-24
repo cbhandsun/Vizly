@@ -10,7 +10,7 @@ import { Result } from 'antd';
 export interface MermaidDiagramProps {
     id?: string;
     title?: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ id: _id, title: _title }) => {

@@ -30,7 +30,7 @@ import {
     classifyTaskCandidatesLocally,
     collectTaskCandidates,
 } from './mindmapTaskClassification';
-import { cleanMindMapData, cleanMindMapTopic } from './mindmapTreeSanitizer';
+import { cleanMindMapData, cleanMindMapTopic, refreshMindElixirWithSanitizedData } from './mindmapTreeSanitizer';
 import { cleanMindMapNodePatch } from './mindmapNodePatchSecurity';
 
 const { TextArea } = Input;
@@ -62,7 +62,7 @@ function appendChildren(node: NodeObj, children: NodeObj[]) {
 function refreshCleanMindMap(mind: ReturnType<typeof getMindElixirInstance>) {
     if (!mind) return null;
     const cleaned = cleanMindMapData(mind.getData());
-    mind.refresh(cleaned);
+    refreshMindElixirWithSanitizedData(mind, cleaned);
     return cleaned.nodeData;
 }
 
@@ -125,9 +125,10 @@ export function MindMapAIPanel() {
         return collectTaskCandidates(data.nodeData, targetNode.id);
     }, [data, targetNode]);
 
-    const applyOperation = useCallback((name: string, node?: NodeObj) => {
+    const applyOperation = useCallback((_name: string, node?: NodeObj) => {
         if (!mind) return;
-        mind.bus.fire('operation', { name, obj: node ?? mind.getData().nodeData });
+        const changedNode = node ?? mind.getData().nodeData;
+        mind.bus.fire('operation', { name: 'reshapeNode', obj: changedNode, origin: changedNode });
         setTimeout(() => mind.toCenter(), 80);
     }, [mind]);
 
@@ -142,7 +143,7 @@ export function MindMapAIPanel() {
                 return;
             }
             const current = mind.getData();
-            mind.refresh(cleanMindMapData({ ...current, nodeData: result.nodeData }));
+            refreshMindElixirWithSanitizedData(mind, cleanMindMapData({ ...current, nodeData: result.nodeData }));
             applyOperation('ai_generate_map', result.nodeData);
             message.success(`已生成 ${countNodes(result.nodeData)} 个节点`);
             setPrompt('');
@@ -249,7 +250,7 @@ export function MindMapAIPanel() {
                 tags: result.tags,
                 icons: result.icons,
             });
-            if (result.topic !== undefined) node.topic = cleanPatch.topic;
+            if (cleanPatch.topic !== undefined) node.topic = cleanPatch.topic;
             if (result.note !== undefined) node.note = cleanPatch.note;
             if (result.tags !== undefined) node.tags = cleanPatch.tags;
             if (result.icons !== undefined) node.icons = cleanPatch.icons;

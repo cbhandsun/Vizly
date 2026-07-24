@@ -105,13 +105,16 @@ function repairInwardEndpointTraversals(
   if (!sourceSide && !targetSide) return edge;
 
   const repaired = withComputedPath(edge, path);
-  const data = (repaired.data || {}) as Record<string, any>;
+  const data = (repaired.data || {}) as Record<string, unknown>;
   const nextSourceHandle = sourceSide && edgeTerminalSideCanSwitch(edge, 'source', sourceSide)
     ? resolveEdgeTerminalHandleForSide(edge, 'source', sourceSide)
     : repaired.sourceHandle;
   const nextTargetHandle = targetSide && edgeTerminalSideCanSwitch(edge, 'target', targetSide)
     ? resolveEdgeTerminalHandleForSide(edge, 'target', targetSide)
     : repaired.targetHandle;
+  const treeRouting = data.treeRouting && typeof data.treeRouting === 'object'
+    ? data.treeRouting as Record<string, unknown>
+    : undefined;
   return {
     ...repaired,
     sourceHandle: nextSourceHandle,
@@ -126,11 +129,11 @@ function repairInwardEndpointTraversals(
         ...(sourceSide ? { source: true } : {}),
         ...(targetSide ? { target: true } : {}),
       },
-      treeRouting: data.treeRouting && Array.isArray(data.treeRouting.points)
+      treeRouting: treeRouting && Array.isArray(treeRouting.points)
         ? {
-          ...data.treeRouting,
-          effectiveSourceHandle: nextSourceHandle ?? data.treeRouting.effectiveSourceHandle,
-          effectiveTargetHandle: nextTargetHandle ?? data.treeRouting.effectiveTargetHandle,
+          ...treeRouting,
+          effectiveSourceHandle: nextSourceHandle ?? treeRouting.effectiveSourceHandle,
+          effectiveTargetHandle: nextTargetHandle ?? treeRouting.effectiveTargetHandle,
           points: path,
         }
         : data.treeRouting,

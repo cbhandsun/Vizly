@@ -58,7 +58,7 @@ const clamp = (value: number, minimum: number, maximum: number): number => (
 );
 
 const declaredSide = (edge: Edge, role: TerminalRole): TerminalSide | null => (
-  fullDisplayPortSide(normalizeHandle(role === 'source' ? edge.sourceHandle : edge.targetHandle))
+  fullDisplayPortSide(normalizeHandle(role === 'source' ? edge.sourceHandle : edge.targetHandle)) ?? null
 );
 
 const terminalTangent = (point: DisplayPoint, side: TerminalSide): number => (
@@ -123,7 +123,7 @@ const buildTangentCoordinates = (
     current - 24,
     current + 24,
     current + 48,
-  ].map(value => clamp(value, boundaryMinimum, boundaryMaximum)))
+  ].map(value => clamp(value, boundaryMinimum, boundaryMaximum)), current)
     .sort((first, second) => Math.abs(first - current) - Math.abs(second - current));
 };
 
@@ -154,7 +154,7 @@ const buildStubLengths = (
     96,
     120,
     ...outwardDistances,
-  ]).sort((first, second) => first - second);
+  ], MIN_DECLARED_ROLE_STUB).sort((first, second) => first - second);
 };
 
 /**
@@ -296,8 +296,11 @@ export const repairDeclaredTerminalRolesWithHardGateWithOutcome = <T extends Edg
   if (!getDisplayTerminalValidationReport(edges, terminalValidation).allAnchored) return unchanged();
   const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   const defectiveIndexes = edges.flatMap((edge, index) => {
-    const sourceRect = getDisplayNodeRect(nodeById.get(edge.source));
-    const targetRect = getDisplayNodeRect(nodeById.get(edge.target));
+    const sourceNode = nodeById.get(edge.source);
+    const targetNode = nodeById.get(edge.target);
+    if (!sourceNode || !targetNode) return [];
+    const sourceRect = getDisplayNodeRect(sourceNode);
+    const targetRect = getDisplayNodeRect(targetNode);
     if (!sourceRect || !targetRect) return [];
     return edgeHasDeclaredRoleDefect(edge, getDisplayComputedPath(edge), sourceRect, targetRect)
       ? [index]
@@ -309,8 +312,11 @@ export const repairDeclaredTerminalRolesWithHardGateWithOutcome = <T extends Edg
 
   const edgeIndex = defectiveIndexes[0];
   const edge = edges[edgeIndex];
-  const sourceRect = getDisplayNodeRect(nodeById.get(edge.source));
-  const targetRect = getDisplayNodeRect(nodeById.get(edge.target));
+  const sourceNode = nodeById.get(edge.source);
+  const targetNode = nodeById.get(edge.target);
+  if (!sourceNode || !targetNode) return unchanged();
+  const sourceRect = getDisplayNodeRect(sourceNode);
+  const targetRect = getDisplayNodeRect(targetNode);
   if (!sourceRect || !targetRect) return unchanged();
 
   const qualityContext = createEdgePathQualityEvaluationContext(edges);

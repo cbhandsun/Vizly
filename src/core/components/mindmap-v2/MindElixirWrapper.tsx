@@ -18,13 +18,14 @@ import React, {
     useState,
 } from 'react';
 import MindElixir from 'mind-elixir';
-import type { MindElixirInstance, MindElixirData, NodeObj } from 'mind-elixir';
+import type { MindElixirInstance, MindElixirData, NodeObj, Topic } from 'mind-elixir';
 import 'mind-elixir/style.css';
+import './MindElixirWrapper.css';
 
 import { PluginContext } from '../../types/plugin';
 import { VIZLY_HYPER_THEME, VIZLY_HYPER_DARK_THEME, VIZLY_THEMES } from './theme';
-import { migrateV1ToV2, directionStringToInt, markdownToNodeObj, opmlToNodeObj } from './migrate';
-import { isMindMapV2 } from './types';
+import { migrateV1ToV2, directionStringToInt, findNodeById } from './migrate';
+import { isMindMapV1, isMindMapV2 } from './types';
 import { registerMindElixirInstance, unregisterMindElixirInstance } from './mindElixirStore';
 import { MindElixirContext } from './MindElixirContext';
 import MindMapContextMenu, { type CtxPos } from './MindMapContextMenu';
@@ -41,377 +42,56 @@ import MindMapMultiplayerCursors from './MindMapMultiplayerCursors';
 import { MindMapAIPanel } from './MindMapAIPanel';
 import { emitToggleOutline } from './mindmapOutlineStore';
 import { MindMapSpeakerNotes } from './MindMapSpeakerNotes';
-import { findNodeById } from './migrate';
-import { getFileSizeLimitError, MINDMAP_TEXT_IMPORT_MAX_BYTES } from '../../utils/fileImportGuards';
 import { marked } from 'marked';
 import { sanitizeMarkdownHtml, toSafeExternalUrl } from '../../utils/sanitizeHtml';
-import { cleanAndValidateTree, cleanMindMapData } from './mindmapTreeSanitizer';
+import { cleanMindMapData } from './mindmapTreeSanitizer';
 import { cleanMindMapBridgeNode, cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import { parseMindElixirClipboardNodes } from './mindmapClipboardSecurity';
 import { createSafeMindMapV2Payload } from './mindmapPersistenceSecurity';
 import { getSafeMindMapShortcutAction } from './mindmapKeyboardSecurity';
+import { persistMindMapThemeKey, readStoredMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeStorage';
 import {
     logMindmapWrapperAiBridgeFailure,
     logMindmapWrapperClipboardPayloadBlocked,
-    logMindmapWrapperCollapsedBadgeFailure,
     logMindmapWrapperCopyTopicFailure,
-    logMindmapWrapperDragImportFailure,
-    logMindmapWrapperDragImportRejected,
-    logMindmapWrapperHistoryRecordFailure,
     logMindmapWrapperHyperlinkOpenFailure,
     logMindmapWrapperNotePreviewFailure,
     logMindmapWrapperSafePasteFailure,
     logMindmapWrapperSafeShortcutFailure,
     logMindmapWrapperSaveFailure,
-    logMindmapWrapperShapeSyncFailure,
 } from './mindmapWrapperLogging';
+import { coerceMindElixirDirection } from './mindElixirDirection';
+import { projectMindMapTreeToBridge } from './mindmapBridgeProjection';
+import { bindMindElixirOperationEffects } from './mindElixirOperationEffects';
+import { applyMindElixirPalette, clearMindElixirPalette } from './mindElixirThemeDom';
+import { useMindElixirFileDrop } from './useMindElixirFileDrop';
+import type { FlowDataBridgeEntry } from '../../utils/flowDataBridge';
 
 // ─── Default data shown for a fresh mindmap ──────────────────────────────────
 const DEFAULT_DATA: MindElixirData = {
     nodeData: {
         id: 'root',
         topic: '中心主题',
-        // 'root' is not in NodeObj type but mind-elixir uses it at runtime for the root node
-        ...({ root: true } as any),
+        root: true,
         children: [
             { id: 'b1', topic: '分支一', children: [] },
             { id: 'b2', topic: '分支二', children: [] },
             { id: 'b3', topic: '分支三', children: [] },
         ],
-    },
+    } as NodeObj & { root: true },
     direction: MindElixir.SIDE as 0 | 1 | 2,
 };
-
-// ─── CSS fix: inject a style override so gradient backgrounds actually render ──
-// mind-elixir uses `background-color: var(--main-bgcolor)` but CSS gradients are
-// not valid values for background-color — they need the `background` shorthand.
-const ME_DYNAMIC_THEME_ID = 'me-dynamic-theme-override';
-function injectThemeStyles(theme: any) {
-    if (!theme || !theme.palette) return;
-    let style = document.getElementById(ME_DYNAMIC_THEME_ID) as HTMLStyleElement | null;
-    if (!style) {
-        style = document.createElement('style');
-        style.id = ME_DYNAMIC_THEME_ID;
-        document.head.appendChild(style);
-    }
-    let cssText = '';
-    const palette = theme.palette;
-    palette.forEach((color: string, index: number) => {
-        cssText += `
-            .map-container me-main > me-wrapper:nth-of-type(${index + 1}) > me-parent > me-tpc {
-                background: ${color} !important;
-                color: #ffffff !important;
-            }
-        `;
-    });
-    style.textContent = cssText;
-}
-
-const ME_GRADIENT_FIX_ID = 'me-gradient-bg-fix';
-function injectGradientFix() {
-    if (document.getElementById(ME_GRADIENT_FIX_ID)) return;
-    const style = document.createElement('style');
-    style.id = ME_GRADIENT_FIX_ID;
-    // Note: mind-elixir uses `background-color: var(--main-bgcolor)` for first-level branches,
-    // but CSS gradients are not valid for background-color — they need the `background` shorthand.
-    // We override with background shorthand to fix this. DO NOT also set background-color: transparent
-    // for the root node — it would override the root's valid hex color (#312e81).
-    style.textContent = `
-        @keyframes noteTooltipIn {
-            from { opacity: 0; transform: translateY(-96%) scale(0.97); }
-            to   { opacity: 1; transform: translateY(-100%) scale(1); }
-        }
-
-        /* ── First-level branch nodes: gradient background fix ────────────────── */
-        /* background-color can't hold gradients; use background shorthand instead */
-        .map-container me-main > me-wrapper > me-parent > me-tpc {
-            background: var(--main-bgcolor) !important;
-            color: var(--main-color) !important;
-            font-weight: 500;
-            letter-spacing: 0.01em;
-        }
-
-        /* ── Root node: solid color from --root-bgcolor ────────────────────────── */
-        .map-container me-root me-tpc {
-            background: var(--root-bgcolor, #312e81) !important;
-            color: var(--root-color, #ffffff) !important;
-            font-weight: 700 !important;
-            font-size: 15px !important;
-            padding: 10px 20px !important;
-        }
-
-        /* ── Deeper nodes (2nd level+): transparent bg, dark text ─────────────── */
-        .map-container me-wrapper me-wrapper me-parent me-tpc {
-            background: transparent !important;
-            color: var(--color) !important;
-        }
-
-        /* ── All nodes: smooth transitions ─────────────────────────────────────── */
-        .map-container me-tpc {
-            transition: box-shadow 0.18s ease, transform 0.12s ease, opacity 0.15s ease !important;
-            cursor: default;
-        }
-
-        /* ── Hover: subtle lift effect ──────────────────────────────────────────── */
-        .map-container me-tpc:hover {
-            box-shadow: 0 2px 10px rgba(0,0,0,0.12) !important;
-            transform: translateY(-1px) !important;
-        }
-
-        /* ── Selected node: indigo ring + lift ─────────────────────────────────── */
-        .map-container me-tpc.selected {
-            box-shadow: 0 0 0 3px var(--selected),
-                        0 4px 16px rgba(99,102,241,0.28) !important;
-            transform: translateY(-1px) !important;
-        }
-
-        /* ── Editing (inline input) ─────────────────────────────────────────────── */
-        .map-container me-tpc.editing {
-            box-shadow: 0 0 0 2px #6366f1, 0 4px 16px rgba(99,102,241,0.3) !important;
-        }
-
-        /* ── Connection lines: smooth ───────────────────────────────────────────── */
-        .map-container svg path {
-            transition: stroke 0.25s ease, opacity 0.2s ease;
-        }
-
-        /* ── Context menu: rounded, glassmorphism ───────────────────────────────── */
-        me-context-menu {
-            border-radius: 12px !important;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.16), 0 1px 4px rgba(0,0,0,0.08) !important;
-            backdrop-filter: blur(12px) !important;
-            border: 1px solid rgba(255,255,255,0.12) !important;
-            overflow: hidden !important;
-        }
-        me-context-menu li {
-            padding: 7px 14px !important;
-            font-size: 13px !important;
-            border-radius: 0 !important;
-            transition: background 0.12s ease !important;
-        }
-        me-context-menu li:first-child {
-            border-radius: 12px 12px 0 0 !important;
-        }
-        me-context-menu li:last-child {
-            border-radius: 0 0 12px 12px !important;
-        }
-
-        /* ── Thin scrollbar on canvas ───────────────────────────────────────────── */
-        #vizly-mind-elixir-root .map-container {
-            scrollbar-width: thin;
-            scrollbar-color: rgba(99,102,241,0.3) transparent;
-        }
-        #vizly-mind-elixir-root .map-container::-webkit-scrollbar {
-            width: 5px; height: 5px;
-        }
-        #vizly-mind-elixir-root .map-container::-webkit-scrollbar-thumb {
-            background: rgba(99,102,241,0.25);
-            border-radius: 10px;
-        }
-
-        /* ── 折叠数量气泡 ────────────────────────────────────────────────────────── */
-        me-tpc .node-children-count {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 18px;
-            height: 18px;
-            padding: 0 5px;
-            margin-left: 6px;
-            background: rgba(99,102,241,0.15);
-            color: #6366f1;
-            font-size: 10px;
-            font-weight: 700;
-            border-radius: 9px;
-            border: 1px solid rgba(99,102,241,0.25);
-            vertical-align: middle;
-            line-height: 1;
-        }
-
-        /* ── 节点图片 ────────────────────────────────────────────────────────────── */
-        me-tpc img {
-            border-radius: 6px;
-            display: block;
-            margin: 4px auto 2px;
-            max-width: 200px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
-
-        /* ── 关联箭头（Arrow）样式 ───────────────────────────────────────────────── */
-        .map-container .custom-link {
-            stroke: rgba(99,102,241,0.6) !important;
-            stroke-width: 2px !important;
-            stroke-dasharray: 6 3 !important;
-            transition: stroke 0.2s ease !important;
-        }
-        .map-container .custom-link:hover {
-            stroke: rgba(99,102,241,1) !important;
-            stroke-width: 2.5px !important;
-        }
-        .map-container .custom-link.selected {
-            stroke: #6366f1 !important;
-            stroke-width: 3px !important;
-        }
-
-        /* ── Summary 汇总括号 ────────────────────────────────────────────────────── */
-        .map-container .summary-tpc {
-            background: rgba(99,102,241,0.06) !important;
-            border: 1.5px dashed rgba(99,102,241,0.35) !important;
-            border-radius: 8px !important;
-            color: #6366f1 !important;
-            font-size: 12px !important;
-            font-style: italic;
-        }
-        .map-container path.summary-link {
-            stroke: rgba(99,102,241,0.4) !important;
-            stroke-width: 1.5px !important;
-        }
-
-        /* ── 节点内 Tags 渲染 ────────────────────────────────────────────────────── */
-        me-tpc .node-tag {
-            display: inline-flex;
-            align-items: center;
-            padding: 1px 7px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: 600;
-            margin: 2px 2px 0;
-            line-height: 16px;
-        }
-
-        /* ── Canvas background presets ───────────────────────────────────────────── */
-        #vizly-mind-elixir-root[data-bg="grid"] .map-container {
-            background-image:
-                repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(99,102,241,0.12) 23px, rgba(99,102,241,0.12) 24px),
-                repeating-linear-gradient(90deg, transparent, transparent 23px, rgba(99,102,241,0.12) 23px, rgba(99,102,241,0.12) 24px) !important;
-        }
-        #vizly-mind-elixir-root[data-bg="dots"] .map-container {
-            background-image:
-                radial-gradient(circle, rgba(99,102,241,0.35) 1px, transparent 1px) !important;
-            background-size: 24px 24px !important;
-        }
-
-        /* ── 折叠/展开 动画 ───────────────────────────────────────────────────── */
-        me-children {
-            transform-origin: left center;
-            transition: opacity 0.2s ease, transform 0.2s ease !important;
-        }
-        /* When node is collapsing (mind-elixir adds 'collapsed' attr to me-wrapper) */
-        me-wrapper[data-id] me-children {
-            animation: none;
-        }
-        /* Expand animation via :not(:hidden) — animate freshly visible children */
-        @keyframes meChildrenExpand {
-            from { opacity: 0; transform: scaleX(0.8) translateX(-8px); }
-            to   { opacity: 1; transform: scaleX(1) translateX(0); }
-        }
-
-        /* ── me-tpc (node bubble) hover micro-interaction ────────────────────── */
-        me-tpc {
-            transition: box-shadow 0.15s ease, filter 0.15s ease !important;
-        }
-        me-tpc:hover {
-            filter: brightness(1.08) !important;
-            box-shadow: 0 0 0 2px rgba(99,102,241,0.25) !important;
-        }
-
-        /* ── Markdown rendered content inside nodes ───────────────────────────── */
-        me-tpc strong { font-weight: 700; }
-        me-tpc em     { font-style: italic; opacity: 0.9; }
-        me-tpc code   {
-            font-family: 'Menlo', 'Consolas', monospace;
-            background: rgba(255,255,255,0.1);
-            padding: 0 3px;
-            border-radius: 3px;
-            font-size: 0.88em;
-        }
-        me-tpc a { color: #93c5fd; text-decoration: underline; }
-
-        /* ── 节点形状 (data-shape 属性驱动) ─────────────────────────────────────── */
-        /* 椭圆 */
-        me-wrapper[data-shape="oval"] me-tpc {
-            border-radius: 999px !important;
-            padding-left: 20px !important;
-            padding-right: 20px !important;
-        }
-        /* 矩形（直角） */
-        me-wrapper[data-shape="rect"] me-tpc {
-            border-radius: 3px !important;
-        }
-        /* 下划线（无背景，仅底部线条） */
-        me-wrapper[data-shape="underline"] me-tpc {
-            background: transparent !important;
-            border: none !important;
-            border-bottom: 2px solid currentColor !important;
-            border-radius: 0 !important;
-            padding-left: 2px !important;
-            padding-right: 2px !important;
-        }
-        /* 菱形 (clip-path polygon) */
-        me-wrapper[data-shape="diamond"] me-tpc {
-            clip-path: polygon(12px 50%, 50% 2px, calc(100% - 12px) 50%, 50% calc(100% - 2px)) !important;
-            padding: 6px 24px !important;
-        }
-
-        /* ── 自动节点编号 (data-numbering 驱动) ─────────────────────────────────── */
-        #vizly-mind-elixir-root[data-numbering] me-children {
-            counter-reset: me-seq;
-        }
-        #vizly-mind-elixir-root[data-numbering] me-children > me-wrapper {
-            counter-increment: me-seq;
-        }
-        #vizly-mind-elixir-root[data-numbering] me-children > me-wrapper > me-tpc::before {
-            content: counter(me-seq) ".";
-            font-size: 0.75em;
-            font-weight: 700;
-            letter-spacing: 0.02em;
-            opacity: 0.45;
-            margin-right: 5px;
-            font-family: 'Menlo', 'Consolas', monospace;
-            color: inherit;
-        }
-
-        /* ── 备注指示器：右上角 amber 点 ────────────────────────────────────── */
-        me-wrapper[data-note] me-tpc {
-            position: relative !important;
-        }
-        me-wrapper[data-note] me-tpc::after {
-            content: '';
-            position: absolute;
-            top: -3px;
-            right: -3px;
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #f59e0b;
-            box-shadow: 0 0 5px rgba(245,158,11,0.55);
-            pointer-events: none;
-            z-index: 10;
-        }
-    `;
-    document.head.appendChild(style);
-}
-
-
-// ─── Debounce utility ─────────────────────────────────────────────────────────
-function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): T {
-    let timer: ReturnType<typeof setTimeout>;
-    return ((...args: any[]) => {
-        clearTimeout(timer);
-        timer = setTimeout(() => fn(...args), ms);
-    }) as T;
-}
 
 // ─── Load / Save helpers ──────────────────────────────────────────────────────
 function loadData(ctx: PluginContext): MindElixirData {
     try {
-        const nodes = (ctx as any).getNodes?.() ?? [];
-        const edges = (ctx as any).getEdges?.() ?? [];
+        const nodes = ctx.getNodes();
+        const edges = ctx.getEdges();
 
         // Restore persisted direction from localStorage (user may have changed it)
         const { directionStringToInt: d2i } = { directionStringToInt };
         const lsDir = localStorage.getItem('vizly_mindmap_dir');
-        const persistedDir = lsDir ? (d2i(lsDir) as 0 | 1 | 2) : null;
+        const persistedDir = lsDir ? coerceMindElixirDirection(d2i(lsDir)) : null;
 
         if (nodes.length === 0) return {
             ...DEFAULT_DATA,
@@ -419,30 +99,30 @@ function loadData(ctx: PluginContext): MindElixirData {
         };
 
         // Detect v2 format stored in a special "meta" node
-        const metaNode = nodes.find((n: any) => n.id === '__mindmap_meta__');
+        const metaNode = nodes.find(node => node.id === '__mindmap_meta__');
         if (metaNode?.data?.mindmapV2) {
             const v2 = metaNode.data.mindmapV2;
             if (isMindMapV2(v2)) {
                 // If themeKey persisted separately, sync localStorage
-                if (v2.themeKey) localStorage.setItem('vizly_mindmap_theme', v2.themeKey);
+                if (v2.themeKey) persistMindMapThemeKey(v2.themeKey);
                 return {
                     nodeData: v2.nodeData,
-                    direction: persistedDir ?? (v2.direction ?? MindElixir.SIDE) as 0 | 1 | 2,
+                    direction: persistedDir ?? coerceMindElixirDirection(v2.direction),
                     theme: v2.theme ?? VIZLY_HYPER_THEME,
                 };
             }
         }
 
         // Fallback: migrate from v1 (RF nodes/edges)
-        const mindmapNodes = nodes.filter((n: any) => n.type === 'mindmap');
+        const mindmapNodes = nodes.filter(node => node.type === 'mindmap');
         if (mindmapNodes.length === 0) return {
             ...DEFAULT_DATA,
             direction: persistedDir ?? DEFAULT_DATA.direction,
         };
 
         // If only the root node exists with no children edges, treat as fresh mindmap
-        const childEdges = edges.filter((e: any) => e.type !== 'relationshipEdge');
-        const realNodes = mindmapNodes.filter((n: any) => n.id !== '__mindmap_meta__');
+        const childEdges = edges.filter(edge => edge.type !== 'relationshipEdge');
+        const realNodes = mindmapNodes.filter(node => node.id !== '__mindmap_meta__');
         if (realNodes.length === 1 && childEdges.length === 0) {
             const rootLabel = (realNodes[0].data?.label as string) || '中心主题';
             return {
@@ -455,7 +135,7 @@ function loadData(ctx: PluginContext): MindElixirData {
         const v2 = migrateV1ToV2({ nodes: mindmapNodes, edges });
         return {
             nodeData: v2.nodeData,
-            direction: persistedDir ?? (v2.direction ?? MindElixir.SIDE) as 0 | 1 | 2,
+            direction: persistedDir ?? coerceMindElixirDirection(v2.direction),
             theme: VIZLY_HYPER_THEME,
         };
     } catch {
@@ -466,15 +146,12 @@ function loadData(ctx: PluginContext): MindElixirData {
 
 function saveData(ctx: PluginContext, mind: MindElixirInstance): void {
     try {
-        const themeKey = localStorage.getItem('vizly_mindmap_theme') ?? 'indigo';
+        const themeKey = resolveMindMapThemeKey();
         const v2Payload = createSafeMindMapV2Payload(mind.getData(), themeKey, MindElixir.SIDE as 0 | 1 | 2 | 3);
 
-        const setNodes = (ctx as any).setNodes;
-        if (!setNodes) return;
-
-        setNodes((prev: any[]) => {
+        ctx.setNodes(prev => {
             // Remove old meta node if present
-            const filtered = prev.filter((n: any) => n.id !== '__mindmap_meta__');
+            const filtered = prev.filter(node => node.id !== '__mindmap_meta__');
             return [
                 ...filtered,
                 {
@@ -491,46 +168,6 @@ function saveData(ctx: PluginContext, mind: MindElixirInstance): void {
     }
 }
 
-function flattenMindmapTree(root: NodeObj, parentId: string | null = null, depth = 0, side?: 'left' | 'right'): { nodes: any[], edges: any[] } {
-    const nodes: any[] = [];
-    const edges: any[] = [];
-
-    const nodeSide = root.side || side || 'right';
-
-    nodes.push({
-        id: root.id,
-        type: 'mindmap',
-        data: {
-            label: root.topic,
-            depth,
-            side: root.id === 'root' ? undefined : nodeSide,
-            parentId: parentId || undefined,
-            note: root.note,
-            url: root.hyperLink,
-            tags: root.tags,
-            icons: root.icons,
-        }
-    });
-
-    if (parentId) {
-        edges.push({
-            id: `edge_${parentId}_${root.id}`,
-            source: parentId,
-            target: root.id,
-        });
-    }
-
-    if (root.children) {
-        root.children.forEach(child => {
-            const childRes = flattenMindmapTree(child, root.id, depth + 1, nodeSide);
-            nodes.push(...childRes.nodes);
-            edges.push(...childRes.edges);
-        });
-    }
-
-    return { nodes, edges };
-}
-
 function isMindMapTextEditingTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
     if (target.closest('#input-box')) return true;
@@ -539,25 +176,6 @@ function isMindMapTextEditingTarget(target: EventTarget | null): boolean {
 }
 
 // ─── Wrapper Component ────────────────────────────────────────────────────────
-const OP_NAMES_MAP: Record<string, string> = {
-    insertSibling: '添加兄弟节点',
-    addChild: '添加子节点',
-    removeNodes: '删除节点',
-    removeNode: '删除节点',
-    setNodeTopic: '修改节点文本',
-    moveNode: '移动节点位置',
-    setNodeNote: '修改节点备注',
-    setNodeTags: '修改节点标签',
-    setNodeIcons: '修改节点图标',
-    setNodeHyperLink: '修改节点链接',
-    outline_structure_change: '大纲拖拽排序',
-    template_apply: '套用模板',
-    ai_custom_action: 'AI 交互式指令处理',
-    clearHistory: '清空历史',
-    import: '导入数据',
-    restore_version: '恢复历史版本'
-};
-
 interface MindElixirWrapperProps {
     ctx: PluginContext;
     isDark?: boolean;
@@ -580,15 +198,13 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
     const [notePreview, setNotePreview] = useState<{ safeHtml: string; x: number; y: number } | null>(null);
 
     useEffect(() => {
-        // Inject gradient CSS fix once globally
-        injectGradientFix();
-
         if (!containerRef.current) return;
+        const themeStyle = containerRef.current.style;
 
         const initialData = loadData(ctx);
 
         // Theme priority: localStorage key > isDark flag > default
-        const storedThemeKey = localStorage.getItem('vizly_mindmap_theme');
+        const storedThemeKey = readStoredMindMapThemeKey();
         const theme = storedThemeKey
             ? (VIZLY_THEMES[storedThemeKey] ?? (isDark ? VIZLY_HYPER_DARK_THEME : VIZLY_HYPER_THEME))
             : (isDark ? VIZLY_HYPER_DARK_THEME : VIZLY_HYPER_THEME);
@@ -630,19 +246,18 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
 
         // ── 拦截 changeTheme 并同步彩虹色样式 ──────────────────────────
         const originalChangeTheme = mind.changeTheme.bind(mind);
-        mind.changeTheme = (newTheme: any) => {
+        mind.changeTheme = (newTheme: Parameters<MindElixirInstance['changeTheme']>[0]) => {
             originalChangeTheme(newTheme);
-            injectThemeStyles(newTheme);
+            applyMindElixirPalette(themeStyle, newTheme);
         };
 
-        // 首次初始化后执行一次
-        injectThemeStyles(theme);
+        applyMindElixirPalette(themeStyle, theme);
 
         // ── 系统深色/浅色主题自动跟随 ─────────────────────────────────────────
         const mq = window.matchMedia('(prefers-color-scheme: dark)');
         const handleColorScheme = (e: MediaQueryListEvent) => {
             // 只在用户没有手动选主题时自动切换
-            const hasManualTheme = localStorage.getItem('vizly_mindmap_theme');
+            const hasManualTheme = readStoredMindMapThemeKey();
             if (hasManualTheme) return;
             mind.changeTheme(e.matches ? VIZLY_HYPER_DARK_THEME : VIZLY_HYPER_THEME);
         };
@@ -655,8 +270,8 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             if (!tpc) return;
             // me-tpc elements have a data-nodeid or we can find the id from mind.currentNode
             const nodeId = tpc.getAttribute('data-nodeid')
-                || (mind.currentNode as any)?.id
-                || (mind.currentNodes?.[0] as any)?.id;
+                || mind.currentNode?.id
+                || mind.currentNodes?.[0]?.id;
             if (!nodeId) return;
             try {
                 const obj = mind.getObjById(nodeId, mind.getData().nodeData);
@@ -680,29 +295,18 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             const wrapper = tpc.closest('me-wrapper') as HTMLElement | null;
             const nodeId = tpc.getAttribute('data-nodeid')
                 || wrapper?.getAttribute('data-nodeid')
-                || (mind.currentNode as any)?.id
+                || mind.currentNode?.id
                 || null;
             if (!nodeId) return;
             setCtxMenu({ visible: true, x: e.clientX, y: e.clientY, nodeId });
         };
         mind.container.addEventListener('contextmenu', handleContextMenu);
 
-        // Debounced auto-save on every operation
-        const debouncedSave = debounce(() => saveRef.current(), 800);
-        const onOperation = (op: any) => {
-            debouncedSave();
-            
-            // Record history snapshot
-            const opName = op?.name;
-            const desc = OP_NAMES_MAP[opName] || '更新思维导图';
-            try {
-                const nodeData = mind.getData().nodeData;
-                addHistoryRecord(desc, nodeData);
-            } catch (err) {
-                logMindmapWrapperHistoryRecordFailure(err);
-            }
-        };
-        mind.bus.addListener('operation', onOperation);
+        const unbindOperationEffects = bindMindElixirOperationEffects({
+            mind,
+            root: containerRef.current,
+            onSave: () => saveRef.current(),
+        });
 
         const handleSafeMindElixirPaste = (event: ClipboardEvent) => {
             const text = event.clipboardData?.getData('text/plain') ?? '';
@@ -721,7 +325,10 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             const target = mind.currentNode;
             if (!target || nodes.length === 0) return;
             try {
-                mind.copyNodes(nodes.map(nodeObj => ({ nodeObj })) as any, target);
+                const copiedNodes = nodes.map(nodeObj => ({ nodeObj })) as Parameters<
+                    MindElixirInstance['copyNodes']
+                >[0];
+                mind.copyNodes(copiedNodes, target);
             } catch (err) {
                 logMindmapWrapperSafePasteFailure(err);
             }
@@ -732,14 +339,14 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             const action = getSafeMindMapShortcutAction(event);
             if (!action || !mind.editable || isMindMapTextEditingTarget(event.target)) return;
 
-            const tpc = mind.currentNode as HTMLElement | null;
+            const tpc: Topic | null = mind.currentNode;
             if (!tpc) return;
 
             event.preventDefault();
             event.stopImmediatePropagation();
 
             try {
-                const nodeObj = (tpc as any).nodeObj as NodeObj | undefined;
+                const nodeObj = tpc.nodeObj;
                 if (action === 'addChild') {
                     mind.addChild(tpc, cleanMindMapChildNode());
                 } else if (action === 'insertParent') {
@@ -761,68 +368,6 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         };
         mind.container.addEventListener('keydown', handleSafeNodeShortcut, true);
 
-        // ── Collapsed count badges (data-driven) ─────────────────────────────
-        // Walk the nodeData tree; for each collapsed node inject a child-count badge
-        const updateBadgesFromData = () => {
-            try {
-                const data = mind.getData();
-                const container = document.getElementById('vizly-mind-elixir-root');
-                if (!container) return;
-                container.querySelectorAll('.me-collapsed-badge').forEach(el => el.remove());
-                function walkNodes(node: NodeObj) {
-                    if (node.expanded === false && node.children && node.children.length > 0) {
-                        try {
-                            const tpc = mind.findEle(node.id);
-                            if (tpc && !tpc.querySelector('.me-collapsed-badge')) {
-                                const badge = document.createElement('span');
-                                badge.className = 'me-collapsed-badge node-children-count';
-                                badge.textContent = String(node.children.length);
-                                tpc.appendChild(badge);
-                            }
-                        } catch (error) {
-                            logMindmapWrapperCollapsedBadgeFailure(error);
-                        }
-                    }
-                    (node.children ?? []).forEach(walkNodes);
-                }
-                walkNodes(data.nodeData);
-            } catch (error) {
-                logMindmapWrapperCollapsedBadgeFailure(error);
-            }
-        };
-
-        mind.bus.addListener('operation', updateBadgesFromData);
-        // Initial badge update after layout settles
-        setTimeout(updateBadgesFromData, 350);
-
-        // ── Apply node shapes + note indicators to DOM ──────────────────────
-        const applyShapes = () => {
-            try {
-                const walk = (node: NodeObj) => {
-                    const shape = (node as any).shapeClass as string | undefined;
-                    try {
-                        const tpc = mind.findEle(node.id) as HTMLElement | null;
-                        const wrapper = tpc?.closest('me-wrapper') as HTMLElement | null;
-                        if (wrapper) {
-                            if (shape) wrapper.setAttribute('data-shape', shape);
-                            else wrapper.removeAttribute('data-shape');
-                            // Note indicator
-                            if (node.note) wrapper.setAttribute('data-note', '1');
-                            else wrapper.removeAttribute('data-note');
-                        }
-                    } catch (error) {
-                        logMindmapWrapperShapeSyncFailure(error);
-                    }
-                    (node.children ?? []).forEach(walk);
-                };
-                walk(mind.getData().nodeData);
-            } catch (error) {
-                logMindmapWrapperShapeSyncFailure(error);
-            }
-        };
-        mind.bus.addListener('operation', applyShapes);
-        setTimeout(applyShapes, 400);
-
         // ── Keyboard shortcuts: Alt+O (outline), Ctrl+Shift+C (copy text) ────
         const handleGlobalKeys = (e: KeyboardEvent) => {
             // Alt+O — toggle outline panel
@@ -840,7 +385,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
             // Ctrl+Shift+C — copy selected node topic to clipboard
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
                 try {
-                    const currentNode = (mind as any).currentNode as HTMLElement | null;
+                    const currentNode = mind.currentNode;
                     const nodeId = currentNode?.dataset?.nodeid ?? '';
                     if (!nodeId) return;
                     const obj = findNodeById(mind.getData().nodeData, nodeId);
@@ -903,20 +448,18 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
 
         return () => {
             mq.removeEventListener('change', handleColorScheme);
-            mind.bus.removeListener('operation', debouncedSave);
+            unbindOperationEffects();
             mind.container.removeEventListener('paste', handleSafeMindElixirPaste, true);
             mind.container.removeEventListener('keydown', handleSafeNodeShortcut, true);
-            mind.bus.removeListener('operation', updateBadgesFromData);
             mind.bus.removeListener('selectNodes', handleSelectNodes);
             mind.bus.removeListener('selectNewNode', handleSelectNewNode);
             mind.bus.removeListener('unselectNodes', handleUnselectNodes);
-            mind.bus.removeListener('operation', applyShapes);
             mind.container?.removeEventListener('click', handleHyperLinkClick);
             mind.container?.removeEventListener('contextmenu', handleContextMenu);
             mind.container?.removeEventListener('mouseover', handleNoteOver);
             mind.container?.removeEventListener('mouseout', handleNoteOut);
             document.removeEventListener('keydown', handleGlobalKeys);
-            document.getElementById(ME_DYNAMIC_THEME_ID)?.remove();
+            clearMindElixirPalette(themeStyle);
             // mind-elixir doesn't have a formal destroy() — unmounting the div is enough
             unregisterMindElixirInstance();
             mindRef.current = null;
@@ -937,35 +480,43 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         const diagramId = ctx.diagramId;
         if (!diagramId) return;
 
-        if (!(window as any).__flowDataBridge) {
-            (window as any).__flowDataBridge = {};
+        if (!window.__flowDataBridge) {
+            window.__flowDataBridge = {};
         }
 
         const bridgeObj = {
             get nodes() {
                 if (!mindRef.current) return [];
                 const data = mindRef.current.getData();
-                return flattenMindmapTree(data.nodeData).nodes;
+                return projectMindMapTreeToBridge(data.nodeData).nodes;
             },
             get edges() {
                 if (!mindRef.current) return [];
                 const data = mindRef.current.getData();
-                return flattenMindmapTree(data.nodeData).edges;
+                return projectMindMapTreeToBridge(data.nodeData).edges;
             },
-            importData: async (newData: any) => {
+            importData: async (newData: unknown) => {
                 if (!mindRef.current) return;
                 try {
-                    const v2 = isMindMapV2(newData) || newData?.nodeData
+                    const hasNodeData = typeof newData === 'object'
+                        && newData !== null
+                        && 'nodeData' in newData;
+                    const v2 = isMindMapV2(newData) || hasNodeData
                         ? newData
-                        : migrateV1ToV2(newData);
+                        : isMindMapV1(newData)
+                            ? migrateV1ToV2(newData)
+                            : newData;
                     const safeData = cleanMindMapData(v2);
-                    mindRef.current.refresh(safeData);
+                    mindRef.current.refresh({
+                        ...safeData,
+                        direction: coerceMindElixirDirection(safeData.direction),
+                    });
                     saveData(ctx, mindRef.current);
                 } catch (err) {
                     logMindmapWrapperAiBridgeFailure('importData', err);
                 }
             },
-            addNode: async (args: { label: string; shape?: string }) => {
+            addNode: async (args: unknown) => {
                 if (!mindRef.current) return;
                 try {
                     const parentId = mindRef.current.currentNode?.id || 'root';
@@ -980,9 +531,11 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     logMindmapWrapperAiBridgeFailure('addNode', err);
                 }
             },
-            addChild: async (args: { parentId: string; label: string; side?: 'left' | 'right' }) => {
+            addChild: async (args: unknown) => {
                 if (!mindRef.current) return;
                 try {
+                    if (typeof args !== 'object' || args === null || !('parentId' in args)
+                        || typeof args.parentId !== 'string') return;
                     const parent = mindRef.current.findEle(args.parentId);
                     if (parent) {
                         const newId = `node_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
@@ -1018,63 +571,16 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     logMindmapWrapperAiBridgeFailure('collapse', err);
                 }
             }
-        };
+        } satisfies FlowDataBridgeEntry;
 
-        (window as any).__flowDataBridge[diagramId] = bridgeObj;
+        window.__flowDataBridge[diagramId] = bridgeObj;
 
         return () => {
-            delete (window as any).__flowDataBridge?.[diagramId];
+            delete window.__flowDataBridge?.[diagramId];
         };
     }, [ctx, instance]);
 
-    // Drag-to-import handler: drop .md / .opml files onto canvas
-    const handleDragOver = useCallback((e: React.DragEvent) => {
-        const files = Array.from(e.dataTransfer.items || []);
-        const hasCompatible = files.some(item =>
-            item.kind === 'file' && (
-                item.type === 'text/markdown' ||
-                item.type === 'text/plain' ||
-                item.type === 'application/xml' ||
-                item.type === 'text/xml' ||
-                (item.getAsFile()?.name.match(/\.(md|markdown|opml|xml|txt)$/i) ?? false)
-            )
-        );
-        if (hasCompatible || files.some(f => f.kind === 'file')) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'copy';
-        }
-    }, []);
-
-    const handleDrop = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        const mind = mindRef.current;
-        if (!mind) return;
-        const file = e.dataTransfer.files[0];
-        if (!file) return;
-        const sizeError = getFileSizeLimitError(file, MINDMAP_TEXT_IMPORT_MAX_BYTES, 'mind map');
-        if (sizeError) {
-            logMindmapWrapperDragImportRejected(sizeError);
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            try {
-                const text = ev.target?.result as string;
-                let nodeData;
-                if (file.name.match(/\.(opml|xml)$/i)) {
-                    nodeData = cleanAndValidateTree(opmlToNodeObj(text), true);
-                } else {
-                    nodeData = cleanAndValidateTree(markdownToNodeObj(text), true);
-                }
-                mind.refresh({ nodeData });
-                mind.toCenter();
-                mind.clearHistory?.();
-            } catch (err) {
-                logMindmapWrapperDragImportFailure(err);
-            }
-        };
-        reader.readAsText(file);
-    }, []);
+    const { handleDragOver, handleDrop } = useMindElixirFileDrop(mindRef);
 
     const [isDragOver, setIsDragOver] = useState(false);
 

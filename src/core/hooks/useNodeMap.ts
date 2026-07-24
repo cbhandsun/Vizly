@@ -12,7 +12,13 @@
 
 import { useMemo } from 'react';
 import { useStore } from '@xyflow/react';
-import type { Node } from '@xyflow/react';
+import type { Node, XYPosition } from '@xyflow/react';
+
+type RuntimeNode = Node & {
+    positionAbsolute?: XYPosition;
+    computed?: { positionAbsolute?: XYPosition };
+    parentNode?: string;
+};
 
 /**
  * 创建节点 ID -> Node 的 Map 用于 O(1) 查找
@@ -20,7 +26,7 @@ import type { Node } from '@xyflow/react';
  * @returns Map<string, Node> 节点映射表
  */
 export const useNodeMap = (): Map<string, Node> => {
-    const nodes = useStore((s: any) => s.nodes || []);
+    const nodes = useStore(s => s.nodes);
 
     return useMemo(() => {
         const map = new Map<string, Node>();
@@ -49,23 +55,24 @@ export interface SimpleNodeData {
 }
 
 export const useSimpleNodeMap = (): Map<string, SimpleNodeData> => {
-    const nodes = useStore((s: any) => s.nodes || []);
+    const nodes = useStore(s => s.nodes);
 
     return useMemo(() => {
         const map = new Map<string, SimpleNodeData>();
-        const rawNodesMap = new Map<string, any>();
+        const rawNodesMap = new Map<string, RuntimeNode>();
 
         for (const node of nodes) {
-            if (node?.id) rawNodesMap.set(node.id, node);
+            if (node?.id) rawNodesMap.set(node.id, node as RuntimeNode);
         }
 
-        const getAbsolutePosition = (node: any): { x: number, y: number } => {
+        const getAbsolutePosition = (node: RuntimeNode): { x: number, y: number } => {
             if (node.computed?.positionAbsolute) return node.computed.positionAbsolute;
             if (node.positionAbsolute) return node.positionAbsolute;
 
             const pId = node.parentId || node.parentNode;
-            if (pId && rawNodesMap.has(pId)) {
+            if (pId) {
                 const parent = rawNodesMap.get(pId);
+                if (!parent) return node.position || { x: 0, y: 0 };
                 const parentAbs = getAbsolutePosition(parent);
                 return {
                     x: parentAbs.x + (node.position?.x ?? 0),

@@ -15,6 +15,13 @@ export type Rect = { x: number; y: number; width: number; height: number };
 export type Axis = 'h' | 'v';
 export type Side = 'top' | 'bottom' | 'left' | 'right';
 export type Role = 'source' | 'target';
+type PositionedNode = ReactFlowNode & { positionAbsolute?: Point };
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
 export type IndexedPathSegment = {
   edgeIndex: number;
   axis: Axis;
@@ -50,13 +57,13 @@ const finite = (value: unknown, fallback = 0): number => (
 
 export function nodeRect(node: ReactFlowNode | undefined): Rect | null {
   if (!node) return null;
-  const position = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-  const width = finite((node as any).measured?.width ?? node.width ?? (node.style as any)?.width);
-  const height = finite((node as any).measured?.height ?? node.height ?? (node.style as any)?.height);
+  const position = (node as PositionedNode).positionAbsolute ?? node.position;
+  const width = finite(node.measured?.width ?? node.width ?? node.style?.width);
+  const height = finite(node.measured?.height ?? node.height ?? node.style?.height);
   if (width <= 1 || height <= 1) return null;
   return {
-    x: finite((position as any).x),
-    y: finite((position as any).y),
+    x: finite(position.x),
+    y: finite(position.y),
     width,
     height,
   };
@@ -129,9 +136,10 @@ export function withPath(
     ...(edge.data || {}),
     computedPath: path,
     sharedEndpointPortOrderRepaired: true,
-  } as Record<string, any>;
-  if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-    data.treeRouting = { ...data.treeRouting, points: path };
+  } as Record<string, unknown>;
+  const treeRouting = asRecord(data.treeRouting);
+  if (Array.isArray(treeRouting.points)) {
+    data.treeRouting = { ...treeRouting, points: path };
   }
   const result = { ...edge, data };
   if (

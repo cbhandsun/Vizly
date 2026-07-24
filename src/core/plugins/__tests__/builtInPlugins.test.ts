@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiagramTypePlugin } from '../../types';
 
@@ -13,7 +15,13 @@ const fakePlugin = (id: string): DiagramTypePlugin => ({
   name: id,
   version: '1.0.0',
   description: `${id} plugin`,
-  diagramTypes: [],
+  parseData: () => ({ nodes: [], edges: [] }),
+  serializeData: () => ({ nodes: [], edges: [] }),
+  getEmptyState: () => ({ nodes: [], edges: [] }),
+  getSupportedLayouts: () => [],
+  getDefaultLayout: () => '',
+  getNodeTypes: () => ({}),
+  getEdgeTypes: () => ({}),
 });
 
 const mockPluginModule = (path: string, exportName: string, id: string) => {

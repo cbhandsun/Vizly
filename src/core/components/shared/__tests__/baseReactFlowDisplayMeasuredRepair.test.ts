@@ -109,6 +109,139 @@ describe('measured display repair outcome', () => {
     ));
   });
 
+  it('repairs attached terminal-axis mismatches even without crossings or overlaps', () => {
+    const axisMismatchEdges: Edge[] = [{
+      ...edges[0],
+      data: {
+        computedPath: [
+          { x: 100, y: 50 },
+          { x: 100, y: 150 },
+          { x: 220, y: 150 },
+          { x: 220, y: 50 },
+        ],
+      },
+    }];
+    const initialReport = getDisplayHardQualityGateReport(
+      axisMismatchEdges,
+      repairNodes,
+      'polished',
+    );
+    expect(initialReport.terminalsAttached).toBe(true);
+    expect(initialReport.terminalsAnchored).toBe(false);
+    expect(initialReport.quality.strictCrossings).toBe(0);
+
+    const outcome = repairBaseReactFlowMeasuredDisplayEdgesWithReport(
+      axisMismatchEdges,
+      nodes,
+    );
+
+    expect(outcome.report.hardClean).toBe(true);
+    expect(outcome.report.terminalsAnchored).toBe(true);
+  });
+
+  it('closes terminal repair regressions from the measured WMS browser geometry', () => {
+    const browserNodes: Node[] = [
+      { id: 'allocation', position: { x: 1080, y: 1450 }, width: 206, height: 96, data: {} },
+      { id: 'batch-lot', position: { x: 1612, y: 1662 }, width: 194, height: 73, data: {} },
+      { id: 'wave-planning', position: { x: 1606, y: 1895 }, width: 206, height: 73, data: {} },
+      {
+        id: 'labor-schedule-feedback',
+        position: { x: 6145, y: 1552 },
+        width: 202,
+        height: 60,
+        data: {},
+      },
+    ];
+    const browserEdges: Edge[] = [
+      {
+        id: 'e-batch', source: 'allocation', target: 'batch-lot',
+        sourceHandle: 'right', targetHandle: 'bottom',
+        data: { computedPath: [
+          { x: 1286, y: 1466 }, { x: 1565, y: 1466 }, { x: 1565, y: 1790 },
+          { x: 1709, y: 1790 }, { x: 1709, y: 1735 },
+        ] },
+      },
+      {
+        id: 'e-wave-plan', source: 'allocation', target: 'wave-planning',
+        sourceHandle: 'bottom', targetHandle: 'bottom',
+        data: { computedPath: [
+          { x: 1286, y: 1514 }, { x: 1286, y: 1587 }, { x: 1398, y: 1587 },
+          { x: 1398, y: 1683 }, { x: 1566, y: 1683 }, { x: 1566, y: 2023 },
+          { x: 1709, y: 2023 }, { x: 1709, y: 1968 },
+        ] },
+      },
+      {
+        id: 'e-labor-alloc-fb', source: 'labor-schedule-feedback', target: 'allocation',
+        sourceHandle: 'bottom', targetHandle: 'right',
+        data: { computedPath: [
+          { x: 6246, y: 1612 }, { x: 6246, y: 1708 }, { x: 6294, y: 1708 },
+          { x: 6294, y: 2213 }, { x: 1346, y: 2213 }, { x: 1346, y: 1586 },
+          { x: 1382, y: 1586 }, { x: 1382, y: 1498 }, { x: 1286, y: 1498 },
+        ] },
+      },
+    ];
+    const initial = getDisplayHardQualityGateReport(browserEdges, browserNodes, 'polished');
+    expect(initial.quality.hairpins).toBe(1);
+    expect(initial.quality.unexplainedRelatedOverlap).toBe(143);
+
+    const outcome = repairBaseReactFlowMeasuredDisplayEdgesWithReport(
+      browserEdges,
+      browserNodes,
+    );
+
+    expect(outcome.report, JSON.stringify(outcome.report)).toMatchObject({
+      hardClean: true,
+      terminalsAttached: true,
+      terminalsAnchored: true,
+    });
+  });
+
+  it('closes the anchored WMS allocation residual transaction', () => {
+    const browserNodes: Node[] = [
+      { id: 'allocation', position: { x: 1080, y: 1417.5 }, width: 206, height: 96, data: {} },
+      { id: 'batch-lot', position: { x: 1612, y: 1662 }, width: 194, height: 73, data: {} },
+      { id: 'wave-planning', position: { x: 1606, y: 1895 }, width: 206, height: 73, data: {} },
+      { id: 'allocation-rollback', position: { x: 1624, y: 2128.5 }, width: 170, height: 73, data: {} },
+    ];
+    const browserEdges: Edge[] = [
+      {
+        id: 'e-batch', source: 'allocation', target: 'batch-lot',
+        sourceHandle: 'right', targetHandle: 'bottom',
+        data: { computedPath: [
+          { x: 1286, y: 1466 }, { x: 1577, y: 1466 }, { x: 1577, y: 1790 },
+          { x: 1709, y: 1790 }, { x: 1709, y: 1735 },
+        ] },
+      },
+      {
+        id: 'e-alloc-rollback', source: 'allocation', target: 'allocation-rollback',
+        sourceHandle: 'right', targetHandle: 'left',
+        data: { computedPath: [
+          { x: 1286, y: 1514 }, { x: 1342, y: 1514 }, { x: 1342, y: 1586 },
+          { x: 1374, y: 1586 }, { x: 1374, y: 2165 }, { x: 1624, y: 2165 },
+        ] },
+      },
+      {
+        id: 'e-wave-plan', source: 'allocation', target: 'wave-planning',
+        sourceHandle: 'bottom', targetHandle: 'bottom',
+        data: { computedPath: [
+          { x: 1285.8, y: 1513.5 }, { x: 1286, y: 1586 }, { x: 1566, y: 1586 },
+          { x: 1566, y: 2023 }, { x: 1709, y: 2023 }, { x: 1709, y: 1968 },
+        ] },
+      },
+    ];
+    const initial = getDisplayHardQualityGateReport(browserEdges, browserNodes, 'polished');
+    expect(initial).toMatchObject({ terminalsAnchored: true });
+    expect(initial.quality).toMatchObject({ hairpins: 1, unexplainedRelatedOverlap: 32 });
+
+    const outcome = repairBaseReactFlowMeasuredDisplayEdgesWithReport(browserEdges, browserNodes);
+
+    expect(outcome.report, JSON.stringify(outcome.report)).toMatchObject({
+      hardClean: true,
+      terminalsAttached: true,
+      terminalsAnchored: true,
+    });
+  });
+
   it('preserves the legacy empty-input identity while returning an exact report', () => {
     const emptyEdges: Edge[] = [];
     const outcome = repairBaseReactFlowMeasuredDisplayEdgesWithReport(emptyEdges, []);

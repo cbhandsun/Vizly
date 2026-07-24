@@ -6,12 +6,6 @@
 import {
   Theme,
   ThemePreset,
-  _ThemeTransition,
-  _ThemePerformanceOptions,
-  _ThemeEvent,
-  _ThemeEventListener,
-  _ThemeChangeEvent,
-  _ThemePresetEvent,
   ThemeColor
 } from './types/ThemeTypes';
 
@@ -25,8 +19,6 @@ import {
   getAvailableThemeIds,
   preloadThemePreset,
   clearThemePresetCache,
-  _getCachedThemePreset,
-  _isThemePresetCached,
   getCacheStats
 } from './ThemePresetLoader';
 
@@ -44,6 +36,45 @@ import {
   logThemeManagerLoadFailure,
   logThemeManagerPreloadFailure,
 } from './themeLogging';
+import { getApplicationDiagramRuntime } from '../ports/applicationDiagramRuntime';
+import { isSafeCssColor } from './themeImportSecurity';
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
+type ThemeColorPatch = Partial<Record<keyof ThemeColor, string>>;
+interface EmbeddedDiagramTheme {
+  name: string;
+  displayName?: string;
+  domains: Record<string, ThemeColorPatch>;
+}
+
+const THEME_COLOR_KEYS: (keyof ThemeColor)[] = [
+  'main', 'light', 'dark', 'contrast', 'border', 'background', 'text', 'shadow',
+];
+
+export const parseEmbeddedDiagramTheme = (value: unknown): EmbeddedDiagramTheme | null => {
+  if (!isRecord(value) || typeof value.name !== 'string') return null;
+  const name = value.name.trim().slice(0, 120);
+  if (!name) return null;
+  const domains: Record<string, ThemeColorPatch> = {};
+  if (isRecord(value.domains)) {
+    Object.entries(value.domains).slice(0, 64).forEach(([domain, rawColor]) => {
+      if (!isRecord(rawColor)) return;
+      const patch: ThemeColorPatch = {};
+      THEME_COLOR_KEYS.forEach(key => {
+        if (typeof rawColor[key] === 'string' && isSafeCssColor(rawColor[key])) patch[key] = rawColor[key];
+      });
+      if (Object.keys(patch).length > 0) domains[domain.slice(0, 120)] = patch;
+    });
+  }
+  return {
+    name,
+    displayName: typeof value.displayName === 'string' ? value.displayName.trim().slice(0, 240) : undefined,
+    domains,
+  };
+};
 
 /**
  * 主题管理器事件类型
@@ -99,8 +130,8 @@ export class EnhancedThemeManager {
   private normalizeDomainText(t: Theme): Theme {
     try {
       const domains = t?.diagram?.domains || {};
-      const newDomains: Record<string, any> = { ...domains } as any;
-      Object.entries(domains).forEach(([key, color]: any) => {
+      const newDomains: Record<string, ThemeColor> = { ...domains };
+      Object.entries(domains).forEach(([key, color]) => {
         const bg = color?.background || color?.light || color?.main;
         const text = color?.text || pickReadableTextColor(String(bg || '#ffffff'), '#FFFFFF', '#111111');
         newDomains[key] = { ...color, text };
@@ -224,37 +255,41 @@ export class EnhancedThemeManager {
 
       // 如果预设不存在，尝试从数据中心(DataRegistry)提取内嵌的主题属性
       try {
-        const { DataRegistry } = await import('../../data/DataRegistry');
-        const dataService = DataRegistry.getInstance().getDataService();
-        const result = await dataService.queryDiagrams({});
-        const diagramWithTheme = result.data.find((d: any) => d.theme?.name === themeId);
+        const diagrams = await getApplicationDiagramRuntime().listDiagrams();
+        const embeddedTheme = diagrams
+          .map(diagram => parseEmbeddedDiagramTheme(diagram.theme))
+          .find(theme => theme?.name === themeId);
         
-        if (diagramWithTheme && diagramWithTheme.theme) {
+        if (embeddedTheme) {
           // 借用 light 预设作为基础主题拼装出一个完整的 Theme 对象
           const basePreset = await loadThemePreset('light');
           if (basePreset) {
-            const customTheme = {
+            const mergedDomains = { ...basePreset.theme.diagram.domains };
+            Object.entries(embeddedTheme.domains).forEach(([domain, patch]) => {
+              mergedDomains[domain] = {
+                ...(mergedDomains[domain] ?? basePreset.theme.palette.primary),
+                ...patch,
+              };
+            });
+            const customTheme: Theme = {
                ...basePreset.theme,
                id: themeId,
-               name: diagramWithTheme.theme.displayName || themeId,
+               name: embeddedTheme.displayName || themeId,
                diagram: {
                  ...basePreset.theme.diagram,
-                 domains: {
-                   ...basePreset.theme.diagram.domains,
-                   ...diagramWithTheme.theme.domains
-                 }
+                 domains: mergedDomains,
                }
             };
-            this.addCustomTheme(customTheme as any);
+            this.addCustomTheme(customTheme);
             
             this.emitEvent({
               type: 'theme-loaded',
               themeId,
-              newTheme: customTheme as any,
+              newTheme: customTheme,
               timestamp: Date.now()
             });
 
-            return customTheme as any;
+            return customTheme;
           }
         }
       } catch (embErr) {
@@ -552,10 +587,10 @@ export class EnhancedThemeManager {
    */
   private async loadCustomThemes(): Promise<void> {
     try {
-      const savedThemes = this.configManager.get('theme.customThemes', []);
+      const savedThemes = this.configManager.get<unknown[]>('theme.customThemes', []);
       if (savedThemes && Array.isArray(savedThemes)) {
-        savedThemes.forEach((themeData: any) => {
-          if (themeData && themeData.id) {
+        savedThemes.forEach(themeData => {
+          if (validateTheme(themeData)) {
             this.customThemes.set(themeData.id, themeData);
           }
         });

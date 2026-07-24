@@ -3,7 +3,7 @@ import { Input, Spin, Empty, theme, Tooltip } from 'antd';
 import { FaSearch } from 'react-icons/fa';
 import { Icon } from '@iconify/react';
 import { useTranslation } from 'react-i18next';
-import { buildIconifySearchUrl, isSafeIconifyIconName, parseIconifySearchResponse } from '../../utils/iconifySecurity';
+import { isSafeIconifyIconName, searchIconifyIcons } from '../../utils/iconifySecurity';
 import { logIconLibraryPanelSearchFailure } from '../shared/iconSearchLogging';
 
 
@@ -43,6 +43,7 @@ export const IconLibraryPanel: React.FC = () => {
             return;
         }
 
+        const controller = new AbortController();
         const fetchIcons = async () => {
             const query = debouncedSearch.trim();
             if (CACHE.current[query]) {
@@ -54,10 +55,10 @@ export const IconLibraryPanel: React.FC = () => {
             setError(null);
             try {
                 // Call Iconify public search API
-                const res = await fetch(buildIconifySearchUrl({ query, limit: 60 }));
-                if (!res.ok) throw new Error('API request failed');
-                
-                const data = parseIconifySearchResponse(await res.json(), 60);
+                const data = await searchIconifyIcons(
+                    { query, limit: 60 },
+                    { signal: controller.signal },
+                );
                 if (data.icons.length) {
                     const results: IconResult[] = data.icons.map((id) => {
                         const [prefix, name] = id.split(':');
@@ -68,16 +69,18 @@ export const IconLibraryPanel: React.FC = () => {
                 } else {
                     setIcons([]);
                 }
-            } catch (err: any) {
+            } catch (err: unknown) {
+                if (controller.signal.aborted) return;
                 logIconLibraryPanelSearchFailure(err);
-                setError(err.message || "Failed to load icons");
+                setError(err instanceof Error ? err.message : "Failed to load icons");
                 setIcons([]);
             } finally {
-                setLoading(false);
+                if (!controller.signal.aborted) setLoading(false);
             }
         };
 
-        fetchIcons();
+        void fetchIcons();
+        return () => controller.abort();
     }, [debouncedSearch]);
 
     const onDragStart = (event: React.DragEvent, iconId: string) => {

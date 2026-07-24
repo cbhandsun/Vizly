@@ -2,14 +2,9 @@ import { useState, useCallback, useRef } from 'react';
 import { Node, Edge } from '@xyflow/react';
 import jsonpatch from 'fast-json-patch';
 
-const { compare, applyPatch, deepClone } = jsonpatch as any;
+const { compare, applyPatch, deepClone } = jsonpatch;
 
-export interface Operation {
-    op: string;
-    path: string;
-    value?: any;
-    from?: string;
-}
+export type Operation = ReturnType<typeof compare>[number];
 
 export interface HistoryState {
     nodes: Node[];

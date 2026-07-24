@@ -25,6 +25,9 @@ export class SequencePlugin implements DiagramTypePlugin {
   parseData(_source: unknown) { return { nodes: [], edges: [] }; }
   serializeData(nodes: Node[], edges: Edge[]) { return { nodes, edges }; }
 
+  getSupportedLayouts() { return ['SequenceLayout']; }
+  getDefaultLayout() { return 'SequenceLayout'; }
+
   getEmptyState() {
     return {
       nodes: [

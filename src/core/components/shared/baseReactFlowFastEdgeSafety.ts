@@ -1,4 +1,4 @@
-import type { Edge, Node } from '@xyflow/react';
+import type { Edge, Node, XYPosition } from '@xyflow/react';
 
 import { expandHandle } from '../../routing/utils/handleUtils';
 
@@ -12,6 +12,17 @@ const CONTAINER_TYPES = new Set(['titleGroup', 'subGroup', 'group', 'domain', 's
 
 const finiteNumber = (value: unknown, fallback = 0): number => (
   typeof value === 'number' && Number.isFinite(value) ? value : fallback
+);
+
+type DisplayNode = Node & {
+  positionAbsolute?: XYPosition;
+  measured?: { width?: number; height?: number };
+};
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
 );
 
 const samePoint = (a: FastPoint, b: FastPoint): boolean => (
@@ -39,13 +50,13 @@ const resolveNodePosition = (
   nodeById: Map<string, Node>,
   seen = new Set<string>(),
 ): FastPoint => {
-  const absolute = (node as any).positionAbsolute;
+  const absolute = (node as DisplayNode).positionAbsolute;
   if (absolute) {
     return { x: finiteNumber(absolute.x), y: finiteNumber(absolute.y) };
   }
   const local = node.position ?? { x: 0, y: 0 };
   const position = { x: finiteNumber(local.x), y: finiteNumber(local.y) };
-  const parentId = (node as any).parentId;
+  const parentId = node.parentId;
   if (!parentId || seen.has(parentId)) return position;
   const parent = nodeById.get(parentId);
   if (!parent) return position;
@@ -60,12 +71,14 @@ const nodeRects = (nodes: Node[]): FastRect[] => {
   .filter(node => !CONTAINER_TYPES.has(String(node.type || '')))
   .map((node) => {
     const position = resolveNodePosition(node, nodeById);
-    const width = finiteNumber((node as any).measured?.width ?? node.width ?? (node.style as any)?.width);
-    const height = finiteNumber((node as any).measured?.height ?? node.height ?? (node.style as any)?.height);
+    const displayNode = node as DisplayNode;
+    const style = asRecord(node.style);
+    const width = finiteNumber(displayNode.measured?.width ?? node.width ?? style.width);
+    const height = finiteNumber(displayNode.measured?.height ?? node.height ?? style.height);
     return {
       id: node.id,
-      x: finiteNumber((position as any).x) - OBSTACLE_PADDING,
-      y: finiteNumber((position as any).y) - OBSTACLE_PADDING,
+      x: finiteNumber(position.x) - OBSTACLE_PADDING,
+      y: finiteNumber(position.y) - OBSTACLE_PADDING,
       width: width + OBSTACLE_PADDING * 2,
       height: height + OBSTACLE_PADDING * 2,
     };
@@ -313,7 +326,7 @@ const repairObstacleHits = (path: FastPoint[], rects: FastRect[]): FastPoint[] =
 };
 
 const fastComputedPath = (edge: Edge): FastPoint[] => {
-  const value = (edge.data as any)?.computedPath;
+  const value = asRecord(edge.data).computedPath;
   if (!Array.isArray(value)) return [];
   return value
     .filter(point => point && Number.isFinite(point.x) && Number.isFinite(point.y))
@@ -347,14 +360,19 @@ export const repairFastDisplayHardSafety = (edges: Edge[], nodes: Node[]): Edge[
     if (repaired.length === path.length && repaired.every((point, index) => samePoint(point, path[index]))) {
       return edge;
     }
-    const data = {
-      ...((edge.data || {}) as Record<string, any>),
+    const originalData = (edge.data || {}) as Record<string, unknown>;
+    const data: Record<string, unknown> = {
+      ...originalData,
       computedPath: repaired,
       layoutPathLocked: true,
       fastHardSafetyRepaired: true,
     };
-    if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-      data.treeRouting = { ...data.treeRouting, points: repaired };
+    const treeRouting = originalData.treeRouting;
+    if (treeRouting && typeof treeRouting === 'object' && !Array.isArray(treeRouting)) {
+      const treeRoutingRecord = treeRouting as Record<string, unknown>;
+      if (Array.isArray(treeRoutingRecord.points)) {
+        data.treeRouting = { ...treeRoutingRecord, points: repaired };
+      }
     }
     changed = true;
     return { ...edge, data };

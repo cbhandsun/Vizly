@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { Node } from '@xyflow/react';
-import { diagramConfigManager } from '../../../config/DiagramConfig';
+import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import { LayeredConfigManager } from '../../../../config/LayeredConfigManager';
 import { calcNodeSignature } from './useDiagramStability';
 

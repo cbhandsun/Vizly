@@ -1,14 +1,25 @@
+// @vitest-environment node
+
 import { describe, expect, it, vi } from 'vitest';
+import type { FlowDataBridgeEntry } from '@/core/utils/flowDataBridge';
 
 import {
   createDiagramViewerSaveCopy,
   isDiagramViewerBridgeSavable,
+  normalizeDiagramSaveAsName,
   saveDiagramViewerCloudReplica,
   saveDiagramViewerDirectCloud,
   syncDiagramViewerBridgeCloudReplica,
 } from '../diagramViewerSave';
 
 describe('diagramViewerSave', () => {
+  it('normalizes save-as names at the UI boundary', () => {
+    expect(normalizeDiagramSaveAsName('  Diagram name  ')).toBe('Diagram name');
+    expect(normalizeDiagramSaveAsName('')).toBeNull();
+    expect(normalizeDiagramSaveAsName(null)).toBeNull();
+    expect(normalizeDiagramSaveAsName('x'.repeat(501))).toBeNull();
+  });
+
   it('checks whether a bridge has savable diagram data', () => {
     expect(isDiagramViewerBridgeSavable(undefined)).toBe(false);
     expect(isDiagramViewerBridgeSavable({ id: 'a' })).toBe(false);
@@ -16,7 +27,9 @@ describe('diagramViewerSave', () => {
   });
 
   it('creates and syncs cloud save copies', () => {
-    const bridge = { id: 'old', name: 'Old', nodes: [], metadata: { foo: 'bar' } };
+    const bridge: FlowDataBridgeEntry = {
+      id: 'old', name: 'Old', nodes: [], metadata: { foo: 'bar' },
+    };
     const saveCopy = createDiagramViewerSaveCopy({
       bridge,
       name: 'New Name',
@@ -35,7 +48,7 @@ describe('diagramViewerSave', () => {
     });
 
     expect(bridge.id).toBe('cloud-id');
-    expect(bridge.metadata.cloud).toEqual({
+    expect(bridge.metadata?.cloud).toEqual({
       provider: 'supabase',
       id: 'cloud-id',
       title: 'Cloud Name',
@@ -43,7 +56,7 @@ describe('diagramViewerSave', () => {
   });
 
   it('saves a cloud replica and updates bridge metadata', async () => {
-    const bridge = { id: 'old', name: 'Old', nodes: [], metadata: {} };
+    const bridge: FlowDataBridgeEntry = { id: 'old', name: 'Old', nodes: [], metadata: {} };
     const saveDiagram = vi.fn().mockResolvedValue(undefined);
     const invalidatePreview = vi.fn();
 
@@ -64,7 +77,7 @@ describe('diagramViewerSave', () => {
     expect(newId).toBe('new-id');
     expect(saveDiagram).toHaveBeenCalledTimes(1);
     expect(invalidatePreview).toHaveBeenCalledWith('new-id');
-    expect(bridge.metadata.cloud.provider).toBe('supabase');
+    expect(bridge.metadata?.cloud?.provider).toBe('supabase');
   });
 
   it('saves direct cloud updates when cloud metadata exists', async () => {
@@ -93,5 +106,36 @@ describe('diagramViewerSave', () => {
     });
     expect(saveDiagram).toHaveBeenCalledTimes(1);
     expect(invalidatePreview).toHaveBeenCalledWith('cloud-id');
+  });
+
+  it('rejects unsupported providers and oversized titles at the save boundary', async () => {
+    const provider = {
+      isConfigured: () => true,
+      saveDiagram: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await expect(saveDiagramViewerDirectCloud({
+      bridge: {
+        id: 'bridge-id',
+        nodes: [],
+        metadata: { cloud: { provider: 'ftp', id: 'cloud-id', title: 'Cloud Title' } },
+      },
+      selectedDiagramId: 'diagram-a',
+      getProvider: vi.fn(async () => provider),
+      attachSnapshot: async (diagram) => ({ diagram }),
+      invalidatePreview: vi.fn(),
+    })).rejects.toThrow('云端保存元数据无效');
+
+    await expect(saveDiagramViewerCloudReplica({
+      bridge: { id: 'bridge-id', nodes: [] },
+      selectedDiagramId: 'diagram-a',
+      providerName: 'supabase',
+      title: 'x'.repeat(501),
+      getProvider: vi.fn(async () => provider),
+      attachSnapshot: async (diagram) => ({ diagram }),
+      invalidatePreview: vi.fn(),
+      createId: () => 'new-id',
+    })).rejects.toThrow('图表名称无效');
+    expect(provider.saveDiagram).not.toHaveBeenCalled();
   });
 });

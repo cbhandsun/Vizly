@@ -61,13 +61,15 @@ export const UnifiedDesigner: React.FC<UnifiedDesignerProps> = ({
   }, [nodes, edges]);
 
   // 插件状态沙箱
-  const [pluginStates, setPluginStates] = useState<Record<string, any>>({});
+  const [pluginStates, setPluginStates] = useState<Record<string, unknown>>({});
   const activePluginStateKey = plugin?.id || pluginId || '__default__';
   const getPluginState = React.useCallback(<T,>() => pluginStates[activePluginStateKey] as T | undefined, [pluginStates, activePluginStateKey]);
   const setPluginState = React.useCallback(<T,>(patch: Partial<T> | ((prev: T) => T)) => {
       setPluginStates(prev => {
           const current = (prev[activePluginStateKey] || {}) as T;
-          const updated = typeof patch === 'function' ? (patch as any)(current) : { ...current, ...patch };
+          const updated = typeof patch === 'function'
+            ? (patch as (value: T) => T)(current)
+            : { ...current, ...patch };
           return { ...prev, [activePluginStateKey]: updated };
       });
   }, [activePluginStateKey]);

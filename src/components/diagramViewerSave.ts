@@ -1,31 +1,59 @@
-type DiagramBridgeLike = {
-  id: string;
+export type DiagramBridgeLike = {
+  id?: string;
   name?: string;
   nodes?: unknown[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
+} & Record<string, unknown>;
+
+type CloudDiagramPayload = {
+  id: string;
+  title: string;
+  content: Record<string, unknown>;
+  updated_at: string;
+  user_id: string;
 };
 
 type CloudProviderLike = {
   isConfigured: () => boolean;
-  saveDiagram: (payload: {
-    id: string;
-    title: string;
-    content: any;
-    updated_at: string;
-    user_id: string;
-  }) => Promise<void>;
+  saveDiagram: (payload: CloudDiagramPayload) => Promise<unknown>;
 };
 
-export const isDiagramViewerBridgeSavable = (bridge: DiagramBridgeLike | null | undefined): boolean => (
+type DiagramSnapshotAttacher<TDiagram extends DiagramBridgeLike> = (
+  diagram: TDiagram,
+  selectedDiagramId: string,
+) => Promise<{ diagram: unknown }>;
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+
+export type DiagramViewerCloudProviderName = 's3' | 'supabase';
+
+const parseCloudProviderName = (value: unknown): DiagramViewerCloudProviderName | null => (
+  value === 's3' || value === 'supabase' ? value : null
+);
+
+const parseRequiredText = (value: unknown, maxLength = 500): string | null => {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  return text && text.length <= maxLength ? text : null;
+};
+
+export const normalizeDiagramSaveAsName = (value: unknown): string | null => parseRequiredText(value, 500);
+
+export const isDiagramViewerBridgeSavable = (
+  bridge: DiagramBridgeLike | null | undefined,
+): bridge is DiagramBridgeLike & { nodes: unknown[] } => (
   Boolean(bridge && Array.isArray(bridge.nodes) && bridge.nodes.length >= 0)
 );
 
-export const createDiagramViewerSaveCopy = ({
+export const createDiagramViewerSaveCopy = <TDiagram extends DiagramBridgeLike>({
   bridge,
   name,
   createId,
 }: {
-  bridge: DiagramBridgeLike & Record<string, any>;
+  bridge: TDiagram;
   name: string;
   createId: () => string;
 }) => ({
@@ -44,8 +72,8 @@ export const syncDiagramViewerBridgeCloudReplica = ({
   id,
   title,
 }: {
-  bridge: DiagramBridgeLike & Record<string, any>;
-  provider: string;
+  bridge: DiagramBridgeLike;
+  provider: DiagramViewerCloudProviderName;
   id: string;
   title: string;
 }) => {
@@ -57,7 +85,7 @@ export const syncDiagramViewerBridgeCloudReplica = ({
   };
 };
 
-export const saveDiagramViewerCloudReplica = async ({
+export const saveDiagramViewerCloudReplica = async <TDiagram extends DiagramBridgeLike>({
   bridge,
   selectedDiagramId,
   providerName,
@@ -67,18 +95,21 @@ export const saveDiagramViewerCloudReplica = async ({
   invalidatePreview,
   createId,
 }: {
-  bridge: DiagramBridgeLike & Record<string, any>;
+  bridge: TDiagram;
   selectedDiagramId: string;
-  providerName: 's3' | 'supabase';
+  providerName: DiagramViewerCloudProviderName;
   title: string;
-  getProvider: (provider: 's3' | 'supabase') => Promise<CloudProviderLike>;
-  attachSnapshot: (diagram: any, selectedDiagramId: string) => Promise<{ diagram: any }>;
+  getProvider: (provider: DiagramViewerCloudProviderName) => Promise<CloudProviderLike>;
+  attachSnapshot: DiagramSnapshotAttacher<TDiagram>;
   invalidatePreview: (id: string) => void;
   createId: () => string;
 }) => {
+  const safeTitle = parseRequiredText(title);
+  if (!safeTitle) throw new Error('图表名称无效');
+
   const saveCopy = createDiagramViewerSaveCopy({
     bridge,
-    name: title,
+    name: safeTitle,
     createId,
   });
   const snapshot = await attachSnapshot(saveCopy, selectedDiagramId);
@@ -89,8 +120,8 @@ export const saveDiagramViewerCloudReplica = async ({
 
   await provider.saveDiagram({
     id: saveCopy.id,
-    title,
-    content: { ...snapshot.diagram, id: saveCopy.id, name: title } as any,
+    title: safeTitle,
+    content: { ...asRecord(snapshot.diagram), id: saveCopy.id, name: safeTitle },
     updated_at: new Date().toISOString(),
     user_id: 'anonymous',
   });
@@ -100,44 +131,52 @@ export const saveDiagramViewerCloudReplica = async ({
     bridge,
     provider: providerName,
     id: saveCopy.id,
-    title,
+    title: safeTitle,
   });
 
   return saveCopy.id;
 };
 
-export const saveDiagramViewerDirectCloud = async ({
+export const saveDiagramViewerDirectCloud = async <TDiagram extends DiagramBridgeLike>({
   bridge,
   selectedDiagramId,
   getProvider,
   attachSnapshot,
   invalidatePreview,
 }: {
-  bridge: DiagramBridgeLike & Record<string, any>;
+  bridge: TDiagram;
   selectedDiagramId: string;
-  getProvider: (provider: string) => Promise<CloudProviderLike>;
-  attachSnapshot: (diagram: any, selectedDiagramId: string) => Promise<{ diagram: any }>;
+  getProvider: (provider: DiagramViewerCloudProviderName) => Promise<CloudProviderLike>;
+  attachSnapshot: DiagramSnapshotAttacher<TDiagram>;
   invalidatePreview: (id: string) => void;
 }) => {
-  const cloudMeta = bridge?.metadata?.cloud;
+  const cloudMeta = asRecord(bridge.metadata?.cloud);
   if (!cloudMeta?.provider || !cloudMeta?.title) {
     return null;
   }
 
+  const providerName = parseCloudProviderName(cloudMeta.provider);
+  const title = parseRequiredText(cloudMeta.title);
+  if (!providerName || !title) {
+    throw new Error('云端保存元数据无效');
+  }
+
   const snapshot = await attachSnapshot(bridge, selectedDiagramId);
-  const provider = await getProvider(String(cloudMeta.provider));
-  const targetId = cloudMeta.id || bridge.id;
+  const provider = await getProvider(providerName);
+  const targetId = parseRequiredText(cloudMeta.id)
+    || parseRequiredText(bridge.id)
+    || selectedDiagramId;
   await provider.saveDiagram({
     id: targetId,
-    title: cloudMeta.title,
-    content: { ...snapshot.diagram, id: targetId } as any,
+    title,
+    content: { ...asRecord(snapshot.diagram), id: targetId },
     updated_at: new Date().toISOString(),
     user_id: 'anonymous',
   });
   invalidatePreview(targetId);
   return {
-    provider: String(cloudMeta.provider),
+    provider: providerName,
     id: targetId,
-    title: String(cloudMeta.title),
+    title,
   };
 };

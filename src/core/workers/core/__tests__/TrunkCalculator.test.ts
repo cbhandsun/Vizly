@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TrunkCalculator } from '../TrunkCalculator';
 import { Rectangle } from '../../../algorithms/geometryUtils';
-import { UnifiedRoutingConfig } from '../../../types/routing';
+import { createDefaultRoutingConfig, UnifiedRoutingConfig } from '../../../types/routing';
 
 describe('TrunkCalculator', () => {
     const trunkCalculator = new TrunkCalculator();
@@ -10,9 +10,14 @@ describe('TrunkCalculator', () => {
     // Hub center: x = 140, y = 130
     
     const defaultConfig: UnifiedRoutingConfig = {
+        ...createDefaultRoutingConfig(),
         bus: {
+            ...createDefaultRoutingConfig().bus,
+            spacing: 25,
+            manyToOneSpacing: 3,
             trunkBase: 40,
             trunkMultiplier: 10,
+            enableAdaptiveSeparation: true,
             parallelTrunkSpacing: 60,
             parallelTrunkStrategy: 'count-based'
         }

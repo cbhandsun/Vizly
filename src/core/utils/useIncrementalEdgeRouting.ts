@@ -158,7 +158,7 @@ export function useIncrementalEdgeRouting(
         const shouldThrottle = now - lastUpdateRef.current < throttleMs;
 
         // 检查是否有位置变化
-        const hasPositionChange = changes.some(c => c.type === 'position' && (c as any).position);
+        const hasPositionChange = changes.some(c => c.type === 'position' && c.position);
 
         // 应用节点变化
         const newNodes = applyNodeChanges(changes, currentNodes);

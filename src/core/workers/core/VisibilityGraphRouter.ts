@@ -7,7 +7,7 @@
 
 import type { Point, Rectangle } from '../../algorithms/geometryUtils';
 import type { SpatialIndex } from '../../algorithms/SpatialIndex';
-import type { UnifiedRoutingConfig } from '../../types/routing';
+import type { LineObstacle, UnifiedRoutingConfig } from '../../types/routing';
 import { findPathOnVisibilityGraph } from '../../algorithms/visibilityGraph';
 import { VisibilityGraphCache } from '../../algorithms/VisibilityGraphCache';
 import { RoutingStrategySelector, RoutingAlgorithm } from '../../algorithms/RoutingStrategySelector';
@@ -54,10 +54,10 @@ export class VisibilityGraphRouter {
         end: Point,
         obstacles: Rectangle[] | SpatialIndex,
         spatialIndex?: SpatialIndex,
-        lineObstacles?: any[]
+        lineObstacles?: LineObstacle[]
     ): Point[] | null {
-        const isSpatialIndex = (obs: any): obs is SpatialIndex =>
-            typeof (obs as SpatialIndex).query === 'function';
+        const isSpatialIndex = (obs: Rectangle[] | SpatialIndex): obs is SpatialIndex =>
+            !Array.isArray(obs) && typeof obs.query === 'function';
 
         // [I-11] Use local bounding-box query instead of getAll().
         // getAll() fetches every obstacle in the graph, causing O(N²) VG construction
@@ -132,7 +132,7 @@ export class VisibilityGraphRouter {
      */
     private shouldUseOneBend(): boolean {
         // Check for experimental feature flag
-        const experimental = (this.config as any).experimental;
+        const experimental = this.config.experimental;
         if (experimental && typeof experimental.enable1BendVG === 'boolean') {
             return experimental.enable1BendVG;
         }

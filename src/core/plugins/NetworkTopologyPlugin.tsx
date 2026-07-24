@@ -16,6 +16,16 @@ interface IconDef {
   provider: 'aws' | 'azure' | 'gcp';
   color: string;
 }
+type NetworkProvider = IconDef['provider'];
+interface NetworkPaletteDragData {
+  typeName: 'networkNode' | 'networkContainer';
+  label: string;
+  config: Record<string, unknown>;
+}
+
+const isNetworkProvider = (value: string | number): value is NetworkProvider => (
+  value === 'aws' || value === 'azure' || value === 'gcp'
+);
 
 const NETWORK_ICONS: IconDef[] = [
   // AWS - Compute
@@ -76,7 +86,7 @@ const CONTAINERS = [
 
 // ====== 侧边栏组件 ======
 const NetworkPalette: React.FC = () => {
-  const [provider, setProvider] = useState<'aws' | 'azure' | 'gcp'>('aws');
+  const [provider, setProvider] = useState<NetworkProvider>('aws');
   const [search, setSearch] = useState('');
 
   const filteredIcons = useMemo(() => {
@@ -96,7 +106,7 @@ const NetworkPalette: React.FC = () => {
     }));
   }, [filteredIcons]);
 
-  const onDragStart = (event: React.DragEvent, data: any) => {
+  const onDragStart = (event: React.DragEvent, data: NetworkPaletteDragData) => {
     event.dataTransfer.setData('application/reactflow', JSON.stringify(data));
     event.dataTransfer.effectAllowed = 'move';
   };
@@ -155,7 +165,9 @@ const NetworkPalette: React.FC = () => {
       <Segmented
         block
         value={provider}
-        onChange={(val) => setProvider(val as any)}
+        onChange={(val) => {
+          if (isNetworkProvider(val)) setProvider(val);
+        }}
         options={[
           { label: 'AWS', value: 'aws' },
           { label: 'Azure', value: 'azure' },
@@ -230,7 +242,7 @@ export class NetworkTopologyPlugin extends BaseDiagramPlugin implements DiagramT
   name = '网络拓扑图';
   version = '1.0';
 
-  async migrate(data: any, fromVersion: string | undefined): Promise<any> {
+  async migrate<T>(data: T, fromVersion: string | undefined): Promise<T> {
     return await super.migrate(data, fromVersion);
   }
 

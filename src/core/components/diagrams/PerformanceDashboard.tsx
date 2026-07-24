@@ -47,8 +47,11 @@ export const PerformanceDashboard: React.FC<{ nodeCount: number; edgeCount: numb
                 const avgFrameTime = elapsed / frameCount;
                 
                 // Memory Usage (if supported by Chrome/Edge)
-                const memoryUsage = (performance as any).memory?.usedJSHeapSize
-                    ? Math.round((performance as any).memory.usedJSHeapSize / 1024 / 1024)
+                const performanceMemory = (performance as Performance & {
+                    memory?: { usedJSHeapSize?: number };
+                }).memory;
+                const memoryUsage = performanceMemory?.usedJSHeapSize
+                    ? Math.round(performanceMemory.usedJSHeapSize / 1024 / 1024)
                     : undefined;
 
                 setStats({

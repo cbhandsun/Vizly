@@ -12,7 +12,7 @@ export class SwimlanePlugin implements DiagramTypePlugin {
     name = '泳道图';
     version = '1.0';
 
-    async migrate(data: any, _fromVersion: string | undefined): Promise<any> {
+    async migrate<T>(data: T, _fromVersion: string | undefined): Promise<T> {
         return data;
     }
 

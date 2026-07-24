@@ -1,10 +1,8 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import { normalizeHandle } from '../../routing/utils/handleUtils';
-import { findStrictCrossings } from '../../strategies/shared/edgeDetachedOverlapRepair';
 import { countRoutingObstacleHits } from '../../strategies/shared/edgeWaypointCandidateRepair';
 import {
-  calculateEdgePathQualityScore,
   createEdgePathQualityEvaluationContext,
   type EdgePathQualityScore,
 } from '../../strategies/shared/edgeStrictCrossingGuard';
@@ -13,30 +11,18 @@ import {
   buildNearTerminalSideCandidates,
   buildSharedNodeTerminalSideCandidates,
 } from './baseReactFlowSharedNodePortRoleRepair';
-import { buildStrictCrossingZipperCandidates } from './baseReactFlowStrictCrossingZipperRepair';
-import {
-  anchorComputedDisplayEdgeEndpoints,
-  compactOrthogonalPath,
-} from './baseReactFlowDisplayEdgeCore';
+import { anchorComputedDisplayEdgeEndpoints } from './baseReactFlowDisplayEdgeCore';
 import {
   buildDisplayRoutingObstacles,
   displayAxisOf,
   displayPointsCoincide,
-  extractDisplaySegments,
   fullDisplayPortSide,
   getDisplayComputedPath,
   getDisplayNodeRect,
-  OBSTACLE_REPAIR_NODE_PADDING,
   oppositeDisplayPortSide,
-  RESIDUAL_PARALLEL_LANE_GAP,
-  sortedUniqueNumbers,
-  withDisplayComputedPath,
   type DisplayPoint,
-  type DisplayRect,
 } from './baseReactFlowDisplayGeometry';
-import {
-  createDisplayObstacleEvaluationContext,
-} from './baseReactFlowDisplayEvaluation';
+import { createDisplayObstacleEvaluationContext } from './baseReactFlowDisplayEvaluation';
 import {
   buildDeclaredTerminalAxisStubCandidates,
   buildOppositeRoleSharedNodeCandidates,
@@ -50,6 +36,27 @@ import {
 import {
   createDisplayTerminalValidationSnapshot,
 } from './baseReactFlowTerminalAxisRepair';
+import {
+  adaptiveDetachedTerminalStub,
+  buildDeclaredTerminalInsetNudgeCandidates,
+  buildShortTerminalStaircaseTranslationCandidate,
+  detachedTerminalConnectorLanes,
+  inferTerminalGeometrySide,
+  MIN_DISPLAY_ENDPOINT_STUB,
+} from './baseReactFlowDisplayTerminalGeometry';
+import { buildSingleEdgeZipperCandidates } from './baseReactFlowDisplayTerminalPortZipperCandidates';
+import {
+  createDisplayDeclaredAxisMismatchCounter,
+  rollbackIncompleteDeclaredAxisTransactions,
+} from './baseReactFlowDisplayDeclaredAxisTransaction';
+import {
+  createDisplayTerminalPortCandidateBuckets,
+  displayTerminalPortCandidateIsBetter,
+  displayTerminalPortCandidateIsComplete,
+  rankDisplayTerminalPortCandidates,
+} from './baseReactFlowDisplayTerminalPortCandidateRanking';
+
+export { repairTerminalHandleHemisphereHairpins } from './baseReactFlowDisplayHemisphereHairpinRepair';
 
 export {
   buildCrossingCompanionOuterPortVariants,
@@ -59,478 +66,6 @@ export {
   displayTerminalSideCanSwitch,
   withDisplayPortBridge,
 } from './baseReactFlowDisplayTerminalPortCandidates';
-
-const MIN_DISPLAY_ENDPOINT_STUB = 48;
-const MAX_TERMINAL_STUB_NUMERIC_DRIFT = 2;
-
-const buildShortTerminalStaircaseTranslationCandidate = (
-  path: DisplayPoint[],
-  role: 'source' | 'target',
-  side: 'top' | 'bottom' | 'left' | 'right',
-): DisplayPoint[] | null => {
-  if (path.length < 4) return null;
-  const oriented = role === 'source'
-    ? path.map(point => ({ ...point }))
-    : [...path].reverse().map(point => ({ ...point }));
-  const terminal = oriented[0];
-  const adjacent = oriented[1];
-  if (!terminal || !adjacent) return null;
-  const horizontalTerminal = side === 'left' || side === 'right';
-  const expectedAxis = horizontalTerminal ? 'h' : 'v';
-  if (displayAxisOf(terminal, adjacent) !== expectedAxis) return null;
-  const outwardDirection = side === 'right' || side === 'bottom' ? 1 : -1;
-  const axisCoordinate = (point: DisplayPoint): number => (
-    horizontalTerminal ? point.x : point.y
-  );
-  const outwardSpan = (axisCoordinate(adjacent) - axisCoordinate(terminal)) * outwardDirection;
-  const shortfall = MIN_DISPLAY_ENDPOINT_STUB - outwardSpan;
-  if (outwardSpan <= 0 || shortfall <= 0 || shortfall > MAX_TERMINAL_STUB_NUMERIC_DRIFT) return null;
-
-  let shiftedEndIndex = 1;
-  while (shiftedEndIndex < oriented.length - 1) {
-    const current = oriented[shiftedEndIndex];
-    const next = oriented[shiftedEndIndex + 1];
-    if (displayAxisOf(current, next) !== expectedAxis) {
-      shiftedEndIndex += 1;
-      continue;
-    }
-    const shiftedCurrentCoordinate = axisCoordinate(current) + outwardDirection * shortfall;
-    const adjustedBoundaryLength = Math.abs(axisCoordinate(next) - shiftedCurrentCoordinate);
-    if (adjustedBoundaryLength >= RESIDUAL_PARALLEL_LANE_GAP) break;
-    shiftedEndIndex += 1;
-  }
-  if (shiftedEndIndex >= oriented.length - 1) return null;
-
-  const translated = oriented.map((point, index) => {
-    if (index < 1 || index > shiftedEndIndex) return point;
-    return horizontalTerminal
-      ? { x: point.x + outwardDirection * shortfall, y: point.y }
-      : { x: point.x, y: point.y + outwardDirection * shortfall };
-  });
-  const candidate = compactOrthogonalPath(role === 'source' ? translated : [...translated].reverse());
-  return candidate.length >= 2 ? candidate : null;
-};
-
-const repairStartHandleHemisphereHairpin = (
-  path: DisplayPoint[],
-  handle: string | null | undefined,
-  fallbackSide?: 'l' | 'r' | 't' | 'b',
-): DisplayPoint[] => {
-  if (path.length < 4) return path;
-  const side = normalizeHandle(handle) ?? fallbackSide;
-  const [endpoint, firstLane, secondLane, continuation] = path;
-  const firstVertical = Math.abs(endpoint.x - firstLane.x) <= 0.5;
-  const bridgeHorizontal = Math.abs(firstLane.y - secondLane.y) <= 0.5;
-  const continuationVertical = Math.abs(secondLane.x - continuation.x) <= 0.5;
-  const firstHorizontal = Math.abs(endpoint.y - firstLane.y) <= 0.5;
-  const bridgeVertical = Math.abs(firstLane.x - secondLane.x) <= 0.5;
-  const continuationHorizontal = Math.abs(secondLane.y - continuation.y) <= 0.5;
-
-  if ((side === 't' || side === 'b') && firstHorizontal && bridgeVertical && continuationHorizontal) {
-    const expectedDirection = side === 'b' ? 1 : -1;
-    const outwardSpan = secondLane.y - endpoint.y;
-    const firstDirection = Math.sign(firstLane.x - endpoint.x);
-    const continuationDirection = Math.sign(continuation.x - secondLane.x);
-    if (
-      Math.sign(outwardSpan) === expectedDirection
-      && Math.abs(outwardSpan) >= MIN_DISPLAY_ENDPOINT_STUB
-      && firstDirection !== 0
-      && continuationDirection === -firstDirection
-    ) {
-      return compactOrthogonalPath([
-        endpoint,
-        { x: endpoint.x, y: secondLane.y },
-        { x: continuation.x, y: secondLane.y },
-        ...path.slice(3),
-      ]);
-    }
-  }
-
-  if ((side === 'l' || side === 'r') && firstVertical && bridgeHorizontal && continuationVertical) {
-    const expectedDirection = side === 'r' ? 1 : -1;
-    const outwardSpan = secondLane.x - endpoint.x;
-    const firstDirection = Math.sign(firstLane.y - endpoint.y);
-    const continuationDirection = Math.sign(continuation.y - secondLane.y);
-    if (
-      Math.sign(outwardSpan) === expectedDirection
-      && Math.abs(outwardSpan) >= MIN_DISPLAY_ENDPOINT_STUB
-      && firstDirection !== 0
-      && continuationDirection === -firstDirection
-    ) {
-      return compactOrthogonalPath([
-        endpoint,
-        { x: secondLane.x, y: endpoint.y },
-        { x: secondLane.x, y: continuation.y },
-        ...path.slice(3),
-      ]);
-    }
-  }
-
-  if ((side === 't' || side === 'b') && firstVertical && bridgeHorizontal && continuationVertical) {
-    const firstDirection = Math.sign(firstLane.y - endpoint.y);
-    const expectedDirection = side === 'b' ? 1 : -1;
-    const continuationDirection = Math.sign(continuation.y - secondLane.y);
-    const span = continuation.y - endpoint.y;
-    if (
-      firstDirection === -expectedDirection
-      && continuationDirection === expectedDirection
-      && Math.sign(span) === expectedDirection
-      && Math.abs(span) >= MIN_DISPLAY_ENDPOINT_STUB * 2
-    ) {
-      const laneY = endpoint.y + span / 2;
-      return compactOrthogonalPath([
-        endpoint,
-        { x: endpoint.x, y: laneY },
-        { x: secondLane.x, y: laneY },
-        ...path.slice(3),
-      ]);
-    }
-  }
-
-  if ((side === 'l' || side === 'r') && firstHorizontal && bridgeVertical && continuationHorizontal) {
-    const firstDirection = Math.sign(firstLane.x - endpoint.x);
-    const expectedDirection = side === 'r' ? 1 : -1;
-    const continuationDirection = Math.sign(continuation.x - secondLane.x);
-    const span = continuation.x - endpoint.x;
-    if (
-      firstDirection === -expectedDirection
-      && continuationDirection === expectedDirection
-      && Math.sign(span) === expectedDirection
-      && Math.abs(span) >= MIN_DISPLAY_ENDPOINT_STUB * 2
-    ) {
-      const laneX = endpoint.x + span / 2;
-      return compactOrthogonalPath([
-        endpoint,
-        { x: laneX, y: endpoint.y },
-        { x: laneX, y: secondLane.y },
-        ...path.slice(3),
-      ]);
-    }
-  }
-
-  return path;
-};
-
-export const repairTerminalHandleHemisphereHairpins = <T extends Edge[]>(
-  edges: T,
-  _nodes: Node[],
-): T => {
-  let changed = false;
-  const candidate = edges.map((edge) => {
-    const path = getDisplayComputedPath(edge);
-    if (path.length < 4) return edge;
-    if (calculateEdgePathQualityScore([edge]).hairpins === 0) return edge;
-    const first = path[0];
-    const second = path[1];
-    const last = path[path.length - 1];
-    const beforeLast = path[path.length - 2];
-    const sourceFallback = Math.abs(first.x - second.x) <= 0.5
-      ? (last.y >= first.y ? 'b' : 't')
-      : (last.x >= first.x ? 'r' : 'l');
-    const targetFallback = Math.abs(last.x - beforeLast.x) <= 0.5
-      ? (last.y >= first.y ? 't' : 'b')
-      : (last.x >= first.x ? 'l' : 'r');
-    const sourceRepaired = repairStartHandleHemisphereHairpin(path, edge.sourceHandle, sourceFallback);
-    const reversed = [...sourceRepaired].reverse();
-    const targetRepaired = repairStartHandleHemisphereHairpin(
-      reversed,
-      edge.targetHandle,
-      targetFallback,
-    ).reverse();
-    const repaired = compactOrthogonalPath(targetRepaired);
-    if (repaired.length === path.length && repaired.every((point, index) => (
-      Math.abs(point.x - path[index].x) <= 0.5 && Math.abs(point.y - path[index].y) <= 0.5
-    ))) {
-      return edge;
-    }
-    const data = {
-      ...((edge.data || {}) as Record<string, any>),
-      computedPath: repaired,
-      terminalHandleHemisphereRepaired: true,
-    };
-    if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-      data.treeRouting = { ...data.treeRouting, points: repaired };
-    }
-    changed = true;
-    return { ...edge, data };
-  }) as T;
-  return changed ? candidate : edges;
-};
-
-const adaptiveDetachedTerminalStub = (
-  edges: Edge[],
-  nodes: Node[],
-  edgeIndex: number,
-  path: DisplayPoint[],
-  role: 'source' | 'target',
-  rect: DisplayRect,
-  side: 'top' | 'bottom' | 'left' | 'right',
-): number => {
-  const oriented = role === 'target' ? path : [...path].reverse();
-  const splice = oriented[Math.max(1, oriented.length - 5)];
-  if (!splice) return MIN_DISPLAY_ENDPOINT_STUB;
-  const endpoint = side === 'left'
-    ? { x: rect.x, y: rect.y + rect.height / 2 }
-    : side === 'right'
-      ? { x: rect.x + rect.width, y: rect.y + rect.height / 2 }
-      : side === 'top'
-        ? { x: rect.x + rect.width / 2, y: rect.y }
-        : { x: rect.x + rect.width / 2, y: rect.y + rect.height };
-  const segments = extractDisplaySegments(edges).filter(segment => segment.edgeIndex !== edgeIndex);
-  const obstacles = buildDisplayRoutingObstacles(nodes);
-  const horizontalTerminal = side === 'left' || side === 'right';
-  const boundary = side === 'left'
-    ? rect.x
-    : side === 'right'
-      ? rect.x + rect.width
-      : side === 'top'
-        ? rect.y
-        : rect.y + rect.height;
-  let lane = side === 'left' || side === 'top'
-    ? boundary - MIN_DISPLAY_ENDPOINT_STUB
-    : boundary + MIN_DISPLAY_ENDPOINT_STUB;
-  const spanStart = horizontalTerminal ? splice.y : splice.x;
-  const spanEnd = horizontalTerminal ? endpoint.y : endpoint.x;
-  const spanMin = Math.min(spanStart, spanEnd);
-  const spanMax = Math.max(spanStart, spanEnd);
-
-  for (let iteration = 0; iteration < 8; iteration += 1) {
-    let nextLane = lane;
-    for (const segment of segments) {
-      if (horizontalTerminal && segment.axis === 'h') {
-        if (segment.a.y <= spanMin + 1 || segment.a.y >= spanMax - 1) continue;
-        const min = Math.min(segment.a.x, segment.b.x);
-        const max = Math.max(segment.a.x, segment.b.x);
-        if (lane <= min + 1 || lane >= max - 1) continue;
-        nextLane = side === 'right'
-          ? Math.max(nextLane, max + MIN_DISPLAY_ENDPOINT_STUB)
-          : Math.min(nextLane, min - MIN_DISPLAY_ENDPOINT_STUB);
-      }
-      if (!horizontalTerminal && segment.axis === 'v') {
-        if (segment.a.x <= spanMin + 1 || segment.a.x >= spanMax - 1) continue;
-        const min = Math.min(segment.a.y, segment.b.y);
-        const max = Math.max(segment.a.y, segment.b.y);
-        if (lane <= min + 1 || lane >= max - 1) continue;
-        nextLane = side === 'bottom'
-          ? Math.max(nextLane, max + MIN_DISPLAY_ENDPOINT_STUB)
-          : Math.min(nextLane, min - MIN_DISPLAY_ENDPOINT_STUB);
-      }
-    }
-    for (const [nodeId, obstacle] of obstacles) {
-      const edge = edges[edgeIndex];
-      if (!edge || nodeId === edge.source || nodeId === edge.target) continue;
-      if (horizontalTerminal) {
-        if (obstacle.y + obstacle.height <= spanMin || obstacle.y >= spanMax) continue;
-        const min = obstacle.x - OBSTACLE_REPAIR_NODE_PADDING;
-        const max = obstacle.x + obstacle.width + OBSTACLE_REPAIR_NODE_PADDING;
-        if (lane <= min || lane >= max) continue;
-        nextLane = side === 'right'
-          ? Math.max(nextLane, max + MIN_DISPLAY_ENDPOINT_STUB)
-          : Math.min(nextLane, min - MIN_DISPLAY_ENDPOINT_STUB);
-      } else {
-        if (obstacle.x + obstacle.width <= spanMin || obstacle.x >= spanMax) continue;
-        const min = obstacle.y - OBSTACLE_REPAIR_NODE_PADDING;
-        const max = obstacle.y + obstacle.height + OBSTACLE_REPAIR_NODE_PADDING;
-        if (lane <= min || lane >= max) continue;
-        nextLane = side === 'bottom'
-          ? Math.max(nextLane, max + MIN_DISPLAY_ENDPOINT_STUB)
-          : Math.min(nextLane, min - MIN_DISPLAY_ENDPOINT_STUB);
-      }
-    }
-    if (Math.abs(nextLane - lane) <= 0.5) break;
-    lane = nextLane;
-  }
-  return Math.max(MIN_DISPLAY_ENDPOINT_STUB, Math.abs(lane - boundary));
-};
-
-const detachedTerminalConnectorLanes = (
-  edge: Edge,
-  nodes: Node[],
-  path: DisplayPoint[],
-  role: 'source' | 'target',
-  rect: DisplayRect,
-  side: 'top' | 'bottom' | 'left' | 'right',
-  stubLength: number,
-): number[] => {
-  const oriented = role === 'target' ? path : [...path].reverse();
-  const splice = oriented[Math.max(1, oriented.length - 5)];
-  if (!splice) return [];
-  const horizontalTerminal = side === 'left' || side === 'right';
-  const endpointCoordinate = horizontalTerminal
-    ? rect.y + rect.height / 2
-    : rect.x + rect.width / 2;
-  const outerCoordinate = side === 'left'
-    ? rect.x - stubLength
-    : side === 'right'
-      ? rect.x + rect.width + stubLength
-      : side === 'top'
-        ? rect.y - stubLength
-        : rect.y + rect.height + stubLength;
-  const directCoordinate = horizontalTerminal ? splice.y : splice.x;
-  const mainStart = horizontalTerminal ? splice.x : splice.y;
-  const mainMin = Math.min(mainStart, outerCoordinate);
-  const mainMax = Math.max(mainStart, outerCoordinate);
-  let before: number | null = null;
-  let after: number | null = null;
-
-  for (const [nodeId, obstacle] of buildDisplayRoutingObstacles(nodes)) {
-    if (nodeId === edge.source || nodeId === edge.target) continue;
-    if (horizontalTerminal) {
-      if (
-        directCoordinate <= obstacle.y - OBSTACLE_REPAIR_NODE_PADDING
-        || directCoordinate >= obstacle.y + obstacle.height + OBSTACLE_REPAIR_NODE_PADDING
-        || obstacle.x + obstacle.width <= mainMin
-        || obstacle.x >= mainMax
-      ) continue;
-      const upper = obstacle.y - OBSTACLE_REPAIR_NODE_PADDING - MIN_DISPLAY_ENDPOINT_STUB;
-      const lower = obstacle.y + obstacle.height + OBSTACLE_REPAIR_NODE_PADDING + MIN_DISPLAY_ENDPOINT_STUB;
-      before = before === null ? upper : Math.min(before, upper);
-      after = after === null ? lower : Math.max(after, lower);
-    } else {
-      if (
-        directCoordinate <= obstacle.x - OBSTACLE_REPAIR_NODE_PADDING
-        || directCoordinate >= obstacle.x + obstacle.width + OBSTACLE_REPAIR_NODE_PADDING
-        || obstacle.y + obstacle.height <= mainMin
-        || obstacle.y >= mainMax
-      ) continue;
-      const left = obstacle.x - OBSTACLE_REPAIR_NODE_PADDING - MIN_DISPLAY_ENDPOINT_STUB;
-      const right = obstacle.x + obstacle.width + OBSTACLE_REPAIR_NODE_PADDING + MIN_DISPLAY_ENDPOINT_STUB;
-      before = before === null ? left : Math.min(before, left);
-      after = after === null ? right : Math.max(after, right);
-    }
-  }
-  const towardEndpoint = Math.sign(endpointCoordinate - directCoordinate);
-  return [before, after]
-    .filter((value): value is number => value !== null && Number.isFinite(value))
-    .sort((first, second) => {
-      const firstToward = Math.sign(first - directCoordinate) === towardEndpoint ? 0 : 1;
-      const secondToward = Math.sign(second - directCoordinate) === towardEndpoint ? 0 : 1;
-      return firstToward - secondToward
-        || Math.abs(first - directCoordinate) - Math.abs(second - directCoordinate);
-    });
-};
-
-const buildDeclaredTerminalInsetNudgeCandidates = (
-  path: DisplayPoint[],
-  role: 'source' | 'target',
-  rect: DisplayRect,
-  side: 'top' | 'bottom' | 'left' | 'right',
-): DisplayPoint[][] => {
-  if (path.length < 2) return [];
-  const oriented = role === 'source' ? path : [...path].reverse();
-  const terminal = oriented[0];
-  const horizontalSide = side === 'left' || side === 'right';
-  const tangentMinimum = horizontalSide ? rect.y : rect.x;
-  const tangentMaximum = tangentMinimum + (horizontalSide ? rect.height : rect.width);
-  const terminalTangent = horizontalSide ? terminal.y : terminal.x;
-  const tangentValues = sortedUniqueNumbers([
-    terminalTangent - 48,
-    terminalTangent - 24,
-    terminalTangent + 24,
-    terminalTangent + 48,
-    tangentMinimum + 24,
-    tangentMinimum + 48,
-    tangentMaximum - 48,
-    tangentMaximum - 24,
-  ]).filter(value => value >= tangentMinimum + 16 && value <= tangentMaximum - 16);
-  if (tangentValues.length === 0) return [];
-
-  const boundary = side === 'left'
-    ? rect.x
-    : side === 'right'
-      ? rect.x + rect.width
-      : side === 'top'
-        ? rect.y
-        : rect.y + rect.height;
-  const outwardDirection = side === 'right' || side === 'bottom' ? 1 : -1;
-  const axisCoordinate = (point: DisplayPoint): number => (horizontalSide ? point.x : point.y);
-  let spliceIndex = oriented.slice(1, 5).findIndex(point => (
-    (axisCoordinate(point) - boundary) * outwardDirection >= MIN_DISPLAY_ENDPOINT_STUB - 1
-  ));
-  spliceIndex = spliceIndex < 0 ? 1 : spliceIndex + 1;
-  const splice = oriented[spliceIndex];
-  if (!splice) return [];
-  const spliceAxisCoordinate = axisCoordinate(splice);
-  const outwardCoordinate = (spliceAxisCoordinate - boundary) * outwardDirection
-    >= MIN_DISPLAY_ENDPOINT_STUB - 1
-    ? spliceAxisCoordinate
-    : boundary + outwardDirection * MIN_DISPLAY_ENDPOINT_STUB;
-
-  return tangentValues.map((tangent): DisplayPoint[] => {
-    const endpoint = horizontalSide
-      ? { x: boundary, y: tangent }
-      : { x: tangent, y: boundary };
-    const stub = horizontalSide
-      ? { x: outwardCoordinate, y: tangent }
-      : { x: tangent, y: outwardCoordinate };
-    const bridge = horizontalSide
-      ? { x: outwardCoordinate, y: splice.y }
-      : { x: splice.x, y: outwardCoordinate };
-    const candidate = compactOrthogonalPath([
-      endpoint,
-      stub,
-      bridge,
-      splice,
-      ...oriented.slice(spliceIndex + 1),
-    ]);
-    return role === 'source' ? candidate : [...candidate].reverse();
-  });
-};
-
-const inferTerminalGeometrySide = (
-  path: DisplayPoint[],
-  role: 'source' | 'target',
-  rect: DisplayRect,
-): 'top' | 'bottom' | 'left' | 'right' | null => {
-  if (path.length < 2) return null;
-  const oriented = role === 'source' ? path : [...path].reverse();
-  const [terminal, adjacent, next] = oriented;
-  if (!terminal || !adjacent) return null;
-  const candidates = (['top', 'bottom', 'left', 'right'] as const)
-    .map((side) => {
-      const horizontalSide = side === 'left' || side === 'right';
-      const onBoundary = side === 'top'
-        ? Math.abs(terminal.y - rect.y) <= 3
-          && terminal.x >= rect.x - 3 && terminal.x <= rect.x + rect.width + 3
-        : side === 'bottom'
-          ? Math.abs(terminal.y - (rect.y + rect.height)) <= 3
-            && terminal.x >= rect.x - 3 && terminal.x <= rect.x + rect.width + 3
-          : side === 'left'
-            ? Math.abs(terminal.x - rect.x) <= 3
-              && terminal.y >= rect.y - 3 && terminal.y <= rect.y + rect.height + 3
-            : Math.abs(terminal.x - (rect.x + rect.width)) <= 3
-              && terminal.y >= rect.y - 3 && terminal.y <= rect.y + rect.height + 3;
-      if (!onBoundary) return null;
-      const expectedAxis = horizontalSide ? 'h' : 'v';
-      const firstAxis = displayAxisOf(terminal, adjacent);
-      const outward = (point: DisplayPoint): boolean => (
-        side === 'left'
-          ? point.x < terminal.x - 1
-          : side === 'right'
-            ? point.x > terminal.x + 1
-            : side === 'top'
-              ? point.y < terminal.y - 1
-              : point.y > terminal.y + 1
-      );
-      if (firstAxis === expectedAxis && outward(adjacent)) return { side, score: 0 };
-      if (!next || !firstAxis || firstAxis === expectedAxis) return null;
-      const adjacentStaysOnBoundary = side === 'top'
-        ? Math.abs(adjacent.y - rect.y) <= 3
-        : side === 'bottom'
-          ? Math.abs(adjacent.y - (rect.y + rect.height)) <= 3
-          : side === 'left'
-            ? Math.abs(adjacent.x - rect.x) <= 3
-            : Math.abs(adjacent.x - (rect.x + rect.width)) <= 3;
-      if (!adjacentStaysOnBoundary || displayAxisOf(adjacent, next) !== expectedAxis) return null;
-      return outward(next) ? { side, score: 1 } : null;
-    })
-    .filter((candidate): candidate is {
-      side: 'top' | 'bottom' | 'left' | 'right';
-      score: number;
-    } => Boolean(candidate))
-    .sort((first, second) => first.score - second.score);
-  return candidates[0]?.side ?? null;
-};
 
 const detachedTerminalQualityDoesNotRegress = (
   baseline: EdgePathQualityScore,
@@ -546,57 +81,31 @@ const detachedTerminalQualityDoesNotRegress = (
   && candidate.hairpins <= baseline.hairpins
 );
 
-const buildSingleEdgeZipperCandidates = <T extends Edge[]>(
-  edges: T,
-  moverEdgeIndex: number,
-  maxCandidates = 4,
-): T[] => {
-  const paths = edges.map(edge => getDisplayComputedPath(edge));
-  const crossings = findStrictCrossings(paths, edges)
-    .filter(crossing => (
-      crossing.a.edgeIndex === moverEdgeIndex || crossing.b.edgeIndex === moverEdgeIndex
-    ));
-  const candidates: T[] = [];
-
-  for (const crossing of crossings) {
-    const segment = crossing.a.edgeIndex === moverEdgeIndex ? crossing.a : crossing.b;
-    const other = crossing.a.edgeIndex === moverEdgeIndex ? crossing.b : crossing.a;
-    const path = paths[moverEdgeIndex];
-    if (
-      !path
-      || segment.axis === other.axis
-      || segment.segIdx <= 0
-      || segment.segIdx >= path.length - 2
-    ) continue;
-    const blockers = paths.flatMap((blockerPath, edgeIndex) => {
-      if (edgeIndex === moverEdgeIndex || blockerPath.length < 2) return [];
-      return blockerPath.slice(0, -1).flatMap((point, segmentIndex) => {
-        const next = blockerPath[segmentIndex + 1];
-        const axis = displayAxisOf(point, next);
-        if (!axis || axis === segment.axis) return [];
-        return [{
-          path: blockerPath,
-          segment: { segmentIndex, axis, a: point, b: next },
-        }];
-      });
-    });
-    for (const candidatePath of buildStrictCrossingZipperCandidates(
-      path,
-      {
-        segmentIndex: segment.segIdx,
-        axis: segment.axis,
-        a: segment.a,
-        b: segment.b,
-      },
-      blockers,
-    )) {
-      candidates.push(edges.map((edge, edgeIndex) => (
-        edgeIndex === moverEdgeIndex ? withDisplayComputedPath(edge, candidatePath) : edge
-      )) as T);
-      if (candidates.length >= maxCandidates) return candidates;
-    }
-  }
-  return candidates;
+const buildApproachSideTerminalCandidate = (
+  path: DisplayPoint[],
+  role: 'source' | 'target',
+  rect: NonNullable<ReturnType<typeof getDisplayNodeRect>>,
+): { path: DisplayPoint[]; side: 'top' | 'bottom' | 'left' | 'right' } | null => {
+  if (path.length < 2) return null;
+  const terminalIndex = role === 'source' ? 0 : path.length - 1;
+  const adjacentIndex = role === 'source' ? 1 : path.length - 2;
+  const terminal = path[terminalIndex];
+  const adjacent = path[adjacentIndex];
+  const axis = displayAxisOf(terminal, adjacent);
+  if (!axis) return null;
+  const side = axis === 'h'
+    ? (adjacent.x < terminal.x ? 'left' : 'right')
+    : (adjacent.y < terminal.y ? 'top' : 'bottom');
+  const endpoint = side === 'left'
+    ? { x: rect.x, y: Math.max(rect.y, Math.min(rect.y + rect.height, adjacent.y)) }
+    : side === 'right'
+      ? { x: rect.x + rect.width, y: Math.max(rect.y, Math.min(rect.y + rect.height, adjacent.y)) }
+      : side === 'top'
+        ? { x: Math.max(rect.x, Math.min(rect.x + rect.width, adjacent.x)), y: rect.y }
+        : { x: Math.max(rect.x, Math.min(rect.x + rect.width, adjacent.x)), y: rect.y + rect.height };
+  const candidatePath = path.map(point => ({ ...point }));
+  candidatePath[terminalIndex] = endpoint;
+  return { path: candidatePath, side };
 };
 
 export const repairDetachedTerminalsWithBoundedPortRoles = <T extends Edge[]>(
@@ -804,6 +313,7 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
   const nodeById = new Map(nodes.map(node => [node.id, node] as const));
   const routingObstacles = buildDisplayRoutingObstacles(nodes);
   const terminalValidation = createDisplayTerminalValidationSnapshot(nodes);
+  const countDeclaredAxisMismatches = createDisplayDeclaredAxisMismatchCounter(nodes);
   for (let pass = 0; pass < edges.length && qualityEvaluations < maxQualityEvaluations; pass += 1) {
     const edgeIndex = current
       .map((edge, index) => {
@@ -881,24 +391,32 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
       continue;
     }
 
-    const candidateEdges: Edge[] = [];
-    const handleOnlyCandidateEdges: Edge[] = [];
-    const insetNudgeCandidateEdges: Edge[] = [];
-    const appendCandidate = (candidateEdge: Edge) => {
-      if (!terminalValidation.validateEdge(candidateEdge).anchored) return;
-      candidateEdges.push(candidateEdge);
-    };
-    const appendPriorityCandidate = (candidateEdge: Edge) => {
-      if (!terminalValidation.validateEdge(candidateEdge).anchored) return;
-      handleOnlyCandidateEdges.push(candidateEdge);
-    };
-    const appendInsetNudgeCandidate = (candidateEdge: Edge) => {
-      if (!terminalValidation.validateEdge(candidateEdge).anchored) return;
-      insetNudgeCandidateEdges.push(candidateEdge);
-    };
+    const {
+      candidateEdges, handleOnlyCandidateEdges, insetNudgeCandidateEdges,
+      appendCandidate, appendPriorityCandidate, appendInsetNudgeCandidate,
+    } = createDisplayTerminalPortCandidateBuckets(
+      candidateEdge => terminalValidation.validateEdge(candidateEdge).anchored,
+    );
     appendCandidate(anchorComputedDisplayEdgeEndpoints([edge], nodes)[0] ?? edge);
     const geometrySourceSide = inferTerminalGeometrySide(path, 'source', sourceRect);
     const geometryTargetSide = inferTerminalGeometrySide(path, 'target', targetRect);
+    const approachSource = buildApproachSideTerminalCandidate(path, 'source', sourceRect);
+    const approachTarget = buildApproachSideTerminalCandidate(path, 'target', targetRect);
+    if (
+      approachSource
+      && approachTarget
+      && displayTerminalSideCanSwitch(edge, 'source', approachSource.side)
+      && displayTerminalSideCanSwitch(edge, 'target', approachTarget.side)
+    ) {
+      const approachPath = approachSource.path.map(point => ({ ...point }));
+      approachPath[approachPath.length - 1] = approachTarget.path[approachTarget.path.length - 1];
+      appendPriorityCandidate(withDisplayPortBridge(
+        edge,
+        approachPath,
+        approachSource.side,
+        approachTarget.side,
+      ));
+    }
     if (
       geometrySourceSide
       && geometryTargetSide
@@ -1106,18 +624,19 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
     const baselineQuality = qualityContext.evaluate(current);
     const baselineObstacleHits = obstacleContext.evaluate(current);
     let accepted: T | null = null;
+    let acceptedDeclaredAxisMismatches = Number.POSITIVE_INFINITY;
     let acceptedObstacleHits = Number.POSITIVE_INFINITY;
-    const rankCandidateEdges = (edgesToRank: Edge[]) => edgesToRank
-      .map((candidateEdge, order) => ({
-        candidateEdge,
-        order,
-        obstacleHits: countRoutingObstacleHits(
+    const prioritizeDeclaredAxisCompletion = edges.length === 1;
+    const rankCandidateEdges = (edgesToRank: Edge[]) => rankDisplayTerminalPortCandidates(
+      edgesToRank,
+      countDeclaredAxisMismatches,
+      candidateEdge => countRoutingObstacleHits(
           getDisplayComputedPath(candidateEdge),
           candidateEdge,
           routingObstacles,
-        ),
-      }))
-      .sort((first, second) => first.obstacleHits - second.obstacleHits || first.order - second.order);
+      ),
+      prioritizeDeclaredAxisCompletion,
+    );
     const rankedCandidateEdges = baselineObstacleHits === 0
       ? [
         ...rankCandidateEdges(handleOnlyCandidateEdges),
@@ -1129,7 +648,7 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
         ...rankCandidateEdges(candidateEdges),
         ...rankCandidateEdges(insetNudgeCandidateEdges),
       ];
-    for (const { candidateEdge } of rankedCandidateEdges) {
+    for (const { candidateEdge, declaredAxisMismatches } of rankedCandidateEdges) {
       if (qualityEvaluations >= maxQualityEvaluations) break;
       qualityEvaluations += 1;
       const candidate = current.map((item, index) => (
@@ -1139,10 +658,19 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
       if (!detachedTerminalQualityDoesNotRegress(baselineQuality, candidateQuality)) continue;
       const candidateObstacleHits = obstacleContext.evaluateKnownChanges(candidate, [edgeIndex]);
       if (candidateObstacleHits > baselineObstacleHits) continue;
-      if (accepted && candidateObstacleHits >= acceptedObstacleHits) continue;
+      if (accepted && !displayTerminalPortCandidateIsBetter(
+        { declaredAxisMismatches, obstacleHits: candidateObstacleHits },
+        acceptedDeclaredAxisMismatches,
+        acceptedObstacleHits,
+        prioritizeDeclaredAxisCompletion,
+      )) continue;
       accepted = candidate;
+      acceptedDeclaredAxisMismatches = declaredAxisMismatches;
       acceptedObstacleHits = candidateObstacleHits;
-      if (candidateObstacleHits === 0) break;
+      if (displayTerminalPortCandidateIsComplete(
+        { declaredAxisMismatches, obstacleHits: candidateObstacleHits },
+        prioritizeDeclaredAxisCompletion,
+      )) break;
     }
     if (!accepted) {
       skippedEdgeIds.add(edge.id);
@@ -1150,7 +678,11 @@ export const repairAxisMismatchedTerminalsWithBoundedPortRoles = <T extends Edge
     }
     current = accepted;
   }
-  return current;
+  return rollbackIncompleteDeclaredAxisTransactions(
+    edges,
+    current,
+    countDeclaredAxisMismatches,
+  );
 };
 
 export const repairBoundedReverseParallelOverlaps = <T extends Edge[]>(

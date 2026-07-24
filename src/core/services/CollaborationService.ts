@@ -4,7 +4,7 @@ import {
     normalizeCollaborationDiagramId,
     normalizeCollaborationRoomName,
     normalizeCollaborationServerUrl,
-} from '@/components/diagrams/collaboration/collaborationSecurity';
+} from '../utils/collaborationSecurity';
 
 export interface CollaborationUser {
     id: string;

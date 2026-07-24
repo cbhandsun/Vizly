@@ -1,4 +1,4 @@
-import type { Node } from '@xyflow/react';
+import type { Node, XYPosition } from '@xyflow/react';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   !!value && typeof value === 'object' && !Array.isArray(value)
@@ -28,7 +28,11 @@ const finiteNodeNumber = (value: unknown): number | undefined => (
   typeof value === 'number' && Number.isFinite(value) ? value : undefined
 );
 
-type BaseReactFlowInternalNodeLookup = Pick<Map<string, Node>, 'get'>;
+type BaseReactFlowInternalNode = Node & {
+  internals?: { positionAbsolute?: XYPosition };
+  positionAbsolute?: XYPosition;
+};
+type BaseReactFlowInternalNodeLookup = Pick<Map<string, BaseReactFlowInternalNode>, 'get'>;
 
 /**
  * Full-quality display routing must use the DOM geometry published by React Flow.
@@ -41,7 +45,7 @@ export const areBaseReactFlowInternalNodesReadyForRouting = (
 ): boolean => {
   if (nodeIds.length === 0 || !nodeLookup) return false;
   return nodeIds.every((nodeId) => {
-    const node = nodeLookup.get(nodeId) as any;
+    const node = nodeLookup.get(nodeId);
     if (!node) return false;
     const absolute = node.internals?.positionAbsolute ?? node.positionAbsolute ?? node.position;
     const width = finiteNodeNumber(node.measured?.width ?? node.width);
@@ -69,7 +73,7 @@ export const computeBaseReactFlowInternalNodeGeometrySignature = (
   nodeIds: string[],
   nodeLookup: BaseReactFlowInternalNodeLookup | undefined,
 ): string => nodeIds.map((nodeId) => {
-  const node = nodeLookup?.get(nodeId) as any;
+  const node = nodeLookup?.get(nodeId);
   if (!node) return `${nodeId.length}:${nodeId}:missing`;
   const absolute = node.internals?.positionAbsolute ?? node.positionAbsolute ?? node.position;
   return [
@@ -98,8 +102,10 @@ export const mergeBaseReactFlowMeasuredNodes = (
   const merged = sourceNodes.map((sourceNode) => {
     const internalNode = internalById.get(sourceNode.id);
     if (!internalNode) return sourceNode;
-    const internalMeasured = (internalNode as any).measured;
-    const sourceMeasured = (sourceNode as any).measured;
+    const internalDisplayNode = internalNode as BaseReactFlowInternalNode;
+    const sourceDisplayNode = sourceNode as BaseReactFlowInternalNode;
+    const internalMeasured = internalDisplayNode.measured;
+    const sourceMeasured = sourceDisplayNode.measured;
     const width = finiteNodeNumber(internalMeasured?.width)
       ?? finiteNodeNumber(internalNode.width)
       ?? finiteNodeNumber(sourceMeasured?.width)
@@ -109,14 +115,14 @@ export const mergeBaseReactFlowMeasuredNodes = (
       ?? finiteNodeNumber(sourceMeasured?.height)
       ?? finiteNodeNumber(sourceNode.height);
     const position = internalNode.position ?? sourceNode.position;
-    const positionAbsolute = (internalNode as any).positionAbsolute
-      ?? (internalNode as any).internals?.positionAbsolute
-      ?? (sourceNode as any).positionAbsolute;
+    const positionAbsolute = internalDisplayNode.positionAbsolute
+      ?? internalDisplayNode.internals?.positionAbsolute
+      ?? sourceDisplayNode.positionAbsolute;
     const nextMeasured = width !== undefined || height !== undefined
       ? { width, height }
       : sourceMeasured;
     const geometryChanged = position !== sourceNode.position
-      || positionAbsolute !== (sourceNode as any).positionAbsolute
+      || positionAbsolute !== sourceDisplayNode.positionAbsolute
       || width !== finiteNodeNumber(sourceMeasured?.width ?? sourceNode.width)
       || height !== finiteNodeNumber(sourceMeasured?.height ?? sourceNode.height);
     if (!geometryChanged) return sourceNode;

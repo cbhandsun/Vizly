@@ -1,9 +1,9 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { TEST_CI_SHARDS } from './lib/test-ci-shards.mjs';
 
 const projectRoot = process.cwd();
 const packageJson = JSON.parse(readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
-const runTestCiSource = readFileSync(path.join(projectRoot, 'scripts/run-test-ci.mjs'), 'utf8');
 const testFilePattern = /\.test\.(ts|tsx)$/;
 const searchRoots = ['src', 'supabase'];
 
@@ -32,19 +32,8 @@ const allTests = searchRoots
   .filter((file) => testFilePattern.test(file))
   .sort();
 
-const parseRunnerShardNames = () => {
-  const match = runTestCiSource.match(/const\s+shardNames\s*=\s*\[([\s\S]*?)\];/);
-  if (!match) {
-    throw new Error('Unable to locate shardNames in scripts/run-test-ci.mjs');
-  }
-
-  return [...match[1].matchAll(/['"`]([^'"`]+)['"`]/g)]
-    .map((entry) => entry[1])
-    .filter(Boolean);
-};
-
 const packageScripts = packageJson.scripts ?? {};
-const runnerShardNames = parseRunnerShardNames();
+const runnerShardNames = TEST_CI_SHARDS;
 const missingRunnerScripts = runnerShardNames.filter((name) => typeof packageScripts[name] !== 'string');
 const directVitestShardNames = Object.entries(packageScripts)
   .filter(([name, command]) => name.startsWith('test:ci:') && typeof command === 'string' && /\bvitest\s+run\b/.test(command))

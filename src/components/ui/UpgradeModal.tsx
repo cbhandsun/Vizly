@@ -4,8 +4,7 @@ import { CrownOutlined, CheckCircleFilled } from '@ant-design/icons';
 import { useSubscription } from '@/context/useSubscription';
 import { useTranslation } from 'react-i18next';
 import { appMessage } from '@/core/utils/antdStaticBridge';
-import { buildSupabaseFunctionUrl, normalizeStripePriceId } from '@/services/runtimeEnv';
-import { isSafeCheckoutRedirectUrl } from './checkoutRedirect';
+import { createCheckoutSession } from '@/services/checkoutSessionClient';
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -28,54 +27,16 @@ export const UpgradeModal: React.FC = () => {
 
     setLoading(true);
     try {
-      const checkoutUrl = buildSupabaseFunctionUrl(
-        import.meta.env.VITE_SUPABASE_URL,
-        'create-checkout-session'
-      );
-      const priceId = normalizeStripePriceId(import.meta.env.VITE_STRIPE_PRO_PRICE_ID);
-
-      if (!checkoutUrl || !priceId) {
-        throw new Error(t('upgrade.checkoutConfigMissing', { defaultValue: 'Checkout is not configured.' }));
-      }
-
-      const response = await fetch(checkoutUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${jwtToken}`
-        },
-        body: JSON.stringify({
-          priceId,
-          successUrl: `${window.location.origin}?success=true`,
-          cancelUrl: `${window.location.origin}?canceled=true`,
-        })
+      const { url } = await createCheckoutSession({
+        supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+        priceId: import.meta.env.VITE_STRIPE_PRO_PRICE_ID,
+        jwtToken,
+        origin: window.location.origin,
       });
-
-      if (!response.ok) {
-         let errorText = '';
-         try {
-             const rawText = await response.text();
-             try {
-                 const errJson = JSON.parse(rawText);
-                 errorText = errJson.error || errJson.message || rawText;
-             } catch {
-                 errorText = rawText;
-             }
-         } catch {
-             errorText = response.statusText || t('upgrade.unknownResponse');
-         }
-         throw new Error(t('upgrade.statusError', { status: response.status, message: errorText }));
-      }
-
-      const data = await response.json();
-
-      if (isSafeCheckoutRedirectUrl(data.url)) {
-        window.location.href = data.url; // 重定向至 Stripe 网关
-      } else {
-        appMessage.error(t('upgrade.checkoutFail', { error: data.error || t('upgrade.unknownError') }));
-      }
-    } catch (e: any) {
-       appMessage.error(t('upgrade.gatewayFail', { error: e.message }));
+      window.location.href = url;
+    } catch (error: unknown) {
+       const message = error instanceof Error ? error.message : t('upgrade.unknownError');
+       appMessage.error(t('upgrade.gatewayFail', { error: message }));
     } finally {
        setLoading(false);
     }

@@ -37,8 +37,13 @@ describe('mindmapNodePatchSecurity', () => {
         expect(patch.topic).toHaveLength(MINDMAP_MAX_TOPIC_LENGTH);
         expect(patch.note).toHaveLength(MINDMAP_MAX_NOTE_LENGTH);
         expect(patch.tags).toHaveLength(MINDMAP_MAX_TAGS);
-        expect(patch.tags?.[0]?.text).toHaveLength(MINDMAP_MAX_TAG_LENGTH);
-        expect(patch.tags?.[0]?.style).toEqual({ background: '#ffffff', borderColor: '#000' });
+        const firstTag = patch.tags?.[0];
+        expect(firstTag).toEqual(expect.any(Object));
+        if (!firstTag || typeof firstTag === 'string') {
+            throw new Error('Expected a sanitized tag object');
+        }
+        expect(firstTag.text).toHaveLength(MINDMAP_MAX_TAG_LENGTH);
+        expect(firstTag.style).toEqual({ background: '#ffffff', borderColor: '#000' });
         expect(patch.icons).toHaveLength(MINDMAP_MAX_TAGS);
         expect(patch.icons?.[0]).toHaveLength(MINDMAP_MAX_ICON_LENGTH);
         expect(patch.hyperLink).toBeUndefined();

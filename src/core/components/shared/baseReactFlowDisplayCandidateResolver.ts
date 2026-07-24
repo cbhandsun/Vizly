@@ -27,11 +27,12 @@ export const resolveBaseReactFlowPrecompiledCandidateTimeoutMs = (value: number)
 };
 
 /**
- * Resolves external display candidates before a worker job starts. A signed
- * persistent candidate has priority; otherwise the generated registry is
- * loaded lazily. Callers must treat `null` as a stale/aborted schedule and must
- * not start a worker for it. A cache miss remains a valid resolution so the
- * same scheduled job can proceed directly to full routing.
+ * Resolves external display candidates before a worker job starts. A generated
+ * precompiled artifact is tried first so an invalid persistent candidate cannot
+ * force an expensive full route when a versioned artifact exists. Persistent
+ * data remains the fallback for registry misses, failures, and bounded timeouts.
+ * Callers must treat `null` as a stale/aborted schedule and must not start a
+ * worker for it.
  */
 export const resolveBaseReactFlowDisplayCandidate = async ({
   input,
@@ -49,12 +50,6 @@ export const resolveBaseReactFlowDisplayCandidate = async ({
   loadTimeoutMs?: number;
 }): Promise<BaseReactFlowDisplayCandidateResolution | null> => {
   if (signal.aborted || !isCurrent()) return null;
-  if (persistentCandidateEdges) {
-    return {
-      candidateEdges: persistentCandidateEdges,
-      source: 'persistent',
-    };
-  }
 
   type LoadOutcome =
     | { kind: 'loaded'; candidateEdges: Edge[] | null }
@@ -84,7 +79,9 @@ export const resolveBaseReactFlowDisplayCandidate = async ({
   if (outcome.kind === 'aborted') return null;
   if (signal.aborted || !isCurrent()) return null;
   const candidateEdges = outcome.kind === 'loaded' ? outcome.candidateEdges : null;
-  return candidateEdges
-    ? { candidateEdges, source: 'precompiled' }
-    : { candidateEdges: null, source: 'miss' };
+  if (candidateEdges) return { candidateEdges, source: 'precompiled' };
+  if (persistentCandidateEdges) {
+    return { candidateEdges: persistentCandidateEdges, source: 'persistent' };
+  }
+  return { candidateEdges: null, source: 'miss' };
 };

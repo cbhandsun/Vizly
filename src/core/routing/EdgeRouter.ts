@@ -2,9 +2,10 @@ import { geometryAnalyzer } from './core/GeometryAnalyzer';
 import { portSelector } from './core/PortSelector';
 import { costEvaluator } from './core/CostEvaluator';
 import * as pathFinder from '../algorithms/pathfinding';
-import { calculateAdaptiveGridSize } from '../workers/core/GraphBuilder'; // [P1]
+import { calculateAdaptiveGridSize } from '../algorithms/adaptiveGridSize';
 import { expandHandle, normalizeHandle, isHorizontalHandle, isVerticalHandle } from './utils/handleUtils';
 import { logEdgeRouterFatalError } from '../utils/routingLogging';
+import { EdgeType } from './types/routing';
 
 import type {
     NodeGeometry,
@@ -12,9 +13,9 @@ import type {
     RoutingDecision,
     EdgeRoutingWeights,
     PortUsage,
-    EdgeType,
     RoutingPlugin,
-    Point
+    Point,
+    GeometryAnalysis
 } from './types/routing';
 
 /**
@@ -161,7 +162,7 @@ export class EdgeRouter {
 
             // 如果是Step相关类型，启用高级寻路
             // 确保有 obstacles 数据（由HandlePicker注入）
-            if ((type === 'advanced-smart-step' || type === 'step' || type === 'advanced-smart-straight' || type === 'advanced-smart-bezier') && (config as any).obstacles) {
+            if ((type === 'advanced-smart-step' || type === 'step' || type === 'advanced-smart-straight' || type === 'advanced-smart-bezier') && config.obstacles) {
 
 
 
@@ -219,7 +220,7 @@ export class EdgeRouter {
                 const path = pathFinder.findPath(
                     startPoint,
                     endPoint,
-                    (config as any).obstacles || [],
+                    config.obstacles || [],
                     adaptiveGridSize,  // [P1]
                     lineObstacles
                 );
@@ -248,7 +249,7 @@ export class EdgeRouter {
             logEdgeRouterFatalError(error);
             // Fallback to straight line to prevent missing lines
             return {
-                type: 'advanced-smart-straight' as any,
+                type: EdgeType.ADVANCED_SMART_STRAIGHT,
                 sourceHandle: 'bottom',
                 targetHandle: 'top',
                 autoSource: true,
@@ -295,7 +296,7 @@ export class EdgeRouter {
     /**
      * 解析边类型
      */
-    private resolveEdgeType(config: RoutingConfig, _geometry: any): EdgeType {
+    private resolveEdgeType(config: RoutingConfig, _geometry: GeometryAnalysis): EdgeType {
         if (config.mode === 'native') {
             const globalPath = config.globalPath || 'bezier';
             if (globalPath.includes('smooth')) return 'smoothstep' as unknown as EdgeType;

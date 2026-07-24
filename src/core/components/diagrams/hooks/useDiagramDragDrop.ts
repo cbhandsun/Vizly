@@ -10,6 +10,7 @@ import {
     logDiagramDragDropImportRejected,
     logDiagramDragDropReverseImportFailure,
 } from './diagramInteractionLogging';
+import { createSwimlaneDropNodes } from './diagramDropSwimlaneFactory';
 
 interface UseDiagramDragDropProps {
     nodes: Node[];
@@ -19,7 +20,7 @@ interface UseDiagramDragDropProps {
     takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
     reactFlowInstance: ReactFlowInstance | null;
     setIsDragging: (dragging: boolean) => void;
-    onSmartNodeDrag?: (e: React.MouseEvent, node: Node, nodes: Node[]) => SnapDelta | null;
+    onSmartNodeDrag?: (event: MouseEvent | TouchEvent, node: Node, nodes: Node[]) => SnapDelta | null;
     clearGuides: () => void;
     enableAltDuplicate?: boolean;
     isConnecting?: boolean; 
@@ -50,6 +51,8 @@ export const useDiagramDragDrop = ({
     const dragTargetIdRef = useRef<string | null>(null);
     const dragRafIdRef = useRef<number | null>(null); // ⭐ P4: onNodeDrag RAF 节流
     const smartGuideRafRef = useRef<number | null>(null); // 🚀 P3: SmartGuides RAF 节流
+    const lastActiveSnapDeltaRef = useRef<SnapDelta | null>(null);
+    const lastMindmapDropPosRef = useRef<'above' | 'below' | 'inside' | null>(null);
 
     const onDragOver = useCallback((event: React.DragEvent) => {
         event.preventDefault();
@@ -191,57 +194,14 @@ export const useDiagramDragDrop = ({
 
                 // ⭐ Swimlane: create container + child titleGroup nodes as lanes
                 if (typeName === 'swimlane') {
-                    const lanes = config?.lanes || [
-                        { id: 'lane-1', label: '用户', color: '#3b82f6' },
-                        { id: 'lane-2', label: '系统', color: '#10b981' },
-                        { id: 'lane-3', label: '第三方', color: '#f59e0b' },
-                    ];
-                    const containerW = 800;
-                    const containerH = 500;
-                    const headerH = 36;
-                    const isHorizontal = config?.direction !== 'vertical';
-
-                    // Initial Layout Calculation
-                    const laneW = isHorizontal ? containerW : Math.floor(containerW / lanes.length);
-                    const laneH = isHorizontal ? Math.floor((containerH - headerH) / lanes.length) : (containerH - headerH);
-
-                    const swimlaneNode: Node = {
-                        id: newNodeId,
-                        type: 'swimlane',
+                    const swimlaneNodes = createSwimlaneDropNodes({
+                        containerId: newNodeId,
                         position,
-                        data: {
-                            label: label || 'Swimlane',
-                            direction: config?.direction || 'horizontal',
-                            layer: activeLayerId,
-                            laneCount: lanes.length, // Store count for resizing logic
-                        },
-                        style: { width: containerW, height: containerH },
-                        zIndex: -2,
-                    };
-
-                    const laneNodes: Node[] = lanes.map((lane: { id: string; label: string; color?: string }, idx: number) => ({
-                        id: `${newNodeId} -${lane.id} `,
-                        type: 'titleGroup',
-                        // Position is relative to parent
-                        position: isHorizontal
-                            ? { x: 0, y: headerH + idx * laneH }
-                            : { x: idx * laneW, y: headerH },
-                        parentId: newNodeId,
-                        extent: 'parent' as const,
-                        data: {
-                            label: lane.label,
-                            description: lane.label,
-                            themeColor: lane.color || '#6366f1',
-                            titleBarHeight: 28,
-                            layer: activeLayerId,
-                            isLane: true, // ⭐ Enable lane styling (squared corners, no shadow)
-                            domainClass: 'core', // Default to core for consistent styling
-                        },
-                        style: { width: laneW, height: laneH },
-                        zIndex: -1,
-                    }));
-
-                    setNodes((nds) => nds.concat(swimlaneNode, ...laneNodes));
+                        label,
+                        config,
+                        layerId: activeLayerId,
+                    });
+                    setNodes((nds) => nds.concat(swimlaneNodes));
                     return;
                 }
 
@@ -297,7 +257,7 @@ export const useDiagramDragDrop = ({
         [reactFlowInstance, takeSnapshot, setNodes, setEdges, activeLayerId]
     );
 
-    const onNodeDragStart = useCallback((event: React.MouseEvent, node: Node) => {
+    const onNodeDragStart = useCallback((event: MouseEvent | TouchEvent, node: Node) => {
         // 禁用连线时的 Alt 复制功能
         const shouldDuplicate = enableAltDuplicate && event.altKey && !isConnecting;
 
@@ -328,7 +288,7 @@ export const useDiagramDragDrop = ({
     // ⭐ 防振荡：记录上次 snap 签名，避免重复 snap
     const lastSnapSigRef = useRef('');
 
-    const onNodeDrag = useCallback((e: React.MouseEvent, node: Node, allNodes: Node[]) => {
+    const onNodeDrag = useCallback((event: MouseEvent | TouchEvent, node: Node, allNodes: Node[]) => {
         // 🚀 P3: Smart Guides 吸附纳入 RAF 节流
         //   避免每个 mousemove 同步执行 O(n) 对齐计算
         if (onSmartNodeDrag) {
@@ -340,16 +300,14 @@ export const useDiagramDragDrop = ({
             const capturedAllNodes = allNodes;
             smartGuideRafRef.current = requestAnimationFrame(() => {
                 smartGuideRafRef.current = null;
-                const snapDelta = onSmartNodeDrag(e, capturedNode, capturedAllNodes);
+                const snapDelta = onSmartNodeDrag(event, capturedNode, capturedAllNodes);
                 if (snapDelta && (Math.abs(snapDelta.x) > 0.5 || Math.abs(snapDelta.y) > 0.5)) {
                     // 防振荡：生成签名，与上次相同则跳过
                     const sig = `${capturedNode.id}:${snapDelta.x.toFixed(1)}:${snapDelta.y.toFixed(1)}`;
                     if (sig !== lastSnapSigRef.current) {
                         lastSnapSigRef.current = sig;
                         // [FIX] Save the delta for drop persistence
-                        if (typeof window !== 'undefined') {
-                            (window as any)._lastActiveSnapDelta = snapDelta;
-                        }
+                        lastActiveSnapDeltaRef.current = snapDelta;
 
                         setNodes(nds => nds.map(n => {
                             if (n.id !== capturedNode.id) return n;
@@ -365,9 +323,7 @@ export const useDiagramDragDrop = ({
                 } else {
                     // 无吸附时清空签名，允许下次吸附
                     lastSnapSigRef.current = '';
-                    if (typeof window !== 'undefined') {
-                        (window as any)._lastActiveSnapDelta = null;
-                    }
+                    lastActiveSnapDeltaRef.current = null;
                 }
             });
         }
@@ -452,7 +408,10 @@ export const useDiagramDragDrop = ({
             }
 
             // 使用 CSS 类名替代 React 状态更新，避免抖动
-            if (newTargetId !== dragTargetIdRef.current || (typeof window !== 'undefined' && dropPosition !== (window as any)._lastMindmapDropPos)) {
+            if (
+                newTargetId !== dragTargetIdRef.current
+                || dropPosition !== lastMindmapDropPosRef.current
+            ) {
                 // 移除旧高亮
                 if (dragTargetIdRef.current) {
                     const oldElement = document.querySelector(`[data-id="${dragTargetIdRef.current}"]`);
@@ -465,16 +424,14 @@ export const useDiagramDragDrop = ({
                     newElement?.classList.add('drop-target-highlight');
                     if (dropPosition) {
                          newElement?.classList.add(`drop-${dropPosition}`);
-                         if (typeof window !== 'undefined') {
-                             (window as any)._lastMindmapDropPos = dropPosition;
-                         }
-                    } else if (typeof window !== 'undefined') {
-                         (window as any)._lastMindmapDropPos = null;
+                         lastMindmapDropPosRef.current = dropPosition;
+                    } else {
+                         lastMindmapDropPosRef.current = null;
                     }
                 }
                 
-                if (!newTargetId && typeof window !== 'undefined') {
-                    (window as any)._lastMindmapDropPos = null;
+                if (!newTargetId) {
+                    lastMindmapDropPosRef.current = null;
                 }
 
                 dragTargetIdRef.current = newTargetId;
@@ -482,7 +439,7 @@ export const useDiagramDragDrop = ({
         });
     }, [onSmartNodeDrag, setNodes]);
 
-    const onNodeDragStop = useCallback((_e: React.MouseEvent, node: Node, allNodes: Node[]) => {
+    const onNodeDragStop = useCallback((_event: MouseEvent | TouchEvent, node: Node, allNodes: Node[]) => {
         // ⭐ P4: 清理pending的RAF
         if (dragRafIdRef.current !== null) {
             cancelAnimationFrame(dragRafIdRef.current);
@@ -497,10 +454,8 @@ export const useDiagramDragDrop = ({
         // [FIX] Capture the active snapDelta before clearing guides so we can cement the drop location
         // React Flow natively enforces snapToGrid when the drag drops, which discards our custom snapDelta
         // causing the node to jump back to strict grid coordinates upon release.
-        const finalSnapDelta = typeof window !== 'undefined' ? (window as any)._lastActiveSnapDelta : null;
-        if ((window as any)._lastActiveSnapDelta) {
-            (window as any)._lastActiveSnapDelta = null;
-        }
+        const finalSnapDelta = lastActiveSnapDeltaRef.current;
+        lastActiveSnapDeltaRef.current = null;
 
         setIsDragging(false);
         clearGuides();
@@ -565,11 +520,11 @@ export const useDiagramDragDrop = ({
             // [DDD] Mind Map Domain Event (Delegate reparenting to Orchestrator)
             if (node.type === 'mindmap' && parentCandidate.type === 'mindmap') {
                 if (typeof window !== 'undefined') {
-                    const finalPosition = (window as any)._lastMindmapDropPos || 'inside';
+                    const finalPosition = lastMindmapDropPosRef.current || 'inside';
                     window.dispatchEvent(new CustomEvent('mindmap:reparent', {
                         detail: { nodeId: node.id, targetId: parentCandidate.id, position: finalPosition }
                     }));
-                    (window as any)._lastMindmapDropPos = null;
+                    lastMindmapDropPosRef.current = null;
                 }
                 return; // Stop standard Group parenting execution
             }

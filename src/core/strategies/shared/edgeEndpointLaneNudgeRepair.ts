@@ -14,6 +14,13 @@ import {
 
 type Rect = { x: number; y: number; width: number; height: number };
 type Side = 'top' | 'bottom' | 'left' | 'right';
+type PositionedNode = ReactFlowNode & { positionAbsolute?: Point };
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
 
 const EPS = 0.5;
 const MIN_ENDPOINT_STUB = 48;
@@ -26,10 +33,14 @@ const num = (value: unknown, fallback: number): number => (
 );
 
 function getEdgePath(edge: Edge): Point[] {
-  const raw = (edge.data as any)?.computedPath || (edge.data as any)?.treeRouting?.points || [];
+  const treeRouting = asRecord(edge.data?.treeRouting);
+  const raw = edge.data?.computedPath || treeRouting.points || [];
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((point: any) => ({ x: Number(point?.x), y: Number(point?.y) }))
+    .map(point => {
+      const candidate = asRecord(point);
+      return { x: Number(candidate.x), y: Number(candidate.y) };
+    })
     .filter((point: Point) => Number.isFinite(point.x) && Number.isFinite(point.y));
 }
 
@@ -76,13 +87,13 @@ function pathLength(path: Point[]): number {
 }
 
 function getNodeRect(node: ReactFlowNode): Rect | null {
-  const position = (node as any).positionAbsolute ?? node.position ?? { x: 0, y: 0 };
-  const width = num((node as any).measured?.width ?? node.width ?? (node.style as any)?.width, 0);
-  const height = num((node as any).measured?.height ?? node.height ?? (node.style as any)?.height, 0);
+  const position = (node as PositionedNode).positionAbsolute ?? node.position;
+  const width = num(node.measured?.width ?? node.width ?? node.style?.width, 0);
+  const height = num(node.measured?.height ?? node.height ?? node.style?.height, 0);
   if (width <= 1 || height <= 1) return null;
   return {
-    x: num((position as any).x, 0),
-    y: num((position as any).y, 0),
+    x: num(position.x, 0),
+    y: num(position.y, 0),
     width,
     height,
   };
@@ -543,9 +554,10 @@ function outerBypassOverlapCandidates(
 }
 
 function withComputedPath(edge: Edge, path: Point[]): Edge {
-  const data: any = { ...(edge.data || {}), computedPath: path, endpointLaneNudged: true };
-  if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-    data.treeRouting = { ...data.treeRouting, points: path };
+  const data: Record<string, unknown> = { ...(edge.data || {}), computedPath: path, endpointLaneNudged: true };
+  const treeRouting = asRecord(data.treeRouting);
+  if (Array.isArray(treeRouting.points)) {
+    data.treeRouting = { ...treeRouting, points: path };
   }
   return { ...edge, data };
 }

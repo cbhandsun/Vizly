@@ -25,12 +25,12 @@ const findBrowserExecutable = () => {
 
 const findAvailablePort = () => new Promise((resolve, reject) => {
   const server = createServer();
-  server.unref();
   server.once('error', reject);
   server.listen(0, '127.0.0.1', () => {
     const address = server.address();
     const port = typeof address === 'object' && address ? address.port : 0;
-    server.close(error => (error ? reject(error) : resolve(port)));
+    server.close();
+    resolve(port);
   });
 });
 
@@ -71,6 +71,17 @@ class CdpPageSession {
       if (message.error) pending.reject(new Error(message.error.message));
       else pending.resolve(message.result);
     });
+    const rejectPending = (reason) => {
+      const error = reason instanceof Error
+        ? reason
+        : new Error('CDP session closed before receiving a response');
+      for (const pending of this.pending.values()) pending.reject(error);
+      this.pending.clear();
+    };
+    this.socket.on('error', rejectPending);
+    this.socket.on('close', (code, reason) => rejectPending(new Error(
+      `CDP session closed before receiving a response (code ${code}${reason?.length ? `: ${String(reason)}` : ''})`,
+    )));
   }
 
   send(method, params = {}) {
@@ -108,8 +119,13 @@ export const withPrecompiledRouteBrowser = async (run) => {
   const browser = spawn(browserPath, [
     '--headless=new',
     '--disable-gpu',
+    '--disable-gpu-compositing',
+    '--disable-gpu-sandbox',
+    '--disable-dev-shm-usage',
+    '--no-sandbox',
     '--no-first-run',
     '--no-default-browser-check',
+    '--remote-allow-origins=*',
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${profile}`,
     'about:blank',

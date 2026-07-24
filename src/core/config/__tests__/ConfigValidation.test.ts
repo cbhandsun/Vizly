@@ -19,6 +19,9 @@ describe('ConfigValidation validators', () => {
     expect(validators.string.minLength(3).validate('ab')).toBe('字符串长度不能少于 3 个字符');
     expect(validators.string.maxLength(3).validate('abcd')).toBe('字符串长度不能超过 3 个字符');
     expect(validators.string.pattern(/^viz/).validate('vizly')).toBe(true);
+    const globalPattern = validators.string.pattern(/^viz/g);
+    expect(globalPattern.validate('vizly')).toBe(true);
+    expect(globalPattern.validate('vizly')).toBe(true);
     expect(validators.string.pattern(/^viz/, 'bad prefix').validate('ly')).toBe('bad prefix');
     expect(validators.string.oneOf(['light', 'dark']).validate('auto')).toBe('值必须是以下之一: light, dark');
     expect(color.validate('#ABC')).toBe(true);
@@ -28,10 +31,13 @@ describe('ConfigValidation validators', () => {
     expect(color.validate('rgb(999, 2, 3)')).toBe('颜色格式不正确，支持 HEX、RGB、RGBA 格式');
     expect(color.validate('rgba(1, 2, 3, 2)')).toBe('颜色格式不正确，支持 HEX、RGB、RGBA 格式');
     expect(color.sanitize?.('#ABCDEF')).toBe('#abcdef');
+    expect(color.sanitize?.('  #ABCDEF  ')).toBe('#abcdef');
     expect(url.validate('https://example.com')).toBe(true);
     expect(url.validate('http://example.com')).toBe(true);
     expect(url.validate('javascript:alert(1)')).toBe('URL 协议不安全，仅支持 HTTP 或 HTTPS');
     expect(url.validate('data:text/html,<script>alert(1)</script>')).toBe('URL 协议不安全，仅支持 HTTP 或 HTTPS');
+    expect(url.validate('https://user:password@example.com')).toBe('URL 不能包含认证信息');
+    expect(url.validate({})).toBe('URL 格式不正确');
     expect(url.validate('nope')).toBe('URL 格式不正确');
   });
 
@@ -44,6 +50,10 @@ describe('ConfigValidation validators', () => {
     expect(validators.number.integer().sanitize?.(1.6)).toBe(2);
     expect(validators.number.positive().validate(0)).toBe('必须是正数');
     expect(validators.number.percentage().validate(101)).toBe('百分比必须在 0 到 100 之间');
+    expect(validators.number.required().validate(Number.POSITIVE_INFINITY)).toBe('必须是有效数字');
+    expect(validators.number.min(2).validate(Number.NaN)).toBe('数值不能小于 2');
+    expect(validators.number.max(2).validate(Number.NEGATIVE_INFINITY)).toBe('数值不能大于 2');
+    expect(validators.number.range(1, 3).validate('2')).toBe('数值必须在 1 到 3 之间');
   });
 
   it('validates booleans, objects, and arrays', () => {
@@ -53,6 +63,7 @@ describe('ConfigValidation validators', () => {
 
     expect(validators.object.required().validate({})).toBe(true);
     expect(validators.object.required().validate([] as never)).toBe('必须是对象');
+    expect(validators.object.required().validate(new Date())).toBe('必须是对象');
     expect(validators.object.hasKeys(['id', 'name']).validate({ id: 1 })).toBe('缺少必需的键: name');
 
     const shape = validators.object.shape({
@@ -121,6 +132,55 @@ describe('ConfigValidation helpers', () => {
       isValid: false,
       errors: { size: '数值必须在 1 到 20 之间' },
       sanitizedConfigs: { name: 'Vizly', extra: true },
+    });
+  });
+
+  it('rejects malformed batches and prototype-sensitive keys', () => {
+    expect(validateConfigBatch(null, schemas)).toEqual({
+      isValid: false,
+      errors: { $config: '配置必须是对象' },
+      sanitizedConfigs: {},
+    });
+    expect(validateConfigBatch([], schemas)).toEqual({
+      isValid: false,
+      errors: { $config: '配置必须是对象' },
+      sanitizedConfigs: {},
+    });
+
+    const polluted = JSON.parse('{"__proto__":{"polluted":true},"name":"Vizly"}');
+    expect(validateConfigBatch(polluted, schemas)).toEqual({
+      isValid: false,
+      errors: { $config: '配置键不安全: __proto__' },
+      sanitizedConfigs: { name: 'Vizly' },
+    });
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it('contains failures from hostile objects and custom validators', () => {
+    const hostileConfig = new Proxy({}, {
+      ownKeys: () => {
+        throw new Error('internal details');
+      },
+    });
+    expect(validateConfigBatch(hostileConfig, schemas)).toEqual({
+      isValid: false,
+      errors: { $config: '配置读取失败' },
+      sanitizedConfigs: {},
+    });
+
+    const throwingSchemas: ConfigSchema[] = [{
+      key: 'unstable',
+      type: 'string',
+      defaultValue: '',
+      validator: {
+        validate: () => {
+          throw new Error('internal details');
+        },
+      },
+    }];
+    expect(validateConfigValue('unstable', 'value', throwingSchemas)).toEqual({
+      isValid: false,
+      error: '验证器执行失败',
     });
   });
 });

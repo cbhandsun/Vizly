@@ -1,0 +1,16 @@
+.mindmap-shortcuts-modal .ant-modal-content {
+    background: rgba(15, 15, 22, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    backdrop-filter: blur(24px);
+}
+
+.mindmap-shortcuts-modal .ant-modal-header {
+    padding-bottom: 12px;
+    background: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mindmap-shortcuts-modal .ant-modal-body {
+    padding-top: 16px;
+}

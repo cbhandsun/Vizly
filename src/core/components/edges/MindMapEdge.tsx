@@ -11,9 +11,7 @@ export const MindMapEdge = ({
     targetY,
     sourcePosition,
     targetPosition,
-    style = {},
-    _markerEnd,
-    _data
+    style = {}
 }: EdgeProps) => {
 
     const sourceNode = useInternalNode(source);

@@ -13,6 +13,7 @@ const makeDiagram = (id: string): StandardDiagramData => ({
   id,
   name: `Query Cache ${id}`,
   type: 'flowchart',
+  version: '1.0.0',
   nodes: [
     {
       id: `${id}-node`,
@@ -22,8 +23,15 @@ const makeDiagram = (id: string): StandardDiagramData => ({
     },
   ],
   edges: [],
+  layout: {
+    type: 'custom',
+    direction: 'TB',
+    spacing: { horizontal: 100, vertical: 80 },
+    padding: { horizontal: 20, vertical: 20 },
+  },
   theme: {
     name: 'default',
+    displayName: 'Default',
     domains: {},
   },
   metadata: {
@@ -62,9 +70,21 @@ describe('DataService', () => {
       constructor?: unknown;
       metadata: NonNullable<StandardDiagramData['metadata']> & { constructor?: unknown };
     };
-    unsafeDiagram.constructor = { polluted: true };
-    unsafeDiagram.nodes[0].constructor = { polluted: true };
-    unsafeDiagram.metadata.constructor = { polluted: true };
+    Object.defineProperty(unsafeDiagram, 'constructor', {
+      configurable: true,
+      enumerable: true,
+      value: { polluted: true },
+    });
+    Object.defineProperty(unsafeDiagram.nodes[0], 'constructor', {
+      configurable: true,
+      enumerable: true,
+      value: { polluted: true },
+    });
+    Object.defineProperty(unsafeDiagram.metadata, 'constructor', {
+      configurable: true,
+      enumerable: true,
+      value: { polluted: true },
+    });
 
     service.registerDiagram(unsafeDiagram, false);
     touchedIds.add(id);
@@ -169,6 +189,7 @@ describe('DataService', () => {
       id: 'remote-diagram',
       title: 'Remote Diagram',
       updated_at: '2026-06-14T00:00:00.000Z',
+      user_id: 'test-user',
       content: {
         id: 'unsafe-id',
         name: 'Remote Diagram',
@@ -202,6 +223,7 @@ describe('DataService', () => {
       id: 'bad-diagram',
       title: 'Bad Diagram',
       updated_at: '2026-06-14T00:00:00.000Z',
+      user_id: 'test-user',
       content: { id: 'bad-diagram', name: 'Bad Diagram', type: 'flowchart', nodes: 'not-array' },
     });
 

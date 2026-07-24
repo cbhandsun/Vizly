@@ -11,7 +11,7 @@ export interface Waypoint {
 
 export interface EdgeUpdateCallbacks {
     onLabelOffsetChange: (edgeId: string, offset: { x: number; y: number }) => void;
-    onLabelStyleChange: (edgeId: string, style: Record<string, any>) => void;
+    onLabelStyleChange: (edgeId: string, style: Record<string, unknown>) => void;
     onWaypointsChange: (edgeId: string, waypoints: Waypoint[]) => void;
     onLabelChange: (edgeId: string, label: string) => void;
 }

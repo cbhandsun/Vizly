@@ -1,5 +1,7 @@
 import React from 'react';
-import type { Node, Edge } from '@xyflow/react';
+import type { Edge, EdgeTypes, Node, NodeTypes, ReactFlowInstance, XYPosition } from '@xyflow/react';
+
+export type PluginData = Record<string, unknown>;
 
 /** 命令面板分组类型 */
 export type CommandGroup = 'favorites' | 'recent' | 'actions' | 'diagrams';
@@ -39,7 +41,7 @@ export interface PropertyEditorExtension {
   id: string;
   matchNode?: (node: Node) => boolean;
   matchEdge?: (edge: Edge) => boolean;
-  component: React.ComponentType<{ selectedElement: Node | Edge; onUpdate: (data: any) => void }>;
+  component: React.ComponentType<{ selectedElement: Node | Edge; onUpdate: (data: PluginData) => void }>;
 }
 
 export interface PluginContext {
@@ -48,8 +50,8 @@ export interface PluginContext {
   getEdges: () => Edge[];
   
   // Safe Mutators (auto snapshotting)
-  updateNodesBatch: (nodeIds: string[], updates: any) => void;
-  updateEdgesBatch: (edgeIds: string[], updates: any) => void;
+  updateNodesBatch: (nodeIds: string[], updates: PluginData) => void;
+  updateEdgesBatch: (edgeIds: string[], updates: PluginData) => void;
   takeSnapshot: () => void;
 
   // Raw State (Deprecated for direct use, kept for backward compat inside specific effects)
@@ -58,13 +60,13 @@ export interface PluginContext {
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
   
-  reactFlowInstance?: any;
+  reactFlowInstance?: ReactFlowInstance | null;
   diagramId?: string;
 
   /** 
    * [NEW] 在画布中心或指定位置添加节点 (GAP-11 Mobile Tap-to-Add)
    */
-  addNode: (type: string, data?: any, position?: { x: number, y: number }) => string;
+  addNode: (type: string, data?: unknown, position?: XYPosition) => string;
   
   // ====== 插件状态沙箱 (Plugin State Sandbox) ======
   /** 获取当前激活插件的独立持久化状态 */
@@ -116,9 +118,9 @@ export interface DiagramTypePlugin {
 
   // ====== 渲染 ======
   /** 注册该类型专用的自定义 NodeType */
-  getNodeTypes(): Record<string, React.ComponentType<any>>;
+  getNodeTypes(): NodeTypes;
   /** 注册该类型专用的自定义 EdgeType */
-  getEdgeTypes(): Record<string, React.ComponentType<any>>;
+  getEdgeTypes(): EdgeTypes;
 
   // ====== UI 扩展 ======
   /** 工具栏扩展区域（如标准图的模板选择器） */
@@ -142,7 +144,7 @@ export interface DiagramTypePlugin {
   /** 注册插件自定义全局快捷键 */
   contributeShortcuts?(ctx: PluginContext): KeyboardShortcut[];
   /** 注册插件自定义按需全局指令，会被自动吸附进 Ctrl+K 的全局命令面板中 */
-  contributeCommands?(ctx: PluginContext): import('../components/ui/CommandPalette').CommandItem[];
+  contributeCommands?(ctx: PluginContext): CommandItem[];
 
   // ====== 被动监听钩子 (Passive Event Observers) ======
   /** 插件初始化生命周期 */
@@ -190,7 +192,7 @@ export interface DiagramTypePlugin {
 
   // ====== 行为 ======
   /** 节点拖入画布时的默认数据工厂 */
-  createNodeData?(type: string): Record<string, any>;
+  createNodeData?(type: string): PluginData;
   /** 是否支持域/子域分组 */
   supportsGrouping?: boolean;
   /** 是否支持智能路由 */
@@ -201,12 +203,12 @@ export interface DiagramTypePlugin {
    * 处理 AI 生成的领域特定指令。
    * 返回 true 表示已处理，false 表示忽略或由系统默认处理程序接管。
    */
-  onAIAction?(action: string, params: any, ctx: PluginContext): boolean | Promise<boolean>;
+  onAIAction?(action: string, params: unknown, ctx: PluginContext): boolean | Promise<boolean>;
 }
 
 export interface AIActionContext {
   action: string;
-  params: any;
+  params: unknown;
   pluginId: string;
   timestamp: number;
 }

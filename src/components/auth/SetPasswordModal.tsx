@@ -9,6 +9,11 @@ interface SetPasswordModalProps {
     onCancel: () => void;
 }
 
+interface SetPasswordFormValues {
+    password: string;
+    confirmPassword: string;
+}
+
 export const SetPasswordModal: React.FC<SetPasswordModalProps> = ({ open, onCancel }) => {
     const { t } = useTranslation();
     const { updatePassword } = useAuth();
@@ -20,7 +25,7 @@ export const SetPasswordModal: React.FC<SetPasswordModalProps> = ({ open, onCanc
         onCancel();
     };
 
-    const onFinish = async (values: any) => {
+    const onFinish = async (values: SetPasswordFormValues) => {
         if (values.password !== values.confirmPassword) {
             message.error(t('auth.modal.register.passwordMismatch'));
             return;

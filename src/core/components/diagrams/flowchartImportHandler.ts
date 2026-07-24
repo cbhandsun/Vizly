@@ -1,8 +1,13 @@
+import type { Edge, Node } from '@xyflow/react';
+
+import type { StandardDiagramData } from '@/core/models/DiagramModels';
+
 import { runFlowchartImportPipeline } from './flowchartImportPipeline';
 import {
     readFlowchartImportFileText,
     validateFlowchartImportFile,
 } from './flowchartImportFile';
+import type { FlowchartImportPlugin } from './flowchartImportPlan';
 
 type FlowchartImportEvent = {
     target: {
@@ -20,15 +25,15 @@ type MessageApiLike = {
 export interface CreateFlowchartImportHandlerOptions {
     t: (key: string, params?: Record<string, unknown>) => string;
     messageApi: MessageApiLike;
-    activePlugin?: unknown;
+    activePlugin?: FlowchartImportPlugin | null;
     businessDataId?: string;
     diagramId?: string;
-    setNodes: (nodes: any[]) => void;
-    setEdges: (edges: any[]) => void;
+    setNodes: (nodes: Node[]) => void;
+    setEdges: (edges: Edge[]) => void;
     fitView: () => void;
     scheduleDelay?: (callback: () => void, delayMs: number) => void;
     registerStandardReload: (payload: {
-        normalized: any;
+        normalized: StandardDiagramData;
         currentId: string;
         title: string;
     }) => Promise<void>;
@@ -67,7 +72,7 @@ export const createFlowchartImportHandler = ({
             content,
             importKind: validation.importKind,
             invalidFormatMessage,
-            activePlugin: activePlugin as any,
+            activePlugin,
             businessDataId,
             diagramId,
             fallbackTitle: 'Imported Diagram',

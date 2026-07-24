@@ -111,6 +111,47 @@ describe('ConfigManager', () => {
     expect(localStorage.getItem('config_theme.primaryColor')).toBe(JSON.stringify('#00ffaa'));
 
     expect(() => manager.set('theme.primaryColor', 'blue')).toThrow('配置值验证失败: theme.primaryColor');
+    expect(() => manager.set('layout.spacing.node', '100')).toThrow('配置值验证失败: layout.spacing.node');
+    expect(() => manager.set('layout.spacing.node', Number.NaN)).toThrow('配置值验证失败: layout.spacing.node');
+    expect(() => manager.set('layout.spacing.node', Number.POSITIVE_INFINITY)).toThrow(
+      '配置值验证失败: layout.spacing.node'
+    );
+  });
+
+  it('returns owned values and isolates listener event payloads', () => {
+    manager.set('theme.current', { palette: { primary: '#123456' } });
+
+    type ThemeValue = { palette: { primary: string } };
+    const value = manager.get<ThemeValue>('theme.current');
+    value.palette.primary = '#ffffff';
+    const all = manager.getAll();
+    (all['theme.current'] as ThemeValue).palette.primary = '#000000';
+
+    const secondListener = vi.fn();
+    manager.addListener<ThemeValue>('theme.current', event => {
+      event.newValue.palette.primary = '#abcdef';
+    });
+    manager.addListener('theme.current', secondListener);
+    manager.set('theme.current', { palette: { primary: '#654321' } });
+
+    expect(secondListener).toHaveBeenCalledWith(expect.objectContaining({
+      newValue: { palette: { primary: '#654321' } },
+    }));
+    expect(manager.get('theme.current')).toEqual({ palette: { primary: '#654321' } });
+  });
+
+  it('owns registered defaults and compares structured defaults by value', () => {
+    const defaultValue = { nested: { enabled: true } };
+    manager.registerDefinition({
+      key: 'custom.options',
+      defaultValue,
+      group: 'custom',
+    });
+    defaultValue.nested.enabled = false;
+
+    expect(manager.get('custom.options')).toEqual({ nested: { enabled: true } });
+    expect(manager.exportConfig()).not.toContain('custom.options');
+    expect(manager.getStats().customized).toBe(0);
   });
 
   it('logs and keeps runtime value when config persistence write fails', () => {
@@ -194,6 +235,12 @@ describe('ConfigManager', () => {
     manager.registerDefinition(customDefinition);
     manager.set('secret.apiKey', 'live-secret');
     manager.set('custom.limit', 20);
+
+    const logPayload = JSON.stringify(
+      Object.values(safeLogState).flatMap(mock => mock.mock.calls)
+    );
+    expect(logPayload).not.toContain('default-secret');
+    expect(logPayload).not.toContain('live-secret');
 
     expect(manager.getGroup('custom')).toEqual({ 'custom.limit': 20 });
     expect(manager.getAll()).not.toHaveProperty('secret.apiKey');

@@ -106,6 +106,78 @@ describe('LayeredConfigManager', () => {
     expect(() => manager.setMultiple({ 'diagram.node.width': 220 }, 'bad-layer' as never)).toThrow('无效的配置层');
   });
 
+  it('owns schema defaults, cached values, layer snapshots, and listener payloads', () => {
+    const defaultValue = { nested: { enabled: true } };
+    manager.registerSchema({
+      key: 'custom.options',
+      type: 'object',
+      defaultValue,
+    });
+    defaultValue.nested.enabled = false;
+
+    type CustomOptions = { nested: { enabled: boolean } };
+    const cachedValue = manager.get<CustomOptions>('custom.options');
+    cachedValue.nested.enabled = false;
+    expect(manager.get('custom.options')).toEqual({ nested: { enabled: true } });
+
+    const secondListener = vi.fn();
+    manager.addListener<CustomOptions>('custom.options', event => {
+      event.newValue.nested.enabled = false;
+      event.effectiveValue.nested.enabled = false;
+    });
+    manager.addListener('custom.options', secondListener);
+    manager.set('custom.options', { nested: { enabled: true } });
+
+    const layerSnapshot = manager.getLayer(module.ConfigLayer.USER);
+    (layerSnapshot['custom.options'] as { nested: { enabled: boolean } }).nested.enabled = false;
+    expect(secondListener).toHaveBeenCalledWith(expect.objectContaining({
+      newValue: { nested: { enabled: true } },
+      effectiveValue: { nested: { enabled: true } },
+    }));
+    expect(manager.get('custom.options')).toEqual({ nested: { enabled: true } });
+  });
+
+  it('enforces declared schema types even without a custom validator', () => {
+    manager.registerSchema({
+      key: 'custom.limit',
+      type: 'number',
+      defaultValue: 5,
+    });
+
+    expect(() => manager.set('custom.limit', '5')).toThrow('配置值验证失败: custom.limit');
+    expect(() => manager.set('custom.limit', Number.NaN)).toThrow('配置值验证失败: custom.limit');
+    expect(() => manager.registerSchema({
+      key: 'custom.invalid-default',
+      type: 'number',
+      defaultValue: '5',
+    })).toThrow('配置模式默认值类型无效: custom.invalid-default');
+
+    expect(manager.get('custom.limit')).toBe(5);
+    expect(() => manager.registerSchema({
+      key: 'custom.limit',
+      type: 'number',
+      defaultValue: 10,
+      validator: { validate: () => false },
+    })).toThrow('配置模式默认值验证失败: custom.limit');
+    expect(manager.get('custom.limit')).toBe(5);
+  });
+
+  it('reports the true effective value when a lower-priority layer changes', () => {
+    const listener = vi.fn();
+    manager.set('diagram.node.width', 400, module.ConfigLayer.RUNTIME);
+    manager.addListener('diagram.node.width', listener);
+
+    manager.setMultiple({ 'diagram.node.width': 250 }, module.ConfigLayer.USER);
+
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({
+      oldValue: 400,
+      newValue: 250,
+      layer: module.ConfigLayer.USER,
+      effectiveValue: 400,
+    }));
+    expect(manager.get('diagram.node.width')).toBe(400);
+  });
+
   it('validates persisted layer data before loading it', async () => {
     localStorage.setItem('layered-config-user', JSON.stringify({
       'diagram.node.width': 333,
@@ -157,7 +229,7 @@ describe('LayeredConfigManager', () => {
 
   it('ignores invalid cloud layer payloads without blocking later valid rows', async () => {
     const adapter = {
-      syncWithCloud: vi.fn(async (onConfigLoaded: (key: string, value: any) => void) => {
+      syncWithCloud: vi.fn(async (onConfigLoaded: (key: string, value: unknown) => void) => {
         onConfigLoaded('layered-config-user', null);
         onConfigLoaded('layered-config-user', {
           'diagram.node.width': 277,
@@ -177,7 +249,12 @@ describe('LayeredConfigManager', () => {
   });
 
   it('redacts cloud sync failures before logging', async () => {
-    (manager as any).cloudAdapter = {
+    (manager as unknown as {
+      cloudAdapter: {
+        syncWithCloud: () => Promise<void>;
+        saveConfig: () => Promise<void>;
+      };
+    }).cloudAdapter = {
       syncWithCloud: vi.fn(async () => {
         throw new Error('Authorization: Bearer cloud-secret');
       }),

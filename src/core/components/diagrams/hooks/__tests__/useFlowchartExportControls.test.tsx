@@ -1,7 +1,13 @@
+// @vitest-environment jsdom
+
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-const exportDiagramToSVG = vi.fn(async () => undefined);
+type ExportSvgContext = Parameters<
+  (typeof import('../../../../hooks/diagramExportActions'))['exportDiagramToSVG']
+>[0];
+
+const exportDiagramToSVG = vi.fn(async (_context: ExportSvgContext) => undefined);
 
 vi.mock('../../../../hooks/useDiagramControls', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../hooks/useDiagramControls')>();
@@ -40,8 +46,8 @@ describe('useFlowchartExportControls', () => {
     });
 
     const context = exportDiagramToSVG.mock.calls[0]?.[0];
-    expect(context.diagramId).toBe('diagram-1');
-    expect(context.getReactFlowSnapshot()).toEqual({
+    expect(context?.diagramId).toBe('diagram-1');
+    expect(context?.getReactFlowSnapshot?.()).toEqual({
       nodes: [{ id: 'n1' }],
       edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
       viewport: { x: 1, y: 2, zoom: 1.25 },
@@ -58,6 +64,6 @@ describe('useFlowchartExportControls', () => {
     });
 
     const context = exportDiagramToSVG.mock.calls[0]?.[0];
-    expect(context.getReactFlowSnapshot()).toBeNull();
+    expect(context?.getReactFlowSnapshot?.()).toBeNull();
   });
 });

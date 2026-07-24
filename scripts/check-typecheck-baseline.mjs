@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,17 +17,19 @@ import {
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, '..');
 const baselinePath = path.join(scriptDirectory, 'typecheck-diagnostic-baseline.json');
-const compilerPath = path.join(projectRoot, 'node_modules', 'typescript', 'bin', 'tsc');
+const compilerPath = path.join(projectRoot, 'node_modules', '@typescript', 'native', 'bin', 'tsc');
+const buildInfoDirectory = path.join(projectRoot, 'node_modules', '.cache', 'vizly-typecheck');
 const projects = ['tsconfig.app.json', 'tsconfig.node.json'];
 const { writeBaseline } = parseTypecheckArguments(process.argv.slice(2));
 
 if (!existsSync(compilerPath)) {
-  throw new Error('Local TypeScript compiler is missing; run npm install before typecheck');
+  throw new Error('Local TypeScript 7 native compiler is missing; run npm install before typecheck');
 }
 
 const timeout = parseTypecheckTimeoutMs(process.env.TYPECHECK_TIMEOUT_MS);
 const projectDiagnostics = {};
 const startedAt = Date.now();
+mkdirSync(buildInfoDirectory, { recursive: true });
 
 for (const projectName of projects) {
   if (!existsSync(path.join(projectRoot, projectName))) {
@@ -36,7 +38,14 @@ for (const projectName of projects) {
   const projectStartedAt = Date.now();
   const result = spawnSync(
     process.execPath,
-    [compilerPath, '-p', projectName, '--noEmit', '--pretty', 'false', '--incremental', 'false'],
+    [
+      compilerPath,
+      '-p', projectName,
+      '--noEmit',
+      '--pretty', 'false',
+      '--incremental', 'true',
+      '--tsBuildInfoFile', path.join(buildInfoDirectory, `${projectName}.tsbuildinfo`),
+    ],
     {
       cwd: projectRoot,
       encoding: 'utf8',
@@ -99,7 +108,15 @@ if (writeBaseline) {
       `Typecheck baseline gate failed: ${comparison.additions.length} new or increased diagnostic fingerprint(s).\n`,
     );
     for (const addition of comparison.additions.slice(0, 50)) {
-      const location = addition.file ?? '<global>';
+      const matchingDiagnostic = projectDiagnostics[addition.projectName].find((diagnostic) => (
+        diagnostic.file === addition.file
+        && diagnostic.code === addition.code
+        && diagnostic.messageHash === addition.messageHash
+      ));
+      const position = matchingDiagnostic?.line
+        ? `:${matchingDiagnostic.line}:${matchingDiagnostic.column ?? 1}`
+        : '';
+      const location = `${addition.file ?? '<global>'}${position}`;
       process.stderr.write(
         `  - ${addition.projectName}: ${location} TS${addition.code} ${addition.messageHash.slice(0, 12)} (+${addition.delta})\n`,
       );
@@ -114,9 +131,13 @@ if (writeBaseline) {
   }
 
   if (comparison.removals.length > 0) {
-    process.stdout.write(
-      `[typecheck] ${comparison.removals.length} historical diagnostic fingerprint(s) decreased; baseline refresh is optional\n`,
+    process.stderr.write(
+      `Typecheck baseline gate failed: ${comparison.removals.length} historical diagnostic fingerprint(s) decreased.\n`,
     );
+    process.stderr.write(
+      'Review the resolved diagnostics and run npm run typecheck:baseline so fixed debt cannot silently return.\n',
+    );
+    process.exit(1);
   }
 }
 

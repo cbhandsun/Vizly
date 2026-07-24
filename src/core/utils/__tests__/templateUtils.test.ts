@@ -91,7 +91,7 @@ describe('templateUtils', () => {
         const serialized = serializeStoredTemplates([
             { ...validTemplate, createdAt: new Date('2026-06-13T00:00:00.000Z') },
             { ...validTemplate, id: '', name: 'invalid' },
-        ] as any);
+        ]);
 
         expect(JSON.parse(serialized)).toEqual([
             expect.objectContaining({

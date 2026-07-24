@@ -17,6 +17,8 @@ interface CanvasSearchBarProps {
     onBeforeReplace?: () => void;
 }
 
+type ThemeToken = ReturnType<typeof theme.useToken>['token'];
+
 /**
  * 画布内搜索栏 — Ctrl+F / Ctrl+K 触发
  * 支持关键词匹配节点标签/描述/ID/域名，上/下导航结果，聚焦视口 + 脉冲高亮
@@ -313,7 +315,7 @@ export const CanvasSearchBar: React.FC<CanvasSearchBarProps> = ({
 };
 
 // ── 样式辅助 ──
-const navBtnStyle = (active: boolean, token: any): React.CSSProperties => ({
+const navBtnStyle = (active: boolean, token: ThemeToken): React.CSSProperties => ({
     border: 'none', background: 'transparent',
     cursor: active ? 'pointer' : 'default',
     color: active ? token.colorText : token.colorTextDisabled,
@@ -322,7 +324,7 @@ const navBtnStyle = (active: boolean, token: any): React.CSSProperties => ({
     transition: 'background 0.15s',
 });
 
-const actionBtnStyle = (active: boolean, token: any): React.CSSProperties => ({
+const actionBtnStyle = (active: boolean, token: ThemeToken): React.CSSProperties => ({
     border: `1px solid ${active ? token.colorPrimaryBorder : token.colorBorder}`,
     background: active ? token.colorPrimaryBg : token.colorBgContainerDisabled,
     color: active ? token.colorPrimary : token.colorTextDisabled,

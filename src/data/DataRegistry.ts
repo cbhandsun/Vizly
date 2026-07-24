@@ -51,7 +51,7 @@ export const normalizeLocalDiagramForRegistry = (
   builtInDiagram?: StandardDiagramData
 ): StandardDiagramData => {
   const raw = (localDiagram && typeof localDiagram === 'object') ? localDiagram as Record<string, unknown> : {};
-  const builtInLayout = (builtInDiagram as any)?.layout || {};
+  const builtInLayout = builtInDiagram?.layout || {};
   const localLayout = (raw.layout && typeof raw.layout === 'object') ? raw.layout as Record<string, unknown> : {};
   const merged = builtInDiagram
     ? {
@@ -64,9 +64,13 @@ export const normalizeLocalDiagramForRegistry = (
       }
     : raw;
 
+  const mergedRecord = merged as Record<string, unknown>;
+  const mergedMetadata = mergedRecord.metadata && typeof mergedRecord.metadata === 'object'
+    ? mergedRecord.metadata as Record<string, unknown>
+    : {};
   return parseRemoteDiagramContent(merged, {
-    id: String((merged as any).id || builtInDiagram?.id || 'local-diagram'),
-    title: String((merged as any).name || (merged as any).metadata?.title || builtInDiagram?.name || 'Local Diagram'),
+    id: String(mergedRecord.id || builtInDiagram?.id || 'local-diagram'),
+    title: String(mergedRecord.name || mergedMetadata.title || builtInDiagram?.name || 'Local Diagram'),
   }) as StandardDiagramData;
 };
 
@@ -143,7 +147,7 @@ export class DataRegistry {
    * 注册标准化数据
    */
   private async registerStandardData(): Promise<void> {
-    const diagrams: any[] = [
+    const diagrams: unknown[] = [
       enterpriseArchitectureData,
       logisticsStandardData,
       logisticsPlanningData,
@@ -158,9 +162,10 @@ export class DataRegistry {
     ];
 
     // 批量注册内置图表数据，并禁止重复写入 IndexedDB
-    for (const diagram of diagrams) {
-      this.builtInDiagrams.set(diagram.id, diagram as StandardDiagramData);
-      this.dataService.registerDiagram(diagram as StandardDiagramData, false);
+    for (const rawDiagram of diagrams) {
+      const diagram = rawDiagram as StandardDiagramData;
+      this.builtInDiagrams.set(diagram.id, diagram);
+      this.dataService.registerDiagram(diagram, false);
     }
   }
 
@@ -218,7 +223,11 @@ export class DataRegistry {
           const localDiagrams = await localDB.listDiagrams();
           for (const diagram of localDiagrams) {
               try {
-                  const builtIn = this.builtInDiagrams.get(diagram.id);
+                  const diagramRecord = diagram && typeof diagram === 'object' && !Array.isArray(diagram)
+                    ? diagram as Record<string, unknown>
+                    : {};
+                  const diagramId = typeof diagramRecord.id === 'string' ? diagramRecord.id : '';
+                  const builtIn = diagramId ? this.builtInDiagrams.get(diagramId) : undefined;
                   const normalizedDiagram = normalizeLocalDiagramForRegistry(diagram, builtIn);
                   // 注册到内存，但不重复写入 IndexedDB
                   this.dataService.registerDiagram(normalizedDiagram, false);
@@ -266,7 +275,7 @@ export class DataRegistry {
    */
   public async getAvailableTypes(): Promise<string[]> {
     const result = await this.dataService.queryDiagrams({});
-    const types = new Set(result.data.map((item: any) => item.type));
+    const types = new Set(result.data.map(item => item.type));
     return Array.from(types);
   }
 
@@ -277,8 +286,8 @@ export class DataRegistry {
     const result = await this.dataService.queryDiagrams({});
     const domains = new Set<string>();
     
-    result.data.forEach((diagram: any) => {
-      diagram.nodes.forEach((node: any) => {
+    result.data.forEach(diagram => {
+      diagram.nodes.forEach(node => {
         if (node.domain) {
           domains.add(node.domain);
         }
@@ -305,7 +314,7 @@ export class DataRegistry {
     let totalNodes = 0;
     let totalEdges = 0;
 
-    result.data.forEach((diagram: any) => {
+    result.data.forEach(diagram => {
       // 统计类型分布
       typeDistribution[diagram.type] = (typeDistribution[diagram.type] || 0) + 1;
       
@@ -314,7 +323,7 @@ export class DataRegistry {
       totalEdges += diagram.edges.length;
       
       // 统计域分布
-      diagram.nodes.forEach((node: any) => {
+      diagram.nodes.forEach(node => {
         if (node.domain) {
           domainDistribution[node.domain] = (domainDistribution[node.domain] || 0) + 1;
         }

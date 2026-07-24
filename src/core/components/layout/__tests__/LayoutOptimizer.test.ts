@@ -54,7 +54,7 @@ const mockState = vi.hoisted(() => {
   return { layoutConfig, fullConfig, listeners, measureNodeContent, measureMultipleNodes };
 });
 
-vi.mock('../../config/DiagramConfig', () => ({
+vi.mock('@/core/config/DiagramConfig', () => ({
   diagramConfigManager: {
     getLayoutConfig: () => mockState.layoutConfig,
     getConfig: () => mockState.fullConfig,

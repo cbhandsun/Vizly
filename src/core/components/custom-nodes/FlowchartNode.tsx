@@ -13,10 +13,10 @@ export type FlowchartNodeProps = NodeProps<Node<FlowchartNodeData>>;
 
 const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
     const _isConnecting = useStore((s) => s.connection.inProgress);
-    const nodeData = useStore((s: any) => s.nodeLookup?.get(id) || s.nodeInternals?.get(id));
+    const nodeData = useStore(s => s.nodeLookup.get(id));
 
-    const nodeWidth = (nodeData?.measured?.width || (nodeData as any)?.width || 150) as number;
-    const nodeHeight = (nodeData?.measured?.height || (nodeData as any)?.height || 80) as number;
+    const nodeWidth = nodeData?.measured?.width || nodeData?.width || 150;
+    const nodeHeight = nodeData?.measured?.height || nodeData?.height || 80;
 
     const {
         isHovered,
@@ -25,9 +25,6 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
         contentRef,
         editStartRef,
         handleUpdateData,
-        _handleDelete,
-        _handleClone,
-        _handleDomainClassChange,
         handleQuickClone
     } = useFlowchartNodeInteractions(id as string, data, selected);
 
@@ -38,7 +35,6 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
         mainColor,
         finalBorderColor,
         finalBgColor,
-        _resolvedIcon,
         businessState,
         nodeStyle
     } = useFlowchartNodeStyleResolution({ data, selected });
@@ -70,7 +66,7 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
 
             <FlowchartNodeGraphics
                 id={id}
-                shape={shape as any}
+                shape={shape}
                 data={data}
                 preset={preset}
                 selected={selected}
@@ -195,7 +191,7 @@ const FlowchartNode = ({ data, selected, id }: FlowchartNodeProps) => {
                                             const dx = Math.abs(ue.clientX - startX);
                                             const dy = Math.abs(ue.clientY - startY);
                                             if (dx < 5 && dy < 5) {
-                                                handleQuickClone(dirCapture, ev as any);
+                                                handleQuickClone(dirCapture, ue);
                                             }
                                         };
                                         document.addEventListener('pointerup', onUp, { once: true });

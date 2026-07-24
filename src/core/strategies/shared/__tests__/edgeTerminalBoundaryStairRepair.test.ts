@@ -5,7 +5,9 @@ import { repairTerminalBoundaryStairs } from '../edgeTerminalBoundaryStairRepair
 import { calculateEdgePathQualityScore } from '../edgeStrictCrossingGuard';
 import { countEndpointNodeTraversalHits } from '../edgeWaypointCandidateRepair';
 
-const node = (id: string, x: number, y: number, width: number, height: number): Node => ({
+const node = (
+  id: string, x: number, y: number, width: number, height: number,
+): Node & { positionAbsolute: { x: number; y: number } } => ({
   id,
   position: { x, y },
   positionAbsolute: { x, y },

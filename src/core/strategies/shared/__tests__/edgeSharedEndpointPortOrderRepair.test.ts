@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -16,10 +18,13 @@ import wmsStandardData from '../../../../data/standardized/WmsStandardData.json'
 import { withDisplayAbsolutePositions } from '../../../components/shared/baseReactFlowDisplayEdgeCore';
 import { standardDataToCanvas } from '../../../components/diagrams/designerUtils';
 import { repairSharedEndpointPortOrderCrossings } from '../edgeSharedEndpointPortOrderRepair';
+import { buildAdjacentTerminalSideEscapeCandidates } from '../edgeSharedEndpointPortOrderTerminalCandidates';
 import { terminalSideIsFixed, withPath } from '../edgeSharedEndpointPortOrderGeometry';
 import { calculateEdgePathQualityScore } from '../edgeStrictCrossingGuard';
 
-const node = (id: string, x: number, y: number, width: number, height: number): Node => ({
+const node = (
+  id: string, x: number, y: number, width: number, height: number,
+): Node & { positionAbsolute: { x: number; y: number } } => ({
   id,
   position: { x, y },
   positionAbsolute: { x, y },
@@ -28,6 +33,49 @@ const node = (id: string, x: number, y: number, width: number, height: number): 
 });
 
 describe('repairSharedEndpointPortOrderCrossings', () => {
+  it('builds bounded adjacent-side candidates without mutating the input path', () => {
+    const path = [
+      { x: 50, y: 100 },
+      { x: 50, y: 148 },
+      { x: 200, y: 148 },
+      { x: 200, y: 300 },
+    ];
+    const edge: Edge = {
+      id: 'candidate-edge',
+      source: 'shared',
+      target: 'remote',
+      sourceHandle: 'bottom',
+    };
+
+    const candidates = buildAdjacentTerminalSideEscapeCandidates(
+      edge,
+      path,
+      'source',
+      { x: 0, y: 0, width: 100, height: 100 },
+      {
+        edgeId: edge.id,
+        edgeIndex: 0,
+        segIdx: 1,
+        pointCount: path.length,
+        fromStart: 1,
+        fromEnd: 2,
+        a: path[1],
+        b: path[2],
+        axis: 'h',
+      },
+    );
+
+    expect(path).toEqual([
+      { x: 50, y: 100 },
+      { x: 50, y: 148 },
+      { x: 200, y: 148 },
+      { x: 200, y: 300 },
+    ]);
+    expect(new Set(candidates.map(candidate => candidate.terminalSide)))
+      .toEqual(new Set(['left', 'right']));
+    expect(candidates.every(candidate => candidate.path.length >= 4)).toBe(true);
+  });
+
   it('centralizes fixed and runtime terminal ownership when materializing a port side', () => {
     const manual: Edge = {
       id: 'manual',

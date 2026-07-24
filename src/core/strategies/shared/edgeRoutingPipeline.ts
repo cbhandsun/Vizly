@@ -4,8 +4,16 @@
  */
 import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
 
-import { diagramConfigManager } from '../../components/config/DiagramConfig';
-import { expandHandle } from '../../routing/utils/handleUtils';
+import { diagramConfigManager } from '../../config/DiagramConfig';
+import type { EdgeConfig } from '../../config/DiagramConfig';
+import {
+  edgeTerminalHandleChangeIsAllowed,
+  readEdgeTerminalPolicy,
+  resolveEdgeTerminalHandleForSide,
+  type EdgeTerminalRole,
+  type EdgeTerminalSide,
+} from '../../routing/utils/edgeTerminalPolicy';
+import { normalizeHandle } from '../../routing/utils/handleUtils';
 import {
   assignGlobalPorts,
   beautifyOrthogonalEdges,
@@ -61,26 +69,132 @@ export {
   setAbsolutePositions,
 };
 
+const HANDLE_SIDE_BY_SHORTHAND: Record<'l' | 'r' | 't' | 'b', EdgeTerminalSide> = {
+  l: 'left',
+  r: 'right',
+  t: 'top',
+  b: 'bottom',
+};
+
+type PipelineNode = ReactFlowNode & {
+  positionAbsolute?: { x: number; y: number };
+};
+
+type PipelinePorts = Record<string, { source?: string; target?: string }>;
+
+interface ProcessedPipelineEdge {
+  edge: Edge;
+  computedPath: Array<{ x: number; y: number }>;
+}
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+
+const configBoolean = (
+  config: Record<string, unknown>,
+  key: string,
+  fallback: boolean,
+): boolean => typeof config[key] === 'boolean' ? config[key] : fallback;
+
+const nodePosition = (node: PipelineNode): { x: number; y: number } =>
+  node.positionAbsolute ?? node.position ?? { x: 0, y: 0 };
+
+const nodeDimensions = (node: PipelineNode): { width: number; height: number } => ({
+  width: typeof node.measured?.width === 'number' && Number.isFinite(node.measured.width)
+    ? node.measured.width
+    : 100,
+  height: typeof node.measured?.height === 'number' && Number.isFinite(node.measured.height)
+    ? node.measured.height
+    : 50,
+});
+
+const edgeTerminalHandle = (
+  edge: Edge,
+  role: EdgeTerminalRole,
+): string | null | undefined => (
+  role === 'source' ? edge.sourceHandle : edge.targetHandle
+);
+
+/**
+ * A routing choice selects a terminal side, not a DOM handle identity. Keep an
+ * existing exact/compound ID when the side is unchanged and reject changes to
+ * source-authored or unvalidated runtime-owned terminals.
+ */
+const resolvePipelineTerminalHandle = (
+  edge: Edge,
+  role: EdgeTerminalRole,
+  proposedHandle: unknown,
+): string | null | undefined => {
+  const currentHandle = edgeTerminalHandle(edge, role);
+  if (typeof proposedHandle !== 'string') return currentHandle;
+  const shorthand = normalizeHandle(proposedHandle);
+  if (!shorthand) return currentHandle;
+  const resolvedHandle = resolveEdgeTerminalHandleForSide(
+    edge,
+    role,
+    HANDLE_SIDE_BY_SHORTHAND[shorthand],
+  );
+  return edgeTerminalHandleChangeIsAllowed(edge, role, resolvedHandle)
+    ? resolvedHandle
+    : currentHandle;
+};
+
+const constrainPipelinePortsForEdge = (
+  edge: Edge,
+  globalPorts: Record<string, { source?: string; target?: string }>,
+): Record<string, { source?: string; target?: string }> => {
+  let constrainedPorts = globalPorts;
+  const constrainRole = (role: EdgeTerminalRole, nodeId: string): void => {
+    const policy = readEdgeTerminalPolicy(edge, role);
+    if (!policy.sideFixed && !policy.runtimeFixed) return;
+    const side = normalizeHandle(edgeTerminalHandle(edge, role));
+    if (!side) return;
+    if (constrainedPorts === globalPorts) constrainedPorts = { ...globalPorts };
+    constrainedPorts[nodeId] = {
+      ...(constrainedPorts[nodeId] || {}),
+      [role]: HANDLE_SIDE_BY_SHORTHAND[side],
+    };
+  };
+  constrainRole('source', edge.source);
+  constrainRole('target', edge.target);
+  return constrainedPorts;
+};
+
+const preservePipelineTerminalOwnership = (
+  baselineEdges: readonly Edge[],
+  candidateEdges: Edge[],
+): Edge[] => candidateEdges.map((candidate, index) => {
+  const baseline = baselineEdges[index];
+  if (!baseline) return candidate;
+  return {
+    ...candidate,
+    sourceHandle: resolvePipelineTerminalHandle(baseline, 'source', candidate.sourceHandle),
+    targetHandle: resolvePipelineTerminalHandle(baseline, 'target', candidate.targetHandle),
+  };
+});
+
 /** 处理单条边的路由。 */
 function processEdge(
-  edge: any,
+  edge: Edge,
   existingPaths: Array<{ points: Array<{ x: number; y: number }> }>,
-  nodeMap: Map<string, ReactFlowNode>,
-  nodes: ReactFlowNode[],
-  cfgEdge: any,
+  nodeMap: Map<string, PipelineNode>,
+  nodes: PipelineNode[],
+  cfgEdge: EdgeConfig,
   layoutDirection: string,
-  globalPorts: any,
-) {
+  globalPorts: PipelinePorts,
+): ProcessedPipelineEdge {
   const edgeType = String(edge.type || '').toLowerCase();
   const baseType = edgeType.includes('smart') ? edge.type : 'smart-step';
 
   const newData = {
-    ...(edge.data || {}),
+    ...asRecord(edge.data),
     intraContainerNoObstacle: true,
     obstacleScope: 'corridor',
     obstaclePadding: 24,
     pathOptions: {
-      ...(edge.data?.pathOptions || {}),
+      ...asRecord(edge.data?.pathOptions),
       gridRatio: 1.04,
       borderRadius: 4,
     },
@@ -103,26 +217,20 @@ function processEdge(
       directionalHandlePolicy: 'force' as const,
       angleToleranceDeg: Number(cfgEdge.angleToleranceDeg ?? 36),
       routedPaths: existingPaths,
-      preAssignedPorts: globalPorts,
+      preAssignedPorts: constrainPipelinePortsForEdge(edge, globalPorts),
     };
 
     const choice = decideEdgeRouting(sourceNode, targetNode, nodes, routingConfig);
     finalType = choice.type;
-    finalSourceHandle = choice.sourceHandle;
-    finalTargetHandle = choice.targetHandle;
+    finalSourceHandle = resolvePipelineTerminalHandle(edge, 'source', choice.sourceHandle);
+    finalTargetHandle = resolvePipelineTerminalHandle(edge, 'target', choice.targetHandle);
     computedPath = choice.computedPath || [];
 
     if (computedPath.length < 2) {
-      const sourcePosition = (sourceNode as any).positionAbsolute
-        ?? (sourceNode as any).position
-        ?? { x: 0, y: 0 };
-      const targetPosition = (targetNode as any).positionAbsolute
-        ?? (targetNode as any).position
-        ?? { x: 0, y: 0 };
-      const sourceWidth = (sourceNode as any)?.measured?.width ?? 100;
-      const sourceHeight = (sourceNode as any)?.measured?.height ?? 50;
-      const targetWidth = (targetNode as any)?.measured?.width ?? 100;
-      const targetHeight = (targetNode as any)?.measured?.height ?? 50;
+      const sourcePosition = nodePosition(sourceNode);
+      const targetPosition = nodePosition(targetNode);
+      const { width: sourceWidth, height: sourceHeight } = nodeDimensions(sourceNode);
+      const { width: targetWidth, height: targetHeight } = nodeDimensions(targetNode);
 
       if (!finalSourceHandle) {
         const dx = targetPosition.x - sourcePosition.x;
@@ -162,12 +270,8 @@ function processEdge(
     edge: {
       ...edge,
       type: finalType,
-      sourceHandle: finalSourceHandle
-        ? expandHandle(String(finalSourceHandle))
-        : finalSourceHandle,
-      targetHandle: finalTargetHandle
-        ? expandHandle(String(finalTargetHandle))
-        : finalTargetHandle,
+      sourceHandle: finalSourceHandle,
+      targetHandle: finalTargetHandle,
       data: { ...newData, computedPath },
     },
     computedPath,
@@ -195,13 +299,17 @@ export async function runEdgeRoutingPipeline(
   options: EdgeRoutingOptions,
 ): Promise<Edge[]> {
   const { layoutDirection } = options;
-  const cfgEdge = (diagramConfigManager.getConfig() as any)?.edge || {};
-  const nodeMap = new Map<string, ReactFlowNode>(nodes.map(node => [node.id, node] as const));
+  const cfgEdge = diagramConfigManager.getConfig().edge;
+  const extendedEdgeConfig = asRecord(cfgEdge);
+  const pipelineNodes: PipelineNode[] = nodes;
+  const nodeMap = new Map<string, PipelineNode>(
+    pipelineNodes.map(node => [node.id, node] as const),
+  );
 
   setAbsolutePositions(nodes);
 
   const routedPaths: Array<{ points: Array<{ x: number; y: number }> }> = [];
-  const globalPorts = assignGlobalPorts(nodes, edges, { ...cfgEdge, layoutDirection });
+  const globalPorts = assignGlobalPorts(pipelineNodes, edges, { ...cfgEdge, layoutDirection });
   const topologyStats = buildEdgeTopologyStats(edges);
 
   const edgesWithDistance = edges.map((edge, originalIndex) => {
@@ -209,16 +317,10 @@ export async function runEdgeRoutingPipeline(
     const targetNode = nodeMap.get(edge.target);
     let distance = 0;
     if (sourceNode && targetNode) {
-      const sourcePosition = (sourceNode as any).positionAbsolute
-        ?? (sourceNode as any).position
-        ?? { x: 0, y: 0 };
-      const targetPosition = (targetNode as any).positionAbsolute
-        ?? (targetNode as any).position
-        ?? { x: 0, y: 0 };
-      const sourceWidth = (sourceNode as any)?.measured?.width ?? 100;
-      const sourceHeight = (sourceNode as any)?.measured?.height ?? 50;
-      const targetWidth = (targetNode as any)?.measured?.width ?? 100;
-      const targetHeight = (targetNode as any)?.measured?.height ?? 50;
+      const sourcePosition = nodePosition(sourceNode);
+      const targetPosition = nodePosition(targetNode);
+      const { width: sourceWidth, height: sourceHeight } = nodeDimensions(sourceNode);
+      const { width: targetWidth, height: targetHeight } = nodeDimensions(targetNode);
       const sourceCenterX = sourcePosition.x + sourceWidth / 2;
       const sourceCenterY = sourcePosition.y + sourceHeight / 2;
       const targetCenterX = targetPosition.x + targetWidth / 2;
@@ -242,13 +344,13 @@ export async function runEdgeRoutingPipeline(
     return first.distance - second.distance;
   });
 
-  const sortedResults: Array<{ result: any; originalIndex: number }> = [];
+  const sortedResults: Array<{ result: ProcessedPipelineEdge; originalIndex: number }> = [];
   for (const item of edgesWithDistance) {
     const result = processEdge(
       item.edge,
       routedPaths,
       nodeMap,
-      nodes,
+      pipelineNodes,
       cfgEdge,
       layoutDirection,
       globalPorts,
@@ -257,7 +359,7 @@ export async function runEdgeRoutingPipeline(
     sortedResults.push({ result, originalIndex: item.originalIndex });
   }
 
-  const firstPassResults = new Array(edges.length);
+  const firstPassResults: Array<ProcessedPipelineEdge | undefined> = new Array(edges.length);
   for (const item of sortedResults) {
     firstPassResults[item.originalIndex] = item.result;
   }
@@ -273,7 +375,7 @@ export async function runEdgeRoutingPipeline(
       edges[index],
       otherPaths,
       nodeMap,
-      nodes,
+      pipelineNodes,
       cfgEdge,
       layoutDirection,
       globalPorts,
@@ -285,29 +387,37 @@ export async function runEdgeRoutingPipeline(
     }
   }
 
-  let finalEdges = firstPassResults.map((result: any) => result.edge);
+  let finalEdges: Edge[] = firstPassResults.map((result, index) => result?.edge ?? edges[index]);
 
-  const enableGlobalOptimization = cfgEdge?.globalOptimization ?? false;
+  const enableGlobalOptimization = configBoolean(
+    extendedEdgeConfig,
+    'globalOptimization',
+    false,
+  );
   if (enableGlobalOptimization && finalEdges.length > 1) {
-    finalEdges = globalOptimizeEdgeRouting(
-      finalEdges,
-      nodes,
-      {
-        mode: 'advanced-smart',
-        layoutDirection,
-        directionalHandlePolicy: 'force',
-        topK: 4,
-        preAssignedPorts: globalPorts,
-      },
-      3,
+    const preGlobalOptimizationEdges = finalEdges;
+    finalEdges = preservePipelineTerminalOwnership(
+      preGlobalOptimizationEdges,
+      globalOptimizeEdgeRouting(
+        finalEdges,
+        pipelineNodes,
+        {
+          mode: 'advanced-smart',
+          layoutDirection,
+          directionalHandlePolicy: 'force',
+          topK: 4,
+          preAssignedPorts: globalPorts,
+        },
+        3,
+      ),
     );
   }
 
   finalEdges = separateParallelEdges(finalEdges, 12);
-  finalEdges = distributePortConnections(finalEdges, nodes, 16);
+  finalEdges = distributePortConnections(finalEdges, pipelineNodes, 16);
 
-  const bundlingEnabled = cfgEdge?.bundling ?? true;
-  finalEdges = bundleEdges(finalEdges, nodes, {
+  const bundlingEnabled = configBoolean(extendedEdgeConfig, 'bundling', true);
+  finalEdges = bundleEdges(finalEdges, pipelineNodes, {
     enabled: bundlingEnabled,
     layoutDirection,
     regionSize: 200,
@@ -315,12 +425,12 @@ export async function runEdgeRoutingPipeline(
     bundleSpacing: 8,
   });
 
-  finalEdges = layerBasedEdgeRouting(finalEdges, nodes, {
+  finalEdges = layerBasedEdgeRouting(finalEdges, pipelineNodes, {
     enabled: true,
     layerThreshold: 400,
     layoutDirection,
   });
-  finalEdges = beautifyOrthogonalEdges(finalEdges, nodes, {
+  finalEdges = beautifyOrthogonalEdges(finalEdges, pipelineNodes, {
     enabled: true,
     minSegmentLength: 20,
   });
@@ -352,12 +462,12 @@ export async function runEdgeRoutingPipeline(
   finalEdges = repairSharedTrunkAwareObstacles(finalEdges, nodes, 18);
   finalEdges = sanitizeComputedPaths(finalEdges);
 
-  finalEdges = optimizeEdgeLabelPositions(finalEdges, nodes, {
+  finalEdges = optimizeEdgeLabelPositions(finalEdges, pipelineNodes, {
     enabled: true,
     labelPadding: 8,
   });
 
-  const useElkRouting = cfgEdge?.useElkRouting ?? false;
+  const useElkRouting = configBoolean(extendedEdgeConfig, 'useElkRouting', false);
   if (useElkRouting && finalEdges.length > 0) {
     try {
       const elkPaths = await routeEdgesWithELK(nodes, finalEdges, {
@@ -367,7 +477,7 @@ export async function runEdgeRoutingPipeline(
       });
 
       if (elkPaths.size > 0) {
-        finalEdges = finalEdges.map((edge: any) => {
+        finalEdges = finalEdges.map(edge => {
           const path = elkPaths.get(edge.id || `${edge.source}->${edge.target}`);
           if (path && path.length >= 2) {
             return {
@@ -382,16 +492,6 @@ export async function runEdgeRoutingPipeline(
       logElkEdgeRouterFallback(error);
     }
   }
-
-  finalEdges = finalEdges.map(edge => ({
-    ...edge,
-    sourceHandle: edge.sourceHandle
-      ? expandHandle(String(edge.sourceHandle))
-      : edge.sourceHandle,
-    targetHandle: edge.targetHandle
-      ? expandHandle(String(edge.targetHandle))
-      : edge.targetHandle,
-  }));
 
   finalEdges = separateDetachedParallelOverlaps(
     repairLocalDoglegArtifacts(
@@ -538,6 +638,7 @@ export async function runEdgeRoutingPipeline(
     if (nextFinalEdges === finalEdges) break;
     finalEdges = nextFinalEdges;
   }
+  finalEdges = preservePipelineTerminalOwnership(edges, finalEdges);
   finalEdges = lockComputedPathsForDisplay(finalEdges);
   return finalEdges;
 }

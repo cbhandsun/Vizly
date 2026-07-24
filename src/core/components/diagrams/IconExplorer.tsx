@@ -4,7 +4,7 @@ import { SearchOutlined, CloudDownloadOutlined, FireOutlined } from '@ant-design
 import { Icon } from '@iconify/react';
 import { PluginContext } from '../../types/plugin';
 import { appMessage } from '@/core/utils/antdStaticBridge';
-import { buildIconifySearchUrl, isSafeIconifyIconName, parseIconifySearchResponse } from '@/core/utils/iconifySecurity';
+import { isSafeIconifyIconName, searchIconifyIcons } from '@/core/utils/iconifySecurity';
 import { logDiagramIconExplorerFetchFailure } from '../shared/iconSearchLogging';
 
 
@@ -43,21 +43,26 @@ export const IconExplorer: React.FC<IconExplorerProps> = ({ ctx: _ctx }) => {
             return;
         }
 
+        const controller = new AbortController();
         const fetchIcons = async () => {
             setLoading(true);
             try {
-                const response = await fetch(buildIconifySearchUrl({ query: debouncedQuery, limit: 100 }));
-                const data = parseIconifySearchResponse(await response.json(), 100);
+                const data = await searchIconifyIcons(
+                    { query: debouncedQuery, limit: 100 },
+                    { signal: controller.signal },
+                );
                 setResults(data.icons);
             } catch (error) {
+                if (controller.signal.aborted) return;
                 logDiagramIconExplorerFetchFailure(error);
                 appMessage.error('搜索图标失败，请检查网络连接');
             } finally {
-                setLoading(false);
+                if (!controller.signal.aborted) setLoading(false);
             }
         };
 
-        fetchIcons();
+        void fetchIcons();
+        return () => controller.abort();
     }, [debouncedQuery]);
 
     const onDragStart = (event: React.DragEvent, iconName: string) => {

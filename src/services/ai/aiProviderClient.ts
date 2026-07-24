@@ -15,6 +15,8 @@ export interface AIProviderRequestOptions {
 }
 
 const DEFAULT_TIMEOUT_MS = 60_000;
+const MAX_TIMEOUT_MS = 5 * 60_000;
+export const AI_PROVIDER_REQUEST_BODY_MAX_CHARS = 2 * 1024 * 1024;
 const MAX_AI_MODELS = 200;
 const MAX_AI_MODEL_ID_LENGTH = 160;
 const MAX_AI_JSON_RESPONSE_CHARS = 1024 * 1024;
@@ -47,6 +49,13 @@ export class AIProviderInvalidResponseError extends Error {
     constructor(message: string) {
         super(message);
         this.name = 'AIProviderInvalidResponseError';
+    }
+}
+
+export class AIProviderInvalidRequestError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'AIProviderInvalidRequestError';
     }
 }
 
@@ -186,11 +195,38 @@ export function normalizeAIModelsResponse(value: unknown): NormalizedAIModel[] {
         .slice(0, MAX_AI_MODELS);
 }
 
+export function serializeAIProviderRequestBody(body: unknown): string {
+    let serialized: string | undefined;
+    try {
+        serialized = JSON.stringify(body);
+    } catch {
+        throw new AIProviderInvalidRequestError('AI 请求内容无法序列化为 JSON。');
+    }
+
+    if (serialized === undefined) {
+        throw new AIProviderInvalidRequestError('AI 请求内容必须是可序列化的 JSON。');
+    }
+    if (serialized.length > AI_PROVIDER_REQUEST_BODY_MAX_CHARS) {
+        throw new AIProviderInvalidRequestError(
+            `AI 请求内容超过 ${AI_PROVIDER_REQUEST_BODY_MAX_CHARS} 字符限制。`
+        );
+    }
+    return serialized;
+}
+
+export function coerceAIProviderTimeoutMs(value: unknown): number {
+    if (value === undefined) return DEFAULT_TIMEOUT_MS;
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > MAX_TIMEOUT_MS) {
+        throw new AIProviderInvalidRequestError(`AI Provider timeoutMs 必须是 1 到 ${MAX_TIMEOUT_MS} 的整数。`);
+    }
+    return value;
+}
+
 async function withRequestTimeout<T>(
     options: AIProviderRequestOptions,
     request: (signal: AbortSignal) => Promise<T>
 ): Promise<T> {
-    const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeoutMs = coerceAIProviderTimeoutMs(options.timeoutMs);
     const controller = new AbortController();
     let timedOut = false;
 
@@ -226,11 +262,12 @@ export async function requestAIChatCompletion(
     body: unknown,
     options: AIProviderRequestOptions = {}
 ): Promise<Response> {
+    const serializedBody = serializeAIProviderRequestBody(body);
     return withRequestTimeout(options, async (signal) => {
         const response = await fetch(resolveAIProviderEndpoint(provider, '/chat/completions'), {
             method: 'POST',
             headers: createAIProviderHeaders(provider, { json: true }),
-            body: JSON.stringify(body),
+            body: serializedBody,
             signal,
         });
 
@@ -255,7 +292,7 @@ export async function requestAIModels(
     });
 }
 
-export async function requestAIChatCompletionJson<T = any>(
+export async function requestAIChatCompletionJson<T = unknown>(
     provider: AIProviderRequestConfig,
     body: unknown,
     options: AIProviderRequestOptions = {}
@@ -277,6 +314,10 @@ export function formatAIProviderRequestError(error: unknown, maxLength = 240): s
     }
 
     if (error instanceof AIProviderInvalidResponseError) {
+        return sanitizeAIProviderError(error.message, maxLength);
+    }
+
+    if (error instanceof AIProviderInvalidRequestError) {
         return sanitizeAIProviderError(error.message, maxLength);
     }
 

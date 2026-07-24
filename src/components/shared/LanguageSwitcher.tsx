@@ -7,6 +7,7 @@ import {
     logLanguageSwitcherConfigSyncFailure,
 } from '@/components/configurationLogging';
 import { LayeredConfigManager, ConfigLayer } from '@/core/config/LayeredConfigManager';
+import type { LayeredConfigChangeEvent } from '@/core/config/LayeredConfigTypes';
 
 export const LanguageSwitcher: React.FC<{ variant?: 'select' | 'icon', className?: string }> = ({ variant = 'select', className }) => {
     const { i18n } = useTranslation();
@@ -23,8 +24,8 @@ export const LanguageSwitcher: React.FC<{ variant?: 'select' | 'icon', className
                 i18n.changeLanguage(savedLng);
             }
 
-            const handleConfigChange = (e: any) => {
-                if (e.key === 'i18n.language' && e.effectiveValue && e.effectiveValue !== i18n.language) {
+            const handleConfigChange = (e: LayeredConfigChangeEvent<unknown>) => {
+                if (e.key === 'i18n.language' && typeof e.effectiveValue === 'string' && e.effectiveValue !== i18n.language) {
                     i18n.changeLanguage(e.effectiveValue);
                 }
             };

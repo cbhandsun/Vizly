@@ -20,6 +20,8 @@ import {
   ToolbarButton,
   ToolbarDivider,
 } from '../../shared/FloatingToolbar';
+import type { PluginContext } from '../../../types/plugin';
+import type { NodeDataUpdate } from '../../../types/diagram-updates';
 
 export const MindMapActionBar: React.FC = () => {
   const { t } = useTranslation();
@@ -31,14 +33,14 @@ export const MindMapActionBar: React.FC = () => {
       return {
           getNodes,
           getEdges,
-          updateNodesBatch: (ids: string[], partialData: any) => {
+          updateNodesBatch: (ids: string[], partialData: NodeDataUpdate) => {
               setNodes((nds) => nds.map(n =>
                   ids.includes(n.id)
                       ? { ...n, data: { ...n.data, ...partialData } }
                       : n
               ));
           }
-      } as any;
+      } as unknown as PluginContext;
   }, [getNodes, getEdges, setNodes]);
   
   // [O-1] Use useStore selectors — subscribe only to selection changes

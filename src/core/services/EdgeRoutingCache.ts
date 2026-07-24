@@ -40,7 +40,7 @@ export class EdgeRoutingCache {
         // Keep port fields and routing version in the key: endpoint coordinates can
         // remain stable while the selected side/handle changes, which changes the
         // required first/last segment direction and must invalidate stale paths.
-        const p = params as any;
+        const p = params;
         return [
             edgeId,
             p.rv ?? 0,
