@@ -1,5 +1,5 @@
 import React from 'react';
-import { Node, Edge, BackgroundVariant, ReactFlowInstance, SelectionMode, NodeTypes, EdgeTypes, NodeChange, EdgeChange, Connection, OnConnectStart, OnConnectEnd, ConnectionMode, ConnectionLineType, type IsValidConnection, type OnReconnect } from '@xyflow/react';
+import { Node, Edge, BackgroundVariant, ReactFlowInstance, SelectionMode, NodeTypes, EdgeTypes, NodeChange, EdgeChange, Connection, OnConnectStart, OnConnectEnd, ConnectionMode, ConnectionLineType, type IsValidConnection, type OnNodeDrag, type OnReconnect } from '@xyflow/react';
 import BaseReactFlow from '../shared/BaseReactFlow';
 import { useConnectionMicrointeractions } from './hooks/useConnectionMicrointeractions';
 
@@ -19,9 +19,9 @@ export interface FlowchartCanvasShellProps {
     showMinimap: boolean;
     showGrid: boolean;
     gridVariant: BackgroundVariant;
-    onNodeDrag: (event: React.MouseEvent, node: Node, nodes: Node[]) => void;
-    onNodeDragStart: (event: React.MouseEvent, node: Node, nodes: Node[]) => void;
-    onNodeDragStop?: (event: React.MouseEvent, node: Node, nodes: Node[]) => void;
+    onNodeDrag: OnNodeDrag<Node>;
+    onNodeDragStart: OnNodeDrag<Node>;
+    onNodeDragStop?: OnNodeDrag<Node>;
     onSelectionChange: (params: { nodes: Node[]; edges: Edge[] }) => void;
     onViewportChange?: (viewport: { x: number; y: number; zoom: number }) => void;
     onPaneClick: () => void;

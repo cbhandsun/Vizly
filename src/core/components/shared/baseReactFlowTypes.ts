@@ -12,6 +12,7 @@ import type {
   NodeTypes,
   OnConnectEnd,
   OnConnectStart,
+  OnNodeDrag,
   ReactFlowInstance,
   SelectionMode,
 } from '@xyflow/react';
@@ -61,9 +62,9 @@ export interface BaseReactFlowProps {
   backgroundVariant?: BackgroundVariant;
   backgroundGap?: number;
   showBackgroundGrid?: boolean;
-  onNodeDrag?: (event: React.MouseEvent, node: Node, nodes: Node[]) => void;
-  onNodeDragStart?: (event: React.MouseEvent, node: Node, nodes: Node[]) => void;
-  onNodeDragStop?: (event: React.MouseEvent, node: Node, nodes: Node[]) => void;
+  onNodeDrag?: OnNodeDrag<Node>;
+  onNodeDragStart?: OnNodeDrag<Node>;
+  onNodeDragStop?: OnNodeDrag<Node>;
   onNodeContextMenu?: (event: React.MouseEvent, node: Node) => void;
   onEdgeContextMenu?: (event: React.MouseEvent, edge: Edge) => void;
   onPaneContextMenu?: (event: React.MouseEvent | MouseEvent) => void;

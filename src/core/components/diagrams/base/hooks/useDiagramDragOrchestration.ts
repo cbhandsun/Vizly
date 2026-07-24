@@ -15,7 +15,7 @@ export function useDiagramDragOrchestration({ rfNodes }: DragOrchestrationParams
   const livePositionsRef = useRef<Record<string, { x: number; y: number }>>({});
   const [draggingNodeIds, setDraggingNodeIds] = useState<string[]>([]);
 
-  const handleNodeDrag = useCallback((_event: React.MouseEvent, node: Node, nodes: Node[]) => {
+  const handleNodeDrag = useCallback((_event: MouseEvent | TouchEvent, node: Node, nodes: Node[]) => {
     const currentIds: Set<string> = new Set();
     const draggedNodesMap = new Map<string, Node>();
 

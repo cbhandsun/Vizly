@@ -118,7 +118,7 @@
     "@types/dagre": "^0.7.54",
     "@types/lodash": "^4.17.24",
     "@types/three": "^0.183.1",
-    "@xyflow/react": "^12.10.2",
+    "@xyflow/react": "^12.11.2",
     "antd": "^6.5.2",
     "d3-force": "^3.0.0",
     "dagre": "^0.8.5",

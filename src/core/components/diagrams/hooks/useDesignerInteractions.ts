@@ -190,7 +190,7 @@ export function useDesignerInteractions({
     const [isDraggingNode, setIsDraggingNode] = useState(false);
     const nodeAnimationTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    const wrappedOnNodeDragStart = useCallback((event: React.MouseEvent, node: Node) => {
+    const wrappedOnNodeDragStart = useCallback((event: MouseEvent | TouchEvent, node: Node) => {
         setIsDraggingNode(true);
         if (typeof document !== 'undefined') {
             document.body.classList.add('performance-mode');
@@ -198,7 +198,7 @@ export function useDesignerInteractions({
         onNodeDragStart(event, node);
     }, [onNodeDragStart]);
 
-    const onNodeDragStop = useCallback((event: React.MouseEvent, node: Node, matchedNodes: Node[]) => {
+    const onNodeDragStop = useCallback((event: MouseEvent | TouchEvent, node: Node, matchedNodes: Node[]) => {
         originalOnNodeDragStop(event, node, matchedNodes);
         if (nodeAnimationTimerRef.current) clearTimeout(nodeAnimationTimerRef.current);
 

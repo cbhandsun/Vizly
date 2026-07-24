@@ -20,7 +20,7 @@ interface UseDiagramDragDropProps {
     takeSnapshot: (nodes: Node[], edges: Edge[]) => void;
     reactFlowInstance: ReactFlowInstance | null;
     setIsDragging: (dragging: boolean) => void;
-    onSmartNodeDrag?: (e: React.MouseEvent, node: Node, nodes: Node[]) => SnapDelta | null;
+    onSmartNodeDrag?: (event: MouseEvent | TouchEvent, node: Node, nodes: Node[]) => SnapDelta | null;
     clearGuides: () => void;
     enableAltDuplicate?: boolean;
     isConnecting?: boolean; 
@@ -257,7 +257,7 @@ export const useDiagramDragDrop = ({
         [reactFlowInstance, takeSnapshot, setNodes, setEdges, activeLayerId]
     );
 
-    const onNodeDragStart = useCallback((event: React.MouseEvent, node: Node) => {
+    const onNodeDragStart = useCallback((event: MouseEvent | TouchEvent, node: Node) => {
         // 禁用连线时的 Alt 复制功能
         const shouldDuplicate = enableAltDuplicate && event.altKey && !isConnecting;
 
@@ -288,7 +288,7 @@ export const useDiagramDragDrop = ({
     // ⭐ 防振荡：记录上次 snap 签名，避免重复 snap
     const lastSnapSigRef = useRef('');
 
-    const onNodeDrag = useCallback((e: React.MouseEvent, node: Node, allNodes: Node[]) => {
+    const onNodeDrag = useCallback((event: MouseEvent | TouchEvent, node: Node, allNodes: Node[]) => {
         // 🚀 P3: Smart Guides 吸附纳入 RAF 节流
         //   避免每个 mousemove 同步执行 O(n) 对齐计算
         if (onSmartNodeDrag) {
@@ -300,7 +300,7 @@ export const useDiagramDragDrop = ({
             const capturedAllNodes = allNodes;
             smartGuideRafRef.current = requestAnimationFrame(() => {
                 smartGuideRafRef.current = null;
-                const snapDelta = onSmartNodeDrag(e, capturedNode, capturedAllNodes);
+                const snapDelta = onSmartNodeDrag(event, capturedNode, capturedAllNodes);
                 if (snapDelta && (Math.abs(snapDelta.x) > 0.5 || Math.abs(snapDelta.y) > 0.5)) {
                     // 防振荡：生成签名，与上次相同则跳过
                     const sig = `${capturedNode.id}:${snapDelta.x.toFixed(1)}:${snapDelta.y.toFixed(1)}`;
@@ -439,7 +439,7 @@ export const useDiagramDragDrop = ({
         });
     }, [onSmartNodeDrag, setNodes]);
 
-    const onNodeDragStop = useCallback((_e: React.MouseEvent, node: Node, allNodes: Node[]) => {
+    const onNodeDragStop = useCallback((_event: MouseEvent | TouchEvent, node: Node, allNodes: Node[]) => {
         // ⭐ P4: 清理pending的RAF
         if (dragRafIdRef.current !== null) {
             cancelAnimationFrame(dragRafIdRef.current);
