@@ -147,7 +147,7 @@
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^4.9.0",
     "react-resize-detector": "^12.3.0",
-    "react-router-dom": "^7.14.0",
+    "react-router-dom": "^7.18.1",
     "rehype-highlight": "^7.0.2",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
