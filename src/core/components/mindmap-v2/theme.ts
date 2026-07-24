@@ -20,7 +20,7 @@ interface VizlyThemeColors {
     rootText: string;
 }
 
-const createThemeCssVars = (colors: VizlyThemeColors): Theme['cssVar'] => ({
+const createThemeCssVars = (colors: VizlyThemeColors) => ({
     '--node-gap-x': '32px',
     '--node-gap-y': '32px',
     '--main-gap-x': '48px',
@@ -42,10 +42,10 @@ const createThemeCssVars = (colors: VizlyThemeColors): Theme['cssVar'] => ({
     '--panel-bgcolor': colors.panel,
     '--panel-border-color': colors.border,
     '--map-padding': '32px',
-});
+}) satisfies Theme['cssVar'];
 
 // ─── Theme 1: Vizly Indigo (默认品牌色) ────────────────────────────────────
-export const VIZLY_HYPER_THEME: Theme = {
+export const VIZLY_HYPER_THEME = {
     name: 'Vizly Indigo',
     palette: [
         '#6366f1', '#8b5cf6', '#06b6d4', '#10b981',
@@ -60,10 +60,10 @@ export const VIZLY_HYPER_THEME: Theme = {
         mainBackgroundTransparent: 'rgba(99, 102, 241, 0.12)',
         rootBackground: '#312e81', rootText: '#ffffff',
     }),
-};
+} satisfies Theme;
 
 // ─── Theme 2: Ocean Teal ────────────────────────────────────────────────────
-export const VIZLY_OCEAN_THEME: Theme = {
+export const VIZLY_OCEAN_THEME = {
     name: 'Vizly Ocean',
     palette: [
         '#06b6d4', '#0891b2', '#0e7490', '#22d3ee',
@@ -78,10 +78,10 @@ export const VIZLY_OCEAN_THEME: Theme = {
         mainBackgroundTransparent: 'rgba(6, 182, 212, 0.12)',
         rootBackground: '#0c4a6e', rootText: '#ffffff',
     }),
-};
+} satisfies Theme;
 
 // ─── Theme 3: Emerald Forest ────────────────────────────────────────────────
-export const VIZLY_EMERALD_THEME: Theme = {
+export const VIZLY_EMERALD_THEME = {
     name: 'Vizly Emerald',
     palette: [
         '#10b981', '#059669', '#34d399', '#6ee7b7',
@@ -96,10 +96,10 @@ export const VIZLY_EMERALD_THEME: Theme = {
         mainBackgroundTransparent: 'rgba(16, 185, 129, 0.12)',
         rootBackground: '#064e3b', rootText: '#ffffff',
     }),
-};
+} satisfies Theme;
 
 // ─── Theme 4: Sunset Rose ────────────────────────────────────────────────────
-export const VIZLY_ROSE_THEME: Theme = {
+export const VIZLY_ROSE_THEME = {
     name: 'Vizly Rose',
     palette: [
         '#ec4899', '#db2777', '#f472b6', '#f9a8d4',
@@ -114,10 +114,10 @@ export const VIZLY_ROSE_THEME: Theme = {
         mainBackgroundTransparent: 'rgba(236, 72, 153, 0.12)',
         rootBackground: '#881337', rootText: '#ffffff',
     }),
-};
+} satisfies Theme;
 
 // ─── Theme 5: Dark Mode ──────────────────────────────────────────────────────
-export const VIZLY_HYPER_DARK_THEME: Theme = {
+export const VIZLY_HYPER_DARK_THEME = {
     name: 'Vizly Dark',
     palette: [
         '#818cf8', '#a78bfa', '#22d3ee', '#34d399',
@@ -132,7 +132,7 @@ export const VIZLY_HYPER_DARK_THEME: Theme = {
         mainBackgroundTransparent: 'rgba(129, 140, 248, 0.16)',
         rootBackground: '#1e1b4b', rootText: '#e0e7ff',
     }),
-};
+} satisfies Theme;
 
 // ─── Theme Registry ──────────────────────────────────────────────────────────
 export const VIZLY_THEMES: Record<string, Theme> = {
