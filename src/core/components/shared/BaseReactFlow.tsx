@@ -27,7 +27,6 @@ import { SharedTrunkLayer } from '../custom-edges/renderers/SharedTrunkLayer';
 import {
   areBaseReactFlowHandlesMeasured,
   refreshBaseReactFlowNodeInternals,
-  scheduleBaseReactFlowMountedDomRefresh,
   scheduleBaseReactFlowNodeInternalsRetry,
 } from './baseReactFlowNodeInternals';
 import {
@@ -204,12 +203,16 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const [isContainerReady, setIsContainerReady] = useState(false);
   const readyTimeoutRef = useRef<number | null>(null);
 
-  const performanceConfig = useMemo(() => {
-    return readBaseReactFlowPerformanceConfig({
-      readConfig: () => diagramConfigManager.getConfig(),
-      onReadFailure: (error) => logBaseReactFlowConfigReadFailure('performance', error),
-    });
+  const runtimeConfig = useMemo(() => {
+    return {
+      performanceConfig: readBaseReactFlowPerformanceConfig({
+        readConfig: () => diagramConfigManager.getConfig(),
+        onReadFailure: (error) => logBaseReactFlowConfigReadFailure('performance', error),
+      }),
+      rawUiScale: getUiScale(),
+    };
   }, []);
+  const { performanceConfig, rawUiScale } = runtimeConfig;
 
   const renderNodes = useMemo(() => (
     normalizeBaseReactFlowRenderableNodes(nodes)
@@ -398,22 +401,6 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     });
   }, [visibleNodes, nodeInternalsRefreshKey, updateNodeInternals, rfStore]);
 
-  useEffect(() => {
-    if (visibleNodes.length === 0) return;
-    const nodeIds = visibleNodes.map(node => node.id);
-    const refreshFromMountedDom = () => {
-      refreshBaseReactFlowNodeInternals({
-        container: containerRef.current,
-        nodeIds,
-        rfStore,
-        updateNodeInternals,
-      });
-    };
-    return scheduleBaseReactFlowMountedDomRefresh({
-      refresh: refreshFromMountedDom,
-    });
-  }, [visibleNodes, rfStore, updateNodeInternals]);
-
   /**
    * 函数级注释：导出期间隐藏背景网格
    * 实现：监听导出全局事件（diagramExportStart/Complete/Error），在导出窗口期不渲染 <Background>
@@ -519,7 +506,6 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   // 🎯 CSS zoom 反向补偿：抵消祖先的 zoom: uiScale，使 React Flow 在 zoom=1 空间运作
   // 使用 width/height: 100%（而非 85%），让 ReactFlow 获得完整 CSS 像素空间。
   // 视觉溢出 (~17.6%) 由父容器的 overflow: hidden 裁剪，对交互无影响。
-  const rawUiScale = getUiScale();
   const uiScale = disableZoomCompensation ? 1 : rawUiScale;
   const counterZoom = uiScale !== 1 ? (1 / uiScale) : 1;
   const effectiveReconnectRadius = resolveBaseReactFlowReconnectRadius(reconnectRadius);

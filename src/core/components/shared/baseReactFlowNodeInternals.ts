@@ -67,10 +67,18 @@ export const areBaseReactFlowHandlesMeasured = ({
   const state = readReactFlowNodeInternalsState(rfStore);
   const nodeLookup = state.nodeLookup;
   if (!(nodeLookup instanceof Map)) return false;
+  const handlesAreHiddenBySemanticZoom = container?.classList.contains(
+    'diagram-zoomed-out',
+  ) ?? false;
 
   return nodeIds.every((id) => {
     const element = getBaseReactFlowNodeElement(container, id);
-    if (!element || !element.querySelector('.react-flow__handle')) return true;
+    if (!element) return false;
+    if (!element.querySelector('.react-flow__handle')) return true;
+    // Semantic zoom deliberately applies display:none to every handle. React
+    // Flow cannot produce handle bounds in that state, so retrying a forced
+    // full-graph measurement can never make progress.
+    if (handlesAreHiddenBySemanticZoom) return true;
     const bounds = nodeLookup.get(id)?.internals?.handleBounds;
     return Boolean((bounds?.source?.length || 0) + (bounds?.target?.length || 0));
   });
@@ -95,13 +103,20 @@ export const scheduleBaseReactFlowNodeInternalsRetry = ({
   let attempts = 0;
 
   const retryUntilMeasured = () => {
+    if (areHandlesMeasured()) {
+      return;
+    }
+
     refresh();
-    retryTimer = setTimeoutImpl(() => {
-      attempts += 1;
-      if (!areHandlesMeasured() && attempts < 8) {
-        retryUntilMeasured();
-      }
-    }, attempts < 3 ? 120 : 280);
+    attempts += 1;
+    if (attempts >= 8) {
+      return;
+    }
+
+    retryTimer = setTimeoutImpl(
+      retryUntilMeasured,
+      attempts < 3 ? 120 : 280,
+    );
   };
 
   const raf = requestAnimationFrameImpl(() => {
@@ -112,44 +127,6 @@ export const scheduleBaseReactFlowNodeInternalsRetry = ({
     cancelAnimationFrameImpl(raf);
     if (retryTimer !== undefined) {
       clearTimeoutImpl(retryTimer);
-    }
-  };
-};
-
-export const scheduleBaseReactFlowMountedDomRefresh = ({
-  refresh,
-  delays = [240, 720, 1440, 2400],
-  requestAnimationFrameImpl = window.requestAnimationFrame.bind(window),
-  cancelAnimationFrameImpl = window.cancelAnimationFrame.bind(window),
-  setTimeoutImpl = window.setTimeout.bind(window),
-  clearTimeoutImpl = window.clearTimeout.bind(window),
-}: {
-  refresh: RefreshFn;
-  delays?: number[];
-  requestAnimationFrameImpl?: (callback: FrameRequestCallback) => number;
-  cancelAnimationFrameImpl?: (handle: number) => void;
-  setTimeoutImpl?: (handler: TimerHandler, timeout?: number) => number;
-  clearTimeoutImpl?: (handle?: number) => void;
-}): (() => void) => {
-  let cancelled = false;
-  const guardedRefresh = () => {
-    if (!cancelled) {
-      refresh();
-    }
-  };
-
-  const raf = requestAnimationFrameImpl(() => {
-    guardedRefresh();
-  });
-  const timers = delays.map((delay) => setTimeoutImpl(() => {
-    guardedRefresh();
-  }, delay));
-
-  return () => {
-    cancelled = true;
-    cancelAnimationFrameImpl(raf);
-    for (const timer of timers) {
-      clearTimeoutImpl(timer);
     }
   };
 };

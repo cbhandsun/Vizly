@@ -6,13 +6,13 @@ import {
   areBaseReactFlowHandlesMeasured,
   getBaseReactFlowNodeElement,
   refreshBaseReactFlowNodeInternals,
-  scheduleBaseReactFlowMountedDomRefresh,
   scheduleBaseReactFlowNodeInternalsRetry,
 } from '../baseReactFlowNodeInternals';
 
 describe('baseReactFlowNodeInternals', () => {
   afterEach(() => {
     document.body.innerHTML = '';
+    document.body.className = '';
     vi.useRealTimers();
   });
 
@@ -104,6 +104,51 @@ describe('baseReactFlowNodeInternals', () => {
     })).toBe(false);
   });
 
+  it('waits for visible node DOM to mount before reporting handles measured', () => {
+    const rfStore = {
+      getState: () => ({
+        nodeLookup: new Map([
+          ['node-1', { internals: { handleBounds: { source: [], target: [] } } }],
+        ]),
+      }),
+    };
+
+    expect(areBaseReactFlowHandlesMeasured({
+      container: document.body,
+      nodeIds: ['node-1'],
+      rfStore,
+    })).toBe(false);
+
+    document.body.innerHTML = '<div class="react-flow__node" data-id="node-1"></div>';
+
+    expect(areBaseReactFlowHandlesMeasured({
+      container: document.body,
+      nodeIds: ['node-1'],
+      rfStore,
+    })).toBe(true);
+  });
+
+  it('does not retry permanently hidden handles in semantic zoom mode', () => {
+    document.body.classList.add('diagram-zoomed-out');
+    document.body.innerHTML = [
+      '<div class="react-flow__node" data-id="node-1">',
+      '  <div class="react-flow__handle"></div>',
+      '</div>',
+    ].join('');
+
+    expect(areBaseReactFlowHandlesMeasured({
+      container: document.body,
+      nodeIds: ['node-1'],
+      rfStore: {
+        getState: () => ({
+          nodeLookup: new Map([
+            ['node-1', { internals: { handleBounds: { source: [], target: [] } } }],
+          ]),
+        }),
+      },
+    })).toBe(true);
+  });
+
   it('schedules retry refreshes until handles are measured', () => {
     vi.useFakeTimers();
     const refresh = vi.fn();
@@ -126,18 +171,20 @@ describe('baseReactFlowNodeInternals', () => {
     vi.advanceTimersByTime(120);
     expect(refresh).toHaveBeenCalledTimes(2);
     vi.advanceTimersByTime(120);
-    expect(refresh).toHaveBeenCalledTimes(3);
+    expect(refresh).toHaveBeenCalledTimes(2);
+    expect(areHandlesMeasured).toHaveBeenCalledTimes(3);
 
     cleanup();
   });
 
-  it('schedules mounted DOM refresh immediately and on follow-up delays', () => {
+  it('skips forced refresh when handles are already measured', () => {
     vi.useFakeTimers();
     const refresh = vi.fn();
+    const areHandlesMeasured = vi.fn(() => true);
 
-    const cleanup = scheduleBaseReactFlowMountedDomRefresh({
+    const cleanup = scheduleBaseReactFlowNodeInternalsRetry({
       refresh,
-      delays: [100, 200],
+      areHandlesMeasured,
       requestAnimationFrameImpl: (callback) => {
         callback(0);
         return 1;
@@ -145,11 +192,8 @@ describe('baseReactFlowNodeInternals', () => {
       cancelAnimationFrameImpl: vi.fn(),
     });
 
-    expect(refresh).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(100);
-    expect(refresh).toHaveBeenCalledTimes(2);
-    vi.advanceTimersByTime(100);
-    expect(refresh).toHaveBeenCalledTimes(3);
+    expect(refresh).not.toHaveBeenCalled();
+    expect(areHandlesMeasured).toHaveBeenCalledTimes(1);
 
     cleanup();
   });
