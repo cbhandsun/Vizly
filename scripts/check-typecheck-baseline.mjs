@@ -17,13 +17,13 @@ import {
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, '..');
 const baselinePath = path.join(scriptDirectory, 'typecheck-diagnostic-baseline.json');
-const compilerPath = path.join(projectRoot, 'node_modules', 'typescript', 'bin', 'tsc');
+const compilerPath = path.join(projectRoot, 'node_modules', '@typescript', 'native', 'bin', 'tsc');
 const buildInfoDirectory = path.join(projectRoot, 'node_modules', '.cache', 'vizly-typecheck');
 const projects = ['tsconfig.app.json', 'tsconfig.node.json'];
 const { writeBaseline } = parseTypecheckArguments(process.argv.slice(2));
 
 if (!existsSync(compilerPath)) {
-  throw new Error('Local TypeScript compiler is missing; run npm install before typecheck');
+  throw new Error('Local TypeScript 7 native compiler is missing; run npm install before typecheck');
 }
 
 const timeout = parseTypecheckTimeoutMs(process.env.TYPECHECK_TIMEOUT_MS);
