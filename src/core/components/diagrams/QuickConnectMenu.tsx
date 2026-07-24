@@ -66,7 +66,7 @@ const SHAPE_CATALOG: ShapeDef[] = [
 ];
 
 function buildOption(def: ShapeDef): QuickConnectOption {
-    if (def.shape === 'mindmap' as any) {
+    if (String(def.shape) === 'mindmap') {
         return {
             label: def.label,
             icon: <div style={{width: 28, height: 20, borderRadius: 10, background: def.color, border: '2px solid rgba(0,0,0,0.1)'}}></div>,

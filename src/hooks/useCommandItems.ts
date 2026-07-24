@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { CommandItem } from '@/core/types/plugin';
+import type { DiagramDefinition } from '@/core/types/diagram-components';
 
 export interface UseCommandItemsOptions {
     setIsShortcutsOpen: (open: boolean) => void;
@@ -11,7 +12,7 @@ export interface UseCommandItemsOptions {
     commandRecentOps: (string | number)[];
     commandFavorites: (string | number)[];
     commandRecent: (string | number)[];
-    diagramDefinitions: any[];
+    diagramDefinitions: DiagramDefinition[];
     handleSelectDiagram: (id: string | number) => void;
     openDiagramInNewTab: (id: string | number) => void;
     t: (key: string, fallback?: string) => string;

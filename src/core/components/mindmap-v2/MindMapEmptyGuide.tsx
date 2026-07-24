@@ -63,8 +63,8 @@ const MindMapEmptyGuide: React.FC = () => {
                 setPrompt('');
                 checkEmpty();
             }
-        } catch (err: any) {
-            setError(err?.message ?? '请求失败，请检查网络或配置');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : '请求失败，请检查网络或配置');
         } finally {
             setLoading(false);
         }

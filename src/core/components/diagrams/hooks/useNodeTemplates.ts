@@ -122,7 +122,7 @@ export const useNodeTemplates = (activeLayerId: string = 'layer-0') => {
     }, {});
 
     /** 保存多节点组为模板 */
-    const saveGroupAsTemplate = useCallback((selectedNodes: Node[], relatedEdges: Array<{ source: string; target: string; label?: string; type?: string; data?: any }>, name: string, category: string = '自定义组件') => {
+    const saveGroupAsTemplate = useCallback((selectedNodes: Node[], relatedEdges: Array<{ source: string; target: string; label?: string; type?: string; data?: unknown }>, name: string, category: string = '自定义组件') => {
         if (selectedNodes.length === 0) return null;
 
         // 计算最小包围盒，以第一个节点为基准计算相对位置

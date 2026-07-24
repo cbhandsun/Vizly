@@ -1,6 +1,6 @@
 // src/components/diagrams/SmartEdgeDemoEnhanced.tsx
 import React from 'react';
-import { ReactFlow, MiniMap, Controls, Background, addEdge, useEdgesState, useNodesState } from '@xyflow/react';
+import { ReactFlow, MiniMap, Controls, Background, addEdge, useEdgesState, useNodesState, type Connection } from '@xyflow/react';
 import { AdvancedSmartStepEdge } from '../custom-edges/AdvancedSmartEdge';
 
 /**
@@ -24,7 +24,7 @@ export default function SmartEdgeDemoEnhanced() {
     const [nodes, _setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-    const onConnect = (params: any) => setEdges((eds) => addEdge({ ...params, type: 'advanced-smart' }, eds));
+    const onConnect = (params: Connection) => setEdges((eds) => addEdge({ ...params, type: 'advanced-smart' }, eds));
 
     return (
         <div style={{ width: '100%', height: '500px' }}>

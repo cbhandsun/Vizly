@@ -10,7 +10,7 @@ import { Result } from 'antd';
 interface ThreeDiagramProps {
     id?: string;
     title?: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 const ThreeDiagram: React.FC<ThreeDiagramProps> = () => {

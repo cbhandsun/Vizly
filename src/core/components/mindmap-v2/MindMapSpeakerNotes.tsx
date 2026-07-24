@@ -25,7 +25,7 @@ export const MindMapSpeakerNotes: React.FC = () => {
 
     // 缓存上一次请求的节点ID和语气，避免重复请求
     const lastRequestKeyRef = useRef<string>('');
-    const debounceTimerRef = useRef<any>(null);
+    const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // 订阅演示状态
     useEffect(() => {

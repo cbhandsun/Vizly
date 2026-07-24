@@ -104,7 +104,9 @@ export const repairBaseReactFlowMeasuredDisplayEdgesWithReport = (
   let currentReport = compactedReport;
   if (currentReport.hardClean) return outcomeFor(current, current, currentReport);
 
-  const layoutDirection = String((compacted[0]?.data as any)?.layoutDirection || 'TB');
+  const layoutDirection = typeof compacted[0]?.data?.layoutDirection === 'string'
+    ? compacted[0].data.layoutDirection
+    : 'TB';
   const stageCandidates: Edge[][] = [];
   const acceptStage = (candidate: Edge[]): boolean => {
     const nextReport = reportFor(candidate, current, currentReport);

@@ -316,9 +316,15 @@ const coordinatePools = (paths: Point[][], obstacles: Map<string, Rect>) => {
 };
 
 const withPath = (edge: Edge, path: Point[]): Edge => {
-  const data: any = { ...(edge.data || {}), computedPath: path, terminalHandleAxisRepaired: true };
-  if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-    data.treeRouting = { ...data.treeRouting, points: path };
+  const data: Record<string, unknown> = {
+    ...(edge.data || {}),
+    computedPath: path,
+    terminalHandleAxisRepaired: true,
+  };
+  const treeRouting = data.treeRouting;
+  if (treeRouting && typeof treeRouting === 'object' && !Array.isArray(treeRouting)) {
+    const route = treeRouting as Record<string, unknown>;
+    if (Array.isArray(route.points)) data.treeRouting = { ...route, points: path };
   }
   return { ...edge, data };
 };

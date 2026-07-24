@@ -557,7 +557,9 @@ export const repairFinalResidualStrictCrossings = <T extends Edge[]>(edges: T, n
       const obstacleCleaned = repairDisplayObstacleHits(
         transientObstacleCandidate,
         nodes,
-        String((current[0]?.data as any)?.layoutDirection || 'TB'),
+        typeof current[0]?.data?.layoutDirection === 'string'
+          ? current[0].data.layoutDirection
+          : 'TB',
         {
           maxEdges: 1,
           maxCandidatesPerEdge: 40,

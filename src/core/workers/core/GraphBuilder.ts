@@ -66,7 +66,8 @@ export function countObstaclesInDirection(
     }
 
     // [OPTIMIZATION] Use Spatial Index if available
-    const isSpatialIndex = (obs: any): obs is SpatialIndex => typeof (obs as SpatialIndex).query === 'function';
+    const isSpatialIndex = (obs: Rectangle[] | SpatialIndex): obs is SpatialIndex =>
+        !Array.isArray(obs) && typeof obs.query === 'function';
 
     if (isSpatialIndex(obstacles)) {
         const candidates = obstacles.query(scanArea);

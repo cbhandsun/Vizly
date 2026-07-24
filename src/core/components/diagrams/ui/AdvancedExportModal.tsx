@@ -182,7 +182,7 @@ export const AdvancedExportModal: React.FC<AdvancedExportModalProps> = ({ visibl
       const currentNodes = useDiagramStore.getState().nodes;
       await runAdvancedExport({
         diagramId,
-        nodes: currentNodes as any[],
+        nodes: currentNodes,
         format,
         pixelRatio,
         includeBackground,

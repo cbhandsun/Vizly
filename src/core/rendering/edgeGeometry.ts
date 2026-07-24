@@ -181,6 +181,6 @@ export const createRenderEdgeGeometryFromEdgeProps = (
     opacity: coerceRenderNumber(style.opacity, 1, 0, 1),
     markerStart: resolveEdgeMarker(props.markerStart, stroke),
     markerEnd: resolveEdgeMarker(props.markerEnd, stroke),
-    zIndex: coerceRenderNumber((props as any).zIndex, 0, -10_000, 10_000),
+    zIndex: coerceRenderNumber((props as typeof props & { zIndex?: unknown }).zIndex, 0, -10_000, 10_000),
   };
 };

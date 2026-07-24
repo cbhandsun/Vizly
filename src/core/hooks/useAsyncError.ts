@@ -25,7 +25,7 @@ export interface UseAsyncErrorReturn<T> {
 /**
  * 异步错误处理Hook
  */
-export function useAsyncError<T = any>(
+export function useAsyncError<T = unknown>(
     options: UseAsyncErrorOptions = {}
 ): UseAsyncErrorReturn<T> {
     const [error, setError] = useState<Error | null>(null);

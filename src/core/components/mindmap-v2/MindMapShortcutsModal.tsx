@@ -7,6 +7,7 @@
 import React from 'react';
 import { Modal } from 'antd';
 import { KeyOutlined } from '@ant-design/icons';
+import './MindMapShortcutsModal.css';
 
 // ─── Shortcut data ────────────────────────────────────────────────────────────
 
@@ -107,6 +108,7 @@ const MindMapShortcutsModal: React.FC<MindMapShortcutsModalProps> = ({ open, onC
             footer={null}
             width={720}
             centered
+            wrapClassName="mindmap-shortcuts-modal"
             title={
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <KeyOutlined style={{ color: '#6366f1' }} />
@@ -116,21 +118,6 @@ const MindMapShortcutsModal: React.FC<MindMapShortcutsModalProps> = ({ open, onC
                     </span>
                 </div>
             }
-            styles={{
-                content: {
-                    background: 'rgba(15,15,22,0.95)',
-                    backdropFilter: 'blur(24px)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: 20,
-                },
-                header: {
-                    background: 'transparent',
-                    borderBottom: '1px solid rgba(255,255,255,0.06)',
-                    paddingBottom: 12,
-                },
-                body: { paddingTop: 16 },
-                mask: { backdropFilter: 'blur(4px)' },
-            } as any}
         >
             <div style={{
                 display: 'grid',

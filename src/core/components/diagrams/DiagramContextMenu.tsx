@@ -144,7 +144,7 @@ export const DiagramContextMenu: React.FC<ContextMenuProps> = ({
       // Edge-specific actions
       if (type === 'edge') {
         const targetEdge = selectedEdges.find(e => e.id === targetId);
-        const hasWaypoints = targetEdge?.data?.waypoints && (targetEdge.data.waypoints as any[]).length > 0;
+        const hasWaypoints = Array.isArray(targetEdge?.data?.waypoints) && targetEdge.data.waypoints.length > 0;
         const isEditable = targetEdge?.type === 'editable';
 
         items.push(

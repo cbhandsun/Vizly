@@ -120,7 +120,18 @@ export function useFlowchartNodeStyleResolution({ data, selected }: ResolutionPa
             }
         }
 
-        const businessState = data.businessKey && businessData ? businessData[data.businessKey] : null;
+        const businessStateCandidate =
+            data.businessKey && businessData ? businessData[data.businessKey] : null;
+        const businessState =
+            businessStateCandidate && typeof businessStateCandidate === 'object'
+                ? {
+                    ...businessStateCandidate,
+                    status: 'status' in businessStateCandidate
+                        && typeof businessStateCandidate.status === 'string'
+                        ? businessStateCandidate.status
+                        : undefined,
+                }
+                : null;
 
         if (businessState) {
             if (businessState.status === 'error') {

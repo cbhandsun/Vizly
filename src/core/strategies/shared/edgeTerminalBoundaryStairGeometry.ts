@@ -694,13 +694,16 @@ export function routingObstacles(nodes: ReactFlowNode[]): Map<string, Rect> {
 }
 
 export function withComputedPath(edge: Edge, path: Point[]): Edge {
-  const data: any = {
+  const data: Record<string, unknown> = {
     ...(edge.data || {}),
     computedPath: path,
     terminalBoundaryStairRepaired: true,
   };
-  if (data.treeRouting && Array.isArray(data.treeRouting.points)) {
-    data.treeRouting = { ...data.treeRouting, points: path };
+  const treeRouting = data.treeRouting && typeof data.treeRouting === 'object'
+    ? data.treeRouting as Record<string, unknown>
+    : undefined;
+  if (treeRouting && Array.isArray(treeRouting.points)) {
+    data.treeRouting = { ...treeRouting, points: path };
   }
   return { ...edge, data };
 }

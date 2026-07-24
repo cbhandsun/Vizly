@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
-import { Node, Connection, OnConnectStart, OnConnectEnd, ReactFlowInstance } from '@xyflow/react';
+import { Node, Edge, Connection, OnConnectStart, OnConnectEnd, ReactFlowInstance } from '@xyflow/react';
 import { logConnectionMicrointeractionFailure } from './diagramInteractionLogging';
 
 /**
@@ -12,7 +12,7 @@ import { logConnectionMicrointeractionFailure } from './diagramInteractionLoggin
  */
 export interface UseConnectionMicrointeractionsProps {
     nodes: Node[];
-    setEdges: React.Dispatch<React.SetStateAction<any[]>>;
+    setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
     onConnect: (connection: Connection) => void;
     onConnectEnd?: OnConnectEnd;
     reactFlowInstance: ReactFlowInstance | null;

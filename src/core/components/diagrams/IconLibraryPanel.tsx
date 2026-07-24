@@ -69,10 +69,10 @@ export const IconLibraryPanel: React.FC = () => {
                 } else {
                     setIcons([]);
                 }
-            } catch (err: any) {
+            } catch (err: unknown) {
                 if (controller.signal.aborted) return;
                 logIconLibraryPanelSearchFailure(err);
-                setError(err.message || "Failed to load icons");
+                setError(err instanceof Error ? err.message : "Failed to load icons");
                 setIcons([]);
             } finally {
                 if (!controller.signal.aborted) setLoading(false);

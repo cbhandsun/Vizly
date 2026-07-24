@@ -24,7 +24,7 @@ const resolveCoreThemeId = (themeId: string): string => {
  * Core React Hook for accessing and modifying the global theme safely from within the agnostic core package.
  * Returns a tuple identical to the application layer's `useTheme` hook to avoid destructuring crashes.
  */
-export function useTheme(_options: any = {}): [Theme | null, (themeId: string) => Promise<void>] {
+export function useTheme(_options: Record<string, unknown> = {}): [Theme | null, (themeId: string) => Promise<void>] {
     const [theme, setTheme] = useState<Theme | null>(() => {
         try {
             return getThemeManager().getCurrentTheme() || null;

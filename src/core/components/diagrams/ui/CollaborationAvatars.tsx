@@ -9,6 +9,24 @@ interface PresenceUser {
     avatar?: string;
 }
 
+const readPresenceUser = (state: unknown): PresenceUser | null => {
+    if (!state || typeof state !== 'object' || !('user' in state)) return null;
+    const user = state.user;
+    if (!user || typeof user !== 'object') return null;
+    const candidate = user as Record<string, unknown>;
+    if (
+        typeof candidate.id !== 'string'
+        || typeof candidate.name !== 'string'
+        || typeof candidate.color !== 'string'
+    ) return null;
+    return {
+        id: candidate.id,
+        name: candidate.name,
+        color: candidate.color,
+        ...(typeof candidate.avatar === 'string' ? { avatar: candidate.avatar } : {}),
+    };
+};
+
 /**
  * 实时协作用户头像列表 (Phase 9)
  */
@@ -30,10 +48,11 @@ export const CollaborationAvatars: React.FC = () => {
             const activeUsers: PresenceUser[] = [];
             const seenIds = new Set<string>();
 
-            states.forEach((s: any) => {
-                if (s.user && !seenIds.has(s.user.id)) {
-                    activeUsers.push(s.user);
-                    seenIds.add(s.user.id);
+            states.forEach((state) => {
+                const user = readPresenceUser(state);
+                if (user && !seenIds.has(user.id)) {
+                    activeUsers.push(user);
+                    seenIds.add(user.id);
                 }
             });
 

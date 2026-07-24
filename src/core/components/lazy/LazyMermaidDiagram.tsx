@@ -23,7 +23,7 @@ const MermaidDiagram = lazy(() =>
 export interface LazyMermaidDiagramProps {
     id?: string;
     title?: string;
-    [key: string]: any;
+    [key: string]: unknown;
     loading?: React.ReactNode;
 }
 

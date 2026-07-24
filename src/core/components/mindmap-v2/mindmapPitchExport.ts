@@ -46,7 +46,7 @@ function headingLevel(depth: number): string {
 function taskLine(node: NodeObj): string | null {
     const task = getTaskMeta(node);
     const hasTask =
-        !!(node as any).task ||
+        !!(node as NodeObj & { task?: unknown }).task ||
         task.status !== 'todo' ||
         task.priority !== '无' ||
         !!task.assignee ||

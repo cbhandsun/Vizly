@@ -46,8 +46,8 @@ function analyzeGraph(nodes: Node[], edges: Edge[]): GraphMetrics {
     // 域统计
     const domains = new Set<string>();
     normalNodes.forEach(n => {
-        const domain = (n.data as any)?.domain;
-        if (domain) domains.add(domain);
+        const domain = n.data?.domain;
+        if (typeof domain === 'string' && domain) domains.add(domain);
     });
 
     // 度数统计

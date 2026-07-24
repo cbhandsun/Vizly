@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMindElixir } from './MindElixirContext';
 import { logMindmapBoundariesWalkFailure } from './mindmapPanelLogging';
+import type { NodeObj } from 'mind-elixir';
 
 interface BoundaryBox {
     id: string;
@@ -12,6 +13,10 @@ interface BoundaryBox {
     color: string;
     title?: string;
 }
+
+type BoundaryNode = NodeObj & {
+    boundary?: { color?: string; title?: string };
+};
 
 export default function MindMapBoundaries() {
     const { instance } = useMindElixir();
@@ -32,7 +37,7 @@ export default function MindMapBoundaries() {
             const boxes: BoundaryBox[] = [];
             const data = instance.getData();
 
-            const walk = (node: any) => {
+            const walk = (node: BoundaryNode) => {
                 // If the node has boundary data, render a bounding box
                 if (node.boundary) {
                     const tpc = instance.findEle(node.id);
@@ -68,7 +73,7 @@ export default function MindMapBoundaries() {
                         }
                     }
                 }
-                (node.children || []).forEach(walk);
+                (node.children || []).forEach(child => walk(child as BoundaryNode));
             };
 
             try {

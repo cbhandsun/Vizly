@@ -4,12 +4,12 @@ import { getStraightPath } from '@xyflow/react';
 
 
 // Selector to get nodes, edges, transform, and real-time drag state
-const selector = (state: any) => ({
+const selector = (state: Parameters<Parameters<typeof useStore>[0]>[0]) => ({
     nodes: state.nodes,
     edges: state.edges,
     transform: state.transform,
-    nodesDragging: state.nodesDragging, // Track if nodes are being dragged
-    nodeInternals: state.nodeInternals  // Get real-time node positions during drag
+    nodesDragging: state.nodes.some(node => node.dragging),
+    nodeInternals: state.nodeLookup
 });
 
 /**

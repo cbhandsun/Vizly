@@ -18,7 +18,7 @@ export const registerDefaultLayeredConfigSchemas = (
       },
       description: '主题性能优化配置',
       validator: {
-        validate: (value: any) => {
+        validate: (value: unknown) => {
           if (typeof value !== 'object' || value === null) return false;
           return true;
         },

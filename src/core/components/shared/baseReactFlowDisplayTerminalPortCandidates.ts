@@ -169,7 +169,7 @@ export const withDisplayPortBridge = (
   targetHandle: 'top' | 'bottom' | 'left' | 'right',
 ): Edge => {
   const candidate = withDisplayComputedPath(edge, path);
-  const data = ((candidate.data || {}) as Record<string, any>);
+  const data = (candidate.data || {}) as Record<string, unknown>;
   const resolvedSourceHandle = resolveDisplayTerminalHandleForSide(
     edge,
     'source',
@@ -180,15 +180,18 @@ export const withDisplayPortBridge = (
     'target',
     targetHandle,
   );
+  const treeRouting = data.treeRouting && typeof data.treeRouting === 'object'
+    ? data.treeRouting as Record<string, unknown>
+    : undefined;
   return {
     ...candidate,
     sourceHandle: resolvedSourceHandle,
     targetHandle: resolvedTargetHandle,
     data: {
       ...data,
-      treeRouting: data.treeRouting && Array.isArray(data.treeRouting.points)
+      treeRouting: treeRouting && Array.isArray(treeRouting.points)
         ? {
-          ...data.treeRouting,
+          ...treeRouting,
           effectiveSourceHandle: resolvedSourceHandle,
           effectiveTargetHandle: resolvedTargetHandle,
           points: path,
