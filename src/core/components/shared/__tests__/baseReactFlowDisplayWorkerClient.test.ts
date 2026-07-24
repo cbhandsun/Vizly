@@ -523,20 +523,20 @@ describe('baseReactFlowDisplayWorkerClient', () => {
     })).toEqual({ mode: 'skip', timeoutMs: 0 });
   });
 
-  it('runs complex standard diagrams on the cancellable full-quality worker path', () => {
+  it('keeps complex standard diagrams on the bounded interactive worker path', () => {
     expect(resolveBaseReactFlowDisplayQualityPolicy({
       nodeCount: 45,
       edgeCount: 44,
       isLargeGraph: false,
-    })).toEqual({ mode: 'full', timeoutMs: 300_000 });
+    })).toEqual({ mode: 'interactive', timeoutMs: 12_000 });
   });
 
-  it('runs medium standard diagrams on the cancellable full-quality worker path', () => {
+  it('keeps medium standard diagrams on the bounded interactive worker path', () => {
     expect(resolveBaseReactFlowDisplayQualityPolicy({
       nodeCount: 32,
       edgeCount: 33,
       isLargeGraph: false,
-    })).toEqual({ mode: 'full', timeoutMs: 300_000 });
+    })).toEqual({ mode: 'interactive', timeoutMs: 12_000 });
   });
 
   it('keeps small diagrams on the full quality worker path', () => {
@@ -575,6 +575,19 @@ describe('baseReactFlowDisplayWorkerClient', () => {
       cached: null,
       immediate,
     })).toEqual(routed);
+  });
+
+  it('keeps source edges visible while bounded interactive routing is pending', () => {
+    const immediate = [{ id: 'edge', source: 'source', target: 'target' }];
+
+    expect(resolveBaseReactFlowDisplayedEdges({
+      signature: 'graph-a',
+      geometryDigest: 'digest-a',
+      policyMode: 'interactive',
+      deferred: null,
+      cached: null,
+      immediate,
+    })).toBe(immediate);
   });
 
   it('replays deferred routing patches onto current metadata and fails closed for stale shapes', () => {

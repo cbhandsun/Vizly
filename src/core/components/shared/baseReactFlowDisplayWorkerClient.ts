@@ -86,10 +86,7 @@ type DisplayRoutingDebugState = {
 };
 
 const DISPLAY_WORKER_TIMEOUT_MS = 60_000;
-const COMPLEX_DISPLAY_WORKER_TIMEOUT_MS = 300_000;
 const INTERACTIVE_DISPLAY_WORKER_TIMEOUT_MS = 12_000;
-const LARGE_DISPLAY_NODE_THRESHOLD = 36;
-const LARGE_DISPLAY_EDGE_THRESHOLD = 36;
 const INTERACTIVE_DISPLAY_NODE_THRESHOLD = 30;
 const INTERACTIVE_DISPLAY_EDGE_THRESHOLD = 24;
 const DISPLAY_QUALITY_GEOMETRY_SETTLE_MS = 320;
@@ -116,21 +113,14 @@ export const resolveBaseReactFlowDisplayQualityPolicy = ({
   ) {
     return { mode: 'skip', timeoutMs: 0 };
   }
-  if (isLargeGraph) {
-    return {
-      mode: 'interactive',
-      timeoutMs: INTERACTIVE_DISPLAY_WORKER_TIMEOUT_MS,
-    };
-  }
   if (
-    nodeCount > LARGE_DISPLAY_NODE_THRESHOLD
-    || edgeCount > LARGE_DISPLAY_EDGE_THRESHOLD
+    isLargeGraph
     || nodeCount > INTERACTIVE_DISPLAY_NODE_THRESHOLD
     || edgeCount > INTERACTIVE_DISPLAY_EDGE_THRESHOLD
   ) {
     return {
-      mode: 'full',
-      timeoutMs: COMPLEX_DISPLAY_WORKER_TIMEOUT_MS,
+      mode: 'interactive',
+      timeoutMs: INTERACTIVE_DISPLAY_WORKER_TIMEOUT_MS,
     };
   }
   return {
@@ -222,7 +212,7 @@ export const resolveBaseReactFlowDisplayedEdges = ({
     return mergeBaseReactFlowDisplayEdgePatches(immediate, deferred.displayPatches) ?? [];
   }
   if (cached) return cached;
-  return policyMode === 'skip' ? immediate : [];
+  return policyMode === 'skip' || policyMode === 'interactive' ? immediate : [];
 };
 
 const detachBaseReactFlowDisplayWorkerIdleListeners = (worker: Worker): void => {
@@ -492,7 +482,7 @@ export const resolveBaseReactFlowDisplayWorkerTimeoutMs = (
 ): number => {
   const maximumTimeoutMs = qualityMode === 'interactive'
     ? INTERACTIVE_DISPLAY_WORKER_TIMEOUT_MS
-    : COMPLEX_DISPLAY_WORKER_TIMEOUT_MS;
+    : DISPLAY_WORKER_TIMEOUT_MS;
   const fallbackTimeoutMs = qualityMode === 'interactive'
     ? INTERACTIVE_DISPLAY_WORKER_TIMEOUT_MS
     : DISPLAY_WORKER_TIMEOUT_MS;

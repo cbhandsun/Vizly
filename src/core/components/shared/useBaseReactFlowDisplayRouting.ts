@@ -31,7 +31,12 @@ import {
   resolveBaseReactFlowDisplayCacheReplaySignature,
 } from './baseReactFlowDisplayRoutingTransaction';
 import { resolveBaseReactFlowDisplayCandidate } from './baseReactFlowDisplayCandidateResolver';
+import {
+  canCommitBaseReactFlowDisplayResult,
+  shouldRepairBaseReactFlowDisplayResult,
+} from './baseReactFlowDisplayCommitPolicy';
 import { computeBaseReactFlowDisplayGeometryDigest } from './baseReactFlowDisplayInputIdentity';
+import { createBaseReactFlowInteractiveFallbackEdges } from './baseReactFlowDisplayFallback';
 import { logBaseReactFlowEventBindingFailure } from './baseReactFlowLogging';
 import {
   createDisplayTerminalValidationSnapshot,
@@ -456,30 +461,35 @@ export const useBaseReactFlowDisplayRouting = ({
               },
             });
           }
-          const repairRequestId = `${requestId}:repair`;
-          updateDisplayRoutingDebugState({
-            stage: 'worker-fallback-loading',
-            signature: displayEdgeCacheSignature,
-            requestId: repairRequestId,
-            nodeCount,
-            edgeCount,
-          });
-          resolvedWorkerResult = await repairBaseReactFlowDisplayEdgesInWorker({
-            workerRef: displayEdgeWorkerRef,
-            requestId: repairRequestId,
-            edges: mergedWorkerEdges,
-            nodes: latestRoutingInput.nodes,
-            timeoutMs: displayQualityPolicy.timeoutMs,
-            signal: workerAbortController.signal,
-          });
-          if (!isRequestCurrent()) return;
-          updateDisplayRoutingDebugState({
-            stage: 'worker-fallback-repaired',
-            signature: displayEdgeCacheSignature,
-            requestId: repairRequestId,
-            nodeCount,
-            edgeCount: resolvedWorkerResult.edges.length,
-          });
+          if (shouldRepairBaseReactFlowDisplayResult({
+            qualityMode: displayWorkerQualityMode,
+            hardClean: workerResult.hardClean,
+          })) {
+            const repairRequestId = `${requestId}:repair`;
+            updateDisplayRoutingDebugState({
+              stage: 'worker-fallback-loading',
+              signature: displayEdgeCacheSignature,
+              requestId: repairRequestId,
+              nodeCount,
+              edgeCount,
+            });
+            resolvedWorkerResult = await repairBaseReactFlowDisplayEdgesInWorker({
+              workerRef: displayEdgeWorkerRef,
+              requestId: repairRequestId,
+              edges: mergedWorkerEdges,
+              nodes: latestRoutingInput.nodes,
+              timeoutMs: displayQualityPolicy.timeoutMs,
+              signal: workerAbortController.signal,
+            });
+            if (!isRequestCurrent()) return;
+            updateDisplayRoutingDebugState({
+              stage: 'worker-fallback-repaired',
+              signature: displayEdgeCacheSignature,
+              requestId: repairRequestId,
+              nodeCount,
+              edgeCount: resolvedWorkerResult.edges.length,
+            });
+          }
         }
         if (!isRequestCurrent()) return;
         workerCompleted = true;
@@ -522,9 +532,17 @@ export const useBaseReactFlowDisplayRouting = ({
         }
         const mergedFinalEdges = mergedTransactions.edges;
         const mergedOutputRouteSignature = computeBaseReactFlowDisplayOutputRouteSignature(mergedFinalEdges);
-        const trustedFinalHardClean = resolvedWorkerResult.hardClean === true
-          && doBaseReactFlowDisplayRoutesMatchExactly(reportedFinalEdges, mergedFinalEdges);
-        if (!trustedFinalHardClean) {
+        const routesMatchExactly = doBaseReactFlowDisplayRoutesMatchExactly(
+          reportedFinalEdges,
+          mergedFinalEdges,
+        );
+        const canCommitFinalResult = canCommitBaseReactFlowDisplayResult({
+          qualityMode: displayWorkerQualityMode,
+          hardClean: resolvedWorkerResult.hardClean,
+          routeResolution: resolvedWorkerResult.routeResolution,
+          routesMatch: routesMatchExactly,
+        });
+        if (!canCommitFinalResult) {
           updateDisplayRoutingDebugState({
             stage: 'final-quality-rejected',
             signature: displayEdgeCacheSignature,
@@ -564,9 +582,13 @@ export const useBaseReactFlowDisplayRouting = ({
           signature: displayEdgeCacheSignature,
           geometryDigest: inputGeometryDigest,
           displayPatches: mergedTransactions.displayPatches,
-          hardClean: true,
+          hardClean: resolvedWorkerResult.hardClean === true,
         });
-        if (cacheReplaySignature !== null && mergedTransactions.cachePatches) {
+        if (
+          resolvedWorkerResult.hardClean === true
+          && cacheReplaySignature !== null
+          && mergedTransactions.cachePatches
+        ) {
           const cachePatches = mergedTransactions.cachePatches;
           cancelCacheWrite = scheduleBaseReactFlowDisplayCacheWrite(() => {
             writeBaseReactFlowDisplayEdgesCache(displayEdgeCacheSignature, cachePatches, {
@@ -616,13 +638,20 @@ export const useBaseReactFlowDisplayRouting = ({
     routingGeometryReady,
   ]);
 
+  const immediateDisplayEdges = useMemo(
+    () => displayQualityPolicy.mode === 'interactive'
+      ? createBaseReactFlowInteractiveFallbackEdges(edges)
+      : edges,
+    [displayQualityPolicy.mode, edges],
+  );
+
   const resolvedDisplayEdges = resolveBaseReactFlowDisplayedEdges({
     signature: displayEdgeCacheSignature,
     geometryDigest: inputGeometryDigest,
     policyMode: displayQualityPolicy.mode,
     deferred: deferredDisplayEdges,
     cached: null,
-    immediate: edges,
+    immediate: immediateDisplayEdges,
   });
 
   return resolvedDisplayEdges;

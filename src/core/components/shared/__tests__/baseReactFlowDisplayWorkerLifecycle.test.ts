@@ -4,6 +4,11 @@ import {
   computeBaseReactFlowDisplayEdgesInWorker,
   resolveBaseReactFlowDisplayWorkerTimeoutMs,
 } from '../baseReactFlowDisplayWorkerClient';
+import { createBaseReactFlowInteractiveFallbackEdges } from '../baseReactFlowDisplayFallback';
+import {
+  canCommitBaseReactFlowDisplayResult,
+  shouldRepairBaseReactFlowDisplayResult,
+} from '../baseReactFlowDisplayCommitPolicy';
 
 const installWorkerHarness = () => {
   const terminate = vi.fn();
@@ -83,7 +88,7 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     expect(resolveBaseReactFlowDisplayWorkerTimeoutMs(Number.NaN, 'full')).toBe(60_000);
     expect(resolveBaseReactFlowDisplayWorkerTimeoutMs(Number.POSITIVE_INFINITY, 'interactive')).toBe(12_000);
     expect(resolveBaseReactFlowDisplayWorkerTimeoutMs(-10, 'full')).toBe(1_000);
-    expect(resolveBaseReactFlowDisplayWorkerTimeoutMs(900_000, 'full')).toBe(300_000);
+    expect(resolveBaseReactFlowDisplayWorkerTimeoutMs(900_000, 'full')).toBe(60_000);
   });
 
   it('transfers only routing-owned cache patches into validate-or-route', async () => {
@@ -326,5 +331,43 @@ describe('baseReactFlowDisplayWorker lifecycle', () => {
     await rejected;
     expect(harness.terminate).toHaveBeenCalledTimes(1);
     expect(workerRef.current).toBeNull();
+  });
+
+  it('uses lightweight built-in paths for smart edges during interactive fallback', () => {
+    const plain = { id: 'plain', source: 'source', target: 'target', type: 'straight' };
+    const smart = { id: 'smart', source: 'source', target: 'target', type: 'advanced-smart-step' };
+    const input = [plain, smart];
+    const fallback = createBaseReactFlowInteractiveFallbackEdges(input);
+
+    expect(fallback).not.toBe(input);
+    expect(fallback[0]).toBe(plain);
+    expect(fallback[1]).toEqual({
+      ...smart,
+      type: 'smoothstep',
+    });
+    expect(createBaseReactFlowInteractiveFallbackEdges([plain])[0]).toBe(plain);
+  });
+
+  it('commits bounded interactive results without starting a second repair pass', () => {
+    expect(shouldRepairBaseReactFlowDisplayResult({
+      qualityMode: 'interactive',
+      hardClean: false,
+    })).toBe(false);
+    expect(shouldRepairBaseReactFlowDisplayResult({
+      qualityMode: 'full',
+      hardClean: false,
+    })).toBe(true);
+    expect(canCommitBaseReactFlowDisplayResult({
+      qualityMode: 'interactive',
+      hardClean: false,
+      routeResolution: 'full-route',
+      routesMatch: true,
+    })).toBe(true);
+    expect(canCommitBaseReactFlowDisplayResult({
+      qualityMode: 'interactive',
+      hardClean: false,
+      routeResolution: 'full-route',
+      routesMatch: false,
+    })).toBe(false);
   });
 });
