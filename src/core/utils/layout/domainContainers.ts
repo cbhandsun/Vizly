@@ -1,51 +1,21 @@
-import type { Edge, Node as ReactFlowNode } from '@xyflow/react';
+import type { Edge } from '@xyflow/react';
 import { diagramConfigManager } from '../../config/DiagramConfig';
 import { calculateBoundingBox, countRectOverlaps } from './geometryUtils';
-
-type LayoutNode = ReactFlowNode<Record<string, unknown>>;
-
-const GROUP_TYPES = new Set(['subGroup', 'titleGroup', 'group', 'domain']);
-
-const asRecord = (value: unknown): Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
-
-const finiteNumber = (value: unknown, fallback: number): number =>
-  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-
-const nodeDomain = (node: LayoutNode | undefined): string =>
-  String(node?.data.domain ?? '');
-
-const nodeChildren = (node: LayoutNode): string[] =>
-  Array.isArray(node.data.children)
-    ? node.data.children.filter((child): child is string => typeof child === 'string')
-    : [];
-
-const nodeWidth = (node: LayoutNode, fallback: number): number =>
-  finiteNumber(node.measured?.width ?? node.style?.width ?? node.width, fallback);
-
-const nodeHeight = (node: LayoutNode, fallback: number): number =>
-  finiteNumber(node.measured?.height ?? node.style?.height ?? node.height, fallback);
-
-const nodeX = (node: LayoutNode, fallback = 0): number =>
-  finiteNumber(node.position.x, fallback);
-
-const nodeY = (node: LayoutNode, fallback = 0): number =>
-  finiteNumber(node.position.y, fallback);
-
-const isHiddenNode = (node: LayoutNode): boolean => node.data.hidden === true;
-
-const setNodePosition = (node: LayoutNode | undefined, x: number, y: number): void => {
-  if (node) node.position = { x, y };
-};
-
-const setNodeDimensions = (node: LayoutNode, width: number, height: number): void => {
-  node.style = { ...node.style, width, height };
-  node.measured = { ...node.measured, width, height };
-  node.width = width;
-  node.height = height;
-};
+import {
+  asDomainRecord as asRecord,
+  finiteDomainNumber as finiteNumber,
+  GROUP_TYPES,
+  isHiddenNode,
+  nodeChildren,
+  nodeDomain,
+  nodeHeight,
+  nodeWidth,
+  nodeX,
+  nodeY,
+  setNodeDimensions,
+  setNodePosition,
+  type LayoutNode,
+} from './domainContainerAccessors';
 
 /**
  * @file 统一布局工具函数

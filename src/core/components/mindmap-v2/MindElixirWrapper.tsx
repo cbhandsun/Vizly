@@ -18,13 +18,13 @@ import React, {
     useState,
 } from 'react';
 import MindElixir from 'mind-elixir';
-import type { MindElixirInstance, MindElixirData, NodeObj, Topic } from 'mind-elixir';
+import type { MindElixirInstance, NodeObj, Topic } from 'mind-elixir';
 import 'mind-elixir/style.css';
 import './MindElixirWrapper.css';
 
 import { PluginContext } from '../../types/plugin';
 import { VIZLY_HYPER_THEME, VIZLY_HYPER_DARK_THEME, VIZLY_THEMES } from './theme';
-import { migrateV1ToV2, directionStringToInt, findNodeById } from './migrate';
+import { migrateV1ToV2, findNodeById } from './migrate';
 import { isMindMapV1, isMindMapV2 } from './types';
 import { registerMindElixirInstance, unregisterMindElixirInstance } from './mindElixirStore';
 import { MindElixirContext } from './MindElixirContext';
@@ -47,9 +47,8 @@ import { sanitizeMarkdownHtml, toSafeExternalUrl } from '../../utils/sanitizeHtm
 import { cleanMindMapData } from './mindmapTreeSanitizer';
 import { cleanMindMapBridgeNode, cleanMindMapChildNode } from './mindmapBridgeSecurity';
 import { parseMindElixirClipboardNodes } from './mindmapClipboardSecurity';
-import { createSafeMindMapV2Payload } from './mindmapPersistenceSecurity';
 import { getSafeMindMapShortcutAction } from './mindmapKeyboardSecurity';
-import { persistMindMapThemeKey, readStoredMindMapThemeKey, resolveMindMapThemeKey } from './mindmapThemeStorage';
+import { readStoredMindMapThemeKey } from './mindmapThemeStorage';
 import {
     logMindmapWrapperAiBridgeFailure,
     logMindmapWrapperClipboardPayloadBlocked,
@@ -58,7 +57,6 @@ import {
     logMindmapWrapperNotePreviewFailure,
     logMindmapWrapperSafePasteFailure,
     logMindmapWrapperSafeShortcutFailure,
-    logMindmapWrapperSaveFailure,
 } from './mindmapWrapperLogging';
 import { coerceMindElixirDirection } from './mindElixirDirection';
 import { projectMindMapTreeToBridge } from './mindmapBridgeProjection';
@@ -66,107 +64,7 @@ import { bindMindElixirOperationEffects } from './mindElixirOperationEffects';
 import { applyMindElixirPalette, clearMindElixirPalette } from './mindElixirThemeDom';
 import { useMindElixirFileDrop } from './useMindElixirFileDrop';
 import type { FlowDataBridgeEntry } from '../../utils/flowDataBridge';
-
-// ─── Default data shown for a fresh mindmap ──────────────────────────────────
-const DEFAULT_DATA: MindElixirData = {
-    nodeData: {
-        id: 'root',
-        topic: '中心主题',
-        root: true,
-        children: [
-            { id: 'b1', topic: '分支一', children: [] },
-            { id: 'b2', topic: '分支二', children: [] },
-            { id: 'b3', topic: '分支三', children: [] },
-        ],
-    } as NodeObj & { root: true },
-    direction: MindElixir.SIDE as 0 | 1 | 2,
-};
-
-// ─── Load / Save helpers ──────────────────────────────────────────────────────
-function loadData(ctx: PluginContext): MindElixirData {
-    try {
-        const nodes = ctx.getNodes();
-        const edges = ctx.getEdges();
-
-        // Restore persisted direction from localStorage (user may have changed it)
-        const { directionStringToInt: d2i } = { directionStringToInt };
-        const lsDir = localStorage.getItem('vizly_mindmap_dir');
-        const persistedDir = lsDir ? coerceMindElixirDirection(d2i(lsDir)) : null;
-
-        if (nodes.length === 0) return {
-            ...DEFAULT_DATA,
-            direction: persistedDir ?? DEFAULT_DATA.direction,
-        };
-
-        // Detect v2 format stored in a special "meta" node
-        const metaNode = nodes.find(node => node.id === '__mindmap_meta__');
-        if (metaNode?.data?.mindmapV2) {
-            const v2 = metaNode.data.mindmapV2;
-            if (isMindMapV2(v2)) {
-                // If themeKey persisted separately, sync localStorage
-                if (v2.themeKey) persistMindMapThemeKey(v2.themeKey);
-                return {
-                    nodeData: v2.nodeData,
-                    direction: persistedDir ?? coerceMindElixirDirection(v2.direction),
-                    theme: v2.theme ?? VIZLY_HYPER_THEME,
-                };
-            }
-        }
-
-        // Fallback: migrate from v1 (RF nodes/edges)
-        const mindmapNodes = nodes.filter(node => node.type === 'mindmap');
-        if (mindmapNodes.length === 0) return {
-            ...DEFAULT_DATA,
-            direction: persistedDir ?? DEFAULT_DATA.direction,
-        };
-
-        // If only the root node exists with no children edges, treat as fresh mindmap
-        const childEdges = edges.filter(edge => edge.type !== 'relationshipEdge');
-        const realNodes = mindmapNodes.filter(node => node.id !== '__mindmap_meta__');
-        if (realNodes.length === 1 && childEdges.length === 0) {
-            const rootLabel = (realNodes[0].data?.label as string) || '中心主题';
-            return {
-                ...DEFAULT_DATA,
-                direction: persistedDir ?? DEFAULT_DATA.direction,
-                nodeData: { ...DEFAULT_DATA.nodeData, topic: rootLabel },
-            };
-        }
-
-        const v2 = migrateV1ToV2({ nodes: mindmapNodes, edges });
-        return {
-            nodeData: v2.nodeData,
-            direction: persistedDir ?? coerceMindElixirDirection(v2.direction),
-            theme: VIZLY_HYPER_THEME,
-        };
-    } catch {
-        return DEFAULT_DATA;
-    }
-}
-
-
-function saveData(ctx: PluginContext, mind: MindElixirInstance): void {
-    try {
-        const themeKey = resolveMindMapThemeKey();
-        const v2Payload = createSafeMindMapV2Payload(mind.getData(), themeKey, MindElixir.SIDE as 0 | 1 | 2 | 3);
-
-        ctx.setNodes(prev => {
-            // Remove old meta node if present
-            const filtered = prev.filter(node => node.id !== '__mindmap_meta__');
-            return [
-                ...filtered,
-                {
-                    id: '__mindmap_meta__',
-                    type: 'mindmap',
-                    position: { x: -9999, y: -9999 }, // off-screen, invisible
-                    hidden: true,
-                    data: { mindmapV2: v2Payload, depth: -1, label: '' },
-                },
-            ];
-        });
-    } catch (e) {
-        logMindmapWrapperSaveFailure(e);
-    }
-}
+import { loadMindElixirData, saveMindElixirData } from './mindElixirPersistence';
 
 function isMindMapTextEditingTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
@@ -191,7 +89,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
 
     // Keep save callback fresh without recreating the debounced fn
     saveRef.current = useCallback(() => {
-        if (mindRef.current) saveData(ctx, mindRef.current);
+        if (mindRef.current) saveMindElixirData(ctx, mindRef.current);
     }, [ctx]);
 
     const [ctxMenu, setCtxMenu] = useState<CtxPos>({ visible: false, x: 0, y: 0, nodeId: null });
@@ -201,7 +99,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
         if (!containerRef.current) return;
         const themeStyle = containerRef.current.style;
 
-        const initialData = loadData(ctx);
+        const initialData = loadMindElixirData(ctx);
 
         // Theme priority: localStorage key > isDark flag > default
         const storedThemeKey = readStoredMindMapThemeKey();
@@ -511,7 +409,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                         ...safeData,
                         direction: coerceMindElixirDirection(safeData.direction),
                     });
-                    saveData(ctx, mindRef.current);
+                    saveMindElixirData(ctx, mindRef.current);
                 } catch (err) {
                     logMindmapWrapperAiBridgeFailure('importData', err);
                 }
@@ -524,7 +422,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     if (parent) {
                         const newId = `node_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
                         mindRef.current.addChild(parent, cleanMindMapBridgeNode(args, newId));
-                        saveData(ctx, mindRef.current);
+                        saveMindElixirData(ctx, mindRef.current);
                         return newId;
                     }
                 } catch (err) {
@@ -540,7 +438,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     if (parent) {
                         const newId = `node_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
                         mindRef.current.addChild(parent, cleanMindMapBridgeNode(args, newId));
-                        saveData(ctx, mindRef.current);
+                        saveMindElixirData(ctx, mindRef.current);
                         return newId;
                     }
                 } catch (err) {
@@ -553,7 +451,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     const els = ids.map(id => mindRef.current!.findEle(id)).filter(Boolean);
                     if (els.length > 0) {
                         mindRef.current.removeNodes(els);
-                        saveData(ctx, mindRef.current);
+                        saveMindElixirData(ctx, mindRef.current);
                     }
                 } catch (err) {
                     logMindmapWrapperAiBridgeFailure('deleteNodes', err);
@@ -565,7 +463,7 @@ const MindElixirWrapper: React.FC<MindElixirWrapperProps> = ({ ctx, isDark, onNo
                     const el = mindRef.current.findEle(id);
                     if (el) {
                         mindRef.current.expandNode(el, !collapsed);
-                        saveData(ctx, mindRef.current);
+                        saveMindElixirData(ctx, mindRef.current);
                     }
                 } catch (err) {
                     logMindmapWrapperAiBridgeFailure('collapse', err);

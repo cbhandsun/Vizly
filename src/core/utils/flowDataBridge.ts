@@ -72,10 +72,36 @@ export const getFlowDataBridgeEdges = (diagramId: string): unknown[] => {
     return Array.isArray(edges) ? edges : [];
 };
 
+export const registerFlowDataBridge = (
+    diagramId: string,
+    entry: FlowDataBridgeEntry,
+): (() => void) => {
+    if (typeof window === 'undefined' || !diagramId || diagramId.length > 200) return () => {};
+    window.__flowDataBridge ??= {};
+    window.__flowDataBridge[diagramId] = entry;
+    return () => {
+        if (window.__flowDataBridge?.[diagramId] === entry) {
+            delete window.__flowDataBridge[diagramId];
+        }
+    };
+};
+
 export const removeFlowDataBridge = (diagramId: string): void => {
     const registry = getFlowDataBridgeRegistry();
     if (!registry || !diagramId) return;
     delete registry[diagramId];
+};
+
+export const registerFlowDesignerCloudOpener = (
+    opener: NonNullable<Window['__flowDesignerOpenCloud']>,
+): (() => void) => {
+    if (typeof window === 'undefined') return () => {};
+    window.__flowDesignerOpenCloud = opener;
+    return () => {
+        if (window.__flowDesignerOpenCloud === opener) {
+            delete window.__flowDesignerOpenCloud;
+        }
+    };
 };
 import type { StandardDiagramData } from '../models/DiagramModels';
 import { coerceStandardDiagramImport } from './diagramJsonImport';

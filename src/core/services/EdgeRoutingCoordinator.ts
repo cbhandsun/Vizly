@@ -12,7 +12,7 @@ import WorkerPool from '../workers/WorkerPool';
 import { EdgeRoutingCache } from './EdgeRoutingCache';
 import { RoutingPerformanceMonitor } from '../monitoring/RoutingPerformanceMonitor';
 import { IncrementalRoutingManager } from './IncrementalRoutingManager';
-import { PathfindingWorkerPool } from '../workers/PathfindingWorkerPool'; // [FIX] Partial lowercase filename
+import type { PathfindingWorkerPool } from '../workers/PathfindingWorkerPool';
 import { RoutingStrategySelector } from '../algorithms/RoutingStrategySelector';
 import { VisibilityGraphCache } from '../algorithms/VisibilityGraphCache';
 import { setPathfindingConfig } from '../algorithms/pathfinding';
@@ -31,13 +31,11 @@ import {
 import {
     logEdgeRoutingCoordinatorBatchRoutingFailure,
     logEdgeRoutingCoordinatorCachesCleared,
-    logEdgeRoutingCoordinatorDebugToolsReady,
     logEdgeRoutingCoordinatorGlobalNudgeFailure,
     logEdgeRoutingCoordinatorMissingResult,
     logEdgeRoutingCoordinatorNoLatestRequest,
     logEdgeRoutingCoordinatorParallelFallback,
     logEdgeRoutingCoordinatorParallelIncomplete,
-    logEdgeRoutingCoordinatorParallelPoolInitFailure,
     logEdgeRoutingCoordinatorSerialRoutingFailure,
     logEdgeRoutingDebugListenerFailure,
     logEdgeRoutingGraphVersionSubscriberFailure,
@@ -60,22 +58,16 @@ import { EdgeRoutingResultContext } from './edgeRoutingResultContext';
 import { EdgeRoutingDebugState, refreshDebugRoutingRequestEndpoints } from './edgeRoutingDebugState';
 import { buildEdgeRoutingCacheParams } from './edgeRoutingCacheParams';
 import { coerceEdgeRoutingSnapshotNodes } from './edgeRoutingNodeChangeDetection';
-
-type RoutingDebugWindow = Window & {
-    __vizly_coordinator__?: EdgeRoutingCoordinator;
-    __vizly_routing__?: {
-        clearCache: () => void;
-        coordinator: () => EdgeRoutingCoordinator;
-    };
-};
-
-const finiteMetadataNumber = (
-    metadata: PathFindingResult['metadata'],
-    key: string
-): number | undefined => {
-    const value = metadata?.[key];
-    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-};
+import {
+    createParallelRoutingPool,
+    exposeRoutingCoordinatorInstance,
+    finiteMetadataNumber,
+    installEdgeRoutingDebugTools,
+    pruneInactiveRoutingEdges,
+    settlePendingRoutingRequests,
+    type LatestRoutingRequest,
+    type PendingRoutingResolver,
+} from './edgeRoutingCoordinatorSupport';
 
 /**
  * [P0-2] Main coordination service for edge routing.
@@ -107,7 +99,7 @@ export class EdgeRoutingCoordinator {
     });
     // [P2-3] Pending Requests for Batching
     // Track latest request per edge to avoid duplicate work in same tick
-    private latestRequests: Map<string, { request: RoutingRequest; graphKey: string; seq: number; updatedAt: number }> = new Map();
+    private latestRequests: Map<string, LatestRoutingRequest> = new Map();
     private requestSeq: number = 0;
 
     public clearDebugEdge(): void {
@@ -115,10 +107,7 @@ export class EdgeRoutingCoordinator {
     }
 
     // Map to store resolvers for pending edge requests
-    private pendingResolvers: Map<
-        string,
-        { resolve: (value: PathFindingResult | PromiseLike<PathFindingResult>) => void; seq: number }
-    > = new Map();
+    private pendingResolvers: Map<string, PendingRoutingResolver> = new Map();
 
     private readonly MAX_PENDING_SEGMENTS = 400;
 
@@ -175,38 +164,18 @@ export class EdgeRoutingCoordinator {
             vgCacheManager: this.vgCacheManager
         });
 
-        // Initialize parallel pool if enabled
-        this.initializeParallelPool();
-    }
-
-    /**
-     * [P0 OPTIMIZATION] Initialize parallel worker pool
-     */
-    private initializeParallelPool(): void {
-        try {
-            this.parallelPool = new PathfindingWorkerPool();
-            this.useParallelRouting = true;
-        } catch (error) {
-            logEdgeRoutingCoordinatorParallelPoolInitFailure(error);
-            this.useParallelRouting = false;
-        }
+        this.parallelPool = createParallelRoutingPool();
+        this.useParallelRouting = this.parallelPool !== null;
     }
 
     public static getInstance(): EdgeRoutingCoordinator {
         if (!EdgeRoutingCoordinator.instance) {
             EdgeRoutingCoordinator.instance = new EdgeRoutingCoordinator();
-            // [DEBUG] Expose globally for console debugging
-            // Usage: window.__vizly_coordinator__.forceClearAllCaches()
-            try {
-                (window as RoutingDebugWindow).__vizly_coordinator__ = EdgeRoutingCoordinator.instance;
-            } catch {}
+            exposeRoutingCoordinatorInstance(EdgeRoutingCoordinator.instance);
         }
         return EdgeRoutingCoordinator.instance;
     }
 
-    /**
-     * [P0] Get current graph version
-     */
     public getGraphVersion(): number {
         return this.incrementalState.getGraphVersion();
     }
@@ -274,6 +243,7 @@ export class EdgeRoutingCoordinator {
      * More thorough than notifyGraphChange - clears port usage, dependencies, etc.
      */
     public forceClearAllCaches(): void {
+        settlePendingRoutingRequests(this.latestRequests, this.pendingResolvers);
         this.cache.clear();
         this.workerPool.markDirty();
         this.incrementalState.clearDirtyEdges();
@@ -402,6 +372,15 @@ export class EdgeRoutingCoordinator {
      * Call this once with all edges to build the dependency graph.
      */
     public initializeEdges(edges: Edge[]): void {
+        const activeEdgeIds = new Set(edges.map(edge => edge.id).filter(Boolean));
+        pruneInactiveRoutingEdges({
+            activeEdgeIds,
+            latestRequests: this.latestRequests,
+            pendingResolvers: this.pendingResolvers,
+            deleteCachedEdge: edgeId => this.cache.deleteByEdgeId(edgeId),
+            deleteResultEdge: edgeId => this.resultContext.deletePath(edgeId),
+        });
+        this.resultContext.retainEdges(activeEdgeIds);
         const { affectedNodeIds, hadExistingEdges } = this.incrementalState.initializeEdges(edges);
         // [FIX] Invalidate affected nodes to trigger peer re-routing when topology changes
         if (affectedNodeIds.length > 0 && hadExistingEdges) {
@@ -417,9 +396,6 @@ export class EdgeRoutingCoordinator {
         this.incrementalState.markNodesChanged(nodeIds);
     }
 
-    /**
-     * [P0-2] Get list of dirty edges that need rerouting.
-     */
     public getDirtyEdges(): string[] {
         return this.incrementalState.getDirtyEdgeIds();
     }
@@ -790,10 +766,14 @@ export class EdgeRoutingCoordinator {
      */
     public cleanup(): void {
         this.scheduler.cancel();
+        settlePendingRoutingRequests(this.latestRequests, this.pendingResolvers);
+        this.latestRequests.clear();
         this.workerPool.terminate();
         this.parallelPool?.terminate();
         this.cache.clear();
+        this.resultContext.clearPaths();
         this.resultContext.clearLabelObstacles();
+        clearRenderedPathCache();
         EdgeRoutingCoordinator.instance = null;
     }
     /**
@@ -815,14 +795,5 @@ export class EdgeRoutingCoordinator {
     }
 }
 
-// [DEV] Debug tools on window object (dev mode only)
-if (typeof window !== 'undefined' && import.meta.env.DEV) {
-    (window as RoutingDebugWindow).__vizly_routing__ = {
-        /** Clear all routing caches and force full re-route */
-        clearCache: () => EdgeRoutingCoordinator.getInstance().clearAllCaches(),
-        /** Get Coordinator instance */
-        coordinator: () => EdgeRoutingCoordinator.getInstance(),
-    };
-    logEdgeRoutingCoordinatorDebugToolsReady();
-}
+installEdgeRoutingDebugTools(() => EdgeRoutingCoordinator.getInstance());
 

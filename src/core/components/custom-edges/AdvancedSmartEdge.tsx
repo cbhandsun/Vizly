@@ -1,9 +1,9 @@
 // src/components/custom-edges/AdvancedSmartEdge.tsx
 import React, { memo } from 'react';
 import type { EdgeProps } from '@xyflow/react';
-import { useEdgeLabelInteractions } from './hooks/useEdgeLabelInteractions';
-import { useSmartEdgeRouting } from './hooks/useSmartEdgeRouting';
-import { AdvancedSmartEdgeGraphics } from './renderers/AdvancedSmartEdgeGraphics';
+import { CanvasRoutedSmartEdge } from './CanvasRoutedSmartEdge';
+import { EdgeOwnedAdvancedSmartEdge } from './EdgeOwnedAdvancedSmartEdge';
+import { useSmartEdgeRoutingOwner } from './smartEdgeRoutingOwnership';
 
 /**
  * [OPTIMIZATION] Strict props comparison to avoid unnecessary re-renders during drag
@@ -63,15 +63,11 @@ function areSmartEdgePropsEqual(prev: EdgeProps, next: EdgeProps) {
  * AdvancedSmartEdge (Shell Component)
  * Delegating all logic domains into separate controllers and rendering through a pure graphic function.
  */
-const InnerAdvancedSmartStepEdge: React.FC<EdgeProps> = (props) => {
-    // Domain 1: Drag, inline edit, and context menu logic
-    const labelManager = useEdgeLabelInteractions(props);
-    
-    // Domain 2: Worker coordination, fallback maths, line jumps
-    const router = useSmartEdgeRouting(props);
-
-    // Shell rendering
-    return <AdvancedSmartEdgeGraphics router={router} labelManager={labelManager} props={props} />;
+const InnerAdvancedSmartStepEdge = (props: EdgeProps) => {
+    const routingOwner = useSmartEdgeRoutingOwner();
+    return routingOwner === 'canvas'
+        ? <CanvasRoutedSmartEdge {...props} />
+        : <EdgeOwnedAdvancedSmartEdge {...props} />;
 };
 
 // Export memoized components

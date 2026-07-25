@@ -1,4 +1,7 @@
-import { resolveRouteBudget } from '../smokeRouteBudgetUtils.mjs';
+import {
+  collectRouteStabilityViolations,
+  resolveRouteBudget,
+} from '../smokeRouteBudgetUtils.mjs';
 
 export const getUnexpectedLogs = (logs, allowedWarningPatterns) => logs.filter((entry) => {
   if (entry.level === 'error') return true;
@@ -217,6 +220,16 @@ export const collectBudgetViolations = (results, { enabled = false, isMobile = f
         });
       }
     }
+    for (const violation of collectRouteStabilityViolations(
+      result.stabilityReport,
+      result.stabilityBudget,
+    )) {
+      violations.push({
+        route: result.name,
+        ...violation,
+        sampleCount: result.sampleCount || 1,
+      });
+    }
   }
 
   return violations;
@@ -239,5 +252,9 @@ export const printBudgetSummary = (
       ? `, samples ${result.sampleCount}, worst ready ${result.worstReport.readyAt} ms`
       : '';
     log(`- ${result.name}: critical assets ${report.criticalAssets}/${budget.criticalAssets}, decoded ${report.criticalDecodedKB}/${budget.criticalDecodedKB} KB, ready ${report.readyAt}/${budget.readyMs} ms${sampleSummary}`);
+    if (result.stabilityReport) {
+      const stability = result.stabilityReport;
+      log(`  stability ${stability.durationMs} ms: long tasks ${stability.longTaskCount}, max ${stability.maxLongTaskMs} ms, heap ${stability.heapGrowthKB} KB, workers ${stability.activeWorkers}/${stability.queuedTasks}`);
+    }
   }
 };

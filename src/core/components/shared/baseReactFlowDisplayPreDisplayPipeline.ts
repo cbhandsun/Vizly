@@ -54,11 +54,7 @@ import {
   displayReportCanFinishWithAnchoringCluster,
   displayReportOnlyNeedsTerminalAnchoring,
 } from './baseReactFlowDisplayReportPolicy';
-
-const readDisplayLayoutDirection = (edge: Edge | undefined): string => {
-  const direction = edge?.data?.layoutDirection;
-  return typeof direction === "string" && direction ? direction : "TB";
-};
+import { readDisplayLayoutDirection } from './baseReactFlowDisplayDirection';
 
 export const createBaseReactFlowPreDisplayFinalEdges = (args: {
   edges: Edge[];

@@ -16,6 +16,8 @@ describe('smoke route modules', () => {
     expect(new Set(names).size).toBe(routes.length);
     expect(routes.every((route) => route.url.startsWith('http://127.0.0.1:5373'))).toBe(true);
     expect(routes.every((route) => route.timeoutMs > 0 && route.expression.length > 0)).toBe(true);
+    expect(routes.find((route) => route.name === 'enterprise-architecture-large-diagram')?.stabilityBudget)
+      .toMatchObject({ durationMs: 15000, maxActiveWorkers: 0 });
   });
 
   it('keeps CDP runtime options explicit at the browser boundary', () => {

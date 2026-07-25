@@ -106,4 +106,25 @@ describe('globalErrorHandler', () => {
     expect(errorPayload).not.toContain('stack-token');
     expect(errorPayload).toContain('[redacted]');
   });
+
+  it('is idempotent and removes its listeners during cleanup', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const addEventListener = vi.spyOn(window, 'addEventListener');
+    const removeEventListener = vi.spyOn(window, 'removeEventListener');
+    vi.doMock('../errorLogger', () => ({
+      errorLogger: { log: vi.fn() },
+    }));
+
+    const { initGlobalErrorHandling } = await import('../globalErrorHandler');
+    const cleanup = initGlobalErrorHandling();
+    const duplicateCleanup = initGlobalErrorHandling();
+
+    expect(duplicateCleanup).toBe(cleanup);
+    expect(addEventListener).toHaveBeenCalledTimes(2);
+
+    cleanup();
+    cleanup();
+
+    expect(removeEventListener).toHaveBeenCalledTimes(2);
+  });
 });

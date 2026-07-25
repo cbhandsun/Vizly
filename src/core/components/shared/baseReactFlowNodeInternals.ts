@@ -9,6 +9,57 @@ type ReactFlowStoreApi = {
 
 type RefreshFn = () => void;
 
+export type BaseReactFlowNodeInternalsRefreshNode = {
+  id: string;
+  type?: string;
+  position?: unknown;
+  measured?: { width?: number; height?: number };
+  width?: number;
+  height?: number;
+  style?: { width?: unknown; height?: unknown };
+};
+
+export type BaseReactFlowNodeInternalsRefreshSnapshot = {
+  key: string;
+  nodeIds: string[];
+};
+
+/**
+ * Node-internal measurements depend on mounted node identity, renderer type,
+ * and dimensions. Position is intentionally excluded: React Flow already
+ * tracks it, and remeasuring every handle during drag creates a full DOM scan.
+ */
+export const createBaseReactFlowNodeInternalsRefreshSnapshot = (
+  nodes: readonly BaseReactFlowNodeInternalsRefreshNode[],
+): BaseReactFlowNodeInternalsRefreshSnapshot => {
+  const nodeIds: string[] = [];
+  const keyParts: Array<[string, string, string, string]> = [];
+  for (const node of nodes) {
+    const width = node.measured?.width ?? node.width ?? node.style?.width ?? '';
+    const height = node.measured?.height ?? node.height ?? node.style?.height ?? '';
+    nodeIds.push(node.id);
+    keyParts.push([node.id, node.type ?? '', String(width), String(height)]);
+  }
+  return {
+    key: JSON.stringify(keyParts),
+    nodeIds,
+  };
+};
+
+export const readBaseReactFlowNodeInternalsRefreshNodeIds = (
+  refreshKey: string,
+): string[] => {
+  try {
+    const entries: unknown = JSON.parse(refreshKey);
+    if (!Array.isArray(entries)) return [];
+    return entries.flatMap(entry => (
+      Array.isArray(entry) && typeof entry[0] === 'string' ? [entry[0]] : []
+    ));
+  } catch {
+    return [];
+  }
+};
+
 const readReactFlowNodeInternalsState = (
   rfStore: ReactFlowStoreApi,
 ): ReactFlowNodeInternalsState => {
@@ -22,8 +73,25 @@ export const getBaseReactFlowNodeElement = (
   container: HTMLElement | null,
   id: string
 ): HTMLElement | null => {
-  const safeId = String(id).replace(/"/g, '\\"');
-  return container?.querySelector(`.react-flow__node[data-id="${safeId}"]`) as HTMLElement | null;
+  if (!container) return null;
+  for (const element of container.querySelectorAll<HTMLElement>('.react-flow__node[data-id]')) {
+    if (element.dataset.id === id) return element;
+  }
+  return null;
+};
+
+export const collectBaseReactFlowMountedNodeElements = (
+  container: HTMLElement | null,
+  nodeIds: readonly string[],
+): Map<string, HTMLElement> => {
+  const mounted = new Map<string, HTMLElement>();
+  if (!container || nodeIds.length === 0) return mounted;
+  const requestedIds = new Set(nodeIds);
+  for (const element of container.querySelectorAll<HTMLElement>('.react-flow__node[data-id]')) {
+    const id = element.dataset.id;
+    if (id && requestedIds.has(id)) mounted.set(id, element);
+  }
+  return mounted;
 };
 
 export const refreshBaseReactFlowNodeInternals = ({
@@ -40,11 +108,8 @@ export const refreshBaseReactFlowNodeInternals = ({
   const state = readReactFlowNodeInternalsState(rfStore);
   const internalsMap = new Map<string, { id: string; nodeElement: HTMLElement; force: boolean }>();
 
-  for (const id of nodeIds) {
-    const nodeElement = getBaseReactFlowNodeElement(container, id);
-    if (nodeElement) {
-      internalsMap.set(id, { id, nodeElement, force: true });
-    }
+  for (const [id, nodeElement] of collectBaseReactFlowMountedNodeElements(container, nodeIds)) {
+    internalsMap.set(id, { id, nodeElement, force: true });
   }
 
   if (internalsMap.size > 0 && typeof state.updateNodeInternals === 'function') {
@@ -70,10 +135,10 @@ export const areBaseReactFlowHandlesMeasured = ({
   const handlesAreHiddenBySemanticZoom = container?.classList.contains(
     'diagram-zoomed-out',
   ) ?? false;
+  const mountedNodes = collectBaseReactFlowMountedNodeElements(container, nodeIds);
+  if (mountedNodes.size === 0) return false;
 
-  return nodeIds.every((id) => {
-    const element = getBaseReactFlowNodeElement(container, id);
-    if (!element) return false;
+  return Array.from(mountedNodes).every(([id, element]) => {
     if (!element.querySelector('.react-flow__handle')) return true;
     // Semantic zoom deliberately applies display:none to every handle. React
     // Flow cannot produce handle bounds in that state, so retrying a forced

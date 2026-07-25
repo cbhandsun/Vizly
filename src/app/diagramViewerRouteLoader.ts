@@ -4,7 +4,7 @@ type LazyPageModule = { default: ComponentType };
 
 type DiagramViewerRouteLoaderDependencies = {
   loadPage: () => Promise<LazyPageModule>;
-  preloadCanvasRuntime: () => Promise<unknown>;
+  preloadCanvasRuntime?: () => Promise<unknown>;
 };
 
 export const createDiagramViewerRouteLoader = ({
@@ -15,7 +15,9 @@ export const createDiagramViewerRouteLoader = ({
   let preloadPromise: Promise<unknown> | undefined;
 
   return () => {
-    preloadPromise ??= preloadCanvasRuntime().catch(() => undefined);
+    if (preloadCanvasRuntime) {
+      preloadPromise ??= preloadCanvasRuntime().catch(() => undefined);
+    }
     pagePromise ??= loadPage().catch((error) => {
       pagePromise = undefined;
       throw error;
@@ -24,17 +26,6 @@ export const createDiagramViewerRouteLoader = ({
   };
 };
 
-const preloadDefaultFlowchartRuntime = async (): Promise<void> => {
-  if (import.meta.env.MODE === 'test') return;
-  await Promise.all([
-    import('@/core/components/diagrams/FlowchartDesigner'),
-    import('@/core/plugins/builtInPlugins').then(({ ensureBuiltInPlugins }) => (
-      ensureBuiltInPlugins('flowchart')
-    )),
-  ]);
-};
-
 export const loadDiagramViewerRoute = createDiagramViewerRouteLoader({
   loadPage: () => import('./DiagramViewerRoute'),
-  preloadCanvasRuntime: preloadDefaultFlowchartRuntime,
 });

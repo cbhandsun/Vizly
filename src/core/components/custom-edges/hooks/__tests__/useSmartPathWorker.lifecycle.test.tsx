@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
 import { act, renderHook } from '@testing-library/react';
+import type { PropsWithChildren } from 'react';
 import { Position, type Edge } from '@xyflow/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EdgeRoutingCoordinator } from '../../../../services/EdgeRoutingCoordinator';
+import { SmartEdgeRoutingOwnerContext } from '../../smartEdgeRoutingOwnership';
 import { useSmartPathWorker, type EdgeData, type UseSmartPathWorkerProps } from '../useSmartPathWorker';
 
 const routedResult = {
@@ -110,6 +112,12 @@ const dispatchScheduledRouting = async () => {
     });
 };
 
+const CanvasRoutingOwner = ({ children }: PropsWithChildren) => (
+    <SmartEdgeRoutingOwnerContext.Provider value="canvas">
+        {children}
+    </SmartEdgeRoutingOwnerContext.Provider>
+);
+
 describe('useSmartPathWorker lifecycle invariants', () => {
     beforeEach(() => {
         vi.useFakeTimers();
@@ -181,5 +189,46 @@ describe('useSmartPathWorker lifecycle invariants', () => {
         expect(Array.from(fixture.simpleNodeMap.entries())).toEqual(nodeSnapshot);
         expect(fixture.storeEdges).toEqual(edgeSnapshot);
         expect(coordinator.route).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not subscribe or submit per-edge work when the canvas owns routing', async () => {
+        const getCoordinator = vi.spyOn(EdgeRoutingCoordinator, 'getInstance');
+        const fixture = createFixture();
+        const { result } = renderHook(
+            () => useSmartPathWorker(fixture.buildProps()),
+            { wrapper: CanvasRoutingOwner },
+        );
+
+        await dispatchScheduledRouting();
+
+        expect(getCoordinator).not.toHaveBeenCalled();
+        expect(result.current.path).toBeNull();
+        expect(result.current.smartPoints).toBeNull();
+        expect(result.current.isLoading).toBe(true);
+    });
+
+    it('consumes a compatible canvas-computed path without starting the coordinator', async () => {
+        const getCoordinator = vi.spyOn(EdgeRoutingCoordinator, 'getInstance');
+        const fixture = createFixture();
+        const computedPath = [
+            { x: 100, y: 40 },
+            { x: 200, y: 40 },
+            { x: 300, y: 40 },
+        ];
+        const { result } = renderHook(
+            () => useSmartPathWorker(fixture.buildProps({
+                _layoutEpoch: 1,
+                algorithm: 'smart',
+                computedPath,
+            })),
+            { wrapper: CanvasRoutingOwner },
+        );
+
+        await dispatchScheduledRouting();
+
+        expect(getCoordinator).not.toHaveBeenCalled();
+        expect(result.current.path).toBeTruthy();
+        expect(result.current.smartPoints).toEqual(computedPath);
+        expect(result.current.isLoading).toBe(false);
     });
 });

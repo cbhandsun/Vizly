@@ -25,6 +25,8 @@ interface ImportMeta {
 }
 
 interface Window {
+    __currentUserId?: string | null;
+    __vizlyDisplayRoutingDiagnosticsEnabled?: boolean;
     __flowDesignerOpenCloud?: (
         data: import('./core/models/DiagramModels').StandardDiagramData,
     ) => void | Promise<void>;

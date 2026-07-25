@@ -10,7 +10,7 @@
  * - 调整路径用于替代原始 workerSmartPoints 进行 filleting
  */
 
-import { useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { LineJumpEngine } from '../../../services/LineJumpEngine';
 import { globalChannelRouting } from '../../../algorithms/globalChannelRouting';
 import type { Point } from '../../../services/LineJumpEngine';
@@ -28,13 +28,18 @@ interface UseChannelRoutingOptions {
  * 如果无需调整或禁用，返回 null。
  */
 export function useChannelRouting({ edgeId, points, enabled = true }: UseChannelRoutingOptions): Point[] | null {
-    const engine = LineJumpEngine.getInstance();
-
-    // [FIX N-6] 同 useLineJumps：用 useSyncExternalStore 订阅引擎版本变化
+    const subscribe = useCallback((callback: () => void) => {
+        if (!enabled) return () => undefined;
+        return LineJumpEngine.getInstance().subscribe(callback);
+    }, [enabled]);
+    const getSnapshot = useCallback(
+        () => enabled ? LineJumpEngine.getInstance().getVersion() : 0,
+        [enabled],
+    );
     const engineVersion = useSyncExternalStore(
-        (cb) => engine.subscribe(cb),
-        () => engine.getVersion(),
-        () => 0
+        subscribe,
+        getSnapshot,
+        () => 0,
     );
 
     return useMemo(() => {
@@ -43,6 +48,7 @@ export function useChannelRouting({ edgeId, points, enabled = true }: UseChannel
         if (!enabled || !points || points.length < 2) {
             return null;
         }
+        const engine = LineJumpEngine.getInstance();
 
         // [P2-3] 使用引擎缓存的通道分配结果，避免每条边各自重算 O(E²) Interval Coloring。
         // getCachedChannelRouting 内部检查 engineVersion：版本未变则直接返回缓存 Map（O(1)）；
@@ -70,5 +76,5 @@ export function useChannelRouting({ edgeId, points, enabled = true }: UseChannel
 
         return changed ? myAdjusted : null;
     // engineVersion 由 useSyncExternalStore 响应式维护
-    }, [edgeId, points, enabled, engine, engineVersion]);
+    }, [edgeId, points, enabled, engineVersion]);
 }

@@ -46,6 +46,7 @@ export class EnhancedTextMeasurement {
   private cacheHitCount = 0;   // 缓存命中次数
   private lastTtlAdjustAt = 0; // 上次TTL调整时间戳
   private gcTimerId: number | null = null; // 缓存清理定时器ID
+  private retainCount = 0;
   
   private defaultOptions: Required<TextMeasurementOptions> = {
     fontSize: 18,
@@ -62,9 +63,37 @@ export class EnhancedTextMeasurement {
       throw new Error('无法创建Canvas 2D上下文');
     }
     this.ctx = context;
-    
-    // 定期清理过期缓存
-    this.gcTimerId = (setInterval(() => this.cleanExpiredCache(), 60000) as unknown as number); // 每分钟清理一次
+  }
+
+  private startCacheMaintenance(): void {
+    if (this.gcTimerId !== null) return;
+    this.gcTimerId = setInterval(() => this.cleanExpiredCache(), 60000) as unknown as number;
+  }
+
+  private stopCacheMaintenance(): void {
+    if (this.gcTimerId === null) return;
+    clearInterval(this.gcTimerId);
+    this.gcTimerId = null;
+  }
+
+  /**
+   * Retains the shared measurement runtime for one mounted canvas. The final
+   * release clears its cache, while overlapping canvases cannot dispose each
+   * other's timer or measurements.
+   */
+  public retain(): () => void {
+    this.retainCount += 1;
+    this.startCacheMaintenance();
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.retainCount = Math.max(0, this.retainCount - 1);
+      if (this.retainCount === 0) {
+        this.stopCacheMaintenance();
+        this.clearCache();
+      }
+    };
   }
 
   /**
@@ -481,12 +510,8 @@ export class EnhancedTextMeasurement {
    * - 清空现有缓存与画布上下文引用
    */
   public dispose(): void {
-    try {
-      if (this.gcTimerId !== null) {
-        clearInterval(this.gcTimerId as unknown as number);
-        this.gcTimerId = null;
-      }
-    } catch {}
+    this.retainCount = 0;
+    this.stopCacheMaintenance();
     this.clearCache();
     // 不销毁 ctx 和 canvas，因为这是单例模式，后续还会复用
   }

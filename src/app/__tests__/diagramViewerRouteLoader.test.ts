@@ -39,4 +39,13 @@ describe('createDiagramViewerRouteLoader', () => {
 
     await expect(load()).resolves.toEqual({ default: Page });
   });
+
+  it('loads the route without assuming a default diagram runtime', async () => {
+    const Page = () => null;
+    const loadPage = vi.fn(async () => ({ default: Page }));
+    const load = createDiagramViewerRouteLoader({ loadPage });
+
+    await expect(load()).resolves.toEqual({ default: Page });
+    expect(loadPage).toHaveBeenCalledTimes(1);
+  });
 });

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PluginContext } from '../../types/plugin';
 import { MindMapPlugin } from '../MindMapPlugin';
@@ -6,8 +6,13 @@ import { MindMapPlugin } from '../MindMapPlugin';
 const context = { diagramId: 'mindmap-1' } as PluginContext;
 
 describe('MindMapPlugin boundaries', () => {
+    beforeEach(() => {
+        vi.stubGlobal('window', {});
+    });
+
     afterEach(() => {
         delete window.__flowDataBridge;
+        vi.unstubAllGlobals();
     });
 
     it('rejects malformed AI action parameters and normalizes valid child input', async () => {

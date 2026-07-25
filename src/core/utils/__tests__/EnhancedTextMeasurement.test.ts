@@ -78,4 +78,31 @@ describe('EnhancedTextMeasurement', () => {
     measureText.mockRestore();
     measurement.dispose();
   });
+
+  it('keeps shared cache maintenance alive until the final canvas releases it', async () => {
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
+    const { EnhancedTextMeasurement } = await import('../EnhancedTextMeasurement');
+    const measurement = new EnhancedTextMeasurement();
+
+    const releaseFirstCanvas = measurement.retain();
+    const releaseSecondCanvas = measurement.retain();
+
+    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+    releaseFirstCanvas();
+    expect(clearIntervalSpy).not.toHaveBeenCalled();
+
+    releaseSecondCanvas();
+    expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+
+    releaseSecondCanvas();
+    expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+
+    const releaseRemountedCanvas = measurement.retain();
+    expect(setIntervalSpy).toHaveBeenCalledTimes(2);
+    releaseRemountedCanvas();
+    expect(clearIntervalSpy).toHaveBeenCalledTimes(2);
+
+    measurement.dispose();
+  });
 });

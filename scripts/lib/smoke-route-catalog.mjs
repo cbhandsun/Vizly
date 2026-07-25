@@ -97,6 +97,14 @@ export const createSmokeRouteCatalog = (BASE_URL) => {
       name: 'wms-process-large-diagram',
       url: `${BASE_URL}/?diagram=wms-process-flow-v1`,
       timeoutMs: 55000,
+      stabilityBudget: {
+        durationMs: 15000,
+        maxLongTaskMs: 250,
+        maxLongTaskCount: 1,
+        maxHeapGrowthKB: 8192,
+        maxActiveWorkers: 0,
+        maxQueuedTasks: 0,
+      },
       expression: `(() => {
         const body = document.body?.textContent || '';
         const bridge = window.__flowDataBridge?.['wms-process-flow-v1'];
@@ -150,6 +158,47 @@ export const createSmokeRouteCatalog = (BASE_URL) => {
             renderedEdgeCount >= 35 &&
             workerHealthy &&
             displayRoutingReady &&
+            !body.includes('加载图表') &&
+            !body.includes('页面出现错误'),
+        };
+      })()`,
+    },
+    {
+      name: 'enterprise-architecture-large-diagram',
+      url: `${BASE_URL}/?diagram=enterprise-architecture-v2`,
+      timeoutMs: 55000,
+      stabilityBudget: {
+        durationMs: 15000,
+        maxLongTaskMs: 250,
+        maxLongTaskCount: 1,
+        maxHeapGrowthKB: 8192,
+        maxActiveWorkers: 0,
+        maxQueuedTasks: 0,
+      },
+      expression: `(() => {
+        const body = document.body?.textContent || '';
+        const renderedNodeCount = document.querySelectorAll('.react-flow__node').length;
+        const renderedEdgeCount = document.querySelectorAll('.react-flow__edge').length;
+        const optimizationStats = window.__vizly_coordinator__?.getOptimizationStats?.();
+        const parallelStats = optimizationStats?.parallel || null;
+        const workerHealthy = !parallelStats ||
+          (parallelStats.activeWorkers === 0 && parallelStats.queuedTasks === 0);
+        return {
+          href: location.href,
+          title: document.title,
+          readyState: document.readyState,
+          renderedNodeCount,
+          renderedEdgeCount,
+          parallelStats,
+          workerHealthy,
+          appFallback: body.includes('加载应用'),
+          pageFallback: body.includes('加载图表'),
+          errorBoundary: body.includes('页面出现错误'),
+          bodyText: body.slice(0, 240),
+          ready: Boolean(document.querySelector('.react-flow__renderer')) &&
+            renderedNodeCount >= 40 &&
+            renderedEdgeCount >= 30 &&
+            workerHealthy &&
             !body.includes('加载图表') &&
             !body.includes('页面出现错误'),
         };

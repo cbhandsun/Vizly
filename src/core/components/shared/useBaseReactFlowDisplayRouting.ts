@@ -42,6 +42,10 @@ import {
   createDisplayTerminalValidationSnapshot,
   getDisplayTerminalValidationReport,
 } from './baseReactFlowTerminalValidation';
+import {
+  collectBoundedDisplayRoutingPairDiagnostics,
+  isBaseReactFlowDisplayDiagnosticsEnabled,
+} from './baseReactFlowDisplayDiagnostics';
 import { calculateEdgePathQualityScore } from '../../strategies/shared/edgeStrictCrossingGuard';
 import { displayTerminalRoleNeedsDeclaredAxisRepair } from './baseReactFlowDisplayTerminalPortCandidates';
 import { getDisplayComputedPath, getDisplayNodeRect } from './baseReactFlowDisplayGeometry';
@@ -54,6 +58,12 @@ export type UseBaseReactFlowDisplayRoutingOptions = {
   enableSmartEdges: boolean;
   smartEdgePadding: number;
   isLargeGraph: boolean;
+  isNodeDragging: boolean;
+};
+
+export type UseBaseReactFlowDisplayRoutingResult = {
+  edges: Edge[];
+  routingOwner: 'edge' | 'canvas';
 };
 
 /**
@@ -69,7 +79,8 @@ export const useBaseReactFlowDisplayRouting = ({
   enableSmartEdges,
   smartEdgePadding,
   isLargeGraph,
-}: UseBaseReactFlowDisplayRoutingOptions): Edge[] => {
+  isNodeDragging,
+}: UseBaseReactFlowDisplayRoutingOptions): UseBaseReactFlowDisplayRoutingResult => {
   const displayEdgeWorkerRef = useRef<Worker | null>(null);
   const displayEdgeWorkerRequestSeqRef = useRef(0);
   const displayEdgeWorkerStartCountRef = useRef(0);
@@ -216,6 +227,15 @@ export const useBaseReactFlowDisplayRouting = ({
     if (!isContainerReady) {
       updateDisplayRoutingDebugState({
         stage: 'wait-container',
+        signature: displayEdgeCacheSignature,
+        nodeCount,
+        edgeCount,
+      });
+      return undefined;
+    }
+    if (isNodeDragging) {
+      updateDisplayRoutingDebugState({
+        stage: 'paused-node-drag',
         signature: displayEdgeCacheSignature,
         nodeCount,
         edgeCount,
@@ -370,8 +390,7 @@ export const useBaseReactFlowDisplayRouting = ({
         }
         let resolvedWorkerResult = workerResult;
         if (workerResult.hardClean !== true) {
-          const debugHost = typeof window !== 'undefined' ? window.location.hostname : '';
-          if (debugHost === 'localhost' || debugHost === '127.0.0.1' || debugHost === '::1') {
+          if (isBaseReactFlowDisplayDiagnosticsEnabled()) {
             const terminalNodes = withDisplayAbsolutePositions(
               latestRoutingInput.nodes,
               new Map(latestRoutingInput.nodes.map(node => [node.id, node] as const)),
@@ -431,21 +450,9 @@ export const useBaseReactFlowDisplayRouting = ({
                 targetRect,
               );
             });
-            const unexplainedPairs: Array<{ first: Edge; second: Edge; overlap: number }> = [];
-            for (let firstIndex = 0; firstIndex < workerResult.edges.length; firstIndex += 1) {
-              for (
-                let secondIndex = firstIndex + 1;
-                secondIndex < workerResult.edges.length;
-                secondIndex += 1
-              ) {
-                const first = workerResult.edges[firstIndex];
-                const second = workerResult.edges[secondIndex];
-                const overlap = calculateEdgePathQualityScore(
-                  [first, second],
-                ).unexplainedRelatedOverlap;
-                if (overlap > 0) unexplainedPairs.push({ first, second, overlap });
-              }
-            }
+            const unexplainedPairReport = collectBoundedDisplayRoutingPairDiagnostics({
+              edges: workerResult.edges,
+            });
             updateDisplayRoutingDebugState({
               terminalDiagnostics: {
                 unanchored: terminalReport.unanchoredEdgeIndexes.slice(0, 3).map(
@@ -453,11 +460,15 @@ export const useBaseReactFlowDisplayRouting = ({
                 ),
                 hairpins: hairpinEdges.slice(0, 3).map(summarizeEdge),
                 declaredAxisMismatches: declaredAxisMismatches.slice(0, 3).map(summarizeEdge),
-                unexplainedPairs: unexplainedPairs.slice(0, 3).map(pair => ({
+                unexplainedPairs: unexplainedPairReport.pairs.map(pair => ({
                   first: summarizeEdge(pair.first),
                   second: summarizeEdge(pair.second),
                   overlap: pair.overlap,
                 })),
+                pairBudget: {
+                  evaluatedPairCount: unexplainedPairReport.evaluatedPairCount,
+                  truncated: unexplainedPairReport.truncated,
+                },
               },
             });
           }
@@ -635,6 +646,7 @@ export const useBaseReactFlowDisplayRouting = ({
     displayQualityPolicy,
     inputGeometryDigest,
     isContainerReady,
+    isNodeDragging,
     routingGeometryReady,
   ]);
 
@@ -654,5 +666,10 @@ export const useBaseReactFlowDisplayRouting = ({
     immediate: immediateDisplayEdges,
   });
 
-  return resolvedDisplayEdges;
+  return {
+    edges: resolvedDisplayEdges,
+    // BaseReactFlow is always canvas-owned, including the geometry bootstrap
+    // window. Standalone custom edges retain the context default ('edge').
+    routingOwner: 'canvas',
+  };
 };

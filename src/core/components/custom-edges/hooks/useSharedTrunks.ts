@@ -7,17 +7,25 @@
  * Usage: mount once at the Canvas/FlowchartDesigner level, pass the result
  * to the <SharedTrunkLayer /> component for rendering.
  */
-import { useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
 import type { SharedTrunkSegment } from '../../../types/routing';
 
-export function useSharedTrunks(): SharedTrunkSegment[] {
-    // Re-runs whenever graphVersion changes (i.e., after every routing batch).
+export function useSharedTrunks(enabled = true): SharedTrunkSegment[] {
+    const subscribe = useCallback((callback: () => void) => {
+        if (!enabled) return () => undefined;
+        return EdgeRoutingCoordinator.getInstance().subscribeGraphVersion(callback);
+    }, [enabled]);
+    const getSnapshot = useCallback(
+        () => enabled ? EdgeRoutingCoordinator.getInstance().getGraphVersion() : 0,
+        [enabled],
+    );
     const _version = useSyncExternalStore(
-        (cb) => EdgeRoutingCoordinator.getInstance().subscribeGraphVersion(cb),
-        () => EdgeRoutingCoordinator.getInstance().getGraphVersion(),
+        subscribe,
+        getSnapshot,
+        () => 0,
     );
 
-    // Derive from Coordinator synchronously — no async, no extra state.
+    if (!enabled) return [];
     return EdgeRoutingCoordinator.getInstance().getSharedTrunks();
 }

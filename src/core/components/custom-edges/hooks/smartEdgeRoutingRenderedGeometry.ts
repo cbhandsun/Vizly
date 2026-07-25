@@ -157,6 +157,30 @@ const parseRenderedPathPoints = (path: string): PathPoint[] => {
     return points.filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
 };
 
+const collectBoundedRenderedLabelAvoidancePaths = (
+    cache: ReadonlyMap<string, string>,
+    edgeId: string,
+    maxExaminedEntries = 128,
+    maxPaths = 48,
+): PathPoint[][] => {
+    const examinedLimit = Number.isFinite(maxExaminedEntries)
+        ? Math.max(0, Math.min(512, Math.floor(maxExaminedEntries)))
+        : 128;
+    const pathLimit = Number.isFinite(maxPaths)
+        ? Math.max(0, Math.min(128, Math.floor(maxPaths)))
+        : 48;
+    const paths: PathPoint[][] = [];
+    let examined = 0;
+    for (const [cachedEdgeId, cachedPath] of cache) {
+        if (examined >= examinedLimit || paths.length >= pathLimit) break;
+        examined += 1;
+        if (cachedEdgeId === edgeId || !cachedPath || /C/i.test(cachedPath)) continue;
+        const points = parseRenderedPathPoints(cachedPath);
+        if (points.length >= 2) paths.push(points);
+    }
+    return paths;
+};
+
 const isTwoPointOrthogonalPath = (points: PathPoint[]): boolean => {
     if (points.length !== 2) return false;
     const [a, b] = points;
@@ -597,6 +621,7 @@ export {
     axisAlignedEndpointPath,
     bendCount,
     candidateDoesNotRegress,
+    collectBoundedRenderedLabelAvoidancePaths,
     countStrictCrossings,
     findCompactTwoPointDetour,
     getLabelAutoOffset,

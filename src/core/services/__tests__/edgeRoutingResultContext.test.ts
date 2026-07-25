@@ -98,4 +98,32 @@ describe('EdgeRoutingResultContext', () => {
     }, graph);
     expect(context.getLabelObstacles()).toEqual([]);
   });
+
+  it('retains only paths and label obstacles owned by the active graph', () => {
+    const context = new EdgeRoutingResultContext();
+    const graph = {
+      edges: [
+        { id: 'active', label: 'Active' },
+        { id: 'stale', label: 'Stale' },
+      ],
+    } as unknown as SharedGraphContext;
+    context.storePath('active', result([{ x: 0, y: 0 }, { x: 1, y: 1 }]), 'v1');
+    context.storePath('stale', result([{ x: 0, y: 0 }, { x: 2, y: 2 }]), 'v1');
+    context.updateLabelObstacle('active', { ...result([{ x: 0, y: 0 }, { x: 1, y: 1 }]), edgeId: 'active' }, graph);
+    context.updateLabelObstacle('stale', { ...result([{ x: 0, y: 0 }, { x: 2, y: 2 }]), edgeId: 'stale' }, graph);
+
+    context.retainEdges(new Set(['active']));
+
+    expect(context.getLabelObstacles()).toEqual([
+      expect.objectContaining({ edgeId: 'active' }),
+    ]);
+    expect(context.buildPathCandidates(
+      new Map([
+        ['active', { ...requestEntry(), request: { ...requestEntry().request, edgeId: 'active' } }],
+        ['stale', { ...requestEntry(), request: { ...requestEntry().request, edgeId: 'stale' } }],
+      ]),
+      () => null,
+      () => false,
+    ).find(candidate => candidate.edgeId === 'stale')?.points).toBeUndefined();
+  });
 });

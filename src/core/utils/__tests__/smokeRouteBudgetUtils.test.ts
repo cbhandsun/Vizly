@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   defaultDesktopRouteBudgets,
+  collectRouteStabilityViolations,
   isFinalWmsDisplayRoutingReady,
   resolveRouteBudget,
   shouldRetryEvaluateAfterTimeout,
@@ -92,5 +93,24 @@ describe('smokeRouteBudgetUtils', () => {
       ...finalState,
       outputRouteSignature: 'route-v2:forged',
     })).toBe(false);
+  });
+
+  it('reports only bounded post-ready stability regressions', () => {
+    expect(collectRouteStabilityViolations({
+      maxLongTaskMs: 280,
+      longTaskCount: 2,
+      heapGrowthKB: 1024,
+      activeWorkers: 0,
+      queuedTasks: 0,
+    }, {
+      maxLongTaskMs: 250,
+      maxLongTaskCount: 1,
+      maxHeapGrowthKB: 8192,
+      maxActiveWorkers: 0,
+      maxQueuedTasks: 0,
+    })).toEqual([
+      { metric: 'maxLongTaskMs', actual: 280, max: 250, unit: 'ms' },
+      { metric: 'longTaskCount', actual: 2, max: 1, unit: 'tasks' },
+    ]);
   });
 });

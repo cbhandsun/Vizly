@@ -11,7 +11,6 @@ import {
     PathFindingResult,
     PathfindingContext,
     Point,
-    Rectangle,
     UnifiedRoutingConfig,
     createDefaultRoutingConfig
 } from '../types/routing';
@@ -30,8 +29,27 @@ import {
     logPathfindingWorkerTaskExecutionFailure,
 } from '../utils/routingLogging';
 
-
 import type { LineObstacle } from '../types/routing';
+import {
+    getWorkerErrorMessage as getErrorMessage,
+    getWorkerNodeCenter as nodeCenter,
+    getWorkerNodeDimension as getNodeDimension,
+    getWorkerNodeId as getNodeId,
+    getWorkerNodeType as getNodeType,
+    getWorkerNodeXY as getNodeXY,
+    hasWorkerString as hasString,
+    isValidBatchPathfindingWorkerMessage,
+    isValidSinglePathfindingWorkerMessage,
+    isValidWorkerJob,
+    isWorkerRecord as isRecord,
+    isWorkerRectangle as isRectangle,
+    postInvalidWorkerMessage,
+    readWorkerBorderRadius as readBorderRadius,
+} from './pathfindingWorkerBoundary';
+export {
+    isValidBatchPathfindingWorkerMessage,
+    isValidSinglePathfindingWorkerMessage,
+} from './pathfindingWorkerBoundary';
 
 // [Imp-8] Global Cache Definition
 interface WorkerGraphCache {
@@ -50,114 +68,6 @@ let globalCache: WorkerGraphCache = {
     gridSize: 20,
     grid: null,
     gridBounds: null
-};
-
-const finiteNumberOr = (value: unknown, fallback = 0): number =>
-    typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-
-const getNodeXY = (value: unknown): Point => {
-    const node = isRecord(value) ? value : {};
-    const computed = isRecord(node.computed) ? node.computed : {};
-    const absolute = isRecord(computed.positionAbsolute)
-        ? computed.positionAbsolute
-        : isRecord(node.positionAbsolute)
-            ? node.positionAbsolute
-            : isRecord(node.absolutePosition)
-                ? node.absolutePosition
-                : undefined;
-    const position = absolute ?? (isRecord(node.position) ? node.position : {});
-    return {
-        x: finiteNumberOr(position.x, finiteNumberOr(node.x)),
-        y: finiteNumberOr(position.y, finiteNumberOr(node.y))
-    };
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-    return !!value && typeof value === 'object' && !Array.isArray(value);
-};
-
-const hasString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
-
-const hasFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
-
-const getNodeDimension = (value: unknown, dimension: 'width' | 'height', fallback = 0): number => {
-    if (!isRecord(value)) return fallback;
-    const measured = isRecord(value.measured) ? value.measured : {};
-    return finiteNumberOr(measured[dimension], finiteNumberOr(value[dimension], fallback));
-};
-
-const nodeCenter = (value: unknown): Point => {
-    const position = getNodeXY(value);
-    return {
-        x: position.x + getNodeDimension(value, 'width') / 2,
-        y: position.y + getNodeDimension(value, 'height') / 2
-    };
-};
-
-const getNodeId = (value: unknown): string | undefined =>
-    isRecord(value) && hasString(value.id) ? value.id : undefined;
-
-const getNodeType = (value: unknown): string | undefined =>
-    isRecord(value) && hasString(value.type) ? value.type : undefined;
-
-const isRectangle = (value: unknown): value is Rectangle =>
-    isRecord(value)
-    && hasFiniteNumber(value.x)
-    && hasFiniteNumber(value.y)
-    && hasFiniteNumber(value.width)
-    && hasFiniteNumber(value.height);
-
-const readBorderRadius = (value: unknown): number =>
-    isRecord(value) && hasFiniteNumber(value.borderRadius) ? value.borderRadius : 8;
-
-const getErrorMessage = (error: unknown, fallback: string): string =>
-    error instanceof Error && error.message ? error.message : fallback;
-
-const isValidWorkerJob = (value: unknown): value is PathFindingJob => {
-    if (!isRecord(value)) return false;
-    return hasString(value.jobId)
-        && hasString(value.edgeId)
-        && hasString(value.source)
-        && hasString(value.target)
-        && hasFiniteNumber(value.sourceX)
-        && hasFiniteNumber(value.sourceY)
-        && hasFiniteNumber(value.targetX)
-        && hasFiniteNumber(value.targetY);
-};
-
-export const isValidBatchPathfindingWorkerMessage = (value: unknown): value is BatchPathFindingJob => {
-    if (!isRecord(value)) return false;
-    return value.mode === 'batch'
-        && hasString(value.jobId)
-        && isRecord(value.context)
-        && Array.isArray(value.tasks)
-        && value.tasks.length > 0
-        && value.tasks.every(isValidWorkerJob);
-};
-
-export const isValidSinglePathfindingWorkerMessage = (value: unknown): boolean => {
-    if (!isRecord(value)) return false;
-    const maybeRequest = value as { job?: unknown; graph?: unknown };
-    if (maybeRequest.job !== undefined || maybeRequest.graph !== undefined) {
-        return isValidWorkerJob(maybeRequest.job) && isRecord(maybeRequest.graph);
-    }
-    return isValidWorkerJob(value);
-};
-
-const postInvalidWorkerMessage = (jobId: string | undefined, error: string, batch = false): void => {
-    if (batch) {
-        self.postMessage({
-            type: 'BATCH_RESULT',
-            batchId: jobId ?? '',
-            error
-        });
-        return;
-    }
-
-    self.postMessage({
-        jobId: jobId ?? '',
-        error
-    });
 };
 
 /**

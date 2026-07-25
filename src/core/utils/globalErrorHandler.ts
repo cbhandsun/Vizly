@@ -18,12 +18,16 @@ const notifyDevelopmentError = async (message: string): Promise<void> => {
     }
 };
 
+let activeCleanup: (() => void) | undefined;
+
 /**
- * 初始化全局错误处理
+ * 初始化全局错误处理。重复调用不会注册重复监听器。
  */
-export function initGlobalErrorHandling() {
+export function initGlobalErrorHandling(): () => void {
+    if (activeCleanup) return activeCleanup;
+
     // 捕获未处理的Promise拒绝
-    window.addEventListener('unhandledrejection', (event) => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
         const error = event.reason instanceof Error
             ? event.reason
             : new Error(String(event.reason));
@@ -51,10 +55,10 @@ export function initGlobalErrorHandling() {
 
         // 阻止默认的错误提示
         event.preventDefault();
-    });
+    };
 
     // 捕获全局错误
-    window.addEventListener('error', (event) => {
+    const handleGlobalError = (event: ErrorEvent) => {
         // 1. 过滤资源加载错误（如 img, script, link 加载失败）
         // 这些错误 event.target 是具体的 DOM 元素，而不是 window
         if (event.target !== window) {
@@ -101,7 +105,10 @@ export function initGlobalErrorHandling() {
         });
 
         void notifyDevelopmentError(`全局错误: ${error.message}`);
-    });
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    window.addEventListener('error', handleGlobalError);
 
     // 在开发环境中，提供控制台命令查看错误日志
     if (process.env.NODE_ENV === 'development') {
@@ -111,4 +118,21 @@ export function initGlobalErrorHandling() {
         safeLog.info('使用 window.__errorLogger.export() 导出错误日志');
         safeLog.info('使用 window.__errorLogger.clear() 清除错误日志');
     }
+
+    let cleanedUp = false;
+    activeCleanup = () => {
+        if (cleanedUp) return;
+        cleanedUp = true;
+        window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+        window.removeEventListener('error', handleGlobalError);
+        if (
+            process.env.NODE_ENV === 'development'
+            && (window as unknown as { __errorLogger?: typeof errorLogger }).__errorLogger === errorLogger
+        ) {
+            delete (window as unknown as { __errorLogger?: typeof errorLogger }).__errorLogger;
+        }
+        activeCleanup = undefined;
+    };
+
+    return activeCleanup;
 }

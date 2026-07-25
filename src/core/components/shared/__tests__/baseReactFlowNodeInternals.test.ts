@@ -4,7 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   areBaseReactFlowHandlesMeasured,
+  createBaseReactFlowNodeInternalsRefreshSnapshot,
   getBaseReactFlowNodeElement,
+  readBaseReactFlowNodeInternalsRefreshNodeIds,
   refreshBaseReactFlowNodeInternals,
   scheduleBaseReactFlowNodeInternalsRetry,
 } from '../baseReactFlowNodeInternals';
@@ -14,6 +16,66 @@ describe('baseReactFlowNodeInternals', () => {
     document.body.innerHTML = '';
     document.body.className = '';
     vi.useRealTimers();
+  });
+
+  it('keeps the refresh identity stable when only node positions change', () => {
+    const beforeDrag = createBaseReactFlowNodeInternalsRefreshSnapshot([{
+      id: 'node-1',
+      type: 'process',
+      measured: { width: 160, height: 80 },
+      position: { x: 0, y: 0 },
+    }]);
+    const duringDrag = createBaseReactFlowNodeInternalsRefreshSnapshot([{
+      id: 'node-1',
+      type: 'process',
+      measured: { width: 160, height: 80 },
+      position: { x: 900, y: 600 },
+    }]);
+
+    expect(duringDrag).toEqual(beforeDrag);
+  });
+
+  it('changes the refresh identity for topology, renderer, or dimension changes', () => {
+    const baseline = createBaseReactFlowNodeInternalsRefreshSnapshot([{
+      id: 'node-1',
+      type: 'process',
+      measured: { width: 160, height: 80 },
+    }]);
+
+    expect(createBaseReactFlowNodeInternalsRefreshSnapshot([{
+      id: 'node-1',
+      type: 'decision',
+      measured: { width: 160, height: 80 },
+    }]).key).not.toBe(baseline.key);
+    expect(createBaseReactFlowNodeInternalsRefreshSnapshot([{
+      id: 'node-1',
+      type: 'process',
+      measured: { width: 200, height: 80 },
+    }]).key).not.toBe(baseline.key);
+    expect(createBaseReactFlowNodeInternalsRefreshSnapshot([
+      {
+        id: 'node-1',
+        type: 'process',
+        measured: { width: 160, height: 80 },
+      },
+      { id: 'node-2', type: 'process' },
+    ])).toEqual(expect.objectContaining({
+      nodeIds: ['node-1', 'node-2'],
+    }));
+  });
+
+  it('recovers node ids from the stable key and rejects malformed snapshots', () => {
+    const snapshot = createBaseReactFlowNodeInternalsRefreshSnapshot([
+      { id: 'node:1|quoted"', type: 'process' },
+      { id: 'node-2' },
+    ]);
+
+    expect(readBaseReactFlowNodeInternalsRefreshNodeIds(snapshot.key)).toEqual([
+      'node:1|quoted"',
+      'node-2',
+    ]);
+    expect(readBaseReactFlowNodeInternalsRefreshNodeIds('not-json')).toEqual([]);
+    expect(readBaseReactFlowNodeInternalsRefreshNodeIds('{"id":"wrong-shape"}')).toEqual([]);
   });
 
   it('finds mounted react-flow nodes using escaped data-id selectors', () => {
@@ -126,6 +188,29 @@ describe('baseReactFlowNodeInternals', () => {
       nodeIds: ['node-1'],
       rfStore,
     })).toBe(true);
+  });
+
+  it('ignores virtualized offscreen nodes and scans mounted DOM once', () => {
+    document.body.innerHTML = [
+      '<div class="react-flow__node" data-id="node-1">',
+      '  <div class="react-flow__handle"></div>',
+      '</div>',
+    ].join('');
+    const querySelectorAll = vi.spyOn(document.body, 'querySelectorAll');
+
+    expect(areBaseReactFlowHandlesMeasured({
+      container: document.body,
+      nodeIds: ['node-1', 'offscreen-node'],
+      rfStore: {
+        getState: () => ({
+          nodeLookup: new Map([
+            ['node-1', { internals: { handleBounds: { source: [{}], target: [] } } }],
+            ['offscreen-node', { internals: { handleBounds: { source: [], target: [] } } }],
+          ]),
+        }),
+      },
+    })).toBe(true);
+    expect(querySelectorAll).toHaveBeenCalledTimes(1);
   });
 
   it('does not retry permanently hidden handles in semantic zoom mode', () => {

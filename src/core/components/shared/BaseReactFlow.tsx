@@ -13,7 +13,6 @@ import FixedMiniMap from './FixedMiniMap';
 
 import { AdvancedSmartStepEdge, AdvancedSmartBezierEdge, AdvancedSmartStraightEdge } from '../custom-edges/AdvancedSmartEdge';
 import { SmartOrthogonalEdge } from '../custom-edges/SmartOrthogonalEdge';
-import { ObstacleProvider } from '../custom-edges/ObstacleProvider';
 import { diagramConfigManager } from '@/core/config/DiagramConfig';
 import { getLastViewport, setLastViewport, getUiScale } from './viewportStore';
 import { ElkEdge } from '../custom-edges/ElkEdge'; // 导入 ElkEdge
@@ -22,10 +21,10 @@ import { enhancedTextMeasurement } from '../../utils/EnhancedTextMeasurement';
 import CanvasEdgeLayer from '../layers/CanvasEdgeLayer';
 import { CanvasRefEdge } from '../edges/CanvasRefEdge';
 import EditableEdge from '../custom-edges/EditableEdge'; // ⭐ Waypoint编辑Edge
-import { useSharedTrunks } from '../custom-edges/hooks/useSharedTrunks';
-import { SharedTrunkLayer } from '../custom-edges/renderers/SharedTrunkLayer';
 import {
   areBaseReactFlowHandlesMeasured,
+  createBaseReactFlowNodeInternalsRefreshSnapshot,
+  readBaseReactFlowNodeInternalsRefreshNodeIds,
   refreshBaseReactFlowNodeInternals,
   scheduleBaseReactFlowNodeInternalsRetry,
 } from './baseReactFlowNodeInternals';
@@ -72,6 +71,7 @@ import {
 } from './baseReactFlowOverlayRenderers';
 import type { BaseReactFlowProps } from './baseReactFlowTypes';
 import { useBaseReactFlowFitController } from './useBaseReactFlowFitController';
+import { SmartEdgeRoutingOwnerContext } from '../custom-edges/smartEdgeRoutingOwnership';
 
 // 模块级常量：避免在组件参数默认值中创建新引用
 const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 };
@@ -163,7 +163,21 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
   const updateNodeInternals = useUpdateNodeInternals();
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const sharedTrunks = useSharedTrunks();
+  const [isNodeDragging, setIsNodeDragging] = useState(false);
+  const handleNodeDragStart = useCallback<NonNullable<BaseReactFlowProps['onNodeDragStart']>>(
+    (event, node, draggedNodes) => {
+      setIsNodeDragging(true);
+      onNodeDragStart?.(event, node, draggedNodes);
+    },
+    [onNodeDragStart],
+  );
+  const handleNodeDragStop = useCallback<NonNullable<BaseReactFlowProps['onNodeDragStop']>>(
+    (event, node, draggedNodes) => {
+      setIsNodeDragging(false);
+      onNodeDragStop?.(event, node, draggedNodes);
+    },
+    [onNodeDragStop],
+  );
 
   // 全局滚轮灵敏度（函数级注释）：从配置系统读取，用于主画布自定义缩放
   const globalSensitivity = useMemo(() => {
@@ -358,7 +372,10 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     });
   }, [edgeTypes]);
 
-  const displayEdges = useBaseReactFlowDisplayRouting({
+  const {
+    edges: displayEdges,
+    routingOwner: smartEdgeRoutingOwner,
+  } = useBaseReactFlowDisplayRouting({
     edges,
     routingNodes,
     routingGeometryReady,
@@ -366,20 +383,17 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
     enableSmartEdges,
     smartEdgePadding,
     isLargeGraph,
+    isNodeDragging,
   });
 
-  const nodeInternalsRefreshKey = useMemo(() => {
-    return visibleNodes.map((node) => {
-      const measured = node.measured;
-      const width = measured?.width ?? node.width ?? node.style?.width ?? '';
-      const height = measured?.height ?? node.height ?? node.style?.height ?? '';
-      return `${node.id}:${node.position?.x ?? 0}:${node.position?.y ?? 0}:${width}:${height}`;
-    }).join('|');
-  }, [visibleNodes]);
+  const nodeInternalsRefreshKey = useMemo(
+    () => createBaseReactFlowNodeInternalsRefreshSnapshot(visibleNodes).key,
+    [visibleNodes],
+  );
 
   useEffect(() => {
-    if (visibleNodes.length === 0) return;
-    const nodeIds = visibleNodes.map(node => node.id);
+    const nodeIds = readBaseReactFlowNodeInternalsRefreshNodeIds(nodeInternalsRefreshKey);
+    if (nodeIds.length === 0) return;
     const refresh = () => {
       refreshBaseReactFlowNodeInternals({
         container: containerRef.current,
@@ -399,7 +413,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
       refresh,
       areHandlesMeasured: allRenderableHandlesMeasured,
     });
-  }, [visibleNodes, nodeInternalsRefreshKey, updateNodeInternals, rfStore]);
+  }, [nodeInternalsRefreshKey, updateNodeInternals, rfStore]);
 
   /**
    * 函数级注释：导出期间隐藏背景网格
@@ -495,13 +509,17 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         clearTimeout(readyTimeoutRef.current);
         readyTimeoutRef.current = null;
       }
-      try {
-        enhancedTextMeasurement.dispose?.();
-      } catch (error) {
-        logBaseReactFlowEventBindingFailure('disposeEnhancedTextMeasurement', error);
-      }
     };
   }, [updateContainerReady]);
+
+  useEffect(() => {
+    try {
+      return enhancedTextMeasurement.retain();
+    } catch (error) {
+      logBaseReactFlowEventBindingFailure('retainEnhancedTextMeasurement', error);
+      return undefined;
+    }
+  }, []);
 
   // 🎯 CSS zoom 反向补偿：抵消祖先的 zoom: uiScale，使 React Flow 在 zoom=1 空间运作
   // 使用 width/height: 100%（而非 85%），让 ReactFlow 获得完整 CSS 像素空间。
@@ -518,6 +536,7 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
         height: '100%',
         position: 'relative',
       } : { width: '100%', height: '100%', position: 'relative' }}>
+        <SmartEdgeRoutingOwnerContext.Provider value={smartEdgeRoutingOwner}>
         <ReactFlow
           proOptions={proOptions}
           onlyRenderVisibleElements={isLargeGraph}
@@ -552,8 +571,8 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           connectionLineComponent={connectionLineComponent}
           connectionMode={connectionMode}
           onNodeDrag={onNodeDrag}
-          onNodeDragStart={onNodeDragStart}
-          onNodeDragStop={onNodeDragStop}
+          onNodeDragStart={handleNodeDragStart}
+          onNodeDragStop={handleNodeDragStop}
           onNodeContextMenu={onNodeContextMenu}
           onEdgeContextMenu={onEdgeContextMenu}
           onPaneContextMenu={onPaneContextMenu}
@@ -609,10 +628,8 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
           <BaseReactFlowAlignGuide />
           <BaseReactFlowRightEdgeGuides />
           {children}
-          {enableSmartEdges && sharedTrunks.length > 0 && (
-            <SharedTrunkLayer trunks={sharedTrunks} />
-          )}
         </ReactFlow>
+        </SmartEdgeRoutingOwnerContext.Provider>
       </div>
       {!isContainerReady && (
         <div style={{
@@ -640,13 +657,11 @@ const BaseReactFlowInner: React.FC<BaseReactFlowProps> = ({
 /**
  * BaseReactFlow 包装组件（函数级注释）
  * - 提供 ReactFlowProvider 上下文
- * - 提供 ObstacleProvider 共享障碍物计算（性能优化）
+ * - 智能边由画布 worker 统一布线，不再维护逐边障碍物上下文
  */
 const BaseReactFlow: React.FC<BaseReactFlowProps> = (props) => (
   <ReactFlowProvider>
-    <ObstacleProvider>
-      <BaseReactFlowInner {...props} />
-    </ObstacleProvider>
+    <BaseReactFlowInner {...props} />
   </ReactFlowProvider>
 );
 

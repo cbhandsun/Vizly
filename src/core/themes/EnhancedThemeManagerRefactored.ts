@@ -37,44 +37,8 @@ import {
   logThemeManagerPreloadFailure,
 } from './themeLogging';
 import { getApplicationDiagramRuntime } from '../ports/applicationDiagramRuntime';
-import { isSafeCssColor } from './themeImportSecurity';
-
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
-);
-
-type ThemeColorPatch = Partial<Record<keyof ThemeColor, string>>;
-interface EmbeddedDiagramTheme {
-  name: string;
-  displayName?: string;
-  domains: Record<string, ThemeColorPatch>;
-}
-
-const THEME_COLOR_KEYS: (keyof ThemeColor)[] = [
-  'main', 'light', 'dark', 'contrast', 'border', 'background', 'text', 'shadow',
-];
-
-export const parseEmbeddedDiagramTheme = (value: unknown): EmbeddedDiagramTheme | null => {
-  if (!isRecord(value) || typeof value.name !== 'string') return null;
-  const name = value.name.trim().slice(0, 120);
-  if (!name) return null;
-  const domains: Record<string, ThemeColorPatch> = {};
-  if (isRecord(value.domains)) {
-    Object.entries(value.domains).slice(0, 64).forEach(([domain, rawColor]) => {
-      if (!isRecord(rawColor)) return;
-      const patch: ThemeColorPatch = {};
-      THEME_COLOR_KEYS.forEach(key => {
-        if (typeof rawColor[key] === 'string' && isSafeCssColor(rawColor[key])) patch[key] = rawColor[key];
-      });
-      if (Object.keys(patch).length > 0) domains[domain.slice(0, 120)] = patch;
-    });
-  }
-  return {
-    name,
-    displayName: typeof value.displayName === 'string' ? value.displayName.trim().slice(0, 240) : undefined,
-    domains,
-  };
-};
+import { parseEmbeddedDiagramTheme } from './embeddedDiagramTheme';
+export { parseEmbeddedDiagramTheme } from './embeddedDiagramTheme';
 
 /**
  * 主题管理器事件类型
@@ -333,15 +297,10 @@ export class EnhancedThemeManager {
       // 保存当前主题ID
       this.configManager.set('theme.currentId', themeId, ConfigSource.USER_OVERRIDE);
 
-      // 应用CSS变量到文档根元素
-      const cssVariables = themeToCSSVariables(normalizedTheme);
-      applyCSSVariables(document.documentElement, cssVariables);
-
-      // 根据主题模式切换 Tailwind CSS 的 dark 类
-      if (normalizedTheme.mode === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
+      if (typeof document !== 'undefined') {
+        const cssVariables = themeToCSSVariables(normalizedTheme);
+        applyCSSVariables(document.documentElement, cssVariables);
+        document.documentElement.classList.toggle('dark', normalizedTheme.mode === 'dark');
       }
 
       /**

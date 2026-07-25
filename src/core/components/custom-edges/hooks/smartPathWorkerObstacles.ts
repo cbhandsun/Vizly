@@ -177,7 +177,10 @@ export const useSmartPathObstacles = (
   obstacles: readonly SmartPathObstacleItem[],
   source: string,
   target: string,
+  enabled = true,
 ): { obstacleRects: SmartPathObstacleRect[]; containerBounds: SmartPathObstacleRect[] } => useMemo(
-  () => buildSmartPathObstacles(simpleNodeMap, obstacles, source, target),
-  [simpleNodeMap, obstacles, source, target],
+  () => enabled
+    ? buildSmartPathObstacles(simpleNodeMap, obstacles, source, target)
+    : { obstacleRects: [], containerBounds: [] },
+  [enabled, simpleNodeMap, obstacles, source, target],
 );

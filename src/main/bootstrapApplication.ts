@@ -71,9 +71,14 @@ export const scheduleDataRegistryWarmup = ({
 };
 
 /** Initializes process-wide browser concerns before React mounts. */
-export const initializeApplicationRuntime = (): void => {
+export const initializeApplicationRuntime = (): (() => void) => {
   initDevConsoleFilters();
-  initGlobalErrorHandling();
-  performanceMonitor.setEnabled(true);
+  const cleanupGlobalErrorHandling = initGlobalErrorHandling();
+  performanceMonitor.start();
   scheduleDataRegistryWarmup();
+
+  return () => {
+    cleanupGlobalErrorHandling();
+    performanceMonitor.stop();
+  };
 };

@@ -54,58 +54,70 @@ export interface SimpleNodeData {
     measured: { width: number; height: number };
 }
 
-export const useSimpleNodeMap = (): Map<string, SimpleNodeData> => {
-    const nodes = useStore(s => s.nodes);
+const MAX_PARENT_DEPTH = 256;
 
-    return useMemo(() => {
-        const map = new Map<string, SimpleNodeData>();
-        const rawNodesMap = new Map<string, RuntimeNode>();
+export const createSimpleNodeMap = (nodes: readonly Node[]): Map<string, SimpleNodeData> => {
+    const map = new Map<string, SimpleNodeData>();
+    const rawNodesMap = new Map<string, RuntimeNode>();
 
-        for (const node of nodes) {
-            if (node?.id) rawNodesMap.set(node.id, node as RuntimeNode);
-        }
+    for (const node of nodes) {
+        if (node?.id) rawNodesMap.set(node.id, node as RuntimeNode);
+    }
 
-        const getAbsolutePosition = (node: RuntimeNode): { x: number, y: number } => {
-            if (node.computed?.positionAbsolute) return node.computed.positionAbsolute;
-            if (node.positionAbsolute) return node.positionAbsolute;
+    const getAbsolutePosition = (node: RuntimeNode): { x: number; y: number } => {
+        const direct = node.computed?.positionAbsolute ?? node.positionAbsolute;
+        if (direct) return direct;
 
-            const pId = node.parentId || node.parentNode;
-            if (pId) {
-                const parent = rawNodesMap.get(pId);
-                if (!parent) return node.position || { x: 0, y: 0 };
-                const parentAbs = getAbsolutePosition(parent);
+        let x = node.position?.x ?? 0;
+        let y = node.position?.y ?? 0;
+        let current = node;
+        const visited = new Set<string>(node.id ? [node.id] : []);
+        let depth = 0;
+
+        while (depth < MAX_PARENT_DEPTH) {
+            const parentId = current.parentId || current.parentNode;
+            if (!parentId || visited.has(parentId)) break;
+            visited.add(parentId);
+            const parent = rawNodesMap.get(parentId);
+            if (!parent) break;
+            const parentAbsolute = parent.computed?.positionAbsolute ?? parent.positionAbsolute;
+            if (parentAbsolute) {
                 return {
-                    x: parentAbs.x + (node.position?.x ?? 0),
-                    y: parentAbs.y + (node.position?.y ?? 0)
+                    x: parentAbsolute.x + x,
+                    y: parentAbsolute.y + y,
                 };
             }
-
-            return node.position || { x: 0, y: 0 };
-        };
-
-        for (const node of nodes) {
-            if (!node?.id) continue;
-
-            const absPos = getAbsolutePosition(node);
-            const x = absPos.x;
-            const y = absPos.y;
-
-            const width = node.measured?.width ?? (typeof node.style?.width === 'number' ? node.style.width : 150);
-            const height = node.measured?.height ?? (typeof node.style?.height === 'number' ? node.style.height : 80);
-
-            map.set(node.id, {
-                id: node.id,
-                type: node.type,
-                x,
-                y,
-                width,
-                height,
-                position: { x, y },
-                measured: { width, height },
-            });
+            x += parent.position?.x ?? 0;
+            y += parent.position?.y ?? 0;
+            current = parent;
+            depth += 1;
         }
-        return map;
-    }, [nodes]);
+        return { x, y };
+    };
+
+    for (const node of nodes) {
+        if (!node?.id) continue;
+        const absPos = getAbsolutePosition(node as RuntimeNode);
+        const width = node.measured?.width ?? (typeof node.style?.width === 'number' ? node.style.width : 150);
+        const height = node.measured?.height ?? (typeof node.style?.height === 'number' ? node.style.height : 80);
+
+        map.set(node.id, {
+            id: node.id,
+            type: node.type,
+            x: absPos.x,
+            y: absPos.y,
+            width,
+            height,
+            position: { x: absPos.x, y: absPos.y },
+            measured: { width, height },
+        });
+    }
+    return map;
+};
+
+export const useSimpleNodeMap = (): Map<string, SimpleNodeData> => {
+    const nodes = useStore(s => s.nodes);
+    return useMemo(() => createSimpleNodeMap(nodes), [nodes]);
 };
 
 /**

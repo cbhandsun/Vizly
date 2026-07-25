@@ -1,5 +1,8 @@
+import { Position, type EdgeProps } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 import { __smartEdgeRoutingTestUtils } from '../useSmartEdgeRouting';
+import { createCanvasRoutedEdgeModel } from '../useCanvasRoutedEdge';
+import { collectBoundedRenderedLabelAvoidancePaths } from '../smartEdgeRoutingRenderedGeometry';
 import { resolveRenderedSmartEdgePath } from '../smartEdgeRoutingRenderedPath';
 
 const parsePoints = (path: string): Array<{ x: number; y: number }> => {
@@ -187,5 +190,87 @@ describe('useSmartEdgeRouting repair helpers', () => {
         expect(repaired).not.toBe(nearMissPath);
         expect(pathHitsRect(points, greedySpec)).toBe(false);
         expect(minDistanceToRect(points, greedySpec)).toBeGreaterThanOrEqual(18);
+    });
+
+    it('renders canvas-owned computed paths without per-edge routing state', () => {
+        const props = {
+            id: 'canvas-edge',
+            source: 'source',
+            target: 'target',
+            sourceX: 100,
+            sourceY: 40,
+            targetX: 300,
+            targetY: 40,
+            sourcePosition: Position.Right,
+            targetPosition: Position.Left,
+            data: {
+                computedPath: [
+                    { x: 100, y: 40 },
+                    { x: 200, y: 40 },
+                    { x: 300, y: 40 },
+                ],
+                labelPosition: { x: 190, y: 30 },
+                labelOffset: { x: 5, y: -2 },
+            },
+        } as unknown as EdgeProps;
+
+        const model = createCanvasRoutedEdgeModel(props);
+
+        expect(model.path).toContain('M 100 40');
+        expect(model.points).toHaveLength(3);
+        expect(model.labelX).toBe(195);
+        expect(model.labelY).toBe(28);
+        expect(model.nodesDragging).toBe(false);
+    });
+
+    it('falls back safely for malformed or actively dragged canvas routes', () => {
+        const props = {
+            id: 'canvas-edge',
+            source: 'source',
+            target: 'target',
+            sourceX: 100,
+            sourceY: 40,
+            targetX: 300,
+            targetY: 40,
+            sourcePosition: Position.Right,
+            targetPosition: Position.Left,
+            data: {
+                computedPath: [{ x: Number.NaN, y: 40 }],
+                labelPosition: { x: Number.POSITIVE_INFINITY, y: 30 },
+                _draggingNodeIds: ['source'],
+            },
+        } as unknown as EdgeProps;
+
+        const model = createCanvasRoutedEdgeModel(props);
+
+        expect(model.path).toMatch(/^M/);
+        expect(model.points).toBeNull();
+        expect(model.nodesDragging).toBe(true);
+        expect(Number.isFinite(model.labelX)).toBe(true);
+        expect(Number.isFinite(model.labelY)).toBe(true);
+    });
+
+    it('bounds label avoidance parsing independently of cache size', () => {
+        const cache = new Map<string, string>();
+        for (let index = 0; index < 200; index += 1) {
+            cache.set(`edge-${index}`, `M 0 ${index} L 100 ${index}`);
+        }
+
+        expect(collectBoundedRenderedLabelAvoidancePaths(
+            cache,
+            'current-edge',
+        )).toHaveLength(48);
+        expect(collectBoundedRenderedLabelAvoidancePaths(
+            cache,
+            'current-edge',
+            2,
+            48,
+        )).toHaveLength(2);
+        expect(collectBoundedRenderedLabelAvoidancePaths(
+            cache,
+            'current-edge',
+            -1,
+            -1,
+        )).toEqual([]);
     });
 });

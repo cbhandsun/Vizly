@@ -28,7 +28,11 @@ import {
     projectDesignerStandardEdges,
     projectDesignerStandardNodes,
 } from './designerFlowDataBridgeProjection';
-import type { FlowDataBridgeEntry } from '../../../utils/flowDataBridge';
+import {
+    registerFlowDataBridge,
+    registerFlowDesignerCloudOpener,
+    type FlowDataBridgeEntry,
+} from '../../../utils/flowDataBridge';
 import type { StandardDiagramData } from '../../../models/DiagramModels';
 
 const PLUGIN_EMPTY_CANVAS_IDS = new Set(['flowchart']);
@@ -64,10 +68,6 @@ export function useDesignerSystemSync({
     useEffect(() => { reactFlowRef.current = reactFlowInstance; }, [reactFlowInstance]);
 
     useEffect(() => {
-        if (!window.__flowDataBridge) {
-            window.__flowDataBridge = {};
-        }
-
         const standardData: FlowDataBridgeEntry = {
             id: `diagram-${Date.now()}`,
             name: diagramIdForExport,
@@ -408,15 +408,12 @@ export function useDesignerSystemSync({
                 }
             });
 
-            window.__flowDataBridge[diagramIdForExport] = standardData;
-        return () => {
-            delete window.__flowDataBridge?.[diagramIdForExport];
-        };
+        return registerFlowDataBridge(diagramIdForExport, standardData);
     // 仅在 diagramIdForExport/id/pluginId 变化时重建，nodes/edges 通过 ref 访问
     }, [diagramIdForExport, id, setNodes, setEdges, pluginId, messageApi]);
 
     useEffect(() => {
-        window.__flowDesignerOpenCloud = async (data: StandardDiagramData) => {
+        const openCloudDiagram = async (data: StandardDiagramData) => {
             const { standardDataToCanvas } = await import('../designerUtils');
             const { nodes: newNodes, edges: newEdges } = await standardDataToCanvas(data);
             if (newNodes.length > 0) {
@@ -425,9 +422,7 @@ export function useDesignerSystemSync({
                 setTimeout(() => reactFlowInstance?.fitView({ duration: 800, padding: 0.35, minZoom: 0.55, maxZoom: 1.15 }), 50);
             }
         };
-        return () => {
-            delete window.__flowDesignerOpenCloud;
-        };
+        return registerFlowDesignerCloudOpener(openCloudDiagram);
     }, [setNodes, setEdges, reactFlowInstance]);
 
     const performanceMode = useMemo(() => {

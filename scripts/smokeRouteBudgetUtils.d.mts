@@ -28,3 +28,29 @@ export const shouldRetryEvaluateAfterTimeout: (
 ) => boolean;
 
 export const isFinalWmsDisplayRoutingReady: (value: unknown) => boolean;
+
+export type RouteStabilityReport = Readonly<{
+  maxLongTaskMs?: number;
+  longTaskCount?: number;
+  heapGrowthKB?: number;
+  activeWorkers?: number;
+  queuedTasks?: number;
+}>;
+
+export type RouteStabilityBudget = Readonly<{
+  maxLongTaskMs?: number;
+  maxLongTaskCount?: number;
+  maxHeapGrowthKB?: number;
+  maxActiveWorkers?: number;
+  maxQueuedTasks?: number;
+}>;
+
+export const collectRouteStabilityViolations: (
+  report: RouteStabilityReport | null | undefined,
+  budget: RouteStabilityBudget | null | undefined,
+) => Array<{
+  metric: string;
+  actual: number;
+  max: number;
+  unit: string;
+}>;

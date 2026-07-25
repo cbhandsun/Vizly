@@ -68,4 +68,34 @@ describe('performanceMonitor', () => {
     expect(errorPayload).not.toContain('live-token');
     expect(infoPayload).not.toContain('test-api-key-placeholder-0003');
   });
+
+  it('owns an explicit idempotent lifecycle and releases background resources', async () => {
+    const addEventListener = vi.spyOn(window, 'addEventListener');
+    const removeEventListener = vi.spyOn(window, 'removeEventListener');
+    const clearIntervalSpy = vi.spyOn(window, 'clearInterval').mockImplementation(() => undefined);
+    const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout').mockImplementation(() => undefined);
+    Object.defineProperty(document, 'readyState', {
+      configurable: true,
+      value: 'complete',
+    });
+
+    const mod = await import('../performanceMonitor');
+
+    expect(setInterval).not.toHaveBeenCalled();
+    expect(addEventListener).not.toHaveBeenCalled();
+
+    mod.performanceMonitor.start();
+    mod.performanceMonitor.start();
+
+    expect(setInterval).toHaveBeenCalledTimes(1);
+    expect(addEventListener).toHaveBeenCalledTimes(1);
+    expect(addEventListener).toHaveBeenCalledWith('beforeunload', expect.any(Function));
+
+    mod.performanceMonitor.stop();
+    mod.performanceMonitor.stop();
+
+    expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+    expect(clearTimeoutSpy).toHaveBeenCalledTimes(1);
+    expect(removeEventListener).toHaveBeenCalledWith('beforeunload', expect.any(Function));
+  });
 });

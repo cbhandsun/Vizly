@@ -23,17 +23,12 @@ const perfLog = {
   log: (...args: unknown[]) => safeLog.info(...args),
 };
 
-const currentLogUrl = (): string => sanitizeUrlForLog(window.location.href);
+const currentLogUrl = (): string => (
+  typeof window === 'undefined' ? '' : sanitizeUrlForLog(window.location.href)
+);
 
 const sanitizeReportData = <T extends object>(report: T): T => {
   return redactSensitiveLogValue(report) as T;
-};
-
-type ResourceElement = HTMLElement & { src?: unknown; href?: unknown };
-
-const resourceUrl = (element: ResourceElement, key: 'src' | 'href'): string => {
-  const value = element[key];
-  return typeof value === 'string' ? sanitizeUrlForLog(value) : '';
 };
 
 // 性能指标接口
@@ -103,13 +98,16 @@ class PerformanceMonitor {
   private sessionId: string;
   private userId?: string;
   private isEnabled: boolean = true;
+  private isStarted: boolean = false;
   private errorQueue: ErrorReport[] = [];
   private performanceQueue: PerformanceReport[] = [];
   private maxQueueSize: number = 100;
+  private runtimeCollectionInterval?: ReturnType<typeof setInterval>;
+  private pageMetricsTimeout?: ReturnType<typeof setTimeout>;
+  private observers = new Set<PerformanceObserver>();
 
   private constructor() {
     this.sessionId = this.generateSessionId();
-    this.initializeMonitoring();
   }
 
   /**
@@ -132,109 +130,70 @@ class PerformanceMonitor {
   /**
    * 初始化监控
    */
-  private initializeMonitoring(): void {
-    if (!this.isEnabled) return;
+  public start(): void {
+    if (!this.isEnabled || this.isStarted) return;
     if (typeof window === 'undefined' || (typeof process !== 'undefined' && process.env.NODE_ENV === 'test')) {
       return;
     }
 
-    // 监听JavaScript错误
-    window.addEventListener('error', this.handleJavaScriptError.bind(this));
-
-    // 监听Promise拒绝
-    window.addEventListener('unhandledrejection', this.handlePromiseRejection.bind(this));
-
-    // 监听资源加载错误
-    window.addEventListener('error', this.handleResourceError.bind(this), true);
+    this.isStarted = true;
 
     // 页面加载完成后收集性能指标
     if (document.readyState === 'complete') {
-      this.collectPagePerformanceMetrics();
+      this.schedulePageMetricsCollection();
     } else {
-      window.addEventListener('load', () => {
-        setTimeout(() => this.collectPagePerformanceMetrics(), 1000);
-      });
+      window.addEventListener('load', this.handleWindowLoad, { once: true });
     }
 
     // 定期收集性能指标
-    setInterval(() => {
+    this.runtimeCollectionInterval = setInterval(() => {
+      if (!this.isStarted) return;
       this.collectRuntimePerformanceMetrics();
     }, 30000); // 每30秒收集一次
 
     // 页面卸载时发送剩余数据
-    window.addEventListener('beforeunload', () => {
-      this.flush();
-    });
+    window.addEventListener('beforeunload', this.handleBeforeUnload);
   }
 
   /**
-   * 处理JavaScript错误
+   * 停止所有后台采集并释放浏览器资源。
    */
-  private handleJavaScriptError(event: ErrorEvent): void {
-    const errorReport: ErrorReport = {
-      id: this.generateErrorId(),
-      timestamp: Date.now(),
-      type: 'javascript',
-      message: event.message,
-      stack: event.error?.stack,
-      filename: event.filename,
-      lineno: event.lineno,
-      colno: event.colno,
-      userAgent: navigator.userAgent,
-      url: currentLogUrl(),
-      userId: this.userId,
-      sessionId: this.sessionId
-    };
+  public stop(): void {
+    if (!this.isStarted) return;
+    this.isStarted = false;
 
-    this.addErrorReport(errorReport);
-  }
+    window.removeEventListener('load', this.handleWindowLoad);
+    window.removeEventListener('beforeunload', this.handleBeforeUnload);
 
-  /**
-   * 处理Promise拒绝
-   */
-  private handlePromiseRejection(event: PromiseRejectionEvent): void {
-    const errorReport: ErrorReport = {
-      id: this.generateErrorId(),
-      timestamp: Date.now(),
-      type: 'promise',
-      message: event.reason?.message || String(event.reason),
-      stack: event.reason?.stack,
-      userAgent: navigator.userAgent,
-      url: currentLogUrl(),
-      userId: this.userId,
-      sessionId: this.sessionId
-    };
-
-    this.addErrorReport(errorReport);
-  }
-
-  /**
-   * 处理资源加载错误
-   */
-  private handleResourceError(event: Event): void {
-    const target = event.target;
-    if (target instanceof HTMLElement) {
-      const resource = target as ResourceElement;
-      const src = resourceUrl(resource, 'src');
-      const href = resourceUrl(resource, 'href');
-      const errorReport: ErrorReport = {
-        id: this.generateErrorId(),
-        timestamp: Date.now(),
-        type: 'resource',
-        message: `Resource load failed: ${src || href}`,
-        userAgent: navigator.userAgent,
-        url: currentLogUrl(),
-        userId: this.userId,
-        sessionId: this.sessionId,
-        additionalData: {
-          tagName: target.tagName,
-          src,
-          href,
-        }
-      };
-
-      this.addErrorReport(errorReport);
+    if (this.runtimeCollectionInterval !== undefined) {
+      clearInterval(this.runtimeCollectionInterval);
+      this.runtimeCollectionInterval = undefined;
     }
+    if (this.pageMetricsTimeout !== undefined) {
+      clearTimeout(this.pageMetricsTimeout);
+      this.pageMetricsTimeout = undefined;
+    }
+
+    this.observers.forEach(observer => observer.disconnect());
+    this.observers.clear();
+  }
+
+  private readonly handleWindowLoad = (): void => {
+    this.schedulePageMetricsCollection();
+  };
+
+  private readonly handleBeforeUnload = (): void => {
+    this.flush();
+  };
+
+  private schedulePageMetricsCollection(): void {
+    if (!this.isStarted || this.pageMetricsTimeout !== undefined) return;
+    this.pageMetricsTimeout = setTimeout(() => {
+      this.pageMetricsTimeout = undefined;
+      if (this.isStarted) {
+        this.collectPagePerformanceMetrics();
+      }
+    }, 1000);
   }
 
   /**
@@ -274,6 +233,7 @@ class PerformanceMonitor {
         const lastEntry = entries[entries.length - 1];
         metrics.largestContentfulPaint = lastEntry.startTime;
       });
+      this.observers.add(lcpObserver);
       lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
 
       // FID观察器
@@ -288,6 +248,7 @@ class PerformanceMonitor {
           }
         });
       });
+      this.observers.add(fidObserver);
       fidObserver.observe({ entryTypes: ['first-input'] });
 
       // CLS观察器
@@ -306,6 +267,7 @@ class PerformanceMonitor {
         });
         metrics.cumulativeLayoutShift = clsValue;
       });
+      this.observers.add(clsObserver);
       clsObserver.observe({ entryTypes: ['layout-shift'] });
     } catch (error) {
       safeLog.error('Failed to observe web vitals:', redactSensitiveLogValue(error));
@@ -376,6 +338,8 @@ class PerformanceMonitor {
    * 记录自定义错误
    */
   public recordError(error: Error, additionalData?: Record<string, unknown>): void {
+    if (!this.isEnabled) return;
+
     const errorReport: ErrorReport = {
       id: this.generateErrorId(),
       timestamp: Date.now(),
@@ -512,6 +476,11 @@ class PerformanceMonitor {
    */
   public setEnabled(enabled: boolean): void {
     this.isEnabled = enabled;
+    if (enabled) {
+      this.start();
+    } else {
+      this.stop();
+    }
   }
 
   /**

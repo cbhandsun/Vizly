@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import type { MutableRefObject } from 'react';
 import { Edge, Position } from '@xyflow/react';
 import { EdgeRoutingCoordinator } from '../../../services/EdgeRoutingCoordinator';
@@ -22,6 +22,10 @@ import {
     pointsToOrthogonalPath,
     type SmartPathPoint,
 } from './smartPathCompatibility';
+import {
+    createSmartEdgeRoutingLabelSignature,
+    useSmartEdgeRoutingLease,
+} from '../smartEdgeRoutingOwnership';
 // import WorkerPool from '../../../workers/WorkerPool'; // Replaced by Coordinator
 
 // Define types locally to avoid circular deps
@@ -151,6 +155,7 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
         isLayoutStable = true, // 默认稳定
         nodesDragging // [NEW] From props
     } = props;
+    const { edgeOwnsRouting, graphVersion } = useSmartEdgeRoutingLease();
 
     const [path, setPath] = useState<string | null>(null);
     const [smartLabelPos, setSmartLabelPos] = useState<{ x: number, y: number } | null>(null);
@@ -176,33 +181,19 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
     const edgeBorderRadius = edgeData?.borderRadius as number | undefined;
     const edgeLabelPosition = edgeData?.labelPosition;
     const edgeDataSig = `${edgeLayoutEpoch}|${edgeAlgorithm ?? ''}`;
-    const routingLabelSig = useMemo(() => {
-        return storeEdges.map((edge) => {
-            const data = (edge.data ?? {}) as Record<string, unknown>;
-            const label = String(data.label ?? (edge as unknown as Record<string, unknown>).label ?? '');
-            const pos = data.labelPosition as { x?: number; y?: number } | undefined;
-            const absX = data.absoluteLabelX;
-            const absY = data.absoluteLabelY;
-            return [
-                edge.id,
-                label,
-                Math.round(Number(pos?.x ?? absX ?? 0)),
-                Math.round(Number(pos?.y ?? absY ?? 0)),
-            ].join(':');
-        }).join('|');
-    }, [storeEdges]);
-
-    // [P0-2] 响应式订阅 graphVersion，替代把 getGraphVersion() 放进 deps 的错误做法。
-    // 之前写法：deps 里用函数调用，React 每次渲染都执行但无法检测返回值变化。
-    // 新写法：useSyncExternalStore 能精确在 graphVersion 递增时触发重渲染。
-    const graphVersion = useSyncExternalStore(
-        (cb) => EdgeRoutingCoordinator.getInstance().subscribeGraphVersion(cb),
-        () => EdgeRoutingCoordinator.getInstance().getGraphVersion(),
-        () => 0
+    const routingLabelSig = useMemo(
+        () => edgeOwnsRouting ? createSmartEdgeRoutingLabelSignature(storeEdges) : '',
+        [edgeOwnsRouting, storeEdges],
     );
 
     // [P3.3] Pre-compute obstacles via memoized hook (only recalculates when topology changes)
-    const obstacleData = useSmartPathObstacles(simpleNodeMap, obstacles as ObstacleItem[], source, target);
+    const obstacleData = useSmartPathObstacles(
+        simpleNodeMap,
+        obstacles as ObstacleItem[],
+        source,
+        target,
+        edgeOwnsRouting,
+    );
     const { obstacleRects, containerBounds } = obstacleData;
 
     const elkPoints = useMemo(() => {
@@ -251,6 +242,20 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
                 lastFingerprintRef.current = '';
             }, 0);
             return () => clearTimeout(timer);
+        }
+
+        if (!edgeOwnsRouting) {
+            lastFingerprintRef.current = '';
+            pathRef.current = null;
+            const resetTimer = setTimeout(() => {
+                if (!isMountedRef.current) return;
+                setPath(null);
+                setSmartPoints(null);
+                setSmartLabelPos(null);
+                setWorkerUsedPositions(null);
+                setIsLoading(true);
+            }, 0);
+            return () => clearTimeout(resetTimer);
         }
 
         const currentArgs = {
@@ -682,7 +687,8 @@ export function useSmartPathWorker(props: UseSmartPathWorkerProps) {
         respectSourceHandle, respectTargetHandle, sourceHandleId, targetHandleId,
         id, edgeDataSig, edgeLayoutEpoch, edgeAlgorithm, edgeBorderRadius, edgeLabelPosition,
         multiEdgeInfo, isLayoutStable, nodesDragging, elkPoints, computedPoints,
-        isReverseEdge, isBus, graphVersion, routingLabelSig, isLoading, obstacleRects, containerBounds
+        isReverseEdge, isBus, graphVersion, routingLabelSig, isLoading, obstacleRects, containerBounds,
+        edgeOwnsRouting
     ]);
 
     return { path, smartLabelPos, setPath, setSmartLabelPos, smartPoints, isLoading, workerUsedPositions };

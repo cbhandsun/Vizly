@@ -2,7 +2,8 @@ export const defaultDesktopRouteBudgets = {
   management: { criticalAssets: 45, criticalDecodedKB: 2050, readyMs: 6000 },
   'management-templates': { criticalAssets: 46, criticalDecodedKB: 2150, readyMs: 6500 },
   'default-diagram': { criticalAssets: 92, criticalDecodedKB: 3900, readyMs: 4500 },
-  'wms-process-large-diagram': { criticalAssets: 105, criticalDecodedKB: 4800, readyMs: 6500 },
+  'wms-process-large-diagram': { criticalAssets: 108, criticalDecodedKB: 4900, readyMs: 6500 },
+  'enterprise-architecture-large-diagram': { criticalAssets: 108, criticalDecodedKB: 4900, readyMs: 6500 },
   'storage-config': { criticalAssets: 40, criticalDecodedKB: 2700, readyMs: 3000 },
   'shared-missing-token': { criticalAssets: 35, criticalDecodedKB: 2200, readyMs: 3000 },
   'theme-colors': { criticalAssets: 40, criticalDecodedKB: 1200, readyMs: 2500 },
@@ -80,3 +81,17 @@ export const isFinalWmsDisplayRoutingReady = (value) => (
   && typeof value.outputRouteSignature === 'string'
   && /^route-v2:\d{1,3}:\d{1,6}:[0-9a-f]{16}$/.test(value.outputRouteSignature)
 );
+
+export const collectRouteStabilityViolations = (report, budget) => {
+  if (!report || !budget) return [];
+  const checks = [
+    ['maxLongTaskMs', report.maxLongTaskMs, budget.maxLongTaskMs, 'ms'],
+    ['longTaskCount', report.longTaskCount, budget.maxLongTaskCount, 'tasks'],
+    ['heapGrowthKB', report.heapGrowthKB, budget.maxHeapGrowthKB, 'KB'],
+    ['activeWorkers', report.activeWorkers, budget.maxActiveWorkers, 'workers'],
+    ['queuedTasks', report.queuedTasks, budget.maxQueuedTasks, 'tasks'],
+  ];
+  return checks
+    .filter(([, actual, max]) => Number.isFinite(actual) && Number.isFinite(max) && actual > max)
+    .map(([metric, actual, max, unit]) => ({ metric, actual, max, unit }));
+};

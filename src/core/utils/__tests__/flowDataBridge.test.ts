@@ -1,17 +1,20 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     getFlowDataBridge,
     getFlowDataBridgeEdges,
     getFlowDataBridgeNodes,
     getFlowDataBridgeRegistry,
+    registerFlowDataBridge,
+    registerFlowDesignerCloudOpener,
     removeFlowDataBridge,
 } from '../flowDataBridge';
 
 describe('flowDataBridge', () => {
     beforeEach(() => {
         delete window.__flowDataBridge;
+        delete window.__flowDesignerOpenCloud;
     });
 
     it('returns undefined when the global bridge registry is missing or invalid', () => {
@@ -57,5 +60,31 @@ describe('flowDataBridge', () => {
 
         expect(window.__flowDataBridge?.['diagram-a']).toBeUndefined();
         expect(window.__flowDataBridge?.['diagram-b']).toEqual({ id: 'diagram-b' });
+    });
+
+    it('does not let stale cleanup remove a newer bridge owner', () => {
+        const first = { id: 'first' };
+        const second = { id: 'second' };
+        const cleanupFirst = registerFlowDataBridge('diagram', first);
+        const cleanupSecond = registerFlowDataBridge('diagram', second);
+
+        cleanupFirst();
+        expect(getFlowDataBridge('diagram')).toBe(second);
+
+        cleanupSecond();
+        expect(getFlowDataBridge('diagram')).toBeUndefined();
+    });
+
+    it('keeps the newest cloud opener when an older owner unmounts', () => {
+        const first = vi.fn();
+        const second = vi.fn();
+        const cleanupFirst = registerFlowDesignerCloudOpener(first);
+        const cleanupSecond = registerFlowDesignerCloudOpener(second);
+
+        cleanupFirst();
+        expect(window.__flowDesignerOpenCloud).toBe(second);
+
+        cleanupSecond();
+        expect(window.__flowDesignerOpenCloud).toBeUndefined();
     });
 });

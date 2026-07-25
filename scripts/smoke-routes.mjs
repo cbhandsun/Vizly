@@ -430,6 +430,52 @@ const assertViewportState = async (session, routeName) => {
   return viewportState;
 };
 
+const collectRouteStabilityReport = async (session, budget) => {
+  if (!budget || IS_MOBILE_SMOKE_SCRIPT) return null;
+  await session.send('HeapProfiler.enable').catch(() => {});
+  await session.send('HeapProfiler.collectGarbage').catch(() => {});
+  await session.evaluate(`(() => {
+    window.__smokeStability = {
+      startedAt: performance.now(),
+      heapStart: Number(performance.memory?.usedJSHeapSize) || 0,
+      longTasks: [],
+    };
+    if ('PerformanceObserver' in window) {
+      const observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          window.__smokeStability.longTasks.push({
+            startTime: entry.startTime,
+            duration: entry.duration,
+          });
+        }
+      });
+      observer.observe({ entryTypes: ['longtask'] });
+      window.__smokeStability.observer = observer;
+    }
+  })()`);
+  await delay(budget.durationMs);
+  await session.send('HeapProfiler.collectGarbage').catch(() => {});
+  return session.evaluate(`(() => {
+    const state = window.__smokeStability || { longTasks: [] };
+    state.observer?.disconnect();
+    const durations = state.longTasks.map((entry) => entry.duration).filter(Number.isFinite);
+    const heapEnd = Number(performance.memory?.usedJSHeapSize) || 0;
+    const parallel = window.__vizly_coordinator__?.getOptimizationStats?.()?.parallel || null;
+    const report = {
+      durationMs: Math.round(performance.now() - (state.startedAt || performance.now())),
+      longTaskCount: durations.length,
+      maxLongTaskMs: durations.length ? Math.round(Math.max(...durations)) : 0,
+      heapGrowthKB: state.heapStart && heapEnd
+        ? Math.round((heapEnd - state.heapStart) / 1024)
+        : 0,
+      activeWorkers: Number(parallel?.activeWorkers) || 0,
+      queuedTasks: Number(parallel?.queuedTasks) || 0,
+    };
+    delete window.__smokeStability;
+    return report;
+  })()`);
+};
+
 const isWorkspaceChildPath = (candidatePath) => {
   const resolved = resolve(candidatePath);
   return resolved.startsWith(`${WORKSPACE_ROOT}\\`) || resolved.startsWith(`${WORKSPACE_ROOT}/`);
@@ -569,6 +615,7 @@ const runRouteSample = async (route, sampleIndex = 0) => {
     log(`Waiting for route readiness: ${route.name}${sampleSuffix}`);
     const state = await waitForRouteState(session, route);
     const viewportState = await assertViewportState(session, route.name);
+    const stabilityReport = await collectRouteStabilityReport(session, route.stabilityBudget);
     const assetReport = attachInitiators(session, await getRouteAssetReport(session, state.readyAt));
     const routeLogs = session.logs;
     const routeNetworkIssues = session.networkIssues;
@@ -580,7 +627,15 @@ const runRouteSample = async (route, sampleIndex = 0) => {
       fail(`Unexpected network issue on ${route.name}`, routeNetworkIssues);
     }
     log(`✓ ${route.name}${sampleSuffix}: ${state.href}`);
-    return { name: route.name, state, viewportState, warnings: routeLogs.length, assetReport };
+    return {
+      name: route.name,
+      state,
+      viewportState,
+      warnings: routeLogs.length,
+      assetReport,
+      stabilityReport,
+      stabilityBudget: route.stabilityBudget,
+    };
   } finally {
     session.close();
   }

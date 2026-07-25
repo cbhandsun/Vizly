@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { LineJumpEngine, injectLineJumps } from '../../../services/LineJumpEngine';
 import type { Point, IntersectionInfo } from '../../../services/LineJumpEngine';
 // [FIX-FILLET] Updated to pass cornerRadius for unified jump+fillet path rendering
@@ -25,30 +25,30 @@ interface UseLineJumpsResult {
 }
 
 export function useLineJumps({ edgeId, sourceId, targetId, points, enabled = true, renderJumps = enabled, cornerRadius = 16 }: UseLineJumpsOptions): UseLineJumpsResult {
-    const engine = LineJumpEngine.getInstance();
-
-    // [FIX N-6] 用 useSyncExternalStore 订阅 engine 的版本变化
-    // 原来 engine.getVersion() 作为 useMemo deps 无法响应式更新：
-    // React 只在渲染时读取该值，engine 内部变化不触发重渲染。
-    // useSyncExternalStore 注册回调，当 invalidateCache 触发时自动通知 React。
+    const subscribe = useCallback((callback: () => void) => {
+        if (!enabled) return () => undefined;
+        return LineJumpEngine.getInstance().subscribe(callback);
+    }, [enabled]);
+    const getSnapshot = useCallback(
+        () => enabled ? LineJumpEngine.getInstance().getVersion() : 0,
+        [enabled],
+    );
     const engineVersion = useSyncExternalStore(
-        (cb) => engine.subscribe(cb),
-        () => engine.getVersion(),
-        () => 0
+        subscribe,
+        getSnapshot,
+        () => 0,
     );
 
     // 注册/更新路径点
     useEffect(() => {
-        if (!enabled || !points || points.length < 2) {
-            engine.unregisterEdge(edgeId);
-            return;
-        }
+        if (!enabled || !points || points.length < 2) return undefined;
+        const engine = LineJumpEngine.getInstance();
         engine.registerEdge(edgeId, points, { source: sourceId, target: targetId });
 
         return () => {
             engine.unregisterEdge(edgeId);
         };
-    }, [edgeId, sourceId, targetId, points, enabled, engine]);
+    }, [edgeId, sourceId, targetId, points, enabled]);
 
     // 查询交叉点
     const result = useMemo(() => {
@@ -58,6 +58,7 @@ export function useLineJumps({ edgeId, sourceId, targetId, points, enabled = tru
             return { jumps: [], jumpPath: null };
         }
 
+        const engine = LineJumpEngine.getInstance();
         const jumps = engine.getJumpsForEdge(edgeId);
         if (jumps.length === 0) {
             return { jumps: [], jumpPath: null };
@@ -66,7 +67,7 @@ export function useLineJumps({ edgeId, sourceId, targetId, points, enabled = tru
         const jumpPath = injectLineJumps(points, jumps, engine.getJumpRadius(), cornerRadius);
         return { jumps, jumpPath: jumpPath || null };
     // engineVersion 作为依赖，useSyncExternalStore 保证它在引擎变化时更新
-    }, [edgeId, points, enabled, renderJumps, engine, engineVersion, cornerRadius]);
+    }, [edgeId, points, enabled, renderJumps, engineVersion, cornerRadius]);
 
     return result;
 }

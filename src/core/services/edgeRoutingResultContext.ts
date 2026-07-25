@@ -79,6 +79,15 @@ export class EdgeRoutingResultContext {
     this.labelObstacles.clear();
   }
 
+  public retainEdges(activeEdgeIds: ReadonlySet<string>): void {
+    for (const edgeId of this.latestPaths.keys()) {
+      if (!activeEdgeIds.has(edgeId)) this.latestPaths.delete(edgeId);
+    }
+    for (const edgeId of this.labelObstacles.keys()) {
+      if (!activeEdgeIds.has(edgeId)) this.labelObstacles.delete(edgeId);
+    }
+  }
+
   public buildPathCandidates(
     latestRequests: ReadonlyMap<string, LatestRoutingRequestEntry>,
     getCachedResult: (entry: LatestRoutingRequestEntry) => PathFindingResult | null,
