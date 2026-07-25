@@ -49,6 +49,7 @@ import {
   injectSemanticSubGroupsForMissingKeys,
   rebindDomainHorizontalChildren,
 } from './domainHorizontalSemanticModel';
+import { unifyContainerHeightsByMaximum } from './shared/domainContainerSizeNormalization';
 
 type LayoutNode = ReactFlowNode<Record<string, unknown>>;
 
@@ -730,6 +731,13 @@ export class DomainHorizontalLayoutStrategy implements ILayoutStrategy {
 
     // 终态：按投影均衡左右留白
     updatedNodes = equalizeSubGroupMarginsByProjection(updatedNodes);
+    // 横向并排的域必须共享最终最大高度。该步骤必须晚于所有域高度
+    // 投影与钳制，避免后续逐域回收重新制造高度差。
+    updatedNodes = unifyContainerHeightsByMaximum(
+      updatedNodes,
+      new Set(['titleGroup', 'domain']),
+      360,
+    );
 
     if (stopAfterPhase === 'phase2') {
       const processedEdges = edges.map(edge => {

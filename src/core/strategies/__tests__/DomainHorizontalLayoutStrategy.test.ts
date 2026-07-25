@@ -6,6 +6,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { LayoutType } from '../../types/layout';
 import DomainHorizontalLayoutStrategy from '../DomainHorizontalLayoutStrategy';
 
+vi.mock('../shared/edgeRoutingPipeline', () => ({
+  runEdgeRoutingPipeline: vi.fn(async (_nodes, edges) => edges),
+}));
+
 vi.hoisted(() => {
   Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
     configurable: true,
@@ -16,7 +20,11 @@ vi.hoisted(() => {
   });
 });
 
-const businessNode = (id: string, subDomain: string): ReactFlowNode => ({
+const businessNode = (
+  id: string,
+  subDomain: string,
+  domain = 'domain-a',
+): ReactFlowNode => ({
   id,
   type: 'default',
   position: { x: 0, y: 0 },
@@ -25,7 +33,7 @@ const businessNode = (id: string, subDomain: string): ReactFlowNode => ({
   data: {
     id,
     description: id,
-    domain: 'domain-a',
+    domain,
     subDomain,
   },
 });
@@ -74,6 +82,40 @@ describe('DomainHorizontalLayoutStrategy', () => {
       expect(child.position.y).toBeGreaterThanOrEqual(group!.position.y);
       expect(child.position.x + dimension(child, 'width')).toBeLessThanOrEqual(groupRight);
       expect(child.position.y + dimension(child, 'height')).toBeLessThanOrEqual(groupBottom);
+    }
+  }, 15_000);
+
+  it('keeps horizontally arranged domains at one final maximum height', async () => {
+    const result = await new DomainHorizontalLayoutStrategy().calculateLayout(
+      [
+        businessNode('a', 'sub-a', 'domain-a'),
+        businessNode('b1', 'sub-b', 'domain-b'),
+        businessNode('b2', 'sub-b', 'domain-b'),
+        businessNode('b3', 'sub-b', 'domain-b'),
+      ],
+      [],
+      {
+        type: LayoutType.HORIZONTAL,
+        nodeLayout: LayoutType.VERTICAL,
+        generateDomainGroups: true,
+        generateSubDomainGroups: true,
+        domainOrder: ['domain-a', 'domain-b'],
+        subDomainOrder: {
+          'domain-a': ['sub-a'],
+          'domain-b': ['sub-b'],
+        },
+        padding: { top: 80, right: 40, bottom: 40, left: 60 },
+      } as never,
+    );
+    const domains = result.nodes.filter(node => node.type === 'titleGroup');
+    const heights = domains.map(node => dimension(node, 'height'));
+
+    expect(domains).toHaveLength(2);
+    expect(heights[0]).toBeGreaterThan(0);
+    expect(new Set(heights).size).toBe(1);
+    for (const domain of domains) {
+      expect(domain.style?.height).toBe(heights[0]);
+      expect(domain.height).toBe(heights[0]);
     }
   }, 15_000);
 });

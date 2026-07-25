@@ -1,4 +1,5 @@
 import type { Node as ReactFlowNode } from '@xyflow/react';
+export { unifyContainerWidthsByMaximum } from './domainContainerSizeNormalization';
 
 const finiteNumber = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback;
@@ -575,32 +576,6 @@ export const projectAndUnifySemanticDomainWidths = (
       container,
       unifiedWidth,
       readHeight(container, fallbackContainerHeight),
-    );
-  }
-  return updated;
-};
-
-/**
- * Equalizes selected container widths to their current maximum without moving
- * containers or their members.
- */
-export const unifyContainerWidthsByMaximum = (
-  nodes: readonly ReactFlowNode[],
-  containerTypes: ReadonlySet<string>,
-  fallbackHeight: number,
-): ReactFlowNode[] => {
-  const updated = cloneNodes(nodes);
-  const containers = updated.filter(node =>
-    containerTypes.has(String(node.type ?? '')));
-  const maximumWidth = containers.length
-    ? Math.max(...containers.map(readWidth))
-    : 0;
-  if (!(maximumWidth > 0)) return updated;
-  for (const container of containers) {
-    writeSize(
-      container,
-      maximumWidth,
-      readHeight(container, fallbackHeight),
     );
   }
   return updated;

@@ -6,6 +6,7 @@ import { ILayoutStrategy } from './LayoutStrategyManager';
 import { assignChildrenToSubGroupsBySemantic, enforceDomainContainerStrictContainment, recomputeSubGroupContainersBasic, purgeSubGroupChildrenBySemantic, resolveSubGroupOverlaps, resolveFreeNodeOverlapsInDomain, resolveSubGroupChildrenOverlapsStrict, expandSubGroupContainersBySemantic, enforceSubGroupStrictContainmentByChildren, finalizeSubGroupHeightsByProjectionPreserveAnchor, finalizeDomainWidthsByProjection, ensureMeasuredForNodes, finalizeSubGroupWidthsByProjectionPreserveAnchor, unifySubGroupWidthsByDomain, finalizeDomainHeightsByProjection, packSubGroupChildrenRigid, clampDomainHeightsToSubGroups, unifySubGroupGapsInDomain, unifySubGroupHeightsByDomain, syncDagreChildPositions, centerSubGroupsInDomain, scaleDomainContentToFitWidthAll } from '../utils/layoutUtils';
 import { centerSubGroupChildrenHorizontally, centerSubGroupChildrenVertically, layoutSubGroupChildrenInRow, alignSubGroupGridRows, alignSubGroupStack } from '../utils/layoutUtils';
 import { ensureDomainContainment } from './shared/geometryGuard';
+import { unifyContainerWidthsByMaximum } from './shared/domainContainerSizeNormalization';
 import { runEdgeRoutingPipeline } from './shared/edgeRoutingPipeline';
 import { collectOrderedDomainSubGroups } from './shared/domainVerticalLayoutPreparation';
 import {
@@ -27,7 +28,6 @@ import {
   projectAndUnifySemanticDomainWidths,
   projectDomainHeightsFromVisibleMembers,
   projectSingleDomainContainer,
-  unifyContainerWidthsByMaximum,
 } from './shared/domainVerticalContainerProjection';
 import { alignDomainVerticalTerminalSubGroupChildren } from './shared/domainVerticalTerminalChildAlignment';
 import { recoverGridSubGroupsByDomainWidth } from './shared/domainVerticalGridSubGroupRecovery';
@@ -744,11 +744,18 @@ export class DomainVerticalLayoutStrategy implements ILayoutStrategy {
       }
     }
 
-    // ===== 边路由管线（已提取至 shared/edgeRoutingPipeline.ts）=====
-    const finalRoutedEdges = await runEdgeRoutingPipeline(updatedNodes, safeEdges, { layoutDirection: 'TB' });
-
     // ===== 最终几何包含保障（已提取至 shared/geometryGuard.ts）=====
     ensureDomainContainment(updatedNodes, 30);
+    // 垂直堆叠的域必须共享最终最大宽度。放在 Dagre 重投影与包含扩展
+    // 之后，保证任何分支都不能覆盖最终的一致性契约。
+    updatedNodes = unifyContainerWidthsByMaximum(
+      updatedNodes,
+      new Set(['titleGroup', 'domain']),
+      titleH + titleV + titleSafe + bottomSafe,
+    );
+
+    // ===== 边路由管线（已提取至 shared/edgeRoutingPipeline.ts）=====
+    const finalRoutedEdges = await runEdgeRoutingPipeline(updatedNodes, safeEdges, { layoutDirection: 'TB' });
     return { nodes: updatedNodes, edges: finalRoutedEdges };
   }
 }

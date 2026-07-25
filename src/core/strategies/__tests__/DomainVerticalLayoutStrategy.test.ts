@@ -41,6 +41,10 @@ const businessNode = (
   },
 });
 
+const dimension = (node: ReactFlowNode, key: 'width' | 'height'): number => Number(
+  node.measured?.[key] ?? node.style?.[key] ?? 0,
+);
+
 describe('DomainVerticalLayoutStrategy', () => {
   beforeEach(() => {
     vi.mocked(runEdgeRoutingPipeline).mockClear();
@@ -96,6 +100,7 @@ describe('DomainVerticalLayoutStrategy', () => {
       'B-domain',
       'A-domain',
     ]);
+    expect(new Set(domains.map(domain => dimension(domain, 'width'))).size).toBe(1);
     expect(domains[1].position.y).toBeGreaterThan(
       domains[0].position.y + Number(domains[0].measured?.height ?? 0),
     );
@@ -128,4 +133,39 @@ describe('DomainVerticalLayoutStrategy', () => {
     },
     15_000,
   );
+
+  it('keeps vertically arranged domains at one final maximum width', async () => {
+    const result = await new DomainVerticalLayoutStrategy().calculateLayout(
+      [
+        businessNode('a', 'domain-a', 'sub-a'),
+        businessNode('b1', 'domain-b', 'sub-b'),
+        businessNode('b2', 'domain-b', 'sub-b'),
+        businessNode('b3', 'domain-b', 'sub-b'),
+      ],
+      [],
+      {
+        type: LayoutType.VERTICAL,
+        nodeLayout: LayoutType.HORIZONTAL,
+        direction: 'TB',
+        generateDomainGroups: true,
+        generateSubDomainGroups: true,
+        domainOrder: ['domain-a', 'domain-b'],
+        subDomainOrder: {
+          'domain-a': ['sub-a'],
+          'domain-b': ['sub-b'],
+        },
+        padding: { top: 80, right: 40, bottom: 40, left: 40 },
+      } as never,
+    );
+    const domains = result.nodes.filter(node => node.type === 'titleGroup');
+    const widths = domains.map(node => dimension(node, 'width'));
+
+    expect(domains).toHaveLength(2);
+    expect(widths[0]).toBeGreaterThan(0);
+    expect(new Set(widths).size).toBe(1);
+    for (const domain of domains) {
+      expect(domain.style?.width).toBe(widths[0]);
+      expect(domain.width).toBe(widths[0]);
+    }
+  }, 15_000);
 });
